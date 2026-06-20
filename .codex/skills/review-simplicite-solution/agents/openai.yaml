@@ -1,0 +1,4 @@
+interface:
+  display_name: "Review Simplicité Solution"
+  short_description: "Réduit complexité accidentelle"
+  default_prompt: "Use $review-simplicite-solution pour revoir ce changement selon cet axe de code review."

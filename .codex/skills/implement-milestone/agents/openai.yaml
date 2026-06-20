@@ -1,0 +1,4 @@
+interface:
+  display_name: "Implement Milestone"
+  short_description: "Implémente un milestone avec PR"
+  default_prompt: "Use $implement-milestone to implémenter ce milestone sur une branche dédiée avec revues et PR."

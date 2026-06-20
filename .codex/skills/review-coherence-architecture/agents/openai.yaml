@@ -1,0 +1,4 @@
+interface:
+  display_name: "Review Cohérence Architecture"
+  short_description: "Protège frontières du système"
+  default_prompt: "Use $review-coherence-architecture pour revoir ce changement selon cet axe de code review."

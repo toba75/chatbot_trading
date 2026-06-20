@@ -1,0 +1,4 @@
+interface:
+  display_name: "Review Gestion Erreurs"
+  short_description: "Contrôle erreurs explicites"
+  default_prompt: "Use $review-gestion-erreurs pour revoir ce changement selon cet axe de code review."

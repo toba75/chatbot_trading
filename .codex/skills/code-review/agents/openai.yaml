@@ -1,0 +1,4 @@
+interface:
+  display_name: "Code Review"
+  short_description: "Orchestre revue multi-axes"
+  default_prompt: "Use $code-review pour lancer une revue de code OSTrading avec sous-agents spécialisés."

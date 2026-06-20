@@ -1,0 +1,4 @@
+interface:
+  display_name: "Review Qualité Tests"
+  short_description: "Évalue robustesse des tests"
+  default_prompt: "Use $review-qualite-tests pour revoir ce changement selon cet axe de code review."

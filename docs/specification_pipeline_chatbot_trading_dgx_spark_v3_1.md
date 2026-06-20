@@ -91,6 +91,10 @@ La première version ne cherche pas à :
 
 # 3. Décisions d’architecture
 
+Les décisions ci-dessous sont matérialisées dans le registre ADR du projet : `docs/adr/`.
+
+Toute nouvelle décision structurante DOIT être ajoutée au registre ADR. Une décision acceptée ne doit pas être modifiée silencieusement pour changer son sens : elle doit être remplacée par une nouvelle ADR explicite.
+
 ## ADR-001 — Artefacts canoniques
 
 Pour chaque document, les artefacts faisant autorité sont :

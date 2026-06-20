@@ -1,0 +1,4 @@
+interface:
+  display_name: "Review Dépendances"
+  short_description: "Justifie supply chain et licences"
+  default_prompt: "Use $review-dependances pour revoir ce changement selon cet axe de code review."

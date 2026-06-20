@@ -1,0 +1,4 @@
+interface:
+  display_name: "Review Concurrence Données"
+  short_description: "Vérifie atomicité et cohérence"
+  default_prompt: "Use $review-concurrence-coherence-donnees pour revoir ce changement selon cet axe de code review."
