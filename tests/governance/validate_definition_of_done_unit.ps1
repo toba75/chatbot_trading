@@ -6,6 +6,7 @@ $temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m000_definiti
 
 $eAcute = [char] 0x00E9
 $eGrave = [char] 0x00E8
+$eCircumflex = [char] 0x00EA
 $aCircumflex = [char] 0x00E2
 $cCedilla = [char] 0x00E7
 $oCircumflex = [char] 0x00F4
@@ -24,35 +25,35 @@ function New-DefinitionDocument {
 
 ## $scenarioHeading
 
-- Given une t$($aCircumflex)che de milestone candidate a la cloture.
+- Given une t$($aCircumflex)che de milestone candidate $($aGrave) la cl$($oCircumflex)ture.
 - When la d$($eAcute)finition d'ach$($eGrave)vement transverse est $($eAcute)valuee.
-- Then les preuves BDD, ATDD, TDD, ADR, tra$($cCedilla)abilit$($eAcute), tests, lint et commits RED/GREEN sont presentes ou la cloture est refusee explicitement.
+- Then les preuves BDD, ATDD, TDD, ADR, tra$($cCedilla)abilit$($eAcute), tests, lint et commits RED/GREEN sont pr$($eAcute)sentes ou la cl$($oCircumflex)ture est refus$($eAcute)e explicitement.
 
 ## $scopeHeading
 
-Cette d$($eAcute)finition s'applique a chaque tache de milestone avant declaration de cloture.
+Cette d$($eAcute)finition s'applique $($aGrave) chaque t$($aCircumflex)che de milestone avant d$($eAcute)claration de cl$($oCircumflex)ture.
 
 ## Gates obligatoires
 
 | Gate | Preuve requise | Refus explicite |
 |---|---|---|
-| BDD | Scenario Given-When-Then versionne. | Refuser la cloture sans scenario. |
-| ATDD | Test d'acceptation automatise cree avant implementation. | Refuser la cloture sans preuve RED. |
-| TDD | Test unitaire de chaque invariant touche. | Refuser la cloture sans preuve de boucle TDD. |
-| Commit RED | Hash du commit RED contenant le scenario et les tests. | Refuser la cloture si le commit RED manque. |
-| Commit GREEN | Hash du commit GREEN contenant l'implementation stricte. | Refuser la cloture si le commit GREEN manque. |
-| ADR | ADR creee, remplacee ou absence d'ADR justifiee. | Refuser la cloture si une decision structurante est implicite. |
-| $traceabilityGate | Ligne de matrice specs-tests-code-ADR mise a jour. | Refuser la cloture si la matrice est incoherente. |
-| Tests | Commandes de tests ciblees puis pertinentes executees. | Refuser la cloture si un test echoue ou est ignore. |
-| Lint | Commandes de lint ou validation statique executees. | Refuser la cloture si un lint configure echoue ou manque sans blocage trace. |
+| BDD | Sc$($eAcute)nario Given-When-Then versionn$($eAcute). | Refuser la cl$($oCircumflex)ture sans sc$($eAcute)nario. |
+| ATDD | Test d'acceptation automatis$($eAcute) cr$($eAcute)$($eAcute) avant impl$($eAcute)mentation. | Refuser la cl$($oCircumflex)ture sans preuve RED. |
+| TDD | Test unitaire de chaque invariant touch$($eAcute). | Refuser la cl$($oCircumflex)ture sans preuve de boucle TDD. |
+| Commit RED | Hash du commit RED contenant le sc$($eAcute)nario et les tests. | Refuser la cl$($oCircumflex)ture si le commit RED manque. |
+| Commit GREEN | Hash du commit GREEN contenant l'impl$($eAcute)mentation stricte. | Refuser la cl$($oCircumflex)ture si le commit GREEN manque. |
+| ADR | ADR cr$($eAcute)$($eAcute)e, remplac$($eAcute)e ou absence d'ADR justifi$($eAcute)e. | Refuser la cl$($oCircumflex)ture si une d$($eAcute)cision structurante est implicite. |
+| $traceabilityGate | Ligne de matrice specs-tests-code-ADR mise $($aGrave) jour. | Refuser la cl$($oCircumflex)ture si la matrice est incoh$($eAcute)rente. |
+| Tests | Commandes de tests cibl$($eAcute)es puis pertinentes ex$($eAcute)cut$($eAcute)es. | Refuser la cl$($oCircumflex)ture si un test $($eAcute)choue ou est ignor$($eAcute). |
+| Lint | Commandes de lint ou validation statique ex$($eAcute)cut$($eAcute)es. | Refuser la cl$($oCircumflex)ture si un lint configur$($eAcute) $($eAcute)choue ou manque sans blocage trac$($eAcute). |
 
 ## $proofHeading
 
-Chaque gate possede une preuve explicite, datable dans Git et reliee a une commande de validation.
+Chaque gate poss$($eGrave)de une preuve explicite, datable dans Git et reli$($eAcute)e $($aGrave) une commande de validation.
 
 ## $adrHeading
 
-Toute decision structurante est documentee dans docs/adr/ ou l'absence d'ADR est justifiee.
+Toute d$($eAcute)cision structurante est document$($eAcute)e dans docs/adr/ ou l'absence d'ADR est justifi$($eAcute)e.
 
 ## $traceabilityHeading
 
@@ -60,11 +61,11 @@ La matrice docs/traceability/matrix.md relie exigence, test, commande, code et A
 
 ## Validation finale
 
-La validation finale execute scripts/test.ps1, scripts/lint.ps1 et les validateurs de gouvernance disponibles.
+La validation finale ex$($eAcute)cute scripts/test.ps1, scripts/lint.ps1 et les validateurs de gouvernance disponibles.
 
 ## $closureHeading
 
-Aucune derogation implicite n'est acceptee; tout ecart devient un blocage documente.
+Aucune d$($eAcute)rogation implicite n'est accept$($eAcute)e; tout $($eAcute)cart devient un blocage document$($eAcute).
 "@
 }
 
@@ -172,7 +173,7 @@ try {
     $missingSectionResult = Invoke-Validator -ProjectRoot $missingSectionProjectRoot
     Assert-ExitCode -Actual $missingSectionResult.ExitCode -Expected 1 -Message "Une section obligatoire absente doit être refusée."
 
-    $emptySectionDocument = $validDocument.Replace("La validation finale execute scripts/test.ps1, scripts/lint.ps1 et les validateurs de gouvernance disponibles.", "")
+    $emptySectionDocument = $validDocument.Replace("La validation finale ex$($eAcute)cute scripts/test.ps1, scripts/lint.ps1 et les validateurs de gouvernance disponibles.", "")
     $emptySectionProjectRoot = New-TemporaryProject -Name "empty-section" -Document $emptySectionDocument
     $emptySectionResult = Invoke-Validator -ProjectRoot $emptySectionProjectRoot
     Assert-ExitCode -Actual $emptySectionResult.ExitCode -Expected 1 -Message "Une section obligatoire vide doit être refusée."
@@ -182,7 +183,8 @@ try {
     $missingGateResult = Invoke-Validator -ProjectRoot $missingGateProjectRoot
     Assert-ExitCode -Actual $missingGateResult.ExitCode -Expected 1 -Message "Une gate obligatoire absente doit être refusée."
 
-    $unknownGateDocument = $validDocument.Replace("| Lint | Commandes de lint ou validation statique executees. | Refuser la cloture si un lint configure echoue ou manque sans blocage trace. |", "| Lint | Commandes de lint ou validation statique executees. | Refuser la cloture si un lint configure echoue ou manque sans blocage trace. |`r`n| Revue manuelle | Validation hors gate automatique. | Refuser selon preference. |")
+    $lintGateRow = "| Lint | Commandes de lint ou validation statique ex$($eAcute)cut$($eAcute)es. | Refuser la cl$($oCircumflex)ture si un lint configur$($eAcute) $($eAcute)choue ou manque sans blocage trac$($eAcute). |"
+    $unknownGateDocument = $validDocument.Replace($lintGateRow, "$lintGateRow`r`n| Revue manuelle | Validation hors gate automatique. | Refuser selon pr$($eAcute)f$($eAcute)rence. |")
     $unknownGateProjectRoot = New-TemporaryProject -Name "unknown-gate" -Document $unknownGateDocument
     $unknownGateResult = Invoke-Validator -ProjectRoot $unknownGateProjectRoot
     Assert-ExitCode -Actual $unknownGateResult.ExitCode -Expected 1 -Message "Une gate non autorisée doit être refusée."

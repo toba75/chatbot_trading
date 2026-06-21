@@ -84,6 +84,15 @@ function Assert-RepositoryRelativeFile {
         -Message "Chemin introuvable dans la matrice ($Context): $RelativePath"
 }
 
+function Convert-ToMatrixRelativePath {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $RelativePath
+    )
+
+    return $RelativePath.TrimStart(".", "/", "\").Replace("\", "/")
+}
+
 function Get-ExistingAdrIds {
     $adrDir = Join-Path $repoRoot "docs/adr"
 
@@ -172,7 +181,7 @@ function Assert-CommandCell {
     }
 
     $scriptPath = $Matches["script"]
-    $scriptPath = $scriptPath.TrimStart(".", "/", "\")
+    $scriptPath = Convert-ToMatrixRelativePath -RelativePath $scriptPath
 
     Assert-RepositoryRelativeFile `
         -RelativePath $scriptPath `
@@ -184,6 +193,42 @@ function Assert-CommandCell {
             -RelativePath $pathArgument `
             -Context "argument -Path ${RequirementId}"
     }
+
+    return $scriptPath
+}
+
+function Assert-M000GateProof {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $CodePath,
+
+        [Parameter(Mandatory = $true)]
+        [string] $TestPath,
+
+        [Parameter(Mandatory = $false)]
+        [AllowNull()]
+        [string] $CommandScriptPath,
+
+        [Parameter(Mandatory = $true)]
+        [string] $RequirementId
+    )
+
+    $normalizedCodePath = Convert-ToMatrixRelativePath -RelativePath $CodePath
+    if ($normalizedCodePath -notin @("scripts/test.ps1", "scripts/lint.ps1")) {
+        return
+    }
+
+    $expectedProofPath = "tests/governance/validate_m000_validation_commands_acceptance.ps1"
+    $normalizedTestPath = Convert-ToMatrixRelativePath -RelativePath $TestPath
+    $normalizedCommandScriptPath = ""
+
+    if ($null -ne $CommandScriptPath) {
+        $normalizedCommandScriptPath = Convert-ToMatrixRelativePath -RelativePath $CommandScriptPath
+    }
+
+    Assert-Condition `
+        -Condition (($normalizedTestPath -eq $expectedProofPath) -and ($normalizedCommandScriptPath -eq $expectedProofPath)) `
+        -Message "Preuve de gate M-000 invalide pour ${RequirementId}: test et commande doivent ex$($eAcute)cuter $expectedProofPath"
 }
 
 if (-not $PSBoundParameters.ContainsKey("Path")) {
@@ -283,7 +328,8 @@ for ($index = $headerIndex + 2; $index -lt $content.Count; $index++) {
     Assert-RepositoryRelativeFile -RelativePath $row["Test"] -Context "test ${requirementId}"
     Assert-RepositoryRelativeFile -RelativePath $row["Code"] -Context "code ${requirementId}"
 
-    Assert-CommandCell -Command $row["Commande"] -Status $status -RequirementId $requirementId
+    $commandScriptPath = Assert-CommandCell -Command $row["Commande"] -Status $status -RequirementId $requirementId
+    Assert-M000GateProof -CodePath $row["Code"] -TestPath $row["Test"] -CommandScriptPath $commandScriptPath -RequirementId $requirementId
     Assert-AdrCell -AdrCell $row["ADR"] -Justification $row["Justification ADR"] -ExistingAdrIds $existingAdrIds -RequirementId $requirementId
 
     $rows.Add([pscustomobject] $row)

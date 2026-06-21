@@ -109,21 +109,38 @@ function Assert-AllowedStatus {
     }
 }
 
+function Assert-AdrDate {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $Date,
+
+        [Parameter(Mandatory = $true)]
+        [string] $Context
+    )
+
+    $parsedDate = [datetime]::MinValue
+    if (-not [datetime]::TryParseExact($Date, "yyyy-MM-dd", [System.Globalization.CultureInfo]::InvariantCulture, [System.Globalization.DateTimeStyles]::None, [ref] $parsedDate)) {
+        throw "Date ADR invalide dans ${Context}: $Date"
+    }
+}
+
 function Get-AdrReferences {
     param(
         [Parameter(Mandatory = $true)]
         [string] $Value
     )
 
-    if ($Value -in @("Aucun", "Aucune")) {
+    $trimmedValue = $Value.Trim()
+    if ($trimmedValue -in @("Aucun", "Aucune")) {
         return @()
     }
 
-    $matches = [regex]::Matches($Value, "(?:DDD-)?ADR-\d{3}")
-    if ($matches.Count -eq 0) {
+    $referenceListPattern = "^(?:DDD-)?ADR-\d{3}(?:\s*[;,]\s*(?:DDD-)?ADR-\d{3})*$"
+    if ($trimmedValue -notmatch $referenceListPattern) {
         throw "R$($eAcute)f$($eAcute)rence ADR invalide: $Value"
     }
 
+    $matches = [regex]::Matches($trimmedValue, "(?:DDD-)?ADR-\d{3}")
     return @($matches | ForEach-Object { $_.Value })
 }
 
@@ -217,16 +234,6 @@ function Get-GitMasterFileContent {
     $ErrorActionPreference = "Continue"
 
     try {
-        & git -C $RepositoryRoot cat-file -e "master:$RelativePath" 2>$null
-        $existsExitCode = $LASTEXITCODE
-
-        if ($existsExitCode -ne 0) {
-            return [pscustomobject] @{
-                Exists = $false
-                Content = ""
-            }
-        }
-
         $output = & git -C $RepositoryRoot show "master:$RelativePath" 2>&1
         $showExitCode = $LASTEXITCODE
     }
@@ -239,9 +246,40 @@ function Get-GitMasterFileContent {
     }
 
     return [pscustomobject] @{
-        Exists = $true
         Content = ($output -join "`n")
     }
+}
+
+function Get-GitMasterAdrPathSet {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $RepositoryRoot
+    )
+
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+
+    try {
+        $output = & git -C $RepositoryRoot ls-tree -r --name-only master -- docs/adr 2>&1
+        $exitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+
+    if ($exitCode -ne 0) {
+        throw "Lecture Git impossible pour la liste ADR de master: $($output -join ' ')"
+    }
+
+    $paths = New-Object System.Collections.Generic.HashSet[string]
+    foreach ($line in $output) {
+        $path = $line.Trim()
+        if ($path -ne "") {
+            [void] $paths.Add($path.Replace("\", "/"))
+        }
+    }
+
+    return $paths
 }
 
 function Assert-GitMasterReference {
@@ -331,6 +369,7 @@ foreach ($adrFile in $adrFiles) {
     $status = Get-RequiredMetadataValue -Content $content -Label "Statut" -FileName $adrFile.Name
     Assert-AllowedStatus -Status $status -Context $adrFile.Name
     $date = Get-RequiredMetadataValue -Content $content -Label "Date" -FileName $adrFile.Name
+    Assert-AdrDate -Date $date -Context $adrFile.Name
 
     $replaces = Get-RequiredMetadataValue -Content $content -Label "Remplace" -FileName $adrFile.Name
     $replacedBy = Get-RequiredMetadataValue -Content $content -Label "Remplac$($eAcute)e par" -FileName $adrFile.Name
@@ -379,6 +418,7 @@ foreach ($row in $indexRows) {
     }
 
     Assert-AllowedStatus -Status $status -Context "index ${fileName}"
+    Assert-AdrDate -Date $date -Context "index ${fileName}"
 
     if ($adrStatusesByFileName[$fileName] -ne $status) {
         throw "Statut incoh$($eAcute)rent entre l'ADR et l'index pour ${fileName}."
@@ -445,17 +485,18 @@ foreach ($id in $adrReplacementById.Keys) {
 }
 
 Assert-GitMasterReference -RepositoryRoot $repoRoot
+$masterAdrPaths = Get-GitMasterAdrPathSet -RepositoryRoot $repoRoot
 
 foreach ($id in $adrById.Keys) {
     $adrFile = $adrById[$id]
 
     $relativePath = "docs/adr/$($adrFile.Name)"
-    $masterFile = Get-GitMasterFileContent -RepositoryRoot $repoRoot -RelativePath $relativePath
 
-    if (-not $masterFile.Exists) {
+    if (-not $masterAdrPaths.Contains($relativePath)) {
         continue
     }
 
+    $masterFile = Get-GitMasterFileContent -RepositoryRoot $repoRoot -RelativePath $relativePath
     $masterContent = $masterFile.Content
     $masterStatusMatch = [regex]::Match($masterContent, "(?m)^\*\*Statut\s*:\*\*\s*(?<status>\S.*)$")
     if ((-not $masterStatusMatch.Success) -or ($masterStatusMatch.Groups["status"].Value.Trim() -ne "Accept$($eAcute)e")) {

@@ -278,7 +278,7 @@ try {
     Initialize-GitBaseline -ProjectRoot $invalidReplacementFormatProjectRoot
     $invalidReplacementFormatResult = Invoke-Validator -ProjectRoot $invalidReplacementFormatProjectRoot
     Assert-ExitCode -Actual $invalidReplacementFormatResult.ExitCode -Expected 1 -Message "Un champ Remplace avec texte libre doit etre refuse."
-    Assert-OutputContains -Output $invalidReplacementFormatResult.Output -Expected "Reference ADR invalide" -Message "Le champ Remplace mal forme doit etre nomme."
+    Assert-OutputContains -Output $invalidReplacementFormatResult.Output -Expected "ADR invalide" -Message "Le champ Remplace mal forme doit etre nomme."
 
     $invalidDateProjectRoot = New-TemporaryProject -Name "invalid-date"
     $adrPath = Join-Path $invalidDateProjectRoot "docs/adr/ADR-001-artefacts-canoniques.md"

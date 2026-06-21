@@ -69,4 +69,4 @@ Les gates DOIVENT contrôler l'identité et l'unicité des chemins attendus, et 
 - Spécification: `docs/specs/plan_implementation_milestones_workstreams.md`, M-000 et règles d'exécution.
 - Plan d'implémentation: M-000, T-006.
 - Tests d'acceptation: `tests/governance/validate_m000_validation_commands_acceptance.ps1`.
-- Commits: `6d71280bbed826fa102330ef369128886b93ca69`, corrections de revue documentées dans `docs/tasks/milestone_000/journal.md`.
+- Commits: implémentation initiale `6d71280bbed826fa102330ef369128886b93ca69`, création ADR `87517ab`, complément identité/unicité `b90e8fb`, corrections de revue documentées dans `docs/tasks/milestone_000/journal.md`.

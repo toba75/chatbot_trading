@@ -152,8 +152,8 @@
 - Statut: GREEN confirmé localement.
 - Commit RED: `765892109763ed8a8a44e4ae44cc6bd05f99d643`
 - Commit GREEN: `6d71280bbed826fa102330ef369128886b93ca69`
-- ADR: non requise.
-- ADR consultées: `docs/adr/index.md`, `docs/adr/ADR-001-artefacts-canoniques.md`, registre ADR complet via `scripts/validate_adr_system.ps1`.
+- ADR: `docs/adr/ADR-010-gates-gouvernance-powershell.md`, créée lors de l'itération 1 de revue pour documenter la politique durable des gates PowerShell.
+- ADR consultées: `docs/adr/index.md`, `docs/adr/ADR-001-artefacts-canoniques.md`, `docs/adr/ADR-010-gates-gouvernance-powershell.md`, registre ADR complet via `scripts/validate_adr_system.ps1`.
 - Fichiers intégrés:
   - `scripts/m000_validation_gate.ps1`
   - `scripts/test.ps1`
@@ -181,6 +181,7 @@
 
 ### Itération 1 - Corrections de revue
 - Statut: corrections appliquées et validations GREEN.
+- Commit de correction: `87517ab`.
 - Findings corrigés:
   - traçabilité hors dépôt via `..` dans `scripts/validate_traceability.ps1`;
   - commande PowerShell de matrice acceptée avec suffixe non validé;
@@ -197,6 +198,7 @@
 
 ### Itération 2 - Corrections de revue
 - Statut: corrections appliquées et validations GREEN.
+- Commit de correction: `b90e8fb`.
 - Findings corrigés:
   - référence Git `master` requise explicitement par le validateur ADR avant de contrôler les ADR acceptées;
   - section `Décision` d'une ADR acceptée dans `master` protégée même si son statut courant change;
@@ -212,3 +214,13 @@
   - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`
   - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`
   - `git diff --check`
+
+### Itération 3 - Corrections de revue
+- Statut: corrections en cours avec boucle RED/GREEN séparée.
+- Commit RED: `2aa1310`.
+- Findings corrigés:
+  - format complet des champs ADR `Remplace` et `Remplacée par` rendu strict;
+  - dates ADR validées au format calendaire `yyyy-MM-dd`;
+  - preuve de traçabilité des gates M-000 alignée sur le test d'acceptation qui exécute réellement `scripts/test.ps1` et `scripts/lint.ps1`;
+  - T-006, la matrice et ADR-010 réalignées sur la décision ADR-010.
+- Commit GREEN: à renseigner après validation.

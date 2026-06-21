@@ -282,7 +282,7 @@ try {
 "@ | Set-Content -Encoding UTF8 -LiteralPath (Join-Path $m000GateProofProjectRoot "docs/traceability/matrix.md")
     $m000GateProofResult = Invoke-Validator -ProjectRoot $m000GateProofProjectRoot
     Assert-ExitCode -Actual $m000GateProofResult.ExitCode -Expected 1 -Message "Une gate M-000 doit etre tracee par le test d'acceptation qui l'execute."
-    Assert-OutputContains -Output $m000GateProofResult.Output -Expected "preuve de gate M-000" -Message "La preuve de gate M-000 incorrecte doit etre nommee."
+    Assert-OutputContains -Output $m000GateProofResult.Output -Expected "Preuve de gate M-000" -Message "La preuve de gate M-000 incorrecte doit etre nommee."
 }
 finally {
     Remove-Item -LiteralPath $temporaryRoot -Recurse -Force

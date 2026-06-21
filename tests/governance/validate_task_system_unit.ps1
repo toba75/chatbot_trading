@@ -4,6 +4,8 @@ $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
 $validatorPath = Join-Path $repoRoot "scripts/validate_task_system.ps1"
 $temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m000_tasks_unit_" + [System.Guid]::NewGuid().ToString("N"))
 $eAcute = [char] 0x00E9
+$eGrave = [char] 0x00E8
+$eCircumflex = [char] 0x00EA
 $aGrave = [char] 0x00E0
 $aCircumflex = [char] 0x00E2
 
@@ -25,28 +27,28 @@ function New-TaskContent {
 - Objectif métier: rendre une tâche contrôlable automatiquement.
 
 ## Contexte DDD
-- Domaine: gouvernance d'implementation.
+- Domaine: gouvernance d'impl$($eAcute)mentation.
 - Bounded context: transverse.
-- Objectif m$($eAcute)tier: empecher une tache non verifiable.
-- Langage ubiquitaire: milestone, tache verticale, scenario BDD, test RED, commit RED, commit GREEN, commande de validation.
-- Invariants critiques: une tache possede un scenario et des validations.
+- Objectif m$($eAcute)tier: emp$($eCircumflex)cher une t$($aCircumflex)che non v$($eAcute)rifiable.
+- Langage ubiquitaire: milestone, t$($aCircumflex)che verticale, sc$($eAcute)nario BDD, test RED, commit RED, commit GREEN, commande de validation.
+- Invariants critiques: une t$($aCircumflex)che poss$($eGrave)de un sc$($eAcute)nario et des validations.
 - Garde-fous: aucune correction silencieuse.
 
 ## Blocages Ou Pr$($eAcute)conditions
 - État GREEN/RED connu: connu.
-- Presence des milestones amont dans master: M-000 n'a aucune dependance amont.
-- Decisions manquantes: aucune.
-- Risques: tache non observable.
+- Pr$($eAcute)sence des milestones amont dans master: M-000 n'a aucune d$($eAcute)pendance amont.
+- D$($eAcute)cisions manquantes: aucune.
+- Risques: t$($aCircumflex)che non observable.
 
 ## T$($aCircumflex)ches
 ### $TaskId - $Title
-- But m$($eAcute)tier: controler une tache verticale.
+- But m$($eAcute)tier: contr$([char] 0x00F4)ler une t$($aCircumflex)che verticale.
 - Port$($eAcute)e DDD: gouvernance transverse.
 - Sc$($eAcute)nario BDD:
-  - Given un milestone pret.
-  - When une tache est creee.
-  - Then la convention est controlable automatiquement.
-- Tests d'acceptation $($aGrave) $($eAcute)crire: un test automatise RED.
+  - Given un milestone pr$($eCircumflex)t.
+  - When une t$($aCircumflex)che est cr$($eAcute)$($eAcute)e.
+  - Then la convention est contr$([char] 0x00F4)lable automatiquement.
+- Tests d'acceptation $($aGrave) $($eAcute)crire: un test automatis$($eAcute) RED.
 - Tests unitaires $($aGrave) $($eAcute)crire: tests des invariants de structure.
 - Impl$($eAcute)mentation attendue: un validateur strict.
 - Invariants et garde-fous: pas de fallback silencieux.
@@ -83,10 +85,10 @@ function New-TemporaryProject {
 - La tâche déclare `Commit RED`, `Commit GREEN` et `Commandes de validation`.
 "@ | Set-Content -Encoding UTF8 -LiteralPath (Join-Path $tasksDir "README.md")
 
-    New-TaskContent -TaskId "T-001" -Title "Verifier la precondition GREEN de gouvernance initiale" |
+    New-TaskContent -TaskId "T-001" -Title "V$($eAcute)rifier la pr$($eAcute)condition GREEN de gouvernance initiale" |
         Set-Content -Encoding UTF8 -LiteralPath (Join-Path $milestoneDir "0001_verifier_precondition_green.md")
 
-    New-TaskContent -TaskId "T-002" -Title "Controler la tache suivante" |
+    New-TaskContent -TaskId "T-002" -Title "Contr$([char] 0x00F4)ler la t$($aCircumflex)che suivante" |
         Set-Content -Encoding UTF8 -LiteralPath (Join-Path $milestoneDir "0002_controler_tache_suivante.md")
 
     "# Journal M-000`n" | Set-Content -Encoding UTF8 -LiteralPath (Join-Path $milestoneDir "journal.md")
@@ -172,7 +174,7 @@ try {
 
     $missingGivenProjectRoot = New-TemporaryProject -Name "missing-given"
     $taskPath = Join-Path $missingGivenProjectRoot "docs/tasks/milestone_000/0002_controler_tache_suivante.md"
-    (Get-Content -Raw -Encoding UTF8 -LiteralPath $taskPath).Replace("  - Given un milestone pret.", "  - Sachant un milestone pret.") |
+    (Get-Content -Raw -Encoding UTF8 -LiteralPath $taskPath).Replace("  - Given un milestone pr$($eCircumflex)t.", "  - Sachant un milestone pr$($eCircumflex)t.") |
         Set-Content -Encoding UTF8 -LiteralPath $taskPath
     $missingGivenResult = Invoke-Validator -ProjectRoot $missingGivenProjectRoot
     Assert-ExitCode -Actual $missingGivenResult.ExitCode -Expected 1 -Message "Un scénario sans Given doit être refusé."

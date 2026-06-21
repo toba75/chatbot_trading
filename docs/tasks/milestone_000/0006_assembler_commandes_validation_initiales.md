@@ -16,7 +16,7 @@
 ## Blocages Ou Préconditions
 - État GREEN/RED connu: au début de M-000, les commandes `scripts/test.ps1` et `scripts/lint.ps1` sont absentes; `scripts/validate_adr_system.ps1` est la seule validation existante.
 - Présence des milestones amont dans master: M-000 n'a aucune dépendance amont.
-- Décisions manquantes: aucune ADR requise si les commandes ne choisissent pas une architecture applicative durable au-delà de la gouvernance M-000.
+- Décisions manquantes: ADR-010 documente la décision durable de gates PowerShell; aucune autre décision structurante n'est manquante.
 - Risques: faire réussir une commande parce que le dépôt n'a pas encore de code applicatif; oublier d'ajouter les validations ADR, tâches, traçabilité et définition de terminé.
 
 ## Tâches
