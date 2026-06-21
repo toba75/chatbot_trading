@@ -143,6 +143,7 @@ Invoke-M000ValidationGate -GateName "test" -RepositoryRoot $repoRoot -Validation
     $missingProjectRoot = New-TemporaryProject -Name "missing" -WrapperContent $missingWrapper
     $missingResult = Invoke-TestGate -ProjectRoot $missingProjectRoot
     Assert-ExitCode -Actual $missingResult.ExitCode -Expected 1 -Message "Une validation absente doit échouer."
+    Assert-OutputContains -Output $missingResult.Output -Expected "Gate test RED" -Message "La gate doit annoncer son état RED."
     Assert-OutputContains -Output $missingResult.Output -Expected "Validation requise absente: scripts/missing_validation.ps1" -Message "La validation absente doit être ciblée."
 
     $failingWrapper = @'
@@ -160,6 +161,7 @@ Invoke-M000ValidationGate -GateName "test" -RepositoryRoot $repoRoot -Validation
     $failingProjectRoot = New-TemporaryProject -Name "failing" -WrapperContent $failingWrapper
     $failingResult = Invoke-TestGate -ProjectRoot $failingProjectRoot
     Assert-ExitCode -Actual $failingResult.ExitCode -Expected 1 -Message "Une validation échouée doit échouer."
+    Assert-OutputContains -Output $failingResult.Output -Expected "Gate test RED" -Message "La gate doit annoncer son état RED."
     Assert-OutputContains `
         -Output $failingResult.Output `
         -Expected "Validation $($eAcute)chou$($eAcute)e: scripts/failing_validation.ps1" `
@@ -178,6 +180,7 @@ Invoke-M000ValidationGate -GateName "test" -RepositoryRoot $repoRoot -Validation
     $emptyProjectRoot = New-TemporaryProject -Name "empty" -WrapperContent $emptyWrapper
     $emptyResult = Invoke-TestGate -ProjectRoot $emptyProjectRoot
     Assert-ExitCode -Actual $emptyResult.ExitCode -Expected 1 -Message "Une gate sans commande requise doit échouer."
+    Assert-OutputContains -Output $emptyResult.Output -Expected "Gate test RED" -Message "La gate vide doit annoncer son état RED."
     Assert-OutputContains -Output $emptyResult.Output -Expected "Gate test sans commande requise." -Message "La gate vide doit être refusée explicitement."
 
     $duplicateWrapper = @'
@@ -196,6 +199,7 @@ Invoke-M000ValidationGate -GateName "test" -RepositoryRoot $repoRoot -Validation
     $duplicateProjectRoot = New-TemporaryProject -Name "duplicate" -WrapperContent $duplicateWrapper
     $duplicateResult = Invoke-TestGate -ProjectRoot $duplicateProjectRoot
     Assert-ExitCode -Actual $duplicateResult.ExitCode -Expected 1 -Message "Une gate avec doublon à comptage correct doit échouer."
+    Assert-OutputContains -Output $duplicateResult.Output -Expected "Gate test RED" -Message "La gate avec doublon doit annoncer son état RED."
     Assert-OutputContains -Output $duplicateResult.Output -Expected "Validation dupliqué" -Message "La gate doit nommer le doublon de validation."
 }
 finally {
