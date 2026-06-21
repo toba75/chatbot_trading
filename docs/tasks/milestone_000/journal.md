@@ -110,3 +110,39 @@
   - `git diff --check`
 - Résultat du validateur réel: 8 exigences de traçabilité contrôlées.
 - Risque résiduel: les exigences T-005 et T-006 restent explicitement `Planifié` dans la matrice; `scripts/test.ps1` et `scripts/lint.ps1` restent absents jusqu'à T-006.
+
+### T-005 - Définir l'achèvement transverse vérifiable
+- Sous-agent: `Codex`.
+- Statut: GREEN confirmé localement.
+- Commit RED: `6aa3ee3c2ec5c870161ce202530f18e2b74e5b1f`
+- Commit GREEN: `fba6395c7adcb936f1e53048dcfb07d746f4cb3c`
+- ADR: non requise.
+- ADR consultées: `docs/adr/index.md`, `docs/adr/ADR-001-artefacts-canoniques.md`, registre ADR complet via `scripts/validate_adr_system.ps1`, sections 20 et 21 de `docs/specs/specification_unifiee_ddd_technique_chatbot_trading_v4_1.md`, M-000 et gates transverses de `docs/specs/plan_implementation_milestones_workstreams.md`.
+- Fichiers intégrés:
+  - `docs/governance/definition_of_done.md`
+  - `scripts/validate_definition_of_done.ps1`
+  - `tests/governance/validate_definition_of_done_acceptance.ps1`
+  - `tests/governance/validate_definition_of_done_unit.ps1`
+  - `docs/traceability/matrix.md`
+- RED observé:
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\governance\validate_definition_of_done_acceptance.ps1` a échoué car `scripts/validate_definition_of_done.ps1` était absent.
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\governance\validate_definition_of_done_unit.ps1` a échoué car `scripts/validate_definition_of_done.ps1` était absent.
+- Validations rejouées localement:
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\governance\validate_definition_of_done_acceptance.ps1`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\governance\validate_definition_of_done_unit.ps1`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_definition_of_done.ps1`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_traceability.ps1`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\governance\validate_traceability_acceptance.ps1`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\governance\validate_traceability_unit.ps1`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_task_system.ps1`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\governance\validate_task_system_acceptance.ps1`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\governance\validate_task_system_unit.ps1`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_adr_system.ps1`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\governance\validate_adr_system_acceptance.ps1`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\governance\validate_adr_system_unit.ps1`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m000_precondition_report.ps1 -Path .\docs\governance\m000_precondition_green_initiale.md`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\governance\validate_m000_precondition_report_acceptance.ps1`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\governance\validate_m000_precondition_report_unit.ps1`
+  - `git diff --check`
+- Résultat du validateur réel: définition d'achèvement valide avec 9 gates contrôlées; matrice de traçabilité valide avec 9 exigences contrôlées.
+- Risque résiduel: `scripts/test.ps1` et `scripts/lint.ps1` restent absents jusqu'à T-006; T-005 les mentionne comme gates attendues sans les déclarer GREEN silencieusement.
