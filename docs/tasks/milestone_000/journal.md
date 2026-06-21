@@ -223,4 +223,4 @@
   - dates ADR validées au format calendaire `yyyy-MM-dd`;
   - preuve de traçabilité des gates M-000 alignée sur le test d'acceptation qui exécute réellement `scripts/test.ps1` et `scripts/lint.ps1`;
   - T-006, la matrice et ADR-010 réalignées sur la décision ADR-010.
-- Commit GREEN: à renseigner après validation.
+- Commit GREEN: `aaf4800`.
