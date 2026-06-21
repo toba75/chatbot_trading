@@ -41,3 +41,11 @@
 ## Conclusion
 
 La précondition M-000 est connue: le registre ADR est GREEN, les commandes génériques de test et de lint sont explicitement RED car absentes, et l'état des tâches M-000 dans `master` est explicitement RED. Aucun état inconnu n'est assimilé à GREEN.
+
+## Actualisation T-006
+
+Les tableaux précédents conservent l'état historique observé au démarrage de M-000.
+
+Depuis T-006 sur la branche `feature/milestone-m000-gouvernance-executable`, `scripts/test.ps1` et `scripts/lint.ps1` existent et sont décrits dans `docs/governance/m000_validation_commands.md`.
+
+Cette actualisation ne transforme pas le RED initial en GREEN rétroactif: elle indique seulement que la création des commandes est livrée par T-006 et couverte par `docs/traceability/matrix.md`.
