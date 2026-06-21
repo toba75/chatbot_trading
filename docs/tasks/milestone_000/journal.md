@@ -146,3 +146,33 @@
   - `git diff --check`
 - Résultat du validateur réel: définition d'achèvement valide avec 9 gates contrôlées; matrice de traçabilité valide avec 9 exigences contrôlées.
 - Risque résiduel: `scripts/test.ps1` et `scripts/lint.ps1` restent absents jusqu'à T-006; T-005 les mentionne comme gates attendues sans les déclarer GREEN silencieusement.
+
+### T-006 - Assembler les commandes de validation initiales
+- Sous-agent: `Codex`.
+- Statut: GREEN confirmé localement.
+- Commit RED: `765892109763ed8a8a44e4ae44cc6bd05f99d643`
+- Commit GREEN: `6d71280bbed826fa102330ef369128886b93ca69`
+- ADR: non requise.
+- ADR consultées: `docs/adr/index.md`, `docs/adr/ADR-001-artefacts-canoniques.md`, registre ADR complet via `scripts/validate_adr_system.ps1`.
+- Fichiers intégrés:
+  - `scripts/m000_validation_gate.ps1`
+  - `scripts/test.ps1`
+  - `scripts/lint.ps1`
+  - `docs/governance/m000_validation_commands.md`
+  - `docs/governance/m000_precondition_green_initiale.md`
+  - `docs/traceability/matrix.md`
+  - `tests/governance/validate_m000_validation_commands_acceptance.ps1`
+  - `tests/governance/validate_m000_validation_commands_unit.ps1`
+- RED observé:
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\governance\validate_m000_validation_commands_acceptance.ps1` a échoué car `scripts/test.ps1` était absent.
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\governance\validate_m000_validation_commands_unit.ps1` a échoué car `scripts/m000_validation_gate.ps1` était absent.
+- Validations rejouées localement:
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\governance\validate_m000_validation_commands_acceptance.ps1`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\governance\validate_m000_validation_commands_unit.ps1`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`
+  - `git diff --check`
+- Résultat des gates globales:
+  - `scripts/test.ps1`: 5 validations et 10 tests contrôlés.
+  - `scripts/lint.ps1`: 5 validations contrôlées.
+- Risque résiduel: M-000 ne livre toujours pas de suite applicative métier; cette absence reste déclarée `Hors périmètre M-000` dans `docs/traceability/matrix.md`. Les auto-tests T-006 sont exécutés explicitement pour éviter une récursion de `scripts/test.ps1` sur lui-même.
