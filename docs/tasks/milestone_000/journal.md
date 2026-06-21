@@ -226,11 +226,11 @@
 - Commit GREEN: `aaf4800`.
 
 ### Itération 4 - Corrections de revue
-- Statut: corrections en cours avec boucle RED/GREEN séparée.
+- Statut: corrections appliquées et validations GREEN.
 - Commit RED: `9a44fa5`.
 - Findings corrigés:
   - sortie RED stable des gates M-000;
   - self-test unitaire T-006 inclus dans `scripts/test.ps1` sans récursion;
   - prérequis Git `master` documenté pour les gates standards;
   - sorties console PowerShell stabilisées en français accentué.
-- Commit GREEN: à renseigner après validation.
+- Commit GREEN: `b329a3c`.
