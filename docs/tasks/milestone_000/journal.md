@@ -78,3 +78,35 @@
   - `git diff --check`
 - Résultat du validateur réel: 1 milestone et 6 tâches contrôlées.
 - Risque résiduel: `scripts/test.ps1` et `scripts/lint.ps1` restent absents jusqu'à T-006; T-003 publie leur future intégration mais ne crée pas ces commandes.
+
+### T-004 - Publier la matrice de traçabilité initiale
+- Sous-agent: `Codex`.
+- Statut: GREEN confirmé localement.
+- Commit RED: `cc593741a0ffa78fdb85681b19d449d181c9c011`
+- Commit GREEN: `2402d0e8ccbe77600217b7ff98870de8c1d31cb4`
+- ADR: non requise.
+- ADR consultées: `docs/adr/index.md`, `docs/adr/ADR-001-artefacts-canoniques.md`, registre ADR complet via `scripts/validate_adr_system.ps1`, section 21 de `docs/specs/specification_unifiee_ddd_technique_chatbot_trading_v4_1.md`, M-000 de `docs/specs/plan_implementation_milestones_workstreams.md`.
+- Fichiers intégrés:
+  - `docs/traceability/matrix.md`
+  - `scripts/validate_traceability.ps1`
+  - `tests/governance/validate_traceability_acceptance.ps1`
+  - `tests/governance/validate_traceability_unit.ps1`
+- RED observé:
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\governance\validate_traceability_acceptance.ps1` a échoué car `scripts/validate_traceability.ps1` était absent.
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\governance\validate_traceability_unit.ps1` a échoué car `scripts/validate_traceability.ps1` était absent.
+- Validations rejouées localement:
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\governance\validate_traceability_acceptance.ps1`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\governance\validate_traceability_unit.ps1`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_traceability.ps1`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\governance\validate_m000_precondition_report_acceptance.ps1`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\governance\validate_m000_precondition_report_unit.ps1`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m000_precondition_report.ps1 -Path .\docs\governance\m000_precondition_green_initiale.md`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\governance\validate_adr_system_acceptance.ps1`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\governance\validate_adr_system_unit.ps1`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_adr_system.ps1`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\governance\validate_task_system_acceptance.ps1`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\governance\validate_task_system_unit.ps1`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_task_system.ps1`
+  - `git diff --check`
+- Résultat du validateur réel: 8 exigences de traçabilité contrôlées.
+- Risque résiduel: les exigences T-005 et T-006 restent explicitement `Planifié` dans la matrice; `scripts/test.ps1` et `scripts/lint.ps1` restent absents jusqu'à T-006.
