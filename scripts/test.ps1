@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $gatePath = Join-Path $PSScriptRoot "m000_validation_gate.ps1"
@@ -19,7 +19,7 @@ $validationCommands = @(
     @{ Path = "scripts/validate_definition_of_done.ps1"; Arguments = @() }
 )
 
-# Les auto-tests de cette gate sont exécutés explicitement pendant T-006 pour éviter une récursion.
+# Le self-test d'acceptation T-006 reste exécuté explicitement hors gate pour éviter une récursion.
 $testCommands = @(
     @{ Path = "tests/governance/validate_m000_precondition_report_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/governance/validate_m000_precondition_report_unit.ps1"; Arguments = @() },
@@ -30,7 +30,8 @@ $testCommands = @(
     @{ Path = "tests/governance/validate_traceability_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/governance/validate_traceability_unit.ps1"; Arguments = @() },
     @{ Path = "tests/governance/validate_definition_of_done_acceptance.ps1"; Arguments = @() },
-    @{ Path = "tests/governance/validate_definition_of_done_unit.ps1"; Arguments = @() }
+    @{ Path = "tests/governance/validate_definition_of_done_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/governance/validate_m000_validation_commands_unit.ps1"; Arguments = @() }
 )
 
 $expectedValidationPaths = @(
@@ -51,7 +52,8 @@ $expectedTestPaths = @(
     "tests/governance/validate_traceability_acceptance.ps1",
     "tests/governance/validate_traceability_unit.ps1",
     "tests/governance/validate_definition_of_done_acceptance.ps1",
-    "tests/governance/validate_definition_of_done_unit.ps1"
+    "tests/governance/validate_definition_of_done_unit.ps1",
+    "tests/governance/validate_m000_validation_commands_unit.ps1"
 )
 
 Invoke-M000ValidationGate `
@@ -60,6 +62,6 @@ Invoke-M000ValidationGate `
     -ValidationCommands $validationCommands `
     -TestCommands $testCommands `
     -ExpectedValidationCount 5 `
-    -ExpectedTestCount 10 `
+    -ExpectedTestCount 11 `
     -ExpectedValidationPaths $expectedValidationPaths `
     -ExpectedTestPaths $expectedTestPaths

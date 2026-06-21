@@ -173,7 +173,7 @@
   - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`
   - `git diff --check`
 - Résultat des gates globales:
-  - `scripts/test.ps1`: 5 validations et 10 tests contrôlés.
+  - `scripts/test.ps1`: 5 validations et 11 tests contrôlés.
   - `scripts/lint.ps1`: 5 validations contrôlées.
 - Risque résiduel: M-000 ne livre toujours pas de suite applicative métier; cette absence reste déclarée `Hors périmètre M-000` dans `docs/traceability/matrix.md`. Les auto-tests T-006 sont exécutés explicitement pour éviter une récursion de `scripts/test.ps1` sur lui-même.
 
@@ -216,7 +216,7 @@
   - `git diff --check`
 
 ### Itération 3 - Corrections de revue
-- Statut: corrections en cours avec boucle RED/GREEN séparée.
+- Statut: corrections appliquées et validations GREEN.
 - Commit RED: `2aa1310`.
 - Findings corrigés:
   - format complet des champs ADR `Remplace` et `Remplacée par` rendu strict;
@@ -224,3 +224,13 @@
   - preuve de traçabilité des gates M-000 alignée sur le test d'acceptation qui exécute réellement `scripts/test.ps1` et `scripts/lint.ps1`;
   - T-006, la matrice et ADR-010 réalignées sur la décision ADR-010.
 - Commit GREEN: `aaf4800`.
+
+### Itération 4 - Corrections de revue
+- Statut: corrections en cours avec boucle RED/GREEN séparée.
+- Commit RED: `9a44fa5`.
+- Findings corrigés:
+  - sortie RED stable des gates M-000;
+  - self-test unitaire T-006 inclus dans `scripts/test.ps1` sans récursion;
+  - prérequis Git `master` documenté pour les gates standards;
+  - sorties console PowerShell stabilisées en français accentué.
+- Commit GREEN: à renseigner après validation.

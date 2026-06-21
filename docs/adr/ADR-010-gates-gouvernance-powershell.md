@@ -22,7 +22,9 @@ Le dépôt DOIT exposer deux gates PowerShell canoniques:
 
 Ces gates DOIVENT exécuter les validateurs M-000 requis via `scripts/m000_validation_gate.ps1`.
 
-`scripts/test.ps1` DOIT exécuter les validateurs de gouvernance puis les tests d'acceptation et unitaires de gouvernance déjà livrés par M-000.
+`scripts/test.ps1` DOIT exécuter les validateurs de gouvernance, les tests d'acceptation et unitaires de gouvernance livrés par T-001 à T-005, ainsi que le self-test unitaire non récursif T-006.
+
+Le self-test d'acceptation T-006 DOIT rester exécuté explicitement hors `scripts/test.ps1` pour éviter une récursion.
 
 `scripts/lint.ps1` DOIT exécuter les validateurs de gouvernance sans lancer les tests.
 
@@ -55,7 +57,7 @@ Les gates DOIVENT contrôler l'identité et l'unicité des chemins attendus, et 
 
 - Risque: gate amputée qui reste GREEN. Contrôle: comptage attendu, identité et unicité des validations et tests.
 - Risque: preuve hors dépôt ou commande suffixée. Contrôle: validation stricte des chemins et commandes dans la matrice de traçabilité.
-- Risque: récursion des auto-tests de la gate. Contrôle: les tests T-006 restent exécutés explicitement hors `scripts/test.ps1`.
+- Risque: récursion des auto-tests de la gate. Contrôle: le self-test d'acceptation T-006 reste exécuté explicitement hors `scripts/test.ps1`, tandis que le self-test unitaire T-006 est inclus dans la gate canonique.
 
 ## Impact d'implémentation
 

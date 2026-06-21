@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 
 $eAcute = [char] 0x00E9
 
@@ -239,44 +239,50 @@ function Invoke-M000ValidationGate {
         [string[]] $ExpectedTestPaths
     )
 
-    if (-not (Test-Path -LiteralPath $RepositoryRoot -PathType Container)) {
-        throw "Racine de dépôt introuvable pour la gate ${GateName}: $RepositoryRoot"
+    try {
+        if (-not (Test-Path -LiteralPath $RepositoryRoot -PathType Container)) {
+            throw "Racine de dépôt introuvable pour la gate ${GateName}: $RepositoryRoot"
+        }
+
+        $resolvedRepositoryRoot = (Resolve-Path -LiteralPath $RepositoryRoot).Path
+        $validationCommandList = @($ValidationCommands)
+        $testCommandList = @($TestCommands)
+        $commandCount = $validationCommandList.Count + $testCommandList.Count
+
+        if ($validationCommandList.Count -ne $ExpectedValidationCount) {
+            throw "Gate $GateName attend $ExpectedValidationCount validation(s), mais $($validationCommandList.Count) sont déclarée(s)."
+        }
+
+        if ($testCommandList.Count -ne $ExpectedTestCount) {
+            throw "Gate $GateName attend $ExpectedTestCount test(s), mais $($testCommandList.Count) sont déclaré(s)."
+        }
+
+        if ($commandCount -eq 0) {
+            throw "Gate $GateName sans commande requise."
+        }
+
+        $actualValidationPaths = @($validationCommandList | ForEach-Object {
+            (Get-M000CommandDescriptor -Command $_ -Kind "Validation" -RepositoryRoot $resolvedRepositoryRoot).DisplayPath
+        })
+        $actualTestPaths = @($testCommandList | ForEach-Object {
+            (Get-M000CommandDescriptor -Command $_ -Kind "Test" -RepositoryRoot $resolvedRepositoryRoot).DisplayPath
+        })
+
+        Assert-M000ExpectedPathSet -ActualPaths $actualValidationPaths -ExpectedPaths $ExpectedValidationPaths -Kind "Validation" -GateName $GateName
+        Assert-M000ExpectedPathSet -ActualPaths $actualTestPaths -ExpectedPaths $ExpectedTestPaths -Kind "Test" -GateName $GateName
+
+        foreach ($command in $validationCommandList) {
+            Invoke-M000RequiredCommand -RepositoryRoot $resolvedRepositoryRoot -Command $command -Kind "Validation"
+        }
+
+        foreach ($command in $testCommandList) {
+            Invoke-M000RequiredCommand -RepositoryRoot $resolvedRepositoryRoot -Command $command -Kind "Test"
+        }
+
+        Write-Host "Gate $GateName GREEN: $($validationCommandList.Count) validation(s), $($testCommandList.Count) test(s)."
     }
-
-    $resolvedRepositoryRoot = (Resolve-Path -LiteralPath $RepositoryRoot).Path
-    $validationCommandList = @($ValidationCommands)
-    $testCommandList = @($TestCommands)
-    $commandCount = $validationCommandList.Count + $testCommandList.Count
-
-    if ($validationCommandList.Count -ne $ExpectedValidationCount) {
-        throw "Gate $GateName attend $ExpectedValidationCount validation(s), mais $($validationCommandList.Count) sont déclarée(s)."
+    catch {
+        Write-Host "Gate $GateName RED: $($_.Exception.Message)"
+        throw
     }
-
-    if ($testCommandList.Count -ne $ExpectedTestCount) {
-        throw "Gate $GateName attend $ExpectedTestCount test(s), mais $($testCommandList.Count) sont déclaré(s)."
-    }
-
-    if ($commandCount -eq 0) {
-        throw "Gate $GateName sans commande requise."
-    }
-
-    $actualValidationPaths = @($validationCommandList | ForEach-Object {
-        (Get-M000CommandDescriptor -Command $_ -Kind "Validation" -RepositoryRoot $resolvedRepositoryRoot).DisplayPath
-    })
-    $actualTestPaths = @($testCommandList | ForEach-Object {
-        (Get-M000CommandDescriptor -Command $_ -Kind "Test" -RepositoryRoot $resolvedRepositoryRoot).DisplayPath
-    })
-
-    Assert-M000ExpectedPathSet -ActualPaths $actualValidationPaths -ExpectedPaths $ExpectedValidationPaths -Kind "Validation" -GateName $GateName
-    Assert-M000ExpectedPathSet -ActualPaths $actualTestPaths -ExpectedPaths $ExpectedTestPaths -Kind "Test" -GateName $GateName
-
-    foreach ($command in $validationCommandList) {
-        Invoke-M000RequiredCommand -RepositoryRoot $resolvedRepositoryRoot -Command $command -Kind "Validation"
-    }
-
-    foreach ($command in $testCommandList) {
-        Invoke-M000RequiredCommand -RepositoryRoot $resolvedRepositoryRoot -Command $command -Kind "Test"
-    }
-
-    Write-Host "Gate $GateName GREEN: $($validationCommandList.Count) validation(s), $($testCommandList.Count) test(s)."
 }
