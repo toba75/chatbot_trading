@@ -1,0 +1,215 @@
+$ErrorActionPreference = "Stop"
+
+$repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
+$testCommandPath = Join-Path $repoRoot "scripts/test.ps1"
+$lintCommandPath = Join-Path $repoRoot "scripts/lint.ps1"
+$temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m000_validation_commands_acceptance_" + [System.Guid]::NewGuid().ToString("N"))
+$eAcute = [char] 0x00E9
+
+function Split-MarkdownRow {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $Line
+    )
+
+    return @($Line.Trim().Trim("|").Split("|") | ForEach-Object { $_.Trim() })
+}
+
+function Join-MarkdownRow {
+    param(
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [AllowEmptyString()]
+        [string[]] $Cells
+    )
+
+    return "| " + ($Cells -join " | ") + " |"
+}
+
+function Set-MatrixCell {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $Path,
+
+        [Parameter(Mandatory = $true)]
+        [string] $RequirementId,
+
+        [Parameter(Mandatory = $true)]
+        [string] $ColumnName,
+
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyString()]
+        [string] $Value
+    )
+
+    $lines = [System.Collections.Generic.List[string]] (Get-Content -Encoding UTF8 -LiteralPath $Path)
+    $headerIndex = -1
+
+    for ($index = 0; $index -lt $lines.Count; $index++) {
+        if ($lines[$index] -match "^\|\s*Exigence\s*\|") {
+            $headerIndex = $index
+            break
+        }
+    }
+
+    if ($headerIndex -lt 0) {
+        throw "En-tête de matrice introuvable."
+    }
+
+    $headers = Split-MarkdownRow -Line $lines[$headerIndex]
+    $columnIndex = [array]::IndexOf($headers, $ColumnName)
+
+    if ($columnIndex -lt 0) {
+        throw "Colonne introuvable dans la matrice: $ColumnName"
+    }
+
+    for ($index = $headerIndex + 1; $index -lt $lines.Count; $index++) {
+        if ($lines[$index] -notmatch "^\|") {
+            continue
+        }
+
+        $cells = Split-MarkdownRow -Line $lines[$index]
+        if (($cells.Count -gt 0) -and ($cells[0] -eq $RequirementId)) {
+            $cells[$columnIndex] = $Value
+            $lines[$index] = Join-MarkdownRow -Cells $cells
+            Set-Content -Encoding UTF8 -LiteralPath $Path -Value $lines
+            return
+        }
+    }
+
+    throw "Exigence introuvable dans la matrice: $RequirementId"
+}
+
+function New-TemporaryProject {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $Name
+    )
+
+    $projectRoot = Join-Path $temporaryRoot $Name
+    New-Item -ItemType Directory -Path $projectRoot -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $projectRoot "docs") -Force | Out-Null
+
+    Copy-Item -LiteralPath (Join-Path $repoRoot "scripts") -Destination (Join-Path $projectRoot "scripts") -Recurse
+    Copy-Item -LiteralPath (Join-Path $repoRoot "tests") -Destination (Join-Path $projectRoot "tests") -Recurse
+    Copy-Item -LiteralPath (Join-Path $repoRoot "docs/adr") -Destination (Join-Path $projectRoot "docs/adr") -Recurse
+    Copy-Item -LiteralPath (Join-Path $repoRoot "docs/governance") -Destination (Join-Path $projectRoot "docs/governance") -Recurse
+    Copy-Item -LiteralPath (Join-Path $repoRoot "docs/specs") -Destination (Join-Path $projectRoot "docs/specs") -Recurse
+    Copy-Item -LiteralPath (Join-Path $repoRoot "docs/tasks") -Destination (Join-Path $projectRoot "docs/tasks") -Recurse
+    Copy-Item -LiteralPath (Join-Path $repoRoot "docs/traceability") -Destination (Join-Path $projectRoot "docs/traceability") -Recurse
+
+    return $projectRoot
+}
+
+function Invoke-ProjectCommand {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $ProjectRoot,
+
+        [Parameter(Mandatory = $true)]
+        [string] $RelativePath
+    )
+
+    $scriptPath = Join-Path $ProjectRoot $RelativePath
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    Push-Location -LiteralPath $ProjectRoot
+
+    try {
+        $output = & powershell -NoProfile -ExecutionPolicy Bypass -File $scriptPath 2>&1
+    }
+    finally {
+        Pop-Location
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+
+    return [pscustomobject] @{
+        ExitCode = $LASTEXITCODE
+        Output = ($output -join "`n")
+    }
+}
+
+function Assert-ExitCode {
+    param(
+        [Parameter(Mandatory = $true)]
+        [int] $Actual,
+
+        [Parameter(Mandatory = $true)]
+        [int] $Expected,
+
+        [Parameter(Mandatory = $true)]
+        [string] $Message
+    )
+
+    if ($Actual -ne $Expected) {
+        throw "$Message Code obtenu: $Actual"
+    }
+}
+
+function Assert-OutputContains {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $Output,
+
+        [Parameter(Mandatory = $true)]
+        [string] $Expected,
+
+        [Parameter(Mandatory = $true)]
+        [string] $Message
+    )
+
+    if (-not $Output.Contains($Expected)) {
+        throw "$Message Sortie obtenue: $Output"
+    }
+}
+
+if (-not (Test-Path -LiteralPath $testCommandPath -PathType Leaf)) {
+    throw "Commande de test M-000 absente: scripts/test.ps1"
+}
+
+if (-not (Test-Path -LiteralPath $lintCommandPath -PathType Leaf)) {
+    throw "Commande de lint M-000 absente: scripts/lint.ps1"
+}
+
+New-Item -ItemType Directory -Path $temporaryRoot | Out-Null
+
+try {
+    # Given les artefacts de gouvernance M-000 sont présents.
+    # When les gates globales de test et de lint sont exécutées.
+    # Then elles retournent GREEN sur un dépôt valide ou RED avec la validation fautive nommée.
+    $validProjectRoot = New-TemporaryProject -Name "valid"
+    $testResult = Invoke-ProjectCommand -ProjectRoot $validProjectRoot -RelativePath "scripts/test.ps1"
+    Assert-ExitCode -Actual $testResult.ExitCode -Expected 0 -Message "La gate de test M-000 conforme doit réussir."
+    Assert-OutputContains -Output $testResult.Output -Expected "Gate test GREEN" -Message "La gate de test doit annoncer son état GREEN."
+
+    $lintResult = Invoke-ProjectCommand -ProjectRoot $validProjectRoot -RelativePath "scripts/lint.ps1"
+    Assert-ExitCode -Actual $lintResult.ExitCode -Expected 0 -Message "La gate de lint M-000 conforme doit réussir."
+    Assert-OutputContains -Output $lintResult.Output -Expected "Gate lint GREEN" -Message "La gate de lint doit annoncer son état GREEN."
+
+    $missingValidationProjectRoot = New-TemporaryProject -Name "missing-validation"
+    Remove-Item -LiteralPath (Join-Path $missingValidationProjectRoot "scripts/validate_traceability.ps1")
+    $missingValidationResult = Invoke-ProjectCommand -ProjectRoot $missingValidationProjectRoot -RelativePath "scripts/lint.ps1"
+    Assert-ExitCode -Actual $missingValidationResult.ExitCode -Expected 1 -Message "Une validation requise absente doit produire un RED."
+    Assert-OutputContains `
+        -Output $missingValidationResult.Output `
+        -Expected "Validation requise absente: scripts/validate_traceability.ps1" `
+        -Message "La validation absente doit être nommée."
+
+    $failingValidationProjectRoot = New-TemporaryProject -Name "failing-validation"
+    Set-MatrixCell `
+        -Path (Join-Path $failingValidationProjectRoot "docs/traceability/matrix.md") `
+        -RequirementId "REQ-M000-004" `
+        -ColumnName "Commande" `
+        -Value "Non applicable: commande rendue invalide pour le test."
+    $failingValidationResult = Invoke-ProjectCommand -ProjectRoot $failingValidationProjectRoot -RelativePath "scripts/lint.ps1"
+    Assert-ExitCode -Actual $failingValidationResult.ExitCode -Expected 1 -Message "Une validation requise échouée doit produire un RED."
+    Assert-OutputContains `
+        -Output $failingValidationResult.Output `
+        -Expected "Validation $($eAcute)chou$($eAcute)e: scripts/validate_traceability.ps1" `
+        -Message "La validation échouée doit être nommée."
+}
+finally {
+    Remove-Item -LiteralPath $temporaryRoot -Recurse -Force
+}
+
+Write-Host "Test d'acceptation des commandes de validation M-000: OK"
