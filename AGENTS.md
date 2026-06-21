@@ -29,7 +29,7 @@ L'implémentation doit suivre un processus **Behavior Driven Development (BDD)**
 
 3. **TDD** : implémenter chaque étape via des tests unitaires.
 
-Le code doit être strict : pas de valeur par défaut, pas de fallback silencieux
+Le code doit être strict : pas de valeur par défaut, pas de fallback silencieux, pas de gestion d'erreurs non requise, pas de try catch non requis, pas de logique défensive.
 
 ## Règle TDD
 
