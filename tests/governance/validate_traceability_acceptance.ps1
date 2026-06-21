@@ -17,6 +17,8 @@ function Split-MarkdownRow {
 function Join-MarkdownRow {
     param(
         [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [AllowEmptyString()]
         [string[]] $Cells
     )
 

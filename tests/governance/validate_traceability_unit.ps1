@@ -3,6 +3,9 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
 $validatorPath = Join-Path $repoRoot "scripts/validate_traceability.ps1"
 $temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m000_traceability_unit_" + [System.Guid]::NewGuid().ToString("N"))
+$eAcute = [char] 0x00E9
+$eGrave = [char] 0x00E8
+$aGrave = [char] 0x00E0
 
 function Split-MarkdownRow {
     param(
@@ -16,6 +19,8 @@ function Split-MarkdownRow {
 function Join-MarkdownRow {
     param(
         [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [AllowEmptyString()]
         [string[]] $Cells
     )
 
@@ -63,10 +68,10 @@ function New-MatrixContent {
     return @"
 | Exigence | Source | Statut | Test | Commande | Code | ADR | Justification ADR |
 |---|---|---|---|---|---|---|---|
-| REQ-M000-901 | docs/specs/specification.md | Couvert | tests/governance/example_acceptance.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\example.ps1 | scripts/example.ps1 | ADR-001 | Décision structurante déjà publiée. |
-| REQ-M000-902 | docs/specs/specification.md | Partiel | tests/governance/example_acceptance.ps1 | Non applicable: couverture partielle documentée. | scripts/example.ps1 | Non requise | Aucune décision structurante nouvelle pour ce contrôle partiel. |
-| REQ-M000-903 | docs/specs/specification.md | Planifié | tests/governance/example_acceptance.ps1 | Non applicable: exigence planifiée. | scripts/example.ps1 | Non requise | Aucune décision structurante nouvelle pour cette planification. |
-| REQ-M000-904 | docs/specs/specification.md | Hors périmètre M-000 | tests/governance/example_acceptance.ps1 | Non applicable: hors périmètre du milestone. | scripts/example.ps1 | Non requise | Aucune décision structurante nouvelle car le code métier est hors périmètre. |
+| REQ-M000-901 | docs/specs/specification.md | Couvert | tests/governance/example_acceptance.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\example.ps1 | scripts/example.ps1 | ADR-001 | D$($eAcute)cision structurante d$($eAcute)j$($aGrave) publi$($eAcute)e. |
+| REQ-M000-902 | docs/specs/specification.md | Partiel | tests/governance/example_acceptance.ps1 | Non applicable: couverture partielle document$($eAcute)e. | scripts/example.ps1 | Non requise | Aucune d$($eAcute)cision structurante nouvelle pour ce contr$([char] 0x00F4)le partiel. |
+| REQ-M000-903 | docs/specs/specification.md | Planifi$($eAcute) | tests/governance/example_acceptance.ps1 | Non applicable: exigence planifi$($eAcute)e. | scripts/example.ps1 | Non requise | Aucune d$($eAcute)cision structurante nouvelle pour cette planification. |
+| REQ-M000-904 | docs/specs/specification.md | Hors p$($eAcute)rim$($eGrave)tre M-000 | tests/governance/example_acceptance.ps1 | Non applicable: hors p$($eAcute)rim$($eGrave)tre du milestone. | scripts/example.ps1 | Non requise | Aucune d$($eAcute)cision structurante nouvelle car le code m$($eAcute)tier est hors p$($eAcute)rim$($eGrave)tre. |
 "@
 }
 
@@ -159,7 +164,7 @@ try {
         -Path (Join-Path $invalidStatusProjectRoot "docs/traceability/matrix.md") `
         -RequirementId "REQ-M000-901" `
         -ColumnName "Statut" `
-        -Value "Terminé"
+        -Value "Termin$($eAcute)"
     $invalidStatusResult = Invoke-Validator -ProjectRoot $invalidStatusProjectRoot
     Assert-ExitCode -Actual $invalidStatusResult.ExitCode -Expected 1 -Message "Un statut non autorisé doit être refusé."
 
