@@ -1,665 +1,557 @@
-# Plan d'implémentation - Milestones et Workstreams
+# Plan d'implémentation v4.1 - Milestones et Workstreams
 
-**Source :** `docs/specification_pipeline_chatbot_trading_dgx_spark_v3_1.md`  
-**Date :** 20 juin 2026  
-**Produit cible :** chatbot personnel local de recherche documentaire, synthèse de stratégies de trading et backtests reproductibles sur DGX Spark.
+Source unique: `docs/specs/specification_unifiee_ddd_technique_chatbot_trading_v4_1.md`.
 
----
+Date de création: 21 juin 2026.
 
-## 1. Principes d'exécution
+Statut: plan initial d'implémentation.
 
-1. **Local-first strict.** Tous les services sont liés à `127.0.0.1` par défaut. Aucun service interne, modèle, Qdrant ou PostgreSQL n'est exposé publiquement.
-2. **Pas de fallback silencieux.** Toute route documentaire, tout modèle, tout outil et toute citation doivent être explicites. Si une condition obligatoire n'est pas satisfaite, le système renvoie un statut contrôlé, met en quarantaine, ou bloque le traitement.
-3. **PDF original immuable.** Les fichiers dans `corpus/raw/` sont traités comme source canonique visuelle et ne sont jamais modifiés.
-4. **DoclingDocument JSON comme artefact canonique structuré.** Markdown, HTML, images et textes extraits sont des exports régénérables.
-5. **Autorité textuelle unique par page.** Une page ne mélange jamais silencieusement texte natif, OCR et VLM.
-6. **Provenance obligatoire.** Toute réponse factuelle doit pouvoir remonter au document, à la page PDF et à l'item source.
-7. **LLM non calculateur.** Le LLM peut proposer, structurer et interpréter ; les calculs, signaux, positions et backtests sont exécutés par du code déterministe.
-8. **Évaluation avant promotion.** Aucun modèle, seuil de routage, route documentaire ou stratégie de recherche n'est promu sans mesure sur corpus pilote.
+Ce document repart de zéro depuis la spécification v4.1. Il ne reprend pas un plan antérieur comme source. Toute modification structurante ultérieure devra être documentée par ADR dans `docs/adr/` et reportée dans `docs/adr/index.md`.
 
----
+## 1. Intention métier
 
-## 2. Workstreams
+Le système doit transformer un corpus financier hétérogène en connaissances vérifiables, puis produire des réponses conversationnelles citées, des synthèses conditionnelles, des stratégies candidates attribuées et des expériences reproductibles.
 
-### WS0 - Pilotage, architecture et standards
-
-**Objectif :** garder une implémentation cohérente avec la spécification et éviter les dérives implicites.
-
-**Responsabilités :**
-- maintenir les ADR applicables ;
-- maintenir le registre ADR dans `docs/adr/` ;
-- définir les conventions de configuration, schémas, erreurs et statuts ;
-- maintenir la matrice de conformité aux critères V1 ;
-- piloter les décisions de benchmark et de promotion de modèles ;
-- documenter les écarts justifiés à la spécification.
-
-**Livrables récurrents :**
-- backlog priorisé ;
-- matrice `spec -> ADR -> implementation -> tests` ;
-- journal des décisions ;
-- définition d'achèvement par milestone.
-
-### WS1 - Plateforme locale, sécurité et orchestration
-
-**Objectif :** fournir le socle local DGX Spark, les services, les jobs et les profils de charge.
-
-**Responsabilités :**
-- `docker-compose.yml` ou équivalent local ;
-- services `orchestrator-api`, `qdrant`, `postgres`, `gemma-vllm`, `granite-docling`, `ui`, workers ;
-- ports liés à `127.0.0.1` ;
-- file de jobs, priorités, idempotence ;
-- profils `INGEST_BATCH`, `INTERACTIVE_RESEARCH`, `DEEP_RESEARCH`, `BACKTEST` ;
-- gestion des secrets hors dépôt ;
-- observabilité de base.
-
-**Modules principaux :**
-- `app/api/`
-- `app/orchestration/`
-- `config/security.yaml`
-- `config/models.yaml`
-- `config/quality_gates.yaml`
-
-### WS2 - Données, schémas et persistance
-
-**Objectif :** créer les contrats de données persistants et les migrations.
-
-**Responsabilités :**
-- schémas PostgreSQL pour documents, pages, conversions, chunks, claims, conversations, jobs, experiments ;
-- schémas JSON/YAML pour entrées et sorties ;
-- stockage des artefacts canoniques et dérivés ;
-- hashes d'entrée, configuration, code et modèle ;
-- contraintes d'unicité, provenance et audit.
-
-**Modèles couverts :**
-- `DocumentRecord`
-- `PageDiagnostic`
-- `ConversionRun`
-- `DocItemRecord`
-- `ChunkRecord`
-- `ClaimRecord`
-- `EvidenceLink`
-- `ClaimRelation`
-- `ConversationRecord`
-- `ChatTurnRecord`
-- `ExperimentRecord`
-
-### WS3 - Ingestion, diagnostic et routage documentaire
-
-**Objectif :** inventorier les PDF, diagnostiquer les pages et produire un plan de route sans ambiguïté.
-
-**Responsabilités :**
-- scan de `corpus/raw/` ;
-- hash stable et manifeste ;
-- extraction de métadonnées bibliographiques initiales ;
-- diagnostic page par page ;
-- classification des états de page ;
-- routage vers `NATIVE_STANDARD`, `SCAN_GRANITE`, `PREPROCESS_GRANITE`, `BAD_OCR_TO_GRANITE`, `MIXED_PAGEWISE`, `TARGETED_ENRICHMENT` ;
-- blocage ou revue explicite si route incertaine.
-
-**Modules principaux :**
-- `app/inventory/`
-- `app/diagnostics/`
-- `app/routing/`
-
-### WS4 - Conversion Docling, QA et artefacts canoniques
-
-**Objectif :** convertir chaque document en DoclingDocument JSON traçable, avec contrôle qualité avant indexation.
-
-**Responsabilités :**
-- conversion Docling standard ;
-- rendu de pages pour VLM et contrôle visuel ;
-- conversion Granite-Docling ;
-- prétraitement physique conditionnel via OCRmyPDF ;
-- fusion pagewise ;
-- contrôle qualité pré-conversion et post-conversion ;
-- mise en quarantaine explicite ;
-- exports régénérables.
-
-**Modules principaux :**
-- `app/conversion/`
-- `app/quality/`
-- `corpus/docling/`
-- `corpus/exports/`
-- `corpus/quarantine/`
-
-### WS5 - Chunking, métadonnées, embeddings et recherche hybride
-
-**Objectif :** rendre le corpus interrogeable avec recherche dense/sparse, filtres, reranking et citations ouvrables.
-
-**Responsabilités :**
-- chunking hiérarchique ;
-- enrichissement bibliographique et métier ;
-- embeddings denses ;
-- index sparse ou BM25 ;
-- collections Qdrant ;
-- fusion RRF ou DBSF ;
-- reranking ;
-- expansion vers fragments parents ;
-- diversification par document et auteur ;
-- évaluation Recall@k, MRR, nDCG.
-
-**Modules principaux :**
-- `app/chunking/`
-- `app/indexing/`
-- `app/retrieval/`
-- `evaluation/retrieval/`
-
-### WS6 - Chatbot, conversations et API produit
-
-**Objectif :** exposer l'expérience utilisateur principale : conversation, suivi de contexte, classification du mode et réponses citées.
-
-**Responsabilités :**
-- API conversations ;
-- endpoint compatible `/v1/chat/completions` ;
-- gestion de session ;
-- résolution des références conversationnelles ;
-- classification de requête ;
-- sélection des modes `DOCUMENTARY`, `DEEP_RESEARCH`, `STRATEGY`, `CALCULATION`, `BACKTEST` ;
-- UI locale ;
-- ouverture de citation vers PDF/page/zone ;
-- distinction visible source, déduction et choix de conception.
-
-**Modules principaux :**
-- `app/api/`
-- `app/chat/`
-- `app/synthesis/`
-- `ui/`
-
-### WS7 - Claims, preuves, contradictions et synthèse approfondie
-
-**Objectif :** construire la couche d'analyse auditable au-dessus des passages documentaires.
-
-**Responsabilités :**
-- extraction atomique d'affirmations ;
-- canonicalisation ;
-- vérification indépendante ;
-- liens de preuves ;
-- relations de support, contradiction, dépendance et généralisation ;
-- évaluation de qualité des preuves ;
-- planificateur de recherche approfondie ;
-- synthèse multi-sources traçable ;
-- abstention explicite si preuves insuffisantes.
-
-**Modules principaux :**
-- `app/claims/`
-- `app/synthesis/`
-- `app/research/`
-
-### WS8 - Stratégies candidates, calculs et backtests
-
-**Objectif :** transformer les résultats documentaires en spécifications de stratégies testables, puis exécuter des backtests reproductibles.
-
-**Responsabilités :**
-- compilateur de stratégie YAML ;
-- attribution obligatoire de l'origine de chaque règle ;
-- moteur de contraintes ;
-- génération ou assemblage de code déterministe ;
-- contrôle des biais ;
-- registre append-only des expériences ;
-- stockage des résultats négatifs ;
-- validation hors échantillon, walk-forward et stress tests.
-
-**Modules principaux :**
-- `app/strategies/`
-- `app/backtests/`
-- `data/experiments/`
-
-### WS9 - Évaluation, qualité, observabilité et exploitation
-
-**Objectif :** mesurer, surveiller et durcir le système avant acceptation V1.
-
-**Responsabilités :**
-- corpus pilote de 50 à 100 PDF ;
-- jeu annoté page par page ;
-- benchmark routes documentaires ;
-- benchmark LLM principal ;
-- benchmark recherche ;
-- benchmark réponses ;
-- logs structurés ;
-- métriques ingestion, recherche, claims et réponses ;
-- sauvegardes chiffrées ;
-- documentation d'exploitation locale.
-
-**Modules principaux :**
-- `evaluation/`
-- `tests/`
-- `data/logs/`
-- `docs/operations/`
-
----
-
-## 3. Milestones
-
-### M0 - Cadrage exécutable et squelette projet
-
-**But :** passer d'une spécification à un projet exécutable localement.
-
-**Workstreams actifs :** WS0, WS1, WS2, WS9
-
-**Livrables :**
-- arborescence conforme à la spécification ;
-- `pyproject.toml` ;
-- configuration initiale dans `config/` ;
-- schémas de base dans `schemas/` ;
-- conventions d'erreurs et de statuts ;
-- squelette FastAPI ;
-- squelette workers ;
-- suite de tests minimale ;
-- matrice initiale de conformité V1.
-
-**Critère d'acceptation :**
-- le projet s'installe localement ;
-- les tests de smoke passent ;
-- les services peuvent démarrer sans exposer de port public ;
-- les statuts d'erreur sont explicites, sans fallback silencieux.
-
-**Dépendances :** aucune.
-
-### M1 - Socle de persistance, jobs et API interne
-
-**But :** disposer d'une base persistante et d'un orchestrateur idempotent.
-
-**Workstreams actifs :** WS1, WS2, WS9
-
-**Livrables :**
-- PostgreSQL avec migrations ;
-- tables documents, pages, conversions, jobs, conversations, turns ;
-- Qdrant lancé localement ;
-- file de jobs avec types et priorités de la spécification ;
-- idempotence par hash d'entrée, configuration, code et modèle ;
-- logs structurés avec `trace_id`, `job_id`, phase, statut et latence ;
-- endpoints de santé et readiness.
-
-**Critère d'acceptation :**
-- un job rejoué avec les mêmes entrées n'est pas recalculé sans option explicite ;
-- les ports sont liés à `127.0.0.1` ;
-- les erreurs de configuration bloquent le démarrage avec message actionnable ;
-- les migrations sont reproductibles depuis une base vide.
-
-**Dépendances :** M0.
-
-### M2 - Inventaire, diagnostic et routage PDF
-
-**But :** identifier chaque PDF, diagnostiquer chaque page et produire une route documentaire explicite.
-
-**Workstreams actifs :** WS2, WS3, WS9
-
-**Livrables :**
-- endpoint `POST /v1/documents` ;
-- endpoint `POST /v1/documents/{document_id}/diagnose` ;
-- enregistrement `DocumentRecord` ;
-- enregistrement `PageDiagnostic` ;
-- machine d'états documentaire jusqu'à `ROUTE_PLANNED`, `MANUAL_REVIEW` ou `QUARANTINED` ;
-- implémentation de `routing.yaml` ;
-- rapport de diagnostic par document ;
-- premiers tests sur corpus synthétique.
-
-**Critère d'acceptation :**
-- 100 % des PDF inventoriés ont un identifiant stable ;
-- aucun original n'est modifié ;
-- chaque page diagnostiquée a un état, une confiance et une route recommandée ;
-- une route incertaine ne bascule pas vers une autre route : elle passe en revue explicite ;
-- les documents en quarantaine ne sont pas indexables.
-
-**Dépendances :** M1.
-
-### M3 - Conversion hybride et DoclingDocument canonique
-
-**But :** convertir les documents pilotes en JSON Docling valide et traçable.
-
-**Workstreams actifs :** WS3, WS4, WS9
-
-**Livrables :**
-- endpoint `POST /v1/documents/{document_id}/convert` ;
-- profil Docling standard ;
-- profil Granite-Docling ;
-- rendu de pages ;
-- prétraitement OCRmyPDF conditionnel ;
-- fusion pagewise ;
-- `ConversionRun` ;
-- stockage `corpus/docling/` ;
-- exports régénérables ;
-- QA post-conversion ;
-- quarantaine explicite.
-
-**Critère d'acceptation :**
-- le nombre de pages correspond au PDF original ;
-- le JSON Docling est valide ;
-- chaque `DocItemRecord` contient page, route, autorité textuelle et provenance ;
-- aucune page n'est silencieusement omise ;
-- les PDF mixtes conservent la pagination ;
-- les documents qui échouent au QA ne passent pas à l'indexation.
-
-**Dépendances :** M2.
-
-### M4 - Chunking, indexation et recherche citée
-
-**But :** rendre un corpus pilote consultable avec recherche hybride et références ouvrables.
-
-**Workstreams actifs :** WS5, WS9
-
-**Livrables :**
-- endpoint `POST /v1/documents/{document_id}/index` ;
-- chunking hiérarchique ;
-- enrichissement de métadonnées ;
-- embeddings denses ;
-- BM25 ou sparse Qdrant ;
-- collection Qdrant avec payload complet ;
-- indexation incrémentale d'un document ajouté après l'initialisation du corpus ;
-- fusion dense/sparse ;
-- reranking ;
-- endpoint `POST /v1/search` ;
-- format interne de citation ;
-- évaluation retrieval initiale.
-
-**Critère d'acceptation :**
-- chaque chunk remonte à ses `item_ids` et pages ;
-- les filtres de métadonnées fonctionnent ;
-- une recherche renvoie citations, scores et provenance ;
-- Recall@20 est mesuré sur un premier jeu annoté ;
-- les documents en quarantaine sont absents de l'index ;
-- un PDF ajouté après le premier corpus peut être inventorié, converti, validé et indexé sans retraiter les documents inchangés ;
-- une erreur d'embedding ou de reranking produit un statut explicite.
-
-**Dépendances :** M3.
-
-### M5 - Chatbot MVP avec conversations et citations
-
-**But :** livrer la première tranche verticale produit : poser une question, obtenir une réponse citée, poursuivre la conversation.
-
-**Workstreams actifs :** WS1, WS5, WS6, WS9
-
-**Livrables :**
-- endpoint `POST /v1/conversations` ;
-- endpoint `GET /v1/conversations/{conversation_id}` ;
-- endpoint `GET /v1/conversations/{conversation_id}/turns` ;
-- endpoint `POST /v1/conversations/{conversation_id}/messages` ;
-- endpoint `POST /v1/chat/completions` ;
-- classification de requête initiale ;
-- résolution des références conversationnelles simples ;
-- assemblage de preuves ;
-- génération structurée par Gemma via vLLM ;
-- vérification minimale des citations ;
-- UI locale de chat ;
-- affichage du statut documentaire.
-
-**Critère d'acceptation :**
-- l'utilisateur peut créer une conversation ;
-- une question de suivi reprend le contexte utile du tour précédent ;
-- chaque réponse factuelle affiche au moins une preuve ouvrable ;
-- un PDF acquis après la mise en service du MVP peut devenir interrogeable après passage explicite par inventaire, diagnostic, conversion, QA et indexation ;
-- le statut `SUPPORTED`, `PARTIALLY_SUPPORTED`, `INSUFFICIENT_EVIDENCE`, `CONFLICTING_EVIDENCE` ou `REQUIRES_CURRENT_DATA` est visible ;
-- l'historique conversationnel n'est pas traité comme source factuelle ;
-- si les preuves manquent, le chatbot s'abstient explicitement.
-
-**Dépendances :** M4.
-
-### M6 - Claims, vérification et recherche approfondie
-
-**But :** ajouter la couche d'analyse multi-sources auditable.
-
-**Workstreams actifs :** WS6, WS7, WS9
-
-**Livrables :**
-- endpoint `POST /v1/claims/extract` ;
-- endpoint `POST /v1/claims/{claim_id}/verify` ;
-- endpoints `GET /v1/claims/{claim_id}` et `/evidence` ;
-- extraction atomique structurée ;
-- vérification entailment ;
-- relations entre claims ;
-- détection de contradictions ;
-- évaluation de qualité des preuves ;
-- endpoint `POST /v1/research/deep` ;
-- planificateur de recherche multi-requêtes ;
-- synthèse approfondie avec convergences, contradictions, limites et conditions.
-
-**Critère d'acceptation :**
-- une affirmation sans preuve n'est pas promue en claim vérifié ;
-- conditions, limites et dépendances sont conservées ;
-- les contradictions sont explicites ;
-- la synthèse distingue source, déduction et choix de conception ;
-- la couverture documentaire est mesurée ;
-- les citations restent ouvrables depuis la réponse finale.
-
-**Dépendances :** M5.
-
-### M7 - Stratégies candidates et backtests reproductibles
-
-**But :** compiler des stratégies candidates issues des sources et les tester par code déterministe.
-
-**Workstreams actifs :** WS7, WS8, WS9
-
-**Livrables :**
-- endpoint `POST /v1/strategies/compile` ;
-- endpoint `GET /v1/strategies/{strategy_id}` ;
-- schéma YAML de stratégie candidate ;
-- attribution obligatoire `SOURCE`, `DEDUCTION`, `DESIGN_CHOICE`, `PARAMETER_TO_CALIBRATE`, `USER_CONSTRAINT` ;
-- moteur de contraintes ;
-- endpoint `POST /v1/strategies/{strategy_id}/backtest` ;
-- endpoint `GET /v1/experiments/{experiment_id}` ;
-- registre append-only des expériences ;
-- contrôles biais, coûts, liquidité, stabilité et benchmarks simples ;
-- rapports de backtest cités et reproductibles.
-
-**Critère d'acceptation :**
-- une stratégie candidate contient des règles déterministes ;
-- chaque règle indique son origine ;
-- aucun paramètre inventé par le LLM n'est accepté sans statut explicite ;
-- le LLM ne calcule pas mentalement les résultats ;
-- les résultats négatifs sont conservés ;
-- un backtest peut être reproduit depuis `spec_hash`, `data_snapshot`, paramètres et modèle de coût.
-
-**Dépendances :** M6.
-
-### M8 - Évaluation pilote et calibration
-
-**But :** mesurer la qualité du système sur un corpus pilote représentatif avant durcissement V1.
-
-**Workstreams actifs :** WS0, WS3, WS4, WS5, WS6, WS7, WS8, WS9
-
-**Livrables :**
-- corpus pilote de 50 à 100 PDF ;
-- jeu annoté page par page ;
-- benchmark routes documentaires ;
-- benchmark LLM principal ;
-- benchmark recherche sur 100 à 300 questions ;
-- benchmark réponses ;
-- seuils calibrés dans `routing.yaml` et `quality_gates.yaml` ;
-- rapport de calibration ;
-- liste des écarts bloquants V1.
-
-**Critère d'acceptation :**
-- les métriques de conversion sont mesurées : CER/WER, exactitude numérique, signes, tableaux, ordre de lecture ;
-- les modèles Gemma candidats sont comparés sur tâches métier ;
-- Recall@5, Recall@10, Recall@20, MRR et nDCG sont publiés ;
-- précision des citations et taux d'abstention sont mesurés ;
-- aucun modèle communautaire n'est promu sans benchmark supérieur ou égal aux références ;
-- les seuils de routage sont justifiés par données.
-
-**Dépendances :** M7 peut être partiel si l'évaluation backtest n'est pas encore complète, mais M5 et M6 doivent être stables.
-
-### M9 - Durcissement, exploitation et acceptation V1
-
-**But :** transformer le prototype complet en version personnelle exploitable et maintenable.
-
-**Workstreams actifs :** WS0, WS1, WS6, WS8, WS9
-
-**Livrables :**
-- durcissement sécurité ;
-- vérification ports locaux ;
-- sauvegardes chiffrées ;
-- runbooks d'exploitation ;
-- monitoring local ;
-- tests de régression ;
-- tests de restauration ;
-- optimisation mémoire DGX Spark ;
-- documentation utilisateur ;
-- rapport final d'acceptation V1.
-
-**Critère d'acceptation :**
-- les 20 critères d'acceptation V1 de la spécification sont validés ou marqués explicitement non satisfaits ;
-- aucun service n'est exposé publiquement ;
-- les sauvegardes sont restaurées au moins une fois en test ;
-- les profils de charge évitent les pics simultanés inutiles ;
-- la suite de régression couvre ingestion, recherche, chat, claims, stratégies et backtests ;
-- les anti-patterns interdits sont vérifiés par revue ou tests automatisés lorsque possible.
-
-**Dépendances :** M8.
-
----
-
-## 4. Chemin critique
-
-Le chemin critique minimal pour atteindre un chatbot cité est :
+La chaîne métier directrice est:
 
 ```text
-M0 Squelette
--> M1 Persistance et jobs
--> M2 Inventaire / diagnostic / routage
--> M3 Conversion Docling canonique
--> M4 Indexation hybride
--> M5 Chatbot avec citations
+Document source
+-> Version canonique
+-> Preuve localisable
+-> Affirmation vérifiée
+-> Réponse ou synthèse vérifiée
+-> Stratégie candidate attribuée
+-> Expérience reproductible
+-> Résultat interprétable et conservé
 ```
 
-Le chemin critique pour la version complète V1 est :
+Les jalons sont donc ordonnés par capacité métier vérifiable, pas par composant technique isolé.
+
+## 2. Règles d'exécution
+
+Chaque milestone doit être exécuté selon le flux BDD, ATDD et TDD obligatoire du projet:
+
+1. vérifier l'état GREEN existant;
+2. écrire ou compléter la spécification DDD du comportement;
+3. formuler le scénario métier au format `Given-When-Then`;
+4. ajouter le test d'acceptation automatisé RED;
+5. créer le commit RED avec uniquement scénario et test;
+6. ajouter les tests unitaires nécessaires;
+7. implémenter strictement le domaine, les cas d'usage et les ports requis;
+8. obtenir GREEN avec tests, lint et contrôles d'architecture configurés;
+9. créer le commit GREEN avec uniquement l'implémentation et les ajustements requis.
+
+Règles permanentes:
+
+- aucune valeur par défaut implicite;
+- aucun fallback silencieux;
+- aucune conversion ambiguë;
+- aucune gestion d'erreur générique non justifiée;
+- aucun accès direct au stockage possédé par un autre bounded context;
+- aucune sortie de modèle probabiliste ne change seule un état métier protégé;
+- aucune réponse factuelle publiée sans preuve localisable ou statut d'abstention explicite;
+- aucun backtest calculé ou estimé par le LLM.
+
+## 3. Préconditions connues
+
+- État GREEN/RED connu: le dépôt courant ne contient pas encore de suite applicative exécutable visible dans le working tree; le milestone M-000 doit créer les commandes de test et de lint minimales.
+- Présence des milestones amont dans `master`: aucun dossier `docs/tasks/milestone_NNN` n'est visible dans `master` au moment de ce plan.
+- Décisions manquantes ou à matérialiser: la spécification v4.1 référence des ADR dans `docs/adr/`; leur présence effective doit être vérifiée avant toute implémentation structurante.
+- Règle de planification détaillée: les fichiers de tâches `docs/tasks/milestone_NNN/*.md` doivent être créés milestone par milestone, uniquement lorsque les milestones amont requis sont présents dans `master`.
+
+Commande de vérification avant de détailler un milestone:
+
+```powershell
+git fetch origin --prune
+git ls-tree -r --name-only master -- docs/tasks docs/adr docs/specs
+```
+
+## 4. Workstreams
+
+| Code | Workstream | Responsabilité | Bounded contexts ou couche | Définition de terminé |
+|---|---|---|---|---|
+| WS-01 | Gouvernance, ADR et traçabilité | Maintenir décisions, conformité spec-code-tests, conventions BDD/TDD et absence de dérive silencieuse | Transverse | Matrice de traçabilité maintenue, ADR à jour, critères V1 suivis |
+| WS-02 | Langage publié et frontières DDD | Établir les contrats intercontextes, les identifiants, les événements et les règles de dépendance | SP, KA, EG, RA, CV, SD, EX | Contrats versionnés, tests de contrats et tests d'architecture en place |
+| WS-03 | Plateforme locale et inférence | Fournir `docker-local`, jobs, outbox, observabilité, sécurité réseau et `llm-gateway` vers le Spark | `platform` | Services locaux non exposés, inférence Spark jointe uniquement via gateway, erreurs explicites |
+| WS-04 | Traitement des sources | Enregistrer, diagnostiquer, router, convertir, contrôler et publier les versions canoniques | SP | Original immuable, page manifest complet, version canonique publiée, citation résolvable |
+| WS-05 | Accès aux connaissances | Construire les projections régénérables et retourner des preuves candidates traçables | KA | Projection versionnée, recherche hybride derrière un port, `SourceLocator` résolvable |
+| WS-06 | Gouvernance des preuves | Créer, vérifier, relier et versionner les claims et leurs preuves | EG | Claim sans preuve directe refusé, portée conservée, dépendances comptabilisées |
+| WS-07 | Recherche et réponse | Planifier la recherche, sceller les preuves, analyser contradictions et publier des réponses vérifiées | RA | Réponse non supportée refusée, abstention fonctionnelle, citations ouvrables |
+| WS-08 | Conversation et API produit | Conserver la continuité du dialogue, résoudre les références et router les demandes utilisateur | CV | Tours append-only, question résolue autonome, historique non utilisé comme preuve |
+| WS-09 | Conception de stratégies | Formaliser des stratégies candidates, attribuer les règles et produire des snapshots immuables | SD | Règle sans origine bloquante, paramètres à calibrer explicités, snapshot compilable |
+| WS-10 | Expérimentation | Exécuter des protocoles déterministes et conserver tous les résultats | EX | Entrées figées, résultats immuables, résultats négatifs consultables |
+| WS-11 | Évaluation et exploitation | Mesurer conversion, recherche, réponses, modèles, backtests, sauvegarde et exploitation locale | Transverse | Benchmarks publiés, seuils justifiés, runbooks et acceptation V1 validés |
+
+## 5. Vue des milestones
+
+| Milestone | Nom | Objectif métier | Workstreams principaux | Dépendances |
+|---|---|---|---|---|
+| M-000 | Gouvernance exécutable | Rendre le projet pilotable par tests, ADR et traçabilité | WS-01 | Aucune |
+| M-001 | Frontières DDD et contrats publiés | Stabiliser le langage commun et les contrats entre contextes | WS-01, WS-02 | M-000 |
+| M-002 | Plateforme locale sûre | Exécuter commandes, jobs, outbox et inférence sans exposition publique | WS-03, WS-11 | M-001 |
+| M-003 | Source enregistrée, diagnostiquée et routée | Identifier les PDF, diagnostiquer les pages et décider une route explicite | WS-04 | M-001, M-002 |
+| M-004 | Version canonique publiée | Produire une version documentaire canonique contrôlée et immutable | WS-04, WS-11 | M-003 |
+| M-005 | Projection de connaissance recherchable | Rechercher des passages avec provenance résolvable | WS-05, WS-11 | M-004 |
+| M-006 | Claims vérifiables | Refuser les affirmations sans preuve directe et conserver portée et dépendances | WS-06 | M-004, M-005 |
+| M-007 | Réponse documentaire vérifiée | Produire une réponse citée, qualifiée ou explicitement abstinente | WS-06, WS-07 | M-006 |
+| M-008 | Conversation produit | Permettre une conversation suivie sans traiter l'historique comme preuve | WS-08, WS-07 | M-007 |
+| M-009 | Recherche approfondie multi-sources | Couvrir, comparer et synthétiser convergences, contradictions et limites | WS-06, WS-07, WS-08 | M-008 |
+| M-010 | Stratégie candidate attribuée | Transformer un résultat vérifié en stratégie compilable ou diagnostic bloquant | WS-09, WS-06, WS-07 | M-009 |
+| M-011 | Expérience reproductible | Exécuter un backtest déterministe avec entrées figées et résultat conservé | WS-10, WS-09 | M-010 |
+| M-012 | Évaluation pilote et calibration | Mesurer le système sur corpus pilote et justifier les seuils | WS-11, tous | M-011 |
+| M-013 | Durcissement et acceptation V1 | Valider sécurité, exploitation, régression et critères V1 | WS-01, WS-03, WS-11 | M-012 |
+
+## 6. Milestones détaillés
+
+### M-000 - Gouvernance exécutable
+
+- Source: sections 0, 3, 20, 21 et 22 de la spécification v4.1.
+- Objectif métier: rendre l'implémentation contrôlable avant toute fonctionnalité, avec règles de preuve, tests et décisions visibles.
+- Workstreams actifs: WS-01.
+- Bounded contexts concernés: tous, sans implémentation métier encore.
+- Scénario directeur:
+  - Given une spécification v4.1 normative
+  - When un développement est lancé
+  - Then les commandes de test, lint, traçabilité et ADR existent avant le premier comportement métier
+- Livrables:
+  - arborescence documentaire minimale;
+  - registre ADR présent et aligné avec la spécification;
+  - conventions de nommage des tâches `docs/tasks/milestone_NNN`;
+  - matrice initiale `exigence -> test -> code -> ADR`;
+  - commandes de validation initiales;
+  - définition d'achèvement transverse.
+- Tests et gates:
+  - smoke test de l'outillage;
+  - test de présence des répertoires et fichiers de gouvernance;
+  - vérification que les commandes de validation échouent explicitement si un outil requis manque.
+- Sortie attendue: le projet sait dire GREEN ou RED sans ambiguïté.
+
+### M-001 - Frontières DDD et contrats publiés
+
+- Source: sections 2, 4, 13, 14, 15 et 21.
+- Objectif métier: donner aux sept bounded contexts une frontière explicite et un langage publié stable.
+- Workstreams actifs: WS-01, WS-02.
+- Bounded contexts concernés: SP, KA, EG, RA, CV, SD, EX.
+- Scénario directeur:
+  - Given sept bounded contexts identifiés
+  - When un contexte doit communiquer avec un autre
+  - Then il utilise un contrat publié versionné et ne lit pas le modèle interne du producteur
+- Livrables:
+  - modules de contexte avec couches `domain`, `application`, `adapters`;
+  - contrats `CanonicalSourceRef`, `SourceLocator`, `EvidenceRef`, `VerifiedClaimRef`, `VerifiedResearchOutcome`, `StrategySnapshot`, `ExperimentResult`;
+  - enveloppe d'événement versionnée;
+  - erreurs métier stables;
+  - tests de contrat producteur et consommateur;
+  - tests d'architecture interdisant imports et accès croisés non autorisés.
+- Tests et gates:
+  - sérialisation et désérialisation stable des contrats;
+  - refus d'un `SourceLocator` pointant une version invalide;
+  - détection automatisée des dépendances intercontextes interdites.
+- Sortie attendue: l'architecture peut accueillir les comportements métier sans mélanger les modèles.
+
+### M-002 - Plateforme locale sûre
+
+- Source: sections 13, 15, 16, 18, 19, 20 et 21.
+- Objectif métier: exécuter les traitements locaux, jobs et inférences sans exposer les données ni masquer les pannes.
+- Workstreams actifs: WS-03, WS-11.
+- Bounded contexts concernés: `platform`, tous par dépendance technique.
+- Scénario directeur:
+  - Given une demande d'inférence nécessitant Gemma
+  - When `spark-inference` est indisponible ou son certificat invalide
+  - Then l'état `LLM_UNAVAILABLE` ou l'erreur TLS explicite est retourné sans changer l'état métier
+- Livrables:
+  - configuration locale `docker-local`;
+  - services PostgreSQL, Qdrant, API, workers, `llm-gateway`, observabilité;
+  - aucune présence de Gemma ou vLLM principal dans le Compose local;
+  - outbox transactionnelle et consommateurs idempotents;
+  - file de jobs avec priorités et idempotence;
+  - contract test compatible OpenAI entre `llm-gateway` et vLLM Spark;
+  - règles réseau limitant l'accès Spark au seul gateway.
+- Tests et gates:
+  - aucun port PostgreSQL, Qdrant, worker ou Spark exposé publiquement;
+  - retry autorisé uniquement avant premier token;
+  - sortie partielle non publiée;
+  - duplication d'événement sans double transition métier;
+  - logs sans corps complets de prompts et réponses.
+- Sortie attendue: les futures capacités métier disposent d'une exécution locale sûre et auditable.
+
+### M-003 - Source enregistrée, diagnostiquée et routée
+
+- Source: sections 5, 12, 17, 19, 20 et 21.
+- Objectif métier: enregistrer un document source immuable, diagnostiquer chaque page et produire une route explicite sans bascule silencieuse.
+- Workstreams actifs: WS-04.
+- Bounded context propriétaire: SP.
+- Scénario directeur:
+  - Given un PDF original ajouté au corpus
+  - When le diagnostic et le routage sont demandés
+  - Then chaque page reçoit un état, une route et une justification, ou le document passe en revue explicite
+- Livrables:
+  - agrégats `SourceDocument` et `DocumentProcessingRun`;
+  - inventaire par hash stable;
+  - page manifest complet;
+  - diagnostic page par page;
+  - politique de routage;
+  - états `ROUTE_PLANNED`, `MANUAL_REVIEW`, `QUARANTINED`;
+  - endpoints `POST /v1/documents` et `POST /v1/documents/{id}/diagnose`.
+- Tests et gates:
+  - aucun original modifié;
+  - 100 % des pages présentes dans le manifest;
+  - route incertaine refusée au lieu d'être remplacée implicitement;
+  - document en quarantaine non publiable.
+- Sortie attendue: le système sait décider explicitement comment traiter une source.
+
+### M-004 - Version canonique publiée
+
+- Source: sections 5, 12, 14, 17, 19, 20 et 21.
+- Objectif métier: produire une version canonique structurée, contrôlée, immutable et publiable vers les contextes aval.
+- Workstreams actifs: WS-04, WS-11.
+- Bounded context propriétaire: SP.
+- Scénario directeur:
+  - Given une page avec une sortie native et une sortie Granite
+  - When l'adjudication est terminée
+  - Then une seule autorité textuelle est retenue, les autres sorties restent auditées et la justification est enregistrée
+- Livrables:
+  - agrégat `CanonicalSource`;
+  - adaptateurs Docling, Granite-Docling et OCRmyPDF conditionnel;
+  - fusion pagewise;
+  - contrôle qualité pré et post-conversion;
+  - JSON Docling canonique;
+  - exports régénérables;
+  - événement `CanonicalSourcePublished`;
+  - endpoint `POST /v1/documents/{id}/convert`.
+- Tests et gates:
+  - version en quarantaine non publiable;
+  - correction créant une nouvelle version sans modifier l'ancienne;
+  - aucune page omise;
+  - `SourceLocator` résolvable jusqu'à page et item;
+  - QA refusant chiffres, signes ou tableaux incohérents selon politique.
+- Sortie attendue: les contextes aval peuvent consommer une source canonique fiable.
+
+### M-005 - Projection de connaissance recherchable
+
+- Source: sections 6, 12, 14, 17, 19, 20 et 21.
+- Objectif métier: rendre les versions canoniques interrogeables sans confondre projection et source de vérité.
+- Workstreams actifs: WS-05, WS-11.
+- Bounded context propriétaire: KA.
+- Scénario directeur:
+  - Given une projection `SEARCHABLE`
+  - When la recherche retourne un passage
+  - Then le passage contient un `SourceLocator` résolvable et un `content_hash` cohérent
+- Livrables:
+  - agrégat `KnowledgeProjection`;
+  - chunking hiérarchique;
+  - enrichissement de métadonnées;
+  - embeddings et recherche sparse;
+  - collection Qdrant régénérable;
+  - fusion hybride et reranking derrière un port;
+  - endpoint `POST /v1/search`;
+  - métriques Recall@k, MRR, nDCG initiales.
+- Tests et gates:
+  - source en quarantaine non indexable;
+  - projection reconstruisible;
+  - filtres de métadonnées vérifiés;
+  - absence d'accès direct de RA à Qdrant;
+  - recherche renvoyant scores, citations et provenance.
+- Sortie attendue: RA et EG peuvent demander des preuves candidates sans dépendre de Qdrant.
+
+### M-006 - Claims vérifiables
+
+- Source: sections 7, 12, 14, 16, 17, 19, 20 et 21.
+- Objectif métier: protéger le passage d'une formulation plausible à une affirmation vérifiée.
+- Workstreams actifs: WS-06.
+- Bounded context propriétaire: EG.
+- Scénario directeur:
+  - Given une affirmation à l'état `UNDER_VERIFICATION`
+  - When aucune preuve admissible `SUPPORTS_DIRECTLY` n'existe
+  - Then l'affirmation ne passe pas à `VERIFIED` et la raison est enregistrée
+- Livrables:
+  - agrégats `Claim`, `VerificationCase`, `DependencyGroup`;
+  - extraction atomique structurée;
+  - politique d'admissibilité;
+  - conservation de la portée;
+  - groupes de dépendance;
+  - relations support, contradiction, généralisation et dépendance;
+  - endpoints `POST /v1/claims/extract`, `POST /v1/claims/{id}/verify`, `GET /v1/claims/{id}/evidence`.
+- Tests et gates:
+  - condition de preuve jamais élargie silencieusement;
+  - trois reprises d'une même étude comptées comme une seule confirmation indépendante;
+  - sortie LLM traduite en proposition puis décidée par politique;
+  - claim rejeté ou supersédé conservé.
+- Sortie attendue: le registre de preuves devient le coeur vérifiable du système.
+
+### M-007 - Réponse documentaire vérifiée
+
+- Source: sections 8, 12, 16, 17, 19, 20 et 21.
+- Objectif métier: produire une réponse utile dont les assertions importantes sont supportées, qualifiées ou retirées.
+- Workstreams actifs: WS-06, WS-07.
+- Bounded context propriétaire: RA.
+- Scénario directeur:
+  - Given un brouillon contenant une assertion factuelle importante
+  - When aucune preuve admissible ne la soutient
+  - Then l'assertion est supprimée ou reformulée comme incertaine et la réponse ne devient pas `SUPPORTED`
+- Livrables:
+  - agrégats `ResearchCase` et `Answer`;
+  - `ResearchMandate`;
+  - recherche locale simple;
+  - jeu de preuves scellé;
+  - assemblage de preuves;
+  - vérification des assertions de réponse;
+  - statuts `SUPPORTED`, `PARTIALLY_SUPPORTED`, `INSUFFICIENT_EVIDENCE`, `CONFLICTING_EVIDENCE`, `REQUIRES_CURRENT_DATA`;
+  - endpoint `POST /v1/answer`.
+- Tests et gates:
+  - abstention si données actuelles requises mais non autorisées;
+  - contradiction conditionnelle classée sans généralisation abusive;
+  - citation ouvrable pour chaque assertion factuelle conservée;
+  - aucune valeur de marché inventée.
+- Sortie attendue: le système peut répondre sans présenter une hypothèse comme connaissance.
+
+### M-008 - Conversation produit
+
+- Source: sections 9, 12, 17, 18, 19, 20 et 21.
+- Objectif métier: permettre une interaction suivie tout en séparant mémoire conversationnelle et preuve factuelle.
+- Workstreams actifs: WS-08, WS-07.
+- Bounded context propriétaire: CV.
+- Scénario directeur:
+  - Given une conversation portant sur le volatility targeting
+  - When l'utilisateur écrit `compare-la maintenant à Kelly`
+  - Then une question autonome mentionnant explicitement les deux méthodes est produite
+- Livrables:
+  - agrégats `Conversation` et `ConversationTurn`;
+  - `ConversationContextSnapshot`;
+  - routage de mode documentaire, approfondi, stratégie, calcul ou backtest;
+  - endpoints de conversation et endpoint compatible `/v1/chat/completions`;
+  - API de consultation de tours;
+  - rattachement des réponses vérifiées aux tours;
+  - affichage produit minimal des citations et statuts.
+- Tests et gates:
+  - historique non utilisé comme preuve autonome;
+  - assertion réutilisée recherchée et vérifiée à nouveau;
+  - suppression ou archivage de conversation sans suppression cascade des connaissances;
+  - mode choisi visible et justifié.
+- Sortie attendue: le produit devient un chatbot local utile sans rompre la chaîne de preuve.
+
+### M-009 - Recherche approfondie multi-sources
+
+- Source: sections 7, 8, 12, 17, 19, 20 et 21.
+- Objectif métier: analyser convergences, contradictions, limites, dépendances et lacunes sur plusieurs sources.
+- Workstreams actifs: WS-06, WS-07, WS-08.
+- Bounded context propriétaire: RA, avec EG comme fournisseur de claims vérifiés.
+- Scénario directeur:
+  - Given deux affirmations opposées portant sur des horizons différents
+  - When l'analyse des contradictions est exécutée
+  - Then la relation est classée `DIFFERENT_HORIZON` et la réponse explique la condition
+- Livrables:
+  - planificateur de recherche approfondie;
+  - obligations de couverture;
+  - recherches multi-requêtes;
+  - analyse de contradictions et compatibilités;
+  - synthèse multi-sources;
+  - endpoint `POST /v1/research/deep`;
+  - métriques de couverture documentaire.
+- Tests et gates:
+  - limites et conditions conservées dans la synthèse;
+  - contradictions non résolues visibles;
+  - couverture insuffisante produisant un statut explicite;
+  - distinction source, déduction et choix de conception.
+- Sortie attendue: le système peut produire une analyse approfondie sans effacer les nuances des études.
+
+### M-010 - Stratégie candidate attribuée
+
+- Source: sections 10, 12, 17, 18, 19, 20 et 21.
+- Objectif métier: transformer un résultat vérifié en stratégie candidate déterministe, attribuée et compilable ou en diagnostic bloquant.
+- Workstreams actifs: WS-09, WS-06, WS-07.
+- Bounded context propriétaire: SD.
+- Scénario directeur:
+  - Given une stratégie candidate comportant une règle d'entrée sans `RuleOrigin`
+  - When la validation de compilation est demandée
+  - Then la stratégie passe à `INCOMPLETE` et la règle devient un diagnostic bloquant
+- Livrables:
+  - agrégat `StrategyCandidate`;
+  - entités `StrategyRule` et `StrategyParameter`;
+  - origines `SOURCE`, `DEDUCTION`, `DESIGN_CHOICE`, `PARAMETER_TO_CALIBRATE`, `USER_CONSTRAINT`;
+  - `StrategyCompiler`;
+  - analyse de compatibilité;
+  - snapshot immuable `StrategySnapshot`;
+  - endpoints `POST /v1/strategies/compile` et `GET /v1/strategies/{id}`.
+- Tests et gates:
+  - paramètre à calibrer refusé sans domaine ni protocole;
+  - règle documentaire conservant `ClaimId`, version et `EvidenceRefs`;
+  - mandat utilisateur appliqué;
+  - stratégie compilable sans paramètre bloquant non résolu.
+- Sortie attendue: une stratégie n'est jamais un texte séduisant, mais une hypothèse attribuée et vérifiable.
+
+### M-011 - Expérience reproductible
+
+- Source: sections 11, 12, 14, 17, 19, 20 et 21.
+- Objectif métier: exécuter une stratégie snapshotée avec entrées figées et conserver tous les résultats.
+- Workstreams actifs: WS-10, WS-09.
+- Bounded context propriétaire: EX.
+- Scénario directeur:
+  - Given une expérience `RUNNING`
+  - When la modification du modèle de coûts est demandée
+  - Then la commande est refusée et une nouvelle expérience doit être planifiée
+- Livrables:
+  - agrégat `Experiment`;
+  - `ExperimentResult`;
+  - snapshot de données;
+  - modèle de coûts figé;
+  - adaptateur `DeterministicBacktestEngineAdapter`;
+  - registre append-only des expériences;
+  - endpoints `POST /v1/strategies/{id}/backtest` et `GET /v1/experiments/{id}`.
+- Tests et gates:
+  - résultat négatif conservé et consultable;
+  - métriques provenant du moteur de backtest, jamais du LLM;
+  - reproduction depuis `spec_hash`, `data_snapshot`, paramètres, modèle de coûts et version de code;
+  - résultats échoués enregistrés avec cause explicite.
+- Sortie attendue: les hypothèses de stratégie deviennent expérimentables et auditables.
+
+### M-012 - Évaluation pilote et calibration
+
+- Source: sections 19, 20, 21 et 22.
+- Objectif métier: mesurer la qualité du système sur un corpus représentatif avant acceptation.
+- Workstreams actifs: WS-11, tous les workstreams métier.
+- Bounded contexts concernés: tous.
+- Scénario directeur:
+  - Given un corpus pilote annoté
+  - When les routes documentaires, la recherche, les réponses et les modèles sont évalués
+  - Then les seuils et promotions sont justifiés par métriques et non par préférence implicite
+- Livrables:
+  - corpus pilote de 50 à 100 PDF;
+  - jeu annoté page par page;
+  - benchmark de routes documentaires;
+  - benchmark des modèles Gemma candidats via le chemin réel `docker-local -> llm-gateway -> Spark`;
+  - benchmark recherche sur 100 à 300 questions;
+  - benchmark réponses;
+  - benchmark backtests;
+  - seuils calibrés;
+  - rapport des écarts V1.
+- Tests et gates:
+  - CER/WER, exactitude numérique, signes, tableaux et ordre de lecture mesurés;
+  - Recall@5, Recall@10, Recall@20, MRR et nDCG publiés;
+  - précision des citations et taux d'abstention mesurés;
+  - aucun checkpoint communautaire promu sans benchmark supérieur ou égal aux références;
+  - un test scientifique échoué ne peut pas être masqué par un test logiciel GREEN.
+- Sortie attendue: les décisions de promotion reposent sur des preuves mesurées.
+
+### M-013 - Durcissement et acceptation V1
+
+- Source: sections 18, 19, 20, 21, 22, 23 et 24.
+- Objectif métier: transformer le système complet en version personnelle exploitable, sûre et maintenable.
+- Workstreams actifs: WS-01, WS-03, WS-11.
+- Bounded contexts concernés: tous.
+- Scénario directeur:
+  - Given le système complet déployé localement
+  - When la gate V1 est exécutée
+  - Then chaque critère d'acceptation DDD, fonctionnel, technique et sécurité est validé ou explicitement marqué non satisfait
+- Livrables:
+  - suite de régression complète;
+  - audit réseau et sécurité;
+  - sauvegardes chiffrées et test de restauration;
+  - runbooks d'exploitation locale;
+  - monitoring local;
+  - documentation utilisateur;
+  - rapport d'acceptation V1;
+  - liste des écarts non acceptés.
+- Tests et gates:
+  - aucun service exposé publiquement;
+  - Spark accessible uniquement depuis `llm-gateway`;
+  - navigateur incapable d'appeler le Spark;
+  - pannes Spark explicites sans corruption d'état;
+  - restauration de sauvegarde testée;
+  - anti-patterns interdits vérifiés par tests ou revue documentée.
+- Sortie attendue: la V1 est acceptable, exploitable et conforme à la spécification.
+
+## 7. Chemin critique
+
+Chemin critique pour obtenir un chatbot documentaire cité:
 
 ```text
-M5 Chatbot cité
--> M6 Claims et recherche approfondie
--> M7 Stratégies et backtests
--> M8 Évaluation pilote
--> M9 Durcissement V1
+M-000 -> M-001 -> M-002 -> M-003 -> M-004 -> M-005 -> M-006 -> M-007 -> M-008
 ```
 
----
+Chemin critique pour la V1 complète:
 
-## 5. Mapping spécification vers milestones
+```text
+M-008 -> M-009 -> M-010 -> M-011 -> M-012 -> M-013
+```
 
-| Spécification | Milestone principal | Workstreams |
+La plateforme M-002 peut avancer en parallèle des premières spécifications détaillées de M-003 uniquement si M-001 est accepté et présent dans `master`.
+
+## 8. Gates transverses par milestone
+
+Chaque milestone doit produire:
+
+- au moins un scénario `Given-When-Then` métier;
+- au moins un test d'acceptation RED avant implémentation;
+- les tests unitaires des invariants touchés;
+- les tests de contrat si un langage publié est créé ou modifié;
+- les tests d'architecture si une frontière DDD est touchée;
+- les tests de processus si un workflow intercontexte est introduit;
+- les métriques ou logs nécessaires à l'audit du comportement;
+- un commit RED puis un commit GREEN;
+- une entrée dans la matrice de traçabilité.
+
+## 9. Jalons de décision ADR
+
+Les points suivants doivent déclencher une vérification ADR avant implémentation:
+
+| Décision | Moment minimal | ADR attendue si non matérialisée |
 |---|---|---|
-| ADR et principes d'architecture | M0 | WS0 |
-| Services DGX Spark et profils de charge | M1, M9 | WS1 |
-| Organisation des données | M0, M1 | WS2 |
-| Modèles de données | M1 | WS2 |
-| Machine d'états documentaire | M2 | WS2, WS3 |
-| Phase 0 - Ingestion et inventaire | M2 | WS3 |
-| Phase 1 - Diagnostic page par page | M2 | WS3 |
-| Phase 2 - Routage du document | M2 | WS3 |
-| Phase 3 - Contrôle qualité pré-conversion | M3 | WS4 |
-| Phase 4 - Conversion structurée | M3 | WS4 |
-| Phase 5 - Contrôle qualité post-conversion | M3 | WS4 |
-| Phase 6 - Chunking hiérarchique | M4 | WS5 |
-| Phase 7 - Enrichissement des métadonnées | M4 | WS5 |
-| Phase 8 - Embeddings et indexation | M4 | WS5 |
-| Couche conversationnelle | M5 | WS6 |
-| Phase 9 - Recherche et preuves | M5, M6 | WS5, WS6, WS7 |
-| Phase 10 - Registre d'affirmations | M6 | WS7 |
-| Phase 11 - Qualité des preuves | M6 | WS7 |
-| Phase 12 - Contradictions | M6 | WS7 |
-| Phase 13 - Synthèse multi-sources | M6 | WS7 |
-| Phase 14 - Stratégie candidate | M7 | WS8 |
-| Phase 15 - Backtest et validation | M7 | WS8 |
-| Phase 16 - Vérification des réponses | M5, M6 | WS6, WS7 |
-| API fonctionnelle | M2 à M7 | WS6 |
-| Configuration indicative | M0, M1, M8 | WS0, WS1, WS9 |
-| Orchestration | M1 | WS1 |
-| Observabilité et audit | M1, M9 | WS9 |
-| Sécurité et confidentialité | M1, M9 | WS1, WS9 |
-| Plan d'évaluation | M8 | WS9 |
-| Critères d'acceptation V1 | M9 | WS0, WS9 |
+| Artefacts canoniques PDF et Docling JSON | M-004 | Oui |
+| Routage hybride Docling, Granite et OCRmyPDF conditionnel | M-003 ou M-004 | Oui |
+| Autorité textuelle unique par page | M-004 | Oui |
+| Recherche hybride et Qdrant comme projection | M-005 | Oui |
+| Registre de claims séparé de l'index documentaire | M-006 | Oui |
+| Monolithe modulaire et cycles de vie séparés | M-001 | Oui |
+| Cohérence éventuelle intercontextes par outbox | M-002 | Oui |
+| Topologie `docker-local` et `spark-inference` | M-002 | Oui |
+| Gemma 4 servi par vLLM sur Spark | M-002 | Oui |
+| Snapshots immuables pour stratégies et expériences | M-010 ou M-011 | Oui |
 
----
+Une ADR acceptée ne doit pas être réécrite pour changer son sens. Toute évolution doit créer une nouvelle ADR remplaçante.
 
-## 6. Ordre de réalisation recommandé
+## 10. Règles de création des tâches détaillées
 
-1. **Construire la tranche verticale documentaire avant les fonctions avancées.** Le chatbot sans provenance fiable ne satisfait pas la spécification.
-2. **Faire fonctionner le pipeline sur un corpus minuscule.** Commencer avec 3 à 5 PDF représentatifs avant le corpus pilote complet.
-3. **Mesurer tôt les routes documentaires.** Le choix Docling standard, Granite-Docling ou prétraitement conditionnel détermine la qualité de tout le reste.
-4. **Stabiliser les citations avant la synthèse profonde.** Les claims et contradictions dépendent de liens de preuves corrects.
-5. **Ajouter les stratégies après les claims vérifiés.** Une stratégie candidate doit être issue de preuves structurées, pas seulement d'une réponse textuelle.
-6. **Durcir en continu.** Sécurité locale, absence d'exposition publique, logs et idempotence doivent être présents dès les premiers services.
+Avant d'implémenter un milestone `M-NNN`:
 
----
+1. vérifier que tous ses milestones amont sont visibles dans `master`;
+2. créer `docs/tasks/milestone_NNN`;
+3. créer un fichier par tâche verticale au format `NNNN_slug.md`;
+4. commencer par `0001_verifier_precondition_green.md`;
+5. écrire les tâches dans le langage métier du bounded context;
+6. inclure pour chaque tâche le scénario BDD, le test d'acceptation RED, les tests unitaires, l'implémentation attendue, les invariants, les dépendances, les commandes de validation, le commit RED et le commit GREEN.
 
-## 7. Définition d'achèvement transverse
+Si un milestone amont requis n'est pas présent dans `master`, la création du dossier de tâches du milestone aval doit être refusée.
 
-Un développement est considéré terminé seulement si :
+## 11. Risques structurants et contrôles
 
-- le comportement est couvert par tests unitaires ou d'intégration adaptés au risque ;
-- les erreurs attendues ont des statuts explicites ;
-- aucune bascule silencieuse n'est introduite ;
-- les artefacts persistants sont idempotents ou versionnés ;
-- les logs contiennent assez de contexte pour auditer le traitement ;
-- la provenance est conservée lorsqu'un contenu documentaire est manipulé ;
-- les endpoints publics locaux sont documentés ;
-- les critères de sécurité locale restent validés ;
-- la matrice de conformité est mise à jour.
-
----
-
-## 8. Risques principaux et contrôles
-
-| Risque | Contrôle |
+| Risque | Contrôle prévu |
 |---|---|
-| Mauvaise conversion de chiffres, signes ou tableaux | QA post-conversion, jeu annoté, métriques numériques strictes |
-| Route documentaire incorrecte | Diagnostic page par page, seuils calibrés, revue explicite si confiance insuffisante |
-| Citations fausses ou non ouvrables | `item_id`, page PDF, bbox, vérification de réponse |
-| Hallucination de synthèse | registre de claims, entailment, abstention explicite |
-| Paramètres de stratégie inventés | origine obligatoire des règles, `PARAMETER_TO_CALIBRATE` |
-| Backtest biaisé | contrôles survivance, look-ahead, coûts, liquidité, walk-forward |
-| Explosion mémoire sur DGX Spark | profils de charge, concurrence limitée, benchmarks |
-| Exposition réseau accidentelle | bind `127.0.0.1`, tests de configuration, revue sécurité |
-| Résultats non reproductibles | hashes, versions modèle/code/config, registre append-only |
+| Conversion documentaire fidèle en apparence mais fausse sur chiffres ou tableaux | QA M-004 et évaluation pilote M-012 |
+| Citations non ouvrables | `SourceLocator` M-001, SP M-004, KA M-005, gate RA M-007 |
+| Confusion entre projection Qdrant et source de vérité | Contrats M-001, KA M-005, tests d'architecture |
+| Réponse plausible sans preuve | EG M-006, RA M-007, statuts d'abstention |
+| Historique conversationnel traité comme source | CV M-008 et test dédié |
+| Paramètres de stratégie inventés | SD M-010, origine obligatoire et protocole de calibration |
+| Backtest non reproductible | EX M-011, entrées figées et registre append-only |
+| Résultat négatif effacé | EX M-011, rétention M-013 |
+| Spark ou vLLM exposé directement | Plateforme M-002 et audit M-013 |
+| Panne Spark masquée | Gateway M-002, tests de processus et absence de fallback silencieux |
+| Critère scientifique ignoré après GREEN logiciel | Évaluation M-012 séparant tests logiciels et métriques scientifiques |
 
----
+## 12. Livrable V1 attendu
 
-## 9. Jalons de décision
+À la fin de M-013, l'utilisateur doit pouvoir:
 
-### D1 - Choix des seuils de routage
-
-**Moment :** fin M2, puis recalibration M8.  
-**Décision :** seuils `routing.yaml` pour routes natives, scans, prétraitement et enrichissement ciblé.  
-**Données requises :** diagnostics pages, échantillon annoté, erreurs observées.
-
-### D2 - Promotion du pipeline de conversion
-
-**Moment :** fin M3.  
-**Décision :** routes autorisées pour ingestion batch.  
-**Données requises :** QA structurelle, exactitude numérique, fidélité tableaux, temps par page.
-
-### D3 - Choix embeddings et reranker
-
-**Moment :** fin M4.  
-**Décision :** modèles d'embedding et de reranking retenus.  
-**Données requises :** Recall@k, MRR, nDCG, performance FR vers sources EN.
-
-### D4 - Promotion du modèle LLM principal
-
-**Moment :** M5 pour MVP, M8 pour V1.  
-**Décision :** modèle Gemma principal et paramètres de contexte.  
-**Données requises :** JSON valide, tool calling, négations, nombres, citations, entailment.
-
-### D5 - Acceptation des stratégies et backtests en V1
-
-**Moment :** fin M7.  
-**Décision :** périmètre exact des stratégies compilées et des backtests autorisés.  
-**Données requises :** reproductibilité, contrôles biais, registre d'expériences, tests déterministes.
-
----
-
-## 10. Livrable V1 attendu
-
-À la fin de M9, le système doit permettre :
-
-- de charger une bibliothèque personnelle de PDF ;
-- d'inventorier, diagnostiquer, router, convertir, valider et indexer les documents ;
-- de poser des questions en français ou en anglais dans une interface de chat locale ;
-- de poursuivre une conversation avec contexte utile ;
-- de recevoir des réponses citées et ouvrables ;
-- de lancer une recherche approfondie multi-sources ;
-- de consulter claims, preuves, contradictions et limites ;
-- de compiler une stratégie candidate avec origine explicite de chaque règle ;
-- d'exécuter un backtest reproductible par code déterministe ;
-- de conserver les expériences positives et négatives ;
-- d'auditer les traitements, configurations, modèles et versions utilisés ;
-- d'exploiter le tout localement sans exposition publique.
+- charger un corpus personnel de PDF;
+- obtenir des versions canoniques contrôlées et traçables;
+- rechercher des passages avec citations ouvrables;
+- poser des questions en français ou en anglais dans une conversation locale;
+- recevoir une réponse vérifiée, qualifiée ou abstinente;
+- lancer une recherche approfondie multi-sources;
+- consulter claims, preuves, contradictions et limites;
+- compiler une stratégie candidate dont chaque règle possède une origine;
+- exécuter une expérience reproductible par code déterministe;
+- conserver les résultats positifs, négatifs et échoués;
+- auditer les décisions, modèles, versions, données et configurations;
+- exploiter le système localement sans exposition publique.
