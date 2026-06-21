@@ -165,6 +165,23 @@ function Assert-ExitCode {
     }
 }
 
+function Assert-OutputContains {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $Output,
+
+        [Parameter(Mandatory = $true)]
+        [string] $Expected,
+
+        [Parameter(Mandatory = $true)]
+        [string] $Message
+    )
+
+    if (-not $Output.Contains($Expected)) {
+        throw "$Message Sortie obtenue: $Output"
+    }
+}
+
 if (-not (Test-Path -LiteralPath $validatorPath -PathType Leaf)) {
     throw "Validateur de traçabilité absent: scripts/validate_traceability.ps1"
 }
@@ -253,6 +270,19 @@ try {
     $blankPathProjectRoot = New-TemporaryProject -Name "blank-path"
     $blankPathResult = Invoke-ValidatorWithPath -ProjectRoot $blankPathProjectRoot -Path "   "
     Assert-ExitCode -Actual $blankPathResult.ExitCode -Expected 1 -Message "Un paramètre -Path explicitement vide doit être refusé."
+
+    $m000GateProofProjectRoot = New-TemporaryProject -Name "m000-gate-proof"
+    "# Lint`n" | Set-Content -Encoding UTF8 -LiteralPath (Join-Path $m000GateProofProjectRoot "scripts/lint.ps1")
+    "# Test unitaire`n" | Set-Content -Encoding UTF8 -LiteralPath (Join-Path $m000GateProofProjectRoot "tests/governance/validate_m000_validation_commands_unit.ps1")
+    "# Test acceptation`n" | Set-Content -Encoding UTF8 -LiteralPath (Join-Path $m000GateProofProjectRoot "tests/governance/validate_m000_validation_commands_acceptance.ps1")
+    @"
+| Exigence | Source | Statut | Test | Commande | Code | ADR | Justification ADR |
+|---|---|---|---|---|---|---|---|
+| REQ-M000-910 | docs/specs/specification.md | Couvert | tests/governance/validate_m000_validation_commands_unit.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\governance\validate_m000_validation_commands_unit.ps1 | scripts/lint.ps1 | ADR-001 | D$($eAcute)cision structurante d$($eAcute)j$($aGrave) publi$($eAcute)e. |
+"@ | Set-Content -Encoding UTF8 -LiteralPath (Join-Path $m000GateProofProjectRoot "docs/traceability/matrix.md")
+    $m000GateProofResult = Invoke-Validator -ProjectRoot $m000GateProofProjectRoot
+    Assert-ExitCode -Actual $m000GateProofResult.ExitCode -Expected 1 -Message "Une gate M-000 doit etre tracee par le test d'acceptation qui l'execute."
+    Assert-OutputContains -Output $m000GateProofResult.Output -Expected "preuve de gate M-000" -Message "La preuve de gate M-000 incorrecte doit etre nommee."
 }
 finally {
     Remove-Item -LiteralPath $temporaryRoot -Recurse -Force
