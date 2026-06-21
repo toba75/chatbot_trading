@@ -49,3 +49,32 @@
   - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m000_precondition_report.ps1 -Path .\docs\governance\m000_precondition_green_initiale.md`
 - Résultat du registre réel: 19 ADR contrôlées, 19 décisions de section 3 matérialisées.
 - Risque résiduel: `scripts/test.ps1` et `scripts/lint.ps1` restent absents jusqu'à T-006; T-002 ne crée pas encore la gate globale M-000.
+
+### T-003 - Publier la convention des tâches de milestone
+- Sous-agent: `Codex`.
+- Statut: GREEN confirmé localement.
+- Commit RED: `e0133dbf1d1a9752e4520cb666dd9c5948359976`
+- Commit GREEN: `853916df270a4b2074a1256b0c27cedcacc8eb98`
+- ADR: non requise.
+- ADR consultées: `docs/adr/index.md`, `docs/adr/ADR-001-artefacts-canoniques.md`.
+- Fichiers intégrés:
+  - `docs/tasks/README.md`
+  - `scripts/validate_task_system.ps1`
+  - `tests/governance/validate_task_system_acceptance.ps1`
+  - `tests/governance/validate_task_system_unit.ps1`
+- RED observé:
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\governance\validate_task_system_acceptance.ps1` a échoué car `scripts/validate_task_system.ps1` était absent.
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\governance\validate_task_system_unit.ps1` a échoué car `scripts/validate_task_system.ps1` était absent.
+- Validations rejouées localement:
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\governance\validate_task_system_acceptance.ps1`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\governance\validate_task_system_unit.ps1`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_task_system.ps1`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\governance\validate_m000_precondition_report_acceptance.ps1`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\governance\validate_m000_precondition_report_unit.ps1`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m000_precondition_report.ps1 -Path .\docs\governance\m000_precondition_green_initiale.md`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\governance\validate_adr_system_acceptance.ps1`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\governance\validate_adr_system_unit.ps1`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_adr_system.ps1`
+  - `git diff --check`
+- Résultat du validateur réel: 1 milestone et 6 tâches contrôlées.
+- Risque résiduel: `scripts/test.ps1` et `scripts/lint.ps1` restent absents jusqu'à T-006; T-003 publie leur future intégration mais ne crée pas ces commandes.
