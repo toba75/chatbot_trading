@@ -165,6 +165,17 @@ function Assert-ExitCode {
     }
 }
 
+function Initialize-GitBaseline {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $ProjectRoot
+    )
+
+    & git -C $ProjectRoot init -b master 2>$null | Out-Null
+    & git -C $ProjectRoot -c core.autocrlf=false -c user.email="m000@example.test" -c user.name="M000" add . 2>$null | Out-Null
+    & git -C $ProjectRoot -c core.autocrlf=false -c user.email="m000@example.test" -c user.name="M000" commit -m "baseline adr" 2>$null | Out-Null
+}
+
 if (-not (Test-Path -LiteralPath $validatorPath -PathType Leaf)) {
     throw "Validateur ADR absent: scripts/validate_adr_system.ps1"
 }
@@ -206,6 +217,21 @@ try {
         Set-Content -Encoding UTF8 -LiteralPath $indexPath
     $brokenIndexResult = Invoke-Validator -ProjectRoot $brokenIndexProjectRoot
     Assert-ExitCode -Actual $brokenIndexResult.ExitCode -Expected 1 -Message "Un lien d'index vers une ADR inexistante doit etre refuse."
+
+    $replacementMismatchProjectRoot = New-TemporaryProject -Name "replacement-mismatch"
+    $dddAdrPath = Join-Path $replacementMismatchProjectRoot "docs/adr/DDD-ADR-001-monolithe-modulaire.md"
+    (Get-Content -Raw -Encoding UTF8 -LiteralPath $dddAdrPath).Replace("**Remplace :** Aucun", "**Remplace :** ADR-001") |
+        Set-Content -Encoding UTF8 -LiteralPath $dddAdrPath
+    $replacementMismatchResult = Invoke-Validator -ProjectRoot $replacementMismatchProjectRoot
+    Assert-ExitCode -Actual $replacementMismatchResult.ExitCode -Expected 1 -Message "Un remplacement incoherent entre ADR et index doit etre refuse."
+
+    $acceptedDecisionChangeProjectRoot = New-TemporaryProject -Name "accepted-decision-change"
+    Initialize-GitBaseline -ProjectRoot $acceptedDecisionChangeProjectRoot
+    $acceptedAdrPath = Join-Path $acceptedDecisionChangeProjectRoot "docs/adr/ADR-001-artefacts-canoniques.md"
+    (Get-Content -Raw -Encoding UTF8 -LiteralPath $acceptedAdrPath).Replace("Decision de test.", "Decision modifiee sans ADR remplacante.") |
+        Set-Content -Encoding UTF8 -LiteralPath $acceptedAdrPath
+    $acceptedDecisionChangeResult = Invoke-Validator -ProjectRoot $acceptedDecisionChangeProjectRoot
+    Assert-ExitCode -Actual $acceptedDecisionChangeResult.ExitCode -Expected 1 -Message "Une ADR acceptee modifiee dans sa decision doit etre refusee."
 
     $missingDecisionProjectRoot = New-TemporaryProject -Name "missing-section-3-decision"
     $specPath = Join-Path $missingDecisionProjectRoot "docs/specs/specification_unifiee_ddd_technique_chatbot_trading_v4_1.md"

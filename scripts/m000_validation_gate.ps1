@@ -162,6 +162,16 @@ function Invoke-M000ValidationGate {
         [ValidateNotNull()]
         [AllowEmptyCollection()]
         [object[]] $TestCommands
+        ,
+
+        [Parameter(Mandatory = $true)]
+        [ValidateRange(0, 1000)]
+        [int] $ExpectedValidationCount
+        ,
+
+        [Parameter(Mandatory = $true)]
+        [ValidateRange(0, 1000)]
+        [int] $ExpectedTestCount
     )
 
     if (-not (Test-Path -LiteralPath $RepositoryRoot -PathType Container)) {
@@ -172,6 +182,14 @@ function Invoke-M000ValidationGate {
     $validationCommandList = @($ValidationCommands)
     $testCommandList = @($TestCommands)
     $commandCount = $validationCommandList.Count + $testCommandList.Count
+
+    if ($validationCommandList.Count -ne $ExpectedValidationCount) {
+        throw "Gate $GateName attend $ExpectedValidationCount validation(s), mais $($validationCommandList.Count) sont déclarée(s)."
+    }
+
+    if ($testCommandList.Count -ne $ExpectedTestCount) {
+        throw "Gate $GateName attend $ExpectedTestCount test(s), mais $($testCommandList.Count) sont déclaré(s)."
+    }
 
     if ($commandCount -eq 0) {
         throw "Gate $GateName sans commande requise."

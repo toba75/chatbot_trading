@@ -12,13 +12,6 @@ $eGrave = [char] 0x00E8
 $cCedilla = [char] 0x00E7
 $traceabilityLabel = "tra$($cCedilla)abilit$($eAcute)"
 
-if ([string]::IsNullOrWhiteSpace($matrixPath)) {
-    $matrixPath = Join-Path $repoRoot "docs/traceability/matrix.md"
-}
-elseif (-not [System.IO.Path]::IsPathRooted($matrixPath)) {
-    $matrixPath = Join-Path $repoRoot $matrixPath
-}
-
 $requiredHeaders = @(
     "Exigence",
     "Source",
@@ -78,7 +71,13 @@ function Assert-RepositoryRelativeFile {
         -Message "Chemin absolu interdit dans la matrice ($Context): $RelativePath"
 
     $normalizedRelativePath = $RelativePath.Replace("/", [System.IO.Path]::DirectorySeparatorChar).Replace("\", [System.IO.Path]::DirectorySeparatorChar)
-    $candidatePath = Join-Path $repoRoot $normalizedRelativePath
+    $resolvedRepositoryRoot = [System.IO.Path]::GetFullPath($repoRoot)
+    $candidatePath = [System.IO.Path]::GetFullPath((Join-Path $resolvedRepositoryRoot $normalizedRelativePath))
+    $repositoryPrefix = $resolvedRepositoryRoot.TrimEnd("\", "/") + [System.IO.Path]::DirectorySeparatorChar
+
+    Assert-Condition `
+        -Condition ($candidatePath.StartsWith($repositoryPrefix, [System.StringComparison]::OrdinalIgnoreCase)) `
+        -Message "Chemin hors dépôt interdit dans la matrice ($Context): $RelativePath"
 
     Assert-Condition `
         -Condition (Test-Path -LiteralPath $candidatePath -PathType Leaf) `
@@ -156,7 +155,7 @@ function Assert-CommandCell {
         [string] $RequirementId
     )
 
-    $commandPattern = "^powershell\s+-NoProfile\s+-ExecutionPolicy\s+Bypass\s+-File\s+(?<script>\.?[\\/][^\s]+)"
+    $commandPattern = "^powershell\s+-NoProfile\s+-ExecutionPolicy\s+Bypass\s+-File\s+(?<script>\.?[\\/][^\s;|&]+)(?:\s+-Path\s+(?<pathArg>\.?[\\/][^\s;|&]+))?\s*$"
 
     if ($Status -eq "Couvert") {
         Assert-Condition `
@@ -178,6 +177,26 @@ function Assert-CommandCell {
     Assert-RepositoryRelativeFile `
         -RelativePath $scriptPath `
         -Context "commande ${RequirementId}"
+
+    if ($Matches["pathArg"]) {
+        $pathArgument = $Matches["pathArg"].TrimStart(".", "/", "\")
+        Assert-RepositoryRelativeFile `
+            -RelativePath $pathArgument `
+            -Context "argument -Path ${RequirementId}"
+    }
+}
+
+if (-not $PSBoundParameters.ContainsKey("Path")) {
+    $matrixPath = Join-Path $repoRoot "docs/traceability/matrix.md"
+}
+else {
+    Assert-Condition `
+        -Condition (-not [string]::IsNullOrWhiteSpace($matrixPath)) `
+        -Message "Chemin de matrice vide."
+
+    if (-not [System.IO.Path]::IsPathRooted($matrixPath)) {
+        $matrixPath = Join-Path $repoRoot $matrixPath
+    }
 }
 
 Assert-Condition `

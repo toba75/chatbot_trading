@@ -15,6 +15,7 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 | [ADR-007](ADR-007-deploiement-local-sur-dgx-spark.md) | Topologie physique locale à deux plans | Acceptée | 2026-06-21 | Aucun | Aucune |
 | [ADR-008](ADR-008-llm-principal-servi-par-vllm.md) | LLM principal servi par vLLM sur le DGX Spark | Acceptée | 2026-06-21 | Aucun | Aucune |
 | [ADR-009](ADR-009-spark-sans-etat-metier.md) | Le Spark est sans état métier | Acceptée | 2026-06-21 | Aucun | Aucune |
+| [ADR-010](ADR-010-gates-gouvernance-powershell.md) | Gates de gouvernance PowerShell | Acceptée | 2026-06-21 | Aucun | Aucune |
 
 ## ADR DDD
 
@@ -34,7 +35,7 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 ## Prochains numéros disponibles
 
 ```text
-Prochaine ADR technique: ADR-010
+Prochaine ADR technique: ADR-011
 Prochaine DDD-ADR: DDD-ADR-011
 ```
 

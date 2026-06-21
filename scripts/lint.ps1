@@ -25,4 +25,6 @@ Invoke-M000ValidationGate `
     -GateName "lint" `
     -RepositoryRoot $repoRoot `
     -ValidationCommands $validationCommands `
-    -TestCommands $testCommands
+    -TestCommands $testCommands `
+    -ExpectedValidationCount 5 `
+    -ExpectedTestCount 0

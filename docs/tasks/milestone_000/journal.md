@@ -176,3 +176,21 @@
   - `scripts/test.ps1`: 5 validations et 10 tests contrôlés.
   - `scripts/lint.ps1`: 5 validations contrôlées.
 - Risque résiduel: M-000 ne livre toujours pas de suite applicative métier; cette absence reste déclarée `Hors périmètre M-000` dans `docs/traceability/matrix.md`. Les auto-tests T-006 sont exécutés explicitement pour éviter une récursion de `scripts/test.ps1` sur lui-même.
+
+## Revue locale
+
+### Itération 1 - Corrections de revue
+- Statut: corrections appliquées et validations GREEN.
+- Findings corrigés:
+  - traçabilité hors dépôt via `..` dans `scripts/validate_traceability.ps1`;
+  - commande PowerShell de matrice acceptée avec suffixe non validé;
+  - `-Path` explicitement vide traité comme chemin par défaut dans les validateurs de traçabilité et d'achèvement;
+  - registre ADR ne comparant pas les champs `Titre`, `Date`, `Remplace` et `Remplacée par` avec l'index;
+  - absence de test d'acceptation pour modification silencieuse de la section `Décision` d'une ADR acceptée;
+  - gate `scripts/test.ps1` insuffisamment protégée contre l'amputation de tests requis;
+  - absence d'ADR pour la politique durable des gates PowerShell M-000.
+- ADR créée: `docs/adr/ADR-010-gates-gouvernance-powershell.md`.
+- Validations:
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`
+  - `git diff --check`

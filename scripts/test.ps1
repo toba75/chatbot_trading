@@ -37,4 +37,6 @@ Invoke-M000ValidationGate `
     -GateName "test" `
     -RepositoryRoot $repoRoot `
     -ValidationCommands $validationCommands `
-    -TestCommands $testCommands
+    -TestCommands $testCommands `
+    -ExpectedValidationCount 5 `
+    -ExpectedTestCount 10

@@ -112,6 +112,32 @@ function Invoke-Validator {
     }
 }
 
+function Invoke-ValidatorWithPath {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $ProjectRoot,
+
+        [Parameter(Mandatory = $true)]
+        [string] $Path
+    )
+
+    $scriptPath = Join-Path $ProjectRoot "scripts/validate_definition_of_done.ps1"
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+
+    try {
+        $output = & powershell -NoProfile -ExecutionPolicy Bypass -File $scriptPath -Path $Path 2>&1
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+
+    return [pscustomobject] @{
+        ExitCode = $LASTEXITCODE
+        Output = ($output -join "`n")
+    }
+}
+
 function Assert-ExitCode {
     param(
         [Parameter(Mandatory = $true)]
@@ -160,6 +186,10 @@ try {
     $unknownGateProjectRoot = New-TemporaryProject -Name "unknown-gate" -Document $unknownGateDocument
     $unknownGateResult = Invoke-Validator -ProjectRoot $unknownGateProjectRoot
     Assert-ExitCode -Actual $unknownGateResult.ExitCode -Expected 1 -Message "Une gate non autorisée doit être refusée."
+
+    $blankPathProjectRoot = New-TemporaryProject -Name "blank-path" -Document $validDocument
+    $blankPathResult = Invoke-ValidatorWithPath -ProjectRoot $blankPathProjectRoot -Path "   "
+    Assert-ExitCode -Actual $blankPathResult.ExitCode -Expected 1 -Message "Un paramètre -Path explicitement vide doit être refusé."
 }
 finally {
     Remove-Item -LiteralPath $temporaryRoot -Recurse -Force

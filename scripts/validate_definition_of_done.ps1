@@ -23,7 +23,11 @@ $finalValidationHeading = "Validation finale"
 $closureHeading = "Refus de cl$($oCircumflex)ture"
 $traceabilityGate = "Tra$($cCedilla)abilit$($eAcute)"
 
-if ([string]::IsNullOrWhiteSpace($definitionPath)) {
+if ($PSBoundParameters.ContainsKey("Path") -and [string]::IsNullOrWhiteSpace($definitionPath)) {
+    throw "Chemin de définition d'achèvement vide."
+}
+
+if (-not $PSBoundParameters.ContainsKey("Path")) {
     $definitionPath = Join-Path $repoRoot "docs/governance/definition_of_done.md"
 }
 elseif (-not [System.IO.Path]::IsPathRooted($definitionPath)) {

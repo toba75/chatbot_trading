@@ -122,6 +122,32 @@ function Invoke-Validator {
     }
 }
 
+function Invoke-ValidatorWithPath {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $ProjectRoot,
+
+        [Parameter(Mandatory = $true)]
+        [string] $Path
+    )
+
+    $scriptPath = Join-Path $ProjectRoot "scripts/validate_traceability.ps1"
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+
+    try {
+        $output = & powershell -NoProfile -ExecutionPolicy Bypass -File $scriptPath -Path $Path 2>&1
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+
+    return [pscustomobject] @{
+        ExitCode = $LASTEXITCODE
+        Output = ($output -join "`n")
+    }
+}
+
 function Assert-ExitCode {
     param(
         [Parameter(Mandatory = $true)]
@@ -203,6 +229,30 @@ try {
         -Value "scripts/code_absent.ps1"
     $missingCodeResult = Invoke-Validator -ProjectRoot $missingCodeProjectRoot
     Assert-ExitCode -Actual $missingCodeResult.ExitCode -Expected 1 -Message "Un artefact de code absent doit être refusé."
+
+    $outsideFileProjectRoot = New-TemporaryProject -Name "outside-file"
+    $outsideFilePath = Join-Path (Split-Path -Parent $outsideFileProjectRoot) "outside.ps1"
+    "# Outside`n" | Set-Content -Encoding UTF8 -LiteralPath $outsideFilePath
+    Set-MatrixCell `
+        -Path (Join-Path $outsideFileProjectRoot "docs/traceability/matrix.md") `
+        -RequirementId "REQ-M000-901" `
+        -ColumnName "Test" `
+        -Value "../outside.ps1"
+    $outsideFileResult = Invoke-Validator -ProjectRoot $outsideFileProjectRoot
+    Assert-ExitCode -Actual $outsideFileResult.ExitCode -Expected 1 -Message "Un chemin sortant du dépôt doit être refusé."
+
+    $commandSuffixProjectRoot = New-TemporaryProject -Name "command-suffix"
+    Set-MatrixCell `
+        -Path (Join-Path $commandSuffixProjectRoot "docs/traceability/matrix.md") `
+        -RequirementId "REQ-M000-901" `
+        -ColumnName "Commande" `
+        -Value "powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\example.ps1 ; Write-Host danger"
+    $commandSuffixResult = Invoke-Validator -ProjectRoot $commandSuffixProjectRoot
+    Assert-ExitCode -Actual $commandSuffixResult.ExitCode -Expected 1 -Message "Une commande avec suffixe non validé doit être refusée."
+
+    $blankPathProjectRoot = New-TemporaryProject -Name "blank-path"
+    $blankPathResult = Invoke-ValidatorWithPath -ProjectRoot $blankPathProjectRoot -Path "   "
+    Assert-ExitCode -Actual $blankPathResult.ExitCode -Expected 1 -Message "Un paramètre -Path explicitement vide doit être refusé."
 }
 finally {
     Remove-Item -LiteralPath $temporaryRoot -Recurse -Force

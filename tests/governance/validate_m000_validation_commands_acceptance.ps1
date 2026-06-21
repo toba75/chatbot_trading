@@ -181,10 +181,14 @@ try {
     $testResult = Invoke-ProjectCommand -ProjectRoot $validProjectRoot -RelativePath "scripts/test.ps1"
     Assert-ExitCode -Actual $testResult.ExitCode -Expected 0 -Message "La gate de test M-000 conforme doit réussir."
     Assert-OutputContains -Output $testResult.Output -Expected "Gate test GREEN" -Message "La gate de test doit annoncer son état GREEN."
+    Assert-OutputContains -Output $testResult.Output -Expected "Gate test GREEN: 5 validation(s), 10 test(s)." -Message "La gate de test doit prouver le nombre exact de validations et tests."
+    Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/governance/validate_m000_precondition_report_acceptance.ps1" -Message "La gate de test doit exécuter le test d'acceptation T-001."
+    Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/governance/validate_definition_of_done_unit.ps1" -Message "La gate de test doit exécuter le dernier test unitaire T-005."
 
     $lintResult = Invoke-ProjectCommand -ProjectRoot $validProjectRoot -RelativePath "scripts/lint.ps1"
     Assert-ExitCode -Actual $lintResult.ExitCode -Expected 0 -Message "La gate de lint M-000 conforme doit réussir."
     Assert-OutputContains -Output $lintResult.Output -Expected "Gate lint GREEN" -Message "La gate de lint doit annoncer son état GREEN."
+    Assert-OutputContains -Output $lintResult.Output -Expected "Gate lint GREEN: 5 validation(s), 0 test(s)." -Message "La gate de lint doit prouver le nombre exact de validations et tests."
 
     $missingValidationProjectRoot = New-TemporaryProject -Name "missing-validation"
     Remove-Item -LiteralPath (Join-Path $missingValidationProjectRoot "scripts/validate_traceability.ps1")
@@ -207,6 +211,17 @@ try {
         -Output $failingValidationResult.Output `
         -Expected "Validation $($eAcute)chou$($eAcute)e: scripts/validate_traceability.ps1" `
         -Message "La validation échouée doit être nommée."
+
+    $missingTestCommandProjectRoot = New-TemporaryProject -Name "missing-test-command"
+    $testScriptPath = Join-Path $missingTestCommandProjectRoot "scripts/test.ps1"
+    (Get-Content -Raw -Encoding UTF8 -LiteralPath $testScriptPath).Replace('    @{ Path = "tests/governance/validate_m000_precondition_report_acceptance.ps1"; Arguments = @() },', '') |
+        Set-Content -Encoding UTF8 -LiteralPath $testScriptPath
+    $missingTestCommandResult = Invoke-ProjectCommand -ProjectRoot $missingTestCommandProjectRoot -RelativePath "scripts/test.ps1"
+    Assert-ExitCode -Actual $missingTestCommandResult.ExitCode -Expected 1 -Message "Une gate amputée d'un test requis doit produire un RED."
+    Assert-OutputContains `
+        -Output $missingTestCommandResult.Output `
+        -Expected "Gate test attend 10 test(s)" `
+        -Message "La gate amputée doit nommer l'écart de comptage des tests."
 }
 finally {
     Remove-Item -LiteralPath $temporaryRoot -Recurse -Force

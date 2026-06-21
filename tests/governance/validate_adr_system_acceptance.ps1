@@ -61,6 +61,17 @@ function Assert-ExitCode {
     }
 }
 
+function Initialize-GitBaseline {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $ProjectRoot
+    )
+
+    & git -C $ProjectRoot init -b master 2>$null | Out-Null
+    & git -C $ProjectRoot -c core.autocrlf=false -c user.email="m000@example.test" -c user.name="M000" add . 2>$null | Out-Null
+    & git -C $ProjectRoot -c core.autocrlf=false -c user.email="m000@example.test" -c user.name="M000" commit -m "baseline adr" 2>$null | Out-Null
+}
+
 if (-not (Test-Path -LiteralPath $validatorPath -PathType Leaf)) {
     throw "Validateur ADR absent: scripts/validate_adr_system.ps1"
 }
@@ -91,10 +102,45 @@ try {
 
     $missingDecisionProjectRoot = New-TemporaryProject -Name "missing-section-3-decision"
     $specPath = Join-Path $missingDecisionProjectRoot "docs/specs/specification_unifiee_ddd_technique_chatbot_trading_v4_1.md"
-    (Get-Content -Raw -Encoding UTF8 -LiteralPath $specPath).Replace("## ADR DDD structurantes", "### ADR-010 - Decision structurante non materialisee`n`n## ADR DDD structurantes") |
+    (Get-Content -Raw -Encoding UTF8 -LiteralPath $specPath).Replace("## ADR DDD structurantes", "### ADR-011 - Decision structurante non materialisee`n`n## ADR DDD structurantes") |
         Set-Content -Encoding UTF8 -LiteralPath $specPath
     $missingDecisionResult = Invoke-Validator -ProjectRoot $missingDecisionProjectRoot
     Assert-ExitCode -Actual $missingDecisionResult.ExitCode -Expected 1 -Message "Une décision structurante de la section 3 sans ADR matérialisée doit être refusée."
+
+    $acceptedDecisionChangeProjectRoot = New-TemporaryProject -Name "accepted-decision-change"
+    Initialize-GitBaseline -ProjectRoot $acceptedDecisionChangeProjectRoot
+    $acceptedAdrPath = Join-Path $acceptedDecisionChangeProjectRoot "docs/adr/ADR-001-artefacts-canoniques.md"
+    $acceptedAdrLines = [System.Collections.Generic.List[string]] (Get-Content -Encoding UTF8 -LiteralPath $acceptedAdrPath)
+    $decisionHeadingIndex = -1
+    $nextHeadingIndex = -1
+    for ($index = 0; $index -lt $acceptedAdrLines.Count; $index++) {
+        if ($acceptedAdrLines[$index] -match "^## D.cision$") {
+            $decisionHeadingIndex = $index
+            continue
+        }
+
+        if (($decisionHeadingIndex -ge 0) -and ($index -gt $decisionHeadingIndex) -and ($acceptedAdrLines[$index] -match "^##\s+")) {
+            $nextHeadingIndex = $index
+            break
+        }
+    }
+
+    if (($decisionHeadingIndex -lt 0) -or ($nextHeadingIndex -lt 0)) {
+        throw "Section Décision introuvable dans la fixture ADR."
+    }
+
+    $modifiedAdrLines = New-Object System.Collections.Generic.List[string]
+    for ($index = 0; $index -le $decisionHeadingIndex; $index++) {
+        $modifiedAdrLines.Add($acceptedAdrLines[$index])
+    }
+    $modifiedAdrLines.Add("")
+    $modifiedAdrLines.Add("La decision acceptee est modifiee sans ADR remplacante.")
+    for ($index = $nextHeadingIndex; $index -lt $acceptedAdrLines.Count; $index++) {
+        $modifiedAdrLines.Add($acceptedAdrLines[$index])
+    }
+    Set-Content -Encoding UTF8 -LiteralPath $acceptedAdrPath -Value $modifiedAdrLines
+    $acceptedDecisionChangeResult = Invoke-Validator -ProjectRoot $acceptedDecisionChangeProjectRoot
+    Assert-ExitCode -Actual $acceptedDecisionChangeResult.ExitCode -Expected 1 -Message "Une ADR acceptée modifiée dans sa décision sans remplacement explicite doit être refusée."
 }
 finally {
     Remove-Item -LiteralPath $temporaryRoot -Recurse -Force

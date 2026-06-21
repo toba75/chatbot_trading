@@ -118,7 +118,7 @@ $testCommands = @(
     @{ Path = "tests/governance/ok_test.ps1"; Arguments = @() }
 )
 Invoke-M000ValidationGate -GateName "test" -RepositoryRoot $repoRoot -ValidationCommands $validationCommands -TestCommands $testCommands
-'@
+'@ -replace 'Invoke-M000ValidationGate -GateName "test" -RepositoryRoot \$repoRoot -ValidationCommands \$validationCommands -TestCommands \$testCommands', 'Invoke-M000ValidationGate -GateName "test" -RepositoryRoot $repoRoot -ValidationCommands $validationCommands -TestCommands $testCommands -ExpectedValidationCount 1 -ExpectedTestCount 1'
     $successProjectRoot = New-TemporaryProject -Name "success" -WrapperContent $successWrapper
     $successResult = Invoke-TestGate -ProjectRoot $successProjectRoot
     Assert-ExitCode -Actual $successResult.ExitCode -Expected 0 -Message "L'agrégateur doit réussir quand toutes les commandes passent."
@@ -135,7 +135,7 @@ $validationCommands = @(
 )
 $testCommands = @()
 Invoke-M000ValidationGate -GateName "test" -RepositoryRoot $repoRoot -ValidationCommands $validationCommands -TestCommands $testCommands
-'@
+'@ -replace 'Invoke-M000ValidationGate -GateName "test" -RepositoryRoot \$repoRoot -ValidationCommands \$validationCommands -TestCommands \$testCommands', 'Invoke-M000ValidationGate -GateName "test" -RepositoryRoot $repoRoot -ValidationCommands $validationCommands -TestCommands $testCommands -ExpectedValidationCount 1 -ExpectedTestCount 0'
     $missingProjectRoot = New-TemporaryProject -Name "missing" -WrapperContent $missingWrapper
     $missingResult = Invoke-TestGate -ProjectRoot $missingProjectRoot
     Assert-ExitCode -Actual $missingResult.ExitCode -Expected 1 -Message "Une validation absente doit échouer."
@@ -150,7 +150,7 @@ $validationCommands = @(
 )
 $testCommands = @()
 Invoke-M000ValidationGate -GateName "test" -RepositoryRoot $repoRoot -ValidationCommands $validationCommands -TestCommands $testCommands
-'@
+'@ -replace 'Invoke-M000ValidationGate -GateName "test" -RepositoryRoot \$repoRoot -ValidationCommands \$validationCommands -TestCommands \$testCommands', 'Invoke-M000ValidationGate -GateName "test" -RepositoryRoot $repoRoot -ValidationCommands $validationCommands -TestCommands $testCommands -ExpectedValidationCount 1 -ExpectedTestCount 0'
     $failingProjectRoot = New-TemporaryProject -Name "failing" -WrapperContent $failingWrapper
     $failingResult = Invoke-TestGate -ProjectRoot $failingProjectRoot
     Assert-ExitCode -Actual $failingResult.ExitCode -Expected 1 -Message "Une validation échouée doit échouer."
@@ -166,7 +166,7 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $validationCommands = @()
 $testCommands = @()
 Invoke-M000ValidationGate -GateName "test" -RepositoryRoot $repoRoot -ValidationCommands $validationCommands -TestCommands $testCommands
-'@
+'@ -replace 'Invoke-M000ValidationGate -GateName "test" -RepositoryRoot \$repoRoot -ValidationCommands \$validationCommands -TestCommands \$testCommands', 'Invoke-M000ValidationGate -GateName "test" -RepositoryRoot $repoRoot -ValidationCommands $validationCommands -TestCommands $testCommands -ExpectedValidationCount 0 -ExpectedTestCount 0'
     $emptyProjectRoot = New-TemporaryProject -Name "empty" -WrapperContent $emptyWrapper
     $emptyResult = Invoke-TestGate -ProjectRoot $emptyProjectRoot
     Assert-ExitCode -Actual $emptyResult.ExitCode -Expected 1 -Message "Une gate sans commande requise doit échouer."

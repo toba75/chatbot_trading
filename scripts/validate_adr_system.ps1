@@ -159,6 +159,78 @@ function Get-SpecSection3DecisionIds {
     return $decisionIds
 }
 
+function Convert-ReferenceListToKey {
+    param(
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [string[]] $References
+    )
+
+    return (@($References) | Sort-Object) -join ","
+}
+
+function Get-MarkdownSectionContent {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $Content,
+
+        [Parameter(Mandatory = $true)]
+        [string] $Heading
+    )
+
+    $lines = @($Content -split "`r?`n")
+    $sectionLines = New-Object System.Collections.Generic.List[string]
+    $insideSection = $false
+
+    foreach ($line in $lines) {
+        if ($line -match ("^##\s+" + [regex]::Escape($Heading) + "\s*$")) {
+            $insideSection = $true
+            continue
+        }
+
+        if ($insideSection -and $line -match "^##\s+") {
+            break
+        }
+
+        if ($insideSection) {
+            $sectionLines.Add($line)
+        }
+    }
+
+    if (-not $insideSection) {
+        throw "Section introuvable pour comparaison ADR: $Heading"
+    }
+
+    return (($sectionLines -join "`n").Trim())
+}
+
+function Get-GitMasterFileContent {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $RepositoryRoot,
+
+        [Parameter(Mandatory = $true)]
+        [string] $RelativePath
+    )
+
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+
+    try {
+        $output = & git -C $RepositoryRoot show "master:$RelativePath" 2>$null
+        $exitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+
+    if ($exitCode -ne 0) {
+        return $null
+    }
+
+    return ($output -join "`n")
+}
+
 Assert-PathExists -Path $adrDir -PathType "Container" -Message "Le r$($eAcute)pertoire docs/adr est absent."
 Assert-PathExists -Path $specPath -PathType "Leaf" -Message "La sp$($eAcute)cification v4.1 est absente: docs/specs/specification_unifiee_ddd_technique_chatbot_trading_v4_1.md"
 
@@ -180,6 +252,8 @@ $technicalNumbers = New-Object System.Collections.Generic.HashSet[int]
 $dddNumbers = New-Object System.Collections.Generic.HashSet[int]
 $adrByFileName = @{}
 $adrById = @{}
+$adrTitlesByFileName = @{}
+$adrDatesByFileName = @{}
 $adrStatusesByFileName = @{}
 $adrReplacementById = @{}
 $adrReplacedById = @{}
@@ -206,7 +280,10 @@ foreach ($adrFile in $adrFiles) {
     $id = "$family-$numberText"
     $content = Get-Content -Raw -Encoding UTF8 -LiteralPath $adrFile.FullName
 
-    Assert-Regex -Content $content -Pattern "(?m)^# $([regex]::Escape($id)) - .+$" -Message "Titre ADR invalide ou absent: $($adrFile.Name)"
+    $titleMatch = [regex]::Match($content, "(?m)^# $([regex]::Escape($id)) - (?<title>.+)$")
+    if (-not $titleMatch.Success) {
+        throw "Titre ADR invalide ou absent: $($adrFile.Name)"
+    }
 
     foreach ($label in $requiredMetadataLabels) {
         [void] (Get-RequiredMetadataValue -Content $content -Label $label -FileName $adrFile.Name)
@@ -218,12 +295,15 @@ foreach ($adrFile in $adrFiles) {
 
     $status = Get-RequiredMetadataValue -Content $content -Label "Statut" -FileName $adrFile.Name
     Assert-AllowedStatus -Status $status -Context $adrFile.Name
+    $date = Get-RequiredMetadataValue -Content $content -Label "Date" -FileName $adrFile.Name
 
     $replaces = Get-RequiredMetadataValue -Content $content -Label "Remplace" -FileName $adrFile.Name
     $replacedBy = Get-RequiredMetadataValue -Content $content -Label "Remplac$($eAcute)e par" -FileName $adrFile.Name
 
     $adrByFileName[$adrFile.Name] = $adrFile
     $adrById[$id] = $adrFile
+    $adrTitlesByFileName[$adrFile.Name] = $titleMatch.Groups["title"].Value.Trim()
+    $adrDatesByFileName[$adrFile.Name] = $date
     $adrStatusesByFileName[$adrFile.Name] = $status
     $adrReplacementById[$id] = @(Get-AdrReferences -Value $replaces)
     $adrReplacedById[$id] = @(Get-AdrReferences -Value $replacedBy)
@@ -242,6 +322,8 @@ foreach ($row in $indexRows) {
     $id = $rowMatch.Groups["id"].Value.Trim()
     $fileName = $rowMatch.Groups["file"].Value.Trim()
     $status = $rowMatch.Groups["status"].Value.Trim()
+    $title = $rowMatch.Groups["title"].Value.Trim()
+    $date = $rowMatch.Groups["date"].Value.Trim()
     $replaces = $rowMatch.Groups["replaces"].Value.Trim()
     $replacedBy = $rowMatch.Groups["replacedBy"].Value.Trim()
 
@@ -267,9 +349,25 @@ foreach ($row in $indexRows) {
         throw "Statut incoh$($eAcute)rent entre l'ADR et l'index pour ${fileName}."
     }
 
+    if ($adrTitlesByFileName[$fileName] -ne $title) {
+        throw "Titre incoh$($eAcute)rent entre l'ADR et l'index pour ${fileName}."
+    }
+
+    if ($adrDatesByFileName[$fileName] -ne $date) {
+        throw "Date incoh$($eAcute)rente entre l'ADR et l'index pour ${fileName}."
+    }
+
     $indexedStatusesByFileName[$fileName] = $status
-    [void] (Get-AdrReferences -Value $replaces)
-    [void] (Get-AdrReferences -Value $replacedBy)
+    $indexReplacementReferences = @(Get-AdrReferences -Value $replaces)
+    $indexReplacedByReferences = @(Get-AdrReferences -Value $replacedBy)
+
+    if ((Convert-ReferenceListToKey -References $adrReplacementById[$id]) -ne (Convert-ReferenceListToKey -References $indexReplacementReferences)) {
+        throw "Champ Remplace incoh$($eAcute)rent entre l'ADR et l'index pour ${fileName}."
+    }
+
+    if ((Convert-ReferenceListToKey -References $adrReplacedById[$id]) -ne (Convert-ReferenceListToKey -References $indexReplacedByReferences)) {
+        throw "Champ Remplac$($eAcute)e par incoh$($eAcute)rent entre l'ADR et l'index pour ${fileName}."
+    }
 }
 
 foreach ($adrFile in $adrFiles) {
@@ -294,6 +392,35 @@ foreach ($id in $adrReplacementById.Keys) {
     $fileName = $adrById[$id].Name
     if ($adrStatusesByFileName[$fileName] -eq "Remplac$($eAcute)e" -and $adrReplacedById[$id].Count -eq 0) {
         throw "ADR remplac$($eAcute)e sans champ 'Remplac$($eAcute)e par' renseign$($eAcute): $id"
+    }
+}
+
+foreach ($id in $adrById.Keys) {
+    $adrFile = $adrById[$id]
+    $currentStatus = $adrStatusesByFileName[$adrFile.Name]
+
+    if ($currentStatus -ne "Accept$($eAcute)e") {
+        continue
+    }
+
+    $relativePath = "docs/adr/$($adrFile.Name)"
+    $masterContent = Get-GitMasterFileContent -RepositoryRoot $repoRoot -RelativePath $relativePath
+
+    if ($null -eq $masterContent) {
+        continue
+    }
+
+    $masterStatusMatch = [regex]::Match($masterContent, "(?m)^\*\*Statut\s*:\*\*\s*(?<status>\S.*)$")
+    if ((-not $masterStatusMatch.Success) -or ($masterStatusMatch.Groups["status"].Value.Trim() -ne "Accept$($eAcute)e")) {
+        continue
+    }
+
+    $currentContent = Get-Content -Raw -Encoding UTF8 -LiteralPath $adrFile.FullName
+    $currentDecision = Get-MarkdownSectionContent -Content $currentContent -Heading "D$($eAcute)cision"
+    $masterDecision = Get-MarkdownSectionContent -Content $masterContent -Heading "D$($eAcute)cision"
+
+    if ($currentDecision -ne $masterDecision) {
+        throw "ADR accept$($eAcute)e modifi$($eAcute)e silencieusement dans sa section D$($eAcute)cision: $id"
     }
 }
 
