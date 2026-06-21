@@ -1,60 +1,56 @@
-# ADR-005 - Recherche hybride
+﻿# ADR-005 - Recherche hybride
 
-**Statut :** Acceptée  
-**Date :** 2026-06-20  
-**Décideurs :** Projet chatbot trading  
-**Remplace :** Aucun  
-**Remplacée par :** Aucune  
-**Source :** `docs/specification_pipeline_chatbot_trading_dgx_spark_v3_1.md`, section 3, ADR-005
-
----
+**Statut :** Acceptée
+**Date :** 2026-06-21
+**Décideurs :** Propriétaire du projet
+**Remplace :** Aucun
+**Remplacée par :** Aucune
+**Source :** `docs/specs/specification_unifiee_ddd_technique_chatbot_trading_v4_1.md`, sections 3 et 6
 
 ## Contexte
 
-Le chatbot doit répondre à des questions documentaires, retrouver des passages précis, comparer plusieurs sources et citer des pages. Une recherche dense seule peut manquer des termes exacts, tandis qu'une recherche sparse seule peut manquer des reformulations sémantiques.
+Les questions de recherche financière nécessitent de retrouver concepts, termes exacts, chiffres, auteurs, périodes et passages multilingues. Une seule méthode de recherche ne couvre pas ces besoins.
 
 ## Décision
 
-La recherche DOIT combiner :
+La recherche DOIT combiner recherche dense, recherche sparse ou BM25, filtres de métadonnées, fusion, reranking, diversification et expansion vers fragments parents.
 
-- recherche dense sémantique ;
-- recherche sparse ou BM25 ;
-- filtres de métadonnées ;
-- reranking ;
-- diversification par document et auteur ;
-- expansion vers les fragments parents.
-
-Qdrant est retenu comme moteur d'index pour stocker les vecteurs, les métadonnées et permettre les requêtes hybrides.
+Les détails Qdrant restent derrière le port `SearchKnowledge`. Les consommateurs NE DOIVENT PAS dépendre directement des collections Qdrant.
 
 ## Options considérées
 
-| Option | Décision | Raisons |
+| Option | Statut | Raisons |
 |---|---|---|
-| Recherche dense seule | Rejetée | Risque sur les termes exacts, chiffres, noms propres et expressions techniques. |
-| Recherche BM25 seule | Rejetée | Moins robuste aux reformulations et aux requêtes conceptuelles. |
-| Recherche hybride avec reranking | Retenue | Meilleur compromis entre rappel, précision et auditabilité. |
+| Recherche dense seule | Rejetée | Moins fiable sur termes exacts, chiffres et auteurs. |
+| Recherche lexicale seule | Rejetée | Moins robuste aux reformulations et questions FR vers sources EN. |
+| Recherche hybride | Retenue | Combine rappel sémantique et précision lexicale. |
 
 ## Conséquences
 
 ### Positives
 
-- Meilleur rappel sur corpus technique.
-- Possibilité de filtrer par auteur, année, type de source ou thème.
-- Citations plus robustes grâce au reranking et à l'expansion parent.
+- Le rappel et la précision peuvent être mesurés séparément.
+- Les résultats restent filtrables et diversifiables.
 
 ### Négatives ou coûts
 
-- Deux familles d'index ou de scores doivent être maintenues.
-- L'évaluation retrieval devient obligatoire avant promotion.
+- Le pipeline d'évaluation est plus exigeant.
+- Les projections doivent être versionnées et régénérables.
 
 ### Risques et contrôles
 
-- Risque : pondération dense/sparse mal calibrée.  
-  Contrôle : benchmark Recall@k, MRR, nDCG et précision de page.
+- Risque: score hybride interprété comme vérité. Contrôle: KA retourne des preuves candidates, EG/RA décident.
 
 ## Impact d'implémentation
 
-- Modules concernés : `app/chunking/`, `app/indexing/`, `app/retrieval/`, `evaluation/retrieval/`.
-- Configuration concernée : `config/models.yaml`, `config/quality_gates.yaml`.
-- Tests attendus : recherche dense, recherche sparse, fusion, reranking, filtres et citations.
-- Milestones concernées : M4, M5, M8.
+- Modules concernés: `knowledge_access`.
+- Configuration concernée: embeddings, sparse index, reranker, Qdrant.
+- Tests attendus: recherche traçable, filtres, absence de source en quarantaine.
+- Milestones concernées: M-005, M-012.
+
+## Liens de traçabilité
+
+- Spécification: sections 3, 6, 20 et 21.
+- Plan d'implémentation: M-005.
+- Tests d'acceptation: résultat de recherche traçable.
+- Commits: à renseigner lors de l'implémentation.

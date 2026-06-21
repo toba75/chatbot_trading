@@ -1,61 +1,56 @@
-# ADR-002 - Routage hybride Docling
+﻿# ADR-002 - Routage hybride Docling
 
-**Statut :** Acceptée  
-**Date :** 2026-06-20  
-**Décideurs :** Projet chatbot trading  
-**Remplace :** Aucun  
-**Remplacée par :** Aucune  
-**Source :** `docs/specification_pipeline_chatbot_trading_dgx_spark_v3_1.md`, section 3, ADR-002
-
----
+**Statut :** Acceptée
+**Date :** 2026-06-21
+**Décideurs :** Propriétaire du projet
+**Remplace :** Aucun
+**Remplacée par :** Aucune
+**Source :** `docs/specs/specification_unifiee_ddd_technique_chatbot_trading_v4_1.md`, section 3, ADR-002
 
 ## Contexte
 
-Le corpus contient des PDF numériques propres, des scans, des documents mixtes, des pages avec tableaux, graphiques et structures complexes. Un unique pipeline appliqué à tous les documents produirait des erreurs ou des coûts inutiles.
+Le corpus contient des PDF numériques, des scans, des pages mixtes et des documents visuellement complexes. Une chaîne unique de conversion produirait soit trop d'erreurs, soit trop de coût.
 
 ## Décision
 
-Le pipeline documentaire DOIT employer deux modes principaux :
+Le pipeline documentaire DOIT router explicitement chaque document ou page entre Docling standard, Granite-Docling et les routes mixtes prévues par la politique de traitement.
 
-```text
-PDF numérique avec texte natif fiable
--> pipeline Docling standard
-
-Page image, scan ou structure visuelle nécessitant une conversion end-to-end
--> pipeline VLM Docling avec Granite-Docling
-```
-
-Le routage peut être effectué page par page lorsque le document est mixte.
+Une route incertaine NE DOIT PAS déclencher une autre route silencieuse. Elle doit produire un statut explicite de revue ou de quarantaine.
 
 ## Options considérées
 
-| Option | Décision | Raisons |
+| Option | Statut | Raisons |
 |---|---|---|
-| Docling standard pour tout le corpus | Rejetée | Insuffisant pour les scans et certaines pages visuelles. |
-| Granite-Docling pour tout le corpus | Rejetée | Coût inutile et risque de dégrader du texte natif fiable. |
-| Routage hybride | Retenue | Adapte le traitement à l'état réel de chaque page. |
+| Docling standard pour tous les PDF | Rejetée | Ne couvre pas correctement scans et pages visuellement difficiles. |
+| Granite-Docling pour tous les PDF | Rejetée | Coûteux et inutile pour les PDF natifs fiables. |
+| Routage hybride explicite | Retenue | Adapte le traitement au diagnostic tout en conservant l'audit. |
 
 ## Conséquences
 
 ### Positives
 
-- Meilleure qualité sur documents hétérogènes.
-- Coût VLM limité aux pages qui en ont besoin.
-- Possibilité de traiter correctement les documents mixtes.
+- La qualité documentaire devient mesurable route par route.
+- Les pages difficiles peuvent être traitées sans pénaliser les pages simples.
 
 ### Négatives ou coûts
 
-- Le diagnostic page par page devient obligatoire.
-- La fusion pagewise doit préserver la pagination et la provenance.
+- Le diagnostic et la politique de routage deviennent obligatoires.
+- Les tests doivent couvrir les routes et les refus.
 
 ### Risques et contrôles
 
-- Risque : route incorrecte.  
-  Contrôle : seuils calibrés, statut de revue explicite si confiance insuffisante.
+- Risque: mauvais routage produisant une mauvaise preuve. Contrôle: seuils calibrés, revue explicite, métriques M-012.
 
 ## Impact d'implémentation
 
-- Modules concernés : `app/diagnostics/`, `app/routing/`, `app/conversion/`, `app/quality/`.
-- Configuration concernée : `config/routing.yaml`, `config/docling_profiles.yaml`.
-- Tests attendus : routage par page, documents mixtes, absence de fallback silencieux.
-- Milestones concernées : M2, M3, M8.
+- Modules concernés: `source_processing`.
+- Configuration concernée: `routing.yaml`, politiques de qualité.
+- Tests attendus: route explicite, refus des routes incertaines, absence de fallback.
+- Milestones concernées: M-003, M-004, M-012.
+
+## Liens de traçabilité
+
+- Spécification: sections 3, 5, 20 et 21.
+- Plan d'implémentation: M-003, M-004.
+- Tests d'acceptation: diagnostic et routage d'un document source.
+- Commits: à renseigner lors de l'implémentation.

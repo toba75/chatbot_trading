@@ -1,61 +1,56 @@
-# ADR-003 - OCRmyPDF conditionnel
+﻿# ADR-003 - OCRmyPDF conditionnel
 
-**Statut :** Acceptée  
-**Date :** 2026-06-20  
-**Décideurs :** Projet chatbot trading  
-**Remplace :** Aucun  
-**Remplacée par :** Aucune  
-**Source :** `docs/specification_pipeline_chatbot_trading_dgx_spark_v3_1.md`, section 3, ADR-003
-
----
+**Statut :** Acceptée
+**Date :** 2026-06-21
+**Décideurs :** Propriétaire du projet
+**Remplace :** Aucun
+**Remplacée par :** Aucune
+**Source :** `docs/specs/specification_unifiee_ddd_technique_chatbot_trading_v4_1.md`, section 3, ADR-003
 
 ## Contexte
 
-Certains PDF scannés peuvent nécessiter une correction physique avant conversion : rotation, redressement, nettoyage prudent ou réparation exceptionnelle d'une couche OCR. Appliquer OCRmyPDF à tout le corpus introduirait des transcriptions concurrentes et des transformations inutiles.
+Certains scans nécessitent une correction physique avant conversion. Appliquer OCRmyPDF à tout le corpus introduirait une couche textuelle non contrôlée et des altérations inutiles.
 
 ## Décision
 
 OCRmyPDF NE DOIT PAS être appliqué à tous les PDF.
 
-Il intervient uniquement comme outil de correction physique des scans lorsque nécessaire :
-
-- rotation ;
-- redressement ;
-- préparation d'une image très dégradée ;
-- nettoyage prudent ;
-- réparation exceptionnelle d'une couche OCR.
-
-Sa sortie n'est pas le format final du système. Le format final reste le `DoclingDocument`.
+Il PEUT intervenir uniquement comme prétraitement conditionnel pour corriger rotation, redressement, nettoyage prudent ou réparation exceptionnelle d'une couche OCR. Sa sortie n'est pas le format final du système.
 
 ## Options considérées
 
-| Option | Décision | Raisons |
+| Option | Statut | Raisons |
 |---|---|---|
-| OCRmyPDF systématique | Rejetée | Contredit le principe d'autorité textuelle unique et peut dégrader des PDF natifs. |
-| Aucun OCR amont | Rejetée | Ne permet pas de corriger certains scans dégradés. |
-| OCRmyPDF conditionnel | Retenue | Limite l'usage aux cas où il améliore la conversion physique. |
+| OCRmyPDF systématique | Rejetée | Introduit une transcription concurrente et des coûts inutiles. |
+| Interdiction totale d'OCRmyPDF | Rejetée | Bloque les scans physiquement dégradés. |
+| Usage conditionnel explicite | Retenue | Permet la correction sans perdre l'autorité du Docling JSON. |
 
 ## Conséquences
 
 ### Positives
 
-- Réduction du risque de double OCR.
-- Préservation des PDF numériques fiables.
-- Meilleure qualité possible sur scans dégradés.
+- Les scans dégradés restent traitables.
+- L'autorité textuelle reste décidée explicitement.
 
 ### Négatives ou coûts
 
-- Le diagnostic doit identifier les cas qui justifient le prétraitement.
-- Les artefacts préparés doivent être hashés et tracés.
+- Le diagnostic doit justifier l'usage d'OCRmyPDF.
+- Les artefacts de prétraitement doivent être conservés pour audit.
 
 ### Risques et contrôles
 
-- Risque : nettoyage destructif.  
-  Contrôle : configuration prudente et interdiction des transformations non justifiées.
+- Risque: une couche OCR prétraitée devient autorité sans adjudication. Contrôle: ADR-004 et tests d'autorité textuelle.
 
 ## Impact d'implémentation
 
-- Modules concernés : `app/diagnostics/`, `app/routing/`, `app/conversion/`, `app/quality/`.
-- Configuration concernée : `config/routing.yaml`, `config/docling_profiles.yaml`.
-- Tests attendus : scans inclinés, scans bruités, PDF natifs non modifiés.
-- Milestones concernées : M2, M3, M8.
+- Modules concernés: `source_processing.adapters`.
+- Configuration concernée: politique de prétraitement.
+- Tests attendus: OCRmyPDF refusé sans diagnostic admissible.
+- Milestones concernées: M-003, M-004.
+
+## Liens de traçabilité
+
+- Spécification: sections 3 et 5.
+- Plan d'implémentation: M-004.
+- Tests d'acceptation: conversion hybride et QA documentaire.
+- Commits: à renseigner lors de l'implémentation.

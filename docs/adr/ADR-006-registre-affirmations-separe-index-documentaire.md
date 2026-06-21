@@ -1,55 +1,56 @@
-# ADR-006 - Registre d'affirmations séparé de l'index documentaire
+﻿# ADR-006 - Registre d'affirmations séparé de l'index documentaire
 
-**Statut :** Acceptée  
-**Date :** 2026-06-20  
-**Décideurs :** Projet chatbot trading  
-**Remplace :** Aucun  
-**Remplacée par :** Aucune  
-**Source :** `docs/specification_pipeline_chatbot_trading_dgx_spark_v3_1.md`, section 3, ADR-006
-
----
+**Statut :** Acceptée
+**Date :** 2026-06-21
+**Décideurs :** Propriétaire du projet
+**Remplace :** Aucun
+**Remplacée par :** Aucune
+**Source :** `docs/specs/specification_unifiee_ddd_technique_chatbot_trading_v4_1.md`, sections 3 et 7
 
 ## Contexte
 
-Le système doit distinguer les passages documentaires des propositions structurées qui en sont extraites. Une affirmation doit porter ses preuves, conditions, limites et relations avec d'autres affirmations.
+L'index documentaire contient des fragments retrouvables. Il ne représente pas les affirmations, leurs conditions, leurs relations de dépendance ni leurs verdicts de vérification.
 
 ## Décision
 
-L'index vectoriel stocke des fragments documentaires.
+Le registre d'affirmations DOIT être séparé de l'index documentaire.
 
-Le registre d'affirmations stocke des propositions structurées, leurs preuves, leurs conditions, leurs limites et leurs relations.
-
-Le registre ne remplace pas les passages sources ; il sert de couche d'analyse et d'audit.
+L'index vectoriel stocke des fragments et localisateurs. Le registre EG stocke les claims, preuves, portées, relations, vérifications, dépendances et supersessions.
 
 ## Options considérées
 
-| Option | Décision | Raisons |
+| Option | Statut | Raisons |
 |---|---|---|
-| Tout stocker dans l'index vectoriel | Rejetée | Mélange preuves et interprétations, rend l'audit difficile. |
-| Remplacer les passages par des claims | Rejetée | Perte du lien direct avec la source primaire. |
-| Séparer index documentaire et registre d'affirmations | Retenue | Préserve les sources et ajoute une couche analytique auditable. |
+| Stocker les claims dans Qdrant | Rejetée | Confond projection de recherche et état métier vérifié. |
+| Ne pas matérialiser les claims | Rejetée | Empêche audit, contradictions et réutilisation contrôlée. |
+| Registre EG séparé | Retenue | Protège les invariants du core domain. |
 
 ## Conséquences
 
 ### Positives
 
-- Les synthèses peuvent s'appuyer sur des affirmations vérifiées.
-- Les contradictions et dépendances deviennent modélisables.
-- L'audit peut distinguer source, déduction et choix de conception.
+- Une affirmation sans preuve directe peut être refusée de façon explicite.
+- Les dépendances et contradictions deviennent auditables.
 
 ### Négatives ou coûts
 
-- Nécessite des tables et workflows dédiés.
-- L'extraction et la vérification des claims ajoutent de la latence.
+- Un bounded context EG complet est nécessaire.
+- Des synchronisations SP vers EG sont requises.
 
 ### Risques et contrôles
 
-- Risque : claim promu sans support.  
-  Contrôle : statut de vérification et liens de preuve obligatoires.
+- Risque: duplication apparente entre passages et claims. Contrôle: contrats `EvidenceRef` et `VerifiedClaimRef`.
 
 ## Impact d'implémentation
 
-- Modules concernés : `app/claims/`, `app/synthesis/`, `app/research/`.
-- Configuration concernée : schémas claims, quality gates de vérification.
-- Tests attendus : extraction atomique, entailment, rejet des claims sans preuve.
-- Milestones concernées : M6, M7, M8.
+- Modules concernés: `evidence_governance`, `knowledge_access`.
+- Configuration concernée: stockage claims et événements intercontextes.
+- Tests attendus: claim sans preuve directe refusé, dépendances comptées.
+- Milestones concernées: M-006, M-007, M-009.
+
+## Liens de traçabilité
+
+- Spécification: sections 3, 7 et 21.
+- Plan d'implémentation: M-006.
+- Tests d'acceptation: affirmation sans preuve directe.
+- Commits: à renseigner lors de l'implémentation.

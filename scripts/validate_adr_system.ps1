@@ -20,7 +20,7 @@ foreach ($fileName in $requiredFiles) {
     }
 }
 
-$allowedStatuses = @("Proposée", "Acceptée", "Remplacée", "Dépréciée", "Rejetée")
+$allowedStatusPattern = "^(Propos.e|Accept.e|Remplac.e|D.pr.ci.e|Rejet.e)$"
 $adrFiles = Get-ChildItem -LiteralPath $adrDir -File |
     Where-Object { $_.Name -notin $requiredFiles } |
     Sort-Object Name
@@ -40,7 +40,12 @@ foreach ($adrFile in $adrFiles) {
 
     $family = $Matches[1]
     $number = [int]$Matches[2]
-    $numberSet = if ($family -eq "ADR") { $technicalNumbers } else { $dddNumbers }
+    if ($family -eq "ADR") {
+        $numberSet = $technicalNumbers
+    }
+    else {
+        $numberSet = $dddNumbers
+    }
 
     if (-not $numberSet.Add($number)) {
         throw "Numéro ADR dupliqué dans la famille ${family}: $($Matches[2])"
@@ -51,13 +56,13 @@ foreach ($adrFile in $adrFiles) {
         "^# $family-\d{3} - .+",
         "\*\*Statut\s*:\*\*",
         "\*\*Date\s*:\*\*",
-        "\*\*Décideurs\s*:\*\*",
+        "\*\*D.cideurs\s*:\*\*",
         "\*\*Source\s*:\*\*",
         "## Contexte",
-        "## Décision",
-        "## Conséquences",
-        "## Impact d'implémentation",
-        "## Liens de traçabilité"
+        "## D.cision",
+        "## Cons.quences",
+        "## Impact d'impl.mentation",
+        "## Liens de tra.abilit."
     )
 
     foreach ($pattern in $requiredPatterns) {
@@ -72,7 +77,7 @@ foreach ($adrFile in $adrFiles) {
     }
 
     $status = $statusMatch.Groups[1].Value.Trim()
-    if ($allowedStatuses -notcontains $status) {
+    if ($status -notmatch $allowedStatusPattern) {
         throw "Statut ADR non autorisé dans $($adrFile.Name): $status"
     }
 
@@ -81,7 +86,7 @@ foreach ($adrFile in $adrFiles) {
     }
 }
 
-if ($indexContent -notmatch "## Règles de maintenance") {
+if ($indexContent -notmatch "## R.gles de maintenance") {
     throw "L'index ADR ne contient pas les règles de maintenance."
 }
 

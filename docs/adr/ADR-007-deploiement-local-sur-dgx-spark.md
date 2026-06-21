@@ -1,55 +1,59 @@
-# ADR-007 - Déploiement local sur DGX Spark
+﻿# ADR-007 - Topologie physique locale à deux plans
 
-**Statut :** Acceptée  
-**Date :** 2026-06-20  
-**Décideurs :** Projet chatbot trading  
-**Remplace :** Aucun  
-**Remplacée par :** Aucune  
-**Source :** `docs/specification_pipeline_chatbot_trading_dgx_spark_v3_1.md`, section 3, ADR-007
-
----
+**Statut :** Acceptée
+**Date :** 2026-06-21
+**Décideurs :** Propriétaire du projet
+**Remplace :** Aucun
+**Remplacée par :** Aucune
+**Source :** `docs/specs/specification_unifiee_ddd_technique_chatbot_trading_v4_1.md`, sections 3 et 13
 
 ## Contexte
 
-Le produit cible est un chatbot personnel local-first exécuté sur NVIDIA DGX Spark. Le corpus est privé et les services internes manipulent des documents, embeddings, historiques de conversation et résultats de backtests.
+Le système doit rester local-first tout en utilisant un DGX Spark pour l'inférence principale. Les données métier et les stockages doivent rester sur la machine applicative locale.
 
 ## Décision
 
-Le déploiement cible est local sur DGX Spark.
+La plateforme cible utilise deux plans physiques:
 
-Les services DOIVENT être liés à l'interface locale, sauf décision explicite d'accès depuis un réseau privé contrôlé.
+- `spark-inference`: DGX Spark servant Gemma 4 via vLLM;
+- `docker-local`: application métier, interface, workers, Docling, PostgreSQL, Qdrant, corpus et expériences.
 
-Par défaut, les services internes écoutent sur `127.0.0.1`.
+Le Spark NE DOIT PAS héberger de stockage métier, worker documentaire, Qdrant, PostgreSQL ou moteur de backtest.
 
 ## Options considérées
 
-| Option | Décision | Raisons |
+| Option | Statut | Raisons |
 |---|---|---|
-| Déploiement cloud par défaut | Rejetée | Incompatible avec le périmètre local-first et la confidentialité du corpus. |
-| Exposition réseau large par défaut | Rejetée | Augmente inutilement la surface d'attaque. |
-| Déploiement local avec ports liés à `127.0.0.1` | Retenue | Cohérent avec l'usage personnel et la sécurité attendue. |
+| Tout exécuter sur `docker-local` | Rejetée pour V1 cible | Ne correspond pas à la topologie d'acceptation avec Spark. |
+| Déporter données et traitements sur Spark | Rejetée | Introduit état métier et surface d'accès non souhaités. |
+| Deux plans physiques | Retenue | Sépare inférence et données métier. |
 
 ## Conséquences
 
 ### Positives
 
-- Confidentialité renforcée.
-- Contrôle local des modèles, index et documents.
-- Réduction de la dépendance aux services distants.
+- Les données durables restent sur `docker-local`.
+- La frontière d'inférence est auditable.
 
 ### Négatives ou coûts
 
-- L'utilisateur doit gérer ressources, stockage, sauvegardes et mises à jour locales.
-- Les profils de charge doivent éviter les pics mémoire inutiles.
+- La configuration réseau et TLS devient obligatoire.
+- Les tests doivent simuler ou vérifier les pannes Spark.
 
 ### Risques et contrôles
 
-- Risque : exposition accidentelle d'un port interne.  
-  Contrôle : tests de configuration, bind `127.0.0.1`, revue sécurité.
+- Risque: accès direct au Spark depuis navigateur ou worker. Contrôle: pare-feu, gateway unique, tests M-002 et M-013.
 
 ## Impact d'implémentation
 
-- Modules concernés : `app/api/`, `app/orchestration/`, `ui/`, workers.
-- Configuration concernée : `config/security.yaml`, `docker-compose.yml`, `config/models.yaml`.
-- Tests attendus : ports locaux, absence d'exposition publique, readiness des services.
-- Milestones concernées : M1, M5, M9.
+- Modules concernés: `platform.llm_gateway`, déploiement.
+- Configuration concernée: Docker Compose local, DNS, TLS, pare-feu Spark.
+- Tests attendus: ports non exposés, Spark inaccessible hors gateway.
+- Milestones concernées: M-002, M-013.
+
+## Liens de traçabilité
+
+- Spécification: sections 3, 13, 18 et 21.
+- Plan d'implémentation: M-002, M-013.
+- Tests d'acceptation: sécurité locale et frontière Spark.
+- Commits: à renseigner lors de l'implémentation.

@@ -1,35 +1,32 @@
-# ADR-NNN - Titre court
+﻿# ADR-NNN - Titre court
 
-**Statut :** Proposée  
-**Date :** AAAA-MM-JJ  
-**Décideurs :** À compléter  
-**Remplace :** Aucun  
-**Remplacée par :** Aucune  
+**Statut :** Proposée
+**Date :** AAAA-MM-JJ
+**Décideurs :** À compléter
+**Remplace :** Aucun
+**Remplacée par :** Aucune
 **Source :** À compléter
-
----
 
 ## Contexte
 
-Décrire le problème, les contraintes, les hypothèses et les exigences concernées.
+Décrire le problème, les contraintes, les hypothèses, les exigences et les alternatives visibles au moment de la décision.
 
 ## Décision
 
 Décrire la décision retenue de manière normative.
 
-Utiliser si nécessaire :
+Utiliser:
 
-- **DOIT** pour une obligation ;
-- **NE DOIT PAS** pour une interdiction ;
-- **DEVRAIT** pour une recommandation forte ;
-- **PEUT** pour une option.
+- **DOIT** pour une obligation;
+- **NE DOIT PAS** pour une interdiction;
+- **DEVRAIT** pour une recommandation forte;
+- **PEUT** pour une option autorisée.
 
 ## Options considérées
 
-| Option | Décision | Raisons |
+| Option | Statut | Raisons |
 |---|---|---|
-| Option A | Retenue / rejetée | À compléter |
-| Option B | Retenue / rejetée | À compléter |
+| À compléter | Retenue ou rejetée | À compléter |
 
 ## Conséquences
 
@@ -47,10 +44,17 @@ Utiliser si nécessaire :
 
 ## Impact d'implémentation
 
-- Modules concernés : à compléter.
-- Configuration concernée : à compléter.
-- Tests attendus : à compléter.
-- Milestones concernées : à compléter.
+- Modules concernés: à compléter.
+- Configuration concernée: à compléter.
+- Tests attendus: à compléter.
+- Milestones concernées: à compléter.
+
+## Liens de traçabilité
+
+- Spécification: à compléter.
+- Plan d'implémentation: à compléter.
+- Tests d'acceptation: à compléter.
+- Commits: à compléter.
 
 ## Notes
 
