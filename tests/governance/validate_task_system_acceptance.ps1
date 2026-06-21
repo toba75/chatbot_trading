@@ -4,6 +4,7 @@ $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
 $validatorPath = Join-Path $repoRoot "scripts/validate_task_system.ps1"
 $tasksSourceDir = Join-Path $repoRoot "docs/tasks"
 $temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m000_tasks_acceptance_" + [System.Guid]::NewGuid().ToString("N"))
+$eAcute = [char] 0x00E9
 
 function New-TemporaryProject {
     param(
@@ -90,7 +91,7 @@ try {
 
     $missingScenarioProjectRoot = New-TemporaryProject -Name "missing-scenario"
     $taskPath = Join-Path $missingScenarioProjectRoot "docs/tasks/milestone_000/0003_publier_convention_taches_milestone.md"
-    (Get-Content -Raw -Encoding UTF8 -LiteralPath $taskPath).Replace("- Scénario BDD:", "- Scénario supprimé:") |
+    (Get-Content -Raw -Encoding UTF8 -LiteralPath $taskPath).Replace("- Sc$($eAcute)nario BDD:", "- Sc$($eAcute)nario supprim$($eAcute):") |
         Set-Content -Encoding UTF8 -LiteralPath $taskPath
     $missingScenarioResult = Invoke-Validator -ProjectRoot $missingScenarioProjectRoot
     Assert-ExitCode -Actual $missingScenarioResult.ExitCode -Expected 1 -Message "Une tâche sans scénario BDD doit être refusée."
