@@ -88,6 +88,59 @@ function Get-M000CommandDescriptor {
     }
 }
 
+function Assert-M000ExpectedPathSet {
+    param(
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [string[]] $ActualPaths,
+
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [string[]] $ExpectedPaths,
+
+        [Parameter(Mandatory = $true)]
+        [string] $Kind,
+
+        [Parameter(Mandatory = $true)]
+        [string] $GateName
+    )
+
+    $actualSet = New-Object System.Collections.Generic.HashSet[string]
+    foreach ($actualPath in $ActualPaths) {
+        if (-not $actualSet.Add($actualPath)) {
+            throw "$Kind dupliqué dans la gate ${GateName}: $actualPath"
+        }
+    }
+
+    $expectedSet = New-Object System.Collections.Generic.HashSet[string]
+    foreach ($expectedPath in $ExpectedPaths) {
+        if ([string]::IsNullOrWhiteSpace($expectedPath)) {
+            throw "$Kind attendu vide dans la gate ${GateName}."
+        }
+
+        $normalizedExpectedPath = $expectedPath.Replace("\", "/")
+        if ($normalizedExpectedPath.StartsWith("./")) {
+            $normalizedExpectedPath = $normalizedExpectedPath.Substring(2)
+        }
+
+        if (-not $expectedSet.Add($normalizedExpectedPath)) {
+            throw "$Kind attendu dupliqué dans la gate ${GateName}: $normalizedExpectedPath"
+        }
+    }
+
+    foreach ($expectedPath in $expectedSet) {
+        if (-not $actualSet.Contains($expectedPath)) {
+            throw "$Kind requis absent dans la gate ${GateName}: $expectedPath"
+        }
+    }
+
+    foreach ($actualPath in $actualSet) {
+        if (-not $expectedSet.Contains($actualPath)) {
+            throw "$Kind non attendu dans la gate ${GateName}: $actualPath"
+        }
+    }
+}
+
 function Invoke-M000RequiredCommand {
     param(
         [Parameter(Mandatory = $true)]
@@ -172,6 +225,18 @@ function Invoke-M000ValidationGate {
         [Parameter(Mandatory = $true)]
         [ValidateRange(0, 1000)]
         [int] $ExpectedTestCount
+        ,
+
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNull()]
+        [AllowEmptyCollection()]
+        [string[]] $ExpectedValidationPaths
+        ,
+
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNull()]
+        [AllowEmptyCollection()]
+        [string[]] $ExpectedTestPaths
     )
 
     if (-not (Test-Path -LiteralPath $RepositoryRoot -PathType Container)) {
@@ -194,6 +259,16 @@ function Invoke-M000ValidationGate {
     if ($commandCount -eq 0) {
         throw "Gate $GateName sans commande requise."
     }
+
+    $actualValidationPaths = @($validationCommandList | ForEach-Object {
+        (Get-M000CommandDescriptor -Command $_ -Kind "Validation" -RepositoryRoot $resolvedRepositoryRoot).DisplayPath
+    })
+    $actualTestPaths = @($testCommandList | ForEach-Object {
+        (Get-M000CommandDescriptor -Command $_ -Kind "Test" -RepositoryRoot $resolvedRepositoryRoot).DisplayPath
+    })
+
+    Assert-M000ExpectedPathSet -ActualPaths $actualValidationPaths -ExpectedPaths $ExpectedValidationPaths -Kind "Validation" -GateName $GateName
+    Assert-M000ExpectedPathSet -ActualPaths $actualTestPaths -ExpectedPaths $ExpectedTestPaths -Kind "Test" -GateName $GateName
 
     foreach ($command in $validationCommandList) {
         Invoke-M000RequiredCommand -RepositoryRoot $resolvedRepositoryRoot -Command $command -Kind "Validation"

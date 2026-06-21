@@ -165,6 +165,23 @@ function Assert-ExitCode {
     }
 }
 
+function Assert-OutputContains {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $Output,
+
+        [Parameter(Mandatory = $true)]
+        [string] $Expected,
+
+        [Parameter(Mandatory = $true)]
+        [string] $Message
+    )
+
+    if (-not $Output.Contains($Expected)) {
+        throw "$Message Sortie obtenue: $Output"
+    }
+}
+
 function Initialize-GitBaseline {
     param(
         [Parameter(Mandatory = $true)]
@@ -183,7 +200,13 @@ if (-not (Test-Path -LiteralPath $validatorPath -PathType Leaf)) {
 New-Item -ItemType Directory -Path $temporaryRoot | Out-Null
 
 try {
+    $missingMasterProjectRoot = New-TemporaryProject -Name "missing-master"
+    $missingMasterResult = Invoke-Validator -ProjectRoot $missingMasterProjectRoot
+    Assert-ExitCode -Actual $missingMasterResult.ExitCode -Expected 1 -Message "Un registre ADR valide sans reference master doit echouer explicitement."
+    Assert-OutputContains -Output $missingMasterResult.Output -Expected "master indisponible" -Message "L'absence de master doit etre nommee."
+
     $validProjectRoot = New-TemporaryProject -Name "valid"
+    Initialize-GitBaseline -ProjectRoot $validProjectRoot
     $validResult = Invoke-Validator -ProjectRoot $validProjectRoot
     Assert-ExitCode -Actual $validResult.ExitCode -Expected 0 -Message "Un registre ADR minimal et complet doit etre accepte."
 
@@ -225,6 +248,20 @@ try {
     $replacementMismatchResult = Invoke-Validator -ProjectRoot $replacementMismatchProjectRoot
     Assert-ExitCode -Actual $replacementMismatchResult.ExitCode -Expected 1 -Message "Un remplacement incoherent entre ADR et index doit etre refuse."
 
+    $asymmetricReplacementProjectRoot = New-TemporaryProject -Name "asymmetric-replacement"
+    $adr002Path = Join-Path $asymmetricReplacementProjectRoot "docs/adr/ADR-002-remplacement-asymetrique.md"
+    (New-AdrContent -Id "ADR-002" -Title "Remplacement asymetrique" -Status "Accept$($eAcute)e").Replace("**Remplace :** Aucun", "**Remplace :** ADR-001") |
+        Set-Content -Encoding UTF8 -LiteralPath $adr002Path
+    $indexPath = Join-Path $asymmetricReplacementProjectRoot "docs/adr/index.md"
+    $adr002Row = "| [ADR-002](ADR-002-remplacement-asymetrique.md) | Remplacement asymetrique | Accept$($eAcute)e | 2026-06-21 | ADR-001 | Aucune |"
+    (Get-Content -Raw -Encoding UTF8 -LiteralPath $indexPath).
+        Replace("| [ADR-001](ADR-001-artefacts-canoniques.md) | Artefacts canoniques | Accept$($eAcute)e | 2026-06-21 | Aucun | Aucune |", "| [ADR-001](ADR-001-artefacts-canoniques.md) | Artefacts canoniques | Accept$($eAcute)e | 2026-06-21 | Aucun | Aucune |`n$adr002Row").
+        Replace("Prochaine ADR technique: ADR-002", "Prochaine ADR technique: ADR-003") |
+        Set-Content -Encoding UTF8 -LiteralPath $indexPath
+    $asymmetricReplacementResult = Invoke-Validator -ProjectRoot $asymmetricReplacementProjectRoot
+    Assert-ExitCode -Actual $asymmetricReplacementResult.ExitCode -Expected 1 -Message "Une relation ADR Remplace non reciproque doit etre refusee."
+    Assert-OutputContains -Output $asymmetricReplacementResult.Output -Expected "Relation ADR asym" -Message "La relation ADR asymetrique doit etre nommee."
+
     $acceptedDecisionChangeProjectRoot = New-TemporaryProject -Name "accepted-decision-change"
     Initialize-GitBaseline -ProjectRoot $acceptedDecisionChangeProjectRoot
     $acceptedAdrPath = Join-Path $acceptedDecisionChangeProjectRoot "docs/adr/ADR-001-artefacts-canoniques.md"
@@ -233,7 +270,23 @@ try {
     $acceptedDecisionChangeResult = Invoke-Validator -ProjectRoot $acceptedDecisionChangeProjectRoot
     Assert-ExitCode -Actual $acceptedDecisionChangeResult.ExitCode -Expected 1 -Message "Une ADR acceptee modifiee dans sa decision doit etre refusee."
 
+    $acceptedStatusChangeProjectRoot = New-TemporaryProject -Name "accepted-status-change"
+    Initialize-GitBaseline -ProjectRoot $acceptedStatusChangeProjectRoot
+    $acceptedAdrPath = Join-Path $acceptedStatusChangeProjectRoot "docs/adr/ADR-001-artefacts-canoniques.md"
+    (Get-Content -Raw -Encoding UTF8 -LiteralPath $acceptedAdrPath).
+        Replace("**Statut :** Accept$($eAcute)e", "**Statut :** Propos$($eAcute)e").
+        Replace("Decision de test.", "Decision modifiee en changeant le statut courant.") |
+        Set-Content -Encoding UTF8 -LiteralPath $acceptedAdrPath
+    $indexPath = Join-Path $acceptedStatusChangeProjectRoot "docs/adr/index.md"
+    (Get-Content -Raw -Encoding UTF8 -LiteralPath $indexPath).
+        Replace("| [ADR-001](ADR-001-artefacts-canoniques.md) | Artefacts canoniques | Accept$($eAcute)e |", "| [ADR-001](ADR-001-artefacts-canoniques.md) | Artefacts canoniques | Propos$($eAcute)e |") |
+        Set-Content -Encoding UTF8 -LiteralPath $indexPath
+    $acceptedStatusChangeResult = Invoke-Validator -ProjectRoot $acceptedStatusChangeProjectRoot
+    Assert-ExitCode -Actual $acceptedStatusChangeResult.ExitCode -Expected 1 -Message "Une ADR acceptee dans master doit rester protegee meme si son statut courant change."
+    Assert-OutputContains -Output $acceptedStatusChangeResult.Output -Expected "modifi" -Message "La modification de decision doit etre nommee."
+
     $missingDecisionProjectRoot = New-TemporaryProject -Name "missing-section-3-decision"
+    Initialize-GitBaseline -ProjectRoot $missingDecisionProjectRoot
     $specPath = Join-Path $missingDecisionProjectRoot "docs/specs/specification_unifiee_ddd_technique_chatbot_trading_v4_1.md"
     (Get-Content -Raw -Encoding UTF8 -LiteralPath $specPath).Replace("# 4. Suite", "### DDD-ADR-002 - Cycle manquant`n`n# 4. Suite") |
         Set-Content -Encoding UTF8 -LiteralPath $specPath

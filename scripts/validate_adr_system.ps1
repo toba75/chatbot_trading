@@ -217,7 +217,44 @@ function Get-GitMasterFileContent {
     $ErrorActionPreference = "Continue"
 
     try {
-        $output = & git -C $RepositoryRoot show "master:$RelativePath" 2>$null
+        & git -C $RepositoryRoot cat-file -e "master:$RelativePath" 2>$null
+        $existsExitCode = $LASTEXITCODE
+
+        if ($existsExitCode -ne 0) {
+            return [pscustomobject] @{
+                Exists = $false
+                Content = ""
+            }
+        }
+
+        $output = & git -C $RepositoryRoot show "master:$RelativePath" 2>&1
+        $showExitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+
+    if ($showExitCode -ne 0) {
+        throw "Lecture Git impossible pour master:${RelativePath}: $($output -join ' ')"
+    }
+
+    return [pscustomobject] @{
+        Exists = $true
+        Content = ($output -join "`n")
+    }
+}
+
+function Assert-GitMasterReference {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $RepositoryRoot
+    )
+
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+
+    try {
+        $output = & git -C $RepositoryRoot rev-parse --verify "master^{commit}" 2>&1
         $exitCode = $LASTEXITCODE
     }
     finally {
@@ -225,10 +262,8 @@ function Get-GitMasterFileContent {
     }
 
     if ($exitCode -ne 0) {
-        return $null
+        throw "R$($eAcute)f$($eAcute)rence Git master indisponible pour contr$($oCircumflex)ler les ADR accept$($eAcute)es: $($output -join ' ')"
     }
-
-    return ($output -join "`n")
 }
 
 Assert-PathExists -Path $adrDir -PathType "Container" -Message "Le r$($eAcute)pertoire docs/adr est absent."
@@ -395,21 +430,33 @@ foreach ($id in $adrReplacementById.Keys) {
     }
 }
 
+foreach ($id in $adrReplacementById.Keys) {
+    foreach ($replacedId in $adrReplacementById[$id]) {
+        if ($adrReplacedById[$replacedId] -notcontains $id) {
+            throw "Relation ADR asym$($eAcute)trique: $id remplace $replacedId, mais $replacedId ne d$($eAcute)clare pas 'Remplac$($eAcute)e par' $id."
+        }
+    }
+
+    foreach ($replacementId in $adrReplacedById[$id]) {
+        if ($adrReplacementById[$replacementId] -notcontains $id) {
+            throw "Relation ADR asym$($eAcute)trique: $id est remplac$($eAcute)e par $replacementId, mais $replacementId ne d$($eAcute)clare pas 'Remplace' $id."
+        }
+    }
+}
+
+Assert-GitMasterReference -RepositoryRoot $repoRoot
+
 foreach ($id in $adrById.Keys) {
     $adrFile = $adrById[$id]
-    $currentStatus = $adrStatusesByFileName[$adrFile.Name]
-
-    if ($currentStatus -ne "Accept$($eAcute)e") {
-        continue
-    }
 
     $relativePath = "docs/adr/$($adrFile.Name)"
-    $masterContent = Get-GitMasterFileContent -RepositoryRoot $repoRoot -RelativePath $relativePath
+    $masterFile = Get-GitMasterFileContent -RepositoryRoot $repoRoot -RelativePath $relativePath
 
-    if ($null -eq $masterContent) {
+    if (-not $masterFile.Exists) {
         continue
     }
 
+    $masterContent = $masterFile.Content
     $masterStatusMatch = [regex]::Match($masterContent, "(?m)^\*\*Statut\s*:\*\*\s*(?<status>\S.*)$")
     if ((-not $masterStatusMatch.Success) -or ($masterStatusMatch.Groups["status"].Value.Trim() -ne "Accept$($eAcute)e")) {
         continue

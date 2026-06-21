@@ -33,10 +33,33 @@ $testCommands = @(
     @{ Path = "tests/governance/validate_definition_of_done_unit.ps1"; Arguments = @() }
 )
 
+$expectedValidationPaths = @(
+    "scripts/validate_m000_precondition_report.ps1",
+    "scripts/validate_adr_system.ps1",
+    "scripts/validate_task_system.ps1",
+    "scripts/validate_traceability.ps1",
+    "scripts/validate_definition_of_done.ps1"
+)
+
+$expectedTestPaths = @(
+    "tests/governance/validate_m000_precondition_report_acceptance.ps1",
+    "tests/governance/validate_m000_precondition_report_unit.ps1",
+    "tests/governance/validate_adr_system_acceptance.ps1",
+    "tests/governance/validate_adr_system_unit.ps1",
+    "tests/governance/validate_task_system_acceptance.ps1",
+    "tests/governance/validate_task_system_unit.ps1",
+    "tests/governance/validate_traceability_acceptance.ps1",
+    "tests/governance/validate_traceability_unit.ps1",
+    "tests/governance/validate_definition_of_done_acceptance.ps1",
+    "tests/governance/validate_definition_of_done_unit.ps1"
+)
+
 Invoke-M000ValidationGate `
     -GateName "test" `
     -RepositoryRoot $repoRoot `
     -ValidationCommands $validationCommands `
     -TestCommands $testCommands `
     -ExpectedValidationCount 5 `
-    -ExpectedTestCount 10
+    -ExpectedTestCount 10 `
+    -ExpectedValidationPaths $expectedValidationPaths `
+    -ExpectedTestPaths $expectedTestPaths

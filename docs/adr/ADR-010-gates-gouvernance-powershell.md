@@ -26,7 +26,9 @@ Ces gates DOIVENT exécuter les validateurs M-000 requis via `scripts/m000_valid
 
 `scripts/lint.ps1` DOIT exécuter les validateurs de gouvernance sans lancer les tests.
 
-Une gate NE DOIT PAS retourner GREEN si une validation ou un test requis est absent, échoue, sort du dépôt ou si le nombre de commandes déclarées ne correspond pas au nombre attendu.
+Une gate NE DOIT PAS retourner GREEN si une validation ou un test requis est absent, échoue, sort du dépôt, est dupliqué, n'appartient pas à la liste attendue ou si le nombre de commandes déclarées ne correspond pas au nombre attendu.
+
+Les gates DOIVENT contrôler l'identité et l'unicité des chemins attendus, et pas seulement le nombre total de validations ou de tests.
 
 ## Options considérées
 
@@ -51,7 +53,7 @@ Une gate NE DOIT PAS retourner GREEN si une validation ou un test requis est abs
 
 ### Risques et contrôles
 
-- Risque: gate amputée qui reste GREEN. Contrôle: comptage attendu des validations et tests.
+- Risque: gate amputée qui reste GREEN. Contrôle: comptage attendu, identité et unicité des validations et tests.
 - Risque: preuve hors dépôt ou commande suffixée. Contrôle: validation stricte des chemins et commandes dans la matrice de traçabilité.
 - Risque: récursion des auto-tests de la gate. Contrôle: les tests T-006 restent exécutés explicitement hors `scripts/test.ps1`.
 
@@ -67,4 +69,4 @@ Une gate NE DOIT PAS retourner GREEN si une validation ou un test requis est abs
 - Spécification: `docs/specs/plan_implementation_milestones_workstreams.md`, M-000 et règles d'exécution.
 - Plan d'implémentation: M-000, T-006.
 - Tests d'acceptation: `tests/governance/validate_m000_validation_commands_acceptance.ps1`.
-- Commits: `6d71280bbed826fa102330ef369128886b93ca69`, correction de revue à venir.
+- Commits: `6d71280bbed826fa102330ef369128886b93ca69`, corrections de revue documentées dans `docs/tasks/milestone_000/journal.md`.

@@ -163,6 +163,17 @@ function Assert-OutputContains {
     }
 }
 
+function Initialize-GitBaseline {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $ProjectRoot
+    )
+
+    & git -C $ProjectRoot init -b master 2>$null | Out-Null
+    & git -C $ProjectRoot -c core.autocrlf=false -c user.email="m000@example.test" -c user.name="M000" add . 2>$null | Out-Null
+    & git -C $ProjectRoot -c core.autocrlf=false -c user.email="m000@example.test" -c user.name="M000" commit -m "baseline m000 validation commands" 2>$null | Out-Null
+}
+
 if (-not (Test-Path -LiteralPath $testCommandPath -PathType Leaf)) {
     throw "Commande de test M-000 absente: scripts/test.ps1"
 }
@@ -178,6 +189,7 @@ try {
     # When les gates globales de test et de lint sont exécutées.
     # Then elles retournent GREEN sur un dépôt valide ou RED avec la validation fautive nommée.
     $validProjectRoot = New-TemporaryProject -Name "valid"
+    Initialize-GitBaseline -ProjectRoot $validProjectRoot
     $testResult = Invoke-ProjectCommand -ProjectRoot $validProjectRoot -RelativePath "scripts/test.ps1"
     Assert-ExitCode -Actual $testResult.ExitCode -Expected 0 -Message "La gate de test M-000 conforme doit réussir."
     Assert-OutputContains -Output $testResult.Output -Expected "Gate test GREEN" -Message "La gate de test doit annoncer son état GREEN."
@@ -191,6 +203,7 @@ try {
     Assert-OutputContains -Output $lintResult.Output -Expected "Gate lint GREEN: 5 validation(s), 0 test(s)." -Message "La gate de lint doit prouver le nombre exact de validations et tests."
 
     $missingValidationProjectRoot = New-TemporaryProject -Name "missing-validation"
+    Initialize-GitBaseline -ProjectRoot $missingValidationProjectRoot
     Remove-Item -LiteralPath (Join-Path $missingValidationProjectRoot "scripts/validate_traceability.ps1")
     $missingValidationResult = Invoke-ProjectCommand -ProjectRoot $missingValidationProjectRoot -RelativePath "scripts/lint.ps1"
     Assert-ExitCode -Actual $missingValidationResult.ExitCode -Expected 1 -Message "Une validation requise absente doit produire un RED."
@@ -200,6 +213,7 @@ try {
         -Message "La validation absente doit être nommée."
 
     $failingValidationProjectRoot = New-TemporaryProject -Name "failing-validation"
+    Initialize-GitBaseline -ProjectRoot $failingValidationProjectRoot
     Set-MatrixCell `
         -Path (Join-Path $failingValidationProjectRoot "docs/traceability/matrix.md") `
         -RequirementId "REQ-M000-004" `
@@ -213,6 +227,7 @@ try {
         -Message "La validation échouée doit être nommée."
 
     $missingTestCommandProjectRoot = New-TemporaryProject -Name "missing-test-command"
+    Initialize-GitBaseline -ProjectRoot $missingTestCommandProjectRoot
     $testScriptPath = Join-Path $missingTestCommandProjectRoot "scripts/test.ps1"
     (Get-Content -Raw -Encoding UTF8 -LiteralPath $testScriptPath).Replace('    @{ Path = "tests/governance/validate_m000_precondition_report_acceptance.ps1"; Arguments = @() },', '') |
         Set-Content -Encoding UTF8 -LiteralPath $testScriptPath

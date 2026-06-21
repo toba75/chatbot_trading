@@ -83,6 +83,7 @@ try {
     # When la validation du registre ADR est exécutée.
     # Then chaque ADR versionnée respecte le format attendu, apparaît dans l'index et correspond à une décision référencée ou explicitement ajoutée.
     $validProjectRoot = New-TemporaryProject -Name "valid"
+    Initialize-GitBaseline -ProjectRoot $validProjectRoot
     $validResult = Invoke-Validator -ProjectRoot $validProjectRoot
     Assert-ExitCode -Actual $validResult.ExitCode -Expected 0 -Message "Le registre ADR canonique complet doit être accepté."
 
@@ -101,6 +102,7 @@ try {
     Assert-ExitCode -Actual $unknownStatusResult.ExitCode -Expected 1 -Message "Un statut ADR non autorisé doit être refusé."
 
     $missingDecisionProjectRoot = New-TemporaryProject -Name "missing-section-3-decision"
+    Initialize-GitBaseline -ProjectRoot $missingDecisionProjectRoot
     $specPath = Join-Path $missingDecisionProjectRoot "docs/specs/specification_unifiee_ddd_technique_chatbot_trading_v4_1.md"
     (Get-Content -Raw -Encoding UTF8 -LiteralPath $specPath).Replace("## ADR DDD structurantes", "### ADR-011 - Decision structurante non materialisee`n`n## ADR DDD structurantes") |
         Set-Content -Encoding UTF8 -LiteralPath $specPath

@@ -194,3 +194,21 @@
   - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`
   - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`
   - `git diff --check`
+
+### Itération 2 - Corrections de revue
+- Statut: corrections appliquées et validations GREEN.
+- Findings corrigés:
+  - référence Git `master` requise explicitement par le validateur ADR avant de contrôler les ADR acceptées;
+  - section `Décision` d'une ADR acceptée dans `master` protégée même si son statut courant change;
+  - relations ADR `Remplace` et `Remplacée par` contrôlées en réciprocité;
+  - gates `scripts/test.ps1` et `scripts/lint.ps1` protégées par identité et unicité des chemins attendus, pas seulement par comptage;
+  - matrice de traçabilité T-006 alignée avec l'exécution explicite des auto-tests hors récursion de `scripts/test.ps1`;
+  - ADR-010 complétée pour documenter le contrat durable d'identité et d'unicité des gates.
+- Validations:
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\governance\validate_adr_system_unit.ps1`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\governance\validate_adr_system_acceptance.ps1`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\governance\validate_m000_validation_commands_unit.ps1`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\governance\validate_m000_validation_commands_acceptance.ps1`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`
+  - `git diff --check`

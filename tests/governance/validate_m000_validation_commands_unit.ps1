@@ -117,8 +117,10 @@ $validationCommands = @(
 $testCommands = @(
     @{ Path = "tests/governance/ok_test.ps1"; Arguments = @() }
 )
-Invoke-M000ValidationGate -GateName "test" -RepositoryRoot $repoRoot -ValidationCommands $validationCommands -TestCommands $testCommands
-'@ -replace 'Invoke-M000ValidationGate -GateName "test" -RepositoryRoot \$repoRoot -ValidationCommands \$validationCommands -TestCommands \$testCommands', 'Invoke-M000ValidationGate -GateName "test" -RepositoryRoot $repoRoot -ValidationCommands $validationCommands -TestCommands $testCommands -ExpectedValidationCount 1 -ExpectedTestCount 1'
+$expectedValidationPaths = @("scripts/ok_validation.ps1")
+$expectedTestPaths = @("tests/governance/ok_test.ps1")
+Invoke-M000ValidationGate -GateName "test" -RepositoryRoot $repoRoot -ValidationCommands $validationCommands -TestCommands $testCommands -ExpectedValidationCount 1 -ExpectedTestCount 1 -ExpectedValidationPaths $expectedValidationPaths -ExpectedTestPaths $expectedTestPaths
+'@
     $successProjectRoot = New-TemporaryProject -Name "success" -WrapperContent $successWrapper
     $successResult = Invoke-TestGate -ProjectRoot $successProjectRoot
     Assert-ExitCode -Actual $successResult.ExitCode -Expected 0 -Message "L'agrégateur doit réussir quand toutes les commandes passent."
@@ -134,8 +136,10 @@ $validationCommands = @(
     @{ Path = "scripts/missing_validation.ps1"; Arguments = @() }
 )
 $testCommands = @()
-Invoke-M000ValidationGate -GateName "test" -RepositoryRoot $repoRoot -ValidationCommands $validationCommands -TestCommands $testCommands
-'@ -replace 'Invoke-M000ValidationGate -GateName "test" -RepositoryRoot \$repoRoot -ValidationCommands \$validationCommands -TestCommands \$testCommands', 'Invoke-M000ValidationGate -GateName "test" -RepositoryRoot $repoRoot -ValidationCommands $validationCommands -TestCommands $testCommands -ExpectedValidationCount 1 -ExpectedTestCount 0'
+$expectedValidationPaths = @("scripts/missing_validation.ps1")
+$expectedTestPaths = @()
+Invoke-M000ValidationGate -GateName "test" -RepositoryRoot $repoRoot -ValidationCommands $validationCommands -TestCommands $testCommands -ExpectedValidationCount 1 -ExpectedTestCount 0 -ExpectedValidationPaths $expectedValidationPaths -ExpectedTestPaths $expectedTestPaths
+'@
     $missingProjectRoot = New-TemporaryProject -Name "missing" -WrapperContent $missingWrapper
     $missingResult = Invoke-TestGate -ProjectRoot $missingProjectRoot
     Assert-ExitCode -Actual $missingResult.ExitCode -Expected 1 -Message "Une validation absente doit échouer."
@@ -149,8 +153,10 @@ $validationCommands = @(
     @{ Path = "scripts/failing_validation.ps1"; Arguments = @() }
 )
 $testCommands = @()
-Invoke-M000ValidationGate -GateName "test" -RepositoryRoot $repoRoot -ValidationCommands $validationCommands -TestCommands $testCommands
-'@ -replace 'Invoke-M000ValidationGate -GateName "test" -RepositoryRoot \$repoRoot -ValidationCommands \$validationCommands -TestCommands \$testCommands', 'Invoke-M000ValidationGate -GateName "test" -RepositoryRoot $repoRoot -ValidationCommands $validationCommands -TestCommands $testCommands -ExpectedValidationCount 1 -ExpectedTestCount 0'
+$expectedValidationPaths = @("scripts/failing_validation.ps1")
+$expectedTestPaths = @()
+Invoke-M000ValidationGate -GateName "test" -RepositoryRoot $repoRoot -ValidationCommands $validationCommands -TestCommands $testCommands -ExpectedValidationCount 1 -ExpectedTestCount 0 -ExpectedValidationPaths $expectedValidationPaths -ExpectedTestPaths $expectedTestPaths
+'@
     $failingProjectRoot = New-TemporaryProject -Name "failing" -WrapperContent $failingWrapper
     $failingResult = Invoke-TestGate -ProjectRoot $failingProjectRoot
     Assert-ExitCode -Actual $failingResult.ExitCode -Expected 1 -Message "Une validation échouée doit échouer."
@@ -165,12 +171,32 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 . (Join-Path $PSScriptRoot "m000_validation_gate.ps1")
 $validationCommands = @()
 $testCommands = @()
-Invoke-M000ValidationGate -GateName "test" -RepositoryRoot $repoRoot -ValidationCommands $validationCommands -TestCommands $testCommands
-'@ -replace 'Invoke-M000ValidationGate -GateName "test" -RepositoryRoot \$repoRoot -ValidationCommands \$validationCommands -TestCommands \$testCommands', 'Invoke-M000ValidationGate -GateName "test" -RepositoryRoot $repoRoot -ValidationCommands $validationCommands -TestCommands $testCommands -ExpectedValidationCount 0 -ExpectedTestCount 0'
+$expectedValidationPaths = @()
+$expectedTestPaths = @()
+Invoke-M000ValidationGate -GateName "test" -RepositoryRoot $repoRoot -ValidationCommands $validationCommands -TestCommands $testCommands -ExpectedValidationCount 0 -ExpectedTestCount 0 -ExpectedValidationPaths $expectedValidationPaths -ExpectedTestPaths $expectedTestPaths
+'@
     $emptyProjectRoot = New-TemporaryProject -Name "empty" -WrapperContent $emptyWrapper
     $emptyResult = Invoke-TestGate -ProjectRoot $emptyProjectRoot
     Assert-ExitCode -Actual $emptyResult.ExitCode -Expected 1 -Message "Une gate sans commande requise doit échouer."
     Assert-OutputContains -Output $emptyResult.Output -Expected "Gate test sans commande requise." -Message "La gate vide doit être refusée explicitement."
+
+    $duplicateWrapper = @'
+$ErrorActionPreference = "Stop"
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+. (Join-Path $PSScriptRoot "m000_validation_gate.ps1")
+$validationCommands = @(
+    @{ Path = "scripts/ok_validation.ps1"; Arguments = @() },
+    @{ Path = "scripts/ok_validation.ps1"; Arguments = @() }
+)
+$testCommands = @()
+$expectedValidationPaths = @("scripts/ok_validation.ps1", "scripts/failing_validation.ps1")
+$expectedTestPaths = @()
+Invoke-M000ValidationGate -GateName "test" -RepositoryRoot $repoRoot -ValidationCommands $validationCommands -TestCommands $testCommands -ExpectedValidationCount 2 -ExpectedTestCount 0 -ExpectedValidationPaths $expectedValidationPaths -ExpectedTestPaths $expectedTestPaths
+'@
+    $duplicateProjectRoot = New-TemporaryProject -Name "duplicate" -WrapperContent $duplicateWrapper
+    $duplicateResult = Invoke-TestGate -ProjectRoot $duplicateProjectRoot
+    Assert-ExitCode -Actual $duplicateResult.ExitCode -Expected 1 -Message "Une gate avec doublon à comptage correct doit échouer."
+    Assert-OutputContains -Output $duplicateResult.Output -Expected "Validation dupliqué" -Message "La gate doit nommer le doublon de validation."
 }
 finally {
     Remove-Item -LiteralPath $temporaryRoot -Recurse -Force

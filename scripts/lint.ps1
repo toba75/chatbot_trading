@@ -21,10 +21,22 @@ $validationCommands = @(
 
 $testCommands = @()
 
+$expectedValidationPaths = @(
+    "scripts/validate_m000_precondition_report.ps1",
+    "scripts/validate_adr_system.ps1",
+    "scripts/validate_task_system.ps1",
+    "scripts/validate_traceability.ps1",
+    "scripts/validate_definition_of_done.ps1"
+)
+
+$expectedTestPaths = @()
+
 Invoke-M000ValidationGate `
     -GateName "lint" `
     -RepositoryRoot $repoRoot `
     -ValidationCommands $validationCommands `
     -TestCommands $testCommands `
     -ExpectedValidationCount 5 `
-    -ExpectedTestCount 0
+    -ExpectedTestCount 0 `
+    -ExpectedValidationPaths $expectedValidationPaths `
+    -ExpectedTestPaths $expectedTestPaths
