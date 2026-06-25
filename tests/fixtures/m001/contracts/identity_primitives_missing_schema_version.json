@@ -1,0 +1,7 @@
+{
+  "contract_name": "IdentityPrimitiveCompatibilityFixture",
+  "primary_identity": "DOC-000001",
+  "identities": {
+    "document_id": "DOC-000001"
+  }
+}
