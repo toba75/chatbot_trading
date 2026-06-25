@@ -32,7 +32,7 @@
 
 ## Suivi d'exécution
 
-- Statut: T-004 livrée en GREEN; la stack Compose locale M-002 publie seulement `edge-gateway` sur `127.0.0.1`, garde les stockages et workers internes, monte les secrets Spark hors dépôt et interdit Gemma/vLLM principal local.
+- Statut: T-005 livrée en GREEN; le gateway LLM publie un contrat local strict, traduit les demandes d'inférence vers l'appel compatible OpenAI privé et retourne une sortie structurée avec provenance minimale.
 
 | Tâche | Commit RED | Commit GREEN | ADR consultées | ADR créée ou modifiée | Validations GREEN déclarées |
 |---|---|---|---|---|---|
@@ -40,6 +40,7 @@
 | T-002 - Publier la spécification de plateforme locale sûre | `b7de11257d726e165d5dfb59f905d08ca30df979` | Commit courant `docs(m002): publier la spécification de plateforme locale` | ADR-007; ADR-008; ADR-009; DDD-ADR-006; DDD-ADR-008; ADR-010 | Aucune | `tests/m002/validate_m002_specification_acceptance.ps1`; `tests/m002/validate_m002_specification_unit.ps1`; `scripts/validate_m002_specification.ps1`; `scripts/validate_traceability.ps1`; `scripts/test.ps1`; `scripts/lint.ps1` |
 | T-003 - Déclarer la topologie docker-local et spark-inference | `29b887375be11edfeee8fa2eebd21c838a8d1b4a` | Commit courant `feat(m002): déclarer la topologie docker spark` | ADR-007; ADR-009 | Aucune | `tests/m002/validate_platform_topology_acceptance.ps1`; `tests/m002/validate_platform_topology_unit.ps1`; `scripts/validate_platform_topology.ps1`; `scripts/validate_m002_specification.ps1`; `scripts/validate_traceability.ps1`; `scripts/test.ps1`; `scripts/lint.ps1` |
 | T-004 - Configurer la stack Docker locale contrôlée | `0160224153bde0b822ce8b2891a647c6adec8793` | Commit courant `feat(m002): configurer la stack docker locale` | ADR-007; ADR-008; ADR-009 | Aucune | `tests/m002/validate_local_compose_acceptance.ps1`; `tests/m002/validate_local_compose_unit.ps1`; `scripts/validate_local_compose.ps1`; `scripts/validate_traceability.ps1`; `scripts/test.ps1`; `scripts/lint.ps1` |
+| T-005 - Publier le contrat du gateway LLM | `85d458a396a5c1f8fe06f00ae1c18f9a8f87d14b` | Commit courant `feat(m002): publier le contrat gateway llm` | ADR-008; ADR-009 | Aucune | `tests/m002/validate_llm_gateway_contract_acceptance.ps1`; `tests/m002/validate_llm_gateway_contract_unit.ps1`; `scripts/validate_traceability.ps1`; `scripts/test.ps1`; `scripts/lint.ps1` |
 
 ## Clôture T-001
 
@@ -74,3 +75,13 @@
 - Validateur livré: `scripts/validate_local_compose.ps1`, `scripts/validate_local_compose.py` et `app/platform/local_compose.py` refusent les ports publiés sur stockages, modèles locaux et workers, les images non épinglées, un service sans healthcheck, un secret Spark absent et tout accès `spark-egress` hors `llm-gateway`.
 - ADR: aucune ADR créée ou modifiée; T-004 applique ADR-007, ADR-008 et ADR-009 sans ajouter de provider LLM distant ni déplacer Gemma/vLLM principal dans Compose local.
 - Hors périmètre confirmé: Docker Compose n'a pas été démarré; la validation reste statique et aucun secret réel n'est versionné.
+
+## Clôture T-005
+
+- Scénario BDD: Given un cas d'usage demande une inférence Gemma avec schéma de sortie et identifiants de corrélation; When le gateway transmet l'appel vers vLLM Spark; Then la réponse compatible OpenAI est traduite en résultat structuré avec provenance, ou en erreur technique explicite sans décision métier.
+- RED T-005 confirmé: `tests/m002/validate_llm_gateway_contract_acceptance.ps1` échouait sur l'absence de `GatewayConfiguration` dans `app.platform.llm_gateway`.
+- Implémentation: `app/platform/llm_gateway/__init__.py` publie `LocalLanguageModelGateway`, `GatewayConfiguration`, `InferenceRequest`, `InferenceResult`, `ModelProvenance`, `LLMGatewayContractError`, l'adaptateur `OpenAICompatibleLocalLanguageModelGateway` et un transport HTTP standard compatible OpenAI.
+- Contrat livré: le gateway exige une URL HTTPS explicite, une clé d'API, un bundle TLS, un modèle servi, un schéma JSON de sortie, des identifiants `trace_id`, `request_id`, `idempotency_key`, et refuse une réponse sans `model_revision`.
+- Tests livrés: le double compatible OpenAI vérifie modèle servi, schéma de sortie, TLS requis, clé d'API requise, identité technique `llm-gateway`, corrélation et provenance minimale; les tests unitaires couvrent construction de requête, configuration obligatoire, schéma absent, révision modèle absente et masquage des secrets.
+- ADR: aucune ADR créée ou modifiée; T-005 applique ADR-008 et ADR-009 sans ajouter de provider distant, sans déplacer l'état métier vers le Spark et sans exposer vLLM dans le domaine.
+- Hors périmètre confirmé: retries, circuit breaker, pannes Spark avancées, sortie streaming partielle et politiques de reprise restent à traiter par T-006.
