@@ -90,7 +90,16 @@ function Convert-ToMatrixRelativePath {
         [string] $RelativePath
     )
 
-    return $RelativePath.TrimStart(".", "/", "\").Replace("\", "/")
+    Assert-Condition `
+        -Condition (-not [System.IO.Path]::IsPathRooted($RelativePath)) `
+        -Message "Chemin absolu interdit dans la matrice: $RelativePath"
+
+    $normalizedRelativePath = $RelativePath.Replace("\", "/")
+    if ($normalizedRelativePath.StartsWith("./")) {
+        return $normalizedRelativePath.Substring(2)
+    }
+
+    return $normalizedRelativePath
 }
 
 function Get-ExistingAdrIds {
@@ -188,7 +197,7 @@ function Assert-CommandCell {
         -Context "commande ${RequirementId}"
 
     if ($Matches["pathArg"]) {
-        $pathArgument = $Matches["pathArg"].TrimStart(".", "/", "\")
+        $pathArgument = Convert-ToMatrixRelativePath -RelativePath $Matches["pathArg"]
         Assert-RepositoryRelativeFile `
             -RelativePath $pathArgument `
             -Context "argument -Path ${RequirementId}"
