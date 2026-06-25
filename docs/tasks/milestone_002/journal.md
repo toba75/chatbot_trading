@@ -32,12 +32,13 @@
 
 ## Suivi d'exécution
 
-- Statut: T-001 livrée en GREEN; la précondition M-002 refuse `master` absent, milestone amont absent, gate RED et branche locale non alignée sur `master`.
+- Statut: T-003 livrée en GREEN; la topologie M-002 refuse Gemma/vLLM dans Compose local, les stockages ou workers sur Spark, un hôte inconnu et un service sans hôte explicite.
 
 | Tâche | Commit RED | Commit GREEN | ADR consultées | ADR créée ou modifiée | Validations GREEN déclarées |
 |---|---|---|---|---|---|
 | T-001 - Vérifier la précondition GREEN de M-002 | `ff51415` | Commit courant `docs(m002): valider la précondition green de plateforme` | ADR-010 | Aucune | `tests/m002/validate_m002_precondition_acceptance.ps1`; `tests/m002/validate_m002_precondition_unit.ps1`; `scripts/validate_m002_precondition.ps1 -Path .\docs\governance\m002_precondition_green.md`; `scripts/validate_traceability.ps1`; `scripts/test.ps1`; `scripts/lint.ps1` |
 | T-002 - Publier la spécification de plateforme locale sûre | `b7de11257d726e165d5dfb59f905d08ca30df979` | Commit courant `docs(m002): publier la spécification de plateforme locale` | ADR-007; ADR-008; ADR-009; DDD-ADR-006; DDD-ADR-008; ADR-010 | Aucune | `tests/m002/validate_m002_specification_acceptance.ps1`; `tests/m002/validate_m002_specification_unit.ps1`; `scripts/validate_m002_specification.ps1`; `scripts/validate_traceability.ps1`; `scripts/test.ps1`; `scripts/lint.ps1` |
+| T-003 - Déclarer la topologie docker-local et spark-inference | `29b887375be11edfeee8fa2eebd21c838a8d1b4a` | Commit courant `feat(m002): déclarer la topologie docker spark` | ADR-007; ADR-009 | Aucune | `tests/m002/validate_platform_topology_acceptance.ps1`; `tests/m002/validate_platform_topology_unit.ps1`; `scripts/validate_platform_topology.ps1`; `scripts/validate_m002_specification.ps1`; `scripts/validate_traceability.ps1`; `scripts/test.ps1`; `scripts/lint.ps1` |
 
 ## Clôture T-001
 
@@ -54,3 +55,12 @@
 - Validateur livré: `scripts/validate_m002_specification.ps1` refuse section manquante, ADR absente, placement incohérent, fallback silencieux et endpoint Spark codé en dur.
 - ADR: aucune ADR créée ou modifiée; T-002 applique ADR-007, ADR-008, ADR-009, DDD-ADR-006, DDD-ADR-008 et ADR-010 sans changer leur sens.
 - Hors périmètre confirmé: aucun Compose, gateway, outbox runtime, file de jobs, règle réseau ou observabilité runtime n'est implémenté par T-002.
+
+## Clôture T-003
+
+- Scénario BDD: Given la plateforme contient des services applicatifs, des stockages et un service Gemma; When la topologie M-002 est validée; Then chaque service est placé sur l'hôte autorisé et aucun stockage métier n'est déclaré sur `spark-inference`.
+- RED T-003 confirmé: `tests/m002/validate_platform_topology_acceptance.ps1` échouait sur l'absence de `scripts/validate_platform_topology.ps1`.
+- Implémentation: `app/platform/topology_registry.json` déclare les hôtes `docker-local` et `spark-inference`, les responsabilités exclusives, `gemma-vllm`, le cache Spark régénérable, les services applicatifs, les stockages, l'outbox, la file de jobs, les workers et le moteur de backtest.
+- Validateur livré: `scripts/validate_platform_topology.ps1` et `scripts/validate_platform_topology.py` refusent un hôte inconnu, un service sans hôte explicite, Gemma/vLLM dans Compose local, un stockage métier sur Spark, un traitement local sur Spark et un cache Spark non régénérable.
+- ADR: aucune ADR créée ou modifiée; T-003 applique ADR-007 et ADR-009 sans déplacer les responsabilités.
+- Hors périmètre confirmé: aucun fichier Compose concret, aucun démarrage de runtime et aucun endpoint Spark local codé en dur ne sont livrés par T-003.

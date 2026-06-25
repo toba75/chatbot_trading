@@ -32,7 +32,7 @@ Le wrapper `scripts/validate_architecture_boundaries.ps1` refuse explicitement u
 
 ## Périmètre des tests
 
-`scripts/test.ps1` exécute les validateurs M-000, les validateurs M-001 et le validateur de spécification M-002, les tests d'acceptation et unitaires de gouvernance livrés par M-000, puis les tests d'acceptation et unitaires M-001 et M-002.
+`scripts/test.ps1` exécute les validateurs M-000, les validateurs M-001, le validateur de spécification M-002 et le validateur de topologie M-002, les tests d'acceptation et unitaires de gouvernance livrés par M-000, puis les tests d'acceptation et unitaires M-001 et M-002.
 
 Le self-test d'acceptation `tests/governance/validate_m000_validation_commands_acceptance.ps1` reste exécuté explicitement hors `scripts/test.ps1` pour vérifier les gates sans récursion de `scripts/test.ps1` sur lui-même.
 
@@ -47,6 +47,7 @@ Le self-test d'acceptation `tests/governance/validate_m000_validation_commands_a
 - `scripts/validate_definition_of_done.ps1`
 - `scripts/validate_m001_specification.ps1`
 - `scripts/validate_m002_specification.ps1`
+- `scripts/validate_platform_topology.ps1`
 - `scripts/validate_architecture_boundaries.ps1`
 
 ## Refus explicites
@@ -69,6 +70,6 @@ Les tests M-001 restent non récursifs: ils valident les contrats, fixtures, rè
 
 ## Extension M-002
 
-M-002 ajoute la spécification de plateforme locale sûre aux gates existantes sans changer les points d'entrée PowerShell ADR-010.
+M-002 ajoute la spécification de plateforme locale sûre et le registre de topologie `docker-local` / `spark-inference` aux gates existantes sans changer les points d'entrée PowerShell ADR-010.
 
-Les tests M-002 restent non récursifs: ils valident la présence des sections, scénarios, placements physiques, règles `docker-local` et `spark-inference`, gateway unique, outbox, commandes de validation et garde-fous sans lancer `scripts/test.ps1`.
+Les tests M-002 restent non récursifs: ils valident la présence des sections, scénarios, placements physiques, règles `docker-local` et `spark-inference`, registre de topologie, gateway unique, outbox, commandes de validation et garde-fous sans lancer `scripts/test.ps1`.

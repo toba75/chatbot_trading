@@ -12,6 +12,7 @@ if (-not (Test-Path -LiteralPath $gatePath -PathType Leaf)) {
 $preconditionReportPath = Join-Path $repoRoot "docs/governance/m000_precondition_green_initiale.md"
 $m001SpecificationPath = Join-Path $repoRoot "docs/specs/m001_frontieres_ddd_contrats_publies.md"
 $m002SpecificationPath = Join-Path $repoRoot "docs/specs/m002_plateforme_locale_sure.md"
+$platformTopologyPath = Join-Path $repoRoot "app/platform/topology_registry.json"
 $appRoot = Join-Path $repoRoot "app"
 $contextRegistryPath = Join-Path $repoRoot "app/context_registry.json"
 
@@ -23,6 +24,7 @@ $validationCommands = @(
     @{ Path = "scripts/validate_definition_of_done.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_m001_specification.ps1"; Arguments = @("-Path", $m001SpecificationPath) },
     @{ Path = "scripts/validate_m002_specification.ps1"; Arguments = @("-Path", $m002SpecificationPath) },
+    @{ Path = "scripts/validate_platform_topology.ps1"; Arguments = @("-Path", $platformTopologyPath) },
     @{ Path = "scripts/validate_architecture_boundaries.ps1"; Arguments = @("-AppRoot", $appRoot, "-ContextRegistryPath", $contextRegistryPath, "-SpecificationPath", $m001SpecificationPath) }
 )
 
@@ -60,7 +62,9 @@ $testCommands = @(
     @{ Path = "tests/m001/validate_m001_traceability_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/m001/validate_m001_traceability_unit.ps1"; Arguments = @() },
     @{ Path = "tests/m002/validate_m002_specification_acceptance.ps1"; Arguments = @() },
-    @{ Path = "tests/m002/validate_m002_specification_unit.ps1"; Arguments = @() }
+    @{ Path = "tests/m002/validate_m002_specification_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m002/validate_platform_topology_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m002/validate_platform_topology_unit.ps1"; Arguments = @() }
 )
 
 $expectedValidationPaths = @(
@@ -71,6 +75,7 @@ $expectedValidationPaths = @(
     "scripts/validate_definition_of_done.ps1",
     "scripts/validate_m001_specification.ps1",
     "scripts/validate_m002_specification.ps1",
+    "scripts/validate_platform_topology.ps1",
     "scripts/validate_architecture_boundaries.ps1"
 )
 
@@ -107,7 +112,9 @@ $expectedTestPaths = @(
     "tests/m001/validate_m001_traceability_acceptance.ps1",
     "tests/m001/validate_m001_traceability_unit.ps1",
     "tests/m002/validate_m002_specification_acceptance.ps1",
-    "tests/m002/validate_m002_specification_unit.ps1"
+    "tests/m002/validate_m002_specification_unit.ps1",
+    "tests/m002/validate_platform_topology_acceptance.ps1",
+    "tests/m002/validate_platform_topology_unit.ps1"
 )
 
 Invoke-M000ValidationGate `
@@ -115,7 +122,7 @@ Invoke-M000ValidationGate `
     -RepositoryRoot $repoRoot `
     -ValidationCommands $validationCommands `
     -TestCommands $testCommands `
-    -ExpectedValidationCount 8 `
-    -ExpectedTestCount 33 `
+    -ExpectedValidationCount 9 `
+    -ExpectedTestCount 35 `
     -ExpectedValidationPaths $expectedValidationPaths `
     -ExpectedTestPaths $expectedTestPaths

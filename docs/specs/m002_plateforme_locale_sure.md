@@ -58,6 +58,32 @@ Les relations M-001 restent gouvernées par leurs producteurs et consommateurs. 
 | Outbox et file de jobs | docker-local | Les événements intercontextes et jobs techniques restent possédés localement. |
 | Granite-Docling, embeddings et reranker | docker-local | Ces capacités ne sont pas déportées sur le Spark sans nouvelle ADR. |
 
+## Registre de topologie M-002
+
+`app/platform/topology_registry.json` est le registre exécutable de T-003. Il documente le mapping des services sans démarrer de runtime et sans créer la stack Compose concrète de T-004.
+
+| Service ou artefact | Hôte obligatoire | Responsabilité |
+|---|---|---|
+| `gemma-vllm` | spark-inference | servir Gemma 4 par vLLM |
+| `spark-model-cache` | spark-inference | conserver seulement le cache de poids et tokenizers régénérable |
+| `edge-gateway` | docker-local | publier le point d'entrée utilisateur local |
+| `ui` | docker-local | servir l'interface locale sans donnée canonique |
+| `orchestrator-api` | docker-local | exposer les capacités applicatives locales |
+| `llm-gateway` | docker-local | adapter les ports d'inférence vers le Spark |
+| `granite-docling` | docker-local | exécuter le traitement documentaire local |
+| `embedding-service` | docker-local | calculer les embeddings localement |
+| `reranker-service` | docker-local | reranker les résultats localement |
+| `postgres` | docker-local | stocker les schémas PostgreSQL locaux |
+| `qdrant` | docker-local | stocker les collections vectorielles locales |
+| `corpus-store` | docker-local | conserver les corpus et artefacts documentaires |
+| `experiment-registry` | docker-local | conserver les entrées et résultats d'expérimentation |
+| `outbox` | docker-local | persister les événements intercontextes avec l'état producteur |
+| `job-queue` | docker-local | ordonner les jobs techniques priorisés |
+| `worker-documents` | docker-local | exécuter les traitements documentaires locaux |
+| `worker-research` | docker-local | exécuter les recherches et vérifications locales |
+| `worker-backtest` | docker-local | piloter les backtests locaux |
+| `backtest-engine` | docker-local | calculer les backtests déterministes |
+
 ## Règles de plateforme M-002
 
 | Règle | Comportement attendu | Invariants | Tests | ADR |
@@ -77,6 +103,9 @@ La commande sans `-Path` cible exclusivement `docs/specs/m002_plateforme_locale_
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m002_specification.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_platform_topology.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m002\validate_platform_topology_acceptance.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m002\validate_platform_topology_unit.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1
 ```

@@ -4,6 +4,8 @@ $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
 $validatorPath = Join-Path $repoRoot "scripts/validate_platform_topology.ps1"
 $registryPath = Join-Path $repoRoot "app/platform/topology_registry.json"
 $temporaryRoot = Join-Path $repoRoot (".tmp/ost_m002_platform_topology_acceptance_" + [System.Guid]::NewGuid().ToString("N"))
+$eAcute = [char] 0x00E9
+$oCircumflex = [char] 0x00F4
 
 function Invoke-PlatformTopologyValidator {
     param(
@@ -134,14 +136,14 @@ try {
     $postgresSparkPath = New-TemporaryTopology -Name "postgres-spark" -Registry $postgresSparkRegistry
     $postgresSparkResult = Invoke-PlatformTopologyValidator -TopologyPath $postgresSparkPath
     Assert-ExitCode -Actual $postgresSparkResult.ExitCode -Expected 1 -Message "PostgreSQL sur Spark doit être refusé."
-    Assert-OutputContains -Output $postgresSparkResult.Output -Expected "Stockage métier interdit sur spark-inference: postgres" -Message "Le stockage Spark interdit doit être nommé."
+    Assert-OutputContains -Output $postgresSparkResult.Output -Expected "Stockage m$($eAcute)tier interdit sur spark-inference: postgres" -Message "Le stockage Spark interdit doit être nommé."
 
     $qdrantSparkRegistry = Copy-RegistryObject -Registry $validRegistry
     (Get-TopologyService -Registry $qdrantSparkRegistry -ServiceId "qdrant").host = "spark-inference"
     $qdrantSparkPath = New-TemporaryTopology -Name "qdrant-spark" -Registry $qdrantSparkRegistry
     $qdrantSparkResult = Invoke-PlatformTopologyValidator -TopologyPath $qdrantSparkPath
     Assert-ExitCode -Actual $qdrantSparkResult.ExitCode -Expected 1 -Message "Qdrant sur Spark doit être refusé."
-    Assert-OutputContains -Output $qdrantSparkResult.Output -Expected "Stockage métier interdit sur spark-inference: qdrant" -Message "Le stockage Spark interdit doit être nommé."
+    Assert-OutputContains -Output $qdrantSparkResult.Output -Expected "Stockage m$($eAcute)tier interdit sur spark-inference: qdrant" -Message "Le stockage Spark interdit doit être nommé."
 
     $workerSparkRegistry = Copy-RegistryObject -Registry $validRegistry
     (Get-TopologyService -Registry $workerSparkRegistry -ServiceId "worker-documents").host = "spark-inference"
@@ -155,7 +157,7 @@ try {
     $missingHostPath = New-TemporaryTopology -Name "service-without-host" -Registry $missingHostRegistry
     $missingHostResult = Invoke-PlatformTopologyValidator -TopologyPath $missingHostPath
     Assert-ExitCode -Actual $missingHostResult.ExitCode -Expected 1 -Message "Un service sans hôte explicite doit être refusé."
-    Assert-OutputContains -Output $missingHostResult.Output -Expected "Hôte explicite absent pour service: llm-gateway" -Message "Le service sans hôte doit être nommé."
+    Assert-OutputContains -Output $missingHostResult.Output -Expected "H$($oCircumflex)te explicite absent pour service: llm-gateway" -Message "Le service sans hôte doit être nommé."
 }
 finally {
     Remove-Item -LiteralPath $temporaryRoot -Recurse -Force

@@ -216,19 +216,21 @@ try {
     $testResult = Invoke-ProjectCommand -ProjectRoot $validProjectRoot -RelativePath "scripts/test.ps1"
     Assert-ExitCode -Actual $testResult.ExitCode -Expected 0 -Message "La gate de test M-000 conforme doit réussir."
     Assert-OutputContains -Output $testResult.Output -Expected "Gate test GREEN" -Message "La gate de test doit annoncer son état GREEN."
-    Assert-OutputContains -Output $testResult.Output -Expected "Gate test GREEN: 8 validation(s), 33 test(s)." -Message "La gate de test doit prouver le nombre exact de validations et tests."
+    Assert-OutputContains -Output $testResult.Output -Expected "Gate test GREEN: 9 validation(s), 35 test(s)." -Message "La gate de test doit prouver le nombre exact de validations et tests."
     Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/governance/validate_m000_precondition_report_acceptance.ps1" -Message "La gate de test doit exécuter le test d'acceptation T-001."
     Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/governance/validate_definition_of_done_unit.ps1" -Message "La gate de test doit exécuter le dernier test unitaire T-005."
     Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/governance/validate_m000_validation_commands_unit.ps1" -Message "La gate de test doit exécuter le self-test unitaire T-006."
     Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m001/validate_m001_traceability_unit.ps1" -Message "La gate de test doit exécuter le test unitaire de traçabilité M-001."
     Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m002/validate_m002_specification_acceptance.ps1" -Message "La gate de test doit exécuter le test d'acceptation de spécification M-002."
     Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m002/validate_m002_specification_unit.ps1" -Message "La gate de test doit exécuter le test unitaire de spécification M-002."
+    Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m002/validate_platform_topology_acceptance.ps1" -Message "La gate de test doit exécuter le test d'acceptation de topologie M-002."
+    Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m002/validate_platform_topology_unit.ps1" -Message "La gate de test doit exécuter le test unitaire de topologie M-002."
     Assert-OutputNotContains -Output $testResult.Output -Forbidden "Ã" -Message "La sortie de la gate de test doit rester lisible en français accentué."
 
     $lintResult = Invoke-ProjectCommand -ProjectRoot $validProjectRoot -RelativePath "scripts/lint.ps1"
     Assert-ExitCode -Actual $lintResult.ExitCode -Expected 0 -Message "La gate de lint M-000 conforme doit réussir."
     Assert-OutputContains -Output $lintResult.Output -Expected "Gate lint GREEN" -Message "La gate de lint doit annoncer son état GREEN."
-    Assert-OutputContains -Output $lintResult.Output -Expected "Gate lint GREEN: 8 validation(s), 0 test(s)." -Message "La gate de lint doit prouver le nombre exact de validations et tests."
+    Assert-OutputContains -Output $lintResult.Output -Expected "Gate lint GREEN: 9 validation(s), 0 test(s)." -Message "La gate de lint doit prouver le nombre exact de validations et tests."
     Assert-OutputNotContains -Output $lintResult.Output -Forbidden "Ã" -Message "La sortie de la gate de lint doit rester lisible en français accentué."
 
     $validationCommandsDocument = Get-Content -Raw -Encoding UTF8 -LiteralPath $validationCommandsDocumentPath
@@ -270,7 +272,7 @@ try {
     Assert-ExitCode -Actual $missingTestCommandResult.ExitCode -Expected 1 -Message "Une gate amputée d'un test requis doit produire un RED."
     Assert-OutputContains `
         -Output $missingTestCommandResult.Output `
-        -Expected "Gate test attend 33 test(s)" `
+        -Expected "Gate test attend 35 test(s)" `
         -Message "La gate amputée doit nommer l'écart de comptage des tests."
 }
 finally {
