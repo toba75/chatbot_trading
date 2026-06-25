@@ -16,6 +16,8 @@ import json
 import sys
 from pathlib import Path
 
+sys.path.insert(0, sys.argv[1])
+
 from app.contracts.identity import (
     ALLOWED_DOMAIN_IDENTIFIER_PREFIXES,
     serialize_contract_payload,
@@ -57,9 +59,9 @@ def assert_raises(expected_fragment, action):
         raise AssertionError(f"Erreur attendue absente: {expected_fragment}")
 
 
-valid_payload = load_payload(sys.argv[1])
-missing_schema_payload = load_payload(sys.argv[2])
-technical_identity_payload = load_payload(sys.argv[3])
+valid_payload = load_payload(sys.argv[2])
+missing_schema_payload = load_payload(sys.argv[3])
+technical_identity_payload = load_payload(sys.argv[4])
 
 # Given un contexte publie un contrat pour un autre contexte.
 # When le contrat est serialise et valide.
@@ -100,7 +102,7 @@ $ErrorActionPreference = "Continue"
 $pythonScriptPath = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m001_contract_identity_acceptance_" + [System.Guid]::NewGuid().ToString("N") + ".py")
 Set-Content -Encoding UTF8 -LiteralPath $pythonScriptPath -Value $pythonCode
 try {
-    $output = & python $pythonScriptPath $validFixturePath $missingSchemaFixturePath $technicalIdentityFixturePath 2>&1
+    $output = & python -B $pythonScriptPath $repoRoot $validFixturePath $missingSchemaFixturePath $technicalIdentityFixturePath 2>&1
 }
 finally {
     $ErrorActionPreference = $previousErrorActionPreference

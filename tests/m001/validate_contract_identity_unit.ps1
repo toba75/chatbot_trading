@@ -3,6 +3,10 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
 
 $pythonCode = @'
+import sys
+
+sys.path.insert(0, sys.argv[1])
+
 from app.contracts.identity import (
     ALLOWED_DOMAIN_IDENTIFIER_PREFIXES,
     ContractSchemaVersion,
@@ -43,6 +47,7 @@ if str(version) != "1.0":
 assert_raises("schema_version absent", lambda: ContractSchemaVersion.require_in_payload({}, supported_schema_versions={"1.0"}))
 assert_raises("schema_version vide", lambda: ContractSchemaVersion.parse("", supported_schema_versions={"1.0"}))
 assert_raises("schema_version non supportee", lambda: ContractSchemaVersion.parse("2.0", supported_schema_versions={"1.0"}))
+assert_raises("Versions de schema supportees absentes", lambda: ContractSchemaVersion.parse("1.0", supported_schema_versions=set()))
 
 payload = {
     "schema_version": "1.0",
@@ -83,7 +88,7 @@ $ErrorActionPreference = "Continue"
 $pythonScriptPath = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m001_contract_identity_unit_" + [System.Guid]::NewGuid().ToString("N") + ".py")
 Set-Content -Encoding UTF8 -LiteralPath $pythonScriptPath -Value $pythonCode
 try {
-    $output = & python $pythonScriptPath 2>&1
+    $output = & python -B $pythonScriptPath $repoRoot 2>&1
 }
 finally {
     $ErrorActionPreference = $previousErrorActionPreference
