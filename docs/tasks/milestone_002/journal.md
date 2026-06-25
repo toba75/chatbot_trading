@@ -32,7 +32,7 @@
 
 ## Suivi d'exécution
 
-- Statut: T-008 livrée en GREEN; la file locale de jobs priorise les traitements techniques, refuse le recalcul implicite d'un succès identique et conserve la distinction entre job et événement de domaine.
+- Statut: T-009 livrée en GREEN; la frontière réseau locale interdit les ports publics implicites, l'egress Spark hors `llm-gateway`, le contournement TLS, les callbacks Spark et l'accès navigateur direct au Spark.
 
 | Tâche | Commit RED | Commit GREEN | ADR consultées | ADR créée ou modifiée | Validations GREEN déclarées |
 |---|---|---|---|---|---|
@@ -44,6 +44,7 @@
 | T-006 - Contrôler les pannes d'inférence Spark | `4015d34` | Commit courant `feat(m002): controler les pannes inference spark` | ADR-008; ADR-009; DDD-ADR-007 | Aucune | `tests/m002/validate_llm_gateway_failures_acceptance.ps1`; `tests/m002/validate_llm_gateway_failures_unit.ps1`; `tests/m002/validate_llm_gateway_contract_acceptance.ps1`; `tests/m002/validate_llm_gateway_contract_unit.ps1`; `scripts/validate_traceability.ps1`; `scripts/test.ps1`; `scripts/lint.ps1` |
 | T-007 - Livrer l'outbox d'événements idempotente | `e3be31f` | Commit courant `feat(m002): livrer outbox idempotente` | DDD-ADR-006; DDD-ADR-008 | Aucune | `tests/m002/validate_outbox_acceptance.ps1`; `tests/m002/validate_outbox_unit.ps1`; `scripts/validate_traceability.ps1`; `scripts/test.ps1`; `scripts/lint.ps1` |
 | T-008 - Livrer la file de jobs priorisée et idempotente | `617b535` | Commit courant `feat(m002): livrer la file de jobs idempotente` | DDD-ADR-006; DDD-ADR-008 | Aucune | `tests/m002/validate_job_runtime_acceptance.ps1`; `tests/m002/validate_job_runtime_unit.ps1`; `scripts/validate_traceability.ps1`; `scripts/test.ps1`; `scripts/lint.ps1` |
+| T-009 - Verrouiller la frontière réseau locale | `9a68426` | Commit courant `feat(m002): verrouiller la frontiere reseau locale` | ADR-007; ADR-008; ADR-009 | Aucune | `tests/m002/validate_network_boundary_acceptance.ps1`; `tests/m002/validate_network_boundary_unit.ps1`; `scripts/validate_network_boundary.ps1`; `scripts/validate_local_compose.ps1`; `scripts/validate_traceability.ps1`; `scripts/test.ps1`; `scripts/lint.ps1` |
 
 ## Clôture T-001
 
@@ -118,3 +119,14 @@
 - Tests livrés: le test d'acceptation couvre P0/P4, doublon exact, version modèle différente et recalcul explicite; les tests unitaires couvrent priorité, clé complète, statuts, catalogue strict, séparation job/événement, workers injectés et absence de valeur par défaut sur le recalcul.
 - ADR: aucune ADR créée ou modifiée; T-008 applique DDD-ADR-006 et DDD-ADR-008 sans event sourcing généralisé, sans broker externe durable et sans transformer les jobs en événements de domaine.
 - Hors périmètre confirmé: aucune persistance durable, aucun worker métier propriétaire et aucune transition métier implicite ne sont introduits.
+
+## Clôture T-009
+
+- Scénario BDD: Given la stack locale et le service vLLM Spark sont configurés; When les règles réseau M-002 sont validées; Then seul `llm-gateway` peut joindre `spark-inference:8443` et aucun stockage local n'est accessible hors réseau Docker privé.
+- RED T-009 confirmé: `tests/m002/validate_network_boundary_acceptance.ps1` échouait sur l'absence de `scripts/validate_network_boundary.ps1`.
+- Implémentation: `app/platform/security/network_boundary.py` ajoute la politique de frontière réseau, la matrice de flux Spark, le parseur de politique pare-feu et les contrôles Compose sans démarrer Docker ni Spark.
+- Artefact livré: `deploy/spark-firewall/network-boundary.json` décrit le seul ingress Spark autorisé, TLS et certificat requis, l'absence de callback Spark, l'absence d'accès navigateur direct et l'absence d'Internet entrant.
+- Validateur livré: `scripts/validate_network_boundary.ps1` et `scripts/validate_network_boundary.py` refusent les ports publics sur stockages et profils Compose, l'egress Spark hors `llm-gateway`, une source Spark non autorisée, TLS désactivé, certificat absent, callback Spark et secret vLLM accessible au navigateur.
+- Tests livrés: le test d'acceptation couvre Compose, topologie, pare-feu Spark et mutations de sécurité; les tests unitaires couvrent matrice de flux, allow-list Spark, ports interdits, certificat requis, absence de callback, secret navigateur interdit et accès utilisateur distant optionnel explicite.
+- ADR: aucune ADR créée ou modifiée; T-009 applique ADR-007, ADR-008 et ADR-009 sans rendre mTLS obligatoire et sans changer le sens de TLS et de la clé d'API déjà prescrits.
+- Hors périmètre confirmé: aucun runtime Spark ou Docker n'est démarré, aucune règle système de pare-feu n'est appliquée à l'hôte et aucun port de débogage n'est ouvert.

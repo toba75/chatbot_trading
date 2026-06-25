@@ -58,6 +58,7 @@ class ComposeService:
     image: str
     ports: tuple[str, ...]
     expose: tuple[str, ...]
+    profiles: tuple[str, ...]
     networks: tuple[str, ...]
     secrets: tuple[str, ...]
     environment: Mapping[str, str]
@@ -172,6 +173,7 @@ def _parse_service(service_id: str, payload: Mapping[str, Any]) -> ComposeServic
         image=_required_text(payload, "image", f"service {service_id}"),
         ports=_optional_text_list(payload, "ports", f"service {service_id}"),
         expose=_optional_text_list(payload, "expose", f"service {service_id}"),
+        profiles=_optional_text_list(payload, "profiles", f"service {service_id}"),
         networks=_optional_text_list(payload, "networks", f"service {service_id}"),
         secrets=_optional_text_list(payload, "secrets", f"service {service_id}"),
         environment=environment,

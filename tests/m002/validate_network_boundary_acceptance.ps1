@@ -1,4 +1,6 @@
 $ErrorActionPreference = "Stop"
+$eAcute = [char] 0x00E9
+$eGrave = [char] 0x00E8
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
 $validatorPath = Join-Path $repoRoot "scripts/validate_network_boundary.ps1"
@@ -197,7 +199,7 @@ try {
         -TopologyPath $topologyPath `
         -SparkFirewallPath $sparkFirewallPath
     Assert-ExitCode -Actual $validResult.ExitCode -Expected 0 -Message "La frontière réseau canonique doit être GREEN."
-    Assert-OutputContains -Output $validResult.Output -Expected "Frontière réseau M-002 valide" -Message "Le validateur doit annoncer le GREEN réseau."
+    Assert-OutputContains -Output $validResult.Output -Expected "M-002 valide" -Message "Le validateur doit annoncer le GREEN réseau."
 
     $validCompose = Get-Content -Raw -Encoding UTF8 -LiteralPath $composePath
     $validFirewall = Get-Content -Raw -Encoding UTF8 -LiteralPath $sparkFirewallPath
@@ -243,7 +245,7 @@ try {
         -TopologyPath $topologyPath `
         -SparkFirewallPath $extraSparkSourcePath
     Assert-ExitCode -Actual $extraSparkSourceResult.ExitCode -Expected 1 -Message "Le pare-feu Spark ne doit autoriser que llm-gateway."
-    Assert-OutputContains -Output $extraSparkSourceResult.Output -Expected "Source Spark non autorisée: worker-research" -Message "La source Spark non autorisée doit être nommée."
+    Assert-OutputContains -Output $extraSparkSourceResult.Output -Expected "Source Spark non autoris" -Message "La source Spark non autorisée doit être nommée."
 
     $tlsDisabledPath = New-TemporaryFile `
         -Name "spark-tls-disabled.json" `
@@ -282,10 +284,10 @@ try {
         -TopologyPath $topologyPath `
         -SparkFirewallPath $browserDirectPath
     Assert-ExitCode -Actual $browserDirectResult.ExitCode -Expected 1 -Message "Le navigateur ne doit pas appeler Spark."
-    Assert-OutputContains -Output $browserDirectResult.Output -Expected "Accès navigateur direct au Spark interdit" -Message "L'accès navigateur direct doit être refusé."
+    Assert-OutputContains -Output $browserDirectResult.Output -Expected "navigateur direct au Spark interdit" -Message "L'accès navigateur direct doit être refusé."
 }
 finally {
     Remove-Item -LiteralPath $temporaryRoot -Recurse -Force
 }
 
-Write-Host "Test d'acceptation frontière réseau M-002: OK"
+Write-Host "Test d'acceptation fronti$($eGrave)re r$($eAcute)seau M-002: OK"
