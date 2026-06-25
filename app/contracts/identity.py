@@ -131,7 +131,7 @@ class ContractSchemaVersion:
         supported_schema_versions: Iterable[str],
     ) -> "ContractSchemaVersion":
         if not isinstance(payload, Mapping):
-            raise ValueError("Contrat publie non objet.")
+            raise ValueError("Contrat publié non objet.")
 
         if "schema_version" not in payload:
             raise ValueError("schema_version absent")

@@ -48,6 +48,8 @@ _VERIFIED_RESEARCH_OUTCOME_FIELDS = frozenset(
         "completed_at",
     }
 )
+_RESEARCH_CONFLICT_REF_FIELDS = frozenset({"summary", "claim_refs", "blocking"})
+_KNOWLEDGE_GAP_REF_FIELDS = frozenset({"topic", "impact"})
 
 
 @dataclass(frozen=True)
@@ -82,6 +84,7 @@ class ResearchConflictRef:
     @classmethod
     def from_payload(cls, payload: Mapping[str, Any]) -> "ResearchConflictRef":
         _ensure_mapping(payload, "unresolved_conflicts")
+        ensure_allowed_fields(payload, _RESEARCH_CONFLICT_REF_FIELDS, "ResearchConflictRef")
         return cls(
             summary=_required_text(payload, "summary"),
             claim_refs=_required_claim_refs(payload, "claim_refs"),
@@ -106,6 +109,7 @@ class KnowledgeGapRef:
     @classmethod
     def from_payload(cls, payload: Mapping[str, Any]) -> "KnowledgeGapRef":
         _ensure_mapping(payload, "knowledge_gaps")
+        ensure_allowed_fields(payload, _KNOWLEDGE_GAP_REF_FIELDS, "KnowledgeGapRef")
         return cls(
             topic=_required_text(payload, "topic"),
             impact=_required_text(payload, "impact"),

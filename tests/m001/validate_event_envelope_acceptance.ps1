@@ -4,7 +4,7 @@ $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
 $eventFixturePath = Join-Path $repoRoot "tests/fixtures/m001/contracts/sp_to_ka_canonical_source_published_event_v1.json"
 
 if (-not (Test-Path -LiteralPath $eventFixturePath -PathType Leaf)) {
-    throw "Fixture d'enveloppe d'evenement absente: $eventFixturePath"
+    throw "Fixture d'enveloppe d'événement absente: $eventFixturePath"
 }
 
 $pythonCode = @'
@@ -56,7 +56,7 @@ def assert_no_operational_messaging(payload):
 event_payload = load_payload(sys.argv[2])
 
 # Given SP publie un fait metier passe vers KA.
-# When l'enveloppe d'evenement est validee.
+# When l'enveloppe d'événement est validée.
 # Then le producteur, l'agregat, la causalite et l'idempotence sont explicites.
 event = EventEnvelope.from_payload(event_payload)
 
@@ -77,9 +77,9 @@ assert_no_operational_messaging(event_payload)
 
 roundtrip_event = EventEnvelope.from_json(event.to_json())
 if roundtrip_event != event:
-    raise AssertionError("Le round-trip de l'enveloppe d'evenement doit rester stable.")
+    raise AssertionError("Le round-trip de l'enveloppe d'événement doit rester stable.")
 if roundtrip_event.to_json() != event.to_json():
-    raise AssertionError("La serialisation de l'enveloppe d'evenement doit etre deterministe.")
+    raise AssertionError("La sérialisation de l'enveloppe d'événement doit être déterministe.")
 
 ledger = EventIdempotenceLedger.from_processed_event_ids([])
 first_decision = ledger.record(event)
@@ -90,7 +90,7 @@ if not first_decision.ledger.has_processed(event):
 
 second_decision = first_decision.ledger.record(event)
 if not second_decision.already_processed:
-    raise AssertionError("La seconde occurrence du meme event_id doit etre detectee.")
+    raise AssertionError("La seconde occurrence du même event_id doit être détectée.")
 if second_decision.ledger != first_decision.ledger:
     raise AssertionError("La detection du doublon ne doit pas modifier l'etat de test.")
 
@@ -114,7 +114,7 @@ without_causality = dict(event_payload)
 del without_causality["causation_id"]
 assert_raises("causation_id absent", lambda: EventEnvelope.from_payload(without_causality))
 
-print("Contrat d'enveloppe d'evenement M-001 accepte.")
+print("Contrat d'enveloppe d'événement M-001 accepté.")
 '@
 
 $previousErrorActionPreference = $ErrorActionPreference
@@ -133,4 +133,4 @@ if ($LASTEXITCODE -ne 0) {
     throw ($output -join "`n")
 }
 
-Write-Host "Test d'acceptation de l'enveloppe d'evenement M-001: OK"
+Write-Host "Test d'acceptation de l'enveloppe d'événement M-001: OK"

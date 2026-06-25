@@ -195,6 +195,9 @@ class ExperimentResult:
             supported_schema_versions=STRATEGY_EXPERIMENT_SCHEMA_VERSIONS,
         )
         data_snapshot_id = _required_domain_identifier(payload, "data_snapshot_id", "DATA")
+        status = _required_experiment_result_status(payload)
+        diagnostics = _required_mapping_copy(payload, "diagnostics")
+        _ensure_failed_result_diagnostics(status=status, diagnostics=diagnostics)
 
         return cls(
             schema_version=str(schema_version),
@@ -207,10 +210,10 @@ class ExperimentResult:
             data_snapshot_id=data_snapshot_id,
             result_hash=_required_hash(payload, "result_hash"),
             code_version=_required_text(payload, "code_version"),
-            status=_required_experiment_result_status(payload),
+            status=status,
             frozen_inputs=_required_frozen_inputs(payload, data_snapshot_id=data_snapshot_id),
             metrics=_required_mapping_copy(payload, "metrics"),
-            diagnostics=_required_mapping_copy(payload, "diagnostics"),
+            diagnostics=diagnostics,
             artifacts=_required_artifacts(payload),
             started_at=_required_utc_instant(payload, "started_at"),
             completed_at=_required_utc_instant(payload, "completed_at"),
@@ -253,6 +256,14 @@ def _required_experiment_result_status(payload: Mapping[str, Any]) -> str:
     if status not in ALLOWED_EXPERIMENT_RESULT_STATUSES:
         raise ValueError(f"status non autorise: {status}")
     return status
+
+
+def _ensure_failed_result_diagnostics(status: str, diagnostics: Mapping[str, Any]) -> None:
+    if status != FAILED_EXPERIMENT_STATUS:
+        return
+    if "failure_reason" not in diagnostics:
+        raise ValueError("diagnostic d'echec requis")
+    _required_text(diagnostics, "failure_reason")
 
 
 def _required_strategy_rules(payload: Mapping[str, Any]) -> tuple[Mapping[str, Any], ...]:
@@ -411,9 +422,10 @@ def _ensure_no_forbidden_contract_markers(
 ) -> None:
     if isinstance(value, Mapping):
         for key, child_value in value.items():
-            if key in _PROFITABILITY_MARKER_KEYS:
+            normalized_key = key.lower() if isinstance(key, str) else key
+            if normalized_key in _PROFITABILITY_MARKER_KEYS:
                 raise ValueError("declaration de rentabilite interdite")
-            if key in _MUTABLE_MARKER_KEYS:
+            if normalized_key in _MUTABLE_MARKER_KEYS:
                 raise ValueError(mutable_error_message)
             _ensure_no_forbidden_contract_markers(
                 child_value,

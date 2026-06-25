@@ -1,4 +1,4 @@
-"""Enveloppe versionnee des evenements intercontextes."""
+"""Enveloppe versionnée des événements intercontextes."""
 
 from __future__ import annotations
 
@@ -97,7 +97,7 @@ _COMMAND_PREFIXES = (
 
 @dataclass(frozen=True)
 class EventEnvelope:
-    """Contrat publie minimal d'un evenement intercontexte."""
+    """Contrat publié minimal d'un événement intercontexte."""
 
     event_id: str
     event_type: str
@@ -168,7 +168,7 @@ class EventEnvelope:
 
 @dataclass(frozen=True)
 class EventIdempotenceDecision:
-    """Resultat observable d'une verification d'idempotence par event_id."""
+    """Résultat observable d'une vérification d'idempotence par event_id."""
 
     event_id: str
     already_processed: bool
@@ -177,7 +177,7 @@ class EventIdempotenceDecision:
 
 @dataclass
 class EventIdempotenceLedger:
-    """Etat de test non persistant des event_id deja traites."""
+    """État de test non persistant des event_id déjà traités."""
 
     processed_event_ids: frozenset[str]
 
@@ -364,7 +364,7 @@ def _required_utc_instant(payload: Mapping[str, Any], field_name: str) -> str:
 
 
 def _loads_event_json(serialized_payload: str) -> Mapping[str, Any]:
-    _ensure_text_value(serialized_payload, "evenement serialise")
+    _ensure_text_value(serialized_payload, "événement sérialisé")
     payload = json.loads(serialized_payload)
     if not isinstance(payload, Mapping):
         raise ValueError("EventEnvelope non objet")

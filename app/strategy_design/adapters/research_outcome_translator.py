@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Any, Mapping
 
 from app.contracts.research_outcomes import (
@@ -19,6 +21,20 @@ BLOCKING_SUPPORT_STATUSES = frozenset(
         INSUFFICIENT_EVIDENCE_STATUS,
         REQUIRES_CURRENT_DATA_STATUS,
     }
+)
+FORBIDDEN_TRANSLATION_DETAIL_KEYS = frozenset(
+    {
+        "answer_draft",
+        "ra_internal_state",
+        "rule_expression",
+        "strategy_rule",
+    }
+)
+SENSITIVE_TRANSLATION_DETAIL_SUFFIXES = (
+    "_api_key",
+    "_password",
+    "_secret",
+    "_token",
 )
 
 
@@ -43,6 +59,11 @@ class ResearchOutcomeTranslationDecision:
         if not isinstance(self.blocking, bool):
             raise ValueError("blocking non booléen")
         _ensure_mapping(self.details, "details")
+        object.__setattr__(
+            self,
+            "details",
+            _freeze_translation_value(self.details),
+        )
 
     def to_payload(self) -> dict[str, Any]:
         return {
@@ -52,7 +73,7 @@ class ResearchOutcomeTranslationDecision:
             "source_claim_refs": list(self.source_claim_refs),
             "description": self.description,
             "blocking": self.blocking,
-            "details": _copy_contract_value(self.details),
+            "details": _thaw_translation_value(self.details),
         }
 
 
@@ -154,25 +175,44 @@ def _ensure_mapping(value: Any, field_name: str) -> None:
         raise ValueError(f"{field_name} vide")
 
 
-def _copy_contract_value(value: Any) -> Any:
+def _freeze_translation_value(value: Any) -> Any:
     if value is None:
         raise ValueError("valeur de traduction invalide")
     if isinstance(value, str):
         return _ensure_text_value(value, "valeur de traduction")
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise ValueError("valeur de traduction invalide")
+        return value
     if isinstance(value, Mapping):
         _ensure_mapping(value, "valeur de traduction")
-        return {
-            _ensure_text_value(key, "clé de traduction"): _copy_contract_value(child_value)
-            for key, child_value in value.items()
-        }
+        frozen_mapping: dict[str, Any] = {}
+        for key, child_value in value.items():
+            normalized_key = _ensure_text_value(key, "clé de traduction").lower()
+            if normalized_key in FORBIDDEN_TRANSLATION_DETAIL_KEYS:
+                raise ValueError(f"cle interdite: {key}")
+            if normalized_key.endswith(SENSITIVE_TRANSLATION_DETAIL_SUFFIXES):
+                raise ValueError(f"cle interdite: {key}")
+            frozen_mapping[key] = _freeze_translation_value(child_value)
+        return MappingProxyType(frozen_mapping)
     if isinstance(value, list):
         if len(value) == 0:
             raise ValueError("valeur de traduction invalide")
-        return [_copy_contract_value(child_value) for child_value in value]
+        return tuple(_freeze_translation_value(child_value) for child_value in value)
     if isinstance(value, tuple):
         if len(value) == 0:
             raise ValueError("valeur de traduction invalide")
-        return [_copy_contract_value(child_value) for child_value in value]
-    if isinstance(value, (bool, int, float)):
-        return value
+        return tuple(_freeze_translation_value(child_value) for child_value in value)
     raise ValueError("valeur de traduction invalide")
+
+
+def _thaw_translation_value(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {key: _thaw_translation_value(child_value) for key, child_value in value.items()}
+    if isinstance(value, tuple):
+        return [_thaw_translation_value(child_value) for child_value in value]
+    return value

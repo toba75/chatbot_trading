@@ -26,7 +26,7 @@ La branche locale `master` DOIT exister et représenter la base de comparaison a
 
 M-001 ajoute un validateur d'architecture qui inspecte l'AST Python avec la bibliothèque standard. Cette dépendance d'outillage est documentée par `docs/adr/ADR-011-python-outille-pour-validateurs-architecture.md`.
 
-Avant d'exécuter `scripts/test.ps1`, `scripts/lint.ps1` ou `scripts/validate_architecture_boundaries.ps1`, l'appelant DOIT disposer de `python` dans `PATH` avec une version `3.10` ou supérieure.
+Avant d'exécuter `scripts/test.ps1`, `scripts/lint.ps1`, `scripts/validate_architecture_boundaries.ps1` ou un test PowerShell M-001 qui lance `python -B`, l'appelant DOIT disposer de `python` dans `PATH` avec une version `3.10` ou supérieure.
 
 Le wrapper `scripts/validate_architecture_boundaries.ps1` refuse explicitement un interpréteur absent, trop ancien ou non résolu.
 

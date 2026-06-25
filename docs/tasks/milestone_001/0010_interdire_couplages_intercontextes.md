@@ -16,7 +16,7 @@
 ## Blocages Ou Préconditions
 - État GREEN/RED connu: T-001 doit être GREEN; T-003 matérialise les modules; T-004 à T-009 publient les contrats utilisés comme chemins autorisés.
 - Présence des milestones amont dans master: M-000 est présent dans `master`.
-- Décisions manquantes: aucune ADR nouvelle si la tâche applique DDD-ADR-001 et les règles d'architecture v4.1.
+- Décisions manquantes: aucune ADR nouvelle hors ADR-011, qui documente l'outillage Python du validateur d'architecture.
 - Risques: laisser passer un couplage parce que le module est encore vide; confondre import de contrat publié et import d'agrégat interne; autoriser un cycle par commodité.
 
 ## Tâches
@@ -31,7 +31,7 @@
 - Tests unitaires à écrire: tests du graphe d'import, classification des packages `domain`, `application`, `adapters`, détection de cycle et distinction entre contrat publié autorisé et agrégat interne interdit.
 - Implémentation attendue: créer un validateur d'architecture ou une suite de tests qui inspecte les imports Python et échoue sur les violations des règles M-001.
 - Invariants et garde-fous: aucune liste blanche non documentée; aucun import adaptateur dans `domain`; aucun cycle masqué; aucun `try/catch` qui transforme une analyse incomplète en GREEN.
-- Dépendances: T-003; T-004; T-005; T-006; T-007; T-008; T-009; DDD-ADR-001.
+- Dépendances: T-003; T-004; T-005; T-006; T-007; T-008; T-009; DDD-ADR-001; ADR-011.
 - Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m001\validate_architecture_boundaries_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m001\validate_architecture_boundaries_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
 - Commit RED: `test(m001): couvrir les couplages intercontextes interdits`.
 - Commit GREEN: `feat(m001): verrouiller les frontières d'import`.

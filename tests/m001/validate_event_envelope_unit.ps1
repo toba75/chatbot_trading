@@ -278,4 +278,4 @@ if ($LASTEXITCODE -ne 0) {
     throw ($output -join "`n")
 }
 
-Write-Host "Tests unitaires de l'enveloppe d'evenement M-001: OK"
+Write-Host "Tests unitaires de l'enveloppe d'événement M-001: OK"

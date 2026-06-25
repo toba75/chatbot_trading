@@ -39,7 +39,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 $version = [version] ([string] $versionOutput).Trim()
 if ($version -lt ([version] "3.10.0")) {
-    throw "Python 3.10+ requis: version detectee $version."
+    throw "Python 3.10+ requis: version détectée $version."
 }
 
 $env:PYTHONIOENCODING = "utf-8"

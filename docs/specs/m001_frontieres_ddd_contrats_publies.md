@@ -57,6 +57,8 @@ Cette spécification matérialise la carte DDD v4.1 pour M-001. Elle ne crée pa
 | EG -> SD | EG | SD | VerifiedClaimRef | Livré | Published Language | graphe de claims, cas de vérification et états internes EG |
 | RA -> SD | RA | SD | VerifiedResearchOutcome | Livré | Anti-Corruption Layer | brouillons de réponse, jeux de preuves et états de recherche RA |
 | SD -> EX | SD | EX | StrategySnapshot | Livré | Published Language immuable | stratégie candidate mutable, paramètres ouverts et règles internes SD |
+| EX -> RA | EX | RA | ExperimentResult | Livré | Published Language | registre d'expérience, diagnostics et artefacts internes EX |
+| EX -> CV | EX | CV | ExperimentResult | Livré | Published Language | registre d'expérience, diagnostics et artefacts internes EX |
 | CV -> RA | CV | RA | ResolvedQuestion | Réservé | façade applicative | historique conversationnel, tours et snapshots internes CV |
 | CV -> SD | CV | SD | StrategyRequest | Réservé | façade applicative | historique conversationnel, préférences et tours internes CV |
 | CV -> EX | EX | CV | GetExperiment | Réservé | façade applicative | registre d'expérience, diagnostics et artefacts internes EX |
@@ -72,6 +74,7 @@ La relation `CV -> EX` décrit la demande applicative portée par CV pour consul
 | VerifiedClaimRef | EG | RA, SD | identifiant d'affirmation, version, texte canonique, portée, statut, références de preuve et dépendances |
 | VerifiedResearchOutcome | RA | SD | cas de recherche, question, mandat, statut de support, claims retenus, conflits et lacunes |
 | StrategySnapshot | SD | EX | version immuable de stratégie, règles attribuées, paramètres, contraintes, exigences de données et plan de validation |
+| ExperimentResult | EX | RA, CV | résultat d'expérience rattaché aux entrées figées, métriques, diagnostics, artefacts publiés et horodatages d'exécution |
 | ResolvedQuestion | CV | RA | question autonome, mandat et références utilisateur explicitement résolues |
 | StrategyRequest | CV | SD | intention de conception, contraintes utilisateur et références vérifiées disponibles |
 | GetExperiment | EX | CV | requête de consultation d'expérience et réponse contrôlée par EX sans exposition du registre interne |
@@ -102,7 +105,7 @@ Les lignes `Livré` correspondent aux contrats versionnés et fixtures publiés 
 ## Critères d'acceptation M-001
 
 - Les sept bounded contexts SP, KA, EG, RA, CV, SD et EX sont listés avec responsabilité exclusive, propriétaire de données et modèle interne interdit.
-- Les relations SP vers KA et EG, KA vers RA, EG vers RA et SD, RA vers SD, SD vers EX, CV vers RA, SD et EX sont listées explicitement.
+- Les relations SP vers KA et EG, KA vers RA, EG vers RA et SD, RA vers SD, SD vers EX, EX vers RA et CV, CV vers RA, SD et EX sont listées explicitement.
 - Chaque relation nomme son contrat publié, son producteur, son consommateur et le modèle interne qui ne doit pas être lu.
 - Aucune relation implicite n'est acceptée.
 - Les contrats détaillés ultérieurs doivent reprendre les noms de contrats publiés ici ou créer une nouvelle ADR si leur sens change.

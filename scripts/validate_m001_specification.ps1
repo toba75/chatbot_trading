@@ -29,6 +29,8 @@ $expectedRelations = @(
     @{ Key = "EG->SD"; Relation = "EG -> SD"; Contract = "VerifiedClaimRef"; Producer = "EG"; Consumer = "SD"; Status = "Livr$($eAcute)" },
     @{ Key = "RA->SD"; Relation = "RA -> SD"; Contract = "VerifiedResearchOutcome"; Producer = "RA"; Consumer = "SD"; Status = "Livr$($eAcute)" },
     @{ Key = "SD->EX"; Relation = "SD -> EX"; Contract = "StrategySnapshot"; Producer = "SD"; Consumer = "EX"; Status = "Livr$($eAcute)" },
+    @{ Key = "EX->RA"; Relation = "EX -> RA"; Contract = "ExperimentResult"; Producer = "EX"; Consumer = "RA"; Status = "Livr$($eAcute)" },
+    @{ Key = "EX->CV"; Relation = "EX -> CV"; Contract = "ExperimentResult"; Producer = "EX"; Consumer = "CV"; Status = "Livr$($eAcute)" },
     @{ Key = "CV->RA"; Relation = "CV -> RA"; Contract = "ResolvedQuestion"; Producer = "CV"; Consumer = "RA"; Status = "R$($eAcute)serv$($eAcute)" },
     @{ Key = "CV->SD"; Relation = "CV -> SD"; Contract = "StrategyRequest"; Producer = "CV"; Consumer = "SD"; Status = "R$($eAcute)serv$($eAcute)" },
     @{ Key = "CV->EX"; Relation = "CV -> EX"; Contract = "GetExperiment"; Producer = "EX"; Consumer = "CV"; Status = "R$($eAcute)serv$($eAcute)" }

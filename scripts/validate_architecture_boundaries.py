@@ -29,15 +29,54 @@ CONTEXT_LAYERS = {"domain", "application", "adapters"}
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 SPECIAL_SOURCE_CONTRACTS = "CONTRACTS"
 SPECIAL_SOURCE_PLATFORM = "PLATFORM"
+ALL_CONTEXT_CODES = frozenset({"SP", "KA", "EG", "RA", "CV", "SD", "EX"})
+SOURCE_REFERENCE_CONSUMERS = frozenset({"SP", "KA", "EG", "RA", "CV"})
+EVIDENCE_CLAIM_CONSUMERS = frozenset({"EG", "RA", "SD"})
+RESEARCH_OUTCOME_CONSUMERS = frozenset({"RA", "SD"})
+STRATEGY_SNAPSHOT_CONSUMERS = frozenset({"SD", "EX"})
+EXPERIMENT_RESULT_CONSUMERS = frozenset({"EX", "RA", "CV"})
 CONTRACT_MODULE_ALLOWED_CONSUMERS: dict[str, frozenset[str]] = {
-    "app.contracts": frozenset({"SP", "KA", "EG", "RA", "CV", "SD", "EX"}),
-    "app.contracts.identity": frozenset({"SP", "KA", "EG", "RA", "CV", "SD", "EX"}),
-    "app.contracts.source_references": frozenset({"SP", "KA", "EG", "RA", "CV"}),
-    "app.contracts.evidence_claims": frozenset({"EG", "RA", "SD"}),
-    "app.contracts.research_outcomes": frozenset({"RA", "SD"}),
-    "app.contracts.strategy_experiments": frozenset({"SD", "EX", "RA", "CV"}),
-    "app.contracts.event_envelope": frozenset({"SP", "KA", "EG", "RA", "CV", "SD", "EX"}),
+    "app.contracts.identity": ALL_CONTEXT_CODES,
+    "app.contracts.source_references": SOURCE_REFERENCE_CONSUMERS,
+    "app.contracts.evidence_claims": EVIDENCE_CLAIM_CONSUMERS,
+    "app.contracts.research_outcomes": RESEARCH_OUTCOME_CONSUMERS,
+    "app.contracts.event_envelope": ALL_CONTEXT_CODES,
 }
+CONTRACT_SYMBOL_ALLOWED_CONSUMERS: dict[tuple[str, str], frozenset[str]] = {
+    ("app.contracts", "ContractSchemaVersion"): ALL_CONTEXT_CODES,
+    ("app.contracts", "DomainIdentifier"): ALL_CONTEXT_CODES,
+    ("app.contracts", "serialize_contract_payload"): ALL_CONTEXT_CODES,
+    ("app.contracts", "validate_contract_payload"): ALL_CONTEXT_CODES,
+    ("app.contracts", "CanonicalSourceRef"): SOURCE_REFERENCE_CONSUMERS,
+    ("app.contracts.source_references", "CanonicalSourceRef"): SOURCE_REFERENCE_CONSUMERS,
+    ("app.contracts", "SourceLocator"): SOURCE_REFERENCE_CONSUMERS,
+    ("app.contracts.source_references", "SourceLocator"): SOURCE_REFERENCE_CONSUMERS,
+    ("app.contracts", "SourceLocatorValidationPolicy"): SOURCE_REFERENCE_CONSUMERS,
+    ("app.contracts.source_references", "SourceLocatorValidationPolicy"): SOURCE_REFERENCE_CONSUMERS,
+    ("app.contracts", "EvidenceRef"): EVIDENCE_CLAIM_CONSUMERS,
+    ("app.contracts.evidence_claims", "EvidenceRef"): EVIDENCE_CLAIM_CONSUMERS,
+    ("app.contracts", "VerifiedClaimRef"): EVIDENCE_CLAIM_CONSUMERS,
+    ("app.contracts.evidence_claims", "VerifiedClaimRef"): EVIDENCE_CLAIM_CONSUMERS,
+    ("app.contracts", "VerifiedResearchOutcome"): RESEARCH_OUTCOME_CONSUMERS,
+    ("app.contracts.research_outcomes", "VerifiedResearchOutcome"): RESEARCH_OUTCOME_CONSUMERS,
+    ("app.contracts", "ResearchConflictRef"): RESEARCH_OUTCOME_CONSUMERS,
+    ("app.contracts.research_outcomes", "ResearchConflictRef"): RESEARCH_OUTCOME_CONSUMERS,
+    ("app.contracts", "KnowledgeGapRef"): RESEARCH_OUTCOME_CONSUMERS,
+    ("app.contracts.research_outcomes", "KnowledgeGapRef"): RESEARCH_OUTCOME_CONSUMERS,
+    ("app.contracts", "VersionedClaimRef"): RESEARCH_OUTCOME_CONSUMERS,
+    ("app.contracts.research_outcomes", "VersionedClaimRef"): RESEARCH_OUTCOME_CONSUMERS,
+    ("app.contracts", "StrategySnapshot"): STRATEGY_SNAPSHOT_CONSUMERS,
+    ("app.contracts.strategy_experiments", "StrategySnapshot"): STRATEGY_SNAPSHOT_CONSUMERS,
+    ("app.contracts", "ExperimentResult"): EXPERIMENT_RESULT_CONSUMERS,
+    ("app.contracts.strategy_experiments", "ExperimentResult"): EXPERIMENT_RESULT_CONSUMERS,
+    ("app.contracts", "EventEnvelope"): ALL_CONTEXT_CODES,
+    ("app.contracts.event_envelope", "EventEnvelope"): ALL_CONTEXT_CODES,
+    ("app.contracts", "EventIdempotenceDecision"): ALL_CONTEXT_CODES,
+    ("app.contracts.event_envelope", "EventIdempotenceDecision"): ALL_CONTEXT_CODES,
+    ("app.contracts", "EventIdempotenceLedger"): ALL_CONTEXT_CODES,
+    ("app.contracts.event_envelope", "EventIdempotenceLedger"): ALL_CONTEXT_CODES,
+}
+CONTRACT_SYMBOL_REQUIRED_MODULES = frozenset({"app.contracts", "app.contracts.strategy_experiments"})
 
 
 @dataclass(frozen=True)
@@ -63,6 +102,13 @@ class ImportedModule:
     context_code: str | None
     context_module: str | None
     layer: str | None
+
+
+@dataclass(frozen=True)
+class ImportReference:
+    module_name: str
+    symbol_names: tuple[str, ...]
+    line_number: int
 
 
 @dataclass(frozen=True)
@@ -349,16 +395,28 @@ def resolve_import_from_module(source: SourceModule, node: ast.ImportFrom) -> st
     return ".".join(base_parts)
 
 
-def imported_module_names(source: SourceModule, tree: ast.AST) -> list[str]:
-    imports: list[str] = []
+def imported_references(source: SourceModule, tree: ast.AST) -> list[ImportReference]:
+    imports: list[ImportReference] = []
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for alias in node.names:
-                imports.append(alias.name)
+                imports.append(
+                    ImportReference(
+                        module_name=alias.name,
+                        symbol_names=(),
+                        line_number=node.lineno,
+                    )
+                )
         elif isinstance(node, ast.ImportFrom):
             module_name = resolve_import_from_module(source, node)
             if module_name:
-                imports.append(module_name)
+                imports.append(
+                    ImportReference(
+                        module_name=module_name,
+                        symbol_names=tuple(alias.name for alias in node.names),
+                        line_number=node.lineno,
+                    )
+                )
     return imports
 
 
@@ -451,19 +509,52 @@ def contract_module_key(import_name: str) -> str:
     return import_name
 
 
-def contract_import_violations(source: SourceModule, target: ImportedModule) -> list[str]:
+def format_source_location(source: SourceModule, line_number: int) -> str:
+    try:
+        relative_path = source.path.relative_to(REPOSITORY_ROOT)
+    except ValueError:
+        relative_path = source.path
+    return f"{relative_path}:{line_number}"
+
+
+def format_import_reference(target: ImportedModule, import_reference: ImportReference) -> str:
+    if len(import_reference.symbol_names) == 0:
+        return target.name
+    return f"{target.name} import {', '.join(import_reference.symbol_names)}"
+
+
+def allowed_contract_consumers(
+    target: ImportedModule,
+    symbol_name: str,
+) -> frozenset[str] | None:
+    symbol_allowed_consumers = CONTRACT_SYMBOL_ALLOWED_CONSUMERS.get((target.name, symbol_name))
+    if symbol_allowed_consumers is not None:
+        return symbol_allowed_consumers
+
+    if target.name in CONTRACT_SYMBOL_REQUIRED_MODULES:
+        return None
+
+    return CONTRACT_MODULE_ALLOWED_CONSUMERS.get(contract_module_key(target.name))
+
+
+def contract_import_violations(
+    source: SourceModule,
+    target: ImportedModule,
+    import_reference: ImportReference,
+) -> list[str]:
     violations: list[str] = []
+    location = format_source_location(source, import_reference.line_number)
 
     if source.context_code == SPECIAL_SOURCE_CONTRACTS:
         if target.kind == "bounded_context":
             violations.append(
                 "Import de contexte metier interdit dans contracts: "
-                f"module {source.module_name}, import {target.name}."
+                f"module {source.module_name}, import {target.name}, ligne {location}."
             )
         if target.kind == "platform":
             violations.append(
                 "Import de plateforme interdit dans contracts: "
-                f"module {source.module_name}, import {target.name}."
+                f"module {source.module_name}, import {target.name}, ligne {location}."
             )
         return violations
 
@@ -471,60 +562,72 @@ def contract_import_violations(source: SourceModule, target: ImportedModule) -> 
         if target.kind == "bounded_context":
             violations.append(
                 "Import de contexte metier interdit dans platform: "
-                f"module {source.module_name}, import {target.name}."
+                f"module {source.module_name}, import {target.name}, ligne {location}."
             )
         return violations
 
     if target.kind != "contracts":
         return violations
 
-    module_key = contract_module_key(target.name)
-    allowed_consumers = CONTRACT_MODULE_ALLOWED_CONSUMERS.get(module_key)
-    if allowed_consumers is None:
-        violations.append(
-            "Import de contrat publie interdit: "
-            f"contexte {source.context_code}, module {source.module_name}, import {target.name}."
-        )
+    if len(import_reference.symbol_names) > 0:
+        for symbol_name in import_reference.symbol_names:
+            allowed_consumers = allowed_contract_consumers(target, symbol_name)
+            if allowed_consumers is not None and source.context_code in allowed_consumers:
+                continue
+
+            violations.append(
+                "Import de contrat publie interdit: "
+                f"contexte {source.context_code}, module {source.module_name}, "
+                f"import {format_import_reference(target, import_reference)}, symbole {symbol_name}, "
+                f"ligne {location}."
+            )
         return violations
 
-    if source.context_code not in allowed_consumers:
+    allowed_consumers = CONTRACT_MODULE_ALLOWED_CONSUMERS.get(contract_module_key(target.name))
+    if allowed_consumers is None or source.context_code not in allowed_consumers:
         violations.append(
             "Import de contrat publie interdit: "
-            f"contexte {source.context_code}, module {source.module_name}, import {target.name}."
+            f"contexte {source.context_code}, module {source.module_name}, "
+            f"import {target.name}, ligne {location}."
         )
 
     return violations
 
 
-def domain_layer_violations(source: SourceModule, target: ImportedModule) -> list[str]:
+def domain_layer_violations(
+    source: SourceModule,
+    target: ImportedModule,
+    import_reference: ImportReference,
+) -> list[str]:
     if source.layer != "domain":
         return []
 
     violations: list[str] = []
+    location = format_source_location(source, import_reference.line_number)
     external_root = target.name.split(".", 1)[0]
     if target.kind == "external" and external_root in DOMAIN_FORBIDDEN_EXTERNAL_IMPORTS:
         violations.append(
             f"Import de framework externe interdit dans domain: contexte {source.context_code}, "
             f"module {source.module_name}, framework {external_root} "
-            f"({DOMAIN_FORBIDDEN_EXTERNAL_IMPORTS[external_root]})."
+            f"({DOMAIN_FORBIDDEN_EXTERNAL_IMPORTS[external_root]}), ligne {location}."
         )
 
     if target.kind == "platform":
         violations.append(
             f"Import de plateforme interdit dans domain: contexte {source.context_code}, "
-            f"module {source.module_name}, import {target.name}."
+            f"module {source.module_name}, import {target.name}, ligne {location}."
         )
 
     if target.kind == "bounded_context" and target.context_code == source.context_code:
         if target.layer == "adapters":
             violations.append(
                 f"Import d'adapter interdit dans domain: contexte {source.context_code}, "
-                f"module {source.module_name}, import {target.name}."
+                f"module {source.module_name}, import {target.name}, ligne {location}."
             )
         if target.layer == "application":
             violations.append(
                 f"Import de couche application interdit dans domain: contexte {source.context_code}, "
-                f"module {source.module_name}, import {target.name}."
+                f"module {source.module_name}, import {target.name}, ligne {location}."
             )
 
     return violations
@@ -534,13 +637,15 @@ def intercontext_violation(
     source: SourceModule,
     target: ImportedModule,
     relations: list[PublishedRelation],
+    import_reference: ImportReference,
 ) -> str:
     contracts = expected_contracts(source.context_code, str(target.context_code), relations)
+    location = format_source_location(source, import_reference.line_number)
     return (
         "Import intercontexte interdit: "
         f"consommateur {source.context_code} ({source.module_name}), "
         f"producteur {target.context_code} ({target.context_module}), "
-        f"import {target.name}, contrat publié attendu: {contracts}."
+        f"import {target.name}, contrat publié attendu: {contracts}, ligne {location}."
     )
 
 
@@ -605,11 +710,11 @@ def analyze_architecture(
         tree = ast.parse(path.read_text(encoding="utf-8-sig"), filename=str(path))
         violations.extend(find_domain_api_models(source, tree))
 
-        for import_name in imported_module_names(source, tree):
+        for import_reference in imported_references(source, tree):
             analyzed_import_count += 1
-            target = classify_import(import_name, contexts_by_module)
+            target = classify_import(import_reference.module_name, contexts_by_module)
 
-            violations.extend(contract_import_violations(source, target))
+            violations.extend(contract_import_violations(source, target, import_reference))
 
             if source.context_code in {SPECIAL_SOURCE_CONTRACTS, SPECIAL_SOURCE_PLATFORM}:
                 continue
@@ -617,7 +722,7 @@ def analyze_architecture(
             if target.kind == "contracts":
                 continue
 
-            violations.extend(domain_layer_violations(source, target))
+            violations.extend(domain_layer_violations(source, target, import_reference))
 
             if target.kind != "bounded_context":
                 continue
@@ -630,7 +735,7 @@ def analyze_architecture(
             if allows_facade_import(source, target, relations):
                 continue
 
-            violations.append(intercontext_violation(source, target, relations))
+            violations.append(intercontext_violation(source, target, relations, import_reference))
 
     for cycle in find_context_cycles(context_edges):
         violations.append(f"Cycle intercontexte interdit: {' -> '.join(cycle)}.")

@@ -45,6 +45,12 @@ FORBIDDEN_CONTRACT_KEYS = frozenset(
         "verification_case_id",
     }
 )
+SENSITIVE_CONTRACT_KEY_SUFFIXES = (
+    "_api_key",
+    "_password",
+    "_secret",
+    "_token",
+)
 
 
 class FrozenList(tuple):
@@ -78,7 +84,7 @@ def ensure_no_forbidden_contract_keys(value: Any, field_name: str) -> None:
     if isinstance(value, Mapping):
         for key, child_value in value.items():
             _ensure_mapping_key(key, field_name)
-            if key.lower() in FORBIDDEN_CONTRACT_KEYS:
+            if _is_forbidden_contract_key(key):
                 raise ValueError(f"cle interdite: {key}")
             ensure_no_forbidden_contract_keys(child_value, field_name)
     elif isinstance(value, (list, tuple)):
@@ -129,7 +135,7 @@ def freeze_contract_value(
         frozen_mapping: dict[str, Any] = {}
         for key, child_value in value.items():
             _ensure_mapping_key(key, field_name)
-            if key.lower() in FORBIDDEN_CONTRACT_KEYS:
+            if _is_forbidden_contract_key(key):
                 raise ValueError(f"cle interdite: {key}")
             frozen_mapping[key] = freeze_contract_value(
                 child_value,
@@ -175,3 +181,10 @@ def _ensure_mapping_key(value: Any, field_name: str) -> str:
     if not isinstance(value, str) or value.strip() == "" or value != value.strip():
         raise ValueError(f"{field_name} invalide")
     return value
+
+
+def _is_forbidden_contract_key(value: str) -> bool:
+    normalized = value.lower()
+    if normalized in FORBIDDEN_CONTRACT_KEYS:
+        return True
+    return normalized.endswith(SENSITIVE_CONTRACT_KEY_SUFFIXES)

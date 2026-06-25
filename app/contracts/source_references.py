@@ -6,6 +6,7 @@ import json
 import math
 import re
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Any, Mapping
 
 from app.contracts._validation import (
@@ -195,30 +196,67 @@ class SourceLocatorValidationPolicy:
             "resolvable_item_ids_by_version_id",
         )
 
+        normalized_sources_by_version_id: dict[str, CanonicalSourceRef] = {}
+        normalized_statuses_by_version_id: dict[str, str] = {}
+        normalized_item_ids_by_version_id: dict[str, frozenset[str]] = {}
+
         for version_id, canonical_source in self.canonical_sources_by_version_id.items():
-            _ensure_domain_identifier_value(version_id, "canonical_version_id", "CVER")
+            normalized_version_id = _ensure_domain_identifier_value(
+                version_id,
+                "canonical_version_id",
+                "CVER",
+            )
             if not isinstance(canonical_source, CanonicalSourceRef):
                 raise ValueError("CanonicalSourceRef invalide dans la politique SourceLocator")
-            if version_id != canonical_source.canonical_version_id:
+            if normalized_version_id != canonical_source.canonical_version_id:
                 raise ValueError("Cle de version incoherente avec CanonicalSourceRef")
-            if version_id not in self.version_statuses_by_version_id:
-                raise ValueError(f"Statut de version canonique absent: {version_id}")
+            normalized_sources_by_version_id[normalized_version_id] = canonical_source
 
         for version_id, status in self.version_statuses_by_version_id.items():
-            _ensure_domain_identifier_value(version_id, "canonical_version_id", "CVER")
+            normalized_version_id = _ensure_domain_identifier_value(
+                version_id,
+                "canonical_version_id",
+                "CVER",
+            )
             _ensure_text_value(status, "canonical_version_status")
             if status not in ALLOWED_CANONICAL_VERSION_STATUSES:
                 raise ValueError(f"Statut de version canonique inconnu: {status}")
+            normalized_statuses_by_version_id[normalized_version_id] = status
+
+        for version_id in normalized_sources_by_version_id:
+            if version_id not in normalized_statuses_by_version_id:
+                raise ValueError(f"Statut de version canonique absent: {version_id}")
 
         for version_id, item_ids in self.resolvable_item_ids_by_version_id.items():
-            _ensure_domain_identifier_value(version_id, "canonical_version_id", "CVER")
+            normalized_version_id = _ensure_domain_identifier_value(
+                version_id,
+                "canonical_version_id",
+                "CVER",
+            )
             if isinstance(item_ids, str) or not hasattr(item_ids, "__iter__"):
                 raise ValueError("item_ids resolvables non iterables")
             materialized_item_ids = frozenset(item_ids)
             if len(materialized_item_ids) == 0:
-                raise ValueError(f"item_ids resolvables absents: {version_id}")
+                raise ValueError(f"item_ids resolvables absents: {normalized_version_id}")
             for item_id in materialized_item_ids:
                 _ensure_text_value(item_id, "item_id")
+            normalized_item_ids_by_version_id[normalized_version_id] = materialized_item_ids
+
+        object.__setattr__(
+            self,
+            "canonical_sources_by_version_id",
+            MappingProxyType(normalized_sources_by_version_id),
+        )
+        object.__setattr__(
+            self,
+            "version_statuses_by_version_id",
+            MappingProxyType(normalized_statuses_by_version_id),
+        )
+        object.__setattr__(
+            self,
+            "resolvable_item_ids_by_version_id",
+            MappingProxyType(normalized_item_ids_by_version_id),
+        )
 
     def validate_locator(self, locator: SourceLocator) -> None:
         if not isinstance(locator, SourceLocator):

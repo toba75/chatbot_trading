@@ -1,6 +1,9 @@
 ﻿param(
     [Parameter(Mandatory = $false)]
-    [string] $Path
+    [string] $Path,
+
+    [Parameter(Mandatory = $false)]
+    [switch] $AllowM000OnlyMatrix
 )
 
 $ErrorActionPreference = "Stop"
@@ -395,6 +398,9 @@ function Assert-M001RequirementRows {
             (Get-MatrixRowCell -Row $_ -CellName "Exigence" -RequirementId "ligne inconnue") -match "^REQ-M001-"
         }).Count -gt 0
         if (-not $containsM001Rows) {
+            Assert-Condition `
+                -Condition $AllowM000OnlyMatrix `
+                -Message "Matrice M-001 absente sans autorisation explicite."
             return
         }
     }
