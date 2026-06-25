@@ -57,7 +57,7 @@ def request_for(job_name: str, priority: JobPriority, input_hash: str = "a" * 64
 
 
 submit_signature = inspect.signature(InMemoryJobQueue.submit)
-if submit_signature.parameters["recalculate"].default is not inspect._empty:
+if submit_signature.parameters["recalculate"].default is not inspect.Parameter.empty:
     raise AssertionError("submit.recalculate ne doit pas avoir de valeur par defaut.")
 
 if not JOB_RUNTIME_CATALOG.includes("VERIFY_RESPONSE"):
