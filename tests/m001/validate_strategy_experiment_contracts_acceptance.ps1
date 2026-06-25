@@ -102,7 +102,7 @@ unresolved_blocking_parameter["parameters"] = [
 unresolved_blocking_parameter["parameters"][0]["resolution_status"] = "UNRESOLVED"
 unresolved_blocking_parameter["parameters"][0]["blocking"] = True
 assert_raises(
-    "paramètre bloquant non résolu",
+    "parametre bloquant non resolu",
     lambda: StrategySnapshot.from_payload(unresolved_blocking_parameter),
 )
 
@@ -110,7 +110,7 @@ mutable_strategy_reference = dict(strategy_payload)
 mutable_strategy_reference["rules"] = [dict(rule) for rule in strategy_payload["rules"]]
 mutable_strategy_reference["rules"][0]["mutable_reference"] = "strategy_candidate:STRAT-000017/current"
 assert_raises(
-    "référence mutable interdite",
+    "reference mutable interdite",
     lambda: StrategySnapshot.from_payload(mutable_strategy_reference),
 )
 
@@ -118,7 +118,7 @@ mutable_result_input = dict(ex_to_ra_payload)
 mutable_result_input["frozen_inputs"] = dict(ex_to_ra_payload["frozen_inputs"])
 mutable_result_input["frozen_inputs"]["mutable_input"] = "market-data:latest"
 assert_raises(
-    "entrée mutable interdite",
+    "entree mutable interdite",
     lambda: ExperimentResult.from_payload(mutable_result_input),
 )
 
@@ -136,7 +136,7 @@ assert_raises(
 profitability_claim = dict(ex_to_ra_payload)
 profitability_claim["profitability_statement"] = "validated"
 assert_raises(
-    "déclaration de rentabilité interdite",
+    "declaration de rentabilite interdite",
     lambda: ExperimentResult.from_payload(profitability_claim),
 )
 

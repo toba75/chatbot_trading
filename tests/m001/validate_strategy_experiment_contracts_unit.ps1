@@ -160,7 +160,7 @@ assert_raises("spec_hash invalide", lambda: StrategySnapshot.from_payload(invali
 
 not_compilable = strategy_payload()
 not_compilable["status"] = "DRAFT"
-assert_raises("status non autorisé", lambda: StrategySnapshot.from_payload(not_compilable))
+assert_raises("status non autorise", lambda: StrategySnapshot.from_payload(not_compilable))
 
 missing_rules = strategy_payload()
 del missing_rules["rules"]
@@ -181,19 +181,19 @@ unresolved_blocking_parameter["parameters"] = [
 ]
 unresolved_blocking_parameter["parameters"][0]["resolution_status"] = "UNRESOLVED"
 assert_raises(
-    "paramètre bloquant non résolu",
+    "parametre bloquant non resolu",
     lambda: StrategySnapshot.from_payload(unresolved_blocking_parameter),
 )
 
 mutable_reference = strategy_payload()
 mutable_reference["constraints"] = [dict(mutable_reference["constraints"][0])]
 mutable_reference["constraints"][0]["mutable_reference"] = "strategy_candidate:STRAT-000017/current"
-assert_raises("référence mutable interdite", lambda: StrategySnapshot.from_payload(mutable_reference))
+assert_raises("reference mutable interdite", lambda: StrategySnapshot.from_payload(mutable_reference))
 
 profitability_statement = strategy_payload()
 profitability_statement["profitability_statement"] = "validated"
 assert_raises(
-    "déclaration de rentabilité interdite",
+    "declaration de rentabilite interdite",
     lambda: StrategySnapshot.from_payload(profitability_statement),
 )
 
@@ -221,7 +221,7 @@ assert_raises("status vide", lambda: ExperimentResult.from_payload(implicit_stat
 
 unknown_status = result_payload()
 unknown_status["status"] = "ARCHIVED"
-assert_raises("status non autorisé", lambda: ExperimentResult.from_payload(unknown_status))
+assert_raises("status non autorise", lambda: ExperimentResult.from_payload(unknown_status))
 
 for status in ALLOWED_EXPERIMENT_RESULT_STATUSES:
     payload = result_payload()
@@ -235,13 +235,13 @@ assert_raises("frozen_inputs absent", lambda: ExperimentResult.from_payload(miss
 mutable_input = result_payload()
 mutable_input["frozen_inputs"] = dict(mutable_input["frozen_inputs"])
 mutable_input["frozen_inputs"]["mutable_input"] = "market-data:latest"
-assert_raises("entrée mutable interdite", lambda: ExperimentResult.from_payload(mutable_input))
+assert_raises("entree mutable interdite", lambda: ExperimentResult.from_payload(mutable_input))
 
 inconsistent_frozen_input = result_payload()
 inconsistent_frozen_input["frozen_inputs"] = dict(inconsistent_frozen_input["frozen_inputs"])
 inconsistent_frozen_input["frozen_inputs"]["data_snapshot_id"] = "DATA-999999"
 assert_raises(
-    "data_snapshot_id incohérent avec frozen_inputs",
+    "data_snapshot_id incoherent avec frozen_inputs",
     lambda: ExperimentResult.from_payload(inconsistent_frozen_input),
 )
 
@@ -260,7 +260,7 @@ assert_raises("artifacts absent", lambda: ExperimentResult.from_payload(missing_
 profitability_claim = result_payload()
 profitability_claim["rentability_claim"] = "profitable"
 assert_raises(
-    "déclaration de rentabilité interdite",
+    "declaration de rentabilite interdite",
     lambda: ExperimentResult.from_payload(profitability_claim),
 )
 
