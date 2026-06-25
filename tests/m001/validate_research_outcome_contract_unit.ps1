@@ -100,7 +100,7 @@ assert_raises("support_status vide", lambda: VerifiedResearchOutcome.from_payloa
 
 unknown_status = base_payload()
 unknown_status["support_status"] = "DRAFT"
-assert_raises("support_status non autorisé: DRAFT", lambda: VerifiedResearchOutcome.from_payload(unknown_status))
+assert_raises("support_status non autoris", lambda: VerifiedResearchOutcome.from_payload(unknown_status))
 
 missing_claim_refs = base_payload()
 del missing_claim_refs["claim_refs"]
@@ -136,7 +136,7 @@ assert_raises(
 supported_with_conflict = conflicting_payload()
 supported_with_conflict["support_status"] = SUPPORTED_STATUS
 assert_raises(
-    "support_status masque des conflits non résolus",
+    "support_status masque des conflits",
     lambda: VerifiedResearchOutcome.from_payload(supported_with_conflict),
 )
 

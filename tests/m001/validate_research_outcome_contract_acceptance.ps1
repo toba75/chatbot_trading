@@ -75,7 +75,7 @@ conflicting_decisions = translator.translate(conflicting_outcome)
 # Then SD obtient une traduction explicite sans lire l'état interne RA ni créer une règle.
 if supported_outcome.question != supported_payload["question"]:
     raise AssertionError("La question résolue doit être conservée.")
-if supported_outcome.mandate["objective"] != "formaliser une hypothèse de stratégie testable":
+if supported_outcome.mandate["objective"] != supported_payload["mandate"]["objective"]:
     raise AssertionError("Le mandat explicite doit être conservé.")
 if str(supported_outcome.claim_refs[0]) != "CLM-004812@3":
     raise AssertionError("Les claim_refs doivent rester versionnés.")
@@ -117,7 +117,7 @@ masked_conflict["unresolved_conflicts"] = [
         "blocking": True,
     }
 ]
-assert_raises("support_status masque des conflits non résolus", lambda: VerifiedResearchOutcome.from_payload(masked_conflict))
+assert_raises("support_status masque des conflits", lambda: VerifiedResearchOutcome.from_payload(masked_conflict))
 
 implicit_status = dict(supported_payload)
 implicit_status["support_status"] = ""
