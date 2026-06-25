@@ -295,6 +295,22 @@ def load_source():
         }
     }
 
+    $missingRegistryPath = Join-Path $contractRuleMismatch.Root "missing_context_registry.json"
+    $missingRegistryResult = Invoke-ArchitectureBoundaryValidator `
+        -AppRoot $contractRuleMismatch.AppRoot `
+        -ContextRegistryPath $missingRegistryPath
+    if ($missingRegistryResult.ExitCode -eq 0) {
+        throw "Un registre de contextes absent doit etre refuse."
+    }
+    if ($missingRegistryResult.Output.Contains("Traceback")) {
+        throw "Une erreur de configuration M-001 ne doit pas afficher de traceback Python.`nSortie obtenue:`n$($missingRegistryResult.Output)"
+    }
+    foreach ($expectedFragment in @("Erreur de configuration M-001", "Registre de contextes absent")) {
+        if (-not $missingRegistryResult.Output.Contains($expectedFragment)) {
+            throw "Fragment attendu absent: $expectedFragment`nSortie obtenue:`n$($missingRegistryResult.Output)"
+        }
+    }
+
     $missingPython = New-ControlledApp -ScenarioName "missing_python"
     $createdRoots += $missingPython.Root
     $powershellExecutable = (Get-Command powershell -ErrorAction Stop).Source

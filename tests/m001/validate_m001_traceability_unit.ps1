@@ -289,6 +289,22 @@ if (-not (Test-Path -LiteralPath $validatorPath -PathType Leaf)) {
     throw "Validateur de traçabilité absent: scripts/validate_traceability.ps1"
 }
 
+$pythonPreflightPath = Join-Path $repoRoot "scripts/require_python.ps1"
+if (-not (Test-Path -LiteralPath $pythonPreflightPath -PathType Leaf)) {
+    throw "Préflight Python absent: scripts/require_python.ps1"
+}
+
+Get-ChildItem -LiteralPath (Join-Path $repoRoot "tests/m001") -Filter "*.ps1" |
+    ForEach-Object {
+        $testContent = Get-Content -Raw -Encoding UTF8 -LiteralPath $_.FullName
+        if ($testContent -notmatch "&\s+python\s+-B") {
+            return
+        }
+        if (-not $testContent.Contains("Get-RequiredPythonExecutable")) {
+            throw "Test M-001 sans préflight Python explicite: $($_.FullName)"
+        }
+    }
+
 New-Item -ItemType Directory -Path $temporaryRoot | Out-Null
 
 try {
