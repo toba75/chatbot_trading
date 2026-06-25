@@ -118,7 +118,7 @@ if ($realResult.ExitCode -ne 0) {
 }
 Assert-OutputContains -Output $realResult.Output -Expected "Fronti$($eGrave)res d'import M-001 valides"
 
-$tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m001_arch_acceptance_" + [System.Guid]::NewGuid().ToString("N"))
+$tempRoot = Join-Path $repoRoot (".tmp/ost_m001_arch_acceptance_" + [System.Guid]::NewGuid().ToString("N"))
 try {
     $sampleAppRoot = Initialize-ControlledApp -TargetRoot $tempRoot
     New-PythonPackageFile -Path (Join-Path $sampleAppRoot "knowledge_access/domain/direct_source_model.py") -Content @"

@@ -2,7 +2,7 @@ $ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
 $validatorPath = Join-Path $repoRoot "scripts/validate_m001_specification.ps1"
-$temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m001_spec_unit_" + [System.Guid]::NewGuid().ToString("N"))
+$temporaryRoot = Join-Path $repoRoot (".tmp/ost_m001_spec_unit_" + [System.Guid]::NewGuid().ToString("N"))
 
 $eAcute = [char] 0x00E9
 $eGrave = [char] 0x00E8
@@ -42,18 +42,18 @@ Le langage M-001 publie les termes suivants: bounded context, responsabilit$($eA
 
 ## Relations intercontextes publi$($eAcute)es
 
-| Relation | Producteur | Consommateur | Contrat publi$($eAcute) | Type | Mod$($eGrave)le interne interdit |
-|---|---|---|---|---|---|
-| SP -> KA | SP | KA | CanonicalSourcePublished | Published Language | tables et agr$($eAcute)gats SP internes |
-| SP -> EG | SP | EG | CanonicalSourcePublished | Published Language | tables et agr$($eAcute)gats SP internes |
-| KA -> RA | KA | RA | SearchEvidence API | Customer/Supplier | Qdrant, embeddings et fusion interne |
-| EG -> RA | EG | RA | VerifiedClaimRef | Published Language | revue interne EG et graphe de claims |
-| EG -> SD | EG | SD | VerifiedClaimRef | Published Language | revue interne EG et graphe de claims |
-| RA -> SD | RA | SD | VerifiedResearchOutcome | Anti-Corruption Layer | brouillons de r$($eAcute)ponse et jeux de preuves RA |
-| SD -> EX | SD | EX | StrategySnapshot | Published Language immuable | strat$($eAcute)gie candidate mutable SD |
-| CV -> RA | CV | RA | ResolvedQuestion | fa$($cCedilla)ade applicative | historique conversationnel CV |
-| CV -> SD | CV | SD | StrategyRequest | fa$($cCedilla)ade applicative | pr$($eAcute)f$($eAcute)rences et tours CV |
-| CV -> EX | EX | CV | GetExperiment | fa$($cCedilla)ade applicative | registre interne EX |
+| Relation | Producteur | Consommateur | Contrat publi$($eAcute) | Statut M-001 | Type | Mod$($eGrave)le interne interdit |
+|---|---|---|---|---|---|---|
+| SP -> KA | SP | KA | CanonicalSourcePublished | Livr$($eAcute) | Published Language | tables et agr$($eAcute)gats SP internes |
+| SP -> EG | SP | EG | CanonicalSourcePublished | Livr$($eAcute) | Published Language | tables et agr$($eAcute)gats SP internes |
+| KA -> RA | KA | RA | SearchEvidence API | R$($eAcute)serv$($eAcute) | Customer/Supplier | Qdrant, embeddings et fusion interne |
+| EG -> RA | EG | RA | VerifiedClaimRef | Livr$($eAcute) | Published Language | revue interne EG et graphe de claims |
+| EG -> SD | EG | SD | VerifiedClaimRef | Livr$($eAcute) | Published Language | revue interne EG et graphe de claims |
+| RA -> SD | RA | SD | VerifiedResearchOutcome | Livr$($eAcute) | Anti-Corruption Layer | brouillons de r$($eAcute)ponse et jeux de preuves RA |
+| SD -> EX | SD | EX | StrategySnapshot | Livr$($eAcute) | Published Language immuable | strat$($eAcute)gie candidate mutable SD |
+| CV -> RA | CV | RA | ResolvedQuestion | R$($eAcute)serv$($eAcute) | fa$($cCedilla)ade applicative | historique conversationnel CV |
+| CV -> SD | CV | SD | StrategyRequest | R$($eAcute)serv$($eAcute) | fa$($cCedilla)ade applicative | pr$($eAcute)f$($eAcute)rences et tours CV |
+| CV -> EX | EX | CV | GetExperiment | R$($eAcute)serv$($eAcute) | fa$($cCedilla)ade applicative | registre interne EX |
 
 ## Crit$($eGrave)res d'acceptation
 
@@ -169,14 +169,34 @@ try {
     Assert-ExitCode -Actual $emptyOwnerResult.ExitCode -Expected 1 -Message "Un propri$($eAcute)taire de donn$($eAcute)es vide doit $([char] 0x00EA)tre refus$($eAcute)."
     Assert-OutputContains -Output $emptyOwnerResult.Output -Expected "Propri$($eAcute)taire de donn$($eAcute)es vide pour RA" -Message "Le propri$($eAcute)taire vide doit $([char] 0x00EA)tre nomm$($eAcute)."
 
-    $cvExLine = "| CV -> EX | EX | CV | GetExperiment | fa$($cCedilla)ade applicative | registre interne EX |"
-    $unknownRelationLine = "$cvExLine`n| KA -> EX | KA | EX | SearchEvidence API | Published Language | projection KA interne |"
+    $cvExLine = "| CV -> EX | EX | CV | GetExperiment | R$($eAcute)serv$($eAcute) | fa$($cCedilla)ade applicative | registre interne EX |"
+    $unknownRelationLine = "$cvExLine`n| KA -> EX | KA | EX | SearchEvidence API | R$($eAcute)serv$($eAcute) | Published Language | projection KA interne |"
     $unknownRelationSpecPath = New-TemporarySpec `
         -Name "unknown-relation" `
         -Content ($validContent.Replace($cvExLine, $unknownRelationLine))
     $unknownRelationResult = Invoke-M001Validator -SpecPath $unknownRelationSpecPath
     Assert-ExitCode -Actual $unknownRelationResult.ExitCode -Expected 1 -Message "Une relation absente de la context map v4.1 doit $([char] 0x00EA)tre refus$($eAcute)e."
     Assert-OutputContains -Output $unknownRelationResult.Output -Expected "Relation non pr$($eAcute)sente dans la context map v4.1: KA -> EX" -Message "La relation interdite doit $([char] 0x00EA)tre nomm$($eAcute)e."
+
+    $wrongStatusSpecPath = New-TemporarySpec `
+        -Name "wrong-status" `
+        -Content ($validContent.Replace("| RA -> SD | RA | SD | VerifiedResearchOutcome | Livr$($eAcute) |", "| RA -> SD | RA | SD | VerifiedResearchOutcome | R$($eAcute)serv$($eAcute) |"))
+    $wrongStatusResult = Invoke-M001Validator -SpecPath $wrongStatusSpecPath
+    Assert-ExitCode -Actual $wrongStatusResult.ExitCode -Expected 1 -Message "Un statut de livraison M-001 incoh$($eAcute)rent doit $([char] 0x00EA)tre refus$($eAcute)."
+    Assert-OutputContains -Output $wrongStatusResult.Output -Expected "Statut M-001 invalide pour RA -> SD" -Message "Le statut M-001 incorrect doit $([char] 0x00EA)tre nomm$($eAcute)."
+
+    $externalRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m001_spec_external_" + [System.Guid]::NewGuid().ToString("N"))
+    New-Item -ItemType Directory -Path $externalRoot | Out-Null
+    try {
+        $externalSpecPath = Join-Path $externalRoot "external.md"
+        $validContent | Set-Content -Encoding UTF8 -LiteralPath $externalSpecPath
+        $externalResult = Invoke-M001Validator -SpecPath $externalSpecPath
+        Assert-ExitCode -Actual $externalResult.ExitCode -Expected 1 -Message "Une sp$($eAcute)cification hors d$([char] 0x00E9)p$([char] 0x00F4)t doit $([char] 0x00EA)tre refus$($eAcute)e."
+        Assert-OutputContains -Output $externalResult.Output -Expected "Chemin hors d$([char] 0x00E9)p$([char] 0x00F4)t interdit" -Message "Le chemin externe doit $([char] 0x00EA)tre nomm$($eAcute)."
+    }
+    finally {
+        Remove-Item -LiteralPath $externalRoot -Recurse -Force
+    }
 }
 finally {
     Remove-Item -LiteralPath $temporaryRoot -Recurse -Force

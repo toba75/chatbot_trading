@@ -127,11 +127,31 @@ if StrategySnapshot.from_json(snapshot.to_json()) != snapshot:
 if StrategySnapshot.from_json(snapshot.to_json()).to_json() != snapshot.to_json():
     raise AssertionError("La sérialisation StrategySnapshot doit être déterministe.")
 
+snapshot_json = snapshot.to_json()
+try:
+    snapshot.rules[0]["kind"] = "MUTATED"
+except TypeError:
+    pass
+else:
+    raise AssertionError("StrategySnapshot.rules doit etre immuable apres validation.")
+if snapshot.to_json() != snapshot_json:
+    raise AssertionError("Une mutation externe ne doit pas modifier StrategySnapshot.")
+
 result = ExperimentResult.from_payload(result_payload())
 if ExperimentResult.from_json(result.to_json()) != result:
     raise AssertionError("Le round-trip ExperimentResult doit rester stable.")
 if ExperimentResult.from_json(result.to_json()).to_json() != result.to_json():
     raise AssertionError("La sérialisation ExperimentResult doit être déterministe.")
+
+result_json = result.to_json()
+try:
+    result.frozen_inputs["data_snapshot_id"] = "DATA-999999"
+except TypeError:
+    pass
+else:
+    raise AssertionError("ExperimentResult.frozen_inputs doit etre immuable apres validation.")
+if result.to_json() != result_json:
+    raise AssertionError("Une mutation externe ne doit pas modifier ExperimentResult.")
 
 if FAILED_EXPERIMENT_STATUS not in ALLOWED_EXPERIMENT_RESULT_STATUSES:
     raise AssertionError("Les résultats échoués doivent rester représentables.")
@@ -263,6 +283,24 @@ assert_raises(
     "declaration de rentabilite interdite",
     lambda: ExperimentResult.from_payload(profitability_claim),
 )
+
+impossible_created_at = strategy_payload()
+impossible_created_at["created_at"] = "2026-02-30T10:00:00Z"
+assert_raises("created_at invalide", lambda: StrategySnapshot.from_payload(impossible_created_at))
+
+non_finite_metric = result_payload()
+non_finite_metric["metrics"] = dict(non_finite_metric["metrics"])
+non_finite_metric["metrics"]["sharpe"] = float("nan")
+assert_raises("valeur de contrat invalide", lambda: ExperimentResult.from_payload(non_finite_metric))
+
+internal_experiment_key = result_payload()
+internal_experiment_key["diagnostics"] = dict(internal_experiment_key["diagnostics"])
+internal_experiment_key["diagnostics"]["retry_policy"] = "interne"
+assert_raises("cle interdite", lambda: ExperimentResult.from_payload(internal_experiment_key))
+
+top_level_extra_key = strategy_payload()
+top_level_extra_key["strategy_candidate_id"] = "STRAT-CANDIDATE-001"
+assert_raises("champ interdit", lambda: StrategySnapshot.from_payload(top_level_extra_key))
 
 print("Invariants unitaires StrategySnapshot et ExperimentResult M-001: OK")
 '@

@@ -58,6 +58,32 @@ valid_locator = SourceLocator.from_payload(locator_payload, validation_policy=va
 if SourceLocator.from_json(valid_locator.to_json(), validation_policy=validation_policy) != valid_locator:
     raise AssertionError("Le round-trip unitaire SourceLocator doit rester stable.")
 
+assert_raises(
+    "validation_policy invalide",
+    lambda: SourceLocator.from_payload(locator_payload, validation_policy=None),
+)
+
+impossible_accepted_at = dict(canonical_payload)
+impossible_accepted_at["accepted_at"] = "2026-02-30T08:30:00Z"
+assert_raises(
+    "accepted_at invalide",
+    lambda: CanonicalSourceRef.from_payload(impossible_accepted_at),
+)
+
+internal_source_key = dict(locator_payload)
+internal_source_key["sp_table"] = "source_processing.canonical_sources"
+assert_raises(
+    "cle interdite",
+    lambda: SourceLocator.from_payload(internal_source_key, validation_policy=validation_policy),
+)
+
+nan_bbox = dict(locator_payload)
+nan_bbox["bbox"] = [0.1, float("nan"), 0.8, 0.4]
+assert_raises(
+    "bbox invalide",
+    lambda: SourceLocator.from_payload(nan_bbox, validation_policy=validation_policy),
+)
+
 unsupported_schema = dict(locator_payload)
 unsupported_schema["schema_version"] = "2.0"
 assert_raises(

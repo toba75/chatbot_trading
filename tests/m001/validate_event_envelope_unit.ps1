@@ -51,6 +51,16 @@ if EventEnvelope.from_json(event.to_json()) != event:
 if EventEnvelope.from_json(event.to_json()).to_json() != event.to_json():
     raise AssertionError("La serialisation EventEnvelope doit etre deterministe.")
 
+event_json = event.to_json()
+try:
+    event.payload["document_id"] = "DOC-999999"
+except TypeError:
+    pass
+else:
+    raise AssertionError("EventEnvelope.payload doit etre immuable apres validation.")
+if event.to_json() != event_json:
+    raise AssertionError("Une mutation externe ne doit pas modifier EventEnvelope.")
+
 expected_contexts = {"SP", "KA", "EG", "RA", "CV", "SD", "EX"}
 if ALLOWED_EVENT_PRODUCER_CONTEXTS != expected_contexts:
     raise AssertionError("Les producteurs autorises doivent rester les sept bounded contexts metier.")
@@ -99,6 +109,10 @@ assert_raises("occurred_at absent", lambda: EventEnvelope.from_payload(missing_o
 invalid_occurred_at = valid_payload()
 invalid_occurred_at["occurred_at"] = "2026-06-21 08:30:00"
 assert_raises("occurred_at invalide", lambda: EventEnvelope.from_payload(invalid_occurred_at))
+
+impossible_occurred_at = valid_payload()
+impossible_occurred_at["occurred_at"] = "2026-02-30T08:30:00Z"
+assert_raises("occurred_at invalide", lambda: EventEnvelope.from_payload(impossible_occurred_at))
 
 missing_aggregate_type = valid_payload()
 del missing_aggregate_type["aggregate_type"]
@@ -152,6 +166,49 @@ payload_with_empty_value = valid_payload()
 payload_with_empty_value["payload"] = {"schema_version": "1.0", "empty": ""}
 assert_raises("payload invalide", lambda: EventEnvelope.from_payload(payload_with_empty_value))
 
+payload_with_secret = valid_payload()
+payload_with_secret["payload"] = {
+    "schema_version": "1.0",
+    "canonical_source_id": "CSRC-000001",
+    "document_id": "DOC-000001",
+    "canonical_version_id": "CVER-000004",
+    "source_sha256": "a" * 64,
+    "canonical_artifact_sha256": "b" * 64,
+    "page_count": 2,
+    "accepted_at": "2026-06-21T08:30:00Z",
+    "quality_policy_version": "source-qa-v3",
+    "api_key": "secret",
+}
+assert_raises("cle interdite", lambda: EventEnvelope.from_payload(payload_with_secret))
+
+payload_with_nan = valid_payload()
+payload_with_nan["payload"] = {"schema_version": "1.0", "score": float("nan")}
+assert_raises("payload invalide", lambda: EventEnvelope.from_payload(payload_with_nan))
+
+incomplete_canonical_payload = valid_payload()
+incomplete_canonical_payload["payload"] = {"schema_version": "1.0", "canonical_source_id": "CSRC-000001"}
+assert_raises(
+    "payload CanonicalSourcePublished invalide",
+    lambda: EventEnvelope.from_payload(incomplete_canonical_payload),
+)
+
+inconsistent_canonical_payload = valid_payload()
+inconsistent_canonical_payload["payload"] = {
+    "schema_version": "1.0",
+    "canonical_source_id": "CSRC-999999",
+    "document_id": "DOC-000001",
+    "canonical_version_id": "CVER-000004",
+    "source_sha256": "a" * 64,
+    "canonical_artifact_sha256": "b" * 64,
+    "page_count": 2,
+    "accepted_at": "2026-06-21T08:30:00Z",
+    "quality_policy_version": "source-qa-v3",
+}
+assert_raises(
+    "aggregate_id incoherent",
+    lambda: EventEnvelope.from_payload(inconsistent_canonical_payload),
+)
+
 ledger = EventIdempotenceLedger.from_processed_event_ids(["EVT-000099"])
 if not ledger.has_processed("EVT-000099"):
     raise AssertionError("Le ledger de test doit reconnaitre un event_id deja traite.")
@@ -163,6 +220,10 @@ if first_decision.already_processed:
     raise AssertionError("Un nouvel event_id ne doit pas etre signale comme doublon.")
 if not first_decision.ledger.has_processed(event):
     raise AssertionError("Le nouvel event_id doit etre ajoute au ledger de test.")
+
+second_decision_from_same_ledger = ledger.record(event)
+if not second_decision_from_same_ledger.already_processed:
+    raise AssertionError("Deux records depuis le meme ledger initial doivent detecter le doublon.")
 
 duplicate_decision = first_decision.ledger.record(event)
 if not duplicate_decision.already_processed:

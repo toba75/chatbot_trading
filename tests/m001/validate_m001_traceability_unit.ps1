@@ -220,6 +220,28 @@ function Invoke-Validator {
     }
 }
 
+function Invoke-ValidatorWithPath {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $MatrixPath
+    )
+
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+
+    try {
+        $output = & powershell -NoProfile -ExecutionPolicy Bypass -File $validatorPath -Path $MatrixPath 2>&1
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+
+    return [pscustomobject] @{
+        ExitCode = $LASTEXITCODE
+        Output = ($output -join "`n")
+    }
+}
+
 function Assert-ExitCode {
     param(
         [Parameter(Mandatory = $true)]
@@ -358,6 +380,31 @@ try {
         -Output $wrongJustificationResult.Output `
         -Expected "Justification ADR insuffisante pour REQ-M001-004" `
         -Message "La justification ADR insuffisante doit être nommée."
+    $m000OnlyMatrixRoot = Join-Path $repoRoot (".tmp/ost_m001_traceability_m000_only_" + [System.Guid]::NewGuid().ToString("N"))
+    New-Item -ItemType Directory -Path $m000OnlyMatrixRoot | Out-Null
+    $m000OnlyMatrixPath = Join-Path $m000OnlyMatrixRoot "matrix-m000-only.md"
+    Get-Content -Encoding UTF8 -LiteralPath (Join-Path $repoRoot "docs/traceability/matrix.md") |
+        Where-Object { $_ -notmatch "^\|\s*REQ-M001-" } |
+        Set-Content -Encoding UTF8 -LiteralPath $m000OnlyMatrixPath
+    $m000OnlyResult = Invoke-ValidatorWithPath -MatrixPath $m000OnlyMatrixPath
+    Assert-ExitCode -Actual $m000OnlyResult.ExitCode -Expected 0 -Message "Une matrice M-000 transmise par -Path doit rester valide."
+
+    $externalMatrixRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m001_traceability_external_" + [System.Guid]::NewGuid().ToString("N"))
+    New-Item -ItemType Directory -Path $externalMatrixRoot | Out-Null
+    try {
+        $externalMatrixPath = Join-Path $externalMatrixRoot "matrix.md"
+        Copy-Item -LiteralPath (Join-Path $repoRoot "docs/traceability/matrix.md") -Destination $externalMatrixPath
+        $externalMatrixResult = Invoke-ValidatorWithPath -MatrixPath $externalMatrixPath
+        Assert-ExitCode -Actual $externalMatrixResult.ExitCode -Expected 1 -Message "Une matrice hors depot transmise par -Path doit etre refusee."
+        Assert-OutputContains `
+            -Output $externalMatrixResult.Output `
+            -Expected "Chemin hors depot interdit" `
+            -Message "Le chemin de matrice externe doit etre nomme."
+    }
+    finally {
+        Remove-Item -LiteralPath $externalMatrixRoot -Recurse -Force
+    }
+    Remove-Item -LiteralPath $m000OnlyMatrixRoot -Recurse -Force
 }
 finally {
     Remove-Item -LiteralPath $temporaryRoot -Recurse -Force

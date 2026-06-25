@@ -74,6 +74,16 @@ if VerifiedResearchOutcome.from_json(outcome.to_json()) != outcome:
 if VerifiedResearchOutcome.from_json(outcome.to_json()).to_json() != outcome.to_json():
     raise AssertionError("La sérialisation VerifiedResearchOutcome doit être déterministe.")
 
+initial_json = outcome.to_json()
+try:
+    outcome.mandate["objective"] = "mutation interdite"
+except TypeError:
+    pass
+else:
+    raise AssertionError("VerifiedResearchOutcome.mandate doit etre immuable apres validation.")
+if outcome.to_json() != initial_json:
+    raise AssertionError("Une mutation externe ne doit pas modifier VerifiedResearchOutcome.")
+
 if str(VersionedClaimRef.parse("CLM-004812@3")) != "CLM-004812@3":
     raise AssertionError("VersionedClaimRef doit conserver claim_id et version.")
 
@@ -151,6 +161,34 @@ assert_raises("knowledge_gaps absent", lambda: VerifiedResearchOutcome.from_payl
 invalid_gap = base_payload()
 invalid_gap["knowledge_gaps"] = [{"impact": "paramètre à calibrer"}]
 assert_raises("knowledge_gaps invalide", lambda: VerifiedResearchOutcome.from_payload(invalid_gap))
+
+internal_answer_key = base_payload()
+internal_answer_key["mandate"] = dict(internal_answer_key["mandate"])
+internal_answer_key["mandate"]["answer_draft"] = "brouillon interne"
+assert_raises("cle interdite", lambda: VerifiedResearchOutcome.from_payload(internal_answer_key))
+
+top_level_extra_key = base_payload()
+top_level_extra_key["answer_draft"] = "brouillon interne"
+assert_raises("champ interdit", lambda: VerifiedResearchOutcome.from_payload(top_level_extra_key))
+
+impossible_completed_at = base_payload()
+impossible_completed_at["completed_at"] = "2026-02-30T09:30:00Z"
+assert_raises("completed_at invalide", lambda: VerifiedResearchOutcome.from_payload(impossible_completed_at))
+
+non_finite_mandate_value = base_payload()
+non_finite_mandate_value["mandate"] = dict(non_finite_mandate_value["mandate"])
+non_finite_mandate_value["mandate"]["score"] = float("inf")
+assert_raises("valeur de contrat invalide", lambda: VerifiedResearchOutcome.from_payload(non_finite_mandate_value))
+
+insufficient_without_gap = base_payload()
+insufficient_without_gap["support_status"] = "INSUFFICIENT_EVIDENCE"
+insufficient_without_gap["knowledge_gaps"] = []
+assert_raises("knowledge_gaps requis", lambda: VerifiedResearchOutcome.from_payload(insufficient_without_gap))
+
+requires_current_without_gap = base_payload()
+requires_current_without_gap["support_status"] = "REQUIRES_CURRENT_DATA"
+requires_current_without_gap["knowledge_gaps"] = []
+assert_raises("knowledge_gaps requis", lambda: VerifiedResearchOutcome.from_payload(requires_current_without_gap))
 
 translator = StrategyDesignResearchOutcomeTranslator()
 decisions = translator.translate(outcome)

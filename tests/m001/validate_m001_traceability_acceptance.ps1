@@ -3,6 +3,7 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
 $validatorPath = Join-Path $repoRoot "scripts/validate_traceability.ps1"
 $matrixPath = Join-Path $repoRoot "docs/traceability/matrix.md"
+$journalPath = Join-Path $repoRoot "docs/tasks/milestone_001/journal.md"
 $temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m001_traceability_acceptance_" + [System.Guid]::NewGuid().ToString("N"))
 $eAcute = [char] 0x00E9
 $cCedilla = [char] 0x00E7
@@ -189,6 +190,19 @@ if (-not (Test-Path -LiteralPath $validatorPath -PathType Leaf)) {
 
 if (-not (Test-Path -LiteralPath $matrixPath -PathType Leaf)) {
     throw "Matrice de traçabilité absente: docs/traceability/matrix.md"
+}
+
+if (-not (Test-Path -LiteralPath $journalPath -PathType Leaf)) {
+    throw "Journal M-001 absent: docs/tasks/milestone_001/journal.md"
+}
+
+$journalContent = Get-Content -Raw -Encoding UTF8 -LiteralPath $journalPath
+if ($journalContent.Contains("Commit de clôture T-011") -or $journalContent.Contains("Commit de clÃ´ture T-011")) {
+    throw "Journal M-001 incomplet: commit de clôture T-011 non renseigné."
+}
+$expectedT011Pattern = "\| T-011 - Relier M-001 .+ gates \| `?[0-9a-f]{7,40}`? \| `?[0-9a-f]{7,40}`? \|"
+if ($journalContent -notmatch $expectedT011Pattern) {
+    throw "Journal M-001 incomplet: T-011 doit citer ses commits RED et GREEN."
 }
 
 New-Item -ItemType Directory -Path $temporaryRoot | Out-Null

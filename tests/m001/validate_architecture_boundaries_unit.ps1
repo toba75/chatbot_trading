@@ -35,7 +35,7 @@ function New-ControlledApp {
         [string] $ScenarioName
     )
 
-    $targetRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m001_arch_unit_" + $ScenarioName + "_" + [System.Guid]::NewGuid().ToString("N"))
+    $targetRoot = Join-Path $repoRoot (".tmp/ost_m001_arch_unit_" + $ScenarioName + "_" + [System.Guid]::NewGuid().ToString("N"))
     $sampleAppRoot = Join-Path $targetRoot "app"
     $registry = Get-Content -Raw -Encoding UTF8 -LiteralPath $realRegistryPath | ConvertFrom-Json
 
@@ -193,6 +193,82 @@ def read_source():
     Assert-FailsWith `
         -Scenario $interContextInternalModel `
         -ExpectedFragments @("Import intercontexte interdit", "consommateur KA", "producteur SP", "contrat publi$($eAcute) attendu: CanonicalSourcePublished")
+
+    $inverseFacadeImport = New-ControlledApp -ScenarioName "inverse_facade"
+    $createdRoots += $inverseFacadeImport.Root
+    New-PythonPackageFile -Path (Join-Path $inverseFacadeImport.AppRoot "experimentation/application/conversation_client.py") -Content @"
+from app.conversation.application.strategy_request_facade import StrategyRequestFacade
+
+def load_facade():
+    return StrategyRequestFacade()
+"@
+    Assert-FailsWith `
+        -Scenario $inverseFacadeImport `
+        -ExpectedFragments @("Import intercontexte interdit", "consommateur EX", "producteur CV", "app.conversation.application.strategy_request_facade")
+
+    $forbiddenContractImport = New-ControlledApp -ScenarioName "forbidden_contract"
+    $createdRoots += $forbiddenContractImport.Root
+    New-PythonPackageFile -Path (Join-Path $forbiddenContractImport.AppRoot "experimentation/domain/uses_research_outcome.py") -Content @"
+from app.contracts.research_outcomes import VerifiedResearchOutcome
+
+def project_outcome(outcome: VerifiedResearchOutcome):
+    return outcome
+"@
+    Assert-FailsWith `
+        -Scenario $forbiddenContractImport `
+        -ExpectedFragments @("Import de contrat publie interdit", "contexte EX", "app.contracts.research_outcomes")
+
+    $platformBusinessImport = New-ControlledApp -ScenarioName "platform_business_import"
+    $createdRoots += $platformBusinessImport.Root
+    New-PythonPackageFile -Path (Join-Path $platformBusinessImport.AppRoot "platform/job_runtime.py") -Content @"
+from app.source_processing.domain.canonical_source import CanonicalSource
+
+def load_source():
+    return CanonicalSource()
+"@
+    Assert-FailsWith `
+        -Scenario $platformBusinessImport `
+        -ExpectedFragments @("Import de contexte metier interdit dans platform", "app.source_processing.domain.canonical_source")
+
+    $emptyAppRoot = Join-Path $repoRoot (".tmp/ost_m001_arch_unit_empty_" + [System.Guid]::NewGuid().ToString("N"))
+    $createdRoots += $emptyAppRoot
+    New-Item -ItemType Directory -Force -Path $emptyAppRoot | Out-Null
+    $emptyResult = Invoke-ArchitectureBoundaryValidator -AppRoot $emptyAppRoot -ContextRegistryPath $realRegistryPath
+    if ($emptyResult.ExitCode -eq 0) {
+        throw "Un AppRoot vide doit etre refuse."
+    }
+    foreach ($expectedFragment in @("Module de contexte absent", "source_processing")) {
+        if (-not $emptyResult.Output.Contains($expectedFragment)) {
+            throw "Fragment attendu absent: $expectedFragment`nSortie obtenue:`n$($emptyResult.Output)"
+        }
+    }
+
+    $missingPython = New-ControlledApp -ScenarioName "missing_python"
+    $createdRoots += $missingPython.Root
+    $powershellExecutable = (Get-Command powershell -ErrorAction Stop).Source
+    $previousPath = $env:PATH
+    $env:PATH = $PSHOME
+    try {
+        $missingPythonOutput = & $powershellExecutable `
+            -NoProfile `
+            -ExecutionPolicy Bypass `
+            -File $validatorPath `
+            -AppRoot $missingPython.AppRoot `
+            -ContextRegistryPath $missingPython.RegistryPath `
+            -SpecificationPath $specificationPath `
+            2>&1
+        $missingPythonExitCode = $LASTEXITCODE
+    }
+    finally {
+        $env:PATH = $previousPath
+    }
+    $missingPythonText = $missingPythonOutput -join "`n"
+    if ($missingPythonExitCode -eq 0) {
+        throw "Le wrapper doit echouer quand python est absent du PATH."
+    }
+    if (-not $missingPythonText.Contains("Python 3.10+ requis")) {
+        throw "Message Python absent. Sortie obtenue:`n$missingPythonText"
+    }
 
     $cycleBetweenFacades = New-ControlledApp -ScenarioName "cycle"
     $createdRoots += $cycleBetweenFacades.Root

@@ -91,6 +91,16 @@ if VerifiedClaimRef.from_json(claim.to_json(), source_locator_validation_policy=
 if claim.dependency_group_ids != ("DEP-000123", "DEP-000124"):
     raise AssertionError("dependency_group_ids perdus pendant la validation.")
 
+claim_json = claim.to_json()
+try:
+    claim.scope["universe"] = ["mutated"]
+except TypeError:
+    pass
+else:
+    raise AssertionError("VerifiedClaimRef.scope doit etre immuable apres validation.")
+if claim.to_json() != claim_json:
+    raise AssertionError("Une mutation externe ne doit pas modifier VerifiedClaimRef.")
+
 missing_status = dict(claim_payload)
 del missing_status["status"]
 assert_raises(
@@ -192,6 +202,29 @@ invalid_relation["relation"] = "QUALIFIES"
 assert_raises(
     "relation non autorisee: QUALIFIES",
     lambda: EvidenceRef.from_payload(invalid_relation, source_locator_validation_policy=validation_policy),
+)
+
+internal_evidence_key = dict(evidence_payload)
+internal_evidence_key["claim_repository_id"] = "eg.internal.claims"
+assert_raises(
+    "champ interdit",
+    lambda: EvidenceRef.from_payload(internal_evidence_key, source_locator_validation_policy=validation_policy),
+)
+
+internal_scope_key = dict(claim_payload)
+internal_scope_key["scope"] = dict(internal_scope_key["scope"])
+internal_scope_key["scope"]["claim_repository_id"] = "eg.internal.claims"
+assert_raises(
+    "cle interdite",
+    lambda: VerifiedClaimRef.from_payload(internal_scope_key, source_locator_validation_policy=validation_policy),
+)
+
+non_finite_scope_value = dict(claim_payload)
+non_finite_scope_value["scope"] = dict(non_finite_scope_value["scope"])
+non_finite_scope_value["scope"]["score"] = float("nan")
+assert_raises(
+    "scope invalide",
+    lambda: VerifiedClaimRef.from_payload(non_finite_scope_value, source_locator_validation_policy=validation_policy),
 )
 
 print("Invariants unitaires EvidenceRef et VerifiedClaimRef M-001: OK")
