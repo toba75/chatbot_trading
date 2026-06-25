@@ -1,0 +1,31 @@
+# Journal M-002 - Plateforme locale sûre
+
+## Source
+
+- Plan: `docs/specs/plan_implementation_milestones_workstreams.md`, section `M-002 - Plateforme locale sûre`.
+- Spécification normative: `docs/specs/specification_unifiee_ddd_technique_chatbot_trading_v4_1.md`, sections 13, 15, 16, 18, 19, 20 et 21.
+- ADR applicables: ADR-007, ADR-008, ADR-009, DDD-ADR-006, DDD-ADR-008, DDD-ADR-007.
+
+## Tâches planifiées
+
+| Tâche | Statut initial | RED prévu | GREEN prévu | ADR |
+|---|---|---|---|---|
+| T-001 - Vérifier la précondition GREEN de M-002 | Planifiée | `test(m002): couvrir la précondition green de plateforme` | `docs(m002): valider la précondition green de plateforme` | ADR-010 |
+| T-002 - Publier la spécification de plateforme locale sûre | Planifiée | `test(m002): couvrir la spécification de plateforme locale` | `docs(m002): publier la spécification de plateforme locale` | ADR-007; ADR-008; ADR-009; DDD-ADR-006; DDD-ADR-008 |
+| T-003 - Déclarer la topologie docker-local et spark-inference | Planifiée | `test(m002): couvrir la topologie docker spark` | `feat(m002): déclarer la topologie docker spark` | ADR-007; ADR-009 |
+| T-004 - Configurer la stack Docker locale contrôlée | Planifiée | `test(m002): couvrir la stack docker locale` | `feat(m002): configurer la stack docker locale` | ADR-007; ADR-008; ADR-009 |
+| T-005 - Publier le contrat du gateway LLM | Planifiée | `test(m002): couvrir le contrat gateway llm` | `feat(m002): publier le contrat gateway llm` | ADR-008; ADR-009 |
+| T-006 - Contrôler les pannes d'inférence Spark | Planifiée | `test(m002): couvrir les pannes inference spark` | `feat(m002): controler les pannes inference spark` | ADR-008; ADR-009; DDD-ADR-007 |
+| T-007 - Livrer l'outbox d'événements idempotente | Planifiée | `test(m002): couvrir outbox et idempotence` | `feat(m002): livrer outbox idempotente` | DDD-ADR-006; DDD-ADR-008 |
+| T-008 - Livrer la file de jobs priorisée et idempotente | Planifiée | `test(m002): couvrir la file de jobs idempotente` | `feat(m002): livrer la file de jobs idempotente` | Non requise à ce stade |
+| T-009 - Verrouiller la frontière réseau locale | Planifiée | `test(m002): couvrir la frontiere reseau locale` | `feat(m002): verrouiller la frontiere reseau locale` | ADR-007; ADR-008; ADR-009 |
+| T-010 - Observer le gateway sans payloads complets | Planifiée | `test(m002): couvrir observabilite gateway` | `feat(m002): observer le gateway sans payloads` | ADR-008; ADR-009 |
+| T-011 - Relier M-002 à la traçabilité et aux gates | Planifiée | `test(m002): couvrir la tracabilite plateforme` | `docs(m002): relier m002 aux gates et a la tracabilite` | ADR-010 |
+
+## Précondition observée à la planification
+
+- Branche de planification: `codex/milestone-m002-plateforme-locale-sure`.
+- `master`: `35a5765`.
+- `scripts/test.ps1`: GREEN, 7 validations et 31 tests.
+- `scripts/lint.ps1`: GREEN, 7 validations.
+- Milestones amont dans `master`: `docs/tasks/milestone_000` et `docs/tasks/milestone_001`.
