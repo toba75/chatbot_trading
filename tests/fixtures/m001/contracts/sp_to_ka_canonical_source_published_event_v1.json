@@ -1,0 +1,23 @@
+{
+  "event_id": "EVT-000001",
+  "event_type": "CanonicalSourcePublished",
+  "event_version": 1,
+  "occurred_at": "2026-06-21T08:30:00Z",
+  "aggregate_type": "CanonicalSource",
+  "aggregate_id": "CSRC-000001",
+  "aggregate_version": 4,
+  "correlation_id": "CORR-000001",
+  "causation_id": "CMD-ACCEPT-CANONICAL-SOURCE-000001",
+  "producer_context": "SP",
+  "payload": {
+    "schema_version": "1.0",
+    "canonical_source_id": "CSRC-000001",
+    "document_id": "DOC-000001",
+    "canonical_version_id": "CVER-000004",
+    "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "canonical_artifact_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "page_count": 412,
+    "accepted_at": "2026-06-21T08:30:00Z",
+    "quality_policy_version": "source-qa-v3"
+  }
+}
