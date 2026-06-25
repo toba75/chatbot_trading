@@ -32,7 +32,7 @@
 
 ## Suivi d'exécution
 
-- Statut: T-006 livrée en GREEN; le gateway LLM contrôle les pannes Spark avec erreurs typées, retry borné avant premier token, circuit breaker et refus de sortie partielle non publiable.
+- Statut: T-007 livrée en GREEN; l'outbox transactionnelle locale conserve les événements avec la mutation productrice et les consommateurs enregistrent les `event_id` traités pour ignorer les doublons explicitement.
 
 | Tâche | Commit RED | Commit GREEN | ADR consultées | ADR créée ou modifiée | Validations GREEN déclarées |
 |---|---|---|---|---|---|
@@ -42,6 +42,7 @@
 | T-004 - Configurer la stack Docker locale contrôlée | `0160224153bde0b822ce8b2891a647c6adec8793` | Commit courant `feat(m002): configurer la stack docker locale` | ADR-007; ADR-008; ADR-009 | Aucune | `tests/m002/validate_local_compose_acceptance.ps1`; `tests/m002/validate_local_compose_unit.ps1`; `scripts/validate_local_compose.ps1`; `scripts/validate_traceability.ps1`; `scripts/test.ps1`; `scripts/lint.ps1` |
 | T-005 - Publier le contrat du gateway LLM | `85d458a396a5c1f8fe06f00ae1c18f9a8f87d14b` | Commit courant `feat(m002): publier le contrat gateway llm` | ADR-008; ADR-009 | Aucune | `tests/m002/validate_llm_gateway_contract_acceptance.ps1`; `tests/m002/validate_llm_gateway_contract_unit.ps1`; `scripts/validate_traceability.ps1`; `scripts/test.ps1`; `scripts/lint.ps1` |
 | T-006 - Contrôler les pannes d'inférence Spark | `4015d34` | Commit courant `feat(m002): controler les pannes inference spark` | ADR-008; ADR-009; DDD-ADR-007 | Aucune | `tests/m002/validate_llm_gateway_failures_acceptance.ps1`; `tests/m002/validate_llm_gateway_failures_unit.ps1`; `tests/m002/validate_llm_gateway_contract_acceptance.ps1`; `tests/m002/validate_llm_gateway_contract_unit.ps1`; `scripts/validate_traceability.ps1`; `scripts/test.ps1`; `scripts/lint.ps1` |
+| T-007 - Livrer l'outbox d'événements idempotente | `e3be31f` | Commit courant `feat(m002): livrer outbox idempotente` | DDD-ADR-006; DDD-ADR-008 | Aucune | `tests/m002/validate_outbox_acceptance.ps1`; `tests/m002/validate_outbox_unit.ps1`; `scripts/validate_traceability.ps1`; `scripts/test.ps1`; `scripts/lint.ps1` |
 
 ## Clôture T-001
 
@@ -96,3 +97,13 @@
 - Tests livrés: les tests d'acceptation couvrent indisponibilité, certificat invalide, timeout avant premier token, interruption après premier token et ouverture du circuit breaker; les tests unitaires couvrent classification d'erreur, retry borné, idempotence obligatoire, refus de sortie partielle, métriques sans secret et absence de masquage des erreurs inattendues.
 - ADR: aucune ADR créée ou modifiée; T-006 applique ADR-008, ADR-009 et DDD-ADR-007 sans introduire de fallback modèle ni mutation métier depuis `platform`.
 - Hors périmètre confirmé: aucun endpoint runtime n'est démarré, aucune persistance métier n'est ajoutée et aucune stratégie de fallback modèle n'est introduite.
+
+## Clôture T-007
+
+- Scénario BDD: Given un contexte publie un événement intercontexte dans la même transaction que son état; When le même événement est livré deux fois au consommateur; Then le consommateur applique la décision une seule fois et enregistre le doublon sans erreur métier silencieuse.
+- RED T-007 confirmé: `tests/m002/validate_outbox_acceptance.ps1` échouait sur l'absence de `IdempotentEventConsumer` dans `app.platform.event_bus`.
+- Implémentation: `app/platform/event_bus/outbox.py` ajoute `ProducerStateMutation`, `OutboxEntry`, `OutboxMessageStatus`, `InMemoryTransactionalOutbox`, `InMemoryProcessedEventRegistry` et `IdempotentEventConsumer`.
+- Comportement livré: l'outbox refuse un événement incohérent avec la mutation productrice, expose les statuts `pending`, `delivered` et `failed`, ordonne les événements pending par `aggregate_version` pour un agrégat et marque explicitement les doublons dans le registre d'idempotence.
+- Tests livrés: le test d'acceptation couvre la publication transactionnelle et la livraison dupliquée sans double transition; les tests unitaires couvrent stockage, statuts, doublons, ordre, registre `event_id` et refus d'événement invalide.
+- ADR: aucune ADR créée ou modifiée; T-007 applique DDD-ADR-006 et DDD-ADR-008 sans event sourcing généralisé, sans bus distribué externe et sans transaction forte intercontexte.
+- Hors périmètre confirmé: aucun broker externe, aucune table métier partagée et aucune garantie de livraison exactement une fois ne sont introduits.

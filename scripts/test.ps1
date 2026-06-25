@@ -71,7 +71,9 @@ $testCommands = @(
     @{ Path = "tests/m002/validate_llm_gateway_contract_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/m002/validate_llm_gateway_contract_unit.ps1"; Arguments = @() },
     @{ Path = "tests/m002/validate_llm_gateway_failures_acceptance.ps1"; Arguments = @() },
-    @{ Path = "tests/m002/validate_llm_gateway_failures_unit.ps1"; Arguments = @() }
+    @{ Path = "tests/m002/validate_llm_gateway_failures_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m002/validate_outbox_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m002/validate_outbox_unit.ps1"; Arguments = @() }
 )
 
 $expectedValidationPaths = @(
@@ -128,7 +130,9 @@ $expectedTestPaths = @(
     "tests/m002/validate_llm_gateway_contract_acceptance.ps1",
     "tests/m002/validate_llm_gateway_contract_unit.ps1",
     "tests/m002/validate_llm_gateway_failures_acceptance.ps1",
-    "tests/m002/validate_llm_gateway_failures_unit.ps1"
+    "tests/m002/validate_llm_gateway_failures_unit.ps1",
+    "tests/m002/validate_outbox_acceptance.ps1",
+    "tests/m002/validate_outbox_unit.ps1"
 )
 
 Invoke-M000ValidationGate `
@@ -137,6 +141,6 @@ Invoke-M000ValidationGate `
     -ValidationCommands $validationCommands `
     -TestCommands $testCommands `
     -ExpectedValidationCount 10 `
-    -ExpectedTestCount 41 `
+    -ExpectedTestCount 43 `
     -ExpectedValidationPaths $expectedValidationPaths `
     -ExpectedTestPaths $expectedTestPaths
