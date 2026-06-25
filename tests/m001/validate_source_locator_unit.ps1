@@ -78,6 +78,11 @@ normalized_policy = SourceLocatorValidationPolicy(
 )
 mutable_item_hashes["DOC-000001-P002-I001"] = "d" * 64
 SourceLocator.from_payload(locator_payload, validation_policy=normalized_policy)
+expected_item_hashes = {"DOC-000001-P002-I001": "c" * 64}
+if dict(normalized_policy.resolvable_item_ids_by_version_id[canonical_ref.canonical_version_id]) != expected_item_hashes:
+    raise AssertionError("La politique SourceLocator doit conserver le mapping item_id -> content_hash.")
+if hasattr(normalized_policy, "content_hashes_by_item_id_by_version_id"):
+    raise AssertionError("La politique SourceLocator ne doit pas exposer d'attribut parallèle implicite.")
 
 assert_raises(
     "validation_policy invalide",
