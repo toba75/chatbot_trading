@@ -17,7 +17,7 @@
 | T-005 - Publier le contrat du gateway LLM | Planifiée | `test(m002): couvrir le contrat gateway llm` | `feat(m002): publier le contrat gateway llm` | ADR-008; ADR-009 |
 | T-006 - Contrôler les pannes d'inférence Spark | Planifiée | `test(m002): couvrir les pannes inference spark` | `feat(m002): controler les pannes inference spark` | ADR-008; ADR-009; DDD-ADR-007 |
 | T-007 - Livrer l'outbox d'événements idempotente | Planifiée | `test(m002): couvrir outbox et idempotence` | `feat(m002): livrer outbox idempotente` | DDD-ADR-006; DDD-ADR-008 |
-| T-008 - Livrer la file de jobs priorisée et idempotente | Planifiée | `test(m002): couvrir la file de jobs idempotente` | `feat(m002): livrer la file de jobs idempotente` | Non requise à ce stade |
+| T-008 - Livrer la file de jobs priorisée et idempotente | Planifiée | `test(m002): couvrir la file de jobs idempotente` | `feat(m002): livrer la file de jobs idempotente` | DDD-ADR-006; DDD-ADR-008; aucune nouvelle ADR |
 | T-009 - Verrouiller la frontière réseau locale | Planifiée | `test(m002): couvrir la frontiere reseau locale` | `feat(m002): verrouiller la frontiere reseau locale` | ADR-007; ADR-008; ADR-009 |
 | T-010 - Observer le gateway sans payloads complets | Planifiée | `test(m002): couvrir observabilite gateway` | `feat(m002): observer le gateway sans payloads` | ADR-008; ADR-009 |
 | T-011 - Relier M-002 à la traçabilité et aux gates | Planifiée | `test(m002): couvrir la tracabilite plateforme` | `docs(m002): relier m002 aux gates et a la tracabilite` | ADR-010 |
@@ -32,7 +32,7 @@
 
 ## Suivi d'exécution
 
-- Statut: T-007 livrée en GREEN; l'outbox transactionnelle locale conserve les événements avec la mutation productrice et les consommateurs enregistrent les `event_id` traités pour ignorer les doublons explicitement.
+- Statut: T-008 livrée en GREEN; la file locale de jobs priorise les traitements techniques, refuse le recalcul implicite d'un succès identique et conserve la distinction entre job et événement de domaine.
 
 | Tâche | Commit RED | Commit GREEN | ADR consultées | ADR créée ou modifiée | Validations GREEN déclarées |
 |---|---|---|---|---|---|
@@ -43,6 +43,7 @@
 | T-005 - Publier le contrat du gateway LLM | `85d458a396a5c1f8fe06f00ae1c18f9a8f87d14b` | Commit courant `feat(m002): publier le contrat gateway llm` | ADR-008; ADR-009 | Aucune | `tests/m002/validate_llm_gateway_contract_acceptance.ps1`; `tests/m002/validate_llm_gateway_contract_unit.ps1`; `scripts/validate_traceability.ps1`; `scripts/test.ps1`; `scripts/lint.ps1` |
 | T-006 - Contrôler les pannes d'inférence Spark | `4015d34` | Commit courant `feat(m002): controler les pannes inference spark` | ADR-008; ADR-009; DDD-ADR-007 | Aucune | `tests/m002/validate_llm_gateway_failures_acceptance.ps1`; `tests/m002/validate_llm_gateway_failures_unit.ps1`; `tests/m002/validate_llm_gateway_contract_acceptance.ps1`; `tests/m002/validate_llm_gateway_contract_unit.ps1`; `scripts/validate_traceability.ps1`; `scripts/test.ps1`; `scripts/lint.ps1` |
 | T-007 - Livrer l'outbox d'événements idempotente | `e3be31f` | Commit courant `feat(m002): livrer outbox idempotente` | DDD-ADR-006; DDD-ADR-008 | Aucune | `tests/m002/validate_outbox_acceptance.ps1`; `tests/m002/validate_outbox_unit.ps1`; `scripts/validate_traceability.ps1`; `scripts/test.ps1`; `scripts/lint.ps1` |
+| T-008 - Livrer la file de jobs priorisée et idempotente | `617b535` | Commit courant `feat(m002): livrer la file de jobs idempotente` | DDD-ADR-006; DDD-ADR-008 | Aucune | `tests/m002/validate_job_runtime_acceptance.ps1`; `tests/m002/validate_job_runtime_unit.ps1`; `scripts/validate_traceability.ps1`; `scripts/test.ps1`; `scripts/lint.ps1` |
 
 ## Clôture T-001
 
@@ -107,3 +108,13 @@
 - Tests livrés: le test d'acceptation couvre la publication transactionnelle et la livraison dupliquée sans double transition; les tests unitaires couvrent stockage, statuts, doublons, ordre, registre `event_id` et refus d'événement invalide.
 - ADR: aucune ADR créée ou modifiée; T-007 applique DDD-ADR-006 et DDD-ADR-008 sans event sourcing généralisé, sans bus distribué externe et sans transaction forte intercontexte.
 - Hors périmètre confirmé: aucun broker externe, aucune table métier partagée et aucune garantie de livraison exactement une fois ne sont introduits.
+
+## Clôture T-008
+
+- Scénario BDD: Given un job `VERIFY_RESPONSE` a déjà réussi avec le même hash d'entrée, hash configuration, version code et version modèle; When le même job est soumis sans option explicite de recalcul; Then la file refuse le recalcul et retourne le résultat existant sans créer de nouveau travail.
+- RED T-008 confirmé: `tests/m002/validate_job_runtime_acceptance.ps1` échouait sur l'absence de `InMemoryJobQueue` dans `app.platform.job_runtime`.
+- Implémentation: `app/platform/job_runtime/__init__.py` ajoute `JobCatalog`, `JobPriority`, `JobStatus`, `JobIdempotenceKey`, `JobRequest`, `JobRecord`, `JobSubmissionDecision`, `InMemoryJobQueue` et `InMemoryJobWorkerRegistry`.
+- Comportement livré: la file ordonne les jobs `P0` avant `P4`, refuse les jobs inconnus, indexe l'idempotence par nom de job, hash d'entrée, hash configuration, version code et version modèle, et ne recalcule pas un job réussi sans `recalculate=True`.
+- Tests livrés: le test d'acceptation couvre P0/P4, doublon exact, version modèle différente et recalcul explicite; les tests unitaires couvrent priorité, clé complète, statuts, catalogue strict, séparation job/événement, workers injectés et absence de valeur par défaut sur le recalcul.
+- ADR: aucune ADR créée ou modifiée; T-008 applique DDD-ADR-006 et DDD-ADR-008 sans event sourcing généralisé, sans broker externe durable et sans transformer les jobs en événements de domaine.
+- Hors périmètre confirmé: aucune persistance durable, aucun worker métier propriétaire et aucune transition métier implicite ne sont introduits.

@@ -217,7 +217,7 @@ try {
     $testResult = Invoke-ProjectCommand -ProjectRoot $validProjectRoot -RelativePath "scripts/test.ps1"
     Assert-ExitCode -Actual $testResult.ExitCode -Expected 0 -Message "La gate de test M-000 conforme doit réussir."
     Assert-OutputContains -Output $testResult.Output -Expected "Gate test GREEN" -Message "La gate de test doit annoncer son état GREEN."
-    Assert-OutputContains -Output $testResult.Output -Expected "Gate test GREEN: 10 validation(s), 41 test(s)." -Message "La gate de test doit prouver le nombre exact de validations et tests."
+    Assert-OutputContains -Output $testResult.Output -Expected "Gate test GREEN: 10 validation(s), 45 test(s)." -Message "La gate de test doit prouver le nombre exact de validations et tests."
     Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/governance/validate_m000_precondition_report_acceptance.ps1" -Message "La gate de test doit exécuter le test d'acceptation T-001."
     Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/governance/validate_definition_of_done_unit.ps1" -Message "La gate de test doit exécuter le dernier test unitaire T-005."
     Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/governance/validate_m000_validation_commands_unit.ps1" -Message "La gate de test doit exécuter le self-test unitaire T-006."
@@ -233,6 +233,10 @@ try {
     Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m002/validate_llm_gateway_contract_unit.ps1" -Message "La gate de test doit exécuter le test unitaire contrat gateway LLM M-002."
     Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m002/validate_llm_gateway_failures_acceptance.ps1" -Message "La gate de test doit exécuter le test d'acceptation pannes gateway LLM M-002."
     Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m002/validate_llm_gateway_failures_unit.ps1" -Message "La gate de test doit exécuter le test unitaire pannes gateway LLM M-002."
+    Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m002/validate_outbox_acceptance.ps1" -Message "La gate de test doit exécuter le test d'acceptation outbox M-002."
+    Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m002/validate_outbox_unit.ps1" -Message "La gate de test doit exécuter le test unitaire outbox M-002."
+    Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m002/validate_job_runtime_acceptance.ps1" -Message "La gate de test doit exécuter le test d'acceptation file de jobs M-002."
+    Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m002/validate_job_runtime_unit.ps1" -Message "La gate de test doit exécuter le test unitaire file de jobs M-002."
     Assert-OutputNotContains -Output $testResult.Output -Forbidden "Ã" -Message "La sortie de la gate de test doit rester lisible en français accentué."
 
     $lintResult = Invoke-ProjectCommand -ProjectRoot $validProjectRoot -RelativePath "scripts/lint.ps1"
@@ -281,7 +285,7 @@ try {
     Assert-ExitCode -Actual $missingTestCommandResult.ExitCode -Expected 1 -Message "Une gate amputée d'un test requis doit produire un RED."
     Assert-OutputContains `
         -Output $missingTestCommandResult.Output `
-        -Expected "Gate test attend 41 test(s)" `
+        -Expected "Gate test attend 45 test(s)" `
         -Message "La gate amputée doit nommer l'écart de comptage des tests."
 }
 finally {
