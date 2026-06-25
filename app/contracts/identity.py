@@ -1,4 +1,4 @@
-"""Identifiants opaques et version minimale des contrats publies."""
+"""Identifiants opaques et version minimale des contrats publiés."""
 
 from __future__ import annotations
 

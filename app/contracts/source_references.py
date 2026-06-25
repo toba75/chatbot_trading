@@ -1,4 +1,4 @@
-"""Contrats publies de reference documentaire."""
+"""Contrats publiés de référence documentaire."""
 
 from __future__ import annotations
 
@@ -54,7 +54,7 @@ _SOURCE_LOCATOR_FIELDS = frozenset(
 
 @dataclass(frozen=True)
 class CanonicalSourceRef:
-    """Reference publiee d'une version documentaire canonique acceptee."""
+    """Référence publiée d'une version documentaire canonique acceptée."""
 
     schema_version: str
     canonical_source_id: str
@@ -113,7 +113,7 @@ class CanonicalSourceRef:
 
 @dataclass(frozen=True)
 class SourceLocator:
-    """Localisateur publie d'une preuve dans une version canonique."""
+    """Localisateur publié d'une preuve dans une version canonique."""
 
     schema_version: str
     canonical_version_id: str
@@ -182,7 +182,7 @@ class SourceLocator:
 
 @dataclass(frozen=True)
 class SourceLocatorValidationPolicy:
-    """Contexte publie minimal pour verifier un SourceLocator."""
+    """Contexte publié minimal pour vérifier un SourceLocator."""
 
     canonical_sources_by_version_id: Mapping[str, CanonicalSourceRef]
     version_statuses_by_version_id: Mapping[str, str]
@@ -198,8 +198,7 @@ class SourceLocatorValidationPolicy:
 
         normalized_sources_by_version_id: dict[str, CanonicalSourceRef] = {}
         normalized_statuses_by_version_id: dict[str, str] = {}
-        normalized_item_ids_by_version_id: dict[str, frozenset[str]] = {}
-        normalized_content_hashes_by_version_id: dict[str, Mapping[str, str]] = {}
+        normalized_item_hashes_by_version_id: dict[str, Mapping[str, str]] = {}
 
         for version_id, canonical_source in self.canonical_sources_by_version_id.items():
             normalized_version_id = _ensure_domain_identifier_value(
@@ -228,26 +227,24 @@ class SourceLocatorValidationPolicy:
             if version_id not in normalized_statuses_by_version_id:
                 raise ValueError(f"Statut de version canonique absent: {version_id}")
 
-        for version_id, item_ids in self.resolvable_item_ids_by_version_id.items():
+        for version_id, item_hashes in self.resolvable_item_ids_by_version_id.items():
             normalized_version_id = _ensure_domain_identifier_value(
                 version_id,
                 "canonical_version_id",
                 "CVER",
             )
-            if not isinstance(item_ids, Mapping):
+            if not isinstance(item_hashes, Mapping):
                 raise ValueError("item_ids resolvables non objet")
             materialized_item_hashes: dict[str, str] = {}
-            for item_id, content_hash in item_ids.items():
+            for item_id, content_hash in item_hashes.items():
                 _ensure_text_value(item_id, "item_id")
                 materialized_item_hashes[item_id] = _ensure_hash_value(
                     content_hash,
                     "content_hash",
                 )
-            materialized_item_ids = frozenset(materialized_item_hashes)
-            if len(materialized_item_ids) == 0:
+            if len(materialized_item_hashes) == 0:
                 raise ValueError(f"item_ids resolvables absents: {normalized_version_id}")
-            normalized_item_ids_by_version_id[normalized_version_id] = materialized_item_ids
-            normalized_content_hashes_by_version_id[normalized_version_id] = MappingProxyType(
+            normalized_item_hashes_by_version_id[normalized_version_id] = MappingProxyType(
                 materialized_item_hashes
             )
 
@@ -264,12 +261,7 @@ class SourceLocatorValidationPolicy:
         object.__setattr__(
             self,
             "resolvable_item_ids_by_version_id",
-            MappingProxyType(normalized_item_ids_by_version_id),
-        )
-        object.__setattr__(
-            self,
-            "content_hashes_by_item_id_by_version_id",
-            MappingProxyType(normalized_content_hashes_by_version_id),
+            MappingProxyType(normalized_item_hashes_by_version_id),
         )
 
     def validate_locator(self, locator: SourceLocator) -> None:
@@ -292,15 +284,12 @@ class SourceLocatorValidationPolicy:
         if locator.page_pdf > canonical_source.page_count:
             raise ValueError("page_pdf hors version canonique")
 
-        resolvable_item_ids = self.resolvable_item_ids_by_version_id.get(locator.canonical_version_id)
-        if resolvable_item_ids is None or locator.item_id not in resolvable_item_ids:
-            raise ValueError("item_id non resolvable")
-        content_hashes_by_item_id = self.content_hashes_by_item_id_by_version_id.get(
+        resolvable_item_hashes = self.resolvable_item_ids_by_version_id.get(
             locator.canonical_version_id
         )
-        if content_hashes_by_item_id is None:
-            raise ValueError(f"content_hash absent pour version: {locator.canonical_version_id}")
-        expected_content_hash = content_hashes_by_item_id.get(locator.item_id)
+        if resolvable_item_hashes is None or locator.item_id not in resolvable_item_hashes:
+            raise ValueError("item_id non resolvable")
+        expected_content_hash = resolvable_item_hashes.get(locator.item_id)
         if expected_content_hash is None:
             raise ValueError("content_hash absent pour item_id")
         if locator.content_hash != expected_content_hash:
