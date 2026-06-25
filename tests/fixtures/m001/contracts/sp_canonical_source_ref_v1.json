@@ -1,0 +1,11 @@
+{
+  "schema_version": "1.0",
+  "canonical_source_id": "CSRC-000001",
+  "document_id": "DOC-000001",
+  "canonical_version_id": "CVER-000004",
+  "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "canonical_artifact_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "page_count": 412,
+  "accepted_at": "2026-06-21T08:30:00Z",
+  "quality_policy_version": "source-qa-v3"
+}
