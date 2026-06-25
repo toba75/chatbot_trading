@@ -14,6 +14,8 @@ from json import JSONDecodeError
 from typing import Any, Mapping, Protocol
 from urllib.parse import urlparse
 
+from app.platform.observability import GatewayObservation, InMemoryObservabilityCollector, sha256_text
+
 
 GATEWAY_CLIENT_ID = "llm-gateway"
 SECRET_MASK = "<secret-masked>"
@@ -135,11 +137,20 @@ class GatewayFailureMetricEvent:
 
 
 class GatewayFailureMetricRecorder:
-    def __init__(self) -> None:
+    def __init__(self, *, observability_collector: InMemoryObservabilityCollector) -> None:
+        if not isinstance(observability_collector, InMemoryObservabilityCollector):
+            raise LLMGatewayContractError(
+                "LLM_OBSERVABILITY_COLLECTOR_INVALID",
+                "Le recorder gateway exige un collecteur d'observabilite local explicite.",
+            )
         self.events: list[GatewayFailureMetricEvent] = []
+        self._observability_collector = observability_collector
 
     def record(self, event: GatewayFailureMetricEvent) -> None:
         self.events.append(event)
+
+    def record_gateway_observation(self, observation: GatewayObservation) -> None:
+        self._observability_collector.record_gateway_observation(observation)
 
 
 class GatewayCircuitBreaker:
@@ -333,6 +344,13 @@ class OpenAICompatibleResponse:
     headers: Mapping[str, str]
 
 
+@dataclass(frozen=True)
+class _GatewayTransportSuccess:
+    response: OpenAICompatibleResponse
+    attempt: int
+    latency_ms: float
+
+
 class LocalLanguageModelGateway(Protocol):
     def infer(self, request: InferenceRequest) -> InferenceResult:
         raise NotImplementedError
@@ -371,11 +389,12 @@ class OpenAICompatibleLocalLanguageModelGateway:
         started_at = _utc_now()
         body = build_openai_chat_completion_request(configuration=self._configuration, request=request)
         headers = _build_headers(configuration=self._configuration, request=request)
-        response = self._post_chat_completion_with_failure_policy(
+        transport_success = self._post_chat_completion_with_failure_policy(
             request=request,
             headers=headers,
             body=body,
         )
+        response = transport_success.response
         structured_output = _extract_structured_output(response.payload)
         completed_at = _utc_now()
         provenance = _build_provenance(
@@ -385,6 +404,23 @@ class OpenAICompatibleLocalLanguageModelGateway:
             structured_output=structured_output,
             started_at=started_at,
             completed_at=completed_at,
+        )
+        self._failure_metric_recorder.record_gateway_observation(
+            _build_gateway_observation(
+                configuration=self._configuration,
+                request=request,
+                body=body,
+                status="SUCCEEDED",
+                latency_ms=transport_success.latency_ms,
+                response_payload=response.payload,
+                model_revision=provenance.model_revision,
+                runtime_version=provenance.runtime_version,
+                ttft_ms=transport_success.latency_ms,
+                retry_count=transport_success.attempt - 1,
+                circuit_open=False,
+                output_interrupted=False,
+                error_code=None,
+            )
         )
         return InferenceResult(
             structured_output=structured_output,
@@ -398,7 +434,7 @@ class OpenAICompatibleLocalLanguageModelGateway:
         request: InferenceRequest,
         headers: Mapping[str, str],
         body: Mapping[str, Any],
-    ) -> OpenAICompatibleResponse:
+    ) -> _GatewayTransportSuccess:
         if self._circuit_breaker.is_open():
             error = LLMGatewayInferenceError(
                 code="LLM_CIRCUIT_OPEN",
@@ -419,10 +455,28 @@ class OpenAICompatibleLocalLanguageModelGateway:
                     circuit_open=True,
                 )
             )
+            self._failure_metric_recorder.record_gateway_observation(
+                _build_gateway_observation(
+                    configuration=self._configuration,
+                    request=request,
+                    body=body,
+                    status=error.code,
+                    latency_ms=0.0,
+                    response_payload=None,
+                    model_revision=None,
+                    runtime_version=None,
+                    ttft_ms=None,
+                    retry_count=0,
+                    circuit_open=True,
+                    output_interrupted=False,
+                    error_code=error.code,
+                )
+            )
             raise error
 
         max_attempts = self._retry_policy.max_retries_before_first_token + 1
         for attempt in range(1, max_attempts + 1):
+            attempt_started_ns = time.perf_counter_ns()
             try:
                 response = self._transport.post_chat_completion(
                     base_url=self._configuration.base_url,
@@ -437,6 +491,7 @@ class OpenAICompatibleLocalLanguageModelGateway:
                 SparkTLSCertificateInvalidError,
                 SparkStreamingInterruptedError,
             ) as exc:
+                latency_ms = _elapsed_ms_since(attempt_started_ns)
                 classification = classify_gateway_failure(exc)
                 self._circuit_breaker.record_failure(classification)
                 retry_pending = (
@@ -456,6 +511,23 @@ class OpenAICompatibleLocalLanguageModelGateway:
                         circuit_open=self._circuit_breaker.is_open(),
                     )
                 )
+                self._failure_metric_recorder.record_gateway_observation(
+                    _build_gateway_observation(
+                        configuration=self._configuration,
+                        request=request,
+                        body=body,
+                        status="RETRY_PENDING" if retry_pending else classification.code,
+                        latency_ms=latency_ms,
+                        response_payload=None,
+                        model_revision=None,
+                        runtime_version=None,
+                        ttft_ms=latency_ms if not classification.before_first_token else None,
+                        retry_count=1 if retry_pending else attempt - 1,
+                        circuit_open=self._circuit_breaker.is_open(),
+                        output_interrupted=not classification.before_first_token,
+                        error_code=classification.code,
+                    )
+                )
                 if retry_pending:
                     continue
                 raise LLMGatewayInferenceError(
@@ -467,7 +539,16 @@ class OpenAICompatibleLocalLanguageModelGateway:
                     business_state_changed=False,
                 ) from exc
             self._circuit_breaker.record_success()
-            return response
+            return _GatewayTransportSuccess(
+                response=response,
+                attempt=attempt,
+                latency_ms=_elapsed_ms_since(attempt_started_ns),
+            )
+
+        raise LLMGatewayContractError(
+            "LLM_RETRY_LOOP_EXHAUSTED",
+            "La boucle de retry gateway s'est terminee sans reponse ni erreur explicite.",
+        )
 
 
 class UrllibOpenAICompatibleTransport:
@@ -577,6 +658,66 @@ def _build_failure_metric_event(
         circuit_open=circuit_open,
         message=message,
     )
+
+
+def _build_gateway_observation(
+    *,
+    configuration: GatewayConfiguration,
+    request: InferenceRequest,
+    body: Mapping[str, Any],
+    status: str,
+    latency_ms: float,
+    response_payload: Mapping[str, Any] | None,
+    model_revision: str | None,
+    runtime_version: str | None,
+    ttft_ms: float | None,
+    retry_count: int,
+    circuit_open: bool,
+    output_interrupted: bool,
+    error_code: str | None,
+) -> GatewayObservation:
+    return GatewayObservation(
+        trace_id=request.trace_id,
+        request_id=request.request_id,
+        idempotency_key=request.idempotency_key,
+        phase="spark_inference",
+        status=status,
+        latency_ms=latency_ms,
+        served_model=configuration.served_model,
+        model_revision=model_revision,
+        runtime_version=runtime_version,
+        prompt_hash=_prompt_hash(request),
+        request_payload_bytes=_payload_size_bytes(body),
+        response_payload_bytes=None if response_payload is None else _payload_size_bytes(response_payload),
+        ttft_ms=ttft_ms,
+        retry_count=retry_count,
+        circuit_open=circuit_open,
+        output_interrupted=output_interrupted,
+        error_code=error_code,
+    )
+
+
+def _prompt_hash(request: InferenceRequest) -> str:
+    prompt_payload = {
+        "messages": [{"role": message.role, "content": message.content} for message in request.messages],
+        "prompt_id": request.prompt_id,
+        "prompt_version": request.prompt_version,
+    }
+    return sha256_text(_canonical_json(prompt_payload))
+
+
+def _payload_size_bytes(payload: Mapping[str, Any]) -> int:
+    return len(_canonical_json(payload).encode("utf-8"))
+
+
+def _elapsed_ms_since(started_ns: int) -> float:
+    elapsed_ns = time.perf_counter_ns() - started_ns
+    if elapsed_ns < 0:
+        raise LLMGatewayContractError(
+            "LLM_GATEWAY_CLOCK_INVALID",
+            "L'horloge monotone du gateway a produit une duree negative.",
+        )
+    return elapsed_ns / 1_000_000
 
 
 def _extract_structured_output(payload: Mapping[str, Any]) -> dict[str, Any]:

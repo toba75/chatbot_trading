@@ -3,6 +3,7 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
 . (Join-Path $repoRoot "scripts/require_python.ps1")
 $pythonExecutable = Get-RequiredPythonExecutable
+$eAcute = [char] 0x00E9
 
 $pythonCode = @'
 from __future__ import annotations
@@ -247,4 +248,4 @@ if ($LASTEXITCODE -ne 0) {
     throw ($output -join "`n")
 }
 
-Write-Host "Test d'acceptation observabilité gateway M-002: OK"
+Write-Host "Test d'acceptation observabilit$($eAcute) gateway M-002: OK"

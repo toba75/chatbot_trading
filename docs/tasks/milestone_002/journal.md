@@ -32,7 +32,7 @@
 
 ## Suivi d'exécution
 
-- Statut: T-009 livrée en GREEN; la frontière réseau locale interdit les ports publics implicites, l'egress Spark hors `llm-gateway`, le contournement TLS, les callbacks Spark et l'accès navigateur direct au Spark.
+- Statut: T-010 livrée en GREEN; le gateway émet logs structurés et métriques techniques corrélés sans prompts, preuves, réponses complètes ni secrets.
 
 | Tâche | Commit RED | Commit GREEN | ADR consultées | ADR créée ou modifiée | Validations GREEN déclarées |
 |---|---|---|---|---|---|
@@ -45,6 +45,7 @@
 | T-007 - Livrer l'outbox d'événements idempotente | `e3be31f` | Commit courant `feat(m002): livrer outbox idempotente` | DDD-ADR-006; DDD-ADR-008 | Aucune | `tests/m002/validate_outbox_acceptance.ps1`; `tests/m002/validate_outbox_unit.ps1`; `scripts/validate_traceability.ps1`; `scripts/test.ps1`; `scripts/lint.ps1` |
 | T-008 - Livrer la file de jobs priorisée et idempotente | `617b535` | Commit courant `feat(m002): livrer la file de jobs idempotente` | DDD-ADR-006; DDD-ADR-008 | Aucune | `tests/m002/validate_job_runtime_acceptance.ps1`; `tests/m002/validate_job_runtime_unit.ps1`; `scripts/validate_traceability.ps1`; `scripts/test.ps1`; `scripts/lint.ps1` |
 | T-009 - Verrouiller la frontière réseau locale | `9a68426` | Commit courant `feat(m002): verrouiller la frontiere reseau locale` | ADR-007; ADR-008; ADR-009 | Aucune | `tests/m002/validate_network_boundary_acceptance.ps1`; `tests/m002/validate_network_boundary_unit.ps1`; `scripts/validate_network_boundary.ps1`; `scripts/validate_local_compose.ps1`; `scripts/validate_traceability.ps1`; `scripts/test.ps1`; `scripts/lint.ps1` |
+| T-010 - Observer le gateway sans payloads complets | `0f9eece` | Commit courant `feat(m002): observer le gateway sans payloads` | ADR-008; ADR-009 | Aucune | `tests/m002/validate_gateway_observability_acceptance.ps1`; `tests/m002/validate_gateway_observability_unit.ps1`; `tests/m002/validate_llm_gateway_failures_acceptance.ps1`; `tests/m002/validate_llm_gateway_failures_unit.ps1`; `scripts/validate_traceability.ps1`; `scripts/test.ps1`; `scripts/lint.ps1` |
 
 ## Clôture T-001
 
@@ -130,3 +131,13 @@
 - Tests livrés: le test d'acceptation couvre Compose, topologie, pare-feu Spark et mutations de sécurité; les tests unitaires couvrent matrice de flux, allow-list Spark, ports interdits, certificat requis, absence de callback, secret navigateur interdit et accès utilisateur distant optionnel explicite.
 - ADR: aucune ADR créée ou modifiée; T-009 applique ADR-007, ADR-008 et ADR-009 sans rendre mTLS obligatoire et sans changer le sens de TLS et de la clé d'API déjà prescrits.
 - Hors périmètre confirmé: aucun runtime Spark ou Docker n'est démarré, aucune règle système de pare-feu n'est appliquée à l'hôte et aucun port de débogage n'est ouvert.
+
+## Clôture T-010
+
+- Scénario BDD: Given un appel d'inférence échoue après validation TLS; When le gateway émet logs et métriques; Then le `trace_id`, la phase, le statut et la latence sont visibles, mais le prompt complet, la réponse complète et les secrets sont absents.
+- RED T-010 confirmé: `tests/m002/validate_gateway_observability_acceptance.ps1` échouait sur l'absence de `InMemoryObservabilityCollector` dans `app.platform.observability`.
+- Implémentation: `app/platform/observability/__init__.py` ajoute `GatewayObservation`, `JobObservation`, `OutboxObservation`, `StructuredLogEvent`, `TechnicalMetricEvent`, `InMemoryObservabilityCollector`, redaction explicite des secrets et hash SHA-256 de prompt.
+- Intégration gateway: `app/platform/llm_gateway/__init__.py` émet des observations locales sur succès, TLS invalide, timeout avant premier token, retry, sortie interrompue et circuit breaker, sans corps complet de requête ou réponse.
+- Tests livrés: le test d'acceptation couvre succès, TLS invalide, timeout avec retry et sortie interrompue; le test unitaire couvre redaction, champs obligatoires, versions modèle/vLLM, TTFT, retries, circuit breaker, jobs et outbox.
+- ADR: aucune ADR créée ou modifiée; T-010 applique ADR-008 et ADR-009 sans changer la topologie, sans service externe obligatoire et sans persistance de payload métier.
+- Hors périmètre confirmé: aucun backend externe d'observabilité, aucune exportation Prometheus/OpenTelemetry, aucune persistance durable de logs et aucune configuration runtime Spark n'est ajoutée par T-010.

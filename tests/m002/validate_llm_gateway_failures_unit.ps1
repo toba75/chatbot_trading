@@ -29,6 +29,7 @@ from app.platform.llm_gateway import (
     SparkUnavailableError,
     classify_gateway_failure,
 )
+from app.platform.observability import InMemoryObservabilityCollector
 
 
 class ManualClock:
@@ -110,7 +111,9 @@ def success_response() -> OpenAICompatibleResponse:
 
 def gateway_for(outcomes, *, max_retries_before_first_token, failure_threshold=3):
     transport = ScriptedTransport(outcomes)
-    recorder = GatewayFailureMetricRecorder()
+    recorder = GatewayFailureMetricRecorder(
+        observability_collector=InMemoryObservabilityCollector(),
+    )
     breaker = GatewayCircuitBreaker(
         policy=GatewayCircuitBreakerPolicy(
             failure_threshold=failure_threshold,

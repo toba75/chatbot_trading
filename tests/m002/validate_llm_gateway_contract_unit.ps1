@@ -24,6 +24,7 @@ from app.platform.llm_gateway import (
     OpenAICompatibleResponse,
     build_openai_chat_completion_request,
 )
+from app.platform.observability import InMemoryObservabilityCollector
 
 
 OUTPUT_SCHEMA = {
@@ -175,7 +176,9 @@ gateway = OpenAICompatibleLocalLanguageModelGateway(
         policy=GatewayCircuitBreakerPolicy(failure_threshold=3, open_seconds=30),
         clock=ManualClock(),
     ),
-    failure_metric_recorder=GatewayFailureMetricRecorder(),
+    failure_metric_recorder=GatewayFailureMetricRecorder(
+        observability_collector=InMemoryObservabilityCollector(),
+    ),
 )
 result = gateway.infer(request)
 
@@ -212,7 +215,9 @@ assert_raises_code(
             policy=GatewayCircuitBreakerPolicy(failure_threshold=3, open_seconds=30),
             clock=ManualClock(),
         ),
-        failure_metric_recorder=GatewayFailureMetricRecorder(),
+        failure_metric_recorder=GatewayFailureMetricRecorder(
+            observability_collector=InMemoryObservabilityCollector(),
+        ),
     ).infer(request),
 )
 

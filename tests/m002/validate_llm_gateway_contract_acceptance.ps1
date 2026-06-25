@@ -22,6 +22,7 @@ from app.platform.llm_gateway import (
     OpenAICompatibleLocalLanguageModelGateway,
     OpenAICompatibleResponse,
 )
+from app.platform.observability import InMemoryObservabilityCollector
 
 
 class ManualClock:
@@ -130,7 +131,9 @@ gateway = OpenAICompatibleLocalLanguageModelGateway(
         policy=GatewayCircuitBreakerPolicy(failure_threshold=3, open_seconds=30),
         clock=ManualClock(),
     ),
-    failure_metric_recorder=GatewayFailureMetricRecorder(),
+    failure_metric_recorder=GatewayFailureMetricRecorder(
+        observability_collector=InMemoryObservabilityCollector(),
+    ),
 )
 
 request = InferenceRequest(
