@@ -32,7 +32,7 @@
 
 ## Suivi d'exécution
 
-- Statut: T-005 livrée en GREEN; le gateway LLM publie un contrat local strict, traduit les demandes d'inférence vers l'appel compatible OpenAI privé et retourne une sortie structurée avec provenance minimale.
+- Statut: T-006 livrée en GREEN; le gateway LLM contrôle les pannes Spark avec erreurs typées, retry borné avant premier token, circuit breaker et refus de sortie partielle non publiable.
 
 | Tâche | Commit RED | Commit GREEN | ADR consultées | ADR créée ou modifiée | Validations GREEN déclarées |
 |---|---|---|---|---|---|
@@ -41,6 +41,7 @@
 | T-003 - Déclarer la topologie docker-local et spark-inference | `29b887375be11edfeee8fa2eebd21c838a8d1b4a` | Commit courant `feat(m002): déclarer la topologie docker spark` | ADR-007; ADR-009 | Aucune | `tests/m002/validate_platform_topology_acceptance.ps1`; `tests/m002/validate_platform_topology_unit.ps1`; `scripts/validate_platform_topology.ps1`; `scripts/validate_m002_specification.ps1`; `scripts/validate_traceability.ps1`; `scripts/test.ps1`; `scripts/lint.ps1` |
 | T-004 - Configurer la stack Docker locale contrôlée | `0160224153bde0b822ce8b2891a647c6adec8793` | Commit courant `feat(m002): configurer la stack docker locale` | ADR-007; ADR-008; ADR-009 | Aucune | `tests/m002/validate_local_compose_acceptance.ps1`; `tests/m002/validate_local_compose_unit.ps1`; `scripts/validate_local_compose.ps1`; `scripts/validate_traceability.ps1`; `scripts/test.ps1`; `scripts/lint.ps1` |
 | T-005 - Publier le contrat du gateway LLM | `85d458a396a5c1f8fe06f00ae1c18f9a8f87d14b` | Commit courant `feat(m002): publier le contrat gateway llm` | ADR-008; ADR-009 | Aucune | `tests/m002/validate_llm_gateway_contract_acceptance.ps1`; `tests/m002/validate_llm_gateway_contract_unit.ps1`; `scripts/validate_traceability.ps1`; `scripts/test.ps1`; `scripts/lint.ps1` |
+| T-006 - Contrôler les pannes d'inférence Spark | `4015d34` | Commit courant `feat(m002): controler les pannes inference spark` | ADR-008; ADR-009; DDD-ADR-007 | Aucune | `tests/m002/validate_llm_gateway_failures_acceptance.ps1`; `tests/m002/validate_llm_gateway_failures_unit.ps1`; `tests/m002/validate_llm_gateway_contract_acceptance.ps1`; `tests/m002/validate_llm_gateway_contract_unit.ps1`; `scripts/validate_traceability.ps1`; `scripts/test.ps1`; `scripts/lint.ps1` |
 
 ## Clôture T-001
 
@@ -85,3 +86,13 @@
 - Tests livrés: le double compatible OpenAI vérifie modèle servi, schéma de sortie, TLS requis, clé d'API requise, identité technique `llm-gateway`, corrélation et provenance minimale; les tests unitaires couvrent construction de requête, configuration obligatoire, schéma absent, révision modèle absente et masquage des secrets.
 - ADR: aucune ADR créée ou modifiée; T-005 applique ADR-008 et ADR-009 sans ajouter de provider distant, sans déplacer l'état métier vers le Spark et sans exposer vLLM dans le domaine.
 - Hors périmètre confirmé: retries, circuit breaker, pannes Spark avancées, sortie streaming partielle et politiques de reprise restent à traiter par T-006.
+
+## Clôture T-006
+
+- Scénario BDD: Given une demande d'inférence nécessite Gemma sur `spark-inference`; When le Spark est indisponible ou son certificat est invalide; Then `LLM_UNAVAILABLE` ou l'erreur TLS explicite est retourné sans fallback et sans changement d'état métier.
+- RED T-006 confirmé: `tests/m002/validate_llm_gateway_failures_acceptance.ps1` échouait sur l'absence de `GatewayCircuitBreaker` dans `app.platform.llm_gateway`.
+- Implémentation: `app/platform/llm_gateway/__init__.py` ajoute `GatewayRetryPolicy`, `GatewayCircuitBreakerPolicy`, `GatewayCircuitBreaker`, les exceptions Spark typées, `LLMGatewayInferenceError`, la classification déterministe et les métriques de panne sans secret.
+- Comportement livré: les erreurs transitoires avant premier token peuvent être retentées de manière bornée avec la même `idempotency_key`; un certificat TLS invalide refuse dur; une sortie interrompue après premier token est non publiable et non retentée; le circuit breaker ouvert refuse l'appel sans contacter Spark.
+- Tests livrés: les tests d'acceptation couvrent indisponibilité, certificat invalide, timeout avant premier token, interruption après premier token et ouverture du circuit breaker; les tests unitaires couvrent classification d'erreur, retry borné, idempotence obligatoire, refus de sortie partielle, métriques sans secret et absence de masquage des erreurs inattendues.
+- ADR: aucune ADR créée ou modifiée; T-006 applique ADR-008, ADR-009 et DDD-ADR-007 sans introduire de fallback modèle ni mutation métier depuis `platform`.
+- Hors périmètre confirmé: aucun endpoint runtime n'est démarré, aucune persistance métier n'est ajoutée et aucune stratégie de fallback modèle n'est introduite.

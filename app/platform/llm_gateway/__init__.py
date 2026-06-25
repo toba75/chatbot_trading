@@ -5,6 +5,8 @@ from __future__ import annotations
 import hashlib
 import json
 import ssl
+import time
+import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -25,6 +27,183 @@ class LLMGatewayContractError(ValueError):
         super().__init__(f"{code}: {message}")
         self.code = code
         self.message = message
+
+
+class SparkUnavailableError(ConnectionError):
+    """Panne réseau ou indisponibilité du Spark avant le premier token."""
+
+
+class SparkTLSCertificateInvalidError(ConnectionError):
+    """Refus dur lié à un certificat Spark invalide."""
+
+
+class SparkFirstTokenTimeoutError(TimeoutError):
+    """Timeout avant réception du premier token."""
+
+
+class SparkStreamingInterruptedError(RuntimeError):
+    """Interruption après émission d'au moins un token."""
+
+    def __init__(self, message: str, partial_output: str) -> None:
+        super().__init__(message)
+        _require_text(partial_output, "partial_output", "LLM_PARTIAL_OUTPUT_REQUIRED")
+        self.partial_output = partial_output
+
+
+class LLMGatewayInferenceError(RuntimeError):
+    """Panne d'inférence explicite et non publiable par défaut."""
+
+    def __init__(
+        self,
+        *,
+        code: str,
+        message: str,
+        retryable: bool,
+        retry_pending: bool,
+        publishable: bool,
+        business_state_changed: bool,
+    ) -> None:
+        super().__init__(f"{code}: {message}")
+        self.code = code
+        self.message = message
+        self.retryable = retryable
+        self.retry_pending = retry_pending
+        self.publishable = publishable
+        self.business_state_changed = business_state_changed
+
+
+@dataclass(frozen=True)
+class GatewayFailureClassification:
+    code: str
+    message: str
+    retryable: bool
+    before_first_token: bool
+    publishable: bool
+
+
+@dataclass(frozen=True)
+class GatewayRetryPolicy:
+    max_retries_before_first_token: int
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.max_retries_before_first_token, int) or self.max_retries_before_first_token < 0:
+            raise LLMGatewayContractError(
+                "LLM_RETRY_POLICY_INVALID",
+                "Le nombre de retries avant premier token doit être un entier positif ou nul.",
+            )
+
+
+@dataclass(frozen=True)
+class GatewayCircuitBreakerPolicy:
+    failure_threshold: int
+    open_seconds: int
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.failure_threshold, int) or self.failure_threshold <= 0:
+            raise LLMGatewayContractError(
+                "LLM_CIRCUIT_BREAKER_THRESHOLD_INVALID",
+                "Le seuil du circuit breaker doit être un entier strictement positif.",
+            )
+        if not isinstance(self.open_seconds, int) or self.open_seconds <= 0:
+            raise LLMGatewayContractError(
+                "LLM_CIRCUIT_BREAKER_OPEN_SECONDS_INVALID",
+                "La durée d'ouverture du circuit breaker doit être un entier strictement positif.",
+            )
+
+
+class GatewayClock(Protocol):
+    def monotonic_seconds(self) -> float:
+        raise NotImplementedError
+
+
+class SystemGatewayClock:
+    def monotonic_seconds(self) -> float:
+        return time.monotonic()
+
+
+@dataclass(frozen=True)
+class GatewayFailureMetricEvent:
+    status: str
+    code: str
+    trace_id: str
+    request_id: str
+    idempotency_key: str
+    attempt: int
+    retry_pending: bool
+    circuit_open: bool
+    message: str
+
+
+class GatewayFailureMetricRecorder:
+    def __init__(self) -> None:
+        self.events: list[GatewayFailureMetricEvent] = []
+
+    def record(self, event: GatewayFailureMetricEvent) -> None:
+        self.events.append(event)
+
+
+class GatewayCircuitBreaker:
+    def __init__(self, *, policy: GatewayCircuitBreakerPolicy, clock: GatewayClock) -> None:
+        self._policy = policy
+        self._clock = clock
+        self._failure_count = 0
+        self._opened_until: float | None = None
+
+    def is_open(self) -> bool:
+        if self._opened_until is None:
+            return False
+        if self._clock.monotonic_seconds() < self._opened_until:
+            return True
+        self._opened_until = None
+        self._failure_count = 0
+        return False
+
+    def record_success(self) -> None:
+        self._failure_count = 0
+        self._opened_until = None
+
+    def record_failure(self, classification: GatewayFailureClassification) -> None:
+        if not classification.retryable or not classification.before_first_token:
+            return
+        self._failure_count += 1
+        if self._failure_count >= self._policy.failure_threshold:
+            self._opened_until = self._clock.monotonic_seconds() + self._policy.open_seconds
+
+
+def classify_gateway_failure(error: BaseException) -> GatewayFailureClassification:
+    if isinstance(error, SparkTLSCertificateInvalidError):
+        return GatewayFailureClassification(
+            code="LLM_TLS_CERTIFICATE_INVALID",
+            message="Le certificat TLS de spark-inference est invalide.",
+            retryable=False,
+            before_first_token=True,
+            publishable=False,
+        )
+    if isinstance(error, SparkFirstTokenTimeoutError):
+        return GatewayFailureClassification(
+            code="LLM_FIRST_TOKEN_TIMEOUT",
+            message="Le délai avant le premier token Spark est dépassé.",
+            retryable=True,
+            before_first_token=True,
+            publishable=False,
+        )
+    if isinstance(error, SparkStreamingInterruptedError):
+        return GatewayFailureClassification(
+            code="LLM_PARTIAL_OUTPUT",
+            message="Le flux Spark est interrompu après le premier token; la sortie partielle est non publiable.",
+            retryable=False,
+            before_first_token=False,
+            publishable=False,
+        )
+    if isinstance(error, SparkUnavailableError):
+        return GatewayFailureClassification(
+            code="LLM_UNAVAILABLE",
+            message="spark-inference est indisponible avant le premier token.",
+            retryable=True,
+            before_first_token=True,
+            publishable=False,
+        )
+    raise error
 
 
 @dataclass(frozen=True, repr=False)
@@ -178,19 +357,24 @@ class OpenAICompatibleLocalLanguageModelGateway:
         *,
         configuration: GatewayConfiguration,
         transport: OpenAICompatibleTransport,
+        retry_policy: GatewayRetryPolicy,
+        circuit_breaker: GatewayCircuitBreaker,
+        failure_metric_recorder: GatewayFailureMetricRecorder,
     ) -> None:
         self._configuration = configuration
         self._transport = transport
+        self._retry_policy = retry_policy
+        self._circuit_breaker = circuit_breaker
+        self._failure_metric_recorder = failure_metric_recorder
 
     def infer(self, request: InferenceRequest) -> InferenceResult:
         started_at = _utc_now()
         body = build_openai_chat_completion_request(configuration=self._configuration, request=request)
-        response = self._transport.post_chat_completion(
-            base_url=self._configuration.base_url,
-            headers=_build_headers(configuration=self._configuration, request=request),
+        headers = _build_headers(configuration=self._configuration, request=request)
+        response = self._post_chat_completion_with_failure_policy(
+            request=request,
+            headers=headers,
             body=body,
-            timeout_seconds=self._configuration.timeout_seconds,
-            tls_ca_bundle_path=self._configuration.tls_ca_bundle_path,
         )
         structured_output = _extract_structured_output(response.payload)
         completed_at = _utc_now()
@@ -207,6 +391,83 @@ class OpenAICompatibleLocalLanguageModelGateway:
             provenance=provenance,
             raw_response_id=_required_payload_text(response.payload, "id", "LLM_RESPONSE_ID_MISSING"),
         )
+
+    def _post_chat_completion_with_failure_policy(
+        self,
+        *,
+        request: InferenceRequest,
+        headers: Mapping[str, str],
+        body: Mapping[str, Any],
+    ) -> OpenAICompatibleResponse:
+        if self._circuit_breaker.is_open():
+            error = LLMGatewayInferenceError(
+                code="LLM_CIRCUIT_OPEN",
+                message="Le circuit breaker du gateway LLM refuse l'appel Spark.",
+                retryable=False,
+                retry_pending=False,
+                publishable=False,
+                business_state_changed=False,
+            )
+            self._failure_metric_recorder.record(
+                _build_failure_metric_event(
+                    request=request,
+                    status=error.code,
+                    code=error.code,
+                    message=error.message,
+                    attempt=0,
+                    retry_pending=False,
+                    circuit_open=True,
+                )
+            )
+            raise error
+
+        max_attempts = self._retry_policy.max_retries_before_first_token + 1
+        for attempt in range(1, max_attempts + 1):
+            try:
+                response = self._transport.post_chat_completion(
+                    base_url=self._configuration.base_url,
+                    headers=headers,
+                    body=body,
+                    timeout_seconds=self._configuration.timeout_seconds,
+                    tls_ca_bundle_path=self._configuration.tls_ca_bundle_path,
+                )
+            except (
+                SparkUnavailableError,
+                SparkFirstTokenTimeoutError,
+                SparkTLSCertificateInvalidError,
+                SparkStreamingInterruptedError,
+            ) as exc:
+                classification = classify_gateway_failure(exc)
+                self._circuit_breaker.record_failure(classification)
+                retry_pending = (
+                    classification.retryable
+                    and classification.before_first_token
+                    and attempt <= self._retry_policy.max_retries_before_first_token
+                    and not self._circuit_breaker.is_open()
+                )
+                self._failure_metric_recorder.record(
+                    _build_failure_metric_event(
+                        request=request,
+                        status="RETRY_PENDING" if retry_pending else classification.code,
+                        code=classification.code,
+                        message=classification.message,
+                        attempt=attempt,
+                        retry_pending=retry_pending,
+                        circuit_open=self._circuit_breaker.is_open(),
+                    )
+                )
+                if retry_pending:
+                    continue
+                raise LLMGatewayInferenceError(
+                    code=classification.code,
+                    message=classification.message,
+                    retryable=classification.retryable,
+                    retry_pending=False,
+                    publishable=classification.publishable,
+                    business_state_changed=False,
+                ) from exc
+            self._circuit_breaker.record_success()
+            return response
 
 
 class UrllibOpenAICompatibleTransport:
@@ -227,24 +488,36 @@ class UrllibOpenAICompatibleTransport:
             method="POST",
         )
         context = ssl.create_default_context(cafile=tls_ca_bundle_path)
-        with urllib.request.urlopen(request, timeout=timeout_seconds, context=context) as response:
-            response_body = response.read().decode("utf-8")
-            try:
-                payload = json.loads(response_body)
-            except JSONDecodeError as exc:
-                raise LLMGatewayContractError(
-                    "LLM_RESPONSE_INVALID_JSON",
-                    "La réponse vLLM compatible OpenAI n'est pas un JSON syntaxiquement valide.",
-                ) from exc
-            if not isinstance(payload, Mapping):
-                raise LLMGatewayContractError(
-                    "LLM_RESPONSE_INVALID",
-                    "La réponse vLLM compatible OpenAI doit être un objet JSON.",
+        try:
+            with urllib.request.urlopen(request, timeout=timeout_seconds, context=context) as response:
+                response_body = response.read().decode("utf-8")
+                try:
+                    payload = json.loads(response_body)
+                except JSONDecodeError as exc:
+                    raise LLMGatewayContractError(
+                        "LLM_RESPONSE_INVALID_JSON",
+                        "La réponse vLLM compatible OpenAI n'est pas un JSON syntaxiquement valide.",
+                    ) from exc
+                if not isinstance(payload, Mapping):
+                    raise LLMGatewayContractError(
+                        "LLM_RESPONSE_INVALID",
+                        "La réponse vLLM compatible OpenAI doit être un objet JSON.",
+                    )
+                return OpenAICompatibleResponse(
+                    payload=payload,
+                    headers={key.lower(): value for key, value in response.headers.items()},
                 )
-            return OpenAICompatibleResponse(
-                payload=payload,
-                headers={key.lower(): value for key, value in response.headers.items()},
-            )
+        except ssl.SSLCertVerificationError as exc:
+            raise SparkTLSCertificateInvalidError("Certificat TLS Spark invalide.") from exc
+        except TimeoutError as exc:
+            raise SparkFirstTokenTimeoutError("Timeout avant le premier token Spark.") from exc
+        except urllib.error.URLError as exc:
+            reason = exc.reason
+            if isinstance(reason, ssl.SSLCertVerificationError):
+                raise SparkTLSCertificateInvalidError("Certificat TLS Spark invalide.") from exc
+            if isinstance(reason, TimeoutError):
+                raise SparkFirstTokenTimeoutError("Timeout avant le premier token Spark.") from exc
+            raise SparkUnavailableError("spark-inference indisponible.") from exc
 
 
 def build_openai_chat_completion_request(
@@ -281,6 +554,29 @@ def _build_headers(
         "X-Request-Id": request.request_id,
         "Idempotency-Key": request.idempotency_key,
     }
+
+
+def _build_failure_metric_event(
+    *,
+    request: InferenceRequest,
+    status: str,
+    code: str,
+    message: str,
+    attempt: int,
+    retry_pending: bool,
+    circuit_open: bool,
+) -> GatewayFailureMetricEvent:
+    return GatewayFailureMetricEvent(
+        status=status,
+        code=code,
+        trace_id=request.trace_id,
+        request_id=request.request_id,
+        idempotency_key=request.idempotency_key,
+        attempt=attempt,
+        retry_pending=retry_pending,
+        circuit_open=circuit_open,
+        message=message,
+    )
 
 
 def _extract_structured_output(payload: Mapping[str, Any]) -> dict[str, Any]:
@@ -398,16 +694,29 @@ def _utc_now() -> str:
 
 
 __all__ = [
+    "GatewayCircuitBreaker",
+    "GatewayCircuitBreakerPolicy",
+    "GatewayFailureClassification",
+    "GatewayFailureMetricEvent",
+    "GatewayFailureMetricRecorder",
+    "GatewayRetryPolicy",
     "GatewayConfiguration",
     "InferenceMessage",
     "InferenceRequest",
     "InferenceResult",
     "LLMGatewayContractError",
+    "LLMGatewayInferenceError",
     "LocalLanguageModelGateway",
     "ModelProvenance",
     "OpenAICompatibleLocalLanguageModelGateway",
     "OpenAICompatibleResponse",
     "OpenAICompatibleTransport",
+    "SparkFirstTokenTimeoutError",
+    "SparkStreamingInterruptedError",
+    "SparkTLSCertificateInvalidError",
+    "SparkUnavailableError",
+    "SystemGatewayClock",
     "UrllibOpenAICompatibleTransport",
     "build_openai_chat_completion_request",
+    "classify_gateway_failure",
 ]

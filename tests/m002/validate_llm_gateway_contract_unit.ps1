@@ -12,7 +12,11 @@ import sys
 sys.path.insert(0, sys.argv[1])
 
 from app.platform.llm_gateway import (
+    GatewayCircuitBreaker,
+    GatewayCircuitBreakerPolicy,
     GatewayConfiguration,
+    GatewayFailureMetricRecorder,
+    GatewayRetryPolicy,
     InferenceMessage,
     InferenceRequest,
     LLMGatewayContractError,
@@ -28,6 +32,11 @@ OUTPUT_SCHEMA = {
     "properties": {"answer": {"type": "string"}},
     "additionalProperties": False,
 }
+
+
+class ManualClock:
+    def monotonic_seconds(self):
+        return 0.0
 
 
 def valid_configuration() -> GatewayConfiguration:
@@ -158,7 +167,16 @@ successful_transport = FixedTransport(
         "usage": {"prompt_tokens": 3, "completion_tokens": 2, "total_tokens": 5},
     }
 )
-gateway = OpenAICompatibleLocalLanguageModelGateway(configuration=configuration, transport=successful_transport)
+gateway = OpenAICompatibleLocalLanguageModelGateway(
+    configuration=configuration,
+    transport=successful_transport,
+    retry_policy=GatewayRetryPolicy(max_retries_before_first_token=0),
+    circuit_breaker=GatewayCircuitBreaker(
+        policy=GatewayCircuitBreakerPolicy(failure_threshold=3, open_seconds=30),
+        clock=ManualClock(),
+    ),
+    failure_metric_recorder=GatewayFailureMetricRecorder(),
+)
 result = gateway.infer(request)
 
 if result.structured_output != {"answer": "ok"}:
@@ -189,6 +207,12 @@ assert_raises_code(
     lambda: OpenAICompatibleLocalLanguageModelGateway(
         configuration=configuration,
         transport=missing_revision_transport,
+        retry_policy=GatewayRetryPolicy(max_retries_before_first_token=0),
+        circuit_breaker=GatewayCircuitBreaker(
+            policy=GatewayCircuitBreakerPolicy(failure_threshold=3, open_seconds=30),
+            clock=ManualClock(),
+        ),
+        failure_metric_recorder=GatewayFailureMetricRecorder(),
     ).infer(request),
 )
 

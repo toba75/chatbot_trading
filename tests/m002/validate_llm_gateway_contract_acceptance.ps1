@@ -12,12 +12,21 @@ import sys
 sys.path.insert(0, sys.argv[1])
 
 from app.platform.llm_gateway import (
+    GatewayCircuitBreaker,
+    GatewayCircuitBreakerPolicy,
     GatewayConfiguration,
+    GatewayFailureMetricRecorder,
+    GatewayRetryPolicy,
     InferenceMessage,
     InferenceRequest,
     OpenAICompatibleLocalLanguageModelGateway,
     OpenAICompatibleResponse,
 )
+
+
+class ManualClock:
+    def monotonic_seconds(self):
+        return 0.0
 
 
 class ControlledOpenAIDouble:
@@ -113,7 +122,16 @@ configuration = GatewayConfiguration(
     timeout_seconds=7,
 )
 transport = ControlledOpenAIDouble()
-gateway = OpenAICompatibleLocalLanguageModelGateway(configuration=configuration, transport=transport)
+gateway = OpenAICompatibleLocalLanguageModelGateway(
+    configuration=configuration,
+    transport=transport,
+    retry_policy=GatewayRetryPolicy(max_retries_before_first_token=0),
+    circuit_breaker=GatewayCircuitBreaker(
+        policy=GatewayCircuitBreakerPolicy(failure_threshold=3, open_seconds=30),
+        clock=ManualClock(),
+    ),
+    failure_metric_recorder=GatewayFailureMetricRecorder(),
+)
 
 request = InferenceRequest(
     messages=(InferenceMessage(role="user", content="Extraire un fait vérifiable."),),
