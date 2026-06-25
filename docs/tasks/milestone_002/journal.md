@@ -4,7 +4,7 @@
 
 - Plan: `docs/specs/plan_implementation_milestones_workstreams.md`, section `M-002 - Plateforme locale sûre`.
 - Spécification normative: `docs/specs/specification_unifiee_ddd_technique_chatbot_trading_v4_1.md`, sections 13, 15, 16, 18, 19, 20 et 21.
-- ADR applicables: ADR-007, ADR-008, ADR-009, DDD-ADR-006, DDD-ADR-008, DDD-ADR-007.
+- ADR applicables: ADR-007, ADR-008, ADR-009, ADR-010, DDD-ADR-006, DDD-ADR-008, DDD-ADR-007.
 
 ## Tâches planifiées
 
@@ -32,7 +32,7 @@
 
 ## Suivi d'exécution
 
-- Statut: T-010 livrée en GREEN; le gateway émet logs structurés et métriques techniques corrélés sans prompts, preuves, réponses complètes ni secrets.
+- Statut: T-011 livrée en GREEN; M-002 relie topologie, Compose, gateway, pannes Spark, outbox, jobs, sécurité réseau et observabilité aux gates standard.
 
 | Tâche | Commit RED | Commit GREEN | ADR consultées | ADR créée ou modifiée | Validations GREEN déclarées |
 |---|---|---|---|---|---|
@@ -46,6 +46,7 @@
 | T-008 - Livrer la file de jobs priorisée et idempotente | `617b535` | Commit courant `feat(m002): livrer la file de jobs idempotente` | DDD-ADR-006; DDD-ADR-008 | Aucune | `tests/m002/validate_job_runtime_acceptance.ps1`; `tests/m002/validate_job_runtime_unit.ps1`; `scripts/validate_traceability.ps1`; `scripts/test.ps1`; `scripts/lint.ps1` |
 | T-009 - Verrouiller la frontière réseau locale | `9a68426` | Commit courant `feat(m002): verrouiller la frontiere reseau locale` | ADR-007; ADR-008; ADR-009 | Aucune | `tests/m002/validate_network_boundary_acceptance.ps1`; `tests/m002/validate_network_boundary_unit.ps1`; `scripts/validate_network_boundary.ps1`; `scripts/validate_local_compose.ps1`; `scripts/validate_traceability.ps1`; `scripts/test.ps1`; `scripts/lint.ps1` |
 | T-010 - Observer le gateway sans payloads complets | `0f9eece` | Commit courant `feat(m002): observer le gateway sans payloads` | ADR-008; ADR-009 | Aucune | `tests/m002/validate_gateway_observability_acceptance.ps1`; `tests/m002/validate_gateway_observability_unit.ps1`; `tests/m002/validate_llm_gateway_failures_acceptance.ps1`; `tests/m002/validate_llm_gateway_failures_unit.ps1`; `scripts/validate_traceability.ps1`; `scripts/test.ps1`; `scripts/lint.ps1` |
+| T-011 - Relier M-002 à la traçabilité et aux gates | `0aa1e03d50ff5302ac3912b5fcd90294ff6fa0c0` | Commit courant `docs(m002): relier m002 aux gates et a la tracabilite` | ADR-007; ADR-008; ADR-009; ADR-010; DDD-ADR-006; DDD-ADR-007; DDD-ADR-008 | Aucune | `tests/m002/validate_m002_traceability_acceptance.ps1`; `tests/m002/validate_m002_traceability_unit.ps1`; `tests/governance/validate_m000_validation_commands_acceptance.ps1`; `scripts/validate_traceability.ps1`; `scripts/validate_definition_of_done.ps1`; `scripts/test.ps1`; `scripts/lint.ps1` |
 
 ## Clôture T-001
 
@@ -141,3 +142,13 @@
 - Tests livrés: le test d'acceptation couvre succès, TLS invalide, timeout avec retry et sortie interrompue; le test unitaire couvre redaction, champs obligatoires, versions modèle/vLLM, TTFT, retries, circuit breaker, jobs et outbox.
 - ADR: aucune ADR créée ou modifiée; T-010 applique ADR-008 et ADR-009 sans changer la topologie, sans service externe obligatoire et sans persistance de payload métier.
 - Hors périmètre confirmé: aucun backend externe d'observabilité, aucune exportation Prometheus/OpenTelemetry, aucune persistance durable de logs et aucune configuration runtime Spark n'est ajoutée par T-010.
+
+## Clôture T-011
+
+- Scénario BDD: Given les composants M-002 sont implémentés et testés; When les gates de clôture sont exécutées; Then chaque exigence M-002 est reliée à une preuve et la clôture est refusée si un test, une ADR ou une commande manque.
+- RED T-011 confirmé: `tests/m002/validate_m002_traceability_acceptance.ps1` et `tests/m002/validate_m002_traceability_unit.ps1` échouaient car `scripts/validate_traceability.ps1` acceptait encore une matrice sans exigence M-002 livrée `REQ-M002-011`.
+- Implémentation: `scripts/validate_traceability.ps1` rend `REQ-M002-001` à `REQ-M002-011` obligatoires quand `docs/tasks/milestone_002` existe, vérifie les statuts `Couvert`, les chemins de test, commandes, code ou configuration, ADR et justifications de chaque ligne.
+- Traçabilité: `docs/traceability/matrix.md` ajoute `REQ-M002-011` pour relier la clôture M-002 au test d'acceptation de traçabilité, à `scripts/validate_traceability.ps1` et à ADR-010.
+- Gates: `scripts/test.ps1` exécute désormais les tests d'acceptation et unitaires de traçabilité M-002, et la documentation des commandes de validation mentionne cette preuve de clôture.
+- ADR: aucune ADR créée ou modifiée; T-011 applique ADR-010 pour la politique de gates et réutilise ADR-007, ADR-008, ADR-009, DDD-ADR-006, DDD-ADR-007 et DDD-ADR-008 pour les exigences de plateforme sans changer leur sens.
+- Risques traités: une exigence M-002 absente, un statut non couvert, une preuve Compose ou réseau incorrecte, une ADR multiple incomplète ou une commande introuvable refusent explicitement la clôture.

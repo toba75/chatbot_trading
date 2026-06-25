@@ -32,7 +32,7 @@ Le wrapper `scripts/validate_architecture_boundaries.ps1` refuse explicitement u
 
 ## Périmètre des tests
 
-`scripts/test.ps1` exécute les validateurs M-000, les validateurs M-001, le validateur de spécification M-002, le validateur de topologie M-002, le validateur Compose local M-002 et le validateur de frontière réseau M-002, les tests d'acceptation et unitaires de gouvernance livrés par M-000, puis les tests d'acceptation et unitaires M-001 et M-002, dont le contrat du gateway LLM, les pannes d'inférence Spark, l'outbox idempotente, la file de jobs idempotente, l'observabilité gateway sans payload complet et la frontière réseau locale.
+`scripts/test.ps1` exécute les validateurs M-000, les validateurs M-001, le validateur de spécification M-002, le validateur de topologie M-002, le validateur Compose local M-002 et le validateur de frontière réseau M-002, les tests d'acceptation et unitaires de gouvernance livrés par M-000, puis les tests d'acceptation et unitaires M-001 et M-002, dont le contrat du gateway LLM, les pannes d'inférence Spark, l'outbox idempotente, la file de jobs idempotente, l'observabilité gateway sans payload complet, la frontière réseau locale et la traçabilité de clôture M-002.
 
 Le self-test d'acceptation `tests/governance/validate_m000_validation_commands_acceptance.ps1` reste exécuté explicitement hors `scripts/test.ps1` pour vérifier les gates sans récursion de `scripts/test.ps1` sur lui-même.
 
@@ -72,6 +72,6 @@ Les tests M-001 restent non récursifs: ils valident les contrats, fixtures, rè
 
 ## Extension M-002
 
-M-002 ajoute la spécification de plateforme locale sûre, le registre de topologie `docker-local` / `spark-inference`, la validation statique du Compose local, la frontière réseau locale, le contrat du gateway LLM, le contrôle des pannes d'inférence Spark, l'outbox idempotente, la file de jobs priorisée et l'observabilité technique du gateway aux gates existantes sans changer les points d'entrée PowerShell ADR-010.
+M-002 ajoute la spécification de plateforme locale sûre, le registre de topologie `docker-local` / `spark-inference`, la validation statique du Compose local, la frontière réseau locale, le contrat du gateway LLM, le contrôle des pannes d'inférence Spark, l'outbox idempotente, la file de jobs priorisée, l'observabilité technique du gateway et la traçabilité de clôture aux gates existantes sans changer les points d'entrée PowerShell ADR-010.
 
-Les tests M-002 restent non récursifs: ils valident la présence des sections, scénarios, placements physiques, règles `docker-local` et `spark-inference`, registre de topologie, Compose local contrôlé, frontière réseau locale, gateway unique, contrat OpenAI compatible, pannes Spark explicites, outbox, file de jobs, observabilité sans prompt ni réponse complète, commandes de validation et garde-fous sans lancer `scripts/test.ps1`.
+Les tests M-002 restent non récursifs: ils valident la présence des sections, scénarios, placements physiques, règles `docker-local` et `spark-inference`, registre de topologie, Compose local contrôlé, frontière réseau locale, gateway unique, contrat OpenAI compatible, pannes Spark explicites, outbox, file de jobs, observabilité sans prompt ni réponse complète, lignes de matrice `REQ-M002-*`, commandes de validation et garde-fous sans lancer `scripts/test.ps1`.
