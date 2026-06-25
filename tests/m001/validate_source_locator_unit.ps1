@@ -58,6 +58,27 @@ valid_locator = SourceLocator.from_payload(locator_payload, validation_policy=va
 if SourceLocator.from_json(valid_locator.to_json(), validation_policy=validation_policy) != valid_locator:
     raise AssertionError("Le round-trip unitaire SourceLocator doit rester stable.")
 
+class OneShotItemIds:
+    def __init__(self, values):
+        self._values = list(values)
+        self._used = False
+
+    def __iter__(self):
+        if self._used:
+            return iter(())
+        self._used = True
+        return iter(self._values)
+
+
+one_shot_policy = SourceLocatorValidationPolicy(
+    canonical_sources_by_version_id={canonical_ref.canonical_version_id: canonical_ref},
+    version_statuses_by_version_id={canonical_ref.canonical_version_id: "ACCEPTED"},
+    resolvable_item_ids_by_version_id={
+        canonical_ref.canonical_version_id: OneShotItemIds(["DOC-000001-P002-I001"]),
+    },
+)
+SourceLocator.from_payload(locator_payload, validation_policy=one_shot_policy)
+
 assert_raises(
     "validation_policy invalide",
     lambda: SourceLocator.from_payload(locator_payload, validation_policy=None),

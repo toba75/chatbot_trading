@@ -224,14 +224,22 @@ function Invoke-Validator {
 function Invoke-ValidatorWithPath {
     param(
         [Parameter(Mandatory = $true)]
-        [string] $MatrixPath
+        [string] $MatrixPath,
+
+        [Parameter(Mandatory = $false)]
+        [switch] $AllowM000OnlyMatrix
     )
 
     $previousErrorActionPreference = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
 
     try {
-        $output = & powershell -NoProfile -ExecutionPolicy Bypass -File $validatorPath -Path $MatrixPath 2>&1
+        if ($AllowM000OnlyMatrix) {
+            $output = & powershell -NoProfile -ExecutionPolicy Bypass -File $validatorPath -Path $MatrixPath -AllowM000OnlyMatrix 2>&1
+        }
+        else {
+            $output = & powershell -NoProfile -ExecutionPolicy Bypass -File $validatorPath -Path $MatrixPath 2>&1
+        }
     }
     finally {
         $ErrorActionPreference = $previousErrorActionPreference
@@ -387,8 +395,15 @@ try {
     Get-Content -Encoding UTF8 -LiteralPath (Join-Path $repoRoot "docs/traceability/matrix.md") |
         Where-Object { $_ -notmatch "^\|\s*REQ-M001-" } |
         Set-Content -Encoding UTF8 -LiteralPath $m000OnlyMatrixPath
-    $m000OnlyResult = Invoke-ValidatorWithPath -MatrixPath $m000OnlyMatrixPath
-    Assert-ExitCode -Actual $m000OnlyResult.ExitCode -Expected 0 -Message "Une matrice M-000 transmise par -Path doit rester valide."
+    $m000OnlyImplicitResult = Invoke-ValidatorWithPath -MatrixPath $m000OnlyMatrixPath
+    Assert-ExitCode -Actual $m000OnlyImplicitResult.ExitCode -Expected 1 -Message "Une matrice M-000 transmise par -Path sans parametre explicite doit etre refusee."
+    Assert-OutputContains `
+        -Output $m000OnlyImplicitResult.Output `
+        -Expected "Matrice M-001 absente sans autorisation explicite" `
+        -Message "Le refus explicite d'une matrice M-000 seule doit etre nomme."
+
+    $m000OnlyResult = Invoke-ValidatorWithPath -MatrixPath $m000OnlyMatrixPath -AllowM000OnlyMatrix
+    Assert-ExitCode -Actual $m000OnlyResult.ExitCode -Expected 0 -Message "Une matrice M-000 transmise par -Path avec autorisation explicite doit rester valide."
 
     $externalMatrixRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m001_traceability_external_" + [System.Guid]::NewGuid().ToString("N"))
     New-Item -ItemType Directory -Path $externalMatrixRoot | Out-Null

@@ -210,11 +210,31 @@ mutable_reference["constraints"] = [dict(mutable_reference["constraints"][0])]
 mutable_reference["constraints"][0]["mutable_reference"] = "strategy_candidate:STRAT-000017/current"
 assert_raises("reference mutable interdite", lambda: StrategySnapshot.from_payload(mutable_reference))
 
+case_variant_mutable_reference = strategy_payload()
+case_variant_mutable_reference["constraints"] = [
+    dict(case_variant_mutable_reference["constraints"][0])
+]
+case_variant_mutable_reference["constraints"][0]["Mutable_Reference"] = "strategy_candidate:STRAT-000017/current"
+assert_raises(
+    "reference mutable interdite",
+    lambda: StrategySnapshot.from_payload(case_variant_mutable_reference),
+)
+
 profitability_statement = strategy_payload()
 profitability_statement["profitability_statement"] = "validated"
 assert_raises(
     "declaration de rentabilite interdite",
     lambda: StrategySnapshot.from_payload(profitability_statement),
+)
+
+case_variant_profitability_statement = strategy_payload()
+case_variant_profitability_statement["constraints"] = [
+    dict(case_variant_profitability_statement["constraints"][0])
+]
+case_variant_profitability_statement["constraints"][0]["Profitability_Statement"] = "validated"
+assert_raises(
+    "declaration de rentabilite interdite",
+    lambda: StrategySnapshot.from_payload(case_variant_profitability_statement),
 )
 
 missing_data_snapshot_id = result_payload()
@@ -246,7 +266,26 @@ assert_raises("status non autorise", lambda: ExperimentResult.from_payload(unkno
 for status in ALLOWED_EXPERIMENT_RESULT_STATUSES:
     payload = result_payload()
     payload["status"] = status
+    if status == FAILED_EXPERIMENT_STATUS:
+        payload["diagnostics"] = dict(payload["diagnostics"])
+        payload["diagnostics"]["failure_reason"] = "erreur reproductible documentee"
     ExperimentResult.from_payload(payload)
+
+failed_without_failure_reason = result_payload()
+failed_without_failure_reason["status"] = FAILED_EXPERIMENT_STATUS
+failed_without_failure_reason["diagnostics"] = {"warnings": ["generic"]}
+assert_raises(
+    "diagnostic d'echec requis",
+    lambda: ExperimentResult.from_payload(failed_without_failure_reason),
+)
+
+failed_with_failure_reason = result_payload()
+failed_with_failure_reason["status"] = FAILED_EXPERIMENT_STATUS
+failed_with_failure_reason["diagnostics"] = {
+    "failure_reason": "donnees insuffisantes pour terminer l'experience",
+    "warnings": ["sample size limited"],
+}
+ExperimentResult.from_payload(failed_with_failure_reason)
 
 missing_frozen_inputs = result_payload()
 del missing_frozen_inputs["frozen_inputs"]

@@ -210,6 +210,15 @@ if (($t011Cells[1] -notmatch $commitCellPattern) -or ($t011Cells[2] -notmatch $c
     throw "Journal M-001 incomplet: T-011 doit citer ses commits RED et GREEN."
 }
 
+$t010JournalLine = @(Get-Content -Encoding UTF8 -LiteralPath $journalPath | Where-Object { $_ -like "| T-010 - Interdire les couplages intercontextes*|" })
+if ($t010JournalLine.Count -ne 1) {
+    throw "Journal M-001 incomplet: ligne T-010 introuvable."
+}
+$t010Cells = Split-MarkdownRow -Line $t010JournalLine[0]
+if ($t010Cells[4] -ne "ADR-011") {
+    throw "Journal M-001 incoherent: T-010 doit citer ADR-011 comme ADR creee."
+}
+
 New-Item -ItemType Directory -Path $temporaryRoot | Out-Null
 
 try {

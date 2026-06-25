@@ -191,6 +191,18 @@ payload_with_secret["payload"] = {
 }
 assert_raises("cle interdite", lambda: EventEnvelope.from_payload(payload_with_secret))
 
+payload_with_access_token = valid_payload()
+payload_with_access_token["event_type"] = "BoundaryContractVerified"
+payload_with_access_token["aggregate_type"] = "BoundaryContract"
+payload_with_access_token["aggregate_id"] = "EVS-000001"
+payload_with_access_token["payload"] = {
+    "schema_version": "1.0",
+    "credentials": {
+        "access_token": "secret",
+    },
+}
+assert_raises("cle interdite", lambda: EventEnvelope.from_payload(payload_with_access_token))
+
 payload_with_nan = valid_payload()
 payload_with_nan["payload"] = {"schema_version": "1.0", "score": float("nan")}
 assert_raises("payload invalide", lambda: EventEnvelope.from_payload(payload_with_nan))

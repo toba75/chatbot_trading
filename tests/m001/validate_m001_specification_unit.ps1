@@ -51,6 +51,8 @@ Le langage M-001 publie les termes suivants: bounded context, responsabilit$($eA
 | EG -> SD | EG | SD | VerifiedClaimRef | Livr$($eAcute) | Published Language | revue interne EG et graphe de claims |
 | RA -> SD | RA | SD | VerifiedResearchOutcome | Livr$($eAcute) | Anti-Corruption Layer | brouillons de r$($eAcute)ponse et jeux de preuves RA |
 | SD -> EX | SD | EX | StrategySnapshot | Livr$($eAcute) | Published Language immuable | strat$($eAcute)gie candidate mutable SD |
+| EX -> RA | EX | RA | ExperimentResult | Livr$($eAcute) | Published Language | registre d'exp$($eAcute)rience, diagnostics et artefacts internes EX |
+| EX -> CV | EX | CV | ExperimentResult | Livr$($eAcute) | Published Language | registre d'exp$($eAcute)rience, diagnostics et artefacts internes EX |
 | CV -> RA | CV | RA | ResolvedQuestion | R$($eAcute)serv$($eAcute) | fa$($cCedilla)ade applicative | historique conversationnel CV |
 | CV -> SD | CV | SD | StrategyRequest | R$($eAcute)serv$($eAcute) | fa$($cCedilla)ade applicative | pr$($eAcute)f$($eAcute)rences et tours CV |
 | CV -> EX | EX | CV | GetExperiment | R$($eAcute)serv$($eAcute) | fa$($cCedilla)ade applicative | registre interne EX |

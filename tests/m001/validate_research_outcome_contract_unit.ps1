@@ -15,6 +15,7 @@ from app.contracts.research_outcomes import (
     VerifiedResearchOutcome,
 )
 from app.strategy_design.adapters.research_outcome_translator import (
+    ResearchOutcomeTranslationDecision,
     StrategyDesignResearchOutcomeTranslator,
 )
 
@@ -154,6 +155,13 @@ invalid_conflict = conflicting_payload()
 invalid_conflict["unresolved_conflicts"] = [{"claim_refs": ["CLM-004812@3"], "blocking": True}]
 assert_raises("unresolved_conflicts invalide", lambda: VerifiedResearchOutcome.from_payload(invalid_conflict))
 
+internal_conflict = conflicting_payload()
+internal_conflict["unresolved_conflicts"] = [
+    dict(internal_conflict["unresolved_conflicts"][0])
+]
+internal_conflict["unresolved_conflicts"][0]["ra_internal_state"] = "interne"
+assert_raises("champ interdit", lambda: VerifiedResearchOutcome.from_payload(internal_conflict))
+
 missing_gaps = base_payload()
 del missing_gaps["knowledge_gaps"]
 assert_raises("knowledge_gaps absent", lambda: VerifiedResearchOutcome.from_payload(missing_gaps))
@@ -161,6 +169,11 @@ assert_raises("knowledge_gaps absent", lambda: VerifiedResearchOutcome.from_payl
 invalid_gap = base_payload()
 invalid_gap["knowledge_gaps"] = [{"impact": "paramètre à calibrer"}]
 assert_raises("knowledge_gaps invalide", lambda: VerifiedResearchOutcome.from_payload(invalid_gap))
+
+internal_gap = base_payload()
+internal_gap["knowledge_gaps"] = [dict(internal_gap["knowledge_gaps"][0])]
+internal_gap["knowledge_gaps"][0]["answer_draft"] = "brouillon interne"
+assert_raises("champ interdit", lambda: VerifiedResearchOutcome.from_payload(internal_gap))
 
 internal_answer_key = base_payload()
 internal_answer_key["mandate"] = dict(internal_answer_key["mandate"])
@@ -198,6 +211,41 @@ if any("strategy_rule" in payload or "rule_expression" in payload for payload in
 if any(payload["source_answer_id"] != "ANS-000055" for payload in decision_payloads):
     raise AssertionError("Chaque décision de traduction doit rester liée à la réponse RA.")
 assert_raises("VerifiedResearchOutcome attendu", lambda: translator.translate(base_payload()))
+
+decision_json = decisions[0].to_payload()
+try:
+    decisions[0].details["support_status"] = "MUTATED"
+except TypeError:
+    pass
+else:
+    raise AssertionError("ResearchOutcomeTranslationDecision.details doit etre immuable.")
+if decisions[0].to_payload() != decision_json:
+    raise AssertionError("Une mutation externe ne doit pas modifier la decision de traduction.")
+
+assert_raises(
+    "cle interdite",
+    lambda: ResearchOutcomeTranslationDecision(
+        decision_type="FORBIDDEN_DETAIL",
+        source_research_case_id="RSC-000055",
+        source_answer_id="ANS-000055",
+        source_claim_refs=("CLM-004812@3",),
+        description="Detail interne refuse.",
+        blocking=False,
+        details={"answer_draft": "brouillon interne"},
+    ),
+)
+assert_raises(
+    "valeur de traduction invalide",
+    lambda: ResearchOutcomeTranslationDecision(
+        decision_type="NON_FINITE_DETAIL",
+        source_research_case_id="RSC-000055",
+        source_answer_id="ANS-000055",
+        source_claim_refs=("CLM-004812@3",),
+        description="Score non fini refuse.",
+        blocking=False,
+        details={"score": float("nan")},
+    ),
+)
 
 print("Invariants unitaires VerifiedResearchOutcome M-001: OK")
 '@

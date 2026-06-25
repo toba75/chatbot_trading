@@ -219,6 +219,30 @@ def project_outcome(outcome: VerifiedResearchOutcome):
         -Scenario $forbiddenContractImport `
         -ExpectedFragments @("Import de contrat publie interdit", "contexte EX", "app.contracts.research_outcomes")
 
+    $forbiddenReexportedContractImport = New-ControlledApp -ScenarioName "forbidden_reexported_contract"
+    $createdRoots += $forbiddenReexportedContractImport.Root
+    New-PythonPackageFile -Path (Join-Path $forbiddenReexportedContractImport.AppRoot "experimentation/domain/uses_reexported_research_outcome.py") -Content @"
+from app.contracts import VerifiedResearchOutcome
+
+def project_outcome(outcome: VerifiedResearchOutcome):
+    return outcome
+"@
+    Assert-FailsWith `
+        -Scenario $forbiddenReexportedContractImport `
+        -ExpectedFragments @("Import de contrat publie interdit", "contexte EX", "VerifiedResearchOutcome")
+
+    $forbiddenMixedModuleContractImport = New-ControlledApp -ScenarioName "forbidden_mixed_module_contract"
+    $createdRoots += $forbiddenMixedModuleContractImport.Root
+    New-PythonPackageFile -Path (Join-Path $forbiddenMixedModuleContractImport.AppRoot "research_answering/domain/uses_strategy_snapshot.py") -Content @"
+from app.contracts.strategy_experiments import StrategySnapshot
+
+def project_snapshot(snapshot: StrategySnapshot):
+    return snapshot
+"@
+    Assert-FailsWith `
+        -Scenario $forbiddenMixedModuleContractImport `
+        -ExpectedFragments @("Import de contrat publie interdit", "contexte RA", "StrategySnapshot")
+
     $platformBusinessImport = New-ControlledApp -ScenarioName "platform_business_import"
     $createdRoots += $platformBusinessImport.Root
     New-PythonPackageFile -Path (Join-Path $platformBusinessImport.AppRoot "platform/job_runtime.py") -Content @"
