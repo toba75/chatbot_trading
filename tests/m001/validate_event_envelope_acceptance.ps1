@@ -4,6 +4,7 @@ $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
 . (Join-Path $repoRoot "scripts/require_python.ps1")
 $pythonExecutable = Get-RequiredPythonExecutable
 $eventFixturePath = Join-Path $repoRoot "tests/fixtures/m001/contracts/sp_to_ka_canonical_source_published_event_v1.json"
+$eAcute = [char] 0x00E9
 
 if (-not (Test-Path -LiteralPath $eventFixturePath -PathType Leaf)) {
     throw "Fixture d'enveloppe d'événement absente: $eventFixturePath"
@@ -135,4 +136,4 @@ if ($LASTEXITCODE -ne 0) {
     throw ($output -join "`n")
 }
 
-Write-Host "Test d'acceptation de l'enveloppe d'événement M-001: OK"
+Write-Host "Test d'acceptation de l'enveloppe d'$($eAcute)v$($eAcute)nement M-001: OK"

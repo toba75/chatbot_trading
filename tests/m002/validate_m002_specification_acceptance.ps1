@@ -3,6 +3,7 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
 $validatorPath = Join-Path $repoRoot "scripts/validate_m002_specification.ps1"
 $specPath = Join-Path $repoRoot "docs/specs/m002_plateforme_locale_sure.md"
+$eAcute = [char] 0x00E9
 
 if (-not (Test-Path -LiteralPath $validatorPath -PathType Leaf)) {
     throw "Validateur de spécification M-002 absent: scripts/validate_m002_specification.ps1"
@@ -24,4 +25,4 @@ if ($LASTEXITCODE -ne 0) {
     throw ($output -join "`n")
 }
 
-Write-Host "Test d'acceptation de la spécification M-002: OK"
+Write-Host "Test d'acceptation de la sp$($eAcute)cification M-002: OK"

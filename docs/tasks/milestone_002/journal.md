@@ -37,6 +37,7 @@
 | Tâche | Commit RED | Commit GREEN | ADR consultées | ADR créée ou modifiée | Validations GREEN déclarées |
 |---|---|---|---|---|---|
 | T-001 - Vérifier la précondition GREEN de M-002 | `ff51415` | Commit courant `docs(m002): valider la précondition green de plateforme` | ADR-010 | Aucune | `tests/m002/validate_m002_precondition_acceptance.ps1`; `tests/m002/validate_m002_precondition_unit.ps1`; `scripts/validate_m002_precondition.ps1 -Path .\docs\governance\m002_precondition_green.md`; `scripts/validate_traceability.ps1`; `scripts/test.ps1`; `scripts/lint.ps1` |
+| T-002 - Publier la spécification de plateforme locale sûre | `b7de11257d726e165d5dfb59f905d08ca30df979` | Commit courant `docs(m002): publier la spécification de plateforme locale` | ADR-007; ADR-008; ADR-009; DDD-ADR-006; DDD-ADR-008; ADR-010 | Aucune | `tests/m002/validate_m002_specification_acceptance.ps1`; `tests/m002/validate_m002_specification_unit.ps1`; `scripts/validate_m002_specification.ps1`; `scripts/validate_traceability.ps1`; `scripts/test.ps1`; `scripts/lint.ps1` |
 
 ## Clôture T-001
 
@@ -44,3 +45,12 @@
 - RED T-001 confirmé: `tests/m002/validate_m002_precondition_acceptance.ps1` échouait sur l'absence de `scripts/validate_m002_precondition.ps1`.
 - ADR: aucune ADR créée ou modifiée; T-001 applique ADR-010 sans changer la politique durable des gates PowerShell.
 - Risque traité: la précondition M-002 ne bascule pas vers une branche remote et refuse une base locale non alignée avant toute livraison de plateforme.
+
+## Clôture T-002
+
+- Scénario BDD: Given la spécification v4.1 impose deux plans physiques et une cohérence éventuelle par outbox; When la spécification M-002 est publiée; Then chaque règle de plateforme nomme le comportement attendu, les invariants, les tests et les ADR qui la gouvernent.
+- RED T-002 confirmé: `tests/m002/validate_m002_specification_acceptance.ps1` échouait sur l'absence de `scripts/validate_m002_specification.ps1`.
+- Implémentation documentaire: `docs/specs/m002_plateforme_locale_sure.md` publie le langage de plateforme, les placements `docker-local` et `spark-inference`, le gateway LLM unique, l'outbox transactionnelle, les jobs priorisés, les pannes explicites, l'observabilité technique et les commandes de validation.
+- Validateur livré: `scripts/validate_m002_specification.ps1` refuse section manquante, ADR absente, placement incohérent, fallback silencieux et endpoint Spark codé en dur.
+- ADR: aucune ADR créée ou modifiée; T-002 applique ADR-007, ADR-008, ADR-009, DDD-ADR-006, DDD-ADR-008 et ADR-010 sans changer leur sens.
+- Hors périmètre confirmé: aucun Compose, gateway, outbox runtime, file de jobs, règle réseau ou observabilité runtime n'est implémenté par T-002.

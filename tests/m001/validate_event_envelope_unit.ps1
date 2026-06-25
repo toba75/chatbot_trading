@@ -3,6 +3,7 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
 . (Join-Path $repoRoot "scripts/require_python.ps1")
 $pythonExecutable = Get-RequiredPythonExecutable
+$eAcute = [char] 0x00E9
 
 $pythonCode = @'
 import sys
@@ -280,4 +281,4 @@ if ($LASTEXITCODE -ne 0) {
     throw ($output -join "`n")
 }
 
-Write-Host "Tests unitaires de l'enveloppe d'événement M-001: OK"
+Write-Host "Tests unitaires de l'enveloppe d'$($eAcute)v$($eAcute)nement M-001: OK"
