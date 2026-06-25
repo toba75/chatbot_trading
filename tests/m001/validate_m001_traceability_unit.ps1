@@ -4,6 +4,7 @@ $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
 $validatorPath = Join-Path $repoRoot "scripts/validate_traceability.ps1"
 $temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m001_traceability_unit_" + [System.Guid]::NewGuid().ToString("N"))
 $eAcute = [char] 0x00E9
+$cCedilla = [char] 0x00E7
 
 function Split-MarkdownRow {
     param(
@@ -362,4 +363,4 @@ finally {
     Remove-Item -LiteralPath $temporaryRoot -Recurse -Force
 }
 
-Write-Host "Tests unitaires de traçabilité M-001: OK"
+Write-Host "Tests unitaires de tra$($cCedilla)abilit$($eAcute) M-001: OK"

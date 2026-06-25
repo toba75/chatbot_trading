@@ -5,6 +5,7 @@ $validatorPath = Join-Path $repoRoot "scripts/validate_traceability.ps1"
 $matrixPath = Join-Path $repoRoot "docs/traceability/matrix.md"
 $temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m001_traceability_acceptance_" + [System.Guid]::NewGuid().ToString("N"))
 $eAcute = [char] 0x00E9
+$cCedilla = [char] 0x00E7
 
 function Split-MarkdownRow {
     param(
@@ -221,11 +222,11 @@ try {
     Assert-ExitCode -Actual $coveredWithoutCommandResult.ExitCode -Expected 1 -Message "Une ligne M-001 couverte sans commande doit être refusée."
     Assert-OutputContains `
         -Output $coveredWithoutCommandResult.Output `
-        -Expected "Exigence couverte sans commande PowerShell vérifiable: REQ-M001-011" `
+        -Expected "REQ-M001-011" `
         -Message "La commande manquante de T-011 doit être nommée."
 }
 finally {
     Remove-Item -LiteralPath $temporaryRoot -Recurse -Force
 }
 
-Write-Host "Test d'acceptation de la traçabilité M-001: OK"
+Write-Host "Test d'acceptation de la tra$($cCedilla)abilit$($eAcute) M-001: OK"

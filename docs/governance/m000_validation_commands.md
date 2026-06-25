@@ -1,8 +1,8 @@
-# Commandes de validation M-000
+# Commandes de validation M-000 et M-001
 
 ## Scénario BDD
 
-- Given les artefacts de gouvernance M-000 sont présents.
+- Given les artefacts de gouvernance M-000 et les contrats M-001 sont présents.
 - When `.\scripts\test.ps1` et `.\scripts\lint.ps1` sont exécutés.
 - Then les validateurs requis sont lancés sans omission et la gate retourne GREEN ou RED avec la commande fautive nommée.
 
@@ -24,11 +24,11 @@ La branche locale `master` DOIT exister et représenter la base de comparaison a
 
 ## Périmètre des tests
 
-`scripts/test.ps1` exécute les validateurs M-000, puis les tests d'acceptation et unitaires livrés par T-001 à T-005, ainsi que le self-test unitaire non récursif T-006 `tests/governance/validate_m000_validation_commands_unit.ps1`.
+`scripts/test.ps1` exécute les validateurs M-000, les validateurs M-001, les tests d'acceptation et unitaires de gouvernance livrés par M-000, puis les tests d'acceptation et unitaires M-001.
 
-Le self-test d'acceptation T-006 `tests/governance/validate_m000_validation_commands_acceptance.ps1` reste exécuté explicitement pendant T-006 pour vérifier les gates sans récursion de `scripts/test.ps1` sur lui-même.
+Le self-test d'acceptation `tests/governance/validate_m000_validation_commands_acceptance.ps1` reste exécuté explicitement hors `scripts/test.ps1` pour vérifier les gates sans récursion de `scripts/test.ps1` sur lui-même.
 
-`scripts/lint.ps1` exécute les validateurs M-000 sans lancer de suite de tests.
+`scripts/lint.ps1` exécute les validateurs M-000 et M-001 sans lancer de suite de tests.
 
 ## Validateurs requis
 
@@ -37,6 +37,8 @@ Le self-test d'acceptation T-006 `tests/governance/validate_m000_validation_comm
 - `scripts/validate_task_system.ps1`
 - `scripts/validate_traceability.ps1`
 - `scripts/validate_definition_of_done.ps1`
+- `scripts/validate_m001_specification.ps1`
+- `scripts/validate_architecture_boundaries.ps1`
 
 ## Refus explicites
 
@@ -49,3 +51,9 @@ Aucune suite vide n'est acceptée comme GREEN.
 ## Hors périmètre M-000
 
 M-000 ne livre pas de code métier applicatif. L'absence de suite applicative reste tracée dans `docs/traceability/matrix.md` comme hors périmètre du milestone de gouvernance.
+
+## Extension M-001
+
+M-001 ajoute les contrats publiés, le registre de contextes et les frontières d'import aux gates existantes sans changer la politique d'exécution ADR-010.
+
+Les tests M-001 restent non récursifs: ils valident les contrats, fixtures, règles d'architecture et lignes de traçabilité sans relancer `scripts/test.ps1`.
