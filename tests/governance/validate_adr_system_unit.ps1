@@ -202,13 +202,13 @@ New-Item -ItemType Directory -Path $temporaryRoot | Out-Null
 try {
     $missingMasterProjectRoot = New-TemporaryProject -Name "missing-master"
     $missingMasterResult = Invoke-Validator -ProjectRoot $missingMasterProjectRoot
-    Assert-ExitCode -Actual $missingMasterResult.ExitCode -Expected 1 -Message "Un registre ADR valide sans reference master doit echouer explicitement."
-    Assert-OutputContains -Output $missingMasterResult.Output -Expected "master indisponible" -Message "L'absence de master doit etre nommee."
+    Assert-ExitCode -Actual $missingMasterResult.ExitCode -Expected 1 -Message "Un registre ADR valide sans référence master doit échouer explicitement."
+    Assert-OutputContains -Output $missingMasterResult.Output -Expected "master indisponible" -Message "L'absence de master doit être nommée."
 
     $validProjectRoot = New-TemporaryProject -Name "valid"
     Initialize-GitBaseline -ProjectRoot $validProjectRoot
     $validResult = Invoke-Validator -ProjectRoot $validProjectRoot
-    Assert-ExitCode -Actual $validResult.ExitCode -Expected 0 -Message "Un registre ADR minimal et complet doit etre accepte."
+    Assert-ExitCode -Actual $validResult.ExitCode -Expected 0 -Message "Un registre ADR minimal et complet doit être accepté."
 
     $invalidNameProjectRoot = New-TemporaryProject -Name "invalid-name"
     Rename-Item -LiteralPath (Join-Path $invalidNameProjectRoot "docs/adr/ADR-001-artefacts-canoniques.md") -NewName "ADR-01-artefacts-canoniques.md"

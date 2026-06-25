@@ -267,6 +267,24 @@ try {
     $commandSuffixResult = Invoke-Validator -ProjectRoot $commandSuffixProjectRoot
     Assert-ExitCode -Actual $commandSuffixResult.ExitCode -Expected 1 -Message "Une commande avec suffixe non validé doit être refusée."
 
+    $absoluteCommandPathProjectRoot = New-TemporaryProject -Name "absolute-command-path"
+    Set-MatrixCell `
+        -Path (Join-Path $absoluteCommandPathProjectRoot "docs/traceability/matrix.md") `
+        -RequirementId "REQ-M000-901" `
+        -ColumnName "Commande" `
+        -Value "powershell -NoProfile -ExecutionPolicy Bypass -File /scripts/example.ps1"
+    $absoluteCommandPathResult = Invoke-Validator -ProjectRoot $absoluteCommandPathProjectRoot
+    Assert-ExitCode -Actual $absoluteCommandPathResult.ExitCode -Expected 1 -Message "Une commande avec chemin absolu doit être refusée."
+
+    $absolutePathArgumentProjectRoot = New-TemporaryProject -Name "absolute-path-argument"
+    Set-MatrixCell `
+        -Path (Join-Path $absolutePathArgumentProjectRoot "docs/traceability/matrix.md") `
+        -RequirementId "REQ-M000-901" `
+        -ColumnName "Commande" `
+        -Value "powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\example.ps1 -Path /docs/specs/specification.md"
+    $absolutePathArgumentResult = Invoke-Validator -ProjectRoot $absolutePathArgumentProjectRoot
+    Assert-ExitCode -Actual $absolutePathArgumentResult.ExitCode -Expected 1 -Message "Un argument -Path absolu doit être refusé."
+
     $blankPathProjectRoot = New-TemporaryProject -Name "blank-path"
     $blankPathResult = Invoke-ValidatorWithPath -ProjectRoot $blankPathProjectRoot -Path "   "
     Assert-ExitCode -Actual $blankPathResult.ExitCode -Expected 1 -Message "Un paramètre -Path explicitement vide doit être refusé."
@@ -281,8 +299,8 @@ try {
 | REQ-M000-910 | docs/specs/specification.md | Couvert | tests/governance/validate_m000_validation_commands_unit.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\governance\validate_m000_validation_commands_unit.ps1 | scripts/lint.ps1 | ADR-001 | D$($eAcute)cision structurante d$($eAcute)j$($aGrave) publi$($eAcute)e. |
 "@ | Set-Content -Encoding UTF8 -LiteralPath (Join-Path $m000GateProofProjectRoot "docs/traceability/matrix.md")
     $m000GateProofResult = Invoke-Validator -ProjectRoot $m000GateProofProjectRoot
-    Assert-ExitCode -Actual $m000GateProofResult.ExitCode -Expected 1 -Message "Une gate M-000 doit etre tracee par le test d'acceptation qui l'execute."
-    Assert-OutputContains -Output $m000GateProofResult.Output -Expected "Preuve de gate M-000" -Message "La preuve de gate M-000 incorrecte doit etre nommee."
+    Assert-ExitCode -Actual $m000GateProofResult.ExitCode -Expected 1 -Message "Une gate M-000 doit être tracée par le test d'acceptation qui l'exécute."
+    Assert-OutputContains -Output $m000GateProofResult.Output -Expected "Preuve de gate M-000" -Message "La preuve de gate M-000 incorrecte doit être nommée."
 }
 finally {
     Remove-Item -LiteralPath $temporaryRoot -Recurse -Force
