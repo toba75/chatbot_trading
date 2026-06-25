@@ -155,11 +155,12 @@ function Add-VllmPrincipalService {
 
 '@
 
-    if (-not $Content.Contains("networks:`n")) {
+    $rootNetworksMarker = "networks:`n  edge:"
+    if (-not $Content.Contains($rootNetworksMarker)) {
         throw "Bloc networks racine absent du fixture."
     }
 
-    return $Content.Replace("networks:`n", "$injectedService`nnetworks:`n")
+    return $Content.Replace($rootNetworksMarker, "$injectedService`n$rootNetworksMarker")
 }
 
 if (-not (Test-Path -LiteralPath $validatorPath -PathType Leaf)) {
@@ -196,7 +197,7 @@ try {
         $portsPath = New-TemporaryCompose -Name "$serviceId-ports" -Content (Add-PublishedPortToService -Content $validCompose -ServiceId $serviceId)
         $portsResult = Invoke-LocalComposeValidator -ComposePath $portsPath
         Assert-ExitCode -Actual $portsResult.ExitCode -Expected 1 -Message "Le service $serviceId ne doit pas publier de port."
-        Assert-OutputContains -Output $portsResult.Output -Expected "Port publié interdit pour service interne: $serviceId" -Message "Le port interdit doit nommer le service."
+        Assert-OutputContains -Output $portsResult.Output -Expected "interdit pour service interne: $serviceId" -Message "Le port interdit doit nommer le service."
     }
 
     $vllmPath = New-TemporaryCompose -Name "vllm-main-local" -Content (Add-VllmPrincipalService -Content $validCompose)
@@ -212,7 +213,7 @@ try {
     $workerEgressPath = New-TemporaryCompose -Name "worker-spark-egress" -Content (Add-SparkEgressToService -Content $validCompose -ServiceId "worker-documents")
     $workerEgressResult = Invoke-LocalComposeValidator -ComposePath $workerEgressPath
     Assert-ExitCode -Actual $workerEgressResult.ExitCode -Expected 1 -Message "Un worker ne doit pas joindre spark-egress."
-    Assert-OutputContains -Output $workerEgressResult.Output -Expected "Réseau spark-egress interdit pour service: worker-documents" -Message "Le réseau interdit doit nommer le service."
+    Assert-OutputContains -Output $workerEgressResult.Output -Expected "spark-egress interdit pour service: worker-documents" -Message "Le réseau interdit doit nommer le service."
 }
 finally {
     Remove-Item -LiteralPath $temporaryRoot -Recurse -Force

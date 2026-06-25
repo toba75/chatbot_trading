@@ -1,0 +1,237 @@
+$ErrorActionPreference = "Stop"
+
+$repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
+. (Join-Path $repoRoot "scripts/require_python.ps1")
+$pythonExecutable = Get-RequiredPythonExecutable
+
+$pythonCode = @'
+from __future__ import annotations
+
+import copy
+import sys
+
+sys.path.insert(0, sys.argv[1])
+
+from app.platform.local_compose import parse_local_compose_document, validate_local_compose
+
+
+BASE_SERVICES = {
+    "edge-gateway": {
+        "image": "caddy:2.8.4-alpine",
+        "ports": ["127.0.0.1:${OST_EDGE_HTTPS_PORT?OST_EDGE_HTTPS_PORT requis}:443"],
+        "networks": ["edge", "core"],
+    },
+    "ui": {
+        "image": "ostrading/ui:0.0.0-m002",
+        "expose": ["8081"],
+        "networks": ["core"],
+        "environment": {"UI_API_URL": "${UI_API_URL?UI_API_URL requis}"},
+    },
+    "orchestrator-api": {
+        "image": "ostrading/orchestrator-api:0.0.0-m002",
+        "expose": ["8080"],
+        "networks": ["core"],
+        "environment": {
+            "DATABASE_URL": "${DATABASE_URL?DATABASE_URL requis}",
+            "QDRANT_URL": "${QDRANT_URL?QDRANT_URL requis}",
+            "LLM_GATEWAY_URL": "${LLM_GATEWAY_URL?LLM_GATEWAY_URL requis}",
+        },
+    },
+    "llm-gateway": {
+        "image": "ostrading/llm-gateway:0.0.0-m002",
+        "expose": ["8090"],
+        "networks": ["core", "spark-egress"],
+        "environment": {
+            "GEMMA_BASE_URL": "${GEMMA_BASE_URL?GEMMA_BASE_URL requis}",
+            "GEMMA_MODEL": "${GEMMA_MODEL?GEMMA_MODEL requis}",
+            "GEMMA_API_KEY_FILE": "/run/secrets/gemma_api_key",
+            "GEMMA_CA_BUNDLE": "/run/secrets/spark_ca",
+        },
+        "secrets": ["gemma_api_key", "spark_ca"],
+    },
+    "postgres": {
+        "image": "postgres:17.2-alpine",
+        "expose": ["5432"],
+        "networks": ["core"],
+        "environment": {
+            "POSTGRES_DB": "${POSTGRES_DB?POSTGRES_DB requis}",
+            "POSTGRES_USER": "${POSTGRES_USER?POSTGRES_USER requis}",
+            "POSTGRES_PASSWORD_FILE": "/run/secrets/postgres_password",
+        },
+        "secrets": ["postgres_password"],
+    },
+    "qdrant": {
+        "image": "qdrant/qdrant:v1.13.4",
+        "expose": ["6333"],
+        "networks": ["core"],
+    },
+    "granite-docling": {
+        "image": "ostrading/granite-docling:0.0.0-m002",
+        "expose": ["8001"],
+        "networks": ["core"],
+    },
+    "embedding-service": {
+        "image": "ostrading/embedding-service:0.0.0-m002",
+        "expose": ["8101"],
+        "networks": ["core"],
+    },
+    "reranker-service": {
+        "image": "ostrading/reranker-service:0.0.0-m002",
+        "expose": ["8102"],
+        "networks": ["core"],
+    },
+    "worker-documents": {
+        "image": "ostrading/worker-documents:0.0.0-m002",
+        "networks": ["core"],
+    },
+    "worker-research": {
+        "image": "ostrading/worker-research:0.0.0-m002",
+        "networks": ["core"],
+    },
+    "worker-backtest": {
+        "image": "ostrading/worker-backtest:0.0.0-m002",
+        "networks": ["core"],
+    },
+    "backtest-engine": {
+        "image": "ostrading/backtest-engine:0.0.0-m002",
+        "expose": ["8200"],
+        "networks": ["core"],
+    },
+}
+
+
+def service_lines(service_id, definition):
+    lines = [f"  {service_id}:", f"    image: {definition['image']}"]
+    for section in ("ports", "expose", "networks", "secrets"):
+        values = definition.get(section, [])
+        if values:
+            lines.append(f"    {section}:")
+            for value in values:
+                lines.append(f'      - "{value}"')
+
+    environment = definition.get("environment", {})
+    if environment:
+        lines.append("    environment:")
+        for name, value in environment.items():
+            lines.append(f'      {name}: "{value}"')
+
+    if definition.get("healthcheck", True):
+        lines.extend(
+            [
+                "    healthcheck:",
+                "      test:",
+                "        - CMD-SHELL",
+                f'        - "test -f /tmp/{service_id}.health"',
+                "      interval: 30s",
+                "      timeout: 5s",
+                "      retries: 3",
+                "      start_period: 10s",
+            ]
+        )
+
+    return lines
+
+
+def valid_compose(service_overrides=None, top_level_secrets=None):
+    services = copy.deepcopy(BASE_SERVICES)
+    for service_id, overrides in (service_overrides or {}).items():
+        services[service_id].update(overrides)
+        for key, value in overrides.items():
+            if value is None:
+                services[service_id].pop(key, None)
+
+    secret_names = top_level_secrets or ["gemma_api_key", "spark_ca", "postgres_password"]
+    lines = ["name: trading-research-assistant", "services:"]
+    for service_id, definition in services.items():
+        lines.extend(service_lines(service_id, definition))
+    lines.extend(
+        [
+            "networks:",
+            "  edge: {}",
+            "  core:",
+            "    internal: true",
+            "  spark-egress: {}",
+            "secrets:",
+        ]
+    )
+    for secret_name in secret_names:
+        suffix = ".pem" if secret_name == "spark_ca" else ""
+        lines.extend([f"  {secret_name}:", f"    file: ./secrets/{secret_name}{suffix}"])
+
+    return "\n".join(lines) + "\n"
+
+
+def assert_raises(expected_fragment, document):
+    try:
+        validate_local_compose(parse_local_compose_document(document, source="fixture-compose.yaml"))
+    except ValueError as exc:
+        if expected_fragment not in str(exc):
+            raise AssertionError(f"Erreur inattendue: {exc}")
+    else:
+        raise AssertionError(f"Erreur attendue absente: {expected_fragment}")
+
+
+compose = parse_local_compose_document(valid_compose(), source="fixture-compose.yaml")
+validate_local_compose(compose)
+
+postgres = compose.service("postgres")
+if postgres.ports != ():
+    raise AssertionError("Le parseur ne doit pas confondre ports et expose pour PostgreSQL.")
+if postgres.expose != ("5432",):
+    raise AssertionError(f"Expose PostgreSQL incorrect: {postgres.expose}")
+
+edge_gateway = compose.service("edge-gateway")
+if edge_gateway.ports != ("127.0.0.1:${OST_EDGE_HTTPS_PORT?OST_EDGE_HTTPS_PORT requis}:443",):
+    raise AssertionError(f"Ports edge-gateway incorrects: {edge_gateway.ports}")
+
+assert_raises(
+    "interdit pour service interne: postgres",
+    valid_compose({"postgres": {"ports": ["127.0.0.1:5432:5432"]}}),
+)
+
+assert_raises(
+    "pour service qdrant",
+    valid_compose({"qdrant": {"image": "qdrant/qdrant:latest"}}),
+)
+
+assert_raises(
+    "Healthcheck absent pour service: embedding-service",
+    valid_compose({"embedding-service": {"healthcheck": False}}),
+)
+
+assert_raises(
+    "Secret Spark absent pour llm-gateway: gemma_api_key",
+    valid_compose({"llm-gateway": {"secrets": ["spark_ca"]}}),
+)
+
+assert_raises(
+    "spark-egress interdit pour service: worker-research",
+    valid_compose({"worker-research": {"networks": ["core", "spark-egress"]}}),
+)
+
+assert_raises(
+    "Secret Compose absent: spark_ca",
+    valid_compose(top_level_secrets=["gemma_api_key", "postgres_password"]),
+)
+
+print("Tests unitaires Compose local M-002: OK")
+'@
+
+$previousErrorActionPreference = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+$pythonScriptPath = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m002_local_compose_unit_" + [System.Guid]::NewGuid().ToString("N") + ".py")
+Set-Content -Encoding UTF8 -LiteralPath $pythonScriptPath -Value $pythonCode
+try {
+    $env:PYTHONIOENCODING = "utf-8"
+    $output = & $pythonExecutable -B $pythonScriptPath $repoRoot 2>&1
+}
+finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+    Remove-Item -LiteralPath $pythonScriptPath -Force
+}
+
+if ($LASTEXITCODE -ne 0) {
+    throw ($output -join "`n")
+}
+
+Write-Host "Tests unitaires Compose local M-002: OK"

@@ -25,6 +25,7 @@ $validationCommands = @(
     @{ Path = "scripts/validate_m001_specification.ps1"; Arguments = @("-Path", $m001SpecificationPath) },
     @{ Path = "scripts/validate_m002_specification.ps1"; Arguments = @("-Path", $m002SpecificationPath) },
     @{ Path = "scripts/validate_platform_topology.ps1"; Arguments = @("-Path", $platformTopologyPath) },
+    @{ Path = "scripts/validate_local_compose.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_architecture_boundaries.ps1"; Arguments = @("-AppRoot", $appRoot, "-ContextRegistryPath", $contextRegistryPath, "-SpecificationPath", $m001SpecificationPath) }
 )
 
@@ -39,6 +40,7 @@ $expectedValidationPaths = @(
     "scripts/validate_m001_specification.ps1",
     "scripts/validate_m002_specification.ps1",
     "scripts/validate_platform_topology.ps1",
+    "scripts/validate_local_compose.ps1",
     "scripts/validate_architecture_boundaries.ps1"
 )
 
@@ -49,7 +51,7 @@ Invoke-M000ValidationGate `
     -RepositoryRoot $repoRoot `
     -ValidationCommands $validationCommands `
     -TestCommands $testCommands `
-    -ExpectedValidationCount 9 `
+    -ExpectedValidationCount 10 `
     -ExpectedTestCount 0 `
     -ExpectedValidationPaths $expectedValidationPaths `
     -ExpectedTestPaths $expectedTestPaths
