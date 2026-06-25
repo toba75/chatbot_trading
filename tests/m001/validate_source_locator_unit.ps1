@@ -52,7 +52,7 @@ validation_policy = SourceLocatorValidationPolicy(
     canonical_sources_by_version_id={canonical_ref.canonical_version_id: canonical_ref},
     version_statuses_by_version_id={canonical_ref.canonical_version_id: "ACCEPTED"},
     resolvable_item_ids_by_version_id={
-        canonical_ref.canonical_version_id: frozenset({"DOC-000001-P002-I001"}),
+        canonical_ref.canonical_version_id: {"DOC-000001-P002-I001": "c" * 64},
     },
 )
 
@@ -60,26 +60,24 @@ valid_locator = SourceLocator.from_payload(locator_payload, validation_policy=va
 if SourceLocator.from_json(valid_locator.to_json(), validation_policy=validation_policy) != valid_locator:
     raise AssertionError("Le round-trip unitaire SourceLocator doit rester stable.")
 
-class OneShotItemIds:
-    def __init__(self, values):
-        self._values = list(values)
-        self._used = False
-
-    def __iter__(self):
-        if self._used:
-            return iter(())
-        self._used = True
-        return iter(self._values)
+invalid_content_hash = dict(locator_payload)
+invalid_content_hash["content_hash"] = "d" * 64
+assert_raises(
+    "content_hash incoherent",
+    lambda: SourceLocator.from_payload(invalid_content_hash, validation_policy=validation_policy),
+)
 
 
-one_shot_policy = SourceLocatorValidationPolicy(
+mutable_item_hashes = {"DOC-000001-P002-I001": "c" * 64}
+normalized_policy = SourceLocatorValidationPolicy(
     canonical_sources_by_version_id={canonical_ref.canonical_version_id: canonical_ref},
     version_statuses_by_version_id={canonical_ref.canonical_version_id: "ACCEPTED"},
     resolvable_item_ids_by_version_id={
-        canonical_ref.canonical_version_id: OneShotItemIds(["DOC-000001-P002-I001"]),
+        canonical_ref.canonical_version_id: mutable_item_hashes,
     },
 )
-SourceLocator.from_payload(locator_payload, validation_policy=one_shot_policy)
+mutable_item_hashes["DOC-000001-P002-I001"] = "d" * 64
+SourceLocator.from_payload(locator_payload, validation_policy=normalized_policy)
 
 assert_raises(
     "validation_policy invalide",
@@ -184,7 +182,7 @@ quarantined_policy = SourceLocatorValidationPolicy(
     canonical_sources_by_version_id={canonical_ref.canonical_version_id: canonical_ref},
     version_statuses_by_version_id={canonical_ref.canonical_version_id: "QUARANTINED"},
     resolvable_item_ids_by_version_id={
-        canonical_ref.canonical_version_id: frozenset({"DOC-000001-P002-I001"}),
+        canonical_ref.canonical_version_id: {"DOC-000001-P002-I001": "c" * 64},
     },
 )
 assert_raises(
@@ -196,7 +194,7 @@ retired_policy = SourceLocatorValidationPolicy(
     canonical_sources_by_version_id={canonical_ref.canonical_version_id: canonical_ref},
     version_statuses_by_version_id={canonical_ref.canonical_version_id: "RETIRED"},
     resolvable_item_ids_by_version_id={
-        canonical_ref.canonical_version_id: frozenset({"DOC-000001-P002-I001"}),
+        canonical_ref.canonical_version_id: {"DOC-000001-P002-I001": "c" * 64},
     },
 )
 assert_raises(

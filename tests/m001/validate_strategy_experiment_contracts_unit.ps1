@@ -306,6 +306,21 @@ assert_raises(
     lambda: ExperimentResult.from_payload(inconsistent_frozen_input),
 )
 
+completed_before_started = result_payload()
+completed_before_started["completed_at"] = "2026-06-21T10:09:00Z"
+assert_raises(
+    "chronologie experience incoherente",
+    lambda: ExperimentResult.from_payload(completed_before_started),
+)
+
+frozen_after_started = result_payload()
+frozen_after_started["frozen_inputs"] = dict(frozen_after_started["frozen_inputs"])
+frozen_after_started["frozen_inputs"]["frozen_at"] = "2026-06-21T10:11:00Z"
+assert_raises(
+    "chronologie experience incoherente",
+    lambda: ExperimentResult.from_payload(frozen_after_started),
+)
+
 missing_metrics = result_payload()
 del missing_metrics["metrics"]
 assert_raises("metrics absent", lambda: ExperimentResult.from_payload(missing_metrics))

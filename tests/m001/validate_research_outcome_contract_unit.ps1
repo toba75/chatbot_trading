@@ -212,6 +212,13 @@ if any("strategy_rule" in payload or "rule_expression" in payload for payload in
     raise AssertionError("Le traducteur SD ne doit pas compiler de stratégie.")
 if any(payload["source_answer_id"] != "ANS-000055" for payload in decision_payloads):
     raise AssertionError("Chaque décision de traduction doit rester liée à la réponse RA.")
+knowledge_gap_decisions = [
+    payload for payload in decision_payloads if payload["decision_type"] == "KNOWLEDGE_GAP"
+]
+if len(knowledge_gap_decisions) == 0:
+    raise AssertionError("Les lacunes RA doivent etre traduites vers SD.")
+if any(payload["blocking"] is not True for payload in knowledge_gap_decisions):
+    raise AssertionError("Une lacune RA doit bloquer la formalisation SD.")
 assert_raises("VerifiedResearchOutcome attendu", lambda: translator.translate(base_payload()))
 
 decision_json = decisions[0].to_payload()
