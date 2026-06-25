@@ -1,0 +1,20 @@
+{
+  "schema_version": "1.0",
+  "claim_id": "CLM-004812",
+  "claim_version": 3,
+  "canonical_text": "Les strategies de suivi de tendance quotidiennes sur futures ont ete rentables sur la periode etudiee.",
+  "scope": {
+    "universe": [
+      "futures"
+    ],
+    "frequency": "daily",
+    "sample_period": "1985-2018",
+    "transaction_costs_included": true
+  },
+  "status": "VERIFIED",
+  "verification_id": "VER-002991",
+  "evidence_refs": [],
+  "dependency_group_ids": [
+    "DEP-000123"
+  ]
+}

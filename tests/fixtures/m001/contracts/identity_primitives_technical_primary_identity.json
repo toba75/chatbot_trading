@@ -1,0 +1,8 @@
+{
+  "schema_version": "1.0",
+  "contract_name": "IdentityPrimitiveCompatibilityFixture",
+  "primary_identity": "qdrant:knowledge_access:point:42",
+  "identities": {
+    "document_id": "DOC-000001"
+  }
+}

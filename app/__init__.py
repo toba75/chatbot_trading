@@ -1,0 +1,1 @@
+"""Monolithe modulaire OSTrading."""

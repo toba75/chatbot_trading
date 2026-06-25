@@ -17,7 +17,47 @@ function New-TemporaryProject {
     New-Item -ItemType Directory -Path (Join-Path $projectRoot "docs") -Force | Out-Null
     Copy-Item -LiteralPath $validatorPath -Destination (Join-Path $projectRoot "scripts/validate_task_system.ps1")
     Copy-Item -LiteralPath $tasksSourceDir -Destination (Join-Path $projectRoot "docs/tasks") -Recurse
+    Initialize-TemporaryGitMaster -ProjectRoot $projectRoot
     return $projectRoot
+}
+
+function Invoke-TemporaryGit {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $ProjectRoot,
+
+        [Parameter(Mandatory = $true)]
+        [string[]] $Arguments,
+
+        [Parameter(Mandatory = $true)]
+        [string] $Message
+    )
+
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $output = & git -C $ProjectRoot @Arguments 2>&1
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "$Message Sortie git: $($output -join "`n")"
+    }
+}
+
+function Initialize-TemporaryGitMaster {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $ProjectRoot
+    )
+
+    Invoke-TemporaryGit -ProjectRoot $ProjectRoot -Arguments @("init", "-b", "master") -Message "Impossible d'initialiser le dépôt temporaire."
+    Invoke-TemporaryGit -ProjectRoot $ProjectRoot -Arguments @("config", "user.email", "tests@example.local") -Message "Impossible de configurer l'email Git temporaire."
+    Invoke-TemporaryGit -ProjectRoot $ProjectRoot -Arguments @("config", "user.name", "Tests Gouvernance") -Message "Impossible de configurer le nom Git temporaire."
+    Invoke-TemporaryGit -ProjectRoot $ProjectRoot -Arguments @("add", "docs/tasks", "scripts/validate_task_system.ps1") -Message "Impossible de préparer le master temporaire."
+    Invoke-TemporaryGit -ProjectRoot $ProjectRoot -Arguments @("commit", "-m", "test: publier les tâches en master") -Message "Impossible de créer le master temporaire."
 }
 
 function Invoke-Validator {
@@ -60,6 +100,23 @@ function Assert-ExitCode {
     }
 }
 
+function Assert-OutputContains {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $Output,
+
+        [Parameter(Mandatory = $true)]
+        [string] $Expected,
+
+        [Parameter(Mandatory = $true)]
+        [string] $Message
+    )
+
+    if (-not $Output.Contains($Expected)) {
+        throw "$Message Sortie obtenue: $Output"
+    }
+}
+
 if (-not (Test-Path -LiteralPath $validatorPath -PathType Leaf)) {
     throw "Validateur des tâches absent: scripts/validate_task_system.ps1"
 }
@@ -72,7 +129,21 @@ try {
     # Then leur chemin, leur ordre, leur scénario BDD, leurs commits RED/GREEN et leurs validations sont contrôlables automatiquement.
     $validProjectRoot = New-TemporaryProject -Name "valid"
     $validResult = Invoke-Validator -ProjectRoot $validProjectRoot
-    Assert-ExitCode -Actual $validResult.ExitCode -Expected 0 -Message "Les tâches M-000 conformes doivent être acceptées."
+    if ($validResult.ExitCode -ne 0) {
+        throw "Les tâches M-000 et M-001 conformes doivent être acceptées. Sortie du validateur: $($validResult.Output)"
+    }
+    Assert-ExitCode -Actual $validResult.ExitCode -Expected 0 -Message "Les tâches M-000 et M-001 conformes doivent être acceptées."
+
+    $invalidTitleProjectRoot = New-TemporaryProject -Name "invalid-title-message"
+    $taskPath = Join-Path $invalidTitleProjectRoot "docs/tasks/milestone_000/0001_verifier_precondition_green.md"
+    (Get-Content -Raw -Encoding UTF8 -LiteralPath $taskPath).Replace("# T-001 - ", "# ") |
+        Set-Content -Encoding UTF8 -LiteralPath $taskPath
+    $invalidTitleResult = Invoke-Validator -ProjectRoot $invalidTitleProjectRoot
+    Assert-ExitCode -Actual $invalidTitleResult.ExitCode -Expected 1 -Message "Une tâche sans titre canonique doit être refusée."
+    Assert-OutputContains `
+        -Output $invalidTitleResult.Output `
+        -Expected "Titre de tâche invalide ou absent: 0001_verifier_precondition_green.md" `
+        -Message "Le RED de titre doit rester ciblé."
 
     $invalidFolderProjectRoot = New-TemporaryProject -Name "invalid-folder"
     Rename-Item -LiteralPath (Join-Path $invalidFolderProjectRoot "docs/tasks/milestone_000") -NewName "milestone_0"

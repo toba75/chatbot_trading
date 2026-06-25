@@ -1,6 +1,9 @@
 ﻿param(
     [Parameter(Mandatory = $false)]
-    [string] $Path
+    [string] $Path,
+
+    [Parameter(Mandatory = $false)]
+    [switch] $AllowM000OnlyMatrix
 )
 
 $ErrorActionPreference = "Stop"
@@ -28,6 +31,97 @@ $allowedStatuses = @(
     "Partiel",
     "Planifi$($eAcute)",
     "Hors p$($eAcute)rim$($eGrave)tre M-000"
+)
+
+$requiredM001Requirements = @(
+    [ordered] @{
+        Id = "REQ-M001-001"
+        Source = "docs/tasks/milestone_001/0001_verifier_precondition_green.md"
+        Test = "tests/governance/validate_task_system_acceptance.ps1"
+        CommandScript = "scripts/validate_task_system.ps1"
+        Code = "scripts/validate_task_system.ps1"
+        Adr = "ADR-010"
+    },
+    [ordered] @{
+        Id = "REQ-M001-002"
+        Source = "docs/tasks/milestone_001/0002_publier_specification_frontieres_ddd.md"
+        Test = "tests/m001/validate_m001_specification_acceptance.ps1"
+        CommandScript = "scripts/validate_m001_specification.ps1"
+        Code = "docs/specs/m001_frontieres_ddd_contrats_publies.md"
+        Adr = "DDD-ADR-001; DDD-ADR-002; DDD-ADR-003"
+    },
+    [ordered] @{
+        Id = "REQ-M001-003"
+        Source = "docs/tasks/milestone_001/0003_declarer_contextes_proprietaires.md"
+        Test = "tests/m001/validate_context_modules_acceptance.ps1"
+        CommandScript = "tests/m001/validate_context_modules_acceptance.ps1"
+        Code = "app/context_registry.json"
+        Adr = "DDD-ADR-001"
+    },
+    [ordered] @{
+        Id = "REQ-M001-004"
+        Source = "docs/tasks/milestone_001/0004_publier_identifiants_contrats_communs.md"
+        Test = "tests/m001/validate_contract_identity_acceptance.ps1"
+        CommandScript = "tests/m001/validate_contract_identity_acceptance.ps1"
+        Code = "app/contracts/identity.py"
+        Adr = "Non requise"
+    },
+    [ordered] @{
+        Id = "REQ-M001-005"
+        Source = "docs/tasks/milestone_001/0005_publier_source_locator_canonical_source_ref.md"
+        Test = "tests/m001/validate_source_contracts_acceptance.ps1"
+        CommandScript = "tests/m001/validate_source_contracts_acceptance.ps1"
+        Code = "app/contracts/source_references.py"
+        Adr = "DDD-ADR-003"
+    },
+    [ordered] @{
+        Id = "REQ-M001-006"
+        Source = "docs/tasks/milestone_001/0006_publier_contrats_preuves_claims.md"
+        Test = "tests/m001/validate_evidence_claim_contracts_acceptance.ps1"
+        CommandScript = "tests/m001/validate_evidence_claim_contracts_acceptance.ps1"
+        Code = "app/contracts/evidence_claims.py"
+        Adr = "DDD-ADR-005"
+    },
+    [ordered] @{
+        Id = "REQ-M001-007"
+        Source = "docs/tasks/milestone_001/0007_publier_research_outcome_acl_strategie.md"
+        Test = "tests/m001/validate_research_outcome_contract_acceptance.ps1"
+        CommandScript = "tests/m001/validate_research_outcome_contract_acceptance.ps1"
+        Code = "app/contracts/research_outcomes.py"
+        Adr = "DDD-ADR-001; DDD-ADR-002; DDD-ADR-005; DDD-ADR-007"
+    },
+    [ordered] @{
+        Id = "REQ-M001-008"
+        Source = "docs/tasks/milestone_001/0008_publier_snapshot_strategie_resultat_experience.md"
+        Test = "tests/m001/validate_strategy_experiment_contracts_acceptance.ps1"
+        CommandScript = "tests/m001/validate_strategy_experiment_contracts_acceptance.ps1"
+        Code = "app/contracts/strategy_experiments.py"
+        Adr = "DDD-ADR-009"
+    },
+    [ordered] @{
+        Id = "REQ-M001-009"
+        Source = "docs/tasks/milestone_001/0009_publier_enveloppe_evenement_versionnee.md"
+        Test = "tests/m001/validate_event_envelope_acceptance.ps1"
+        CommandScript = "tests/m001/validate_event_envelope_acceptance.ps1"
+        Code = "app/contracts/event_envelope.py"
+        Adr = "DDD-ADR-006; DDD-ADR-008"
+    },
+    [ordered] @{
+        Id = "REQ-M001-010"
+        Source = "docs/tasks/milestone_001/0010_interdire_couplages_intercontextes.md"
+        Test = "tests/m001/validate_architecture_boundaries_acceptance.ps1"
+        CommandScript = "tests/m001/validate_architecture_boundaries_acceptance.ps1"
+        Code = "scripts/validate_architecture_boundaries.py"
+        Adr = "DDD-ADR-001; ADR-011"
+    },
+    [ordered] @{
+        Id = "REQ-M001-011"
+        Source = "docs/tasks/milestone_001/0011_relier_m001_tracabilite_gates.md"
+        Test = "tests/m001/validate_m001_traceability_acceptance.ps1"
+        CommandScript = "scripts/validate_traceability.ps1"
+        Code = "scripts/validate_traceability.ps1"
+        Adr = "ADR-010"
+    }
 )
 
 function Assert-Condition {
@@ -240,6 +334,125 @@ function Assert-M000GateProof {
         -Message "Preuve de gate M-000 invalide pour ${RequirementId}: test et commande doivent ex$($eAcute)cuter $expectedProofPath"
 }
 
+function Get-MatrixRowCell {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object] $Row,
+
+        [Parameter(Mandatory = $true)]
+        [string] $CellName,
+
+        [Parameter(Mandatory = $true)]
+        [string] $RequirementId
+    )
+
+    $property = $Row.PSObject.Properties[$CellName]
+    Assert-Condition `
+        -Condition ($null -ne $property) `
+        -Message "Cellule $CellName introuvable pour ${RequirementId}."
+
+    return [string] $property.Value
+}
+
+function Assert-M001PathCell {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object] $Row,
+
+        [Parameter(Mandatory = $true)]
+        [string] $RequirementId,
+
+        [Parameter(Mandatory = $true)]
+        [string] $CellName,
+
+        [Parameter(Mandatory = $true)]
+        [string] $ExpectedValue
+    )
+
+    $actualValue = Convert-ToMatrixRelativePath -RelativePath (Get-MatrixRowCell -Row $Row -CellName $CellName -RequirementId $RequirementId)
+
+    Assert-Condition `
+        -Condition ($actualValue -eq $ExpectedValue) `
+        -Message "$CellName M-001 invalide pour ${RequirementId}. Attendu: $ExpectedValue. Obtenu: $actualValue"
+}
+
+function Test-M001MilestoneIsPresent {
+    $milestoneDir = Join-Path $repoRoot "docs/tasks/milestone_001"
+    return (Test-Path -LiteralPath $milestoneDir -PathType Container)
+}
+
+function Assert-M001RequirementRows {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object[]] $Rows
+    )
+
+    if (-not (Test-M001MilestoneIsPresent)) {
+        return
+    }
+
+    $canonicalMatrixPath = [System.IO.Path]::GetFullPath((Join-Path $repoRoot "docs/traceability/matrix.md"))
+    $currentMatrixPath = [System.IO.Path]::GetFullPath($matrixPath)
+    if (-not $currentMatrixPath.Equals($canonicalMatrixPath, [System.StringComparison]::OrdinalIgnoreCase)) {
+        $containsM001Rows = @($Rows | Where-Object {
+            (Get-MatrixRowCell -Row $_ -CellName "Exigence" -RequirementId "ligne inconnue") -match "^REQ-M001-"
+        }).Count -gt 0
+        if (-not $containsM001Rows) {
+            Assert-Condition `
+                -Condition $AllowM000OnlyMatrix `
+                -Message "Matrice M-001 absente sans autorisation explicite."
+            return
+        }
+    }
+
+    $rowsByRequirementId = @{}
+    foreach ($row in $Rows) {
+        $requirementId = Get-MatrixRowCell -Row $row -CellName "Exigence" -RequirementId "ligne inconnue"
+        $rowsByRequirementId[$requirementId] = $row
+    }
+
+    foreach ($expected in $requiredM001Requirements) {
+        $requirementId = $expected["Id"]
+
+        Assert-Condition `
+            -Condition ($rowsByRequirementId.ContainsKey($requirementId)) `
+            -Message "Exigence M-001 livr$($eAcute)e absente: $requirementId"
+
+        $row = $rowsByRequirementId[$requirementId]
+        $status = Get-MatrixRowCell -Row $row -CellName "Statut" -RequirementId $requirementId
+
+        Assert-Condition `
+            -Condition ($status -eq "Couvert") `
+            -Message "Exigence M-001 livr$($eAcute)e non couverte: $requirementId"
+
+        Assert-M001PathCell -Row $row -RequirementId $requirementId -CellName "Source" -ExpectedValue $expected["Source"]
+        Assert-M001PathCell -Row $row -RequirementId $requirementId -CellName "Test" -ExpectedValue $expected["Test"]
+        Assert-M001PathCell -Row $row -RequirementId $requirementId -CellName "Code" -ExpectedValue $expected["Code"]
+
+        $commandScript = Get-MatrixRowCell -Row $row -CellName "CommandeScript" -RequirementId $requirementId
+        Assert-Condition `
+            -Condition ($commandScript -eq $expected["CommandScript"]) `
+            -Message "Commande M-001 invalide pour ${requirementId}. Attendu: $($expected["CommandScript"]). Obtenu: $commandScript"
+
+        $adr = Get-MatrixRowCell -Row $row -CellName "ADR" -RequirementId $requirementId
+        Assert-Condition `
+            -Condition ($adr -eq $expected["Adr"]) `
+            -Message "ADR M-001 invalide pour ${requirementId}. Attendu: $($expected["Adr"]). Obtenu: $adr"
+
+        $justification = Get-MatrixRowCell -Row $row -CellName "Justification ADR" -RequirementId $requirementId
+        if ($adr -eq "Non requise") {
+            Assert-Condition `
+                -Condition ($justification -match "^Aucune d$($eAcute)cision structurante nouvelle") `
+                -Message "Justification ADR M-001 invalide pour ${requirementId}: $justification"
+        }
+        else {
+            Assert-Condition `
+                -Condition ($justification -match "^D$($eAcute)cision structurante document$($eAcute)e:") `
+                -Message "Justification ADR M-001 invalide pour ${requirementId}: $justification"
+        }
+    }
+}
+
 if (-not $PSBoundParameters.ContainsKey("Path")) {
     $matrixPath = Join-Path $repoRoot "docs/traceability/matrix.md"
 }
@@ -251,6 +464,16 @@ else {
     if (-not [System.IO.Path]::IsPathRooted($matrixPath)) {
         $matrixPath = Join-Path $repoRoot $matrixPath
     }
+
+    $resolvedRepositoryRoot = [System.IO.Path]::GetFullPath($repoRoot)
+    $resolvedMatrixPath = [System.IO.Path]::GetFullPath($matrixPath)
+    $repositoryPrefix = $resolvedRepositoryRoot.TrimEnd("\", "/") + [System.IO.Path]::DirectorySeparatorChar
+
+    Assert-Condition `
+        -Condition ($resolvedMatrixPath.StartsWith($repositoryPrefix, [System.StringComparison]::OrdinalIgnoreCase)) `
+        -Message "Chemin hors depot interdit (matrice): $resolvedMatrixPath"
+
+    $matrixPath = $resolvedMatrixPath
 }
 
 Assert-Condition `
@@ -338,6 +561,7 @@ for ($index = $headerIndex + 2; $index -lt $content.Count; $index++) {
     Assert-RepositoryRelativeFile -RelativePath $row["Code"] -Context "code ${requirementId}"
 
     $commandScriptPath = Assert-CommandCell -Command $row["Commande"] -Status $status -RequirementId $requirementId
+    $row["CommandeScript"] = if ($null -eq $commandScriptPath) { "" } else { $commandScriptPath }
     Assert-M000GateProof -CodePath $row["Code"] -TestPath $row["Test"] -CommandScriptPath $commandScriptPath -RequirementId $requirementId
     Assert-AdrCell -AdrCell $row["ADR"] -Justification $row["Justification ADR"] -ExistingAdrIds $existingAdrIds -RequirementId $requirementId
 
@@ -347,5 +571,7 @@ for ($index = $headerIndex + 2; $index -lt $content.Count; $index++) {
 Assert-Condition `
     -Condition ($rows.Count -gt 0) `
     -Message "Aucune exigence n'est déclarée dans la matrice de traçabilité."
+
+Assert-M001RequirementRows -Rows $rows.ToArray()
 
 Write-Host "Matrice de $traceabilityLabel valide: $($rows.Count) exigence(s) contr$([char] 0x00F4)l$($eAcute)e(s)."

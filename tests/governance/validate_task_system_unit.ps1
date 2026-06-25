@@ -96,6 +96,48 @@ function New-TemporaryProject {
     return $projectRoot
 }
 
+function Set-TaskContentWithLineEnding {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $Path,
+
+        [Parameter(Mandatory = $true)]
+        [string] $Content,
+
+        [Parameter(Mandatory = $true)]
+        [string] $LineEnding
+    )
+
+    $normalizedContent = $Content -replace "`r`n", "`n"
+    $normalizedContent = $normalizedContent -replace "`r", "`n"
+    $contentWithLineEnding = $normalizedContent -replace "`n", $LineEnding
+
+    [System.IO.File]::WriteAllText($Path, $contentWithLineEnding, [System.Text.Encoding]::UTF8)
+}
+
+function Set-ProjectTaskLineEndings {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $ProjectRoot,
+
+        [Parameter(Mandatory = $true)]
+        [string] $LineEnding
+    )
+
+    $firstTaskPath = Join-Path $ProjectRoot "docs/tasks/milestone_000/0001_verifier_precondition_green.md"
+    $secondTaskPath = Join-Path $ProjectRoot "docs/tasks/milestone_000/0002_controler_tache_suivante.md"
+
+    Set-TaskContentWithLineEnding `
+        -Path $firstTaskPath `
+        -Content (New-TaskContent -TaskId "T-001" -Title "V$($eAcute)rifier la pr$($eAcute)condition GREEN de gouvernance initiale") `
+        -LineEnding $LineEnding
+
+    Set-TaskContentWithLineEnding `
+        -Path $secondTaskPath `
+        -Content (New-TaskContent -TaskId "T-002" -Title "Contr$([char] 0x00F4)ler la t$($aCircumflex)che suivante") `
+        -LineEnding $LineEnding
+}
+
 function Invoke-Validator {
     param(
         [Parameter(Mandatory = $true)]
@@ -136,6 +178,23 @@ function Assert-ExitCode {
     }
 }
 
+function Assert-OutputContains {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $Output,
+
+        [Parameter(Mandatory = $true)]
+        [string] $Expected,
+
+        [Parameter(Mandatory = $true)]
+        [string] $Message
+    )
+
+    if (-not $Output.Contains($Expected)) {
+        throw "$Message Sortie obtenue: $Output"
+    }
+}
+
 if (-not (Test-Path -LiteralPath $validatorPath -PathType Leaf)) {
     throw "Validateur des tâches absent: scripts/validate_task_system.ps1"
 }
@@ -149,6 +208,55 @@ try {
         throw "Un dossier de tâches minimal conforme doit être accepté. Sortie du validateur: $($validResult.Output)"
     }
     Assert-ExitCode -Actual $validResult.ExitCode -Expected 0 -Message "Un dossier de tâches minimal conforme doit être accepté."
+
+    $validCrlfProjectRoot = New-TemporaryProject -Name "valid-crlf-title"
+    Set-ProjectTaskLineEndings -ProjectRoot $validCrlfProjectRoot -LineEnding "`r`n"
+    $validCrlfResult = Invoke-Validator -ProjectRoot $validCrlfProjectRoot
+    if ($validCrlfResult.ExitCode -ne 0) {
+        throw "Un titre de tâche valide avec fins de ligne CRLF doit être accepté. Sortie du validateur: $($validCrlfResult.Output)"
+    }
+    Assert-ExitCode -Actual $validCrlfResult.ExitCode -Expected 0 -Message "Un titre de tâche valide avec fins de ligne CRLF doit être accepté."
+
+    $validLfProjectRoot = New-TemporaryProject -Name "valid-lf-title"
+    Set-ProjectTaskLineEndings -ProjectRoot $validLfProjectRoot -LineEnding "`n"
+    $validLfResult = Invoke-Validator -ProjectRoot $validLfProjectRoot
+    if ($validLfResult.ExitCode -ne 0) {
+        throw "Un titre de tâche valide avec fins de ligne LF doit être accepté. Sortie du validateur: $($validLfResult.Output)"
+    }
+    Assert-ExitCode -Actual $validLfResult.ExitCode -Expected 0 -Message "Un titre de tâche valide avec fins de ligne LF doit être accepté."
+
+    $missingTitleProjectRoot = New-TemporaryProject -Name "missing-title"
+    $taskPath = Join-Path $missingTitleProjectRoot "docs/tasks/milestone_000/0002_controler_tache_suivante.md"
+    (Get-Content -Raw -Encoding UTF8 -LiteralPath $taskPath).Replace("# T-002 - ", "# ") |
+        Set-Content -Encoding UTF8 -LiteralPath $taskPath
+    $missingTitleResult = Invoke-Validator -ProjectRoot $missingTitleProjectRoot
+    Assert-ExitCode -Actual $missingTitleResult.ExitCode -Expected 1 -Message "Un titre de tâche manquant doit être refusé."
+    Assert-OutputContains `
+        -Output $missingTitleResult.Output `
+        -Expected "Titre de tâche invalide ou absent: 0002_controler_tache_suivante.md" `
+        -Message "Le titre manquant doit produire un message ciblé."
+
+    $incoherentTaskNumberProjectRoot = New-TemporaryProject -Name "incoherent-task-number"
+    $taskPath = Join-Path $incoherentTaskNumberProjectRoot "docs/tasks/milestone_000/0002_controler_tache_suivante.md"
+    (Get-Content -Raw -Encoding UTF8 -LiteralPath $taskPath).
+        Replace("# T-002 - ", "# T-003 - ").
+        Replace("### T-002 - ", "### T-003 - ") |
+        Set-Content -Encoding UTF8 -LiteralPath $taskPath
+    $incoherentTaskNumberResult = Invoke-Validator -ProjectRoot $incoherentTaskNumberProjectRoot
+    Assert-ExitCode -Actual $incoherentTaskNumberResult.ExitCode -Expected 1 -Message "Un titre dont le numéro diverge du fichier doit être refusé."
+    Assert-OutputContains `
+        -Output $incoherentTaskNumberResult.Output `
+        -Expected "Titre de tâche invalide ou absent: 0002_controler_tache_suivante.md" `
+        -Message "Le numéro incohérent doit produire un message ciblé."
+
+    $journalIgnoredProjectRoot = New-TemporaryProject -Name "journal-ignore"
+    "# T-999 - Entrée de journal volontairement hors convention`n" |
+        Set-Content -Encoding UTF8 -LiteralPath (Join-Path $journalIgnoredProjectRoot "docs/tasks/milestone_000/journal.md")
+    $journalIgnoredResult = Invoke-Validator -ProjectRoot $journalIgnoredProjectRoot
+    if ($journalIgnoredResult.ExitCode -ne 0) {
+        throw "Le fichier journal.md doit être ignoré comme tâche. Sortie du validateur: $($journalIgnoredResult.Output)"
+    }
+    Assert-ExitCode -Actual $journalIgnoredResult.ExitCode -Expected 0 -Message "Le fichier journal.md doit être ignoré comme tâche."
 
     $invalidMilestoneProjectRoot = New-TemporaryProject -Name "invalid-milestone-number"
     Rename-Item -LiteralPath (Join-Path $invalidMilestoneProjectRoot "docs/tasks/milestone_000") -NewName "milestone_00"
