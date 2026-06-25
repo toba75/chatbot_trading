@@ -1,0 +1,56 @@
+{
+  "schema_version": "1.0",
+  "strategy_id": "STRAT-000017",
+  "strategy_version_id": "SVER-000006",
+  "spec_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "status": "COMPILABLE",
+  "rules": [
+    {
+      "rule_id": "STRAT-000017-RULE-001",
+      "kind": "SIGNAL",
+      "expression": "close_200d > close_50d",
+      "origin": "SOURCE",
+      "evidence_refs": ["CLM-004812@3"],
+      "deterministic": true
+    }
+  ],
+  "parameters": [
+    {
+      "name": "lookback_fast",
+      "unit": "trading_day",
+      "value": 50,
+      "origin": "DESIGN_CHOICE",
+      "blocking": true,
+      "resolution_status": "RESOLVED"
+    },
+    {
+      "name": "lookback_slow",
+      "unit": "trading_day",
+      "value": 200,
+      "origin": "DESIGN_CHOICE",
+      "blocking": true,
+      "resolution_status": "RESOLVED"
+    }
+  ],
+  "constraints": [
+    {
+      "name": "max_leverage",
+      "value": 1.0,
+      "origin": "USER_CONSTRAINT"
+    }
+  ],
+  "data_requirements": [
+    {
+      "name": "daily_adjusted_close",
+      "frequency": "daily",
+      "point_in_time": true
+    }
+  ],
+  "validation_plan": {
+    "walk_forward": "anchored",
+    "costs": "commissions_spread_slippage",
+    "out_of_sample_policy": "defined_before_execution"
+  },
+  "evidence_refs": ["CLM-004812@3"],
+  "created_at": "2026-06-21T10:00:00Z"
+}
