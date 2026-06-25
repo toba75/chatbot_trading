@@ -29,6 +29,14 @@ from app.contracts.evidence_claims import (
     EvidenceRef,
     VerifiedClaimRef,
 )
+from app.contracts.event_envelope import (
+    ALLOWED_EVENT_PRODUCER_CONTEXTS,
+    ALLOWED_PAST_EVENT_SUFFIXES,
+    SUPPORTED_EVENT_VERSIONS,
+    EventEnvelope,
+    EventIdempotenceDecision,
+    EventIdempotenceLedger,
+)
 from app.contracts.source_references import (
     ACCEPTED_CANONICAL_VERSION_STATUS,
     ALLOWED_CANONICAL_VERSION_STATUSES,
@@ -55,7 +63,9 @@ __all__ = [
     "ALLOWED_DOMAIN_IDENTIFIER_PREFIXES",
     "ALLOWED_CANONICAL_VERSION_STATUSES",
     "ALLOWED_EVIDENCE_RELATIONS",
+    "ALLOWED_EVENT_PRODUCER_CONTEXTS",
     "ALLOWED_EXPERIMENT_RESULT_STATUSES",
+    "ALLOWED_PAST_EVENT_SUFFIXES",
     "ALLOWED_VERIFIED_CLAIM_STATUSES",
     "ALLOWED_RESEARCH_SUPPORT_STATUSES",
     "ALLOWED_STRATEGY_SNAPSHOT_STATUSES",
@@ -68,6 +78,9 @@ __all__ = [
     "DomainIdentifier",
     "EVIDENCE_CLAIM_SCHEMA_VERSIONS",
     "EvidenceRef",
+    "EventEnvelope",
+    "EventIdempotenceDecision",
+    "EventIdempotenceLedger",
     "ExperimentResult",
     "FAILED_EXPERIMENT_STATUS",
     "INSUFFICIENT_EVIDENCE_STATUS",
@@ -80,6 +93,7 @@ __all__ = [
     "STRATEGY_EXPERIMENT_SCHEMA_VERSIONS",
     "SUPPORTS_DIRECTLY_RELATION",
     "SUPPORTED_STATUS",
+    "SUPPORTED_EVENT_VERSIONS",
     "SourceLocator",
     "SourceLocatorValidationPolicy",
     "StrategySnapshot",
