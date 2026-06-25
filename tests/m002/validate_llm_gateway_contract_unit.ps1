@@ -20,6 +20,7 @@ from app.platform.llm_gateway import (
     InferenceMessage,
     InferenceRequest,
     LLMGatewayContractError,
+    LLMGatewayInferenceError,
     OpenAICompatibleLocalLanguageModelGateway,
     OpenAICompatibleResponse,
     build_openai_chat_completion_request,
@@ -75,10 +76,31 @@ def assert_raises_code(expected_code, callback):
         raise AssertionError(f"Erreur attendue absente: {expected_code}")
 
 
+def assert_gateway_error_code(expected_code, callback):
+    try:
+        callback()
+    except (LLMGatewayContractError, LLMGatewayInferenceError) as exc:
+        if exc.code != expected_code:
+            raise AssertionError(f"Code erreur inattendu: {exc.code}, attendu: {expected_code}")
+    else:
+        raise AssertionError(f"Erreur attendue absente: {expected_code}")
+
+
 assert_raises_code(
     "LLM_GATEWAY_TLS_REQUIRED",
     lambda: GatewayConfiguration(
         base_url="http://spark-inference.test:8443/v1",
+        served_model="gemma-research",
+        api_key="unit-secret-key",
+        tls_ca_bundle_path="C:/spark/ca.pem",
+        timeout_seconds=9,
+    ),
+)
+
+assert_raises_code(
+    "LLM_GATEWAY_SPARK_ENDPOINT_REQUIRED",
+    lambda: GatewayConfiguration(
+        base_url="https://attacker.example:443/v1",
         served_model="gemma-research",
         api_key="unit-secret-key",
         tls_ca_bundle_path="C:/spark/ca.pem",
@@ -126,6 +148,27 @@ if payload["response_format"] != {
 if payload["temperature"] != 0 or payload["top_p"] != 1:
     raise AssertionError(f"Paramètres de sampling absents du payload: {payload}")
 
+mutable_sampling_parameters = {"temperature": 0, "top_p": 1}
+immutable_request = InferenceRequest(
+    messages=(InferenceMessage(role="user", content="Répondre en JSON."),),
+    output_schema=OUTPUT_SCHEMA,
+    schema_name="answer_schema",
+    schema_version="answer_schema.v1",
+    trace_id="trace-unit-immutable",
+    request_id="request-unit-immutable",
+    idempotency_key="idem-unit-immutable",
+    prompt_id="prompt-unit",
+    prompt_version="1",
+    sampling_parameters=mutable_sampling_parameters,
+)
+mutable_sampling_parameters["model"] = "fallback-model"
+immutable_payload = build_openai_chat_completion_request(
+    configuration=configuration,
+    request=immutable_request,
+)
+if immutable_payload["model"] != "gemma-research":
+    raise AssertionError(f"Paramètres de sampling mutables: {immutable_payload}")
+
 masked = configuration.masked_for_logs()
 if masked["api_key"] != "<secret-masked>":
     raise AssertionError(f"Secret non masqué: {masked}")
@@ -134,9 +177,9 @@ if "unit-secret-key" in repr(configuration) or "unit-secret-key" in str(masked):
 
 
 class FixedTransport:
-    def __init__(self, payload):
+    def __init__(self, payload, headers=None):
         self.payload = payload
-        self.headers = {"x-request-id": "spark-unit"}
+        self.headers = {"x-request-id": "spark-unit"} if headers is None else headers
         self.call = None
 
     def post_chat_completion(
@@ -196,6 +239,60 @@ if result.provenance.schema_version != "answer_schema.v1":
     raise AssertionError(f"schema_version absent: {result.provenance}")
 if result.provenance.sampling_parameters != {"temperature": 0, "top_p": 1}:
     raise AssertionError(f"sampling_parameters absents: {result.provenance}")
+
+header_provenance_transport = FixedTransport(
+    {
+        "id": "chatcmpl-unit",
+        "model": "gemma-research",
+        "choices": [{"message": {"content": '{"answer":"ok"}'}}],
+    },
+    headers={
+        "x-request-id": "spark-unit",
+        "x-model-revision": "gemma-4-header-revision",
+        "x-runtime-version": "vllm-openai-header",
+    },
+)
+header_provenance_result = OpenAICompatibleLocalLanguageModelGateway(
+    configuration=configuration,
+    transport=header_provenance_transport,
+    retry_policy=GatewayRetryPolicy(max_retries_before_first_token=0),
+    circuit_breaker=GatewayCircuitBreaker(
+        policy=GatewayCircuitBreakerPolicy(failure_threshold=3, open_seconds=30),
+        clock=ManualClock(),
+    ),
+    failure_metric_recorder=GatewayFailureMetricRecorder(
+        observability_collector=InMemoryObservabilityCollector(),
+    ),
+).infer(request)
+if header_provenance_result.provenance.model_revision != "gemma-4-header-revision":
+    raise AssertionError(f"model_revision header ignorée: {header_provenance_result.provenance}")
+if header_provenance_result.provenance.runtime_version != "vllm-openai-header":
+    raise AssertionError(f"runtime_version header ignorée: {header_provenance_result.provenance}")
+
+schema_violation_transport = FixedTransport(
+    {
+        "id": "chatcmpl-unit",
+        "model": "gemma-research",
+        "model_revision": "gemma-4-revision-unit",
+        "runtime_version": "vllm-openai-unit",
+        "choices": [{"message": {"content": '{"answer":"ok","unexpected":"exfil"}'}}],
+    }
+)
+assert_gateway_error_code(
+    "LLM_RESPONSE_SCHEMA_INVALID",
+    lambda: OpenAICompatibleLocalLanguageModelGateway(
+        configuration=configuration,
+        transport=schema_violation_transport,
+        retry_policy=GatewayRetryPolicy(max_retries_before_first_token=0),
+        circuit_breaker=GatewayCircuitBreaker(
+            policy=GatewayCircuitBreakerPolicy(failure_threshold=3, open_seconds=30),
+            clock=ManualClock(),
+        ),
+        failure_metric_recorder=GatewayFailureMetricRecorder(
+            observability_collector=InMemoryObservabilityCollector(),
+        ),
+    ).infer(request),
+)
 
 missing_revision_transport = FixedTransport(
     {

@@ -148,6 +148,14 @@ def add_gateway_environment_line(document: str, line: str) -> str:
     return document[:marker_index] + f"      {line}\n" + document[marker_index:]
 
 
+def replace_gateway_base_url(document: str, value: str) -> str:
+    current = '      GEMMA_BASE_URL: "${GEMMA_BASE_URL?GEMMA_BASE_URL requis}"'
+    replacement = f'      GEMMA_BASE_URL: "{value}"'
+    if current not in document:
+        raise AssertionError("Variable GEMMA_BASE_URL absente du fixture")
+    return document.replace(current, replacement)
+
+
 def add_ui_environment_line(document: str, line: str) -> str:
     ui_header = "  ui:\n"
     ui_index = document.find(ui_header)
@@ -223,6 +231,11 @@ assert_boundary_error("navigateur direct au Spark interdit", firewall_payload=fi
 assert_boundary_error(
     "GEMMA_TLS_VERIFY",
     compose_document=add_gateway_environment_line(valid_compose_document, 'GEMMA_TLS_VERIFY: "false"'),
+)
+
+assert_boundary_error(
+    "Endpoint Spark invalide pour llm-gateway",
+    compose_document=replace_gateway_base_url(valid_compose_document, "https://api.openai.com/v1"),
 )
 
 assert_boundary_error(

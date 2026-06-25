@@ -8,9 +8,11 @@ $pythonCode = @'
 from __future__ import annotations
 
 import sys
+import urllib.error
 
 sys.path.insert(0, sys.argv[1])
 
+import app.platform.llm_gateway as gateway_module
 from app.platform.llm_gateway import (
     GatewayCircuitBreaker,
     GatewayCircuitBreakerPolicy,
@@ -23,10 +25,13 @@ from app.platform.llm_gateway import (
     LLMGatewayInferenceError,
     OpenAICompatibleLocalLanguageModelGateway,
     OpenAICompatibleResponse,
+    SparkAuthenticationError,
     SparkFirstTokenTimeoutError,
+    SparkHTTPStatusError,
     SparkStreamingInterruptedError,
     SparkTLSCertificateInvalidError,
     SparkUnavailableError,
+    UrllibOpenAICompatibleTransport,
     classify_gateway_failure,
 )
 from app.platform.observability import InMemoryObservabilityCollector
@@ -164,6 +169,14 @@ classification = classify_gateway_failure(SparkTLSCertificateInvalidError("certi
 if classification.code != "LLM_TLS_CERTIFICATE_INVALID" or classification.retryable or not classification.before_first_token:
     raise AssertionError(f"Classification TLS invalide: {classification}")
 
+classification = classify_gateway_failure(SparkAuthenticationError("authentification Spark refusée"))
+if classification.code != "LLM_AUTHENTICATION_FAILED" or classification.retryable or not classification.before_first_token:
+    raise AssertionError(f"Classification authentification invalide: {classification}")
+
+classification = classify_gateway_failure(SparkHTTPStatusError("erreur HTTP Spark", status_code=503))
+if classification.code != "LLM_SPARK_HTTP_ERROR" or not classification.retryable or not classification.before_first_token:
+    raise AssertionError(f"Classification HTTP Spark invalide: {classification}")
+
 classification = classify_gateway_failure(
     SparkStreamingInterruptedError("flux interrompu", partial_output="fragment secret")
 )
@@ -235,6 +248,34 @@ if len(transport.calls) != 1:
 if "réponse partielle" in str(failure):
     raise AssertionError("La sortie partielle ne doit pas apparaître dans le message.")
 
+partial_finish_transport = ScriptedTransport([
+    OpenAICompatibleResponse(
+        payload={
+            "id": "chatcmpl-unit-t006",
+            "model": "gemma-research",
+            "model_revision": "gemma-4-revision-unit-t006",
+            "runtime_version": "vllm-openai-unit-t006",
+            "choices": [{"finish_reason": "length", "message": {"content": '{"answer":"ok"}'}}],
+        },
+        headers={"x-request-id": "spark-unit-t006"},
+    )
+])
+partial_finish_gateway = OpenAICompatibleLocalLanguageModelGateway(
+    configuration=valid_configuration(),
+    transport=partial_finish_transport,
+    retry_policy=GatewayRetryPolicy(max_retries_before_first_token=0),
+    circuit_breaker=GatewayCircuitBreaker(
+        policy=GatewayCircuitBreakerPolicy(failure_threshold=3, open_seconds=30),
+        clock=ManualClock(),
+    ),
+    failure_metric_recorder=GatewayFailureMetricRecorder(
+        observability_collector=InMemoryObservabilityCollector(),
+    ),
+)
+failure = assert_inference_error("LLM_PARTIAL_OUTPUT", lambda: partial_finish_gateway.infer(valid_request()))
+if failure.publishable:
+    raise AssertionError("Un finish_reason length ne doit pas être publiable.")
+
 
 gateway, transport, recorder, breaker = gateway_for(
     [SparkUnavailableError("spark indisponible avec secret-unit-t006")],
@@ -258,6 +299,63 @@ if failure.retryable:
     raise AssertionError("TLS invalide ne doit pas être retryable.")
 if len(transport.calls) != 1:
     raise AssertionError(f"Retry TLS interdit: {len(transport.calls)}")
+
+
+class RaisingUrlopen:
+    def __init__(self, error):
+        self.error = error
+
+    def __call__(self, *args, **kwargs):
+        raise self.error
+
+
+def assert_transport_error(expected_type, callback) -> None:
+    try:
+        callback()
+    except expected_type:
+        return
+    except BaseException as exc:
+        raise AssertionError(f"Erreur transport inattendue: {type(exc).__name__}: {exc}") from exc
+    raise AssertionError(f"Erreur transport attendue absente: {expected_type.__name__}")
+
+
+original_urlopen = gateway_module.urllib.request.urlopen
+original_context = gateway_module.ssl.create_default_context
+try:
+    gateway_module.ssl.create_default_context = lambda cafile: object()
+    gateway_module.urllib.request.urlopen = RaisingUrlopen(
+        urllib.error.HTTPError(
+            url="https://spark-inference.test:8443/v1/chat/completions",
+            code=401,
+            msg="Unauthorized",
+            hdrs={},
+            fp=None,
+        )
+    )
+    assert_transport_error(
+        SparkAuthenticationError,
+        lambda: UrllibOpenAICompatibleTransport().post_chat_completion(
+            base_url="https://spark-inference.test:8443/v1",
+            headers={},
+            body={"model": "gemma-research"},
+            timeout_seconds=1,
+            tls_ca_bundle_path="C:/spark/ca.pem",
+        ),
+    )
+finally:
+    gateway_module.urllib.request.urlopen = original_urlopen
+    gateway_module.ssl.create_default_context = original_context
+
+assert_transport_error(
+    SparkTLSCertificateInvalidError,
+    lambda: UrllibOpenAICompatibleTransport().post_chat_completion(
+        base_url="https://spark-inference.test:8443/v1",
+        headers={},
+        body={"model": "gemma-research"},
+        timeout_seconds=1,
+        tls_ca_bundle_path="C:/spark/ca-file-does-not-exist.pem",
+    ),
+)
 
 
 gateway, transport, recorder, breaker = gateway_for(

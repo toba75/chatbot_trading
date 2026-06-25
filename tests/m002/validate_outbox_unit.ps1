@@ -8,6 +8,8 @@ $pythonCode = @'
 from __future__ import annotations
 
 import sys
+import threading
+import time
 
 sys.path.insert(0, sys.argv[1])
 
@@ -16,6 +18,7 @@ from app.platform.event_bus import (
     IdempotentEventConsumer,
     InMemoryProcessedEventRegistry,
     InMemoryTransactionalOutbox,
+    OutboxEntry,
     OutboxMessageStatus,
     ProducerStateMutation,
 )
@@ -93,6 +96,7 @@ if tuple(entry.event.event_id for entry in outbox.pending_events()) != (
     "EVT-M002-OUTBOX-0003",
 ):
     raise AssertionError("Un evenement delivered ne doit plus etre pending.")
+assert_raises("transition outbox invalide", lambda: outbox.mark_failed(event_v1.event_id, "delivered must stay delivered"))
 
 outbox.mark_failed(event_v2.event_id, "consumer unavailable")
 failed_entry = outbox.entry_for(event_v2.event_id)
@@ -100,6 +104,7 @@ if failed_entry.status is not OutboxMessageStatus.FAILED:
     raise AssertionError("mark_failed doit rendre le statut failed observable.")
 if failed_entry.failure_reason != "consumer unavailable":
     raise AssertionError(f"La raison d'echec doit etre explicite: {failed_entry.failure_reason}")
+assert_raises("transition outbox invalide", lambda: outbox.mark_delivered(event_v2.event_id))
 
 assert_raises("event_id outbox duplique", lambda: outbox.append_in_transaction(mutation_for(event_v3), event_v3))
 assert_raises("event outbox inconnu", lambda: outbox.mark_delivered("EVT-M002-OUTBOX-9999"))
@@ -117,6 +122,20 @@ assert_raises(
     lambda: InMemoryTransactionalOutbox.empty().append_in_transaction(
         state_mutation=mismatched_mutation,
         event=event_v1,
+    ),
+)
+assert_raises(
+    "aggregate_version incoherente",
+    lambda: InMemoryTransactionalOutbox(
+        entries=(
+            OutboxEntry(
+                sequence=1,
+                state_mutation=mismatched_mutation,
+                event=event_v1,
+                status=OutboxMessageStatus.PENDING,
+                failure_reason=None,
+            ),
+        )
     ),
 )
 assert_raises(
@@ -167,6 +186,46 @@ if registry.duplicate_event_ids() != (event_v1.event_id,):
     raise AssertionError(f"event_id duplique absent: {registry.duplicate_event_ids()}")
 assert_raises("event_id invalide", lambda: InMemoryProcessedEventRegistry.from_processed_event_ids(("EXP-000001",)))
 assert_raises("event invalide", lambda: consumer.consume(event={"event_id": event_v1.event_id}, handler=lambda event: None))
+
+concurrent_registry = InMemoryProcessedEventRegistry.empty()
+concurrent_consumer = IdempotentEventConsumer(processed_events=concurrent_registry)
+handler_entries = []
+handler_entered = threading.Event()
+
+
+def slow_handler(event: EventEnvelope) -> None:
+    handler_entries.append(event.event_id)
+    handler_entered.set()
+    time.sleep(0.2)
+
+
+decisions = []
+errors = []
+
+
+def consume_concurrently() -> None:
+    try:
+        decisions.append(concurrent_consumer.consume(event=event_v3, handler=slow_handler))
+    except BaseException as exc:
+        errors.append(exc)
+
+
+first_thread = threading.Thread(target=consume_concurrently)
+second_thread = threading.Thread(target=consume_concurrently)
+first_thread.start()
+if not handler_entered.wait(timeout=2):
+    raise AssertionError("Le premier handler concurrent n'a pas démarré.")
+second_thread.start()
+first_thread.join(timeout=3)
+second_thread.join(timeout=3)
+if first_thread.is_alive() or second_thread.is_alive():
+    raise AssertionError("Consommation concurrente bloquée.")
+if errors:
+    raise AssertionError(f"Erreur concurrente inattendue: {errors}")
+if handler_entries != [event_v3.event_id]:
+    raise AssertionError(f"Le handler concurrent doit être appelé une seule fois: {handler_entries}")
+if sorted((decision.applied, decision.duplicate) for decision in decisions) != [(False, True), (True, False)]:
+    raise AssertionError(f"Décisions concurrentes invalides: {decisions}")
 
 print("Tests unitaires outbox idempotente M-002: OK")
 '@

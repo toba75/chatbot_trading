@@ -17,18 +17,20 @@ from app.platform.local_compose import parse_local_compose_document, validate_lo
 
 BASE_SERVICES = {
     "edge-gateway": {
-        "image": "caddy:2.8.4-alpine",
+        "image": "caddy@sha256:" + "a" * 64,
         "ports": ["127.0.0.1:${OST_EDGE_HTTPS_PORT?OST_EDGE_HTTPS_PORT requis}:443"],
         "networks": ["edge", "core"],
     },
     "ui": {
         "image": "ostrading/ui:0.0.0-m002",
+        "command": ["python", "-m", "app.platform.local_runtime", "serve-http", "ui", "8081"],
         "expose": ["8081"],
         "networks": ["core"],
         "environment": {"UI_API_URL": "${UI_API_URL?UI_API_URL requis}"},
     },
     "orchestrator-api": {
         "image": "ostrading/orchestrator-api:0.0.0-m002",
+        "command": ["python", "-m", "app.platform.local_runtime", "serve-http", "orchestrator-api", "8080"],
         "expose": ["8080"],
         "networks": ["core"],
         "environment": {
@@ -39,6 +41,7 @@ BASE_SERVICES = {
     },
     "llm-gateway": {
         "image": "ostrading/llm-gateway:0.0.0-m002",
+        "command": ["python", "-m", "app.platform.local_runtime", "serve-http", "llm-gateway", "8090"],
         "expose": ["8090"],
         "networks": ["core", "spark-egress"],
         "environment": {
@@ -50,7 +53,7 @@ BASE_SERVICES = {
         "secrets": ["gemma_api_key", "spark_ca"],
     },
     "postgres": {
-        "image": "postgres:17.2-alpine",
+        "image": "postgres@sha256:" + "b" * 64,
         "expose": ["5432"],
         "networks": ["core"],
         "environment": {
@@ -61,39 +64,46 @@ BASE_SERVICES = {
         "secrets": ["postgres_password"],
     },
     "qdrant": {
-        "image": "qdrant/qdrant:v1.13.4",
+        "image": "qdrant/qdrant@sha256:" + "c" * 64,
         "expose": ["6333"],
         "networks": ["core"],
     },
     "granite-docling": {
         "image": "ostrading/granite-docling:0.0.0-m002",
+        "command": ["python", "-m", "app.platform.local_runtime", "serve-http", "granite-docling", "8001"],
         "expose": ["8001"],
         "networks": ["core"],
     },
     "embedding-service": {
         "image": "ostrading/embedding-service:0.0.0-m002",
+        "command": ["python", "-m", "app.platform.local_runtime", "serve-http", "embedding-service", "8101"],
         "expose": ["8101"],
         "networks": ["core"],
     },
     "reranker-service": {
         "image": "ostrading/reranker-service:0.0.0-m002",
+        "command": ["python", "-m", "app.platform.local_runtime", "serve-http", "reranker-service", "8102"],
         "expose": ["8102"],
         "networks": ["core"],
     },
     "worker-documents": {
         "image": "ostrading/worker-documents:0.0.0-m002",
+        "command": ["python", "-m", "app.platform.local_runtime", "run-worker", "worker-documents"],
         "networks": ["core"],
     },
     "worker-research": {
         "image": "ostrading/worker-research:0.0.0-m002",
+        "command": ["python", "-m", "app.platform.local_runtime", "run-worker", "worker-research"],
         "networks": ["core"],
     },
     "worker-backtest": {
         "image": "ostrading/worker-backtest:0.0.0-m002",
+        "command": ["python", "-m", "app.platform.local_runtime", "run-worker", "worker-backtest"],
         "networks": ["core"],
     },
     "backtest-engine": {
         "image": "ostrading/backtest-engine:0.0.0-m002",
+        "command": ["python", "-m", "app.platform.local_runtime", "serve-http", "backtest-engine", "8200"],
         "expose": ["8200"],
         "networks": ["core"],
     },
@@ -102,6 +112,11 @@ BASE_SERVICES = {
 
 def service_lines(service_id, definition):
     lines = [f"  {service_id}:", f"    image: {definition['image']}"]
+    command = definition.get("command", [])
+    if command:
+        lines.append("    command:")
+        for value in command:
+            lines.append(f'      - "{value}"')
     for section in ("ports", "expose", "networks", "secrets"):
         values = definition.get(section, [])
         if values:
@@ -192,6 +207,16 @@ assert_raises(
 assert_raises(
     "pour service qdrant",
     valid_compose({"qdrant": {"image": "qdrant/qdrant:latest"}}),
+)
+
+assert_raises(
+    "Image tierce sans digest",
+    valid_compose({"postgres": {"image": "postgres:17.2-alpine"}}),
+)
+
+assert_raises(
+    "Commande Compose non exécutable",
+    valid_compose({"llm-gateway": {"command": ["python", "-m", "app.platform.module_absent"]}}),
 )
 
 assert_raises(

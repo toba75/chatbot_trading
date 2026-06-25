@@ -18,6 +18,7 @@ from app.platform.job_runtime import (
     JOB_RUNTIME_CATALOG,
     JobIdempotenceKey,
     JobPriority,
+    JobRecord,
     JobRequest,
     JobStatus,
 )
@@ -228,6 +229,56 @@ assert_raises("worker non appelable", lambda: InMemoryJobWorkerRegistry.from_wor
     workers={"VERIFY_RESPONSE": "not-callable"},
     catalog=JOB_RUNTIME_CATALOG,
 ))
+
+failing_queue = InMemoryJobQueue.empty(catalog=JOB_RUNTIME_CATALOG)
+failing_submission = failing_queue.submit(
+    request=request_for("VERIFY_RESPONSE", JobPriority.P0, "f" * 64),
+    recalculate=False,
+)
+failing_registry = InMemoryJobWorkerRegistry.from_workers(
+    workers={"VERIFY_RESPONSE": lambda job: (_ for _ in ()).throw(RuntimeError("worker verification failed"))},
+    catalog=JOB_RUNTIME_CATALOG,
+)
+try:
+    failing_queue.execute_next(worker_registry=failing_registry)
+except RuntimeError as exc:
+    if str(exc) != "worker verification failed":
+        raise AssertionError(f"Erreur worker altérée: {exc}")
+else:
+    raise AssertionError("Erreur worker attendue absente.")
+failed_job = failing_queue.job_for(failing_submission.job.job_id)
+if failed_job.status is not JobStatus.FAILED:
+    raise AssertionError(f"Un worker en échec doit marquer le job failed: {failed_job.status}")
+if failed_job.failure_reason != "worker verification failed":
+    raise AssertionError(f"Raison d'échec worker absente: {failed_job.failure_reason}")
+retry_after_failure = failing_queue.submit(
+    request=request_for("VERIFY_RESPONSE", JobPriority.P0, "f" * 64),
+    recalculate=False,
+)
+if not retry_after_failure.created:
+    raise AssertionError("Un échec ne doit pas bloquer indéfiniment la clé d'idempotence.")
+
+duplicate_active_request = request_for("VERIFY_RESPONSE", JobPriority.P1, "d" * 64)
+duplicate_active_job_1 = JobRecord(
+    sequence=1,
+    job_id="JOB-M002-100001",
+    request=duplicate_active_request,
+    status=JobStatus.PENDING,
+    result=None,
+    failure_reason=None,
+)
+duplicate_active_job_2 = JobRecord(
+    sequence=2,
+    job_id="JOB-M002-100002",
+    request=duplicate_active_request,
+    status=JobStatus.RUNNING,
+    result=None,
+    failure_reason=None,
+)
+assert_raises(
+    "clé d'idempotence active dupliquée",
+    lambda: InMemoryJobQueue(catalog=JOB_RUNTIME_CATALOG, jobs=(duplicate_active_job_1, duplicate_active_job_2)),
+)
 
 print("Tests unitaires file de jobs idempotente M-002: OK")
 '@

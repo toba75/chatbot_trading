@@ -62,7 +62,7 @@ Les contrats M-001 restent les contrats de communication intercontextes. ``platf
 | PLAT-004 - Outbox transactionnelle | Les $($eAcute)v$($eAcute)nements intercontextes sont $($eAcute)crits dans l'outbox avec l'$($eAcute)tat producteur. | Les consommateurs sont idempotents; les jobs ne sont pas des $($eAcute)v$($eAcute)nements de domaine. | T-007 | DDD-ADR-006; DDD-ADR-008 |
 | PLAT-005 - Jobs techniques prioris$($eAcute)s | La file de jobs ex$($eAcute)cute les unit$($eAcute)s techniques avec priorit$($eAcute) et idempotence. | Un job ne porte pas de fait de domaine et ne remplace pas un $($eAcute)v$($eAcute)nement publi$($eAcute). | T-008 | DDD-ADR-006 |
 | PLAT-006 - Pannes explicites d'inf$($eAcute)rence | Une indisponibilit$($eAcute) Spark retourne ``LLM_UNAVAILABLE`` ou une erreur TLS explicite. | Aucun fallback silencieux n'est autoris$($eAcute); aucune publication partielle apr$($eGrave)s streaming interrompu. | T-006 | ADR-008; ADR-009 |
-| PLAT-007 - Observabilit$($eAcute) technique | Les logs et m$($eAcute)triques couvrent latence, TLS, retries et circuit breaker. | Les prompts, preuves et r$($eAcute)ponses complets ne sont pas journalis$($eAcute)s. | T-010 | ADR-008; ADR-009 |
+| PLAT-007 - Observabilit$($eAcute) technique | Les logs et m$($eAcute)triques couvrent disponibilit$($eAcute) Spark, DNS, TCP, TLS, authentification, latence, TTFT, retries et circuit breaker. | Les prompts, preuves et r$($eAcute)ponses complets ne sont pas journalis$($eAcute)s. | T-010 | ADR-008; ADR-009 |
 | PLAT-008 - Commandes de validation | La sp$($eAcute)cification est valid$($eAcute)e par les commandes M-002, test et lint. | Aucun GREEN n'est implicite; chaque commande doit $($eCircumflex)tre ex$($eAcute)cut$($eAcute)e explicitement. | T-002, T-011 | ADR-010 |
 
 ## Commandes de validation
@@ -193,6 +193,22 @@ try {
     $silentFallbackResult = Invoke-M002Validator -SpecPath $silentFallbackSpecPath
     Assert-ExitCode -Actual $silentFallbackResult.ExitCode -Expected 1 -Message "Un fallback silencieux doit $([char] 0x00EA)tre refus$($eAcute)."
     Assert-OutputContains -Output $silentFallbackResult.Output -Expected "Fallback silencieux interdit" -Message "Le fallback silencieux doit $([char] 0x00EA)tre nomm$($eAcute)."
+
+    $requiredObservabilityTerms = @(
+        "disponibilit$($eAcute) Spark",
+        "DNS",
+        "TCP",
+        "authentification",
+        "TTFT"
+    )
+    foreach ($term in $requiredObservabilityTerms) {
+        $weakenedObservabilitySpecPath = New-TemporarySpec `
+            -Name ("missing-observability-" + ($term -replace "[^A-Za-z0-9]", "-")) `
+            -Content ($validContent.Replace("$term, ", "").Replace(", $term", ""))
+        $weakenedObservabilityResult = Invoke-M002Validator -SpecPath $weakenedObservabilitySpecPath
+        Assert-ExitCode -Actual $weakenedObservabilityResult.ExitCode -Expected 1 -Message "Une observabilit$($eAcute) PLAT-007 incompl$($eGrave)te doit $([char] 0x00EA)tre refus$($eAcute)e: $term."
+        Assert-OutputContains -Output $weakenedObservabilityResult.Output -Expected "Dimension d'observabilit$($eAcute) absente: $term" -Message "La dimension d'observabilit$($eAcute) absente doit $([char] 0x00EA)tre nomm$($eAcute)e."
+    }
 
     $hardcodedEndpointSpecPath = New-TemporarySpec `
         -Name "hardcoded-endpoint" `

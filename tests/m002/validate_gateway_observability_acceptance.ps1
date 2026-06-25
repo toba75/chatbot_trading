@@ -27,6 +27,7 @@ from app.platform.llm_gateway import (
     SparkFirstTokenTimeoutError,
     SparkStreamingInterruptedError,
     SparkTLSCertificateInvalidError,
+    SparkUnavailableError,
 )
 from app.platform.observability import InMemoryObservabilityCollector
 
@@ -109,11 +110,11 @@ def success_response() -> OpenAICompatibleResponse:
             "runtime_version": "vllm-openai-t010",
             "choices": [{"message": {"content": json.dumps({"answer": RESPONSE_CANARY})}}],
         },
-        headers={"x-request-id": "spark-request-t010"},
+        headers={"x-request-id": "spark-request-t010", "x-ttft-ms": "12.5"},
     )
 
 
-def gateway_for(outcomes):
+def gateway_for(outcomes, *, failure_threshold: int = 3):
     collector = InMemoryObservabilityCollector()
     recorder = GatewayFailureMetricRecorder(observability_collector=collector)
     gateway = OpenAICompatibleLocalLanguageModelGateway(
@@ -122,7 +123,7 @@ def gateway_for(outcomes):
         retry_policy=GatewayRetryPolicy(max_retries_before_first_token=1),
         circuit_breaker=GatewayCircuitBreaker(
             policy=GatewayCircuitBreakerPolicy(
-                failure_threshold=3,
+                failure_threshold=failure_threshold,
                 open_seconds=30,
             ),
             clock=ManualClock(),
@@ -195,6 +196,22 @@ for metric_name in ("llm_gateway_ttft_ms", "llm_gateway_payload_bytes"):
     if metric_name not in success_metric_names:
         raise AssertionError(f"Métrique succès absente: {metric_name}")
 
+gateway, collector = gateway_for([
+    OpenAICompatibleResponse(
+        payload={
+            "id": "chatcmpl-t010",
+            "model": "gemma-research-t010",
+            "model_revision": "gemma-4-revision-t010",
+            "runtime_version": "vllm-openai-t010",
+            "choices": [{"message": {"content": json.dumps({"answer": "ok"})}}],
+        },
+        headers={"x-request-id": "spark-request-t010"},
+    )
+])
+gateway.infer(request("trace-t010-no-ttft"))
+if "llm_gateway_ttft_ms" in {metric.name for metric in collector.metrics()}:
+    raise AssertionError("TTFT ne doit pas être émis quand le transport ne le mesure pas explicitement.")
+
 
 # Given un appel d'inférence échoue après validation TLS.
 # When le gateway émet logs et métriques.
@@ -213,7 +230,12 @@ gateway, collector = gateway_for([
 ])
 gateway.infer(request("trace-t010-timeout"))
 assert_observability_safe(collector, expected_status="SUCCEEDED", trace_id="trace-t010-timeout")
-if "llm_gateway_retry_before_first_token_total" not in {metric.name for metric in collector.metrics()}:
+retry_metric_values = [
+    metric.value
+    for metric in collector.metrics()
+    if metric.trace_id == "trace-t010-timeout" and metric.name == "llm_gateway_retry_before_first_token_total"
+]
+if retry_metric_values != [1.0]:
     raise AssertionError("Métrique de retry avant premier token absente.")
 
 
@@ -227,6 +249,36 @@ expect_failure("LLM_PARTIAL_OUTPUT", lambda: gateway.infer(request("trace-t010-p
 assert_observability_safe(collector, expected_status="LLM_PARTIAL_OUTPUT", trace_id="trace-t010-partial")
 if "llm_gateway_output_interrupted_total" not in {metric.name for metric in collector.metrics()}:
     raise AssertionError("Métrique de sortie interrompue absente.")
+
+
+# Given le Spark renvoie un contenu JSON invalide.
+# When le gateway refuse la réponse.
+# Then le refus reste observable sans payload complet.
+gateway, collector = gateway_for([
+    OpenAICompatibleResponse(
+        payload={
+            "id": "chatcmpl-t010",
+            "model": "gemma-research-t010",
+            "model_revision": "gemma-4-revision-t010",
+            "runtime_version": "vllm-openai-t010",
+            "choices": [{"message": {"content": "not-json"}}],
+        },
+        headers={"x-request-id": "spark-request-t010"},
+    )
+])
+expect_failure("LLM_RESPONSE_INVALID_JSON", lambda: gateway.infer(request("trace-t010-invalid-json")))
+assert_observability_safe(collector, expected_status="LLM_RESPONSE_INVALID_JSON", trace_id="trace-t010-invalid-json")
+
+
+# Given le circuit breaker est ouvert après une panne Spark.
+# When une nouvelle demande arrive.
+# Then le refus circuit ouvert est observable et corrélé.
+gateway, collector = gateway_for([SparkUnavailableError("spark indisponible")], failure_threshold=1)
+expect_failure("LLM_UNAVAILABLE", lambda: gateway.infer(request("trace-t010-circuit")))
+expect_failure("LLM_CIRCUIT_OPEN", lambda: gateway.infer(request("trace-t010-circuit-open")))
+assert_observability_safe(collector, expected_status="LLM_CIRCUIT_OPEN", trace_id="trace-t010-circuit-open")
+if "llm_gateway_circuit_breaker_open" not in {metric.name for metric in collector.metrics()}:
+    raise AssertionError("Métrique circuit breaker ouvert absente.")
 
 print("Test d'acceptation observabilité gateway M-002: OK")
 '@
