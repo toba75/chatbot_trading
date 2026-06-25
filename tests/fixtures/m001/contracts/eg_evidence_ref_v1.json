@@ -1,0 +1,20 @@
+{
+  "schema_version": "1.0",
+  "evidence_id": "EVS-001204",
+  "source_locator": {
+    "schema_version": "1.0",
+    "canonical_version_id": "CVER-000004",
+    "document_id": "DOC-000001",
+    "page_pdf": 37,
+    "item_id": "DOC-000001-P037-I004",
+    "bbox": [
+      0.1,
+      0.2,
+      0.85,
+      0.42
+    ],
+    "content_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  },
+  "relation": "SUPPORTS_DIRECTLY",
+  "quoted_span_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+}
