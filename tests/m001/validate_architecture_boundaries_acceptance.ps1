@@ -7,6 +7,7 @@ $realRegistryPath = Join-Path $realAppRoot "context_registry.json"
 $specificationPath = Join-Path $repoRoot "docs/specs/m001_frontieres_ddd_contrats_publies.md"
 
 $eAcute = [char] 0x00E9
+$eGrave = [char] 0x00E8
 
 function Assert-ValidatorExists {
     if (-not (Test-Path -LiteralPath $validatorPath -PathType Leaf)) {
@@ -115,7 +116,7 @@ $realResult = Invoke-ArchitectureBoundaryValidator `
 if ($realResult.ExitCode -ne 0) {
     throw $realResult.Output
 }
-Assert-OutputContains -Output $realResult.Output -Expected "Fronti$($eAcute)res d'import M-001 valides"
+Assert-OutputContains -Output $realResult.Output -Expected "Fronti$($eGrave)res d'import M-001 valides"
 
 $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m001_arch_acceptance_" + [System.Guid]::NewGuid().ToString("N"))
 try {
@@ -152,4 +153,4 @@ finally {
     }
 }
 
-Write-Host "Test d'acceptation des frontieres d'import M-001: OK"
+Write-Host "Test d'acceptation des fronti$($eGrave)res d'import M-001: OK"

@@ -6,6 +6,7 @@ $realRegistryPath = Join-Path $repoRoot "app/context_registry.json"
 $specificationPath = Join-Path $repoRoot "docs/specs/m001_frontieres_ddd_contrats_publies.md"
 
 $eAcute = [char] 0x00E9
+$eGrave = [char] 0x00E8
 
 function Assert-ValidatorExists {
     if (-not (Test-Path -LiteralPath $validatorPath -PathType Leaf)) {
@@ -179,7 +180,7 @@ class ResearchQuery(BaseModel):
 "@
     Assert-FailsWith `
         -Scenario $domainFrameworkImport `
-        -ExpectedFragments @("Import de framework externe interdit dans domain", "framework pydantic", "Mod$($eAcute)le d'API interdit dans domain", "ResearchQuery")
+        -ExpectedFragments @("Import de framework externe interdit dans domain", "framework pydantic", "Mod$($eGrave)le d'API interdit dans domain", "ResearchQuery")
 
     $interContextInternalModel = New-ControlledApp -ScenarioName "intercontext_internal"
     $createdRoots += $interContextInternalModel.Root
@@ -219,4 +220,4 @@ finally {
     }
 }
 
-Write-Host "Tests unitaires des frontieres d'import M-001: OK"
+Write-Host "Tests unitaires des fronti$($eGrave)res d'import M-001: OK"
