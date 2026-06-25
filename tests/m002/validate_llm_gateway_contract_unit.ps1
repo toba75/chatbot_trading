@@ -302,7 +302,7 @@ missing_revision_transport = FixedTransport(
         "choices": [{"message": {"content": '{"answer":"ok"}'}}],
     }
 )
-assert_raises_code(
+assert_gateway_error_code(
     "LLM_RESPONSE_PROVENANCE_MISSING",
     lambda: OpenAICompatibleLocalLanguageModelGateway(
         configuration=configuration,

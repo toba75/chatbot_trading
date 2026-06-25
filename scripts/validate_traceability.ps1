@@ -147,7 +147,7 @@ $requiredM002Requirements = @(
         Test = "tests/m002/validate_platform_topology_acceptance.ps1"
         CommandScript = "scripts/validate_platform_topology.ps1"
         Code = "app/platform/topology_registry.json"
-        Adr = "ADR-007; ADR-009"
+        Adr = "ADR-007; ADR-009; ADR-012"
     },
     [ordered] @{
         Id = "REQ-M002-004"
@@ -155,7 +155,7 @@ $requiredM002Requirements = @(
         Test = "tests/m002/validate_local_compose_acceptance.ps1"
         CommandScript = "scripts/validate_local_compose.ps1"
         Code = "deploy/local-compose/compose.yaml"
-        Adr = "ADR-007; ADR-008; ADR-009"
+        Adr = "ADR-007; ADR-008; ADR-009; ADR-012"
     },
     [ordered] @{
         Id = "REQ-M002-005"
@@ -195,7 +195,7 @@ $requiredM002Requirements = @(
         Test = "tests/m002/validate_network_boundary_acceptance.ps1"
         CommandScript = "scripts/validate_network_boundary.ps1"
         Code = "app/platform/security/network_boundary.py"
-        Adr = "ADR-007; ADR-008; ADR-009"
+        Adr = "ADR-007; ADR-008; ADR-009; ADR-012"
     },
     [ordered] @{
         Id = "REQ-M002-010"

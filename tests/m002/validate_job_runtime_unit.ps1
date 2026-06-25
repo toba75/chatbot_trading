@@ -276,7 +276,7 @@ duplicate_active_job_2 = JobRecord(
     failure_reason=None,
 )
 assert_raises(
-    "clé d'idempotence active dupliquée",
+    "idempotence active dupli",
     lambda: InMemoryJobQueue(catalog=JOB_RUNTIME_CATALOG, jobs=(duplicate_active_job_1, duplicate_active_job_2)),
 )
 

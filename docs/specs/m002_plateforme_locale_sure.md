@@ -6,7 +6,7 @@
 - Source canonique: `docs/specs/plan_implementation_milestones_workstreams.md`, section `M-002 - Plateforme locale sûre`.
 - Spécification normative: `docs/specs/specification_unifiee_ddd_technique_chatbot_trading_v4_1.md`, sections 13, 15, 16, 18, 19, 20 et 21.
 - Contrat amont: `docs/specs/m001_frontieres_ddd_contrats_publies.md`.
-- ADR consultées: ADR-007, ADR-008, ADR-009, DDD-ADR-006, DDD-ADR-008, ADR-010.
+- ADR consultées: ADR-007, ADR-008, ADR-009, DDD-ADR-006, DDD-ADR-008, ADR-010, ADR-012.
 
 Cette spécification rend M-002 vérifiable avant configuration ou code de plateforme. Elle ne crée pas de microservice métier, ne déplace aucune donnée hors `docker-local`, conserve mTLS comme recommandation et ne change pas le sens d'une ADR acceptée.
 
@@ -95,7 +95,7 @@ Les relations M-001 restent gouvernées par leurs producteurs et consommateurs. 
 | PLAT-005 - Jobs techniques priorisés | La file de jobs exécute les unités techniques avec priorité et idempotence. | Un job ne porte pas de fait de domaine, ne remplace pas un événement publié et ne recalcule pas un succès identique sans option explicite. | T-008 | DDD-ADR-006 |
 | PLAT-006 - Pannes explicites d'inférence | Une indisponibilité Spark retourne `LLM_UNAVAILABLE` ou une erreur TLS explicite selon la cause. | Aucun fallback silencieux n'est autorisé; aucune publication partielle n'est admise après streaming interrompu; un retry ne crée pas deux transitions métier. | T-006 | ADR-008; ADR-009 |
 | PLAT-007 - Observabilité technique | Les logs et métriques couvrent disponibilité Spark, DNS, TCP, TLS, authentification, latence, TTFT, retries et circuit breaker. | Les prompts, preuves et réponses complets ne sont pas journalisés; les métriques restent techniques et corrélables par `trace_id`. | T-010 | ADR-008; ADR-009 |
-| PLAT-008 - Commandes de validation | La spécification est validée par les commandes M-002, test et lint. | Aucun GREEN n'est implicite; chaque commande doit être exécutée explicitement et reliée à la matrice de traçabilité. | T-002, T-011 | ADR-010 |
+| PLAT-008 - Commandes de validation | La spécification est validée par les commandes M-002, test et lint. | Aucun GREEN n'est implicite; chaque commande doit être exécutée explicitement et reliée à la matrice de traçabilité. | T-002, T-011 | ADR-010; ADR-012 |
 
 ## Commandes de validation
 

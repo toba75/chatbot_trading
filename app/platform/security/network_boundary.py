@@ -6,6 +6,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
+from urllib.parse import urlparse
 
 from app.platform.local_compose import ComposeService, LocalCompose
 from app.platform.topology import PlatformTopology
@@ -19,6 +20,7 @@ SPARK_EGRESS_NETWORK_ID = "spark-egress"
 EDGE_GATEWAY_SERVICE_ID = "edge-gateway"
 SPARK_PORT = 8443
 SPARK_PROTOCOL = "tcp"
+EXPECTED_SPARK_BASE_PATH = "/v1"
 
 REQUIRED_ADR_IDS = ("ADR-007", "ADR-008", "ADR-009")
 PRIVATE_STORAGE_SERVICE_IDS = frozenset(
@@ -265,7 +267,7 @@ def validate_network_boundary(
     _validate_topology_contract(topology)
     _validate_compose_ports(compose, spark_firewall.remote_user_access)
     _validate_compose_spark_egress(compose)
-    _validate_gateway_tls_and_secret_scope(compose)
+    _validate_gateway_tls_and_secret_scope(compose, spark_firewall)
     _validate_flow_matrix(build_network_flow_matrix(compose=compose, spark_firewall=spark_firewall))
 
 
@@ -407,13 +409,14 @@ def _validate_compose_spark_egress(compose: LocalCompose) -> None:
             raise ValueError(f"Egress Spark interdit hors llm-gateway: {service.id}")
 
 
-def _validate_gateway_tls_and_secret_scope(compose: LocalCompose) -> None:
+def _validate_gateway_tls_and_secret_scope(compose: LocalCompose, spark_firewall: SparkFirewallPolicy) -> None:
     gateway = compose.service(LLM_GATEWAY_SERVICE_ID)
     _require_gateway_environment(gateway, "GEMMA_BASE_URL")
     _require_gateway_environment(gateway, "GEMMA_API_KEY_FILE")
     _require_gateway_environment(gateway, "GEMMA_CA_BUNDLE")
 
     base_url = gateway.environment["GEMMA_BASE_URL"]
+    _validate_gateway_base_url(base_url, spark_firewall)
     if base_url.lower().startswith("http://"):
         raise ValueError("TLS Spark désactivé pour llm-gateway: GEMMA_BASE_URL")
 
@@ -436,6 +439,20 @@ def _validate_gateway_tls_and_secret_scope(compose: LocalCompose) -> None:
             secret_upper = secret_id.upper()
             if any(marker in secret_upper for marker in VLLM_SECRET_MARKERS):
                 raise ValueError(f"Secret vLLM interdit pour accès navigateur: {service.id}")
+
+
+def _validate_gateway_base_url(base_url: str, spark_firewall: SparkFirewallPolicy) -> None:
+    parsed_base_url = urlparse(base_url)
+    if parsed_base_url.scheme != "https":
+        raise ValueError("TLS Spark désactivé pour llm-gateway: GEMMA_BASE_URL")
+    if parsed_base_url.hostname != spark_firewall.spark_endpoint.host:
+        raise ValueError("Endpoint Spark invalide pour llm-gateway: GEMMA_BASE_URL")
+    if parsed_base_url.port != spark_firewall.spark_endpoint.port:
+        raise ValueError("Endpoint Spark invalide pour llm-gateway: GEMMA_BASE_URL")
+    if parsed_base_url.path != EXPECTED_SPARK_BASE_PATH:
+        raise ValueError("Endpoint Spark invalide pour llm-gateway: GEMMA_BASE_URL")
+    if parsed_base_url.username is not None or parsed_base_url.password is not None:
+        raise ValueError("Endpoint Spark invalide pour llm-gateway: GEMMA_BASE_URL")
 
 
 def _validate_flow_matrix(flows: tuple[NetworkFlow, ...]) -> None:

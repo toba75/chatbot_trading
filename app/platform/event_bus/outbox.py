@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import threading
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from enum import Enum
@@ -88,7 +89,7 @@ class InMemoryTransactionalOutbox:
     def __init__(
         self,
         entries: Iterable[OutboxEntry],
-        state_mutations: Iterable[ProducerStateMutation],
+        state_mutations: Iterable[ProducerStateMutation] = (),
     ) -> None:
         if entries is None:
             raise ValueError("entries absent")
@@ -108,6 +109,7 @@ class InMemoryTransactionalOutbox:
             event_id = entry.event.event_id
             if event_id in self._entries_by_event_id:
                 raise ValueError(f"event_id outbox duplique: {event_id}")
+            _ensure_event_matches_mutation(entry.state_mutation, entry.event)
             self._entries_by_event_id[event_id] = entry
             self._event_order.append(event_id)
 
@@ -171,8 +173,8 @@ class InMemoryTransactionalOutbox:
 
     def mark_delivered(self, event_id: str) -> OutboxEntry:
         entry = self.entry_for(event_id)
-        if entry.status is OutboxMessageStatus.DELIVERED:
-            raise ValueError(f"event outbox deja delivered: {entry.event.event_id}")
+        if entry.status is not OutboxMessageStatus.PENDING:
+            raise ValueError(f"transition outbox invalide vers delivered: {entry.event.event_id}")
         delivered_entry = OutboxEntry(
             sequence=entry.sequence,
             state_mutation=entry.state_mutation,
@@ -186,6 +188,8 @@ class InMemoryTransactionalOutbox:
     def mark_failed(self, event_id: str, failure_reason: str) -> OutboxEntry:
         reason = _ensure_text(failure_reason, "raison d'echec")
         entry = self.entry_for(event_id)
+        if entry.status is not OutboxMessageStatus.PENDING:
+            raise ValueError(f"transition outbox invalide vers failed: {entry.event.event_id}")
         failed_entry = OutboxEntry(
             sequence=entry.sequence,
             state_mutation=entry.state_mutation,
@@ -271,6 +275,7 @@ class IdempotentEventConsumer:
     def __post_init__(self) -> None:
         if not isinstance(self.processed_events, InMemoryProcessedEventRegistry):
             raise ValueError("processed_events invalide")
+        object.__setattr__(self, "_lock", threading.Lock())
 
     def consume(
         self,
@@ -281,21 +286,22 @@ class IdempotentEventConsumer:
         if not callable(handler):
             raise ValueError("handler invalide")
 
-        if self.processed_events.has_processed(envelope):
-            self.processed_events.record_duplicate(envelope)
+        with self._lock:
+            if self.processed_events.has_processed(envelope):
+                self.processed_events.record_duplicate(envelope)
+                return EventConsumptionDecision(
+                    event_id=envelope.event_id,
+                    applied=False,
+                    duplicate=True,
+                )
+
+            handler(envelope)
+            self.processed_events.record_processed(envelope)
             return EventConsumptionDecision(
                 event_id=envelope.event_id,
-                applied=False,
-                duplicate=True,
+                applied=True,
+                duplicate=False,
             )
-
-        handler(envelope)
-        self.processed_events.record_processed(envelope)
-        return EventConsumptionDecision(
-            event_id=envelope.event_id,
-            applied=True,
-            duplicate=False,
-        )
 
 
 def _ensure_event_matches_mutation(

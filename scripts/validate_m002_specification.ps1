@@ -81,6 +81,18 @@ $expectedRules = @(
     @{ Name = "PLAT-008 - Commandes de validation"; Adr = @("ADR-010") }
 )
 
+$requiredObservabilityDimensions = @(
+    "disponibilit$($eAcute) Spark",
+    "DNS",
+    "TCP",
+    "TLS",
+    "authentification",
+    "latence",
+    "TTFT",
+    "retries",
+    "circuit breaker"
+)
+
 function Normalize-M002Cell {
     param(
         [Parameter(Mandatory = $true)]
@@ -367,6 +379,15 @@ function Assert-M002Rules {
         $row = $rulesByName[$expectedRule.Name]
         foreach ($adrId in $expectedRule.Adr) {
             Assert-M002AdrToken -Content $row["ADR"] -AdrId $adrId
+        }
+
+        if ($expectedRule.Name -eq "PLAT-007 - Observabilit$($eAcute) technique") {
+            $observabilityRuleContent = "$($row["Comportement attendu"]) $($row["Invariants"])"
+            foreach ($dimension in $requiredObservabilityDimensions) {
+                if (-not $observabilityRuleContent.Contains($dimension)) {
+                    throw "Dimension d'observabilit$($eAcute) absente: $dimension"
+                }
+            }
         }
     }
 

@@ -1,0 +1,13 @@
+:8443 {
+    tls internal
+
+    respond /health "healthy" 200
+
+    handle_path /api/* {
+        reverse_proxy orchestrator-api:8080
+    }
+
+    handle {
+        reverse_proxy ui:8081
+    }
+}

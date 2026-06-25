@@ -97,27 +97,29 @@ def assert_boundary_error(expected_fragment: str, *, compose_document=None, fire
 
 
 def add_published_port(document: str, service_id: str) -> str:
-    service_header = f"  {service_id}:\n"
+    service_header = f"\n  {service_id}:\n"
     if service_header not in document:
         raise AssertionError(f"Service fixture absent: {service_id}")
     return document.replace(
         service_header,
-        f'  {service_id}:\n    ports:\n      - "0.0.0.0:9191:9191"\n',
+        f'\n  {service_id}:\n    ports:\n      - "0.0.0.0:9191:9191"\n',
+        1,
     )
 
 
 def add_profile_published_port(document: str, service_id: str) -> str:
-    service_header = f"  {service_id}:\n"
+    service_header = f"\n  {service_id}:\n"
     if service_header not in document:
         raise AssertionError(f"Service fixture absent: {service_id}")
     return document.replace(
         service_header,
-        f'  {service_id}:\n    profiles:\n      - debug\n    ports:\n      - "127.0.0.1:6333:6333"\n',
+        f'\n  {service_id}:\n    profiles:\n      - debug\n    ports:\n      - "127.0.0.1:6333:6333"\n',
+        1,
     )
 
 
 def add_spark_egress(document: str, service_id: str) -> str:
-    service_header = f"  {service_id}:\n"
+    service_header = f"\n  {service_id}:\n"
     service_index = document.find(service_header)
     if service_index < 0:
         raise AssertionError(f"Service fixture absent: {service_id}")
@@ -135,7 +137,7 @@ def add_spark_egress(document: str, service_id: str) -> str:
 
 
 def add_gateway_environment_line(document: str, line: str) -> str:
-    gateway_header = "  llm-gateway:\n"
+    gateway_header = "\n  llm-gateway:\n"
     gateway_index = document.find(gateway_header)
     if gateway_index < 0:
         raise AssertionError("Service fixture absent: llm-gateway")
@@ -149,7 +151,7 @@ def add_gateway_environment_line(document: str, line: str) -> str:
 
 
 def replace_gateway_base_url(document: str, value: str) -> str:
-    current = '      GEMMA_BASE_URL: "${GEMMA_BASE_URL?GEMMA_BASE_URL requis}"'
+    current = '      GEMMA_BASE_URL: "https://spark-inference:8443/v1"'
     replacement = f'      GEMMA_BASE_URL: "{value}"'
     if current not in document:
         raise AssertionError("Variable GEMMA_BASE_URL absente du fixture")
@@ -157,7 +159,7 @@ def replace_gateway_base_url(document: str, value: str) -> str:
 
 
 def add_ui_environment_line(document: str, line: str) -> str:
-    ui_header = "  ui:\n"
+    ui_header = "\n  ui:\n"
     ui_index = document.find(ui_header)
     if ui_index < 0:
         raise AssertionError("Service fixture absent: ui")

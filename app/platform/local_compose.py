@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib.util
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -50,12 +51,27 @@ REQUIRED_SPARK_SECRETS = ("gemma_api_key", "spark_ca")
 FORBIDDEN_MODEL_SERVICE_PATTERN = re.compile(r"(^|[-_])(gemma|vllm)([-_]|$)")
 REQUIRED_ENVIRONMENT_PATTERN = re.compile(r"^\$\{[A-Z][A-Z0-9_]*\?[^}]+\}$")
 SECRET_ENVIRONMENT_MARKERS = ("PASSWORD", "TOKEN", "SECRET", "API_KEY")
+INTERNAL_IMAGE_PREFIX = "ostrading/"
+LLM_GATEWAY_SPARK_BASE_URL = "https://spark-inference:8443/v1"
+EXPECTED_SERVICE_COMMANDS = {
+    "ui": ("python", "-m", "app.platform.local_runtime", "serve-http", "ui", "8081"),
+    "orchestrator-api": ("python", "-m", "app.platform.local_runtime", "serve-http", "orchestrator-api", "8080"),
+    "llm-gateway": ("python", "-m", "app.platform.local_runtime", "serve-http", "llm-gateway", "8090"),
+    "granite-docling": ("python", "-m", "app.platform.local_runtime", "serve-http", "granite-docling", "8001"),
+    "embedding-service": ("python", "-m", "app.platform.local_runtime", "serve-http", "embedding-service", "8101"),
+    "reranker-service": ("python", "-m", "app.platform.local_runtime", "serve-http", "reranker-service", "8102"),
+    "worker-documents": ("python", "-m", "app.platform.local_runtime", "run-worker", "worker-documents"),
+    "worker-research": ("python", "-m", "app.platform.local_runtime", "run-worker", "worker-research"),
+    "worker-backtest": ("python", "-m", "app.platform.local_runtime", "run-worker", "worker-backtest"),
+    "backtest-engine": ("python", "-m", "app.platform.local_runtime", "serve-http", "backtest-engine", "8200"),
+}
 
 
 @dataclass(frozen=True)
 class ComposeService:
     id: str
     image: str
+    command: tuple[str, ...]
     ports: tuple[str, ...]
     expose: tuple[str, ...]
     profiles: tuple[str, ...]
@@ -63,6 +79,7 @@ class ComposeService:
     secrets: tuple[str, ...]
     environment: Mapping[str, str]
     healthcheck: Mapping[str, Any]
+    read_only: bool
 
 
 @dataclass(frozen=True)
@@ -147,6 +164,7 @@ def validate_local_compose(compose: LocalCompose) -> None:
         _validate_service_ports(service)
         _validate_service_exposure(service)
         _validate_service_healthcheck(service)
+        _validate_service_command(service)
         _validate_service_networks(service, compose.networks)
         _validate_service_secrets(service, compose.secrets)
         _validate_service_environment(service)
@@ -171,6 +189,7 @@ def _parse_service(service_id: str, payload: Mapping[str, Any]) -> ComposeServic
     return ComposeService(
         id=service_id,
         image=_required_text(payload, "image", f"service {service_id}"),
+        command=_optional_text_list(payload, "command", f"service {service_id}"),
         ports=_optional_text_list(payload, "ports", f"service {service_id}"),
         expose=_optional_text_list(payload, "expose", f"service {service_id}"),
         profiles=_optional_text_list(payload, "profiles", f"service {service_id}"),
@@ -178,6 +197,7 @@ def _parse_service(service_id: str, payload: Mapping[str, Any]) -> ComposeServic
         secrets=_optional_text_list(payload, "secrets", f"service {service_id}"),
         environment=environment,
         healthcheck=healthcheck_payload,
+        read_only=_optional_bool(payload, "read_only", f"service {service_id}"),
     )
 
 
@@ -221,6 +241,8 @@ def _validate_secrets(compose: LocalCompose) -> None:
 
 
 def _validate_service_image(service: ComposeService) -> None:
+    if not service.image.startswith(INTERNAL_IMAGE_PREFIX) and "@sha256:" not in service.image:
+        raise ValueError(f"Image tierce sans digest pour service {service.id}: {service.image}")
     if not _is_pinned_image(service.image):
         raise ValueError(f"Image non épinglée pour service {service.id}: {service.image}")
 
@@ -263,6 +285,31 @@ def _validate_service_healthcheck(service: ComposeService) -> None:
     for field_name in ("interval", "timeout", "retries", "start_period"):
         if field_name not in service.healthcheck:
             raise ValueError(f"Healthcheck incomplet pour service {service.id}: {field_name}")
+
+    command_text = " ".join(str(item) for item in test)
+    if service.read_only and ("touch " in command_text or ">" in command_text):
+        raise ValueError(f"Healthcheck mutant interdit pour service read_only: {service.id}")
+
+
+def _validate_service_command(service: ComposeService) -> None:
+    expected_command = EXPECTED_SERVICE_COMMANDS.get(service.id)
+    if expected_command is None:
+        if len(service.command) > 0:
+            raise ValueError(f"Commande Compose non prévue pour service {service.id}")
+        return
+
+    if service.command != expected_command:
+        if len(service.command) >= 3 and service.command[0] == "python" and service.command[1] == "-m":
+            module_name = service.command[2]
+            if importlib.util.find_spec(module_name) is None:
+                raise ValueError(f"Commande Compose non exécutable pour service {service.id}: {module_name}")
+        raise ValueError(f"Commande Compose invalide pour service {service.id}")
+    if len(service.command) >= 3 and service.command[0] == "python" and service.command[1] == "-m":
+        module_name = service.command[2]
+        if importlib.util.find_spec(module_name) is None:
+            raise ValueError(f"Commande Compose non exécutable pour service {service.id}: {module_name}")
+        return
+    raise ValueError(f"Commande Compose non exécutable pour service {service.id}")
 
 
 def _validate_service_networks(service: ComposeService, networks: Mapping[str, Any]) -> None:
@@ -315,6 +362,11 @@ def _validate_service_environment(service: ComposeService) -> None:
         if value.startswith("/run/secrets/"):
             continue
 
+        if service.id == "llm-gateway" and key == "GEMMA_BASE_URL":
+            if value != LLM_GATEWAY_SPARK_BASE_URL:
+                raise ValueError(f"Endpoint Spark invalide pour service {service.id}: {key}")
+            continue
+
         if not REQUIRED_ENVIRONMENT_PATTERN.match(value):
             raise ValueError(f"Variable non injectée explicitement pour service {service.id}: {key}")
 
@@ -329,6 +381,8 @@ def _is_pinned_image(image: str) -> bool:
     if "@sha256:" in image:
         digest = image.rsplit("@sha256:", 1)[1]
         return bool(re.fullmatch(r"[a-fA-F0-9]{64}", digest))
+    if not image.startswith(INTERNAL_IMAGE_PREFIX):
+        return False
 
     last_segment = image.rsplit("/", 1)[-1]
     if ":" not in last_segment:
@@ -547,3 +601,12 @@ def _optional_text_list(payload: Mapping[str, Any], field_name: str, context: st
             raise ValueError(f"Entrée {field_name}[{index}] non normalisée pour {context}.")
         values.append(item)
     return tuple(values)
+
+
+def _optional_bool(payload: Mapping[str, Any], field_name: str, context: str) -> bool:
+    if field_name not in payload:
+        return False
+    value = payload[field_name]
+    if not isinstance(value, bool):
+        raise ValueError(f"Champ {field_name} non booléen pour {context}.")
+    return value

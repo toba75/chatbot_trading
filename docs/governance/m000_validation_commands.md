@@ -72,6 +72,6 @@ Les tests M-001 restent non récursifs: ils valident les contrats, fixtures, rè
 
 ## Extension M-002
 
-M-002 ajoute la spécification de plateforme locale sûre, le registre de topologie `docker-local` / `spark-inference`, la validation statique du Compose local, la frontière réseau locale, le contrat du gateway LLM, le contrôle des pannes d'inférence Spark, l'outbox idempotente, la file de jobs priorisée, l'observabilité technique du gateway et la traçabilité de clôture aux gates existantes sans changer les points d'entrée PowerShell ADR-010.
+M-002 ajoute la spécification de plateforme locale sûre, le registre de topologie `docker-local` / `spark-inference`, la validation statique du Compose local, la frontière réseau locale, le contrat du gateway LLM, le contrôle des pannes d'inférence Spark, l'outbox idempotente, la file de jobs priorisée, l'observabilité technique du gateway et la traçabilité de clôture aux gates existantes sans changer les points d'entrée PowerShell ADR-010. Les validateurs de plateforme qui utilisent Python standard-library sont gouvernés par ADR-012.
 
 Les tests M-002 restent non récursifs: ils valident la présence des sections, scénarios, placements physiques, règles `docker-local` et `spark-inference`, registre de topologie, Compose local contrôlé, frontière réseau locale, gateway unique, contrat OpenAI compatible, pannes Spark explicites, outbox, file de jobs, observabilité sans prompt ni réponse complète, lignes de matrice `REQ-M002-*`, commandes de validation et garde-fous sans lancer `scripts/test.ps1`.

@@ -141,7 +141,7 @@
       "id": "outbox",
       "host": "docker-local",
       "kind": "outbox",
-      "compose_local": true,
+      "compose_local": false,
       "business_storage": true,
       "durability": "durable_business",
       "responsibility": "Persister les événements intercontextes avec l'état producteur."
@@ -150,7 +150,7 @@
       "id": "job-queue",
       "host": "docker-local",
       "kind": "job-queue",
-      "compose_local": true,
+      "compose_local": false,
       "business_storage": false,
       "durability": "durable_technical",
       "responsibility": "Ordonner les jobs techniques priorisés et idempotents."

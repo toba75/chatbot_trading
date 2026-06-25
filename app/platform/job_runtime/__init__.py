@@ -349,7 +349,12 @@ class InMemoryJobQueue:
         next_job = pending_jobs[0]
         running_job = self.mark_running(next_job.job_id)
         worker = worker_registry.worker_for(running_job.request.job_name)
-        result = worker(running_job)
+        try:
+            result = worker(running_job)
+        except Exception as exc:
+            failure_reason = str(exc) if str(exc) != "" else exc.__class__.__name__
+            self.mark_failed(job_id=running_job.job_id, failure_reason=failure_reason)
+            raise
         return self.mark_succeeded(job_id=running_job.job_id, result=result)
 
     def _store_initial_job(self, job: JobRecord) -> None:
@@ -362,8 +367,12 @@ class InMemoryJobQueue:
         self._job_order.append(job.job_id)
         key = job.request.idempotence_key.identity_tuple()
         if job.status in {JobStatus.PENDING, JobStatus.RUNNING}:
+            if key in self._active_job_id_by_key:
+                raise ValueError("clé d'idempotence active dupliquée")
             self._active_job_id_by_key[key] = job.job_id
         if job.status is JobStatus.SUCCEEDED:
+            if key in self._successful_job_id_by_key:
+                raise ValueError("clé d'idempotence réussie dupliquée")
             self._successful_job_id_by_key[key] = job.job_id
 
 

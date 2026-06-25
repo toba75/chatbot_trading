@@ -11,6 +11,7 @@ import urllib.request
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from json import JSONDecodeError
+from types import MappingProxyType
 from typing import Any, Mapping, Protocol
 from urllib.parse import urlparse
 
@@ -20,6 +21,11 @@ from app.platform.observability import GatewayObservation, InMemoryObservability
 GATEWAY_CLIENT_ID = "llm-gateway"
 SECRET_MASK = "<secret-masked>"
 _FORBIDDEN_SAMPLING_KEYS = frozenset({"model", "messages", "response_format"})
+_ALLOWED_SPARK_HOSTS = frozenset({"spark-inference", "spark-inference.test"})
+_SPARK_HTTPS_PORT = 8443
+_MODEL_REVISION_HEADER = "x-model-revision"
+_RUNTIME_VERSION_HEADER = "x-runtime-version"
+_TTFT_HEADER = "x-ttft-ms"
 
 
 class LLMGatewayContractError(ValueError):
@@ -33,6 +39,23 @@ class LLMGatewayContractError(ValueError):
 
 class SparkUnavailableError(ConnectionError):
     """Panne réseau ou indisponibilité du Spark avant le premier token."""
+
+
+class SparkAuthenticationError(ConnectionError):
+    """Refus d'authentification explicite du Spark."""
+
+
+class SparkHTTPStatusError(ConnectionError):
+    """Réponse HTTP Spark non nominale avant le premier token."""
+
+    def __init__(self, message: str, *, status_code: int) -> None:
+        super().__init__(message)
+        if not isinstance(status_code, int) or status_code <= 0:
+            raise LLMGatewayContractError(
+                "LLM_SPARK_HTTP_STATUS_INVALID",
+                "Le statut HTTP Spark doit être un entier strictement positif.",
+            )
+        self.status_code = status_code
 
 
 class SparkTLSCertificateInvalidError(ConnectionError):
@@ -182,6 +205,23 @@ class GatewayCircuitBreaker:
 
 
 def classify_gateway_failure(error: BaseException) -> GatewayFailureClassification:
+    if isinstance(error, SparkAuthenticationError):
+        return GatewayFailureClassification(
+            code="LLM_AUTHENTICATION_FAILED",
+            message="L'authentification du gateway LLM auprès du Spark est refusée.",
+            retryable=False,
+            before_first_token=True,
+            publishable=False,
+        )
+    if isinstance(error, SparkHTTPStatusError):
+        retryable = error.status_code == 429 or error.status_code >= 500
+        return GatewayFailureClassification(
+            code="LLM_SPARK_HTTP_ERROR",
+            message=f"Le Spark retourne un statut HTTP non nominal: {error.status_code}.",
+            retryable=retryable,
+            before_first_token=True,
+            publishable=False,
+        )
     if isinstance(error, SparkTLSCertificateInvalidError):
         return GatewayFailureClassification(
             code="LLM_TLS_CERTIFICATE_INVALID",
@@ -236,6 +276,28 @@ class GatewayConfiguration:
             raise LLMGatewayContractError(
                 "LLM_GATEWAY_TLS_REQUIRED",
                 "Le gateway LLM exige une URL Spark HTTPS explicite.",
+            )
+        if parsed_base_url.username is not None or parsed_base_url.password is not None:
+            raise LLMGatewayContractError(
+                "LLM_GATEWAY_SPARK_ENDPOINT_REQUIRED",
+                "L'URL Spark du gateway LLM ne doit pas contenir d'identifiant.",
+            )
+        if parsed_base_url.hostname not in _ALLOWED_SPARK_HOSTS:
+            raise LLMGatewayContractError(
+                "LLM_GATEWAY_SPARK_ENDPOINT_REQUIRED",
+                "Le gateway LLM doit cibler explicitement spark-inference.",
+            )
+        try:
+            parsed_port = parsed_base_url.port
+        except ValueError as exc:
+            raise LLMGatewayContractError(
+                "LLM_GATEWAY_SPARK_ENDPOINT_REQUIRED",
+                "Le port Spark du gateway LLM est invalide.",
+            ) from exc
+        if parsed_port != _SPARK_HTTPS_PORT:
+            raise LLMGatewayContractError(
+                "LLM_GATEWAY_SPARK_ENDPOINT_REQUIRED",
+                "Le gateway LLM doit cibler spark-inference sur le port 8443.",
             )
 
         if not isinstance(self.timeout_seconds, int) or self.timeout_seconds <= 0:
@@ -314,6 +376,12 @@ class InferenceRequest:
                 "LLM_SAMPLING_PARAMETER_FORBIDDEN",
                 f"Paramètres réservés au gateway: {', '.join(forbidden_keys)}",
             )
+        object.__setattr__(self, "output_schema", _freeze_json_value(self.output_schema, "output_schema"))
+        object.__setattr__(
+            self,
+            "sampling_parameters",
+            _freeze_json_value(self.sampling_parameters, "sampling_parameters"),
+        )
 
 
 @dataclass(frozen=True)
@@ -349,6 +417,7 @@ class _GatewayTransportSuccess:
     response: OpenAICompatibleResponse
     attempt: int
     latency_ms: float
+    ttft_ms: float | None
 
 
 class LocalLanguageModelGateway(Protocol):
@@ -395,16 +464,70 @@ class OpenAICompatibleLocalLanguageModelGateway:
             body=body,
         )
         response = transport_success.response
-        structured_output = _extract_structured_output(response.payload)
-        completed_at = _utc_now()
-        provenance = _build_provenance(
-            response=response,
-            request=request,
-            body=body,
-            structured_output=structured_output,
-            started_at=started_at,
-            completed_at=completed_at,
-        )
+        try:
+            structured_output = _extract_structured_output(response.payload, request.output_schema)
+            completed_at = _utc_now()
+            provenance = _build_provenance(
+                response=response,
+                request=request,
+                body=body,
+                structured_output=structured_output,
+                started_at=started_at,
+                completed_at=completed_at,
+            )
+        except SparkStreamingInterruptedError as exc:
+            classification = classify_gateway_failure(exc)
+            self._failure_metric_recorder.record_gateway_observation(
+                _build_gateway_observation(
+                    configuration=self._configuration,
+                    request=request,
+                    body=body,
+                    status=classification.code,
+                    latency_ms=transport_success.latency_ms,
+                    response_payload=response.payload,
+                    model_revision=_optional_response_text(response, "model_revision"),
+                    runtime_version=_optional_response_text(response, "runtime_version"),
+                    ttft_ms=transport_success.ttft_ms,
+                    retry_count=transport_success.attempt - 1,
+                    circuit_open=False,
+                    output_interrupted=True,
+                    error_code=classification.code,
+                )
+            )
+            raise LLMGatewayInferenceError(
+                code=classification.code,
+                message=classification.message,
+                retryable=classification.retryable,
+                retry_pending=False,
+                publishable=classification.publishable,
+                business_state_changed=False,
+            ) from exc
+        except LLMGatewayContractError as exc:
+            self._failure_metric_recorder.record_gateway_observation(
+                _build_gateway_observation(
+                    configuration=self._configuration,
+                    request=request,
+                    body=body,
+                    status=exc.code,
+                    latency_ms=transport_success.latency_ms,
+                    response_payload=response.payload,
+                    model_revision=_optional_response_text(response, "model_revision"),
+                    runtime_version=_optional_response_text(response, "runtime_version"),
+                    ttft_ms=transport_success.ttft_ms,
+                    retry_count=transport_success.attempt - 1,
+                    circuit_open=False,
+                    output_interrupted=False,
+                    error_code=exc.code,
+                )
+            )
+            raise LLMGatewayInferenceError(
+                code=exc.code,
+                message=exc.message,
+                retryable=False,
+                retry_pending=False,
+                publishable=False,
+                business_state_changed=False,
+            ) from exc
         self._failure_metric_recorder.record_gateway_observation(
             _build_gateway_observation(
                 configuration=self._configuration,
@@ -415,7 +538,7 @@ class OpenAICompatibleLocalLanguageModelGateway:
                 response_payload=response.payload,
                 model_revision=provenance.model_revision,
                 runtime_version=provenance.runtime_version,
-                ttft_ms=transport_success.latency_ms,
+                ttft_ms=transport_success.ttft_ms,
                 retry_count=transport_success.attempt - 1,
                 circuit_open=False,
                 output_interrupted=False,
@@ -435,6 +558,7 @@ class OpenAICompatibleLocalLanguageModelGateway:
         headers: Mapping[str, str],
         body: Mapping[str, Any],
     ) -> _GatewayTransportSuccess:
+        circuit_refusal_started_ns = time.perf_counter_ns()
         if self._circuit_breaker.is_open():
             error = LLMGatewayInferenceError(
                 code="LLM_CIRCUIT_OPEN",
@@ -461,7 +585,7 @@ class OpenAICompatibleLocalLanguageModelGateway:
                     request=request,
                     body=body,
                     status=error.code,
-                    latency_ms=0.0,
+                    latency_ms=_elapsed_ms_since(circuit_refusal_started_ns),
                     response_payload=None,
                     model_revision=None,
                     runtime_version=None,
@@ -487,6 +611,8 @@ class OpenAICompatibleLocalLanguageModelGateway:
                 )
             except (
                 SparkUnavailableError,
+                SparkAuthenticationError,
+                SparkHTTPStatusError,
                 SparkFirstTokenTimeoutError,
                 SparkTLSCertificateInvalidError,
                 SparkStreamingInterruptedError,
@@ -521,7 +647,7 @@ class OpenAICompatibleLocalLanguageModelGateway:
                         response_payload=None,
                         model_revision=None,
                         runtime_version=None,
-                        ttft_ms=latency_ms if not classification.before_first_token else None,
+                        ttft_ms=None,
                         retry_count=1 if retry_pending else attempt - 1,
                         circuit_open=self._circuit_breaker.is_open(),
                         output_interrupted=not classification.before_first_token,
@@ -543,6 +669,7 @@ class OpenAICompatibleLocalLanguageModelGateway:
                 response=response,
                 attempt=attempt,
                 latency_ms=_elapsed_ms_since(attempt_started_ns),
+                ttft_ms=_ttft_ms_from_headers(response.headers),
             )
 
         raise LLMGatewayContractError(
@@ -568,8 +695,8 @@ class UrllibOpenAICompatibleTransport:
             headers=dict(headers),
             method="POST",
         )
-        context = ssl.create_default_context(cafile=tls_ca_bundle_path)
         try:
+            context = ssl.create_default_context(cafile=tls_ca_bundle_path)
             with urllib.request.urlopen(request, timeout=timeout_seconds, context=context) as response:
                 response_body = response.read().decode("utf-8")
                 try:
@@ -588,8 +715,14 @@ class UrllibOpenAICompatibleTransport:
                     payload=payload,
                     headers={key.lower(): value for key, value in response.headers.items()},
                 )
+        except urllib.error.HTTPError as exc:
+            if exc.code in {401, 403}:
+                raise SparkAuthenticationError("Authentification Spark refusée.") from exc
+            raise SparkHTTPStatusError("Statut HTTP Spark non nominal.", status_code=exc.code) from exc
         except ssl.SSLCertVerificationError as exc:
             raise SparkTLSCertificateInvalidError("Certificat TLS Spark invalide.") from exc
+        except (FileNotFoundError, ssl.SSLError) as exc:
+            raise SparkTLSCertificateInvalidError("Bundle CA Spark invalide.") from exc
         except TimeoutError as exc:
             raise SparkFirstTokenTimeoutError("Timeout avant le premier token Spark.") from exc
         except urllib.error.URLError as exc:
@@ -613,12 +746,12 @@ def build_openai_chat_completion_request(
             "type": "json_schema",
             "json_schema": {
                 "name": request.schema_name,
-                "schema": dict(request.output_schema),
+                "schema": _thaw_json_value(request.output_schema),
                 "strict": True,
             },
         },
     }
-    payload.update(dict(request.sampling_parameters))
+    payload.update(_thaw_json_value(request.sampling_parameters))
     return payload
 
 
@@ -720,7 +853,7 @@ def _elapsed_ms_since(started_ns: int) -> float:
     return elapsed_ns / 1_000_000
 
 
-def _extract_structured_output(payload: Mapping[str, Any]) -> dict[str, Any]:
+def _extract_structured_output(payload: Mapping[str, Any], output_schema: Mapping[str, Any]) -> dict[str, Any]:
     choices = payload.get("choices")
     if not isinstance(choices, list) or len(choices) == 0:
         raise LLMGatewayContractError(
@@ -733,6 +866,17 @@ def _extract_structured_output(payload: Mapping[str, Any]) -> dict[str, Any]:
         raise LLMGatewayContractError(
             "LLM_RESPONSE_CHOICE_INVALID",
             "Le premier choix compatible OpenAI doit être un objet.",
+        )
+
+    finish_reason = first_choice.get("finish_reason")
+    if finish_reason is not None and finish_reason != "stop":
+        partial_output = "sortie partielle non journalisée"
+        message = first_choice.get("message")
+        if isinstance(message, Mapping) and isinstance(message.get("content"), str):
+            partial_output = message["content"]
+        raise SparkStreamingInterruptedError(
+            "Le Spark a terminé la génération sans statut stop.",
+            partial_output=partial_output,
         )
 
     message = first_choice.get("message")
@@ -762,6 +906,7 @@ def _extract_structured_output(payload: Mapping[str, Any]) -> dict[str, Any]:
             "LLM_RESPONSE_INVALID_JSON",
             "La sortie structurée du LLM doit être un objet JSON.",
         )
+    _validate_structured_output_schema(structured_output, output_schema)
     return structured_output
 
 
@@ -775,16 +920,8 @@ def _build_provenance(
     completed_at: str,
 ) -> ModelProvenance:
     model_id = _required_payload_text(response.payload, "model", "LLM_RESPONSE_PROVENANCE_MISSING")
-    model_revision = _required_payload_text(
-        response.payload,
-        "model_revision",
-        "LLM_RESPONSE_PROVENANCE_MISSING",
-    )
-    runtime_version = _required_payload_text(
-        response.payload,
-        "runtime_version",
-        "LLM_RESPONSE_PROVENANCE_MISSING",
-    )
+    model_revision = _required_response_text(response, "model_revision", _MODEL_REVISION_HEADER)
+    runtime_version = _required_response_text(response, "runtime_version", _RUNTIME_VERSION_HEADER)
 
     return ModelProvenance(
         model_id=model_id,
@@ -793,7 +930,7 @@ def _build_provenance(
         prompt_id=request.prompt_id,
         prompt_version=request.prompt_version,
         schema_version=request.schema_version,
-        sampling_parameters=dict(request.sampling_parameters),
+        sampling_parameters=_thaw_json_value(request.sampling_parameters),
         input_hash=_sha256_json(body),
         output_hash=_sha256_json(structured_output),
         started_at=started_at,
@@ -810,6 +947,31 @@ def _required_payload_text(payload: Mapping[str, Any], field_name: str, code: st
     return value
 
 
+def _required_response_text(response: OpenAICompatibleResponse, field_name: str, header_name: str) -> str:
+    value = response.payload.get(field_name)
+    if value is None:
+        value = response.headers.get(header_name)
+    if not isinstance(value, str) or value.strip() == "":
+        raise LLMGatewayContractError("LLM_RESPONSE_PROVENANCE_MISSING", f"Champ de réponse requis absent: {field_name}")
+    if value != value.strip():
+        raise LLMGatewayContractError("LLM_RESPONSE_PROVENANCE_MISSING", f"Champ de réponse non normalisé: {field_name}")
+    return value
+
+
+def _optional_response_text(response: OpenAICompatibleResponse, field_name: str) -> str | None:
+    value = response.payload.get(field_name)
+    if value is None:
+        header_name = _MODEL_REVISION_HEADER if field_name == "model_revision" else _RUNTIME_VERSION_HEADER
+        value = response.headers.get(header_name)
+    if value is None:
+        return None
+    if not isinstance(value, str) or value.strip() == "":
+        return None
+    if value != value.strip():
+        return None
+    return value
+
+
 def _require_text(value: object, field_name: str, code: str) -> None:
     if not isinstance(value, str) or value.strip() == "":
         raise LLMGatewayContractError(code, f"Champ requis absent: {field_name}")
@@ -820,6 +982,129 @@ def _require_text(value: object, field_name: str, code: str) -> None:
 def _require_mapping(value: object, field_name: str, code: str) -> None:
     if not isinstance(value, Mapping) or len(value) == 0:
         raise LLMGatewayContractError(code, f"Objet requis absent: {field_name}")
+
+
+def _validate_structured_output_schema(output: Mapping[str, Any], schema: Mapping[str, Any]) -> None:
+    if schema.get("type") != "object":
+        raise LLMGatewayContractError(
+            "LLM_RESPONSE_SCHEMA_INVALID",
+            "Le schéma de sortie local doit être un objet JSON Schema.",
+        )
+
+    required = schema.get("required", ())
+    if not isinstance(required, (list, tuple)):
+        raise LLMGatewayContractError(
+            "LLM_RESPONSE_SCHEMA_INVALID",
+            "Le champ required du schéma de sortie doit être une liste.",
+        )
+    for field_name in required:
+        if not isinstance(field_name, str) or field_name.strip() == "":
+            raise LLMGatewayContractError(
+                "LLM_RESPONSE_SCHEMA_INVALID",
+                "Le champ required du schéma de sortie contient une entrée invalide.",
+            )
+        if field_name not in output:
+            raise LLMGatewayContractError(
+                "LLM_RESPONSE_SCHEMA_INVALID",
+                f"Champ de sortie requis absent: {field_name}",
+            )
+
+    properties = schema.get("properties", {})
+    if not isinstance(properties, Mapping):
+        raise LLMGatewayContractError(
+            "LLM_RESPONSE_SCHEMA_INVALID",
+            "Le champ properties du schéma de sortie doit être un objet.",
+        )
+
+    if schema.get("additionalProperties") is False:
+        allowed_fields = set(properties)
+        extra_fields = sorted(set(output).difference(allowed_fields))
+        if len(extra_fields) > 0:
+            raise LLMGatewayContractError(
+                "LLM_RESPONSE_SCHEMA_INVALID",
+                f"Champs de sortie non déclarés: {', '.join(extra_fields)}",
+            )
+
+    for field_name, property_schema in properties.items():
+        if field_name not in output:
+            continue
+        if not isinstance(property_schema, Mapping):
+            raise LLMGatewayContractError(
+                "LLM_RESPONSE_SCHEMA_INVALID",
+                f"Schéma de propriété invalide: {field_name}",
+            )
+        _validate_json_type(output[field_name], property_schema.get("type"), field_name)
+
+
+def _validate_json_type(value: Any, expected_type: Any, field_name: str) -> None:
+    if expected_type is None:
+        return
+    type_validators = {
+        "string": lambda item: isinstance(item, str),
+        "number": lambda item: (isinstance(item, (int, float)) and not isinstance(item, bool)),
+        "integer": lambda item: (isinstance(item, int) and not isinstance(item, bool)),
+        "boolean": lambda item: isinstance(item, bool),
+        "object": lambda item: isinstance(item, Mapping),
+        "array": lambda item: isinstance(item, list),
+    }
+    validator = type_validators.get(expected_type)
+    if validator is None:
+        raise LLMGatewayContractError(
+            "LLM_RESPONSE_SCHEMA_INVALID",
+            f"Type JSON Schema non supporté: {expected_type}",
+        )
+    if not validator(value):
+        raise LLMGatewayContractError(
+            "LLM_RESPONSE_SCHEMA_INVALID",
+            f"Type de sortie invalide pour {field_name}: {expected_type}",
+        )
+
+
+def _ttft_ms_from_headers(headers: Mapping[str, str]) -> float | None:
+    raw_value = headers.get(_TTFT_HEADER)
+    if raw_value is None:
+        return None
+    try:
+        parsed_value = float(raw_value)
+    except ValueError as exc:
+        raise LLMGatewayContractError(
+            "LLM_RESPONSE_TTFT_INVALID",
+            "Le header TTFT Spark doit être numérique.",
+        ) from exc
+    if parsed_value < 0:
+        raise LLMGatewayContractError(
+            "LLM_RESPONSE_TTFT_INVALID",
+            "Le header TTFT Spark doit être positif ou nul.",
+        )
+    return parsed_value
+
+
+def _freeze_json_value(value: Any, field_name: str) -> Any:
+    if isinstance(value, Mapping):
+        frozen_values = {}
+        for key, item in value.items():
+            if not isinstance(key, str) or key.strip() == "":
+                raise LLMGatewayContractError(
+                    "LLM_JSON_MAPPING_INVALID",
+                    f"Clé JSON invalide pour {field_name}.",
+                )
+            frozen_values[key] = _freeze_json_value(item, f"{field_name}.{key}")
+        return MappingProxyType(frozen_values)
+    if isinstance(value, tuple):
+        return tuple(_freeze_json_value(item, field_name) for item in value)
+    if isinstance(value, list):
+        return tuple(_freeze_json_value(item, field_name) for item in value)
+    return value
+
+
+def _thaw_json_value(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {key: _thaw_json_value(item) for key, item in value.items()}
+    if isinstance(value, tuple):
+        return [_thaw_json_value(item) for item in value]
+    if isinstance(value, list):
+        return [_thaw_json_value(item) for item in value]
+    return value
 
 
 def _canonical_json(value: Mapping[str, Any]) -> str:
@@ -852,7 +1137,9 @@ __all__ = [
     "OpenAICompatibleLocalLanguageModelGateway",
     "OpenAICompatibleResponse",
     "OpenAICompatibleTransport",
+    "SparkAuthenticationError",
     "SparkFirstTokenTimeoutError",
+    "SparkHTTPStatusError",
     "SparkStreamingInterruptedError",
     "SparkTLSCertificateInvalidError",
     "SparkUnavailableError",

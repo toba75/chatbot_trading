@@ -115,10 +115,33 @@ for expected_metric in (
     "llm_gateway_request_latency_ms",
     "llm_gateway_ttft_ms",
     "llm_gateway_payload_bytes",
-    "llm_gateway_retry_before_first_token_total",
 ):
     if expected_metric not in metric_names:
         raise AssertionError(f"Métrique gateway absente: {expected_metric}")
+
+collector.record_gateway_observation(
+    GatewayObservation(
+        trace_id="trace-unit-t010-retry",
+        request_id="request-unit-t010-retry",
+        idempotency_key="idem-unit-t010-retry",
+        phase="spark_inference",
+        status="RETRY_PENDING",
+        latency_ms=5.0,
+        served_model="gemma-research-t010",
+        model_revision=None,
+        runtime_version=None,
+        prompt_hash=prompt_hash,
+        request_payload_bytes=512,
+        response_payload_bytes=None,
+        ttft_ms=None,
+        retry_count=1,
+        circuit_open=False,
+        output_interrupted=False,
+        error_code="LLM_FIRST_TOKEN_TIMEOUT",
+    )
+)
+if "llm_gateway_retry_before_first_token_total" not in {metric.name for metric in collector.metrics()}:
+    raise AssertionError("Métrique de retry avant premier token absente.")
 
 collector.record_gateway_observation(
     GatewayObservation(

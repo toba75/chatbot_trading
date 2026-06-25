@@ -45,7 +45,7 @@ BASE_SERVICES = {
         "expose": ["8090"],
         "networks": ["core", "spark-egress"],
         "environment": {
-            "GEMMA_BASE_URL": "${GEMMA_BASE_URL?GEMMA_BASE_URL requis}",
+            "GEMMA_BASE_URL": "https://spark-inference:8443/v1",
             "GEMMA_MODEL": "${GEMMA_MODEL?GEMMA_MODEL requis}",
             "GEMMA_API_KEY_FILE": "/run/secrets/gemma_api_key",
             "GEMMA_CA_BUNDLE": "/run/secrets/spark_ca",
@@ -215,7 +215,17 @@ assert_raises(
 )
 
 assert_raises(
-    "Commande Compose non exécutable",
+    "Endpoint Spark invalide",
+    valid_compose({"llm-gateway": {"environment": {
+        "GEMMA_BASE_URL": "https://api.openai.com/v1",
+        "GEMMA_MODEL": "${GEMMA_MODEL?GEMMA_MODEL requis}",
+        "GEMMA_API_KEY_FILE": "/run/secrets/gemma_api_key",
+        "GEMMA_CA_BUNDLE": "/run/secrets/spark_ca",
+    }}}),
+)
+
+assert_raises(
+    "module_absent",
     valid_compose({"llm-gateway": {"command": ["python", "-m", "app.platform.module_absent"]}}),
 )
 

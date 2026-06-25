@@ -100,13 +100,14 @@ function Add-PublishedPortToService {
         [string] $ServiceId
     )
 
-    $serviceHeader = "  ${ServiceId}:`n"
+    $serviceHeader = "`n  ${ServiceId}:`n"
     if (-not $Content.Contains($serviceHeader)) {
         throw "Service fixture absent: $ServiceId"
     }
 
-    $publishedPort = "  ${ServiceId}:`n    ports:`n      - `"0.0.0.0:9191:9191`"`n"
-    return $Content.Replace($serviceHeader, $publishedPort)
+    $publishedPort = "`n  ${ServiceId}:`n    ports:`n      - `"0.0.0.0:9191:9191`"`n"
+    $serviceIndex = $Content.IndexOf($serviceHeader)
+    return $Content.Remove($serviceIndex, $serviceHeader.Length).Insert($serviceIndex, $publishedPort)
 }
 
 function Add-ProfilePublishedPortToService {
@@ -118,13 +119,14 @@ function Add-ProfilePublishedPortToService {
         [string] $ServiceId
     )
 
-    $serviceHeader = "  ${ServiceId}:`n"
+    $serviceHeader = "`n  ${ServiceId}:`n"
     if (-not $Content.Contains($serviceHeader)) {
         throw "Service fixture absent: $ServiceId"
     }
 
-    $publishedPort = "  ${ServiceId}:`n    profiles:`n      - debug`n    ports:`n      - `"127.0.0.1:6333:6333`"`n"
-    return $Content.Replace($serviceHeader, $publishedPort)
+    $publishedPort = "`n  ${ServiceId}:`n    profiles:`n      - debug`n    ports:`n      - `"127.0.0.1:6333:6333`"`n"
+    $serviceIndex = $Content.IndexOf($serviceHeader)
+    return $Content.Remove($serviceIndex, $serviceHeader.Length).Insert($serviceIndex, $publishedPort)
 }
 
 function Add-SparkEgressToService {
@@ -136,7 +138,7 @@ function Add-SparkEgressToService {
         [string] $ServiceId
     )
 
-    $serviceHeader = "  ${ServiceId}:`n"
+    $serviceHeader = "`n  ${ServiceId}:`n"
     $serviceIndex = $Content.IndexOf($serviceHeader)
     if ($serviceIndex -lt 0) {
         throw "Service fixture absent: $ServiceId"

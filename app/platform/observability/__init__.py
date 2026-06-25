@@ -79,11 +79,6 @@ class GatewayObservation:
                     "OBS_RESPONSE_PAYLOAD_SIZE_REQUIRED",
                     "La taille de reponse est requise pour une inference reussie.",
                 )
-            if self.ttft_ms is None:
-                raise ObservabilityContractError(
-                    "OBS_TTFT_REQUIRED",
-                    "Le temps jusqu'au premier token est requis pour une inference reussie.",
-                )
             if self.error_code is not None:
                 raise ObservabilityContractError(
                     "OBS_ERROR_CODE_FORBIDDEN",
@@ -309,7 +304,7 @@ class InMemoryObservabilityCollector:
                 observation=observation,
                 tags=base_tags,
             )
-        if observation.retry_count > 0:
+        if observation.status == "RETRY_PENDING" and observation.retry_count > 0:
             self._append_metric(
                 name="llm_gateway_retry_before_first_token_total",
                 value=observation.retry_count,
