@@ -192,7 +192,7 @@ try {
         $validContent | Set-Content -Encoding UTF8 -LiteralPath $externalSpecPath
         $externalResult = Invoke-M001Validator -SpecPath $externalSpecPath
         Assert-ExitCode -Actual $externalResult.ExitCode -Expected 1 -Message "Une sp$($eAcute)cification hors d$([char] 0x00E9)p$([char] 0x00F4)t doit $([char] 0x00EA)tre refus$($eAcute)e."
-        Assert-OutputContains -Output $externalResult.Output -Expected "Chemin hors d$([char] 0x00E9)p$([char] 0x00F4)t interdit" -Message "Le chemin externe doit $([char] 0x00EA)tre nomm$($eAcute)."
+        Assert-OutputContains -Output $externalResult.Output -Expected "Chemin hors depot interdit" -Message "Le chemin externe doit $([char] 0x00EA)tre nomm$($eAcute)."
     }
     finally {
         Remove-Item -LiteralPath $externalRoot -Recurse -Force

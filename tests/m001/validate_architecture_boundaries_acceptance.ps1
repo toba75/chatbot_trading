@@ -83,6 +83,7 @@ function Initialize-ControlledApp {
     $registry = Get-Content -Raw -Encoding UTF8 -LiteralPath $realRegistryPath | ConvertFrom-Json
 
     New-PythonPackageFile -Path (Join-Path $sampleAppRoot "__init__.py") -Content ""
+    New-PythonPackageFile -Path (Join-Path $sampleAppRoot "platform/__init__.py") -Content ""
     foreach ($context in @($registry.contexts)) {
         $contextRoot = Join-Path $sampleAppRoot $context.module
         New-PythonPackageFile -Path (Join-Path $contextRoot "__init__.py") -Content ""

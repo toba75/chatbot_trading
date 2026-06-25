@@ -7,6 +7,13 @@ import re
 from dataclasses import dataclass
 from typing import Any, Mapping
 
+from app.contracts._validation import (
+    dumps_contract_json,
+    ensure_allowed_fields,
+    ensure_utc_instant_value,
+    freeze_contract_value,
+    thaw_contract_value,
+)
 from app.contracts.identity import ContractSchemaVersion, DomainIdentifier
 
 
@@ -27,8 +34,19 @@ ALLOWED_RESEARCH_SUPPORT_STATUSES = frozenset(
 )
 
 _CLAIM_REF_PATTERN = re.compile(r"^(?P<claim_id>[A-Z]+-[A-Z0-9][A-Z0-9-]*)@(?P<version>[1-9][0-9]*)$")
-_UTC_INSTANT_PATTERN = re.compile(
-    r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+_VERIFIED_RESEARCH_OUTCOME_FIELDS = frozenset(
+    {
+        "schema_version",
+        "research_case_id",
+        "question",
+        "mandate",
+        "answer_id",
+        "support_status",
+        "claim_refs",
+        "unresolved_conflicts",
+        "knowledge_gaps",
+        "completed_at",
+    }
 )
 
 
@@ -117,6 +135,7 @@ class VerifiedResearchOutcome:
 
     @classmethod
     def from_payload(cls, payload: Mapping[str, Any]) -> "VerifiedResearchOutcome":
+        ensure_allowed_fields(payload, _VERIFIED_RESEARCH_OUTCOME_FIELDS, "VerifiedResearchOutcome")
         schema_version = ContractSchemaVersion.require_in_payload(
             payload,
             supported_schema_versions=RESEARCH_OUTCOME_SCHEMA_VERSIONS,
@@ -126,6 +145,11 @@ class VerifiedResearchOutcome:
         _ensure_conflict_visibility(
             support_status=support_status,
             unresolved_conflicts=unresolved_conflicts,
+        )
+        knowledge_gaps = _required_knowledge_gaps(payload)
+        _ensure_knowledge_gap_visibility(
+            support_status=support_status,
+            knowledge_gaps=knowledge_gaps,
         )
 
         return cls(
@@ -137,7 +161,7 @@ class VerifiedResearchOutcome:
             support_status=support_status,
             claim_refs=_required_claim_refs(payload, "claim_refs"),
             unresolved_conflicts=unresolved_conflicts,
-            knowledge_gaps=_required_knowledge_gaps(payload),
+            knowledge_gaps=knowledge_gaps,
             completed_at=_required_utc_instant(payload, "completed_at"),
         )
 
@@ -150,7 +174,7 @@ class VerifiedResearchOutcome:
             "schema_version": self.schema_version,
             "research_case_id": self.research_case_id,
             "question": self.question,
-            "mandate": _copy_contract_value(self.mandate),
+            "mandate": thaw_contract_value(self.mandate),
             "answer_id": self.answer_id,
             "support_status": self.support_status,
             "claim_refs": [str(claim_ref) for claim_ref in self.claim_refs],
@@ -183,6 +207,15 @@ def _required_support_status(payload: Mapping[str, Any]) -> str:
     return support_status
 
 
+def _ensure_knowledge_gap_visibility(
+    support_status: str,
+    knowledge_gaps: tuple[KnowledgeGapRef, ...],
+) -> None:
+    if support_status in {INSUFFICIENT_EVIDENCE_STATUS, REQUIRES_CURRENT_DATA_STATUS}:
+        if len(knowledge_gaps) == 0:
+            raise ValueError(f"knowledge_gaps requis pour {support_status}")
+
+
 def _required_mandate(payload: Mapping[str, Any]) -> dict[str, Any]:
     if "mandate" not in payload:
         raise ValueError("mandate absent")
@@ -191,7 +224,7 @@ def _required_mandate(payload: Mapping[str, Any]) -> dict[str, Any]:
         raise ValueError("mandate non objet")
     if len(mandate) == 0:
         raise ValueError("mandate vide")
-    return _copy_mapping_value(mandate, "mandate")
+    return freeze_contract_value(mandate, "valeur de contrat")
 
 
 def _required_claim_refs(
@@ -293,9 +326,7 @@ def _required_bool(payload: Mapping[str, Any], field_name: str) -> bool:
 
 def _required_utc_instant(payload: Mapping[str, Any], field_name: str) -> str:
     value = _required_text(payload, field_name)
-    if _UTC_INSTANT_PATTERN.fullmatch(value) is None:
-        raise ValueError(f"{field_name} invalide")
-    return value
+    return ensure_utc_instant_value(value, field_name)
 
 
 def _loads_contract_json(serialized_payload: str) -> Mapping[str, Any]:
@@ -307,44 +338,9 @@ def _loads_contract_json(serialized_payload: str) -> Mapping[str, Any]:
 
 
 def _dumps_contract_json(payload: Mapping[str, Any]) -> str:
-    return json.dumps(payload, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+    return dumps_contract_json(payload)
 
 
 def _ensure_mapping(value: Any, field_name: str) -> None:
     if not isinstance(value, Mapping):
         raise ValueError(f"{field_name} non objet")
-
-
-def _copy_mapping_value(value: Mapping[str, Any], field_name: str) -> dict[str, Any]:
-    copied_value: dict[str, Any] = {}
-    for key, child_value in value.items():
-        if not isinstance(key, str) or key.strip() == "":
-            raise ValueError(f"{field_name} invalide")
-        copied_value[key] = _copy_contract_value(child_value)
-    return copied_value
-
-
-def _copy_contract_value(value: Any) -> Any:
-    if value is None:
-        raise ValueError("valeur de contrat invalide")
-    if isinstance(value, str):
-        if value.strip() == "":
-            raise ValueError("valeur de contrat invalide")
-        if value != value.strip():
-            raise ValueError("valeur de contrat invalide")
-        return value
-    if isinstance(value, Mapping):
-        if len(value) == 0:
-            raise ValueError("valeur de contrat invalide")
-        return _copy_mapping_value(value, "valeur de contrat")
-    if isinstance(value, list):
-        if len(value) == 0:
-            raise ValueError("valeur de contrat invalide")
-        return [_copy_contract_value(child_value) for child_value in value]
-    if isinstance(value, tuple):
-        if len(value) == 0:
-            raise ValueError("valeur de contrat invalide")
-        return [_copy_contract_value(child_value) for child_value in value]
-    if isinstance(value, (bool, int, float)):
-        return value
-    raise ValueError("valeur de contrat invalide")

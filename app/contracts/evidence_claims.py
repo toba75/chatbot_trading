@@ -7,6 +7,12 @@ import re
 from dataclasses import dataclass
 from typing import Any, Mapping
 
+from app.contracts._validation import (
+    dumps_contract_json,
+    ensure_allowed_fields,
+    freeze_contract_value,
+    thaw_contract_value,
+)
 from app.contracts.identity import ContractSchemaVersion, DomainIdentifier
 from app.contracts.source_references import SourceLocator, SourceLocatorValidationPolicy
 
@@ -18,6 +24,28 @@ VERIFIED_CLAIM_STATUS = "VERIFIED"
 ALLOWED_VERIFIED_CLAIM_STATUSES = frozenset({VERIFIED_CLAIM_STATUS})
 
 _HASH_PATTERN = re.compile(r"^[0-9a-f]{32}$|^[0-9a-f]{64}$", re.IGNORECASE)
+_EVIDENCE_REF_FIELDS = frozenset(
+    {
+        "schema_version",
+        "evidence_id",
+        "source_locator",
+        "relation",
+        "quoted_span_hash",
+    }
+)
+_VERIFIED_CLAIM_REF_FIELDS = frozenset(
+    {
+        "schema_version",
+        "claim_id",
+        "claim_version",
+        "canonical_text",
+        "scope",
+        "status",
+        "verification_id",
+        "evidence_refs",
+        "dependency_group_ids",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -37,6 +65,7 @@ class EvidenceRef:
         source_locator_validation_policy: SourceLocatorValidationPolicy,
     ) -> "EvidenceRef":
         _ensure_source_locator_validation_policy(source_locator_validation_policy)
+        ensure_allowed_fields(payload, _EVIDENCE_REF_FIELDS, "EvidenceRef")
         schema_version = ContractSchemaVersion.require_in_payload(
             payload,
             supported_schema_versions=EVIDENCE_CLAIM_SCHEMA_VERSIONS,
@@ -98,6 +127,7 @@ class VerifiedClaimRef:
         source_locator_validation_policy: SourceLocatorValidationPolicy,
     ) -> "VerifiedClaimRef":
         _ensure_source_locator_validation_policy(source_locator_validation_policy)
+        ensure_allowed_fields(payload, _VERIFIED_CLAIM_REF_FIELDS, "VerifiedClaimRef")
         schema_version = ContractSchemaVersion.require_in_payload(
             payload,
             supported_schema_versions=EVIDENCE_CLAIM_SCHEMA_VERSIONS,
@@ -138,7 +168,7 @@ class VerifiedClaimRef:
             "claim_id": self.claim_id,
             "claim_version": self.claim_version,
             "canonical_text": self.canonical_text,
-            "scope": _copy_scope_value(self.scope),
+            "scope": thaw_contract_value(self.scope),
             "status": self.status,
             "verification_id": self.verification_id,
             "evidence_refs": [evidence_ref.to_payload() for evidence_ref in self.evidence_refs],
@@ -234,37 +264,7 @@ def _required_scope(payload: Mapping[str, Any]) -> dict[str, Any]:
     if len(scope) == 0:
         raise ValueError("scope vide")
 
-    copied_scope: dict[str, Any] = {}
-    for scope_key, scope_value in scope.items():
-        if not isinstance(scope_key, str) or scope_key.strip() == "":
-            raise ValueError("scope invalide")
-        copied_scope[scope_key] = _copy_scope_value(scope_value)
-
-    return copied_scope
-
-
-def _copy_scope_value(value: Any) -> Any:
-    if value is None:
-        raise ValueError("scope invalide")
-    if isinstance(value, str):
-        if value.strip() == "":
-            raise ValueError("scope invalide")
-        return value
-    if isinstance(value, Mapping):
-        if len(value) == 0:
-            raise ValueError("scope invalide")
-        return {key: _copy_scope_value(child_value) for key, child_value in value.items()}
-    if isinstance(value, list):
-        if len(value) == 0:
-            raise ValueError("scope invalide")
-        return [_copy_scope_value(child_value) for child_value in value]
-    if isinstance(value, tuple):
-        if len(value) == 0:
-            raise ValueError("scope invalide")
-        return [_copy_scope_value(child_value) for child_value in value]
-    if isinstance(value, (bool, int, float)):
-        return value
-    raise ValueError("scope invalide")
+    return freeze_contract_value(scope, "scope")
 
 
 def _required_dependency_group_ids(payload: Mapping[str, Any]) -> tuple[str, ...]:
@@ -343,4 +343,4 @@ def _loads_contract_json(serialized_payload: str) -> Mapping[str, Any]:
 
 
 def _dumps_contract_json(payload: Mapping[str, Any]) -> str:
-    return json.dumps(payload, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+    return dumps_contract_json(payload)

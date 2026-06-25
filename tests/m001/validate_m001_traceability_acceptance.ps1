@@ -200,8 +200,13 @@ $journalContent = Get-Content -Raw -Encoding UTF8 -LiteralPath $journalPath
 if ($journalContent.Contains("Commit de clôture T-011") -or $journalContent.Contains("Commit de clÃ´ture T-011")) {
     throw "Journal M-001 incomplet: commit de clôture T-011 non renseigné."
 }
-$expectedT011Pattern = "\| T-011 - Relier M-001 .+ gates \| `?[0-9a-f]{7,40}`? \| `?[0-9a-f]{7,40}`? \|"
-if ($journalContent -notmatch $expectedT011Pattern) {
+$t011JournalLine = @(Get-Content -Encoding UTF8 -LiteralPath $journalPath | Where-Object { $_ -like "| T-011 - Relier M-001*|" })
+if ($t011JournalLine.Count -ne 1) {
+    throw "Journal M-001 incomplet: ligne T-011 introuvable."
+}
+$t011Cells = Split-MarkdownRow -Line $t011JournalLine[0]
+$commitCellPattern = '^[`]?[0-9a-f]{7,40}[`]?$'
+if (($t011Cells[1] -notmatch $commitCellPattern) -or ($t011Cells[2] -notmatch $commitCellPattern)) {
     throw "Journal M-001 incomplet: T-011 doit citer ses commits RED et GREEN."
 }
 

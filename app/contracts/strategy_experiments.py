@@ -7,6 +7,13 @@ import re
 from dataclasses import dataclass
 from typing import Any, Mapping
 
+from app.contracts._validation import (
+    dumps_contract_json,
+    ensure_allowed_fields,
+    ensure_utc_instant_value,
+    freeze_contract_value,
+    thaw_contract_value,
+)
 from app.contracts.identity import ContractSchemaVersion, DomainIdentifier
 from app.contracts.research_outcomes import VersionedClaimRef
 
@@ -26,8 +33,38 @@ ALLOWED_EXPERIMENT_RESULT_STATUSES = frozenset(
 )
 
 _HASH_PATTERN = re.compile(r"^[0-9a-f]{32}$|^[0-9a-f]{64}$", re.IGNORECASE)
-_UTC_INSTANT_PATTERN = re.compile(
-    r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+_STRATEGY_SNAPSHOT_FIELDS = frozenset(
+    {
+        "schema_version",
+        "strategy_id",
+        "strategy_version_id",
+        "spec_hash",
+        "status",
+        "rules",
+        "parameters",
+        "constraints",
+        "data_requirements",
+        "validation_plan",
+        "evidence_refs",
+        "created_at",
+    }
+)
+_EXPERIMENT_RESULT_FIELDS = frozenset(
+    {
+        "schema_version",
+        "experiment_id",
+        "strategy_version_id",
+        "data_snapshot_id",
+        "result_hash",
+        "code_version",
+        "status",
+        "frozen_inputs",
+        "metrics",
+        "diagnostics",
+        "artifacts",
+        "started_at",
+        "completed_at",
+    }
 )
 _MUTABLE_MARKER_KEYS = frozenset(
     {
@@ -75,6 +112,7 @@ class StrategySnapshot:
             payload,
             mutable_error_message="reference mutable interdite",
         )
+        ensure_allowed_fields(payload, _STRATEGY_SNAPSHOT_FIELDS, "StrategySnapshot")
         schema_version = ContractSchemaVersion.require_in_payload(
             payload,
             supported_schema_versions=STRATEGY_EXPERIMENT_SCHEMA_VERSIONS,
@@ -110,14 +148,14 @@ class StrategySnapshot:
             "strategy_version_id": self.strategy_version_id,
             "spec_hash": self.spec_hash,
             "status": self.status,
-            "rules": [_copy_contract_value(rule) for rule in self.rules],
-            "parameters": [_copy_contract_value(parameter) for parameter in self.parameters],
-            "constraints": [_copy_contract_value(constraint) for constraint in self.constraints],
+            "rules": [thaw_contract_value(rule) for rule in self.rules],
+            "parameters": [thaw_contract_value(parameter) for parameter in self.parameters],
+            "constraints": [thaw_contract_value(constraint) for constraint in self.constraints],
             "data_requirements": [
-                _copy_contract_value(data_requirement)
+                thaw_contract_value(data_requirement)
                 for data_requirement in self.data_requirements
             ],
-            "validation_plan": _copy_contract_value(self.validation_plan),
+            "validation_plan": thaw_contract_value(self.validation_plan),
             "evidence_refs": [str(evidence_ref) for evidence_ref in self.evidence_refs],
             "created_at": self.created_at,
         }
@@ -151,6 +189,7 @@ class ExperimentResult:
             payload,
             mutable_error_message="entree mutable interdite",
         )
+        ensure_allowed_fields(payload, _EXPERIMENT_RESULT_FIELDS, "ExperimentResult")
         schema_version = ContractSchemaVersion.require_in_payload(
             payload,
             supported_schema_versions=STRATEGY_EXPERIMENT_SCHEMA_VERSIONS,
@@ -190,10 +229,10 @@ class ExperimentResult:
             "result_hash": self.result_hash,
             "code_version": self.code_version,
             "status": self.status,
-            "frozen_inputs": _copy_contract_value(self.frozen_inputs),
-            "metrics": _copy_contract_value(self.metrics),
-            "diagnostics": _copy_contract_value(self.diagnostics),
-            "artifacts": [_copy_contract_value(artifact) for artifact in self.artifacts],
+            "frozen_inputs": thaw_contract_value(self.frozen_inputs),
+            "metrics": thaw_contract_value(self.metrics),
+            "diagnostics": thaw_contract_value(self.diagnostics),
+            "artifacts": [thaw_contract_value(artifact) for artifact in self.artifacts],
             "started_at": self.started_at,
             "completed_at": self.completed_at,
         }
@@ -231,7 +270,7 @@ def _required_strategy_rules(payload: Mapping[str, Any]) -> tuple[Mapping[str, A
         if rule["deterministic"] is not True:
             raise ValueError("regle non deterministe")
         _required_versioned_claim_refs(rule, "evidence_refs")
-        parsed_rules.append(_copy_contract_value(rule))
+        parsed_rules.append(freeze_contract_value(rule, "valeur de contrat"))
     return tuple(parsed_rules)
 
 
@@ -246,7 +285,7 @@ def _required_strategy_parameters(payload: Mapping[str, Any]) -> tuple[Mapping[s
         _ensure_parameter_value_declared(parameter)
         if blocking and resolution_status != "RESOLVED":
             raise ValueError("parametre bloquant non resolu")
-        parsed_parameters.append(_copy_contract_value(parameter))
+        parsed_parameters.append(freeze_contract_value(parameter, "valeur de contrat"))
     return tuple(parsed_parameters)
 
 
@@ -256,7 +295,7 @@ def _required_constraints(payload: Mapping[str, Any]) -> tuple[Mapping[str, Any]
     for constraint in constraints:
         _required_text(constraint, "name")
         _required_text(constraint, "origin")
-        parsed_constraints.append(_copy_contract_value(constraint))
+        parsed_constraints.append(freeze_contract_value(constraint, "valeur de contrat"))
     return tuple(parsed_constraints)
 
 
@@ -267,7 +306,7 @@ def _required_data_requirements(payload: Mapping[str, Any]) -> tuple[Mapping[str
         _required_text(data_requirement, "name")
         _required_text(data_requirement, "frequency")
         _required_bool(data_requirement, "point_in_time")
-        parsed_data_requirements.append(_copy_contract_value(data_requirement))
+        parsed_data_requirements.append(freeze_contract_value(data_requirement, "valeur de contrat"))
     return tuple(parsed_data_requirements)
 
 
@@ -298,7 +337,7 @@ def _required_artifacts(payload: Mapping[str, Any]) -> tuple[Mapping[str, Any], 
         _required_text(artifact, "artifact_id")
         _required_text(artifact, "artifact_type")
         _required_hash(artifact, "artifact_hash")
-        parsed_artifacts.append(_copy_contract_value(artifact))
+        parsed_artifacts.append(freeze_contract_value(artifact, "valeur de contrat"))
     return tuple(parsed_artifacts)
 
 
@@ -446,9 +485,7 @@ def _required_hash(payload: Mapping[str, Any], field_name: str) -> str:
 
 def _required_utc_instant(payload: Mapping[str, Any], field_name: str) -> str:
     value = _required_text(payload, field_name)
-    if _UTC_INSTANT_PATTERN.fullmatch(value) is None:
-        raise ValueError(f"{field_name} invalide")
-    return value
+    return ensure_utc_instant_value(value, field_name)
 
 
 def _loads_contract_json(serialized_payload: str) -> Mapping[str, Any]:
@@ -460,7 +497,7 @@ def _loads_contract_json(serialized_payload: str) -> Mapping[str, Any]:
 
 
 def _dumps_contract_json(payload: Mapping[str, Any]) -> str:
-    return json.dumps(payload, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+    return dumps_contract_json(payload)
 
 
 def _ensure_mapping(value: Any, field_name: str) -> None:
@@ -469,33 +506,4 @@ def _ensure_mapping(value: Any, field_name: str) -> None:
 
 
 def _copy_mapping_value(value: Mapping[str, Any], field_name: str) -> dict[str, Any]:
-    copied_value: dict[str, Any] = {}
-    for key, child_value in value.items():
-        if not isinstance(key, str) or key.strip() == "":
-            raise ValueError(f"{field_name} invalide")
-        copied_value[key] = _copy_contract_value(child_value)
-    return copied_value
-
-
-def _copy_contract_value(value: Any) -> Any:
-    if value is None:
-        raise ValueError("valeur de contrat invalide")
-    if isinstance(value, str):
-        if value.strip() == "" or value != value.strip():
-            raise ValueError("valeur de contrat invalide")
-        return value
-    if isinstance(value, Mapping):
-        if len(value) == 0:
-            raise ValueError("valeur de contrat invalide")
-        return _copy_mapping_value(value, "valeur de contrat")
-    if isinstance(value, list):
-        if len(value) == 0:
-            raise ValueError("valeur de contrat invalide")
-        return [_copy_contract_value(child_value) for child_value in value]
-    if isinstance(value, tuple):
-        if len(value) == 0:
-            raise ValueError("valeur de contrat invalide")
-        return [_copy_contract_value(child_value) for child_value in value]
-    if isinstance(value, (bool, int, float)):
-        return value
-    raise ValueError("valeur de contrat invalide")
+    return freeze_contract_value(value, "valeur de contrat")

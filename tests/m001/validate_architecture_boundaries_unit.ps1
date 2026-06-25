@@ -40,6 +40,7 @@ function New-ControlledApp {
     $registry = Get-Content -Raw -Encoding UTF8 -LiteralPath $realRegistryPath | ConvertFrom-Json
 
     New-PythonPackageFile -Path (Join-Path $sampleAppRoot "__init__.py") -Content ""
+    New-PythonPackageFile -Path (Join-Path $sampleAppRoot "platform/__init__.py") -Content ""
     foreach ($context in @($registry.contexts)) {
         $contextRoot = Join-Path $sampleAppRoot $context.module
         New-PythonPackageFile -Path (Join-Path $contextRoot "__init__.py") -Content ""
@@ -232,7 +233,9 @@ def load_source():
 
     $emptyAppRoot = Join-Path $repoRoot (".tmp/ost_m001_arch_unit_empty_" + [System.Guid]::NewGuid().ToString("N"))
     $createdRoots += $emptyAppRoot
-    New-Item -ItemType Directory -Force -Path $emptyAppRoot | Out-Null
+    New-PythonPackageFile -Path (Join-Path $emptyAppRoot "__init__.py") -Content ""
+    New-PythonPackageFile -Path (Join-Path $emptyAppRoot "contracts/__init__.py") -Content ""
+    New-PythonPackageFile -Path (Join-Path $emptyAppRoot "platform/__init__.py") -Content ""
     $emptyResult = Invoke-ArchitectureBoundaryValidator -AppRoot $emptyAppRoot -ContextRegistryPath $realRegistryPath
     if ($emptyResult.ExitCode -eq 0) {
         throw "Un AppRoot vide doit etre refuse."
@@ -247,7 +250,9 @@ def load_source():
     $createdRoots += $missingPython.Root
     $powershellExecutable = (Get-Command powershell -ErrorAction Stop).Source
     $previousPath = $env:PATH
+    $previousMissingPythonErrorActionPreference = $ErrorActionPreference
     $env:PATH = $PSHOME
+    $ErrorActionPreference = "Continue"
     try {
         $missingPythonOutput = & $powershellExecutable `
             -NoProfile `
@@ -261,6 +266,7 @@ def load_source():
     }
     finally {
         $env:PATH = $previousPath
+        $ErrorActionPreference = $previousMissingPythonErrorActionPreference
     }
     $missingPythonText = $missingPythonOutput -join "`n"
     if ($missingPythonExitCode -eq 0) {

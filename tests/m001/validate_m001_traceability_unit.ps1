@@ -57,7 +57,7 @@ function New-M001MatrixContent {
 | REQ-M001-007 | docs/tasks/milestone_001/0007_publier_research_outcome_acl_strategie.md | Couvert | tests/m001/validate_research_outcome_contract_acceptance.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m001\validate_research_outcome_contract_acceptance.ps1 | app/contracts/research_outcomes.py | DDD-ADR-001; DDD-ADR-002; DDD-ADR-005; DDD-ADR-007 | $documentedDecision |
 | REQ-M001-008 | docs/tasks/milestone_001/0008_publier_snapshot_strategie_resultat_experience.md | Couvert | tests/m001/validate_strategy_experiment_contracts_acceptance.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m001\validate_strategy_experiment_contracts_acceptance.ps1 | app/contracts/strategy_experiments.py | DDD-ADR-009 | $documentedDecision |
 | REQ-M001-009 | docs/tasks/milestone_001/0009_publier_enveloppe_evenement_versionnee.md | Couvert | tests/m001/validate_event_envelope_acceptance.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m001\validate_event_envelope_acceptance.ps1 | app/contracts/event_envelope.py | DDD-ADR-006; DDD-ADR-008 | $documentedDecision |
-| REQ-M001-010 | docs/tasks/milestone_001/0010_interdire_couplages_intercontextes.md | Couvert | tests/m001/validate_architecture_boundaries_acceptance.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m001\validate_architecture_boundaries_acceptance.ps1 | scripts/validate_architecture_boundaries.py | DDD-ADR-001 | $documentedDecision |
+| REQ-M001-010 | docs/tasks/milestone_001/0010_interdire_couplages_intercontextes.md | Couvert | tests/m001/validate_architecture_boundaries_acceptance.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m001\validate_architecture_boundaries_acceptance.ps1 | scripts/validate_architecture_boundaries.py | DDD-ADR-001; ADR-011 | $documentedDecision |
 | REQ-M001-011 | docs/tasks/milestone_001/0011_relier_m001_tracabilite_gates.md | Couvert | tests/m001/validate_m001_traceability_acceptance.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_traceability.ps1 | scripts/validate_traceability.ps1 | ADR-010 | $documentedDecision |
 "@
 }
@@ -177,6 +177,7 @@ function New-TemporaryProject {
 
     $adrFiles = @(
         "docs/adr/ADR-010-gates-gouvernance-powershell.md",
+        "docs/adr/ADR-011-python-outille-pour-validateurs-architecture.md",
         "docs/adr/DDD-ADR-001-monolithe-modulaire.md",
         "docs/adr/DDD-ADR-002-cycles-de-vie-separes.md",
         "docs/adr/DDD-ADR-003-source-locator-langage-publie.md",

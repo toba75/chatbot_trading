@@ -48,18 +48,18 @@ Cette spécification matérialise la carte DDD v4.1 pour M-001. Elle ne crée pa
 
 ## Relations intercontextes publiées
 
-| Relation | Producteur | Consommateur | Contrat publié | Type | Modèle interne interdit |
-|---|---|---|---|---|---|
-| SP -> KA | SP | KA | CanonicalSourcePublished | Published Language | tables, agrégats, diagnostics et chemins internes SP |
-| SP -> EG | SP | EG | CanonicalSourcePublished | Published Language | tables, agrégats, diagnostics et chemins internes SP |
-| KA -> RA | KA | RA | SearchEvidence API | Customer/Supplier | Qdrant, embeddings, scores bruts et logique de fusion KA |
-| EG -> RA | EG | RA | VerifiedClaimRef | Published Language | graphe de claims, cas de vérification et états internes EG |
-| EG -> SD | EG | SD | VerifiedClaimRef | Published Language | graphe de claims, cas de vérification et états internes EG |
-| RA -> SD | RA | SD | VerifiedResearchOutcome | Anti-Corruption Layer | brouillons de réponse, jeux de preuves et états de recherche RA |
-| SD -> EX | SD | EX | StrategySnapshot | Published Language immuable | stratégie candidate mutable, paramètres ouverts et règles internes SD |
-| CV -> RA | CV | RA | ResolvedQuestion | façade applicative | historique conversationnel, tours et snapshots internes CV |
-| CV -> SD | CV | SD | StrategyRequest | façade applicative | historique conversationnel, préférences et tours internes CV |
-| CV -> EX | EX | CV | GetExperiment | façade applicative | registre d'expérience, diagnostics et artefacts internes EX |
+| Relation | Producteur | Consommateur | Contrat publié | Statut M-001 | Type | Modèle interne interdit |
+|---|---|---|---|---|---|---|
+| SP -> KA | SP | KA | CanonicalSourcePublished | Livré | Published Language | tables, agrégats, diagnostics et chemins internes SP |
+| SP -> EG | SP | EG | CanonicalSourcePublished | Livré | Published Language | tables, agrégats, diagnostics et chemins internes SP |
+| KA -> RA | KA | RA | SearchEvidence API | Réservé | Customer/Supplier | Qdrant, embeddings, scores bruts et logique de fusion KA |
+| EG -> RA | EG | RA | VerifiedClaimRef | Livré | Published Language | graphe de claims, cas de vérification et états internes EG |
+| EG -> SD | EG | SD | VerifiedClaimRef | Livré | Published Language | graphe de claims, cas de vérification et états internes EG |
+| RA -> SD | RA | SD | VerifiedResearchOutcome | Livré | Anti-Corruption Layer | brouillons de réponse, jeux de preuves et états de recherche RA |
+| SD -> EX | SD | EX | StrategySnapshot | Livré | Published Language immuable | stratégie candidate mutable, paramètres ouverts et règles internes SD |
+| CV -> RA | CV | RA | ResolvedQuestion | Réservé | façade applicative | historique conversationnel, tours et snapshots internes CV |
+| CV -> SD | CV | SD | StrategyRequest | Réservé | façade applicative | historique conversationnel, préférences et tours internes CV |
+| CV -> EX | EX | CV | GetExperiment | Réservé | façade applicative | registre d'expérience, diagnostics et artefacts internes EX |
 
 La relation `CV -> EX` décrit la demande applicative portée par CV pour consulter un résultat ou un artefact d'expérience. EX reste producteur du contrat publié et CV reste consommateur; CV ne lit jamais le registre interne d'EX.
 
@@ -76,7 +76,7 @@ La relation `CV -> EX` décrit la demande applicative portée par CV pour consul
 | StrategyRequest | CV | SD | intention de conception, contraintes utilisateur et références vérifiées disponibles |
 | GetExperiment | EX | CV | requête de consultation d'expérience et réponse contrôlée par EX sans exposition du registre interne |
 
-Chaque contrat M-001 DEVRA être versionné dans les tâches de contrat dédiées. À ce stade, la présente spécification ne définit que le nom, le producteur, les consommateurs et le modèle interdit.
+Les lignes `Livré` correspondent aux contrats versionnés et fixtures publiés par M-001. Les lignes `Réservé` nomment la relation attendue par la context map v4.1, mais leur schéma détaillé reste à publier par un milestone ultérieur ou par une nouvelle ADR si leur sens change.
 
 ## Règles de dépendance
 
@@ -110,8 +110,8 @@ Chaque contrat M-001 DEVRA être versionné dans les tâches de contrat dédiée
 
 ## Hors périmètre M-001
 
-- Création des modules applicatifs physiques.
-- Définition détaillée des schémas de sérialisation de chaque contrat.
+- Implémentation des comportements métier internes des contextes au-delà des contrats publiés M-001.
+- Définition détaillée des schémas des relations marquées `Réservé`.
 - Création de persistance opérationnelle, migration de données ou stockage concret.
 - Implémentation d'UI, de connecteur externe ou d'adaptateur de plateforme.
 - Extraction d'un bounded context en microservice.

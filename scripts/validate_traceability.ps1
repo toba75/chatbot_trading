@@ -109,7 +109,7 @@ $requiredM001Requirements = @(
         Test = "tests/m001/validate_architecture_boundaries_acceptance.ps1"
         CommandScript = "tests/m001/validate_architecture_boundaries_acceptance.ps1"
         Code = "scripts/validate_architecture_boundaries.py"
-        Adr = "DDD-ADR-001"
+        Adr = "DDD-ADR-001; ADR-011"
     },
     [ordered] @{
         Id = "REQ-M001-011"
@@ -388,6 +388,17 @@ function Assert-M001RequirementRows {
         return
     }
 
+    $canonicalMatrixPath = [System.IO.Path]::GetFullPath((Join-Path $repoRoot "docs/traceability/matrix.md"))
+    $currentMatrixPath = [System.IO.Path]::GetFullPath($matrixPath)
+    if (-not $currentMatrixPath.Equals($canonicalMatrixPath, [System.StringComparison]::OrdinalIgnoreCase)) {
+        $containsM001Rows = @($Rows | Where-Object {
+            (Get-MatrixRowCell -Row $_ -CellName "Exigence" -RequirementId "ligne inconnue") -match "^REQ-M001-"
+        }).Count -gt 0
+        if (-not $containsM001Rows) {
+            return
+        }
+    }
+
     $rowsByRequirementId = @{}
     foreach ($row in $Rows) {
         $requirementId = Get-MatrixRowCell -Row $row -CellName "Exigence" -RequirementId "ligne inconnue"
@@ -447,6 +458,16 @@ else {
     if (-not [System.IO.Path]::IsPathRooted($matrixPath)) {
         $matrixPath = Join-Path $repoRoot $matrixPath
     }
+
+    $resolvedRepositoryRoot = [System.IO.Path]::GetFullPath($repoRoot)
+    $resolvedMatrixPath = [System.IO.Path]::GetFullPath($matrixPath)
+    $repositoryPrefix = $resolvedRepositoryRoot.TrimEnd("\", "/") + [System.IO.Path]::DirectorySeparatorChar
+
+    Assert-Condition `
+        -Condition ($resolvedMatrixPath.StartsWith($repositoryPrefix, [System.StringComparison]::OrdinalIgnoreCase)) `
+        -Message "Chemin hors depot interdit (matrice): $resolvedMatrixPath"
+
+    $matrixPath = $resolvedMatrixPath
 }
 
 Assert-Condition `

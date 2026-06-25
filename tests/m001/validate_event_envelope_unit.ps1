@@ -41,6 +41,11 @@ def valid_payload():
             "canonical_source_id": "CSRC-000001",
             "document_id": "DOC-000001",
             "canonical_version_id": "CVER-000004",
+            "source_sha256": "a" * 64,
+            "canonical_artifact_sha256": "b" * 64,
+            "page_count": 2,
+            "accepted_at": "2026-06-21T08:30:00Z",
+            "quality_policy_version": "source-qa-v3",
         },
     }
 
@@ -68,6 +73,11 @@ if ALLOWED_EVENT_PRODUCER_CONTEXTS != expected_contexts:
 for context in sorted(ALLOWED_EVENT_PRODUCER_CONTEXTS):
     payload = valid_payload()
     payload["producer_context"] = context
+    if context != "SP":
+        payload["event_type"] = "BoundaryContractVerified"
+        payload["aggregate_type"] = "BoundaryContract"
+        payload["aggregate_id"] = "EVS-000001"
+        payload["payload"] = {"schema_version": "1.0", "event_marker": "verified"}
     EventEnvelope.from_payload(payload)
 
 missing_event_id = valid_payload()

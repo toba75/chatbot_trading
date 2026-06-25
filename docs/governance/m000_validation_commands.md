@@ -22,6 +22,14 @@ git fetch origin --prune
 
 La branche locale `master` DOIT exister et représenter la base de comparaison attendue du dépôt.
 
+## Préconditions d'outillage
+
+M-001 ajoute un validateur d'architecture qui inspecte l'AST Python avec la bibliothèque standard. Cette dépendance d'outillage est documentée par `docs/adr/ADR-011-python-outille-pour-validateurs-architecture.md`.
+
+Avant d'exécuter `scripts/test.ps1`, `scripts/lint.ps1` ou `scripts/validate_architecture_boundaries.ps1`, l'appelant DOIT disposer de `python` dans `PATH` avec une version `3.10` ou supérieure.
+
+Le wrapper `scripts/validate_architecture_boundaries.ps1` refuse explicitement un interpréteur absent, trop ancien ou non résolu.
+
 ## Périmètre des tests
 
 `scripts/test.ps1` exécute les validateurs M-000, les validateurs M-001, les tests d'acceptation et unitaires de gouvernance livrés par M-000, puis les tests d'acceptation et unitaires M-001.
@@ -54,6 +62,6 @@ M-000 ne livre pas de code métier applicatif. L'absence de suite applicative re
 
 ## Extension M-001
 
-M-001 ajoute les contrats publiés, le registre de contextes et les frontières d'import aux gates existantes sans changer la politique d'exécution ADR-010.
+M-001 ajoute les contrats publiés, le registre de contextes et les frontières d'import aux gates existantes sans changer les points d'entrée PowerShell ADR-010. Le validateur d'architecture utilise Python comme outillage interne selon ADR-011.
 
 Les tests M-001 restent non récursifs: ils valident les contrats, fixtures, règles d'architecture et lignes de traçabilité sans relancer `scripts/test.ps1`.

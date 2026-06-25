@@ -7,7 +7,16 @@ import re
 from dataclasses import dataclass
 from typing import Any, Iterable, Mapping
 
+from app.contracts._validation import (
+    dumps_contract_json,
+    ensure_allowed_fields,
+    ensure_no_forbidden_contract_keys,
+    ensure_utc_instant_value,
+    freeze_contract_value,
+    thaw_contract_value,
+)
 from app.contracts.identity import DomainIdentifier
+from app.contracts.source_references import CanonicalSourceRef
 
 
 SUPPORTED_EVENT_VERSIONS = frozenset({1})
@@ -42,8 +51,20 @@ _CORRELATION_ID_PATTERN = re.compile(r"^CORR-[A-Z0-9][A-Z0-9-]*$")
 _CAUSATION_ID_PATTERN = re.compile(r"^(CMD|EVT)-[A-Z0-9][A-Z0-9-]*$")
 _EVENT_TYPE_PATTERN = re.compile(r"^[A-Z][A-Za-z0-9]*$")
 _TECHNICAL_JOB_NAME_PATTERN = re.compile(r"^[A-Z0-9]+(?:_[A-Z0-9]+)+$")
-_UTC_INSTANT_PATTERN = re.compile(
-    r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+_EVENT_ENVELOPE_FIELDS = frozenset(
+    {
+        "event_id",
+        "event_type",
+        "event_version",
+        "occurred_at",
+        "aggregate_type",
+        "aggregate_id",
+        "aggregate_version",
+        "correlation_id",
+        "causation_id",
+        "producer_context",
+        "payload",
+    }
 )
 _COMMAND_PREFIXES = (
     "Accept",
@@ -93,18 +114,33 @@ class EventEnvelope:
     @classmethod
     def from_payload(cls, payload: Mapping[str, Any]) -> "EventEnvelope":
         _ensure_mapping(payload, "EventEnvelope")
+        ensure_allowed_fields(payload, _EVENT_ENVELOPE_FIELDS, "EventEnvelope")
+        event_type = _required_event_type(payload)
+        occurred_at = _required_utc_instant(payload, "occurred_at")
+        aggregate_type = _required_aggregate_type(payload)
+        aggregate_id = _required_aggregate_id(payload)
+        producer_context = _required_producer_context(payload)
+        event_payload = _required_event_payload(payload)
+        _validate_typed_event_payload(
+            event_type=event_type,
+            aggregate_type=aggregate_type,
+            aggregate_id=aggregate_id,
+            occurred_at=occurred_at,
+            producer_context=producer_context,
+            event_payload=event_payload,
+        )
         return cls(
             event_id=_required_event_id(payload),
-            event_type=_required_event_type(payload),
+            event_type=event_type,
             event_version=_required_event_version(payload),
-            occurred_at=_required_utc_instant(payload, "occurred_at"),
-            aggregate_type=_required_aggregate_type(payload),
-            aggregate_id=_required_aggregate_id(payload),
+            occurred_at=occurred_at,
+            aggregate_type=aggregate_type,
+            aggregate_id=aggregate_id,
             aggregate_version=_required_positive_integer(payload, "aggregate_version"),
             correlation_id=_required_correlation_id(payload),
             causation_id=_required_causation_id(payload),
-            producer_context=_required_producer_context(payload),
-            payload=_required_event_payload(payload),
+            producer_context=producer_context,
+            payload=event_payload,
         )
 
     @classmethod
@@ -123,7 +159,7 @@ class EventEnvelope:
             "correlation_id": self.correlation_id,
             "causation_id": self.causation_id,
             "producer_context": self.producer_context,
-            "payload": _copy_event_payload_value(self.payload),
+            "payload": thaw_contract_value(self.payload),
         }
 
     def to_json(self) -> str:
@@ -139,7 +175,7 @@ class EventIdempotenceDecision:
     ledger: "EventIdempotenceLedger"
 
 
-@dataclass(frozen=True)
+@dataclass
 class EventIdempotenceLedger:
     """Etat de test non persistant des event_id deja traites."""
 
@@ -174,12 +210,11 @@ class EventIdempotenceLedger:
                 ledger=self,
             )
 
+        self.processed_event_ids = self.processed_event_ids | frozenset({event_id})
         return EventIdempotenceDecision(
             event_id=event_id,
             already_processed=False,
-            ledger=EventIdempotenceLedger(
-                processed_event_ids=self.processed_event_ids | frozenset({event_id}),
-            ),
+            ledger=self,
         )
 
 
@@ -264,7 +299,38 @@ def _required_event_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
     event_payload = payload["payload"]
     if not isinstance(event_payload, Mapping):
         raise ValueError("payload non objet")
-    return _copy_event_payload_mapping(event_payload, "payload")
+    ensure_no_forbidden_contract_keys(event_payload, "payload")
+    return freeze_contract_value(
+        event_payload,
+        "payload",
+        allow_empty_sequence=True,
+    )
+
+
+def _validate_typed_event_payload(
+    event_type: str,
+    aggregate_type: str,
+    aggregate_id: str,
+    occurred_at: str,
+    producer_context: str,
+    event_payload: Mapping[str, Any],
+) -> None:
+    if event_type != "CanonicalSourcePublished":
+        return
+
+    try:
+        canonical_source = CanonicalSourceRef.from_payload(thaw_contract_value(event_payload))
+    except ValueError as exc:
+        raise ValueError(f"payload CanonicalSourcePublished invalide: {exc}") from exc
+
+    if producer_context != "SP":
+        raise ValueError("producer_context incoherent avec CanonicalSourcePublished")
+    if aggregate_type != "CanonicalSource":
+        raise ValueError("aggregate_type incoherent avec CanonicalSourcePublished")
+    if aggregate_id != canonical_source.canonical_source_id:
+        raise ValueError("aggregate_id incoherent avec CanonicalSourcePublished")
+    if occurred_at != canonical_source.accepted_at:
+        raise ValueError("occurred_at incoherent avec CanonicalSourcePublished")
 
 
 def _required_text(payload: Mapping[str, Any], field_name: str) -> str:
@@ -294,36 +360,7 @@ def _required_positive_integer(payload: Mapping[str, Any], field_name: str) -> i
 
 def _required_utc_instant(payload: Mapping[str, Any], field_name: str) -> str:
     value = _required_text(payload, field_name)
-    if _UTC_INSTANT_PATTERN.fullmatch(value) is None:
-        raise ValueError(f"{field_name} invalide")
-    return value
-
-
-def _copy_event_payload_mapping(value: Mapping[str, Any], field_name: str) -> dict[str, Any]:
-    copied_value: dict[str, Any] = {}
-    for key, child_value in value.items():
-        if not isinstance(key, str) or key.strip() == "" or key != key.strip():
-            raise ValueError(f"{field_name} invalide")
-        copied_value[key] = _copy_event_payload_value(child_value)
-    return copied_value
-
-
-def _copy_event_payload_value(value: Any) -> Any:
-    if value is None:
-        raise ValueError("payload invalide")
-    if isinstance(value, str):
-        if value.strip() == "" or value != value.strip():
-            raise ValueError("payload invalide")
-        return value
-    if isinstance(value, Mapping):
-        return _copy_event_payload_mapping(value, "payload")
-    if isinstance(value, list):
-        return [_copy_event_payload_value(child_value) for child_value in value]
-    if isinstance(value, tuple):
-        return [_copy_event_payload_value(child_value) for child_value in value]
-    if isinstance(value, (bool, int, float)):
-        return value
-    raise ValueError("payload invalide")
+    return ensure_utc_instant_value(value, field_name)
 
 
 def _loads_event_json(serialized_payload: str) -> Mapping[str, Any]:
@@ -335,7 +372,7 @@ def _loads_event_json(serialized_payload: str) -> Mapping[str, Any]:
 
 
 def _dumps_event_json(payload: Mapping[str, Any]) -> str:
-    return json.dumps(payload, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+    return dumps_contract_json(payload)
 
 
 def _ensure_mapping(value: Any, field_name: str) -> None:

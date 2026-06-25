@@ -26,6 +26,18 @@ DOMAIN_FORBIDDEN_EXTERNAL_IMPORTS: dict[str, str] = {
 
 DOMAIN_API_MODEL_BASES = {"BaseModel", "SQLModel"}
 CONTEXT_LAYERS = {"domain", "application", "adapters"}
+REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+SPECIAL_SOURCE_CONTRACTS = "CONTRACTS"
+SPECIAL_SOURCE_PLATFORM = "PLATFORM"
+CONTRACT_MODULE_ALLOWED_CONSUMERS: dict[str, frozenset[str]] = {
+    "app.contracts": frozenset({"SP", "KA", "EG", "RA", "CV", "SD", "EX"}),
+    "app.contracts.identity": frozenset({"SP", "KA", "EG", "RA", "CV", "SD", "EX"}),
+    "app.contracts.source_references": frozenset({"SP", "KA", "EG", "RA", "CV"}),
+    "app.contracts.evidence_claims": frozenset({"EG", "RA", "SD"}),
+    "app.contracts.research_outcomes": frozenset({"RA", "SD"}),
+    "app.contracts.strategy_experiments": frozenset({"SD", "EX", "RA", "CV"}),
+    "app.contracts.event_envelope": frozenset({"SP", "KA", "EG", "RA", "CV", "SD", "EX"}),
+}
 
 
 @dataclass(frozen=True)
@@ -83,6 +95,13 @@ def require_directory(path: Path, label: str) -> None:
         raise ValueError(f"{label} absent: {path}")
 
 
+def require_path_under_repository(path: Path, label: str) -> None:
+    try:
+        path.relative_to(REPOSITORY_ROOT)
+    except ValueError as exc:
+        raise ValueError(f"Chemin hors depot interdit ({label}): {path}") from exc
+
+
 def load_context_definitions(registry_path: Path) -> tuple[dict[str, ContextDefinition], dict[str, ContextDefinition]]:
     require_file(registry_path, "Registre de contextes")
     registry = json.loads(registry_path.read_text(encoding="utf-8-sig"))
@@ -107,6 +126,29 @@ def load_context_definitions(registry_path: Path) -> tuple[dict[str, ContextDefi
         contexts_by_module[module] = context
 
     return contexts_by_code, contexts_by_module
+
+
+def validate_app_root_structure(
+    app_root: Path,
+    contexts_by_module: dict[str, ContextDefinition],
+) -> None:
+    require_file(app_root / "__init__.py", "Package app")
+    require_directory(app_root / "contracts", "Module contracts")
+    require_file(app_root / "contracts" / "__init__.py", "Package contracts")
+    require_directory(app_root / "platform", "Module platform")
+    require_file(app_root / "platform" / "__init__.py", "Package platform")
+
+    for context in contexts_by_module.values():
+        context_root = app_root / context.module
+        require_directory(context_root, f"Module de contexte absent: {context.module}")
+        require_file(context_root / "__init__.py", f"Package de contexte absent: {context.module}")
+        for layer in sorted(context.layers):
+            layer_root = context_root / layer
+            require_directory(layer_root, f"Couche de contexte absente: {context.module}/{layer}")
+            require_file(
+                layer_root / "__init__.py",
+                f"Package de couche absent: {context.module}/{layer}",
+            )
 
 
 def normalize_markdown_cell(value: str) -> str:
@@ -225,6 +267,24 @@ def classify_source_module(
     parts = relative.parts
     if len(parts) == 0:
         return None
+
+    if parts[0] == "contracts":
+        return SourceModule(
+            path=path,
+            module_name=python_module_name(app_root, path),
+            context_code=SPECIAL_SOURCE_CONTRACTS,
+            context_module="contracts",
+            layer=None,
+        )
+
+    if parts[0] == "platform":
+        return SourceModule(
+            path=path,
+            module_name=python_module_name(app_root, path),
+            context_code=SPECIAL_SOURCE_PLATFORM,
+            context_module="platform",
+            layer=None,
+        )
 
     context = contexts_by_module.get(parts[0])
     if context is None:
@@ -374,8 +434,66 @@ def allows_facade_import(
 
     return any(
         is_facade_relation(relation)
-        for relation in related_relations(source.context_code, str(target.context_code), relations)
+        and relation.relation_source == source.context_code
+        and relation.relation_target == target.context_code
+        for relation in relations
     )
+
+
+def contract_module_key(import_name: str) -> str:
+    if import_name == "app.contracts":
+        return "app.contracts"
+
+    parts = import_name.split(".")
+    if len(parts) >= 3:
+        return ".".join(parts[:3])
+
+    return import_name
+
+
+def contract_import_violations(source: SourceModule, target: ImportedModule) -> list[str]:
+    violations: list[str] = []
+
+    if source.context_code == SPECIAL_SOURCE_CONTRACTS:
+        if target.kind == "bounded_context":
+            violations.append(
+                "Import de contexte metier interdit dans contracts: "
+                f"module {source.module_name}, import {target.name}."
+            )
+        if target.kind == "platform":
+            violations.append(
+                "Import de plateforme interdit dans contracts: "
+                f"module {source.module_name}, import {target.name}."
+            )
+        return violations
+
+    if source.context_code == SPECIAL_SOURCE_PLATFORM:
+        if target.kind == "bounded_context":
+            violations.append(
+                "Import de contexte metier interdit dans platform: "
+                f"module {source.module_name}, import {target.name}."
+            )
+        return violations
+
+    if target.kind != "contracts":
+        return violations
+
+    module_key = contract_module_key(target.name)
+    allowed_consumers = CONTRACT_MODULE_ALLOWED_CONSUMERS.get(module_key)
+    if allowed_consumers is None:
+        violations.append(
+            "Import de contrat publie interdit: "
+            f"contexte {source.context_code}, module {source.module_name}, import {target.name}."
+        )
+        return violations
+
+    if source.context_code not in allowed_consumers:
+        violations.append(
+            "Import de contrat publie interdit: "
+            f"contexte {source.context_code}, module {source.module_name}, import {target.name}."
+        )
+
+    return violations
 
 
 def domain_layer_violations(source: SourceModule, target: ImportedModule) -> list[str]:
@@ -471,6 +589,7 @@ def analyze_architecture(
     relations: list[PublishedRelation],
 ) -> tuple[list[str], int, int]:
     require_directory(app_root, "Racine app")
+    validate_app_root_structure(app_root, contexts_by_module)
 
     violations: list[str] = []
     context_edges: set[tuple[str, str]] = set()
@@ -489,6 +608,11 @@ def analyze_architecture(
         for import_name in imported_module_names(source, tree):
             analyzed_import_count += 1
             target = classify_import(import_name, contexts_by_module)
+
+            violations.extend(contract_import_violations(source, target))
+
+            if source.context_code in {SPECIAL_SOURCE_CONTRACTS, SPECIAL_SOURCE_PLATFORM}:
+                continue
 
             if target.kind == "contracts":
                 continue
@@ -520,6 +644,9 @@ def main() -> int:
     app_root = Path(args.app_root).resolve()
     context_registry_path = Path(args.context_registry_path).resolve()
     specification_path = Path(args.specification_path).resolve()
+    require_path_under_repository(app_root, "app-root")
+    require_path_under_repository(context_registry_path, "context-registry-path")
+    require_path_under_repository(specification_path, "specification-path")
 
     _, contexts_by_module = load_context_definitions(context_registry_path)
     relations = load_published_relations(specification_path)

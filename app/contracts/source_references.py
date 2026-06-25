@@ -3,10 +3,17 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 from dataclasses import dataclass
 from typing import Any, Mapping
 
+from app.contracts._validation import (
+    dumps_contract_json,
+    ensure_allowed_fields,
+    ensure_no_forbidden_contract_keys,
+    ensure_utc_instant_value,
+)
 from app.contracts.identity import ContractSchemaVersion, DomainIdentifier
 
 
@@ -18,8 +25,29 @@ ALLOWED_CANONICAL_VERSION_STATUSES = UNAVAILABLE_CANONICAL_VERSION_STATUSES | {
 }
 
 _HASH_PATTERN = re.compile(r"^[0-9a-f]{32}$|^[0-9a-f]{64}$", re.IGNORECASE)
-_UTC_INSTANT_PATTERN = re.compile(
-    r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+_CANONICAL_SOURCE_REF_FIELDS = frozenset(
+    {
+        "schema_version",
+        "canonical_source_id",
+        "document_id",
+        "canonical_version_id",
+        "source_sha256",
+        "canonical_artifact_sha256",
+        "page_count",
+        "accepted_at",
+        "quality_policy_version",
+    }
+)
+_SOURCE_LOCATOR_FIELDS = frozenset(
+    {
+        "schema_version",
+        "canonical_version_id",
+        "document_id",
+        "page_pdf",
+        "item_id",
+        "bbox",
+        "content_hash",
+    }
 )
 
 
@@ -39,6 +67,7 @@ class CanonicalSourceRef:
 
     @classmethod
     def from_payload(cls, payload: Mapping[str, Any]) -> "CanonicalSourceRef":
+        ensure_allowed_fields(payload, _CANONICAL_SOURCE_REF_FIELDS, "CanonicalSourceRef")
         schema_version = ContractSchemaVersion.require_in_payload(
             payload,
             supported_schema_versions=SOURCE_REFERENCE_SCHEMA_VERSIONS,
@@ -99,6 +128,10 @@ class SourceLocator:
         payload: Mapping[str, Any],
         validation_policy: "SourceLocatorValidationPolicy",
     ) -> "SourceLocator":
+        if not isinstance(validation_policy, SourceLocatorValidationPolicy):
+            raise ValueError("validation_policy invalide")
+        ensure_no_forbidden_contract_keys(payload, "SourceLocator")
+        ensure_allowed_fields(payload, _SOURCE_LOCATOR_FIELDS, "SourceLocator")
         schema_version = ContractSchemaVersion.require_in_payload(
             payload,
             supported_schema_versions=SOURCE_REFERENCE_SCHEMA_VERSIONS,
@@ -262,9 +295,7 @@ def _required_positive_integer(payload: Mapping[str, Any], field_name: str) -> i
 
 def _required_utc_instant(payload: Mapping[str, Any], field_name: str) -> str:
     value = _required_text(payload, field_name)
-    if _UTC_INSTANT_PATTERN.fullmatch(value) is None:
-        raise ValueError(f"{field_name} invalide")
-    return value
+    return ensure_utc_instant_value(value, field_name)
 
 
 def _required_bbox(payload: Mapping[str, Any], field_name: str) -> tuple[float, float, float, float]:
@@ -280,6 +311,8 @@ def _required_bbox(payload: Mapping[str, Any], field_name: str) -> tuple[float, 
 
     for coordinate in coordinates:
         if isinstance(coordinate, bool) or not isinstance(coordinate, (int, float)):
+            raise ValueError(f"{field_name} invalide")
+        if isinstance(coordinate, float) and not math.isfinite(coordinate):
             raise ValueError(f"{field_name} invalide")
         if coordinate < 0 or coordinate > 1:
             raise ValueError(f"{field_name} invalide")
@@ -300,7 +333,7 @@ def _loads_contract_json(serialized_payload: str) -> Mapping[str, Any]:
 
 
 def _dumps_contract_json(payload: Mapping[str, Any]) -> str:
-    return json.dumps(payload, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+    return dumps_contract_json(payload)
 
 
 def _ensure_mapping(value: Any, field_name: str) -> None:

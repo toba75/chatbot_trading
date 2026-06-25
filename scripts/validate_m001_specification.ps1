@@ -5,6 +5,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $eAcute = [char] 0x00E9
 $eGrave = [char] 0x00E8
 $aGrave = [char] 0x00E0
@@ -21,16 +22,16 @@ $expectedContexts = @(
 )
 
 $expectedRelations = @(
-    @{ Key = "SP->KA"; Relation = "SP -> KA"; Contract = "CanonicalSourcePublished"; Producer = "SP"; Consumer = "KA" },
-    @{ Key = "SP->EG"; Relation = "SP -> EG"; Contract = "CanonicalSourcePublished"; Producer = "SP"; Consumer = "EG" },
-    @{ Key = "KA->RA"; Relation = "KA -> RA"; Contract = "SearchEvidence API"; Producer = "KA"; Consumer = "RA" },
-    @{ Key = "EG->RA"; Relation = "EG -> RA"; Contract = "VerifiedClaimRef"; Producer = "EG"; Consumer = "RA" },
-    @{ Key = "EG->SD"; Relation = "EG -> SD"; Contract = "VerifiedClaimRef"; Producer = "EG"; Consumer = "SD" },
-    @{ Key = "RA->SD"; Relation = "RA -> SD"; Contract = "VerifiedResearchOutcome"; Producer = "RA"; Consumer = "SD" },
-    @{ Key = "SD->EX"; Relation = "SD -> EX"; Contract = "StrategySnapshot"; Producer = "SD"; Consumer = "EX" },
-    @{ Key = "CV->RA"; Relation = "CV -> RA"; Contract = "ResolvedQuestion"; Producer = "CV"; Consumer = "RA" },
-    @{ Key = "CV->SD"; Relation = "CV -> SD"; Contract = "StrategyRequest"; Producer = "CV"; Consumer = "SD" },
-    @{ Key = "CV->EX"; Relation = "CV -> EX"; Contract = "GetExperiment"; Producer = "EX"; Consumer = "CV" }
+    @{ Key = "SP->KA"; Relation = "SP -> KA"; Contract = "CanonicalSourcePublished"; Producer = "SP"; Consumer = "KA"; Status = "Livr$($eAcute)" },
+    @{ Key = "SP->EG"; Relation = "SP -> EG"; Contract = "CanonicalSourcePublished"; Producer = "SP"; Consumer = "EG"; Status = "Livr$($eAcute)" },
+    @{ Key = "KA->RA"; Relation = "KA -> RA"; Contract = "SearchEvidence API"; Producer = "KA"; Consumer = "RA"; Status = "R$($eAcute)serv$($eAcute)" },
+    @{ Key = "EG->RA"; Relation = "EG -> RA"; Contract = "VerifiedClaimRef"; Producer = "EG"; Consumer = "RA"; Status = "Livr$($eAcute)" },
+    @{ Key = "EG->SD"; Relation = "EG -> SD"; Contract = "VerifiedClaimRef"; Producer = "EG"; Consumer = "SD"; Status = "Livr$($eAcute)" },
+    @{ Key = "RA->SD"; Relation = "RA -> SD"; Contract = "VerifiedResearchOutcome"; Producer = "RA"; Consumer = "SD"; Status = "Livr$($eAcute)" },
+    @{ Key = "SD->EX"; Relation = "SD -> EX"; Contract = "StrategySnapshot"; Producer = "SD"; Consumer = "EX"; Status = "Livr$($eAcute)" },
+    @{ Key = "CV->RA"; Relation = "CV -> RA"; Contract = "ResolvedQuestion"; Producer = "CV"; Consumer = "RA"; Status = "R$($eAcute)serv$($eAcute)" },
+    @{ Key = "CV->SD"; Relation = "CV -> SD"; Contract = "StrategyRequest"; Producer = "CV"; Consumer = "SD"; Status = "R$($eAcute)serv$($eAcute)" },
+    @{ Key = "CV->EX"; Relation = "CV -> EX"; Contract = "GetExperiment"; Producer = "EX"; Consumer = "CV"; Status = "R$($eAcute)serv$($eAcute)" }
 )
 
 $requiredTerms = @(
@@ -172,6 +173,35 @@ function Assert-M001Contains {
     }
 }
 
+function Resolve-M001RepositoryPath {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $InputPath,
+
+        [Parameter(Mandatory = $true)]
+        [string] $Label
+    )
+
+    if ([string]::IsNullOrWhiteSpace($InputPath)) {
+        throw "Chemin $Label vide."
+    }
+
+    $candidatePath = $InputPath
+    if (-not [System.IO.Path]::IsPathRooted($candidatePath)) {
+        $candidatePath = Join-Path $repoRoot $candidatePath
+    }
+
+    $resolvedRepositoryRoot = [System.IO.Path]::GetFullPath($repoRoot)
+    $resolvedCandidatePath = [System.IO.Path]::GetFullPath($candidatePath)
+    $repositoryPrefix = $resolvedRepositoryRoot.TrimEnd("\", "/") + [System.IO.Path]::DirectorySeparatorChar
+
+    if (-not $resolvedCandidatePath.StartsWith($repositoryPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Chemin hors depot interdit ($Label): $resolvedCandidatePath"
+    }
+
+    return $resolvedCandidatePath
+}
+
 function Assert-M001Spec {
     param(
         [Parameter(Mandatory = $true)]
@@ -252,7 +282,7 @@ function Assert-M001Spec {
 
     $relationRows = Read-M001MarkdownTable `
         -Lines $lines `
-        -RequiredHeaders @("Relation", "Producteur", "Consommateur", "Contrat publi$($eAcute)", "Type", "Mod$($eGrave)le interne interdit") `
+        -RequiredHeaders @("Relation", "Producteur", "Consommateur", "Contrat publi$($eAcute)", "Statut M-001", "Type", "Mod$($eGrave)le interne interdit") `
         -TableName "relations M-001"
 
     $relationsByKey = @{}
@@ -268,6 +298,9 @@ function Assert-M001Spec {
 
         if ([string]::IsNullOrWhiteSpace($row["Contrat publi$($eAcute)"])) {
             throw "Relation sans contrat publi$($eAcute): $($row["Relation"])"
+        }
+        if ($row["Statut M-001"] -notin @("Livr$($eAcute)", "R$($eAcute)serv$($eAcute)")) {
+            throw "Statut M-001 invalide pour $($row["Relation"])."
         }
 
         if ($row["Contrat publi$($eAcute)"] -match "(?i)\b(table|classe|record|agr$($eAcute)gat|schema|sch$($eAcute)ma|postgres|qdrant)\b") {
@@ -302,6 +335,9 @@ function Assert-M001Spec {
         if ($row["Consommateur"] -ne $expectedRelation.Consumer) {
             throw "Consommateur invalide pour $($expectedRelation.Relation)."
         }
+        if ($row["Statut M-001"] -ne $expectedRelation.Status) {
+            throw "Statut M-001 invalide pour $($expectedRelation.Relation)."
+        }
     }
 
     foreach ($relationKey in $relationsByKey.Keys) {
@@ -311,6 +347,7 @@ function Assert-M001Spec {
     }
 }
 
-Assert-M001Spec -SpecPath $Path
+$resolvedPath = Resolve-M001RepositoryPath -InputPath $Path -Label "specification M-001"
+Assert-M001Spec -SpecPath $resolvedPath
 
 Write-Host "Sp$($eAcute)cification M-001 valide: $($expectedContexts.Count) contexte(s), $($expectedRelations.Count) relation(s) contr$([char] 0x00F4)l$($eAcute)e(s)."
