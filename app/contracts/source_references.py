@@ -186,7 +186,7 @@ class SourceLocatorValidationPolicy:
 
     canonical_sources_by_version_id: Mapping[str, CanonicalSourceRef]
     version_statuses_by_version_id: Mapping[str, str]
-    resolvable_item_ids_by_version_id: Mapping[str, frozenset[str]]
+    resolvable_item_ids_by_version_id: Mapping[str, Mapping[str, str]]
 
     def __post_init__(self) -> None:
         _ensure_mapping(self.canonical_sources_by_version_id, "canonical_sources_by_version_id")
@@ -199,6 +199,7 @@ class SourceLocatorValidationPolicy:
         normalized_sources_by_version_id: dict[str, CanonicalSourceRef] = {}
         normalized_statuses_by_version_id: dict[str, str] = {}
         normalized_item_ids_by_version_id: dict[str, frozenset[str]] = {}
+        normalized_content_hashes_by_version_id: dict[str, Mapping[str, str]] = {}
 
         for version_id, canonical_source in self.canonical_sources_by_version_id.items():
             normalized_version_id = _ensure_domain_identifier_value(
@@ -233,14 +234,22 @@ class SourceLocatorValidationPolicy:
                 "canonical_version_id",
                 "CVER",
             )
-            if isinstance(item_ids, str) or not hasattr(item_ids, "__iter__"):
-                raise ValueError("item_ids resolvables non iterables")
-            materialized_item_ids = frozenset(item_ids)
+            if not isinstance(item_ids, Mapping):
+                raise ValueError("item_ids resolvables non objet")
+            materialized_item_hashes: dict[str, str] = {}
+            for item_id, content_hash in item_ids.items():
+                _ensure_text_value(item_id, "item_id")
+                materialized_item_hashes[item_id] = _ensure_hash_value(
+                    content_hash,
+                    "content_hash",
+                )
+            materialized_item_ids = frozenset(materialized_item_hashes)
             if len(materialized_item_ids) == 0:
                 raise ValueError(f"item_ids resolvables absents: {normalized_version_id}")
-            for item_id in materialized_item_ids:
-                _ensure_text_value(item_id, "item_id")
             normalized_item_ids_by_version_id[normalized_version_id] = materialized_item_ids
+            normalized_content_hashes_by_version_id[normalized_version_id] = MappingProxyType(
+                materialized_item_hashes
+            )
 
         object.__setattr__(
             self,
@@ -256,6 +265,11 @@ class SourceLocatorValidationPolicy:
             self,
             "resolvable_item_ids_by_version_id",
             MappingProxyType(normalized_item_ids_by_version_id),
+        )
+        object.__setattr__(
+            self,
+            "content_hashes_by_item_id_by_version_id",
+            MappingProxyType(normalized_content_hashes_by_version_id),
         )
 
     def validate_locator(self, locator: SourceLocator) -> None:
@@ -281,6 +295,16 @@ class SourceLocatorValidationPolicy:
         resolvable_item_ids = self.resolvable_item_ids_by_version_id.get(locator.canonical_version_id)
         if resolvable_item_ids is None or locator.item_id not in resolvable_item_ids:
             raise ValueError("item_id non resolvable")
+        content_hashes_by_item_id = self.content_hashes_by_item_id_by_version_id.get(
+            locator.canonical_version_id
+        )
+        if content_hashes_by_item_id is None:
+            raise ValueError(f"content_hash absent pour version: {locator.canonical_version_id}")
+        expected_content_hash = content_hashes_by_item_id.get(locator.item_id)
+        if expected_content_hash is None:
+            raise ValueError("content_hash absent pour item_id")
+        if locator.content_hash != expected_content_hash:
+            raise ValueError("content_hash incoherent")
 
 
 def _required_domain_identifier(
@@ -317,9 +341,14 @@ def _ensure_text_value(value: Any, field_name: str) -> str:
 
 def _required_hash(payload: Mapping[str, Any], field_name: str) -> str:
     value = _required_text(payload, field_name)
-    if _HASH_PATTERN.fullmatch(value) is None:
+    return _ensure_hash_value(value, field_name)
+
+
+def _ensure_hash_value(value: Any, field_name: str) -> str:
+    text_value = _ensure_text_value(value, field_name)
+    if _HASH_PATTERN.fullmatch(text_value) is None:
         raise ValueError(f"{field_name} invalide")
-    return value
+    return text_value
 
 
 def _required_positive_integer(payload: Mapping[str, Any], field_name: str) -> int:

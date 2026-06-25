@@ -72,7 +72,7 @@ validation_policy = SourceLocatorValidationPolicy(
     canonical_sources_by_version_id={canonical_ref.canonical_version_id: canonical_ref},
     version_statuses_by_version_id={canonical_ref.canonical_version_id: "ACCEPTED"},
     resolvable_item_ids_by_version_id={
-        canonical_ref.canonical_version_id: frozenset({"DOC-000001-P002-I001"}),
+        canonical_ref.canonical_version_id: {"DOC-000001-P002-I001": "c" * 64},
     },
 )
 

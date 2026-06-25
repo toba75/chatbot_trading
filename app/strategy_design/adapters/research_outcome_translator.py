@@ -141,7 +141,7 @@ class StrategyDesignResearchOutcomeTranslator:
                     source_answer_id=outcome.answer_id,
                     source_claim_refs=source_claim_refs,
                     description=knowledge_gap.topic,
-                    blocking=False,
+                    blocking=True,
                     details=knowledge_gap.to_payload(),
                 )
             )

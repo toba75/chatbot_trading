@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, Mapping
 
 from app.contracts._validation import (
@@ -198,6 +199,14 @@ class ExperimentResult:
         status = _required_experiment_result_status(payload)
         diagnostics = _required_mapping_copy(payload, "diagnostics")
         _ensure_failed_result_diagnostics(status=status, diagnostics=diagnostics)
+        frozen_inputs = _required_frozen_inputs(payload, data_snapshot_id=data_snapshot_id)
+        started_at = _required_utc_instant(payload, "started_at")
+        completed_at = _required_utc_instant(payload, "completed_at")
+        _ensure_experiment_timeline(
+            frozen_at=str(frozen_inputs["frozen_at"]),
+            started_at=started_at,
+            completed_at=completed_at,
+        )
 
         return cls(
             schema_version=str(schema_version),
@@ -211,12 +220,12 @@ class ExperimentResult:
             result_hash=_required_hash(payload, "result_hash"),
             code_version=_required_text(payload, "code_version"),
             status=status,
-            frozen_inputs=_required_frozen_inputs(payload, data_snapshot_id=data_snapshot_id),
+            frozen_inputs=frozen_inputs,
             metrics=_required_mapping_copy(payload, "metrics"),
             diagnostics=diagnostics,
             artifacts=_required_artifacts(payload),
-            started_at=_required_utc_instant(payload, "started_at"),
-            completed_at=_required_utc_instant(payload, "completed_at"),
+            started_at=started_at,
+            completed_at=completed_at,
         )
 
     @classmethod
@@ -264,6 +273,16 @@ def _ensure_failed_result_diagnostics(status: str, diagnostics: Mapping[str, Any
     if "failure_reason" not in diagnostics:
         raise ValueError("diagnostic d'echec requis")
     _required_text(diagnostics, "failure_reason")
+
+
+def _ensure_experiment_timeline(frozen_at: str, started_at: str, completed_at: str) -> None:
+    frozen_at_value = datetime.strptime(frozen_at, "%Y-%m-%dT%H:%M:%SZ")
+    started_at_value = datetime.strptime(started_at, "%Y-%m-%dT%H:%M:%SZ")
+    completed_at_value = datetime.strptime(completed_at, "%Y-%m-%dT%H:%M:%SZ")
+    if frozen_at_value > started_at_value:
+        raise ValueError("chronologie experience incoherente")
+    if started_at_value > completed_at_value:
+        raise ValueError("chronologie experience incoherente")
 
 
 def _required_strategy_rules(payload: Mapping[str, Any]) -> tuple[Mapping[str, Any], ...]:

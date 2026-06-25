@@ -57,7 +57,7 @@ validation_policy = SourceLocatorValidationPolicy(
         "CVER-000006": "RETIRED",
     },
     resolvable_item_ids_by_version_id={
-        "CVER-000004": frozenset({"DOC-000001-P037-I004"}),
+        "CVER-000004": {"DOC-000001-P037-I004": "c" * 64},
     },
 )
 
