@@ -793,22 +793,26 @@ def analyze_architecture(
 
 
 def main() -> int:
-    args = parse_args()
-    app_root = Path(args.app_root).resolve()
-    context_registry_path = Path(args.context_registry_path).resolve()
-    specification_path = Path(args.specification_path).resolve()
-    require_path_under_repository(app_root, "app-root")
-    require_path_under_repository(context_registry_path, "context-registry-path")
-    require_path_under_repository(specification_path, "specification-path")
+    try:
+        args = parse_args()
+        app_root = Path(args.app_root).resolve()
+        context_registry_path = Path(args.context_registry_path).resolve()
+        specification_path = Path(args.specification_path).resolve()
+        require_path_under_repository(app_root, "app-root")
+        require_path_under_repository(context_registry_path, "context-registry-path")
+        require_path_under_repository(specification_path, "specification-path")
 
-    _, contexts_by_module = load_context_definitions(context_registry_path)
-    relations = load_published_relations(specification_path)
-    validate_contract_consumer_rules(relations)
-    violations, analyzed_file_count, analyzed_import_count = analyze_architecture(
-        app_root=app_root,
-        contexts_by_module=contexts_by_module,
-        relations=relations,
-    )
+        _, contexts_by_module = load_context_definitions(context_registry_path)
+        relations = load_published_relations(specification_path)
+        validate_contract_consumer_rules(relations)
+        violations, analyzed_file_count, analyzed_import_count = analyze_architecture(
+            app_root=app_root,
+            contexts_by_module=contexts_by_module,
+            relations=relations,
+        )
+    except (json.JSONDecodeError, OSError, ValueError) as exc:
+        print(f"Erreur de configuration M-001: {exc}", file=sys.stderr)
+        return 1
 
     if len(violations) > 0:
         print("Frontières d'import M-001 invalides:", file=sys.stderr)

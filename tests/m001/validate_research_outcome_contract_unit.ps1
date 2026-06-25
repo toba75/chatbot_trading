@@ -1,6 +1,8 @@
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
+. (Join-Path $repoRoot "scripts/require_python.ps1")
+$pythonExecutable = Get-RequiredPythonExecutable
 
 $pythonCode = @'
 import sys
@@ -255,7 +257,7 @@ $ErrorActionPreference = "Continue"
 $pythonScriptPath = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m001_research_outcome_contract_unit_" + [System.Guid]::NewGuid().ToString("N") + ".py")
 Set-Content -Encoding UTF8 -LiteralPath $pythonScriptPath -Value $pythonCode
 try {
-    $output = & python -B $pythonScriptPath $repoRoot 2>&1
+    $output = & $pythonExecutable -B $pythonScriptPath $repoRoot 2>&1
 }
 finally {
     $ErrorActionPreference = $previousErrorActionPreference

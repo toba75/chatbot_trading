@@ -1,6 +1,8 @@
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
+. (Join-Path $repoRoot "scripts/require_python.ps1")
+$pythonExecutable = Get-RequiredPythonExecutable
 $strategySnapshotFixturePath = Join-Path $repoRoot "tests/fixtures/m001/contracts/sd_to_ex_strategy_snapshot_v1.json"
 $exToRaResultFixturePath = Join-Path $repoRoot "tests/fixtures/m001/contracts/ex_to_ra_experiment_result_v1.json"
 $exToCvResultFixturePath = Join-Path $repoRoot "tests/fixtures/m001/contracts/ex_to_cv_experiment_result_v1.json"
@@ -148,7 +150,7 @@ $ErrorActionPreference = "Continue"
 $pythonScriptPath = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m001_strategy_experiment_contracts_acceptance_" + [System.Guid]::NewGuid().ToString("N") + ".py")
 Set-Content -Encoding UTF8 -LiteralPath $pythonScriptPath -Value $pythonCode
 try {
-    $output = & python -B $pythonScriptPath $repoRoot $strategySnapshotFixturePath $exToRaResultFixturePath $exToCvResultFixturePath 2>&1
+    $output = & $pythonExecutable -B $pythonScriptPath $repoRoot $strategySnapshotFixturePath $exToRaResultFixturePath $exToCvResultFixturePath 2>&1
 }
 finally {
     $ErrorActionPreference = $previousErrorActionPreference

@@ -1,6 +1,8 @@
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
+. (Join-Path $repoRoot "scripts/require_python.ps1")
+$pythonExecutable = Get-RequiredPythonExecutable
 $canonicalSourceFixturePath = Join-Path $repoRoot "tests/fixtures/m001/contracts/sp_canonical_source_ref_v1.json"
 $egEvidenceFixturePath = Join-Path $repoRoot "tests/fixtures/m001/contracts/eg_evidence_ref_v1.json"
 $egToRaClaimFixturePath = Join-Path $repoRoot "tests/fixtures/m001/contracts/eg_to_ra_verified_claim_ref_v1.json"
@@ -131,7 +133,7 @@ $ErrorActionPreference = "Continue"
 $pythonScriptPath = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m001_evidence_claim_contracts_acceptance_" + [System.Guid]::NewGuid().ToString("N") + ".py")
 Set-Content -Encoding UTF8 -LiteralPath $pythonScriptPath -Value $pythonCode
 try {
-    $output = & python -B $pythonScriptPath $repoRoot $canonicalSourceFixturePath $egEvidenceFixturePath $egToRaClaimFixturePath $egToSdClaimFixturePath $verifiedWithoutEvidenceFixturePath 2>&1
+    $output = & $pythonExecutable -B $pythonScriptPath $repoRoot $canonicalSourceFixturePath $egEvidenceFixturePath $egToRaClaimFixturePath $egToSdClaimFixturePath $verifiedWithoutEvidenceFixturePath 2>&1
 }
 finally {
     $ErrorActionPreference = $previousErrorActionPreference

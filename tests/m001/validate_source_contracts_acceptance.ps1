@@ -1,6 +1,8 @@
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
+. (Join-Path $repoRoot "scripts/require_python.ps1")
+$pythonExecutable = Get-RequiredPythonExecutable
 $canonicalSourceFixturePath = Join-Path $repoRoot "tests/fixtures/m001/contracts/sp_canonical_source_ref_v1.json"
 $spLocatorFixturePath = Join-Path $repoRoot "tests/fixtures/m001/contracts/sp_source_locator_v1.json"
 $kaLocatorFixturePath = Join-Path $repoRoot "tests/fixtures/m001/contracts/ka_source_locator_v1.json"
@@ -114,7 +116,7 @@ $ErrorActionPreference = "Continue"
 $pythonScriptPath = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m001_source_contracts_acceptance_" + [System.Guid]::NewGuid().ToString("N") + ".py")
 Set-Content -Encoding UTF8 -LiteralPath $pythonScriptPath -Value $pythonCode
 try {
-    $output = & python -B $pythonScriptPath $repoRoot $canonicalSourceFixturePath $spLocatorFixturePath $kaLocatorFixturePath $egLocatorFixturePath 2>&1
+    $output = & $pythonExecutable -B $pythonScriptPath $repoRoot $canonicalSourceFixturePath $spLocatorFixturePath $kaLocatorFixturePath $egLocatorFixturePath 2>&1
 }
 finally {
     $ErrorActionPreference = $previousErrorActionPreference

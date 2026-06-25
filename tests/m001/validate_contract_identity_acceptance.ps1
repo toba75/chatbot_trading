@@ -1,6 +1,8 @@
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
+. (Join-Path $repoRoot "scripts/require_python.ps1")
+$pythonExecutable = Get-RequiredPythonExecutable
 $validFixturePath = Join-Path $repoRoot "tests/fixtures/m001/contracts/identity_primitives_v1.json"
 $missingSchemaFixturePath = Join-Path $repoRoot "tests/fixtures/m001/contracts/identity_primitives_missing_schema_version.json"
 $technicalIdentityFixturePath = Join-Path $repoRoot "tests/fixtures/m001/contracts/identity_primitives_technical_primary_identity.json"
@@ -102,7 +104,7 @@ $ErrorActionPreference = "Continue"
 $pythonScriptPath = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m001_contract_identity_acceptance_" + [System.Guid]::NewGuid().ToString("N") + ".py")
 Set-Content -Encoding UTF8 -LiteralPath $pythonScriptPath -Value $pythonCode
 try {
-    $output = & python -B $pythonScriptPath $repoRoot $validFixturePath $missingSchemaFixturePath $technicalIdentityFixturePath 2>&1
+    $output = & $pythonExecutable -B $pythonScriptPath $repoRoot $validFixturePath $missingSchemaFixturePath $technicalIdentityFixturePath 2>&1
 }
 finally {
     $ErrorActionPreference = $previousErrorActionPreference

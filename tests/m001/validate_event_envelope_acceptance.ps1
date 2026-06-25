@@ -1,6 +1,8 @@
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
+. (Join-Path $repoRoot "scripts/require_python.ps1")
+$pythonExecutable = Get-RequiredPythonExecutable
 $eventFixturePath = Join-Path $repoRoot "tests/fixtures/m001/contracts/sp_to_ka_canonical_source_published_event_v1.json"
 
 if (-not (Test-Path -LiteralPath $eventFixturePath -PathType Leaf)) {
@@ -122,7 +124,7 @@ $ErrorActionPreference = "Continue"
 $pythonScriptPath = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m001_event_envelope_acceptance_" + [System.Guid]::NewGuid().ToString("N") + ".py")
 Set-Content -Encoding UTF8 -LiteralPath $pythonScriptPath -Value $pythonCode
 try {
-    $output = & python -B $pythonScriptPath $repoRoot $eventFixturePath 2>&1
+    $output = & $pythonExecutable -B $pythonScriptPath $repoRoot $eventFixturePath 2>&1
 }
 finally {
     $ErrorActionPreference = $previousErrorActionPreference
