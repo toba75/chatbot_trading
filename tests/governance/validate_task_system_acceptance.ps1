@@ -60,6 +60,23 @@ function Assert-ExitCode {
     }
 }
 
+function Assert-OutputContains {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $Output,
+
+        [Parameter(Mandatory = $true)]
+        [string] $Expected,
+
+        [Parameter(Mandatory = $true)]
+        [string] $Message
+    )
+
+    if (-not $Output.Contains($Expected)) {
+        throw "$Message Sortie obtenue: $Output"
+    }
+}
+
 if (-not (Test-Path -LiteralPath $validatorPath -PathType Leaf)) {
     throw "Validateur des tâches absent: scripts/validate_task_system.ps1"
 }
@@ -72,7 +89,21 @@ try {
     # Then leur chemin, leur ordre, leur scénario BDD, leurs commits RED/GREEN et leurs validations sont contrôlables automatiquement.
     $validProjectRoot = New-TemporaryProject -Name "valid"
     $validResult = Invoke-Validator -ProjectRoot $validProjectRoot
-    Assert-ExitCode -Actual $validResult.ExitCode -Expected 0 -Message "Les tâches M-000 conformes doivent être acceptées."
+    if ($validResult.ExitCode -ne 0) {
+        throw "Les tâches M-000 et M-001 conformes doivent être acceptées. Sortie du validateur: $($validResult.Output)"
+    }
+    Assert-ExitCode -Actual $validResult.ExitCode -Expected 0 -Message "Les tâches M-000 et M-001 conformes doivent être acceptées."
+
+    $invalidTitleProjectRoot = New-TemporaryProject -Name "invalid-title-message"
+    $taskPath = Join-Path $invalidTitleProjectRoot "docs/tasks/milestone_000/0001_verifier_precondition_green.md"
+    (Get-Content -Raw -Encoding UTF8 -LiteralPath $taskPath).Replace("# T-001 - ", "# ") |
+        Set-Content -Encoding UTF8 -LiteralPath $taskPath
+    $invalidTitleResult = Invoke-Validator -ProjectRoot $invalidTitleProjectRoot
+    Assert-ExitCode -Actual $invalidTitleResult.ExitCode -Expected 1 -Message "Une tâche sans titre canonique doit être refusée."
+    Assert-OutputContains `
+        -Output $invalidTitleResult.Output `
+        -Expected "Titre de tâche invalide ou absent: 0001_verifier_precondition_green.md" `
+        -Message "Le RED de titre doit rester ciblé."
 
     $invalidFolderProjectRoot = New-TemporaryProject -Name "invalid-folder"
     Rename-Item -LiteralPath (Join-Path $invalidFolderProjectRoot "docs/tasks/milestone_000") -NewName "milestone_0"
