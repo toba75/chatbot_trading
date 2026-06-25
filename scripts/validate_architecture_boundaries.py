@@ -77,6 +77,24 @@ CONTRACT_SYMBOL_ALLOWED_CONSUMERS: dict[tuple[str, str], frozenset[str]] = {
     ("app.contracts.event_envelope", "EventIdempotenceLedger"): ALL_CONTEXT_CODES,
 }
 CONTRACT_SYMBOL_REQUIRED_MODULES = frozenset({"app.contracts", "app.contracts.strategy_experiments"})
+PUBLISHED_CONTRACT_SYMBOL_KEYS: dict[str, tuple[tuple[str, str], ...]] = {
+    "VerifiedClaimRef": (
+        ("app.contracts", "VerifiedClaimRef"),
+        ("app.contracts.evidence_claims", "VerifiedClaimRef"),
+    ),
+    "VerifiedResearchOutcome": (
+        ("app.contracts", "VerifiedResearchOutcome"),
+        ("app.contracts.research_outcomes", "VerifiedResearchOutcome"),
+    ),
+    "StrategySnapshot": (
+        ("app.contracts", "StrategySnapshot"),
+        ("app.contracts.strategy_experiments", "StrategySnapshot"),
+    ),
+    "ExperimentResult": (
+        ("app.contracts", "ExperimentResult"),
+        ("app.contracts.strategy_experiments", "ExperimentResult"),
+    ),
+}
 
 
 @dataclass(frozen=True)
@@ -118,6 +136,7 @@ class PublishedRelation:
     producer: str
     consumer: str
     contract: str
+    status: str
     relation_type: str
 
 
@@ -271,6 +290,7 @@ def load_published_relations(specification_path: Path) -> list[PublishedRelation
             "Producteur",
             "Consommateur",
             "Contrat publié",
+            "Statut M-001",
             "Type",
             "Modèle interne interdit",
         },
@@ -287,11 +307,39 @@ def load_published_relations(specification_path: Path) -> list[PublishedRelation
                 producer=row["Producteur"],
                 consumer=row["Consommateur"],
                 contract=row["Contrat publié"],
+                status=row["Statut M-001"],
                 relation_type=row["Type"],
             )
         )
 
     return relations
+
+
+def validate_contract_consumer_rules(relations: list[PublishedRelation]) -> None:
+    expected_consumers_by_contract: dict[str, set[str]] = {}
+    for relation in relations:
+        if relation.contract not in PUBLISHED_CONTRACT_SYMBOL_KEYS:
+            continue
+        if relation.status != "Livré":
+            continue
+        expected_consumers = expected_consumers_by_contract.setdefault(relation.contract, set())
+        expected_consumers.add(relation.producer)
+        expected_consumers.add(relation.consumer)
+
+    for contract, symbol_keys in PUBLISHED_CONTRACT_SYMBOL_KEYS.items():
+        if contract not in expected_consumers_by_contract:
+            continue
+        expected_consumers = frozenset(expected_consumers_by_contract[contract])
+        for symbol_key in symbol_keys:
+            actual_consumers = CONTRACT_SYMBOL_ALLOWED_CONSUMERS.get(symbol_key)
+            if actual_consumers == expected_consumers:
+                continue
+            actual_value = sorted(actual_consumers) if actual_consumers is not None else []
+            raise ValueError(
+                "Regle de contrat publie incoherente avec specification M-001: "
+                f"{contract}, symbole {symbol_key[1]}, attendu {sorted(expected_consumers)}, "
+                f"obtenu {actual_value}."
+            )
 
 
 def python_module_name(app_root: Path, path: Path) -> str:
@@ -755,6 +803,7 @@ def main() -> int:
 
     _, contexts_by_module = load_context_definitions(context_registry_path)
     relations = load_published_relations(specification_path)
+    validate_contract_consumer_rules(relations)
     violations, analyzed_file_count, analyzed_import_count = analyze_architecture(
         app_root=app_root,
         contexts_by_module=contexts_by_module,

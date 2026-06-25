@@ -305,7 +305,10 @@ def _required_domain_identifier(
 def _required_text(payload: Mapping[str, Any], field_name: str) -> str:
     if field_name not in payload:
         raise ValueError(f"{field_name} absent")
-    value = payload[field_name]
+    return _ensure_text_value(payload[field_name], field_name)
+
+
+def _ensure_text_value(value: Any, field_name: str) -> str:
     if not isinstance(value, str):
         raise ValueError(f"{field_name} non textuel")
     if value.strip() == "":
@@ -332,13 +335,10 @@ def _required_positive_integer(payload: Mapping[str, Any], field_name: str) -> i
 
 
 def _loads_contract_json(serialized_payload: str) -> Mapping[str, Any]:
-    if not isinstance(serialized_payload, str):
-        raise ValueError("contrat serialise non textuel")
-    if serialized_payload.strip() == "":
-        raise ValueError("contrat serialise vide")
+    _ensure_text_value(serialized_payload, "contrat serialise")
     payload = json.loads(serialized_payload)
     if not isinstance(payload, Mapping):
-        raise ValueError("Contrat publie non objet.")
+        raise ValueError("Contrat publié non objet.")
     return payload
 
 
