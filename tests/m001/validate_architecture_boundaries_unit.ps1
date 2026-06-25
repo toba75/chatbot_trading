@@ -88,7 +88,10 @@ function Invoke-ArchitectureBoundaryValidator {
         [string] $AppRoot,
 
         [Parameter(Mandatory = $true)]
-        [string] $ContextRegistryPath
+        [string] $ContextRegistryPath,
+
+        [Parameter(Mandatory = $false)]
+        [string] $SpecificationPath = $specificationPath
     )
 
     Assert-ValidatorExists
@@ -99,7 +102,7 @@ function Invoke-ArchitectureBoundaryValidator {
         -File $validatorPath `
         -AppRoot $AppRoot `
         -ContextRegistryPath $ContextRegistryPath `
-        -SpecificationPath $specificationPath `
+        -SpecificationPath $SpecificationPath `
         2>&1
 
     return @{
@@ -267,6 +270,28 @@ def load_source():
     foreach ($expectedFragment in @("Module de contexte absent", "source_processing")) {
         if (-not $emptyResult.Output.Contains($expectedFragment)) {
             throw "Fragment attendu absent: $expectedFragment`nSortie obtenue:`n$($emptyResult.Output)"
+        }
+    }
+
+    $contractRuleMismatch = New-ControlledApp -ScenarioName "contract_rule_mismatch"
+    $createdRoots += $contractRuleMismatch.Root
+    $contractRuleMismatchSpecPath = Join-Path $contractRuleMismatch.Root "m001_contract_rule_mismatch.md"
+    $contractRuleMismatchSpec = Get-Content -Raw -Encoding UTF8 -LiteralPath $specificationPath
+    $contractRuleMismatchSpec = $contractRuleMismatchSpec.Replace(
+        "| EX -> RA | EX | RA | ExperimentResult | Livr$($eAcute) |",
+        "| EX -> KA | EX | KA | ExperimentResult | Livr$($eAcute) |"
+    )
+    $contractRuleMismatchSpec | Set-Content -Encoding UTF8 -LiteralPath $contractRuleMismatchSpecPath
+    $contractRuleMismatchResult = Invoke-ArchitectureBoundaryValidator `
+        -AppRoot $contractRuleMismatch.AppRoot `
+        -ContextRegistryPath $contractRuleMismatch.RegistryPath `
+        -SpecificationPath $contractRuleMismatchSpecPath
+    if ($contractRuleMismatchResult.ExitCode -eq 0) {
+        throw "Une incoherence entre la specification M-001 et les consommateurs de contrat doit etre refusee."
+    }
+    foreach ($expectedFragment in @("Regle de contrat publie incoherente", "ExperimentResult")) {
+        if (-not $contractRuleMismatchResult.Output.Contains($expectedFragment)) {
+            throw "Fragment attendu absent: $expectedFragment`nSortie obtenue:`n$($contractRuleMismatchResult.Output)"
         }
     }
 

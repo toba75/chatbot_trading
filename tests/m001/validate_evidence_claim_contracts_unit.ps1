@@ -81,6 +81,15 @@ evidence = EvidenceRef.from_payload(
 if EvidenceRef.from_json(evidence.to_json(), source_locator_validation_policy=validation_policy) != evidence:
     raise AssertionError("Le round-trip unitaire EvidenceRef doit rester stable.")
 
+padded_evidence_json = evidence.to_json() + " "
+assert_raises(
+    "contrat serialise non normalise",
+    lambda: EvidenceRef.from_json(
+        padded_evidence_json,
+        source_locator_validation_policy=validation_policy,
+    ),
+)
+
 claim = VerifiedClaimRef.from_payload(
     claim_payload,
     source_locator_validation_policy=validation_policy,
