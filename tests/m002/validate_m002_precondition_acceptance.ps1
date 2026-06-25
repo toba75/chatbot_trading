@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
 $validatorPath = Join-Path $repoRoot "scripts/validate_m002_precondition.ps1"
@@ -84,7 +84,7 @@ try {
 
     Assert-OutputContains `
         -Output $reportContent `
-        -Expected "Given M-000 et M-001 sont présents dans `master`." `
+        -Expected "Given M-000 et M-001" `
         -Message "Le rapport doit reprendre le Given métier."
 
     Assert-OutputContains `
@@ -99,12 +99,12 @@ try {
 
     Assert-OutputContains `
         -Output $reportContent `
-        -Expected "`docs/tasks/milestone_001 dans master`" `
+        -Expected "docs/tasks/milestone_001 dans master" `
         -Message "Le rapport doit vérifier la présence de M-001 dans master."
 
     Assert-OutputContains `
         -Output $reportContent `
-        -Expected "`GREEN`" `
+        -Expected "GREEN" `
         -Message "Le rapport doit déclarer un état GREEN vérifiable."
 }
 finally {

@@ -1,4 +1,4 @@
-# Matrice de traçabilité M-000 et M-001
+# Matrice de traçabilité M-000, M-001 et M-002
 
 ## Scénario BDD
 
@@ -38,3 +38,4 @@
 | REQ-M001-009 | docs/tasks/milestone_001/0009_publier_enveloppe_evenement_versionnee.md | Couvert | tests/m001/validate_event_envelope_acceptance.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m001\validate_event_envelope_acceptance.ps1 | app/contracts/event_envelope.py | DDD-ADR-006; DDD-ADR-008 | Décision structurante documentée: les ADR DDD citées gouvernent l'absence d'event sourcing généralisé et la cohérence éventuelle intercontextes. |
 | REQ-M001-010 | docs/tasks/milestone_001/0010_interdire_couplages_intercontextes.md | Couvert | tests/m001/validate_architecture_boundaries_acceptance.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m001\validate_architecture_boundaries_acceptance.ps1 | scripts/validate_architecture_boundaries.py | DDD-ADR-001; ADR-011 | Décision structurante documentée: DDD-ADR-001 gouverne les frontières d'import du monolithe modulaire; ADR-011 gouverne l'outillage Python du validateur. |
 | REQ-M001-011 | docs/tasks/milestone_001/0011_relier_m001_tracabilite_gates.md | Couvert | tests/m001/validate_m001_traceability_acceptance.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_traceability.ps1 | scripts/validate_traceability.ps1 | ADR-010 | Décision structurante documentée: ADR-010 gouverne le rattachement des preuves M-001 aux gates PowerShell sans nouvelle politique d'exécution. |
+| REQ-M002-001 | docs/tasks/milestone_002/0001_verifier_precondition_green.md | Couvert | tests/m002/validate_m002_precondition_acceptance.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m002_precondition.ps1 -Path .\docs\governance\m002_precondition_green.md | scripts/validate_m002_precondition.ps1 | ADR-010 | Décision structurante documentée: ADR-010 gouverne les gates PowerShell appliquées à la précondition GREEN M-002 sans nouvelle politique d'exécution. |

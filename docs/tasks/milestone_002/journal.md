@@ -29,3 +29,18 @@
 - `scripts/test.ps1`: GREEN, 7 validations et 31 tests.
 - `scripts/lint.ps1`: GREEN, 7 validations.
 - Milestones amont dans `master`: `docs/tasks/milestone_000` et `docs/tasks/milestone_001`.
+
+## Suivi d'exécution
+
+- Statut: T-001 livrée en GREEN; la précondition M-002 refuse `master` absent, milestone amont absent, gate RED et branche locale non alignée sur `master`.
+
+| Tâche | Commit RED | Commit GREEN | ADR consultées | ADR créée ou modifiée | Validations GREEN déclarées |
+|---|---|---|---|---|---|
+| T-001 - Vérifier la précondition GREEN de M-002 | `ff51415` | Commit courant `docs(m002): valider la précondition green de plateforme` | ADR-010 | Aucune | `tests/m002/validate_m002_precondition_acceptance.ps1`; `tests/m002/validate_m002_precondition_unit.ps1`; `scripts/validate_m002_precondition.ps1 -Path .\docs\governance\m002_precondition_green.md`; `scripts/validate_traceability.ps1`; `scripts/test.ps1`; `scripts/lint.ps1` |
+
+## Clôture T-001
+
+- Scénario BDD: Given M-000 et M-001 sont présents dans `master`; When les gates de validation sont exécutées avant la première tâche M-002; Then M-002 peut commencer uniquement si les tests, la lint, la traçabilité, les ADR et les frontières d'architecture sont GREEN.
+- RED T-001 confirmé: `tests/m002/validate_m002_precondition_acceptance.ps1` échouait sur l'absence de `scripts/validate_m002_precondition.ps1`.
+- ADR: aucune ADR créée ou modifiée; T-001 applique ADR-010 sans changer la politique durable des gates PowerShell.
+- Risque traité: la précondition M-002 ne bascule pas vers une branche remote et refuse une base locale non alignée avant toute livraison de plateforme.
