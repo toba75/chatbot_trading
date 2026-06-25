@@ -17,7 +17,47 @@ function New-TemporaryProject {
     New-Item -ItemType Directory -Path (Join-Path $projectRoot "docs") -Force | Out-Null
     Copy-Item -LiteralPath $validatorPath -Destination (Join-Path $projectRoot "scripts/validate_task_system.ps1")
     Copy-Item -LiteralPath $tasksSourceDir -Destination (Join-Path $projectRoot "docs/tasks") -Recurse
+    Initialize-TemporaryGitMaster -ProjectRoot $projectRoot
     return $projectRoot
+}
+
+function Invoke-TemporaryGit {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $ProjectRoot,
+
+        [Parameter(Mandatory = $true)]
+        [string[]] $Arguments,
+
+        [Parameter(Mandatory = $true)]
+        [string] $Message
+    )
+
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $output = & git -C $ProjectRoot @Arguments 2>&1
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "$Message Sortie git: $($output -join "`n")"
+    }
+}
+
+function Initialize-TemporaryGitMaster {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $ProjectRoot
+    )
+
+    Invoke-TemporaryGit -ProjectRoot $ProjectRoot -Arguments @("init", "-b", "master") -Message "Impossible d'initialiser le dépôt temporaire."
+    Invoke-TemporaryGit -ProjectRoot $ProjectRoot -Arguments @("config", "user.email", "tests@example.local") -Message "Impossible de configurer l'email Git temporaire."
+    Invoke-TemporaryGit -ProjectRoot $ProjectRoot -Arguments @("config", "user.name", "Tests Gouvernance") -Message "Impossible de configurer le nom Git temporaire."
+    Invoke-TemporaryGit -ProjectRoot $ProjectRoot -Arguments @("add", "docs/tasks", "scripts/validate_task_system.ps1") -Message "Impossible de préparer le master temporaire."
+    Invoke-TemporaryGit -ProjectRoot $ProjectRoot -Arguments @("commit", "-m", "test: publier les tâches en master") -Message "Impossible de créer le master temporaire."
 }
 
 function Invoke-Validator {

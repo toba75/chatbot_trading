@@ -132,7 +132,7 @@ function Assert-TaskContent {
 
     Assert-Regex `
         -Content $content `
-        -Pattern "(?m)^# $([regex]::Escape($taskId)) - .+\S$" `
+        -Pattern "(?m)^# $([regex]::Escape($taskId)) - .+\S\r?$" `
         -Message "Titre de tâche invalide ou absent: $($TaskFile.Name)"
 
     foreach ($heading in $requiredHeadings) {
@@ -144,7 +144,7 @@ function Assert-TaskContent {
 
     Assert-Regex `
         -Content $content `
-        -Pattern "(?m)^### $([regex]::Escape($taskId)) - .+\S$" `
+        -Pattern "(?m)^### $([regex]::Escape($taskId)) - .+\S\r?$" `
         -Message "Sous-titre de tâche invalide ou absent: $($TaskFile.Name)"
 
     foreach ($field in $requiredSingleLineFields) {
