@@ -97,7 +97,10 @@ $testCommands = @(
     @{ Path = "tests/m003/validate_route_plan_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/m003/validate_route_plan_unit.ps1"; Arguments = @() },
     @{ Path = "tests/m003/validate_review_quarantine_acceptance.ps1"; Arguments = @() },
-    @{ Path = "tests/m003/validate_review_quarantine_unit.ps1"; Arguments = @() }
+    @{ Path = "tests/m003/validate_review_quarantine_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m003/validate_document_commands_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m003/validate_document_commands_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m003/validate_document_http_contract_acceptance.ps1"; Arguments = @() }
 )
 
 $expectedValidationPaths = @(
@@ -178,7 +181,10 @@ $expectedTestPaths = @(
     "tests/m003/validate_route_plan_acceptance.ps1",
     "tests/m003/validate_route_plan_unit.ps1",
     "tests/m003/validate_review_quarantine_acceptance.ps1",
-    "tests/m003/validate_review_quarantine_unit.ps1"
+    "tests/m003/validate_review_quarantine_unit.ps1",
+    "tests/m003/validate_document_commands_acceptance.ps1",
+    "tests/m003/validate_document_commands_unit.ps1",
+    "tests/m003/validate_document_http_contract_acceptance.ps1"
 )
 
 Invoke-M000ValidationGate `
@@ -187,6 +193,6 @@ Invoke-M000ValidationGate `
     -ValidationCommands $validationCommands `
     -TestCommands $testCommands `
     -ExpectedValidationCount 12 `
-    -ExpectedTestCount 63 `
+    -ExpectedTestCount 66 `
     -ExpectedValidationPaths $expectedValidationPaths `
     -ExpectedTestPaths $expectedTestPaths
