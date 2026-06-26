@@ -22,6 +22,8 @@ from app.source_processing.domain.source_document import (
 
 
 _SOURCE_LOCATOR_SCHEMA_VERSION = "1.0"
+_PAGE_AUTHORITY_MISSING = "PAGE_AUTHORITY_MISSING"
+_PAGE_AUTHORITY_AMBIGUOUS = "PAGE_AUTHORITY_AMBIGUOUS"
 
 
 class ConversionToolName(str, Enum):
@@ -163,6 +165,304 @@ class PageConversionArtifact:
             _ensure_artifact_ref(self.audit_artifact_ref),
         )
         object.__setattr__(self, "items", _ensure_conversion_items(self.items))
+
+
+class TextAuthoritySelectionError(ValueError):
+    """Erreur métier stable pour l'adjudication d'autorité textuelle."""
+
+    def __init__(self, code: str, message: str) -> None:
+        self.code = _ensure_text_authority_error_code(code)
+        super().__init__(f"{self.code}: {message}")
+
+
+@dataclass(frozen=True)
+class PageConversionCandidate:
+    """Sortie de conversion candidate pour l'autorité textuelle d'une page."""
+
+    candidate_id: str
+    page_output: PageConversionArtifact
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "candidate_id",
+            _ensure_authority_text(self.candidate_id, "candidate_id d'autorité invalide"),
+        )
+        if not isinstance(self.page_output, PageConversionArtifact):
+            raise TextAuthoritySelectionError(
+                _PAGE_AUTHORITY_MISSING,
+                "sortie candidate d'autorité invalide",
+            )
+
+    @property
+    def page_number(self) -> PageNumber:
+        return self.page_output.page_number
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "candidate_id": self.candidate_id,
+            "page_pdf": self.page_number.value,
+            "route_name": self.page_output.route_name.value,
+            "tool_name": self.page_output.tool_name.value,
+            "tool_version": self.page_output.tool_version,
+            "artifact_hash": self.page_output.artifact_hash,
+            "audit_artifact_ref": self.page_output.audit_artifact_ref,
+            "content_hashes": tuple(item.content_hash for item in self.page_output.items),
+        }
+
+
+@dataclass(frozen=True)
+class TextAuthority:
+    """Autorité textuelle retenue pour une page canonique."""
+
+    page_number: PageNumber
+    candidate_id: str
+    tool_name: ConversionToolName
+    tool_version: str
+    artifact_hash: str
+    audit_artifact_ref: str
+    policy_version: str
+    justification: str
+
+    def __post_init__(self) -> None:
+        _ensure_page_number(self.page_number)
+        object.__setattr__(
+            self,
+            "candidate_id",
+            _ensure_authority_text(self.candidate_id, "autorité textuelle vide"),
+        )
+        object.__setattr__(self, "tool_name", ConversionToolName.from_value(self.tool_name))
+        object.__setattr__(
+            self,
+            "tool_version",
+            _ensure_authority_text(self.tool_version, "outil source d'autorité absent"),
+        )
+        object.__setattr__(self, "artifact_hash", _ensure_artifact_hash(self.artifact_hash))
+        object.__setattr__(self, "audit_artifact_ref", _ensure_artifact_ref(self.audit_artifact_ref))
+        object.__setattr__(
+            self,
+            "policy_version",
+            _ensure_authority_text(
+                self.policy_version,
+                "version de politique d'autorité obligatoire",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "justification",
+            _ensure_authority_text(
+                self.justification,
+                "justification d'autorité obligatoire",
+            ),
+        )
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "page_pdf": self.page_number.value,
+            "candidate_id": self.candidate_id,
+            "tool_name": self.tool_name.value,
+            "tool_version": self.tool_version,
+            "artifact_hash": self.artifact_hash,
+            "audit_artifact_ref": self.audit_artifact_ref,
+            "policy_version": self.policy_version,
+            "justification": self.justification,
+        }
+
+
+@dataclass(frozen=True)
+class TextAuthorityPageDecision:
+    """Décision d'autorité textuelle et candidats conservés pour audit."""
+
+    page_number: PageNumber
+    authority: TextAuthority
+    candidates: tuple[PageConversionCandidate, ...]
+
+    def __post_init__(self) -> None:
+        parsed_page_number = _ensure_page_number(self.page_number)
+        if not isinstance(self.authority, TextAuthority):
+            raise TextAuthoritySelectionError(
+                _PAGE_AUTHORITY_MISSING,
+                "autorité textuelle absente",
+            )
+        if self.authority.page_number != parsed_page_number:
+            raise TextAuthoritySelectionError(
+                _PAGE_AUTHORITY_MISSING,
+                "autorité textuelle hors page",
+            )
+        candidates = _ensure_authority_candidates(
+            self.candidates,
+            page_number=parsed_page_number,
+        )
+        selected_candidates = tuple(
+            candidate
+            for candidate in candidates
+            if candidate.candidate_id == self.authority.candidate_id
+        )
+        if len(selected_candidates) == 0:
+            raise TextAuthoritySelectionError(
+                _PAGE_AUTHORITY_MISSING,
+                "autorité textuelle absente des candidats",
+            )
+        if len(selected_candidates) > 1:
+            raise TextAuthoritySelectionError(
+                _PAGE_AUTHORITY_AMBIGUOUS,
+                "autorité textuelle dupliquée",
+            )
+        selected_output = selected_candidates[0].page_output
+        if selected_output.tool_name is not self.authority.tool_name:
+            raise TextAuthoritySelectionError(
+                _PAGE_AUTHORITY_MISSING,
+                "outil source d'autorité incohérent",
+            )
+        if selected_output.tool_version != self.authority.tool_version:
+            raise TextAuthoritySelectionError(
+                _PAGE_AUTHORITY_MISSING,
+                "version d'outil d'autorité incohérente",
+            )
+        if selected_output.artifact_hash != self.authority.artifact_hash:
+            raise TextAuthoritySelectionError(
+                _PAGE_AUTHORITY_MISSING,
+                "hash d'artefact d'autorité incohérent",
+            )
+        if selected_output.audit_artifact_ref != self.authority.audit_artifact_ref:
+            raise TextAuthoritySelectionError(
+                _PAGE_AUTHORITY_MISSING,
+                "artefact d'audit d'autorité incohérent",
+            )
+        object.__setattr__(self, "candidates", candidates)
+
+    def selected_page_output(self) -> PageConversionArtifact:
+        for candidate in self.candidates:
+            if candidate.candidate_id == self.authority.candidate_id:
+                return candidate.page_output
+        raise TextAuthoritySelectionError(
+            _PAGE_AUTHORITY_MISSING,
+            "autorité textuelle absente des candidats",
+        )
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "page_pdf": self.page_number.value,
+            "authority": self.authority.to_payload(),
+            "candidates": tuple(candidate.to_payload() for candidate in self.candidates),
+        }
+
+
+@dataclass(frozen=True)
+class TextAuthorityManifest:
+    """Manifeste d'autorité textuelle couvrant exactement les pages publiables."""
+
+    page_manifest: PageManifest
+    page_decisions: tuple[TextAuthorityPageDecision, ...]
+
+    def __post_init__(self) -> None:
+        parsed_page_manifest = _ensure_page_manifest(self.page_manifest)
+        decisions = _ensure_text_authority_page_decisions(self.page_decisions)
+        _ensure_text_authority_manifest_covers_page_manifest(
+            page_manifest=parsed_page_manifest,
+            page_decisions=decisions,
+        )
+        object.__setattr__(self, "page_decisions", decisions)
+
+    @classmethod
+    def from_page_decisions(
+        cls,
+        *,
+        page_manifest: PageManifest,
+        page_decisions: Sequence[TextAuthorityPageDecision],
+    ) -> "TextAuthorityManifest":
+        return cls(
+            page_manifest=page_manifest,
+            page_decisions=tuple(page_decisions),
+        )
+
+    @property
+    def entries(self) -> tuple[TextAuthorityPageDecision, ...]:
+        return self.page_decisions
+
+    def decision_for(self, page_number: PageNumber) -> TextAuthorityPageDecision:
+        parsed_page_number = _ensure_page_number(page_number)
+        for decision in self.page_decisions:
+            if decision.page_number == parsed_page_number:
+                return decision
+        raise TextAuthoritySelectionError(
+            _PAGE_AUTHORITY_MISSING,
+            "autorité textuelle absente pour la page",
+        )
+
+    def selected_page_outputs(self) -> tuple[PageConversionArtifact, ...]:
+        return tuple(decision.selected_page_output() for decision in self.page_decisions)
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "entries": tuple(decision.to_payload() for decision in self.page_decisions),
+        }
+
+
+@dataclass(frozen=True)
+class TextAuthoritySelectionPolicy:
+    """Politique normative d'adjudication explicite d'une autorité par page."""
+
+    policy_version: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "policy_version",
+            _ensure_authority_text(
+                self.policy_version,
+                "version de politique d'autorité obligatoire",
+            ),
+        )
+
+    def select(
+        self,
+        *,
+        page_number: PageNumber,
+        candidates: Sequence[PageConversionCandidate],
+        selected_candidate_ids: Sequence[str],
+        justification: str,
+    ) -> TextAuthorityPageDecision:
+        parsed_page_number = _ensure_page_number(page_number)
+        parsed_candidates = _ensure_authority_candidates(
+            candidates,
+            page_number=parsed_page_number,
+        )
+        selected_ids = _ensure_selected_candidate_ids(selected_candidate_ids)
+        if len(selected_ids) == 0:
+            raise TextAuthoritySelectionError(
+                _PAGE_AUTHORITY_MISSING,
+                "aucune autorité textuelle sélectionnée",
+            )
+        if len(selected_ids) > 1:
+            raise TextAuthoritySelectionError(
+                _PAGE_AUTHORITY_AMBIGUOUS,
+                "plusieurs autorités textuelles sélectionnées",
+            )
+        selected_candidate_id = selected_ids[0]
+        candidates_by_id = {candidate.candidate_id: candidate for candidate in parsed_candidates}
+        if selected_candidate_id not in candidates_by_id:
+            raise TextAuthoritySelectionError(
+                _PAGE_AUTHORITY_MISSING,
+                "autorité textuelle absente des candidats",
+            )
+        selected_candidate = candidates_by_id[selected_candidate_id]
+        selected_output = selected_candidate.page_output
+        authority = TextAuthority(
+            page_number=parsed_page_number,
+            candidate_id=selected_candidate.candidate_id,
+            tool_name=selected_output.tool_name,
+            tool_version=selected_output.tool_version,
+            artifact_hash=selected_output.artifact_hash,
+            audit_artifact_ref=selected_output.audit_artifact_ref,
+            policy_version=self.policy_version,
+            justification=justification,
+        )
+        return TextAuthorityPageDecision(
+            page_number=parsed_page_number,
+            authority=authority,
+            candidates=parsed_candidates,
+        )
 
 
 @dataclass(frozen=True)
@@ -338,6 +638,33 @@ class PagewiseDoclingDocument:
 class PagewiseDoclingFusionService:
     """Fusionne les sorties routées dans l'ordre strict du PDF original."""
 
+    def merge_authorized(
+        self,
+        *,
+        document_id: DocumentId,
+        canonical_version_id: str,
+        source_sha256: SourceFingerprint,
+        original_storage_ref: OriginalStorageRef,
+        page_manifest: PageManifest,
+        text_authority_manifest: TextAuthorityManifest,
+    ) -> PagewiseDoclingDocument:
+        parsed_page_manifest = _ensure_page_manifest(page_manifest)
+        parsed_text_authority_manifest = _ensure_text_authority_manifest(
+            text_authority_manifest
+        )
+        _ensure_text_authority_manifest_covers_page_manifest(
+            page_manifest=parsed_page_manifest,
+            page_decisions=parsed_text_authority_manifest.page_decisions,
+        )
+        return self.merge(
+            document_id=document_id,
+            canonical_version_id=canonical_version_id,
+            source_sha256=source_sha256,
+            original_storage_ref=original_storage_ref,
+            page_manifest=parsed_page_manifest,
+            page_outputs=parsed_text_authority_manifest.selected_page_outputs(),
+        )
+
     def merge(
         self,
         *,
@@ -442,6 +769,157 @@ def _ensure_text(value: Any, message: str) -> str:
     if value != value.strip():
         raise ValueError(message)
     return value
+
+
+def _ensure_text_authority_error_code(value: Any) -> str:
+    if value in {_PAGE_AUTHORITY_MISSING, _PAGE_AUTHORITY_AMBIGUOUS}:
+        return value
+    raise ValueError("code d'erreur d'autorité textuelle inconnu")
+
+
+def _ensure_authority_text(value: Any, message: str) -> str:
+    if not isinstance(value, str):
+        raise TextAuthoritySelectionError(_PAGE_AUTHORITY_MISSING, message)
+    if value.strip() == "":
+        raise TextAuthoritySelectionError(_PAGE_AUTHORITY_MISSING, message)
+    if value != value.strip():
+        raise TextAuthoritySelectionError(_PAGE_AUTHORITY_MISSING, message)
+    return value
+
+
+def _ensure_authority_candidates(
+    value: Sequence[PageConversionCandidate],
+    *,
+    page_number: PageNumber,
+) -> tuple[PageConversionCandidate, ...]:
+    if value is None:
+        raise TextAuthoritySelectionError(
+            _PAGE_AUTHORITY_MISSING,
+            "candidats d'autorité absents",
+        )
+    if isinstance(value, str) or not isinstance(value, Sequence):
+        raise TextAuthoritySelectionError(
+            _PAGE_AUTHORITY_MISSING,
+            "candidats d'autorité invalides",
+        )
+    candidates = tuple(value)
+    if len(candidates) == 0:
+        raise TextAuthoritySelectionError(
+            _PAGE_AUTHORITY_MISSING,
+            "candidats d'autorité vides",
+        )
+    candidate_ids: list[str] = []
+    for candidate in candidates:
+        if not isinstance(candidate, PageConversionCandidate):
+            raise TextAuthoritySelectionError(
+                _PAGE_AUTHORITY_MISSING,
+                "candidat d'autorité invalide",
+            )
+        if candidate.page_number != page_number:
+            raise TextAuthoritySelectionError(
+                _PAGE_AUTHORITY_MISSING,
+                "candidat d'autorité hors page",
+            )
+        candidate_ids.append(candidate.candidate_id)
+    if len(candidate_ids) != len(set(candidate_ids)):
+        raise TextAuthoritySelectionError(
+            _PAGE_AUTHORITY_AMBIGUOUS,
+            "candidats d'autorité dupliqués",
+        )
+    return candidates
+
+
+def _ensure_selected_candidate_ids(value: Sequence[str]) -> tuple[str, ...]:
+    if value is None:
+        raise TextAuthoritySelectionError(
+            _PAGE_AUTHORITY_MISSING,
+            "sélection d'autorité absente",
+        )
+    if isinstance(value, str) or not isinstance(value, Sequence):
+        raise TextAuthoritySelectionError(
+            _PAGE_AUTHORITY_MISSING,
+            "sélection d'autorité invalide",
+        )
+    selected_ids = tuple(
+        _ensure_authority_text(candidate_id, "identifiant d'autorité vide")
+        for candidate_id in value
+    )
+    if len(selected_ids) != len(set(selected_ids)):
+        raise TextAuthoritySelectionError(
+            _PAGE_AUTHORITY_AMBIGUOUS,
+            "sélection d'autorité dupliquée",
+        )
+    return selected_ids
+
+
+def _ensure_text_authority_page_decisions(
+    value: Sequence[TextAuthorityPageDecision],
+) -> tuple[TextAuthorityPageDecision, ...]:
+    if value is None:
+        raise TextAuthoritySelectionError(
+            _PAGE_AUTHORITY_MISSING,
+            "décisions d'autorité absentes",
+        )
+    if isinstance(value, str) or not isinstance(value, Sequence):
+        raise TextAuthoritySelectionError(
+            _PAGE_AUTHORITY_MISSING,
+            "décisions d'autorité invalides",
+        )
+    decisions = tuple(value)
+    if len(decisions) == 0:
+        raise TextAuthoritySelectionError(
+            _PAGE_AUTHORITY_MISSING,
+            "décisions d'autorité vides",
+        )
+    page_numbers: list[int] = []
+    for decision in decisions:
+        if not isinstance(decision, TextAuthorityPageDecision):
+            raise TextAuthoritySelectionError(
+                _PAGE_AUTHORITY_MISSING,
+                "décision d'autorité invalide",
+            )
+        page_numbers.append(decision.page_number.value)
+    if len(page_numbers) != len(set(page_numbers)):
+        raise TextAuthoritySelectionError(
+            _PAGE_AUTHORITY_AMBIGUOUS,
+            "décision d'autorité dupliquée pour une page",
+        )
+    return decisions
+
+
+def _ensure_text_authority_manifest(
+    value: Any,
+) -> TextAuthorityManifest:
+    if not isinstance(value, TextAuthorityManifest):
+        raise TextAuthoritySelectionError(
+            _PAGE_AUTHORITY_MISSING,
+            "manifeste d'autorité textuelle absent",
+        )
+    return value
+
+
+def _ensure_text_authority_manifest_covers_page_manifest(
+    *,
+    page_manifest: PageManifest,
+    page_decisions: tuple[TextAuthorityPageDecision, ...],
+) -> None:
+    expected_pages = tuple(entry.page_number.value for entry in page_manifest.entries)
+    actual_pages = tuple(decision.page_number.value for decision in page_decisions)
+    if len(actual_pages) != len(set(actual_pages)):
+        raise TextAuthoritySelectionError(
+            _PAGE_AUTHORITY_AMBIGUOUS,
+            "plusieurs autorités textuelles pour une page",
+        )
+    if set(actual_pages) != set(expected_pages):
+        raise TextAuthoritySelectionError(
+            _PAGE_AUTHORITY_MISSING,
+            "autorité textuelle absente pour une page publiée",
+        )
+    if actual_pages != expected_pages:
+        raise TextAuthoritySelectionError(
+            _PAGE_AUTHORITY_AMBIGUOUS,
+            "ordre des autorités textuelles ambigu",
+        )
 
 
 def _ensure_content_hash(value: Any) -> str:
@@ -667,10 +1145,16 @@ __all__ = [
     "CanonicalItemProvenance",
     "ConversionToolName",
     "PageConversionArtifact",
+    "PageConversionCandidate",
     "PageConversionItem",
     "PageConversionItemLabel",
     "PageItemGeometry",
     "PagewiseDoclingDocument",
     "PagewiseDoclingFusionService",
     "PreprocessedPageArtifact",
+    "TextAuthority",
+    "TextAuthorityManifest",
+    "TextAuthorityPageDecision",
+    "TextAuthoritySelectionError",
+    "TextAuthoritySelectionPolicy",
 ]

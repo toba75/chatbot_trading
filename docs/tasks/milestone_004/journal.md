@@ -27,6 +27,7 @@
 |---|---|---|---|---|---|
 | T-001 - Vérifier et rétablir la précondition GREEN M-004 | `b5036c60d07de6b8bdd4e8d27661fa4f78dab976` | `test(m004): retablir la precondition green avant version canonique` | ADR-010 | Aucune | `tests/m003/validate_m003_precondition_unit.ps1`; `tests/m003/validate_m003_precondition_acceptance.ps1`; `tests/m004/validate_m004_precondition_unit.ps1`; `tests/m004/validate_m004_precondition_acceptance.ps1`; `scripts/validate_m004_precondition.ps1 -Path .\docs\governance\m004_precondition_green.md`; `scripts/test.ps1`; `scripts/lint.ps1` |
 | T-002 - Publier la spécification de version canonique | `826837c1e12b48acbdbc761cc0284ca35d6cf51a` | `docs(m004): publier la specification de version canonique` | ADR-001; ADR-002; ADR-003; ADR-004; DDD-ADR-003 | Aucune | `tests/m004/validate_m004_specification_acceptance.ps1`; `tests/m004/validate_m004_specification_unit.ps1`; `scripts/validate_m004_specification.ps1`; `scripts/validate_traceability.ps1`; `scripts/test.ps1`; `scripts/lint.ps1` |
+| T-004 - Adjuger l'autorité textuelle par page | `c5208a6` | `feat(m004): adjuger l autorite textuelle par page` | ADR-004 | Aucune | `tests/m004/validate_text_authority_acceptance.ps1`; `tests/m004/validate_text_authority_unit.ps1`; `scripts/validate_traceability.ps1`; `scripts/test.ps1`; `scripts/lint.ps1` |
 
 ## Clôture T-001
 
@@ -59,3 +60,15 @@
 - ADR: non requise; T-003 applique ADR-001, ADR-002, ADR-003, ADR-004 et DDD-ADR-003 sans créer de nouvelle route normative, dépendance structurante ou politique durable.
 - Validations GREEN: `tests/m004/validate_page_conversion_acceptance.ps1`; `tests/m004/validate_page_conversion_unit.ps1`; `scripts/validate_architecture_boundaries.ps1`; `scripts/validate_traceability.ps1`; `tests/m003/validate_m003_precondition_acceptance.ps1`; `scripts/test.ps1`; `scripts/lint.ps1`.
 - Risques résiduels: T-003 produit la conversion et la fusion pagewise; l'adjudication d'autorité textuelle, la QA, la publication immuable, la résolution SourceLocator et l'événement `CanonicalSourcePublished` restent portés par T-004 à T-010.
+
+## Clôture T-004
+
+- Scénario BDD: Given une page avec une sortie native et une sortie Granite qui divergent; When `TextAuthoritySelectionPolicy` arbitre avec une sélection explicite et une justification; Then une seule autorité textuelle est retenue, les candidats concurrents restent audités et une décision absente ou ambiguë bloque la fusion canonique.
+- Commit RED: `c5208a6` (`test(m004): couvrir l autorite textuelle par page`).
+- Commit GREEN: `feat(m004): adjuger l autorite textuelle par page`.
+- Implémentation: `app/source_processing/domain/page_conversion.py` ajoute `PageConversionCandidate`, `TextAuthority`, `TextAuthoritySelectionPolicy`, `TextAuthorityManifest` et la fusion `merge_authorized`, qui alimente le `DoclingDocument` uniquement avec les sorties explicitement retenues par le manifeste d'autorité.
+- Garde-fous livrés: version de politique obligatoire; justification obligatoire; candidat source obligatoire; candidats concurrents conservés; une seule autorité par page du manifeste; refus `PAGE_AUTHORITY_MISSING` pour autorité absente ou page publiée sans autorité; refus `PAGE_AUTHORITY_AMBIGUOUS` pour sélection multiple, candidat dupliqué ou décision de page dupliquée.
+- Gates: `scripts/test.ps1` enrôle `tests/m004/validate_text_authority_acceptance.ps1` et `tests/m004/validate_text_authority_unit.ps1`; `docs/traceability/matrix.md` relie `REQ-M004-004` à la tâche, au test d'acceptation, au code de domaine et à ADR-004. Les assertions de volume de gate ont été réalignées sur 79 tests globaux et 77 tests dans le rapport M-003 imbriqué.
+- ADR: non requise; T-004 applique ADR-004 sans autoriser plusieurs autorités par page et sans changer la politique durable d'autorité textuelle unique.
+- Validations GREEN: `tests/m004/validate_text_authority_acceptance.ps1`; `tests/m004/validate_text_authority_unit.ps1`; `tests/m004/validate_page_conversion_acceptance.ps1`; `tests/m004/validate_page_conversion_unit.ps1`; `tests/m003/validate_m003_precondition_acceptance.ps1`; `scripts/validate_m004_specification.ps1`; `scripts/validate_traceability.ps1`; `scripts/validate_architecture_boundaries.ps1`; `scripts/test.ps1`; `scripts/lint.ps1`.
+- Risques résiduels: T-004 ne publie pas encore `CanonicalSource`, ne réalise pas la QA documentaire finale, ne rend pas `SourceLocator` résolvable et n'émet pas `CanonicalSourcePublished`; ces comportements restent portés par T-005 à T-010.
