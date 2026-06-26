@@ -1,0 +1,412 @@
+name: trading-research-assistant
+
+services:
+  edge-gateway:
+    image: caddy@sha256:af32e97399febea808609119bb21544d0265c58a02836576e32a2d082c262c17
+    ports:
+      - "127.0.0.1:${OST_EDGE_HTTPS_PORT?OST_EDGE_HTTPS_PORT requis}:8443"
+    networks:
+      - edge
+      - core
+    depends_on:
+      ui:
+        condition: service_healthy
+      orchestrator-api:
+        condition: service_healthy
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    environment:
+      CADDY_ADMIN: "${CADDY_ADMIN?CADDY_ADMIN requis}"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "wget --spider --quiet --no-check-certificate https://127.0.0.1:8443/health"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: "no"
+    read_only: true
+
+  ui:
+    image: ostrading/ui:0.0.0-m002
+    build:
+      context: ../..
+      dockerfile: deploy/local-compose/Dockerfile
+    command:
+      - python
+      - -m
+      - app.platform.local_runtime
+      - serve-http
+      - ui
+      - "8081"
+    expose:
+      - "8081"
+    networks:
+      - core
+    environment:
+      UI_API_URL: "${UI_API_URL?UI_API_URL requis}"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "python -c \"import socket; socket.create_connection(('127.0.0.1', 8081), 2).close()\""
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: "no"
+    read_only: true
+
+  orchestrator-api:
+    image: ostrading/orchestrator-api:0.0.0-m002
+    build:
+      context: ../..
+      dockerfile: deploy/local-compose/Dockerfile
+    command:
+      - python
+      - -m
+      - app.platform.local_runtime
+      - serve-http
+      - orchestrator-api
+      - "8080"
+    expose:
+      - "8080"
+    networks:
+      - core
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      llm-gateway:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "${DATABASE_URL?DATABASE_URL requis}"
+      QDRANT_URL: "${QDRANT_URL?QDRANT_URL requis}"
+      LLM_GATEWAY_URL: "${LLM_GATEWAY_URL?LLM_GATEWAY_URL requis}"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "python -c \"import socket; socket.create_connection(('127.0.0.1', 8080), 2).close()\""
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: "no"
+    read_only: true
+
+  llm-gateway:
+    image: ostrading/llm-gateway:0.0.0-m002
+    build:
+      context: ../..
+      dockerfile: deploy/local-compose/Dockerfile
+    command:
+      - python
+      - -m
+      - app.platform.local_runtime
+      - serve-http
+      - llm-gateway
+      - "8090"
+    expose:
+      - "8090"
+    networks:
+      - core
+      - spark-egress
+    environment:
+      GEMMA_BASE_URL: "https://spark-inference:8443/v1"
+      GEMMA_MODEL: "${GEMMA_MODEL?GEMMA_MODEL requis}"
+      GEMMA_API_KEY_FILE: "/run/secrets/gemma_api_key"
+      GEMMA_CA_BUNDLE: "/run/secrets/spark_ca"
+    secrets:
+      - gemma_api_key
+      - spark_ca
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "python -c \"import socket; socket.create_connection(('127.0.0.1', 8090), 2).close()\""
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: "no"
+    read_only: true
+
+  postgres:
+    image: postgres@sha256:7e5df973a74872482e320dcbdeb055e178d6f42de0558b083892c50cda833c96
+    expose:
+      - "5432"
+    networks:
+      - core
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: "${POSTGRES_DB?POSTGRES_DB requis}"
+      POSTGRES_USER: "${POSTGRES_USER?POSTGRES_USER requis}"
+      POSTGRES_PASSWORD_FILE: "/run/secrets/postgres_password"
+    secrets:
+      - postgres_password
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "pg_isready -U ${POSTGRES_USER?POSTGRES_USER requis} -d ${POSTGRES_DB?POSTGRES_DB requis}"
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: "no"
+
+  qdrant:
+    image: qdrant/qdrant@sha256:318c11b72aaab96b36e9662ad244de3cabd0653a1b942d4e8191f18296c81af0
+    expose:
+      - "6333"
+    networks:
+      - core
+    volumes:
+      - qdrant-data:/qdrant/storage
+    environment:
+      QDRANT__SERVICE__GRPC_PORT: "${QDRANT_GRPC_PORT?QDRANT_GRPC_PORT requis}"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "test -d /qdrant/storage"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: "no"
+
+  granite-docling:
+    image: ostrading/granite-docling:0.0.0-m002
+    build:
+      context: ../..
+      dockerfile: deploy/local-compose/Dockerfile.granite
+    command:
+      - python
+      - -m
+      - app.platform.local_runtime
+      - serve-http
+      - granite-docling
+      - "8001"
+    expose:
+      - "8001"
+    networks:
+      - core
+    volumes:
+      - model-cache:/models
+    environment:
+      GRANITE_MODEL_PATH: "${GRANITE_MODEL_PATH?GRANITE_MODEL_PATH requis}"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "python -c \"import socket; socket.create_connection(('127.0.0.1', 8001), 2).close()\""
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: "no"
+    read_only: true
+
+  embedding-service:
+    image: ostrading/embedding-service:0.0.0-m002
+    build:
+      context: ../..
+      dockerfile: deploy/local-compose/Dockerfile
+    command:
+      - python
+      - -m
+      - app.platform.local_runtime
+      - serve-http
+      - embedding-service
+      - "8101"
+    expose:
+      - "8101"
+    networks:
+      - core
+    volumes:
+      - model-cache:/models
+    environment:
+      EMBEDDING_MODEL_PATH: "${EMBEDDING_MODEL_PATH?EMBEDDING_MODEL_PATH requis}"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "python -c \"import socket; socket.create_connection(('127.0.0.1', 8101), 2).close()\""
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: "no"
+    read_only: true
+
+  reranker-service:
+    image: ostrading/reranker-service:0.0.0-m002
+    build:
+      context: ../..
+      dockerfile: deploy/local-compose/Dockerfile
+    command:
+      - python
+      - -m
+      - app.platform.local_runtime
+      - serve-http
+      - reranker-service
+      - "8102"
+    expose:
+      - "8102"
+    networks:
+      - core
+    volumes:
+      - model-cache:/models
+    environment:
+      RERANKER_MODEL_PATH: "${RERANKER_MODEL_PATH?RERANKER_MODEL_PATH requis}"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "python -c \"import socket; socket.create_connection(('127.0.0.1', 8102), 2).close()\""
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: "no"
+    read_only: true
+
+  worker-documents:
+    image: ostrading/worker-documents:0.0.0-m002
+    build:
+      context: ../..
+      dockerfile: deploy/local-compose/Dockerfile
+    command:
+      - python
+      - -m
+      - app.platform.local_runtime
+      - run-worker
+      - worker-documents
+    networks:
+      - core
+    volumes:
+      - corpus-data:/workspace/corpus
+      - document-artifacts:/workspace/data
+    environment:
+      DATABASE_URL: "${DATABASE_URL?DATABASE_URL requis}"
+      QDRANT_URL: "${QDRANT_URL?QDRANT_URL requis}"
+      GRANITE_URL: "${GRANITE_URL?GRANITE_URL requis}"
+      EMBEDDING_SERVICE_URL: "${EMBEDDING_SERVICE_URL?EMBEDDING_SERVICE_URL requis}"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "test -d /workspace/corpus"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: "no"
+
+  worker-research:
+    image: ostrading/worker-research:0.0.0-m002
+    build:
+      context: ../..
+      dockerfile: deploy/local-compose/Dockerfile
+    command:
+      - python
+      - -m
+      - app.platform.local_runtime
+      - run-worker
+      - worker-research
+    networks:
+      - core
+    environment:
+      DATABASE_URL: "${DATABASE_URL?DATABASE_URL requis}"
+      QDRANT_URL: "${QDRANT_URL?QDRANT_URL requis}"
+      LLM_GATEWAY_URL: "${LLM_GATEWAY_URL?LLM_GATEWAY_URL requis}"
+      RERANKER_SERVICE_URL: "${RERANKER_SERVICE_URL?RERANKER_SERVICE_URL requis}"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "python -m app.platform.local_runtime check-worker worker-research"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: "no"
+    read_only: true
+
+  worker-backtest:
+    image: ostrading/worker-backtest:0.0.0-m002
+    build:
+      context: ../..
+      dockerfile: deploy/local-compose/Dockerfile
+    command:
+      - python
+      - -m
+      - app.platform.local_runtime
+      - run-worker
+      - worker-backtest
+    networks:
+      - core
+    volumes:
+      - experiment-data:/workspace/data/experiments
+    environment:
+      DATABASE_URL: "${DATABASE_URL?DATABASE_URL requis}"
+      BACKTEST_ENGINE_URL: "${BACKTEST_ENGINE_URL?BACKTEST_ENGINE_URL requis}"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "test -d /workspace/data/experiments"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: "no"
+
+  backtest-engine:
+    image: ostrading/backtest-engine:0.0.0-m002
+    build:
+      context: ../..
+      dockerfile: deploy/local-compose/Dockerfile
+    command:
+      - python
+      - -m
+      - app.platform.local_runtime
+      - serve-http
+      - backtest-engine
+      - "8200"
+    expose:
+      - "8200"
+    networks:
+      - core
+    environment:
+      BACKTEST_WORKDIR: "${BACKTEST_WORKDIR?BACKTEST_WORKDIR requis}"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "python -c \"import socket; socket.create_connection(('127.0.0.1', 8200), 2).close()\""
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: "no"
+    read_only: true
+
+networks:
+  edge: {}
+  core:
+    internal: true
+  spark-egress: {}
+
+volumes:
+  caddy-data: {}
+  caddy-config: {}
+  postgres-data: {}
+  qdrant-data: {}
+  model-cache: {}
+  corpus-data: {}
+  document-artifacts: {}
+  experiment-data: {}
+
+secrets:
+  gemma_api_key:
+    file: ./secrets/gemma_api_key
+  spark_ca:
+    file: ./secrets/spark_ca.pem
+  postgres_password:
+    file: ./secrets/postgres_password

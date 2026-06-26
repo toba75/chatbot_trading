@@ -104,7 +104,7 @@ try {
     $missingDecisionProjectRoot = New-TemporaryProject -Name "missing-section-3-decision"
     Initialize-GitBaseline -ProjectRoot $missingDecisionProjectRoot
     $specPath = Join-Path $missingDecisionProjectRoot "docs/specs/specification_unifiee_ddd_technique_chatbot_trading_v4_1.md"
-    (Get-Content -Raw -Encoding UTF8 -LiteralPath $specPath).Replace("## ADR DDD structurantes", "### ADR-012 - Decision structurante non materialisee`n`n## ADR DDD structurantes") |
+    (Get-Content -Raw -Encoding UTF8 -LiteralPath $specPath).Replace("## ADR DDD structurantes", "### ADR-099 - Decision structurante non materialisee`n`n## ADR DDD structurantes") |
         Set-Content -Encoding UTF8 -LiteralPath $specPath
     $missingDecisionResult = Invoke-Validator -ProjectRoot $missingDecisionProjectRoot
     Assert-ExitCode -Actual $missingDecisionResult.ExitCode -Expected 1 -Message "Une décision structurante de la section 3 sans ADR matérialisée doit être refusée."

@@ -1,8 +1,8 @@
-# Commandes de validation M-000 et M-001
+# Commandes de validation M-000, M-001 et M-002
 
 ## Scénario BDD
 
-- Given les artefacts de gouvernance M-000 et les contrats M-001 sont présents.
+- Given les artefacts de gouvernance M-000, les contrats M-001 et la spécification M-002 sont présents.
 - When `.\scripts\test.ps1` et `.\scripts\lint.ps1` sont exécutés.
 - Then les validateurs requis sont lancés sans omission et la gate retourne GREEN ou RED avec la commande fautive nommée.
 
@@ -32,11 +32,11 @@ Le wrapper `scripts/validate_architecture_boundaries.ps1` refuse explicitement u
 
 ## Périmètre des tests
 
-`scripts/test.ps1` exécute les validateurs M-000, les validateurs M-001, les tests d'acceptation et unitaires de gouvernance livrés par M-000, puis les tests d'acceptation et unitaires M-001.
+`scripts/test.ps1` exécute les validateurs M-000, les validateurs M-001, le validateur de spécification M-002, le validateur de topologie M-002, le validateur Compose local M-002 et le validateur de frontière réseau M-002, les tests d'acceptation et unitaires de gouvernance livrés par M-000, puis les tests d'acceptation et unitaires M-001 et M-002, dont le contrat du gateway LLM, les pannes d'inférence Spark, l'outbox idempotente, la file de jobs idempotente, l'observabilité gateway sans payload complet, la frontière réseau locale et la traçabilité de clôture M-002.
 
 Le self-test d'acceptation `tests/governance/validate_m000_validation_commands_acceptance.ps1` reste exécuté explicitement hors `scripts/test.ps1` pour vérifier les gates sans récursion de `scripts/test.ps1` sur lui-même.
 
-`scripts/lint.ps1` exécute les validateurs M-000 et M-001 sans lancer de suite de tests.
+`scripts/lint.ps1` exécute les validateurs M-000, M-001, M-002, Compose local et frontière réseau locale sans lancer de suite de tests.
 
 ## Validateurs requis
 
@@ -46,6 +46,10 @@ Le self-test d'acceptation `tests/governance/validate_m000_validation_commands_a
 - `scripts/validate_traceability.ps1`
 - `scripts/validate_definition_of_done.ps1`
 - `scripts/validate_m001_specification.ps1`
+- `scripts/validate_m002_specification.ps1`
+- `scripts/validate_platform_topology.ps1`
+- `scripts/validate_local_compose.ps1`
+- `scripts/validate_network_boundary.ps1`
 - `scripts/validate_architecture_boundaries.ps1`
 
 ## Refus explicites
@@ -65,3 +69,9 @@ M-000 ne livre pas de code métier applicatif. L'absence de suite applicative re
 M-001 ajoute les contrats publiés, le registre de contextes et les frontières d'import aux gates existantes sans changer les points d'entrée PowerShell ADR-010. Le validateur d'architecture utilise Python comme outillage interne selon ADR-011.
 
 Les tests M-001 restent non récursifs: ils valident les contrats, fixtures, règles d'architecture et lignes de traçabilité sans relancer `scripts/test.ps1`.
+
+## Extension M-002
+
+M-002 ajoute la spécification de plateforme locale sûre, le registre de topologie `docker-local` / `spark-inference`, la validation statique du Compose local, la frontière réseau locale, le contrat du gateway LLM, le contrôle des pannes d'inférence Spark, l'outbox idempotente, la file de jobs priorisée, l'observabilité technique du gateway et la traçabilité de clôture aux gates existantes sans changer les points d'entrée PowerShell ADR-010. Les validateurs de plateforme qui utilisent Python standard-library sont gouvernés par ADR-012.
+
+Les tests M-002 restent non récursifs: ils valident la présence des sections, scénarios, placements physiques, règles `docker-local` et `spark-inference`, registre de topologie, Compose local contrôlé, frontière réseau locale, gateway unique, contrat OpenAI compatible, pannes Spark explicites, outbox, file de jobs, observabilité sans prompt ni réponse complète, lignes de matrice `REQ-M002-*`, commandes de validation et garde-fous sans lancer `scripts/test.ps1`.

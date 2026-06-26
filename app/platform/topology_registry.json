@@ -1,0 +1,195 @@
+{
+  "schema_version": "1.0",
+  "source": "docs/specs/specification_unifiee_ddd_technique_chatbot_trading_v4_1.md section 13 et critères 21; docs/specs/m002_plateforme_locale_sure.md",
+  "architecture_decisions": [
+    "ADR-007",
+    "ADR-009"
+  ],
+  "hosts": [
+    {
+      "id": "docker-local",
+      "exclusive_responsibility": "business_data_and_local_processing",
+      "business_storage_allowed": true,
+      "durable_business_storage_allowed": true
+    },
+    {
+      "id": "spark-inference",
+      "exclusive_responsibility": "gemma_inference_only",
+      "business_storage_allowed": false,
+      "durable_business_storage_allowed": false
+    }
+  ],
+  "services": [
+    {
+      "id": "gemma-vllm",
+      "host": "spark-inference",
+      "kind": "inference",
+      "compose_local": false,
+      "business_storage": false,
+      "durability": "stateless",
+      "responsibility": "Servir Gemma 4 par vLLM sur le Spark."
+    },
+    {
+      "id": "spark-model-cache",
+      "host": "spark-inference",
+      "kind": "model-cache",
+      "compose_local": false,
+      "business_storage": false,
+      "durability": "regenerable_cache",
+      "responsibility": "Conserver uniquement les poids et tokenizers régénérables nécessaires au serving."
+    },
+    {
+      "id": "edge-gateway",
+      "host": "docker-local",
+      "kind": "entrypoint",
+      "compose_local": true,
+      "business_storage": false,
+      "durability": "stateless",
+      "responsibility": "Publier le point d'entrée utilisateur local."
+    },
+    {
+      "id": "ui",
+      "host": "docker-local",
+      "kind": "ui",
+      "compose_local": true,
+      "business_storage": false,
+      "durability": "stateless",
+      "responsibility": "Servir l'interface locale sans stockage canonique."
+    },
+    {
+      "id": "orchestrator-api",
+      "host": "docker-local",
+      "kind": "application",
+      "compose_local": true,
+      "business_storage": false,
+      "durability": "stateless",
+      "responsibility": "Exposer les capacités applicatives locales et les repositories métier."
+    },
+    {
+      "id": "llm-gateway",
+      "host": "docker-local",
+      "kind": "llm-gateway",
+      "compose_local": true,
+      "business_storage": false,
+      "durability": "stateless",
+      "responsibility": "Adapter les ports d'inférence locaux vers vLLM sur spark-inference."
+    },
+    {
+      "id": "granite-docling",
+      "host": "docker-local",
+      "kind": "document-processing",
+      "compose_local": true,
+      "business_storage": false,
+      "durability": "regenerable_cache",
+      "responsibility": "Exécuter le traitement documentaire local sans déport sur Spark."
+    },
+    {
+      "id": "embedding-service",
+      "host": "docker-local",
+      "kind": "embedding",
+      "compose_local": true,
+      "business_storage": false,
+      "durability": "regenerable_cache",
+      "responsibility": "Calculer les embeddings localement."
+    },
+    {
+      "id": "reranker-service",
+      "host": "docker-local",
+      "kind": "reranker",
+      "compose_local": true,
+      "business_storage": false,
+      "durability": "regenerable_cache",
+      "responsibility": "Reranker les résultats de recherche localement."
+    },
+    {
+      "id": "postgres",
+      "host": "docker-local",
+      "kind": "storage",
+      "compose_local": true,
+      "business_storage": true,
+      "durability": "durable_business",
+      "responsibility": "Stocker les schémas PostgreSQL des contextes et de la plateforme."
+    },
+    {
+      "id": "qdrant",
+      "host": "docker-local",
+      "kind": "storage",
+      "compose_local": true,
+      "business_storage": true,
+      "durability": "durable_business",
+      "responsibility": "Stocker les collections vectorielles locales."
+    },
+    {
+      "id": "corpus-store",
+      "host": "docker-local",
+      "kind": "corpus",
+      "compose_local": false,
+      "business_storage": true,
+      "durability": "durable_business",
+      "responsibility": "Conserver les sources, corpus et artefacts documentaires canoniques."
+    },
+    {
+      "id": "experiment-registry",
+      "host": "docker-local",
+      "kind": "experiment-registry",
+      "compose_local": false,
+      "business_storage": true,
+      "durability": "durable_business",
+      "responsibility": "Conserver les entrées, résultats et rapports d'expérimentation."
+    },
+    {
+      "id": "outbox",
+      "host": "docker-local",
+      "kind": "outbox",
+      "compose_local": false,
+      "business_storage": true,
+      "durability": "durable_business",
+      "responsibility": "Persister les événements intercontextes avec l'état producteur."
+    },
+    {
+      "id": "job-queue",
+      "host": "docker-local",
+      "kind": "job-queue",
+      "compose_local": false,
+      "business_storage": false,
+      "durability": "durable_technical",
+      "responsibility": "Ordonner les jobs techniques priorisés et idempotents."
+    },
+    {
+      "id": "worker-documents",
+      "host": "docker-local",
+      "kind": "worker",
+      "compose_local": true,
+      "business_storage": false,
+      "durability": "stateless",
+      "responsibility": "Exécuter les traitements documentaires locaux."
+    },
+    {
+      "id": "worker-research",
+      "host": "docker-local",
+      "kind": "worker",
+      "compose_local": true,
+      "business_storage": false,
+      "durability": "stateless",
+      "responsibility": "Exécuter les recherches et vérifications locales."
+    },
+    {
+      "id": "worker-backtest",
+      "host": "docker-local",
+      "kind": "worker",
+      "compose_local": true,
+      "business_storage": false,
+      "durability": "stateless",
+      "responsibility": "Piloter les backtests locaux."
+    },
+    {
+      "id": "backtest-engine",
+      "host": "docker-local",
+      "kind": "backtest",
+      "compose_local": true,
+      "business_storage": false,
+      "durability": "stateless",
+      "responsibility": "Calculer les backtests déterministes sur docker-local."
+    }
+  ]
+}

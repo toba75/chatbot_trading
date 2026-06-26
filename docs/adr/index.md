@@ -17,6 +17,7 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 | [ADR-009](ADR-009-spark-sans-etat-metier.md) | Le Spark est sans état métier | Acceptée | 2026-06-21 | Aucun | Aucune |
 | [ADR-010](ADR-010-gates-gouvernance-powershell.md) | Gates de gouvernance PowerShell | Acceptée | 2026-06-21 | Aucun | Aucune |
 | [ADR-011](ADR-011-python-outille-pour-validateurs-architecture.md) | Python outillé pour les validateurs d'architecture | Acceptée | 2026-06-25 | Aucun | Aucune |
+| [ADR-012](ADR-012-python-outille-pour-validateurs-plateforme.md) | Python outillé pour les validateurs de plateforme | Acceptée | 2026-06-25 | Aucun | Aucune |
 
 ## ADR DDD
 
@@ -36,7 +37,7 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 ## Prochains numéros disponibles
 
 ```text
-Prochaine ADR technique: ADR-012
+Prochaine ADR technique: ADR-013
 Prochaine DDD-ADR: DDD-ADR-011
 ```
 
