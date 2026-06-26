@@ -21,6 +21,8 @@ class DocumentProcessingRunStatus(str, Enum):
     DIAGNOSED = "DIAGNOSED"
     ROUTE_PLANNED = "ROUTE_PLANNED"
     MANUAL_REVIEW = "MANUAL_REVIEW"
+    QUARANTINED = "QUARANTINED"
+    REJECTED = "REJECTED"
 
 
 class PageManifestEntryState(str, Enum):
@@ -781,6 +783,38 @@ class ManualReviewRequested:
 
 
 @dataclass(frozen=True)
+class ProcessingRunQuarantined:
+    """Événement produit quand une tentative est isolée avant publication aval."""
+
+    processing_run_id: ProcessingRunId
+    document_id: DocumentId
+    routing_policy_version: RoutingPolicyVersion
+    reason: str
+
+    def __post_init__(self) -> None:
+        _ensure_processing_run_id(self.processing_run_id)
+        _ensure_document_id(self.document_id)
+        _ensure_routing_policy_version(self.routing_policy_version)
+        object.__setattr__(self, "reason", _ensure_manual_review_reason(self.reason))
+
+
+@dataclass(frozen=True)
+class ProcessingRunRejected:
+    """Événement produit quand une tentative est rejetée explicitement."""
+
+    processing_run_id: ProcessingRunId
+    document_id: DocumentId
+    routing_policy_version: RoutingPolicyVersion
+    reason: str
+
+    def __post_init__(self) -> None:
+        _ensure_processing_run_id(self.processing_run_id)
+        _ensure_document_id(self.document_id)
+        _ensure_routing_policy_version(self.routing_policy_version)
+        object.__setattr__(self, "reason", _ensure_manual_review_reason(self.reason))
+
+
+@dataclass(frozen=True)
 class DocumentProcessingRun:
     """Agrégat SP qui porte une tentative de traitement d'un SourceDocument."""
 
@@ -790,12 +824,15 @@ class DocumentProcessingRun:
     page_decisions: tuple[PageDecision, ...]
     route_plan: RoutePlan | None
     manual_review_reason: str | None
+    blocking_policy_version: RoutingPolicyVersion | None
     status: DocumentProcessingRunStatus
     events: tuple[
         DocumentProcessingStarted
         | PageDiagnosticRecorded
         | PageRouteDecided
-        | ManualReviewRequested,
+        | ManualReviewRequested
+        | ProcessingRunQuarantined
+        | ProcessingRunRejected,
         ...,
     ]
 
@@ -821,9 +858,16 @@ class DocumentProcessingRun:
             page_decisions=(),
             route_plan=None,
             manual_review_reason=None,
+            blocking_policy_version=None,
             status=DocumentProcessingRunStatus.CREATED,
             events=(started_event,),
         )
+
+    @property
+    def blocking_reason(self) -> str | None:
+        """Justification bloquante conservée pour les états non publiables."""
+
+        return self.manual_review_reason
 
     def record_page_diagnostics(
         self,
@@ -854,6 +898,7 @@ class DocumentProcessingRun:
             page_decisions=parsed_page_decisions,
             route_plan=None,
             manual_review_reason=None,
+            blocking_policy_version=None,
             status=DocumentProcessingRunStatus.DIAGNOSED,
             events=self.events + diagnostic_events,
         )
@@ -887,6 +932,7 @@ class DocumentProcessingRun:
                 page_decisions=self.page_decisions,
                 route_plan=None,
                 manual_review_reason=manual_review_event.reason,
+                blocking_policy_version=manual_review_event.routing_policy_version,
                 status=DocumentProcessingRunStatus.MANUAL_REVIEW,
                 events=self.events + (manual_review_event,),
             )
@@ -910,8 +956,83 @@ class DocumentProcessingRun:
             page_decisions=self.page_decisions,
             route_plan=route_plan,
             manual_review_reason=None,
+            blocking_policy_version=None,
             status=DocumentProcessingRunStatus.ROUTE_PLANNED,
             events=self.events + route_events,
+        )
+
+    def quarantine(
+        self,
+        routing_policy_version: RoutingPolicyVersion,
+        reason: str,
+    ) -> "DocumentProcessingRun":
+        if self.status not in (
+            DocumentProcessingRunStatus.DIAGNOSED,
+            DocumentProcessingRunStatus.MANUAL_REVIEW,
+        ):
+            raise ValueError("transition de quarantaine interdite")
+
+        parsed_routing_policy_version = _ensure_routing_policy_version(
+            routing_policy_version
+        )
+        parsed_reason = _ensure_manual_review_reason(reason)
+        quarantined_event = ProcessingRunQuarantined(
+            processing_run_id=self.processing_run_id,
+            document_id=self.document_id,
+            routing_policy_version=parsed_routing_policy_version,
+            reason=parsed_reason,
+        )
+        return DocumentProcessingRun(
+            processing_run_id=self.processing_run_id,
+            document_id=self.document_id,
+            page_manifest=self.page_manifest,
+            page_decisions=self.page_decisions,
+            route_plan=None,
+            manual_review_reason=quarantined_event.reason,
+            blocking_policy_version=quarantined_event.routing_policy_version,
+            status=DocumentProcessingRunStatus.QUARANTINED,
+            events=self.events + (quarantined_event,),
+        )
+
+    def reject(
+        self,
+        routing_policy_version: RoutingPolicyVersion,
+        reason: str,
+    ) -> "DocumentProcessingRun":
+        if self.status is not DocumentProcessingRunStatus.MANUAL_REVIEW:
+            raise ValueError("transition de rejet interdite")
+
+        parsed_routing_policy_version = _ensure_routing_policy_version(
+            routing_policy_version
+        )
+        parsed_reason = _ensure_manual_review_reason(reason)
+        rejected_event = ProcessingRunRejected(
+            processing_run_id=self.processing_run_id,
+            document_id=self.document_id,
+            routing_policy_version=parsed_routing_policy_version,
+            reason=parsed_reason,
+        )
+        return DocumentProcessingRun(
+            processing_run_id=self.processing_run_id,
+            document_id=self.document_id,
+            page_manifest=self.page_manifest,
+            page_decisions=self.page_decisions,
+            route_plan=None,
+            manual_review_reason=rejected_event.reason,
+            blocking_policy_version=rejected_event.routing_policy_version,
+            status=DocumentProcessingRunStatus.REJECTED,
+            events=self.events + (rejected_event,),
+        )
+
+    def ensure_documentary_publication_allowed(self) -> None:
+        if self.status is DocumentProcessingRunStatus.ROUTE_PLANNED:
+            return
+
+        if self.blocking_reason is None:
+            raise ValueError(f"tentative M-003 non publiable: {self.status.value}")
+        raise ValueError(
+            f"tentative M-003 non publiable: {self.status.value}; "
+            f"{self.blocking_reason}"
         )
 
     def __post_init__(self) -> None:
@@ -922,6 +1043,9 @@ class DocumentProcessingRun:
         route_plan = _ensure_route_plan_or_none(self.route_plan)
         manual_review_reason = _ensure_manual_review_reason_or_none(
             self.manual_review_reason
+        )
+        blocking_policy_version = _ensure_routing_policy_version_or_none(
+            self.blocking_policy_version
         )
         if not isinstance(self.status, DocumentProcessingRunStatus):
             raise ValueError("document_processing_run_status invalide")
@@ -937,6 +1061,8 @@ class DocumentProcessingRun:
                     PageDiagnosticRecorded,
                     PageRouteDecided,
                     ManualReviewRequested,
+                    ProcessingRunQuarantined,
+                    ProcessingRunRejected,
                 ),
             ):
                 raise ValueError("event DocumentProcessingRun invalide")
@@ -945,6 +1071,8 @@ class DocumentProcessingRun:
         if self.status is DocumentProcessingRunStatus.CREATED:
             if route_plan is not None or manual_review_reason is not None:
                 raise ValueError("route interdite sur tentative créée")
+            if blocking_policy_version is not None:
+                raise ValueError("décision bloquante interdite sur tentative créée")
         if self.status is DocumentProcessingRunStatus.DIAGNOSED:
             _ensure_page_diagnostic_completeness(
                 page_manifest=self.page_manifest,
@@ -952,6 +1080,8 @@ class DocumentProcessingRun:
             )
             if route_plan is not None or manual_review_reason is not None:
                 raise ValueError("route interdite avant décision de routage")
+            if blocking_policy_version is not None:
+                raise ValueError("décision bloquante interdite avant routage")
         if self.status is DocumentProcessingRunStatus.ROUTE_PLANNED:
             _ensure_page_diagnostic_completeness(
                 page_manifest=self.page_manifest,
@@ -964,6 +1094,8 @@ class DocumentProcessingRun:
             )
             if manual_review_reason is not None:
                 raise ValueError("revue manuelle interdite sur plan approuvé")
+            if blocking_policy_version is not None:
+                raise ValueError("décision bloquante interdite sur plan approuvé")
         if self.status is DocumentProcessingRunStatus.MANUAL_REVIEW:
             _ensure_page_diagnostic_completeness(
                 page_manifest=self.page_manifest,
@@ -972,9 +1104,27 @@ class DocumentProcessingRun:
             if route_plan is not None:
                 raise ValueError("plan de route interdit en revue manuelle")
             _ensure_manual_review_reason(manual_review_reason)
+            _ensure_routing_policy_version(blocking_policy_version)
+        if self.status in (
+            DocumentProcessingRunStatus.QUARANTINED,
+            DocumentProcessingRunStatus.REJECTED,
+        ):
+            _ensure_page_diagnostic_completeness(
+                page_manifest=self.page_manifest,
+                page_decisions=page_decisions,
+            )
+            if route_plan is not None:
+                raise ValueError("plan de route interdit sur tentative bloquée")
+            _ensure_manual_review_reason(manual_review_reason)
+            _ensure_routing_policy_version(blocking_policy_version)
         object.__setattr__(self, "page_decisions", page_decisions)
         object.__setattr__(self, "route_plan", route_plan)
         object.__setattr__(self, "manual_review_reason", manual_review_reason)
+        object.__setattr__(
+            self,
+            "blocking_policy_version",
+            blocking_policy_version,
+        )
 
 
 def _ensure_processing_run_id_value(value: Any) -> str:
@@ -1384,6 +1534,14 @@ def _ensure_routing_policy_version(
     return value
 
 
+def _ensure_routing_policy_version_or_none(
+    value: RoutingPolicyVersion | None,
+) -> RoutingPolicyVersion | None:
+    if value is None:
+        return None
+    return _ensure_routing_policy_version(value)
+
+
 def _ensure_routing_configuration(
     value: PageRoutingConfiguration,
 ) -> PageRoutingConfiguration:
@@ -1450,6 +1608,8 @@ __all__ = [
     "PageRouteName",
     "PageRoutingConfiguration",
     "PageRoutingPolicy",
+    "ProcessingRunQuarantined",
+    "ProcessingRunRejected",
     "ProcessingRunId",
     "RouteDecisionMode",
     "RoutePlan",
