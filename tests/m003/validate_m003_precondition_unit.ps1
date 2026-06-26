@@ -11,6 +11,7 @@ function New-ScriptFile {
         [string] $Path,
 
         [Parameter(Mandatory = $true)]
+        [AllowEmptyString()]
         [string] $Content
     )
 
@@ -90,9 +91,11 @@ function New-TemporaryProject {
         [string] $Name,
 
         [Parameter(Mandatory = $true)]
+        [AllowEmptyString()]
         [string] $TestGateContent,
 
         [Parameter(Mandatory = $true)]
+        [AllowEmptyString()]
         [string] $LintGateContent,
 
         [Parameter(Mandatory = $true)]

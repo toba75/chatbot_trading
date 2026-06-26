@@ -91,6 +91,23 @@ function New-TemporaryFile {
     return $path
 }
 
+function Get-ComposeLineEnding {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $Content
+    )
+
+    if ($Content.Contains("`r`n")) {
+        return "`r`n"
+    }
+
+    if ($Content.Contains("`n")) {
+        return "`n"
+    }
+
+    throw "Fin de ligne fixture Compose absente."
+}
+
 function Add-PublishedPortToService {
     param(
         [Parameter(Mandatory = $true)]
@@ -100,12 +117,13 @@ function Add-PublishedPortToService {
         [string] $ServiceId
     )
 
-    $serviceHeader = "`n  ${ServiceId}:`n"
+    $lineEnding = Get-ComposeLineEnding -Content $Content
+    $serviceHeader = "${lineEnding}  ${ServiceId}:${lineEnding}"
     if (-not $Content.Contains($serviceHeader)) {
         throw "Service fixture absent: $ServiceId"
     }
 
-    $publishedPort = "`n  ${ServiceId}:`n    ports:`n      - `"0.0.0.0:9191:9191`"`n"
+    $publishedPort = "${lineEnding}  ${ServiceId}:${lineEnding}    ports:${lineEnding}      - `"0.0.0.0:9191:9191`"${lineEnding}"
     $serviceIndex = $Content.IndexOf($serviceHeader)
     return $Content.Remove($serviceIndex, $serviceHeader.Length).Insert($serviceIndex, $publishedPort)
 }
@@ -119,12 +137,13 @@ function Add-ProfilePublishedPortToService {
         [string] $ServiceId
     )
 
-    $serviceHeader = "`n  ${ServiceId}:`n"
+    $lineEnding = Get-ComposeLineEnding -Content $Content
+    $serviceHeader = "${lineEnding}  ${ServiceId}:${lineEnding}"
     if (-not $Content.Contains($serviceHeader)) {
         throw "Service fixture absent: $ServiceId"
     }
 
-    $publishedPort = "`n  ${ServiceId}:`n    profiles:`n      - debug`n    ports:`n      - `"127.0.0.1:6333:6333`"`n"
+    $publishedPort = "${lineEnding}  ${ServiceId}:${lineEnding}    profiles:${lineEnding}      - debug${lineEnding}    ports:${lineEnding}      - `"127.0.0.1:6333:6333`"${lineEnding}"
     $serviceIndex = $Content.IndexOf($serviceHeader)
     return $Content.Remove($serviceIndex, $serviceHeader.Length).Insert($serviceIndex, $publishedPort)
 }
@@ -138,19 +157,20 @@ function Add-SparkEgressToService {
         [string] $ServiceId
     )
 
-    $serviceHeader = "`n  ${ServiceId}:`n"
+    $lineEnding = Get-ComposeLineEnding -Content $Content
+    $serviceHeader = "${lineEnding}  ${ServiceId}:${lineEnding}"
     $serviceIndex = $Content.IndexOf($serviceHeader)
     if ($serviceIndex -lt 0) {
         throw "Service fixture absent: $ServiceId"
     }
 
-    $networkBlock = "    networks:`n      - core`n"
+    $networkBlock = "    networks:${lineEnding}      - core${lineEnding}"
     $networkIndex = $Content.IndexOf($networkBlock, $serviceIndex)
     if ($networkIndex -lt 0) {
         throw "Bloc networks fixture absent pour service: $ServiceId"
     }
 
-    $mutatedNetworkBlock = "    networks:`n      - core`n      - spark-egress`n"
+    $mutatedNetworkBlock = "    networks:${lineEnding}      - core${lineEnding}      - spark-egress${lineEnding}"
     return $Content.Remove($networkIndex, $networkBlock.Length).Insert($networkIndex, $mutatedNetworkBlock)
 }
 

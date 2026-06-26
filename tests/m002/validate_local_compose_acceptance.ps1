@@ -74,6 +74,23 @@ function New-TemporaryCompose {
     return $path
 }
 
+function Get-ComposeLineEnding {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $Content
+    )
+
+    if ($Content.Contains("`r`n")) {
+        return "`r`n"
+    }
+
+    if ($Content.Contains("`n")) {
+        return "`n"
+    }
+
+    throw "Fin de ligne fixture Compose absente."
+}
+
 function Add-PublishedPortToService {
     param(
         [Parameter(Mandatory = $true)]
@@ -83,12 +100,13 @@ function Add-PublishedPortToService {
         [string] $ServiceId
     )
 
-    $serviceHeader = "`n  ${ServiceId}:`n"
+    $lineEnding = Get-ComposeLineEnding -Content $Content
+    $serviceHeader = "${lineEnding}  ${ServiceId}:${lineEnding}"
     if (-not $Content.Contains($serviceHeader)) {
         throw "Service fixture absent: $ServiceId"
     }
 
-    $publishedPort = "`n  ${ServiceId}:`n    ports:`n      - `"127.0.0.1:9191:9191`"`n"
+    $publishedPort = "${lineEnding}  ${ServiceId}:${lineEnding}    ports:${lineEnding}      - `"127.0.0.1:9191:9191`"${lineEnding}"
     $serviceIndex = $Content.IndexOf($serviceHeader)
     return $Content.Remove($serviceIndex, $serviceHeader.Length).Insert($serviceIndex, $publishedPort)
 }
@@ -102,19 +120,20 @@ function Add-SparkEgressToService {
         [string] $ServiceId
     )
 
-    $serviceHeader = "`n  ${ServiceId}:`n"
+    $lineEnding = Get-ComposeLineEnding -Content $Content
+    $serviceHeader = "${lineEnding}  ${ServiceId}:${lineEnding}"
     $serviceIndex = $Content.IndexOf($serviceHeader)
     if ($serviceIndex -lt 0) {
         throw "Service fixture absent: $ServiceId"
     }
 
-    $networkBlock = "    networks:`n      - core`n"
+    $networkBlock = "    networks:${lineEnding}      - core${lineEnding}"
     $networkIndex = $Content.IndexOf($networkBlock, $serviceIndex)
     if ($networkIndex -lt 0) {
         throw "Bloc networks fixture absent pour service: $ServiceId"
     }
 
-    $mutatedNetworkBlock = "    networks:`n      - core`n      - spark-egress`n"
+    $mutatedNetworkBlock = "    networks:${lineEnding}      - core${lineEnding}      - spark-egress${lineEnding}"
     return $Content.Remove($networkIndex, $networkBlock.Length).Insert($networkIndex, $mutatedNetworkBlock)
 }
 
@@ -124,7 +143,8 @@ function Remove-GatewaySparkSecret {
         [string] $Content
     )
 
-    $secretLine = "      - gemma_api_key`n"
+    $lineEnding = Get-ComposeLineEnding -Content $Content
+    $secretLine = "      - gemma_api_key${lineEnding}"
     if (-not $Content.Contains($secretLine)) {
         throw "Secret Spark fixture absent: gemma_api_key"
     }
@@ -138,30 +158,32 @@ function Add-VllmPrincipalService {
         [string] $Content
     )
 
-    $injectedService = @'
-  vllm-main:
-    image: vllm/vllm-openai:0.8.5
-    expose:
-      - "8443"
-    networks:
-      - core
-    healthcheck:
-      test:
-        - CMD-SHELL
-        - "test -f /tmp/health"
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
+    $lineEnding = Get-ComposeLineEnding -Content $Content
+    $injectedServiceLines = @(
+        "  vllm-main:",
+        "    image: vllm/vllm-openai:0.8.5",
+        "    expose:",
+        "      - `"8443`"",
+        "    networks:",
+        "      - core",
+        "    healthcheck:",
+        "      test:",
+        "        - CMD-SHELL",
+        "        - `"test -f /tmp/health`"",
+        "      interval: 30s",
+        "      timeout: 5s",
+        "      retries: 3",
+        "      start_period: 10s",
+        ""
+    )
+    $injectedService = $injectedServiceLines -join $lineEnding
 
-'@
-
-    $rootNetworksMarker = "networks:`n  edge:"
+    $rootNetworksMarker = "networks:${lineEnding}  edge:"
     if (-not $Content.Contains($rootNetworksMarker)) {
         throw "Bloc networks racine absent du fixture."
     }
 
-    return $Content.Replace($rootNetworksMarker, "$injectedService`n$rootNetworksMarker")
+    return $Content.Replace($rootNetworksMarker, "$injectedService${lineEnding}$rootNetworksMarker")
 }
 
 if (-not (Test-Path -LiteralPath $validatorPath -PathType Leaf)) {
