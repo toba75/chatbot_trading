@@ -15,22 +15,22 @@
 
 | Ã‰lÃ©ment | Commande | Date UTC | RÃ©sultat | Observation |
 |---|---|---|---|---|
-| `branche courante` | `git rev-parse --abbrev-ref HEAD` | `2026-06-26T17:01:21Z` | `GREEN` | Branche M-004 autorisÃ©e: codex/milestone-m004-version-canonique-publiee |
-| `master local` | `git rev-parse --verify master^{commit}` | `2026-06-26T17:01:21Z` | `GREEN` | RÃ©vision locale master: c3c7a3a4ac1d71529f69d02d2f76f49cbe7d7d72 |
-| `origin/master` | `git rev-parse --verify origin/master^{commit}` | `2026-06-26T17:01:21Z` | `GREEN` | RÃ©vision origin/master: d5437f03e88c3eae88ef1771e0085087c8e8cabc |
-| `master contient origin/master` | `git merge-base --is-ancestor origin/master master` | `2026-06-26T17:01:21Z` | `GREEN` | La rÃ©fÃ©rence master contient origin/master. |
-| `branche contient master` | `git merge-base --is-ancestor master HEAD` | `2026-06-26T17:01:21Z` | `GREEN` | La branche courante contient la rÃ©vision locale master. |
-| `docs/tasks/milestone_000 dans master` | `git ls-tree -r --name-only master -- docs/tasks/milestone_000` | `2026-06-26T17:01:21Z` | `GREEN` | Milestone amont prÃ©sent dans master: docs/tasks/milestone_000 |
-| `docs/tasks/milestone_001 dans master` | `git ls-tree -r --name-only master -- docs/tasks/milestone_001` | `2026-06-26T17:01:21Z` | `GREEN` | Milestone amont prÃ©sent dans master: docs/tasks/milestone_001 |
-| `docs/tasks/milestone_002 dans master` | `git ls-tree -r --name-only master -- docs/tasks/milestone_002` | `2026-06-26T17:01:21Z` | `GREEN` | Milestone amont prÃ©sent dans master: docs/tasks/milestone_002 |
-| `docs/tasks/milestone_003 dans master` | `git ls-tree -r --name-only master -- docs/tasks/milestone_003` | `2026-06-26T17:01:21Z` | `GREEN` | Milestone amont prÃ©sent dans master: docs/tasks/milestone_003 |
+| `branche courante` | `git rev-parse --abbrev-ref HEAD` | `2026-06-26T17:27:36Z` | `GREEN` | Branche M-004 autorisÃ©e: codex/milestone-m004-version-canonique-publiee |
+| `master local` | `git rev-parse --verify master^{commit}` | `2026-06-26T17:27:36Z` | `GREEN` | RÃ©vision locale master: c3c7a3a4ac1d71529f69d02d2f76f49cbe7d7d72 |
+| `origin/master` | `git rev-parse --verify origin/master^{commit}` | `2026-06-26T17:27:37Z` | `GREEN` | RÃ©vision origin/master: d5437f03e88c3eae88ef1771e0085087c8e8cabc |
+| `master contient origin/master` | `git merge-base --is-ancestor origin/master master` | `2026-06-26T17:27:37Z` | `GREEN` | La rÃ©fÃ©rence master contient origin/master. |
+| `branche contient master` | `git merge-base --is-ancestor master HEAD` | `2026-06-26T17:27:37Z` | `GREEN` | La branche courante contient la rÃ©vision locale master. |
+| `docs/tasks/milestone_000 dans master` | `git ls-tree -r --name-only master -- docs/tasks/milestone_000` | `2026-06-26T17:27:37Z` | `GREEN` | Milestone amont prÃ©sent dans master: docs/tasks/milestone_000 |
+| `docs/tasks/milestone_001 dans master` | `git ls-tree -r --name-only master -- docs/tasks/milestone_001` | `2026-06-26T17:27:37Z` | `GREEN` | Milestone amont prÃ©sent dans master: docs/tasks/milestone_001 |
+| `docs/tasks/milestone_002 dans master` | `git ls-tree -r --name-only master -- docs/tasks/milestone_002` | `2026-06-26T17:27:37Z` | `GREEN` | Milestone amont prÃ©sent dans master: docs/tasks/milestone_002 |
+| `docs/tasks/milestone_003 dans master` | `git ls-tree -r --name-only master -- docs/tasks/milestone_003` | `2026-06-26T17:27:37Z` | `GREEN` | Milestone amont prÃ©sent dans master: docs/tasks/milestone_003 |
 
 ## Gates exÃ©cutÃ©es
 
 | Ã‰lÃ©ment | Commande | Date UTC | RÃ©sultat | Observation |
 |---|---|---|---|---|
-| `test` | `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1` | `2026-06-26T17:10:48Z` | `GREEN` | Gate test GREEN. |
-| `lint` | `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1` | `2026-06-26T17:10:55Z` | `GREEN` | Gate lint GREEN. |
+| `test` | `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1` | `2026-06-26T17:38:21Z` | `GREEN` | Gate test GREEN. |
+| `lint` | `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1` | `2026-06-26T17:38:29Z` | `GREEN` | Gate lint GREEN. |
 
 ## Sorties des gates
 
