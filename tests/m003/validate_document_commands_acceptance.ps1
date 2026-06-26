@@ -37,14 +37,34 @@ class InMemorySourceDocumentRepository:
     def __init__(self):
         self.documents_by_id = {}
 
+    def find_by_fingerprint(self, fingerprint):
+        for document in self.documents_by_id.values():
+            if document.fingerprint == fingerprint:
+                return document
+        return None
+
+    def find_by_work_key(self, work_key):
+        for document in self.documents_by_id.values():
+            if document.metadata.work_key == work_key:
+                return document
+        return None
+
     def list_registered(self):
-        return list(self.documents_by_id.values())
+        raise AssertionError("L'enregistrement nominal doit utiliser les index fingerprint/work_key, pas un scan complet.")
 
     def save(self, source_document):
         key = source_document.document_id.value
         if key in self.documents_by_id:
             raise AssertionError("Un SourceDocument existant ne doit pas être remplacé.")
         self.documents_by_id[key] = source_document
+
+    def save_if_absent(self, source_document):
+        key = source_document.document_id.value
+        existing_document = self.documents_by_id.get(key)
+        if existing_document is not None:
+            return existing_document
+        self.documents_by_id[key] = source_document
+        return None
 
     def find_by_document_id(self, document_id):
         return self.documents_by_id.get(document_id.value)
@@ -156,6 +176,18 @@ assert_equal(set(registered.body.keys()), {"document_id", "document_status"}, "L
 document_id = registered.body["document_id"]
 assert_true(document_id.startswith("DOC-"), "L'identité documentaire doit utiliser le préfixe métier DOC.")
 assert_equal(registered.body["document_status"], "REGISTERED", "Le statut documentaire doit être explicite.")
+
+duplicate = post_document(adapter, original_pdf, metadata("1re édition"))
+assert_equal(duplicate.status_code, 200, "Un doublon binaire ne doit pas être présenté comme une création.")
+assert_equal(
+    duplicate.body,
+    {
+        "document_id": document_id,
+        "document_status": "DUPLICATE_SOURCE",
+        "duplicate": True,
+    },
+    "La réponse HTTP doit signaler explicitement le doublon binaire.",
+)
 
 source_document = source_repository.documents_by_id[document_id]
 inspector.inspections_by_ref[source_document.original_storage_ref.value] = DocumentInspection(

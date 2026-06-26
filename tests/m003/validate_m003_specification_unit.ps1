@@ -105,6 +105,14 @@ M-003 ne publie aucune version canonique et ne d$($eAcute)cide pas l'autorit$($e
 | SP-005 - Revue manuelle d'incertitude | Une route incertaine produit une revue manuelle explicite. | Given des signaux contradictoires; When aucune route s$($uGrave)re ne peut $($eCircumflex)tre d$($eAcute)cid$($eAcute)e; Then SP demande une revue manuelle au lieu de changer de route implicitement. | T-006 | ADR-002; ADR-003 | powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m003_specification.ps1 |
 | SP-006 - Quarantaine non publiable | Une source en quarantaine n'est pas publiable. | Given une source en quarantaine; When une publication est demand$($eAcute)e; Then la publication est refus$($eAcute)e explicitement. | T-007 | DDD-ADR-003 | powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m003_specification.ps1 |
 | SP-007 - Commandes de validation | Aucun GREEN n'est implicite. | Given la sp$($eAcute)cification M-003; When les gates sont ex$($eAcute)cut$($eAcute)s; Then le validateur M-003, test et lint sont tous nomm$($eAcute)s. | T-002 | ADR-002; ADR-003; DDD-ADR-003 | powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m003_specification.ps1 |
+| SP-008 - Contrat HTTP documentaire | Les commandes publiques exposent les statuts et erreurs client sans identifiant interne. | Given un client appelle les commandes documentaires SP; When l'enregistrement ou le diagnostic est demand$($eAcute); Then les r$($eAcute)ponses HTTP nomment cr$($eAcute)ation, doublon, acceptation, erreurs client et erreurs m$($eAcute)tier sans fallback. | T-008 | DDD-ADR-003; ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m003_specification.ps1 |
+
+## Contrat HTTP M-003
+
+| Endpoint | Succ$($eGrave)s | Erreurs publiques | Corps public |
+|---|---|---|---|
+| POST /v1/documents | 201 pour une source cr$($eAcute)$($eAcute)e; 200 avec ``DUPLICATE_SOURCE`` pour un doublon binaire existant. | 400 ``HTTP_REQUEST_INVALID`` pour ``original_content`` ou ``bibliographic_metadata`` absent; 422 ``SOURCE_UNREADABLE`` pour PDF corrompu ou chiffr$($eAcute). | ``document_id``, ``document_status``, et ``duplicate`` seulement quand le statut est ``DUPLICATE_SOURCE``. |
+| POST /v1/documents/{id}/diagnose | 202 ``DIAGNOSTIC_REQUESTED`` quand le job ``DIAGNOSE`` est accept$($eAcute). | 400 ``HTTP_REQUEST_INVALID`` pour ``document_id`` invalide; 404 ``SOURCE_NOT_FOUND``; 409 ``DIAGNOSTIC_ALREADY_REQUESTED``. | ``document_id`` et ``diagnostic_status``, sans ``processing_run_id``, sans ``original_storage_ref`` et sans route. |
 
 ## Commandes de validation
 

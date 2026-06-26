@@ -15,21 +15,21 @@
 
 | Élément | Commande | Date UTC | Résultat | Observation |
 |---|---|---|---|---|
-| `branche courante` | `git rev-parse --abbrev-ref HEAD` | `2026-06-26T11:12:19Z` | `GREEN` | Branche M-003 attendue active: codex/milestone-m003-source-routee |
-| `master local` | `git rev-parse --verify master^{commit}` | `2026-06-26T11:12:19Z` | `GREEN` | Révision locale master: 1d3d4896a4bd89818d3457cdd0174b517d588b8e |
-| `origin/master` | `git rev-parse --verify origin/master^{commit}` | `2026-06-26T11:12:19Z` | `GREEN` | Révision origin/master: 1d3d4896a4bd89818d3457cdd0174b517d588b8e |
-| `master synchronisé` | `git rev-parse master origin/master` | `2026-06-26T11:12:19Z` | `GREEN` | master et origin/master pointent sur la même révision. |
-| `branche contient master` | `git merge-base --is-ancestor master HEAD` | `2026-06-26T11:12:19Z` | `GREEN` | La branche courante contient la révision locale master. |
-| `docs/tasks/milestone_000 dans master` | `git ls-tree -r --name-only master -- docs/tasks/milestone_000` | `2026-06-26T11:12:19Z` | `GREEN` | Milestone amont présent dans master: docs/tasks/milestone_000 |
-| `docs/tasks/milestone_001 dans master` | `git ls-tree -r --name-only master -- docs/tasks/milestone_001` | `2026-06-26T11:12:19Z` | `GREEN` | Milestone amont présent dans master: docs/tasks/milestone_001 |
-| `docs/tasks/milestone_002 dans master` | `git ls-tree -r --name-only master -- docs/tasks/milestone_002` | `2026-06-26T11:12:19Z` | `GREEN` | Milestone amont présent dans master: docs/tasks/milestone_002 |
+| `branche courante` | `git rev-parse --abbrev-ref HEAD` | `2026-06-26T13:45:39Z` | `GREEN` | Branche M-003 attendue active: codex/milestone-m003-source-routee |
+| `master local` | `git rev-parse --verify master^{commit}` | `2026-06-26T13:45:39Z` | `GREEN` | Révision locale master: 1d3d4896a4bd89818d3457cdd0174b517d588b8e |
+| `origin/master` | `git rev-parse --verify origin/master^{commit}` | `2026-06-26T13:45:39Z` | `GREEN` | Révision origin/master: 1d3d4896a4bd89818d3457cdd0174b517d588b8e |
+| `master synchronisé` | `git rev-parse master origin/master` | `2026-06-26T13:45:39Z` | `GREEN` | master et origin/master pointent sur la même révision. |
+| `branche contient master` | `git merge-base --is-ancestor master HEAD` | `2026-06-26T13:45:39Z` | `GREEN` | La branche courante contient la révision locale master. |
+| `docs/tasks/milestone_000 dans master` | `git ls-tree -r --name-only master -- docs/tasks/milestone_000` | `2026-06-26T13:45:39Z` | `GREEN` | Milestone amont présent dans master: docs/tasks/milestone_000 |
+| `docs/tasks/milestone_001 dans master` | `git ls-tree -r --name-only master -- docs/tasks/milestone_001` | `2026-06-26T13:45:39Z` | `GREEN` | Milestone amont présent dans master: docs/tasks/milestone_001 |
+| `docs/tasks/milestone_002 dans master` | `git ls-tree -r --name-only master -- docs/tasks/milestone_002` | `2026-06-26T13:45:39Z` | `GREEN` | Milestone amont présent dans master: docs/tasks/milestone_002 |
 
 ## Gates exécutées
 
 | Élément | Commande | Date UTC | Résultat | Observation |
 |---|---|---|---|---|
-| `test` | `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1` | `2026-06-26T11:14:09Z` | `GREEN` | Gate test GREEN. |
-| `lint` | `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1` | `2026-06-26T11:14:15Z` | `GREEN` | Gate lint GREEN. |
+| `test` | `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1` | `2026-06-26T13:47:50Z` | `GREEN` | Gate test GREEN. |
+| `lint` | `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1` | `2026-06-26T13:47:57Z` | `GREEN` | Gate lint GREEN. |
 
 ## Sorties des gates
 
@@ -46,7 +46,7 @@ Validation requise: scripts/validate_task_system.ps1
 Système de tâches valide: 4 milestone(s), 37 tâche(s) contrôlée(s).
 Validation GREEN: scripts/validate_task_system.ps1
 Validation requise: scripts/validate_traceability.ps1
-Matrice de traçabilité valide: 33 exigence(s) contrôlée(s).
+Matrice de traçabilité valide: 43 exigence(s) contrôlée(s).
 Validation GREEN: scripts/validate_traceability.ps1
 Validation requise: scripts/validate_definition_of_done.ps1
 Définition d'achèvement transverse valide: 9 gates contrôlées.
@@ -58,7 +58,7 @@ Validation requise: scripts/validate_m002_specification.ps1
 Spécification M-002 valide: 8 règle(s), 6 placement(s) contrôlé(s).
 Validation GREEN: scripts/validate_m002_specification.ps1
 Validation requise: scripts/validate_m003_specification.ps1
-Spécification M-003 valide: 7 comportement(s), 5 politique(s), 6 état(s) contrôlé(s).
+Spécification M-003 valide: 8 comportement(s), 5 politique(s), 6 état(s) contrôlé(s).
 Validation GREEN: scripts/validate_m003_specification.ps1
 Validation requise: scripts/validate_platform_topology.ps1
 Topologie M-002 valide: 2 hôte(s), 19 service(s) contrôlé(s).
@@ -70,7 +70,7 @@ Validation requise: scripts/validate_network_boundary.ps1
 Frontière réseau M-002 valide: 13 service(s) Compose, 1 règle(s) Spark, TLS et egress contrôlés.
 Validation GREEN: scripts/validate_network_boundary.ps1
 Validation requise: scripts/validate_architecture_boundaries.ps1
-Frontières d'import M-001 valides: 49 fichier(s), 129 import(s) contrôlé(s).
+Frontières d'import M-001 valides: 60 fichier(s), 196 import(s) contrôlé(s).
 Validation GREEN: scripts/validate_architecture_boundaries.ps1
 Test requis: tests/governance/validate_m000_precondition_report_acceptance.ps1
 Test d'acceptation M-000 précondition GREEN: OK
@@ -225,13 +225,64 @@ Test GREEN: tests/m002/validate_m002_traceability_acceptance.ps1
 Test requis: tests/m002/validate_m002_traceability_unit.ps1
 Tests unitaires de traçabilité M-002: OK
 Test GREEN: tests/m002/validate_m002_traceability_unit.ps1
+Test requis: tests/m003/validate_m003_precondition_unit.ps1
+Tests unitaires du validateur de précondition M-003: OK
+Test GREEN: tests/m003/validate_m003_precondition_unit.ps1
 Test requis: tests/m003/validate_m003_specification_acceptance.ps1
 Test d'acceptation de la spécification M-003: OK
 Test GREEN: tests/m003/validate_m003_specification_acceptance.ps1
 Test requis: tests/m003/validate_m003_specification_unit.ps1
 Tests unitaires du validateur de spécification M-003: OK
 Test GREEN: tests/m003/validate_m003_specification_unit.ps1
-Gate test GREEN: 12 validation(s), 53 test(s).
+Test requis: tests/m003/validate_source_registration_acceptance.ps1
+Test d'acceptation T-003 enregistrement immuable des sources: OK
+Test GREEN: tests/m003/validate_source_registration_acceptance.ps1
+Test requis: tests/m003/validate_source_registration_unit.ps1
+Tests unitaires T-003 enregistrement immuable des sources: OK
+Test GREEN: tests/m003/validate_source_registration_unit.ps1
+Test requis: tests/m003/validate_page_manifest_acceptance.ps1
+Test d'acceptation T-004 manifeste complet des pages: OK
+Test GREEN: tests/m003/validate_page_manifest_acceptance.ps1
+Test requis: tests/m003/validate_page_manifest_unit.ps1
+Tests unitaires T-004 manifeste complet des pages: OK
+Test GREEN: tests/m003/validate_page_manifest_unit.ps1
+Test requis: tests/m003/validate_page_diagnostics_acceptance.ps1
+Test d'acceptation T-005 diagnostic page par page: OK
+Test GREEN: tests/m003/validate_page_diagnostics_acceptance.ps1
+Test requis: tests/m003/validate_page_diagnostics_unit.ps1
+Tests unitaires T-005 diagnostic page par page: OK
+Test GREEN: tests/m003/validate_page_diagnostics_unit.ps1
+Test requis: tests/m003/validate_route_plan_acceptance.ps1
+Test d'acceptation T-006 plan de routage explicite: OK
+Test GREEN: tests/m003/validate_route_plan_acceptance.ps1
+Test requis: tests/m003/validate_route_plan_unit.ps1
+Tests unitaires T-006 plan de routage explicite: OK
+Test GREEN: tests/m003/validate_route_plan_unit.ps1
+Test requis: tests/m003/validate_review_quarantine_acceptance.ps1
+Test d'acceptation T-007 blocages revue quarantaine: OK
+Test GREEN: tests/m003/validate_review_quarantine_acceptance.ps1
+Test requis: tests/m003/validate_review_quarantine_unit.ps1
+Tests unitaires T-007 blocages revue quarantaine: OK
+Test GREEN: tests/m003/validate_review_quarantine_unit.ps1
+Test requis: tests/m003/validate_document_commands_acceptance.ps1
+Test d'acceptation T-008 commandes documentaires SP: OK
+Test GREEN: tests/m003/validate_document_commands_acceptance.ps1
+Test requis: tests/m003/validate_document_commands_unit.ps1
+Tests unitaires T-008 commandes documentaires SP: OK
+Test GREEN: tests/m003/validate_document_commands_unit.ps1
+Test requis: tests/m003/validate_document_http_contract_acceptance.ps1
+Test d'acceptation T-008 contrat HTTP documentaire SP: OK
+Test GREEN: tests/m003/validate_document_http_contract_acceptance.ps1
+Test requis: tests/m003/validate_m003_audit_signals_acceptance.ps1
+Test d'acceptation signaux d'audit M-003: OK
+Test GREEN: tests/m003/validate_m003_audit_signals_acceptance.ps1
+Test requis: tests/m003/validate_m003_traceability_acceptance.ps1
+Test d'acceptation de la traçabilité M-003: OK
+Test GREEN: tests/m003/validate_m003_traceability_acceptance.ps1
+Test requis: tests/m003/validate_m003_traceability_unit.ps1
+Tests unitaires de traçabilité M-003: OK
+Test GREEN: tests/m003/validate_m003_traceability_unit.ps1
+Gate test GREEN: 12 validation(s), 70 test(s).
 ~~~
 
 ### lint
@@ -247,7 +298,7 @@ Validation requise: scripts/validate_task_system.ps1
 Système de tâches valide: 4 milestone(s), 37 tâche(s) contrôlée(s).
 Validation GREEN: scripts/validate_task_system.ps1
 Validation requise: scripts/validate_traceability.ps1
-Matrice de traçabilité valide: 33 exigence(s) contrôlée(s).
+Matrice de traçabilité valide: 43 exigence(s) contrôlée(s).
 Validation GREEN: scripts/validate_traceability.ps1
 Validation requise: scripts/validate_definition_of_done.ps1
 Définition d'achèvement transverse valide: 9 gates contrôlées.
@@ -259,7 +310,7 @@ Validation requise: scripts/validate_m002_specification.ps1
 Spécification M-002 valide: 8 règle(s), 6 placement(s) contrôlé(s).
 Validation GREEN: scripts/validate_m002_specification.ps1
 Validation requise: scripts/validate_m003_specification.ps1
-Spécification M-003 valide: 7 comportement(s), 5 politique(s), 6 état(s) contrôlé(s).
+Spécification M-003 valide: 8 comportement(s), 5 politique(s), 6 état(s) contrôlé(s).
 Validation GREEN: scripts/validate_m003_specification.ps1
 Validation requise: scripts/validate_platform_topology.ps1
 Topologie M-002 valide: 2 hôte(s), 19 service(s) contrôlé(s).
@@ -271,7 +322,7 @@ Validation requise: scripts/validate_network_boundary.ps1
 Frontière réseau M-002 valide: 13 service(s) Compose, 1 règle(s) Spark, TLS et egress contrôlés.
 Validation GREEN: scripts/validate_network_boundary.ps1
 Validation requise: scripts/validate_architecture_boundaries.ps1
-Frontières d'import M-001 valides: 49 fichier(s), 129 import(s) contrôlé(s).
+Frontières d'import M-001 valides: 60 fichier(s), 196 import(s) contrôlé(s).
 Validation GREEN: scripts/validate_architecture_boundaries.ps1
 Gate lint GREEN: 12 validation(s), 0 test(s).
 ~~~

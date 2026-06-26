@@ -57,6 +57,14 @@ class InMemoryProcessingRunRepository:
         self.saved_runs.append(processing_run)
 
 
+class InMemorySourceDocumentRepository:
+    def __init__(self):
+        self.saved_sources = []
+
+    def save(self, source_document):
+        self.saved_sources.append(source_document)
+
+
 def assert_equal(actual, expected, message):
     if actual != expected:
         raise AssertionError(f"{message} Valeur obtenue: {actual!r}")
@@ -242,8 +250,10 @@ assert_raises(
 
 # Given la revue confirme que la source doit être isolée.
 quarantine_repository = InMemoryProcessingRunRepository()
+quarantine_source_repository = InMemorySourceDocumentRepository()
 quarantine_handler = QuarantineProcessingRunHandler(
-    processing_run_repository=quarantine_repository
+    processing_run_repository=quarantine_repository,
+    source_document_repository=quarantine_source_repository,
 )
 quarantine_reason = "Page 2 corrompue confirmée par contrôle humain."
 
@@ -251,6 +261,7 @@ quarantine_reason = "Page 2 corrompue confirmée par contrôle humain."
 quarantined_run = quarantine_handler.handle(
     QuarantineProcessingRunCommand(
         processing_run=manual_run,
+        source_document=source_document,
         routing_policy_version=RoutingPolicyVersion.from_value("routing-v1"),
         reason=quarantine_reason,
     )
@@ -262,6 +273,13 @@ assert_equal(quarantined_run.blocking_reason, quarantine_reason, "La quarantaine
 assert_equal(quarantined_run.blocking_policy_version.value, "routing-v1", "La quarantaine doit conserver la version de politique.")
 assert_true(isinstance(quarantined_run.events[-1], ProcessingRunQuarantined), "La quarantaine doit produire un événement explicite.")
 assert_equal(quarantine_repository.saved_runs, [quarantined_run], "La quarantaine doit être persistée une seule fois.")
+assert_equal(len(quarantine_source_repository.saved_sources), 1, "La source quarantinée doit être persistée une seule fois.")
+quarantined_source = quarantine_source_repository.saved_sources[0]
+assert_equal(quarantined_source.document_id, source_document.document_id, "La quarantaine source conserve le DocumentId.")
+assert_raises(
+    "source documentaire non publiable: QUARANTINED",
+    quarantined_source.ensure_documentary_publication_allowed,
+)
 assert_raises(
     "tentative M-003 non publiable: QUARANTINED",
     quarantined_run.ensure_documentary_publication_allowed,
@@ -304,12 +322,12 @@ assert_raises(
 )
 assert_raises("transition de diagnostic interdite", lambda: rejected_run.record_page_diagnostics(()))
 
-# Given une tentative rejetée ne revient jamais à CREATED.
+# Given une tentative rejetée ne revient jamais à MANIFEST_CREATED.
 # When une correction est relancée.
 new_attempt = started_run("RUN-M003-T007-NEW", source_document)
 
 # Then la correction crée une nouvelle tentative sans modifier l'ancienne.
-assert_equal(new_attempt.status, DocumentProcessingRunStatus.CREATED, "La correction doit démarrer une nouvelle tentative.")
+assert_equal(new_attempt.status, DocumentProcessingRunStatus.MANIFEST_CREATED, "La correction doit démarrer une nouvelle tentative.")
 assert_equal(new_attempt.document_id, rejected_run.document_id, "La nouvelle tentative doit rester liée à la même source.")
 assert_true(new_attempt.processing_run_id != rejected_run.processing_run_id, "La nouvelle tentative doit porter un nouvel identifiant.")
 assert_equal(rejected_run.status, DocumentProcessingRunStatus.REJECTED, "La tentative rejetée doit rester finalisée.")
@@ -322,6 +340,7 @@ $ErrorActionPreference = "Continue"
 $pythonScriptPath = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m003_review_quarantine_acceptance_" + [System.Guid]::NewGuid().ToString("N") + ".py")
 Set-Content -Encoding UTF8 -LiteralPath $pythonScriptPath -Value $pythonCode
 try {
+    $env:PYTHONIOENCODING = "utf-8"
     $output = & $pythonExecutable -B $pythonScriptPath $repoRoot 2>&1
 }
 finally {

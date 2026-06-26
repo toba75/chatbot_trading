@@ -13,6 +13,9 @@ from app.contracts.identity import DomainIdentifier
 
 
 _HASH_PATTERN = re.compile(r"^[0-9a-f]{64}$", re.IGNORECASE)
+_ORIGINAL_STORAGE_REF_PATTERN = re.compile(
+    r"^artifact:source_processing\.original_sources/DOC-[A-Z0-9-]+/[0-9a-f]{64}\.pdf$"
+)
 _ORIGINAL_STORAGE_PREFIX = "artifact:source_processing.original_sources/"
 
 
@@ -20,6 +23,7 @@ class SourceDocumentStatus(str, Enum):
     """État métier explicite d'un SourceDocument M-003."""
 
     REGISTERED = "REGISTERED"
+    QUARANTINED = "QUARANTINED"
 
 
 @dataclass(frozen=True)
@@ -128,6 +132,18 @@ class SourceDocumentRegistered:
 
 
 @dataclass(frozen=True)
+class SourceDocumentQuarantined:
+    """Événement produit quand une source documentaire devient non publiable."""
+
+    document_id: DocumentId
+    reason: str
+
+    def __post_init__(self) -> None:
+        _ensure_document_id(self.document_id)
+        object.__setattr__(self, "reason", _ensure_text(self.reason, "reason"))
+
+
+@dataclass(frozen=True)
 class SourceDocument:
     """Agrégat SP qui porte l'original immuable et son état d'enregistrement."""
 
@@ -136,7 +152,7 @@ class SourceDocument:
     original_storage_ref: OriginalStorageRef
     metadata: BibliographicMetadata
     status: SourceDocumentStatus
-    events: tuple[SourceDocumentRegistered, ...]
+    events: tuple[SourceDocumentRegistered | SourceDocumentQuarantined, ...]
 
     @classmethod
     def register_original(
@@ -164,6 +180,27 @@ class SourceDocument:
             events=(registered_event,),
         )
 
+    def quarantine(self, reason: str) -> "SourceDocument":
+        if self.status is not SourceDocumentStatus.REGISTERED:
+            raise ValueError("transition de source interdite")
+        quarantined_event = SourceDocumentQuarantined(
+            document_id=self.document_id,
+            reason=reason,
+        )
+        return SourceDocument(
+            document_id=self.document_id,
+            fingerprint=self.fingerprint,
+            original_storage_ref=self.original_storage_ref,
+            metadata=self.metadata,
+            status=SourceDocumentStatus.QUARANTINED,
+            events=self.events + (quarantined_event,),
+        )
+
+    def ensure_documentary_publication_allowed(self) -> None:
+        if self.status is SourceDocumentStatus.REGISTERED:
+            return
+        raise ValueError(f"source documentaire non publiable: {self.status.value}")
+
     def __post_init__(self) -> None:
         _ensure_document_id(self.document_id)
         _ensure_fingerprint(self.fingerprint)
@@ -176,8 +213,16 @@ class SourceDocument:
         if len(self.events) == 0:
             raise ValueError("events SourceDocument vide")
         for event in self.events:
-            if not isinstance(event, SourceDocumentRegistered):
+            if not isinstance(event, (SourceDocumentRegistered, SourceDocumentQuarantined)):
                 raise ValueError("event SourceDocument invalide")
+        if not isinstance(self.events[0], SourceDocumentRegistered):
+            raise ValueError("premier event SourceDocument invalide")
+        if self.status is SourceDocumentStatus.REGISTERED:
+            if any(isinstance(event, SourceDocumentQuarantined) for event in self.events):
+                raise ValueError("event de quarantaine interdit sur source enregistrée")
+        if self.status is SourceDocumentStatus.QUARANTINED:
+            if not isinstance(self.events[-1], SourceDocumentQuarantined):
+                raise ValueError("event de quarantaine absent")
 
 
 @dataclass(frozen=True)
@@ -262,6 +307,8 @@ def _ensure_original_storage_ref_value(value: Any) -> str:
     text_value = _ensure_text(value, "original_storage_ref")
     if not text_value.startswith(_ORIGINAL_STORAGE_PREFIX):
         raise ValueError("original_storage_ref invalide")
+    if _ORIGINAL_STORAGE_REF_PATTERN.fullmatch(text_value) is None:
+        raise ValueError("original_storage_ref invalide")
     return text_value
 
 
@@ -332,6 +379,7 @@ __all__ = [
     "DuplicateEditionPolicy",
     "OriginalStorageRef",
     "SourceDocument",
+    "SourceDocumentQuarantined",
     "SourceDocumentRegistered",
     "SourceDocumentStatus",
     "SourceFingerprint",

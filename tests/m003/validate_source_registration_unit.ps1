@@ -16,6 +16,7 @@ from app.source_processing.domain.source_document import (
     DuplicateEditionPolicy,
     OriginalStorageRef,
     SourceDocument,
+    SourceDocumentQuarantined,
     SourceDocumentRegistered,
     SourceDocumentStatus,
     SourceFingerprint,
@@ -106,6 +107,29 @@ assert_equal(source_document.original_storage_ref, storage_ref, "La référence 
 assert_equal(len(source_document.events), 1, "L'enregistrement doit produire un seul événement de domaine.")
 assert_true(isinstance(source_document.events[0], SourceDocumentRegistered), "L'événement doit être SourceDocumentRegistered.")
 assert_equal(source_document.events[0].document_id, document_id, "L'événement doit porter le DocumentId.")
+source_document.ensure_documentary_publication_allowed()
+
+quarantined_source = source_document.quarantine(reason="Corruption confirmée par revue documentaire.")
+assert_equal(quarantined_source.status, SourceDocumentStatus.QUARANTINED, "La source mise en quarantaine doit porter un état non publiable.")
+assert_equal(quarantined_source.document_id, source_document.document_id, "La quarantaine conserve l'identité documentaire.")
+assert_equal(len(quarantined_source.events), 2, "La quarantaine doit ajouter un événement de domaine.")
+assert_true(isinstance(quarantined_source.events[-1], SourceDocumentQuarantined), "L'événement doit être SourceDocumentQuarantined.")
+assert_raises(
+    "source documentaire non publiable: QUARANTINED",
+    quarantined_source.ensure_documentary_publication_allowed,
+)
+assert_raises(
+    "transition de source interdite",
+    lambda: quarantined_source.quarantine(reason="Quarantaine répétée interdite."),
+)
+
+for invalid_ref in (
+    f"artifact:source_processing.original_sources/{document_id.value}/../secret.pdf",
+    f"artifact:source_processing.original_sources/{document_id.value}\\{fingerprint.value}.pdf",
+    f"artifact:source_processing.original_sources/{document_id.value}/{fingerprint.value}.txt",
+    f"artifact:source_processing.original_sources/{fingerprint.value}.pdf",
+):
+    assert_raises("original_storage_ref invalide", lambda invalid_ref=invalid_ref: OriginalStorageRef.from_value(invalid_ref))
 
 # DuplicateEditionPolicy distingue doublon binaire, nouvelle édition et nouvelle source.
 policy = DuplicateEditionPolicy()
@@ -148,6 +172,7 @@ $ErrorActionPreference = "Continue"
 $pythonScriptPath = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m003_source_registration_unit_" + [System.Guid]::NewGuid().ToString("N") + ".py")
 Set-Content -Encoding UTF8 -LiteralPath $pythonScriptPath -Value $pythonCode
 try {
+    $env:PYTHONIOENCODING = "utf-8"
     $output = & $pythonExecutable -B $pythonScriptPath $repoRoot 2>&1
 }
 finally {

@@ -86,6 +86,7 @@ $testCommands = @(
     @{ Path = "tests/m002/validate_gateway_observability_unit.ps1"; Arguments = @() },
     @{ Path = "tests/m002/validate_m002_traceability_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/m002/validate_m002_traceability_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m003/validate_m003_precondition_unit.ps1"; Arguments = @() },
     @{ Path = "tests/m003/validate_m003_specification_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/m003/validate_m003_specification_unit.ps1"; Arguments = @() },
     @{ Path = "tests/m003/validate_source_registration_acceptance.ps1"; Arguments = @() },
@@ -173,6 +174,7 @@ $expectedTestPaths = @(
     "tests/m002/validate_gateway_observability_unit.ps1",
     "tests/m002/validate_m002_traceability_acceptance.ps1",
     "tests/m002/validate_m002_traceability_unit.ps1",
+    "tests/m003/validate_m003_precondition_unit.ps1",
     "tests/m003/validate_m003_specification_acceptance.ps1",
     "tests/m003/validate_m003_specification_unit.ps1",
     "tests/m003/validate_source_registration_acceptance.ps1",
@@ -199,6 +201,6 @@ Invoke-M000ValidationGate `
     -ValidationCommands $validationCommands `
     -TestCommands $testCommands `
     -ExpectedValidationCount 12 `
-    -ExpectedTestCount 69 `
+    -ExpectedTestCount 70 `
     -ExpectedValidationPaths $expectedValidationPaths `
     -ExpectedTestPaths $expectedTestPaths

@@ -116,10 +116,19 @@ try {
         -Output $reportContent `
         -Expected "Validation GREEN: scripts/validate_architecture_boundaries.ps1" `
         -Message "Le rapport doit conserver la preuve des frontières d'architecture GREEN."
+
+    Assert-OutputContains `
+        -Output $reportContent `
+        -Expected "validate_m003_precondition_unit.ps1" `
+        -Message "Le rapport doit prouver que le test unitaire de précondition M-003 est enrôlé."
+
+    Assert-OutputContains `
+        -Output $reportContent `
+        -Expected "70 test(s)" `
+        -Message "Le rapport doit prouver le volume de tests courant."
 }
 finally {
     Remove-Item -LiteralPath $temporaryRoot -Recurse -Force
 }
 
 Write-Host "Test d'acceptation de précondition M-003: OK"
-

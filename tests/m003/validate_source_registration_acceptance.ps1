@@ -41,14 +41,28 @@ class InMemorySourceDocumentRepository:
                 return document
         return None
 
+    def find_by_work_key(self, work_key):
+        for document in self.documents_by_id.values():
+            if document.metadata.work_key == work_key:
+                return document
+        return None
+
     def list_registered(self):
-        return list(self.documents_by_id.values())
+        raise AssertionError("L'enregistrement nominal doit utiliser les index fingerprint/work_key, pas un scan complet.")
 
     def save(self, source_document):
         key = source_document.document_id.value
         if key in self.documents_by_id:
             raise AssertionError("Un SourceDocument enregistré ne doit pas être remplacé.")
         self.documents_by_id[key] = source_document
+
+    def save_if_absent(self, source_document):
+        key = source_document.document_id.value
+        existing_document = self.documents_by_id.get(key)
+        if existing_document is not None:
+            return existing_document
+        self.documents_by_id[key] = source_document
+        return None
 
 
 def assert_equal(actual, expected, message):
@@ -170,6 +184,7 @@ $ErrorActionPreference = "Continue"
 $pythonScriptPath = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m003_source_registration_acceptance_" + [System.Guid]::NewGuid().ToString("N") + ".py")
 Set-Content -Encoding UTF8 -LiteralPath $pythonScriptPath -Value $pythonCode
 try {
+    $env:PYTHONIOENCODING = "utf-8"
     $output = & $pythonExecutable -B $pythonScriptPath $repoRoot 2>&1
 }
 finally {

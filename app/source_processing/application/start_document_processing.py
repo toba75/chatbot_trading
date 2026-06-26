@@ -89,6 +89,14 @@ class StartDocumentProcessingHandler:
         if not isinstance(command, StartDocumentProcessingCommand):
             raise ValueError("commande StartDocumentProcessing invalide")
 
+        processing_run = self.prepare(command)
+        self._processing_run_repository.save(processing_run)
+        return processing_run
+
+    def prepare(self, command: StartDocumentProcessingCommand) -> DocumentProcessingRun:
+        if not isinstance(command, StartDocumentProcessingCommand):
+            raise ValueError("commande StartDocumentProcessing invalide")
+
         inspection = self._document_inspector.inspect(
             command.source_document.original_storage_ref
         )
@@ -106,7 +114,6 @@ class StartDocumentProcessingHandler:
             source_document=command.source_document,
             page_manifest=page_manifest,
         )
-        self._processing_run_repository.save(processing_run)
         return processing_run
 
 

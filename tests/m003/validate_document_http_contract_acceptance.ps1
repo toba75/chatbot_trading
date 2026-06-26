@@ -28,6 +28,7 @@ class ScriptedDocumentCommands:
         self.register_result = RegisterDocumentAcceptance(
             document_id=DocumentId.from_value("DOC-1111111111111111"),
             document_status="REGISTERED",
+            duplicate=False,
         )
         self.diagnosis_result = DocumentDiagnosisAcceptance(
             document_id=DocumentId.from_value("DOC-1111111111111111"),
@@ -114,6 +115,32 @@ assert_equal(
 )
 assert_equal(len(commands.register_calls), 1, "L'adaptateur doit déléguer une seule commande d'enregistrement.")
 
+# Given l'application signale un doublon binaire déjà enregistré.
+# When POST /v1/documents est appelé avec le même contenu.
+commands.register_result = RegisterDocumentAcceptance(
+    document_id=DocumentId.from_value("DOC-1111111111111111"),
+    document_status="DUPLICATE_SOURCE",
+    duplicate=True,
+)
+duplicate = post_document(adapter, b"%PDF-1.7\n%%EOF\n")
+
+# Then l'API ne présente pas le doublon comme une création nouvelle.
+assert_equal(duplicate.status_code, 200, "Un doublon binaire doit retourner une réponse non-création.")
+assert_equal(
+    duplicate.body,
+    {
+        "document_id": "DOC-1111111111111111",
+        "document_status": "DUPLICATE_SOURCE",
+        "duplicate": True,
+    },
+    "La réponse de doublon doit être distincte d'une création.",
+)
+commands.register_result = RegisterDocumentAcceptance(
+    document_id=DocumentId.from_value("DOC-1111111111111111"),
+    document_status="REGISTERED",
+    duplicate=False,
+)
+
 # Given un document enregistré.
 # When POST /v1/documents/{id}/diagnose est appelé.
 diagnosis = post_diagnose(adapter, "DOC-1111111111111111")
@@ -172,6 +199,54 @@ assert_equal(
         "document_id": "DOC-1111111111111111",
     },
     "Le mapping diagnostic déjà demandé doit rester stable.",
+)
+
+# Given une requête client omet le contenu original obligatoire.
+# When l'adaptateur reçoit POST /v1/documents.
+missing_original = adapter.handle(
+    HttpRequest(
+        method="POST",
+        path="/v1/documents",
+        body={"bibliographic_metadata": metadata()},
+    )
+)
+
+# Then l'erreur de contrat client est une réponse stable, pas une exception transport.
+assert_equal(missing_original.status_code, 400, "Un contenu original absent doit retourner 400.")
+assert_equal(
+    missing_original.body,
+    {"error_code": "HTTP_REQUEST_INVALID", "field": "original_content"},
+    "Le corps d'erreur client doit rester stable.",
+)
+
+# Given une requête client omet les métadonnées bibliographiques obligatoires.
+# When l'adaptateur reçoit POST /v1/documents.
+missing_metadata = adapter.handle(
+    HttpRequest(
+        method="POST",
+        path="/v1/documents",
+        body={"original_content": b"%PDF-1.7\n%%EOF\n"},
+    )
+)
+
+# Then l'erreur nomme le champ refusé.
+assert_equal(missing_metadata.status_code, 400, "Des métadonnées absentes doivent retourner 400.")
+assert_equal(
+    missing_metadata.body,
+    {"error_code": "HTTP_REQUEST_INVALID", "field": "bibliographic_metadata"},
+    "Le champ bibliographique absent doit être nommé.",
+)
+
+# Given l'identifiant public ne respecte pas le contrat DOC.
+# When l'endpoint de diagnostic est appelé.
+invalid_document_id = post_diagnose(adapter, "not-a-doc")
+
+# Then l'erreur est une réponse client stable.
+assert_equal(invalid_document_id.status_code, 400, "Un DocumentId invalide doit retourner 400.")
+assert_equal(
+    invalid_document_id.body,
+    {"error_code": "HTTP_REQUEST_INVALID", "field": "document_id"},
+    "Le DocumentId invalide doit être nommé.",
 )
 
 print("Test d'acceptation T-008 contrat HTTP documentaire SP: OK")

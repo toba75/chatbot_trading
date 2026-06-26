@@ -13,6 +13,7 @@ from app.source_processing.application.document_commands import (
     SourceNotFoundError,
     SourceUnreadableError,
 )
+from app.source_processing.domain.source_document import DocumentId
 
 
 class DocumentCommandPort(Protocol):
@@ -87,9 +88,9 @@ class SourceProcessingHttpAdapter:
     def _handle_register_document(self, request: HttpRequest) -> HttpResponse:
         body = request.body
         if "original_content" not in body:
-            raise ValueError("original_content absent")
+            return _bad_request_response("original_content")
         if "bibliographic_metadata" not in body:
-            raise ValueError("bibliographic_metadata absent")
+            return _bad_request_response("bibliographic_metadata")
         try:
             acceptance = self._document_commands.register_source_document(
                 original_content=body["original_content"],
@@ -101,6 +102,16 @@ class SourceProcessingHttpAdapter:
                 body={"error_code": "SOURCE_UNREADABLE", "reason": exc.reason},
             )
 
+        if acceptance.duplicate:
+            return HttpResponse(
+                status_code=200,
+                body={
+                    "document_id": acceptance.document_id.value,
+                    "document_status": acceptance.document_status,
+                    "duplicate": True,
+                },
+            )
+
         return HttpResponse(
             status_code=201,
             body={
@@ -110,6 +121,11 @@ class SourceProcessingHttpAdapter:
         )
 
     def _handle_start_diagnosis(self, document_id: str) -> HttpResponse:
+        try:
+            DocumentId.from_value(document_id)
+        except ValueError:
+            return _bad_request_response("document_id")
+
         try:
             acceptance = self._document_commands.start_document_processing(
                 document_id=document_id
@@ -191,6 +207,13 @@ def _ensure_status_code(value: Any) -> int:
     if value < 100 or value > 599:
         raise ValueError("status_code invalide")
     return value
+
+
+def _bad_request_response(field_name: str) -> HttpResponse:
+    return HttpResponse(
+        status_code=400,
+        body={"error_code": "HTTP_REQUEST_INVALID", "field": field_name},
+    )
 
 
 __all__ = [

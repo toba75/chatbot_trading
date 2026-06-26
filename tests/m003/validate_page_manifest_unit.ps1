@@ -169,7 +169,7 @@ run = DocumentProcessingRun.start(
         entries=(entry(1, "PRESENT"), entry(2, "EMPTY"), entry(3, "UNREADABLE")),
     ),
 )
-assert_equal(run.status, DocumentProcessingRunStatus.CREATED, "La tentative démarre en CREATED avant diagnostic.")
+assert_equal(run.status, DocumentProcessingRunStatus.MANIFEST_CREATED, "La tentative démarre en MANIFEST_CREATED avant diagnostic.")
 assert_equal(run.document_id, source_document.document_id, "La tentative doit référencer le SourceDocument enregistré.")
 assert_equal(len(run.events), 1, "Le démarrage doit produire un événement de domaine.")
 assert_true(isinstance(run.events[0], DocumentProcessingStarted), "L'événement doit nommer le démarrage de traitement.")
@@ -194,6 +194,7 @@ $ErrorActionPreference = "Continue"
 $pythonScriptPath = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m003_page_manifest_unit_" + [System.Guid]::NewGuid().ToString("N") + ".py")
 Set-Content -Encoding UTF8 -LiteralPath $pythonScriptPath -Value $pythonCode
 try {
+    $env:PYTHONIOENCODING = "utf-8"
     $output = & $pythonExecutable -B $pythonScriptPath $repoRoot 2>&1
 }
 finally {

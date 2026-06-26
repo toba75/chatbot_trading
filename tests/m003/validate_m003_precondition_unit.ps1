@@ -266,4 +266,3 @@ finally {
 }
 
 Write-Host "Tests unitaires du validateur de précondition M-003: OK"
-

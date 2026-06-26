@@ -25,6 +25,7 @@ $requiredSections = @(
     "## Politiques de domaine M-003",
     "## Machine d'$($eAcute)tats M-003",
     "## Comportements v$($eAcute)rifiables M-003",
+    "## Contrat HTTP M-003",
     "## Commandes de validation",
     "## Exclusions M-004"
 )
@@ -58,6 +59,20 @@ $requiredCommands = @(
     "powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m003_specification.ps1",
     "powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1",
     "powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1"
+)
+
+$requiredHttpMarkers = @(
+    "POST /v1/documents",
+    "POST /v1/documents/{id}/diagnose",
+    "201",
+    "200",
+    "202",
+    "400",
+    "404",
+    "409",
+    "422",
+    "DUPLICATE_SOURCE",
+    "HTTP_REQUEST_INVALID"
 )
 
 $expectedAggregates = @(
@@ -96,7 +111,8 @@ $expectedBehaviors = @(
     @{ Name = "SP-004 - Routage explicite"; Adr = @("ADR-002"); Test = "T-006" },
     @{ Name = "SP-005 - Revue manuelle d'incertitude"; Adr = @("ADR-002", "ADR-003"); Test = "T-006" },
     @{ Name = "SP-006 - Quarantaine non publiable"; Adr = @("DDD-ADR-003"); Test = "T-007" },
-    @{ Name = "SP-007 - Commandes de validation"; Adr = @("ADR-002", "ADR-003", "DDD-ADR-003"); Test = "T-002" }
+    @{ Name = "SP-007 - Commandes de validation"; Adr = @("ADR-002", "ADR-003", "DDD-ADR-003"); Test = "T-002" },
+    @{ Name = "SP-008 - Contrat HTTP documentaire"; Adr = @("DDD-ADR-003", "ADR-010"); Test = "T-008" }
 )
 
 function Normalize-M003Cell {
@@ -542,6 +558,13 @@ function Assert-M003Spec {
             -Content $content `
             -Expected $command `
             -Message "Commande de validation absente: $command"
+    }
+
+    foreach ($marker in $requiredHttpMarkers) {
+        Assert-M003Contains `
+            -Content $content `
+            -Expected $marker `
+            -Message "Marqueur HTTP M-003 absent: $marker"
     }
 
     foreach ($adrId in $requiredAdrIds) {

@@ -9,7 +9,6 @@ from typing import Any, Protocol
 from app.source_processing.domain.source_document import (
     BibliographicMetadata,
     DocumentId,
-    DuplicateEditionPolicy,
     OriginalStorageRef,
     SourceDocument,
     SourceFingerprint,
@@ -31,11 +30,14 @@ class OriginalSourceStore(Protocol):
 class SourceDocumentRepository(Protocol):
     """Port de dépôt de SourceDocument."""
 
-    def list_registered(self) -> list[SourceDocument]:
-        """Retourne les sources documentaires déjà enregistrées."""
+    def find_by_fingerprint(self, fingerprint: SourceFingerprint) -> SourceDocument | None:
+        """Retourne la source qui possède déjà l'empreinte, si elle existe."""
 
-    def save(self, source_document: SourceDocument) -> None:
-        """Persiste un SourceDocument nouvellement enregistré."""
+    def find_by_work_key(self, work_key: tuple[str, tuple[str, ...]]) -> SourceDocument | None:
+        """Retourne une source du même ouvrage, si elle existe."""
+
+    def save_if_absent(self, source_document: SourceDocument) -> SourceDocument | None:
+        """Persiste la source si aucune source de même identité n'existe."""
 
 
 @dataclass(frozen=True)
@@ -101,13 +103,14 @@ class RegisterSourceDocumentHandler:
     ) -> None:
         if not hasattr(original_source_store, "store_original"):
             raise ValueError("original_source_store invalide")
-        if not hasattr(source_document_repository, "list_registered"):
+        if not callable(getattr(source_document_repository, "find_by_fingerprint", None)):
             raise ValueError("source_document_repository invalide")
-        if not hasattr(source_document_repository, "save"):
+        if not callable(getattr(source_document_repository, "find_by_work_key", None)):
+            raise ValueError("source_document_repository invalide")
+        if not callable(getattr(source_document_repository, "save_if_absent", None)):
             raise ValueError("source_document_repository invalide")
         self._original_source_store = original_source_store
         self._source_document_repository = source_document_repository
-        self._duplicate_policy = DuplicateEditionPolicy()
 
     def handle(self, command: RegisterSourceDocumentCommand) -> RegisterSourceDocumentResult:
         if not isinstance(command, RegisterSourceDocumentCommand):
@@ -124,20 +127,24 @@ class RegisterSourceDocumentHandler:
             )
 
         fingerprint = SourceFingerprint.from_content(command.original_content)
-        existing_documents = self._source_document_repository.list_registered()
-        duplicate_decision = self._duplicate_policy.classify(
-            candidate_fingerprint=fingerprint,
-            candidate_metadata=metadata,
-            existing_documents=existing_documents,
+        binary_duplicate = self._source_document_repository.find_by_fingerprint(
+            fingerprint
         )
-
-        if duplicate_decision.decision == "BINARY_DUPLICATE":
+        if binary_duplicate is not None:
             return RegisterSourceDocumentResult(
                 decision="BINARY_DUPLICATE",
                 source_document=None,
-                duplicate_document_id=duplicate_decision.matching_document_id,
+                duplicate_document_id=binary_duplicate.document_id,
                 review_reason=None,
             )
+
+        work_duplicate = self._source_document_repository.find_by_work_key(
+            metadata.work_key
+        )
+        if work_duplicate is None:
+            duplicate_decision = "NEW_SOURCE"
+        else:
+            duplicate_decision = "DISTINCT_EDITION"
 
         document_id = DocumentId.from_fingerprint(fingerprint)
         storage_ref = OriginalStorageRef.from_value(
@@ -153,9 +160,18 @@ class RegisterSourceDocumentHandler:
             original_storage_ref=storage_ref,
             metadata=metadata,
         )
-        self._source_document_repository.save(source_document)
+        concurrent_duplicate = self._source_document_repository.save_if_absent(
+            source_document
+        )
+        if concurrent_duplicate is not None:
+            return RegisterSourceDocumentResult(
+                decision="BINARY_DUPLICATE",
+                source_document=None,
+                duplicate_document_id=concurrent_duplicate.document_id,
+                review_reason=None,
+            )
 
-        if duplicate_decision.decision == "DISTINCT_EDITION":
+        if duplicate_decision == "DISTINCT_EDITION":
             registration_decision = "DISTINCT_EDITION_REGISTERED"
         else:
             registration_decision = "REGISTERED"

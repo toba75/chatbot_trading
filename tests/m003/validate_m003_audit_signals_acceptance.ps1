@@ -19,6 +19,7 @@ from app.source_processing.application.audit_signals import (
     build_source_processing_audit_signals,
 )
 from app.source_processing.domain.document_processing_run import (
+    DocumentProcessingRunStatus,
     PageRouteName,
     ProcessingRunId,
     RoutingPolicyVersion,
@@ -49,8 +50,8 @@ def event(
     trace_id: str,
     document_id: str,
     run_id: str,
-    route_name: PageRouteName,
-    status: str,
+    route_name: PageRouteName | None,
+    status: DocumentProcessingRunStatus | str,
     served_model: str,
     quarantined: bool,
     error_code: str | None,
@@ -81,7 +82,7 @@ signals = build_source_processing_audit_signals(
             "DOC-M003-AUDIT-001",
             "RUN-M003-AUDIT-001",
             PageRouteName.NATIVE_STANDARD,
-            "ROUTE_PLANNED",
+            DocumentProcessingRunStatus.ROUTE_PLANNED,
             "docling-standard",
             False,
             None,
@@ -91,7 +92,7 @@ signals = build_source_processing_audit_signals(
             "DOC-M003-AUDIT-002",
             "RUN-M003-AUDIT-002",
             PageRouteName.SCAN_GRANITE,
-            "ROUTE_PLANNED",
+            DocumentProcessingRunStatus.ROUTE_PLANNED,
             "granite-docling",
             False,
             None,
@@ -100,8 +101,8 @@ signals = build_source_processing_audit_signals(
             "trace-m003-quarantine",
             "DOC-M003-AUDIT-003",
             "RUN-M003-AUDIT-003",
-            PageRouteName.PREPROCESS_GRANITE,
-            "QUARANTINED",
+            None,
+            DocumentProcessingRunStatus.QUARANTINED,
             "granite-docling",
             True,
             "UNSUPPORTED_OR_CORRUPT",
@@ -129,7 +130,6 @@ for log_mapping in log_mappings:
         "processing_run_id",
         "phase",
         "status",
-        "route_name",
         "routing_policy_version",
         "served_model",
         "page_count",
@@ -139,6 +139,10 @@ for log_mapping in log_mappings:
     ):
         if required_field not in log_mapping:
             raise AssertionError(f"Champ de log M-003 absent: {required_field}")
+    if log_mapping["status"] == "ROUTE_PLANNED" and log_mapping["route_name"] is None:
+        raise AssertionError("Un routage planifié doit exposer route_name.")
+    if log_mapping["status"] == "QUARANTINED" and log_mapping["route_name"] is not None:
+        raise AssertionError("Une quarantaine ne doit pas exposer de route fictive.")
 
 metric_names = {metric["name"] for metric in metric_mappings}
 assert_equal(
@@ -154,8 +158,8 @@ documents_par_route = {
 }
 assert_equal(
     documents_par_route,
-    {"NATIVE_STANDARD": 1.0, "SCAN_GRANITE": 1.0, "PREPROCESS_GRANITE": 1.0},
-    "Le compteur documents_par_route doit agréger chaque route explicite.",
+    {"NATIVE_STANDARD": 1.0, "SCAN_GRANITE": 1.0},
+    "Le compteur documents_par_route doit agréger seulement les routes explicites.",
 )
 
 taux_quarantaine = [
@@ -183,12 +187,72 @@ assert_error(
         "trace-m003-invalid",
         "DOC-M003-AUDIT-004",
         "RUN-M003-AUDIT-004",
-        PageRouteName.SCAN_GRANITE,
-        "QUARANTINED",
+        None,
+        DocumentProcessingRunStatus.QUARANTINED,
         "granite-docling",
         True,
         None,
     ),
+)
+assert_error(
+    "SP_AUDIT_ROUTE_REQUIRED",
+    lambda: event(
+        "trace-m003-route-missing",
+        "DOC-M003-AUDIT-005",
+        "RUN-M003-AUDIT-005",
+        None,
+        DocumentProcessingRunStatus.ROUTE_PLANNED,
+        "granite-docling",
+        False,
+        None,
+    ),
+)
+assert_error(
+    "SP_AUDIT_ROUTE_FORBIDDEN",
+    lambda: event(
+        "trace-m003-route-forbidden",
+        "DOC-M003-AUDIT-006",
+        "RUN-M003-AUDIT-006",
+        PageRouteName.SCAN_GRANITE,
+        DocumentProcessingRunStatus.QUARANTINED,
+        "granite-docling",
+        True,
+        "UNSUPPORTED_OR_CORRUPT",
+    ),
+)
+assert_error(
+    "SP_AUDIT_STATUS_INVALID",
+    lambda: event(
+        "trace-m003-status-invalid",
+        "DOC-M003-AUDIT-007",
+        "RUN-M003-AUDIT-007",
+        PageRouteName.SCAN_GRANITE,
+        "ROUTE_PLANEND",
+        "granite-docling",
+        False,
+        None,
+    ),
+)
+
+nominal_signals = build_source_processing_audit_signals(
+    (
+        event(
+            "trace-m003-nominal-native",
+            "DOC-M003-AUDIT-008",
+            "RUN-M003-AUDIT-008",
+            PageRouteName.NATIVE_STANDARD,
+            DocumentProcessingRunStatus.ROUTE_PLANNED,
+            "docling-standard",
+            False,
+            None,
+        ),
+    )
+)
+nominal_metric_names = {metric.name for metric in nominal_signals.metrics}
+assert_equal(
+    nominal_metric_names,
+    {"documents_par_route", "taux_quarantaine"},
+    "Un lot sans erreur ne doit pas exiger erreurs_par_modele.",
 )
 
 print("Test d'acceptation signaux d'audit M-003: OK")

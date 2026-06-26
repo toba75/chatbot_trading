@@ -92,11 +92,21 @@ class RegisterDocumentAcceptance:
 
     document_id: DocumentId
     document_status: str
+    duplicate: bool
 
     def __post_init__(self) -> None:
         _ensure_document_id(self.document_id)
-        if self.document_status != SourceDocumentStatus.REGISTERED.value:
+        if self.document_status not in {
+            SourceDocumentStatus.REGISTERED.value,
+            "DUPLICATE_SOURCE",
+        }:
             raise ValueError("document_status invalide")
+        if not isinstance(self.duplicate, bool):
+            raise ValueError("duplicate invalide")
+        if self.document_status == SourceDocumentStatus.REGISTERED.value and self.duplicate:
+            raise ValueError("duplicate interdit pour enregistrement")
+        if self.document_status == "DUPLICATE_SOURCE" and not self.duplicate:
+            raise ValueError("duplicate requis pour doublon")
 
 
 @dataclass(frozen=True)
@@ -169,7 +179,8 @@ class DocumentCommandService:
         if result.decision == "BINARY_DUPLICATE":
             return RegisterDocumentAcceptance(
                 document_id=_ensure_document_id(result.duplicate_document_id),
-                document_status=SourceDocumentStatus.REGISTERED.value,
+                document_status="DUPLICATE_SOURCE",
+                duplicate=True,
             )
 
         if result.decision in {"REGISTERED", "DISTINCT_EDITION_REGISTERED"}:
@@ -177,6 +188,7 @@ class DocumentCommandService:
             return RegisterDocumentAcceptance(
                 document_id=source_document.document_id,
                 document_status=source_document.status.value,
+                duplicate=False,
             )
 
         raise ValueError(f"décision RegisterSourceDocument non exposée: {result.decision}")
@@ -199,12 +211,11 @@ class DocumentCommandService:
         processing_run_id = ProcessingRunId.from_value(
             f"RUN-DIAGNOSE-{parsed_document_id.value}"
         )
-        processing_run = self._start_handler.handle(
-            StartDocumentProcessingCommand(
-                processing_run_id=processing_run_id,
-                source_document=parsed_source_document,
-            )
+        start_command = StartDocumentProcessingCommand(
+            processing_run_id=processing_run_id,
+            source_document=parsed_source_document,
         )
+        processing_run = self._start_handler.prepare(start_command)
         submission = self._job_queue.submit(
             request=JobRequest(
                 job_name="DIAGNOSE",
@@ -227,6 +238,8 @@ class DocumentCommandService:
         )
         if not submission.created:
             raise DiagnosisAlreadyRequestedError(document_id=parsed_document_id.value)
+
+        self._processing_run_repository.save(processing_run)
 
         return DocumentDiagnosisAcceptance(
             document_id=parsed_document_id,

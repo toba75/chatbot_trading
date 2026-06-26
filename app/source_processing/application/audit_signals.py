@@ -9,6 +9,7 @@ from types import MappingProxyType
 from typing import Any
 
 from app.source_processing.domain.document_processing_run import (
+    DocumentProcessingRunStatus,
     PageRouteName,
     ProcessingRunId,
     RoutingPolicyVersion,
@@ -33,8 +34,8 @@ class DocumentIngestionAuditEvent:
     document_id: DocumentId
     processing_run_id: ProcessingRunId
     phase: str
-    status: str
-    route_name: PageRouteName
+    status: DocumentProcessingRunStatus
+    route_name: PageRouteName | None
     routing_policy_version: RoutingPolicyVersion
     served_model: str
     page_count: int
@@ -47,14 +48,15 @@ class DocumentIngestionAuditEvent:
         _ensure_document_id(self.document_id)
         _ensure_processing_run_id(self.processing_run_id)
         object.__setattr__(self, "phase", _ensure_text(self.phase, "phase", "SP_AUDIT_PHASE_REQUIRED"))
-        object.__setattr__(self, "status", _ensure_text(self.status, "status", "SP_AUDIT_STATUS_REQUIRED"))
-        object.__setattr__(self, "route_name", PageRouteName.from_value(self.route_name))
+        object.__setattr__(self, "status", _ensure_status(self.status))
+        object.__setattr__(self, "route_name", _ensure_optional_route_name(self.route_name))
         _ensure_routing_policy_version(self.routing_policy_version)
         object.__setattr__(self, "served_model", _ensure_text(self.served_model, "served_model", "SP_AUDIT_SERVED_MODEL_REQUIRED"))
         object.__setattr__(self, "page_count", _ensure_positive_integer(self.page_count, "page_count", "SP_AUDIT_PAGE_COUNT_INVALID"))
         object.__setattr__(self, "latency_ms", _ensure_non_negative_number(self.latency_ms, "latency_ms", "SP_AUDIT_LATENCY_INVALID"))
         _ensure_bool(self.quarantined, "quarantined", "SP_AUDIT_QUARANTINED_INVALID")
         object.__setattr__(self, "error_code", _ensure_optional_text(self.error_code, "error_code", "SP_AUDIT_ERROR_CODE_INVALID"))
+        _ensure_status_route_contract(status=self.status, route_name=self.route_name)
         _ensure_status_error_contract(status=self.status, quarantined=self.quarantined, error_code=self.error_code)
 
     def to_log_mapping(self) -> dict[str, Any]:
@@ -63,8 +65,8 @@ class DocumentIngestionAuditEvent:
             "document_id": self.document_id.value,
             "processing_run_id": self.processing_run_id.value,
             "phase": self.phase,
-            "status": self.status,
-            "route_name": self.route_name.value,
+            "status": self.status.value,
+            "route_name": self.route_name.value if self.route_name is not None else None,
             "routing_policy_version": self.routing_policy_version.value,
             "served_model": self.served_model,
             "page_count": self.page_count,
@@ -139,8 +141,9 @@ def build_source_processing_audit_signals(
     quarantined_count = 0
 
     for event in parsed_events:
-        route_name = event.route_name.value
-        route_counts[route_name] = route_counts.get(route_name, 0) + 1
+        if event.route_name is not None:
+            route_name = event.route_name.value
+            route_counts[route_name] = route_counts.get(route_name, 0) + 1
         if event.quarantined:
             quarantined_count += 1
         if event.error_code is not None:
@@ -229,7 +232,7 @@ def _ensure_metric_events(
         raise SourceProcessingAuditSignalError("SP_AUDIT_METRICS_REQUIRED", "Les métriques d'audit sont requises.")
     metrics = tuple(value)
     metric_names = {metric.name for metric in metrics if isinstance(metric, SourceProcessingMetricEvent)}
-    required_metric_names = {"documents_par_route", "taux_quarantaine", "erreurs_par_modele"}
+    required_metric_names = {"documents_par_route", "taux_quarantaine"}
     missing_metric_names = required_metric_names - metric_names
     if len(missing_metric_names) > 0:
         raise SourceProcessingAuditSignalError(
@@ -244,11 +247,11 @@ def _ensure_metric_events(
 
 def _ensure_status_error_contract(
     *,
-    status: str,
+    status: DocumentProcessingRunStatus,
     quarantined: bool,
     error_code: str | None,
 ) -> None:
-    if status == "QUARANTINED":
+    if status is DocumentProcessingRunStatus.QUARANTINED:
         if not quarantined:
             raise SourceProcessingAuditSignalError(
                 "SP_AUDIT_QUARANTINE_FLAG_REQUIRED",
@@ -267,11 +270,49 @@ def _ensure_status_error_contract(
             "Un événement quarantined doit porter le statut QUARANTINED.",
         )
 
-    if status == "ROUTE_PLANNED" and error_code is not None:
+    if status is DocumentProcessingRunStatus.ROUTE_PLANNED and error_code is not None:
         raise SourceProcessingAuditSignalError(
             "SP_AUDIT_ERROR_CODE_FORBIDDEN",
             "Un routage planifié ne doit pas porter de code d'erreur.",
         )
+
+    if status is not DocumentProcessingRunStatus.ROUTE_PLANNED and error_code is not None:
+        raise SourceProcessingAuditSignalError(
+            "SP_AUDIT_ERROR_CODE_FORBIDDEN",
+            "Un code d'erreur n'est accepté que pour une quarantaine M-003.",
+        )
+
+
+def _ensure_status_route_contract(
+    *,
+    status: DocumentProcessingRunStatus,
+    route_name: PageRouteName | None,
+) -> None:
+    if status is DocumentProcessingRunStatus.ROUTE_PLANNED:
+        if route_name is None:
+            raise SourceProcessingAuditSignalError(
+                "SP_AUDIT_ROUTE_REQUIRED",
+                "Un routage planifié doit porter une route.",
+            )
+        return
+
+    if route_name is not None:
+        raise SourceProcessingAuditSignalError(
+            "SP_AUDIT_ROUTE_FORBIDDEN",
+            "Une tentative non routée ne doit pas porter de route.",
+        )
+
+
+def _ensure_status(value: Any) -> DocumentProcessingRunStatus:
+    if isinstance(value, DocumentProcessingRunStatus):
+        return value
+    raise SourceProcessingAuditSignalError("SP_AUDIT_STATUS_INVALID", "status invalide.")
+
+
+def _ensure_optional_route_name(value: Any) -> PageRouteName | None:
+    if value is None:
+        return None
+    return PageRouteName.from_value(value)
 
 
 def _ensure_text(value: Any, field_name: str, code: str) -> str:

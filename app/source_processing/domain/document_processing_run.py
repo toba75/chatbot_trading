@@ -17,7 +17,7 @@ _PROCESSING_RUN_ID_PATTERN = re.compile(r"^RUN-[A-Z0-9][A-Z0-9-]*$")
 class DocumentProcessingRunStatus(str, Enum):
     """État métier explicite d'une tentative de traitement documentaire."""
 
-    CREATED = "CREATED"
+    MANIFEST_CREATED = "MANIFEST_CREATED"
     DIAGNOSED = "DIAGNOSED"
     ROUTE_PLANNED = "ROUTE_PLANNED"
     MANUAL_REVIEW = "MANUAL_REVIEW"
@@ -678,10 +678,7 @@ class PageRoutingPolicy:
         )
         dominant_route_name = _dominant_route_name(page_routes)
         if dominant_route_name is None:
-            return RoutePlanningResult.manual_review(
-                routing_policy_version=parsed_configuration.routing_policy_version,
-                reason="route dominante indécidable sans décision humaine",
-            )
+            dominant_route_name = PageRouteName.MIXED_PAGEWISE
         page_exceptions = tuple(
             page_route
             for page_route in page_routes
@@ -859,7 +856,7 @@ class DocumentProcessingRun:
             route_plan=None,
             manual_review_reason=None,
             blocking_policy_version=None,
-            status=DocumentProcessingRunStatus.CREATED,
+            status=DocumentProcessingRunStatus.MANIFEST_CREATED,
             events=(started_event,),
         )
 
@@ -873,7 +870,7 @@ class DocumentProcessingRun:
         self,
         page_decisions: Sequence[PageDecision],
     ) -> "DocumentProcessingRun":
-        if self.status is not DocumentProcessingRunStatus.CREATED:
+        if self.status is not DocumentProcessingRunStatus.MANIFEST_CREATED:
             raise ValueError("transition de diagnostic interdite")
 
         parsed_page_decisions = _ensure_page_decisions(page_decisions)
@@ -1066,9 +1063,9 @@ class DocumentProcessingRun:
                 ),
             ):
                 raise ValueError("event DocumentProcessingRun invalide")
-        if self.status is DocumentProcessingRunStatus.CREATED and len(page_decisions) != 0:
+        if self.status is DocumentProcessingRunStatus.MANIFEST_CREATED and len(page_decisions) != 0:
             raise ValueError("diagnostics interdits sur tentative créée")
-        if self.status is DocumentProcessingRunStatus.CREATED:
+        if self.status is DocumentProcessingRunStatus.MANIFEST_CREATED:
             if route_plan is not None or manual_review_reason is not None:
                 raise ValueError("route interdite sur tentative créée")
             if blocking_policy_version is not None:

@@ -170,7 +170,7 @@ nominal_run = handler.handle(
 )
 
 # Then le manifeste contient toutes les pages dans l'ordre source.
-assert_equal(nominal_run.status, DocumentProcessingRunStatus.CREATED, "La tentative doit être créée avant diagnostic.")
+assert_equal(nominal_run.status, DocumentProcessingRunStatus.MANIFEST_CREATED, "La tentative doit créer le manifeste avant diagnostic.")
 assert_equal(nominal_run.page_manifest.source_page_count, 2, "Le nombre de pages source doit être conservé.")
 assert_equal(
     tuple(entry.page_number.value for entry in nominal_run.page_manifest.entries),
@@ -239,6 +239,7 @@ $ErrorActionPreference = "Continue"
 $pythonScriptPath = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m003_page_manifest_acceptance_" + [System.Guid]::NewGuid().ToString("N") + ".py")
 Set-Content -Encoding UTF8 -LiteralPath $pythonScriptPath -Value $pythonCode
 try {
+    $env:PYTHONIOENCODING = "utf-8"
     $output = & $pythonExecutable -B $pythonScriptPath $repoRoot 2>&1
 }
 finally {

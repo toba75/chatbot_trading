@@ -238,7 +238,7 @@ try {
     Assert-ExitCode -Actual $missingAuditResult.ExitCode -Expected 1 -Message "Une clôture M-003 sans preuve d'audit doit être refusée."
     Assert-OutputContains `
         -Output $missingAuditResult.Output `
-        -Expected "Signal d'audit M-003 invalide pour REQ-M003-009" `
+        -Expected "Test M-003 invalide pour REQ-M003-009" `
         -Message "La preuve d'audit M-003 absente doit être nommée."
 }
 finally {

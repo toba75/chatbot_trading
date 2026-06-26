@@ -320,6 +320,18 @@ assert_equal(unsupported_result.outcome, RoutePlanningOutcome.MANUAL_REVIEW, "Un
 assert_is_none(unsupported_result.route_plan, "Une page corrompue ne doit pas recevoir de plan de remplacement.")
 assert_true("page 1" in unsupported_result.manual_review_reason, "La page refusée doit être nommée.")
 
+# Deux routes explicites sans majorité globale restent un plan publiable.
+balanced_result = PageRoutingPolicy().plan_routes(
+    page_decisions=(
+        decision(1, PageDecisionState.NATIVE_OK),
+        decision(2, PageDecisionState.SCAN_CLEAN),
+    ),
+    routing_configuration=route_configuration(),
+)
+assert_equal(balanced_result.outcome, RoutePlanningOutcome.ROUTE_PLANNED, "Une égalité de routes explicites ne doit pas demander de revue manuelle.")
+assert_equal(len(balanced_result.route_plan.page_routes), 2, "Toutes les routes de page explicites doivent être conservées.")
+assert_equal(balanced_result.route_plan.dominant_route_name, PageRouteName.MIXED_PAGEWISE, "Une égalité de routes doit exposer un plan pagewise explicite.")
+
 # La configuration de seuils est explicite et versionnée.
 assert_raises(
     "version de politique de routage invalide",
@@ -385,6 +397,7 @@ $ErrorActionPreference = "Continue"
 $pythonScriptPath = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m003_route_plan_unit_" + [System.Guid]::NewGuid().ToString("N") + ".py")
 Set-Content -Encoding UTF8 -LiteralPath $pythonScriptPath -Value $pythonCode
 try {
+    $env:PYTHONIOENCODING = "utf-8"
     $output = & $pythonExecutable -B $pythonScriptPath $repoRoot 2>&1
 }
 finally {

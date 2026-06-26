@@ -275,9 +275,9 @@ $requiredM003Requirements = @(
     [ordered] @{
         Id = "REQ-M003-008"
         Source = "docs/tasks/milestone_003/0008_exposer_commandes_documents_sp.md"
-        Test = "tests/m003/validate_document_http_contract_acceptance.ps1"
-        CommandScript = "tests/m003/validate_document_http_contract_acceptance.ps1"
-        Code = "app/source_processing/adapters/document_http.py"
+        Test = "tests/m003/validate_document_commands_acceptance.ps1"
+        CommandScript = "tests/m003/validate_document_commands_acceptance.ps1"
+        Code = "app/source_processing/application/document_commands.py"
         Adr = "DDD-ADR-003; ADR-010"
     },
     [ordered] @{
@@ -295,6 +295,14 @@ $requiredM003Requirements = @(
         CommandScript = "scripts/validate_traceability.ps1"
         Code = "scripts/validate_traceability.ps1"
         Adr = "ADR-010"
+    },
+    [ordered] @{
+        Id = "REQ-M003-011"
+        Source = "docs/tasks/milestone_003/0008_exposer_commandes_documents_sp.md"
+        Test = "tests/m003/validate_document_http_contract_acceptance.ps1"
+        CommandScript = "tests/m003/validate_document_http_contract_acceptance.ps1"
+        Code = "app/source_processing/adapters/document_http.py"
+        Adr = "DDD-ADR-003; ADR-010"
     }
 )
 
@@ -746,26 +754,6 @@ function Test-M003MilestoneIsPresent {
     return (Test-Path -LiteralPath $milestoneDir -PathType Container)
 }
 
-function Assert-M003AuditSignalRow {
-    param(
-        [Parameter(Mandatory = $true)]
-        [object] $Row
-    )
-
-    $requirementId = "REQ-M003-009"
-    $test = Convert-ToMatrixRelativePath -RelativePath (Get-MatrixRowCell -Row $Row -CellName "Test" -RequirementId $requirementId)
-    $commandScript = Get-MatrixRowCell -Row $Row -CellName "CommandeScript" -RequirementId $requirementId
-    $code = Convert-ToMatrixRelativePath -RelativePath (Get-MatrixRowCell -Row $Row -CellName "Code" -RequirementId $requirementId)
-
-    Assert-Condition `
-        -Condition (
-            ($test -eq "tests/m003/validate_m003_audit_signals_acceptance.ps1") -and
-            ($commandScript -eq "tests/m003/validate_m003_audit_signals_acceptance.ps1") -and
-            ($code -eq "app/source_processing/application/audit_signals.py")
-        ) `
-        -Message "Signal d'audit M-003 invalide pour ${requirementId}: test=$test commande=$commandScript code=$code"
-}
-
 function Assert-M003RequirementRows {
     param(
         [Parameter(Mandatory = $true)]
@@ -813,9 +801,6 @@ function Assert-M003RequirementRows {
         $commandScript = Get-MatrixRowCell -Row $row -CellName "CommandeScript" -RequirementId $requirementId
 
         Assert-M003PathCell -Row $row -RequirementId $requirementId -CellName "Source" -ExpectedValue $expected["Source"]
-        if ($requirementId -eq "REQ-M003-009") {
-            Assert-M003AuditSignalRow -Row $row
-        }
         Assert-M003PathCell -Row $row -RequirementId $requirementId -CellName "Test" -ExpectedValue $expected["Test"]
         Assert-M003PathCell -Row $row -RequirementId $requirementId -CellName "Code" -ExpectedValue $expected["Code"]
 

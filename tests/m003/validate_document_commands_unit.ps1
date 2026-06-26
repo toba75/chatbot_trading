@@ -39,11 +39,31 @@ class InMemorySourceDocumentRepository:
     def __init__(self):
         self.documents_by_id = {}
 
+    def find_by_fingerprint(self, fingerprint):
+        for document in self.documents_by_id.values():
+            if document.fingerprint == fingerprint:
+                return document
+        return None
+
+    def find_by_work_key(self, work_key):
+        for document in self.documents_by_id.values():
+            if document.metadata.work_key == work_key:
+                return document
+        return None
+
     def list_registered(self):
-        return list(self.documents_by_id.values())
+        raise AssertionError("L'enregistrement nominal doit utiliser les index fingerprint/work_key, pas un scan complet.")
 
     def save(self, source_document):
         self.documents_by_id[source_document.document_id.value] = source_document
+
+    def save_if_absent(self, source_document):
+        key = source_document.document_id.value
+        existing_document = self.documents_by_id.get(key)
+        if existing_document is not None:
+            return existing_document
+        self.documents_by_id[key] = source_document
+        return None
 
     def find_by_document_id(self, document_id):
         return self.documents_by_id.get(document_id.value)
@@ -73,6 +93,15 @@ class InMemoryProcessingRunRepository:
 
     def find_by_document_id(self, document_id):
         return self.runs_by_document_id.get(document_id.value)
+
+
+class FailingDiagnosisJobQueue:
+    def __init__(self):
+        self.submission_count = 0
+
+    def submit(self, request, *, recalculate):
+        self.submission_count += 1
+        raise RuntimeError("runtime de jobs indisponible")
 
 
 def assert_equal(actual, expected, message):
@@ -106,23 +135,23 @@ def metadata(edition):
     }
 
 
-def build_service():
+def build_service(job_queue=None):
     store = InMemoryOriginalSourceStore()
     source_repository = InMemorySourceDocumentRepository()
     inspector = ExplicitDocumentInspector()
     processing_repository = InMemoryProcessingRunRepository()
-    job_queue = InMemoryJobQueue.empty(catalog=JOB_RUNTIME_CATALOG)
+    configured_job_queue = job_queue if job_queue is not None else InMemoryJobQueue.empty(catalog=JOB_RUNTIME_CATALOG)
     service = DocumentCommandService(
         original_source_store=store,
         source_document_repository=source_repository,
         document_inspector=inspector,
         processing_run_repository=processing_repository,
-        job_queue=job_queue,
+        job_queue=configured_job_queue,
         diagnosis_configuration_hash="e" * 64,
         code_version="m003-t008-document-commands",
         model_version="diagnosis-policy-v1",
     )
-    return service, source_repository, inspector, processing_repository, job_queue
+    return service, source_repository, inspector, processing_repository, configured_job_queue
 
 
 def readable_pdf(page_count):
@@ -159,8 +188,17 @@ service, source_repository, inspector, processing_repository, job_queue = build_
 registered, source_document = register_readable_source(service, source_repository, inspector)
 assert_equal(registered.document_id.value, source_document.document_id.value, "L'enregistrement doit retourner le DocumentId métier.")
 assert_equal(registered.document_status, "REGISTERED", "L'enregistrement doit publier le statut documentaire.")
+assert_equal(registered.duplicate, False, "Une création documentaire ne doit pas être signalée comme doublon.")
 assert_true(not hasattr(registered, "original_storage_ref"), "La réponse applicative ne doit pas exposer le stockage interne.")
 assert_true(not hasattr(registered, "fingerprint"), "La réponse applicative ne doit pas exposer l'empreinte comme contrat HTTP.")
+
+duplicate = service.register_source_document(
+    original_content=readable_pdf(2),
+    bibliographic_metadata=metadata("1re édition"),
+)
+assert_equal(duplicate.document_id.value, registered.document_id.value, "Le doublon doit retourner le DocumentId existant.")
+assert_equal(duplicate.document_status, "DUPLICATE_SOURCE", "Un doublon binaire doit être exposé distinctement d'une création.")
+assert_equal(duplicate.duplicate, True, "La réponse applicative doit signaler le doublon binaire.")
 
 # Une source illisible est une erreur métier explicite, pas un succès partiel.
 unreadable_error = assert_raises(
@@ -181,6 +219,29 @@ assert_raises(
 )
 assert_equal(len(processing_repository.saved_runs), 0, "Une source inconnue ne doit pas créer de tentative.")
 assert_equal(job_queue.created_job_count(), 0, "Une source inconnue ne doit pas créer de job.")
+
+# Une panne de soumission DIAGNOSE ne doit pas laisser de tentative orpheline.
+failing_queue = FailingDiagnosisJobQueue()
+failing_service, failing_source_repository, failing_inspector, failing_processing_repository, _ = build_service(
+    job_queue=failing_queue
+)
+failing_registered, failing_source_document = register_readable_source(
+    failing_service,
+    failing_source_repository,
+    failing_inspector,
+)
+assert_raises(
+    RuntimeError,
+    "runtime de jobs indisponible",
+    lambda: failing_service.start_document_processing(document_id=failing_registered.document_id.value),
+)
+assert_equal(failing_queue.submission_count, 1, "La file DIAGNOSE doit être appelée une seule fois.")
+assert_equal(len(failing_processing_repository.saved_runs), 0, "Une soumission DIAGNOSE échouée ne doit pas persister de tentative.")
+assert_equal(
+    failing_processing_repository.find_by_document_id(failing_registered.document_id),
+    None,
+    "Le retry doit rester possible après une panne de soumission DIAGNOSE.",
+)
 
 # La demande de diagnostic crée une tentative SP et un job DIAGNOSE idempotent, sans conversion.
 diagnosis = service.start_document_processing(document_id=registered.document_id.value)

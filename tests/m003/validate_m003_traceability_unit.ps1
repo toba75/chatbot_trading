@@ -54,9 +54,10 @@ function New-M003MatrixContent {
 | REQ-M003-005 | docs/tasks/milestone_003/0005_diagnostiquer_pages_source.md | Couvert | tests/m003/validate_page_diagnostics_acceptance.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m003\validate_page_diagnostics_acceptance.ps1 | app/source_processing/domain/document_processing_run.py | ADR-002; ADR-003 | $documentedDecision |
 | REQ-M003-006 | docs/tasks/milestone_003/0006_decider_plan_routage_explicite.md | Couvert | tests/m003/validate_route_plan_acceptance.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m003\validate_route_plan_acceptance.ps1 | app/source_processing/domain/document_processing_run.py | ADR-002; ADR-003 | $documentedDecision |
 | REQ-M003-007 | docs/tasks/milestone_003/0007_bloquer_revue_quarantaine.md | Couvert | tests/m003/validate_review_quarantine_acceptance.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m003\validate_review_quarantine_acceptance.ps1 | app/source_processing/domain/document_processing_run.py | ADR-002; DDD-ADR-003 | $documentedDecision |
-| REQ-M003-008 | docs/tasks/milestone_003/0008_exposer_commandes_documents_sp.md | Couvert | tests/m003/validate_document_http_contract_acceptance.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m003\validate_document_http_contract_acceptance.ps1 | app/source_processing/adapters/document_http.py | DDD-ADR-003; ADR-010 | $documentedDecision |
+| REQ-M003-008 | docs/tasks/milestone_003/0008_exposer_commandes_documents_sp.md | Couvert | tests/m003/validate_document_commands_acceptance.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m003\validate_document_commands_acceptance.ps1 | app/source_processing/application/document_commands.py | DDD-ADR-003; ADR-010 | $documentedDecision |
 | REQ-M003-009 | docs/tasks/milestone_003/0009_relier_m003_tracabilite_gates.md | Couvert | tests/m003/validate_m003_audit_signals_acceptance.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m003\validate_m003_audit_signals_acceptance.ps1 | app/source_processing/application/audit_signals.py | ADR-002; ADR-003; DDD-ADR-003 | $documentedDecision |
 | REQ-M003-010 | docs/tasks/milestone_003/0009_relier_m003_tracabilite_gates.md | Couvert | tests/m003/validate_m003_traceability_acceptance.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_traceability.ps1 | scripts/validate_traceability.ps1 | ADR-010 | $documentedDecision |
+| REQ-M003-011 | docs/tasks/milestone_003/0008_exposer_commandes_documents_sp.md | Couvert | tests/m003/validate_document_http_contract_acceptance.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m003\validate_document_http_contract_acceptance.ps1 | app/source_processing/adapters/document_http.py | DDD-ADR-003; ADR-010 | $documentedDecision |
 "@
 }
 
@@ -151,11 +152,13 @@ function New-TemporaryProject {
         "tests/m003/validate_page_diagnostics_acceptance.ps1",
         "tests/m003/validate_route_plan_acceptance.ps1",
         "tests/m003/validate_review_quarantine_acceptance.ps1",
+        "tests/m003/validate_document_commands_acceptance.ps1",
         "tests/m003/validate_document_http_contract_acceptance.ps1",
         "tests/m003/validate_m003_audit_signals_acceptance.ps1",
         "tests/m003/validate_m003_traceability_acceptance.ps1",
         "app/source_processing/domain/source_document.py",
         "app/source_processing/domain/document_processing_run.py",
+        "app/source_processing/application/document_commands.py",
         "app/source_processing/adapters/document_http.py",
         "app/source_processing/application/audit_signals.py"
     )
@@ -348,7 +351,7 @@ try {
     Assert-ExitCode -Actual $missingAuditResult.ExitCode -Expected 1 -Message "Une preuve M-003 sans métriques ni logs doit être refusée."
     Assert-OutputContains `
         -Output $missingAuditResult.Output `
-        -Expected "Signal d'audit M-003 invalide pour REQ-M003-009" `
+        -Expected "Code M-003 invalide pour REQ-M003-009" `
         -Message "Les métriques ou logs M-003 absents doivent être nommés."
 }
 finally {
