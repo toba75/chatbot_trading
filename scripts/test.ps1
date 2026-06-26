@@ -18,6 +18,7 @@ $sparkFirewallPath = Join-Path $repoRoot "deploy/spark-firewall/network-boundary
 $appRoot = Join-Path $repoRoot "app"
 $contextRegistryPath = Join-Path $repoRoot "app/context_registry.json"
 $m003PreconditionAcceptancePath = "tests/m003/validate_m003_precondition_acceptance.ps1"
+$m004PreconditionAcceptancePath = "tests/m004/validate_m004_precondition_acceptance.ps1"
 
 $validationCommands = @(
     @{ Path = "scripts/validate_m000_precondition_report.ps1"; Arguments = @("-Path", $preconditionReportPath) },
@@ -106,7 +107,9 @@ $testCommands = @(
     @{ Path = "tests/m003/validate_document_http_contract_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/m003/validate_m003_audit_signals_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/m003/validate_m003_traceability_acceptance.ps1"; Arguments = @() },
-    @{ Path = "tests/m003/validate_m003_traceability_unit.ps1"; Arguments = @() }
+    @{ Path = "tests/m003/validate_m003_traceability_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m004/validate_m004_precondition_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m004/validate_m004_precondition_acceptance.ps1"; Arguments = @() }
 )
 
 $expectedValidationPaths = @(
@@ -195,19 +198,36 @@ $expectedTestPaths = @(
     "tests/m003/validate_document_http_contract_acceptance.ps1",
     "tests/m003/validate_m003_audit_signals_acceptance.ps1",
     "tests/m003/validate_m003_traceability_acceptance.ps1",
-    "tests/m003/validate_m003_traceability_unit.ps1"
+    "tests/m003/validate_m003_traceability_unit.ps1",
+    "tests/m004/validate_m004_precondition_unit.ps1",
+    "tests/m004/validate_m004_precondition_acceptance.ps1"
 )
 
-$expectedTestCount = 71
+$expectedTestCount = 73
 if ($env:OST_M003_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     Write-Host "Test d'acceptation de précondition M-003 exclu explicitement: exécution imbriquée du validateur de précondition."
+    Write-Host "Test d'acceptation de précondition M-004 exclu explicitement: M-003 reste indépendant du milestone aval."
+    $excludedPreconditionAcceptancePaths = @(
+        $m003PreconditionAcceptancePath,
+        $m004PreconditionAcceptancePath
+    )
     $testCommands = @(
-        $testCommands | Where-Object { $_.Path -ne $m003PreconditionAcceptancePath }
+        $testCommands | Where-Object { $excludedPreconditionAcceptancePaths -notcontains $_.Path }
     )
     $expectedTestPaths = @(
-        $expectedTestPaths | Where-Object { $_ -ne $m003PreconditionAcceptancePath }
+        $expectedTestPaths | Where-Object { $excludedPreconditionAcceptancePaths -notcontains $_ }
     )
-    $expectedTestCount = 70
+    $expectedTestCount = 71
+}
+elseif ($env:OST_M004_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
+    Write-Host "Test d'acceptation de précondition M-004 exclu explicitement: exécution imbriquée du validateur de précondition."
+    $testCommands = @(
+        $testCommands | Where-Object { $_.Path -ne $m004PreconditionAcceptancePath }
+    )
+    $expectedTestPaths = @(
+        $expectedTestPaths | Where-Object { $_ -ne $m004PreconditionAcceptancePath }
+    )
+    $expectedTestCount = 72
 }
 
 Invoke-M000ValidationGate `

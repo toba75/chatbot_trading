@@ -112,8 +112,8 @@ try {
 
     Assert-OutputContains `
         -Output $reportContent `
-        -Expected "Précondition M-003 GREEN" `
-        -Message "Le rapport doit conserver la preuve que la précondition M-003 post-merge est GREEN."
+        -Expected "Test GREEN: tests/m003/validate_m003_precondition_acceptance.ps1" `
+        -Message "Le rapport doit conserver la preuve que l'acceptation de précondition M-003 post-merge est GREEN."
 
     Assert-OutputContains `
         -Output $reportContent `

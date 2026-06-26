@@ -6,7 +6,12 @@
 $ErrorActionPreference = "Stop"
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-$expectedBranch = "codex/milestone-m003-source-routee"
+$legacyBranch = "codex/milestone-m003-source-routee"
+$postMergeBranches = @(
+    "master",
+    "codex/milestone-m004-version-canonique-publiee"
+)
+$allowedBranches = @($legacyBranch) + $postMergeBranches
 $requiredMilestonePaths = @(
     "docs/tasks/milestone_000",
     "docs/tasks/milestone_001",
@@ -222,7 +227,8 @@ function Write-M003PreconditionReport {
     $lines.Add("## Résultat")
     $lines.Add("")
     $lines.Add("- Statut: ``$OverallStatus``")
-    $lines.Add("- Branche attendue: ``$expectedBranch``")
+    $allowedBranchLabel = $allowedBranches -join "; "
+    $lines.Add("- Branches autorisées: ``$allowedBranchLabel``")
     $lines.Add("")
     $lines.Add("## Vérifications Git")
     $lines.Add("")
@@ -367,11 +373,19 @@ $currentBranchResult = Invoke-M003Process `
     -Executable "git" `
     -Arguments @("-C", $repoRoot, "rev-parse", "--abbrev-ref", "HEAD")
 $currentBranch = if ($currentBranchResult.OutputLines.Count -eq 0) { "" } else { $currentBranchResult.OutputLines[0].Trim() }
-if (($currentBranchResult.ExitCode -eq 0) -and ($currentBranch -eq $expectedBranch)) {
-    Add-M003GitResult -Results $gitResults -Name "branche courante" -Command $currentBranchResult.Command -ExitCode 0 -OutputLines $currentBranchResult.OutputLines -Status "GREEN" -Observation "Branche M-003 attendue active: $currentBranch" -StartedAtUtc $currentBranchResult.StartedAtUtc -CompletedAtUtc $currentBranchResult.CompletedAtUtc
+if (($currentBranchResult.ExitCode -eq 0) -and ($allowedBranches -contains $currentBranch)) {
+    if ($currentBranch -eq $legacyBranch) {
+        $branchObservation = "Branche M-003 historique autorisée: $currentBranch"
+    }
+    else {
+        $branchObservation = "Branche M-003 autorisée post-merge: $currentBranch"
+    }
+    Add-M003GitResult -Results $gitResults -Name "branche courante" -Command $currentBranchResult.Command -ExitCode 0 -OutputLines $currentBranchResult.OutputLines -Status "GREEN" -Observation $branchObservation -StartedAtUtc $currentBranchResult.StartedAtUtc -CompletedAtUtc $currentBranchResult.CompletedAtUtc
+    Write-Host $branchObservation
 }
 else {
-    Add-M003GitResult -Results $gitResults -Name "branche courante" -Command $currentBranchResult.Command -ExitCode $currentBranchResult.ExitCode -OutputLines $currentBranchResult.OutputLines -Status "RED" -Observation "Branche courante invalide. Attendu: $expectedBranch. Obtenu: $currentBranch" -StartedAtUtc $currentBranchResult.StartedAtUtc -CompletedAtUtc $currentBranchResult.CompletedAtUtc
+    $allowedBranchList = $allowedBranches -join ", "
+    Add-M003GitResult -Results $gitResults -Name "branche courante" -Command $currentBranchResult.Command -ExitCode $currentBranchResult.ExitCode -OutputLines $currentBranchResult.OutputLines -Status "RED" -Observation "Branche courante invalide. Autorisées: $allowedBranchList. Obtenu: $currentBranch" -StartedAtUtc $currentBranchResult.StartedAtUtc -CompletedAtUtc $currentBranchResult.CompletedAtUtc
 }
 
 Stop-M003OnRedGitResult -GitResults $gitResults -GateResults $gateResults -ReportPath $reportPath
@@ -408,13 +422,16 @@ else {
 
 Stop-M003OnRedGitResult -GitResults $gitResults -GateResults $gateResults -ReportPath $reportPath
 
-$masterComparisonStartedAtUtc = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
-$masterComparisonCompletedAtUtc = $masterComparisonStartedAtUtc
-if ($masterRevision -eq $originMasterRevision) {
-    Add-M003GitResult -Results $gitResults -Name "master synchronisé" -Command "git rev-parse master origin/master" -ExitCode 0 -OutputLines @($masterRevision, $originMasterRevision) -Status "GREEN" -Observation "master et origin/master pointent sur la même révision." -StartedAtUtc $masterComparisonStartedAtUtc -CompletedAtUtc $masterComparisonCompletedAtUtc
+$masterContainsOriginResult = Invoke-M003Process `
+    -Name "master contient origin/master" `
+    -Command "git merge-base --is-ancestor origin/master master" `
+    -Executable "git" `
+    -Arguments @("-C", $repoRoot, "merge-base", "--is-ancestor", "origin/master", "master")
+if ($masterContainsOriginResult.ExitCode -eq 0) {
+    Add-M003GitResult -Results $gitResults -Name "master contient origin/master" -Command $masterContainsOriginResult.Command -ExitCode 0 -OutputLines @($masterRevision, $originMasterRevision) -Status "GREEN" -Observation "La référence master contient origin/master." -StartedAtUtc $masterContainsOriginResult.StartedAtUtc -CompletedAtUtc $masterContainsOriginResult.CompletedAtUtc
 }
 else {
-    Add-M003GitResult -Results $gitResults -Name "master synchronisé" -Command "git rev-parse master origin/master" -ExitCode 1 -OutputLines @($masterRevision, $originMasterRevision) -Status "RED" -Observation "Référence master divergente entre master et origin/master." -StartedAtUtc $masterComparisonStartedAtUtc -CompletedAtUtc $masterComparisonCompletedAtUtc
+    Add-M003GitResult -Results $gitResults -Name "master contient origin/master" -Command $masterContainsOriginResult.Command -ExitCode $masterContainsOriginResult.ExitCode -OutputLines @($masterRevision, $originMasterRevision) -Status "RED" -Observation "Référence master divergente entre master et origin/master." -StartedAtUtc $masterContainsOriginResult.StartedAtUtc -CompletedAtUtc $masterContainsOriginResult.CompletedAtUtc
 }
 
 Stop-M003OnRedGitResult -GitResults $gitResults -GateResults $gateResults -ReportPath $reportPath

@@ -112,6 +112,11 @@ try {
 
     Assert-OutputContains `
         -Output $reportContent `
+        -Expected "Branche M-003 autorisée post-merge" `
+        -Message "Le rapport doit nommer la branche post-merge autorisée."
+
+    Assert-OutputContains `
+        -Output $reportContent `
         -Expected "Validation GREEN: scripts/validate_traceability.ps1" `
         -Message "Le rapport doit conserver la preuve de traçabilité GREEN."
 
@@ -132,7 +137,7 @@ try {
 
     Assert-OutputContains `
         -Output $reportContent `
-        -Expected "70 test(s)" `
+        -Expected "71 test(s)" `
         -Message "Le rapport doit prouver le volume de tests courant."
 }
 finally {
