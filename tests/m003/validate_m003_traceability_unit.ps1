@@ -50,7 +50,7 @@ function New-M003MatrixContent {
 | REQ-M003-001 | docs/tasks/milestone_003/0001_verifier_precondition_green.md | Couvert | tests/m003/validate_m003_precondition_acceptance.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m003_precondition.ps1 -Path .\docs\governance\m003_precondition_green.md | scripts/validate_m003_precondition.ps1 | ADR-010 | $documentedDecision |
 | REQ-M003-002 | docs/tasks/milestone_003/0002_publier_specification_source_routee.md | Couvert | tests/m003/validate_m003_specification_acceptance.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m003_specification.ps1 -Path .\docs\specs\m003_source_enregistree_diagnostiquee_routee.md | docs/specs/m003_source_enregistree_diagnostiquee_routee.md | ADR-002; ADR-003; DDD-ADR-003 | $documentedDecision |
 | REQ-M003-003 | docs/tasks/milestone_003/0003_enregistrer_source_immuable.md | Couvert | tests/m003/validate_source_registration_acceptance.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m003\validate_source_registration_acceptance.ps1 | app/source_processing/domain/source_document.py | DDD-ADR-003 | $documentedDecision |
-| REQ-M003-004 | docs/tasks/milestone_003/0004_creer_manifeste_pages.md | Couvert | tests/m003/validate_page_manifest_acceptance.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m003\validate_page_manifest_acceptance.ps1 | app/source_processing/domain/document_processing_run.py | DDD-ADR-003 | $documentedDecision |
+| REQ-M003-004 | docs/tasks/milestone_003/0004_creer_manifeste_pages_complet.md | Couvert | tests/m003/validate_page_manifest_acceptance.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m003\validate_page_manifest_acceptance.ps1 | app/source_processing/domain/document_processing_run.py | DDD-ADR-003 | $documentedDecision |
 | REQ-M003-005 | docs/tasks/milestone_003/0005_diagnostiquer_pages_source.md | Couvert | tests/m003/validate_page_diagnostics_acceptance.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m003\validate_page_diagnostics_acceptance.ps1 | app/source_processing/domain/document_processing_run.py | ADR-002; ADR-003 | $documentedDecision |
 | REQ-M003-006 | docs/tasks/milestone_003/0006_decider_plan_routage_explicite.md | Couvert | tests/m003/validate_route_plan_acceptance.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m003\validate_route_plan_acceptance.ps1 | app/source_processing/domain/document_processing_run.py | ADR-002; ADR-003 | $documentedDecision |
 | REQ-M003-007 | docs/tasks/milestone_003/0007_bloquer_revue_quarantaine.md | Couvert | tests/m003/validate_review_quarantine_acceptance.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m003\validate_review_quarantine_acceptance.ps1 | app/source_processing/domain/document_processing_run.py | ADR-002; DDD-ADR-003 | $documentedDecision |
@@ -138,7 +138,7 @@ function New-TemporaryProject {
         "docs/tasks/milestone_003/0001_verifier_precondition_green.md",
         "docs/tasks/milestone_003/0002_publier_specification_source_routee.md",
         "docs/tasks/milestone_003/0003_enregistrer_source_immuable.md",
-        "docs/tasks/milestone_003/0004_creer_manifeste_pages.md",
+        "docs/tasks/milestone_003/0004_creer_manifeste_pages_complet.md",
         "docs/tasks/milestone_003/0005_diagnostiquer_pages_source.md",
         "docs/tasks/milestone_003/0006_decider_plan_routage_explicite.md",
         "docs/tasks/milestone_003/0007_bloquer_revue_quarantaine.md",
