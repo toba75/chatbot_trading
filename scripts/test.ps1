@@ -13,6 +13,7 @@ $preconditionReportPath = Join-Path $repoRoot "docs/governance/m000_precondition
 $m001SpecificationPath = Join-Path $repoRoot "docs/specs/m001_frontieres_ddd_contrats_publies.md"
 $m002SpecificationPath = Join-Path $repoRoot "docs/specs/m002_plateforme_locale_sure.md"
 $m003SpecificationPath = Join-Path $repoRoot "docs/specs/m003_source_enregistree_diagnostiquee_routee.md"
+$m004SpecificationPath = Join-Path $repoRoot "docs/specs/m004_version_canonique_publiee.md"
 $platformTopologyPath = Join-Path $repoRoot "app/platform/topology_registry.json"
 $sparkFirewallPath = Join-Path $repoRoot "deploy/spark-firewall/network-boundary.json"
 $appRoot = Join-Path $repoRoot "app"
@@ -29,6 +30,7 @@ $validationCommands = @(
     @{ Path = "scripts/validate_m001_specification.ps1"; Arguments = @("-Path", $m001SpecificationPath) },
     @{ Path = "scripts/validate_m002_specification.ps1"; Arguments = @("-Path", $m002SpecificationPath) },
     @{ Path = "scripts/validate_m003_specification.ps1"; Arguments = @("-Path", $m003SpecificationPath) },
+    @{ Path = "scripts/validate_m004_specification.ps1"; Arguments = @("-Path", $m004SpecificationPath) },
     @{ Path = "scripts/validate_platform_topology.ps1"; Arguments = @("-Path", $platformTopologyPath) },
     @{ Path = "scripts/validate_local_compose.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_network_boundary.ps1"; Arguments = @("-SparkFirewallPath", $sparkFirewallPath) },
@@ -109,7 +111,9 @@ $testCommands = @(
     @{ Path = "tests/m003/validate_m003_traceability_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/m003/validate_m003_traceability_unit.ps1"; Arguments = @() },
     @{ Path = "tests/m004/validate_m004_precondition_unit.ps1"; Arguments = @() },
-    @{ Path = "tests/m004/validate_m004_precondition_acceptance.ps1"; Arguments = @() }
+    @{ Path = "tests/m004/validate_m004_precondition_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m004/validate_m004_specification_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m004/validate_m004_specification_unit.ps1"; Arguments = @() }
 )
 
 $expectedValidationPaths = @(
@@ -121,6 +125,7 @@ $expectedValidationPaths = @(
     "scripts/validate_m001_specification.ps1",
     "scripts/validate_m002_specification.ps1",
     "scripts/validate_m003_specification.ps1",
+    "scripts/validate_m004_specification.ps1",
     "scripts/validate_platform_topology.ps1",
     "scripts/validate_local_compose.ps1",
     "scripts/validate_network_boundary.ps1",
@@ -200,10 +205,12 @@ $expectedTestPaths = @(
     "tests/m003/validate_m003_traceability_acceptance.ps1",
     "tests/m003/validate_m003_traceability_unit.ps1",
     "tests/m004/validate_m004_precondition_unit.ps1",
-    "tests/m004/validate_m004_precondition_acceptance.ps1"
+    "tests/m004/validate_m004_precondition_acceptance.ps1",
+    "tests/m004/validate_m004_specification_acceptance.ps1",
+    "tests/m004/validate_m004_specification_unit.ps1"
 )
 
-$expectedTestCount = 73
+$expectedTestCount = 75
 if ($env:OST_M003_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     Write-Host "Test d'acceptation de précondition M-003 exclu explicitement: exécution imbriquée du validateur de précondition."
     Write-Host "Test d'acceptation de précondition M-004 exclu explicitement: M-003 reste indépendant du milestone aval."
@@ -217,7 +224,7 @@ if ($env:OST_M003_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     $expectedTestPaths = @(
         $expectedTestPaths | Where-Object { $excludedPreconditionAcceptancePaths -notcontains $_ }
     )
-    $expectedTestCount = 71
+    $expectedTestCount = 73
 }
 elseif ($env:OST_M004_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     Write-Host "Test d'acceptation de précondition M-004 exclu explicitement: exécution imbriquée du validateur de précondition."
@@ -227,7 +234,7 @@ elseif ($env:OST_M004_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     $expectedTestPaths = @(
         $expectedTestPaths | Where-Object { $_ -ne $m004PreconditionAcceptancePath }
     )
-    $expectedTestCount = 72
+    $expectedTestCount = 74
 }
 
 Invoke-M000ValidationGate `
@@ -235,7 +242,7 @@ Invoke-M000ValidationGate `
     -RepositoryRoot $repoRoot `
     -ValidationCommands $validationCommands `
     -TestCommands $testCommands `
-    -ExpectedValidationCount 12 `
+    -ExpectedValidationCount 13 `
     -ExpectedTestCount $expectedTestCount `
     -ExpectedValidationPaths $expectedValidationPaths `
     -ExpectedTestPaths $expectedTestPaths

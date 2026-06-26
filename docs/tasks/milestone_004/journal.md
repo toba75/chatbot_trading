@@ -26,6 +26,7 @@
 | Tâche | Commit RED | Commit GREEN | ADR consultées | ADR créée ou modifiée | Validations GREEN déclarées |
 |---|---|---|---|---|---|
 | T-001 - Vérifier et rétablir la précondition GREEN M-004 | `b5036c60d07de6b8bdd4e8d27661fa4f78dab976` | `test(m004): retablir la precondition green avant version canonique` | ADR-010 | Aucune | `tests/m003/validate_m003_precondition_unit.ps1`; `tests/m003/validate_m003_precondition_acceptance.ps1`; `tests/m004/validate_m004_precondition_unit.ps1`; `tests/m004/validate_m004_precondition_acceptance.ps1`; `scripts/validate_m004_precondition.ps1 -Path .\docs\governance\m004_precondition_green.md`; `scripts/test.ps1`; `scripts/lint.ps1` |
+| T-002 - Publier la spécification de version canonique | `826837c1e12b48acbdbc761cc0284ca35d6cf51a` | `docs(m004): publier la specification de version canonique` | ADR-001; ADR-002; ADR-003; ADR-004; DDD-ADR-003 | Aucune | `tests/m004/validate_m004_specification_acceptance.ps1`; `tests/m004/validate_m004_specification_unit.ps1`; `scripts/validate_m004_specification.ps1`; `scripts/validate_traceability.ps1`; `scripts/test.ps1`; `scripts/lint.ps1` |
 
 ## Clôture T-001
 
@@ -35,3 +36,14 @@
 - Correction M-003: `scripts/validate_m003_precondition.ps1` autorise explicitement le post-merge sur `master` et la branche M-004 sans dépendre silencieusement de l'ancienne branche `codex/milestone-m003-source-routee`.
 - ADR: non requise; T-001 applique ADR-010 et rend la précondition post-merge explicite sans changer la politique durable des gates PowerShell.
 - Risques traités: l'ancien RED M-003 n'est pas supprimé ni masqué; un milestone amont absent, une branche non autorisée, une référence `master` qui ne contient pas `origin/master`, une gate RED ou un rapport hors dépôt restent refusés explicitement.
+
+## Clôture T-002
+
+- Scénario BDD: Given une source M-003 enregistrée, diagnostiquée et routée page par page; When la commande documentaire `POST /v1/documents/{id}/convert` est spécifiée pour produire la version canonique; Then le domaine publie une `CanonicalSource` immuable, construite par fusion pagewise vers un `DoclingDocument` unique, contrôlée avant et après conversion, et exclut explicitement les projections M-005.
+- RED T-002 confirmé: `tests/m004/validate_m004_specification_acceptance.ps1` échouait sur l'absence de `scripts/validate_m004_specification.ps1`; `tests/m004/validate_m004_specification_unit.ps1` échouait ensuite sur la même absence avant l'implémentation.
+- Implémentation: `docs/specs/m004_version_canonique_publiee.md` publie la spécification M-004 avec l'agrégat `CanonicalSource`, la fusion pagewise vers un `DoclingDocument` unique, les politiques `TextAuthoritySelectionPolicy`, `CanonicalAcceptancePolicy` et `CriticalPageSamplingPolicy`, les états, événements, QA pré et post-conversion, le contrat HTTP `POST /v1/documents/{id}/convert` et les exclusions M-005.
+- Validateur: `scripts/validate_m004_specification.ps1` refuse l'absence des sections et marqueurs normatifs, les politiques incomplètes, les états ou événements manquants, les comportements sans scénario/test/ADR/commande, les fallbacks silencieux, l'omission de page, la mutation en place, la projection Qdrant prématurée et les formats non canoniques.
+- Gates: `scripts/test.ps1` et `scripts/lint.ps1` enrôlent le validateur M-004 et les tests M-004; `docs/traceability/matrix.md` relie `REQ-M004-002` à la tâche, aux tests, au validateur et aux ADR appliquées.
+- ADR: non requise; T-002 applique ADR-001, ADR-002, ADR-003, ADR-004 et DDD-ADR-003 sans introduire de décision structurante nouvelle.
+- Validations GREEN: `tests/m004/validate_m004_specification_acceptance.ps1`; `tests/m004/validate_m004_specification_unit.ps1`; `scripts/validate_m004_specification.ps1`; `scripts/validate_traceability.ps1`; `scripts/test.ps1`; `scripts/lint.ps1`.
+- Risques résiduels: la tâche publie la spécification et son validateur; l'implémentation métier de conversion, adjudication, publication, `SourceLocator` et événement `CanonicalSourcePublished` reste portée par T-003 à T-010.
