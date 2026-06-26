@@ -348,7 +348,7 @@ assert_raises(
 
 # OCRmyPDF est refusé hors diagnostic admissible.
 assert_raises(
-    "prétraitement OCRmyPDF inadmissible",
+    "OCRmyPDF inadmissible",
     lambda: PageRoute(
         page_number=PageNumber.from_value(1),
         route_name=PageRouteName.NATIVE_STANDARD,

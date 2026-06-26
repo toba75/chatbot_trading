@@ -19,6 +19,8 @@ class DocumentProcessingRunStatus(str, Enum):
 
     CREATED = "CREATED"
     DIAGNOSED = "DIAGNOSED"
+    ROUTE_PLANNED = "ROUTE_PLANNED"
+    MANUAL_REVIEW = "MANUAL_REVIEW"
 
 
 class PageManifestEntryState(str, Enum):
@@ -63,6 +65,75 @@ class PageDecisionState(str, Enum):
             if state.value == value:
                 return state
         raise ValueError("état de diagnostic inconnu")
+
+
+class PageRouteName(str, Enum):
+    """Route documentaire explicite issue du diagnostic de page."""
+
+    NATIVE_STANDARD = "NATIVE_STANDARD"
+    SCAN_GRANITE = "SCAN_GRANITE"
+    PREPROCESS_GRANITE = "PREPROCESS_GRANITE"
+    BAD_OCR_TO_GRANITE = "BAD_OCR_TO_GRANITE"
+    MIXED_PAGEWISE = "MIXED_PAGEWISE"
+    TARGETED_ENRICHMENT = "TARGETED_ENRICHMENT"
+
+    @classmethod
+    def from_value(cls, value: "PageRouteName | str") -> "PageRouteName":
+        if isinstance(value, cls):
+            return value
+        if not isinstance(value, str):
+            raise ValueError("route de page inconnue")
+        for route_name in cls:
+            if route_name.value == value:
+                return route_name
+        raise ValueError("route de page inconnue")
+
+
+class RouteDecisionMode(str, Enum):
+    """Mode de décision appliqué à une route de page."""
+
+    AUTO = "AUTO"
+    BENCHMARK = "BENCHMARK"
+    MANUAL_REVIEW = "MANUAL_REVIEW"
+
+    @classmethod
+    def from_value(cls, value: "RouteDecisionMode | str") -> "RouteDecisionMode":
+        if isinstance(value, cls):
+            return value
+        if not isinstance(value, str):
+            raise ValueError("mode de décision de route inconnu")
+        for decision_mode in cls:
+            if decision_mode.value == value:
+                return decision_mode
+        raise ValueError("mode de décision de route inconnu")
+
+
+class PagePreprocessingAction(str, Enum):
+    """Prétraitement conditionnel décidé avant conversion documentaire."""
+
+    NONE = "NONE"
+    OCR_PHYSICAL_PREPROCESSING = "OCR_PHYSICAL_PREPROCESSING"
+
+    @classmethod
+    def from_value(
+        cls,
+        value: "PagePreprocessingAction | str",
+    ) -> "PagePreprocessingAction":
+        if isinstance(value, cls):
+            return value
+        if not isinstance(value, str):
+            raise ValueError("prétraitement de page inconnu")
+        for preprocessing_action in cls:
+            if preprocessing_action.value == value:
+                return preprocessing_action
+        raise ValueError("prétraitement de page inconnu")
+
+
+class RoutePlanningOutcome(str, Enum):
+    """Issue globale de la politique de routage."""
+
+    ROUTE_PLANNED = "ROUTE_PLANNED"
+    MANUAL_REVIEW = "MANUAL_REVIEW"
 
 
 class NativeTextSignal(str, Enum):
@@ -243,6 +314,48 @@ class DiagnosticVersion:
 
 
 @dataclass(frozen=True)
+class RoutingPolicyVersion:
+    """Version explicite de la configuration de routage appliquée."""
+
+    value: str
+
+    @classmethod
+    def from_value(cls, value: str) -> "RoutingPolicyVersion":
+        return cls(value=_ensure_routing_policy_version_value(value))
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "value",
+            _ensure_routing_policy_version_value(self.value),
+        )
+
+
+@dataclass(frozen=True)
+class PageRoutingConfiguration:
+    """Seuils versionnés utilisés par la politique de routage de page."""
+
+    routing_policy_version: RoutingPolicyVersion
+    auto_confidence_min: float
+    benchmark_confidence_min: float
+
+    def __post_init__(self) -> None:
+        _ensure_routing_policy_version(self.routing_policy_version)
+        object.__setattr__(
+            self,
+            "auto_confidence_min",
+            _ensure_route_confidence_score(self.auto_confidence_min),
+        )
+        object.__setattr__(
+            self,
+            "benchmark_confidence_min",
+            _ensure_route_confidence_score(self.benchmark_confidence_min),
+        )
+        if self.auto_confidence_min < self.benchmark_confidence_min:
+            raise ValueError("ordre des seuils de routage invalide")
+
+
+@dataclass(frozen=True)
 class PageDiagnosticSignals:
     """Signaux techniques conservés pour justifier une décision de page."""
 
@@ -312,6 +425,139 @@ class PageDecision:
         )
 
 
+@dataclass(frozen=True)
+class PageRoute:
+    """Route explicite et justifiée pour une page diagnostiquée."""
+
+    page_number: PageNumber
+    route_name: PageRouteName
+    decision_mode: RouteDecisionMode
+    confidence_score: float
+    preprocessing_action: PagePreprocessingAction
+    routing_policy_version: RoutingPolicyVersion
+    justification: str
+
+    def __post_init__(self) -> None:
+        _ensure_page_number(self.page_number)
+        object.__setattr__(self, "route_name", PageRouteName.from_value(self.route_name))
+        object.__setattr__(
+            self,
+            "decision_mode",
+            RouteDecisionMode.from_value(self.decision_mode),
+        )
+        if self.decision_mode is RouteDecisionMode.MANUAL_REVIEW:
+            raise ValueError("route de page en revue manuelle invalide")
+        object.__setattr__(
+            self,
+            "confidence_score",
+            _ensure_route_confidence_score(self.confidence_score),
+        )
+        object.__setattr__(
+            self,
+            "preprocessing_action",
+            PagePreprocessingAction.from_value(self.preprocessing_action),
+        )
+        _ensure_routing_policy_version(self.routing_policy_version)
+        object.__setattr__(
+            self,
+            "justification",
+            _ensure_route_justification(self.justification),
+        )
+        _ensure_page_route_preprocessing(
+            route_name=self.route_name,
+            preprocessing_action=self.preprocessing_action,
+        )
+
+
+@dataclass(frozen=True)
+class RoutePlan:
+    """Plan de routage approuvé pour toutes les pages diagnostiquées."""
+
+    routing_policy_version: RoutingPolicyVersion
+    page_routes: tuple[PageRoute, ...]
+    dominant_route_name: PageRouteName
+    page_exceptions: tuple[PageRoute, ...]
+    confidence_score: float
+
+    def __post_init__(self) -> None:
+        _ensure_routing_policy_version(self.routing_policy_version)
+        page_routes = _ensure_page_routes(self.page_routes)
+        object.__setattr__(self, "page_routes", page_routes)
+        object.__setattr__(
+            self,
+            "dominant_route_name",
+            PageRouteName.from_value(self.dominant_route_name),
+        )
+        page_exceptions = _ensure_page_routes(
+            self.page_exceptions,
+            allow_empty=True,
+        )
+        _ensure_route_plan_exceptions(
+            page_routes=page_routes,
+            dominant_route_name=self.dominant_route_name,
+            page_exceptions=page_exceptions,
+        )
+        object.__setattr__(self, "page_exceptions", page_exceptions)
+        object.__setattr__(
+            self,
+            "confidence_score",
+            _ensure_route_confidence_score(self.confidence_score),
+        )
+        for page_route in page_routes:
+            if page_route.routing_policy_version != self.routing_policy_version:
+                raise ValueError("version de routage incohérente")
+
+
+@dataclass(frozen=True)
+class RoutePlanningResult:
+    """Résultat pur de la politique de routage avant transition d'agrégat."""
+
+    outcome: RoutePlanningOutcome
+    routing_policy_version: RoutingPolicyVersion
+    route_plan: RoutePlan | None
+    manual_review_reason: str | None
+
+    @classmethod
+    def route_planned(cls, route_plan: RoutePlan) -> "RoutePlanningResult":
+        parsed_route_plan = _ensure_route_plan(route_plan)
+        return cls(
+            outcome=RoutePlanningOutcome.ROUTE_PLANNED,
+            routing_policy_version=parsed_route_plan.routing_policy_version,
+            route_plan=parsed_route_plan,
+            manual_review_reason=None,
+        )
+
+    @classmethod
+    def manual_review(
+        cls,
+        routing_policy_version: RoutingPolicyVersion,
+        reason: str,
+    ) -> "RoutePlanningResult":
+        return cls(
+            outcome=RoutePlanningOutcome.MANUAL_REVIEW,
+            routing_policy_version=_ensure_routing_policy_version(
+                routing_policy_version
+            ),
+            route_plan=None,
+            manual_review_reason=_ensure_manual_review_reason(reason),
+        )
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.outcome, RoutePlanningOutcome):
+            raise ValueError("issue de routage invalide")
+        _ensure_routing_policy_version(self.routing_policy_version)
+        if self.outcome is RoutePlanningOutcome.ROUTE_PLANNED:
+            route_plan = _ensure_route_plan(self.route_plan)
+            if route_plan.routing_policy_version != self.routing_policy_version:
+                raise ValueError("version de routage incohérente")
+            if self.manual_review_reason is not None:
+                raise ValueError("raison de revue manuelle interdite")
+        if self.outcome is RoutePlanningOutcome.MANUAL_REVIEW:
+            if self.route_plan is not None:
+                raise ValueError("plan de route interdit en revue manuelle")
+            _ensure_manual_review_reason(self.manual_review_reason)
+
+
 class PageDiagnosticPolicy:
     """Politique de classification des signaux en états diagnostiques publiés."""
 
@@ -355,6 +601,103 @@ class PageDiagnosticPolicy:
         )
 
 
+class PageRoutingPolicy:
+    """Politique pure de choix d'une route documentaire à partir des diagnostics."""
+
+    def decide_page_route(
+        self,
+        page_decision: PageDecision,
+        routing_configuration: PageRoutingConfiguration,
+    ) -> PageRoute:
+        parsed_page_decision = _ensure_page_decision(page_decision)
+        parsed_configuration = _ensure_routing_configuration(routing_configuration)
+        manual_review_reason = _manual_review_reason_for_page(
+            page_decision=parsed_page_decision,
+            routing_configuration=parsed_configuration,
+        )
+        if manual_review_reason is not None:
+            raise ValueError(manual_review_reason)
+
+        route_name, confidence_score, preprocessing_action, requires_benchmark = (
+            _routing_profile_for_state(parsed_page_decision.page_state)
+        )
+        decision_mode = _route_decision_mode(
+            confidence_score=confidence_score,
+            requires_benchmark=requires_benchmark,
+            routing_configuration=parsed_configuration,
+        )
+
+        return PageRoute(
+            page_number=parsed_page_decision.page_number,
+            route_name=route_name,
+            decision_mode=decision_mode,
+            confidence_score=confidence_score,
+            preprocessing_action=preprocessing_action,
+            routing_policy_version=parsed_configuration.routing_policy_version,
+            justification=_route_justification(
+                page_decision=parsed_page_decision,
+                route_name=route_name,
+                decision_mode=decision_mode,
+                confidence_score=confidence_score,
+                preprocessing_action=preprocessing_action,
+            ),
+        )
+
+    def plan_routes(
+        self,
+        page_decisions: Sequence[PageDecision],
+        routing_configuration: PageRoutingConfiguration,
+    ) -> RoutePlanningResult:
+        parsed_page_decisions = _ensure_page_decisions(page_decisions)
+        parsed_configuration = _ensure_routing_configuration(routing_configuration)
+        manual_review_reasons = tuple(
+            reason
+            for reason in (
+                _manual_review_reason_for_page(
+                    page_decision=page_decision,
+                    routing_configuration=parsed_configuration,
+                )
+                for page_decision in parsed_page_decisions
+            )
+            if reason is not None
+        )
+        if len(manual_review_reasons) != 0:
+            return RoutePlanningResult.manual_review(
+                routing_policy_version=parsed_configuration.routing_policy_version,
+                reason="; ".join(manual_review_reasons),
+            )
+
+        page_routes = tuple(
+            self.decide_page_route(
+                page_decision=page_decision,
+                routing_configuration=parsed_configuration,
+            )
+            for page_decision in parsed_page_decisions
+        )
+        dominant_route_name = _dominant_route_name(page_routes)
+        if dominant_route_name is None:
+            return RoutePlanningResult.manual_review(
+                routing_policy_version=parsed_configuration.routing_policy_version,
+                reason="route dominante indécidable sans décision humaine",
+            )
+        page_exceptions = tuple(
+            page_route
+            for page_route in page_routes
+            if page_route.route_name is not dominant_route_name
+        )
+        route_plan = RoutePlan(
+            routing_policy_version=parsed_configuration.routing_policy_version,
+            page_routes=page_routes,
+            dominant_route_name=dominant_route_name,
+            page_exceptions=page_exceptions,
+            confidence_score=sum(
+                page_route.confidence_score for page_route in page_routes
+            )
+            / len(page_routes),
+        )
+        return RoutePlanningResult.route_planned(route_plan)
+
+
 @dataclass(frozen=True)
 class DocumentProcessingStarted:
     """Événement produit lors du démarrage d'une tentative de traitement."""
@@ -396,6 +739,48 @@ class PageDiagnosticRecorded:
 
 
 @dataclass(frozen=True)
+class PageRouteDecided:
+    """Événement produit pour chaque route de page décidée."""
+
+    processing_run_id: ProcessingRunId
+    document_id: DocumentId
+    page_number: PageNumber
+    route_name: PageRouteName
+    decision_mode: RouteDecisionMode
+    routing_policy_version: RoutingPolicyVersion
+
+    def __post_init__(self) -> None:
+        _ensure_processing_run_id(self.processing_run_id)
+        _ensure_document_id(self.document_id)
+        _ensure_page_number(self.page_number)
+        object.__setattr__(self, "route_name", PageRouteName.from_value(self.route_name))
+        object.__setattr__(
+            self,
+            "decision_mode",
+            RouteDecisionMode.from_value(self.decision_mode),
+        )
+        if self.decision_mode is RouteDecisionMode.MANUAL_REVIEW:
+            raise ValueError("route décidée en revue manuelle invalide")
+        _ensure_routing_policy_version(self.routing_policy_version)
+
+
+@dataclass(frozen=True)
+class ManualReviewRequested:
+    """Événement produit quand le routage automatique est explicitement refusé."""
+
+    processing_run_id: ProcessingRunId
+    document_id: DocumentId
+    routing_policy_version: RoutingPolicyVersion
+    reason: str
+
+    def __post_init__(self) -> None:
+        _ensure_processing_run_id(self.processing_run_id)
+        _ensure_document_id(self.document_id)
+        _ensure_routing_policy_version(self.routing_policy_version)
+        object.__setattr__(self, "reason", _ensure_manual_review_reason(self.reason))
+
+
+@dataclass(frozen=True)
 class DocumentProcessingRun:
     """Agrégat SP qui porte une tentative de traitement d'un SourceDocument."""
 
@@ -403,8 +788,16 @@ class DocumentProcessingRun:
     document_id: DocumentId
     page_manifest: PageManifest
     page_decisions: tuple[PageDecision, ...]
+    route_plan: RoutePlan | None
+    manual_review_reason: str | None
     status: DocumentProcessingRunStatus
-    events: tuple[DocumentProcessingStarted | PageDiagnosticRecorded, ...]
+    events: tuple[
+        DocumentProcessingStarted
+        | PageDiagnosticRecorded
+        | PageRouteDecided
+        | ManualReviewRequested,
+        ...,
+    ]
 
     @classmethod
     def start(
@@ -426,6 +819,8 @@ class DocumentProcessingRun:
             document_id=parsed_source_document.document_id,
             page_manifest=parsed_manifest,
             page_decisions=(),
+            route_plan=None,
+            manual_review_reason=None,
             status=DocumentProcessingRunStatus.CREATED,
             events=(started_event,),
         )
@@ -457,8 +852,66 @@ class DocumentProcessingRun:
             document_id=self.document_id,
             page_manifest=self.page_manifest,
             page_decisions=parsed_page_decisions,
+            route_plan=None,
+            manual_review_reason=None,
             status=DocumentProcessingRunStatus.DIAGNOSED,
             events=self.events + diagnostic_events,
+        )
+
+    def decide_route_plan(
+        self,
+        routing_configuration: PageRoutingConfiguration,
+    ) -> "DocumentProcessingRun":
+        if self.status is not DocumentProcessingRunStatus.DIAGNOSED:
+            raise ValueError("transition de routage interdite")
+
+        parsed_configuration = _ensure_routing_configuration(routing_configuration)
+        route_planning_result = PageRoutingPolicy().plan_routes(
+            page_decisions=self.page_decisions,
+            routing_configuration=parsed_configuration,
+        )
+
+        if route_planning_result.outcome is RoutePlanningOutcome.MANUAL_REVIEW:
+            manual_review_event = ManualReviewRequested(
+                processing_run_id=self.processing_run_id,
+                document_id=self.document_id,
+                routing_policy_version=route_planning_result.routing_policy_version,
+                reason=_ensure_manual_review_reason(
+                    route_planning_result.manual_review_reason
+                ),
+            )
+            return DocumentProcessingRun(
+                processing_run_id=self.processing_run_id,
+                document_id=self.document_id,
+                page_manifest=self.page_manifest,
+                page_decisions=self.page_decisions,
+                route_plan=None,
+                manual_review_reason=manual_review_event.reason,
+                status=DocumentProcessingRunStatus.MANUAL_REVIEW,
+                events=self.events + (manual_review_event,),
+            )
+
+        route_plan = _ensure_route_plan(route_planning_result.route_plan)
+        route_events = tuple(
+            PageRouteDecided(
+                processing_run_id=self.processing_run_id,
+                document_id=self.document_id,
+                page_number=page_route.page_number,
+                route_name=page_route.route_name,
+                decision_mode=page_route.decision_mode,
+                routing_policy_version=page_route.routing_policy_version,
+            )
+            for page_route in route_plan.page_routes
+        )
+        return DocumentProcessingRun(
+            processing_run_id=self.processing_run_id,
+            document_id=self.document_id,
+            page_manifest=self.page_manifest,
+            page_decisions=self.page_decisions,
+            route_plan=route_plan,
+            manual_review_reason=None,
+            status=DocumentProcessingRunStatus.ROUTE_PLANNED,
+            events=self.events + route_events,
         )
 
     def __post_init__(self) -> None:
@@ -466,6 +919,10 @@ class DocumentProcessingRun:
         _ensure_document_id(self.document_id)
         _ensure_page_manifest(self.page_manifest)
         page_decisions = _ensure_page_decisions(self.page_decisions, allow_empty=True)
+        route_plan = _ensure_route_plan_or_none(self.route_plan)
+        manual_review_reason = _ensure_manual_review_reason_or_none(
+            self.manual_review_reason
+        )
         if not isinstance(self.status, DocumentProcessingRunStatus):
             raise ValueError("document_processing_run_status invalide")
         if not isinstance(self.events, tuple):
@@ -473,16 +930,51 @@ class DocumentProcessingRun:
         if len(self.events) == 0:
             raise ValueError("events DocumentProcessingRun vide")
         for event in self.events:
-            if not isinstance(event, DocumentProcessingStarted | PageDiagnosticRecorded):
+            if not isinstance(
+                event,
+                (
+                    DocumentProcessingStarted,
+                    PageDiagnosticRecorded,
+                    PageRouteDecided,
+                    ManualReviewRequested,
+                ),
+            ):
                 raise ValueError("event DocumentProcessingRun invalide")
         if self.status is DocumentProcessingRunStatus.CREATED and len(page_decisions) != 0:
             raise ValueError("diagnostics interdits sur tentative créée")
+        if self.status is DocumentProcessingRunStatus.CREATED:
+            if route_plan is not None or manual_review_reason is not None:
+                raise ValueError("route interdite sur tentative créée")
         if self.status is DocumentProcessingRunStatus.DIAGNOSED:
             _ensure_page_diagnostic_completeness(
                 page_manifest=self.page_manifest,
                 page_decisions=page_decisions,
             )
+            if route_plan is not None or manual_review_reason is not None:
+                raise ValueError("route interdite avant décision de routage")
+        if self.status is DocumentProcessingRunStatus.ROUTE_PLANNED:
+            _ensure_page_diagnostic_completeness(
+                page_manifest=self.page_manifest,
+                page_decisions=page_decisions,
+            )
+            _ensure_route_plan(route_plan)
+            _ensure_route_plan_completeness(
+                page_decisions=page_decisions,
+                route_plan=route_plan,
+            )
+            if manual_review_reason is not None:
+                raise ValueError("revue manuelle interdite sur plan approuvé")
+        if self.status is DocumentProcessingRunStatus.MANUAL_REVIEW:
+            _ensure_page_diagnostic_completeness(
+                page_manifest=self.page_manifest,
+                page_decisions=page_decisions,
+            )
+            if route_plan is not None:
+                raise ValueError("plan de route interdit en revue manuelle")
+            _ensure_manual_review_reason(manual_review_reason)
         object.__setattr__(self, "page_decisions", page_decisions)
+        object.__setattr__(self, "route_plan", route_plan)
+        object.__setattr__(self, "manual_review_reason", manual_review_reason)
 
 
 def _ensure_processing_run_id_value(value: Any) -> str:
@@ -519,6 +1011,16 @@ def _ensure_diagnostic_version_value(value: Any) -> str:
     return value
 
 
+def _ensure_routing_policy_version_value(value: Any) -> str:
+    if not isinstance(value, str):
+        raise ValueError("version de politique de routage invalide")
+    if value.strip() == "":
+        raise ValueError("version de politique de routage invalide")
+    if value != value.strip():
+        raise ValueError("version de politique de routage invalide")
+    return value
+
+
 def _ensure_diagnostic_justification(value: Any) -> str:
     if not isinstance(value, str):
         raise ValueError("justification de diagnostic invalide")
@@ -527,6 +1029,40 @@ def _ensure_diagnostic_justification(value: Any) -> str:
     if value != value.strip():
         raise ValueError("justification de diagnostic invalide")
     return value
+
+
+def _ensure_route_justification(value: Any) -> str:
+    if not isinstance(value, str):
+        raise ValueError("justification de route invalide")
+    if value.strip() == "":
+        raise ValueError("justification de route invalide")
+    if value != value.strip():
+        raise ValueError("justification de route invalide")
+    return value
+
+
+def _ensure_manual_review_reason(value: Any) -> str:
+    if not isinstance(value, str):
+        raise ValueError("raison de revue manuelle invalide")
+    if value.strip() == "":
+        raise ValueError("raison de revue manuelle invalide")
+    if value != value.strip():
+        raise ValueError("raison de revue manuelle invalide")
+    return value
+
+
+def _ensure_manual_review_reason_or_none(value: Any) -> str | None:
+    if value is None:
+        return None
+    return _ensure_manual_review_reason(value)
+
+
+def _ensure_route_confidence_score(value: Any) -> float:
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        raise ValueError("seuil de confiance de routage invalide")
+    if value < 0.0 or value > 1.0:
+        raise ValueError("seuil de confiance de routage invalide")
+    return float(value)
 
 
 def _ensure_bool(value: Any, field_name: str) -> bool:
@@ -585,6 +1121,27 @@ def _ensure_page_decisions(
     return page_decisions
 
 
+def _ensure_page_routes(
+    value: Sequence[PageRoute],
+    *,
+    allow_empty: bool = False,
+) -> tuple[PageRoute, ...]:
+    if value is None:
+        raise ValueError("routes de pages absentes")
+    if isinstance(value, str) or not isinstance(value, Sequence):
+        raise ValueError("routes de pages invalides")
+    page_routes = tuple(value)
+    if len(page_routes) == 0 and not allow_empty:
+        raise ValueError("routes de pages vides")
+    for page_route in page_routes:
+        if not isinstance(page_route, PageRoute):
+            raise ValueError("route de page invalide")
+    route_pages = tuple(page_route.page_number.value for page_route in page_routes)
+    if len(route_pages) != len(set(route_pages)):
+        raise ValueError("route de page dupliquée")
+    return page_routes
+
+
 def _ensure_page_diagnostic_completeness(
     page_manifest: PageManifest,
     page_decisions: tuple[PageDecision, ...],
@@ -607,6 +1164,186 @@ def _ensure_page_diagnostic_completeness(
 
     if diagnostic_pages != manifest_pages:
         raise ValueError("ordre strict des diagnostics invalide")
+
+
+def _ensure_route_plan_completeness(
+    page_decisions: tuple[PageDecision, ...],
+    route_plan: RoutePlan,
+) -> None:
+    page_routes = _ensure_route_plan(route_plan).page_routes
+    diagnostic_pages = tuple(
+        page_decision.page_number.value for page_decision in page_decisions
+    )
+    route_pages = tuple(page_route.page_number.value for page_route in page_routes)
+
+    if route_pages != diagnostic_pages:
+        raise ValueError("ordre strict des routes invalide")
+
+
+def _ensure_route_plan_exceptions(
+    page_routes: tuple[PageRoute, ...],
+    dominant_route_name: PageRouteName,
+    page_exceptions: tuple[PageRoute, ...],
+) -> None:
+    expected_exceptions = tuple(
+        page_route
+        for page_route in page_routes
+        if page_route.route_name is not dominant_route_name
+    )
+    if page_exceptions != expected_exceptions:
+        raise ValueError("exceptions de route incohérentes")
+
+
+def _ensure_page_route_preprocessing(
+    route_name: PageRouteName,
+    preprocessing_action: PagePreprocessingAction,
+) -> None:
+    if preprocessing_action is PagePreprocessingAction.OCR_PHYSICAL_PREPROCESSING:
+        if route_name is not PageRouteName.PREPROCESS_GRANITE:
+            raise ValueError("prétraitement OCRmyPDF inadmissible")
+    if route_name is PageRouteName.PREPROCESS_GRANITE:
+        if preprocessing_action is not PagePreprocessingAction.OCR_PHYSICAL_PREPROCESSING:
+            raise ValueError("prétraitement OCRmyPDF requis")
+
+
+def _routing_profile_for_state(
+    page_state: PageDecisionState,
+) -> tuple[PageRouteName, float, PagePreprocessingAction, bool]:
+    parsed_page_state = PageDecisionState.from_value(page_state)
+    if parsed_page_state is PageDecisionState.NATIVE_OK:
+        return (
+            PageRouteName.NATIVE_STANDARD,
+            0.98,
+            PagePreprocessingAction.NONE,
+            False,
+        )
+    if parsed_page_state is PageDecisionState.NATIVE_SUSPECT:
+        return (
+            PageRouteName.NATIVE_STANDARD,
+            0.86,
+            PagePreprocessingAction.NONE,
+            True,
+        )
+    if parsed_page_state is PageDecisionState.SCAN_CLEAN:
+        return (
+            PageRouteName.SCAN_GRANITE,
+            0.94,
+            PagePreprocessingAction.NONE,
+            False,
+        )
+    if parsed_page_state is PageDecisionState.SCAN_DEGRADED:
+        return (
+            PageRouteName.PREPROCESS_GRANITE,
+            0.91,
+            PagePreprocessingAction.OCR_PHYSICAL_PREPROCESSING,
+            False,
+        )
+    if parsed_page_state is PageDecisionState.OCR_BAD:
+        return (
+            PageRouteName.BAD_OCR_TO_GRANITE,
+            0.90,
+            PagePreprocessingAction.NONE,
+            False,
+        )
+    if parsed_page_state is PageDecisionState.MIXED_CONTENT:
+        return (
+            PageRouteName.MIXED_PAGEWISE,
+            0.90,
+            PagePreprocessingAction.NONE,
+            False,
+        )
+    if parsed_page_state is PageDecisionState.COMPLEX_VISUAL:
+        return (
+            PageRouteName.TARGETED_ENRICHMENT,
+            0.86,
+            PagePreprocessingAction.NONE,
+            True,
+        )
+    raise ValueError("page sans route documentaire admissible")
+
+
+def _manual_review_reason_for_page(
+    page_decision: PageDecision,
+    routing_configuration: PageRoutingConfiguration,
+) -> str | None:
+    parsed_page_decision = _ensure_page_decision(page_decision)
+    parsed_configuration = _ensure_routing_configuration(routing_configuration)
+
+    if parsed_page_decision.page_state is PageDecisionState.UNSUPPORTED_OR_CORRUPT:
+        return (
+            f"page {parsed_page_decision.page_number.value} "
+            "sans route documentaire admissible"
+        )
+
+    route_name, confidence_score, _, _ = _routing_profile_for_state(
+        parsed_page_decision.page_state
+    )
+    if confidence_score < parsed_configuration.benchmark_confidence_min:
+        return (
+            f"page {parsed_page_decision.page_number.value} "
+            f"score de confiance {confidence_score:.2f} inférieur au seuil "
+            f"de benchmark {parsed_configuration.benchmark_confidence_min:.2f} "
+            f"pour {route_name.value}"
+        )
+
+    return None
+
+
+def _route_decision_mode(
+    confidence_score: float,
+    requires_benchmark: bool,
+    routing_configuration: PageRoutingConfiguration,
+) -> RouteDecisionMode:
+    _ensure_route_confidence_score(confidence_score)
+    _ensure_bool(requires_benchmark, "requires_benchmark")
+    parsed_configuration = _ensure_routing_configuration(routing_configuration)
+    if requires_benchmark:
+        return RouteDecisionMode.BENCHMARK
+    if confidence_score < parsed_configuration.auto_confidence_min:
+        return RouteDecisionMode.BENCHMARK
+    return RouteDecisionMode.AUTO
+
+
+def _route_justification(
+    page_decision: PageDecision,
+    route_name: PageRouteName,
+    decision_mode: RouteDecisionMode,
+    confidence_score: float,
+    preprocessing_action: PagePreprocessingAction,
+) -> str:
+    parsed_page_decision = _ensure_page_decision(page_decision)
+    parsed_route_name = PageRouteName.from_value(route_name)
+    parsed_decision_mode = RouteDecisionMode.from_value(decision_mode)
+    parsed_preprocessing_action = PagePreprocessingAction.from_value(
+        preprocessing_action
+    )
+    _ensure_route_confidence_score(confidence_score)
+    if parsed_preprocessing_action is PagePreprocessingAction.OCR_PHYSICAL_PREPROCESSING:
+        preprocessing_label = "prétraitement OCRmyPDF conditionnel"
+    else:
+        preprocessing_label = "sans prétraitement"
+    return (
+        f"{parsed_page_decision.page_state.value} -> {parsed_route_name.value} "
+        f"en {parsed_decision_mode.value}; score {confidence_score:.2f}; "
+        f"{preprocessing_label}; diagnostic: {parsed_page_decision.justification}"
+    )
+
+
+def _dominant_route_name(page_routes: tuple[PageRoute, ...]) -> PageRouteName | None:
+    parsed_page_routes = _ensure_page_routes(page_routes)
+    route_counts: dict[PageRouteName, int] = {}
+    for page_route in parsed_page_routes:
+        route_counts[page_route.route_name] = route_counts.get(page_route.route_name, 0) + 1
+
+    highest_count = max(route_counts.values())
+    dominant_candidates = tuple(
+        route_name
+        for route_name, route_count in route_counts.items()
+        if route_count == highest_count
+    )
+    if len(dominant_candidates) != 1:
+        return None
+    return dominant_candidates[0]
 
 
 def _ensure_processing_run_id(value: ProcessingRunId) -> ProcessingRunId:
@@ -639,12 +1376,46 @@ def _ensure_diagnostic_version(value: DiagnosticVersion) -> DiagnosticVersion:
     return value
 
 
+def _ensure_routing_policy_version(
+    value: RoutingPolicyVersion,
+) -> RoutingPolicyVersion:
+    if not isinstance(value, RoutingPolicyVersion):
+        raise ValueError("version de politique de routage invalide")
+    return value
+
+
+def _ensure_routing_configuration(
+    value: PageRoutingConfiguration,
+) -> PageRoutingConfiguration:
+    if not isinstance(value, PageRoutingConfiguration):
+        raise ValueError("configuration de routage invalide")
+    return value
+
+
 def _ensure_page_diagnostic_signals(
     value: PageDiagnosticSignals,
 ) -> PageDiagnosticSignals:
     if not isinstance(value, PageDiagnosticSignals):
         raise ValueError("signaux diagnostiques invalides")
     return value
+
+
+def _ensure_page_decision(value: PageDecision) -> PageDecision:
+    if not isinstance(value, PageDecision):
+        raise ValueError("diagnostic de page invalide")
+    return value
+
+
+def _ensure_route_plan(value: RoutePlan | None) -> RoutePlan:
+    if not isinstance(value, RoutePlan):
+        raise ValueError("plan de routage invalide")
+    return value
+
+
+def _ensure_route_plan_or_none(value: RoutePlan | None) -> RoutePlan | None:
+    if value is None:
+        return None
+    return _ensure_route_plan(value)
 
 
 def _ensure_source_document(value: SourceDocument) -> SourceDocument:
@@ -660,7 +1431,9 @@ __all__ = [
     "DocumentProcessingStarted",
     "ExistingOcrSignal",
     "LayoutComplexitySignal",
+    "ManualReviewRequested",
     "NativeTextSignal",
+    "PagePreprocessingAction",
     "PageCorruptionSignal",
     "PageDecision",
     "PageDecisionState",
@@ -672,5 +1445,15 @@ __all__ = [
     "PageManifestEntry",
     "PageManifestEntryState",
     "PageNumber",
+    "PageRoute",
+    "PageRouteDecided",
+    "PageRouteName",
+    "PageRoutingConfiguration",
+    "PageRoutingPolicy",
     "ProcessingRunId",
+    "RouteDecisionMode",
+    "RoutePlan",
+    "RoutePlanningOutcome",
+    "RoutePlanningResult",
+    "RoutingPolicyVersion",
 ]
