@@ -10,13 +10,17 @@ from typing import Any
 
 from app.contracts.identity import DomainIdentifier
 from app.source_processing.domain.document_processing_run import (
+    PageDecision,
     PageManifest,
     PageNumber,
+    RoutePlan,
     PageRouteName,
 )
 from app.source_processing.domain.source_document import (
     DocumentId,
     OriginalStorageRef,
+    SourceDocument,
+    SourceDocumentStatus,
     SourceFingerprint,
 )
 
@@ -65,6 +69,52 @@ class PageConversionItemLabel(str, Enum):
             if label.value == value:
                 return label
         raise ValueError("label d'item inconnu")
+
+
+class QualityDecisionStatus(str, Enum):
+    """Statut métier publié par les contrôles qualité M-004."""
+
+    PASS = "PASS"
+    PASS_WITH_WARNINGS = "PASS_WITH_WARNINGS"
+    RETRY_WITH_ALTERNATIVE_ROUTE = "RETRY_WITH_ALTERNATIVE_ROUTE"
+    MANUAL_REVIEW = "MANUAL_REVIEW"
+    QUARANTINE = "QUARANTINE"
+
+    @classmethod
+    def from_value(
+        cls,
+        value: "QualityDecisionStatus | str",
+    ) -> "QualityDecisionStatus":
+        if isinstance(value, cls):
+            return value
+        if not isinstance(value, str):
+            raise ValueError("statut QA inconnu")
+        for status in cls:
+            if status.value == value:
+                return status
+        raise ValueError("statut QA inconnu")
+
+
+class QualityFindingCode(str, Enum):
+    """Anomalie documentaire conservée sans contenu complet."""
+
+    PAGE_OMITTED = "PAGE_OMITTED"
+    NUMERIC_INCONSISTENCY = "NUMERIC_INCONSISTENCY"
+    NEGATIVE_SIGN_ALTERED = "NEGATIVE_SIGN_ALTERED"
+    INCOMPLETE_TABLE = "INCOMPLETE_TABLE"
+    SOURCE_QUARANTINED = "SOURCE_QUARANTINED"
+    WARNING_REVIEW_NOTE = "WARNING_REVIEW_NOTE"
+
+    @classmethod
+    def from_value(cls, value: "QualityFindingCode | str") -> "QualityFindingCode":
+        if isinstance(value, cls):
+            return value
+        if not isinstance(value, str):
+            raise ValueError("code d'anomalie QA inconnu")
+        for code in cls:
+            if code.value == value:
+                return code
+        raise ValueError("code d'anomalie QA inconnu")
 
 
 @dataclass(frozen=True)
@@ -466,6 +516,435 @@ class TextAuthoritySelectionPolicy:
 
 
 @dataclass(frozen=True)
+class CriticalPageReason:
+    """Raison explicite d'inclusion d'une page dans l'échantillon critique."""
+
+    page_number: PageNumber
+    reason: str
+
+    def __post_init__(self) -> None:
+        _ensure_page_number(self.page_number)
+        object.__setattr__(
+            self,
+            "reason",
+            _ensure_quality_text(self.reason, "raison de page critique obligatoire"),
+        )
+
+
+@dataclass(frozen=True)
+class CriticalPageSelection:
+    """Sélection versionnée des pages contrôlées avant conversion."""
+
+    policy_version: str
+    reasons: tuple[CriticalPageReason, ...]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "policy_version",
+            _ensure_quality_policy_version(self.policy_version),
+        )
+        reasons = _ensure_critical_page_reasons(self.reasons)
+        object.__setattr__(self, "reasons", reasons)
+
+    @property
+    def page_numbers(self) -> tuple[PageNumber, ...]:
+        pages_by_value = {reason.page_number.value: reason.page_number for reason in self.reasons}
+        return tuple(pages_by_value[page_value] for page_value in sorted(pages_by_value))
+
+    def reasons_for(self, page_number: PageNumber) -> tuple[str, ...]:
+        parsed_page_number = _ensure_page_number(page_number)
+        reasons = tuple(
+            reason.reason
+            for reason in self.reasons
+            if reason.page_number == parsed_page_number
+        )
+        if len(reasons) == 0:
+            raise ValueError("page critique absente")
+        return reasons
+
+    def to_audit_payload(self) -> dict[str, Any]:
+        return {
+            "policy_version": self.policy_version,
+            "pages": tuple(
+                {
+                    "page_pdf": page_number.value,
+                    "reasons": self.reasons_for(page_number),
+                }
+                for page_number in self.page_numbers
+            ),
+        }
+
+
+@dataclass(frozen=True)
+class CriticalPageSamplingPolicy:
+    """Politique pré-conversion de sélection explicite des pages critiques."""
+
+    policy_version: str
+    low_confidence_threshold: float
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "policy_version",
+            _ensure_quality_policy_version(self.policy_version),
+        )
+        object.__setattr__(
+            self,
+            "low_confidence_threshold",
+            _ensure_quality_confidence_threshold(self.low_confidence_threshold),
+        )
+
+    def select(
+        self,
+        *,
+        page_manifest: PageManifest,
+        page_diagnostics: Sequence[PageDecision],
+        route_plan: RoutePlan,
+    ) -> CriticalPageSelection:
+        parsed_page_manifest = _ensure_page_manifest(page_manifest)
+        diagnostics = _ensure_page_diagnostics(page_diagnostics)
+        parsed_route_plan = _ensure_route_plan(route_plan)
+        _ensure_diagnostics_cover_manifest(
+            page_manifest=parsed_page_manifest,
+            page_diagnostics=diagnostics,
+        )
+        _ensure_route_plan_covers_manifest(
+            page_manifest=parsed_page_manifest,
+            route_plan=parsed_route_plan,
+        )
+
+        reasons: list[CriticalPageReason] = []
+        manifest_page_numbers = tuple(entry.page_number for entry in parsed_page_manifest.entries)
+        for page_number, reason in _sampling_position_reasons(manifest_page_numbers):
+            reasons.append(CriticalPageReason(page_number=page_number, reason=reason))
+
+        for diagnostic in diagnostics:
+            if diagnostic.signals.has_table:
+                reasons.append(CriticalPageReason(page_number=diagnostic.page_number, reason="TABLE"))
+            if diagnostic.signals.has_formula:
+                reasons.append(CriticalPageReason(page_number=diagnostic.page_number, reason="FORMULA"))
+            if diagnostic.signals.native_text_state.value == "SUSPECT":
+                reasons.append(
+                    CriticalPageReason(page_number=diagnostic.page_number, reason="LOW_CONFIDENCE")
+                )
+
+        for page_route in parsed_route_plan.page_routes:
+            if page_route.confidence_score < self.low_confidence_threshold:
+                reasons.append(
+                    CriticalPageReason(page_number=page_route.page_number, reason="LOW_CONFIDENCE")
+                )
+            if page_route.route_name is not parsed_route_plan.dominant_route_name:
+                reasons.append(
+                    CriticalPageReason(page_number=page_route.page_number, reason="MINORITY_ROUTE")
+                )
+
+        return CriticalPageSelection(
+            policy_version=self.policy_version,
+            reasons=_deduplicate_critical_page_reasons(reasons),
+        )
+
+
+@dataclass(frozen=True)
+class PreConversionRouteComparison:
+    """Comparaison explicite de route avant conversion."""
+
+    page_number: PageNumber
+    current_route_name: PageRouteName
+    alternative_route_name: PageRouteName | None
+    status: QualityDecisionStatus
+    justification: str
+
+    def __post_init__(self) -> None:
+        _ensure_page_number(self.page_number)
+        object.__setattr__(self, "current_route_name", PageRouteName.from_value(self.current_route_name))
+        if self.alternative_route_name is not None:
+            object.__setattr__(
+                self,
+                "alternative_route_name",
+                PageRouteName.from_value(self.alternative_route_name),
+            )
+            if self.alternative_route_name is self.current_route_name:
+                raise ValueError("route alternative incohérente")
+        object.__setattr__(self, "status", QualityDecisionStatus.from_value(self.status))
+        if (
+            self.status is QualityDecisionStatus.RETRY_WITH_ALTERNATIVE_ROUTE
+            and self.alternative_route_name is None
+        ):
+            raise ValueError("route alternative obligatoire")
+        object.__setattr__(
+            self,
+            "justification",
+            _ensure_quality_text(self.justification, "justification QA obligatoire"),
+        )
+
+    def to_audit_payload(self) -> dict[str, Any]:
+        return {
+            "page_pdf": self.page_number.value,
+            "current_route_name": self.current_route_name.value,
+            "alternative_route_name": (
+                None if self.alternative_route_name is None else self.alternative_route_name.value
+            ),
+            "status": self.status.value,
+            "justification": self.justification,
+        }
+
+
+@dataclass(frozen=True)
+class PreConversionQualityReport:
+    """Rapport QA obligatoire avant conversion."""
+
+    policy_version: str
+    critical_page_selection: CriticalPageSelection
+    route_comparisons: tuple[PreConversionRouteComparison, ...]
+    status: QualityDecisionStatus
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "policy_version",
+            _ensure_quality_policy_version(self.policy_version),
+        )
+        if not isinstance(self.critical_page_selection, CriticalPageSelection):
+            raise ValueError("sélection de pages critiques obligatoire")
+        object.__setattr__(
+            self,
+            "route_comparisons",
+            _ensure_route_comparisons(self.route_comparisons),
+        )
+        object.__setattr__(self, "status", QualityDecisionStatus.from_value(self.status))
+        if self.status is QualityDecisionStatus.RETRY_WITH_ALTERNATIVE_ROUTE:
+            if not any(
+                comparison.status is QualityDecisionStatus.RETRY_WITH_ALTERNATIVE_ROUTE
+                for comparison in self.route_comparisons
+            ):
+                raise ValueError("comparaison de route obligatoire")
+
+    def to_audit_payload(self) -> dict[str, Any]:
+        return {
+            "policy_version": self.policy_version,
+            "critical_page_selection": self.critical_page_selection.to_audit_payload(),
+            "route_comparisons": tuple(
+                comparison.to_audit_payload() for comparison in self.route_comparisons
+            ),
+            "status": self.status.value,
+        }
+
+
+@dataclass(frozen=True)
+class PostConversionQualityFinding:
+    """Anomalie QA post-conversion conservée pour refus ou audit."""
+
+    code: QualityFindingCode
+    page_number: PageNumber
+    item_id: str
+    expected: str
+    actual: str
+    detail: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "code", QualityFindingCode.from_value(self.code))
+        _ensure_page_number(self.page_number)
+        object.__setattr__(self, "item_id", _ensure_quality_text(self.item_id, "item_id QA obligatoire"))
+        object.__setattr__(self, "expected", _ensure_quality_text(self.expected, "valeur attendue QA obligatoire"))
+        object.__setattr__(self, "actual", _ensure_quality_text(self.actual, "valeur actuelle QA obligatoire"))
+        object.__setattr__(self, "detail", _ensure_quality_text(self.detail, "détail QA obligatoire"))
+
+    @property
+    def blocking(self) -> bool:
+        return self.code is not QualityFindingCode.WARNING_REVIEW_NOTE
+
+    def to_audit_payload(self) -> dict[str, Any]:
+        return {
+            "code": self.code.value,
+            "page_pdf": self.page_number.value,
+            "item_id": self.item_id,
+        }
+
+
+@dataclass(frozen=True)
+class PostConversionQualityReport:
+    """Rapport QA obligatoire après conversion."""
+
+    policy_version: str
+    findings: tuple[PostConversionQualityFinding, ...]
+    status: QualityDecisionStatus
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "policy_version",
+            _ensure_quality_policy_version(self.policy_version),
+        )
+        findings = _ensure_post_conversion_findings(self.findings)
+        object.__setattr__(self, "findings", findings)
+        object.__setattr__(self, "status", QualityDecisionStatus.from_value(self.status))
+        if self.status is QualityDecisionStatus.PASS and len(findings) > 0:
+            raise ValueError("rapport QA post-conversion incohérent")
+        if self.status is QualityDecisionStatus.PASS_WITH_WARNINGS:
+            if len(findings) == 0 or any(finding.blocking for finding in findings):
+                raise ValueError("rapport QA post-conversion incohérent")
+        if self.status is QualityDecisionStatus.MANUAL_REVIEW:
+            if not any(finding.blocking for finding in findings):
+                raise ValueError("rapport QA post-conversion incohérent")
+
+    def to_audit_payload(self) -> dict[str, Any]:
+        return {
+            "policy_version": self.policy_version,
+            "status": self.status.value,
+            "findings": tuple(finding.to_audit_payload() for finding in self.findings),
+        }
+
+
+@dataclass(frozen=True)
+class CanonicalQualityDecision:
+    """Décision d'acceptation canonique issue des deux rapports QA."""
+
+    policy_version: str
+    status: QualityDecisionStatus
+    publication_allowed: bool
+    findings: tuple[PostConversionQualityFinding, ...]
+    publication_events: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "policy_version",
+            _ensure_quality_policy_version(self.policy_version),
+        )
+        object.__setattr__(self, "status", QualityDecisionStatus.from_value(self.status))
+        _ensure_bool(self.publication_allowed, "publication_allowed")
+        object.__setattr__(self, "findings", _ensure_post_conversion_findings(self.findings))
+        object.__setattr__(self, "publication_events", _ensure_publication_events(self.publication_events))
+        if self.publication_allowed and self.status not in {
+            QualityDecisionStatus.PASS,
+            QualityDecisionStatus.PASS_WITH_WARNINGS,
+        }:
+            raise ValueError("décision QA incohérente")
+        if not self.publication_allowed and self.status in {
+            QualityDecisionStatus.PASS,
+            QualityDecisionStatus.PASS_WITH_WARNINGS,
+        }:
+            raise ValueError("décision QA incohérente")
+
+    def to_audit_payload(self) -> dict[str, Any]:
+        return {
+            "policy_version": self.policy_version,
+            "status": self.status.value,
+            "publication_allowed": self.publication_allowed,
+            "findings": tuple(finding.to_audit_payload() for finding in self.findings),
+            "publication_event_count": len(self.publication_events),
+        }
+
+
+@dataclass(frozen=True)
+class CanonicalAcceptancePolicy:
+    """Politique qui décide si une candidate peut devenir canonique."""
+
+    policy_version: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "policy_version",
+            _ensure_quality_policy_version(self.policy_version),
+        )
+
+    def evaluate_post_conversion(
+        self,
+        *,
+        page_manifest: PageManifest,
+        text_authority_manifest: TextAuthorityManifest,
+        docling_document: PagewiseDoclingDocument,
+        findings: Sequence[PostConversionQualityFinding],
+    ) -> PostConversionQualityReport:
+        parsed_page_manifest = _ensure_page_manifest(page_manifest)
+        parsed_text_authority_manifest = _ensure_text_authority_manifest(text_authority_manifest)
+        if not isinstance(docling_document, PagewiseDoclingDocument):
+            raise ValueError("DoclingDocument QA invalide")
+        _ensure_text_authority_manifest_covers_page_manifest(
+            page_manifest=parsed_page_manifest,
+            page_decisions=parsed_text_authority_manifest.page_decisions,
+        )
+        parsed_findings = _ensure_post_conversion_findings(findings)
+        generated_findings = _page_omission_findings(
+            page_manifest=parsed_page_manifest,
+            docling_document=docling_document,
+        )
+        all_findings = generated_findings + parsed_findings
+        return PostConversionQualityReport(
+            policy_version=self.policy_version,
+            findings=all_findings,
+            status=_post_conversion_status_for(all_findings),
+        )
+
+    def decide(
+        self,
+        *,
+        source_document: SourceDocument,
+        page_manifest: PageManifest,
+        text_authority_manifest: TextAuthorityManifest,
+        pre_conversion_report: PreConversionQualityReport | None,
+        post_conversion_report: PostConversionQualityReport | None,
+    ) -> CanonicalQualityDecision:
+        parsed_source_document = _ensure_source_document(source_document)
+        parsed_page_manifest = _ensure_page_manifest(page_manifest)
+        parsed_text_authority_manifest = _ensure_text_authority_manifest(text_authority_manifest)
+        parsed_pre_report = _ensure_pre_conversion_report(pre_conversion_report)
+        parsed_post_report = _ensure_post_conversion_report(post_conversion_report)
+        _ensure_report_policy_matches(
+            policy_version=self.policy_version,
+            report_policy_version=parsed_pre_report.policy_version,
+            message="rapport QA pré-conversion incohérent",
+        )
+        _ensure_report_policy_matches(
+            policy_version=self.policy_version,
+            report_policy_version=parsed_post_report.policy_version,
+            message="rapport QA post-conversion incohérent",
+        )
+        _ensure_text_authority_manifest_covers_page_manifest(
+            page_manifest=parsed_page_manifest,
+            page_decisions=parsed_text_authority_manifest.page_decisions,
+        )
+
+        findings = parsed_post_report.findings
+        if parsed_source_document.status is SourceDocumentStatus.QUARANTINED:
+            findings = findings + (
+                PostConversionQualityFinding(
+                    code=QualityFindingCode.SOURCE_QUARANTINED,
+                    page_number=parsed_page_manifest.entries[0].page_number,
+                    item_id="SOURCE",
+                    expected="REGISTERED",
+                    actual="QUARANTINED",
+                    detail="Source documentaire en quarantaine.",
+                ),
+            )
+            return CanonicalQualityDecision(
+                policy_version=self.policy_version,
+                status=QualityDecisionStatus.QUARANTINE,
+                publication_allowed=False,
+                findings=findings,
+                publication_events=(),
+            )
+
+        status = _canonical_decision_status(
+            pre_conversion_status=parsed_pre_report.status,
+            post_conversion_status=parsed_post_report.status,
+        )
+        publication_allowed = status in {
+            QualityDecisionStatus.PASS,
+            QualityDecisionStatus.PASS_WITH_WARNINGS,
+        }
+        return CanonicalQualityDecision(
+            policy_version=self.policy_version,
+            status=status,
+            publication_allowed=publication_allowed,
+            findings=findings,
+            publication_events=(),
+        )
+
+
+@dataclass(frozen=True)
 class PreprocessedPageArtifact:
     """Artefact OCRmyPDF conditionnel produit avant Granite-Docling."""
 
@@ -759,6 +1238,246 @@ def _canonical_item_from_conversion_item(
         content_hash=conversion_item.content_hash,
         provenance=provenance,
     )
+
+
+def _ensure_bool(value: Any, field_name: str) -> bool:
+    if not isinstance(value, bool):
+        raise ValueError(f"{field_name} invalide")
+    return value
+
+
+def _ensure_quality_text(value: Any, message: str) -> str:
+    return _ensure_text(value, message)
+
+
+def _ensure_quality_policy_version(value: Any) -> str:
+    return _ensure_text(value, "version de politique QA obligatoire")
+
+
+def _ensure_quality_confidence_threshold(value: Any) -> float:
+    number = _ensure_finite_number(value, "seuil de confiance critique invalide")
+    if number <= 0 or number > 1:
+        raise ValueError("seuil de confiance critique invalide")
+    return number
+
+
+def _ensure_critical_page_reasons(
+    value: Sequence[CriticalPageReason],
+) -> tuple[CriticalPageReason, ...]:
+    if value is None:
+        raise ValueError("raisons de pages critiques absentes")
+    if isinstance(value, str) or not isinstance(value, Sequence):
+        raise ValueError("raisons de pages critiques invalides")
+    reasons = tuple(value)
+    if len(reasons) == 0:
+        raise ValueError("raisons de pages critiques vides")
+    for reason in reasons:
+        if not isinstance(reason, CriticalPageReason):
+            raise ValueError("raison de page critique invalide")
+    reason_keys = tuple((reason.page_number.value, reason.reason) for reason in reasons)
+    if len(reason_keys) != len(set(reason_keys)):
+        raise ValueError("raison de page critique dupliquée")
+    return reasons
+
+
+def _deduplicate_critical_page_reasons(
+    reasons: Sequence[CriticalPageReason],
+) -> tuple[CriticalPageReason, ...]:
+    reason_by_key: dict[tuple[int, str], CriticalPageReason] = {}
+    for reason in reasons:
+        reason_by_key[(reason.page_number.value, reason.reason)] = reason
+    return tuple(reason_by_key[key] for key in sorted(reason_by_key))
+
+
+def _sampling_position_reasons(
+    page_numbers: tuple[PageNumber, ...],
+) -> tuple[tuple[PageNumber, str], ...]:
+    page_count = len(page_numbers)
+    first_quarter_index = math.ceil(page_count * 0.25) - 1
+    center_index = math.ceil(page_count * 0.50) - 1
+    last_quarter_index = math.ceil(page_count * 0.75) - 1
+    return (
+        (page_numbers[0], "FIRST_CONTENT"),
+        (page_numbers[first_quarter_index], "FIRST_QUARTER"),
+        (page_numbers[center_index], "CENTER"),
+        (page_numbers[last_quarter_index], "LAST_QUARTER"),
+        (page_numbers[-1], "FINAL_PAGE"),
+    )
+
+
+def _ensure_page_diagnostics(
+    value: Sequence[PageDecision],
+) -> tuple[PageDecision, ...]:
+    if value is None:
+        raise ValueError("diagnostics de pages absents")
+    if isinstance(value, str) or not isinstance(value, Sequence):
+        raise ValueError("diagnostics de pages invalides")
+    diagnostics = tuple(value)
+    if len(diagnostics) == 0:
+        raise ValueError("diagnostics de pages vides")
+    for diagnostic in diagnostics:
+        if not isinstance(diagnostic, PageDecision):
+            raise ValueError("diagnostic de page invalide")
+    page_values = tuple(diagnostic.page_number.value for diagnostic in diagnostics)
+    if len(page_values) != len(set(page_values)):
+        raise ValueError("diagnostic de page dupliqué")
+    return diagnostics
+
+
+def _ensure_route_plan(value: Any) -> RoutePlan:
+    if not isinstance(value, RoutePlan):
+        raise ValueError("plan de routage invalide")
+    return value
+
+
+def _ensure_diagnostics_cover_manifest(
+    *,
+    page_manifest: PageManifest,
+    page_diagnostics: tuple[PageDecision, ...],
+) -> None:
+    expected_pages = tuple(entry.page_number.value for entry in page_manifest.entries)
+    actual_pages = tuple(diagnostic.page_number.value for diagnostic in page_diagnostics)
+    if set(actual_pages) != set(expected_pages):
+        raise ValueError("diagnostics de pages incomplets")
+
+
+def _ensure_route_plan_covers_manifest(
+    *,
+    page_manifest: PageManifest,
+    route_plan: RoutePlan,
+) -> None:
+    expected_pages = tuple(entry.page_number.value for entry in page_manifest.entries)
+    actual_pages = tuple(page_route.page_number.value for page_route in route_plan.page_routes)
+    if set(actual_pages) != set(expected_pages):
+        raise ValueError("plan de routage incomplet")
+
+
+def _ensure_route_comparisons(
+    value: Sequence[PreConversionRouteComparison],
+) -> tuple[PreConversionRouteComparison, ...]:
+    if value is None:
+        raise ValueError("comparaisons de routes absentes")
+    if isinstance(value, str) or not isinstance(value, Sequence):
+        raise ValueError("comparaisons de routes invalides")
+    comparisons = tuple(value)
+    for comparison in comparisons:
+        if not isinstance(comparison, PreConversionRouteComparison):
+            raise ValueError("comparaison de route invalide")
+    comparison_pages = tuple(comparison.page_number.value for comparison in comparisons)
+    if len(comparison_pages) != len(set(comparison_pages)):
+        raise ValueError("comparaison de route dupliquée")
+    return comparisons
+
+
+def _ensure_post_conversion_findings(
+    value: Sequence[PostConversionQualityFinding],
+) -> tuple[PostConversionQualityFinding, ...]:
+    if value is None:
+        raise ValueError("anomalies QA absentes")
+    if isinstance(value, str) or not isinstance(value, Sequence):
+        raise ValueError("anomalies QA invalides")
+    findings = tuple(value)
+    for finding in findings:
+        if not isinstance(finding, PostConversionQualityFinding):
+            raise ValueError("anomalie QA invalide")
+    return findings
+
+
+def _ensure_publication_events(value: Sequence[str]) -> tuple[str, ...]:
+    if value is None:
+        raise ValueError("événements de publication absents")
+    if isinstance(value, str) or not isinstance(value, Sequence):
+        raise ValueError("événements de publication invalides")
+    events = tuple(_ensure_quality_text(event, "événement de publication invalide") for event in value)
+    return events
+
+
+def _ensure_source_document(value: Any) -> SourceDocument:
+    if not isinstance(value, SourceDocument):
+        raise ValueError("source_document QA invalide")
+    return value
+
+
+def _ensure_pre_conversion_report(value: Any) -> PreConversionQualityReport:
+    if value is None:
+        raise ValueError("rapport QA pré-conversion obligatoire")
+    if not isinstance(value, PreConversionQualityReport):
+        raise ValueError("rapport QA pré-conversion invalide")
+    return value
+
+
+def _ensure_post_conversion_report(value: Any) -> PostConversionQualityReport:
+    if value is None:
+        raise ValueError("rapport QA post-conversion obligatoire")
+    if not isinstance(value, PostConversionQualityReport):
+        raise ValueError("rapport QA post-conversion invalide")
+    return value
+
+
+def _ensure_report_policy_matches(
+    *,
+    policy_version: str,
+    report_policy_version: str,
+    message: str,
+) -> None:
+    if report_policy_version != policy_version:
+        raise ValueError(message)
+
+
+def _page_omission_findings(
+    *,
+    page_manifest: PageManifest,
+    docling_document: PagewiseDoclingDocument,
+) -> tuple[PostConversionQualityFinding, ...]:
+    expected_pages = tuple(entry.page_number.value for entry in page_manifest.entries)
+    actual_pages = tuple(page.page_number.value for page in docling_document.pages)
+    missing_pages = tuple(page for page in expected_pages if page not in set(actual_pages))
+    return tuple(
+        PostConversionQualityFinding(
+            code=QualityFindingCode.PAGE_OMITTED,
+            page_number=PageNumber.from_value(page_value),
+            item_id=f"PAGE-{page_value:03d}",
+            expected="PRESENT",
+            actual="ABSENT",
+            detail="Page absente du DoclingDocument.",
+        )
+        for page_value in missing_pages
+    )
+
+
+def _post_conversion_status_for(
+    findings: tuple[PostConversionQualityFinding, ...],
+) -> QualityDecisionStatus:
+    if len(findings) == 0:
+        return QualityDecisionStatus.PASS
+    if all(not finding.blocking for finding in findings):
+        return QualityDecisionStatus.PASS_WITH_WARNINGS
+    return QualityDecisionStatus.MANUAL_REVIEW
+
+
+def _canonical_decision_status(
+    *,
+    pre_conversion_status: QualityDecisionStatus,
+    post_conversion_status: QualityDecisionStatus,
+) -> QualityDecisionStatus:
+    if (
+        pre_conversion_status is QualityDecisionStatus.QUARANTINE
+        or post_conversion_status is QualityDecisionStatus.QUARANTINE
+    ):
+        return QualityDecisionStatus.QUARANTINE
+    if pre_conversion_status is QualityDecisionStatus.RETRY_WITH_ALTERNATIVE_ROUTE:
+        return QualityDecisionStatus.RETRY_WITH_ALTERNATIVE_ROUTE
+    if (
+        pre_conversion_status is QualityDecisionStatus.MANUAL_REVIEW
+        or post_conversion_status is QualityDecisionStatus.MANUAL_REVIEW
+    ):
+        return QualityDecisionStatus.MANUAL_REVIEW
+    if (
+        pre_conversion_status is QualityDecisionStatus.PASS_WITH_WARNINGS
+        or post_conversion_status is QualityDecisionStatus.PASS_WITH_WARNINGS
+    ):
+        return QualityDecisionStatus.PASS_WITH_WARNINGS
+    return QualityDecisionStatus.PASS
 
 
 def _ensure_text(value: Any, message: str) -> str:
@@ -1140,10 +1859,15 @@ def _ensure_original_storage_ref(value: Any) -> OriginalStorageRef:
 
 
 __all__ = [
+    "CanonicalAcceptancePolicy",
     "CanonicalDocumentItem",
     "CanonicalDocumentPage",
     "CanonicalItemProvenance",
+    "CanonicalQualityDecision",
     "ConversionToolName",
+    "CriticalPageReason",
+    "CriticalPageSamplingPolicy",
+    "CriticalPageSelection",
     "PageConversionArtifact",
     "PageConversionCandidate",
     "PageConversionItem",
@@ -1151,7 +1875,13 @@ __all__ = [
     "PageItemGeometry",
     "PagewiseDoclingDocument",
     "PagewiseDoclingFusionService",
+    "PostConversionQualityFinding",
+    "PostConversionQualityReport",
+    "PreConversionQualityReport",
+    "PreConversionRouteComparison",
     "PreprocessedPageArtifact",
+    "QualityDecisionStatus",
+    "QualityFindingCode",
     "TextAuthority",
     "TextAuthorityManifest",
     "TextAuthorityPageDecision",

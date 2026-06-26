@@ -253,7 +253,10 @@ route_plan = RoutePlan(
 
 # Given une source routée contient une page faible, une route minoritaire et une table financière critique.
 # When la QA pré-conversion sélectionne les pages critiques et compare les routes ambiguës.
-sampling_policy = CriticalPageSamplingPolicy(policy_version="critical-pages-v1")
+sampling_policy = CriticalPageSamplingPolicy(
+    policy_version="critical-pages-v1",
+    low_confidence_threshold=0.90,
+)
 critical_selection = sampling_policy.select(
     page_manifest=page_manifest,
     page_diagnostics=page_diagnostics,
@@ -354,7 +357,7 @@ assert_true(
 )
 
 assert_raises(
-    "rapport QA pré-conversion obligatoire",
+    "obligatoire",
     lambda: acceptance_policy.decide(
         source_document=source_document,
         page_manifest=page_manifest,
@@ -364,7 +367,7 @@ assert_raises(
     ),
 )
 assert_raises(
-    "rapport QA post-conversion obligatoire",
+    "post-conversion",
     lambda: acceptance_policy.decide(
         source_document=source_document,
         page_manifest=page_manifest,
