@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
 $validatorPath = Join-Path $repoRoot "scripts/validate_m003_precondition.ps1"
@@ -122,3 +122,4 @@ finally {
 }
 
 Write-Host "Test d'acceptation de précondition M-003: OK"
+

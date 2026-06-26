@@ -1,35 +1,35 @@
-﻿# Rapport de prÃ©condition GREEN M-003
+﻿# Rapport de précondition GREEN M-003
 
-## ScÃ©nario BDD
+## Scénario BDD
 
-- Given M-000, M-001 et M-002 sont prÃ©sents dans `master`.
-- When les gates de validation sont exÃ©cutÃ©es avant la premiÃ¨re tÃ¢che mÃ©tier M-003.
-- Then M-003 peut commencer uniquement si `test`, `lint`, la traÃ§abilitÃ©, les ADR et les frontiÃ¨res d'architecture sont GREEN.
+- Given M-000, M-001 et M-002 sont présents dans `master`.
+- When les gates de validation sont exécutées avant la première tâche métier M-003.
+- Then M-003 peut commencer uniquement si `test`, `lint`, la traçabilité, les ADR et les frontières d'architecture sont GREEN.
 
-## RÃ©sultat
+## Résultat
 
 - Statut: `GREEN`
 - Branche attendue: `codex/milestone-m003-source-routee`
 
-## VÃ©rifications Git
+## Vérifications Git
 
-| Ã‰lÃ©ment | Commande | Date UTC | RÃ©sultat | Observation |
+| Élément | Commande | Date UTC | Résultat | Observation |
 |---|---|---|---|---|
-| `branche courante` | `git rev-parse --abbrev-ref HEAD` | `2026-06-26T10:45:21Z` | `GREEN` | Branche M-003 attendue active: codex/milestone-m003-source-routee |
-| `master local` | `git rev-parse --verify master^{commit}` | `2026-06-26T10:45:21Z` | `GREEN` | RÃ©vision locale master: 1d3d4896a4bd89818d3457cdd0174b517d588b8e |
-| `origin/master` | `git rev-parse --verify origin/master^{commit}` | `2026-06-26T10:45:21Z` | `GREEN` | RÃ©vision origin/master: 1d3d4896a4bd89818d3457cdd0174b517d588b8e |
-| `master synchronisÃ©` | `git rev-parse master origin/master` | `2026-06-26T10:45:21Z` | `GREEN` | master et origin/master pointent sur la mÃªme rÃ©vision. |
-| `branche contient master` | `git merge-base --is-ancestor master HEAD` | `2026-06-26T10:45:21Z` | `GREEN` | La branche courante contient la rÃ©vision locale master. |
-| `docs/tasks/milestone_000 dans master` | `git ls-tree -r --name-only master -- docs/tasks/milestone_000` | `2026-06-26T10:45:21Z` | `GREEN` | Milestone amont prÃ©sent dans master: docs/tasks/milestone_000 |
-| `docs/tasks/milestone_001 dans master` | `git ls-tree -r --name-only master -- docs/tasks/milestone_001` | `2026-06-26T10:45:21Z` | `GREEN` | Milestone amont prÃ©sent dans master: docs/tasks/milestone_001 |
-| `docs/tasks/milestone_002 dans master` | `git ls-tree -r --name-only master -- docs/tasks/milestone_002` | `2026-06-26T10:45:21Z` | `GREEN` | Milestone amont prÃ©sent dans master: docs/tasks/milestone_002 |
+| `branche courante` | `git rev-parse --abbrev-ref HEAD` | `2026-06-26T11:12:19Z` | `GREEN` | Branche M-003 attendue active: codex/milestone-m003-source-routee |
+| `master local` | `git rev-parse --verify master^{commit}` | `2026-06-26T11:12:19Z` | `GREEN` | Révision locale master: 1d3d4896a4bd89818d3457cdd0174b517d588b8e |
+| `origin/master` | `git rev-parse --verify origin/master^{commit}` | `2026-06-26T11:12:19Z` | `GREEN` | Révision origin/master: 1d3d4896a4bd89818d3457cdd0174b517d588b8e |
+| `master synchronisé` | `git rev-parse master origin/master` | `2026-06-26T11:12:19Z` | `GREEN` | master et origin/master pointent sur la même révision. |
+| `branche contient master` | `git merge-base --is-ancestor master HEAD` | `2026-06-26T11:12:19Z` | `GREEN` | La branche courante contient la révision locale master. |
+| `docs/tasks/milestone_000 dans master` | `git ls-tree -r --name-only master -- docs/tasks/milestone_000` | `2026-06-26T11:12:19Z` | `GREEN` | Milestone amont présent dans master: docs/tasks/milestone_000 |
+| `docs/tasks/milestone_001 dans master` | `git ls-tree -r --name-only master -- docs/tasks/milestone_001` | `2026-06-26T11:12:19Z` | `GREEN` | Milestone amont présent dans master: docs/tasks/milestone_001 |
+| `docs/tasks/milestone_002 dans master` | `git ls-tree -r --name-only master -- docs/tasks/milestone_002` | `2026-06-26T11:12:19Z` | `GREEN` | Milestone amont présent dans master: docs/tasks/milestone_002 |
 
-## Gates exÃ©cutÃ©es
+## Gates exécutées
 
-| Ã‰lÃ©ment | Commande | Date UTC | RÃ©sultat | Observation |
+| Élément | Commande | Date UTC | Résultat | Observation |
 |---|---|---|---|---|
-| `test` | `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1` | `2026-06-26T10:47:00Z` | `GREEN` | Gate test GREEN. |
-| `lint` | `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1` | `2026-06-26T10:47:05Z` | `GREEN` | Gate lint GREEN. |
+| `test` | `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1` | `2026-06-26T11:14:09Z` | `GREEN` | Gate test GREEN. |
+| `lint` | `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1` | `2026-06-26T11:14:15Z` | `GREEN` | Gate lint GREEN. |
 
 ## Sorties des gates
 
@@ -57,6 +57,9 @@ Validation GREEN: scripts/validate_m001_specification.ps1
 Validation requise: scripts/validate_m002_specification.ps1
 Spécification M-002 valide: 8 règle(s), 6 placement(s) contrôlé(s).
 Validation GREEN: scripts/validate_m002_specification.ps1
+Validation requise: scripts/validate_m003_specification.ps1
+Spécification M-003 valide: 7 comportement(s), 5 politique(s), 6 état(s) contrôlé(s).
+Validation GREEN: scripts/validate_m003_specification.ps1
 Validation requise: scripts/validate_platform_topology.ps1
 Topologie M-002 valide: 2 hôte(s), 19 service(s) contrôlé(s).
 Validation GREEN: scripts/validate_platform_topology.ps1
@@ -222,7 +225,13 @@ Test GREEN: tests/m002/validate_m002_traceability_acceptance.ps1
 Test requis: tests/m002/validate_m002_traceability_unit.ps1
 Tests unitaires de traçabilité M-002: OK
 Test GREEN: tests/m002/validate_m002_traceability_unit.ps1
-Gate test GREEN: 11 validation(s), 51 test(s).
+Test requis: tests/m003/validate_m003_specification_acceptance.ps1
+Test d'acceptation de la spécification M-003: OK
+Test GREEN: tests/m003/validate_m003_specification_acceptance.ps1
+Test requis: tests/m003/validate_m003_specification_unit.ps1
+Tests unitaires du validateur de spécification M-003: OK
+Test GREEN: tests/m003/validate_m003_specification_unit.ps1
+Gate test GREEN: 12 validation(s), 53 test(s).
 ~~~
 
 ### lint
@@ -249,6 +258,9 @@ Validation GREEN: scripts/validate_m001_specification.ps1
 Validation requise: scripts/validate_m002_specification.ps1
 Spécification M-002 valide: 8 règle(s), 6 placement(s) contrôlé(s).
 Validation GREEN: scripts/validate_m002_specification.ps1
+Validation requise: scripts/validate_m003_specification.ps1
+Spécification M-003 valide: 7 comportement(s), 5 politique(s), 6 état(s) contrôlé(s).
+Validation GREEN: scripts/validate_m003_specification.ps1
 Validation requise: scripts/validate_platform_topology.ps1
 Topologie M-002 valide: 2 hôte(s), 19 service(s) contrôlé(s).
 Validation GREEN: scripts/validate_platform_topology.ps1
@@ -261,5 +273,5 @@ Validation GREEN: scripts/validate_network_boundary.ps1
 Validation requise: scripts/validate_architecture_boundaries.ps1
 Frontières d'import M-001 valides: 49 fichier(s), 129 import(s) contrôlé(s).
 Validation GREEN: scripts/validate_architecture_boundaries.ps1
-Gate lint GREEN: 11 validation(s), 0 test(s).
+Gate lint GREEN: 12 validation(s), 0 test(s).
 ~~~
