@@ -1,0 +1,676 @@
+"""Sorties pagewise M-004 et fusion locale vers document structuré."""
+
+from __future__ import annotations
+
+import math
+from collections.abc import Sequence
+from dataclasses import dataclass
+from enum import Enum
+from typing import Any
+
+from app.contracts.identity import DomainIdentifier
+from app.source_processing.domain.document_processing_run import (
+    PageManifest,
+    PageNumber,
+    PageRouteName,
+)
+from app.source_processing.domain.source_document import (
+    DocumentId,
+    OriginalStorageRef,
+    SourceFingerprint,
+)
+
+
+_SOURCE_LOCATOR_SCHEMA_VERSION = "1.0"
+
+
+class ConversionToolName(str, Enum):
+    """Outil documentaire réellement exécuté pour une page."""
+
+    DOCLING_STANDARD = "DOCLING_STANDARD"
+    GRANITE_DOCLING = "GRANITE_DOCLING"
+    OCRMYPDF = "OCRMYPDF"
+
+    @classmethod
+    def from_value(cls, value: "ConversionToolName | str") -> "ConversionToolName":
+        if isinstance(value, cls):
+            return value
+        if not isinstance(value, str):
+            raise ValueError("outil de conversion inconnu")
+        for tool_name in cls:
+            if tool_name.value == value:
+                return tool_name
+        raise ValueError("outil de conversion inconnu")
+
+
+class PageConversionItemLabel(str, Enum):
+    """Label minimal conservé dans le document structuré local."""
+
+    TEXT = "TEXT"
+    TABLE = "TABLE"
+    FIGURE = "FIGURE"
+
+    @classmethod
+    def from_value(
+        cls,
+        value: "PageConversionItemLabel | str",
+    ) -> "PageConversionItemLabel":
+        if isinstance(value, cls):
+            return value
+        if not isinstance(value, str):
+            raise ValueError("label d'item inconnu")
+        for label in cls:
+            if label.value == value:
+                return label
+        raise ValueError("label d'item inconnu")
+
+
+@dataclass(frozen=True)
+class PageItemGeometry:
+    """Coordonnées d'item dans le repère de page retourné par l'outil."""
+
+    left: float
+    top: float
+    right: float
+    bottom: float
+    page_width: float
+    page_height: float
+
+    def __post_init__(self) -> None:
+        left = _ensure_finite_number(self.left, "coordonnées de page invalides")
+        top = _ensure_finite_number(self.top, "coordonnées de page invalides")
+        right = _ensure_finite_number(self.right, "coordonnées de page invalides")
+        bottom = _ensure_finite_number(self.bottom, "coordonnées de page invalides")
+        page_width = _ensure_positive_finite_number(
+            self.page_width,
+            "coordonnées de page invalides",
+        )
+        page_height = _ensure_positive_finite_number(
+            self.page_height,
+            "coordonnées de page invalides",
+        )
+        if left < 0 or top < 0 or right > page_width or bottom > page_height:
+            raise ValueError("coordonnées de page invalides")
+        if left >= right or top >= bottom:
+            raise ValueError("coordonnées de page invalides")
+        object.__setattr__(self, "left", left)
+        object.__setattr__(self, "top", top)
+        object.__setattr__(self, "right", right)
+        object.__setattr__(self, "bottom", bottom)
+        object.__setattr__(self, "page_width", page_width)
+        object.__setattr__(self, "page_height", page_height)
+
+    def normalized_bbox(self) -> tuple[float, float, float, float]:
+        """Retourne les coordonnées normalisées attendues par SourceLocator."""
+
+        return (
+            self.left / self.page_width,
+            self.top / self.page_height,
+            self.right / self.page_width,
+            self.bottom / self.page_height,
+        )
+
+
+@dataclass(frozen=True)
+class PageConversionItem:
+    """Item documentaire produit par une conversion de page."""
+
+    label: PageConversionItemLabel
+    text: str
+    geometry: PageItemGeometry
+    content_hash: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "label", PageConversionItemLabel.from_value(self.label))
+        object.__setattr__(self, "text", _ensure_text(self.text, "texte d'item invalide"))
+        _ensure_page_item_geometry(self.geometry)
+        object.__setattr__(
+            self,
+            "content_hash",
+            _ensure_content_hash(self.content_hash),
+        )
+
+
+@dataclass(frozen=True)
+class PageConversionArtifact:
+    """Sortie auditable d'une page convertie par sa route explicite."""
+
+    page_number: PageNumber
+    route_name: PageRouteName
+    tool_name: ConversionToolName
+    tool_version: str
+    artifact_hash: str
+    audit_artifact_ref: str
+    items: tuple[PageConversionItem, ...]
+
+    def __post_init__(self) -> None:
+        _ensure_page_number(self.page_number)
+        object.__setattr__(self, "route_name", PageRouteName.from_value(self.route_name))
+        object.__setattr__(self, "tool_name", ConversionToolName.from_value(self.tool_name))
+        object.__setattr__(
+            self,
+            "tool_version",
+            _ensure_text(self.tool_version, "version d'outil invalide"),
+        )
+        object.__setattr__(
+            self,
+            "artifact_hash",
+            _ensure_artifact_hash(self.artifact_hash),
+        )
+        object.__setattr__(
+            self,
+            "audit_artifact_ref",
+            _ensure_artifact_ref(self.audit_artifact_ref),
+        )
+        object.__setattr__(self, "items", _ensure_conversion_items(self.items))
+
+
+@dataclass(frozen=True)
+class PreprocessedPageArtifact:
+    """Artefact OCRmyPDF conditionnel produit avant Granite-Docling."""
+
+    page_number: PageNumber
+    route_name: PageRouteName
+    tool_name: ConversionToolName
+    tool_version: str
+    artifact_hash: str
+    artifact_ref: str
+
+    def __post_init__(self) -> None:
+        _ensure_page_number(self.page_number)
+        object.__setattr__(self, "route_name", PageRouteName.from_value(self.route_name))
+        object.__setattr__(self, "tool_name", ConversionToolName.from_value(self.tool_name))
+        object.__setattr__(
+            self,
+            "tool_version",
+            _ensure_text(self.tool_version, "version d'outil invalide"),
+        )
+        object.__setattr__(
+            self,
+            "artifact_hash",
+            _ensure_artifact_hash(self.artifact_hash),
+        )
+        object.__setattr__(self, "artifact_ref", _ensure_artifact_ref(self.artifact_ref))
+
+
+@dataclass(frozen=True)
+class CanonicalItemProvenance:
+    """Provenance compatible SourceLocator pour un item canonique candidat."""
+
+    schema_version: str
+    canonical_version_id: str
+    document_id: str
+    page_pdf: int
+    item_id: str
+    bbox: tuple[float, float, float, float]
+    content_hash: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "schema_version",
+            _ensure_source_locator_schema_version(self.schema_version),
+        )
+        object.__setattr__(
+            self,
+            "canonical_version_id",
+            _ensure_domain_identifier(self.canonical_version_id, "canonical_version_id", "CVER"),
+        )
+        object.__setattr__(
+            self,
+            "document_id",
+            _ensure_domain_identifier(self.document_id, "document_id", "DOC"),
+        )
+        object.__setattr__(self, "page_pdf", _ensure_positive_integer(self.page_pdf, "page_pdf invalide"))
+        object.__setattr__(self, "item_id", _ensure_text(self.item_id, "item_id invalide"))
+        object.__setattr__(self, "bbox", _ensure_normalized_bbox(self.bbox))
+        object.__setattr__(self, "content_hash", _ensure_content_hash(self.content_hash))
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "canonical_version_id": self.canonical_version_id,
+            "document_id": self.document_id,
+            "page_pdf": self.page_pdf,
+            "item_id": self.item_id,
+            "bbox": list(self.bbox),
+            "content_hash": self.content_hash,
+        }
+
+
+@dataclass(frozen=True)
+class CanonicalDocumentItem:
+    """Item intégré dans la représentation locale du DoclingDocument unique."""
+
+    item_id: str
+    label: str
+    text: str
+    bbox: tuple[float, float, float, float]
+    content_hash: str
+    provenance: CanonicalItemProvenance
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "item_id", _ensure_text(self.item_id, "item_id invalide"))
+        object.__setattr__(self, "label", _ensure_text(self.label, "label d'item invalide"))
+        object.__setattr__(self, "text", _ensure_text(self.text, "texte d'item invalide"))
+        object.__setattr__(self, "bbox", _ensure_normalized_bbox(self.bbox))
+        object.__setattr__(self, "content_hash", _ensure_content_hash(self.content_hash))
+        if not isinstance(self.provenance, CanonicalItemProvenance):
+            raise ValueError("provenance d'item invalide")
+        if self.provenance.item_id != self.item_id:
+            raise ValueError("provenance d'item incohérente")
+        if self.provenance.content_hash != self.content_hash:
+            raise ValueError("hash de provenance incohérent")
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "item_id": self.item_id,
+            "label": self.label,
+            "text": self.text,
+            "bbox": list(self.bbox),
+            "content_hash": self.content_hash,
+            "provenance": self.provenance.to_payload(),
+        }
+
+
+@dataclass(frozen=True)
+class CanonicalDocumentPage:
+    """Page intégrée dans le document fusionné."""
+
+    page_number: PageNumber
+    route_name: PageRouteName
+    conversion_artifact_hash: str
+    items: tuple[CanonicalDocumentItem, ...]
+
+    def __post_init__(self) -> None:
+        _ensure_page_number(self.page_number)
+        object.__setattr__(self, "route_name", PageRouteName.from_value(self.route_name))
+        object.__setattr__(
+            self,
+            "conversion_artifact_hash",
+            _ensure_artifact_hash(self.conversion_artifact_hash),
+        )
+        object.__setattr__(self, "items", _ensure_canonical_items(self.items))
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "page_pdf": self.page_number.value,
+            "route_name": self.route_name.value,
+            "conversion_artifact_hash": self.conversion_artifact_hash,
+            "items": tuple(item.to_payload() for item in self.items),
+        }
+
+
+@dataclass(frozen=True)
+class PagewiseDoclingDocument:
+    """Représentation locale stricte du DoclingDocument unique M-004."""
+
+    document_id: DocumentId
+    canonical_version_id: str
+    source_sha256: SourceFingerprint
+    original_storage_ref: OriginalStorageRef
+    pages: tuple[CanonicalDocumentPage, ...]
+
+    def __post_init__(self) -> None:
+        _ensure_document_id(self.document_id)
+        object.__setattr__(
+            self,
+            "canonical_version_id",
+            _ensure_domain_identifier(self.canonical_version_id, "canonical_version_id", "CVER"),
+        )
+        _ensure_source_fingerprint(self.source_sha256)
+        _ensure_original_storage_ref(self.original_storage_ref)
+        pages = _ensure_document_pages(self.pages)
+        _ensure_document_page_order(pages)
+        _ensure_unique_item_ids(pages)
+        object.__setattr__(self, "pages", pages)
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "document_id": self.document_id.value,
+            "canonical_version_id": self.canonical_version_id,
+            "source_sha256": self.source_sha256.value,
+            "original_storage_ref": self.original_storage_ref.value,
+            "pages": tuple(page.to_payload() for page in self.pages),
+        }
+
+
+class PagewiseDoclingFusionService:
+    """Fusionne les sorties routées dans l'ordre strict du PDF original."""
+
+    def merge(
+        self,
+        *,
+        document_id: DocumentId,
+        canonical_version_id: str,
+        source_sha256: SourceFingerprint,
+        original_storage_ref: OriginalStorageRef,
+        page_manifest: PageManifest,
+        page_outputs: Sequence[PageConversionArtifact],
+    ) -> PagewiseDoclingDocument:
+        parsed_document_id = _ensure_document_id(document_id)
+        parsed_canonical_version_id = _ensure_domain_identifier(
+            canonical_version_id,
+            "canonical_version_id",
+            "CVER",
+        )
+        parsed_source_sha256 = _ensure_source_fingerprint(source_sha256)
+        parsed_original_storage_ref = _ensure_original_storage_ref(original_storage_ref)
+        parsed_manifest = _ensure_page_manifest(page_manifest)
+        parsed_outputs = _ensure_page_outputs(page_outputs)
+        _ensure_page_outputs_cover_manifest(
+            page_manifest=parsed_manifest,
+            page_outputs=parsed_outputs,
+        )
+
+        pages = tuple(
+            _canonical_page_from_output(
+                document_id=parsed_document_id,
+                canonical_version_id=parsed_canonical_version_id,
+                page_output=page_output,
+            )
+            for page_output in parsed_outputs
+        )
+        return PagewiseDoclingDocument(
+            document_id=parsed_document_id,
+            canonical_version_id=parsed_canonical_version_id,
+            source_sha256=parsed_source_sha256,
+            original_storage_ref=parsed_original_storage_ref,
+            pages=pages,
+        )
+
+
+def _canonical_page_from_output(
+    *,
+    document_id: DocumentId,
+    canonical_version_id: str,
+    page_output: PageConversionArtifact,
+) -> CanonicalDocumentPage:
+    items = tuple(
+        _canonical_item_from_conversion_item(
+            document_id=document_id,
+            canonical_version_id=canonical_version_id,
+            page_number=page_output.page_number,
+            item_index=item_index,
+            conversion_item=conversion_item,
+        )
+        for item_index, conversion_item in enumerate(page_output.items, start=1)
+    )
+    return CanonicalDocumentPage(
+        page_number=page_output.page_number,
+        route_name=page_output.route_name,
+        conversion_artifact_hash=page_output.artifact_hash,
+        items=items,
+    )
+
+
+def _canonical_item_from_conversion_item(
+    *,
+    document_id: DocumentId,
+    canonical_version_id: str,
+    page_number: PageNumber,
+    item_index: int,
+    conversion_item: PageConversionItem,
+) -> CanonicalDocumentItem:
+    parsed_item_index = _ensure_positive_integer(item_index, "index d'item invalide")
+    item_id = f"{document_id.value}-P{page_number.value:03d}-I{parsed_item_index:03d}"
+    bbox = conversion_item.geometry.normalized_bbox()
+    provenance = CanonicalItemProvenance(
+        schema_version=_SOURCE_LOCATOR_SCHEMA_VERSION,
+        canonical_version_id=canonical_version_id,
+        document_id=document_id.value,
+        page_pdf=page_number.value,
+        item_id=item_id,
+        bbox=bbox,
+        content_hash=conversion_item.content_hash,
+    )
+    return CanonicalDocumentItem(
+        item_id=item_id,
+        label=conversion_item.label.value,
+        text=conversion_item.text,
+        bbox=bbox,
+        content_hash=conversion_item.content_hash,
+        provenance=provenance,
+    )
+
+
+def _ensure_text(value: Any, message: str) -> str:
+    if not isinstance(value, str):
+        raise ValueError(message)
+    if value.strip() == "":
+        raise ValueError(message)
+    if value != value.strip():
+        raise ValueError(message)
+    return value
+
+
+def _ensure_content_hash(value: Any) -> str:
+    if not isinstance(value, str):
+        raise ValueError("content_hash non textuel")
+    if value.strip() == "":
+        raise ValueError("content_hash vide")
+    if value != value.strip():
+        raise ValueError("content_hash non normalisé")
+    if len(value) != 64:
+        raise ValueError("content_hash invalide")
+    for character in value:
+        if character not in "0123456789abcdef":
+            raise ValueError("content_hash invalide")
+    return value
+
+
+def _ensure_artifact_hash(value: Any) -> str:
+    if not isinstance(value, str):
+        raise ValueError("hash d'artefact invalide")
+    if value.strip() == "":
+        raise ValueError("hash d'artefact invalide")
+    if value != value.strip():
+        raise ValueError("hash d'artefact invalide")
+    if len(value) != 64:
+        raise ValueError("hash d'artefact invalide")
+    for character in value:
+        if character not in "0123456789abcdef":
+            raise ValueError("hash d'artefact invalide")
+    return value
+
+
+def _ensure_artifact_ref(value: Any) -> str:
+    text = _ensure_text(value, "référence d'artefact invalide")
+    if not text.startswith("artifact:source_processing."):
+        raise ValueError("référence d'artefact invalide")
+    return text
+
+
+def _ensure_finite_number(value: Any, message: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(message)
+    number = float(value)
+    if not math.isfinite(number):
+        raise ValueError(message)
+    return number
+
+
+def _ensure_positive_finite_number(value: Any, message: str) -> float:
+    number = _ensure_finite_number(value, message)
+    if number <= 0:
+        raise ValueError(message)
+    return number
+
+
+def _ensure_positive_integer(value: Any, message: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise ValueError(message)
+    return value
+
+
+def _ensure_normalized_bbox(value: Any) -> tuple[float, float, float, float]:
+    if isinstance(value, str) or not hasattr(value, "__iter__"):
+        raise ValueError("bbox invalide")
+    coordinates = tuple(value)
+    if len(coordinates) != 4:
+        raise ValueError("bbox invalide")
+    left, top, right, bottom = (
+        _ensure_finite_number(coordinate, "bbox invalide")
+        for coordinate in coordinates
+    )
+    if left < 0 or top < 0 or right > 1 or bottom > 1:
+        raise ValueError("bbox invalide")
+    if left >= right or top >= bottom:
+        raise ValueError("bbox invalide")
+    return (left, top, right, bottom)
+
+
+def _ensure_source_locator_schema_version(value: Any) -> str:
+    text = _ensure_text(value, "schema_version invalide")
+    if text != _SOURCE_LOCATOR_SCHEMA_VERSION:
+        raise ValueError("schema_version invalide")
+    return text
+
+
+def _ensure_domain_identifier(value: Any, field_name: str, expected_prefix: str) -> str:
+    if not isinstance(value, str):
+        raise ValueError(f"{field_name} invalide")
+    try:
+        return str(DomainIdentifier.parse_with_prefix(value, expected_prefix))
+    except ValueError as exc:
+        raise ValueError(f"{field_name} invalide: {exc}") from exc
+
+
+def _ensure_page_number(value: Any) -> PageNumber:
+    if not isinstance(value, PageNumber):
+        raise ValueError("page_number invalide")
+    return value
+
+
+def _ensure_page_item_geometry(value: Any) -> PageItemGeometry:
+    if not isinstance(value, PageItemGeometry):
+        raise ValueError("géométrie d'item invalide")
+    return value
+
+
+def _ensure_conversion_items(
+    value: Sequence[PageConversionItem],
+) -> tuple[PageConversionItem, ...]:
+    if value is None:
+        raise ValueError("items de conversion absents")
+    if isinstance(value, str) or not isinstance(value, Sequence):
+        raise ValueError("items de conversion invalides")
+    items = tuple(value)
+    if len(items) == 0:
+        raise ValueError("items de conversion vides")
+    for item in items:
+        if not isinstance(item, PageConversionItem):
+            raise ValueError("item de conversion invalide")
+    return items
+
+
+def _ensure_canonical_items(
+    value: Sequence[CanonicalDocumentItem],
+) -> tuple[CanonicalDocumentItem, ...]:
+    if value is None:
+        raise ValueError("items canoniques absents")
+    if isinstance(value, str) or not isinstance(value, Sequence):
+        raise ValueError("items canoniques invalides")
+    items = tuple(value)
+    if len(items) == 0:
+        raise ValueError("items canoniques vides")
+    for item in items:
+        if not isinstance(item, CanonicalDocumentItem):
+            raise ValueError("item canonique invalide")
+    return items
+
+
+def _ensure_document_pages(
+    value: Sequence[CanonicalDocumentPage],
+) -> tuple[CanonicalDocumentPage, ...]:
+    if value is None:
+        raise ValueError("pages fusionnées absentes")
+    if isinstance(value, str) or not isinstance(value, Sequence):
+        raise ValueError("pages fusionnées invalides")
+    pages = tuple(value)
+    if len(pages) == 0:
+        raise ValueError("pages fusionnées vides")
+    for page in pages:
+        if not isinstance(page, CanonicalDocumentPage):
+            raise ValueError("page fusionnée invalide")
+    return pages
+
+
+def _ensure_document_page_order(pages: tuple[CanonicalDocumentPage, ...]) -> None:
+    for expected_page_number, page in enumerate(pages, start=1):
+        if page.page_number.value != expected_page_number:
+            raise ValueError("ordre strict des pages invalide")
+
+
+def _ensure_unique_item_ids(pages: tuple[CanonicalDocumentPage, ...]) -> None:
+    item_ids = tuple(item.item_id for page in pages for item in page.items)
+    if len(item_ids) != len(set(item_ids)):
+        raise ValueError("item_id canonique dupliqué")
+
+
+def _ensure_page_manifest(value: Any) -> PageManifest:
+    if not isinstance(value, PageManifest):
+        raise ValueError("manifeste de pages invalide")
+    return value
+
+
+def _ensure_page_outputs(
+    value: Sequence[PageConversionArtifact],
+) -> tuple[PageConversionArtifact, ...]:
+    if value is None:
+        raise ValueError("sorties de conversion absentes")
+    if isinstance(value, str) or not isinstance(value, Sequence):
+        raise ValueError("sorties de conversion invalides")
+    outputs = tuple(value)
+    if len(outputs) == 0:
+        raise ValueError("sorties de conversion vides")
+    for output in outputs:
+        if not isinstance(output, PageConversionArtifact):
+            raise ValueError("sortie de conversion invalide")
+    return outputs
+
+
+def _ensure_page_outputs_cover_manifest(
+    *,
+    page_manifest: PageManifest,
+    page_outputs: tuple[PageConversionArtifact, ...],
+) -> None:
+    expected_pages = tuple(entry.page_number.value for entry in page_manifest.entries)
+    actual_pages = tuple(output.page_number.value for output in page_outputs)
+    if set(actual_pages) != set(expected_pages):
+        raise ValueError("page de conversion manquante")
+    if actual_pages != expected_pages:
+        raise ValueError("ordre strict des pages invalide")
+
+
+def _ensure_document_id(value: Any) -> DocumentId:
+    if not isinstance(value, DocumentId):
+        raise ValueError("document_id invalide")
+    return value
+
+
+def _ensure_source_fingerprint(value: Any) -> SourceFingerprint:
+    if not isinstance(value, SourceFingerprint):
+        raise ValueError("source_sha256 invalide")
+    return value
+
+
+def _ensure_original_storage_ref(value: Any) -> OriginalStorageRef:
+    if not isinstance(value, OriginalStorageRef):
+        raise ValueError("original_storage_ref invalide")
+    return value
+
+
+__all__ = [
+    "CanonicalDocumentItem",
+    "CanonicalDocumentPage",
+    "CanonicalItemProvenance",
+    "ConversionToolName",
+    "PageConversionArtifact",
+    "PageConversionItem",
+    "PageConversionItemLabel",
+    "PageItemGeometry",
+    "PagewiseDoclingDocument",
+    "PagewiseDoclingFusionService",
+    "PreprocessedPageArtifact",
+]

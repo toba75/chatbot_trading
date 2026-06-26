@@ -47,3 +47,15 @@
 - ADR: non requise; T-002 applique ADR-001, ADR-002, ADR-003, ADR-004 et DDD-ADR-003 sans introduire de décision structurante nouvelle.
 - Validations GREEN: `tests/m004/validate_m004_specification_acceptance.ps1`; `tests/m004/validate_m004_specification_unit.ps1`; `scripts/validate_m004_specification.ps1`; `scripts/validate_traceability.ps1`; `scripts/test.ps1`; `scripts/lint.ps1`.
 - Risques résiduels: la tâche publie la spécification et son validateur; l'implémentation métier de conversion, adjudication, publication, `SourceLocator` et événement `CanonicalSourcePublished` reste portée par T-003 à T-010.
+
+## Clôture T-003
+
+- Scénario BDD: Given un `DocumentProcessingRun` M-003 avec un `RoutePlan` approuvé pour toutes les pages; When la conversion documentaire M-004 est demandée; Then chaque page est convertie uniquement par la route explicitement planifiée, chaque sortie conserve route, outil, version, hash et justification, puis la fusion pagewise crée un `DoclingDocument` unique avec ordre, item ids, labels, coordonnées et provenance.
+- Commit RED: `8ba1755` (`test(m004): couvrir la conversion et fusion pagewise`).
+- Commit GREEN: `feat(m004): convertir et fusionner les pages routees`.
+- Implémentation: `app/source_processing/domain/page_conversion.py` représente strictement les sorties pagewise, artefacts OCRmyPDF conditionnels, items canoniques et provenance compatible SourceLocator; `app/source_processing/application/convert_routed_pages.py` orchestre les ports Docling standard, Granite-Docling et OCRmyPDF uniquement depuis les routes M-003.
+- Garde-fous livrés: tentative non `ROUTE_PLANNED` refusée; source en quarantaine refusée; route, outil, version et hash obligatoires; aucun fallback Docling vers Granite après erreur; ordre strict des pages; item ids canoniques uniques; coordonnées normalisées; provenance obligatoire; original immuable référencé sans modification.
+- Gates: `scripts/test.ps1` enrôle `tests/m004/validate_page_conversion_acceptance.ps1` et `tests/m004/validate_page_conversion_unit.ps1`; `docs/traceability/matrix.md` relie `REQ-M004-003` à la tâche, au test d'acceptation, au code applicatif et aux ADR appliquées.
+- ADR: non requise; T-003 applique ADR-001, ADR-002, ADR-003, ADR-004 et DDD-ADR-003 sans créer de nouvelle route normative, dépendance structurante ou politique durable.
+- Validations GREEN: `tests/m004/validate_page_conversion_acceptance.ps1`; `tests/m004/validate_page_conversion_unit.ps1`; `scripts/validate_architecture_boundaries.ps1`; `scripts/validate_traceability.ps1`; `tests/m003/validate_m003_precondition_acceptance.ps1`; `scripts/test.ps1`; `scripts/lint.ps1`.
+- Risques résiduels: T-003 produit la conversion et la fusion pagewise; l'adjudication d'autorité textuelle, la QA, la publication immuable, la résolution SourceLocator et l'événement `CanonicalSourcePublished` restent portés par T-004 à T-010.
