@@ -183,7 +183,7 @@ assert_raises(
     ),
 )
 assert_raises(
-    "artefact dérivé non canonique",
+    "non canonique",
     lambda: CanonicalArtifact(
         artifact_ref=f"artifact:source_processing.canonical_exports/{canonical_source_id}/CVER-M004-T006-UNIT-0001/export.md",
         artifact_sha256="b" * 64,

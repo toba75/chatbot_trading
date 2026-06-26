@@ -119,7 +119,9 @@ $testCommands = @(
     @{ Path = "tests/m004/validate_text_authority_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/m004/validate_text_authority_unit.ps1"; Arguments = @() },
     @{ Path = "tests/m004/validate_canonical_quality_acceptance.ps1"; Arguments = @() },
-    @{ Path = "tests/m004/validate_canonical_quality_unit.ps1"; Arguments = @() }
+    @{ Path = "tests/m004/validate_canonical_quality_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m004/validate_canonical_publication_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m004/validate_canonical_publication_unit.ps1"; Arguments = @() }
 )
 
 $expectedValidationPaths = @(
@@ -219,10 +221,12 @@ $expectedTestPaths = @(
     "tests/m004/validate_text_authority_acceptance.ps1",
     "tests/m004/validate_text_authority_unit.ps1",
     "tests/m004/validate_canonical_quality_acceptance.ps1",
-    "tests/m004/validate_canonical_quality_unit.ps1"
+    "tests/m004/validate_canonical_quality_unit.ps1",
+    "tests/m004/validate_canonical_publication_acceptance.ps1",
+    "tests/m004/validate_canonical_publication_unit.ps1"
 )
 
-$expectedTestCount = 81
+$expectedTestCount = 83
 if ($env:OST_M003_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     Write-Host "Test d'acceptation de précondition M-003 exclu explicitement: exécution imbriquée du validateur de précondition."
     Write-Host "Test d'acceptation de précondition M-004 exclu explicitement: M-003 reste indépendant du milestone aval."
@@ -236,7 +240,7 @@ if ($env:OST_M003_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     $expectedTestPaths = @(
         $expectedTestPaths | Where-Object { $excludedPreconditionAcceptancePaths -notcontains $_ }
     )
-    $expectedTestCount = 79
+    $expectedTestCount = 81
 }
 elseif ($env:OST_M004_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     Write-Host "Test d'acceptation de précondition M-004 exclu explicitement: exécution imbriquée du validateur de précondition."
@@ -246,7 +250,7 @@ elseif ($env:OST_M004_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     $expectedTestPaths = @(
         $expectedTestPaths | Where-Object { $_ -ne $m004PreconditionAcceptancePath }
     )
-    $expectedTestCount = 80
+    $expectedTestCount = 82
 }
 
 Invoke-M000ValidationGate `
