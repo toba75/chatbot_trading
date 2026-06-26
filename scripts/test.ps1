@@ -33,7 +33,7 @@ $validationCommands = @(
     @{ Path = "scripts/validate_architecture_boundaries.ps1"; Arguments = @("-AppRoot", $appRoot, "-ContextRegistryPath", $contextRegistryPath, "-SpecificationPath", $m001SpecificationPath) }
 )
 
-# Le self-test d'acceptation T-006 reste exécuté explicitement hors gate pour éviter une récursion.
+# Les tests M-003 ciblés restent exécutés explicitement hors gate pour éviter une récursion.
 $testCommands = @(
     @{ Path = "tests/governance/validate_m000_precondition_report_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/governance/validate_m000_precondition_report_unit.ps1"; Arguments = @() },
@@ -95,7 +95,9 @@ $testCommands = @(
     @{ Path = "tests/m003/validate_page_diagnostics_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/m003/validate_page_diagnostics_unit.ps1"; Arguments = @() },
     @{ Path = "tests/m003/validate_route_plan_acceptance.ps1"; Arguments = @() },
-    @{ Path = "tests/m003/validate_route_plan_unit.ps1"; Arguments = @() }
+    @{ Path = "tests/m003/validate_route_plan_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m003/validate_review_quarantine_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m003/validate_review_quarantine_unit.ps1"; Arguments = @() }
 )
 
 $expectedValidationPaths = @(
@@ -174,7 +176,9 @@ $expectedTestPaths = @(
     "tests/m003/validate_page_diagnostics_acceptance.ps1",
     "tests/m003/validate_page_diagnostics_unit.ps1",
     "tests/m003/validate_route_plan_acceptance.ps1",
-    "tests/m003/validate_route_plan_unit.ps1"
+    "tests/m003/validate_route_plan_unit.ps1",
+    "tests/m003/validate_review_quarantine_acceptance.ps1",
+    "tests/m003/validate_review_quarantine_unit.ps1"
 )
 
 Invoke-M000ValidationGate `
@@ -183,6 +187,6 @@ Invoke-M000ValidationGate `
     -ValidationCommands $validationCommands `
     -TestCommands $testCommands `
     -ExpectedValidationCount 12 `
-    -ExpectedTestCount 61 `
+    -ExpectedTestCount 63 `
     -ExpectedValidationPaths $expectedValidationPaths `
     -ExpectedTestPaths $expectedTestPaths
