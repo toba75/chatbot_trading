@@ -31,6 +31,7 @@
 | T-005 - Contrôler la qualité de la version canonique | `500af18` | `feat(m004): controler la qualite de version canonique` | ADR-001; ADR-002; ADR-003; ADR-004 | Aucune | `tests/m004/validate_canonical_quality_acceptance.ps1`; `tests/m004/validate_canonical_quality_unit.ps1`; `tests/m003/validate_m003_precondition_acceptance.ps1`; `scripts/validate_traceability.ps1`; `scripts/validate_architecture_boundaries.ps1`; `scripts/test.ps1`; `scripts/lint.ps1` |
 | T-006 - Publier une version canonique immuable | `683b6dc` | `feat(m004): publier une version canonique immuable` | ADR-001; DDD-ADR-003 | Aucune | `tests/m004/validate_canonical_publication_acceptance.ps1`; `tests/m004/validate_canonical_publication_unit.ps1`; `tests/m001/validate_source_contracts_acceptance.ps1`; `scripts/validate_traceability.ps1`; `scripts/test.ps1`; `scripts/lint.ps1` |
 | T-007 - Rendre les SourceLocator résolvables | `adaaf93` | `feat(m004): rendre les source locator resolvables` | DDD-ADR-003 | Aucune | `tests/m004/validate_source_locator_resolution_acceptance.ps1`; `tests/m004/validate_source_locator_resolution_unit.ps1`; `tests/m001/validate_source_locator_unit.ps1`; `scripts/validate_architecture_boundaries.ps1`; `scripts/validate_traceability.ps1`; `scripts/test.ps1`; `scripts/lint.ps1` |
+| T-008 - Publier l'événement CanonicalSourcePublished | `6e80443` | `feat(m004): publier l evenement canonical source published` | ADR-001; DDD-ADR-003; DDD-ADR-006; DDD-ADR-008 | Aucune | `tests/m004/validate_canonical_publication_event_acceptance.ps1`; `tests/m004/validate_canonical_publication_event_unit.ps1`; `tests/m001/validate_event_envelope_acceptance.ps1`; `tests/m002/validate_outbox_acceptance.ps1`; `scripts/validate_traceability.ps1`; `scripts/test.ps1`; `scripts/lint.ps1` |
 
 ## Clôture T-001
 
@@ -111,3 +112,15 @@
 - ADR: non requise; T-007 applique DDD-ADR-003 et le contrat M-001 `SourceLocator` sans modifier leur sens ni le langage publié de citation.
 - Validations GREEN: `tests/m004/validate_source_locator_resolution_acceptance.ps1`; `tests/m004/validate_source_locator_resolution_unit.ps1`; `tests/m001/validate_source_locator_unit.ps1`; `scripts/validate_architecture_boundaries.ps1` avec paramètres; `scripts/validate_traceability.ps1`; `scripts/test.ps1`; `scripts/lint.ps1`.
 - Risques résiduels: T-007 rend les citations ouvrables au niveau version, page et item; l'événement `CanonicalSourcePublished`, le contrat HTTP final et les gates M-004 de clôture restent portés par T-008 à T-010.
+
+## Clôture T-008
+
+- Scénario BDD: Given une version canonique vient d'être publiée par SP; When l'intégration intercontextes est traitée; Then un événement `CanonicalSourcePublished` versionné est inscrit dans l'outbox avec un payload `CanonicalSourceRef` et aucune donnée interne SP.
+- Commit RED: `6e80443` (`test(m004): couvrir l evenement canonical source published`).
+- Commit GREEN: `feat(m004): publier l evenement canonical source published`.
+- Implémentation: `app/source_processing/application/publish_canonical_source_event.py` construit une `EventEnvelope` M-001 uniquement depuis le `CanonicalSourceRef` public produit par T-006, calcule un `event_id` déterministe par `canonical_version_id`, associe une `ProducerStateMutation` cohérente et inscrit l'événement dans l'outbox M-002.
+- Garde-fous livrés: événement impossible avant résultat de publication accepté; QA RED bloquée par la publication T-006 avant tout événement; retry idempotent retournant l'entrée outbox existante; refus d'un payload interne SP; absence de chemins d'artefacts, détails de conversion, texte documentaire ou appel direct KA/EG dans le payload.
+- Gates: `scripts/test.ps1` enrôle `tests/m004/validate_canonical_publication_event_acceptance.ps1` et `tests/m004/validate_canonical_publication_event_unit.ps1`; `docs/traceability/matrix.md` relie `REQ-M004-008` à la tâche, au test d'acceptation, au code applicatif et aux ADR appliquées. Les assertions de volume de gate ont été réalignées sur 87 tests globaux, 86 tests dans le rapport M-004 imbriqué et 85 tests dans le rapport M-003 imbriqué.
+- ADR: non requise; T-008 applique le contrat M-001 `EventEnvelope`, l'outbox M-002 et le `CanonicalSourceRef` M-001 sans changer la coordination intercontextes.
+- Validations GREEN: `tests/m004/validate_canonical_publication_event_acceptance.ps1`; `tests/m004/validate_canonical_publication_event_unit.ps1`; `tests/m001/validate_event_envelope_acceptance.ps1`; `tests/m002/validate_outbox_acceptance.ps1`; `scripts/validate_traceability.ps1`; `scripts/test.ps1`; `scripts/lint.ps1`.
+- Risques résiduels: T-008 publie l'événement outbox; le contrat HTTP final de conversion documentaire et les gates M-004 de clôture restent portés par T-009 et T-010.

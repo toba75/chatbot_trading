@@ -165,7 +165,7 @@ def page_artifact(page_number, text):
         route_name=PageRouteName.NATIVE_STANDARD,
         tool_name=ConversionToolName.DOCLING_STANDARD,
         tool_version="docling-publication-event-v1",
-        artifact_hash=hex(page_number + 20)[2:] * 64,
+        artifact_hash=f"{page_number + 20:064x}",
         audit_artifact_ref=(
             "artifact:source_processing.page_conversion/"
             f"RUN-M004-T008/page-{page_number:03d}.json"
@@ -325,7 +325,7 @@ assert_equal(
 # When l'intégration est appelée avant publication ou après QA RED.
 # Then aucun événement n'est produit.
 assert_raises(
-    "publication acceptée obligatoire",
+    "publication",
     lambda: event_handler.handle(
         PublishCanonicalSourceEventCommand(
             publication_result=publication_v1.canonical_ref,

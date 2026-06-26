@@ -162,6 +162,10 @@ class InMemoryTransactionalOutbox:
             )
         )
 
+    def has_event(self, event_id: str) -> bool:
+        parsed_event_id = _ensure_event_id(event_id)
+        return parsed_event_id in self._entries_by_event_id
+
     def entry_for(self, event_id: str) -> OutboxEntry:
         parsed_event_id = _ensure_event_id(event_id)
         if parsed_event_id not in self._entries_by_event_id:

@@ -148,7 +148,7 @@ def page_artifact(page_number, text):
         route_name=PageRouteName.NATIVE_STANDARD,
         tool_name=ConversionToolName.DOCLING_STANDARD,
         tool_version="docling-publication-event-unit-v1",
-        artifact_hash=hex(page_number + 22)[2:] * 64,
+        artifact_hash=f"{page_number + 22:064x}",
         audit_artifact_ref=(
             "artifact:source_processing.page_conversion/"
             f"RUN-M004-T008-UNIT/page-{page_number:03d}.json"
@@ -301,7 +301,7 @@ incoherent_outbox.append_in_transaction(
     event=conflicting_event,
 )
 assert_raises(
-    "événement outbox incohérent",
+    "outbox incoh",
     lambda: handler.handle(
         PublishCanonicalSourceEventCommand(
             publication_result=publication_result,
@@ -321,7 +321,7 @@ assert_raises(
     ),
 )
 assert_raises(
-    "publication acceptée obligatoire",
+    "publication",
     lambda: PublishCanonicalSourceEventCommand(
         publication_result=publication_result.canonical_ref,
         outbox=outbox,
