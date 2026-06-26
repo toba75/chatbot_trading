@@ -2,7 +2,7 @@
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
 $validatorPath = Join-Path $repoRoot "scripts/validate_m003_precondition.ps1"
-$temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m003_precondition_acceptance_" + [System.Guid]::NewGuid().ToString("N"))
+$temporaryRoot = Join-Path $repoRoot ("docs/governance/.tmp_m003_precondition_acceptance_" + [System.Guid]::NewGuid().ToString("N"))
 
 function Invoke-M003PreconditionValidator {
     param(
@@ -14,9 +14,17 @@ function Invoke-M003PreconditionValidator {
     $ErrorActionPreference = "Continue"
 
     try {
+        $previousRecursionGuard = $env:OST_M003_PRECONDITION_ACCEPTANCE_RUNNING
+        $env:OST_M003_PRECONDITION_ACCEPTANCE_RUNNING = "1"
         $output = & powershell -NoProfile -ExecutionPolicy Bypass -File $validatorPath -Path $ReportPath 2>&1
     }
     finally {
+        if ($null -eq $previousRecursionGuard) {
+            Remove-Item Env:\OST_M003_PRECONDITION_ACCEPTANCE_RUNNING -ErrorAction SilentlyContinue
+        }
+        else {
+            $env:OST_M003_PRECONDITION_ACCEPTANCE_RUNNING = $previousRecursionGuard
+        }
         $ErrorActionPreference = $previousErrorActionPreference
     }
 

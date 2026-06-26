@@ -289,7 +289,7 @@ def _ensure_text(value: Any, field_name: str) -> str:
     if value.strip() == "":
         raise ValueError(f"{field_name} vide")
     if value != value.strip():
-        raise ValueError(f"{field_name} non normalise")
+        raise ValueError(f"{field_name} non normalisé")
     return value
 
 

@@ -201,6 +201,24 @@ assert_equal(
     "Le mapping diagnostic déjà demandé doit rester stable.",
 )
 
+# Given une source non publiable est refusée pendant le diagnostic.
+# When l'adaptateur mappe l'erreur métier.
+commands.diagnosis_error = SourceUnreadableError(
+    reason="source documentaire non publiable: QUARANTINED"
+)
+unreadable_diagnosis = post_diagnose(adapter, "DOC-1111111111111111")
+
+# Then l'erreur HTTP est explicite et stable.
+assert_equal(unreadable_diagnosis.status_code, 422, "Une source non publiable doit retourner 422.")
+assert_equal(
+    unreadable_diagnosis.body,
+    {
+        "error_code": "SOURCE_UNREADABLE",
+        "reason": "source documentaire non publiable: QUARANTINED",
+    },
+    "Le mapping diagnostic source non publiable doit rester stable.",
+)
+
 # Given une requête client omet le contenu original obligatoire.
 # When l'adaptateur reçoit POST /v1/documents.
 missing_original = adapter.handle(

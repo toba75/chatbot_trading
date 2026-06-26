@@ -17,6 +17,7 @@ $platformTopologyPath = Join-Path $repoRoot "app/platform/topology_registry.json
 $sparkFirewallPath = Join-Path $repoRoot "deploy/spark-firewall/network-boundary.json"
 $appRoot = Join-Path $repoRoot "app"
 $contextRegistryPath = Join-Path $repoRoot "app/context_registry.json"
+$m003PreconditionAcceptancePath = "tests/m003/validate_m003_precondition_acceptance.ps1"
 
 $validationCommands = @(
     @{ Path = "scripts/validate_m000_precondition_report.ps1"; Arguments = @("-Path", $preconditionReportPath) },
@@ -87,6 +88,7 @@ $testCommands = @(
     @{ Path = "tests/m002/validate_m002_traceability_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/m002/validate_m002_traceability_unit.ps1"; Arguments = @() },
     @{ Path = "tests/m003/validate_m003_precondition_unit.ps1"; Arguments = @() },
+    @{ Path = $m003PreconditionAcceptancePath; Arguments = @() },
     @{ Path = "tests/m003/validate_m003_specification_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/m003/validate_m003_specification_unit.ps1"; Arguments = @() },
     @{ Path = "tests/m003/validate_source_registration_acceptance.ps1"; Arguments = @() },
@@ -175,6 +177,7 @@ $expectedTestPaths = @(
     "tests/m002/validate_m002_traceability_acceptance.ps1",
     "tests/m002/validate_m002_traceability_unit.ps1",
     "tests/m003/validate_m003_precondition_unit.ps1",
+    $m003PreconditionAcceptancePath,
     "tests/m003/validate_m003_specification_acceptance.ps1",
     "tests/m003/validate_m003_specification_unit.ps1",
     "tests/m003/validate_source_registration_acceptance.ps1",
@@ -195,12 +198,24 @@ $expectedTestPaths = @(
     "tests/m003/validate_m003_traceability_unit.ps1"
 )
 
+$expectedTestCount = 71
+if ($env:OST_M003_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
+    Write-Host "Test d'acceptation de précondition M-003 exclu explicitement: exécution imbriquée du validateur de précondition."
+    $testCommands = @(
+        $testCommands | Where-Object { $_.Path -ne $m003PreconditionAcceptancePath }
+    )
+    $expectedTestPaths = @(
+        $expectedTestPaths | Where-Object { $_ -ne $m003PreconditionAcceptancePath }
+    )
+    $expectedTestCount = 70
+}
+
 Invoke-M000ValidationGate `
     -GateName "test" `
     -RepositoryRoot $repoRoot `
     -ValidationCommands $validationCommands `
     -TestCommands $testCommands `
     -ExpectedValidationCount 12 `
-    -ExpectedTestCount 70 `
+    -ExpectedTestCount $expectedTestCount `
     -ExpectedValidationPaths $expectedValidationPaths `
     -ExpectedTestPaths $expectedTestPaths

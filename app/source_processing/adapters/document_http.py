@@ -143,6 +143,11 @@ class SourceProcessingHttpAdapter:
                     "document_id": exc.document_id,
                 },
             )
+        except SourceUnreadableError as exc:
+            return HttpResponse(
+                status_code=422,
+                body={"error_code": "SOURCE_UNREADABLE", "reason": exc.reason},
+            )
 
         return HttpResponse(
             status_code=202,

@@ -15,21 +15,21 @@
 
 | Élément | Commande | Date UTC | Résultat | Observation |
 |---|---|---|---|---|
-| `branche courante` | `git rev-parse --abbrev-ref HEAD` | `2026-06-26T14:11:59Z` | `GREEN` | Branche M-003 attendue active: codex/milestone-m003-source-routee |
-| `master local` | `git rev-parse --verify master^{commit}` | `2026-06-26T14:11:59Z` | `GREEN` | Révision locale master: 1d3d4896a4bd89818d3457cdd0174b517d588b8e |
-| `origin/master` | `git rev-parse --verify origin/master^{commit}` | `2026-06-26T14:11:59Z` | `GREEN` | Révision origin/master: 1d3d4896a4bd89818d3457cdd0174b517d588b8e |
-| `master synchronisé` | `git rev-parse master origin/master` | `2026-06-26T14:11:59Z` | `GREEN` | master et origin/master pointent sur la même révision. |
-| `branche contient master` | `git merge-base --is-ancestor master HEAD` | `2026-06-26T14:11:59Z` | `GREEN` | La branche courante contient la révision locale master. |
-| `docs/tasks/milestone_000 dans master` | `git ls-tree -r --name-only master -- docs/tasks/milestone_000` | `2026-06-26T14:11:59Z` | `GREEN` | Milestone amont présent dans master: docs/tasks/milestone_000 |
-| `docs/tasks/milestone_001 dans master` | `git ls-tree -r --name-only master -- docs/tasks/milestone_001` | `2026-06-26T14:11:59Z` | `GREEN` | Milestone amont présent dans master: docs/tasks/milestone_001 |
-| `docs/tasks/milestone_002 dans master` | `git ls-tree -r --name-only master -- docs/tasks/milestone_002` | `2026-06-26T14:11:59Z` | `GREEN` | Milestone amont présent dans master: docs/tasks/milestone_002 |
+| `branche courante` | `git rev-parse --abbrev-ref HEAD` | `2026-06-26T15:35:42Z` | `GREEN` | Branche M-003 attendue active: codex/milestone-m003-source-routee |
+| `master local` | `git rev-parse --verify master^{commit}` | `2026-06-26T15:35:42Z` | `GREEN` | Révision locale master: 1d3d4896a4bd89818d3457cdd0174b517d588b8e |
+| `origin/master` | `git rev-parse --verify origin/master^{commit}` | `2026-06-26T15:35:42Z` | `GREEN` | Révision origin/master: 1d3d4896a4bd89818d3457cdd0174b517d588b8e |
+| `master synchronisé` | `git rev-parse master origin/master` | `2026-06-26T15:35:42Z` | `GREEN` | master et origin/master pointent sur la même révision. |
+| `branche contient master` | `git merge-base --is-ancestor master HEAD` | `2026-06-26T15:35:42Z` | `GREEN` | La branche courante contient la révision locale master. |
+| `docs/tasks/milestone_000 dans master` | `git ls-tree -r --name-only master -- docs/tasks/milestone_000` | `2026-06-26T15:35:42Z` | `GREEN` | Milestone amont présent dans master: docs/tasks/milestone_000 |
+| `docs/tasks/milestone_001 dans master` | `git ls-tree -r --name-only master -- docs/tasks/milestone_001` | `2026-06-26T15:35:42Z` | `GREEN` | Milestone amont présent dans master: docs/tasks/milestone_001 |
+| `docs/tasks/milestone_002 dans master` | `git ls-tree -r --name-only master -- docs/tasks/milestone_002` | `2026-06-26T15:35:42Z` | `GREEN` | Milestone amont présent dans master: docs/tasks/milestone_002 |
 
 ## Gates exécutées
 
 | Élément | Commande | Date UTC | Résultat | Observation |
 |---|---|---|---|---|
-| `test` | `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1` | `2026-06-26T14:14:09Z` | `GREEN` | Gate test GREEN. |
-| `lint` | `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1` | `2026-06-26T14:14:15Z` | `GREEN` | Gate lint GREEN. |
+| `test` | `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1` | `2026-06-26T15:39:28Z` | `GREEN` | Gate test GREEN. |
+| `lint` | `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1` | `2026-06-26T15:39:33Z` | `GREEN` | Gate lint GREEN. |
 
 ## Sorties des gates
 
@@ -228,6 +228,9 @@ Test GREEN: tests/m002/validate_m002_traceability_unit.ps1
 Test requis: tests/m003/validate_m003_precondition_unit.ps1
 Tests unitaires du validateur de précondition M-003: OK
 Test GREEN: tests/m003/validate_m003_precondition_unit.ps1
+Test requis: tests/m003/validate_m003_precondition_acceptance.ps1
+Test d'acceptation de précondition M-003: OK
+Test GREEN: tests/m003/validate_m003_precondition_acceptance.ps1
 Test requis: tests/m003/validate_m003_specification_acceptance.ps1
 Test d'acceptation de la spécification M-003: OK
 Test GREEN: tests/m003/validate_m003_specification_acceptance.ps1
@@ -282,7 +285,7 @@ Test GREEN: tests/m003/validate_m003_traceability_acceptance.ps1
 Test requis: tests/m003/validate_m003_traceability_unit.ps1
 Tests unitaires de traçabilité M-003: OK
 Test GREEN: tests/m003/validate_m003_traceability_unit.ps1
-Gate test GREEN: 12 validation(s), 70 test(s).
+Gate test GREEN: 12 validation(s), 71 test(s).
 ~~~
 
 ### lint
