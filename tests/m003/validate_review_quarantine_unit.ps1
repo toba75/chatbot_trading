@@ -215,6 +215,23 @@ direct_quarantine = diagnosed_corrupt_run("RUN-M003-T007-UNIT-DIRECT").quarantin
 )
 assert_equal(direct_quarantine.status, DocumentProcessingRunStatus.QUARANTINED, "Un diagnostic corrompu doit pouvoir être quarantiné directement.")
 
+manifest_quarantine = started_run("RUN-M003-T007-UNIT-MANIFEST").quarantine(
+    routing_policy_version=routing_policy_version(),
+    reason="Manifeste illisible isolé avant diagnostic.",
+)
+assert_equal(manifest_quarantine.status, DocumentProcessingRunStatus.QUARANTINED, "Un manifeste créé doit pouvoir être quarantiné directement.")
+assert_equal(manifest_quarantine.page_decisions, (), "La quarantaine depuis manifeste ne doit pas fabriquer de diagnostics.")
+
+quarantined_source = registered_source().quarantine(reason="Source isolée avant nouvelle tentative.")
+assert_raises(
+    "source documentaire non publiable: QUARANTINED",
+    lambda: DocumentProcessingRun.start(
+        processing_run_id=ProcessingRunId.from_value("RUN-M003-T007-SOURCE-BLOCKED"),
+        source_document=quarantined_source,
+        page_manifest=manifest_for(2),
+    ),
+)
+
 reject_reason = "Route insuffisamment justifiée après revue manuelle."
 rejected_run = manual_review_run("RUN-M003-T007-UNIT-REJECT").reject(
     routing_policy_version=routing_policy_version(),

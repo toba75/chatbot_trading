@@ -160,8 +160,6 @@ def _document_id_from_diagnose_path(path: str) -> str | None:
     if not parsed_path.startswith(prefix) or not parsed_path.endswith(suffix):
         return None
     document_id = parsed_path[len(prefix) : -len(suffix)]
-    if document_id == "":
-        raise ValueError("document_id absent")
     return document_id
 
 

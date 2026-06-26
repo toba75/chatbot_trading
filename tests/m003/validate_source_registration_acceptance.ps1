@@ -23,9 +23,15 @@ class InMemoryOriginalSourceStore:
         self.write_operations = []
 
     def store_original(self, document_id, fingerprint, original_content):
+        raise AssertionError("L'enregistrement doit utiliser put_original_if_absent.")
+
+    def put_original_if_absent(self, document_id, fingerprint, original_content):
         storage_ref = f"artifact:source_processing.original_sources/{document_id.value}/{fingerprint.value}.pdf"
-        if storage_ref in self.content_by_ref:
-            raise AssertionError("L'original ne doit pas être réécrit.")
+        existing_content = self.content_by_ref.get(storage_ref)
+        if existing_content is not None:
+            if existing_content != bytes(original_content):
+                raise AssertionError("Un original existant ne doit pas être remplacé par un autre contenu.")
+            return storage_ref
         self.content_by_ref[storage_ref] = bytes(original_content)
         self.write_operations.append(storage_ref)
         return storage_ref

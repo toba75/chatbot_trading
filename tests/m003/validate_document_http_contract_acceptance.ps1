@@ -249,6 +249,18 @@ assert_equal(
     "Le DocumentId invalide doit être nommé.",
 )
 
+# Given l'identifiant public est absent dans le chemin de diagnostic.
+# When l'endpoint de diagnostic est appelé.
+empty_document_id = post_diagnose(adapter, "")
+
+# Then l'erreur reste une réponse client stable.
+assert_equal(empty_document_id.status_code, 400, "Un DocumentId absent doit retourner 400.")
+assert_equal(
+    empty_document_id.body,
+    {"error_code": "HTTP_REQUEST_INVALID", "field": "document_id"},
+    "Le DocumentId absent doit être nommé.",
+)
+
 print("Test d'acceptation T-008 contrat HTTP documentaire SP: OK")
 '@
 

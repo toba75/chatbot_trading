@@ -29,10 +29,18 @@ class InMemoryOriginalSourceStore:
     def __init__(self):
         self.content_by_ref = {}
 
-    def store_original(self, document_id, fingerprint, original_content):
+    def put_original_if_absent(self, document_id, fingerprint, original_content):
         storage_ref = f"artifact:source_processing.original_sources/{document_id.value}/{fingerprint.value}.pdf"
+        existing_content = self.content_by_ref.get(storage_ref)
+        if existing_content is not None:
+            if existing_content != bytes(original_content):
+                raise AssertionError("Un original existant ne doit pas être remplacé par un autre contenu.")
+            return storage_ref
         self.content_by_ref[storage_ref] = bytes(original_content)
         return storage_ref
+
+    def store_original(self, document_id, fingerprint, original_content):
+        raise AssertionError("L'enregistrement doit utiliser put_original_if_absent.")
 
 
 class InMemorySourceDocumentRepository:
@@ -93,6 +101,21 @@ class InMemoryProcessingRunRepository:
 
     def find_by_document_id(self, document_id):
         return self.runs_by_document_id.get(document_id.value)
+
+    def submit_processing_run(self, processing_run, job_queue, job_request):
+        submission = job_queue.submit(request=job_request, recalculate=False)
+        if not submission.created:
+            return submission
+        self.save(processing_run)
+        return submission
+
+
+class SaveFailingProcessingRunRepository(InMemoryProcessingRunRepository):
+    def save(self, processing_run):
+        raise RuntimeError("dépôt de tentatives indisponible")
+
+    def submit_processing_run(self, processing_run, job_queue, job_request):
+        raise RuntimeError("dépôt de tentatives indisponible")
 
 
 class FailingDiagnosisJobQueue:
@@ -243,7 +266,43 @@ assert_equal(
     "Le retry doit rester possible après une panne de soumission DIAGNOSE.",
 )
 
+# Une panne de persistance de tentative ne doit pas créer de job orphelin.
+save_failing_service, save_failing_source_repository, save_failing_inspector, _, save_failing_queue = build_service()
+save_failing_processing_repository = SaveFailingProcessingRunRepository()
+save_failing_service = DocumentCommandService(
+    original_source_store=InMemoryOriginalSourceStore(),
+    source_document_repository=save_failing_source_repository,
+    document_inspector=save_failing_inspector,
+    processing_run_repository=save_failing_processing_repository,
+    job_queue=save_failing_queue,
+    diagnosis_configuration_hash="e" * 64,
+    code_version="m003-t008-document-commands",
+    model_version="diagnosis-policy-v1",
+)
+save_failing_registered, save_failing_source_document = register_readable_source(
+    save_failing_service,
+    save_failing_source_repository,
+    save_failing_inspector,
+)
+assert_raises(
+    RuntimeError,
+    "dépôt de tentatives indisponible",
+    lambda: save_failing_service.start_document_processing(document_id=save_failing_registered.document_id.value),
+)
+assert_equal(save_failing_queue.created_job_count(), 0, "Une persistance de tentative échouée ne doit pas créer de job DIAGNOSE.")
+
+# Une source mise en quarantaine ne peut pas contourner le blocage via l'endpoint de diagnostic.
+quarantined_source = source_document.quarantine(reason="Corruption confirmée avant diagnostic.")
+source_repository.documents_by_id[quarantined_source.document_id.value] = quarantined_source
+assert_raises(
+    SourceUnreadableError,
+    "source documentaire non publiable: QUARANTINED",
+    lambda: service.start_document_processing(document_id=quarantined_source.document_id.value),
+)
+assert_equal(job_queue.created_job_count(), 0, "Une source quarantinée ne doit pas créer de job DIAGNOSE.")
+
 # La demande de diagnostic crée une tentative SP et un job DIAGNOSE idempotent, sans conversion.
+source_repository.documents_by_id[source_document.document_id.value] = source_document
 diagnosis = service.start_document_processing(document_id=registered.document_id.value)
 assert_equal(diagnosis.document_id.value, registered.document_id.value, "Le diagnostic doit conserver le DocumentId métier.")
 assert_equal(diagnosis.diagnostic_status, "DIAGNOSTIC_REQUESTED", "Le statut de diagnostic doit être explicite.")

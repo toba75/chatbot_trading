@@ -165,6 +165,11 @@ class SourceDocument:
         parsed_document_id = _ensure_document_id(document_id)
         parsed_fingerprint = _ensure_fingerprint(fingerprint)
         parsed_storage_ref = _ensure_storage_ref(original_storage_ref)
+        _ensure_storage_ref_matches(
+            storage_ref=parsed_storage_ref,
+            document_id=parsed_document_id,
+            fingerprint=parsed_fingerprint,
+        )
         parsed_metadata = _ensure_metadata(metadata)
         registered_event = SourceDocumentRegistered(
             document_id=parsed_document_id,
@@ -354,6 +359,20 @@ def _ensure_storage_ref(value: OriginalStorageRef) -> OriginalStorageRef:
     if not isinstance(value, OriginalStorageRef):
         raise ValueError("original_storage_ref invalide")
     return value
+
+
+def _ensure_storage_ref_matches(
+    *,
+    storage_ref: OriginalStorageRef,
+    document_id: DocumentId,
+    fingerprint: SourceFingerprint,
+) -> None:
+    expected_value = (
+        f"{_ORIGINAL_STORAGE_PREFIX}"
+        f"{document_id.value}/{fingerprint.value}.pdf"
+    )
+    if storage_ref.value != expected_value:
+        raise ValueError("original_storage_ref incohérent")
 
 
 def _ensure_metadata(value: BibliographicMetadata) -> BibliographicMetadata:

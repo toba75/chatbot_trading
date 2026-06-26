@@ -25,12 +25,18 @@ class InMemoryOriginalSourceStore:
     def __init__(self):
         self.content_by_ref = {}
 
-    def store_original(self, document_id, fingerprint, original_content):
+    def put_original_if_absent(self, document_id, fingerprint, original_content):
         storage_ref = f"artifact:source_processing.original_sources/{document_id.value}/{fingerprint.value}.pdf"
-        if storage_ref in self.content_by_ref:
-            raise AssertionError("L'original ne doit pas être réécrit.")
+        existing_content = self.content_by_ref.get(storage_ref)
+        if existing_content is not None:
+            if existing_content != bytes(original_content):
+                raise AssertionError("Un original existant ne doit pas être remplacé par un autre contenu.")
+            return storage_ref
         self.content_by_ref[storage_ref] = bytes(original_content)
         return storage_ref
+
+    def store_original(self, document_id, fingerprint, original_content):
+        raise AssertionError("L'enregistrement doit utiliser put_original_if_absent.")
 
 
 class InMemorySourceDocumentRepository:
@@ -94,6 +100,13 @@ class InMemoryProcessingRunRepository:
 
     def find_by_document_id(self, document_id):
         return self.runs_by_document_id.get(document_id.value)
+
+    def submit_processing_run(self, processing_run, job_queue, job_request):
+        submission = job_queue.submit(request=job_request, recalculate=False)
+        if not submission.created:
+            return submission
+        self.save(processing_run)
+        return submission
 
 
 def assert_equal(actual, expected, message):

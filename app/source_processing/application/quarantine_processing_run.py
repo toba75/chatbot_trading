@@ -7,23 +7,27 @@ from typing import Protocol
 
 from app.source_processing.domain.document_processing_run import (
     DocumentProcessingRun,
+    DocumentProcessingRunStatus,
     RoutingPolicyVersion,
 )
-from app.source_processing.domain.source_document import SourceDocument
+from app.source_processing.domain.source_document import (
+    SourceDocument,
+    SourceDocumentStatus,
+)
 
 
 class ProcessingRunRepository(Protocol):
     """Port de dépôt des tentatives de traitement documentaire."""
 
-    def save(self, processing_run: DocumentProcessingRun) -> None:
-        """Persiste la tentative mise en quarantaine."""
-
-
-class SourceDocumentRepository(Protocol):
-    """Port de dépôt des sources documentaires mises en quarantaine."""
-
-    def save(self, source_document: SourceDocument) -> None:
-        """Persiste la source mise en quarantaine."""
+    def save_quarantine(
+        self,
+        source_document: SourceDocument,
+        processing_run: DocumentProcessingRun,
+        *,
+        expected_processing_run_status: DocumentProcessingRunStatus,
+        expected_source_document_status: SourceDocumentStatus,
+    ) -> None:
+        """Persiste atomiquement la quarantaine si les statuts attendus tiennent."""
 
 
 @dataclass(frozen=True)
@@ -53,14 +57,10 @@ class QuarantineProcessingRunHandler:
     def __init__(
         self,
         processing_run_repository: ProcessingRunRepository,
-        source_document_repository: SourceDocumentRepository,
     ) -> None:
-        if not callable(getattr(processing_run_repository, "save", None)):
+        if not callable(getattr(processing_run_repository, "save_quarantine", None)):
             raise ValueError("processing_run_repository invalide")
-        if not callable(getattr(source_document_repository, "save", None)):
-            raise ValueError("source_document_repository invalide")
         self._processing_run_repository = processing_run_repository
-        self._source_document_repository = source_document_repository
 
     def handle(self, command: QuarantineProcessingRunCommand) -> DocumentProcessingRun:
         if not isinstance(command, QuarantineProcessingRunCommand):
@@ -71,8 +71,12 @@ class QuarantineProcessingRunHandler:
             routing_policy_version=command.routing_policy_version,
             reason=command.reason,
         )
-        self._source_document_repository.save(quarantined_source)
-        self._processing_run_repository.save(quarantined_run)
+        self._processing_run_repository.save_quarantine(
+            source_document=quarantined_source,
+            processing_run=quarantined_run,
+            expected_processing_run_status=command.processing_run.status,
+            expected_source_document_status=command.source_document.status,
+        )
         return quarantined_run
 
 
@@ -90,5 +94,4 @@ __all__ = [
     "ProcessingRunRepository",
     "QuarantineProcessingRunCommand",
     "QuarantineProcessingRunHandler",
-    "SourceDocumentRepository",
 ]

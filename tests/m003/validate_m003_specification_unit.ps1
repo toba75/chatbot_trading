@@ -20,7 +20,7 @@ function New-ValidM003SpecificationContent {
 - Milestone: M-003 - Source enregistr$($eAcute)e, diagnostiqu$($eAcute)e et rout$($eAcute)e.
 - Source canonique: ``docs/specs/plan_implementation_milestones_workstreams.md``, section ``M-003 - Source enregistr$($eAcute)e, diagnostiqu$($eAcute)e et rout$($eAcute)e``.
 - Sp$($eAcute)cification normative: ``docs/specs/specification_unifiee_ddd_technique_chatbot_trading_v4_1.md``, sections 5, 12, 17, 19, 20 et 21.
-- ADR consult$($eAcute)es: ADR-002, ADR-003, DDD-ADR-003.
+- ADR consult$($eAcute)es: ADR-002, ADR-003, ADR-010, DDD-ADR-003.
 - Contrats amont: ``docs/specs/m001_frontieres_ddd_contrats_publies.md`` et ``docs/specs/m002_plateforme_locale_sure.md``.
 - ADR: non requise, car M-003 applique le routage hybride, l'usage OCRmyPDF conditionnel et le langage publi$($eAcute) documentaire sans changer leur sens.
 

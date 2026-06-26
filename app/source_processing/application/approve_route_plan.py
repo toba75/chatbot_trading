@@ -7,6 +7,7 @@ from typing import Protocol
 
 from app.source_processing.domain.document_processing_run import (
     DocumentProcessingRun,
+    DocumentProcessingRunStatus,
     PageRoutingConfiguration,
 )
 
@@ -14,8 +15,13 @@ from app.source_processing.domain.document_processing_run import (
 class ProcessingRunRepository(Protocol):
     """Port de dépôt des tentatives de traitement documentaire."""
 
-    def save(self, processing_run: DocumentProcessingRun) -> None:
-        """Persiste la tentative routée ou placée en revue manuelle."""
+    def save_transition(
+        self,
+        processing_run: DocumentProcessingRun,
+        *,
+        expected_status: DocumentProcessingRunStatus,
+    ) -> None:
+        """Persiste une transition si la tentative est encore au statut attendu."""
 
 
 @dataclass(frozen=True)
@@ -36,7 +42,7 @@ class ApproveRoutePlanHandler:
     """Handler applicatif de la commande ApproveRoutePlan."""
 
     def __init__(self, processing_run_repository: ProcessingRunRepository) -> None:
-        if not callable(getattr(processing_run_repository, "save", None)):
+        if not callable(getattr(processing_run_repository, "save_transition", None)):
             raise ValueError("processing_run_repository invalide")
         self._processing_run_repository = processing_run_repository
 
@@ -47,7 +53,10 @@ class ApproveRoutePlanHandler:
         routed_run = command.processing_run.decide_route_plan(
             command.routing_configuration
         )
-        self._processing_run_repository.save(routed_run)
+        self._processing_run_repository.save_transition(
+            routed_run,
+            expected_status=command.processing_run.status,
+        )
         return routed_run
 
 

@@ -148,11 +148,19 @@ function Initialize-ProjectWithMasterAndBranch {
 function Invoke-Validator {
     param(
         [Parameter(Mandatory = $true)]
-        [string] $ProjectRoot
+        [string] $ProjectRoot,
+
+        [Parameter(Mandatory = $false)]
+        [string] $ReportPathOverride
     )
 
     $scriptPath = Join-Path $ProjectRoot "scripts/validate_m003_precondition.ps1"
-    $reportPath = Join-Path $ProjectRoot "docs/governance/m003_precondition_green.md"
+    if ([string]::IsNullOrWhiteSpace($ReportPathOverride)) {
+        $reportPath = Join-Path $ProjectRoot "docs/governance/m003_precondition_green.md"
+    }
+    else {
+        $reportPath = $ReportPathOverride
+    }
     $previousErrorActionPreference = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
 
@@ -260,6 +268,16 @@ try {
         -Output $emptyOutputResult.Output `
         -Expected "Gate M-003 RED: test sans sortie." `
         -Message "La sortie vide doit être nommée explicitement."
+
+    $outsideReportRoot = New-TemporaryProject -Name "outside-report-path" -TestGateContent $greenTestGate -LintGateContent $greenLintGate -IncludeMilestone002 $true
+    Initialize-ProjectWithMasterAndBranch -ProjectRoot $outsideReportRoot -DivergeMasterReference $false
+    $outsideReportPath = Join-Path $temporaryRoot "m003_precondition_outside.md"
+    $outsideReportResult = Invoke-Validator -ProjectRoot $outsideReportRoot -ReportPathOverride $outsideReportPath
+    Assert-ExitCode -Actual $outsideReportResult.ExitCode -Expected 1 -Message "La précondition doit refuser un rapport hors dépôt."
+    Assert-OutputContains `
+        -Output $outsideReportResult.Output `
+        -Expected "Chemin de rapport M-003 hors dépôt:" `
+        -Message "Le chemin hors dépôt doit être nommé explicitement."
 }
 finally {
     Remove-Item -LiteralPath $temporaryRoot -Recurse -Force

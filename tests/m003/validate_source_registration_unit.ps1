@@ -131,6 +131,19 @@ for invalid_ref in (
 ):
     assert_raises("original_storage_ref invalide", lambda invalid_ref=invalid_ref: OriginalStorageRef.from_value(invalid_ref))
 
+mismatched_storage_ref = OriginalStorageRef.from_value(
+    f"artifact:source_processing.original_sources/DOC-1111111111111111/{fingerprint.value}.pdf"
+)
+assert_raises(
+    "original_storage_ref incoh",
+    lambda: SourceDocument.register_original(
+        document_id=document_id,
+        fingerprint=fingerprint,
+        original_storage_ref=mismatched_storage_ref,
+        metadata=metadata,
+    ),
+)
+
 # DuplicateEditionPolicy distingue doublon binaire, nouvelle édition et nouvelle source.
 policy = DuplicateEditionPolicy()
 binary_duplicate = policy.classify(

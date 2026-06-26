@@ -15,6 +15,7 @@ sys.path.insert(0, sys.argv[1])
 
 from app.source_processing.application.audit_signals import (
     DocumentIngestionAuditEvent,
+    SourceProcessingAuditLogEvent,
     SourceProcessingAuditSignalError,
     build_source_processing_audit_signals,
 )
@@ -253,6 +254,31 @@ assert_equal(
     nominal_metric_names,
     {"documents_par_route", "taux_quarantaine"},
     "Un lot sans erreur ne doit pas exiger erreurs_par_modele.",
+)
+
+quarantine_only_signals = build_source_processing_audit_signals(
+    (
+        event(
+            "trace-m003-quarantine-only",
+            "DOC-M003-AUDIT-009",
+            "RUN-M003-AUDIT-009",
+            None,
+            DocumentProcessingRunStatus.QUARANTINED,
+            "granite-docling",
+            True,
+            "UNSUPPORTED_OR_CORRUPT",
+        ),
+    )
+)
+quarantine_only_metric_names = {metric.name for metric in quarantine_only_signals.metrics}
+assert_equal(
+    quarantine_only_metric_names,
+    {"taux_quarantaine", "erreurs_par_modele"},
+    "Un lot sans route ne doit pas exiger documents_par_route.",
+)
+assert_error(
+    "SP_AUDIT_FIELD_NAME_FORBIDDEN",
+    lambda: SourceProcessingAuditLogEvent(fields={"page_text": PAGE_TEXT_CANARY}),
 )
 
 print("Test d'acceptation signaux d'audit M-003: OK")

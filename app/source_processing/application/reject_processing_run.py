@@ -7,6 +7,7 @@ from typing import Protocol
 
 from app.source_processing.domain.document_processing_run import (
     DocumentProcessingRun,
+    DocumentProcessingRunStatus,
     RoutingPolicyVersion,
 )
 
@@ -14,8 +15,13 @@ from app.source_processing.domain.document_processing_run import (
 class ProcessingRunRepository(Protocol):
     """Port de dépôt des tentatives de traitement documentaire."""
 
-    def save(self, processing_run: DocumentProcessingRun) -> None:
-        """Persiste la tentative rejetée."""
+    def save_transition(
+        self,
+        processing_run: DocumentProcessingRun,
+        *,
+        expected_status: DocumentProcessingRunStatus,
+    ) -> None:
+        """Persiste le rejet si la tentative est encore au statut attendu."""
 
 
 @dataclass(frozen=True)
@@ -38,7 +44,7 @@ class RejectProcessingRunHandler:
     """Handler applicatif de la commande RejectProcessingRun."""
 
     def __init__(self, processing_run_repository: ProcessingRunRepository) -> None:
-        if not callable(getattr(processing_run_repository, "save", None)):
+        if not callable(getattr(processing_run_repository, "save_transition", None)):
             raise ValueError("processing_run_repository invalide")
         self._processing_run_repository = processing_run_repository
 
@@ -50,7 +56,10 @@ class RejectProcessingRunHandler:
             routing_policy_version=command.routing_policy_version,
             reason=command.reason,
         )
-        self._processing_run_repository.save(rejected_run)
+        self._processing_run_repository.save_transition(
+            rejected_run,
+            expected_status=command.processing_run.status,
+        )
         return rejected_run
 
 

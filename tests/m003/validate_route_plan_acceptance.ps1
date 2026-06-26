@@ -48,9 +48,14 @@ from app.source_processing.domain.source_document import (
 class InMemoryProcessingRunRepository:
     def __init__(self):
         self.saved_runs = []
+        self.saved_transition_statuses = []
 
     def save(self, processing_run):
         self.saved_runs.append(processing_run)
+
+    def save_transition(self, processing_run, *, expected_status):
+        self.saved_runs.append(processing_run)
+        self.saved_transition_statuses.append(expected_status)
 
 
 def assert_equal(actual, expected, message):
@@ -306,6 +311,11 @@ assert_true(
     "Chaque route décidée doit produire un événement PageRouteDecided.",
 )
 assert_equal(route_repository.saved_runs, [planned_run], "Le plan routé doit être persisté une seule fois.")
+assert_equal(
+    route_repository.saved_transition_statuses,
+    [diagnosed_routeable_run.status],
+    "Le plan routé doit être persisté avec le statut source attendu.",
+)
 
 uncertain_diagnostics = (
     diagnostic(
@@ -357,6 +367,11 @@ assert_is_none(manual_run.route_plan, "La revue manuelle ne doit pas fabriquer d
 assert_true("page 2" in manual_run.manual_review_reason, "La revue manuelle doit nommer la page refusée.")
 assert_true(isinstance(manual_run.events[-1], ManualReviewRequested), "La revue manuelle doit produire un événement explicite.")
 assert_equal(manual_repository.saved_runs, [manual_run], "La revue manuelle doit être persistée une seule fois.")
+assert_equal(
+    manual_repository.saved_transition_statuses,
+    [diagnosed_uncertain_run.status],
+    "La revue manuelle doit être persistée avec le statut source attendu.",
+)
 
 print("Test d'acceptation T-006 plan de routage explicite: OK")
 '@

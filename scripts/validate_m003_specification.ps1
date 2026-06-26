@@ -33,6 +33,7 @@ $requiredSections = @(
 $requiredAdrIds = @(
     "ADR-002",
     "ADR-003",
+    "ADR-010",
     "DDD-ADR-003"
 )
 

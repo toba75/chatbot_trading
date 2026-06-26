@@ -16,6 +16,23 @@ from app.source_processing.domain.document_processing_run import (
 )
 from app.source_processing.domain.source_document import DocumentId
 
+_AUDIT_LOG_FIELD_NAMES = frozenset(
+    {
+        "trace_id",
+        "document_id",
+        "processing_run_id",
+        "phase",
+        "status",
+        "route_name",
+        "routing_policy_version",
+        "served_model",
+        "page_count",
+        "latency_ms",
+        "quarantined",
+        "error_code",
+    }
+)
+
 
 class SourceProcessingAuditSignalError(ValueError):
     """Erreur explicite du contrat d'audit SP."""
@@ -232,7 +249,7 @@ def _ensure_metric_events(
         raise SourceProcessingAuditSignalError("SP_AUDIT_METRICS_REQUIRED", "Les métriques d'audit sont requises.")
     metrics = tuple(value)
     metric_names = {metric.name for metric in metrics if isinstance(metric, SourceProcessingMetricEvent)}
-    required_metric_names = {"documents_par_route", "taux_quarantaine"}
+    required_metric_names = {"taux_quarantaine"}
     missing_metric_names = required_metric_names - metric_names
     if len(missing_metric_names) > 0:
         raise SourceProcessingAuditSignalError(
@@ -378,6 +395,11 @@ def _freeze_observable_mapping(value: Mapping[str, Any]) -> Mapping[str, Any]:
     frozen: dict[str, Any] = {}
     for key, nested_value in value.items():
         parsed_key = _ensure_text(key, "field_name", "SP_AUDIT_FIELD_NAME_REQUIRED")
+        if parsed_key not in _AUDIT_LOG_FIELD_NAMES:
+            raise SourceProcessingAuditSignalError(
+                "SP_AUDIT_FIELD_NAME_FORBIDDEN",
+                f"Champ d'audit interdit: {parsed_key}",
+            )
         if isinstance(nested_value, str):
             frozen[parsed_key] = _ensure_text(nested_value, parsed_key, "SP_AUDIT_FIELD_VALUE_REQUIRED")
         elif isinstance(nested_value, bool) or isinstance(nested_value, int) or nested_value is None:
@@ -389,6 +411,12 @@ def _freeze_observable_mapping(value: Mapping[str, Any]) -> Mapping[str, Any]:
                 "SP_AUDIT_FIELD_VALUE_INVALID",
                 f"Valeur d'audit invalide: {parsed_key}",
             )
+    missing_fields = _AUDIT_LOG_FIELD_NAMES - frozenset(frozen.keys())
+    if len(missing_fields) > 0:
+        raise SourceProcessingAuditSignalError(
+            "SP_AUDIT_FIELD_NAME_REQUIRED",
+            "Champs d'audit absents: " + ", ".join(sorted(missing_fields)),
+        )
     return MappingProxyType(frozen)
 
 

@@ -52,17 +52,30 @@ from app.source_processing.domain.source_document import (
 class InMemoryProcessingRunRepository:
     def __init__(self):
         self.saved_runs = []
+        self.saved_sources = []
+        self.saved_transition_statuses = []
+        self.saved_quarantine_statuses = []
 
     def save(self, processing_run):
         self.saved_runs.append(processing_run)
 
+    def save_transition(self, processing_run, *, expected_status):
+        self.saved_runs.append(processing_run)
+        self.saved_transition_statuses.append(expected_status)
 
-class InMemorySourceDocumentRepository:
-    def __init__(self):
-        self.saved_sources = []
-
-    def save(self, source_document):
+    def save_quarantine(
+        self,
+        source_document,
+        processing_run,
+        *,
+        expected_processing_run_status,
+        expected_source_document_status,
+    ):
         self.saved_sources.append(source_document)
+        self.saved_runs.append(processing_run)
+        self.saved_quarantine_statuses.append(
+            (expected_processing_run_status, expected_source_document_status)
+        )
 
 
 def assert_equal(actual, expected, message):
@@ -243,6 +256,11 @@ assert_equal(manual_run.status, DocumentProcessingRunStatus.MANUAL_REVIEW, "La p
 assert_true("page 2" in manual_run.blocking_reason, "La revue manuelle doit conserver la page bloquante.")
 assert_equal(manual_run.blocking_policy_version.value, "routing-v1", "La version de politique bloquante doit être conservée.")
 assert_is_none(manual_run.route_plan, "Une tentative en revue ne doit pas porter de plan publiable.")
+assert_equal(
+    manual_repository.saved_transition_statuses,
+    [diagnosed_uncertain_run.status],
+    "La revue manuelle doit être persistée avec le statut source attendu.",
+)
 assert_raises(
     "tentative M-003 non publiable: MANUAL_REVIEW",
     manual_run.ensure_documentary_publication_allowed,
@@ -250,10 +268,8 @@ assert_raises(
 
 # Given la revue confirme que la source doit être isolée.
 quarantine_repository = InMemoryProcessingRunRepository()
-quarantine_source_repository = InMemorySourceDocumentRepository()
 quarantine_handler = QuarantineProcessingRunHandler(
     processing_run_repository=quarantine_repository,
-    source_document_repository=quarantine_source_repository,
 )
 quarantine_reason = "Page 2 corrompue confirmée par contrôle humain."
 
@@ -273,8 +289,13 @@ assert_equal(quarantined_run.blocking_reason, quarantine_reason, "La quarantaine
 assert_equal(quarantined_run.blocking_policy_version.value, "routing-v1", "La quarantaine doit conserver la version de politique.")
 assert_true(isinstance(quarantined_run.events[-1], ProcessingRunQuarantined), "La quarantaine doit produire un événement explicite.")
 assert_equal(quarantine_repository.saved_runs, [quarantined_run], "La quarantaine doit être persistée une seule fois.")
-assert_equal(len(quarantine_source_repository.saved_sources), 1, "La source quarantinée doit être persistée une seule fois.")
-quarantined_source = quarantine_source_repository.saved_sources[0]
+assert_equal(len(quarantine_repository.saved_sources), 1, "La source quarantinée doit être persistée une seule fois.")
+assert_equal(
+    quarantine_repository.saved_quarantine_statuses,
+    [(manual_run.status, source_document.status)],
+    "La quarantaine doit être persistée avec les statuts source attendus.",
+)
+quarantined_source = quarantine_repository.saved_sources[0]
 assert_equal(quarantined_source.document_id, source_document.document_id, "La quarantaine source conserve le DocumentId.")
 assert_raises(
     "source documentaire non publiable: QUARANTINED",
@@ -316,6 +337,11 @@ assert_equal(rejected_run.status, DocumentProcessingRunStatus.REJECTED, "La tent
 assert_equal(rejected_run.blocking_reason, reject_reason, "Le rejet doit conserver sa justification.")
 assert_true(isinstance(rejected_run.events[-1], ProcessingRunRejected), "Le rejet doit produire un événement explicite.")
 assert_equal(reject_repository.saved_runs, [rejected_run], "Le rejet doit être persisté une seule fois.")
+assert_equal(
+    reject_repository.saved_transition_statuses,
+    [manual_rejected_candidate.status],
+    "Le rejet doit être persisté avec le statut source attendu.",
+)
 assert_raises(
     "tentative M-003 non publiable: REJECTED",
     rejected_run.ensure_documentary_publication_allowed,

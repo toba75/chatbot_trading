@@ -57,6 +57,15 @@ function Resolve-M003ReportPath {
         $resolvedReportPath = [System.IO.Path]::GetFullPath((Join-Path $repoRoot $ReportPath))
     }
 
+    $repoRootPath = [System.IO.Path]::GetFullPath($repoRoot).TrimEnd(
+        [System.IO.Path]::DirectorySeparatorChar,
+        [System.IO.Path]::AltDirectorySeparatorChar
+    )
+    $repoRootPrefix = $repoRootPath + [System.IO.Path]::DirectorySeparatorChar
+    Assert-M003Condition `
+        -Condition ($resolvedReportPath.StartsWith($repoRootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) `
+        -Message "Chemin de rapport M-003 hors dépôt: $resolvedReportPath"
+
     $reportDirectory = Split-Path -Parent $resolvedReportPath
     Assert-M003Condition `
         -Condition (-not [string]::IsNullOrWhiteSpace($reportDirectory)) `

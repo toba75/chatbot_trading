@@ -842,6 +842,7 @@ class DocumentProcessingRun:
     ) -> "DocumentProcessingRun":
         parsed_processing_run_id = _ensure_processing_run_id(processing_run_id)
         parsed_source_document = _ensure_source_document(source_document)
+        parsed_source_document.ensure_documentary_publication_allowed()
         parsed_manifest = _ensure_page_manifest(page_manifest)
         started_event = DocumentProcessingStarted(
             processing_run_id=parsed_processing_run_id,
@@ -964,6 +965,7 @@ class DocumentProcessingRun:
         reason: str,
     ) -> "DocumentProcessingRun":
         if self.status not in (
+            DocumentProcessingRunStatus.MANIFEST_CREATED,
             DocumentProcessingRunStatus.DIAGNOSED,
             DocumentProcessingRunStatus.MANUAL_REVIEW,
         ):
@@ -1106,10 +1108,11 @@ class DocumentProcessingRun:
             DocumentProcessingRunStatus.QUARANTINED,
             DocumentProcessingRunStatus.REJECTED,
         ):
-            _ensure_page_diagnostic_completeness(
-                page_manifest=self.page_manifest,
-                page_decisions=page_decisions,
-            )
+            if self.status is DocumentProcessingRunStatus.REJECTED or len(page_decisions) > 0:
+                _ensure_page_diagnostic_completeness(
+                    page_manifest=self.page_manifest,
+                    page_decisions=page_decisions,
+                )
             if route_plan is not None:
                 raise ValueError("plan de route interdit sur tentative bloquée")
             _ensure_manual_review_reason(manual_review_reason)

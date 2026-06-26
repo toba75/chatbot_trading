@@ -18,13 +18,13 @@ from app.source_processing.domain.source_document import (
 class OriginalSourceStore(Protocol):
     """Port de stockage de l'original immuable."""
 
-    def store_original(
+    def put_original_if_absent(
         self,
         document_id: DocumentId,
         fingerprint: SourceFingerprint,
         original_content: bytes,
     ) -> str:
-        """Stocke l'original bit-à-bit et retourne sa référence immuable."""
+        """Stocke l'original bit-à-bit si absent et retourne sa référence immuable."""
 
 
 class SourceDocumentRepository(Protocol):
@@ -101,7 +101,7 @@ class RegisterSourceDocumentHandler:
         original_source_store: OriginalSourceStore,
         source_document_repository: SourceDocumentRepository,
     ) -> None:
-        if not hasattr(original_source_store, "store_original"):
+        if not callable(getattr(original_source_store, "put_original_if_absent", None)):
             raise ValueError("original_source_store invalide")
         if not callable(getattr(source_document_repository, "find_by_fingerprint", None)):
             raise ValueError("source_document_repository invalide")
@@ -148,7 +148,7 @@ class RegisterSourceDocumentHandler:
 
         document_id = DocumentId.from_fingerprint(fingerprint)
         storage_ref = OriginalStorageRef.from_value(
-            self._original_source_store.store_original(
+            self._original_source_store.put_original_if_absent(
                 document_id=document_id,
                 fingerprint=fingerprint,
                 original_content=command.original_content,
@@ -164,6 +164,8 @@ class RegisterSourceDocumentHandler:
             source_document
         )
         if concurrent_duplicate is not None:
+            if concurrent_duplicate.fingerprint != fingerprint:
+                raise ValueError("document_id concurrent incohérent")
             return RegisterSourceDocumentResult(
                 decision="BINARY_DUPLICATE",
                 source_document=None,

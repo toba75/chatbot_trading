@@ -45,6 +45,14 @@ class ProcessingRunLookupRepository(ProcessingRunRepository, Protocol):
     def find_by_document_id(self, document_id: DocumentId) -> object | None:
         """Retourne une tentative déjà demandée pour ce document."""
 
+    def submit_processing_run(
+        self,
+        processing_run: object,
+        job_queue: "DiagnosisJobQueue",
+        job_request: JobRequest,
+    ) -> JobSubmissionDecision:
+        """Persiste la tentative et soumet le job DIAGNOSE en une opération atomique."""
+
 
 class DiagnosisJobQueue(Protocol):
     """Port de soumission idempotente au runtime de jobs M-002."""
@@ -140,6 +148,8 @@ class DocumentCommandService:
             raise ValueError("source_document_repository sans lecture par document_id")
         if not callable(getattr(processing_run_repository, "find_by_document_id", None)):
             raise ValueError("processing_run_repository sans lecture par document_id")
+        if not callable(getattr(processing_run_repository, "submit_processing_run", None)):
+            raise ValueError("processing_run_repository sans soumission atomique")
         if not callable(getattr(job_queue, "submit", None)):
             raise ValueError("job_queue invalide")
         self._source_document_repository = source_document_repository
@@ -207,6 +217,10 @@ class DocumentCommandService:
         if source_document is None:
             raise SourceNotFoundError(document_id=parsed_document_id.value)
         parsed_source_document = _ensure_source_document(source_document)
+        try:
+            parsed_source_document.ensure_documentary_publication_allowed()
+        except ValueError as exc:
+            raise SourceUnreadableError(reason=str(exc)) from exc
 
         processing_run_id = ProcessingRunId.from_value(
             f"RUN-DIAGNOSE-{parsed_document_id.value}"
@@ -216,30 +230,30 @@ class DocumentCommandService:
             source_document=parsed_source_document,
         )
         processing_run = self._start_handler.prepare(start_command)
-        submission = self._job_queue.submit(
-            request=JobRequest(
+        job_request = JobRequest(
+            job_name="DIAGNOSE",
+            priority=JobPriority.P1,
+            idempotence_key=JobIdempotenceKey(
                 job_name="DIAGNOSE",
-                priority=JobPriority.P1,
-                idempotence_key=JobIdempotenceKey(
-                    job_name="DIAGNOSE",
-                    input_hash=parsed_source_document.fingerprint.value,
-                    configuration_hash=self._diagnosis_configuration_hash,
-                    code_version=self._code_version,
-                    model_version=self._model_version,
-                ),
-                payload={
-                    "document_id": parsed_document_id.value,
-                    "processing_run_id": processing_run.processing_run_id.value,
-                    "original_storage_ref": parsed_source_document.original_storage_ref.value,
-                    "source_sha256": parsed_source_document.fingerprint.value,
-                },
+                input_hash=parsed_source_document.fingerprint.value,
+                configuration_hash=self._diagnosis_configuration_hash,
+                code_version=self._code_version,
+                model_version=self._model_version,
             ),
-            recalculate=False,
+            payload={
+                "document_id": parsed_document_id.value,
+                "processing_run_id": processing_run.processing_run_id.value,
+                "original_storage_ref": parsed_source_document.original_storage_ref.value,
+                "source_sha256": parsed_source_document.fingerprint.value,
+            },
+        )
+        submission = self._processing_run_repository.submit_processing_run(
+            processing_run=processing_run,
+            job_queue=self._job_queue,
+            job_request=job_request,
         )
         if not submission.created:
             raise DiagnosisAlreadyRequestedError(document_id=parsed_document_id.value)
-
-        self._processing_run_repository.save(processing_run)
 
         return DocumentDiagnosisAcceptance(
             document_id=parsed_document_id,
