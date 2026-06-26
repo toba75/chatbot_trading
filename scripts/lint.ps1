@@ -12,6 +12,7 @@ if (-not (Test-Path -LiteralPath $gatePath -PathType Leaf)) {
 $preconditionReportPath = Join-Path $repoRoot "docs/governance/m000_precondition_green_initiale.md"
 $m001SpecificationPath = Join-Path $repoRoot "docs/specs/m001_frontieres_ddd_contrats_publies.md"
 $m002SpecificationPath = Join-Path $repoRoot "docs/specs/m002_plateforme_locale_sure.md"
+$m003SpecificationPath = Join-Path $repoRoot "docs/specs/m003_source_enregistree_diagnostiquee_routee.md"
 $platformTopologyPath = Join-Path $repoRoot "app/platform/topology_registry.json"
 $sparkFirewallPath = Join-Path $repoRoot "deploy/spark-firewall/network-boundary.json"
 $appRoot = Join-Path $repoRoot "app"
@@ -25,6 +26,7 @@ $validationCommands = @(
     @{ Path = "scripts/validate_definition_of_done.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_m001_specification.ps1"; Arguments = @("-Path", $m001SpecificationPath) },
     @{ Path = "scripts/validate_m002_specification.ps1"; Arguments = @("-Path", $m002SpecificationPath) },
+    @{ Path = "scripts/validate_m003_specification.ps1"; Arguments = @("-Path", $m003SpecificationPath) },
     @{ Path = "scripts/validate_platform_topology.ps1"; Arguments = @("-Path", $platformTopologyPath) },
     @{ Path = "scripts/validate_local_compose.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_network_boundary.ps1"; Arguments = @("-SparkFirewallPath", $sparkFirewallPath) },
@@ -41,6 +43,7 @@ $expectedValidationPaths = @(
     "scripts/validate_definition_of_done.ps1",
     "scripts/validate_m001_specification.ps1",
     "scripts/validate_m002_specification.ps1",
+    "scripts/validate_m003_specification.ps1",
     "scripts/validate_platform_topology.ps1",
     "scripts/validate_local_compose.ps1",
     "scripts/validate_network_boundary.ps1",
@@ -54,7 +57,7 @@ Invoke-M000ValidationGate `
     -RepositoryRoot $repoRoot `
     -ValidationCommands $validationCommands `
     -TestCommands $testCommands `
-    -ExpectedValidationCount 11 `
+    -ExpectedValidationCount 12 `
     -ExpectedTestCount 0 `
     -ExpectedValidationPaths $expectedValidationPaths `
     -ExpectedTestPaths $expectedTestPaths
