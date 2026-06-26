@@ -30,6 +30,7 @@
 | T-004 - Adjuger l'autorité textuelle par page | `c5208a6` | `feat(m004): adjuger l autorite textuelle par page` | ADR-004 | Aucune | `tests/m004/validate_text_authority_acceptance.ps1`; `tests/m004/validate_text_authority_unit.ps1`; `scripts/validate_traceability.ps1`; `scripts/test.ps1`; `scripts/lint.ps1` |
 | T-005 - Contrôler la qualité de la version canonique | `500af18` | `feat(m004): controler la qualite de version canonique` | ADR-001; ADR-002; ADR-003; ADR-004 | Aucune | `tests/m004/validate_canonical_quality_acceptance.ps1`; `tests/m004/validate_canonical_quality_unit.ps1`; `tests/m003/validate_m003_precondition_acceptance.ps1`; `scripts/validate_traceability.ps1`; `scripts/validate_architecture_boundaries.ps1`; `scripts/test.ps1`; `scripts/lint.ps1` |
 | T-006 - Publier une version canonique immuable | `683b6dc` | `feat(m004): publier une version canonique immuable` | ADR-001; DDD-ADR-003 | Aucune | `tests/m004/validate_canonical_publication_acceptance.ps1`; `tests/m004/validate_canonical_publication_unit.ps1`; `tests/m001/validate_source_contracts_acceptance.ps1`; `scripts/validate_traceability.ps1`; `scripts/test.ps1`; `scripts/lint.ps1` |
+| T-007 - Rendre les SourceLocator résolvables | `adaaf93` | `feat(m004): rendre les source locator resolvables` | DDD-ADR-003 | Aucune | `tests/m004/validate_source_locator_resolution_acceptance.ps1`; `tests/m004/validate_source_locator_resolution_unit.ps1`; `tests/m001/validate_source_locator_unit.ps1`; `scripts/validate_architecture_boundaries.ps1`; `scripts/validate_traceability.ps1`; `scripts/test.ps1`; `scripts/lint.ps1` |
 
 ## Clôture T-001
 
@@ -98,3 +99,15 @@
 - ADR: non requise; T-006 applique ADR-001 et DDD-ADR-003 sans modifier la source de vérité documentaire ni le langage publié `CanonicalSourceRef`.
 - Validations GREEN: `tests/m004/validate_canonical_publication_acceptance.ps1`; `tests/m004/validate_canonical_publication_unit.ps1`; `tests/m001/validate_source_contracts_acceptance.ps1`; `scripts/validate_traceability.ps1`; `scripts/test.ps1`; `scripts/lint.ps1`.
 - Risques résiduels: T-006 publie l'agrégat et la référence canonique; la résolution fine `SourceLocator`, l'événement `CanonicalSourcePublished`, le contrat HTTP final et les gates M-004 de clôture restent portés par T-007 à T-010.
+
+## Clôture T-007
+
+- Scénario BDD: Given une version canonique publiée contenant une page avec plusieurs items; When un contexte aval valide un `SourceLocator` vers un item précis; Then SP confirme la version, la page PDF, l'item et le `content_hash`, ou refuse explicitement le locator.
+- Commit RED: `adaaf93` (`test(m004): couvrir la resolution des source locator`).
+- Commit GREEN: `feat(m004): rendre les source locator resolvables`.
+- Implémentation: `app/source_processing/application/source_locator_resolution.py` génère un registre de résolvabilité par version canonique, extrait les couples page PDF, `item_id`, `bbox` et `content_hash` du `PagewiseDoclingDocument`, produit une `SourceLocatorValidationPolicy` et résout le locator exact sans exposer les chemins d'artefacts, le stockage SP ni le texte documentaire complet.
+- Garde-fous livrés: `item_id` stable; `content_hash` obligatoire; page hors version refusée par le contrat M-001; item absent, hash incohérent, page incohérente avec l'item, bbox incohérente, version absente, retirée ou en quarantaine refusés explicitement; aucun accès direct de KA, EG ou RA aux tables internes SP.
+- Gates: `scripts/test.ps1` enrôle `tests/m004/validate_source_locator_resolution_acceptance.ps1` et `tests/m004/validate_source_locator_resolution_unit.ps1`; `docs/traceability/matrix.md` relie `REQ-M004-007` à la tâche, au test d'acceptation, au code applicatif et à DDD-ADR-003. Les assertions de volume de gate ont été réalignées sur 85 tests globaux, 84 tests dans le rapport M-004 imbriqué et 83 tests dans le rapport M-003 imbriqué.
+- ADR: non requise; T-007 applique DDD-ADR-003 et le contrat M-001 `SourceLocator` sans modifier leur sens ni le langage publié de citation.
+- Validations GREEN: `tests/m004/validate_source_locator_resolution_acceptance.ps1`; `tests/m004/validate_source_locator_resolution_unit.ps1`; `tests/m001/validate_source_locator_unit.ps1`; `scripts/validate_architecture_boundaries.ps1` avec paramètres; `scripts/validate_traceability.ps1`; `scripts/test.ps1`; `scripts/lint.ps1`.
+- Risques résiduels: T-007 rend les citations ouvrables au niveau version, page et item; l'événement `CanonicalSourcePublished`, le contrat HTTP final et les gates M-004 de clôture restent portés par T-008 à T-010.
