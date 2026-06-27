@@ -124,7 +124,7 @@ La QA post-conversion contrôle le nombre de pages, le JSON valide, les identifi
 
 | Endpoint | Succès | Erreurs publiques | Corps public |
 |---|---|---|---|
-| POST /v1/documents/{id}/convert | 202 `CONVERSION_REQUESTED` quand la source routée est acceptée pour conversion. | 400 `HTTP_REQUEST_INVALID`; 404 `SOURCE_NOT_FOUND`; 409 `SOURCE_NOT_ROUTED`; 409 `SOURCE_QUARANTINED`; 422 `PAGE_AUTHORITY_MISSING`; 422 `SOURCE_NOT_CANONICAL`. | `document_id`; `conversion_status`; `canonical_version_id` seulement après acceptation. |
+| POST /v1/documents/{id}/convert | 202 `CONVERSION_REQUESTED` quand la source routée est acceptée pour conversion; 202 `CANONICAL_ACCEPTED` quand la version canonique est déjà acceptée. | 400 `HTTP_REQUEST_INVALID`; 404 `SOURCE_NOT_FOUND`; 409 `SOURCE_NOT_ROUTED`; 409 `SOURCE_QUARANTINED`; 409 `CONVERSION_ALREADY_REQUESTED`; 422 `PAGE_AUTHORITY_MISSING`; 422 `SOURCE_NOT_CANONICAL`. | `document_id`; `conversion_status`; `canonical_version_id` seulement avec `CANONICAL_ACCEPTED`. |
 
 ## Commandes de validation
 

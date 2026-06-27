@@ -7,6 +7,7 @@ import json
 from dataclasses import dataclass
 from typing import Protocol
 
+from app.contracts.identity import DomainIdentifier
 from app.contracts.source_references import CanonicalSourceRef
 from app.source_processing.domain.canonical_source import (
     CanonicalArtifact,
@@ -80,6 +81,7 @@ class PublishCanonicalSourceCommand:
     text_authority_manifest: TextAuthorityManifest
     quality_decision: CanonicalQualityDecision
     accepted_at: str
+    expected_current_version_id: str | None
     existing_canonical_source: CanonicalSource | None
 
     def __post_init__(self) -> None:
@@ -93,6 +95,17 @@ class PublishCanonicalSourceCommand:
             raise ValueError("décision QA canonique invalide")
         if not isinstance(self.accepted_at, str):
             raise ValueError("accepted_at invalide")
+        if self.existing_canonical_source is None:
+            if self.expected_current_version_id is not None:
+                raise ValueError("version courante attendue interdite")
+        else:
+            if self.expected_current_version_id is None:
+                raise ValueError("version courante attendue obligatoire")
+            object.__setattr__(
+                self,
+                "expected_current_version_id",
+                _ensure_canonical_version_id(self.expected_current_version_id),
+            )
         if self.existing_canonical_source is not None and not isinstance(
             self.existing_canonical_source,
             CanonicalSource,
@@ -160,6 +173,7 @@ class PublishCanonicalSourceHandler:
             )
         else:
             canonical_source = command.existing_canonical_source.publish_correction(
+                expected_current_version_id=command.expected_current_version_id,
                 docling_document=command.docling_document,
                 text_authority_manifest=command.text_authority_manifest,
                 quality_decision=command.quality_decision,
@@ -203,6 +217,13 @@ def _canonical_source_id_for_command(command: PublishCanonicalSourceCommand) -> 
     if command.existing_canonical_source.source_sha256 != command.source_document.fingerprint:
         raise ValueError("source_sha256 canonique incohérent")
     return command.existing_canonical_source.canonical_source_id
+
+
+def _ensure_canonical_version_id(value: str) -> str:
+    try:
+        return str(DomainIdentifier.parse_with_prefix(value, "CVER"))
+    except ValueError as exc:
+        raise ValueError(f"expected_current_version_id invalide: {exc}") from exc
 
 
 def _serialize_docling_document(docling_document: PagewiseDoclingDocument) -> bytes:

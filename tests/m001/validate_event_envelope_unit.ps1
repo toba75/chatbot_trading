@@ -234,6 +234,52 @@ assert_raises(
     lambda: EventEnvelope.from_payload(inconsistent_canonical_payload),
 )
 
+def valid_superseded_payload():
+    payload = valid_payload()
+    payload["event_id"] = "EVT-CANONICAL-SOURCE-SUPERSEDED-CVER-000005"
+    payload["event_type"] = "CanonicalSourceSuperseded"
+    payload["aggregate_type"] = "CanonicalSource"
+    payload["aggregate_id"] = "CSRC-000001"
+    payload["aggregate_version"] = 5
+    payload["payload"] = {
+        "schema_version": "1.0",
+        "canonical_source_id": "CSRC-000001",
+        "previous_canonical_version_id": "CVER-000004",
+        "new_canonical_version_id": "CVER-000005",
+    }
+    return payload
+
+
+EventEnvelope.from_payload(valid_superseded_payload())
+
+missing_superseded_version = valid_superseded_payload()
+del missing_superseded_version["payload"]["new_canonical_version_id"]
+assert_raises(
+    "payload CanonicalSourceSuperseded invalide",
+    lambda: EventEnvelope.from_payload(missing_superseded_version),
+)
+
+inconsistent_superseded_payload = valid_superseded_payload()
+inconsistent_superseded_payload["aggregate_id"] = "CSRC-999999"
+assert_raises(
+    "aggregate_id incoherent avec CanonicalSourceSuperseded",
+    lambda: EventEnvelope.from_payload(inconsistent_superseded_payload),
+)
+
+same_version_superseded_payload = valid_superseded_payload()
+same_version_superseded_payload["payload"]["new_canonical_version_id"] = "CVER-000004"
+assert_raises(
+    "versions identiques",
+    lambda: EventEnvelope.from_payload(same_version_superseded_payload),
+)
+
+extra_superseded_field_payload = valid_superseded_payload()
+extra_superseded_field_payload["payload"]["document_id"] = "DOC-000001"
+assert_raises(
+    "payload CanonicalSourceSuperseded invalide",
+    lambda: EventEnvelope.from_payload(extra_superseded_field_payload),
+)
+
 ledger = EventIdempotenceLedger.from_processed_event_ids(["EVT-000099"])
 if not ledger.has_processed("EVT-000099"):
     raise AssertionError("Le ledger de test doit reconnaitre un event_id deja traite.")

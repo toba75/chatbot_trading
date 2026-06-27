@@ -110,6 +110,31 @@ assert_raises("event_id outbox duplique", lambda: outbox.append_in_transaction(m
 assert_raises("event outbox inconnu", lambda: outbox.mark_delivered("EVT-M002-OUTBOX-9999"))
 assert_raises("raison d'echec vide", lambda: outbox.mark_failed(event_v3.event_id, ""))
 
+batch_outbox = InMemoryTransactionalOutbox.empty()
+batch_entries = batch_outbox.append_many_in_transaction(
+    (
+        (mutation_for(event_v1), event_v1),
+        (mutation_for(event_v2), event_v2),
+    )
+)
+if tuple(entry.event.event_id for entry in batch_entries) != (
+    "EVT-M002-OUTBOX-0001",
+    "EVT-M002-OUTBOX-0002",
+):
+    raise AssertionError("append_many_in_transaction doit retourner le lot inscrit dans l'ordre fourni.")
+rejected_batch_outbox = InMemoryTransactionalOutbox.empty()
+assert_raises(
+    "event_id outbox duplique",
+    lambda: rejected_batch_outbox.append_many_in_transaction(
+        (
+            (mutation_for(event_v1), event_v1),
+            (mutation_for(event_v1), event_v1),
+        )
+    ),
+)
+if rejected_batch_outbox.pending_events() != ():
+    raise AssertionError("Une outbox neuve doit rester vide apres un lot refuse.")
+
 mismatched_mutation = ProducerStateMutation(
     mutation_id="MUT-KA-MISMATCH",
     producer_context="KA",

@@ -81,8 +81,6 @@ class SourceProcessingHttpAdapter:
             raise ValueError("document_commands sans RegisterSourceDocument")
         if not callable(getattr(document_commands, "start_document_processing", None)):
             raise ValueError("document_commands sans StartDocumentProcessing")
-        if not callable(getattr(document_commands, "request_document_conversion", None)):
-            raise ValueError("document_commands sans RequestDocumentConversion")
         self._document_commands = document_commands
 
     def handle(self, request: HttpRequest) -> HttpResponse:
@@ -186,11 +184,16 @@ class SourceProcessingHttpAdapter:
             DocumentId.from_value(document_id)
         except ValueError:
             return _bad_request_response("document_id")
+        request_document_conversion = getattr(
+            self._document_commands,
+            "request_document_conversion",
+            None,
+        )
+        if not callable(request_document_conversion):
+            raise ValueError("document_commands sans RequestDocumentConversion")
 
         try:
-            acceptance = self._document_commands.request_document_conversion(
-                document_id=document_id
-            )
+            acceptance = request_document_conversion(document_id=document_id)
         except SourceNotFoundError as exc:
             return HttpResponse(
                 status_code=404,

@@ -294,6 +294,7 @@ document_v2, manifest_v2 = docling_fixture(
     text_suffix=" corrigé",
 )
 canonical_source_v2 = canonical_source.publish_correction(
+    expected_current_version_id=canonical_source.current_version_id,
     docling_document=document_v2,
     text_authority_manifest=manifest_v2,
     quality_decision=green_quality_decision(),
@@ -314,7 +315,7 @@ multi_version_registry = SourceLocatorResolutionRegistry.from_canonical_source(
         "CVER-M004-T007-0002": document_v2,
     },
     version_statuses_by_version_id={
-        "CVER-M004-T007-0001": "RETIRED",
+        "CVER-M004-T007-0001": "ACCEPTED",
         "CVER-M004-T007-0002": "ACCEPTED",
     },
 )
@@ -322,6 +323,15 @@ assert_equal(
     tuple(multi_version_registry.to_public_payload()["versions"][index]["canonical_version_id"] for index in (0, 1)),
     ("CVER-M004-T007-0001", "CVER-M004-T007-0002"),
     "Le payload public doit conserver chaque version canonique du registre.",
+)
+old_version_locator = SourceLocator.from_payload(
+    target_item.provenance.to_payload(),
+    validation_policy=multi_version_registry.to_validation_policy(),
+)
+assert_equal(
+    old_version_locator.to_payload(),
+    target_item.provenance.to_payload(),
+    "L'ancienne version canonique publiée doit rester résoluble après correction.",
 )
 assert_raises(
     "Version canonique indisponible: QUARANTINED",

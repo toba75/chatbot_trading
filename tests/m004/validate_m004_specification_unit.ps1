@@ -123,7 +123,7 @@ La QA post-conversion contr$([char] 0x00F4)le le nombre de pages, le JSON valide
 
 | Endpoint | Succ$($eGrave)s | Erreurs publiques | Corps public |
 |---|---|---|---|
-| POST /v1/documents/{id}/convert | 202 CONVERSION_REQUESTED quand la source rout$($eAcute)e est accept$($eAcute)e pour conversion. | 400 HTTP_REQUEST_INVALID; 404 SOURCE_NOT_FOUND; 409 SOURCE_NOT_ROUTED; 409 SOURCE_QUARANTINED; 422 PAGE_AUTHORITY_MISSING; 422 SOURCE_NOT_CANONICAL. | document_id; conversion_status; canonical_version_id seulement apr$($eGrave)s acceptation. |
+| POST /v1/documents/{id}/convert | 202 CONVERSION_REQUESTED quand la source rout$($eAcute)e est accept$($eAcute)e pour conversion; 202 CANONICAL_ACCEPTED quand la version canonique est d$($eAcute)j$($aGrave) accept$($eAcute)e. | 400 HTTP_REQUEST_INVALID; 404 SOURCE_NOT_FOUND; 409 SOURCE_NOT_ROUTED; 409 SOURCE_QUARANTINED; 409 CONVERSION_ALREADY_REQUESTED; 422 PAGE_AUTHORITY_MISSING; 422 SOURCE_NOT_CANONICAL. | document_id; conversion_status; canonical_version_id seulement avec CANONICAL_ACCEPTED. |
 
 ## Commandes de validation
 

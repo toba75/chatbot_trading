@@ -251,6 +251,30 @@ class MinimalOutbox:
         self.order.append(event.event_id)
         return entry
 
+    def append_many_in_transaction(self, mutations_and_events):
+        return tuple(
+            self.append_in_transaction(state_mutation, event)
+            for state_mutation, event in mutations_and_events
+        )
+
+
+class RacingOutbox(MinimalOutbox):
+    def append_many_in_transaction(self, mutations_and_events):
+        from app.platform.event_bus import OutboxEntry, OutboxMessageStatus
+
+        pairs = tuple(mutations_and_events)
+        for state_mutation, event in pairs:
+            entry = OutboxEntry(
+                sequence=len(self.order) + 1,
+                state_mutation=state_mutation,
+                event=event,
+                status=OutboxMessageStatus.PENDING,
+                failure_reason=None,
+            )
+            self.entries[event.event_id] = entry
+            self.order.append(event.event_id)
+        raise ValueError(f"event_id outbox duplique: {pairs[0][1].event_id}")
+
 
 public_ref = canonical_ref()
 event = build_canonical_source_published_event(
@@ -345,6 +369,7 @@ publication_result = publication_handler.handle(
         text_authority_manifest=manifest_v1,
         quality_decision=green_quality_decision(),
         accepted_at="2026-06-27T11:15:00Z",
+        expected_current_version_id=None,
         existing_canonical_source=None,
     )
 )
@@ -390,6 +415,7 @@ publication_result_v2 = publication_handler.handle(
         text_authority_manifest=manifest_v2,
         quality_decision=green_quality_decision(),
         accepted_at="2026-06-27T12:15:00Z",
+        expected_current_version_id=publication_result.canonical_source.current_version_id,
         existing_canonical_source=publication_result.canonical_source,
     )
 )
@@ -407,6 +433,29 @@ assert_equal(
     "CanonicalSourceSuperseded",
     "La correction doit exposer l'événement de supersession.",
 )
+
+assert_equal(
+    tuple(entry.event.event_id for entry in outbox.pending_events()),
+    (
+        "EVT-CANONICAL-SOURCE-PUBLISHED-CVER-M004-T008-UNIT-0002",
+        "EVT-CANONICAL-SOURCE-PUBLISHED-CVER-M004-T008-UNIT-0003",
+        "EVT-CANONICAL-SOURCE-SUPERSEDED-CVER-M004-T008-UNIT-0003",
+    ),
+    "La correction doit inscrire Published avant Superseded dans le lot atomique.",
+)
+
+racing_outbox = RacingOutbox()
+racing_result = handler.handle(
+    PublishCanonicalSourceEventCommand(
+        publication_result=publication_result_v2,
+        outbox=racing_outbox,
+        correlation_id="CORR-M004-T008-UNIT-RACE",
+        causation_id="CMD-PUBLISH-CANONICAL-SOURCE-M004-T008-UNIT-RACE",
+    )
+)
+assert_false(racing_result.created, "Une course d'idempotence doit relire l'événement publié existant.")
+assert_false(racing_result.superseded_created, "Une course d'idempotence doit relire l'événement supersédé existant.")
+assert_equal(len(racing_outbox.entries), 2, "La course simulée doit produire le lot complet une seule fois.")
 
 incoherent_outbox = InMemoryTransactionalOutbox.empty()
 conflicting_event = build_canonical_source_published_event(

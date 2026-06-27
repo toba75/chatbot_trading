@@ -1,6 +1,8 @@
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
+. (Join-Path $repoRoot "scripts/require_python.ps1")
+$pythonExecutable = Get-RequiredPythonExecutable
 $validatorPath = Join-Path $repoRoot "scripts/validate_traceability.ps1"
 $matrixPath = Join-Path $repoRoot "docs/traceability/matrix.md"
 $journalPath = Join-Path $repoRoot "docs/tasks/milestone_004/journal.md"
@@ -171,7 +173,7 @@ function Invoke-PythonAuditCheck {
     try {
         $previousErrorActionPreference = $ErrorActionPreference
         $ErrorActionPreference = "Continue"
-        $output = & python $scriptPath 2>&1
+        $output = & $pythonExecutable -B $scriptPath 2>&1
         $exitCode = $LASTEXITCODE
     }
     finally {
@@ -347,6 +349,18 @@ events = (
         ambiguous_text_authorities=1,
         artifact_hash="sha256:" + "b" * 64,
         error_code="PAGE_AUTHORITY_AMBIGUOUS",
+    ),
+    CanonicalAuditEvent(
+        trace_id="TRACE-M004-Q",
+        document_id="DOC-M004-Q",
+        canonical_version_id="CVER-M004-Q",
+        phase="canonical_quality",
+        status="QUARANTINED",
+        page_count=1,
+        pages_rejected_by_qa=0,
+        ambiguous_text_authorities=0,
+        artifact_hash="sha256:" + "c" * 64,
+        error_code="SOURCE_QUARANTINED",
     ),
 )
 

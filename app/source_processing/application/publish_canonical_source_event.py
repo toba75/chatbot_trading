@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any, Protocol
 
@@ -32,11 +33,10 @@ class CanonicalPublicationOutbox(Protocol):
     def entry_for(self, event_id: str) -> OutboxEntry:
         """Retourne l'entrée outbox existante."""
 
-    def append_in_transaction(
+    def append_many_in_transaction(
         self,
-        state_mutation: ProducerStateMutation,
-        event: EventEnvelope,
-    ) -> OutboxEntry:
+        mutations_and_events: Iterable[tuple[ProducerStateMutation, EventEnvelope]],
+    ) -> tuple[OutboxEntry, ...]:
         """Inscrit l'événement et sa mutation productrice atomiquement."""
 
 
@@ -115,15 +115,13 @@ class PublishCanonicalSourceEventHandler:
             correlation_id=command.correlation_id,
             causation_id=command.causation_id,
         )
+        events = (event,) if superseded_event is None else (event, superseded_event)
+        entries = _append_or_reuse_events(outbox=command.outbox, events=events)
+        entry, created = entries[0]
         superseded_entry: OutboxEntry | None = None
         superseded_created = False
         if superseded_event is not None:
-            superseded_entry, superseded_created = _append_or_reuse_event(
-                outbox=command.outbox,
-                event=superseded_event,
-            )
-
-        entry, created = _append_or_reuse_event(outbox=command.outbox, event=event)
+            superseded_entry, superseded_created = entries[1]
         return CanonicalSourcePublishedEventResult(
             outbox_entry=entry,
             event=entry.event,
@@ -231,7 +229,57 @@ def _append_or_reuse_event(
         if existing_entry.event != event or existing_entry.state_mutation != state_mutation:
             raise ValueError("événement outbox incohérent pour version canonique")
         return existing_entry, False
-    return outbox.append_in_transaction(state_mutation=state_mutation, event=event), True
+    return outbox.append_many_in_transaction(((state_mutation, event),))[0], True
+
+
+def _append_or_reuse_events(
+    *,
+    outbox: CanonicalPublicationOutbox,
+    events: tuple[EventEnvelope, ...],
+) -> tuple[tuple[OutboxEntry, bool], ...]:
+    mutations_and_events = tuple((_state_mutation_for(event), event) for event in events)
+    existing_entries = _existing_outbox_entries_for(
+        outbox=outbox,
+        mutations_and_events=mutations_and_events,
+    )
+    if existing_entries is not None:
+        return tuple((entry, False) for entry in existing_entries)
+    try:
+        return tuple(
+            (entry, True)
+            for entry in outbox.append_many_in_transaction(mutations_and_events)
+        )
+    except ValueError:
+        existing_entries = _existing_outbox_entries_for(
+            outbox=outbox,
+            mutations_and_events=mutations_and_events,
+        )
+        if existing_entries is not None:
+            return tuple((entry, False) for entry in existing_entries)
+        raise
+
+
+def _existing_outbox_entries_for(
+    *,
+    outbox: CanonicalPublicationOutbox,
+    mutations_and_events: tuple[tuple[ProducerStateMutation, EventEnvelope], ...],
+) -> tuple[OutboxEntry, ...] | None:
+    existing_flags = tuple(
+        outbox.has_event(event.event_id)
+        for _, event in mutations_and_events
+    )
+    if not any(existing_flags):
+        return None
+    if not all(existing_flags):
+        raise ValueError("événements outbox incomplets pour version canonique")
+
+    entries: list[OutboxEntry] = []
+    for state_mutation, event in mutations_and_events:
+        existing_entry = outbox.entry_for(event.event_id)
+        if existing_entry.event != event or existing_entry.state_mutation != state_mutation:
+            raise ValueError("événement outbox incohérent pour version canonique")
+        entries.append(existing_entry)
+    return tuple(entries)
 
 
 def _superseded_event_for(
@@ -296,7 +344,7 @@ def _is_canonical_publication_outbox(value: Any) -> bool:
     return (
         callable(getattr(value, "has_event", None))
         and callable(getattr(value, "entry_for", None))
-        and callable(getattr(value, "append_in_transaction", None))
+        and callable(getattr(value, "append_many_in_transaction", None))
     )
 
 

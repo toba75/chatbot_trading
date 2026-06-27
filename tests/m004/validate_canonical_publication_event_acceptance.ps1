@@ -270,6 +270,7 @@ publication_v1 = publication_handler.handle(
         text_authority_manifest=manifest_v1,
         quality_decision=green_quality_decision(),
         accepted_at="2026-06-27T09:15:00Z",
+        expected_current_version_id=None,
         existing_canonical_source=None,
     )
 )
@@ -338,6 +339,7 @@ publication_v2 = publication_handler.handle(
         text_authority_manifest=manifest_v2,
         quality_decision=green_quality_decision(),
         accepted_at="2026-06-27T10:00:00Z",
+        expected_current_version_id=publication_v1.canonical_source.current_version_id,
         existing_canonical_source=publication_v1.canonical_source,
     )
 )
@@ -354,7 +356,7 @@ assert_true(event_result_v2.superseded_created, "Une correction publiée doit pr
 assert_equal(
     event_result_v2.superseded_event.event_type,
     "CanonicalSourceSuperseded",
-    "La correction doit publier CanonicalSourceSuperseded avant CanonicalSourcePublished.",
+    "La correction doit exposer CanonicalSourceSuperseded après CanonicalSourcePublished.",
 )
 assert_equal(
     dict(event_result_v2.superseded_event.payload),
@@ -371,8 +373,8 @@ assert_equal(
     tuple(entry.event.event_id for entry in outbox.pending_events()),
     (
         "EVT-CANONICAL-SOURCE-PUBLISHED-CVER-M004-T008-0001",
-        "EVT-CANONICAL-SOURCE-SUPERSEDED-CVER-M004-T008-0002",
         "EVT-CANONICAL-SOURCE-PUBLISHED-CVER-M004-T008-0002",
+        "EVT-CANONICAL-SOURCE-SUPERSEDED-CVER-M004-T008-0002",
     ),
     "Les événements outbox doivent rester ordonnés par version d'agrégat.",
 )
@@ -400,6 +402,7 @@ assert_raises(
             text_authority_manifest=docling_fixture(source_document, "CVER-M004-T008-0003", "qa red")[1],
             quality_decision=red_quality_decision(),
             accepted_at="2026-06-27T10:30:00Z",
+            expected_current_version_id=publication_v2.canonical_source.current_version_id,
             existing_canonical_source=publication_v2.canonical_source,
         )
     ),

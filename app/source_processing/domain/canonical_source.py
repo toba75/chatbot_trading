@@ -238,12 +238,20 @@ class CanonicalSource:
     def publish_correction(
         self,
         *,
+        expected_current_version_id: str,
         docling_document: PagewiseDoclingDocument,
         text_authority_manifest: TextAuthorityManifest,
         quality_decision: CanonicalQualityDecision,
         canonical_artifact: CanonicalArtifact,
         accepted_at: str,
     ) -> "CanonicalSource":
+        parsed_expected_current_version_id = _ensure_domain_identifier(
+            expected_current_version_id,
+            "expected_current_version_id",
+            "CVER",
+        )
+        if parsed_expected_current_version_id != self.current_version_id:
+            raise ValueError("version courante inattendue")
         parsed_docling_document = _ensure_docling_document(docling_document)
         if parsed_docling_document.document_id != self.document_id:
             raise ValueError("document_id canonique incohérent")

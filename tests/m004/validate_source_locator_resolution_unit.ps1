@@ -312,6 +312,7 @@ retired_registry = SourceLocatorResolutionRegistry.from_canonical_source(
 
 document_v2, manifest_v2 = docling_fixture(source_document, "CVER-M004-T007-UNIT-0002", "d")
 source_v2 = source.publish_correction(
+    expected_current_version_id=source.current_version_id,
     docling_document=document_v2,
     text_authority_manifest=manifest_v2,
     quality_decision=green_quality_decision(),
@@ -332,7 +333,7 @@ multi_version_registry = SourceLocatorResolutionRegistry.from_canonical_source(
         document_v2.canonical_version_id: document_v2,
     },
     version_statuses_by_version_id={
-        document_a.canonical_version_id: "RETIRED",
+        document_a.canonical_version_id: "ACCEPTED",
         document_v2.canonical_version_id: "ACCEPTED",
     },
 )
@@ -340,6 +341,15 @@ assert_equal(
     tuple(multi_version_registry.indexes_by_version_id.keys()),
     ("CVER-M004-T007-UNIT-0001", "CVER-M004-T007-UNIT-0002"),
     "Le registre doit publier chaque version canonique explicitement.",
+)
+old_version_locator = SourceLocator.from_payload(
+    target_item.provenance.to_payload(),
+    validation_policy=multi_version_registry.to_validation_policy(),
+)
+assert_equal(
+    old_version_locator.to_payload(),
+    target_item.provenance.to_payload(),
+    "Une version canonique remplacée par correction doit rester résoluble.",
 )
 assert_raises(
     "Version canonique indisponible: RETIRED",

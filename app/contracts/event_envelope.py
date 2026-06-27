@@ -15,7 +15,7 @@ from app.contracts._validation import (
     freeze_contract_value,
     thaw_contract_value,
 )
-from app.contracts.identity import DomainIdentifier
+from app.contracts.identity import ContractSchemaVersion, DomainIdentifier
 from app.contracts.source_references import CanonicalSourceRef
 
 
@@ -66,6 +66,15 @@ _EVENT_ENVELOPE_FIELDS = frozenset(
         "payload",
     }
 )
+_CANONICAL_SOURCE_SUPERSEDED_FIELDS = frozenset(
+    {
+        "schema_version",
+        "canonical_source_id",
+        "previous_canonical_version_id",
+        "new_canonical_version_id",
+    }
+)
+_EVENT_PAYLOAD_SCHEMA_VERSIONS = frozenset({"1.0"})
 _COMMAND_PREFIXES = (
     "Accept",
     "Archive",
@@ -315,9 +324,33 @@ def _validate_typed_event_payload(
     producer_context: str,
     event_payload: Mapping[str, Any],
 ) -> None:
-    if event_type != "CanonicalSourcePublished":
+    if event_type == "CanonicalSourcePublished":
+        _validate_canonical_source_published_payload(
+            aggregate_type=aggregate_type,
+            aggregate_id=aggregate_id,
+            occurred_at=occurred_at,
+            producer_context=producer_context,
+            event_payload=event_payload,
+        )
+        return
+    if event_type == "CanonicalSourceSuperseded":
+        _validate_canonical_source_superseded_payload(
+            aggregate_type=aggregate_type,
+            aggregate_id=aggregate_id,
+            producer_context=producer_context,
+            event_payload=event_payload,
+        )
         return
 
+
+def _validate_canonical_source_published_payload(
+    *,
+    aggregate_type: str,
+    aggregate_id: str,
+    occurred_at: str,
+    producer_context: str,
+    event_payload: Mapping[str, Any],
+) -> None:
     try:
         canonical_source = CanonicalSourceRef.from_payload(thaw_contract_value(event_payload))
     except ValueError as exc:
@@ -331,6 +364,54 @@ def _validate_typed_event_payload(
         raise ValueError("aggregate_id incoherent avec CanonicalSourcePublished")
     if occurred_at != canonical_source.accepted_at:
         raise ValueError("occurred_at incoherent avec CanonicalSourcePublished")
+
+
+def _validate_canonical_source_superseded_payload(
+    *,
+    aggregate_type: str,
+    aggregate_id: str,
+    producer_context: str,
+    event_payload: Mapping[str, Any],
+) -> None:
+    payload = thaw_contract_value(event_payload)
+    try:
+        ensure_allowed_fields(
+            payload,
+            _CANONICAL_SOURCE_SUPERSEDED_FIELDS,
+            "CanonicalSourceSuperseded",
+        )
+        ContractSchemaVersion.require_in_payload(
+            payload,
+            supported_schema_versions=_EVENT_PAYLOAD_SCHEMA_VERSIONS,
+        )
+        canonical_source_id = str(
+            DomainIdentifier.parse_with_prefix(payload["canonical_source_id"], "CSRC")
+        )
+        previous_version_id = str(
+            DomainIdentifier.parse_with_prefix(
+                payload["previous_canonical_version_id"],
+                "CVER",
+            )
+        )
+        new_version_id = str(
+            DomainIdentifier.parse_with_prefix(
+                payload["new_canonical_version_id"],
+                "CVER",
+            )
+        )
+    except KeyError as exc:
+        raise ValueError(f"payload CanonicalSourceSuperseded invalide: {exc.args[0]} absent") from exc
+    except ValueError as exc:
+        raise ValueError(f"payload CanonicalSourceSuperseded invalide: {exc}") from exc
+
+    if producer_context != "SP":
+        raise ValueError("producer_context incoherent avec CanonicalSourceSuperseded")
+    if aggregate_type != "CanonicalSource":
+        raise ValueError("aggregate_type incoherent avec CanonicalSourceSuperseded")
+    if aggregate_id != canonical_source_id:
+        raise ValueError("aggregate_id incoherent avec CanonicalSourceSuperseded")
+    if previous_version_id == new_version_id:
+        raise ValueError("payload CanonicalSourceSuperseded invalide: versions identiques")
 
 
 def _required_text(payload: Mapping[str, Any], field_name: str) -> str:

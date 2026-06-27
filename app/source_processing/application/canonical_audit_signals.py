@@ -334,6 +334,9 @@ def _ensure_status_counters_contract(
             "Une version canonique non publiée doit porter un code d'erreur.",
         )
 
+    if status == "QUARANTINED" and error_code == "SOURCE_QUARANTINED":
+        return
+
     if pages_rejected_by_qa == 0 and ambiguous_text_authorities == 0:
         raise CanonicalAuditSignalError(
             "M004_AUDIT_REJECTION_COUNTER_REQUIRED",

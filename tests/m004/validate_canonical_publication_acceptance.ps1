@@ -230,6 +230,7 @@ result_v1 = handler.handle(
         text_authority_manifest=manifest_v1,
         quality_decision=green_quality_decision(),
         accepted_at=accepted_at_v1,
+        expected_current_version_id=None,
         existing_canonical_source=None,
     )
 )
@@ -266,6 +267,7 @@ repeat_result = PublishCanonicalSourceHandler(artifact_store=repeat_store).handl
         text_authority_manifest=manifest_v1,
         quality_decision=green_quality_decision(),
         accepted_at=accepted_at_v1,
+        expected_current_version_id=None,
         existing_canonical_source=None,
     )
 )
@@ -285,6 +287,7 @@ result_v2 = handler.handle(
         text_authority_manifest=manifest_v2,
         quality_decision=green_quality_decision(),
         accepted_at="2026-06-26T11:00:00Z",
+        expected_current_version_id=result_v1.canonical_source.current_version_id,
         existing_canonical_source=result_v1.canonical_source,
     )
 )
@@ -311,6 +314,7 @@ assert_raises(
             text_authority_manifest=manifest_v1,
             quality_decision=green_quality_decision(),
             accepted_at="2026-06-26T11:30:00Z",
+            expected_current_version_id=result_v1.canonical_source.current_version_id,
             existing_canonical_source=result_v1.canonical_source,
         )
     ),
@@ -325,6 +329,7 @@ assert_raises(
             text_authority_manifest=docling_fixture(source_document, "CVER-M004-T006-0003", "red")[1],
             quality_decision=red_quality_decision(),
             accepted_at="2026-06-26T12:00:00Z",
+            expected_current_version_id=result_v2.canonical_source.current_version_id,
             existing_canonical_source=result_v2.canonical_source,
         )
     ),
@@ -342,6 +347,7 @@ assert_raises(
         text_authority_manifest=None,
         quality_decision=green_quality_decision(),
         accepted_at="2026-06-26T12:15:00Z",
+        expected_current_version_id=None,
         existing_canonical_source=None,
     ),
 )
@@ -354,6 +360,7 @@ assert_raises(
             text_authority_manifest=docling_fixture(source_document, "CVER-M004-T006-0004", "quarantaine")[1],
             quality_decision=green_quality_decision(),
             accepted_at="2026-06-26T12:30:00Z",
+            expected_current_version_id=None,
             existing_canonical_source=None,
         )
     ),

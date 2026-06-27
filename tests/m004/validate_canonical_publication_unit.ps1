@@ -269,6 +269,7 @@ assert_equal(
 
 document_v2, manifest_v2 = docling_fixture(source_document, "CVER-M004-T006-UNIT-0002", "v2 corrigée")
 source_v2 = source_v1.publish_correction(
+    expected_current_version_id=source_v1.current_version_id,
     docling_document=document_v2,
     text_authority_manifest=manifest_v2,
     quality_decision=green_quality_decision(),
@@ -287,8 +288,24 @@ assert_equal(
     "La version initiale doit rester inchangée après correction.",
 )
 assert_raises(
+    "version courante inattendue",
+    lambda: source_v1.publish_correction(
+        expected_current_version_id=source_v2.current_version_id,
+        docling_document=document_v2,
+        text_authority_manifest=manifest_v2,
+        quality_decision=green_quality_decision(),
+        canonical_artifact=CanonicalArtifact(
+            artifact_ref=f"artifact:source_processing.canonical_sources/{canonical_source_id}/CVER-M004-T006-UNIT-0002/docling.json",
+            artifact_sha256="d" * 64,
+            artifact_kind=CanonicalArtifactKind.DOCLING_JSON,
+        ),
+        accepted_at="2026-06-26T11:05:00Z",
+    ),
+)
+assert_raises(
     "mutation en place interdite",
     lambda: source_v1.publish_correction(
+        expected_current_version_id=source_v1.current_version_id,
         docling_document=document_v1,
         text_authority_manifest=manifest_v1,
         quality_decision=green_quality_decision(),
