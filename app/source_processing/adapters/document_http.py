@@ -7,10 +7,15 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 
 from app.source_processing.application.document_commands import (
+    CanonicalQualityRejectedError,
+    ConversionAlreadyRequestedError,
     DiagnosisAlreadyRequestedError,
+    DocumentConversionAcceptance,
     DocumentDiagnosisAcceptance,
     RegisterDocumentAcceptance,
     SourceNotFoundError,
+    SourceNotRoutedError,
+    SourceQuarantinedError,
     SourceUnreadableError,
 )
 from app.source_processing.domain.source_document import DocumentId
@@ -33,6 +38,13 @@ class DocumentCommandPort(Protocol):
         document_id: str,
     ) -> DocumentDiagnosisAcceptance:
         """Demande le diagnostic documentaire via SP."""
+
+    def request_document_conversion(
+        self,
+        *,
+        document_id: str,
+    ) -> DocumentConversionAcceptance:
+        """Demande la conversion canonique documentaire via SP."""
 
 
 @dataclass(frozen=True)
@@ -69,6 +81,8 @@ class SourceProcessingHttpAdapter:
             raise ValueError("document_commands sans RegisterSourceDocument")
         if not callable(getattr(document_commands, "start_document_processing", None)):
             raise ValueError("document_commands sans StartDocumentProcessing")
+        if not callable(getattr(document_commands, "request_document_conversion", None)):
+            raise ValueError("document_commands sans RequestDocumentConversion")
         self._document_commands = document_commands
 
     def handle(self, request: HttpRequest) -> HttpResponse:
@@ -79,6 +93,10 @@ class SourceProcessingHttpAdapter:
         diagnosed_document_id = _document_id_from_diagnose_path(parsed_request.path)
         if parsed_request.method == "POST" and diagnosed_document_id is not None:
             return self._handle_start_diagnosis(diagnosed_document_id)
+
+        converted_document_id = _document_id_from_convert_path(parsed_request.path)
+        if parsed_request.method == "POST" and converted_document_id is not None:
+            return self._handle_request_conversion(parsed_request, converted_document_id)
 
         return HttpResponse(
             status_code=404,
@@ -157,11 +175,86 @@ class SourceProcessingHttpAdapter:
             },
         )
 
+    def _handle_request_conversion(
+        self,
+        request: HttpRequest,
+        document_id: str,
+    ) -> HttpResponse:
+        if len(request.body) != 0:
+            return _bad_request_response("body")
+        try:
+            DocumentId.from_value(document_id)
+        except ValueError:
+            return _bad_request_response("document_id")
+
+        try:
+            acceptance = self._document_commands.request_document_conversion(
+                document_id=document_id
+            )
+        except SourceNotFoundError as exc:
+            return HttpResponse(
+                status_code=404,
+                body={"error_code": "SOURCE_NOT_FOUND", "document_id": exc.document_id},
+            )
+        except SourceQuarantinedError as exc:
+            return HttpResponse(
+                status_code=409,
+                body={
+                    "error_code": "SOURCE_QUARANTINED",
+                    "document_id": exc.document_id,
+                    "reason": exc.reason,
+                },
+            )
+        except SourceNotRoutedError as exc:
+            return HttpResponse(
+                status_code=409,
+                body={
+                    "error_code": "SOURCE_NOT_ROUTED",
+                    "document_id": exc.document_id,
+                    "status": exc.status,
+                },
+            )
+        except ConversionAlreadyRequestedError as exc:
+            return HttpResponse(
+                status_code=409,
+                body={
+                    "error_code": "CONVERSION_ALREADY_REQUESTED",
+                    "document_id": exc.document_id,
+                },
+            )
+        except CanonicalQualityRejectedError as exc:
+            return HttpResponse(
+                status_code=422,
+                body={
+                    "error_code": exc.error_code,
+                    "document_id": exc.document_id,
+                    "reason": exc.reason,
+                },
+            )
+
+        body: dict[str, Any] = {
+            "document_id": acceptance.document_id.value,
+            "conversion_status": acceptance.conversion_status.value,
+        }
+        if acceptance.canonical_version_id is not None:
+            body["canonical_version_id"] = acceptance.canonical_version_id
+        return HttpResponse(status_code=202, body=body)
+
 
 def _document_id_from_diagnose_path(path: str) -> str | None:
     parsed_path = _ensure_path(path)
     prefix = "/v1/documents/"
     suffix = "/diagnose"
+    if not parsed_path.startswith(prefix) or not parsed_path.endswith(suffix):
+        return None
+    document_id = parsed_path[len(prefix) : -len(suffix)]
+    return document_id
+
+
+def _document_id_from_convert_path(path: str) -> str | None:
+    parsed_path = _ensure_path(path)
+    prefix = "/v1/documents/"
+    suffix = "/convert"
     if not parsed_path.startswith(prefix) or not parsed_path.endswith(suffix):
         return None
     document_id = parsed_path[len(prefix) : -len(suffix)]

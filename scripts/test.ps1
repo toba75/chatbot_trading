@@ -125,7 +125,9 @@ $testCommands = @(
     @{ Path = "tests/m004/validate_source_locator_resolution_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/m004/validate_source_locator_resolution_unit.ps1"; Arguments = @() },
     @{ Path = "tests/m004/validate_canonical_publication_event_acceptance.ps1"; Arguments = @() },
-    @{ Path = "tests/m004/validate_canonical_publication_event_unit.ps1"; Arguments = @() }
+    @{ Path = "tests/m004/validate_canonical_publication_event_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m004/validate_document_conversion_command_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m004/validate_document_conversion_command_unit.ps1"; Arguments = @() }
 )
 
 $expectedValidationPaths = @(
@@ -231,10 +233,12 @@ $expectedTestPaths = @(
     "tests/m004/validate_source_locator_resolution_acceptance.ps1",
     "tests/m004/validate_source_locator_resolution_unit.ps1",
     "tests/m004/validate_canonical_publication_event_acceptance.ps1",
-    "tests/m004/validate_canonical_publication_event_unit.ps1"
+    "tests/m004/validate_canonical_publication_event_unit.ps1",
+    "tests/m004/validate_document_conversion_command_acceptance.ps1",
+    "tests/m004/validate_document_conversion_command_unit.ps1"
 )
 
-$expectedTestCount = 87
+$expectedTestCount = 89
 if ($env:OST_M003_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     Write-Host "Test d'acceptation de précondition M-003 exclu explicitement: exécution imbriquée du validateur de précondition."
     Write-Host "Test d'acceptation de précondition M-004 exclu explicitement: M-003 reste indépendant du milestone aval."
@@ -248,7 +252,7 @@ if ($env:OST_M003_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     $expectedTestPaths = @(
         $expectedTestPaths | Where-Object { $excludedPreconditionAcceptancePaths -notcontains $_ }
     )
-    $expectedTestCount = 85
+    $expectedTestCount = 87
 }
 elseif ($env:OST_M004_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     Write-Host "Test d'acceptation de précondition M-004 exclu explicitement: exécution imbriquée du validateur de précondition."
@@ -258,7 +262,7 @@ elseif ($env:OST_M004_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     $expectedTestPaths = @(
         $expectedTestPaths | Where-Object { $_ -ne $m004PreconditionAcceptancePath }
     )
-    $expectedTestCount = 86
+    $expectedTestCount = 88
 }
 
 Invoke-M000ValidationGate `

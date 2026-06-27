@@ -56,6 +56,9 @@ class ScriptedDocumentCommands:
             raise self.diagnosis_error
         return self.diagnosis_result
 
+    def request_document_conversion(self, *, document_id):
+        raise AssertionError("Le contrat HTTP M-003 ne doit pas déclencher la conversion M-004.")
+
 
 def assert_equal(actual, expected, message):
     if actual != expected:
