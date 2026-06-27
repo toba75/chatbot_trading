@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
 $validatorPath = Join-Path $repoRoot "scripts/validate_m005_precondition.ps1"
@@ -147,8 +147,8 @@ try {
 
     Assert-OutputContains `
         -Output $reportContent `
-        -Expected "Test GREEN: tests/m004/validate_m004_precondition_acceptance.ps1" `
-        -Message "Le rapport doit conserver la preuve que la précondition M-004 post-merge est GREEN."
+        -Expected "M-005 s'appuie sur les preuves amont" `
+        -Message "Le rapport doit expliciter que l'acceptation M-004 imbriquée est remplacée par la preuve publiée dans master."
 
     Assert-OutputContains `
         -Output $reportContent `

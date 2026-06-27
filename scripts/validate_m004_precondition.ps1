@@ -1,4 +1,4 @@
-param(
+﻿param(
     [Parameter(Mandatory = $false)]
     [string] $Path
 )
@@ -8,7 +8,8 @@ $ErrorActionPreference = "Stop"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $allowedBranches = @(
     "master",
-    "codex/milestone-m004-version-canonique-publiee"
+    "codex/milestone-m004-version-canonique-publiee",
+    "codex/milestone-m005-projection-connaissance"
 )
 $requiredMilestonePaths = @(
     "docs/tasks/milestone_000",

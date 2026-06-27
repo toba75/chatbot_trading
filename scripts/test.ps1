@@ -20,6 +20,8 @@ $appRoot = Join-Path $repoRoot "app"
 $contextRegistryPath = Join-Path $repoRoot "app/context_registry.json"
 $m003PreconditionAcceptancePath = "tests/m003/validate_m003_precondition_acceptance.ps1"
 $m004PreconditionAcceptancePath = "tests/m004/validate_m004_precondition_acceptance.ps1"
+$m005PreconditionAcceptancePath = "tests/m005/validate_m005_precondition_acceptance.ps1"
+$m005PreconditionUnitPath = "tests/m005/validate_m005_precondition_unit.ps1"
 
 $validationCommands = @(
     @{ Path = "scripts/validate_m000_precondition_report.ps1"; Arguments = @("-Path", $preconditionReportPath) },
@@ -129,7 +131,9 @@ $testCommands = @(
     @{ Path = "tests/m004/validate_document_conversion_command_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/m004/validate_document_conversion_command_unit.ps1"; Arguments = @() },
     @{ Path = "tests/m004/validate_m004_traceability_acceptance.ps1"; Arguments = @() },
-    @{ Path = "tests/m004/validate_m004_traceability_unit.ps1"; Arguments = @() }
+    @{ Path = "tests/m004/validate_m004_traceability_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m005/validate_m005_precondition_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m005/validate_m005_precondition_acceptance.ps1"; Arguments = @() }
 )
 
 function Get-GateCommandPaths {
@@ -141,23 +145,41 @@ function Get-GateCommandPaths {
     return @($Commands | ForEach-Object { $_.Path })
 }
 
-$excludedPreconditionAcceptancePaths = @()
+$excludedPreconditionTestPaths = @()
 if ($env:OST_M003_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     Write-Host "Test d'acceptation de précondition M-003 exclu explicitement: exécution imbriquée du validateur de précondition."
     Write-Host "Test d'acceptation de précondition M-004 exclu explicitement: M-003 reste indépendant du milestone aval."
-    $excludedPreconditionAcceptancePaths = @(
+    Write-Host "Tests de précondition M-005 exclus explicitement: M-003 reste indépendant du milestone aval."
+    $excludedPreconditionTestPaths = @(
         $m003PreconditionAcceptancePath,
-        $m004PreconditionAcceptancePath
+        $m004PreconditionAcceptancePath,
+        $m005PreconditionAcceptancePath,
+        $m005PreconditionUnitPath
     )
 }
 elseif ($env:OST_M004_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     Write-Host "Test d'acceptation de précondition M-004 exclu explicitement: exécution imbriquée du validateur de précondition."
-    $excludedPreconditionAcceptancePaths = @($m004PreconditionAcceptancePath)
+    Write-Host "Tests de précondition M-005 exclus explicitement: M-004 reste indépendant du milestone aval."
+    $excludedPreconditionTestPaths = @(
+        $m004PreconditionAcceptancePath,
+        $m005PreconditionAcceptancePath,
+        $m005PreconditionUnitPath
+    )
+}
+elseif ($env:OST_M005_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
+    Write-Host "Test d'acceptation de précondition M-003 exclu explicitement: M-005 s'appuie sur les preuves amont publiées dans master."
+    Write-Host "Test d'acceptation de précondition M-004 exclu explicitement: M-005 s'appuie sur les preuves amont publiées dans master."
+    Write-Host "Test d'acceptation de précondition M-005 exclu explicitement: exécution imbriquée du validateur de précondition."
+    $excludedPreconditionTestPaths = @(
+        $m003PreconditionAcceptancePath,
+        $m004PreconditionAcceptancePath,
+        $m005PreconditionAcceptancePath
+    )
 }
 
-if ($excludedPreconditionAcceptancePaths.Count -gt 0) {
+if ($excludedPreconditionTestPaths.Count -gt 0) {
     $testCommands = @(
-        $testCommands | Where-Object { $excludedPreconditionAcceptancePaths -notcontains $_.Path }
+        $testCommands | Where-Object { $excludedPreconditionTestPaths -notcontains $_.Path }
     )
 }
 
