@@ -306,6 +306,89 @@ $requiredM003Requirements = @(
     }
 )
 
+$requiredM004Requirements = @(
+    [ordered] @{
+        Id = "REQ-M004-001"
+        Source = "docs/tasks/milestone_004/0001_verifier_precondition_green.md"
+        Test = "tests/m004/validate_m004_precondition_acceptance.ps1"
+        CommandScript = "scripts/validate_m004_precondition.ps1"
+        Code = "scripts/validate_m004_precondition.ps1"
+        Adr = "ADR-010"
+    },
+    [ordered] @{
+        Id = "REQ-M004-002"
+        Source = "docs/tasks/milestone_004/0002_publier_specification_version_canonique.md"
+        Test = "tests/m004/validate_m004_specification_acceptance.ps1"
+        CommandScript = "scripts/validate_m004_specification.ps1"
+        Code = "docs/specs/m004_version_canonique_publiee.md"
+        Adr = "ADR-001; ADR-002; ADR-003; ADR-004; DDD-ADR-003"
+    },
+    [ordered] @{
+        Id = "REQ-M004-003"
+        Source = "docs/tasks/milestone_004/0003_convertir_pages_selon_route_explicite.md"
+        Test = "tests/m004/validate_page_conversion_acceptance.ps1"
+        CommandScript = "tests/m004/validate_page_conversion_acceptance.ps1"
+        Code = "app/source_processing/application/convert_routed_pages.py"
+        Adr = "ADR-001; ADR-002; ADR-003; ADR-004; DDD-ADR-003"
+    },
+    [ordered] @{
+        Id = "REQ-M004-004"
+        Source = "docs/tasks/milestone_004/0004_adjuger_autorite_textuelle_page.md"
+        Test = "tests/m004/validate_text_authority_acceptance.ps1"
+        CommandScript = "tests/m004/validate_text_authority_acceptance.ps1"
+        Code = "app/source_processing/domain/page_conversion.py"
+        Adr = "ADR-004"
+    },
+    [ordered] @{
+        Id = "REQ-M004-005"
+        Source = "docs/tasks/milestone_004/0005_controler_qualite_version_canonique.md"
+        Test = "tests/m004/validate_canonical_quality_acceptance.ps1"
+        CommandScript = "tests/m004/validate_canonical_quality_acceptance.ps1"
+        Code = "app/source_processing/domain/page_conversion.py"
+        Adr = "ADR-001; ADR-002; ADR-003; ADR-004"
+    },
+    [ordered] @{
+        Id = "REQ-M004-006"
+        Source = "docs/tasks/milestone_004/0006_publier_version_canonique_immuable.md"
+        Test = "tests/m004/validate_canonical_publication_acceptance.ps1"
+        CommandScript = "tests/m004/validate_canonical_publication_acceptance.ps1"
+        Code = "app/source_processing/domain/canonical_source.py"
+        Adr = "ADR-001; DDD-ADR-003"
+    },
+    [ordered] @{
+        Id = "REQ-M004-007"
+        Source = "docs/tasks/milestone_004/0007_rendre_source_locator_resolvable.md"
+        Test = "tests/m004/validate_source_locator_resolution_acceptance.ps1"
+        CommandScript = "tests/m004/validate_source_locator_resolution_acceptance.ps1"
+        Code = "app/source_processing/application/source_locator_resolution.py"
+        Adr = "DDD-ADR-003"
+    },
+    [ordered] @{
+        Id = "REQ-M004-008"
+        Source = "docs/tasks/milestone_004/0008_publier_evenement_canonical_source_published.md"
+        Test = "tests/m004/validate_canonical_publication_event_acceptance.ps1"
+        CommandScript = "tests/m004/validate_canonical_publication_event_acceptance.ps1"
+        Code = "app/source_processing/application/publish_canonical_source_event.py"
+        Adr = "ADR-001; DDD-ADR-003; DDD-ADR-006; DDD-ADR-008"
+    },
+    [ordered] @{
+        Id = "REQ-M004-009"
+        Source = "docs/tasks/milestone_004/0009_exposer_commande_conversion_documentaire.md"
+        Test = "tests/m004/validate_document_conversion_command_acceptance.ps1"
+        CommandScript = "tests/m004/validate_document_conversion_command_acceptance.ps1"
+        Code = "app/source_processing/application/document_commands.py"
+        Adr = "ADR-010; DDD-ADR-003; DDD-ADR-006; DDD-ADR-008"
+    },
+    [ordered] @{
+        Id = "REQ-M004-010"
+        Source = "docs/tasks/milestone_004/0010_relier_m004_tracabilite_gates.md"
+        Test = "tests/m004/validate_m004_traceability_acceptance.ps1"
+        CommandScript = "tests/m004/validate_m004_traceability_acceptance.ps1"
+        Code = "app/source_processing/application/canonical_audit_signals.py"
+        Adr = "ADR-001; ADR-004; ADR-010; DDD-ADR-003; DDD-ADR-006; DDD-ADR-008"
+    }
+)
+
 function Assert-Condition {
     param(
         [Parameter(Mandatory = $true)]
@@ -820,6 +903,99 @@ function Assert-M003RequirementRows {
     }
 }
 
+function Assert-M004PathCell {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object] $Row,
+
+        [Parameter(Mandatory = $true)]
+        [string] $RequirementId,
+
+        [Parameter(Mandatory = $true)]
+        [string] $CellName,
+
+        [Parameter(Mandatory = $true)]
+        [string] $ExpectedValue
+    )
+
+    $actualValue = Convert-ToMatrixRelativePath -RelativePath (Get-MatrixRowCell -Row $Row -CellName $CellName -RequirementId $RequirementId)
+
+    Assert-Condition `
+        -Condition ($actualValue -eq $ExpectedValue) `
+        -Message "$CellName M-004 invalide pour ${RequirementId}. Attendu: $ExpectedValue. Obtenu: $actualValue"
+}
+
+function Test-M004MilestoneIsPresent {
+    $milestoneDir = Join-Path $repoRoot "docs/tasks/milestone_004"
+    return (Test-Path -LiteralPath $milestoneDir -PathType Container)
+}
+
+function Assert-M004RequirementRows {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object[]] $Rows
+    )
+
+    if (-not (Test-M004MilestoneIsPresent)) {
+        return
+    }
+
+    $canonicalMatrixPath = [System.IO.Path]::GetFullPath((Join-Path $repoRoot "docs/traceability/matrix.md"))
+    $currentMatrixPath = [System.IO.Path]::GetFullPath($matrixPath)
+    if (-not $currentMatrixPath.Equals($canonicalMatrixPath, [System.StringComparison]::OrdinalIgnoreCase)) {
+        $containsM004Rows = @($Rows | Where-Object {
+            (Get-MatrixRowCell -Row $_ -CellName "Exigence" -RequirementId "ligne inconnue") -match "^REQ-M004-"
+        }).Count -gt 0
+        if (-not $containsM004Rows) {
+            Assert-Condition `
+                -Condition $AllowM000OnlyMatrix `
+                -Message "Matrice M-004 absente sans autorisation explicite."
+            return
+        }
+    }
+
+    $rowsByRequirementId = @{}
+    foreach ($row in $Rows) {
+        $requirementId = Get-MatrixRowCell -Row $row -CellName "Exigence" -RequirementId "ligne inconnue"
+        $rowsByRequirementId[$requirementId] = $row
+    }
+
+    foreach ($expected in $requiredM004Requirements) {
+        $requirementId = $expected["Id"]
+
+        Assert-Condition `
+            -Condition ($rowsByRequirementId.ContainsKey($requirementId)) `
+            -Message "Exigence M-004 livr$($eAcute)e absente: $requirementId"
+
+        $row = $rowsByRequirementId[$requirementId]
+        $status = Get-MatrixRowCell -Row $row -CellName "Statut" -RequirementId $requirementId
+
+        Assert-Condition `
+            -Condition ($status -eq "Couvert") `
+            -Message "Exigence M-004 livr$($eAcute)e non couverte: $requirementId"
+
+        $commandScript = Get-MatrixRowCell -Row $row -CellName "CommandeScript" -RequirementId $requirementId
+
+        Assert-M004PathCell -Row $row -RequirementId $requirementId -CellName "Source" -ExpectedValue $expected["Source"]
+        Assert-M004PathCell -Row $row -RequirementId $requirementId -CellName "Test" -ExpectedValue $expected["Test"]
+        Assert-M004PathCell -Row $row -RequirementId $requirementId -CellName "Code" -ExpectedValue $expected["Code"]
+
+        Assert-Condition `
+            -Condition ($commandScript -eq $expected["CommandScript"]) `
+            -Message "Commande M-004 invalide pour ${requirementId}. Attendu: $($expected["CommandScript"]). Obtenu: $commandScript"
+
+        $adr = Get-MatrixRowCell -Row $row -CellName "ADR" -RequirementId $requirementId
+        Assert-Condition `
+            -Condition ($adr -eq $expected["Adr"]) `
+            -Message "ADR M-004 invalide pour ${requirementId}. Attendu: $($expected["Adr"]). Obtenu: $adr"
+
+        $justification = Get-MatrixRowCell -Row $row -CellName "Justification ADR" -RequirementId $requirementId
+        Assert-Condition `
+            -Condition ($justification -match "^D$($eAcute)cision structurante document$($eAcute)e:") `
+            -Message "Justification ADR M-004 invalide pour ${requirementId}: $justification"
+    }
+}
+
 if (-not $PSBoundParameters.ContainsKey("Path")) {
     $matrixPath = Join-Path $repoRoot "docs/traceability/matrix.md"
 }
@@ -942,5 +1118,6 @@ Assert-Condition `
 Assert-M001RequirementRows -Rows $rows.ToArray()
 Assert-M002RequirementRows -Rows $rows.ToArray()
 Assert-M003RequirementRows -Rows $rows.ToArray()
+Assert-M004RequirementRows -Rows $rows.ToArray()
 
 Write-Host "Matrice de $traceabilityLabel valide: $($rows.Count) exigence(s) contr$([char] 0x00F4)l$($eAcute)e(s)."

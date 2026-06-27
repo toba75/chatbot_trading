@@ -172,6 +172,7 @@ function Invoke-PythonAuditCheck {
         $previousErrorActionPreference = $ErrorActionPreference
         $ErrorActionPreference = "Continue"
         $output = & python $scriptPath 2>&1
+        $exitCode = $LASTEXITCODE
     }
     finally {
         $ErrorActionPreference = $previousErrorActionPreference
@@ -185,7 +186,7 @@ function Invoke-PythonAuditCheck {
     }
 
     return [pscustomobject] @{
-        ExitCode = $LASTEXITCODE
+        ExitCode = $exitCode
         Output = ($output -join "`n")
     }
 }
@@ -353,7 +354,7 @@ metrics = {(metric.name, tuple(sorted(metric.tags.items()))): metric.value for m
 
 assert metrics[("versions_canoniques_publiees", (("scope", "m004"),))] == 1.0
 assert metrics[("pages_refusees_qa", (("scope", "m004"),))] == 1.0
-assert metrics[("autorites_textuelles_ambiguës", (("scope", "m004"),))] == 1.0
+assert metrics[("autorites_textuelles_ambigu\u00ebs", (("scope", "m004"),))] == 1.0
 
 serialized_logs = str([log.to_mapping() for log in signals.logs])
 for forbidden in ("PERFORMANCE_TABLE_FULL_TEXT", "Texte documentaire complet", "page_text"):
@@ -362,7 +363,7 @@ for forbidden in ("PERFORMANCE_TABLE_FULL_TEXT", "Texte documentaire complet", "
 print("audit m004 ok")
 '@
     $auditResult = Invoke-PythonAuditCheck -ProjectRoot $validProjectRoot -Script $auditScript
-    Assert-ExitCode -Actual $auditResult.ExitCode -Expected 0 -Message "Les métriques d'audit M-004 doivent être produites sans contenu documentaire complet."
+    Assert-ExitCode -Actual $auditResult.ExitCode -Expected 0 -Message "Les métriques d'audit M-004 doivent être produites sans contenu documentaire complet. Sortie Python: $($auditResult.Output)"
     Assert-OutputContains -Output $auditResult.Output -Expected "audit m004 ok" -Message "Le contrôle d'audit M-004 doit annoncer son succès."
     Assert-OutputNotContains -Output $auditResult.Output -Forbidden "PERFORMANCE_TABLE_FULL_TEXT" -Message "L'audit M-004 ne doit pas exposer le contenu documentaire complet."
 }
