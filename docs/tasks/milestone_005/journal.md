@@ -28,7 +28,7 @@
 | Tâche | Commit RED | Commit GREEN | ADR consultées | ADR créée ou modifiée | Validations GREEN déclarées |
 |---|---|---|---|---|---|
 | T-001 - Vérifier et rétablir la précondition GREEN M-005 | `f397b8b04a21bbd908e6a99eaab37a99600565df` (`test(m005): couvrir la precondition green de projection`) | `0361a45f63990227ccf176cf25a76ca060f6d1cb` (`test(m005): etablir la precondition green de projection`) | ADR-010 | Aucune | `tests/m005/validate_m005_precondition_unit.ps1`; `tests/m005/validate_m005_precondition_acceptance.ps1`; `scripts/validate_m005_precondition.ps1`; `git diff --check`; `scripts/lint.ps1`; `scripts/test.ps1` (`13 validation(s), 93 test(s)`) |
-| T-002 - Publier la spécification de projection de connaissance | À renseigner | À renseigner | ADR-005; ADR-006; ADR-010; DDD-ADR-004; DDD-ADR-008 | Aucune prévue | À renseigner |
+| T-002 - Publier la spécification de projection de connaissance | `a7c7460261281861f869b687428405b132012f99` (`test(m005): couvrir la specification de projection`) | `66e6c39866497032d9344c792344d964fa97ca95` (`docs(m005): publier la specification de projection`) | ADR-005; ADR-006; ADR-010; DDD-ADR-004; DDD-ADR-008 | Aucune | `tests/m005/validate_m005_specification_acceptance.ps1`; `tests/m005/validate_m005_specification_unit.ps1`; `scripts/validate_m005_specification.ps1`; `scripts/validate_traceability.ps1`; `git diff --check`; `scripts/lint.ps1`; `scripts/test.ps1` (`14 validation(s), 95 test(s)`) |
 | T-003 - Créer une projection depuis une version canonique publiée | À renseigner | À renseigner | ADR-010; DDD-ADR-004; DDD-ADR-008 | Aucune prévue | À renseigner |
 | T-004 - Découper le contenu canonique en chunks traçables | À renseigner | À renseigner | ADR-001; DDD-ADR-003; DDD-ADR-004 | Aucune prévue | À renseigner |
 | T-005 - Enrichir les métadonnées de projection filtrable | À renseigner | À renseigner | ADR-005; DDD-ADR-004 | Aucune prévue | À renseigner |
@@ -59,3 +59,14 @@
 - ADR: non requise; T-001 applique ADR-010 et rend le gate de départ M-005 explicite sans changer la politique durable des gates PowerShell.
 - Validations GREEN: `tests/m005/validate_m005_precondition_unit.ps1`; `tests/m005/validate_m005_precondition_acceptance.ps1`; `git diff --check`; `scripts/lint.ps1` (`13 validation(s), 0 test(s)`); `scripts/test.ps1` (`13 validation(s), 93 test(s)`).
 - Risques résiduels: aucun risque résiduel identifié pour la précondition; l'implémentation fonctionnelle de projection, chunking, encodage, indexation et recherche reste portée par T-002 à T-010.
+
+## Clôture T-002
+
+- Scénario BDD: Given une version canonique M-004 publiée; When la spécification M-005 est publiée; Then chaque comportement de projection et recherche nomme son invariant, son scénario BDD, son test RED, ses ADR applicables et sa commande de validation.
+- RED T-002 confirmé: `tests/m005/validate_m005_specification_acceptance.ps1` et `tests/m005/validate_m005_specification_unit.ps1` échouaient tant que `scripts/validate_m005_specification.ps1` et `docs/specs/m005_projection_connaissance_recherchable.md` étaient absents.
+- Implémentation: `docs/specs/m005_projection_connaissance_recherchable.md` publie la mission KA, l'agrégat `KnowledgeProjection`, les états, objets-valeur, politiques, ports, événements KA, API publiques, erreurs, métriques, exclusions M-006/M-007 et comportements exécutables KA-001 à KA-009.
+- Garde-fous publiés: Qdrant reste une projection régénérable; aucun claim EG n'est indexé dans l'index documentaire; RA consomme `KnowledgeSearchPort` sans accès direct à Qdrant; aucun score n'est traité comme vérité métier.
+- Gates: `scripts/validate_m005_specification.ps1` est enrôlé dans `scripts/lint.ps1` et `scripts/test.ps1`; la matrice de traçabilité couvre `REQ-M005-002`; les compteurs de tests impactés ont été alignés sur le nouveau volume du gate.
+- ADR: non requise; T-002 applique ADR-005, ADR-006, ADR-010, DDD-ADR-004 et DDD-ADR-008 sans changer leur sens.
+- Validations GREEN: `tests/m005/validate_m005_specification_acceptance.ps1`; `tests/m005/validate_m005_specification_unit.ps1`; `scripts/validate_m005_specification.ps1`; `scripts/validate_traceability.ps1`; `git diff --check`; `scripts/lint.ps1` (`14 validation(s), 0 test(s)`); `scripts/test.ps1` (`14 validation(s), 95 test(s)`).
+- Risques résiduels: aucun risque résiduel identifié pour la publication de spécification; l'implémentation applicative de projection, chunking, encodage, indexation et recherche reste portée par T-003 à T-009, puis reliée aux gates par T-010.
