@@ -27,7 +27,7 @@
 
 | Tâche | Commit RED | Commit GREEN | ADR consultées | ADR créée ou modifiée | Validations GREEN déclarées |
 |---|---|---|---|---|---|
-| T-001 - Vérifier et rétablir la précondition GREEN M-005 | À renseigner | À renseigner | ADR-010 | Aucune prévue | À renseigner |
+| T-001 - Vérifier et rétablir la précondition GREEN M-005 | `f397b8b04a21bbd908e6a99eaab37a99600565df` (`test(m005): couvrir la precondition green de projection`) | `0361a45f63990227ccf176cf25a76ca060f6d1cb` (`test(m005): etablir la precondition green de projection`) | ADR-010 | Aucune | `tests/m005/validate_m005_precondition_unit.ps1`; `tests/m005/validate_m005_precondition_acceptance.ps1`; `scripts/validate_m005_precondition.ps1`; `git diff --check`; `scripts/lint.ps1`; `scripts/test.ps1` (`13 validation(s), 93 test(s)`) |
 | T-002 - Publier la spécification de projection de connaissance | À renseigner | À renseigner | ADR-005; ADR-006; ADR-010; DDD-ADR-004; DDD-ADR-008 | Aucune prévue | À renseigner |
 | T-003 - Créer une projection depuis une version canonique publiée | À renseigner | À renseigner | ADR-010; DDD-ADR-004; DDD-ADR-008 | Aucune prévue | À renseigner |
 | T-004 - Découper le contenu canonique en chunks traçables | À renseigner | À renseigner | ADR-001; DDD-ADR-003; DDD-ADR-004 | Aucune prévue | À renseigner |
@@ -49,3 +49,13 @@
 - Une source en quarantaine ou non canonique est non indexable.
 - Une projection `STALE` ne doit pas être utilisée silencieusement lorsqu'une projection actuelle est requise.
 - Les métriques Recall@k, MRR et nDCG initiales servent de mesure M-005 et non de seuil d'acceptation V1 avant calibration M-012.
+
+## Clôture T-001
+
+- Scénario BDD: Given M-000, M-001, M-002, M-003 et M-004 sont présents dans `master`; When les gates de précondition M-005 sont exécutées; Then M-005 ne commence que si `test`, `lint`, la traçabilité, les ADR, les frontières d'architecture et les preuves M-004 sont GREEN.
+- RED T-001 confirmé: `tests/m005/validate_m005_precondition_acceptance.ps1` échouait tant que `scripts/validate_m005_precondition.ps1`, le rapport `docs/governance/m005_precondition_green.md` et l'autorisation de la branche M-005 dans les préconditions M-003/M-004 n'étaient pas livrés.
+- Implémentation: `scripts/validate_m005_precondition.ps1` vérifie les branches autorisées `master` et `codex/milestone-m005-projection-connaissance`, la présence de M-000 à M-004 dans `master`, la relation `master`/`origin/master`, la présence de `master` dans la branche courante, les gates `test` et `lint`, puis écrit `docs/governance/m005_precondition_green.md`.
+- Correction amont: les préconditions M-003 et M-004 autorisent explicitement la branche post-merge M-005 sans masquer leurs refus existants; `scripts/test.ps1` évite la récursion des préconditions imbriquées via des variables d'environnement dédiées.
+- ADR: non requise; T-001 applique ADR-010 et rend le gate de départ M-005 explicite sans changer la politique durable des gates PowerShell.
+- Validations GREEN: `tests/m005/validate_m005_precondition_unit.ps1`; `tests/m005/validate_m005_precondition_acceptance.ps1`; `git diff --check`; `scripts/lint.ps1` (`13 validation(s), 0 test(s)`); `scripts/test.ps1` (`13 validation(s), 93 test(s)`).
+- Risques résiduels: aucun risque résiduel identifié pour la précondition; l'implémentation fonctionnelle de projection, chunking, encodage, indexation et recherche reste portée par T-002 à T-010.
