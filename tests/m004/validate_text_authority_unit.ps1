@@ -100,7 +100,7 @@ def content_hash_for(text):
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def item(text, content_hash):
+def item(text):
     return PageConversionItem(
         label=PageConversionItemLabel.TEXT,
         text=text,
@@ -116,7 +116,7 @@ def item(text, content_hash):
     )
 
 
-def artifact(page_number, route_name, tool_name, artifact_hash, content_hash, text):
+def artifact(page_number, route_name, tool_name, artifact_hash, text):
     return PageConversionArtifact(
         page_number=PageNumber.from_value(page_number),
         route_name=route_name,
@@ -127,7 +127,7 @@ def artifact(page_number, route_name, tool_name, artifact_hash, content_hash, te
             "artifact:source_processing.page_conversion/"
             f"RUN-M004-T004-UNIT/page-{page_number:03d}-{tool_name.value.lower()}.json"
         ),
-        items=(item(text, content_hash),),
+        items=(item(text),),
     )
 
 
@@ -143,7 +143,6 @@ def native_candidate(page_number=1, candidate_id="native"):
             PageRouteName.NATIVE_STANDARD,
             ConversionToolName.DOCLING_STANDARD,
             "a" * 64,
-            "1" * 64,
             f"Texte natif page {page_number}.",
         ),
     )
@@ -157,7 +156,6 @@ def granite_candidate(page_number=1, candidate_id="granite"):
             PageRouteName.MIXED_PAGEWISE,
             ConversionToolName.GRANITE_DOCLING,
             "b" * 64,
-            "2" * 64,
             f"Texte Granite page {page_number}.",
         ),
     )

@@ -207,33 +207,41 @@ class InMemoryTransactionalOutbox:
         return self.entry_for(event_id).status
 
     def mark_delivered(self, event_id: str) -> OutboxEntry:
-        entry = self.entry_for(event_id)
-        if entry.status is not OutboxMessageStatus.PENDING:
-            raise ValueError(f"transition outbox invalide vers delivered: {entry.event.event_id}")
-        delivered_entry = OutboxEntry(
-            sequence=entry.sequence,
-            state_mutation=entry.state_mutation,
-            event=entry.event,
-            status=OutboxMessageStatus.DELIVERED,
-            failure_reason=None,
-        )
-        self._entries_by_event_id[entry.event.event_id] = delivered_entry
-        return delivered_entry
+        parsed_event_id = _ensure_event_id(event_id)
+        with self._lock:
+            if parsed_event_id not in self._entries_by_event_id:
+                raise ValueError(f"event outbox inconnu: {parsed_event_id}")
+            entry = self._entries_by_event_id[parsed_event_id]
+            if entry.status is not OutboxMessageStatus.PENDING:
+                raise ValueError(f"transition outbox invalide vers delivered: {entry.event.event_id}")
+            delivered_entry = OutboxEntry(
+                sequence=entry.sequence,
+                state_mutation=entry.state_mutation,
+                event=entry.event,
+                status=OutboxMessageStatus.DELIVERED,
+                failure_reason=None,
+            )
+            self._entries_by_event_id[entry.event.event_id] = delivered_entry
+            return delivered_entry
 
     def mark_failed(self, event_id: str, failure_reason: str) -> OutboxEntry:
         reason = _ensure_text(failure_reason, "raison d'echec")
-        entry = self.entry_for(event_id)
-        if entry.status is not OutboxMessageStatus.PENDING:
-            raise ValueError(f"transition outbox invalide vers failed: {entry.event.event_id}")
-        failed_entry = OutboxEntry(
-            sequence=entry.sequence,
-            state_mutation=entry.state_mutation,
-            event=entry.event,
-            status=OutboxMessageStatus.FAILED,
-            failure_reason=reason,
-        )
-        self._entries_by_event_id[entry.event.event_id] = failed_entry
-        return failed_entry
+        parsed_event_id = _ensure_event_id(event_id)
+        with self._lock:
+            if parsed_event_id not in self._entries_by_event_id:
+                raise ValueError(f"event outbox inconnu: {parsed_event_id}")
+            entry = self._entries_by_event_id[parsed_event_id]
+            if entry.status is not OutboxMessageStatus.PENDING:
+                raise ValueError(f"transition outbox invalide vers failed: {entry.event.event_id}")
+            failed_entry = OutboxEntry(
+                sequence=entry.sequence,
+                state_mutation=entry.state_mutation,
+                event=entry.event,
+                status=OutboxMessageStatus.FAILED,
+                failure_reason=reason,
+            )
+            self._entries_by_event_id[entry.event.event_id] = failed_entry
+            return failed_entry
 
 
 class InMemoryProcessedEventRegistry:
