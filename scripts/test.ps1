@@ -14,6 +14,7 @@ $m001SpecificationPath = Join-Path $repoRoot "docs/specs/m001_frontieres_ddd_con
 $m002SpecificationPath = Join-Path $repoRoot "docs/specs/m002_plateforme_locale_sure.md"
 $m003SpecificationPath = Join-Path $repoRoot "docs/specs/m003_source_enregistree_diagnostiquee_routee.md"
 $m004SpecificationPath = Join-Path $repoRoot "docs/specs/m004_version_canonique_publiee.md"
+$m005SpecificationPath = Join-Path $repoRoot "docs/specs/m005_projection_connaissance_recherchable.md"
 $platformTopologyPath = Join-Path $repoRoot "app/platform/topology_registry.json"
 $sparkFirewallPath = Join-Path $repoRoot "deploy/spark-firewall/network-boundary.json"
 $appRoot = Join-Path $repoRoot "app"
@@ -33,6 +34,7 @@ $validationCommands = @(
     @{ Path = "scripts/validate_m002_specification.ps1"; Arguments = @("-Path", $m002SpecificationPath) },
     @{ Path = "scripts/validate_m003_specification.ps1"; Arguments = @("-Path", $m003SpecificationPath) },
     @{ Path = "scripts/validate_m004_specification.ps1"; Arguments = @("-Path", $m004SpecificationPath) },
+    @{ Path = "scripts/validate_m005_specification.ps1"; Arguments = @("-Path", $m005SpecificationPath) },
     @{ Path = "scripts/validate_platform_topology.ps1"; Arguments = @("-Path", $platformTopologyPath) },
     @{ Path = "scripts/validate_local_compose.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_network_boundary.ps1"; Arguments = @("-SparkFirewallPath", $sparkFirewallPath) },
@@ -133,7 +135,9 @@ $testCommands = @(
     @{ Path = "tests/m004/validate_m004_traceability_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/m004/validate_m004_traceability_unit.ps1"; Arguments = @() },
     @{ Path = "tests/m005/validate_m005_precondition_unit.ps1"; Arguments = @() },
-    @{ Path = "tests/m005/validate_m005_precondition_acceptance.ps1"; Arguments = @() }
+    @{ Path = "tests/m005/validate_m005_precondition_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m005/validate_m005_specification_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m005/validate_m005_specification_unit.ps1"; Arguments = @() }
 )
 
 function Get-GateCommandPaths {

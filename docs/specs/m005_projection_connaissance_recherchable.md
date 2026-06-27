@@ -1,22 +1,3 @@
-$ErrorActionPreference = "Stop"
-
-$repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
-$validatorPath = Join-Path $repoRoot "scripts/validate_m005_specification.ps1"
-$temporaryRoot = Join-Path $repoRoot (".tmp/ost_m005_spec_unit_" + [System.Guid]::NewGuid().ToString("N"))
-$eAcute = [char] 0x00E9
-$eGrave = [char] 0x00E8
-$aGrave = [char] 0x00E0
-$capitalEAcute = [char] 0x00C9
-
-function New-ValidM005SpecificationContent {
-    $canonicalSpecPath = Join-Path $repoRoot "docs/specs/m005_projection_connaissance_recherchable.md"
-    if (-not (Test-Path -LiteralPath $canonicalSpecPath -PathType Leaf)) {
-        throw "Spécification canonique M-005 absente pour le fixture unitaire: docs/specs/m005_projection_connaissance_recherchable.md"
-    }
-
-    return Get-Content -Raw -Encoding UTF8 -LiteralPath $canonicalSpecPath
-
-    return @'
 # M-005 - Projection de connaissance recherchable
 
 ## Statut
@@ -35,11 +16,14 @@ function New-ValidM005SpecificationContent {
 
 KA construit des projections de recherche dérivées des versions canoniques publiées et retourne des preuves candidates traçables sans devenir source de vérité documentaire ou registre de claims.
 
+La mission de M-005 est de rendre une version canonique M-004 recherchable par contrat KA. La projection peut être reconstruite, retirée ou marquée obsolète sans modifier la version canonique SP. KA ne rédige pas de réponse, ne vérifie pas de claim et ne décide pas la vérité d'une affirmation.
+
 ## Contexte DDD
 
 - Domaine: accès aux connaissances.
 - Bounded context: KA.
 - Objectif métier: rendre une version canonique interrogeable tout en conservant SP comme source documentaire et EG comme registre des claims.
+- Intégrations: KA consomme `CanonicalSourcePublished`, expose `KnowledgeSearchPort` à RA et EG, et publie ses événements via outbox en cohérence éventuelle.
 - Garde-fous: Qdrant reste une projection régénérable; aucun claim EG dans l'index documentaire; RA consomme KnowledgeSearchPort sans accès direct à Qdrant; un score n'est pas une vérité métier.
 
 ## Langage ubiquitaire KA
@@ -50,9 +34,11 @@ KA construit des projections de recherche dérivées des versions canoniques pub
 | ProjectionStatus | État observable de projection: REQUESTED, BUILDING, BUILT, INDEXING, SEARCHABLE, STALE, FAILED, RETIRED. |
 | SearchKnowledge | Commande de recherche KA qui retourne des preuves candidates. |
 | RequestKnowledgeProjection | Commande KA qui demande la construction d'une projection. |
+| Preuve candidate | Passage documentaire retrouvable, cité et traçable; ce n'est pas un claim vérifié. |
 | SearchScoreBundle | Détail des scores dense, sparse, fusion, rerank et diversification sans verdict de vérité. |
 | SearchTracePolicy | Politique qui rend la recherche auditable. |
 | SearchTraceStore | Port de persistance de la trace de fusion et des paramètres de recherche. |
+| Fraîcheur | Relation explicite entre projection, version canonique, profil, modèles et date de build. |
 
 ## Agrégat KnowledgeProjection
 
@@ -186,163 +172,4 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1
 
 - M-005 ne crée, ne vérifie et ne stocke aucun claim EG.
 - M-005 ne produit aucune réponse RA, aucune synthèse et aucun verdict de vérité.
-- M-005 ne publie pas POST /v1/claims/extract, POST /v1/claims/{id}/verify, POST /v1/answer ou POST /v1/research/deep.
-'@
-}
-
-function Invoke-M005SpecificationValidator {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string] $SpecPath
-    )
-
-    $previousErrorActionPreference = $ErrorActionPreference
-    $ErrorActionPreference = "Continue"
-    try {
-        $output = & powershell -NoProfile -ExecutionPolicy Bypass -File $validatorPath -Path $SpecPath 2>&1
-    }
-    finally {
-        $ErrorActionPreference = $previousErrorActionPreference
-    }
-
-    return [pscustomobject] @{
-        ExitCode = $LASTEXITCODE
-        Output = ($output -join "`n")
-    }
-}
-
-function Assert-ExitCode {
-    param(
-        [Parameter(Mandatory = $true)]
-        [int] $Actual,
-
-        [Parameter(Mandatory = $true)]
-        [int] $Expected,
-
-        [Parameter(Mandatory = $true)]
-        [string] $Message
-    )
-
-    if ($Actual -ne $Expected) {
-        throw "$Message Code obtenu: $Actual"
-    }
-}
-
-function Assert-OutputContains {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string] $Output,
-
-        [Parameter(Mandatory = $true)]
-        [string] $Expected,
-
-        [Parameter(Mandatory = $true)]
-        [string] $Message
-    )
-
-    if (-not $Output.Contains($Expected)) {
-        throw "$Message Sortie obtenue: $Output"
-    }
-}
-
-function New-TemporarySpec {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string] $Name,
-
-        [Parameter(Mandatory = $true)]
-        [string] $Content
-    )
-
-    $specPath = Join-Path $temporaryRoot "$Name.md"
-    $Content | Set-Content -Encoding UTF8 -LiteralPath $specPath
-    return $specPath
-}
-
-if (-not (Test-Path -LiteralPath $validatorPath -PathType Leaf)) {
-    throw "Validateur de spécification M-005 absent: scripts/validate_m005_specification.ps1"
-}
-
-New-Item -ItemType Directory -Path $temporaryRoot | Out-Null
-
-try {
-    $validContent = New-ValidM005SpecificationContent
-    $validSpecPath = New-TemporarySpec -Name "valid" -Content $validContent
-    $validResult = Invoke-M005SpecificationValidator -SpecPath $validSpecPath
-    Assert-ExitCode -Actual $validResult.ExitCode -Expected 0 -Message "Une spécification M-005 conforme doit être acceptée."
-
-    $missingSectionSpecPath = New-TemporarySpec `
-        -Name "missing-mission-ka" `
-        -Content ($validContent.Replace("## Mission KA", "## Mission incomplète"))
-    $missingSectionResult = Invoke-M005SpecificationValidator -SpecPath $missingSectionSpecPath
-    Assert-ExitCode -Actual $missingSectionResult.ExitCode -Expected 1 -Message "Une section obligatoire absente doit être refusée."
-    Assert-OutputContains -Output $missingSectionResult.Output -Expected "Section obligatoire absente: ## Mission KA" -Message "La section absente doit être nommée."
-
-    $missingBehaviorSpecPath = New-TemporarySpec `
-        -Name "missing-behavior" `
-        -Content ($validContent.Replace("KA-007 - Recherche hybride", "KA-007 - Recherche hybride incompl$($eGrave)te"))
-    $missingBehaviorResult = Invoke-M005SpecificationValidator -SpecPath $missingBehaviorSpecPath
-    Assert-ExitCode -Actual $missingBehaviorResult.ExitCode -Expected 1 -Message "Un comportement obligatoire absent doit être refusé."
-    Assert-OutputContains -Output $missingBehaviorResult.Output -Expected "Comportement attendu absent: KA-007 - Recherche hybride tra$([char] 0x00E7)able" -Message "Le comportement absent doit être nommé."
-
-    $missingAdrSpecPath = New-TemporarySpec `
-        -Name "missing-adr" `
-        -Content ($validContent.Replace("DDD-ADR-004", "DDD-ADR-004-RETIRÉE"))
-    $missingAdrResult = Invoke-M005SpecificationValidator -SpecPath $missingAdrSpecPath
-    Assert-ExitCode -Actual $missingAdrResult.ExitCode -Expected 1 -Message "Une ADR documentaire absente doit être refusée."
-    Assert-OutputContains -Output $missingAdrResult.Output -Expected "ADR applicable absente: DDD-ADR-004" -Message "L'ADR absente doit être nommée."
-
-    $missingIndexEndpointSpecPath = New-TemporarySpec `
-        -Name "missing-index-endpoint" `
-        -Content ($validContent.Replace("POST /v1/documents/{document_id}/index", "POST /v1/documents/{document_id}/project"))
-    $missingIndexEndpointResult = Invoke-M005SpecificationValidator -SpecPath $missingIndexEndpointSpecPath
-    Assert-ExitCode -Actual $missingIndexEndpointResult.ExitCode -Expected 1 -Message "L'endpoint d'indexation KA doit être obligatoire."
-    Assert-OutputContains -Output $missingIndexEndpointResult.Output -Expected "POST /v1/documents/{document_id}/index" -Message "L'endpoint absent doit être nommé."
-
-    $missingEventsSpecPath = New-TemporarySpec `
-        -Name "missing-events" `
-        -Content ($validContent.Replace("KnowledgeProjectionBecameSearchable", "KnowledgeProjectionIndexed"))
-    $missingEventsResult = Invoke-M005SpecificationValidator -SpecPath $missingEventsSpecPath
-    Assert-ExitCode -Actual $missingEventsResult.ExitCode -Expected 1 -Message "Les événements KA obligatoires doivent être contrôlés."
-    Assert-OutputContains -Output $missingEventsResult.Output -Expected "$($capitalEAcute)v$($eAcute)nement attendu absent: KnowledgeProjectionBecameSearchable" -Message "L'événement absent doit être nommé."
-
-    $missingTraceStoreSpecPath = New-TemporarySpec `
-        -Name "missing-search-trace-store" `
-        -Content ($validContent.Replace("SearchTraceStore", "SearchTraceWriter"))
-    $missingTraceStoreResult = Invoke-M005SpecificationValidator -SpecPath $missingTraceStoreSpecPath
-    Assert-ExitCode -Actual $missingTraceStoreResult.ExitCode -Expected 1 -Message "SearchTraceStore doit être obligatoire."
-    Assert-OutputContains -Output $missingTraceStoreResult.Output -Expected "SearchTraceStore" -Message "Le port de trace absent doit être nommé."
-
-    $qdrantAsSourceSpecPath = New-TemporarySpec `
-        -Name "qdrant-source" `
-        -Content ($validContent + "`nQdrant est la source de v$($eAcute)rit$($eAcute) documentaire de KA.`n")
-    $qdrantAsSourceResult = Invoke-M005SpecificationValidator -SpecPath $qdrantAsSourceSpecPath
-    Assert-ExitCode -Actual $qdrantAsSourceResult.ExitCode -Expected 1 -Message "Qdrant source de vérité doit être refusé."
-    Assert-OutputContains -Output $qdrantAsSourceResult.Output -Expected "Qdrant source de v$($eAcute)rit$($eAcute) interdit" -Message "La confusion Qdrant doit être nommée."
-
-    $claimInIndexSpecPath = New-TemporarySpec `
-        -Name "claim-in-index" `
-        -Content ($validContent + "`nL'index documentaire stocke les claims EG vérifiés.`n")
-    $claimInIndexResult = Invoke-M005SpecificationValidator -SpecPath $claimInIndexSpecPath
-    Assert-ExitCode -Actual $claimInIndexResult.ExitCode -Expected 1 -Message "Les claims dans l'index documentaire doivent être refusés."
-    Assert-OutputContains -Output $claimInIndexResult.Output -Expected "Claim EG dans l'index documentaire interdit" -Message "Le claim stocké doit être nommé."
-
-    $directRaQdrantSpecPath = New-TemporarySpec `
-        -Name "direct-ra-qdrant" `
-        -Content ($validContent + "`nRA lit Qdrant directement pour accélérer la recherche.`n")
-    $directRaQdrantResult = Invoke-M005SpecificationValidator -SpecPath $directRaQdrantSpecPath
-    Assert-ExitCode -Actual $directRaQdrantResult.ExitCode -Expected 1 -Message "L'accès RA direct à Qdrant doit être refusé."
-    Assert-OutputContains -Output $directRaQdrantResult.Output -Expected "Acc$($eGrave)s RA direct $($aGrave) Qdrant interdit" -Message "L'accès direct doit être nommé."
-
-    $scoreTruthSpecPath = New-TemporarySpec `
-        -Name "score-truth" `
-        -Content ($validContent + "`nLe score hybride est une v$($eAcute)rit$($eAcute) m$($eAcute)tier suffisante pour décider une affirmation.`n")
-    $scoreTruthResult = Invoke-M005SpecificationValidator -SpecPath $scoreTruthSpecPath
-    Assert-ExitCode -Actual $scoreTruthResult.ExitCode -Expected 1 -Message "Un score comme vérité métier doit être refusé."
-    Assert-OutputContains -Output $scoreTruthResult.Output -Expected "Score trait$($eAcute) comme v$($eAcute)rit$($eAcute) interdit" -Message "Le score-vérité doit être nommé."
-}
-finally {
-    Remove-Item -LiteralPath $temporaryRoot -Recurse -Force
-}
-
-Write-Host "Tests unitaires du validateur de spécification M-005: OK"
+- M-005 ne publie pas `POST /v1/claims/extract`, `POST /v1/claims/{id}/verify`, `POST /v1/answer` ou `POST /v1/research/deep`.
