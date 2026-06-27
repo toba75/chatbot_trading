@@ -231,6 +231,7 @@ class ConvertRoutedPagesHandler:
                 page_output=page_output,
                 page_route=page_route,
                 expected_tool_name=ConversionToolName.DOCLING_STANDARD,
+                expected_artifact_ref=request.expected_output_artifact_ref,
             )
             return _PageConversionOrchestrationResult(
                 page_output=page_output,
@@ -249,6 +250,7 @@ class ConvertRoutedPagesHandler:
             _ensure_preprocessed_artifact_for_route(
                 preprocessed_artifact=preprocessed_artifact,
                 page_route=page_route,
+                expected_artifact_ref=preprocessing_request.expected_output_artifact_ref,
             )
             request = _conversion_request(
                 source_document=source_document,
@@ -261,6 +263,7 @@ class ConvertRoutedPagesHandler:
                 page_output=page_output,
                 page_route=page_route,
                 expected_tool_name=ConversionToolName.GRANITE_DOCLING,
+                expected_artifact_ref=request.expected_output_artifact_ref,
             )
             return _PageConversionOrchestrationResult(
                 page_output=page_output,
@@ -279,6 +282,7 @@ class ConvertRoutedPagesHandler:
                 page_output=page_output,
                 page_route=page_route,
                 expected_tool_name=ConversionToolName.GRANITE_DOCLING,
+                expected_artifact_ref=request.expected_output_artifact_ref,
             )
             return _PageConversionOrchestrationResult(
                 page_output=page_output,
@@ -364,6 +368,7 @@ def _ensure_conversion_output(
     page_output: PageConversionArtifact,
     page_route: PageRoute,
     expected_tool_name: ConversionToolName,
+    expected_artifact_ref: str,
 ) -> PageConversionArtifact:
     if not isinstance(page_output, PageConversionArtifact):
         raise ValueError("sortie de conversion invalide")
@@ -373,6 +378,8 @@ def _ensure_conversion_output(
         raise ValueError("route de conversion incohérente")
     if page_output.tool_name is not expected_tool_name:
         raise ValueError("outil de conversion incohérent")
+    if page_output.audit_artifact_ref != expected_artifact_ref:
+        raise ValueError("artefact de conversion incohérent")
     return page_output
 
 
@@ -380,6 +387,7 @@ def _ensure_preprocessed_artifact_for_route(
     *,
     preprocessed_artifact: PreprocessedPageArtifact,
     page_route: PageRoute,
+    expected_artifact_ref: str,
 ) -> PreprocessedPageArtifact:
     if not isinstance(preprocessed_artifact, PreprocessedPageArtifact):
         raise ValueError("artefact de prétraitement invalide")
@@ -389,6 +397,8 @@ def _ensure_preprocessed_artifact_for_route(
         raise ValueError("route de prétraitement incohérente")
     if preprocessed_artifact.tool_name is not ConversionToolName.OCRMYPDF:
         raise ValueError("outil de prétraitement incohérent")
+    if preprocessed_artifact.artifact_ref != expected_artifact_ref:
+        raise ValueError("artefact de prétraitement incohérent")
     return preprocessed_artifact
 
 

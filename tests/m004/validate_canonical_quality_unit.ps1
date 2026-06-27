@@ -28,6 +28,7 @@ from app.source_processing.domain.document_processing_run import (
 )
 from app.source_processing.domain.page_conversion import (
     CanonicalAcceptancePolicy,
+    CanonicalQualityDecision,
     ConversionToolName,
     CriticalPageSamplingPolicy,
     PageConversionArtifact,
@@ -341,6 +342,15 @@ assert_raises(
         status=QualityDecisionStatus.RETRY_WITH_ALTERNATIVE_ROUTE,
     ),
 )
+assert_raises(
+    "pr\u00e9-conversion incoh\u00e9rent",
+    lambda: PreConversionQualityReport(
+        policy_version="canonical-quality-unit-v1",
+        critical_page_selection=selection,
+        route_comparisons=(retry_comparison,),
+        status=QualityDecisionStatus.PASS,
+    ),
+)
 
 source_document = registered_source()
 authority_manifest = authority_manifest_for(page_manifest, page_routes)
@@ -425,6 +435,16 @@ blocking_findings = (
         expected="SourceLocator figure",
         actual="ABSENT",
         detail="Provenance de figure absente.",
+    ),
+)
+assert_raises(
+    "d\u00e9cision QA incoh\u00e9rente",
+    lambda: CanonicalQualityDecision(
+        policy_version="canonical-quality-unit-v1",
+        status=QualityDecisionStatus.PASS,
+        publication_allowed=True,
+        findings=(blocking_findings[0],),
+        publication_events=("CanonicalSourcePublished",),
     ),
 )
 red_post_report = acceptance_policy.evaluate_post_conversion(

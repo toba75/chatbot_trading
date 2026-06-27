@@ -14,6 +14,7 @@ from app.platform.job_runtime import (
     JobRequest,
     JobSubmissionDecision,
 )
+from app.source_processing.application.canonical_audit_signals import PreCanonicalAuditEvent
 from app.source_processing.application.register_source_document import (
     OriginalSourceStore,
     RegisterSourceDocumentCommand,
@@ -319,6 +320,7 @@ class DocumentCommandService:
         )
         self._code_version = _ensure_text(code_version, "code_version")
         self._model_version = _ensure_text(model_version, "model_version")
+        self._canonical_audit_events: list[PreCanonicalAuditEvent] = []
         self._register_handler = RegisterSourceDocumentHandler(
             original_source_store=original_source_store,
             source_document_repository=source_document_repository,
@@ -327,6 +329,9 @@ class DocumentCommandService:
             document_inspector=document_inspector,
             processing_run_repository=processing_run_repository,
         )
+
+    def canonical_audit_events(self) -> tuple[PreCanonicalAuditEvent, ...]:
+        return tuple(self._canonical_audit_events)
 
     def register_source_document(
         self,
@@ -428,11 +433,23 @@ class DocumentCommandService:
             parsed_document_id
         )
         if source_document is None:
+            self._record_conversion_audit_event(
+                document_id=parsed_document_id,
+                status="REJECTED",
+                error_code="SOURCE_NOT_FOUND",
+                page_count=0,
+            )
             raise SourceNotFoundError(document_id=parsed_document_id.value)
         parsed_source_document = _ensure_source_document(source_document)
         try:
             parsed_source_document.ensure_documentary_publication_allowed()
         except ValueError as exc:
+            self._record_conversion_audit_event(
+                document_id=parsed_document_id,
+                status="QUARANTINED",
+                error_code="SOURCE_QUARANTINED",
+                page_count=0,
+            )
             raise SourceQuarantinedError(
                 document_id=parsed_document_id.value,
                 reason=str(exc),
@@ -442,6 +459,12 @@ class DocumentCommandService:
             parsed_document_id
         )
         if processing_run is None:
+            self._record_conversion_audit_event(
+                document_id=parsed_document_id,
+                status="REJECTED",
+                error_code="SOURCE_NOT_ROUTED",
+                page_count=0,
+            )
             raise SourceNotRoutedError(
                 document_id=parsed_document_id.value,
                 status="ABSENT",
@@ -451,10 +474,22 @@ class DocumentCommandService:
             parsed_processing_run.ensure_documentary_publication_allowed()
         except ValueError as exc:
             if parsed_processing_run.status is DocumentProcessingRunStatus.QUARANTINED:
+                self._record_conversion_audit_event(
+                    document_id=parsed_document_id,
+                    status="QUARANTINED",
+                    error_code="SOURCE_QUARANTINED",
+                    page_count=parsed_processing_run.page_manifest.source_page_count,
+                )
                 raise SourceQuarantinedError(
                     document_id=parsed_document_id.value,
                     reason=str(exc),
                 ) from exc
+            self._record_conversion_audit_event(
+                document_id=parsed_document_id,
+                status="REJECTED",
+                error_code="SOURCE_NOT_ROUTED",
+                page_count=parsed_processing_run.page_manifest.source_page_count,
+            )
             raise SourceNotRoutedError(
                 document_id=parsed_document_id.value,
                 status=parsed_processing_run.status.value,
@@ -468,16 +503,34 @@ class DocumentCommandService:
                 existing_conversion
             )
             if parsed_existing_conversion.conversion_status is DocumentConversionStatus.QA_REJECTED:
+                self._record_conversion_audit_event(
+                    document_id=parsed_document_id,
+                    status="REJECTED",
+                    error_code=parsed_existing_conversion.rejection_error_code,
+                    page_count=parsed_processing_run.page_manifest.source_page_count,
+                )
                 raise CanonicalQualityRejectedError(
                     document_id=parsed_document_id.value,
                     error_code=parsed_existing_conversion.rejection_error_code,
                 )
             if parsed_existing_conversion.conversion_status is DocumentConversionStatus.CANONICAL_ACCEPTED:
                 return DocumentConversionAcceptance.from_state(parsed_existing_conversion)
+            self._record_conversion_audit_event(
+                document_id=parsed_document_id,
+                status="REJECTED",
+                error_code="CONVERSION_ALREADY_REQUESTED",
+                page_count=parsed_processing_run.page_manifest.source_page_count,
+            )
             raise ConversionAlreadyRequestedError(document_id=parsed_document_id.value)
 
         route_plan = parsed_processing_run.route_plan
         if route_plan is None:
+            self._record_conversion_audit_event(
+                document_id=parsed_document_id,
+                status="REJECTED",
+                error_code="SOURCE_NOT_ROUTED",
+                page_count=parsed_processing_run.page_manifest.source_page_count,
+            )
             raise SourceNotRoutedError(
                 document_id=parsed_document_id.value,
                 status=parsed_processing_run.status.value,
@@ -513,8 +566,39 @@ class DocumentCommandService:
             job_request=job_request,
         )
         if not submission.created:
+            self._record_conversion_audit_event(
+                document_id=parsed_document_id,
+                status="REJECTED",
+                error_code="CONVERSION_ALREADY_REQUESTED",
+                page_count=len(route_plan.page_routes),
+            )
             raise ConversionAlreadyRequestedError(document_id=parsed_document_id.value)
+        self._record_conversion_audit_event(
+            document_id=parsed_document_id,
+            status="REQUESTED",
+            error_code=None,
+            page_count=len(route_plan.page_routes),
+        )
         return DocumentConversionAcceptance.from_state(conversion_state)
+
+    def _record_conversion_audit_event(
+        self,
+        *,
+        document_id: DocumentId,
+        status: str,
+        error_code: str | None,
+        page_count: int,
+    ) -> None:
+        self._canonical_audit_events.append(
+            PreCanonicalAuditEvent(
+                trace_id=_conversion_audit_trace_id(document_id),
+                document_id=document_id.value,
+                phase="document_conversion_request",
+                status=status,
+                page_count=page_count,
+                error_code=error_code,
+            )
+        )
 
 
 def _ensure_text(value: Any, field_name: str) -> str:
@@ -594,6 +678,11 @@ def _ensure_quality_rejection_error_code(value: Any) -> str:
     if text not in {"SOURCE_NOT_CANONICAL", "PAGE_AUTHORITY_MISSING"}:
         raise ValueError("rejection_error_code invalide")
     return text
+
+
+def _conversion_audit_trace_id(document_id: DocumentId) -> str:
+    _ensure_document_id(document_id)
+    return f"TRACE-M004-CONVERT-{document_id.value.removeprefix('DOC-')}"
 
 
 def _ensure_canonical_version_id(value: Any) -> str:

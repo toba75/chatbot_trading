@@ -723,12 +723,21 @@ class PreConversionQualityReport:
             _ensure_route_comparisons(self.route_comparisons),
         )
         object.__setattr__(self, "status", QualityDecisionStatus.from_value(self.status))
+        if self.status is QualityDecisionStatus.PASS:
+            if any(comparison.status is not QualityDecisionStatus.PASS for comparison in self.route_comparisons):
+                raise ValueError("rapport QA pré-conversion incohérent")
         if self.status is QualityDecisionStatus.RETRY_WITH_ALTERNATIVE_ROUTE:
             if not any(
                 comparison.status is QualityDecisionStatus.RETRY_WITH_ALTERNATIVE_ROUTE
                 for comparison in self.route_comparisons
             ):
                 raise ValueError("comparaison de route obligatoire")
+        if self.status is QualityDecisionStatus.MANUAL_REVIEW:
+            if not any(
+                comparison.status is QualityDecisionStatus.MANUAL_REVIEW
+                for comparison in self.route_comparisons
+            ):
+                raise ValueError("comparaison de revue manuelle obligatoire")
 
     def to_audit_payload(self) -> dict[str, Any]:
         return {
@@ -830,6 +839,8 @@ class CanonicalQualityDecision:
             QualityDecisionStatus.PASS,
             QualityDecisionStatus.PASS_WITH_WARNINGS,
         }:
+            raise ValueError("décision QA incohérente")
+        if self.publication_allowed and any(finding.blocking for finding in self.findings):
             raise ValueError("décision QA incohérente")
         if not self.publication_allowed and self.status in {
             QualityDecisionStatus.PASS,
@@ -1456,8 +1467,10 @@ def _post_conversion_integrity_findings(
 ) -> tuple[PostConversionQualityFinding, ...]:
     expected_pages = tuple(entry.page_number.value for entry in page_manifest.entries)
     actual_pages = tuple(page.page_number.value for page in docling_document.pages)
-    missing_pages = tuple(page for page in expected_pages if page not in set(actual_pages))
-    unexpected_pages = tuple(page for page in actual_pages if page not in set(expected_pages))
+    expected_page_set = set(expected_pages)
+    actual_page_set = set(actual_pages)
+    missing_pages = tuple(page for page in expected_pages if page not in actual_page_set)
+    unexpected_pages = tuple(page for page in actual_pages if page not in expected_page_set)
     missing_findings = tuple(
         PostConversionQualityFinding(
             code=QualityFindingCode.PAGE_OMITTED,
@@ -1494,22 +1507,23 @@ def _text_authority_document_findings(
     text_authority_manifest: TextAuthorityManifest,
     docling_document: PagewiseDoclingDocument,
 ) -> tuple[PostConversionQualityFinding, ...]:
-    authorized_document = PagewiseDoclingFusionService().merge_authorized(
-        document_id=docling_document.document_id,
-        canonical_version_id=docling_document.canonical_version_id,
-        source_sha256=docling_document.source_sha256,
-        original_storage_ref=docling_document.original_storage_ref,
+    parsed_text_authority_manifest = _ensure_text_authority_manifest(text_authority_manifest)
+    _ensure_text_authority_manifest_covers_page_manifest(
         page_manifest=page_manifest,
-        text_authority_manifest=text_authority_manifest,
+        page_decisions=parsed_text_authority_manifest.page_decisions,
     )
-    if authorized_document.to_payload() == docling_document.to_payload():
-        return ()
     authorized_pages = {
-        page.page_number.value: page.to_payload()
-        for page in authorized_document.pages
+        page_output.page_number.value: _canonical_page_signature(
+            _canonical_page_from_output(
+                document_id=docling_document.document_id,
+                canonical_version_id=docling_document.canonical_version_id,
+                page_output=page_output,
+            )
+        )
+        for page_output in parsed_text_authority_manifest.selected_page_outputs()
     }
     actual_pages = {
-        page.page_number.value: page.to_payload()
+        page.page_number.value: _canonical_page_signature(page)
         for page in docling_document.pages
     }
     return tuple(
@@ -1523,6 +1537,28 @@ def _text_authority_document_findings(
         )
         for page_value in sorted(authorized_pages.keys() & actual_pages.keys())
         if authorized_pages[page_value] != actual_pages[page_value]
+    )
+
+
+def _canonical_page_signature(page: CanonicalDocumentPage) -> tuple[Any, ...]:
+    return (
+        page.page_number.value,
+        page.route_name.value,
+        page.conversion_artifact_hash,
+        tuple(
+            (
+                item.item_id,
+                item.label,
+                item.text,
+                item.bbox,
+                item.content_hash,
+                item.provenance.page_pdf,
+                item.provenance.item_id,
+                item.provenance.bbox,
+                item.provenance.content_hash,
+            )
+            for item in page.items
+        ),
     )
 
 

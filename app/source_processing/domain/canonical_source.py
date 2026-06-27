@@ -19,6 +19,7 @@ from app.source_processing.domain.page_conversion import (
 )
 from app.source_processing.domain.source_document import (
     DocumentId,
+    OriginalStorageRef,
     SourceDocument,
     SourceFingerprint,
 )
@@ -117,6 +118,7 @@ class CanonicalSourceVersion:
     document_id: DocumentId
     canonical_version_id: str
     source_sha256: SourceFingerprint
+    original_storage_ref: OriginalStorageRef
     canonical_artifact: CanonicalArtifact
     page_count: int
     accepted_at: str
@@ -136,6 +138,7 @@ class CanonicalSourceVersion:
             _ensure_domain_identifier(self.canonical_version_id, "canonical_version_id", "CVER"),
         )
         _ensure_source_fingerprint(self.source_sha256)
+        _ensure_original_storage_ref(self.original_storage_ref)
         if not isinstance(self.canonical_artifact, CanonicalArtifact):
             raise ValueError("artefact canonique invalide")
         _ensure_artifact_matches_version(
@@ -162,6 +165,7 @@ class CanonicalSourceVersion:
             document_id=self.document_id,
             canonical_version_id=self.canonical_version_id,
             source_sha256=self.source_sha256,
+            original_storage_ref=self.original_storage_ref,
             canonical_artifact=self.canonical_artifact,
             page_count=self.page_count,
             accepted_at=self.accepted_at,
@@ -190,6 +194,7 @@ class CanonicalSource:
     canonical_source_id: str
     document_id: DocumentId
     source_sha256: SourceFingerprint
+    original_storage_ref: OriginalStorageRef
     status: CanonicalSourceStatus
     current_version_id: str
     versions: tuple[CanonicalSourceVersion, ...]
@@ -230,6 +235,7 @@ class CanonicalSource:
             canonical_source_id=canonical_source_id,
             document_id=parsed_source_document.document_id,
             source_sha256=parsed_source_document.fingerprint,
+            original_storage_ref=parsed_source_document.original_storage_ref,
             status=CanonicalSourceStatus.PUBLISHED,
             current_version_id=version.canonical_version_id,
             versions=(version,),
@@ -257,6 +263,8 @@ class CanonicalSource:
             raise ValueError("document_id canonique incohérent")
         if parsed_docling_document.source_sha256 != self.source_sha256:
             raise ValueError("source_sha256 canonique incohérent")
+        if parsed_docling_document.original_storage_ref != self.original_storage_ref:
+            raise ValueError("original_storage_ref canonique incohérent")
         if self.has_version(parsed_docling_document.canonical_version_id):
             raise ValueError("mutation en place interdite")
         _ensure_docling_document_has_text_authority(
@@ -270,6 +278,7 @@ class CanonicalSource:
             document_id=self.document_id,
             canonical_version_id=parsed_docling_document.canonical_version_id,
             source_sha256=self.source_sha256,
+            original_storage_ref=self.original_storage_ref,
             canonical_artifact=canonical_artifact,
             page_count=len(parsed_docling_document.pages),
             accepted_at=accepted_at,
@@ -280,6 +289,7 @@ class CanonicalSource:
             canonical_source_id=self.canonical_source_id,
             document_id=self.document_id,
             source_sha256=self.source_sha256,
+            original_storage_ref=self.original_storage_ref,
             status=CanonicalSourceStatus.PUBLISHED,
             current_version_id=version.canonical_version_id,
             versions=self.versions + (version,),
@@ -310,6 +320,7 @@ class CanonicalSource:
             canonical_source_id=self.canonical_source_id,
             document_id=self.document_id,
             source_sha256=self.source_sha256,
+            original_storage_ref=self.original_storage_ref,
             status=self.status,
             current_version_id=self.current_version_id,
             versions=tuple(updated_versions),
@@ -342,6 +353,7 @@ class CanonicalSource:
         )
         _ensure_document_id(self.document_id)
         _ensure_source_fingerprint(self.source_sha256)
+        _ensure_original_storage_ref(self.original_storage_ref)
         if not isinstance(self.status, CanonicalSourceStatus):
             raise ValueError("statut CanonicalSource invalide")
         object.__setattr__(
@@ -363,6 +375,8 @@ class CanonicalSource:
                 raise ValueError("document_id canonique incohérent")
             if version.source_sha256 != self.source_sha256:
                 raise ValueError("source_sha256 canonique incohérent")
+            if version.original_storage_ref != self.original_storage_ref:
+                raise ValueError("original_storage_ref canonique incohérent")
 
 
 def canonical_source_id_for(document_id: DocumentId) -> str:
@@ -399,6 +413,7 @@ def _build_version(
         document_id=source_document.document_id,
         canonical_version_id=docling_document.canonical_version_id,
         source_sha256=source_document.fingerprint,
+        original_storage_ref=source_document.original_storage_ref,
         canonical_artifact=canonical_artifact,
         page_count=len(docling_document.pages),
         accepted_at=accepted_at,
@@ -445,8 +460,35 @@ def _ensure_docling_document_has_text_authority(
         page_manifest=text_authority_manifest.page_manifest,
         text_authority_manifest=text_authority_manifest,
     )
-    if authorized_document.to_payload() != docling_document.to_payload():
+    if _docling_document_page_signatures(authorized_document) != _docling_document_page_signatures(docling_document):
         raise ValueError("autorité textuelle obligatoire")
+
+
+def _docling_document_page_signatures(
+    docling_document: PagewiseDoclingDocument,
+) -> tuple[tuple[Any, ...], ...]:
+    return tuple(
+        (
+            page.page_number.value,
+            page.route_name.value,
+            page.conversion_artifact_hash,
+            tuple(
+                (
+                    item.item_id,
+                    item.label,
+                    item.text,
+                    item.bbox,
+                    item.content_hash,
+                    item.provenance.page_pdf,
+                    item.provenance.item_id,
+                    item.provenance.bbox,
+                    item.provenance.content_hash,
+                )
+                for item in page.items
+            ),
+        )
+        for page in docling_document.pages
+    )
 
 
 def _ensure_versions(value: Sequence[CanonicalSourceVersion]) -> tuple[CanonicalSourceVersion, ...]:
@@ -558,6 +600,12 @@ def _ensure_document_id(value: Any) -> DocumentId:
 def _ensure_source_fingerprint(value: Any) -> SourceFingerprint:
     if not isinstance(value, SourceFingerprint):
         raise ValueError("source_sha256 invalide")
+    return value
+
+
+def _ensure_original_storage_ref(value: Any) -> OriginalStorageRef:
+    if not isinstance(value, OriginalStorageRef):
+        raise ValueError("original_storage_ref canonique invalide")
     return value
 
 

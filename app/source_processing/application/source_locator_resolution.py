@@ -174,22 +174,14 @@ class SourceLocatorResolutionRegistry:
         if len(indexes) == 0:
             raise ValueError("registre de résolvabilité vide")
         object.__setattr__(self, "indexes_by_version_id", MappingProxyType(indexes))
+        object.__setattr__(
+            self,
+            "_validation_policy",
+            _validation_policy_for_indexes(indexes),
+        )
 
     def to_validation_policy(self) -> SourceLocatorValidationPolicy:
-        return SourceLocatorValidationPolicy(
-            canonical_sources_by_version_id={
-                version_id: index.canonical_ref
-                for version_id, index in self.indexes_by_version_id.items()
-            },
-            version_statuses_by_version_id={
-                version_id: index.status
-                for version_id, index in self.indexes_by_version_id.items()
-            },
-            resolvable_item_ids_by_version_id={
-                version_id: index.item_hashes()
-                for version_id, index in self.indexes_by_version_id.items()
-            },
-        )
+        return self._validation_policy
 
     def resolve(self, locator: SourceLocator) -> SourceLocatorResolution:
         if not isinstance(locator, SourceLocator):
@@ -207,6 +199,25 @@ class SourceLocatorResolutionRegistry:
                 for index in self.indexes_by_version_id.values()
             )
         }
+
+
+def _validation_policy_for_indexes(
+    indexes_by_version_id: Mapping[str, CanonicalVersionResolutionIndex],
+) -> SourceLocatorValidationPolicy:
+    return SourceLocatorValidationPolicy(
+        canonical_sources_by_version_id={
+            version_id: index.canonical_ref
+            for version_id, index in indexes_by_version_id.items()
+        },
+        version_statuses_by_version_id={
+            version_id: index.status
+            for version_id, index in indexes_by_version_id.items()
+        },
+        resolvable_item_ids_by_version_id={
+            version_id: index.item_hashes()
+            for version_id, index in indexes_by_version_id.items()
+        },
+    )
 
 
 def _build_version_index(

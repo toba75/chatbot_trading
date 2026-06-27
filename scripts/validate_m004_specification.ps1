@@ -40,7 +40,11 @@ $requiredAdrIds = @(
     "ADR-002",
     "ADR-003",
     "ADR-004",
-    "DDD-ADR-003"
+    "ADR-010",
+    "DDD-ADR-003",
+    "DDD-ADR-006",
+    "DDD-ADR-008",
+    "DDD-ADR-010"
 )
 
 $requiredMarkers = @(
@@ -91,7 +95,7 @@ $requiredHttpMarkers = @(
 $expectedAggregates = @(
     @{
         Name = "CanonicalSource"
-        Events = @("CanonicalSourceAccepted", "CanonicalSourcePublished", "CanonicalSourceSuperseded", "CanonicalSourceQuarantined")
+        Events = @("CanonicalSourcePublished", "CanonicalSourceSuperseded")
     }
 )
 
@@ -122,11 +126,10 @@ $expectedStates = @(
 )
 
 $expectedEvents = @(
-    "PageTextAuthoritySelected",
-    "DocumentConversionCompleted",
-    "CanonicalSourceAccepted",
     "CanonicalSourcePublished",
-    "CanonicalSourceSuperseded"
+    "CanonicalSourceSuperseded",
+    "CanonicalAuditEvent",
+    "PreCanonicalAuditEvent"
 )
 
 $expectedBehaviors = @(
@@ -134,11 +137,11 @@ $expectedBehaviors = @(
     @{ Name = "SP-010 - Fusion pagewise vers DoclingDocument unique"; Adr = @("ADR-001", "ADR-002", "ADR-003", "ADR-004"); Test = "T-003" },
     @{ Name = "SP-011 - Autorit$($eAcute) textuelle unique par page"; Adr = @("ADR-004"); Test = "T-004" },
     @{ Name = "SP-012 - QA pr$($eAcute) et post-conversion"; Adr = @("ADR-001", "ADR-002", "ADR-003", "ADR-004"); Test = "T-005" },
-    @{ Name = "SP-013 - Publication immuable"; Adr = @("ADR-001", "DDD-ADR-003"); Test = "T-006" },
+    @{ Name = "SP-013 - Publication immuable"; Adr = @("ADR-001", "DDD-ADR-003", "DDD-ADR-010"); Test = "T-006" },
     @{ Name = "SP-014 - SourceLocator r$($eAcute)solvable"; Adr = @("DDD-ADR-003"); Test = "T-007" },
-    @{ Name = "SP-015 - $($eAcute)v$($eAcute)nement CanonicalSourcePublished"; Adr = @("ADR-001", "DDD-ADR-003"); Test = "T-008" },
-    @{ Name = "SP-016 - Contrat HTTP de conversion"; Adr = @("ADR-010", "DDD-ADR-003"); Test = "T-009" },
-    @{ Name = "SP-017 - Tra$($cCedilla)abilit$($eAcute) et gates M-004"; Adr = @("ADR-010"); Test = "T-010" }
+    @{ Name = "SP-015 - $($eAcute)v$($eAcute)nement CanonicalSourcePublished"; Adr = @("ADR-001", "DDD-ADR-003", "DDD-ADR-006", "DDD-ADR-008"); Test = "T-008" },
+    @{ Name = "SP-016 - Contrat HTTP de conversion"; Adr = @("ADR-010", "DDD-ADR-003", "DDD-ADR-006", "DDD-ADR-008"); Test = "T-009" },
+    @{ Name = "SP-017 - Tra$($cCedilla)abilit$($eAcute) et gates M-004"; Adr = @("ADR-001", "ADR-004", "ADR-010", "DDD-ADR-003", "DDD-ADR-006", "DDD-ADR-008"); Test = "T-010" }
 )
 
 function Normalize-M004Cell {

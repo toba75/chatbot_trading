@@ -213,7 +213,6 @@ class SourceProcessingHttpAdapter:
                 body={
                     "error_code": "SOURCE_NOT_ROUTED",
                     "document_id": exc.document_id,
-                    "status": exc.status,
                 },
             )
         except ConversionAlreadyRequestedError as exc:

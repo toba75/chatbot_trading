@@ -211,7 +211,7 @@ class NativeDoclingConverter:
             tool_name=ConversionToolName.DOCLING_STANDARD,
             tool_version="docling-standard-2.0.0",
             artifact_hash="a" * 64,
-            audit_artifact_ref="artifact:source_processing.page_conversion/RUN-M004-T003-ACCEPTANCE/page-001-native.json",
+            audit_artifact_ref="artifact:source_processing.page_conversion/RUN-M004-T003-ACCEPTANCE/page-001-native_standard.json",
             items=(
                 item(
                     PageConversionItemLabel.TEXT,
@@ -238,7 +238,7 @@ class GraniteDoclingConverter:
                 tool_name=ConversionToolName.GRANITE_DOCLING,
                 tool_version="granite-docling-258m-1.0.0",
                 artifact_hash="b" * 64,
-                audit_artifact_ref="artifact:source_processing.page_conversion/RUN-M004-T003-ACCEPTANCE/page-002-granite.json",
+                audit_artifact_ref="artifact:source_processing.page_conversion/RUN-M004-T003-ACCEPTANCE/page-002-scan_granite.json",
                 items=(
                     item(
                         PageConversionItemLabel.TABLE,
@@ -257,7 +257,7 @@ class GraniteDoclingConverter:
             tool_name=ConversionToolName.GRANITE_DOCLING,
             tool_version="granite-docling-258m-1.0.0",
             artifact_hash="c" * 64,
-            audit_artifact_ref="artifact:source_processing.page_conversion/RUN-M004-T003-ACCEPTANCE/page-003-granite.json",
+            audit_artifact_ref="artifact:source_processing.page_conversion/RUN-M004-T003-ACCEPTANCE/page-003-preprocess_granite.json",
             items=(
                 item(
                     PageConversionItemLabel.FIGURE,
@@ -377,7 +377,7 @@ class MissingProvenanceNativeConverter(NativeDoclingConverter):
             tool_name=ConversionToolName.DOCLING_STANDARD,
             tool_version="docling-standard-2.0.0",
             artifact_hash="e" * 64,
-            audit_artifact_ref="artifact:source_processing.page_conversion/RUN-M004-T003-ACCEPTANCE/page-001-native.json",
+            audit_artifact_ref="artifact:source_processing.page_conversion/RUN-M004-T003-ACCEPTANCE/page-001-native_standard.json",
             items=(
                 item(
                     PageConversionItemLabel.TEXT,

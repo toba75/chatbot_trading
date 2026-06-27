@@ -15,7 +15,7 @@ function New-ValidM004SpecificationContent {
 ## Statut
 
 - Milestone: M-004 - Version canonique publi$($eAcute)e.
-- ADR consult$($eAcute)es: ADR-001, ADR-002, ADR-003, ADR-004, DDD-ADR-003.
+- ADR consult$($eAcute)es: ADR-001, ADR-002, ADR-003, ADR-004, ADR-010, DDD-ADR-003, DDD-ADR-006, DDD-ADR-008, DDD-ADR-010.
 - ADR: non requise, car M-004 applique les d$($eAcute)cisions existantes sans changer leur sens.
 
 ## Sc$($eAcute)nario BDD
@@ -51,7 +51,7 @@ M-004 publie le contrat ex$($eAcute)cutable du bounded context SP pour produire 
 
 | Agr$($eAcute)gat | Responsabilit$($eAcute) M-004 | Invariants | $($eAcute)v$($eAcute)nements |
 |---|---|---|---|
-| CanonicalSource | Accepter, publier, supers$($eAcute)der ou refuser une version canonique. | La version publi$($eAcute)e est immuable; une correction cr$($eAcute)e une nouvelle version canonique et ne modifie jamais la version publi$($eAcute)e en place; une source en quarantaine n'est pas publiable. | CanonicalSourceAccepted; CanonicalSourcePublished; CanonicalSourceSuperseded; CanonicalSourceQuarantined |
+| CanonicalSource | Publier ou supers$($eAcute)der une version canonique accept$($eAcute)e. | La version publi$($eAcute)e est immuable; une correction cr$($eAcute)e une nouvelle version canonique et ne modifie jamais la version publi$($eAcute)e en place; une source en quarantaine n'est pas publiable. | CanonicalSourcePublished; CanonicalSourceSuperseded |
 
 | Objet-valeur | Sens M-004 | Invariants |
 |---|---|---|
@@ -99,11 +99,10 @@ La QA post-conversion contr$([char] 0x00F4)le le nombre de pages, le JSON valide
 
 | $($eAcute)v$($eAcute)nement | D$($eAcute)clencheur | Payload publi$($eAcute) |
 |---|---|---|
-| PageTextAuthoritySelected | Une page retient une autorit$($eAcute) textuelle. | document_id; page_pdf; authority; policy_version |
-| DocumentConversionCompleted | Le DoclingDocument unique est produit. | document_id; canonical_version_id; artifact_hash |
-| CanonicalSourceAccepted | La QA accepte la version canonique. | document_id; canonical_version_id; quality_decision |
 | CanonicalSourcePublished | La version est publi$($eAcute)e vers KA et EG. | `CanonicalSourceRef` contractuel; `canonical_artifact_sha256` inclus; `SourceLocator` r$($eAcute)solu via le registre T-007 |
 | CanonicalSourceSuperseded | Une correction publie une nouvelle version. | previous_canonical_version_id; new_canonical_version_id |
+| CanonicalAuditEvent | Une publication, un refus QA ou une quarantaine post-canonique doit $([char] 0x00EA)tre observ$($eAcute). | trace_id; document_id; canonical_version_id; phase; status; page_count; pages_rejected_by_qa; ambiguous_text_authorities; artifact_hash; error_code |
+| PreCanonicalAuditEvent | Une demande de conversion est accept$($eAcute)e ou refus$($eAcute)e avant existence d'une version canonique. | trace_id; document_id; phase; status; page_count; error_code; canonical_version_id nul; artifact_hash nul |
 
 ## Comportements v$($eAcute)rifiables M-004
 
@@ -113,11 +112,11 @@ La QA post-conversion contr$([char] 0x00F4)le le nombre de pages, le JSON valide
 | SP-010 - Fusion pagewise vers DoclingDocument unique | Aucune page ne peut $([char] 0x00EA)tre omise. | Given des pages rout$($eAcute)es; When la conversion fusionne les sorties; Then le DoclingDocument unique conserve toutes les pages dans l'ordre. | T-003 | ADR-001; ADR-002; ADR-003; ADR-004 | powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m004_specification.ps1 |
 | SP-011 - Autorit$($eAcute) textuelle unique par page | Chaque page poss$($eGrave)de une seule autorit$($eAcute). | Given une sortie native et Granite; When TextAuthoritySelectionPolicy arbitre; Then une seule autorit$($eAcute) est retenue. | T-004 | ADR-004 | powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m004_specification.ps1 |
 | SP-012 - QA pr$($eAcute) et post-conversion | Les pages critiques et le Docling JSON sont contr$([char] 0x00F4)l$($eAcute)s. | Given une conversion candidate; When CanonicalAcceptancePolicy $($eAcute)value la version; Then les chiffres, signes, tableaux et provenance sont v$($eAcute)rifi$($eAcute)s. | T-005 | ADR-001; ADR-002; ADR-003; ADR-004 | powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m004_specification.ps1 |
-| SP-013 - Publication immuable | Une correction cr$($eAcute)e une nouvelle version. | Given une version publi$($eAcute)e; When une correction est accept$($eAcute)e; Then l'ancienne version reste r$($eAcute)solvable et une nouvelle version est publi$($eAcute)e. | T-006 | ADR-001; DDD-ADR-003 | powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m004_specification.ps1 |
+| SP-013 - Publication immuable | Une correction cr$($eAcute)e une nouvelle version. | Given une version publi$($eAcute)e; When une correction est accept$($eAcute)e; Then l'ancienne version reste r$($eAcute)solvable et une nouvelle version est publi$($eAcute)e. | T-006 | ADR-001; DDD-ADR-003; DDD-ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m004_specification.ps1 |
 | SP-014 - SourceLocator r$($eAcute)solvable | Tout item canonique pointe vers document, version, page, item et hash. | Given un item canonique; When un contexte aval ouvre sa preuve; Then SourceLocator r$($eAcute)sout l'item sans lire les tables SP. | T-007 | DDD-ADR-003 | powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m004_specification.ps1 |
-| SP-015 - $($eAcute)v$($eAcute)nement CanonicalSourcePublished | SP est l'unique producteur de CanonicalSourcePublished. | Given une CanonicalSource publi$($eAcute)e; When l'outbox publie l'$($eAcute)v$($eAcute)nement; Then KA et EG re$([char] 0x00E7)oivent une r$($eAcute)f$($eAcute)rence idempotente. | T-008 | ADR-001; DDD-ADR-003 | powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m004_specification.ps1 |
-| SP-016 - Contrat HTTP de conversion | Le client ne voit que les statuts publics et erreurs stables. | Given un client appelle POST /v1/documents/{id}/convert; When la commande est accept$($eAcute)e ou refus$($eAcute)e; Then la r$($eAcute)ponse ne divulgue pas d'identifiant interne. | T-009 | ADR-010; DDD-ADR-003 | powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m004_specification.ps1 |
-| SP-017 - Tra$([char] 0x00E7)abilit$($eAcute) et gates M-004 | Aucun GREEN n'est implicite. | Given les preuves M-004; When les gates s'ex$($eAcute)cutent; Then test, lint et validate_m004_specification.ps1 sont enr$([char] 0x00F4)l$($eAcute)s. | T-010 | ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m004_specification.ps1 |
+| SP-015 - $($eAcute)v$($eAcute)nement CanonicalSourcePublished | SP est l'unique producteur de CanonicalSourcePublished. | Given une CanonicalSource publi$($eAcute)e; When l'outbox publie l'$($eAcute)v$($eAcute)nement; Then KA et EG re$([char] 0x00E7)oivent une r$($eAcute)f$($eAcute)rence idempotente. | T-008 | ADR-001; DDD-ADR-003; DDD-ADR-006; DDD-ADR-008 | powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m004_specification.ps1 |
+| SP-016 - Contrat HTTP de conversion | Le client ne voit que les statuts publics et erreurs stables. | Given un client appelle POST /v1/documents/{id}/convert; When la commande est accept$($eAcute)e ou refus$($eAcute)e; Then la r$($eAcute)ponse ne divulgue pas d'identifiant interne. | T-009 | ADR-010; DDD-ADR-003; DDD-ADR-006; DDD-ADR-008 | powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m004_specification.ps1 |
+| SP-017 - Tra$([char] 0x00E7)abilit$($eAcute) et gates M-004 | Aucun GREEN n'est implicite. | Given les preuves M-004; When les gates s'ex$($eAcute)cutent; Then test, lint et validate_m004_specification.ps1 sont enr$([char] 0x00F4)l$($eAcute)s. | T-010 | ADR-001; ADR-004; ADR-010; DDD-ADR-003; DDD-ADR-006; DDD-ADR-008 | powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m004_specification.ps1 |
 
 ## Contrat HTTP M-004
 

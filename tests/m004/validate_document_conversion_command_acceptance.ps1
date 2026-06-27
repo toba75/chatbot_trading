@@ -10,6 +10,9 @@ import sys
 sys.path.insert(0, sys.argv[1])
 
 from app.platform.job_runtime import InMemoryJobQueue, JOB_RUNTIME_CATALOG
+from app.source_processing.application.canonical_audit_signals import (
+    build_canonical_audit_signals,
+)
 from app.source_processing.adapters.document_http import (
     HttpRequest,
     SourceProcessingHttpAdapter,
@@ -55,7 +58,7 @@ class InMemoryOriginalSourceStore:
         existing_content = self.content_by_ref.get(storage_ref)
         if existing_content is not None:
             if existing_content != bytes(original_content):
-                raise AssertionError("Un original existant ne doit pas etre remplace.")
+                raise AssertionError("Un original existant ne doit pas être remplacé.")
             return storage_ref
         self.content_by_ref[storage_ref] = bytes(original_content)
         return storage_ref
@@ -143,6 +146,19 @@ def assert_equal(actual, expected, message):
 def assert_true(condition, message):
     if not condition:
         raise AssertionError(message)
+
+
+def assert_last_audit_event(service, *, document_id, status, error_code, page_count):
+    audit_event = service.canonical_audit_events()[-1]
+    assert_equal(audit_event.document_id, document_id, "L'audit pré-canonique doit nommer le document.")
+    assert_equal(audit_event.phase, "document_conversion_request", "L'audit pré-canonique doit nommer la phase de commande.")
+    assert_equal(audit_event.status, status, "L'audit pré-canonique doit tracer le statut public.")
+    assert_equal(audit_event.error_code, error_code, "L'audit pré-canonique doit tracer le code d'erreur public.")
+    assert_equal(audit_event.page_count, page_count, "L'audit pré-canonique doit tracer le nombre de pages sans contenu documentaire.")
+    log_mapping = audit_event.to_log_mapping()
+    assert_equal(log_mapping["canonical_version_id"], None, "L'audit pré-canonique ne doit pas inventer de version canonique.")
+    assert_equal(log_mapping["artifact_hash"], None, "L'audit pré-canonique ne doit pas inventer de hash d'artefact.")
+    build_canonical_audit_signals(service.canonical_audit_events())
 
 
 def metadata():
@@ -281,7 +297,7 @@ processing_repository.runs_by_document_id[routed_source.document_id.value] = rou
 # When le client appelle POST /v1/documents/{id}/convert.
 accepted = post_convert(adapter, routed_source.document_id.value)
 
-# Then la conversion canonique est acceptee comme job idempotent sans exposer d'identifiant technique.
+# Then la conversion canonique est acceptée comme job idempotent sans exposer d'identifiant technique.
 assert_equal(accepted.status_code, 202, "La commande de conversion doit retourner 202.")
 assert_equal(
     accepted.body,
@@ -289,7 +305,7 @@ assert_equal(
         "document_id": routed_source.document_id.value,
         "conversion_status": "CONVERSION_REQUESTED",
     },
-    "La reponse de conversion doit rester publique et minimale.",
+    "La réponse de conversion doit rester publique et minimale.",
 )
 for forbidden_key in (
     "job_id",
@@ -299,16 +315,23 @@ for forbidden_key in (
     "source_sha256",
     "original_storage_ref",
 ):
-    assert_true(forbidden_key not in accepted.body, f"La reponse ne doit pas exposer {forbidden_key}.")
+    assert_true(forbidden_key not in accepted.body, f"La réponse ne doit pas exposer {forbidden_key}.")
+assert_last_audit_event(
+    service,
+    document_id=routed_source.document_id.value,
+    status="REQUESTED",
+    error_code=None,
+    page_count=2,
+)
 
 pending_jobs = job_queue.pending_jobs()
-assert_equal(tuple(job.request.job_name for job in pending_jobs), ("CONVERT_DOCUMENT",), "La commande doit creer le job global explicite de conversion.")
+assert_equal(tuple(job.request.job_name for job in pending_jobs), ("CONVERT_DOCUMENT",), "La commande doit créer le job global explicite de conversion.")
 assert_equal(
     pending_jobs[0].request.payload["document_id"],
     routed_source.document_id.value,
     "Le payload de job doit porter le DocumentId public.",
 )
-assert_equal(len(processing_repository.submitted_conversion_requests), 1, "La demande de conversion doit etre persistee une seule fois.")
+assert_equal(len(processing_repository.submitted_conversion_requests), 1, "La demande de conversion doit être persistée une seule fois.")
 
 # Given une source inconnue est convertie.
 unknown = post_convert(adapter, "DOC-FFFFFFFFFFFFFFFF")
@@ -318,6 +341,13 @@ assert_equal(
     {"error_code": "SOURCE_NOT_FOUND", "document_id": "DOC-FFFFFFFFFFFFFFFF"},
     "Le code source inconnue doit rester stable.",
 )
+assert_last_audit_event(
+    service,
+    document_id="DOC-FFFFFFFFFFFFFFFF",
+    status="REJECTED",
+    error_code="SOURCE_NOT_FOUND",
+    page_count=0,
+)
 
 # Given une source en quarantaine existe.
 quarantined_source = source_document("quarantined")
@@ -326,9 +356,16 @@ source_repository.documents_by_id[quarantined_source.document_id.value] = quaran
 )
 quarantined = post_convert(adapter, quarantined_source.document_id.value)
 assert_equal(quarantined.status_code, 409, "Une source en quarantaine doit retourner 409.")
-assert_equal(quarantined.body["error_code"], "SOURCE_QUARANTINED", "Le code quarantaine doit etre stable.")
+assert_equal(quarantined.body["error_code"], "SOURCE_QUARANTINED", "Le code quarantaine doit être stable.")
+assert_last_audit_event(
+    service,
+    document_id=quarantined_source.document_id.value,
+    status="QUARANTINED",
+    error_code="SOURCE_QUARANTINED",
+    page_count=0,
+)
 
-# Given un document enregistre n'a pas de route approuvee.
+# Given un document enregistré n'a pas de route approuvée.
 not_routed_source = source_document("not-routed")
 source_repository.documents_by_id[not_routed_source.document_id.value] = not_routed_source
 processing_repository.runs_by_document_id[not_routed_source.document_id.value] = diagnosed_run(
@@ -336,10 +373,21 @@ processing_repository.runs_by_document_id[not_routed_source.document_id.value] =
     "NOT-ROUTED",
 )
 not_routed = post_convert(adapter, not_routed_source.document_id.value)
-assert_equal(not_routed.status_code, 409, "Une source non routee doit retourner 409.")
-assert_equal(not_routed.body["error_code"], "SOURCE_NOT_ROUTED", "Le code route absente doit etre stable.")
+assert_equal(not_routed.status_code, 409, "Une source non routée doit retourner 409.")
+assert_equal(
+    not_routed.body,
+    {"error_code": "SOURCE_NOT_ROUTED", "document_id": not_routed_source.document_id.value},
+    "Le code route absente doit être stable et ne pas exposer le statut interne.",
+)
+assert_last_audit_event(
+    service,
+    document_id=not_routed_source.document_id.value,
+    status="REJECTED",
+    error_code="SOURCE_NOT_ROUTED",
+    page_count=1,
+)
 
-# Given une conversion a deja ete demandee.
+# Given une conversion a déjà été demandée.
 already_requested_source = source_document("already-requested")
 source_repository.documents_by_id[already_requested_source.document_id.value] = already_requested_source
 processing_repository.runs_by_document_id[already_requested_source.document_id.value] = routed_run(
@@ -353,10 +401,17 @@ processing_repository.conversions_by_document_id[already_requested_source.docume
     rejection_error_code=None,
 )
 already_requested = post_convert(adapter, already_requested_source.document_id.value)
-assert_equal(already_requested.status_code, 409, "Une conversion deja demandee doit retourner 409.")
-assert_equal(already_requested.body["error_code"], "CONVERSION_ALREADY_REQUESTED", "Le code de doublon conversion doit etre stable.")
+assert_equal(already_requested.status_code, 409, "Une conversion déjà demandée doit retourner 409.")
+assert_equal(already_requested.body["error_code"], "CONVERSION_ALREADY_REQUESTED", "Le code de doublon conversion doit être stable.")
+assert_last_audit_event(
+    service,
+    document_id=already_requested_source.document_id.value,
+    status="REJECTED",
+    error_code="CONVERSION_ALREADY_REQUESTED",
+    page_count=2,
+)
 
-# Given la QA canonique a refuse la publication.
+# Given la QA canonique a refusé la publication.
 qa_rejected_source = source_document("qa-rejected")
 source_repository.documents_by_id[qa_rejected_source.document_id.value] = qa_rejected_source
 processing_repository.runs_by_document_id[qa_rejected_source.document_id.value] = routed_run(
@@ -370,32 +425,39 @@ processing_repository.conversions_by_document_id[qa_rejected_source.document_id.
     rejection_error_code="PAGE_AUTHORITY_MISSING",
 )
 qa_rejected = post_convert(adapter, qa_rejected_source.document_id.value)
-assert_equal(qa_rejected.status_code, 422, "Une QA refusee doit retourner 422.")
+assert_equal(qa_rejected.status_code, 422, "Une QA refusée doit retourner 422.")
 assert_equal(
     qa_rejected.body,
     {"error_code": "PAGE_AUTHORITY_MISSING", "document_id": qa_rejected_source.document_id.value},
-    "Le code d'autorite manquante doit etre atteignable sans raison interne.",
+    "Le code d'autorité manquante doit être atteignable sans raison interne.",
+)
+assert_last_audit_event(
+    service,
+    document_id=qa_rejected_source.document_id.value,
+    status="REJECTED",
+    error_code="PAGE_AUTHORITY_MISSING",
+    page_count=2,
 )
 
-# Given le client tente d'imposer une route ou une autorite depuis HTTP.
-# When l'endpoint de conversion recoit un corps non vide.
-# Then le transport refuse la requete au lieu de decider a la place du domaine.
+# Given le client tente d'imposer une route ou une autorité depuis HTTP.
+# When l'endpoint de conversion reçoit un corps non vide.
+# Then le transport refuse la requête au lieu de décider à la place du domaine.
 invalid_body = post_convert(
     adapter,
     routed_source.document_id.value,
     body={"route_name": "SCAN_GRANITE", "authority": "GRANITE"},
 )
-assert_equal(invalid_body.status_code, 400, "Le transport ne doit pas accepter de decision de route.")
-assert_equal(invalid_body.body, {"error_code": "HTTP_REQUEST_INVALID", "field": "body"}, "Le corps de conversion doit etre vide.")
+assert_equal(invalid_body.status_code, 400, "Le transport ne doit pas accepter de décision de route.")
+assert_equal(invalid_body.body, {"error_code": "HTTP_REQUEST_INVALID", "field": "body"}, "Le corps de conversion doit être vide.")
 assert_equal(
     len(processing_repository.submitted_conversion_requests),
     1,
     "Le body invalide ne doit pas persister de demande de conversion.",
 )
 
-# Given un diagnostic est demande depuis l'endpoint M-003.
-# When POST /diagnose est appele.
-# Then aucun job de conversion n'est declenche par le diagnostic.
+# Given un diagnostic est demandé depuis l'endpoint M-003.
+# When POST /diagnose est appelé.
+# Then aucun job de conversion n'est déclenché par le diagnostic.
 diagnosed_source = source_document("diagnose-only")
 source_repository.documents_by_id[diagnosed_source.document_id.value] = diagnosed_source
 inspector.inspections_by_ref[diagnosed_source.original_storage_ref.value] = DocumentInspection(
@@ -403,11 +465,11 @@ inspector.inspections_by_ref[diagnosed_source.original_storage_ref.value] = Docu
     pages=(InspectedPage(page_number=1, state="PRESENT"),),
 )
 diagnosis = post_diagnose(adapter, diagnosed_source.document_id.value)
-assert_equal(diagnosis.status_code, 202, "Le diagnostic doit rester accepte.")
+assert_equal(diagnosis.status_code, 202, "Le diagnostic doit rester accepté.")
 assert_equal(
     tuple(job.request.job_name for job in job_queue.pending_jobs()),
     ("CONVERT_DOCUMENT", "DIAGNOSE"),
-    "Le diagnostic ne doit pas creer de second job de conversion.",
+    "Le diagnostic ne doit pas créer de second job de conversion.",
 )
 assert_equal(
     len(processing_repository.submitted_conversion_requests),

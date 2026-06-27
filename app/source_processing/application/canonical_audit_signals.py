@@ -11,13 +11,14 @@ from typing import Any
 
 from app.contracts.identity import DomainIdentifier
 
-_ALLOWED_STATUSES = frozenset({"PUBLISHED", "REJECTED", "QUARANTINED"})
+_ALLOWED_STATUSES = frozenset({"PUBLISHED", "REJECTED", "QUARANTINED", "REQUESTED"})
 _ALLOWED_PHASES = frozenset(
     {
         "canonical_conversion",
         "canonical_quality",
         "canonical_publication",
         "canonical_supersession",
+        "document_conversion_request",
     }
 )
 _ALLOWED_ERROR_CODES = frozenset(
@@ -33,8 +34,11 @@ _ALLOWED_ERROR_CODES = frozenset(
         "PAGE_UNEXPECTED",
         "PERCENTAGE_ALTERED",
         "SOURCE_LOCATOR_INCONSISTENT",
+        "SOURCE_NOT_FOUND",
         "SOURCE_NOT_CANONICAL",
+        "SOURCE_NOT_ROUTED",
         "SOURCE_QUARANTINED",
+        "CONVERSION_ALREADY_REQUESTED",
     }
 )
 _AUDIT_LOG_FIELD_NAMES = frozenset(
@@ -157,6 +161,66 @@ class CanonicalAuditEvent:
 
 
 @dataclass(frozen=True)
+class PreCanonicalAuditEvent:
+    """Événement d'audit M-004 avant existence d'une version canonique."""
+
+    trace_id: str
+    document_id: str
+    phase: str
+    status: str
+    page_count: int
+    error_code: str | None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "trace_id", _ensure_trace_id(self.trace_id))
+        object.__setattr__(self, "document_id", _ensure_document_id(self.document_id))
+        object.__setattr__(self, "phase", _ensure_phase(self.phase))
+        object.__setattr__(self, "status", _ensure_status(self.status))
+        object.__setattr__(
+            self,
+            "page_count",
+            _ensure_non_negative_integer(
+                self.page_count,
+                "page_count",
+                "M004_AUDIT_PAGE_COUNT_INVALID",
+            ),
+        )
+        object.__setattr__(self, "error_code", _ensure_optional_error_code(self.error_code))
+        if self.status == "REQUESTED" and self.error_code is not None:
+            raise CanonicalAuditSignalError(
+                "M004_AUDIT_REQUESTED_ERROR_FORBIDDEN",
+                "Une demande pré-canonique acceptée ne doit pas porter de code d'erreur.",
+            )
+        if self.status != "REQUESTED" and self.error_code is None:
+            raise CanonicalAuditSignalError(
+                "M004_AUDIT_ERROR_CODE_REQUIRED",
+                "Un refus pré-canonique doit porter un code d'erreur.",
+            )
+
+    def to_log_mapping(self) -> dict[str, Any]:
+        return {
+            "trace_id": self.trace_id,
+            "document_id": self.document_id,
+            "canonical_version_id": None,
+            "phase": self.phase,
+            "status": self.status,
+            "page_count": self.page_count,
+            "pages_rejected_by_qa": 0,
+            "ambiguous_text_authorities": 0,
+            "artifact_hash": None,
+            "error_code": self.error_code,
+        }
+
+    @property
+    def pages_rejected_by_qa(self) -> int:
+        return 0
+
+    @property
+    def ambiguous_text_authorities(self) -> int:
+        return 0
+
+
+@dataclass(frozen=True)
 class CanonicalAuditLogEvent:
     """Log structuré M-004 sans payload documentaire."""
 
@@ -210,7 +274,7 @@ class CanonicalAuditSignals:
 
 
 def build_canonical_audit_signals(
-    events: Sequence[CanonicalAuditEvent],
+    events: Sequence[CanonicalAuditEvent | PreCanonicalAuditEvent],
 ) -> CanonicalAuditSignals:
     parsed_events = _ensure_audit_events(events)
     logs = tuple(CanonicalAuditLogEvent(fields=event.to_log_mapping()) for event in parsed_events)
@@ -218,38 +282,64 @@ def build_canonical_audit_signals(
     published_versions = 0
     rejected_pages = 0
     ambiguous_authorities = 0
+    refusals_by_cause: dict[tuple[str, str, str], int] = {}
 
     for event in parsed_events:
         if event.status == "PUBLISHED":
             published_versions += 1
         rejected_pages += event.pages_rejected_by_qa
         ambiguous_authorities += event.ambiguous_text_authorities
+        if event.error_code is not None:
+            cause = (event.phase, event.status, event.error_code)
+            refusals_by_cause[cause] = refusals_by_cause.get(cause, 0) + 1
 
-    metrics = (
+    metrics = [
         CanonicalMetricEvent(
             name="versions_canoniques_publiees",
             value=float(published_versions),
             unit="versions",
-            tags={"scope": "m004"},
+            tags={"scope": "m004", "phase": "all", "status": "all", "error_code": "all"},
         ),
         CanonicalMetricEvent(
             name="pages_refusees_qa",
             value=float(rejected_pages),
             unit="pages",
-            tags={"scope": "m004"},
+            tags={"scope": "m004", "phase": "all", "status": "all", "error_code": "all"},
         ),
         CanonicalMetricEvent(
-            name="autorites_textuelles_ambiguës",
+            name="autorites_textuelles_ambigues",
             value=float(ambiguous_authorities),
             unit="pages",
-            tags={"scope": "m004"},
+            tags={"scope": "m004", "phase": "all", "status": "all", "error_code": "all"},
         ),
-    )
+        CanonicalMetricEvent(
+            name="refus_canoniques",
+            value=float(sum(refusals_by_cause.values())),
+            unit="events",
+            tags={"scope": "m004", "phase": "all", "status": "all", "error_code": "all"},
+        ),
+    ]
+    for phase, status, error_code in sorted(refusals_by_cause):
+        metrics.append(
+            CanonicalMetricEvent(
+                name="refus_canoniques",
+                value=float(refusals_by_cause[(phase, status, error_code)]),
+                unit="events",
+                tags={
+                    "scope": "m004",
+                    "phase": phase,
+                    "status": status,
+                    "error_code": error_code,
+                },
+            )
+        )
 
-    return CanonicalAuditSignals(logs=logs, metrics=metrics)
+    return CanonicalAuditSignals(logs=logs, metrics=tuple(metrics))
 
 
-def _ensure_audit_events(value: Sequence[CanonicalAuditEvent]) -> tuple[CanonicalAuditEvent, ...]:
+def _ensure_audit_events(
+    value: Sequence[CanonicalAuditEvent | PreCanonicalAuditEvent],
+) -> tuple[CanonicalAuditEvent | PreCanonicalAuditEvent, ...]:
     if value is None:
         raise CanonicalAuditSignalError("M004_AUDIT_EVENTS_REQUIRED", "Les événements d'audit M-004 sont requis.")
     if isinstance(value, str) or not isinstance(value, Sequence):
@@ -261,10 +351,10 @@ def _ensure_audit_events(value: Sequence[CanonicalAuditEvent]) -> tuple[Canonica
     if len(events) == 0:
         raise CanonicalAuditSignalError("M004_AUDIT_EVENTS_REQUIRED", "Les événements d'audit M-004 sont vides.")
     for event in events:
-        if not isinstance(event, CanonicalAuditEvent):
+        if not isinstance(event, (CanonicalAuditEvent, PreCanonicalAuditEvent)):
             raise CanonicalAuditSignalError(
                 "M004_AUDIT_EVENT_INVALID",
-                "Chaque événement d'audit doit utiliser CanonicalAuditEvent.",
+                "Chaque événement d'audit doit utiliser CanonicalAuditEvent ou PreCanonicalAuditEvent.",
             )
     return events
 
@@ -289,7 +379,8 @@ def _ensure_metric_events(value: Sequence[CanonicalMetricEvent]) -> tuple[Canoni
     required_metric_names = {
         "versions_canoniques_publiees",
         "pages_refusees_qa",
-        "autorites_textuelles_ambiguës",
+        "autorites_textuelles_ambigues",
+        "refus_canoniques",
     }
     missing_metric_names = required_metric_names - metric_names
     if len(missing_metric_names) > 0:
@@ -461,13 +552,13 @@ def _freeze_observable_mapping(value: Mapping[str, Any]) -> Mapping[str, Any]:
         elif parsed_key == "document_id":
             frozen[parsed_key] = _ensure_document_id(nested_value)
         elif parsed_key == "canonical_version_id":
-            frozen[parsed_key] = _ensure_canonical_version_id(nested_value)
+            frozen[parsed_key] = None if nested_value is None else _ensure_canonical_version_id(nested_value)
         elif parsed_key == "phase":
             frozen[parsed_key] = _ensure_phase(nested_value)
         elif parsed_key == "status":
             frozen[parsed_key] = _ensure_status(nested_value)
         elif parsed_key == "artifact_hash":
-            frozen[parsed_key] = _ensure_artifact_hash(nested_value)
+            frozen[parsed_key] = None if nested_value is None else _ensure_artifact_hash(nested_value)
         elif parsed_key == "error_code":
             frozen[parsed_key] = _ensure_optional_error_code(nested_value)
         elif isinstance(nested_value, str):
@@ -525,5 +616,6 @@ __all__ = [
     "CanonicalAuditSignalError",
     "CanonicalAuditSignals",
     "CanonicalMetricEvent",
+    "PreCanonicalAuditEvent",
     "build_canonical_audit_signals",
 ]

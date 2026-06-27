@@ -53,10 +53,10 @@ function New-M004MatrixContent {
 | REQ-M004-003 | docs/tasks/milestone_004/0003_convertir_pages_selon_route_explicite.md | Couvert | tests/m004/validate_page_conversion_acceptance.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m004\validate_page_conversion_acceptance.ps1 | app/source_processing/application/convert_routed_pages.py | ADR-001; ADR-002; ADR-003; ADR-004; DDD-ADR-003 | $documentedDecision |
 | REQ-M004-004 | docs/tasks/milestone_004/0004_adjuger_autorite_textuelle_page.md | Couvert | tests/m004/validate_text_authority_acceptance.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m004\validate_text_authority_acceptance.ps1 | app/source_processing/domain/page_conversion.py | ADR-004 | $documentedDecision |
 | REQ-M004-005 | docs/tasks/milestone_004/0005_controler_qualite_version_canonique.md | Couvert | tests/m004/validate_canonical_quality_acceptance.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m004\validate_canonical_quality_acceptance.ps1 | app/source_processing/domain/page_conversion.py | ADR-001; ADR-002; ADR-003; ADR-004 | $documentedDecision |
-| REQ-M004-006 | docs/tasks/milestone_004/0006_publier_version_canonique_immuable.md | Couvert | tests/m004/validate_canonical_publication_acceptance.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m004\validate_canonical_publication_acceptance.ps1 | app/source_processing/domain/canonical_source.py | ADR-001; DDD-ADR-003 | $documentedDecision |
+| REQ-M004-006 | docs/tasks/milestone_004/0006_publier_version_canonique_immuable.md | Couvert | tests/m004/validate_canonical_publication_acceptance.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m004\validate_canonical_publication_acceptance.ps1 | app/source_processing/domain/canonical_source.py | ADR-001; DDD-ADR-003; DDD-ADR-010 | $documentedDecision |
 | REQ-M004-007 | docs/tasks/milestone_004/0007_rendre_source_locator_resolvable.md | Couvert | tests/m004/validate_source_locator_resolution_acceptance.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m004\validate_source_locator_resolution_acceptance.ps1 | app/source_processing/application/source_locator_resolution.py | DDD-ADR-003 | $documentedDecision |
 | REQ-M004-008 | docs/tasks/milestone_004/0008_publier_evenement_canonical_source_published.md | Couvert | tests/m004/validate_canonical_publication_event_acceptance.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m004\validate_canonical_publication_event_acceptance.ps1 | app/source_processing/application/publish_canonical_source_event.py | ADR-001; DDD-ADR-003; DDD-ADR-006; DDD-ADR-008 | $documentedDecision |
-| REQ-M004-009 | docs/tasks/milestone_004/0009_exposer_commande_conversion_documentaire.md | Couvert | tests/m004/validate_document_conversion_command_acceptance.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m004\validate_document_conversion_command_acceptance.ps1 | app/source_processing/application/document_commands.py | ADR-010; DDD-ADR-003; DDD-ADR-006; DDD-ADR-008 | $documentedDecision |
+| REQ-M004-009 | docs/tasks/milestone_004/0009_exposer_commande_conversion_documentaire.md | Couvert | tests/m004/validate_document_conversion_command_acceptance.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m004\validate_document_conversion_command_acceptance.ps1 | app/source_processing/application/document_commands.py; app/source_processing/adapters/document_http.py | ADR-010; DDD-ADR-003; DDD-ADR-006; DDD-ADR-008 | $documentedDecision |
 | REQ-M004-010 | docs/tasks/milestone_004/0010_relier_m004_tracabilite_gates.md | Couvert | tests/m004/validate_m004_traceability_acceptance.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m004\validate_m004_traceability_acceptance.ps1 | app/source_processing/application/canonical_audit_signals.py | ADR-001; ADR-004; ADR-010; DDD-ADR-003; DDD-ADR-006; DDD-ADR-008 | $documentedDecision |
 "@
 }
@@ -160,6 +160,7 @@ function New-TemporaryProject {
         "app/source_processing/application/source_locator_resolution.py",
         "app/source_processing/application/publish_canonical_source_event.py",
         "app/source_processing/application/document_commands.py",
+        "app/source_processing/adapters/document_http.py",
         "app/source_processing/application/canonical_audit_signals.py",
         "app/source_processing/domain/page_conversion.py",
         "app/source_processing/domain/canonical_source.py"
@@ -177,7 +178,8 @@ function New-TemporaryProject {
         "docs/adr/ADR-010-gates-gouvernance-powershell.md",
         "docs/adr/DDD-ADR-003-source-locator-langage-publie.md",
         "docs/adr/DDD-ADR-006-pas-event-sourcing-generalise.md",
-        "docs/adr/DDD-ADR-008-coherence-eventuelle-entre-contextes.md"
+        "docs/adr/DDD-ADR-008-coherence-eventuelle-entre-contextes.md",
+        "docs/adr/DDD-ADR-010-conservation-versions-negatives-supersedees.md"
     )
 
     foreach ($relativePath in $adrFiles) {

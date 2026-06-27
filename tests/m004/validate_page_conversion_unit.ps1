@@ -197,7 +197,7 @@ def conversion_item(label=PageConversionItemLabel.TEXT, text="Texte contrôlé."
     )
 
 
-def artifact(page_number, route_name, tool_name, content_hash=None):
+def artifact(page_number, route_name, tool_name, content_hash=None, audit_artifact_ref=None):
     text = f"Contenu page {page_number}."
     return PageConversionArtifact(
         page_number=PageNumber.from_value(page_number),
@@ -205,7 +205,10 @@ def artifact(page_number, route_name, tool_name, content_hash=None):
         tool_name=tool_name,
         tool_version=f"{tool_name.value.lower()}-v1",
         artifact_hash=str(page_number) * 64,
-        audit_artifact_ref=f"artifact:source_processing.page_conversion/RUN-M004-T003-UNIT/page-{page_number:03d}.json",
+        audit_artifact_ref=(
+            audit_artifact_ref
+            or f"artifact:source_processing.page_conversion/RUN-M004-T003-UNIT/page-{page_number:03d}-{route_name.value.lower()}.json"
+        ),
         items=(
             conversion_item(
                 label=PageConversionItemLabel.TABLE if page_number == 2 else PageConversionItemLabel.TEXT,
@@ -382,6 +385,21 @@ class StaticOcrPreprocessor:
         )
 
 
+class WrongRefOcrPreprocessor:
+    def preprocess_page(self, request):
+        return PreprocessedPageArtifact(
+            page_number=request.page_number,
+            route_name=request.route_name,
+            tool_name=ConversionToolName.OCRMYPDF,
+            tool_version="ocrmypdf-v1",
+            artifact_hash="d" * 64,
+            artifact_ref=(
+                "artifact:source_processing.page_conversion/"
+                "RUN-M004-T003-UNIT/page-003-preprocessed-wrong.pdf"
+            ),
+        )
+
+
 processing_run = planned_run(source_document)
 native_converter = StaticNativeConverter(output=native_output)
 granite_converter = StaticGraniteConverter()
@@ -412,6 +430,44 @@ assert_raises(
         native_converter=wrong_tool_native,
         granite_converter=StaticGraniteConverter(),
         ocrmypdf_preprocessor=StaticOcrPreprocessor(),
+    ).handle(
+        ConvertRoutedPagesCommand(
+            source_document=source_document,
+            processing_run=processing_run,
+            canonical_version_id="CVER-M004-T003",
+        )
+    ),
+)
+
+wrong_ref_native = StaticNativeConverter(
+    output=artifact(
+        1,
+        PageRouteName.NATIVE_STANDARD,
+        ConversionToolName.DOCLING_STANDARD,
+        audit_artifact_ref="artifact:source_processing.page_conversion/RUN-M004-T003-UNIT/page-001-wrong.json",
+    )
+)
+assert_raises(
+    "artefact de conversion",
+    lambda: ConvertRoutedPagesHandler(
+        native_converter=wrong_ref_native,
+        granite_converter=StaticGraniteConverter(),
+        ocrmypdf_preprocessor=StaticOcrPreprocessor(),
+    ).handle(
+        ConvertRoutedPagesCommand(
+            source_document=source_document,
+            processing_run=processing_run,
+            canonical_version_id="CVER-M004-T003",
+        )
+    ),
+)
+
+assert_raises(
+    "artefact de pr\u00e9traitement",
+    lambda: ConvertRoutedPagesHandler(
+        native_converter=StaticNativeConverter(output=native_output),
+        granite_converter=StaticGraniteConverter(),
+        ocrmypdf_preprocessor=WrongRefOcrPreprocessor(),
     ).handle(
         ConvertRoutedPagesCommand(
             source_document=source_document,

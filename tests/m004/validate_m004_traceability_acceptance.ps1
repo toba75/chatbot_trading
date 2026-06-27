@@ -322,6 +322,7 @@ try {
 from app.source_processing.application.canonical_audit_signals import (
     CanonicalAuditEvent,
     CanonicalAuditSignalError,
+    PreCanonicalAuditEvent,
     build_canonical_audit_signals,
 )
 
@@ -362,14 +363,32 @@ events = (
         artifact_hash="sha256:" + "c" * 64,
         error_code="SOURCE_QUARANTINED",
     ),
+    PreCanonicalAuditEvent(
+        trace_id="TRACE-M004-CONVERT-Z",
+        document_id="DOC-M004-Z",
+        phase="document_conversion_request",
+        status="REJECTED",
+        page_count=0,
+        error_code="SOURCE_NOT_FOUND",
+    ),
 )
 
 signals = build_canonical_audit_signals(events)
 metrics = {(metric.name, tuple(sorted(metric.tags.items()))): metric.value for metric in signals.metrics}
 
-assert metrics[("versions_canoniques_publiees", (("scope", "m004"),))] == 1.0
-assert metrics[("pages_refusees_qa", (("scope", "m004"),))] == 1.0
-assert metrics[("autorites_textuelles_ambigu\u00ebs", (("scope", "m004"),))] == 1.0
+all_tags = (("error_code", "all"), ("phase", "all"), ("scope", "m004"), ("status", "all"))
+assert metrics[("versions_canoniques_publiees", all_tags)] == 1.0
+assert metrics[("pages_refusees_qa", all_tags)] == 1.0
+assert metrics[("autorites_textuelles_ambigues", all_tags)] == 1.0
+assert metrics[("refus_canoniques", all_tags)] == 3.0
+assert metrics[(
+    "refus_canoniques",
+    (("error_code", "SOURCE_NOT_FOUND"), ("phase", "document_conversion_request"), ("scope", "m004"), ("status", "REJECTED")),
+)] == 1.0
+
+precanonical_log = signals.logs[-1].to_mapping()
+assert precanonical_log["canonical_version_id"] is None
+assert precanonical_log["artifact_hash"] is None
 
 serialized_logs = str([log.to_mapping() for log in signals.logs])
 for forbidden in ("PERFORMANCE_TABLE_FULL_TEXT", "Texte documentaire complet", "page_text"):

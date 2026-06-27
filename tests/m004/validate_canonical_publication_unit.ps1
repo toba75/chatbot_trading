@@ -287,6 +287,31 @@ assert_equal(
     source_v1.version_for("CVER-M004-T006-UNIT-0001").canonical_ref,
     "La version initiale doit rester inchangée après correction.",
 )
+other_original_ref_document = PagewiseDoclingFusionService().merge_authorized(
+    document_id=source_document.document_id,
+    canonical_version_id="CVER-M004-T006-UNIT-0003",
+    source_sha256=source_document.fingerprint,
+    original_storage_ref=OriginalStorageRef.from_value(
+        f"artifact:source_processing.original_sources/{source_document.document_id.value}/{'f' * 64}.pdf"
+    ),
+    page_manifest=manifest_for(2),
+    text_authority_manifest=manifest_v2,
+)
+assert_raises(
+    "original_storage_ref canonique incoh\u00e9rent",
+    lambda: source_v1.publish_correction(
+        expected_current_version_id=source_v1.current_version_id,
+        docling_document=other_original_ref_document,
+        text_authority_manifest=manifest_v2,
+        quality_decision=green_quality_decision(),
+        canonical_artifact=CanonicalArtifact(
+            artifact_ref=f"artifact:source_processing.canonical_sources/{canonical_source_id}/CVER-M004-T006-UNIT-0003/docling.json",
+            artifact_sha256="e" * 64,
+            artifact_kind=CanonicalArtifactKind.DOCLING_JSON,
+        ),
+        accepted_at="2026-06-26T11:03:00Z",
+    ),
+)
 assert_raises(
     "version courante inattendue",
     lambda: source_v1.publish_correction(

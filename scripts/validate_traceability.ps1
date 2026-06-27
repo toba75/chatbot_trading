@@ -353,7 +353,7 @@ $requiredM004Requirements = @(
         Test = "tests/m004/validate_canonical_publication_acceptance.ps1"
         CommandScript = "tests/m004/validate_canonical_publication_acceptance.ps1"
         Code = "app/source_processing/domain/canonical_source.py"
-        Adr = "ADR-001; DDD-ADR-003"
+        Adr = "ADR-001; DDD-ADR-003; DDD-ADR-010"
     },
     [ordered] @{
         Id = "REQ-M004-007"
@@ -376,7 +376,7 @@ $requiredM004Requirements = @(
         Source = "docs/tasks/milestone_004/0009_exposer_commande_conversion_documentaire.md"
         Test = "tests/m004/validate_document_conversion_command_acceptance.ps1"
         CommandScript = "tests/m004/validate_document_conversion_command_acceptance.ps1"
-        Code = "app/source_processing/application/document_commands.py"
+        Code = "app/source_processing/application/document_commands.py; app/source_processing/adapters/document_http.py"
         Adr = "ADR-010; DDD-ADR-003; DDD-ADR-006; DDD-ADR-008"
     },
     [ordered] @{
@@ -425,22 +425,37 @@ function Assert-RepositoryRelativeFile {
         -Condition (-not [string]::IsNullOrWhiteSpace($RelativePath)) `
         -Message "Chemin vide dans la matrice: $Context"
 
-    Assert-Condition `
-        -Condition (-not [System.IO.Path]::IsPathRooted($RelativePath)) `
-        -Message "Chemin absolu interdit dans la matrice ($Context): $RelativePath"
+    foreach ($path in (Split-MatrixPathCell -RelativePath $RelativePath)) {
+        Assert-Condition `
+            -Condition (-not [System.IO.Path]::IsPathRooted($path)) `
+            -Message "Chemin absolu interdit dans la matrice ($Context): $path"
 
-    $normalizedRelativePath = $RelativePath.Replace("/", [System.IO.Path]::DirectorySeparatorChar).Replace("\", [System.IO.Path]::DirectorySeparatorChar)
-    $resolvedRepositoryRoot = [System.IO.Path]::GetFullPath($repoRoot)
-    $candidatePath = [System.IO.Path]::GetFullPath((Join-Path $resolvedRepositoryRoot $normalizedRelativePath))
-    $repositoryPrefix = $resolvedRepositoryRoot.TrimEnd("\", "/") + [System.IO.Path]::DirectorySeparatorChar
+        $normalizedRelativePath = $path.Replace("/", [System.IO.Path]::DirectorySeparatorChar).Replace("\", [System.IO.Path]::DirectorySeparatorChar)
+        $resolvedRepositoryRoot = [System.IO.Path]::GetFullPath($repoRoot)
+        $candidatePath = [System.IO.Path]::GetFullPath((Join-Path $resolvedRepositoryRoot $normalizedRelativePath))
+        $repositoryPrefix = $resolvedRepositoryRoot.TrimEnd("\", "/") + [System.IO.Path]::DirectorySeparatorChar
 
-    Assert-Condition `
-        -Condition ($candidatePath.StartsWith($repositoryPrefix, [System.StringComparison]::OrdinalIgnoreCase)) `
-        -Message "Chemin hors dépôt interdit dans la matrice ($Context): $RelativePath"
+        Assert-Condition `
+            -Condition ($candidatePath.StartsWith($repositoryPrefix, [System.StringComparison]::OrdinalIgnoreCase)) `
+            -Message "Chemin hors dépôt interdit dans la matrice ($Context): $path"
 
+        Assert-Condition `
+            -Condition (Test-Path -LiteralPath $candidatePath -PathType Leaf) `
+            -Message "Chemin introuvable dans la matrice ($Context): $path"
+    }
+}
+
+function Split-MatrixPathCell {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $RelativePath
+    )
+
+    $paths = @($RelativePath.Split(";") | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" })
     Assert-Condition `
-        -Condition (Test-Path -LiteralPath $candidatePath -PathType Leaf) `
-        -Message "Chemin introuvable dans la matrice ($Context): $RelativePath"
+        -Condition ($paths.Count -gt 0) `
+        -Message "Chemin vide dans la matrice: $RelativePath"
+    return $paths
 }
 
 function Convert-ToMatrixRelativePath {
@@ -459,6 +474,17 @@ function Convert-ToMatrixRelativePath {
     }
 
     return $normalizedRelativePath
+}
+
+function Convert-ToMatrixRelativePathCell {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $RelativePath
+    )
+
+    return ((Split-MatrixPathCell -RelativePath $RelativePath) | ForEach-Object {
+        Convert-ToMatrixRelativePath -RelativePath $_
+    }) -join "; "
 }
 
 function Get-ExistingAdrIds {
@@ -581,8 +607,10 @@ function Assert-M000GateProof {
         [string] $RequirementId
     )
 
-    $normalizedCodePath = Convert-ToMatrixRelativePath -RelativePath $CodePath
-    if ($normalizedCodePath -notin @("scripts/test.ps1", "scripts/lint.ps1")) {
+    $normalizedCodePaths = @((Split-MatrixPathCell -RelativePath $CodePath) | ForEach-Object {
+        Convert-ToMatrixRelativePath -RelativePath $_
+    })
+    if (@($normalizedCodePaths | Where-Object { $_ -in @("scripts/test.ps1", "scripts/lint.ps1") }).Count -eq 0) {
         return
     }
 
@@ -918,7 +946,7 @@ function Assert-M004PathCell {
         [string] $ExpectedValue
     )
 
-    $actualValue = Convert-ToMatrixRelativePath -RelativePath (Get-MatrixRowCell -Row $Row -CellName $CellName -RequirementId $RequirementId)
+    $actualValue = Convert-ToMatrixRelativePathCell -RelativePath (Get-MatrixRowCell -Row $Row -CellName $CellName -RequirementId $RequirementId)
 
     Assert-Condition `
         -Condition ($actualValue -eq $ExpectedValue) `
