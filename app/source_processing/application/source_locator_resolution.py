@@ -9,6 +9,7 @@ from types import MappingProxyType
 from typing import Any
 
 from app.contracts.source_references import (
+    ACCEPTED_CANONICAL_VERSION_STATUS,
     ALLOWED_CANONICAL_VERSION_STATUSES,
     CanonicalSourceRef,
     SourceLocator,
@@ -145,13 +146,19 @@ class SourceLocatorResolutionRegistry:
         for version_id in version_statuses_by_version_id:
             if version_id not in version_id_set:
                 raise ValueError("Statut de version canonique inconnu")
+        for version_id in version_ids:
+            if version_id not in version_statuses_by_version_id:
+                raise ValueError("Statut de version canonique absent")
+        _ensure_statuses_distinguish_current_version(
+            current_version_id=parsed_canonical_source.current_version_id,
+            version_statuses_by_version_id=version_statuses_by_version_id,
+            version_ids=version_ids,
+        )
 
         indexes_by_version_id: dict[str, CanonicalVersionResolutionIndex] = {}
         for version in parsed_canonical_source.versions:
             if version.canonical_version_id not in docling_documents_by_version_id:
                 raise ValueError("DoclingDocument de version absent")
-            if version.canonical_version_id not in version_statuses_by_version_id:
-                raise ValueError("Statut de version canonique absent")
 
             indexes_by_version_id[version.canonical_version_id] = _build_version_index(
                 version=version,
@@ -259,6 +266,20 @@ def _build_version_index(
         status=status,
         items_by_item_id=items_by_item_id,
     )
+
+
+def _ensure_statuses_distinguish_current_version(
+    *,
+    current_version_id: str,
+    version_statuses_by_version_id: Mapping[str, str],
+    version_ids: tuple[str, ...],
+) -> None:
+    for version_id in version_ids:
+        status = _ensure_version_status(version_statuses_by_version_id[version_id])
+        if version_id == current_version_id:
+            continue
+        if status == ACCEPTED_CANONICAL_VERSION_STATUS:
+            raise ValueError("version canonique remplacée sans statut public")
 
 
 def _resolution_from_item(

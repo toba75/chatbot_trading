@@ -89,7 +89,6 @@ class ExplicitDocumentInspector:
 class InMemoryProcessingRunRepository:
     def __init__(self):
         self.runs_by_document_id = {}
-        self.conversions_by_document_id = {}
         self.saved_runs = []
 
     def save(self, processing_run):
@@ -102,20 +101,11 @@ class InMemoryProcessingRunRepository:
     def find_by_document_id(self, document_id):
         return self.runs_by_document_id.get(document_id.value)
 
-    def find_conversion_by_document_id(self, document_id):
-        return self.conversions_by_document_id.get(document_id.value)
-
     def submit_processing_run(self, processing_run, job_queue, job_request):
         submission = job_queue.submit(request=job_request, recalculate=False)
         if not submission.created:
             return submission
         self.save(processing_run)
-        return submission
-
-    def submit_conversion_request(self, conversion_state, job_queue, job_request):
-        submission = job_queue.submit(request=job_request, recalculate=False)
-        if submission.created:
-            self.conversions_by_document_id[conversion_state.document_id.value] = conversion_state
         return submission
 
 
@@ -184,7 +174,6 @@ commands = DocumentCommandService(
     processing_run_repository=processing_repository,
     job_queue=job_queue,
     diagnosis_configuration_hash="d" * 64,
-    conversion_configuration_hash="c" * 64,
     code_version="m003-t008-document-commands",
     model_version="diagnosis-policy-v1",
 )

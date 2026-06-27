@@ -308,6 +308,20 @@ canonical_source_v2 = canonical_source.publish_correction(
     ),
     accepted_at="2026-06-27T09:30:00Z",
 )
+assert_raises(
+    "version canonique remplac\u00e9e sans statut public",
+    lambda: SourceLocatorResolutionRegistry.from_canonical_source(
+        canonical_source=canonical_source_v2,
+        docling_documents_by_version_id={
+            "CVER-M004-T007-0001": document,
+            "CVER-M004-T007-0002": document_v2,
+        },
+        version_statuses_by_version_id={
+            "CVER-M004-T007-0001": "ACCEPTED",
+            "CVER-M004-T007-0002": "ACCEPTED",
+        },
+    ),
+)
 multi_version_registry = SourceLocatorResolutionRegistry.from_canonical_source(
     canonical_source=canonical_source_v2,
     docling_documents_by_version_id={
@@ -315,9 +329,14 @@ multi_version_registry = SourceLocatorResolutionRegistry.from_canonical_source(
         "CVER-M004-T007-0002": document_v2,
     },
     version_statuses_by_version_id={
-        "CVER-M004-T007-0001": "ACCEPTED",
+        "CVER-M004-T007-0001": "SUPERSEDED",
         "CVER-M004-T007-0002": "ACCEPTED",
     },
+)
+assert_equal(
+    multi_version_registry.to_public_payload()["versions"][0]["status"],
+    "SUPERSEDED",
+    "Le payload public doit signaler la version remplacée.",
 )
 assert_equal(
     tuple(multi_version_registry.to_public_payload()["versions"][index]["canonical_version_id"] for index in (0, 1)),

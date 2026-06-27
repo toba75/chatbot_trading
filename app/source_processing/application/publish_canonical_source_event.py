@@ -218,20 +218,6 @@ def canonical_source_superseded_event_id_for(canonical_version_id: str) -> str:
     return f"EVT-CANONICAL-SOURCE-SUPERSEDED-{parsed_version_id}"
 
 
-def _append_or_reuse_event(
-    *,
-    outbox: CanonicalPublicationOutbox,
-    event: EventEnvelope,
-) -> tuple[OutboxEntry, bool]:
-    state_mutation = _state_mutation_for(event)
-    if outbox.has_event(event.event_id):
-        existing_entry = outbox.entry_for(event.event_id)
-        if existing_entry.event != event or existing_entry.state_mutation != state_mutation:
-            raise ValueError("événement outbox incohérent pour version canonique")
-        return existing_entry, False
-    return outbox.append_many_in_transaction(((state_mutation, event),))[0], True
-
-
 def _append_or_reuse_events(
     *,
     outbox: CanonicalPublicationOutbox,

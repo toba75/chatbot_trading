@@ -132,117 +132,16 @@ $testCommands = @(
     @{ Path = "tests/m004/validate_m004_traceability_unit.ps1"; Arguments = @() }
 )
 
-$expectedValidationPaths = @(
-    "scripts/validate_m000_precondition_report.ps1",
-    "scripts/validate_adr_system.ps1",
-    "scripts/validate_task_system.ps1",
-    "scripts/validate_traceability.ps1",
-    "scripts/validate_definition_of_done.ps1",
-    "scripts/validate_m001_specification.ps1",
-    "scripts/validate_m002_specification.ps1",
-    "scripts/validate_m003_specification.ps1",
-    "scripts/validate_m004_specification.ps1",
-    "scripts/validate_platform_topology.ps1",
-    "scripts/validate_local_compose.ps1",
-    "scripts/validate_network_boundary.ps1",
-    "scripts/validate_architecture_boundaries.ps1"
-)
+function Get-GateCommandPaths {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object[]] $Commands
+    )
 
-$expectedTestPaths = @(
-    "tests/governance/validate_m000_precondition_report_acceptance.ps1",
-    "tests/governance/validate_m000_precondition_report_unit.ps1",
-    "tests/governance/validate_adr_system_acceptance.ps1",
-    "tests/governance/validate_adr_system_unit.ps1",
-    "tests/governance/validate_task_system_acceptance.ps1",
-    "tests/governance/validate_task_system_unit.ps1",
-    "tests/governance/validate_traceability_acceptance.ps1",
-    "tests/governance/validate_traceability_unit.ps1",
-    "tests/governance/validate_definition_of_done_acceptance.ps1",
-    "tests/governance/validate_definition_of_done_unit.ps1",
-    "tests/governance/validate_m000_validation_commands_unit.ps1",
-    "tests/m001/validate_m001_specification_acceptance.ps1",
-    "tests/m001/validate_m001_specification_unit.ps1",
-    "tests/m001/validate_context_modules_acceptance.ps1",
-    "tests/m001/validate_context_registry_unit.ps1",
-    "tests/m001/validate_contract_identity_acceptance.ps1",
-    "tests/m001/validate_contract_identity_unit.ps1",
-    "tests/m001/validate_source_contracts_acceptance.ps1",
-    "tests/m001/validate_source_locator_unit.ps1",
-    "tests/m001/validate_evidence_claim_contracts_acceptance.ps1",
-    "tests/m001/validate_evidence_claim_contracts_unit.ps1",
-    "tests/m001/validate_research_outcome_contract_acceptance.ps1",
-    "tests/m001/validate_research_outcome_contract_unit.ps1",
-    "tests/m001/validate_strategy_experiment_contracts_acceptance.ps1",
-    "tests/m001/validate_strategy_experiment_contracts_unit.ps1",
-    "tests/m001/validate_event_envelope_acceptance.ps1",
-    "tests/m001/validate_event_envelope_unit.ps1",
-    "tests/m001/validate_architecture_boundaries_acceptance.ps1",
-    "tests/m001/validate_architecture_boundaries_unit.ps1",
-    "tests/m001/validate_m001_traceability_acceptance.ps1",
-    "tests/m001/validate_m001_traceability_unit.ps1",
-    "tests/m002/validate_m002_specification_acceptance.ps1",
-    "tests/m002/validate_m002_specification_unit.ps1",
-    "tests/m002/validate_platform_topology_acceptance.ps1",
-    "tests/m002/validate_platform_topology_unit.ps1",
-    "tests/m002/validate_local_compose_acceptance.ps1",
-    "tests/m002/validate_local_compose_unit.ps1",
-    "tests/m002/validate_network_boundary_acceptance.ps1",
-    "tests/m002/validate_network_boundary_unit.ps1",
-    "tests/m002/validate_llm_gateway_contract_acceptance.ps1",
-    "tests/m002/validate_llm_gateway_contract_unit.ps1",
-    "tests/m002/validate_llm_gateway_failures_acceptance.ps1",
-    "tests/m002/validate_llm_gateway_failures_unit.ps1",
-    "tests/m002/validate_outbox_acceptance.ps1",
-    "tests/m002/validate_outbox_unit.ps1",
-    "tests/m002/validate_job_runtime_acceptance.ps1",
-    "tests/m002/validate_job_runtime_unit.ps1",
-    "tests/m002/validate_gateway_observability_acceptance.ps1",
-    "tests/m002/validate_gateway_observability_unit.ps1",
-    "tests/m002/validate_m002_traceability_acceptance.ps1",
-    "tests/m002/validate_m002_traceability_unit.ps1",
-    "tests/m003/validate_m003_precondition_unit.ps1",
-    "tests/m003/validate_m003_precondition_acceptance.ps1",
-    "tests/m003/validate_m003_specification_acceptance.ps1",
-    "tests/m003/validate_m003_specification_unit.ps1",
-    "tests/m003/validate_source_registration_acceptance.ps1",
-    "tests/m003/validate_source_registration_unit.ps1",
-    "tests/m003/validate_page_manifest_acceptance.ps1",
-    "tests/m003/validate_page_manifest_unit.ps1",
-    "tests/m003/validate_page_diagnostics_acceptance.ps1",
-    "tests/m003/validate_page_diagnostics_unit.ps1",
-    "tests/m003/validate_route_plan_acceptance.ps1",
-    "tests/m003/validate_route_plan_unit.ps1",
-    "tests/m003/validate_review_quarantine_acceptance.ps1",
-    "tests/m003/validate_review_quarantine_unit.ps1",
-    "tests/m003/validate_document_commands_acceptance.ps1",
-    "tests/m003/validate_document_commands_unit.ps1",
-    "tests/m003/validate_document_http_contract_acceptance.ps1",
-    "tests/m003/validate_m003_audit_signals_acceptance.ps1",
-    "tests/m003/validate_m003_traceability_acceptance.ps1",
-    "tests/m003/validate_m003_traceability_unit.ps1",
-    "tests/m004/validate_m004_precondition_unit.ps1",
-    "tests/m004/validate_m004_precondition_acceptance.ps1",
-    "tests/m004/validate_m004_specification_acceptance.ps1",
-    "tests/m004/validate_m004_specification_unit.ps1",
-    "tests/m004/validate_page_conversion_acceptance.ps1",
-    "tests/m004/validate_page_conversion_unit.ps1",
-    "tests/m004/validate_text_authority_acceptance.ps1",
-    "tests/m004/validate_text_authority_unit.ps1",
-    "tests/m004/validate_canonical_quality_acceptance.ps1",
-    "tests/m004/validate_canonical_quality_unit.ps1",
-    "tests/m004/validate_canonical_publication_acceptance.ps1",
-    "tests/m004/validate_canonical_publication_unit.ps1",
-    "tests/m004/validate_source_locator_resolution_acceptance.ps1",
-    "tests/m004/validate_source_locator_resolution_unit.ps1",
-    "tests/m004/validate_canonical_publication_event_acceptance.ps1",
-    "tests/m004/validate_canonical_publication_event_unit.ps1",
-    "tests/m004/validate_document_conversion_command_acceptance.ps1",
-    "tests/m004/validate_document_conversion_command_unit.ps1",
-    "tests/m004/validate_m004_traceability_acceptance.ps1",
-    "tests/m004/validate_m004_traceability_unit.ps1"
-)
+    return @($Commands | ForEach-Object { $_.Path })
+}
 
-$expectedTestCount = 91
+$excludedPreconditionAcceptancePaths = @()
 if ($env:OST_M003_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     Write-Host "Test d'acceptation de précondition M-003 exclu explicitement: exécution imbriquée du validateur de précondition."
     Write-Host "Test d'acceptation de précondition M-004 exclu explicitement: M-003 reste indépendant du milestone aval."
@@ -250,31 +149,28 @@ if ($env:OST_M003_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m003PreconditionAcceptancePath,
         $m004PreconditionAcceptancePath
     )
-    $testCommands = @(
-        $testCommands | Where-Object { $excludedPreconditionAcceptancePaths -notcontains $_.Path }
-    )
-    $expectedTestPaths = @(
-        $expectedTestPaths | Where-Object { $excludedPreconditionAcceptancePaths -notcontains $_ }
-    )
-    $expectedTestCount = 89
 }
 elseif ($env:OST_M004_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     Write-Host "Test d'acceptation de précondition M-004 exclu explicitement: exécution imbriquée du validateur de précondition."
-    $testCommands = @(
-        $testCommands | Where-Object { $_.Path -ne $m004PreconditionAcceptancePath }
-    )
-    $expectedTestPaths = @(
-        $expectedTestPaths | Where-Object { $_ -ne $m004PreconditionAcceptancePath }
-    )
-    $expectedTestCount = 90
+    $excludedPreconditionAcceptancePaths = @($m004PreconditionAcceptancePath)
 }
 
+if ($excludedPreconditionAcceptancePaths.Count -gt 0) {
+    $testCommands = @(
+        $testCommands | Where-Object { $excludedPreconditionAcceptancePaths -notcontains $_.Path }
+    )
+}
+
+$expectedValidationPaths = Get-GateCommandPaths -Commands $validationCommands
+$expectedTestPaths = Get-GateCommandPaths -Commands $testCommands
+$expectedValidationCount = $expectedValidationPaths.Count
+$expectedTestCount = $expectedTestPaths.Count
 Invoke-M000ValidationGate `
     -GateName "test" `
     -RepositoryRoot $repoRoot `
     -ValidationCommands $validationCommands `
     -TestCommands $testCommands `
-    -ExpectedValidationCount 13 `
+    -ExpectedValidationCount $expectedValidationCount `
     -ExpectedTestCount $expectedTestCount `
     -ExpectedValidationPaths $expectedValidationPaths `
     -ExpectedTestPaths $expectedTestPaths

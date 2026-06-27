@@ -22,7 +22,7 @@ from app.source_processing.domain.source_document import DocumentId
 
 
 class DocumentCommandPort(Protocol):
-    """Port applicatif appelé par l'adaptateur de transport."""
+    """Port applicatif M-003 appelé par l'adaptateur documentaire."""
 
     def register_source_document(
         self,
@@ -38,6 +38,10 @@ class DocumentCommandPort(Protocol):
         document_id: str,
     ) -> DocumentDiagnosisAcceptance:
         """Demande le diagnostic documentaire via SP."""
+
+
+class DocumentConversionCommandPort(Protocol):
+    """Port applicatif M-004 appelé par l'adaptateur de conversion."""
 
     def request_document_conversion(
         self,
@@ -74,7 +78,7 @@ class HttpResponse:
 
 
 class SourceProcessingHttpAdapter:
-    """Route uniquement les endpoints documentaires SP publiés par M-003."""
+    """Route les endpoints documentaires SP d'enregistrement et diagnostic."""
 
     def __init__(self, document_commands: DocumentCommandPort) -> None:
         if not callable(getattr(document_commands, "register_source_document", None)):
@@ -91,10 +95,6 @@ class SourceProcessingHttpAdapter:
         diagnosed_document_id = _document_id_from_diagnose_path(parsed_request.path)
         if parsed_request.method == "POST" and diagnosed_document_id is not None:
             return self._handle_start_diagnosis(diagnosed_document_id)
-
-        converted_document_id = _document_id_from_convert_path(parsed_request.path)
-        if parsed_request.method == "POST" and converted_document_id is not None:
-            return self._handle_request_conversion(parsed_request, converted_document_id)
 
         return HttpResponse(
             status_code=404,
@@ -173,6 +173,26 @@ class SourceProcessingHttpAdapter:
             },
         )
 
+
+class SourceProcessingConversionHttpAdapter:
+    """Route explicitement l'endpoint M-004 de conversion canonique documentaire."""
+
+    def __init__(self, document_conversion_commands: DocumentConversionCommandPort) -> None:
+        if not callable(getattr(document_conversion_commands, "request_document_conversion", None)):
+            raise ValueError("document_conversion_commands sans RequestDocumentConversion")
+        self._document_conversion_commands = document_conversion_commands
+
+    def handle(self, request: HttpRequest) -> HttpResponse:
+        parsed_request = _ensure_http_request(request)
+        converted_document_id = _document_id_from_convert_path(parsed_request.path)
+        if parsed_request.method == "POST" and converted_document_id is not None:
+            return self._handle_request_conversion(parsed_request, converted_document_id)
+
+        return HttpResponse(
+            status_code=404,
+            body={"error_code": "ENDPOINT_NOT_FOUND", "path": parsed_request.path},
+        )
+
     def _handle_request_conversion(
         self,
         request: HttpRequest,
@@ -184,16 +204,11 @@ class SourceProcessingHttpAdapter:
             DocumentId.from_value(document_id)
         except ValueError:
             return _bad_request_response("document_id")
-        request_document_conversion = getattr(
-            self._document_commands,
-            "request_document_conversion",
-            None,
-        )
-        if not callable(request_document_conversion):
-            raise ValueError("document_commands sans RequestDocumentConversion")
 
         try:
-            acceptance = request_document_conversion(document_id=document_id)
+            acceptance = self._document_conversion_commands.request_document_conversion(
+                document_id=document_id
+            )
         except SourceNotFoundError as exc:
             return HttpResponse(
                 status_code=404,
@@ -314,7 +329,9 @@ def _bad_request_response(field_name: str) -> HttpResponse:
 
 __all__ = [
     "DocumentCommandPort",
+    "DocumentConversionCommandPort",
     "HttpRequest",
     "HttpResponse",
+    "SourceProcessingConversionHttpAdapter",
     "SourceProcessingHttpAdapter",
 ]

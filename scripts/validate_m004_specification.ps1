@@ -133,15 +133,15 @@ $expectedEvents = @(
 )
 
 $expectedBehaviors = @(
-    @{ Name = "SP-009 - Sp$($eAcute)cification ex$($eAcute)cutable M-004"; Adr = @("ADR-001", "ADR-002", "ADR-003", "ADR-004", "DDD-ADR-003"); Test = "T-002" },
-    @{ Name = "SP-010 - Fusion pagewise vers DoclingDocument unique"; Adr = @("ADR-001", "ADR-002", "ADR-003", "ADR-004"); Test = "T-003" },
-    @{ Name = "SP-011 - Autorit$($eAcute) textuelle unique par page"; Adr = @("ADR-004"); Test = "T-004" },
-    @{ Name = "SP-012 - QA pr$($eAcute) et post-conversion"; Adr = @("ADR-001", "ADR-002", "ADR-003", "ADR-004"); Test = "T-005" },
-    @{ Name = "SP-013 - Publication immuable"; Adr = @("ADR-001", "DDD-ADR-003", "DDD-ADR-010"); Test = "T-006" },
-    @{ Name = "SP-014 - SourceLocator r$($eAcute)solvable"; Adr = @("DDD-ADR-003"); Test = "T-007" },
-    @{ Name = "SP-015 - $($eAcute)v$($eAcute)nement CanonicalSourcePublished"; Adr = @("ADR-001", "DDD-ADR-003", "DDD-ADR-006", "DDD-ADR-008"); Test = "T-008" },
-    @{ Name = "SP-016 - Contrat HTTP de conversion"; Adr = @("ADR-010", "DDD-ADR-003", "DDD-ADR-006", "DDD-ADR-008"); Test = "T-009" },
-    @{ Name = "SP-017 - Tra$($cCedilla)abilit$($eAcute) et gates M-004"; Adr = @("ADR-001", "ADR-004", "ADR-010", "DDD-ADR-003", "DDD-ADR-006", "DDD-ADR-008"); Test = "T-010" }
+    @{ Name = "SP-009 - Sp$($eAcute)cification ex$($eAcute)cutable M-004"; Adr = @("ADR-001", "ADR-002", "ADR-003", "ADR-004", "DDD-ADR-003"); Test = "T-002"; Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m004_specification.ps1" },
+    @{ Name = "SP-010 - Fusion pagewise vers DoclingDocument unique"; Adr = @("ADR-001", "ADR-002", "ADR-003", "ADR-004"); Test = "T-003"; Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m004\validate_page_conversion_acceptance.ps1" },
+    @{ Name = "SP-011 - Autorit$($eAcute) textuelle unique par page"; Adr = @("ADR-004"); Test = "T-004"; Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m004\validate_text_authority_acceptance.ps1" },
+    @{ Name = "SP-012 - QA pr$($eAcute) et post-conversion"; Adr = @("ADR-001", "ADR-002", "ADR-003", "ADR-004"); Test = "T-005"; Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m004\validate_canonical_quality_acceptance.ps1" },
+    @{ Name = "SP-013 - Publication immuable"; Adr = @("ADR-001", "DDD-ADR-003", "DDD-ADR-010"); Test = "T-006"; Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m004\validate_canonical_publication_acceptance.ps1" },
+    @{ Name = "SP-014 - SourceLocator r$($eAcute)solvable"; Adr = @("DDD-ADR-003"); Test = "T-007"; Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m004\validate_source_locator_resolution_acceptance.ps1" },
+    @{ Name = "SP-015 - $($eAcute)v$($eAcute)nement CanonicalSourcePublished"; Adr = @("ADR-001", "DDD-ADR-003", "DDD-ADR-006", "DDD-ADR-008"); Test = "T-008"; Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m004\validate_canonical_publication_event_acceptance.ps1" },
+    @{ Name = "SP-016 - Contrat HTTP de conversion"; Adr = @("ADR-010", "DDD-ADR-003", "DDD-ADR-006", "DDD-ADR-008"); Test = "T-009"; Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m004\validate_document_conversion_command_acceptance.ps1" },
+    @{ Name = "SP-017 - Tra$($cCedilla)abilit$($eAcute) et gates M-004"; Adr = @("ADR-001", "ADR-004", "ADR-010", "DDD-ADR-003", "DDD-ADR-006", "DDD-ADR-008"); Test = "T-010"; Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m004\validate_m004_traceability_acceptance.ps1" }
 )
 
 function Normalize-M004Cell {
@@ -571,8 +571,8 @@ function Assert-M004Behaviors {
             throw "Test RED non ex$($eAcute)cutable pour $behaviorName."
         }
 
-        if (-not $row["Commande"].Contains("powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m004_specification.ps1")) {
-            throw "Commande de validation M-004 absente pour $behaviorName."
+        if (-not $row["Commande"].StartsWith("powershell -NoProfile -ExecutionPolicy Bypass -File .\")) {
+            throw "Commande PowerShell M-004 absente pour $behaviorName."
         }
 
         $behaviorsByName[$behaviorName] = $row
@@ -586,6 +586,9 @@ function Assert-M004Behaviors {
         $row = $behaviorsByName[$expectedBehavior.Name]
         if ($row["Test RED"] -ne $expectedBehavior.Test) {
             throw "Test RED invalide pour $($expectedBehavior.Name). Attendu: $($expectedBehavior.Test). Obtenu: $($row["Test RED"])"
+        }
+        if ($row["Commande"] -ne $expectedBehavior.Command) {
+            throw "Commande invalide pour $($expectedBehavior.Name). Attendu: $($expectedBehavior.Command). Obtenu: $($row["Commande"])"
         }
 
         foreach ($adrId in $expectedBehavior.Adr) {

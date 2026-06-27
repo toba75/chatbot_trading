@@ -52,12 +52,6 @@ class ProcessingRunLookupRepository(ProcessingRunRepository, Protocol):
     def find_by_document_id(self, document_id: DocumentId) -> object | None:
         """Retourne une tentative déjà demandée pour ce document."""
 
-    def find_conversion_by_document_id(
-        self,
-        document_id: DocumentId,
-    ) -> "DocumentConversionState | None":
-        """Retourne l'état de conversion canonique déjà connu."""
-
     def submit_processing_run(
         self,
         processing_run: object,
@@ -65,6 +59,16 @@ class ProcessingRunLookupRepository(ProcessingRunRepository, Protocol):
         job_request: JobRequest,
     ) -> JobSubmissionDecision:
         """Persiste la tentative et soumet le job DIAGNOSE en une opération atomique."""
+
+
+class DocumentConversionRepository(Protocol):
+    """Dépôt dédié aux demandes de conversion canonique M-004."""
+
+    def find_conversion_by_document_id(
+        self,
+        document_id: DocumentId,
+    ) -> "DocumentConversionState | None":
+        """Retourne l'état de conversion canonique déjà connu."""
 
     def submit_conversion_request(
         self,
@@ -291,7 +295,6 @@ class DocumentCommandService:
         processing_run_repository: ProcessingRunLookupRepository,
         job_queue: DiagnosisJobQueue,
         diagnosis_configuration_hash: str,
-        conversion_configuration_hash: str,
         code_version: str,
         model_version: str,
     ) -> None:
@@ -301,10 +304,6 @@ class DocumentCommandService:
             raise ValueError("processing_run_repository sans lecture par document_id")
         if not callable(getattr(processing_run_repository, "submit_processing_run", None)):
             raise ValueError("processing_run_repository sans soumission atomique")
-        if not callable(getattr(processing_run_repository, "find_conversion_by_document_id", None)):
-            raise ValueError("processing_run_repository sans lecture de conversion")
-        if not callable(getattr(processing_run_repository, "submit_conversion_request", None)):
-            raise ValueError("processing_run_repository sans soumission de conversion")
         if not callable(getattr(job_queue, "submit", None)):
             raise ValueError("job_queue invalide")
         self._source_document_repository = source_document_repository
@@ -314,13 +313,8 @@ class DocumentCommandService:
             diagnosis_configuration_hash,
             "diagnosis_configuration_hash",
         )
-        self._conversion_configuration_hash = _ensure_sha256(
-            conversion_configuration_hash,
-            "conversion_configuration_hash",
-        )
         self._code_version = _ensure_text(code_version, "code_version")
         self._model_version = _ensure_text(model_version, "model_version")
-        self._canonical_audit_events: list[PreCanonicalAuditEvent] = []
         self._register_handler = RegisterSourceDocumentHandler(
             original_source_store=original_source_store,
             source_document_repository=source_document_repository,
@@ -329,9 +323,6 @@ class DocumentCommandService:
             document_inspector=document_inspector,
             processing_run_repository=processing_run_repository,
         )
-
-    def canonical_audit_events(self) -> tuple[PreCanonicalAuditEvent, ...]:
-        return tuple(self._canonical_audit_events)
 
     def register_source_document(
         self,
@@ -423,6 +414,45 @@ class DocumentCommandService:
             diagnostic_status="DIAGNOSTIC_REQUESTED",
         )
 
+
+class DocumentConversionCommandService:
+    """Surface applicative M-004 dédiée à la conversion canonique documentaire."""
+
+    def __init__(
+        self,
+        source_document_repository: SourceDocumentLookupRepository,
+        processing_run_repository: ProcessingRunLookupRepository,
+        document_conversion_repository: DocumentConversionRepository,
+        job_queue: DiagnosisJobQueue,
+        conversion_configuration_hash: str,
+        code_version: str,
+        model_version: str,
+    ) -> None:
+        if not callable(getattr(source_document_repository, "find_by_document_id", None)):
+            raise ValueError("source_document_repository sans lecture par document_id")
+        if not callable(getattr(processing_run_repository, "find_by_document_id", None)):
+            raise ValueError("processing_run_repository sans lecture par document_id")
+        if not callable(getattr(document_conversion_repository, "find_conversion_by_document_id", None)):
+            raise ValueError("document_conversion_repository sans lecture de conversion")
+        if not callable(getattr(document_conversion_repository, "submit_conversion_request", None)):
+            raise ValueError("document_conversion_repository sans soumission de conversion")
+        if not callable(getattr(job_queue, "submit", None)):
+            raise ValueError("job_queue invalide")
+        self._source_document_repository = source_document_repository
+        self._processing_run_repository = processing_run_repository
+        self._document_conversion_repository = document_conversion_repository
+        self._job_queue = job_queue
+        self._conversion_configuration_hash = _ensure_sha256(
+            conversion_configuration_hash,
+            "conversion_configuration_hash",
+        )
+        self._code_version = _ensure_text(code_version, "code_version")
+        self._model_version = _ensure_text(model_version, "model_version")
+        self._canonical_audit_events: list[PreCanonicalAuditEvent] = []
+
+    def canonical_audit_events(self) -> tuple[PreCanonicalAuditEvent, ...]:
+        return tuple(self._canonical_audit_events)
+
     def request_document_conversion(
         self,
         *,
@@ -495,7 +525,7 @@ class DocumentCommandService:
                 status=parsed_processing_run.status.value,
             ) from exc
 
-        existing_conversion = self._processing_run_repository.find_conversion_by_document_id(
+        existing_conversion = self._document_conversion_repository.find_conversion_by_document_id(
             parsed_document_id
         )
         if existing_conversion is not None:
@@ -560,7 +590,7 @@ class DocumentCommandService:
                 "route_count": len(route_plan.page_routes),
             },
         )
-        submission = self._processing_run_repository.submit_conversion_request(
+        submission = self._document_conversion_repository.submit_conversion_request(
             conversion_state=conversion_state,
             job_queue=self._job_queue,
             job_request=job_request,
@@ -702,6 +732,8 @@ __all__ = [
     "DocumentCommandError",
     "DocumentCommandService",
     "DocumentConversionAcceptance",
+    "DocumentConversionCommandService",
+    "DocumentConversionRepository",
     "DocumentConversionState",
     "DocumentConversionStatus",
     "DocumentDiagnosisAcceptance",

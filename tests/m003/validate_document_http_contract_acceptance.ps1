@@ -56,10 +56,6 @@ class ScriptedDocumentCommands:
             raise self.diagnosis_error
         return self.diagnosis_result
 
-    def request_document_conversion(self, *, document_id):
-        raise AssertionError("Le contrat HTTP M-003 ne doit pas déclencher la conversion M-004.")
-
-
 class M3OnlyDocumentCommands:
     def __init__(self):
         self.diagnosis_result = DocumentDiagnosisAcceptance(
@@ -130,6 +126,14 @@ m3_only_adapter = SourceProcessingHttpAdapter(document_commands=m3_only_commands
 m3_only_response = post_diagnose(m3_only_adapter, "DOC-1111111111111111")
 assert_equal(m3_only_response.status_code, 202, "Un port M-003 sans conversion doit encore servir /diagnose.")
 assert_equal(m3_only_commands.diagnosis_calls, ["DOC-1111111111111111"], "Le port M-003 doit recevoir la commande diagnose.")
+m3_convert_response = m3_only_adapter.handle(
+    HttpRequest(
+        method="POST",
+        path="/v1/documents/DOC-1111111111111111/convert",
+        body={},
+    )
+)
+assert_equal(m3_convert_response.status_code, 404, "L'adaptateur M-003 ne doit pas router /convert.")
 
 # Given le contrat HTTP documentaire SP.
 # When POST /v1/documents est appelé.

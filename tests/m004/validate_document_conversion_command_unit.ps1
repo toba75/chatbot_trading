@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
 . (Join-Path $repoRoot "scripts/require_python.ps1")
@@ -18,22 +18,18 @@ from app.source_processing.application.canonical_audit_signals import (
 )
 from app.source_processing.adapters.document_http import (
     HttpRequest,
-    SourceProcessingHttpAdapter,
+    SourceProcessingConversionHttpAdapter,
 )
 from app.source_processing.application.document_commands import (
     CanonicalQualityRejectedError,
     ConversionAlreadyRequestedError,
-    DocumentCommandService,
+    DocumentConversionCommandService,
     DocumentConversionAcceptance,
     DocumentConversionState,
     DocumentConversionStatus,
     SourceNotFoundError,
     SourceNotRoutedError,
     SourceQuarantinedError,
-)
-from app.source_processing.application.start_document_processing import (
-    DocumentInspection,
-    InspectedPage,
 )
 from app.source_processing.domain.document_processing_run import (
     DiagnosticVersion,
@@ -57,16 +53,6 @@ from app.source_processing.domain.source_document import (
     SourceDocument,
     SourceFingerprint,
 )
-
-
-class InMemoryOriginalSourceStore:
-    def __init__(self):
-        self.content_by_ref = {}
-
-    def put_original_if_absent(self, document_id, fingerprint, original_content):
-        storage_ref = f"artifact:source_processing.original_sources/{document_id.value}/{fingerprint.value}.pdf"
-        self.content_by_ref[storage_ref] = bytes(original_content)
-        return storage_ref
 
 
 class InMemorySourceDocumentRepository:
@@ -93,20 +79,10 @@ class InMemorySourceDocumentRepository:
         return self.documents_by_id.get(document_id.value)
 
 
-class ExplicitDocumentInspector:
-    def __init__(self):
-        self.inspections_by_ref = {}
-
-    def inspect(self, original_storage_ref):
-        return self.inspections_by_ref[original_storage_ref.value]
-
-
 class InMemoryProcessingRunRepository:
     def __init__(self):
         self.runs_by_document_id = {}
-        self.conversions_by_document_id = {}
         self.saved_runs = []
-        self.submitted_conversion_requests = []
 
     def save(self, processing_run):
         self.runs_by_document_id[processing_run.document_id.value] = processing_run
@@ -121,6 +97,12 @@ class InMemoryProcessingRunRepository:
             self.save(processing_run)
         return submission
 
+
+class InMemoryDocumentConversionRepository:
+    def __init__(self):
+        self.conversions_by_document_id = {}
+        self.submitted_conversion_requests = []
+
     def find_conversion_by_document_id(self, document_id):
         return self.conversions_by_document_id.get(document_id.value)
 
@@ -132,7 +114,7 @@ class InMemoryProcessingRunRepository:
         return submission
 
 
-class ScriptedDocumentCommands:
+class ScriptedDocumentConversionCommands:
     def __init__(self):
         self.conversion_result = DocumentConversionAcceptance(
             document_id=DocumentId.from_value("DOC-1111111111111111"),
@@ -141,14 +123,6 @@ class ScriptedDocumentCommands:
         )
         self.conversion_error = None
         self.conversion_calls = []
-        self.diagnosis_calls = []
-
-    def register_source_document(self, *, original_content, bibliographic_metadata):
-        raise AssertionError("Ce test ne couvre pas POST /v1/documents.")
-
-    def start_document_processing(self, *, document_id):
-        self.diagnosis_calls.append(document_id)
-        raise AssertionError("POST /convert ne doit pas appeler /diagnose.")
 
     def request_document_conversion(self, *, document_id):
         self.conversion_calls.append(document_id)
@@ -181,14 +155,14 @@ def assert_raises(expected_type, expected_fragment, action):
 
 def assert_last_audit_event(service, *, document_id, status, error_code, page_count):
     audit_event = service.canonical_audit_events()[-1]
-    assert_equal(audit_event.document_id, document_id, "L'audit pré-canonique doit nommer le document.")
-    assert_equal(audit_event.phase, "document_conversion_request", "L'audit pré-canonique doit nommer la phase de commande.")
-    assert_equal(audit_event.status, status, "L'audit pré-canonique doit tracer le statut public.")
-    assert_equal(audit_event.error_code, error_code, "L'audit pré-canonique doit tracer le code d'erreur public.")
-    assert_equal(audit_event.page_count, page_count, "L'audit pré-canonique doit tracer le nombre de pages sans contenu documentaire.")
+    assert_equal(audit_event.document_id, document_id, "L'audit prÃ©-canonique doit nommer le document.")
+    assert_equal(audit_event.phase, "document_conversion_request", "L'audit prÃ©-canonique doit nommer la phase de commande.")
+    assert_equal(audit_event.status, status, "L'audit prÃ©-canonique doit tracer le statut public.")
+    assert_equal(audit_event.error_code, error_code, "L'audit prÃ©-canonique doit tracer le code d'erreur public.")
+    assert_equal(audit_event.page_count, page_count, "L'audit prÃ©-canonique doit tracer le nombre de pages sans contenu documentaire.")
     log_mapping = audit_event.to_log_mapping()
-    assert_equal(log_mapping["canonical_version_id"], None, "L'audit pré-canonique ne doit pas inventer de version canonique.")
-    assert_equal(log_mapping["artifact_hash"], None, "L'audit pré-canonique ne doit pas inventer de hash d'artefact.")
+    assert_equal(log_mapping["canonical_version_id"], None, "L'audit prÃ©-canonique ne doit pas inventer de version canonique.")
+    assert_equal(log_mapping["artifact_hash"], None, "L'audit prÃ©-canonique ne doit pas inventer de hash d'artefact.")
     build_canonical_audit_signals(service.canonical_audit_events())
 
 
@@ -277,33 +251,31 @@ def diagnosed_run(document, run_suffix):
 
 def build_service():
     source_repository = InMemorySourceDocumentRepository()
-    inspector = ExplicitDocumentInspector()
     processing_repository = InMemoryProcessingRunRepository()
+    conversion_repository = InMemoryDocumentConversionRepository()
     job_queue = InMemoryJobQueue.empty(catalog=JOB_RUNTIME_CATALOG)
-    service = DocumentCommandService(
-        original_source_store=InMemoryOriginalSourceStore(),
+    service = DocumentConversionCommandService(
         source_document_repository=source_repository,
-        document_inspector=inspector,
         processing_run_repository=processing_repository,
+        document_conversion_repository=conversion_repository,
         job_queue=job_queue,
-        diagnosis_configuration_hash="d" * 64,
         conversion_configuration_hash="c" * 64,
         code_version="m004-t009-document-commands",
         model_version="document-conversion-policy-v1",
     )
-    return service, source_repository, inspector, processing_repository, job_queue
+    return service, source_repository, processing_repository, conversion_repository, job_queue
 
 
-conversion_signature = inspect.signature(DocumentCommandService.request_document_conversion)
+conversion_signature = inspect.signature(DocumentConversionCommandService.request_document_conversion)
 if conversion_signature.parameters["document_id"].default is not inspect.Parameter.empty:
-    raise AssertionError("request_document_conversion.document_id ne doit pas avoir de valeur par défaut.")
-init_signature = inspect.signature(DocumentCommandService.__init__)
+    raise AssertionError("request_document_conversion.document_id ne doit pas avoir de valeur par dÃ©faut.")
+init_signature = inspect.signature(DocumentConversionCommandService.__init__)
 if init_signature.parameters["conversion_configuration_hash"].default is not inspect.Parameter.empty:
-    raise AssertionError("conversion_configuration_hash ne doit pas avoir de valeur par défaut.")
+    raise AssertionError("conversion_configuration_hash ne doit pas avoir de valeur par dÃ©faut.")
 if not JOB_RUNTIME_CATALOG.includes("CONVERT_DOCUMENT"):
     raise AssertionError("CONVERT_DOCUMENT doit appartenir explicitement au catalogue M-002.")
 if JOB_RUNTIME_CATALOG.includes("CanonicalSourcePublished"):
-    raise AssertionError("Un event type ne doit pas être accepté comme job.")
+    raise AssertionError("Un event type ne doit pas Ãªtre acceptÃ© comme job.")
 
 accepted_state = DocumentConversionState(
     document_id=DocumentId.from_value("DOC-1111111111111111"),
@@ -319,7 +291,7 @@ accepted_payload = DocumentConversionAcceptance(
 assert_equal(
     accepted_payload.canonical_version_id,
     "CVER-M004-T009-0001",
-    "canonical_version_id doit être autorisé seulement après acceptation canonique.",
+    "canonical_version_id doit Ãªtre autorisÃ© seulement aprÃ¨s acceptation canonique.",
 )
 assert_raises(
     ValueError,
@@ -351,18 +323,18 @@ assert_raises(
     ),
 )
 
-service, source_repository, inspector, processing_repository, job_queue = build_service()
+service, source_repository, processing_repository, conversion_repository, job_queue = build_service()
 document = source_document("direct")
 source_repository.documents_by_id[document.document_id.value] = document
 processing_repository.runs_by_document_id[document.document_id.value] = routed_run(document, "DIRECT")
 
-# La commande applicative crée un job CONVERT_DOCUMENT idempotent et ne retourne pas l'identité technique du job.
+# La commande applicative crÃ©e un job CONVERT_DOCUMENT idempotent et ne retourne pas l'identitÃ© technique du job.
 conversion = service.request_document_conversion(document_id=document.document_id.value)
-assert_equal(conversion.document_id, document.document_id, "La conversion doit conserver le DocumentId métier.")
-assert_equal(conversion.conversion_status, DocumentConversionStatus.CONVERSION_REQUESTED, "Le statut public doit être explicite.")
-assert_equal(conversion.canonical_version_id, None, "La version canonique ne doit pas être exposée avant acceptation.")
-assert_true(not hasattr(conversion, "job_id"), "La réponse applicative ne doit pas exposer le job_id.")
-assert_true(not hasattr(conversion, "processing_run_id"), "La réponse applicative ne doit pas exposer le processing_run_id.")
+assert_equal(conversion.document_id, document.document_id, "La conversion doit conserver le DocumentId mÃ©tier.")
+assert_equal(conversion.conversion_status, DocumentConversionStatus.CONVERSION_REQUESTED, "Le statut public doit Ãªtre explicite.")
+assert_equal(conversion.canonical_version_id, None, "La version canonique ne doit pas Ãªtre exposÃ©e avant acceptation.")
+assert_true(not hasattr(conversion, "job_id"), "La rÃ©ponse applicative ne doit pas exposer le job_id.")
+assert_true(not hasattr(conversion, "processing_run_id"), "La rÃ©ponse applicative ne doit pas exposer le processing_run_id.")
 assert_last_audit_event(
     service,
     document_id=document.document_id.value,
@@ -372,15 +344,15 @@ assert_last_audit_event(
 )
 
 pending_job = job_queue.pending_jobs()[0]
-assert_equal(pending_job.request.job_name, "CONVERT_DOCUMENT", "Le job de conversion doit être global et explicite.")
-assert_equal(pending_job.request.idempotence_key.job_name, "CONVERT_DOCUMENT", "La clé d'idempotence doit nommer le job de conversion.")
+assert_equal(pending_job.request.job_name, "CONVERT_DOCUMENT", "Le job de conversion doit Ãªtre global et explicite.")
+assert_equal(pending_job.request.idempotence_key.job_name, "CONVERT_DOCUMENT", "La clÃ© d'idempotence doit nommer le job de conversion.")
 assert_equal(pending_job.request.idempotence_key.input_hash, document.fingerprint.value, "L'idempotence doit porter l'empreinte de source.")
 assert_equal(pending_job.request.idempotence_key.configuration_hash, "c" * 64, "L'idempotence doit porter la configuration de conversion.")
 assert_equal(pending_job.request.payload["document_id"], document.document_id.value, "Le payload de job doit porter le DocumentId.")
 assert_equal(pending_job.request.payload["processing_run_id"], "RUN-M004-T009-DIRECT", "Le payload de job doit porter la tentative SP interne.")
 assert_equal(pending_job.request.payload["routing_policy_version"], "routing-convert-v1", "Le payload de job doit porter la version de routage.")
 assert_equal(pending_job.request.payload["route_count"], 2, "Le payload de job doit porter le nombre de routes.")
-assert_equal(len(processing_repository.submitted_conversion_requests), 1, "La demande doit être persistée une seule fois.")
+assert_equal(len(conversion_repository.submitted_conversion_requests), 1, "La demande doit Ãªtre persistÃ©e une seule fois.")
 
 assert_raises(
     ConversionAlreadyRequestedError,
@@ -394,7 +366,7 @@ assert_last_audit_event(
     error_code="CONVERSION_ALREADY_REQUESTED",
     page_count=2,
 )
-assert_equal(job_queue.created_job_count(), 1, "La répétition ne doit pas créer un second job.")
+assert_equal(job_queue.created_job_count(), 1, "La rÃ©pÃ©tition ne doit pas crÃ©er un second job.")
 
 unknown_error = assert_raises(
     SourceNotFoundError,
@@ -453,7 +425,7 @@ processing_repository.runs_by_document_id[qa_rejected_document.document_id.value
     qa_rejected_document,
     "QA-REJECTED",
 )
-processing_repository.conversions_by_document_id[qa_rejected_document.document_id.value] = DocumentConversionState(
+conversion_repository.conversions_by_document_id[qa_rejected_document.document_id.value] = DocumentConversionState(
     document_id=qa_rejected_document.document_id,
     conversion_status=DocumentConversionStatus.QA_REJECTED,
     canonical_version_id=None,
@@ -473,9 +445,9 @@ assert_last_audit_event(
     page_count=2,
 )
 
-# L'adaptateur HTTP ne décide ni route ni autorité; il transmet seulement le DocumentId.
-scripted_commands = ScriptedDocumentCommands()
-adapter = SourceProcessingHttpAdapter(document_commands=scripted_commands)
+# L'adaptateur HTTP ne dÃ©cide ni route ni autoritÃ©; il transmet seulement le DocumentId.
+scripted_commands = ScriptedDocumentConversionCommands()
+adapter = SourceProcessingConversionHttpAdapter(document_conversion_commands=scripted_commands)
 conversion_response = adapter.handle(
     HttpRequest(
         method="POST",
@@ -491,7 +463,7 @@ assert_equal(
         "document_id": "DOC-1111111111111111",
         "conversion_status": "CONVERSION_REQUESTED",
     },
-    "Le corps HTTP doit rester minimal tant que la version canonique n'est pas acceptée.",
+    "Le corps HTTP doit rester minimal tant que la version canonique n'est pas acceptÃ©e.",
 )
 
 scripted_commands.conversion_result = DocumentConversionAcceptance(
@@ -513,7 +485,7 @@ assert_equal(
         "conversion_status": "CANONICAL_ACCEPTED",
         "canonical_version_id": "CVER-M004-T009-0002",
     },
-    "canonical_version_id doit apparaître seulement après acceptation canonique.",
+    "canonical_version_id doit apparaÃ®tre seulement aprÃ¨s acceptation canonique.",
 )
 
 scripted_commands.conversion_error = SourceNotRoutedError(
@@ -528,7 +500,7 @@ not_routed_response = adapter.handle(
     )
 )
 assert_equal(not_routed_response.status_code, 409, "Le mapping SOURCE_NOT_ROUTED doit retourner 409.")
-assert_equal(not_routed_response.body, {"error_code": "SOURCE_NOT_ROUTED", "document_id": "DOC-2222222222222222"}, "Le code route absente doit être stable et ne pas exposer le statut interne.")
+assert_equal(not_routed_response.body, {"error_code": "SOURCE_NOT_ROUTED", "document_id": "DOC-2222222222222222"}, "Le code route absente doit Ãªtre stable et ne pas exposer le statut interne.")
 
 conversion_call_count_before_invalid_body = len(scripted_commands.conversion_calls)
 invalid_body = adapter.handle(
@@ -538,11 +510,11 @@ invalid_body = adapter.handle(
         body={"route_name": "SCAN_GRANITE"},
     )
 )
-assert_equal(invalid_body.status_code, 400, "Le body de conversion doit être refusé.")
+assert_equal(invalid_body.status_code, 400, "Le body de conversion doit Ãªtre refusÃ©.")
 assert_equal(
     len(scripted_commands.conversion_calls),
     conversion_call_count_before_invalid_body,
-    "Le body invalide ne doit pas déclencher une nouvelle commande.",
+    "Le body invalide ne doit pas dÃ©clencher une nouvelle commande.",
 )
 
 scripted_commands.conversion_error = CanonicalQualityRejectedError(
@@ -563,7 +535,7 @@ assert_equal(
     "Le transport doit exposer seulement le code public et le document_id.",
 )
 
-# Le domaine SP ne dépend d'aucun framework HTTP.
+# Le domaine SP ne dÃ©pend d'aucun framework HTTP.
 framework_roots = {"fastapi", "starlette", "flask", "django"}
 domain_dir = Path(sys.argv[1]) / "app" / "source_processing" / "domain"
 for path in domain_dir.glob("*.py"):

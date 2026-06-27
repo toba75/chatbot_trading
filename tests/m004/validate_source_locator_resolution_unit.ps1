@@ -326,6 +326,20 @@ source_v2 = source.publish_correction(
     ),
     accepted_at="2026-06-27T10:00:00Z",
 )
+assert_raises(
+    "version canonique remplac\u00e9e sans statut public",
+    lambda: SourceLocatorResolutionRegistry.from_canonical_source(
+        canonical_source=source_v2,
+        docling_documents_by_version_id={
+            document_a.canonical_version_id: document_a,
+            document_v2.canonical_version_id: document_v2,
+        },
+        version_statuses_by_version_id={
+            document_a.canonical_version_id: "ACCEPTED",
+            document_v2.canonical_version_id: "ACCEPTED",
+        },
+    ),
+)
 multi_version_registry = SourceLocatorResolutionRegistry.from_canonical_source(
     canonical_source=source_v2,
     docling_documents_by_version_id={
@@ -333,9 +347,14 @@ multi_version_registry = SourceLocatorResolutionRegistry.from_canonical_source(
         document_v2.canonical_version_id: document_v2,
     },
     version_statuses_by_version_id={
-        document_a.canonical_version_id: "ACCEPTED",
+        document_a.canonical_version_id: "SUPERSEDED",
         document_v2.canonical_version_id: "ACCEPTED",
     },
+)
+assert_equal(
+    multi_version_registry.indexes_by_version_id[document_a.canonical_version_id].status,
+    "SUPERSEDED",
+    "Une version canonique remplacée doit publier le statut SUPERSEDED.",
 )
 assert_equal(
     tuple(multi_version_registry.indexes_by_version_id.keys()),
