@@ -1,8 +1,8 @@
-# Commandes de validation M-000, M-001 et M-002
+# Commandes de validation M-000 à M-004
 
 ## Scénario BDD
 
-- Given les artefacts de gouvernance M-000, les contrats M-001 et la spécification M-002 sont présents.
+- Given les artefacts de gouvernance M-000, les contrats M-001 et les spécifications M-002 à M-004 sont présents.
 - When `.\scripts\test.ps1` et `.\scripts\lint.ps1` sont exécutés.
 - Then les validateurs requis sont lancés sans omission et la gate retourne GREEN ou RED avec la commande fautive nommée.
 
@@ -32,11 +32,11 @@ Le wrapper `scripts/validate_architecture_boundaries.ps1` refuse explicitement u
 
 ## Périmètre des tests
 
-`scripts/test.ps1` exécute les validateurs M-000, les validateurs M-001, le validateur de spécification M-002, le validateur de topologie M-002, le validateur Compose local M-002 et le validateur de frontière réseau M-002, les tests d'acceptation et unitaires de gouvernance livrés par M-000, puis les tests d'acceptation et unitaires M-001 et M-002, dont le contrat du gateway LLM, les pannes d'inférence Spark, l'outbox idempotente, la file de jobs idempotente, l'observabilité gateway sans payload complet, la frontière réseau locale et la traçabilité de clôture M-002.
+`scripts/test.ps1` exécute les validateurs M-000, les validateurs M-001, les validateurs de spécification M-002, M-003 et M-004, le validateur de topologie M-002, le validateur Compose local M-002 et le validateur de frontière réseau M-002, les tests d'acceptation et unitaires de gouvernance livrés par M-000, puis les tests d'acceptation et unitaires M-001 à M-004, dont le contrat du gateway LLM, les pannes d'inférence Spark, l'outbox idempotente, la file de jobs idempotente, l'observabilité gateway sans payload complet, la source enregistrée diagnostiquée routée, la version canonique publiée, la frontière réseau locale et les traçabilités de clôture M-002 à M-004.
 
 Le self-test d'acceptation `tests/governance/validate_m000_validation_commands_acceptance.ps1` reste exécuté explicitement hors `scripts/test.ps1` pour vérifier les gates sans récursion de `scripts/test.ps1` sur lui-même.
 
-`scripts/lint.ps1` exécute les validateurs M-000, M-001, M-002, Compose local et frontière réseau locale sans lancer de suite de tests.
+`scripts/lint.ps1` exécute les validateurs M-000, M-001, M-002, M-003, M-004, Compose local et frontière réseau locale sans lancer de suite de tests.
 
 ## Validateurs requis
 
@@ -47,6 +47,8 @@ Le self-test d'acceptation `tests/governance/validate_m000_validation_commands_a
 - `scripts/validate_definition_of_done.ps1`
 - `scripts/validate_m001_specification.ps1`
 - `scripts/validate_m002_specification.ps1`
+- `scripts/validate_m003_specification.ps1`
+- `scripts/validate_m004_specification.ps1`
 - `scripts/validate_platform_topology.ps1`
 - `scripts/validate_local_compose.ps1`
 - `scripts/validate_network_boundary.ps1`
@@ -75,3 +77,15 @@ Les tests M-001 restent non récursifs: ils valident les contrats, fixtures, rè
 M-002 ajoute la spécification de plateforme locale sûre, le registre de topologie `docker-local` / `spark-inference`, la validation statique du Compose local, la frontière réseau locale, le contrat du gateway LLM, le contrôle des pannes d'inférence Spark, l'outbox idempotente, la file de jobs priorisée, l'observabilité technique du gateway et la traçabilité de clôture aux gates existantes sans changer les points d'entrée PowerShell ADR-010. Les validateurs de plateforme qui utilisent Python standard-library sont gouvernés par ADR-012.
 
 Les tests M-002 restent non récursifs: ils valident la présence des sections, scénarios, placements physiques, règles `docker-local` et `spark-inference`, registre de topologie, Compose local contrôlé, frontière réseau locale, gateway unique, contrat OpenAI compatible, pannes Spark explicites, outbox, file de jobs, observabilité sans prompt ni réponse complète, lignes de matrice `REQ-M002-*`, commandes de validation et garde-fous sans lancer `scripts/test.ps1`.
+
+## Extension M-003
+
+M-003 ajoute la spécification de source enregistrée, diagnostiquée et routée, la précondition M-003, l'enregistrement immuable des sources, le manifeste complet des pages, les diagnostics page par page, le plan de routage explicite, les blocages de revue/quarantaine, les commandes et contrats HTTP documentaires SP, les signaux d'audit M-003 et la traçabilité `REQ-M003-*` aux gates existantes sans changer les points d'entrée PowerShell ADR-010.
+
+Les tests M-003 restent non récursifs hors acceptation explicite de précondition: ils valident les règles documentaires, les contrats HTTP M-003, le routage et la traçabilité sans masquer les échecs de commande.
+
+## Extension M-004
+
+M-004 ajoute la spécification de version canonique publiée, la précondition M-004, la conversion pagewise, l'autorité textuelle unique, la QA canonique, la publication immuable, la résolvabilité `SourceLocator`, l'événement `CanonicalSourcePublished`, la commande HTTP de conversion documentaire, les signaux d'audit canoniques et la traçabilité `REQ-M004-*` aux gates existantes sans changer les points d'entrée PowerShell ADR-010.
+
+Les tests M-004 restent non récursifs hors acceptation explicite de précondition: ils valident les comportements canoniques et la clôture M-004 avec des tests ciblés, tandis que `scripts/test.ps1` dérive ses chemins attendus depuis le manifeste exécuté pour éviter les listes dupliquées.

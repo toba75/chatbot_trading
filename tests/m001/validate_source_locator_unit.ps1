@@ -207,6 +207,15 @@ assert_raises(
     lambda: SourceLocator.from_payload(locator_payload, validation_policy=retired_policy),
 )
 
+superseded_policy = SourceLocatorValidationPolicy(
+    canonical_sources_by_version_id={canonical_ref.canonical_version_id: canonical_ref},
+    version_statuses_by_version_id={canonical_ref.canonical_version_id: "SUPERSEDED"},
+    resolvable_item_ids_by_version_id={
+        canonical_ref.canonical_version_id: {"DOC-000001-P002-I001": "c" * 64},
+    },
+)
+SourceLocator.from_payload(locator_payload, validation_policy=superseded_policy)
+
 print("Invariants unitaires SourceLocator M-001: OK")
 '@
 

@@ -1,10 +1,10 @@
-﻿$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
-$validatorPath = Join-Path $repoRoot "scripts/validate_m003_precondition.ps1"
-$temporaryRoot = Join-Path $repoRoot ("docs/governance/.tmp_m003_precondition_acceptance_" + [System.Guid]::NewGuid().ToString("N"))
+$validatorPath = Join-Path $repoRoot "scripts/validate_m004_precondition.ps1"
+$temporaryRoot = Join-Path $repoRoot ("docs/governance/.tmp_m004_precondition_acceptance_" + [System.Guid]::NewGuid().ToString("N"))
 
-function Invoke-M003PreconditionValidator {
+function Invoke-M004PreconditionValidator {
     param(
         [Parameter(Mandatory = $true)]
         [string] $ReportPath
@@ -14,16 +14,16 @@ function Invoke-M003PreconditionValidator {
     $ErrorActionPreference = "Continue"
 
     try {
-        $previousRecursionGuard = $env:OST_M003_PRECONDITION_ACCEPTANCE_RUNNING
-        $env:OST_M003_PRECONDITION_ACCEPTANCE_RUNNING = "1"
+        $previousRecursionGuard = $env:OST_M004_PRECONDITION_ACCEPTANCE_RUNNING
+        $env:OST_M004_PRECONDITION_ACCEPTANCE_RUNNING = "1"
         $output = & powershell -NoProfile -ExecutionPolicy Bypass -File $validatorPath -Path $ReportPath 2>&1
     }
     finally {
         if ($null -eq $previousRecursionGuard) {
-            Remove-Item Env:\OST_M003_PRECONDITION_ACCEPTANCE_RUNNING -ErrorAction SilentlyContinue
+            Remove-Item Env:\OST_M004_PRECONDITION_ACCEPTANCE_RUNNING -ErrorAction SilentlyContinue
         }
         else {
-            $env:OST_M003_PRECONDITION_ACCEPTANCE_RUNNING = $previousRecursionGuard
+            $env:OST_M004_PRECONDITION_ACCEPTANCE_RUNNING = $previousRecursionGuard
         }
         $ErrorActionPreference = $previousErrorActionPreference
     }
@@ -69,30 +69,30 @@ function Assert-OutputContains {
 }
 
 if (-not (Test-Path -LiteralPath $validatorPath -PathType Leaf)) {
-    throw "Validateur de précondition M-003 absent: scripts/validate_m003_precondition.ps1"
+    throw "Validateur de précondition M-004 absent: scripts/validate_m004_precondition.ps1"
 }
 
 New-Item -ItemType Directory -Path $temporaryRoot | Out-Null
 
 try {
-    # Given M-000, M-001 et M-002 sont présents dans master.
-    # When les gates de validation sont exécutées avant la première tâche métier M-003.
-    # Then M-003 peut commencer uniquement si test, lint, traçabilité, ADR et frontières d'architecture sont GREEN.
-    $reportPath = Join-Path $temporaryRoot "m003_precondition_green.md"
-    $result = Invoke-M003PreconditionValidator -ReportPath $reportPath
+    # Given M-000, M-001, M-002 et M-003 sont présents dans master.
+    # When les gates de précondition M-004 sont exécutées depuis la base courante.
+    # Then M-004 peut commencer uniquement si test, lint et la précondition M-003 post-merge sont GREEN.
+    $reportPath = Join-Path $temporaryRoot "m004_precondition_green.md"
+    $result = Invoke-M004PreconditionValidator -ReportPath $reportPath
 
-    Assert-ExitCode -Actual $result.ExitCode -Expected 0 -Message "La précondition M-003 doit être GREEN sur la base courante."
-    Assert-OutputContains -Output $result.Output -Expected "Précondition M-003 GREEN" -Message "Le validateur doit annoncer le GREEN de précondition."
+    Assert-ExitCode -Actual $result.ExitCode -Expected 0 -Message "La précondition M-004 doit être GREEN sur la base courante."
+    Assert-OutputContains -Output $result.Output -Expected "Précondition M-004 GREEN" -Message "Le validateur doit annoncer le GREEN de précondition."
 
     if (-not (Test-Path -LiteralPath $reportPath -PathType Leaf)) {
-        throw "Rapport de précondition M-003 absent après exécution du validateur."
+        throw "Rapport de précondition M-004 absent après exécution du validateur."
     }
 
     $reportContent = Get-Content -Raw -Encoding UTF8 -LiteralPath $reportPath
 
     Assert-OutputContains `
         -Output $reportContent `
-        -Expected "Given M-000, M-001 et M-002" `
+        -Expected "Given M-000, M-001, M-002 et M-003" `
         -Message "Le rapport doit reprendre le Given métier."
 
     Assert-OutputContains `
@@ -107,13 +107,13 @@ try {
 
     Assert-OutputContains `
         -Output $reportContent `
-        -Expected "docs/tasks/milestone_002 dans master" `
-        -Message "Le rapport doit vérifier la présence de M-002 dans master."
+        -Expected "docs/tasks/milestone_003 dans master" `
+        -Message "Le rapport doit vérifier la présence de M-003 dans master."
 
     Assert-OutputContains `
         -Output $reportContent `
-        -Expected "Branche M-003 autorisée post-merge" `
-        -Message "Le rapport doit nommer la branche post-merge autorisée."
+        -Expected "Test GREEN: tests/m003/validate_m003_precondition_acceptance.ps1" `
+        -Message "Le rapport doit conserver la preuve que l'acceptation de précondition M-003 post-merge est GREEN."
 
     Assert-OutputContains `
         -Output $reportContent `
@@ -132,16 +132,11 @@ try {
 
     Assert-OutputContains `
         -Output $reportContent `
-        -Expected "validate_m003_precondition_unit.ps1" `
-        -Message "Le rapport doit prouver que le test unitaire de précondition M-003 est enrôlé."
-
-    Assert-OutputContains `
-        -Output $reportContent `
-        -Expected "89 test(s)" `
-        -Message "Le rapport doit prouver le volume de tests courant."
+        -Expected "validate_m004_precondition_unit.ps1" `
+        -Message "Le rapport doit prouver que le test unitaire de précondition M-004 est enrôlé."
 }
 finally {
     Remove-Item -LiteralPath $temporaryRoot -Recurse -Force
 }
 
-Write-Host "Test d'acceptation de précondition M-003: OK"
+Write-Host "Test d'acceptation de précondition M-004: OK"

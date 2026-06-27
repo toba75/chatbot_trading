@@ -4,14 +4,17 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from enum import Enum
 from typing import Any, Protocol
 
+from app.contracts.identity import DomainIdentifier
 from app.platform.job_runtime import (
     JobIdempotenceKey,
     JobPriority,
     JobRequest,
     JobSubmissionDecision,
 )
+from app.source_processing.application.canonical_audit_signals import PreCanonicalAuditEvent
 from app.source_processing.application.register_source_document import (
     OriginalSourceStore,
     RegisterSourceDocumentCommand,
@@ -24,7 +27,11 @@ from app.source_processing.application.start_document_processing import (
     StartDocumentProcessingCommand,
     StartDocumentProcessingHandler,
 )
-from app.source_processing.domain.document_processing_run import ProcessingRunId
+from app.source_processing.domain.document_processing_run import (
+    DocumentProcessingRun,
+    DocumentProcessingRunStatus,
+    ProcessingRunId,
+)
 from app.source_processing.domain.source_document import (
     DocumentId,
     SourceDocument,
@@ -52,6 +59,24 @@ class ProcessingRunLookupRepository(ProcessingRunRepository, Protocol):
         job_request: JobRequest,
     ) -> JobSubmissionDecision:
         """Persiste la tentative et soumet le job DIAGNOSE en une opération atomique."""
+
+
+class DocumentConversionRepository(Protocol):
+    """Dépôt dédié aux demandes de conversion canonique M-004."""
+
+    def find_conversion_by_document_id(
+        self,
+        document_id: DocumentId,
+    ) -> "DocumentConversionState | None":
+        """Retourne l'état de conversion canonique déjà connu."""
+
+    def submit_conversion_request(
+        self,
+        conversion_state: "DocumentConversionState",
+        job_queue: "DiagnosisJobQueue",
+        job_request: JobRequest,
+    ) -> JobSubmissionDecision:
+        """Persiste la demande de conversion et soumet le job CONVERT_DOCUMENT."""
 
 
 class DiagnosisJobQueue(Protocol):
@@ -92,6 +117,135 @@ class DiagnosisAlreadyRequestedError(DocumentCommandError):
     def __init__(self, document_id: str) -> None:
         self.document_id = _ensure_text(document_id, "document_id")
         super().__init__(f"diagnostic déjà demandé: {self.document_id}")
+
+
+class SourceQuarantinedError(DocumentCommandError):
+    """Erreur produite quand une source ou tentative est explicitement en quarantaine."""
+
+    def __init__(self, document_id: str, reason: str) -> None:
+        self.document_id = _ensure_text(document_id, "document_id")
+        self.reason = _ensure_text(reason, "reason")
+        super().__init__(f"source en quarantaine: {self.document_id}; {self.reason}")
+
+
+class SourceNotRoutedError(DocumentCommandError):
+    """Erreur produite quand la source n'a pas de route M-003 publiable."""
+
+    def __init__(self, document_id: str, status: str) -> None:
+        self.document_id = _ensure_text(document_id, "document_id")
+        self.status = _ensure_text(status, "status")
+        super().__init__(f"source non routée: {self.document_id}; {self.status}")
+
+
+class ConversionAlreadyRequestedError(DocumentCommandError):
+    """Erreur produite quand une conversion canonique est déjà demandée."""
+
+    def __init__(self, document_id: str) -> None:
+        self.document_id = _ensure_text(document_id, "document_id")
+        super().__init__(f"conversion déjà demandée: {self.document_id}")
+
+
+class CanonicalQualityRejectedError(DocumentCommandError):
+    """Erreur produite quand une QA canonique refuse la publication."""
+
+    def __init__(self, document_id: str, error_code: str) -> None:
+        self.document_id = _ensure_text(document_id, "document_id")
+        self.error_code = _ensure_quality_rejection_error_code(error_code)
+        super().__init__(f"version canonique refusée: {self.document_id}; {self.error_code}")
+
+
+class DocumentConversionStatus(str, Enum):
+    """Statut public de la conversion documentaire M-004."""
+
+    CONVERSION_REQUESTED = "CONVERSION_REQUESTED"
+    QA_REJECTED = "QA_REJECTED"
+    CANONICAL_ACCEPTED = "CANONICAL_ACCEPTED"
+
+    @classmethod
+    def from_value(
+        cls,
+        value: "DocumentConversionStatus | str",
+    ) -> "DocumentConversionStatus":
+        if isinstance(value, cls):
+            return value
+        if not isinstance(value, str):
+            raise ValueError("conversion_status invalide")
+        for status in cls:
+            if status.value == value:
+                return status
+        raise ValueError("conversion_status invalide")
+
+
+@dataclass(frozen=True)
+class DocumentConversionState:
+    """État applicatif strict d'une demande de conversion documentaire."""
+
+    document_id: DocumentId
+    conversion_status: DocumentConversionStatus
+    canonical_version_id: str | None
+    rejection_error_code: str | None
+
+    def __post_init__(self) -> None:
+        _ensure_document_id(self.document_id)
+        object.__setattr__(
+            self,
+            "conversion_status",
+            DocumentConversionStatus.from_value(self.conversion_status),
+        )
+        object.__setattr__(
+            self,
+            "canonical_version_id",
+            _ensure_canonical_version_for_status(
+                status=self.conversion_status,
+                canonical_version_id=self.canonical_version_id,
+            ),
+        )
+        object.__setattr__(
+            self,
+            "rejection_error_code",
+            _ensure_rejection_error_code_for_status(
+                status=self.conversion_status,
+                rejection_error_code=self.rejection_error_code,
+            ),
+        )
+
+
+@dataclass(frozen=True)
+class DocumentConversionAcceptance:
+    """Réponse applicative publique de demande de conversion documentaire."""
+
+    document_id: DocumentId
+    conversion_status: DocumentConversionStatus
+    canonical_version_id: str | None
+
+    @classmethod
+    def from_state(cls, state: DocumentConversionState) -> "DocumentConversionAcceptance":
+        parsed_state = _ensure_document_conversion_state(state)
+        if parsed_state.conversion_status is DocumentConversionStatus.QA_REJECTED:
+            raise ValueError("statut de conversion non publiable")
+        return cls(
+            document_id=parsed_state.document_id,
+            conversion_status=parsed_state.conversion_status,
+            canonical_version_id=parsed_state.canonical_version_id,
+        )
+
+    def __post_init__(self) -> None:
+        _ensure_document_id(self.document_id)
+        object.__setattr__(
+            self,
+            "conversion_status",
+            DocumentConversionStatus.from_value(self.conversion_status),
+        )
+        if self.conversion_status is DocumentConversionStatus.QA_REJECTED:
+            raise ValueError("conversion_status invalide")
+        object.__setattr__(
+            self,
+            "canonical_version_id",
+            _ensure_canonical_version_for_status(
+                status=self.conversion_status,
+                canonical_version_id=self.canonical_version_id,
+            ),
+        )
 
 
 @dataclass(frozen=True)
@@ -261,6 +415,222 @@ class DocumentCommandService:
         )
 
 
+class DocumentConversionCommandService:
+    """Surface applicative M-004 dédiée à la conversion canonique documentaire."""
+
+    def __init__(
+        self,
+        source_document_repository: SourceDocumentLookupRepository,
+        processing_run_repository: ProcessingRunLookupRepository,
+        document_conversion_repository: DocumentConversionRepository,
+        job_queue: DiagnosisJobQueue,
+        conversion_configuration_hash: str,
+        code_version: str,
+        model_version: str,
+    ) -> None:
+        if not callable(getattr(source_document_repository, "find_by_document_id", None)):
+            raise ValueError("source_document_repository sans lecture par document_id")
+        if not callable(getattr(processing_run_repository, "find_by_document_id", None)):
+            raise ValueError("processing_run_repository sans lecture par document_id")
+        if not callable(getattr(document_conversion_repository, "find_conversion_by_document_id", None)):
+            raise ValueError("document_conversion_repository sans lecture de conversion")
+        if not callable(getattr(document_conversion_repository, "submit_conversion_request", None)):
+            raise ValueError("document_conversion_repository sans soumission de conversion")
+        if not callable(getattr(job_queue, "submit", None)):
+            raise ValueError("job_queue invalide")
+        self._source_document_repository = source_document_repository
+        self._processing_run_repository = processing_run_repository
+        self._document_conversion_repository = document_conversion_repository
+        self._job_queue = job_queue
+        self._conversion_configuration_hash = _ensure_sha256(
+            conversion_configuration_hash,
+            "conversion_configuration_hash",
+        )
+        self._code_version = _ensure_text(code_version, "code_version")
+        self._model_version = _ensure_text(model_version, "model_version")
+        self._canonical_audit_events: list[PreCanonicalAuditEvent] = []
+
+    def canonical_audit_events(self) -> tuple[PreCanonicalAuditEvent, ...]:
+        return tuple(self._canonical_audit_events)
+
+    def request_document_conversion(
+        self,
+        *,
+        document_id: str,
+    ) -> DocumentConversionAcceptance:
+        parsed_document_id = DocumentId.from_value(document_id)
+        source_document = self._source_document_repository.find_by_document_id(
+            parsed_document_id
+        )
+        if source_document is None:
+            self._record_conversion_audit_event(
+                document_id=parsed_document_id,
+                status="REJECTED",
+                error_code="SOURCE_NOT_FOUND",
+                page_count=0,
+            )
+            raise SourceNotFoundError(document_id=parsed_document_id.value)
+        parsed_source_document = _ensure_source_document(source_document)
+        try:
+            parsed_source_document.ensure_documentary_publication_allowed()
+        except ValueError as exc:
+            self._record_conversion_audit_event(
+                document_id=parsed_document_id,
+                status="QUARANTINED",
+                error_code="SOURCE_QUARANTINED",
+                page_count=0,
+            )
+            raise SourceQuarantinedError(
+                document_id=parsed_document_id.value,
+                reason=str(exc),
+            ) from exc
+
+        processing_run = self._processing_run_repository.find_by_document_id(
+            parsed_document_id
+        )
+        if processing_run is None:
+            self._record_conversion_audit_event(
+                document_id=parsed_document_id,
+                status="REJECTED",
+                error_code="SOURCE_NOT_ROUTED",
+                page_count=0,
+            )
+            raise SourceNotRoutedError(
+                document_id=parsed_document_id.value,
+                status="ABSENT",
+            )
+        parsed_processing_run = _ensure_processing_run(processing_run)
+        try:
+            parsed_processing_run.ensure_documentary_publication_allowed()
+        except ValueError as exc:
+            if parsed_processing_run.status is DocumentProcessingRunStatus.QUARANTINED:
+                self._record_conversion_audit_event(
+                    document_id=parsed_document_id,
+                    status="QUARANTINED",
+                    error_code="SOURCE_QUARANTINED",
+                    page_count=parsed_processing_run.page_manifest.source_page_count,
+                )
+                raise SourceQuarantinedError(
+                    document_id=parsed_document_id.value,
+                    reason=str(exc),
+                ) from exc
+            self._record_conversion_audit_event(
+                document_id=parsed_document_id,
+                status="REJECTED",
+                error_code="SOURCE_NOT_ROUTED",
+                page_count=parsed_processing_run.page_manifest.source_page_count,
+            )
+            raise SourceNotRoutedError(
+                document_id=parsed_document_id.value,
+                status=parsed_processing_run.status.value,
+            ) from exc
+
+        existing_conversion = self._document_conversion_repository.find_conversion_by_document_id(
+            parsed_document_id
+        )
+        if existing_conversion is not None:
+            parsed_existing_conversion = _ensure_document_conversion_state(
+                existing_conversion
+            )
+            if parsed_existing_conversion.conversion_status is DocumentConversionStatus.QA_REJECTED:
+                self._record_conversion_audit_event(
+                    document_id=parsed_document_id,
+                    status="REJECTED",
+                    error_code=parsed_existing_conversion.rejection_error_code,
+                    page_count=parsed_processing_run.page_manifest.source_page_count,
+                )
+                raise CanonicalQualityRejectedError(
+                    document_id=parsed_document_id.value,
+                    error_code=parsed_existing_conversion.rejection_error_code,
+                )
+            if parsed_existing_conversion.conversion_status is DocumentConversionStatus.CANONICAL_ACCEPTED:
+                return DocumentConversionAcceptance.from_state(parsed_existing_conversion)
+            self._record_conversion_audit_event(
+                document_id=parsed_document_id,
+                status="REJECTED",
+                error_code="CONVERSION_ALREADY_REQUESTED",
+                page_count=parsed_processing_run.page_manifest.source_page_count,
+            )
+            raise ConversionAlreadyRequestedError(document_id=parsed_document_id.value)
+
+        route_plan = parsed_processing_run.route_plan
+        if route_plan is None:
+            self._record_conversion_audit_event(
+                document_id=parsed_document_id,
+                status="REJECTED",
+                error_code="SOURCE_NOT_ROUTED",
+                page_count=parsed_processing_run.page_manifest.source_page_count,
+            )
+            raise SourceNotRoutedError(
+                document_id=parsed_document_id.value,
+                status=parsed_processing_run.status.value,
+            )
+
+        conversion_state = DocumentConversionState(
+            document_id=parsed_document_id,
+            conversion_status=DocumentConversionStatus.CONVERSION_REQUESTED,
+            canonical_version_id=None,
+            rejection_error_code=None,
+        )
+        job_request = JobRequest(
+            job_name="CONVERT_DOCUMENT",
+            priority=JobPriority.P1,
+            idempotence_key=JobIdempotenceKey(
+                job_name="CONVERT_DOCUMENT",
+                input_hash=parsed_source_document.fingerprint.value,
+                configuration_hash=self._conversion_configuration_hash,
+                code_version=self._code_version,
+                model_version=self._model_version,
+            ),
+            payload={
+                "document_id": parsed_document_id.value,
+                "processing_run_id": parsed_processing_run.processing_run_id.value,
+                "source_sha256": parsed_source_document.fingerprint.value,
+                "routing_policy_version": route_plan.routing_policy_version.value,
+                "route_count": len(route_plan.page_routes),
+            },
+        )
+        submission = self._document_conversion_repository.submit_conversion_request(
+            conversion_state=conversion_state,
+            job_queue=self._job_queue,
+            job_request=job_request,
+        )
+        if not submission.created:
+            self._record_conversion_audit_event(
+                document_id=parsed_document_id,
+                status="REJECTED",
+                error_code="CONVERSION_ALREADY_REQUESTED",
+                page_count=len(route_plan.page_routes),
+            )
+            raise ConversionAlreadyRequestedError(document_id=parsed_document_id.value)
+        self._record_conversion_audit_event(
+            document_id=parsed_document_id,
+            status="REQUESTED",
+            error_code=None,
+            page_count=len(route_plan.page_routes),
+        )
+        return DocumentConversionAcceptance.from_state(conversion_state)
+
+    def _record_conversion_audit_event(
+        self,
+        *,
+        document_id: DocumentId,
+        status: str,
+        error_code: str | None,
+        page_count: int,
+    ) -> None:
+        self._canonical_audit_events.append(
+            PreCanonicalAuditEvent(
+                trace_id=_conversion_audit_trace_id(document_id),
+                document_id=document_id.value,
+                phase="document_conversion_request",
+                status=status,
+                page_count=page_count,
+                error_code=error_code,
+            )
+        )
+
+
 def _ensure_text(value: Any, field_name: str) -> str:
     if not isinstance(value, str):
         raise ValueError(f"{field_name} non textuel")
@@ -287,21 +657,91 @@ def _ensure_document_id(value: DocumentId | None) -> DocumentId:
     return value
 
 
+def _ensure_processing_run(value: object) -> DocumentProcessingRun:
+    if not isinstance(value, DocumentProcessingRun):
+        raise ValueError("processing_run invalide")
+    return value
+
+
 def _ensure_source_document(value: SourceDocument | None) -> SourceDocument:
     if not isinstance(value, SourceDocument):
         raise ValueError("source_document invalide")
     return value
 
 
+def _ensure_document_conversion_state(value: object) -> DocumentConversionState:
+    if not isinstance(value, DocumentConversionState):
+        raise ValueError("conversion_state invalide")
+    return value
+
+
+def _ensure_canonical_version_for_status(
+    *,
+    status: DocumentConversionStatus,
+    canonical_version_id: str | None,
+) -> str | None:
+    if status is DocumentConversionStatus.CANONICAL_ACCEPTED:
+        if canonical_version_id is None:
+            raise ValueError("canonical_version_id obligatoire")
+        return _ensure_canonical_version_id(canonical_version_id)
+    if canonical_version_id is not None:
+        raise ValueError("canonical_version_id interdit")
+    return None
+
+
+def _ensure_rejection_error_code_for_status(
+    *,
+    status: DocumentConversionStatus,
+    rejection_error_code: str | None,
+) -> str | None:
+    if status is DocumentConversionStatus.QA_REJECTED:
+        if rejection_error_code is None:
+            raise ValueError("rejection_error_code obligatoire")
+        return _ensure_quality_rejection_error_code(rejection_error_code)
+    if rejection_error_code is not None:
+        raise ValueError("rejection_error_code interdit")
+    return None
+
+
+def _ensure_quality_rejection_error_code(value: Any) -> str:
+    text = _ensure_text(value, "rejection_error_code")
+    if text not in {"SOURCE_NOT_CANONICAL", "PAGE_AUTHORITY_MISSING"}:
+        raise ValueError("rejection_error_code invalide")
+    return text
+
+
+def _conversion_audit_trace_id(document_id: DocumentId) -> str:
+    _ensure_document_id(document_id)
+    return f"TRACE-M004-CONVERT-{document_id.value.removeprefix('DOC-')}"
+
+
+def _ensure_canonical_version_id(value: Any) -> str:
+    if not isinstance(value, str):
+        raise ValueError("canonical_version_id invalide")
+    try:
+        return str(DomainIdentifier.parse_with_prefix(value, "CVER"))
+    except ValueError as exc:
+        raise ValueError(f"canonical_version_id invalide: {exc}") from exc
+
+
 __all__ = [
+    "CanonicalQualityRejectedError",
+    "ConversionAlreadyRequestedError",
     "DiagnosisAlreadyRequestedError",
     "DiagnosisJobQueue",
     "DocumentCommandError",
     "DocumentCommandService",
+    "DocumentConversionAcceptance",
+    "DocumentConversionCommandService",
+    "DocumentConversionRepository",
+    "DocumentConversionState",
+    "DocumentConversionStatus",
     "DocumentDiagnosisAcceptance",
     "ProcessingRunLookupRepository",
     "RegisterDocumentAcceptance",
     "SourceDocumentLookupRepository",
     "SourceNotFoundError",
+    "SourceNotRoutedError",
+    "SourceQuarantinedError",
     "SourceUnreadableError",
 ]

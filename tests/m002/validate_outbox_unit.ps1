@@ -68,6 +68,32 @@ def assert_raises(expected_fragment: str, callback) -> None:
         raise AssertionError(f"Erreur attendue absente: {expected_fragment}")
 
 
+class GuardedLock:
+    def __init__(self) -> None:
+        self._lock = threading.RLock()
+        self.depth = 0
+
+    def __enter__(self):
+        self._lock.acquire()
+        self.depth += 1
+        return self
+
+    def __exit__(self, exc_type, exc, traceback):
+        self.depth -= 1
+        self._lock.release()
+
+
+class GuardedEntryDict(dict):
+    def __init__(self, initial_entries, lock: GuardedLock) -> None:
+        super().__init__(initial_entries)
+        self._lock = lock
+
+    def __setitem__(self, key, value) -> None:
+        if self._lock.depth == 0:
+            raise AssertionError("mutation outbox sans verrou")
+        super().__setitem__(key, value)
+
+
 event_v2 = event_for("EVT-M002-OUTBOX-0002", 2)
 event_v1 = event_for("EVT-M002-OUTBOX-0001", 1)
 event_v3 = event_for("EVT-M002-OUTBOX-0003", 3)
@@ -110,6 +136,31 @@ assert_raises("event_id outbox duplique", lambda: outbox.append_in_transaction(m
 assert_raises("event outbox inconnu", lambda: outbox.mark_delivered("EVT-M002-OUTBOX-9999"))
 assert_raises("raison d'echec vide", lambda: outbox.mark_failed(event_v3.event_id, ""))
 
+batch_outbox = InMemoryTransactionalOutbox.empty()
+batch_entries = batch_outbox.append_many_in_transaction(
+    (
+        (mutation_for(event_v1), event_v1),
+        (mutation_for(event_v2), event_v2),
+    )
+)
+if tuple(entry.event.event_id for entry in batch_entries) != (
+    "EVT-M002-OUTBOX-0001",
+    "EVT-M002-OUTBOX-0002",
+):
+    raise AssertionError("append_many_in_transaction doit retourner le lot inscrit dans l'ordre fourni.")
+rejected_batch_outbox = InMemoryTransactionalOutbox.empty()
+assert_raises(
+    "event_id outbox duplique",
+    lambda: rejected_batch_outbox.append_many_in_transaction(
+        (
+            (mutation_for(event_v1), event_v1),
+            (mutation_for(event_v1), event_v1),
+        )
+    ),
+)
+if rejected_batch_outbox.pending_events() != ():
+    raise AssertionError("Une outbox neuve doit rester vide apres un lot refuse.")
+
 mismatched_mutation = ProducerStateMutation(
     mutation_id="MUT-KA-MISMATCH",
     producer_context="KA",
@@ -145,6 +196,34 @@ assert_raises(
         event={"event_id": event_v1.event_id},
     ),
 )
+
+guarded_delivery_outbox = InMemoryTransactionalOutbox.empty()
+guarded_delivery_event = event_for("EVT-M002-OUTBOX-0101", 101)
+guarded_delivery_outbox.append_in_transaction(
+    state_mutation=mutation_for(guarded_delivery_event),
+    event=guarded_delivery_event,
+)
+delivery_lock = GuardedLock()
+guarded_delivery_outbox._lock = delivery_lock
+guarded_delivery_outbox._entries_by_event_id = GuardedEntryDict(
+    guarded_delivery_outbox._entries_by_event_id,
+    delivery_lock,
+)
+guarded_delivery_outbox.mark_delivered(guarded_delivery_event.event_id)
+
+guarded_failure_outbox = InMemoryTransactionalOutbox.empty()
+guarded_failure_event = event_for("EVT-M002-OUTBOX-0102", 102)
+guarded_failure_outbox.append_in_transaction(
+    state_mutation=mutation_for(guarded_failure_event),
+    event=guarded_failure_event,
+)
+failure_lock = GuardedLock()
+guarded_failure_outbox._lock = failure_lock
+guarded_failure_outbox._entries_by_event_id = GuardedEntryDict(
+    guarded_failure_outbox._entries_by_event_id,
+    failure_lock,
+)
+guarded_failure_outbox.mark_failed(guarded_failure_event.event_id, "consumer unavailable")
 
 assert_raises(
     "producer_context vide",

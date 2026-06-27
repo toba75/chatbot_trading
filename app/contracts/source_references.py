@@ -20,9 +20,11 @@ from app.contracts.identity import ContractSchemaVersion, DomainIdentifier
 
 SOURCE_REFERENCE_SCHEMA_VERSIONS = frozenset({"1.0"})
 ACCEPTED_CANONICAL_VERSION_STATUS = "ACCEPTED"
+SUPERSEDED_CANONICAL_VERSION_STATUS = "SUPERSEDED"
 UNAVAILABLE_CANONICAL_VERSION_STATUSES = frozenset({"QUARANTINED", "RETIRED"})
 ALLOWED_CANONICAL_VERSION_STATUSES = UNAVAILABLE_CANONICAL_VERSION_STATUSES | {
-    ACCEPTED_CANONICAL_VERSION_STATUS
+    ACCEPTED_CANONICAL_VERSION_STATUS,
+    SUPERSEDED_CANONICAL_VERSION_STATUS,
 }
 
 _HASH_PATTERN = re.compile(r"^[0-9a-f]{32}$|^[0-9a-f]{64}$", re.IGNORECASE)
@@ -273,7 +275,10 @@ class SourceLocatorValidationPolicy:
             raise ValueError(f"Version canonique absente: {locator.canonical_version_id}")
         if status in UNAVAILABLE_CANONICAL_VERSION_STATUSES:
             raise ValueError(f"Version canonique indisponible: {status}")
-        if status != ACCEPTED_CANONICAL_VERSION_STATUS:
+        if status not in {
+            ACCEPTED_CANONICAL_VERSION_STATUS,
+            SUPERSEDED_CANONICAL_VERSION_STATUS,
+        }:
             raise ValueError(f"Statut de version canonique inconnu: {status}")
 
         canonical_source = self.canonical_sources_by_version_id.get(locator.canonical_version_id)

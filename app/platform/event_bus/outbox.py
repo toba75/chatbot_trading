@@ -99,6 +99,7 @@ class InMemoryTransactionalOutbox:
         self._entries_by_event_id: dict[str, OutboxEntry] = {}
         self._event_order: list[str] = []
         self._state_mutations: list[ProducerStateMutation] = []
+        self._lock = threading.Lock()
 
         for state_mutation in state_mutations:
             self._state_mutations.append(_ensure_state_mutation(state_mutation))
@@ -122,34 +123,62 @@ class InMemoryTransactionalOutbox:
         state_mutation: ProducerStateMutation,
         event: EventEnvelope,
     ) -> OutboxEntry:
-        mutation = _ensure_state_mutation(state_mutation)
-        envelope = _ensure_event(event)
-        _ensure_event_matches_mutation(mutation, envelope)
+        return self.append_many_in_transaction(((state_mutation, event),))[0]
 
-        if envelope.event_id in self._entries_by_event_id:
-            raise ValueError(f"event_id outbox duplique: {envelope.event_id}")
+    def append_many_in_transaction(
+        self,
+        mutations_and_events: Iterable[tuple[ProducerStateMutation, EventEnvelope]],
+    ) -> tuple[OutboxEntry, ...]:
+        if mutations_and_events is None:
+            raise ValueError("lot outbox absent")
+        parsed_pairs: list[tuple[ProducerStateMutation, EventEnvelope]] = []
+        batch_event_ids: set[str] = set()
+        for pair in mutations_and_events:
+            try:
+                state_mutation, event = pair
+            except (TypeError, ValueError) as exc:
+                raise ValueError("lot outbox invalide") from exc
+            mutation = _ensure_state_mutation(state_mutation)
+            envelope = _ensure_event(event)
+            _ensure_event_matches_mutation(mutation, envelope)
+            if envelope.event_id in batch_event_ids:
+                raise ValueError(f"event_id outbox duplique: {envelope.event_id}")
+            batch_event_ids.add(envelope.event_id)
+            parsed_pairs.append((mutation, envelope))
+        if len(parsed_pairs) == 0:
+            raise ValueError("lot outbox vide")
 
-        entry = OutboxEntry(
-            sequence=len(self._event_order) + 1,
-            state_mutation=mutation,
-            event=envelope,
-            status=OutboxMessageStatus.PENDING,
-            failure_reason=None,
-        )
-        self._entries_by_event_id[envelope.event_id] = entry
-        self._event_order.append(envelope.event_id)
-        self._state_mutations.append(mutation)
-        return entry
+        with self._lock:
+            for _, envelope in parsed_pairs:
+                if envelope.event_id in self._entries_by_event_id:
+                    raise ValueError(f"event_id outbox duplique: {envelope.event_id}")
+
+            entries: list[OutboxEntry] = []
+            for mutation, envelope in parsed_pairs:
+                entry = OutboxEntry(
+                    sequence=len(self._event_order) + 1,
+                    state_mutation=mutation,
+                    event=envelope,
+                    status=OutboxMessageStatus.PENDING,
+                    failure_reason=None,
+                )
+                self._entries_by_event_id[envelope.event_id] = entry
+                self._event_order.append(envelope.event_id)
+                self._state_mutations.append(mutation)
+                entries.append(entry)
+            return tuple(entries)
 
     def recorded_state_mutations(self) -> tuple[ProducerStateMutation, ...]:
-        return tuple(self._state_mutations)
+        with self._lock:
+            return tuple(self._state_mutations)
 
     def pending_events(self) -> tuple[OutboxEntry, ...]:
-        entries = (
-            self._entries_by_event_id[event_id]
-            for event_id in self._event_order
-            if self._entries_by_event_id[event_id].status is OutboxMessageStatus.PENDING
-        )
+        with self._lock:
+            entries = tuple(
+                self._entries_by_event_id[event_id]
+                for event_id in self._event_order
+                if self._entries_by_event_id[event_id].status is OutboxMessageStatus.PENDING
+            )
         return tuple(
             sorted(
                 entries,
@@ -162,43 +191,57 @@ class InMemoryTransactionalOutbox:
             )
         )
 
+    def has_event(self, event_id: str) -> bool:
+        parsed_event_id = _ensure_event_id(event_id)
+        with self._lock:
+            return parsed_event_id in self._entries_by_event_id
+
     def entry_for(self, event_id: str) -> OutboxEntry:
         parsed_event_id = _ensure_event_id(event_id)
-        if parsed_event_id not in self._entries_by_event_id:
-            raise ValueError(f"event outbox inconnu: {parsed_event_id}")
-        return self._entries_by_event_id[parsed_event_id]
+        with self._lock:
+            if parsed_event_id not in self._entries_by_event_id:
+                raise ValueError(f"event outbox inconnu: {parsed_event_id}")
+            return self._entries_by_event_id[parsed_event_id]
 
     def status_of(self, event_id: str) -> OutboxMessageStatus:
         return self.entry_for(event_id).status
 
     def mark_delivered(self, event_id: str) -> OutboxEntry:
-        entry = self.entry_for(event_id)
-        if entry.status is not OutboxMessageStatus.PENDING:
-            raise ValueError(f"transition outbox invalide vers delivered: {entry.event.event_id}")
-        delivered_entry = OutboxEntry(
-            sequence=entry.sequence,
-            state_mutation=entry.state_mutation,
-            event=entry.event,
-            status=OutboxMessageStatus.DELIVERED,
-            failure_reason=None,
-        )
-        self._entries_by_event_id[entry.event.event_id] = delivered_entry
-        return delivered_entry
+        parsed_event_id = _ensure_event_id(event_id)
+        with self._lock:
+            if parsed_event_id not in self._entries_by_event_id:
+                raise ValueError(f"event outbox inconnu: {parsed_event_id}")
+            entry = self._entries_by_event_id[parsed_event_id]
+            if entry.status is not OutboxMessageStatus.PENDING:
+                raise ValueError(f"transition outbox invalide vers delivered: {entry.event.event_id}")
+            delivered_entry = OutboxEntry(
+                sequence=entry.sequence,
+                state_mutation=entry.state_mutation,
+                event=entry.event,
+                status=OutboxMessageStatus.DELIVERED,
+                failure_reason=None,
+            )
+            self._entries_by_event_id[entry.event.event_id] = delivered_entry
+            return delivered_entry
 
     def mark_failed(self, event_id: str, failure_reason: str) -> OutboxEntry:
         reason = _ensure_text(failure_reason, "raison d'echec")
-        entry = self.entry_for(event_id)
-        if entry.status is not OutboxMessageStatus.PENDING:
-            raise ValueError(f"transition outbox invalide vers failed: {entry.event.event_id}")
-        failed_entry = OutboxEntry(
-            sequence=entry.sequence,
-            state_mutation=entry.state_mutation,
-            event=entry.event,
-            status=OutboxMessageStatus.FAILED,
-            failure_reason=reason,
-        )
-        self._entries_by_event_id[entry.event.event_id] = failed_entry
-        return failed_entry
+        parsed_event_id = _ensure_event_id(event_id)
+        with self._lock:
+            if parsed_event_id not in self._entries_by_event_id:
+                raise ValueError(f"event outbox inconnu: {parsed_event_id}")
+            entry = self._entries_by_event_id[parsed_event_id]
+            if entry.status is not OutboxMessageStatus.PENDING:
+                raise ValueError(f"transition outbox invalide vers failed: {entry.event.event_id}")
+            failed_entry = OutboxEntry(
+                sequence=entry.sequence,
+                state_mutation=entry.state_mutation,
+                event=entry.event,
+                status=OutboxMessageStatus.FAILED,
+                failure_reason=reason,
+            )
+            self._entries_by_event_id[entry.event.event_id] = failed_entry
+            return failed_entry
 
 
 class InMemoryProcessedEventRegistry:
