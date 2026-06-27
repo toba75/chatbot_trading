@@ -17,6 +17,7 @@ from app.knowledge_access.domain.knowledge_projection import (
     ProjectionProfile,
     ProjectionStatus,
 )
+from app.knowledge_access.domain.chunking import CanonicalChunkDocument
 
 
 _CANONICAL_READ_STATUSES = frozenset(
@@ -57,6 +58,12 @@ class CanonicalSourceReader(Protocol):
         document_id: str,
     ) -> "CanonicalSourceForProjection | None":
         """Lit une vue publique de version canonique sans accéder aux tables SP."""
+
+    def find_chunking_source_by_version_id(
+        self,
+        canonical_version_id: str,
+    ) -> CanonicalChunkDocument | None:
+        """Lit le contenu canonique publié nécessaire au chunking KA."""
 
 
 class ProcessedProjectionEventRegistry(Protocol):

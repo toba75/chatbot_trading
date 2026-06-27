@@ -15,6 +15,11 @@ from app.contracts.source_references import (
     CanonicalSourceRef,
     SourceLocatorValidationPolicy,
 )
+from app.knowledge_access.application.chunk_canonical_source import (
+    ChunkingSourceNotFoundError,
+    ProjectCanonicalChunksCommand,
+    ProjectCanonicalChunksHandler,
+)
 from app.knowledge_access.domain.chunking import (
     CanonicalChunkDocument,
     ChunkingProfile,
@@ -106,6 +111,20 @@ def canonical_document_payload(ref, items):
     }
 
 
+class RecordingCanonicalSourceReader:
+    def __init__(self, records):
+        self.records = dict(records)
+        self.read_version_ids = []
+        self.mutation_attempts = []
+
+    def find_chunking_source_by_version_id(self, canonical_version_id):
+        self.read_version_ids.append(canonical_version_id)
+        return self.records.get(canonical_version_id)
+
+    def mutate_source_processing(self, canonical_version_id):
+        self.mutation_attempts.append(canonical_version_id)
+
+
 # Given une version canonique publiée avec pages, items et hashes.
 ref = canonical_ref()
 items = (
@@ -128,12 +147,18 @@ profile = ChunkingProfile(
 )
 
 # When KA applique un profil de chunking hiérarchique explicite.
-projection = HierarchicalChunkProjector().project(
-    canonical_document=canonical_document,
-    chunking_profile=profile,
+reader = RecordingCanonicalSourceReader({ref.canonical_version_id: canonical_document})
+handler = ProjectCanonicalChunksHandler(canonical_source_reader=reader)
+projection = handler.project_from_canonical_version(
+    ProjectCanonicalChunksCommand(
+        canonical_version_id=ref.canonical_version_id,
+        chunking_profile=profile,
+    )
 )
 
 # Then chaque chunk porte pages, item ids, SourceLocator résolvable et content_hash cohérent.
+assert_equal(reader.read_version_ids, [ref.canonical_version_id], "KA doit lire la version canonique demandée.")
+assert_equal(reader.mutation_attempts, [], "KA ne doit pas muter SP pendant le chunking.")
 assert_equal(projection.canonical_version_id, ref.canonical_version_id, "La projection doit viser la version canonique.")
 assert_equal(projection.document_id, ref.document_id, "La projection doit conserver le document.")
 assert_equal(projection.profile_id, profile.profile_id, "La projection doit conserver le profil.")
@@ -207,6 +232,18 @@ assert_raises(
     lambda: CanonicalChunkDocument.from_payload(
         raw_text_payload,
         validation_policy=validation_policy,
+    ),
+)
+
+assert_raises(
+    "source canonique introuvable",
+    lambda: ProjectCanonicalChunksHandler(
+        canonical_source_reader=RecordingCanonicalSourceReader({}),
+    ).project_from_canonical_version(
+        ProjectCanonicalChunksCommand(
+            canonical_version_id=ref.canonical_version_id,
+            chunking_profile=profile,
+        )
     ),
 )
 
