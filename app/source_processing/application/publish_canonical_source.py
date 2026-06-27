@@ -19,6 +19,7 @@ from app.source_processing.domain.canonical_source import (
 from app.source_processing.domain.page_conversion import (
     CanonicalQualityDecision,
     PagewiseDoclingDocument,
+    TextAuthorityManifest,
 )
 from app.source_processing.domain.source_document import SourceDocument
 
@@ -76,6 +77,7 @@ class PublishCanonicalSourceCommand:
 
     source_document: SourceDocument
     docling_document: PagewiseDoclingDocument
+    text_authority_manifest: TextAuthorityManifest
     quality_decision: CanonicalQualityDecision
     accepted_at: str
     existing_canonical_source: CanonicalSource | None
@@ -85,6 +87,8 @@ class PublishCanonicalSourceCommand:
             raise ValueError("source_document invalide")
         if not isinstance(self.docling_document, PagewiseDoclingDocument):
             raise ValueError("DoclingDocument canonique invalide")
+        if not isinstance(self.text_authority_manifest, TextAuthorityManifest):
+            raise ValueError("autorité textuelle obligatoire")
         if not isinstance(self.quality_decision, CanonicalQualityDecision):
             raise ValueError("décision QA canonique invalide")
         if not isinstance(self.accepted_at, str):
@@ -139,6 +143,30 @@ class PublishCanonicalSourceHandler:
             canonical_source_id=canonical_source_id,
             canonical_version_id=canonical_version_id,
         )
+        canonical_artifact = CanonicalArtifact(
+            artifact_ref=expected_artifact_ref,
+            artifact_sha256=artifact_sha256,
+            artifact_kind=CanonicalArtifactKind.DOCLING_JSON,
+        )
+
+        if command.existing_canonical_source is None:
+            canonical_source = CanonicalSource.publish_initial(
+                source_document=command.source_document,
+                docling_document=command.docling_document,
+                text_authority_manifest=command.text_authority_manifest,
+                quality_decision=command.quality_decision,
+                canonical_artifact=canonical_artifact,
+                accepted_at=command.accepted_at,
+            )
+        else:
+            canonical_source = command.existing_canonical_source.publish_correction(
+                docling_document=command.docling_document,
+                text_authority_manifest=command.text_authority_manifest,
+                quality_decision=command.quality_decision,
+                canonical_artifact=canonical_artifact,
+                accepted_at=command.accepted_at,
+            )
+
         stored_artifact = self._artifact_store.store_docling_json(
             StoreCanonicalArtifactRequest(
                 canonical_source_id=canonical_source_id,
@@ -151,23 +179,9 @@ class PublishCanonicalSourceHandler:
         )
         if not isinstance(stored_artifact, StoredCanonicalArtifact):
             raise ValueError("artefact canonique stocké invalide")
-        canonical_artifact = stored_artifact.to_canonical_artifact()
-
-        if command.existing_canonical_source is None:
-            canonical_source = CanonicalSource.publish_initial(
-                source_document=command.source_document,
-                docling_document=command.docling_document,
-                quality_decision=command.quality_decision,
-                canonical_artifact=canonical_artifact,
-                accepted_at=command.accepted_at,
-            )
-        else:
-            canonical_source = command.existing_canonical_source.publish_correction(
-                docling_document=command.docling_document,
-                quality_decision=command.quality_decision,
-                canonical_artifact=canonical_artifact,
-                accepted_at=command.accepted_at,
-            )
+        stored_canonical_artifact = stored_artifact.to_canonical_artifact()
+        if stored_canonical_artifact != canonical_artifact:
+            raise ValueError("artefact canonique stocké incohérent")
 
         published_version = canonical_source.version_for(canonical_version_id)
         return PublishCanonicalSourceResult(

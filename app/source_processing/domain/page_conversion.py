@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import hashlib
 import math
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import Enum
@@ -28,6 +30,9 @@ from app.source_processing.domain.source_document import (
 _SOURCE_LOCATOR_SCHEMA_VERSION = "1.0"
 _PAGE_AUTHORITY_MISSING = "PAGE_AUTHORITY_MISSING"
 _PAGE_AUTHORITY_AMBIGUOUS = "PAGE_AUTHORITY_AMBIGUOUS"
+_ARTIFACT_REF_PATTERN = re.compile(
+    r"^artifact:source_processing\.[a-z0-9_]+/[A-Za-z0-9_.@/-]+$"
+)
 
 
 class ConversionToolName(str, Enum):
@@ -99,9 +104,14 @@ class QualityFindingCode(str, Enum):
     """Anomalie documentaire conservée sans contenu complet."""
 
     PAGE_OMITTED = "PAGE_OMITTED"
+    PAGE_UNEXPECTED = "PAGE_UNEXPECTED"
+    SOURCE_LOCATOR_INCONSISTENT = "SOURCE_LOCATOR_INCONSISTENT"
     NUMERIC_INCONSISTENCY = "NUMERIC_INCONSISTENCY"
     NEGATIVE_SIGN_ALTERED = "NEGATIVE_SIGN_ALTERED"
+    PERCENTAGE_ALTERED = "PERCENTAGE_ALTERED"
+    DECIMAL_SEPARATOR_ALTERED = "DECIMAL_SEPARATOR_ALTERED"
     INCOMPLETE_TABLE = "INCOMPLETE_TABLE"
+    FIGURE_PROVENANCE_MISSING = "FIGURE_PROVENANCE_MISSING"
     SOURCE_QUARANTINED = "SOURCE_QUARANTINED"
     WARNING_REVIEW_NOTE = "WARNING_REVIEW_NOTE"
 
@@ -174,13 +184,13 @@ class PageConversionItem:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "label", PageConversionItemLabel.from_value(self.label))
-        object.__setattr__(self, "text", _ensure_text(self.text, "texte d'item invalide"))
+        text = _ensure_text(self.text, "texte d'item invalide")
+        object.__setattr__(self, "text", text)
         _ensure_page_item_geometry(self.geometry)
-        object.__setattr__(
-            self,
-            "content_hash",
-            _ensure_content_hash(self.content_hash),
-        )
+        content_hash = _ensure_content_hash(self.content_hash)
+        if content_hash != _content_hash_for_text(text):
+            raise ValueError("content_hash incohérent avec le texte")
+        object.__setattr__(self, "content_hash", content_hash)
 
 
 @dataclass(frozen=True)
@@ -867,8 +877,9 @@ class CanonicalAcceptancePolicy:
             page_decisions=parsed_text_authority_manifest.page_decisions,
         )
         parsed_findings = _ensure_post_conversion_findings(findings)
-        generated_findings = _page_omission_findings(
+        generated_findings = _post_conversion_integrity_findings(
             page_manifest=parsed_page_manifest,
+            text_authority_manifest=parsed_text_authority_manifest,
             docling_document=docling_document,
         )
         all_findings = generated_findings + parsed_findings
@@ -1038,8 +1049,12 @@ class CanonicalDocumentItem:
             raise ValueError("provenance d'item invalide")
         if self.provenance.item_id != self.item_id:
             raise ValueError("provenance d'item incohérente")
+        if self.provenance.bbox != self.bbox:
+            raise ValueError("bbox de provenance incohérente")
         if self.provenance.content_hash != self.content_hash:
             raise ValueError("hash de provenance incohérent")
+        if self.content_hash != _content_hash_for_text(self.text):
+            raise ValueError("content_hash incohérent avec le texte")
 
     def to_payload(self) -> dict[str, Any]:
         return {
@@ -1069,7 +1084,11 @@ class CanonicalDocumentPage:
             "conversion_artifact_hash",
             _ensure_artifact_hash(self.conversion_artifact_hash),
         )
-        object.__setattr__(self, "items", _ensure_canonical_items(self.items))
+        items = _ensure_canonical_items(self.items)
+        for item in items:
+            if item.provenance.page_pdf != self.page_number.value:
+                raise ValueError("page_pdf de provenance incohérent")
+        object.__setattr__(self, "items", items)
 
     def to_payload(self) -> dict[str, Any]:
         return {
@@ -1102,6 +1121,11 @@ class PagewiseDoclingDocument:
         pages = _ensure_document_pages(self.pages)
         _ensure_document_page_order(pages)
         _ensure_unique_item_ids(pages)
+        _ensure_document_provenance(
+            document_id=self.document_id,
+            canonical_version_id=self.canonical_version_id,
+            pages=pages,
+        )
         object.__setattr__(self, "pages", pages)
 
     def to_payload(self) -> dict[str, Any]:
@@ -1424,15 +1448,17 @@ def _ensure_report_policy_matches(
         raise ValueError(message)
 
 
-def _page_omission_findings(
+def _post_conversion_integrity_findings(
     *,
     page_manifest: PageManifest,
+    text_authority_manifest: TextAuthorityManifest,
     docling_document: PagewiseDoclingDocument,
 ) -> tuple[PostConversionQualityFinding, ...]:
     expected_pages = tuple(entry.page_number.value for entry in page_manifest.entries)
     actual_pages = tuple(page.page_number.value for page in docling_document.pages)
     missing_pages = tuple(page for page in expected_pages if page not in set(actual_pages))
-    return tuple(
+    unexpected_pages = tuple(page for page in actual_pages if page not in set(expected_pages))
+    missing_findings = tuple(
         PostConversionQualityFinding(
             code=QualityFindingCode.PAGE_OMITTED,
             page_number=PageNumber.from_value(page_value),
@@ -1442,6 +1468,61 @@ def _page_omission_findings(
             detail="Page absente du DoclingDocument.",
         )
         for page_value in missing_pages
+    )
+    unexpected_findings = tuple(
+        PostConversionQualityFinding(
+            code=QualityFindingCode.PAGE_UNEXPECTED,
+            page_number=PageNumber.from_value(page_value),
+            item_id=f"PAGE-{page_value:03d}",
+            expected="ABSENT",
+            actual="PRESENT",
+            detail="Page hors manifeste dans le DoclingDocument.",
+        )
+        for page_value in unexpected_pages
+    )
+    authority_findings = _text_authority_document_findings(
+        page_manifest=page_manifest,
+        text_authority_manifest=text_authority_manifest,
+        docling_document=docling_document,
+    )
+    return missing_findings + unexpected_findings + authority_findings
+
+
+def _text_authority_document_findings(
+    *,
+    page_manifest: PageManifest,
+    text_authority_manifest: TextAuthorityManifest,
+    docling_document: PagewiseDoclingDocument,
+) -> tuple[PostConversionQualityFinding, ...]:
+    authorized_document = PagewiseDoclingFusionService().merge_authorized(
+        document_id=docling_document.document_id,
+        canonical_version_id=docling_document.canonical_version_id,
+        source_sha256=docling_document.source_sha256,
+        original_storage_ref=docling_document.original_storage_ref,
+        page_manifest=page_manifest,
+        text_authority_manifest=text_authority_manifest,
+    )
+    if authorized_document.to_payload() == docling_document.to_payload():
+        return ()
+    authorized_pages = {
+        page.page_number.value: page.to_payload()
+        for page in authorized_document.pages
+    }
+    actual_pages = {
+        page.page_number.value: page.to_payload()
+        for page in docling_document.pages
+    }
+    return tuple(
+        PostConversionQualityFinding(
+            code=QualityFindingCode.SOURCE_LOCATOR_INCONSISTENT,
+            page_number=PageNumber.from_value(page_value),
+            item_id=f"PAGE-{page_value:03d}",
+            expected="AUTHORIZED_TEXT",
+            actual="CANDIDATE_TEXT",
+            detail="DoclingDocument incohérent avec l'autorité textuelle.",
+        )
+        for page_value in sorted(authorized_pages.keys() & actual_pages.keys())
+        if authorized_pages[page_value] != actual_pages[page_value]
     )
 
 
@@ -1641,6 +1722,31 @@ def _ensure_text_authority_manifest_covers_page_manifest(
         )
 
 
+def _content_hash_for_text(value: str) -> str:
+    text = _ensure_text(value, "texte d'item invalide")
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _ensure_document_provenance(
+    *,
+    document_id: DocumentId,
+    canonical_version_id: str,
+    pages: tuple[CanonicalDocumentPage, ...],
+) -> None:
+    parsed_document_id = _ensure_document_id(document_id)
+    parsed_canonical_version_id = _ensure_domain_identifier(
+        canonical_version_id,
+        "canonical_version_id",
+        "CVER",
+    )
+    for page in pages:
+        for item in page.items:
+            if item.provenance.document_id != parsed_document_id.value:
+                raise ValueError("document_id de provenance incohérent")
+            if item.provenance.canonical_version_id != parsed_canonical_version_id:
+                raise ValueError("version de provenance incohérente")
+
+
 def _ensure_content_hash(value: Any) -> str:
     if not isinstance(value, str):
         raise ValueError("content_hash non textuel")
@@ -1673,7 +1779,9 @@ def _ensure_artifact_hash(value: Any) -> str:
 
 def _ensure_artifact_ref(value: Any) -> str:
     text = _ensure_text(value, "référence d'artefact invalide")
-    if not text.startswith("artifact:source_processing."):
+    if _ARTIFACT_REF_PATTERN.fullmatch(text) is None:
+        raise ValueError("référence d'artefact invalide")
+    if "/../" in text or text.endswith("/..") or "/./" in text or text.endswith("/."):
         raise ValueError("référence d'artefact invalide")
     return text
 

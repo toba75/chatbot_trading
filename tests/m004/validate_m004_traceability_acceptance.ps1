@@ -319,6 +319,7 @@ try {
     $auditScript = @'
 from app.source_processing.application.canonical_audit_signals import (
     CanonicalAuditEvent,
+    CanonicalAuditSignalError,
     build_canonical_audit_signals,
 )
 
@@ -326,7 +327,7 @@ events = (
     CanonicalAuditEvent(
         trace_id="TRACE-M004-A",
         document_id="DOC-M004-A",
-        canonical_version_id="CANON-M004-A",
+        canonical_version_id="CVER-M004-A",
         phase="canonical_publication",
         status="PUBLISHED",
         page_count=3,
@@ -338,7 +339,7 @@ events = (
     CanonicalAuditEvent(
         trace_id="TRACE-M004-B",
         document_id="DOC-M004-B",
-        canonical_version_id="CANON-M004-B",
+        canonical_version_id="CVER-M004-B",
         phase="canonical_quality",
         status="REJECTED",
         page_count=2,
@@ -359,6 +360,33 @@ assert metrics[("autorites_textuelles_ambigu\u00ebs", (("scope", "m004"),))] == 
 serialized_logs = str([log.to_mapping() for log in signals.logs])
 for forbidden in ("PERFORMANCE_TABLE_FULL_TEXT", "Texte documentaire complet", "page_text"):
     assert forbidden not in serialized_logs, forbidden
+
+for overrides in (
+    {"trace_id": "TRACE-M004-TOKEN-SECRET"},
+    {"document_id": "DOC-M004-C-API-TOKEN"},
+    {"canonical_version_id": "CANON-M004-C"},
+    {"phase": "C:\\Users\\maxim\\internal"},
+    {"error_code": "C:\\Users\\maxim\\secret.txt"},
+):
+    candidate = {
+        "trace_id": "TRACE-M004-C",
+        "document_id": "DOC-M004-C",
+        "canonical_version_id": "CVER-M004-C",
+        "phase": "canonical_quality",
+        "status": "REJECTED",
+        "page_count": 1,
+        "pages_rejected_by_qa": 1,
+        "ambiguous_text_authorities": 0,
+        "artifact_hash": "sha256:" + "c" * 64,
+        "error_code": "SOURCE_NOT_CANONICAL",
+    }
+    candidate.update(overrides)
+    try:
+        CanonicalAuditEvent(**candidate)
+    except CanonicalAuditSignalError:
+        pass
+    else:
+        raise AssertionError(f"Audit M-004 dangereux accepté: {overrides!r}")
 
 print("audit m004 ok")
 '@

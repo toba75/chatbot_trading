@@ -5,6 +5,7 @@ $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
 $pythonExecutable = Get-RequiredPythonExecutable
 
 $pythonCode = @'
+import hashlib
 import sys
 
 sys.path.insert(0, sys.argv[1])
@@ -27,11 +28,14 @@ from app.source_processing.domain.page_conversion import (
     CanonicalQualityDecision,
     ConversionToolName,
     PageConversionArtifact,
+    PageConversionCandidate,
     PageConversionItem,
     PageConversionItemLabel,
     PageItemGeometry,
     PagewiseDoclingFusionService,
     QualityDecisionStatus,
+    TextAuthorityManifest,
+    TextAuthoritySelectionPolicy,
 )
 from app.source_processing.domain.source_document import (
     BibliographicMetadata,
@@ -97,6 +101,10 @@ def manifest_for(page_count):
     )
 
 
+def content_hash_for(text):
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
 def conversion_item(page_number, text):
     return PageConversionItem(
         label=PageConversionItemLabel.TEXT,
@@ -109,7 +117,7 @@ def conversion_item(page_number, text):
             page_width=1000,
             page_height=1000,
         ),
-        content_hash=str(page_number) * 64,
+        content_hash=content_hash_for(text),
     )
 
 
@@ -128,18 +136,45 @@ def page_artifact(page_number, text):
     )
 
 
-def docling_document(source_document, canonical_version_id, suffix):
-    return PagewiseDoclingFusionService().merge(
+def page_outputs(suffix):
+    return (
+        page_artifact(1, f"Texte canonique page 1 {suffix}."),
+        page_artifact(2, f"Texte canonique page 2 {suffix}."),
+    )
+
+
+def text_authority_manifest_for(outputs):
+    policy = TextAuthoritySelectionPolicy(policy_version="text-authority-publication-v1")
+    return TextAuthorityManifest.from_page_decisions(
+        page_manifest=manifest_for(2),
+        page_decisions=tuple(
+            policy.select(
+                page_number=output.page_number,
+                candidates=(
+                    PageConversionCandidate(
+                        candidate_id=f"AUTH-P{output.page_number.value:03d}",
+                        page_output=output,
+                    ),
+                ),
+                selected_candidate_ids=(f"AUTH-P{output.page_number.value:03d}",),
+                justification=f"Autorité unique page {output.page_number.value}.",
+            )
+            for output in outputs
+        ),
+    )
+
+
+def docling_fixture(source_document, canonical_version_id, suffix):
+    outputs = page_outputs(suffix)
+    text_authority_manifest = text_authority_manifest_for(outputs)
+    return PagewiseDoclingFusionService().merge_authorized(
         document_id=source_document.document_id,
         canonical_version_id=canonical_version_id,
         source_sha256=source_document.fingerprint,
         original_storage_ref=source_document.original_storage_ref,
         page_manifest=manifest_for(2),
-        page_outputs=(
-            page_artifact(1, f"Texte canonique page 1 {suffix}."),
-            page_artifact(2, f"Texte canonique page 2 {suffix}."),
-        ),
-    )
+        text_authority_manifest=text_authority_manifest,
+    ), text_authority_manifest
 
 
 def green_quality_decision():
@@ -184,7 +219,7 @@ source_document = registered_source()
 artifact_store = RecordingCanonicalArtifactStore()
 handler = PublishCanonicalSourceHandler(artifact_store=artifact_store)
 accepted_at_v1 = "2026-06-26T10:15:00Z"
-document_v1 = docling_document(source_document, "CVER-M004-T006-0001", "v1")
+document_v1, manifest_v1 = docling_fixture(source_document, "CVER-M004-T006-0001", "v1")
 
 # Given une source routée, convertie, adjugée et validée par QA.
 # When la publication canonique est demandée.
@@ -192,6 +227,7 @@ result_v1 = handler.handle(
     PublishCanonicalSourceCommand(
         source_document=source_document,
         docling_document=document_v1,
+        text_authority_manifest=manifest_v1,
         quality_decision=green_quality_decision(),
         accepted_at=accepted_at_v1,
         existing_canonical_source=None,
@@ -227,6 +263,7 @@ repeat_result = PublishCanonicalSourceHandler(artifact_store=repeat_store).handl
     PublishCanonicalSourceCommand(
         source_document=source_document,
         docling_document=document_v1,
+        text_authority_manifest=manifest_v1,
         quality_decision=green_quality_decision(),
         accepted_at=accepted_at_v1,
         existing_canonical_source=None,
@@ -240,11 +277,12 @@ assert_equal(
 
 # Given une version déjà publiée.
 # When une correction validée par QA est publiée.
-document_v2 = docling_document(source_document, "CVER-M004-T006-0002", "v2 corrigée")
+document_v2, manifest_v2 = docling_fixture(source_document, "CVER-M004-T006-0002", "v2 corrigée")
 result_v2 = handler.handle(
     PublishCanonicalSourceCommand(
         source_document=source_document,
         docling_document=document_v2,
+        text_authority_manifest=manifest_v2,
         quality_decision=green_quality_decision(),
         accepted_at="2026-06-26T11:00:00Z",
         existing_canonical_source=result_v1.canonical_source,
@@ -270,22 +308,41 @@ assert_raises(
         PublishCanonicalSourceCommand(
             source_document=source_document,
             docling_document=document_v1,
+            text_authority_manifest=manifest_v1,
             quality_decision=green_quality_decision(),
             accepted_at="2026-06-26T11:30:00Z",
             existing_canonical_source=result_v1.canonical_source,
         )
     ),
 )
+request_count_before_red = len(artifact_store.requests)
 assert_raises(
     "QA GREEN obligatoire",
     lambda: handler.handle(
         PublishCanonicalSourceCommand(
             source_document=source_document,
-            docling_document=docling_document(source_document, "CVER-M004-T006-0003", "red"),
+            docling_document=docling_fixture(source_document, "CVER-M004-T006-0003", "red")[0],
+            text_authority_manifest=docling_fixture(source_document, "CVER-M004-T006-0003", "red")[1],
             quality_decision=red_quality_decision(),
             accepted_at="2026-06-26T12:00:00Z",
             existing_canonical_source=result_v2.canonical_source,
         )
+    ),
+)
+assert_equal(
+    len(artifact_store.requests),
+    request_count_before_red,
+    "Une QA RED ne doit pas stocker de Docling JSON canonique.",
+)
+assert_raises(
+    "textuelle obligatoire",
+    lambda: PublishCanonicalSourceCommand(
+        source_document=source_document,
+        docling_document=document_v1,
+        text_authority_manifest=None,
+        quality_decision=green_quality_decision(),
+        accepted_at="2026-06-26T12:15:00Z",
+        existing_canonical_source=None,
     ),
 )
 assert_raises(
@@ -293,7 +350,8 @@ assert_raises(
     lambda: handler.handle(
         PublishCanonicalSourceCommand(
             source_document=source_document.quarantine("Quarantaine explicite avant publication canonique."),
-            docling_document=docling_document(source_document, "CVER-M004-T006-0004", "quarantaine"),
+            docling_document=docling_fixture(source_document, "CVER-M004-T006-0004", "quarantaine")[0],
+            text_authority_manifest=docling_fixture(source_document, "CVER-M004-T006-0004", "quarantaine")[1],
             quality_decision=green_quality_decision(),
             accepted_at="2026-06-26T12:30:00Z",
             existing_canonical_source=None,

@@ -5,6 +5,7 @@ $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
 $pythonExecutable = Get-RequiredPythonExecutable
 
 $pythonCode = @'
+import hashlib
 import sys
 
 sys.path.insert(0, sys.argv[1])
@@ -108,6 +109,10 @@ def manifest_for(page_count):
     )
 
 
+def content_hash_for(text):
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
 def diagnostic(page_number, page_state, *, has_table=False, has_formula=False):
     native_text_state = "RELIABLE"
     image_state = "NONE"
@@ -166,9 +171,10 @@ def route_plan_for(page_routes):
 
 
 def conversion_item(page_number, *, label=PageConversionItemLabel.TEXT, text=None, content_hash=None):
+    item_text = text or f"Texte QA page {page_number}."
     return PageConversionItem(
         label=label,
-        text=text or f"Texte QA page {page_number}.",
+        text=item_text,
         geometry=PageItemGeometry(
             left=10,
             top=20,
@@ -177,7 +183,7 @@ def conversion_item(page_number, *, label=PageConversionItemLabel.TEXT, text=Non
             page_width=100,
             page_height=100,
         ),
-        content_hash=content_hash or (str(page_number) * 64),
+        content_hash=content_hash_for(item_text) if content_hash is None else content_hash,
     )
 
 
@@ -396,6 +402,30 @@ blocking_findings = (
         actual="deux colonnes",
         detail="Tableau incomplet.",
     ),
+    PostConversionQualityFinding(
+        code=QualityFindingCode.PERCENTAGE_ALTERED,
+        page_number=PageNumber.from_value(4),
+        item_id=incomplete_docling_document.pages[3].items[0].item_id,
+        expected="12.5%",
+        actual="125%",
+        detail="Pourcentage altéré.",
+    ),
+    PostConversionQualityFinding(
+        code=QualityFindingCode.DECIMAL_SEPARATOR_ALTERED,
+        page_number=PageNumber.from_value(4),
+        item_id=incomplete_docling_document.pages[3].items[0].item_id,
+        expected="12,5",
+        actual="125",
+        detail="Séparateur décimal altéré.",
+    ),
+    PostConversionQualityFinding(
+        code=QualityFindingCode.FIGURE_PROVENANCE_MISSING,
+        page_number=PageNumber.from_value(4),
+        item_id=incomplete_docling_document.pages[3].items[0].item_id,
+        expected="SourceLocator figure",
+        actual="ABSENT",
+        detail="Provenance de figure absente.",
+    ),
 )
 red_post_report = acceptance_policy.evaluate_post_conversion(
     page_manifest=page_manifest,
@@ -424,7 +454,45 @@ assert_true(QualityFindingCode.PAGE_OMITTED in red_codes, "La page omise doit ê
 assert_true(QualityFindingCode.NUMERIC_INCONSISTENCY in red_codes, "L'incohérence numérique doit être conservée.")
 assert_true(QualityFindingCode.NEGATIVE_SIGN_ALTERED in red_codes, "Le signe altéré doit être conservé.")
 assert_true(QualityFindingCode.INCOMPLETE_TABLE in red_codes, "Le tableau incomplet doit être conservé.")
+assert_true(QualityFindingCode.PERCENTAGE_ALTERED in red_codes, "Le pourcentage altéré doit être conservé.")
+assert_true(QualityFindingCode.DECIMAL_SEPARATOR_ALTERED in red_codes, "Le séparateur décimal altéré doit être conservé.")
+assert_true(QualityFindingCode.FIGURE_PROVENANCE_MISSING in red_codes, "La provenance de figure absente doit être conservée.")
 assert_equal(red_decision.publication_events, (), "La QA RED ne doit pas produire d'événement de publication.")
+
+unexpected_page_report = acceptance_policy.evaluate_post_conversion(
+    page_manifest=manifest_for(4),
+    text_authority_manifest=authority_manifest_for(manifest_for(4), page_routes[:4]),
+    docling_document=docling_document,
+    findings=(),
+)
+assert_true(
+    QualityFindingCode.PAGE_UNEXPECTED in tuple(finding.code for finding in unexpected_page_report.findings),
+    "Une page hors manifeste doit être refusée.",
+)
+tampered_docling_document = PagewiseDoclingFusionService().merge(
+    document_id=source_document.document_id,
+    canonical_version_id="CVER-M004-T005",
+    source_sha256=source_document.fingerprint,
+    original_storage_ref=source_document.original_storage_ref,
+    page_manifest=page_manifest,
+    page_outputs=(
+        artifact(1, PageRouteName.NATIVE_STANDARD, text="Texte non autorisé."),
+        tuple(artifact(page_route.page_number.value, page_route.route_name) for page_route in page_routes[1:])[0],
+        tuple(artifact(page_route.page_number.value, page_route.route_name) for page_route in page_routes[1:])[1],
+        tuple(artifact(page_route.page_number.value, page_route.route_name) for page_route in page_routes[1:])[2],
+        tuple(artifact(page_route.page_number.value, page_route.route_name) for page_route in page_routes[1:])[3],
+    ),
+)
+authority_mismatch_report = acceptance_policy.evaluate_post_conversion(
+    page_manifest=page_manifest,
+    text_authority_manifest=authority_manifest,
+    docling_document=tampered_docling_document,
+    findings=(),
+)
+assert_true(
+    QualityFindingCode.SOURCE_LOCATOR_INCONSISTENT in tuple(finding.code for finding in authority_mismatch_report.findings),
+    "Un DoclingDocument divergent de l'autorité textuelle doit être refusé.",
+)
 
 warning_post_report = PostConversionQualityReport(
     policy_version="canonical-quality-unit-v1",

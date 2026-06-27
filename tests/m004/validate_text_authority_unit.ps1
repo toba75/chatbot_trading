@@ -5,6 +5,7 @@ $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
 $pythonExecutable = Get-RequiredPythonExecutable
 
 $pythonCode = @'
+import hashlib
 import sys
 
 sys.path.insert(0, sys.argv[1])
@@ -95,6 +96,10 @@ def manifest_for(page_count):
     )
 
 
+def content_hash_for(text):
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
 def item(text, content_hash):
     return PageConversionItem(
         label=PageConversionItemLabel.TEXT,
@@ -107,7 +112,7 @@ def item(text, content_hash):
             page_width=100,
             page_height=100,
         ),
-        content_hash=content_hash,
+        content_hash=content_hash_for(text),
     )
 
 

@@ -9,7 +9,34 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any
 
+from app.contracts.identity import DomainIdentifier
+
 _ALLOWED_STATUSES = frozenset({"PUBLISHED", "REJECTED", "QUARANTINED"})
+_ALLOWED_PHASES = frozenset(
+    {
+        "canonical_conversion",
+        "canonical_quality",
+        "canonical_publication",
+        "canonical_supersession",
+    }
+)
+_ALLOWED_ERROR_CODES = frozenset(
+    {
+        "DECIMAL_SEPARATOR_ALTERED",
+        "FIGURE_PROVENANCE_MISSING",
+        "INCOMPLETE_TABLE",
+        "NEGATIVE_SIGN_ALTERED",
+        "NUMERIC_INCONSISTENCY",
+        "PAGE_AUTHORITY_AMBIGUOUS",
+        "PAGE_AUTHORITY_MISSING",
+        "PAGE_OMITTED",
+        "PAGE_UNEXPECTED",
+        "PERCENTAGE_ALTERED",
+        "SOURCE_LOCATOR_INCONSISTENT",
+        "SOURCE_NOT_CANONICAL",
+        "SOURCE_QUARANTINED",
+    }
+)
 _AUDIT_LOG_FIELD_NAMES = frozenset(
     {
         "trace_id",
@@ -28,9 +55,18 @@ _FORBIDDEN_DOCUMENT_PAYLOAD_TOKENS = frozenset(
     {
         "document_text",
         "full_text",
+        "api_key",
+        "secret",
+        "token",
         "page_text",
         "texte documentaire complet",
         "performance_table_full_text",
+        "artifact:source_processing.original_sources",
+        "c:\\",
+        "\\",
+        "../",
+        "/users/",
+        "/home/",
     }
 )
 
@@ -60,14 +96,14 @@ class CanonicalAuditEvent:
     error_code: str | None
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "trace_id", _ensure_text(self.trace_id, "trace_id", "M004_AUDIT_TRACE_ID_REQUIRED"))
-        object.__setattr__(self, "document_id", _ensure_text(self.document_id, "document_id", "M004_AUDIT_DOCUMENT_ID_REQUIRED"))
+        object.__setattr__(self, "trace_id", _ensure_trace_id(self.trace_id))
+        object.__setattr__(self, "document_id", _ensure_document_id(self.document_id))
         object.__setattr__(
             self,
             "canonical_version_id",
-            _ensure_text(self.canonical_version_id, "canonical_version_id", "M004_AUDIT_VERSION_ID_REQUIRED"),
+            _ensure_canonical_version_id(self.canonical_version_id),
         )
-        object.__setattr__(self, "phase", _ensure_text(self.phase, "phase", "M004_AUDIT_PHASE_REQUIRED"))
+        object.__setattr__(self, "phase", _ensure_phase(self.phase))
         object.__setattr__(self, "status", _ensure_status(self.status))
         object.__setattr__(
             self,
@@ -96,7 +132,7 @@ class CanonicalAuditEvent:
         object.__setattr__(
             self,
             "error_code",
-            _ensure_optional_text(self.error_code, "error_code", "M004_AUDIT_ERROR_CODE_INVALID"),
+            _ensure_optional_error_code(self.error_code),
         )
         _ensure_status_counters_contract(
             status=self.status,
@@ -312,6 +348,52 @@ def _ensure_status(value: Any) -> str:
     return status
 
 
+def _ensure_trace_id(value: Any) -> str:
+    trace_id = _ensure_text(value, "trace_id", "M004_AUDIT_TRACE_ID_REQUIRED")
+    if re.fullmatch(r"TRACE-M004-[A-Z0-9][A-Z0-9-]*", trace_id) is None:
+        raise CanonicalAuditSignalError("M004_AUDIT_TRACE_ID_INVALID", "trace_id M-004 invalide.")
+    return trace_id
+
+
+def _ensure_document_id(value: Any) -> str:
+    document_id = _ensure_text(value, "document_id", "M004_AUDIT_DOCUMENT_ID_REQUIRED")
+    try:
+        return str(DomainIdentifier.parse_with_prefix(document_id, "DOC"))
+    except ValueError as exc:
+        raise CanonicalAuditSignalError("M004_AUDIT_DOCUMENT_ID_INVALID", f"document_id invalide: {exc}") from exc
+
+
+def _ensure_canonical_version_id(value: Any) -> str:
+    canonical_version_id = _ensure_text(
+        value,
+        "canonical_version_id",
+        "M004_AUDIT_VERSION_ID_REQUIRED",
+    )
+    try:
+        return str(DomainIdentifier.parse_with_prefix(canonical_version_id, "CVER"))
+    except ValueError as exc:
+        raise CanonicalAuditSignalError(
+            "M004_AUDIT_VERSION_ID_INVALID",
+            f"canonical_version_id invalide: {exc}",
+        ) from exc
+
+
+def _ensure_phase(value: Any) -> str:
+    phase = _ensure_text(value, "phase", "M004_AUDIT_PHASE_REQUIRED")
+    if phase not in _ALLOWED_PHASES:
+        raise CanonicalAuditSignalError("M004_AUDIT_PHASE_INVALID", "Phase d'audit M-004 invalide.")
+    return phase
+
+
+def _ensure_optional_error_code(value: Any) -> str | None:
+    if value is None:
+        return None
+    error_code = _ensure_text(value, "error_code", "M004_AUDIT_ERROR_CODE_INVALID")
+    if error_code not in _ALLOWED_ERROR_CODES:
+        raise CanonicalAuditSignalError("M004_AUDIT_ERROR_CODE_INVALID", "Code d'erreur M-004 invalide.")
+    return error_code
+
+
 def _ensure_text(value: Any, field_name: str, code: str) -> str:
     if not isinstance(value, str):
         raise CanonicalAuditSignalError(code, f"Champ textuel invalide: {field_name}")
@@ -371,7 +453,21 @@ def _freeze_observable_mapping(value: Mapping[str, Any]) -> Mapping[str, Any]:
                 "M004_AUDIT_FIELD_NAME_FORBIDDEN",
                 f"Champ d'audit M-004 interdit: {parsed_key}",
             )
-        if isinstance(nested_value, str):
+        if parsed_key == "trace_id":
+            frozen[parsed_key] = _ensure_trace_id(nested_value)
+        elif parsed_key == "document_id":
+            frozen[parsed_key] = _ensure_document_id(nested_value)
+        elif parsed_key == "canonical_version_id":
+            frozen[parsed_key] = _ensure_canonical_version_id(nested_value)
+        elif parsed_key == "phase":
+            frozen[parsed_key] = _ensure_phase(nested_value)
+        elif parsed_key == "status":
+            frozen[parsed_key] = _ensure_status(nested_value)
+        elif parsed_key == "artifact_hash":
+            frozen[parsed_key] = _ensure_artifact_hash(nested_value)
+        elif parsed_key == "error_code":
+            frozen[parsed_key] = _ensure_optional_error_code(nested_value)
+        elif isinstance(nested_value, str):
             frozen[parsed_key] = _ensure_text(nested_value, parsed_key, "M004_AUDIT_FIELD_VALUE_REQUIRED")
         elif isinstance(nested_value, bool):
             raise CanonicalAuditSignalError(

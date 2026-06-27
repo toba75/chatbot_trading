@@ -5,6 +5,7 @@ $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
 $pythonExecutable = Get-RequiredPythonExecutable
 
 $pythonCode = @'
+import hashlib
 import sys
 
 sys.path.insert(0, sys.argv[1])
@@ -29,11 +30,14 @@ from app.source_processing.domain.page_conversion import (
     CanonicalQualityDecision,
     ConversionToolName,
     PageConversionArtifact,
+    PageConversionCandidate,
     PageConversionItem,
     PageConversionItemLabel,
     PageItemGeometry,
     PagewiseDoclingFusionService,
     QualityDecisionStatus,
+    TextAuthorityManifest,
+    TextAuthoritySelectionPolicy,
 )
 from app.source_processing.domain.source_document import (
     BibliographicMetadata,
@@ -104,6 +108,10 @@ def manifest_for(page_count):
     )
 
 
+def content_hash_for(text):
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
 def conversion_item(page_number, text):
     return PageConversionItem(
         label=PageConversionItemLabel.TEXT,
@@ -116,7 +124,7 @@ def conversion_item(page_number, text):
             page_width=100,
             page_height=100,
         ),
-        content_hash=str(page_number) * 64,
+        content_hash=content_hash_for(text),
     )
 
 
@@ -135,18 +143,45 @@ def page_artifact(page_number, text):
     )
 
 
-def docling_document(source_document, canonical_version_id, suffix):
-    return PagewiseDoclingFusionService().merge(
+def page_outputs(suffix):
+    return (
+        page_artifact(1, f"Texte unitaire page 1 {suffix}."),
+        page_artifact(2, f"Texte unitaire page 2 {suffix}."),
+    )
+
+
+def text_authority_manifest_for(outputs):
+    policy = TextAuthoritySelectionPolicy(policy_version="text-authority-publication-unit-v1")
+    return TextAuthorityManifest.from_page_decisions(
+        page_manifest=manifest_for(2),
+        page_decisions=tuple(
+            policy.select(
+                page_number=output.page_number,
+                candidates=(
+                    PageConversionCandidate(
+                        candidate_id=f"AUTH-P{output.page_number.value:03d}",
+                        page_output=output,
+                    ),
+                ),
+                selected_candidate_ids=(f"AUTH-P{output.page_number.value:03d}",),
+                justification=f"Autorité unique page {output.page_number.value}.",
+            )
+            for output in outputs
+        ),
+    )
+
+
+def docling_fixture(source_document, canonical_version_id, suffix):
+    outputs = page_outputs(suffix)
+    text_authority_manifest = text_authority_manifest_for(outputs)
+    return PagewiseDoclingFusionService().merge_authorized(
         document_id=source_document.document_id,
         canonical_version_id=canonical_version_id,
         source_sha256=source_document.fingerprint,
         original_storage_ref=source_document.original_storage_ref,
         page_manifest=manifest_for(2),
-        page_outputs=(
-            page_artifact(1, f"Texte unitaire page 1 {suffix}."),
-            page_artifact(2, f"Texte unitaire page 2 {suffix}."),
-        ),
-    )
+        text_authority_manifest=text_authority_manifest,
+    ), text_authority_manifest
 
 
 def green_quality_decision():
@@ -198,10 +233,11 @@ export = RegenerableExport(
 )
 assert_false(export.is_canonical, "Un export HTML doit rester régénérable et non canonique.")
 
-document_v1 = docling_document(source_document, "CVER-M004-T006-UNIT-0001", "v1")
+document_v1, manifest_v1 = docling_fixture(source_document, "CVER-M004-T006-UNIT-0001", "v1")
 source_v1 = CanonicalSource.publish_initial(
     source_document=source_document,
     docling_document=document_v1,
+    text_authority_manifest=manifest_v1,
     quality_decision=green_quality_decision(),
     canonical_artifact=canonical_artifact,
     accepted_at="2026-06-26T10:15:00Z",
@@ -231,9 +267,10 @@ assert_equal(
     "L'export doit rester rattaché comme artefact dérivé.",
 )
 
-document_v2 = docling_document(source_document, "CVER-M004-T006-UNIT-0002", "v2 corrigée")
+document_v2, manifest_v2 = docling_fixture(source_document, "CVER-M004-T006-UNIT-0002", "v2 corrigée")
 source_v2 = source_v1.publish_correction(
     docling_document=document_v2,
+    text_authority_manifest=manifest_v2,
     quality_decision=green_quality_decision(),
     canonical_artifact=CanonicalArtifact(
         artifact_ref=f"artifact:source_processing.canonical_sources/{canonical_source_id}/CVER-M004-T006-UNIT-0002/docling.json",
@@ -253,6 +290,7 @@ assert_raises(
     "mutation en place interdite",
     lambda: source_v1.publish_correction(
         docling_document=document_v1,
+        text_authority_manifest=manifest_v1,
         quality_decision=green_quality_decision(),
         canonical_artifact=canonical_artifact,
         accepted_at="2026-06-26T11:30:00Z",
@@ -263,6 +301,7 @@ assert_raises(
     lambda: CanonicalSource.publish_initial(
         source_document=source_document,
         docling_document=document_v1,
+        text_authority_manifest=manifest_v1,
         quality_decision=CanonicalQualityDecision(
             policy_version="canonical-quality-unit-v1",
             status=QualityDecisionStatus.QUARANTINE,

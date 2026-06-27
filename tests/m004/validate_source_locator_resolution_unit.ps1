@@ -5,6 +5,7 @@ $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
 $pythonExecutable = Get-RequiredPythonExecutable
 
 $pythonCode = @'
+import hashlib
 import sys
 
 sys.path.insert(0, sys.argv[1])
@@ -30,11 +31,14 @@ from app.source_processing.domain.page_conversion import (
     CanonicalQualityDecision,
     ConversionToolName,
     PageConversionArtifact,
+    PageConversionCandidate,
     PageConversionItem,
     PageConversionItemLabel,
     PageItemGeometry,
     PagewiseDoclingFusionService,
     QualityDecisionStatus,
+    TextAuthorityManifest,
+    TextAuthoritySelectionPolicy,
 )
 from app.source_processing.domain.source_document import (
     BibliographicMetadata,
@@ -105,6 +109,10 @@ def manifest_for(page_count):
     )
 
 
+def content_hash_for(text):
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
 def conversion_item(page_number, item_index, text, hash_prefix):
     return PageConversionItem(
         label=PageConversionItemLabel.TEXT,
@@ -117,7 +125,7 @@ def conversion_item(page_number, item_index, text, hash_prefix):
             page_width=1000,
             page_height=1000,
         ),
-        content_hash=f"{hash_prefix}{item_index}" * 32,
+        content_hash=content_hash_for(text),
     )
 
 
@@ -139,18 +147,45 @@ def page_artifact(page_number, hash_prefix):
     )
 
 
-def docling_document(source_document, canonical_version_id, hash_prefix):
-    return PagewiseDoclingFusionService().merge(
+def page_outputs(hash_prefix):
+    return (
+        page_artifact(1, hash_prefix),
+        page_artifact(2, hash_prefix),
+    )
+
+
+def text_authority_manifest_for(outputs):
+    policy = TextAuthoritySelectionPolicy(policy_version="text-authority-source-locator-unit-v1")
+    return TextAuthorityManifest.from_page_decisions(
+        page_manifest=manifest_for(2),
+        page_decisions=tuple(
+            policy.select(
+                page_number=output.page_number,
+                candidates=(
+                    PageConversionCandidate(
+                        candidate_id=f"AUTH-P{output.page_number.value:03d}",
+                        page_output=output,
+                    ),
+                ),
+                selected_candidate_ids=(f"AUTH-P{output.page_number.value:03d}",),
+                justification=f"Autorité unique page {output.page_number.value}.",
+            )
+            for output in outputs
+        ),
+    )
+
+
+def docling_fixture(source_document, canonical_version_id, hash_prefix):
+    outputs = page_outputs(hash_prefix)
+    text_authority_manifest = text_authority_manifest_for(outputs)
+    return PagewiseDoclingFusionService().merge_authorized(
         document_id=source_document.document_id,
         canonical_version_id=canonical_version_id,
         source_sha256=source_document.fingerprint,
         original_storage_ref=source_document.original_storage_ref,
         page_manifest=manifest_for(2),
-        page_outputs=(
-            page_artifact(1, hash_prefix),
-            page_artifact(2, hash_prefix),
-        ),
-    )
+        text_authority_manifest=text_authority_manifest,
+    ), text_authority_manifest
 
 
 def green_quality_decision():
@@ -163,11 +198,12 @@ def green_quality_decision():
     )
 
 
-def published_source(source_document, document, artifact_hash):
+def published_source(source_document, document, text_authority_manifest, artifact_hash):
     canonical_source_id = canonical_source_id_for(source_document.document_id)
     return CanonicalSource.publish_initial(
         source_document=source_document,
         docling_document=document,
+        text_authority_manifest=text_authority_manifest,
         quality_decision=green_quality_decision(),
         canonical_artifact=CanonicalArtifact(
             artifact_ref=(
@@ -182,9 +218,9 @@ def published_source(source_document, document, artifact_hash):
 
 
 source_document = registered_source("stable")
-document_a = docling_document(source_document, "CVER-M004-T007-UNIT-0001", "a")
-document_b = docling_document(source_document, "CVER-M004-T007-UNIT-0001", "a")
-source = published_source(source_document, document_a, "b" * 64)
+document_a, manifest_a = docling_fixture(source_document, "CVER-M004-T007-UNIT-0001", "a")
+document_b, _ = docling_fixture(source_document, "CVER-M004-T007-UNIT-0001", "a")
+source = published_source(source_document, document_a, manifest_a, "b" * 64)
 
 registry = SourceLocatorResolutionRegistry.from_canonical_source(
     canonical_source=source,
@@ -237,7 +273,7 @@ assert_raises(
     ),
 )
 
-document_wrong_version = docling_document(source_document, "CVER-M004-T007-UNIT-9999", "c")
+document_wrong_version, _ = docling_fixture(source_document, "CVER-M004-T007-UNIT-9999", "c")
 assert_raises(
     "DoclingDocument hors version canonique",
     lambda: SourceLocatorResolutionRegistry.from_canonical_source(
@@ -272,6 +308,38 @@ retired_registry = SourceLocatorResolutionRegistry.from_canonical_source(
     canonical_source=source,
     docling_documents_by_version_id={document_a.canonical_version_id: document_a},
     version_statuses_by_version_id={document_a.canonical_version_id: "RETIRED"},
+)
+
+document_v2, manifest_v2 = docling_fixture(source_document, "CVER-M004-T007-UNIT-0002", "d")
+source_v2 = source.publish_correction(
+    docling_document=document_v2,
+    text_authority_manifest=manifest_v2,
+    quality_decision=green_quality_decision(),
+    canonical_artifact=CanonicalArtifact(
+        artifact_ref=(
+            "artifact:source_processing.canonical_sources/"
+            f"{source.canonical_source_id}/{document_v2.canonical_version_id}/docling.json"
+        ),
+        artifact_sha256="c" * 64,
+        artifact_kind=CanonicalArtifactKind.DOCLING_JSON,
+    ),
+    accepted_at="2026-06-27T10:00:00Z",
+)
+multi_version_registry = SourceLocatorResolutionRegistry.from_canonical_source(
+    canonical_source=source_v2,
+    docling_documents_by_version_id={
+        document_a.canonical_version_id: document_a,
+        document_v2.canonical_version_id: document_v2,
+    },
+    version_statuses_by_version_id={
+        document_a.canonical_version_id: "RETIRED",
+        document_v2.canonical_version_id: "ACCEPTED",
+    },
+)
+assert_equal(
+    tuple(multi_version_registry.indexes_by_version_id.keys()),
+    ("CVER-M004-T007-UNIT-0001", "CVER-M004-T007-UNIT-0002"),
+    "Le registre doit publier chaque version canonique explicitement.",
 )
 assert_raises(
     "Version canonique indisponible: RETIRED",

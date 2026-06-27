@@ -5,6 +5,7 @@ $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
 $pythonExecutable = Get-RequiredPythonExecutable
 
 $pythonCode = @'
+import hashlib
 import sys
 
 sys.path.insert(0, sys.argv[1])
@@ -183,16 +184,21 @@ def geometry(left=10, top=20, right=90, bottom=70, width=100, height=200):
     )
 
 
-def conversion_item(label=PageConversionItemLabel.TEXT, text="Texte contrôlé.", content_hash="1" * 64):
+def content_hash_for(text):
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def conversion_item(label=PageConversionItemLabel.TEXT, text="Texte contrôlé.", content_hash=None):
     return PageConversionItem(
         label=label,
         text=text,
         geometry=geometry(),
-        content_hash=content_hash,
+        content_hash=content_hash or content_hash_for(text),
     )
 
 
-def artifact(page_number, route_name, tool_name, content_hash="1" * 64):
+def artifact(page_number, route_name, tool_name, content_hash=None):
+    text = f"Contenu page {page_number}."
     return PageConversionArtifact(
         page_number=PageNumber.from_value(page_number),
         route_name=route_name,
@@ -203,8 +209,8 @@ def artifact(page_number, route_name, tool_name, content_hash="1" * 64):
         items=(
             conversion_item(
                 label=PageConversionItemLabel.TABLE if page_number == 2 else PageConversionItemLabel.TEXT,
-                text=f"Contenu page {page_number}.",
-                content_hash=content_hash,
+                text=text,
+                content_hash=content_hash or content_hash_for(text),
             ),
         ),
     )
@@ -234,6 +240,27 @@ assert_raises(
         text="Texte sans provenance.",
         geometry=geometry(),
         content_hash="",
+    ),
+)
+assert_raises(
+    "content_hash incoh",
+    lambda: PageConversionItem(
+        label=PageConversionItemLabel.TEXT,
+        text="Texte dont le hash est contrôlé.",
+        geometry=geometry(),
+        content_hash="1" * 64,
+    ),
+)
+assert_raises(
+    "artefact invalide",
+    lambda: PageConversionArtifact(
+        page_number=PageNumber.from_value(1),
+        route_name=PageRouteName.NATIVE_STANDARD,
+        tool_name=ConversionToolName.DOCLING_STANDARD,
+        tool_version="docling-standard-v1",
+        artifact_hash="a" * 64,
+        audit_artifact_ref="artifact:source_processing.page_conversion/RUN-M004-T003-UNIT/../page-001.json",
+        items=(conversion_item(),),
     ),
 )
 assert_raises(
@@ -287,8 +314,8 @@ assert_raises(
 # La fusion pagewise refuse les pages manquantes, le désordre et les routes incohérentes.
 source_document = registered_source()
 native_output = artifact(1, PageRouteName.NATIVE_STANDARD, ConversionToolName.DOCLING_STANDARD)
-granite_output = artifact(2, PageRouteName.SCAN_GRANITE, ConversionToolName.GRANITE_DOCLING, content_hash="2" * 64)
-preprocess_output = artifact(3, PageRouteName.PREPROCESS_GRANITE, ConversionToolName.GRANITE_DOCLING, content_hash="3" * 64)
+granite_output = artifact(2, PageRouteName.SCAN_GRANITE, ConversionToolName.GRANITE_DOCLING)
+preprocess_output = artifact(3, PageRouteName.PREPROCESS_GRANITE, ConversionToolName.GRANITE_DOCLING)
 
 docling_document = merge_outputs(source_document, (native_output, granite_output, preprocess_output))
 assert_equal(tuple(page.page_number.value for page in docling_document.pages), (1, 2, 3), "La fusion doit conserver l'ordre PDF.")
@@ -335,8 +362,8 @@ class StaticGraniteConverter:
     def convert_page(self, request):
         self.requests.append(request)
         if request.page_number.value == 2:
-            return artifact(2, PageRouteName.SCAN_GRANITE, ConversionToolName.GRANITE_DOCLING, content_hash="2" * 64)
-        return artifact(3, PageRouteName.PREPROCESS_GRANITE, ConversionToolName.GRANITE_DOCLING, content_hash="3" * 64)
+            return artifact(2, PageRouteName.SCAN_GRANITE, ConversionToolName.GRANITE_DOCLING)
+        return artifact(3, PageRouteName.PREPROCESS_GRANITE, ConversionToolName.GRANITE_DOCLING)
 
 
 class StaticOcrPreprocessor:

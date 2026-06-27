@@ -5,6 +5,7 @@ $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
 $pythonExecutable = Get-RequiredPythonExecutable
 
 $pythonCode = @'
+import hashlib
 import sys
 
 sys.path.insert(0, sys.argv[1])
@@ -22,7 +23,9 @@ from app.source_processing.application.publish_canonical_source_event import (
     PublishCanonicalSourceEventCommand,
     PublishCanonicalSourceEventHandler,
     build_canonical_source_published_event,
+    build_canonical_source_superseded_event,
     canonical_source_published_event_id_for,
+    canonical_source_superseded_event_id_for,
 )
 from app.source_processing.domain.document_processing_run import (
     PageManifest,
@@ -35,11 +38,14 @@ from app.source_processing.domain.page_conversion import (
     CanonicalQualityDecision,
     ConversionToolName,
     PageConversionArtifact,
+    PageConversionCandidate,
     PageConversionItem,
     PageConversionItemLabel,
     PageItemGeometry,
     PagewiseDoclingFusionService,
     QualityDecisionStatus,
+    TextAuthorityManifest,
+    TextAuthoritySelectionPolicy,
 )
 from app.source_processing.domain.source_document import (
     BibliographicMetadata,
@@ -126,6 +132,10 @@ def manifest_for(page_count):
     )
 
 
+def content_hash_for(text):
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
 def conversion_item(page_number, text):
     return PageConversionItem(
         label=PageConversionItemLabel.TEXT,
@@ -138,7 +148,7 @@ def conversion_item(page_number, text):
             page_width=100,
             page_height=100,
         ),
-        content_hash=str(page_number) * 64,
+        content_hash=content_hash_for(text),
     )
 
 
@@ -157,18 +167,45 @@ def page_artifact(page_number, text):
     )
 
 
-def docling_document(source_document, canonical_version_id, suffix):
-    return PagewiseDoclingFusionService().merge(
+def page_outputs(suffix):
+    return (
+        page_artifact(1, f"Texte unitaire événement page 1 {suffix}."),
+        page_artifact(2, f"Texte unitaire événement page 2 {suffix}."),
+    )
+
+
+def text_authority_manifest_for(outputs):
+    policy = TextAuthoritySelectionPolicy(policy_version="text-authority-event-unit-v1")
+    return TextAuthorityManifest.from_page_decisions(
+        page_manifest=manifest_for(2),
+        page_decisions=tuple(
+            policy.select(
+                page_number=output.page_number,
+                candidates=(
+                    PageConversionCandidate(
+                        candidate_id=f"AUTH-P{output.page_number.value:03d}",
+                        page_output=output,
+                    ),
+                ),
+                selected_candidate_ids=(f"AUTH-P{output.page_number.value:03d}",),
+                justification=f"Autorité unique page {output.page_number.value}.",
+            )
+            for output in outputs
+        ),
+    )
+
+
+def docling_fixture(source_document, canonical_version_id, suffix):
+    outputs = page_outputs(suffix)
+    text_authority_manifest = text_authority_manifest_for(outputs)
+    return PagewiseDoclingFusionService().merge_authorized(
         document_id=source_document.document_id,
         canonical_version_id=canonical_version_id,
         source_sha256=source_document.fingerprint,
         original_storage_ref=source_document.original_storage_ref,
         page_manifest=manifest_for(2),
-        page_outputs=(
-            page_artifact(1, f"Texte unitaire événement page 1 {suffix}."),
-            page_artifact(2, f"Texte unitaire événement page 2 {suffix}."),
-        ),
-    )
+        text_authority_manifest=text_authority_manifest,
+    ), text_authority_manifest
 
 
 def green_quality_decision():
@@ -189,6 +226,32 @@ class RecordingCanonicalArtifactStore:
         )
 
 
+class MinimalOutbox:
+    def __init__(self):
+        self.entries = {}
+        self.order = []
+
+    def has_event(self, event_id):
+        return event_id in self.entries
+
+    def entry_for(self, event_id):
+        return self.entries[event_id]
+
+    def append_in_transaction(self, state_mutation, event):
+        from app.platform.event_bus import OutboxEntry, OutboxMessageStatus
+
+        entry = OutboxEntry(
+            sequence=len(self.order) + 1,
+            state_mutation=state_mutation,
+            event=event,
+            status=OutboxMessageStatus.PENDING,
+            failure_reason=None,
+        )
+        self.entries[event.event_id] = entry
+        self.order.append(event.event_id)
+        return entry
+
+
 public_ref = canonical_ref()
 event = build_canonical_source_published_event(
     canonical_ref=public_ref,
@@ -200,6 +263,11 @@ event = build_canonical_source_published_event(
 assert_true(isinstance(event, EventEnvelope), "Le builder doit produire une EventEnvelope.")
 assert_equal(event.event_id, "EVT-CANONICAL-SOURCE-PUBLISHED-CVER-M004-T008-UNIT-0001", "event_id doit dériver de la version canonique.")
 assert_equal(canonical_source_published_event_id_for(public_ref.canonical_version_id), event.event_id, "event_id doit être stable.")
+assert_equal(
+    canonical_source_superseded_event_id_for(public_ref.canonical_version_id),
+    "EVT-CANONICAL-SOURCE-SUPERSEDED-CVER-M004-T008-UNIT-0001",
+    "event_id de supersession doit dériver de la nouvelle version.",
+)
 assert_equal(event.event_type, "CanonicalSourcePublished", "Le type d'événement doit être stable.")
 assert_equal(event.event_version, 1, "event_version doit être 1.")
 assert_equal(event.occurred_at, public_ref.accepted_at, "occurred_at doit venir du CanonicalSourceRef.")
@@ -248,13 +316,33 @@ assert_raises(
         causation_id="CMD-PUBLISH-CANONICAL-SOURCE-M004-T008-UNIT",
     ),
 )
+superseded_event = build_canonical_source_superseded_event(
+    canonical_ref=public_ref,
+    previous_canonical_version_id="CVER-M004-T008-UNIT-0000",
+    aggregate_version=3,
+    correlation_id="CORR-M004-T008-UNIT",
+    causation_id="CMD-PUBLISH-CANONICAL-SOURCE-M004-T008-UNIT",
+)
+assert_equal(superseded_event.event_type, "CanonicalSourceSuperseded", "Le type de supersession doit être stable.")
+assert_equal(
+    dict(superseded_event.payload),
+    {
+        "schema_version": "1.0",
+        "canonical_source_id": public_ref.canonical_source_id,
+        "previous_canonical_version_id": "CVER-M004-T008-UNIT-0000",
+        "new_canonical_version_id": public_ref.canonical_version_id,
+    },
+    "Le payload de supersession doit rester borné aux deux versions.",
+)
 
 source_document = registered_source()
 publication_handler = PublishCanonicalSourceHandler(artifact_store=RecordingCanonicalArtifactStore())
+document_v1, manifest_v1 = docling_fixture(source_document, "CVER-M004-T008-UNIT-0002", "v1")
 publication_result = publication_handler.handle(
     PublishCanonicalSourceCommand(
         source_document=source_document,
-        docling_document=docling_document(source_document, "CVER-M004-T008-UNIT-0002", "v1"),
+        docling_document=document_v1,
+        text_authority_manifest=manifest_v1,
         quality_decision=green_quality_decision(),
         accepted_at="2026-06-27T11:15:00Z",
         existing_canonical_source=None,
@@ -282,6 +370,43 @@ assert_false(second_result.created, "Le retry doit être idempotent.")
 assert_equal(second_result.outbox_entry, first_result.outbox_entry, "Le retry doit retourner l'entrée existante.")
 assert_equal(len(outbox.pending_events()), 1, "Le retry ne doit pas créer d'entrée outbox.")
 assert_equal(len(outbox.recorded_state_mutations()), 1, "Le retry ne doit pas créer de mutation productrice.")
+
+minimal_outbox = MinimalOutbox()
+minimal_result = handler.handle(
+    PublishCanonicalSourceEventCommand(
+        publication_result=publication_result,
+        outbox=minimal_outbox,
+        correlation_id="CORR-M004-T008-UNIT-PORT",
+        causation_id="CMD-PUBLISH-CANONICAL-SOURCE-M004-T008-UNIT-PORT",
+    )
+)
+assert_true(minimal_result.created, "Le handler doit accepter une outbox qui implémente le port minimal.")
+
+document_v2, manifest_v2 = docling_fixture(source_document, "CVER-M004-T008-UNIT-0003", "v2")
+publication_result_v2 = publication_handler.handle(
+    PublishCanonicalSourceCommand(
+        source_document=source_document,
+        docling_document=document_v2,
+        text_authority_manifest=manifest_v2,
+        quality_decision=green_quality_decision(),
+        accepted_at="2026-06-27T12:15:00Z",
+        existing_canonical_source=publication_result.canonical_source,
+    )
+)
+supersession_result = handler.handle(
+    PublishCanonicalSourceEventCommand(
+        publication_result=publication_result_v2,
+        outbox=outbox,
+        correlation_id="CORR-M004-T008-UNIT-0003",
+        causation_id="CMD-PUBLISH-CANONICAL-SOURCE-M004-T008-UNIT-0003",
+    )
+)
+assert_true(supersession_result.superseded_created, "Une correction doit inscrire CanonicalSourceSuperseded.")
+assert_equal(
+    supersession_result.superseded_event.event_type,
+    "CanonicalSourceSuperseded",
+    "La correction doit exposer l'événement de supersession.",
+)
 
 incoherent_outbox = InMemoryTransactionalOutbox.empty()
 conflicting_event = build_canonical_source_published_event(

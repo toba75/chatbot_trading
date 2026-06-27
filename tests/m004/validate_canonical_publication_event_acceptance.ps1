@@ -5,6 +5,7 @@ $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
 $pythonExecutable = Get-RequiredPythonExecutable
 
 $pythonCode = @'
+import hashlib
 import sys
 
 sys.path.insert(0, sys.argv[1])
@@ -33,11 +34,14 @@ from app.source_processing.domain.page_conversion import (
     CanonicalQualityDecision,
     ConversionToolName,
     PageConversionArtifact,
+    PageConversionCandidate,
     PageConversionItem,
     PageConversionItemLabel,
     PageItemGeometry,
     PagewiseDoclingFusionService,
     QualityDecisionStatus,
+    TextAuthorityManifest,
+    TextAuthoritySelectionPolicy,
 )
 from app.source_processing.domain.source_document import (
     BibliographicMetadata,
@@ -143,6 +147,10 @@ def manifest_for(page_count):
     )
 
 
+def content_hash_for(text):
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
 def conversion_item(page_number, text):
     return PageConversionItem(
         label=PageConversionItemLabel.TEXT,
@@ -155,7 +163,7 @@ def conversion_item(page_number, text):
             page_width=1000,
             page_height=1000,
         ),
-        content_hash=str(page_number) * 64,
+        content_hash=content_hash_for(text),
     )
 
 
@@ -174,18 +182,45 @@ def page_artifact(page_number, text):
     )
 
 
-def docling_document(source_document, canonical_version_id, suffix):
-    return PagewiseDoclingFusionService().merge(
+def page_outputs(suffix):
+    return (
+        page_artifact(1, f"Texte canonique page 1 {suffix}."),
+        page_artifact(2, f"Texte canonique page 2 {suffix}."),
+    )
+
+
+def text_authority_manifest_for(outputs):
+    policy = TextAuthoritySelectionPolicy(policy_version="text-authority-event-v1")
+    return TextAuthorityManifest.from_page_decisions(
+        page_manifest=manifest_for(2),
+        page_decisions=tuple(
+            policy.select(
+                page_number=output.page_number,
+                candidates=(
+                    PageConversionCandidate(
+                        candidate_id=f"AUTH-P{output.page_number.value:03d}",
+                        page_output=output,
+                    ),
+                ),
+                selected_candidate_ids=(f"AUTH-P{output.page_number.value:03d}",),
+                justification=f"Autorité unique page {output.page_number.value}.",
+            )
+            for output in outputs
+        ),
+    )
+
+
+def docling_fixture(source_document, canonical_version_id, suffix):
+    outputs = page_outputs(suffix)
+    text_authority_manifest = text_authority_manifest_for(outputs)
+    return PagewiseDoclingFusionService().merge_authorized(
         document_id=source_document.document_id,
         canonical_version_id=canonical_version_id,
         source_sha256=source_document.fingerprint,
         original_storage_ref=source_document.original_storage_ref,
         page_manifest=manifest_for(2),
-        page_outputs=(
-            page_artifact(1, f"Texte canonique page 1 {suffix}."),
-            page_artifact(2, f"Texte canonique page 2 {suffix}."),
-        ),
-    )
+        text_authority_manifest=text_authority_manifest,
+    ), text_authority_manifest
 
 
 def green_quality_decision():
@@ -227,10 +262,12 @@ event_handler = PublishCanonicalSourceEventHandler()
 outbox = InMemoryTransactionalOutbox.empty()
 
 # Given une version canonique vient d'être publiée par SP.
+document_v1, manifest_v1 = docling_fixture(source_document, "CVER-M004-T008-0001", "v1")
 publication_v1 = publication_handler.handle(
     PublishCanonicalSourceCommand(
         source_document=source_document,
-        docling_document=docling_document(source_document, "CVER-M004-T008-0001", "v1"),
+        docling_document=document_v1,
+        text_authority_manifest=manifest_v1,
         quality_decision=green_quality_decision(),
         accepted_at="2026-06-27T09:15:00Z",
         existing_canonical_source=None,
@@ -293,10 +330,12 @@ assert_equal(len(outbox.recorded_state_mutations()), 1, "Le retry ne doit pas aj
 # Given une correction crée une nouvelle version canonique.
 # When l'événement est publié pour cette nouvelle version.
 # Then un second événement distinct est inscrit sans muter le premier.
+document_v2, manifest_v2 = docling_fixture(source_document, "CVER-M004-T008-0002", "v2 corrigée")
 publication_v2 = publication_handler.handle(
     PublishCanonicalSourceCommand(
         source_document=source_document,
-        docling_document=docling_document(source_document, "CVER-M004-T008-0002", "v2 corrigée"),
+        docling_document=document_v2,
+        text_authority_manifest=manifest_v2,
         quality_decision=green_quality_decision(),
         accepted_at="2026-06-27T10:00:00Z",
         existing_canonical_source=publication_v1.canonical_source,
@@ -311,11 +350,28 @@ event_result_v2 = event_handler.handle(
     )
 )
 assert_true(event_result_v2.created, "Une correction publiée doit produire un nouvel événement.")
+assert_true(event_result_v2.superseded_created, "Une correction publiée doit produire l'événement de supersession.")
+assert_equal(
+    event_result_v2.superseded_event.event_type,
+    "CanonicalSourceSuperseded",
+    "La correction doit publier CanonicalSourceSuperseded avant CanonicalSourcePublished.",
+)
+assert_equal(
+    dict(event_result_v2.superseded_event.payload),
+    {
+        "schema_version": "1.0",
+        "canonical_source_id": publication_v1.canonical_ref.canonical_source_id,
+        "previous_canonical_version_id": "CVER-M004-T008-0001",
+        "new_canonical_version_id": "CVER-M004-T008-0002",
+    },
+    "La supersession doit relier l'ancienne et la nouvelle version sans texte ni stockage interne.",
+)
 assert_equal(event_result_v2.event.aggregate_version, 2, "La correction doit porter aggregate_version 2.")
 assert_equal(
     tuple(entry.event.event_id for entry in outbox.pending_events()),
     (
         "EVT-CANONICAL-SOURCE-PUBLISHED-CVER-M004-T008-0001",
+        "EVT-CANONICAL-SOURCE-SUPERSEDED-CVER-M004-T008-0002",
         "EVT-CANONICAL-SOURCE-PUBLISHED-CVER-M004-T008-0002",
     ),
     "Les événements outbox doivent rester ordonnés par version d'agrégat.",
@@ -340,14 +396,15 @@ assert_raises(
     lambda: publication_handler.handle(
         PublishCanonicalSourceCommand(
             source_document=source_document,
-            docling_document=docling_document(source_document, "CVER-M004-T008-0003", "qa red"),
+            docling_document=docling_fixture(source_document, "CVER-M004-T008-0003", "qa red")[0],
+            text_authority_manifest=docling_fixture(source_document, "CVER-M004-T008-0003", "qa red")[1],
             quality_decision=red_quality_decision(),
             accepted_at="2026-06-27T10:30:00Z",
             existing_canonical_source=publication_v2.canonical_source,
         )
     ),
 )
-assert_equal(len(outbox.pending_events()), 2, "Une QA RED ne doit produire aucun événement outbox.")
+assert_equal(len(outbox.pending_events()), 3, "Une QA RED ne doit produire aucun événement outbox.")
 
 # Given un modèle interne SP est fourni comme payload.
 # When l'événement CanonicalSourcePublished est construit.

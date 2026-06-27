@@ -5,6 +5,7 @@ $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
 $pythonExecutable = Get-RequiredPythonExecutable
 
 $pythonCode = @'
+import hashlib
 import sys
 
 sys.path.insert(0, sys.argv[1])
@@ -106,6 +107,10 @@ def manifest_for(page_count):
     )
 
 
+def content_hash_for(text):
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
 def signals_for(page_state, *, has_table=False, has_formula=False):
     native_text_state = "RELIABLE"
     image_state = "NONE"
@@ -163,9 +168,10 @@ def route(
 
 
 def conversion_item(page_number, label=PageConversionItemLabel.TEXT, text=None, content_hash=None):
+    item_text = text or f"Contenu contrôlé page {page_number}."
     return PageConversionItem(
         label=label,
-        text=text or f"Contenu contrôlé page {page_number}.",
+        text=item_text,
         geometry=PageItemGeometry(
             left=100,
             top=100,
@@ -174,7 +180,7 @@ def conversion_item(page_number, label=PageConversionItemLabel.TEXT, text=None, 
             page_width=1000,
             page_height=1000,
         ),
-        content_hash=content_hash or (str(page_number) * 64),
+        content_hash=content_hash_for(item_text) if content_hash is None else content_hash,
     )
 
 
@@ -332,6 +338,30 @@ post_report = acceptance_policy.evaluate_post_conversion(
             actual="colonne rendement seule",
             detail="Structure tabulaire incomplète.",
         ),
+        PostConversionQualityFinding(
+            code=QualityFindingCode.PERCENTAGE_ALTERED,
+            page_number=PageNumber.from_value(5),
+            item_id=incomplete_docling_document.pages[4].items[0].item_id,
+            expected="8.0%",
+            actual="80%",
+            detail="Pourcentage altéré.",
+        ),
+        PostConversionQualityFinding(
+            code=QualityFindingCode.DECIMAL_SEPARATOR_ALTERED,
+            page_number=PageNumber.from_value(4),
+            item_id=incomplete_docling_document.pages[3].items[0].item_id,
+            expected="-12,5",
+            actual="-125",
+            detail="Séparateur décimal altéré.",
+        ),
+        PostConversionQualityFinding(
+            code=QualityFindingCode.FIGURE_PROVENANCE_MISSING,
+            page_number=PageNumber.from_value(6),
+            item_id="PAGE-006-FIGURE",
+            expected="SourceLocator figure",
+            actual="ABSENT",
+            detail="Figure critique sans provenance.",
+        ),
     ),
 )
 
@@ -351,6 +381,9 @@ assert_true(QualityFindingCode.PAGE_OMITTED in finding_codes, "La page omise doi
 assert_true(QualityFindingCode.NUMERIC_INCONSISTENCY in finding_codes, "L'incohérence numérique doit être conservée.")
 assert_true(QualityFindingCode.NEGATIVE_SIGN_ALTERED in finding_codes, "Le signe altéré doit être conservé.")
 assert_true(QualityFindingCode.INCOMPLETE_TABLE in finding_codes, "Le tableau incomplet doit être conservé.")
+assert_true(QualityFindingCode.PERCENTAGE_ALTERED in finding_codes, "Le pourcentage altéré doit être conservé.")
+assert_true(QualityFindingCode.DECIMAL_SEPARATOR_ALTERED in finding_codes, "Le séparateur décimal altéré doit être conservé.")
+assert_true(QualityFindingCode.FIGURE_PROVENANCE_MISSING in finding_codes, "La figure sans provenance doit être conservée.")
 assert_true(
     "PERFORMANCE_TABLE_FULL_TEXT" not in str(decision.to_audit_payload()),
     "Le payload d'audit ne doit pas journaliser le contenu documentaire complet.",

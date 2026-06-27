@@ -102,7 +102,7 @@ La QA post-conversion contr$([char] 0x00F4)le le nombre de pages, le JSON valide
 | PageTextAuthoritySelected | Une page retient une autorit$($eAcute) textuelle. | document_id; page_pdf; authority; policy_version |
 | DocumentConversionCompleted | Le DoclingDocument unique est produit. | document_id; canonical_version_id; artifact_hash |
 | CanonicalSourceAccepted | La QA accepte la version canonique. | document_id; canonical_version_id; quality_decision |
-| CanonicalSourcePublished | La version est publi$($eAcute)e vers KA et EG. | CanonicalSourceRef; SourceLocator; artifact_hash |
+| CanonicalSourcePublished | La version est publi$($eAcute)e vers KA et EG. | `CanonicalSourceRef` contractuel; `canonical_artifact_sha256` inclus; `SourceLocator` r$($eAcute)solu via le registre T-007 |
 | CanonicalSourceSuperseded | Une correction publie une nouvelle version. | previous_canonical_version_id; new_canonical_version_id |
 
 ## Comportements v$($eAcute)rifiables M-004

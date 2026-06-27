@@ -5,6 +5,7 @@ $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
 $pythonExecutable = Get-RequiredPythonExecutable
 
 $pythonCode = @'
+import hashlib
 import sys
 
 sys.path.insert(0, sys.argv[1])
@@ -30,11 +31,14 @@ from app.source_processing.domain.page_conversion import (
     CanonicalQualityDecision,
     ConversionToolName,
     PageConversionArtifact,
+    PageConversionCandidate,
     PageConversionItem,
     PageConversionItemLabel,
     PageItemGeometry,
     PagewiseDoclingFusionService,
     QualityDecisionStatus,
+    TextAuthorityManifest,
+    TextAuthoritySelectionPolicy,
 )
 from app.source_processing.domain.source_document import (
     BibliographicMetadata,
@@ -100,6 +104,10 @@ def manifest_for(page_count):
     )
 
 
+def content_hash_for(text):
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
 def conversion_item(page_number, item_index, text):
     return PageConversionItem(
         label=PageConversionItemLabel.TEXT,
@@ -112,7 +120,7 @@ def conversion_item(page_number, item_index, text):
             page_width=1000,
             page_height=1000,
         ),
-        content_hash=f"{page_number}{item_index}" * 32,
+        content_hash=content_hash_for(text),
     )
 
 
@@ -134,18 +142,45 @@ def page_artifact(page_number, texts):
     )
 
 
-def docling_document(source_document):
-    return PagewiseDoclingFusionService().merge(
+def page_outputs(text_suffix=""):
+    return (
+        page_artifact(1, (f"Capital initial 100000{text_suffix}.", f"Risque 2%{text_suffix}.")),
+        page_artifact(2, (f"Stop initial 95{text_suffix}.", f"Objectif 110{text_suffix}.")),
+    )
+
+
+def text_authority_manifest_for(outputs):
+    policy = TextAuthoritySelectionPolicy(policy_version="text-authority-source-locator-v1")
+    return TextAuthorityManifest.from_page_decisions(
+        page_manifest=manifest_for(2),
+        page_decisions=tuple(
+            policy.select(
+                page_number=output.page_number,
+                candidates=(
+                    PageConversionCandidate(
+                        candidate_id=f"AUTH-P{output.page_number.value:03d}",
+                        page_output=output,
+                    ),
+                ),
+                selected_candidate_ids=(f"AUTH-P{output.page_number.value:03d}",),
+                justification=f"Autorité unique page {output.page_number.value}.",
+            )
+            for output in outputs
+        ),
+    )
+
+
+def docling_fixture(source_document, canonical_version_id="CVER-M004-T007-0001", text_suffix=""):
+    outputs = page_outputs(text_suffix)
+    text_authority_manifest = text_authority_manifest_for(outputs)
+    return PagewiseDoclingFusionService().merge_authorized(
         document_id=source_document.document_id,
-        canonical_version_id="CVER-M004-T007-0001",
+        canonical_version_id=canonical_version_id,
         source_sha256=source_document.fingerprint,
         original_storage_ref=source_document.original_storage_ref,
         page_manifest=manifest_for(2),
-        page_outputs=(
-            page_artifact(1, ("Capital initial 100000.", "Risque 2%.")),
-            page_artifact(2, ("Stop initial 95.", "Objectif 110.")),
-        ),
-    )
+        text_authority_manifest=text_authority_manifest,
+    ), text_authority_manifest
 
 
 def green_quality_decision():
@@ -158,11 +193,12 @@ def green_quality_decision():
     )
 
 
-def published_source(source_document, document):
+def published_source(source_document, document, text_authority_manifest):
     canonical_source_id = canonical_source_id_for(source_document.document_id)
     return CanonicalSource.publish_initial(
         source_document=source_document,
         docling_document=document,
+        text_authority_manifest=text_authority_manifest,
         quality_decision=green_quality_decision(),
         canonical_artifact=CanonicalArtifact(
             artifact_ref=(
@@ -178,8 +214,8 @@ def published_source(source_document, document):
 
 # Given une version canonique publiée contenant une page avec plusieurs items.
 source_document = registered_source()
-document = docling_document(source_document)
-canonical_source = published_source(source_document, document)
+document, text_authority_manifest = docling_fixture(source_document)
+canonical_source = published_source(source_document, document, text_authority_manifest)
 registry = SourceLocatorResolutionRegistry.from_canonical_source(
     canonical_source=canonical_source,
     docling_documents_by_version_id={
@@ -250,6 +286,42 @@ quarantined_registry = SourceLocatorResolutionRegistry.from_canonical_source(
     version_statuses_by_version_id={
         "CVER-M004-T007-0001": "QUARANTINED",
     },
+)
+
+document_v2, manifest_v2 = docling_fixture(
+    source_document,
+    canonical_version_id="CVER-M004-T007-0002",
+    text_suffix=" corrigé",
+)
+canonical_source_v2 = canonical_source.publish_correction(
+    docling_document=document_v2,
+    text_authority_manifest=manifest_v2,
+    quality_decision=green_quality_decision(),
+    canonical_artifact=CanonicalArtifact(
+        artifact_ref=(
+            "artifact:source_processing.canonical_sources/"
+            f"{canonical_source.canonical_source_id}/CVER-M004-T007-0002/docling.json"
+        ),
+        artifact_sha256="b" * 64,
+        artifact_kind=CanonicalArtifactKind.DOCLING_JSON,
+    ),
+    accepted_at="2026-06-27T09:30:00Z",
+)
+multi_version_registry = SourceLocatorResolutionRegistry.from_canonical_source(
+    canonical_source=canonical_source_v2,
+    docling_documents_by_version_id={
+        "CVER-M004-T007-0001": document,
+        "CVER-M004-T007-0002": document_v2,
+    },
+    version_statuses_by_version_id={
+        "CVER-M004-T007-0001": "RETIRED",
+        "CVER-M004-T007-0002": "ACCEPTED",
+    },
+)
+assert_equal(
+    tuple(multi_version_registry.to_public_payload()["versions"][index]["canonical_version_id"] for index in (0, 1)),
+    ("CVER-M004-T007-0001", "CVER-M004-T007-0002"),
+    "Le payload public doit conserver chaque version canonique du registre.",
 )
 assert_raises(
     "Version canonique indisponible: QUARANTINED",

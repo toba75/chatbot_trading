@@ -350,6 +350,7 @@ processing_repository.conversions_by_document_id[already_requested_source.docume
     document_id=already_requested_source.document_id,
     conversion_status=DocumentConversionStatus.CONVERSION_REQUESTED,
     canonical_version_id=None,
+    rejection_error_code=None,
 )
 already_requested = post_convert(adapter, already_requested_source.document_id.value)
 assert_equal(already_requested.status_code, 409, "Une conversion deja demandee doit retourner 409.")
@@ -366,10 +367,15 @@ processing_repository.conversions_by_document_id[qa_rejected_source.document_id.
     document_id=qa_rejected_source.document_id,
     conversion_status=DocumentConversionStatus.QA_REJECTED,
     canonical_version_id=None,
+    rejection_error_code="PAGE_AUTHORITY_MISSING",
 )
 qa_rejected = post_convert(adapter, qa_rejected_source.document_id.value)
 assert_equal(qa_rejected.status_code, 422, "Une QA refusee doit retourner 422.")
-assert_equal(qa_rejected.body["error_code"], "SOURCE_NOT_CANONICAL", "Le code QA refusee doit etre stable.")
+assert_equal(
+    qa_rejected.body,
+    {"error_code": "PAGE_AUTHORITY_MISSING", "document_id": qa_rejected_source.document_id.value},
+    "Le code d'autorite manquante doit etre atteignable sans raison interne.",
+)
 
 # Given le client tente d'imposer une route ou une autorite depuis HTTP.
 # When l'endpoint de conversion recoit un corps non vide.
@@ -381,6 +387,11 @@ invalid_body = post_convert(
 )
 assert_equal(invalid_body.status_code, 400, "Le transport ne doit pas accepter de decision de route.")
 assert_equal(invalid_body.body, {"error_code": "HTTP_REQUEST_INVALID", "field": "body"}, "Le corps de conversion doit etre vide.")
+assert_equal(
+    len(processing_repository.submitted_conversion_requests),
+    1,
+    "Le body invalide ne doit pas persister de demande de conversion.",
+)
 
 # Given un diagnostic est demande depuis l'endpoint M-003.
 # When POST /diagnose est appele.

@@ -202,7 +202,6 @@ class SourceProcessingHttpAdapter:
                 body={
                     "error_code": "SOURCE_QUARANTINED",
                     "document_id": exc.document_id,
-                    "reason": exc.reason,
                 },
             )
         except SourceNotRoutedError as exc:
@@ -228,7 +227,6 @@ class SourceProcessingHttpAdapter:
                 body={
                     "error_code": exc.error_code,
                     "document_id": exc.document_id,
-                    "reason": exc.reason,
                 },
             )
 

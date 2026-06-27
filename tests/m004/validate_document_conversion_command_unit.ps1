@@ -293,6 +293,7 @@ accepted_state = DocumentConversionState(
     document_id=DocumentId.from_value("DOC-1111111111111111"),
     conversion_status=DocumentConversionStatus.CANONICAL_ACCEPTED,
     canonical_version_id="CVER-M004-T009-0001",
+    rejection_error_code=None,
 )
 accepted_payload = DocumentConversionAcceptance(
     document_id=accepted_state.document_id,
@@ -320,6 +321,17 @@ assert_raises(
         document_id=DocumentId.from_value("DOC-1111111111111111"),
         conversion_status=DocumentConversionStatus.CANONICAL_ACCEPTED,
         canonical_version_id=None,
+        rejection_error_code=None,
+    ),
+)
+assert_raises(
+    ValueError,
+    "rejection_error_code obligatoire",
+    lambda: DocumentConversionState(
+        document_id=DocumentId.from_value("DOC-1111111111111111"),
+        conversion_status=DocumentConversionStatus.QA_REJECTED,
+        canonical_version_id=None,
+        rejection_error_code=None,
     ),
 )
 
@@ -394,6 +406,7 @@ processing_repository.conversions_by_document_id[qa_rejected_document.document_i
     document_id=qa_rejected_document.document_id,
     conversion_status=DocumentConversionStatus.QA_REJECTED,
     canonical_version_id=None,
+    rejection_error_code="SOURCE_NOT_CANONICAL",
 )
 qa_error = assert_raises(
     CanonicalQualityRejectedError,
@@ -459,6 +472,7 @@ not_routed_response = adapter.handle(
 assert_equal(not_routed_response.status_code, 409, "Le mapping SOURCE_NOT_ROUTED doit retourner 409.")
 assert_equal(not_routed_response.body["error_code"], "SOURCE_NOT_ROUTED", "Le code route absente doit etre stable.")
 
+conversion_call_count_before_invalid_body = len(scripted_commands.conversion_calls)
 invalid_body = adapter.handle(
     HttpRequest(
         method="POST",
@@ -467,7 +481,29 @@ invalid_body = adapter.handle(
     )
 )
 assert_equal(invalid_body.status_code, 400, "Le body de conversion doit etre refuse.")
-assert_equal(scripted_commands.conversion_calls[-1], "DOC-2222222222222222", "Le body invalide ne doit pas declencher une nouvelle commande.")
+assert_equal(
+    len(scripted_commands.conversion_calls),
+    conversion_call_count_before_invalid_body,
+    "Le body invalide ne doit pas declencher une nouvelle commande.",
+)
+
+scripted_commands.conversion_error = CanonicalQualityRejectedError(
+    document_id="DOC-3333333333333333",
+    error_code="PAGE_AUTHORITY_MISSING",
+)
+authority_missing_response = adapter.handle(
+    HttpRequest(
+        method="POST",
+        path="/v1/documents/DOC-3333333333333333/convert",
+        body={},
+    )
+)
+assert_equal(authority_missing_response.status_code, 422, "PAGE_AUTHORITY_MISSING doit retourner 422.")
+assert_equal(
+    authority_missing_response.body,
+    {"error_code": "PAGE_AUTHORITY_MISSING", "document_id": "DOC-3333333333333333"},
+    "Le transport doit exposer seulement le code public et le document_id.",
+)
 
 # Le domaine SP ne depend d'aucun framework HTTP.
 framework_roots = {"fastapi", "starlette", "flask", "django"}

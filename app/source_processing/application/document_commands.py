@@ -143,12 +143,10 @@ class ConversionAlreadyRequestedError(DocumentCommandError):
 class CanonicalQualityRejectedError(DocumentCommandError):
     """Erreur produite quand une QA canonique refuse la publication."""
 
-    error_code = "SOURCE_NOT_CANONICAL"
-
-    def __init__(self, document_id: str, reason: str) -> None:
+    def __init__(self, document_id: str, error_code: str) -> None:
         self.document_id = _ensure_text(document_id, "document_id")
-        self.reason = _ensure_text(reason, "reason")
-        super().__init__(f"version canonique refusée: {self.document_id}; {self.reason}")
+        self.error_code = _ensure_quality_rejection_error_code(error_code)
+        super().__init__(f"version canonique refusée: {self.document_id}; {self.error_code}")
 
 
 class DocumentConversionStatus(str, Enum):
@@ -180,6 +178,7 @@ class DocumentConversionState:
     document_id: DocumentId
     conversion_status: DocumentConversionStatus
     canonical_version_id: str | None
+    rejection_error_code: str | None
 
     def __post_init__(self) -> None:
         _ensure_document_id(self.document_id)
@@ -194,6 +193,14 @@ class DocumentConversionState:
             _ensure_canonical_version_for_status(
                 status=self.conversion_status,
                 canonical_version_id=self.canonical_version_id,
+            ),
+        )
+        object.__setattr__(
+            self,
+            "rejection_error_code",
+            _ensure_rejection_error_code_for_status(
+                status=self.conversion_status,
+                rejection_error_code=self.rejection_error_code,
             ),
         )
 
@@ -463,7 +470,7 @@ class DocumentCommandService:
             if parsed_existing_conversion.conversion_status is DocumentConversionStatus.QA_REJECTED:
                 raise CanonicalQualityRejectedError(
                     document_id=parsed_document_id.value,
-                    reason="QA_REJECTED",
+                    error_code=parsed_existing_conversion.rejection_error_code,
                 )
             if parsed_existing_conversion.conversion_status is DocumentConversionStatus.CANONICAL_ACCEPTED:
                 return DocumentConversionAcceptance.from_state(parsed_existing_conversion)
@@ -480,6 +487,7 @@ class DocumentCommandService:
             document_id=parsed_document_id,
             conversion_status=DocumentConversionStatus.CONVERSION_REQUESTED,
             canonical_version_id=None,
+            rejection_error_code=None,
         )
         job_request = JobRequest(
             job_name="CONVERT_DOCUMENT",
@@ -565,6 +573,27 @@ def _ensure_canonical_version_for_status(
     if canonical_version_id is not None:
         raise ValueError("canonical_version_id interdit")
     return None
+
+
+def _ensure_rejection_error_code_for_status(
+    *,
+    status: DocumentConversionStatus,
+    rejection_error_code: str | None,
+) -> str | None:
+    if status is DocumentConversionStatus.QA_REJECTED:
+        if rejection_error_code is None:
+            raise ValueError("rejection_error_code obligatoire")
+        return _ensure_quality_rejection_error_code(rejection_error_code)
+    if rejection_error_code is not None:
+        raise ValueError("rejection_error_code interdit")
+    return None
+
+
+def _ensure_quality_rejection_error_code(value: Any) -> str:
+    text = _ensure_text(value, "rejection_error_code")
+    if text not in {"SOURCE_NOT_CANONICAL", "PAGE_AUTHORITY_MISSING"}:
+        raise ValueError("rejection_error_code invalide")
+    return text
 
 
 def _ensure_canonical_version_id(value: Any) -> str:

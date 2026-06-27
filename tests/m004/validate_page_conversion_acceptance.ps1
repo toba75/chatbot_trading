@@ -5,6 +5,7 @@ $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
 $pythonExecutable = Get-RequiredPythonExecutable
 
 $pythonCode = @'
+import hashlib
 import sys
 
 sys.path.insert(0, sys.argv[1])
@@ -178,7 +179,11 @@ def diagnosed_run(source_document):
     return started_run.record_page_diagnostics((decision(1, PageDecisionState.NATIVE_OK),))
 
 
-def item(label, text, left, top, right, bottom, content_hash):
+def content_hash_for(text):
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def item(label, text, left, top, right, bottom, content_hash=None):
     return PageConversionItem(
         label=label,
         text=text,
@@ -190,7 +195,7 @@ def item(label, text, left, top, right, bottom, content_hash):
             page_width=1000,
             page_height=1000,
         ),
-        content_hash=content_hash,
+        content_hash=content_hash_for(text) if content_hash is None else content_hash,
     )
 
 
@@ -215,7 +220,6 @@ class NativeDoclingConverter:
                     100,
                     900,
                     180,
-                    "1" * 64,
                 ),
             ),
         )
@@ -243,7 +247,6 @@ class GraniteDoclingConverter:
                         220,
                         950,
                         620,
-                        "2" * 64,
                     ),
                 ),
             )
@@ -263,7 +266,6 @@ class GraniteDoclingConverter:
                     300,
                     850,
                     900,
-                    "3" * 64,
                 ),
             ),
         )

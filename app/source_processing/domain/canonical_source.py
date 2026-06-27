@@ -12,8 +12,10 @@ from app.contracts.identity import DomainIdentifier
 from app.contracts.source_references import CanonicalSourceRef
 from app.source_processing.domain.page_conversion import (
     CanonicalQualityDecision,
+    PagewiseDoclingFusionService,
     PagewiseDoclingDocument,
     QualityDecisionStatus,
+    TextAuthorityManifest,
 )
 from app.source_processing.domain.source_document import (
     DocumentId,
@@ -198,6 +200,7 @@ class CanonicalSource:
         *,
         source_document: SourceDocument,
         docling_document: PagewiseDoclingDocument,
+        text_authority_manifest: TextAuthorityManifest,
         quality_decision: CanonicalQualityDecision,
         canonical_artifact: CanonicalArtifact,
         accepted_at: str,
@@ -208,6 +211,10 @@ class CanonicalSource:
         _ensure_docling_document_matches_source(
             source_document=parsed_source_document,
             docling_document=parsed_docling_document,
+        )
+        _ensure_docling_document_has_text_authority(
+            docling_document=parsed_docling_document,
+            text_authority_manifest=text_authority_manifest,
         )
         _ensure_green_quality_decision(quality_decision)
         canonical_source_id = canonical_source_id_for(parsed_source_document.document_id)
@@ -232,6 +239,7 @@ class CanonicalSource:
         self,
         *,
         docling_document: PagewiseDoclingDocument,
+        text_authority_manifest: TextAuthorityManifest,
         quality_decision: CanonicalQualityDecision,
         canonical_artifact: CanonicalArtifact,
         accepted_at: str,
@@ -243,6 +251,10 @@ class CanonicalSource:
             raise ValueError("source_sha256 canonique incohérent")
         if self.has_version(parsed_docling_document.canonical_version_id):
             raise ValueError("mutation en place interdite")
+        _ensure_docling_document_has_text_authority(
+            docling_document=parsed_docling_document,
+            text_authority_manifest=text_authority_manifest,
+        )
         _ensure_green_quality_decision(quality_decision)
 
         version = CanonicalSourceVersion(
@@ -408,6 +420,25 @@ def _ensure_docling_document_matches_source(
         raise ValueError("source_sha256 canonique incohérent")
     if docling_document.original_storage_ref != source_document.original_storage_ref:
         raise ValueError("original_storage_ref canonique incohérent")
+
+
+def _ensure_docling_document_has_text_authority(
+    *,
+    docling_document: PagewiseDoclingDocument,
+    text_authority_manifest: TextAuthorityManifest,
+) -> None:
+    if not isinstance(text_authority_manifest, TextAuthorityManifest):
+        raise ValueError("autorité textuelle obligatoire")
+    authorized_document = PagewiseDoclingFusionService().merge_authorized(
+        document_id=docling_document.document_id,
+        canonical_version_id=docling_document.canonical_version_id,
+        source_sha256=docling_document.source_sha256,
+        original_storage_ref=docling_document.original_storage_ref,
+        page_manifest=text_authority_manifest.page_manifest,
+        text_authority_manifest=text_authority_manifest,
+    )
+    if authorized_document.to_payload() != docling_document.to_payload():
+        raise ValueError("autorité textuelle obligatoire")
 
 
 def _ensure_versions(value: Sequence[CanonicalSourceVersion]) -> tuple[CanonicalSourceVersion, ...]:
