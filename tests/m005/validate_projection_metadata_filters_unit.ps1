@@ -3,6 +3,7 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
 . (Join-Path $repoRoot "scripts/require_python.ps1")
 $pythonExecutable = Get-RequiredPythonExecutable
+$eAcute = [char] 0x00E9
 
 $pythonCode = @'
 import hashlib
@@ -220,4 +221,4 @@ if ($LASTEXITCODE -ne 0) {
     throw ($output -join "`n")
 }
 
-Write-Host "Tests unitaires T-005 métadonnées filtrables M-005: OK"
+Write-Host "Tests unitaires T-005 m$($eAcute)tadonn$($eAcute)es filtrables M-005: OK"

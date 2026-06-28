@@ -186,7 +186,7 @@ function Invoke-M000RequiredCommand {
     }
 
     foreach ($line in $output) {
-        Write-Host $line
+        Write-Host (Convert-M000OutputLine -Line $line)
     }
 
     if ($exitCode -ne 0) {
@@ -194,6 +194,27 @@ function Invoke-M000RequiredCommand {
     }
 
     Write-Host "${greenMessage}: $($descriptor.DisplayPath)"
+}
+
+function Convert-M000OutputLine {
+    param(
+        [Parameter(Mandatory = $true)]
+        [AllowNull()]
+        [object] $Line
+    )
+
+    $text = [string] $Line
+    if (-not ($text.Contains("Ã") -or $text.Contains("Â"))) {
+        return $text
+    }
+
+    $windowsEncoding = [System.Text.Encoding]::GetEncoding(1252)
+    $candidate = [System.Text.Encoding]::UTF8.GetString($windowsEncoding.GetBytes($text))
+    if ($candidate.Contains([char] 0xFFFD)) {
+        return $text
+    }
+
+    return $candidate
 }
 
 function Invoke-M000ValidationGate {

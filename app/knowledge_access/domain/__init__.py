@@ -14,16 +14,38 @@ from app.knowledge_access.domain.knowledge_projection import (
     ProjectionProfile,
     ProjectionStatus,
 )
+from app.knowledge_access.domain.projection_metadata import (
+    AppliedFilterTrace,
+    DiversificationTrace,
+    EvidenceDiversificationPolicy,
+    ProjectionFilterTrace,
+    ProjectionFreshnessDecision,
+    ProjectionFreshnessPolicy,
+    ProjectionMetadata,
+    ProjectionMetadataSelection,
+    ProjectionMetadataSelector,
+    SearchFilter,
+)
 
 __all__ = [
+    "AppliedFilterTrace",
     "BuildFingerprint",
     "CanonicalChunkDocument",
     "CanonicalChunkItem",
     "ChunkingProfile",
+    "DiversificationTrace",
+    "EvidenceDiversificationPolicy",
     "HierarchicalChunkProjection",
     "HierarchicalChunkProjector",
     "KnowledgeChunk",
     "KnowledgeProjection",
+    "ProjectionFilterTrace",
+    "ProjectionFreshnessDecision",
+    "ProjectionFreshnessPolicy",
+    "ProjectionMetadata",
+    "ProjectionMetadataSelection",
+    "ProjectionMetadataSelector",
     "ProjectionProfile",
     "ProjectionStatus",
+    "SearchFilter",
 ]

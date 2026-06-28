@@ -405,6 +405,14 @@ $requiredM005Requirements = @(
         CommandScript = "scripts/validate_m005_specification.ps1"
         Code = "docs/specs/m005_projection_connaissance_recherchable.md"
         Adr = "ADR-005; ADR-006; ADR-010; DDD-ADR-004; DDD-ADR-008"
+    },
+    [ordered] @{
+        Id = "REQ-M005-004"
+        Source = "docs/tasks/milestone_005/0005_enrichir_metadonnees_projection_filtrable.md"
+        Test = "tests/m005/validate_projection_metadata_filters_acceptance.ps1"
+        CommandScript = "tests/m005/validate_projection_metadata_filters_acceptance.ps1"
+        Code = "app/knowledge_access/domain/projection_metadata.py"
+        Adr = "ADR-005; DDD-ADR-004"
     }
 )
 
