@@ -223,6 +223,7 @@ class KnowledgeProjection:
     def mark_stale(self) -> "KnowledgeProjection":
         return self._transition(
             allowed_statuses={
+                ProjectionStatus.BUILDING,
                 ProjectionStatus.BUILT,
                 ProjectionStatus.INDEXING,
                 ProjectionStatus.SEARCHABLE,
@@ -243,6 +244,7 @@ class KnowledgeProjection:
     def retire(self) -> "KnowledgeProjection":
         return self._transition(
             allowed_statuses={
+                ProjectionStatus.BUILDING,
                 ProjectionStatus.BUILT,
                 ProjectionStatus.SEARCHABLE,
                 ProjectionStatus.STALE,

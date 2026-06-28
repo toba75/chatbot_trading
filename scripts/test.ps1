@@ -146,7 +146,10 @@ $testCommands = @(
     @{ Path = "tests/m005/validate_projection_metadata_filters_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/m005/validate_projection_metadata_filters_unit.ps1"; Arguments = @() },
     @{ Path = "tests/m005/validate_projection_encoding_acceptance.ps1"; Arguments = @() },
-    @{ Path = "tests/m005/validate_projection_encoding_unit.ps1"; Arguments = @() }
+    @{ Path = "tests/m005/validate_projection_encoding_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m005/validate_qdrant_projection_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m005/validate_qdrant_projection_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m005/validate_knowledge_projection_events_acceptance.ps1"; Arguments = @() }
 )
 
 function Get-GateCommandPaths {

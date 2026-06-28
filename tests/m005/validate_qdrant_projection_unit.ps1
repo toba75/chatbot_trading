@@ -225,7 +225,7 @@ assert_raises(
     ValueError,
     "claim interdit",
     lambda: VectorIndexPoint(
-        point_id="KCHK-M005-T007-UNIT-CLAIM",
+        point_id="KCHK-M005-T007-UNIT-001",
         chunk_id="KCHK-M005-T007-UNIT-001",
         content_hash="1" * 64,
         dense_vector=(0.1, 0.2, 0.3),

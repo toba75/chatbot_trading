@@ -26,6 +26,16 @@ from app.knowledge_access.domain.projection_metadata import (
     ProjectionMetadataSelector,
     SearchFilter,
 )
+from app.knowledge_access.domain.projection_index import (
+    PartialVectorIndexError,
+    VectorIndexDeletion,
+    VectorIndexPoint,
+    VectorIndexPublication,
+    VectorIndexPublishRequest,
+    VectorIndexSchema,
+    VectorIndexUnavailableError,
+    index_generation_for,
+)
 
 __all__ = [
     "AppliedFilterTrace",
@@ -39,6 +49,7 @@ __all__ = [
     "HierarchicalChunkProjector",
     "KnowledgeChunk",
     "KnowledgeProjection",
+    "PartialVectorIndexError",
     "ProjectionFilterTrace",
     "ProjectionFreshnessDecision",
     "ProjectionFreshnessPolicy",
@@ -48,4 +59,11 @@ __all__ = [
     "ProjectionProfile",
     "ProjectionStatus",
     "SearchFilter",
+    "VectorIndexDeletion",
+    "VectorIndexPoint",
+    "VectorIndexPublication",
+    "VectorIndexPublishRequest",
+    "VectorIndexSchema",
+    "VectorIndexUnavailableError",
+    "index_generation_for",
 ]

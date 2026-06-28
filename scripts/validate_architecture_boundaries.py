@@ -35,6 +35,7 @@ EVIDENCE_CLAIM_CONSUMERS = frozenset({"EG", "RA", "SD"})
 RESEARCH_OUTCOME_CONSUMERS = frozenset({"RA", "SD"})
 STRATEGY_SNAPSHOT_CONSUMERS = frozenset({"SD", "EX"})
 EXPERIMENT_RESULT_CONSUMERS = frozenset({"EX", "RA", "CV"})
+QDRANT_DIRECT_ACCESS_FORBIDDEN_CONSUMERS = frozenset({"EG", "RA"})
 CONTRACT_MODULE_ALLOWED_CONSUMERS: dict[str, frozenset[str]] = {
     "app.contracts.identity": ALL_CONTEXT_CODES,
     "app.contracts.source_references": SOURCE_REFERENCE_CONSUMERS,
@@ -681,6 +682,26 @@ def domain_layer_violations(
     return violations
 
 
+def direct_qdrant_access_violations(
+    source: SourceModule,
+    target: ImportedModule,
+    import_reference: ImportReference,
+) -> list[str]:
+    if source.context_code not in QDRANT_DIRECT_ACCESS_FORBIDDEN_CONSUMERS:
+        return []
+    if target.kind != "external":
+        return []
+    if target.name.split(".", 1)[0] != "qdrant_client":
+        return []
+
+    location = format_source_location(source, import_reference.line_number)
+    return [
+        "Accès direct à Qdrant interdit: "
+        f"consommateur {source.context_code} ({source.module_name}), "
+        f"import {format_import_reference(target, import_reference)}, ligne {location}."
+    ]
+
+
 def intercontext_violation(
     source: SourceModule,
     target: ImportedModule,
@@ -770,6 +791,7 @@ def analyze_architecture(
             if target.kind == "contracts":
                 continue
 
+            violations.extend(direct_qdrant_access_violations(source, target, import_reference))
             violations.extend(domain_layer_violations(source, target, import_reference))
 
             if target.kind != "bounded_context":

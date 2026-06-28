@@ -72,6 +72,19 @@ class InMemoryKnowledgeProjectionRepository:
             raise ValueError(f"projection inconnue: {projection_id}")
         return self._projections_by_id[projection_id]
 
+    def save_transition(self, projection: KnowledgeProjection) -> KnowledgeProjection:
+        parsed_projection = _ensure_projection(projection)
+        if parsed_projection.projection_id not in self._projections_by_id:
+            raise ValueError(f"projection inconnue: {parsed_projection.projection_id}")
+        existing_projection = self._projections_by_id[parsed_projection.projection_id]
+        if existing_projection.build_fingerprint != parsed_projection.build_fingerprint:
+            raise ValueError("build_fingerprint transition incoherent")
+        self._projections_by_id[parsed_projection.projection_id] = parsed_projection
+        self._projection_id_by_fingerprint[
+            parsed_projection.build_fingerprint.value
+        ] = parsed_projection.projection_id
+        return parsed_projection
+
     def projection_count(self) -> int:
         return len(self._projections_by_id)
 

@@ -421,6 +421,14 @@ $requiredM005Requirements = @(
         CommandScript = "tests/m005/validate_projection_encoding_acceptance.ps1"
         Code = "app/knowledge_access/domain/projection_encoding.py; app/knowledge_access/application/encode_projection.py"
         Adr = "ADR-005; ADR-007; ADR-009; DDD-ADR-004"
+    },
+    [ordered] @{
+        Id = "REQ-M005-006"
+        Source = "docs/tasks/milestone_005/0007_publier_index_qdrant_regenerable.md"
+        Test = "tests/m005/validate_qdrant_projection_acceptance.ps1"
+        CommandScript = "tests/m005/validate_qdrant_projection_acceptance.ps1"
+        Code = "app/knowledge_access/domain/projection_index.py; app/knowledge_access/application/publish_projection_index.py; app/knowledge_access/application/projection_events.py; app/knowledge_access/adapters/in_memory_vector_index.py"
+        Adr = "ADR-005; DDD-ADR-004; DDD-ADR-008"
     }
 )
 

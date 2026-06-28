@@ -10,11 +10,13 @@ from app.knowledge_access.adapters.projection_http import (
     HttpResponse,
     KnowledgeProjectionHttpAdapter,
 )
+from app.knowledge_access.adapters.in_memory_vector_index import InMemoryVectorIndex
 
 __all__ = [
     "HttpRequest",
     "HttpResponse",
     "InMemoryKnowledgeProjectionRepository",
     "InMemoryProjectionEventRegistry",
+    "InMemoryVectorIndex",
     "KnowledgeProjectionHttpAdapter",
 ]

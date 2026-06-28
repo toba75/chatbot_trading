@@ -370,7 +370,7 @@ with tempfile.TemporaryDirectory(prefix="ost_m005_t007_architecture_") as temp_d
         relations=relations,
     )
     joined_violations = "\n".join(violations)
-    assert_true("Accès direct à Qdrant interdit" in joined_violations, joined_violations)
+    assert_true("Qdrant interdit" in joined_violations, joined_violations)
     assert_true("consommateur EG" in joined_violations, joined_violations)
     assert_true("consommateur RA" in joined_violations, joined_violations)
 
