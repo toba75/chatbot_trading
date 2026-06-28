@@ -37,6 +37,14 @@ class SearchProjectionStaleError(SearchKnowledgeError):
         super().__init__(f"PROJECTION_STALE: {self.projection_id}")
 
 
+class SearchProjectionNotFoundError(SearchKnowledgeError):
+    """Erreur produite quand la projection demandée est absente."""
+
+    def __init__(self, projection_id: str) -> None:
+        self.projection_id = _ensure_text(projection_id, "projection_id")
+        super().__init__(f"PROJECTION_NOT_FOUND: {self.projection_id}")
+
+
 class SearchProjectionUnavailableError(SearchKnowledgeError):
     """Erreur produite quand la projection n'est pas SEARCHABLE."""
 
@@ -154,7 +162,12 @@ class SearchKnowledge:
 
     def search(self, request: SearchRequest) -> SearchResponse:
         parsed_request = _ensure_search_request(request)
-        projection = self.projection_repository.projection_for_id(parsed_request.projection_id)
+        try:
+            projection = self.projection_repository.projection_for_id(parsed_request.projection_id)
+        except ValueError as exc:
+            if str(exc).startswith("projection inconnue:"):
+                raise SearchProjectionNotFoundError(parsed_request.projection_id) from exc
+            raise
         _ensure_projection(projection)
         self._ensure_searchable(projection)
 
@@ -317,6 +330,7 @@ __all__ = [
     "SearchKnowledge",
     "SearchKnowledgeError",
     "SearchProfileUnsupportedError",
+    "SearchProjectionNotFoundError",
     "SearchProjectionRepository",
     "SearchProjectionStaleError",
     "SearchProjectionUnavailableError",
