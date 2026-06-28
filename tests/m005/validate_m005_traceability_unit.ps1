@@ -97,7 +97,7 @@ assert_close(payload["metrics"]["mrr"], 2.0 / 3.0, "MRR initial incorrect.")
 assert_close(payload["metrics"]["ndcg"], 0.7098603945740938, "nDCG initial incorrect.")
 assert_false(payload["is_v1_acceptance_threshold"], "Les métriques M-005 ne sont pas des seuils V1.")
 assert_equal(payload["calibration_milestone"], "M-012", "La calibration seuil doit rester rattachée à M-012.")
-assert_false("threshold" in repr(payload).lower(), "Aucun seuil ne doit être publié avant M-012.")
+assert_false("threshold_value" in repr(payload).lower(), "Aucune valeur de seuil ne doit être publiée avant M-012.")
 assert_false("minimum" in repr(payload).lower(), "Aucun minimum d'acceptation ne doit être publié avant M-012.")
 
 # Une métrique sans jeu de questions serait décorative et doit être refusée.

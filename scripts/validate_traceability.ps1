@@ -407,6 +407,14 @@ $requiredM005Requirements = @(
         Adr = "ADR-005; ADR-006; ADR-010; DDD-ADR-004; DDD-ADR-008"
     },
     [ordered] @{
+        Id = "REQ-M005-003"
+        Source = "docs/tasks/milestone_005/0003_creer_projection_depuis_version_canonique.md"
+        Test = "tests/m005/validate_knowledge_projection_acceptance.ps1"
+        CommandScript = "tests/m005/validate_knowledge_projection_acceptance.ps1"
+        Code = "app/knowledge_access/domain/knowledge_projection.py; app/knowledge_access/application/request_projection.py; app/knowledge_access/adapters/projection_http.py; app/knowledge_access/adapters/in_memory_projection_repository.py"
+        Adr = "ADR-010; DDD-ADR-004; DDD-ADR-008"
+    },
+    [ordered] @{
         Id = "REQ-M005-004"
         Source = "docs/tasks/milestone_005/0005_enrichir_metadonnees_projection_filtrable.md"
         Test = "tests/m005/validate_projection_metadata_filters_acceptance.ps1"
@@ -437,6 +445,22 @@ $requiredM005Requirements = @(
         CommandScript = "tests/m005/validate_hybrid_search_acceptance.ps1"
         Code = "app/knowledge_access/domain/search.py; app/knowledge_access/application/search_knowledge.py; app/knowledge_access/adapters/in_memory_hybrid_search.py"
         Adr = "ADR-005; ADR-006; DDD-ADR-003; DDD-ADR-004; DDD-ADR-008"
+    },
+    [ordered] @{
+        Id = "REQ-M005-008"
+        Source = "docs/tasks/milestone_005/0009_exposer_commande_recherche_knowledge_access.md"
+        Test = "tests/m005/validate_search_command_acceptance.ps1"
+        CommandScript = "tests/m005/validate_search_command_acceptance.ps1"
+        Code = "app/knowledge_access/adapters/search_http.py; app/knowledge_access/application/search_knowledge.py"
+        Adr = "ADR-005; ADR-006; ADR-010; DDD-ADR-003; DDD-ADR-004"
+    },
+    [ordered] @{
+        Id = "REQ-M005-009"
+        Source = "docs/tasks/milestone_005/0010_relier_m005_metriques_tracabilite_gates.md"
+        Test = "tests/m005/validate_m005_traceability_acceptance.ps1"
+        CommandScript = "tests/m005/validate_m005_traceability_acceptance.ps1"
+        Code = "app/knowledge_access/application/traceability_metrics.py"
+        Adr = "ADR-005; ADR-006; ADR-010; DDD-ADR-004; DDD-ADR-008"
     }
 )
 

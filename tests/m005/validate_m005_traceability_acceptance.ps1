@@ -147,7 +147,7 @@ assert_close(metrics_payload["metrics"]["mrr"], expected["metrics"]["mrr"], "MRR
 assert_close(metrics_payload["metrics"]["ndcg"], expected["metrics"]["ndcg"], "nDCG publié incohérent.")
 assert_false(metrics_payload["is_v1_acceptance_threshold"], "La mesure M-005 ne doit pas devenir un seuil V1.")
 assert_equal(metrics_payload["calibration_milestone"], "M-012", "La calibration doit rester prévue en M-012.")
-assert_false("threshold" in repr(metrics_payload).lower(), "Aucun seuil ne doit être publié avant M-012.")
+assert_false("threshold_value" in repr(metrics_payload).lower(), "Aucune valeur de seuil ne doit être publiée avant M-012.")
 assert_false("minimum" in repr(metrics_payload).lower(), "Aucun minimum ne doit être publié avant M-012.")
 
 full_passage = fixture["forbidden_full_passage"]

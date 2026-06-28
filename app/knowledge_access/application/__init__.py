@@ -34,11 +34,25 @@ from app.knowledge_access.application.search_knowledge import (
     SearchProjectionUnavailableError,
     SearchTracePersistenceError,
 )
+from app.knowledge_access.application.traceability_metrics import (
+    EvaluationQuestion,
+    EvaluationResult,
+    InitialSearchMetricSnapshot,
+    InitialSearchMetricsPublisher,
+    KnowledgeSearchAuditSignal,
+    SearchEvaluationCorpus,
+    assert_no_full_passage_in_audit_payload,
+)
 
 __all__ = [
     "CanonicalSourceForProjection",
     "CanonicalSourcePublishedProjectionConsumer",
     "ChunkingSourceNotFoundError",
+    "EvaluationQuestion",
+    "EvaluationResult",
+    "InitialSearchMetricSnapshot",
+    "InitialSearchMetricsPublisher",
+    "KnowledgeSearchAuditSignal",
     "KnowledgeProjectionEventFactory",
     "MarkProjectionStaleCommand",
     "ProjectionLifecycleResult",
@@ -57,6 +71,8 @@ __all__ = [
     "SearchProfileUnsupportedError",
     "SearchProjectionStaleError",
     "SearchProjectionUnavailableError",
+    "SearchEvaluationCorpus",
     "SearchTracePersistenceError",
     "append_projection_events_to_outbox",
+    "assert_no_full_passage_in_audit_payload",
 ]
