@@ -47,11 +47,17 @@ class HttpRequest:
     method: str
     path: str
     body: Mapping[str, Any]
+    authenticated_context: str
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "method", _ensure_http_method(self.method))
         object.__setattr__(self, "path", _ensure_path(self.path))
         object.__setattr__(self, "body", _ensure_mapping(self.body, "body"))
+        object.__setattr__(
+            self,
+            "authenticated_context",
+            _ensure_authenticated_context(self.authenticated_context),
+        )
 
 
 @dataclass(frozen=True)
@@ -208,6 +214,23 @@ def _ensure_status_code(value: Any) -> int:
 
 def _ensure_document_id(value: str) -> str:
     return str(DomainIdentifier.parse_with_prefix(value, "DOC"))
+
+
+def _ensure_authenticated_context(value: Any) -> str:
+    text = _ensure_request_text(value, "authenticated_context")
+    if text not in {"KA", "RA", "EG"}:
+        raise ValueError("authenticated_context inconnu")
+    return text
+
+
+def _ensure_request_text(value: Any, field_name: str) -> str:
+    if not isinstance(value, str):
+        raise ValueError(f"{field_name} non textuel")
+    if value.strip() == "":
+        raise ValueError(f"{field_name} vide")
+    if value != value.strip():
+        raise ValueError(f"{field_name} non normalise")
+    return value
 
 
 def _bad_request_response(field_name: str) -> HttpResponse:

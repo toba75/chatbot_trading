@@ -1,5 +1,4 @@
 """Couche application du contexte KA."""
-"""Application KA."""
 
 from app.knowledge_access.application.chunk_canonical_source import (
     ChunkingSourceNotFoundError,
@@ -26,6 +25,7 @@ from app.knowledge_access.application.publish_projection_index import (
     RetireProjectionIndexCommand,
 )
 from app.knowledge_access.application.search_knowledge import (
+    KnowledgeAccessMetrics,
     KnowledgeSearchPort,
     SearchIndexUnavailableError,
     SearchKnowledge,
@@ -54,6 +54,7 @@ __all__ = [
     "InitialSearchMetricsPublisher",
     "KnowledgeSearchAuditSignal",
     "KnowledgeProjectionEventFactory",
+    "KnowledgeAccessMetrics",
     "MarkProjectionStaleCommand",
     "ProjectionLifecycleResult",
     "ProjectionEligibilityPolicy",

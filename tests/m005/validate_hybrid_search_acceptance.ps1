@@ -16,6 +16,7 @@ from app.knowledge_access.adapters.in_memory_hybrid_search import (
     InMemoryReranker,
     InMemorySearchTraceStore,
 )
+from app.knowledge_access.adapters.in_memory_metrics import InMemoryKnowledgeAccessMetrics
 from app.knowledge_access.adapters.in_memory_projection_repository import InMemoryKnowledgeProjectionRepository
 from app.knowledge_access.application.search_knowledge import SearchKnowledge, SearchProjectionStaleError
 from app.knowledge_access.domain.knowledge_projection import BuildFingerprint, KnowledgeProjection, ProjectionProfile, ProjectionStatus
@@ -26,6 +27,7 @@ from app.knowledge_access.domain.search import (
     RetrievalDocument,
     SearchRequest,
 )
+from app.platform.event_bus import InMemoryTransactionalOutbox
 
 
 def assert_equal(actual, expected, message):
@@ -163,6 +165,17 @@ class RecordingSourceLocatorResolver:
         return {"item_id": locator.item_id, "content_hash": locator.content_hash}
 
 
+class StalingProjectionRepository:
+    def __init__(self):
+        self.read_count = 0
+
+    def projection_for_id(self, projection_id):
+        self.read_count += 1
+        if self.read_count == 1:
+            return projection(status=ProjectionStatus.SEARCHABLE)
+        return projection(status=ProjectionStatus.STALE)
+
+
 texts = {
     "DOC-M005-T008-A-P001-I001": "Convex risk budget protects the downside.",
     "DOC-M005-T008-A-P001-I002": "Convex payoff appears again in the appendix.",
@@ -277,12 +290,16 @@ retrieval_index = InMemoryHybridRetrievalIndex(documents=documents)
 reranker = InMemoryReranker(scores_by_chunk_id={"KCHK-M005-T008-B-001": 0.98, "KCHK-M005-T008-A-001": 0.72, "KCHK-M005-T008-A-002": 0.70})
 trace_store = InMemorySearchTraceStore.empty()
 resolver = RecordingSourceLocatorResolver()
+outbox = InMemoryTransactionalOutbox.empty()
+metrics = InMemoryKnowledgeAccessMetrics()
 search = SearchKnowledge(
     projection_repository=repository,
     retrieval_index=retrieval_index,
     reranker=reranker,
     source_locator_resolver=resolver,
     trace_store=trace_store,
+    outbox=outbox,
+    metrics=metrics,
 )
 request = SearchRequest(
     projection_id="PROJ-M005-T008-ACCEPTANCE",
@@ -324,19 +341,58 @@ assert_equal(trace_payload["fusion"]["algorithm"], "RRF", "La fusion doit nommer
 assert_equal(trace_payload["filters"]["author"], ("Anne Durand",), "Les filtres demandés doivent être persistés.")
 assert_equal(trace_payload["applied_filters"][0]["dimension"], "author", "Le filtre appliqué doit être tracé.")
 assert_equal(trace_payload["diversification"]["mode"], "PER_DOCUMENT", "La diversification doit être tracée.")
-assert_equal(response.warnings, ("PROJECTION_SEARCHABLE_VERIFIED",), "L'avertissement de fraîcheur doit être explicite.")
+assert_equal(response.warnings, (), "Une recherche nominale SEARCHABLE ne doit pas produire d'avertissement.")
 assert_false("Convex risk budget protects" in repr(trace_payload), "La trace ne doit pas stocker le texte documentaire complet.")
+assert_equal(
+    tuple(entry.event.event_type for entry in outbox.pending_events()),
+    ("SearchKnowledgePerformed",),
+    "Une recherche réussie doit publier l'événement auditable.",
+)
+assert_equal(
+    len(metrics.values_for("knowledge_search_latency_seconds")),
+    1,
+    "La latence de recherche doit être observée.",
+)
 
 # Une projection STALE est refusée explicitement, sans fallback vers l'ancienne génération.
 stale_repository = InMemoryKnowledgeProjectionRepository(projections=(projection(status=ProjectionStatus.STALE),))
+stale_metrics = InMemoryKnowledgeAccessMetrics()
 stale_search = SearchKnowledge(
     projection_repository=stale_repository,
     retrieval_index=retrieval_index,
     reranker=reranker,
     source_locator_resolver=resolver,
     trace_store=InMemorySearchTraceStore.empty(),
+    outbox=InMemoryTransactionalOutbox.empty(),
+    metrics=stale_metrics,
 )
 assert_raises(SearchProjectionStaleError, "PROJECTION_STALE", lambda: stale_search.search(request))
+assert_equal(
+    len(stale_metrics.values_for("knowledge_search_stale_projection_total")),
+    1,
+    "Un refus STALE doit être métriqué.",
+)
+
+mid_search_trace_store = InMemorySearchTraceStore.empty()
+mid_search_outbox = InMemoryTransactionalOutbox.empty()
+mid_search_metrics = InMemoryKnowledgeAccessMetrics()
+mid_search = SearchKnowledge(
+    projection_repository=StalingProjectionRepository(),
+    retrieval_index=retrieval_index,
+    reranker=reranker,
+    source_locator_resolver=RecordingSourceLocatorResolver(),
+    trace_store=mid_search_trace_store,
+    outbox=mid_search_outbox,
+    metrics=mid_search_metrics,
+)
+assert_raises(SearchProjectionStaleError, "PROJECTION_STALE", lambda: mid_search.search(request))
+assert_equal(mid_search_trace_store.trace_count(), 0, "Une projection devenue STALE pendant la recherche ne doit pas persister de trace.")
+assert_equal(len(mid_search_outbox.pending_events()), 0, "Une projection devenue STALE pendant la recherche ne doit pas publier SearchKnowledgePerformed.")
+assert_equal(
+    len(mid_search_metrics.values_for("knowledge_search_stale_projection_total")),
+    1,
+    "Le refus STALE pendant la recherche doit être métriqué.",
+)
 
 print("Test d'acceptation T-008 recherche hybride traçable M-005: OK")
 '@

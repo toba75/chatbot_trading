@@ -86,7 +86,10 @@ failed_projection = base_projection.mark_failed()
 stale_projection = searchable_projection.mark_stale()
 retired_projection = stale_projection.retire()
 
-# Les cinq événements KA doivent être des EventEnvelope valides et publiables.
+# Les événements KA doivent être des EventEnvelope valides et publiables.
+requested_event = factory.requested(
+    projection=base_projection,
+)
 built_event = factory.built(
     projection=base_projection.mark_built(),
     chunk_count=2,
@@ -111,8 +114,15 @@ retired_event = factory.retired(
     projection=retired_projection,
     retired_reason="PROJECTION_REPLACED",
 )
+search_event = factory.search_performed(
+    projection=searchable_projection,
+    search_trace_id="STRC-M005-T007-EVENTS-SEARCH-0001",
+    query_hash="a" * 64,
+    filters_hash="b" * 64,
+    result_count=1,
+)
 
-events = (built_event, searchable_event, failed_event, stale_event, retired_event)
+events = (requested_event, built_event, searchable_event, failed_event, stale_event, retired_event, search_event)
 for event in events:
     assert_true(isinstance(event, EventEnvelope), f"{event.event_type} doit utiliser EventEnvelope.")
     assert_equal(event.producer_context, "KA", "Les événements de projection doivent être produits par KA.")
@@ -122,13 +132,19 @@ for event in events:
 assert_equal(
     tuple(event.event_type for event in events),
     (
+        "KnowledgeProjectionRequested",
         "KnowledgeProjectionBuilt",
         "KnowledgeProjectionBecameSearchable",
         "KnowledgeProjectionFailed",
         "KnowledgeProjectionBecameStale",
         "KnowledgeProjectionRetired",
+        "SearchKnowledgePerformed",
     ),
     "Les types d'événements KA doivent être stables.",
+)
+assert_public_payload(
+    requested_event,
+    ("projection_id", "document_id", "canonical_version_id", "projection_profile_id"),
 )
 assert_public_payload(
     built_event,
@@ -150,12 +166,30 @@ assert_public_payload(
     retired_event,
     ("projection_id", "retired_reason"),
 )
+assert_public_payload(
+    search_event,
+    ("search_trace_id", "projection_id", "query_hash", "filters_hash", "result_count"),
+)
+assert_true(
+    requested_event.event_id != built_event.event_id,
+    "Les event_id doivent distinguer type, version et payload.",
+)
+assert_true(
+    search_event.event_id != factory.search_performed(
+        projection=searchable_projection,
+        search_trace_id="STRC-M005-T007-EVENTS-SEARCH-0002",
+        query_hash="a" * 64,
+        filters_hash="b" * 64,
+        result_count=1,
+    ).event_id,
+    "Deux recherches différentes ne doivent pas partager le même event_id.",
+)
 
 # L'outbox M-002 reçoit les événements avec mutation productrice et reste idempotente par event_id.
 outbox = InMemoryTransactionalOutbox.empty()
 first_entries = append_projection_events_to_outbox(outbox=outbox, events=events)
 second_entries = append_projection_events_to_outbox(outbox=outbox, events=events)
-assert_equal(len(first_entries), 5, "Les cinq événements doivent être écrits dans l'outbox.")
+assert_equal(len(first_entries), 7, "Les sept événements doivent être écrits dans l'outbox.")
 assert_equal(len(second_entries), 0, "Une réécriture identique ne doit pas dupliquer l'outbox.")
 assert_equal(
     tuple(entry.event.event_type for entry in outbox.pending_events()),

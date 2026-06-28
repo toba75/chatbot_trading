@@ -10,6 +10,7 @@ import sys
 sys.path.insert(0, sys.argv[1])
 
 from app.knowledge_access.adapters.in_memory_vector_index import InMemoryVectorIndex
+from app.knowledge_access.adapters.qdrant_vector_index import QdrantVectorIndex
 from app.knowledge_access.domain.knowledge_projection import (
     BuildFingerprint,
     KnowledgeProjection,
@@ -163,6 +164,40 @@ def encoded_projection():
     )
 
 
+class FakeQdrantClient:
+    def __init__(self, *, forced_count=None):
+        self.points_by_collection = {}
+        self.deleted_filters = []
+        self.count_calls = []
+        self.forced_count = forced_count
+
+    def upsert(self, *, collection_name, points):
+        stored_points = self.points_by_collection.setdefault(collection_name, [])
+        stored_points.extend(tuple(points))
+        return object()
+
+    def delete(self, *, collection_name, points_selector):
+        self.deleted_filters.append((collection_name, points_selector))
+        generation = points_selector["filter"]["must"][0]["match"]["value"]
+        self.points_by_collection[collection_name] = [
+            point
+            for point in self.points_by_collection.get(collection_name, [])
+            if point["payload"]["index_generation"] != generation
+        ]
+        return object()
+
+    def count(self, *, collection_name, count_filter, exact):
+        self.count_calls.append((collection_name, count_filter, exact))
+        if self.forced_count is not None and len(self.points_by_collection.get(collection_name, [])) > 0:
+            return self.forced_count
+        generation = count_filter["must"][0]["match"]["value"]
+        return sum(
+            1
+            for point in self.points_by_collection.get(collection_name, [])
+            if point["payload"]["index_generation"] == generation
+        )
+
+
 base_projection = projection()
 base_schema = schema()
 base_encoded_projection = encoded_projection()
@@ -220,6 +255,8 @@ point = VectorIndexPoint.from_encoded_chunk(
 )
 assert_equal(point.payload["projection_id"], base_projection.projection_id, "Le payload doit nommer la projection.")
 assert_equal(point.payload["content_hash"], "1" * 64, "Le payload doit porter le hash documentaire.")
+assert_equal(len(point.payload["dense_vector_hash"]), 64, "Le hash dense doit être stocké sans exposer le vecteur.")
+assert_equal(len(point.payload["sparse_weights_hash"]), 64, "Le hash sparse doit être stocké sans exposer les poids.")
 assert_false("claim" in point.payload, "Le payload documentaire ne doit pas contenir de claim.")
 assert_raises(
     ValueError,
@@ -231,6 +268,18 @@ assert_raises(
         dense_vector=(0.1, 0.2, 0.3),
         sparse_weights=(("alpha", 1.0),),
         payload={**point.payload, "claim": "résultat métier interdit"},
+    ),
+)
+assert_raises(
+    ValueError,
+    "verified_claim_ref interdit",
+    lambda: VectorIndexPoint(
+        point_id="KCHK-M005-T007-UNIT-001",
+        chunk_id="KCHK-M005-T007-UNIT-001",
+        content_hash="1" * 64,
+        dense_vector=(0.1, 0.2, 0.3),
+        sparse_weights=(("alpha", 1.0),),
+        payload={**point.payload, "verified_claim_ref": "CLAIM-M005-T007-UNIT"},
     ),
 )
 assert_raises(
@@ -284,6 +333,43 @@ assert_equal(
     ),
     2,
     "La reconstruction idempotente ne doit pas dupliquer les points.",
+)
+
+qdrant_client = FakeQdrantClient()
+qdrant_index = QdrantVectorIndex(client=qdrant_client)
+qdrant_publication = qdrant_index.publish_generation(request)
+assert_equal(qdrant_publication.published_point_count, 2, "L'adaptateur Qdrant doit publier tous les points.")
+assert_true(
+    qdrant_index.generation_exists(
+        collection_name=base_schema.collection_name,
+        index_generation=first_generation,
+    ),
+    "L'adaptateur Qdrant doit vérifier la génération par filtre de payload.",
+)
+qdrant_point = qdrant_client.points_by_collection[base_schema.collection_name][0]
+assert_equal(qdrant_point["vector"]["dense"], (0.1, 0.2, 0.3), "Le vecteur dense doit être transmis au port Qdrant.")
+assert_equal(qdrant_point["payload"]["dense_vector_hash"], point.payload["dense_vector_hash"], "Le hash dense doit rester dans le payload.")
+assert_equal(qdrant_point["payload"]["sparse_weights_hash"], point.payload["sparse_weights_hash"], "Le hash sparse doit rester dans le payload.")
+assert_false("claim" in repr(qdrant_point["payload"]).lower(), "Le payload Qdrant ne doit pas contenir de claim.")
+qdrant_second_publication = qdrant_index.publish_generation(request)
+assert_true(qdrant_second_publication.idempotent, "Une génération Qdrant déjà visible doit être idempotente.")
+qdrant_deleted = qdrant_index.delete_generation(
+    collection_name=base_schema.collection_name,
+    index_generation=first_generation,
+)
+assert_true(qdrant_deleted.deleted, "L'adaptateur Qdrant doit supprimer la génération demandée.")
+assert_false(
+    qdrant_index.generation_exists(
+        collection_name=base_schema.collection_name,
+        index_generation=first_generation,
+    ),
+    "La génération Qdrant supprimée ne doit plus être visible.",
+)
+partial_qdrant_index = QdrantVectorIndex(client=FakeQdrantClient(forced_count=1))
+assert_raises(
+    PartialVectorIndexError,
+    "INDEX_PARTIAL",
+    lambda: partial_qdrant_index.publish_generation(request),
 )
 
 partial_index = InMemoryVectorIndex.empty(omit_receipt_for_chunk_ids=("KCHK-M005-T007-UNIT-002",))

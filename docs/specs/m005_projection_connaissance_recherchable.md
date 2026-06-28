@@ -3,7 +3,7 @@
 ## Statut
 
 - Milestone: M-005 - Projection de connaissance recherchable.
-- ADR consultées: ADR-005, ADR-006, ADR-010, DDD-ADR-004, DDD-ADR-008.
+- ADR consultées: ADR-001, ADR-005, ADR-006, ADR-007, ADR-009, ADR-010, DDD-ADR-003, DDD-ADR-004, DDD-ADR-008.
 - ADR: non requise, car M-005 applique les décisions existantes sans changer leur sens.
 
 ## Scénario BDD
@@ -94,6 +94,8 @@ La mission de M-005 est de rendre une version canonique M-004 recherchable par c
 | KnowledgeSearchPort | Contrat consommé par RA et EG pour obtenir des preuves candidates. | Aucun accès direct à Qdrant. |
 | SearchTraceStore | Persiste la trace de fusion et les paramètres de recherche. | Aucune recherche auditable sans trace. |
 
+`QdrantVectorIndex` est l'adaptateur technique injecté derrière `VectorIndex`; RA et EG ne dépendent jamais de `qdrant_client`.
+
 ## Événements KA
 
 | Événement | Déclencheur | Payload publié |
@@ -112,6 +114,15 @@ La mission de M-005 est de rendre une version canonique M-004 recherchable par c
 |---|---|---|---|
 | POST /v1/documents/{document_id}/index | 202 INDEXATION_REQUESTED quand la version canonique est acceptée pour projection. | 400 HTTP_REQUEST_INVALID; 404 SOURCE_NOT_FOUND; 409 SOURCE_NOT_CANONICAL; 409 SOURCE_QUARANTINED; 409 PROJECTION_ALREADY_REQUESTED; 422 PROJECTION_PROFILE_INVALID. | document_id; projection_id; projection_status; canonical_version_id. |
 | POST /v1/search | 200 SEARCH_COMPLETED quand les preuves candidates sont retournées avec trace. | 400 HTTP_REQUEST_INVALID; 404 PROJECTION_NOT_FOUND; 409 PROJECTION_STALE; 422 FILTER_NOT_SUPPORTED; 422 SEARCH_PROFILE_UNSUPPORTED; 503 SEARCH_INDEX_UNAVAILABLE. | search_trace_id; projection_id; results; warnings; applied_filters. |
+
+### Corps de requête publics
+
+| Endpoint | Champs acceptés | Champs interdits |
+|---|---|---|
+| POST /v1/documents/{document_id}/index | projection_profile_id; chunking_profile; embedding_model; sparse_profile; index_schema | qdrant_collection; build_fingerprint; canonical_version_id imposé par le client |
+| POST /v1/search | projection_id; query_text; filters; search_profile_id; occurred_at | requested_by_context; qdrant_collection; embedding_model; projection_profile_id |
+
+Le contexte consommateur de `POST /v1/search` est fourni par le transport authentifié (`authenticated_context`) et non par le body public. Les seuls contextes autorisés pour la recherche sont RA et EG.
 
 ## Erreurs publiques
 
@@ -147,14 +158,14 @@ La mission de M-005 est de rendre une version canonique M-004 recherchable par c
 
 | Comportement | Invariant | Scénario BDD | Test RED | ADR | Commande |
 |---|---|---|---|---|---|
-| KA-001 - Spécification exécutable M-005 | La spécification nomme mission KA, KnowledgeProjection, états, politiques, ports, événements, API, erreurs, métriques, exclusions et garde-fous. | Given une version canonique M-004 publiée; When la spécification M-005 est publiée; Then elle est validée par commande PowerShell. | T-002 | ADR-005; ADR-006; ADR-010; DDD-ADR-004; DDD-ADR-008 | powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m005_specification.ps1 |
+| KA-001 - Spécification exécutable M-005 | La spécification nomme mission KA, KnowledgeProjection, états, politiques, ports, événements, API, erreurs, métriques, exclusions et garde-fous. | Given une version canonique M-004 publiée; When la spécification M-005 est publiée; Then elle est validée par commande PowerShell. | T-002 | ADR-001; ADR-005; ADR-006; ADR-007; ADR-009; ADR-010; DDD-ADR-003; DDD-ADR-004; DDD-ADR-008 | powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m005_specification.ps1 |
 | KA-002 - Projection depuis version canonique | Une projection ne naît que depuis une version canonique publiée. | Given une CanonicalSource publiée; When RequestKnowledgeProjection est accepté; Then KnowledgeProjection est REQUESTED sans mutation SP. | T-003 | DDD-ADR-004; DDD-ADR-008; ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_knowledge_projection_acceptance.ps1 |
-| KA-003 - Chunking traçable | Chaque chunk conserve SourceLocator et ContentHash. | Given un contenu canonique; When KA découpe le contenu; Then chaque chunk reste relié à la version canonique. | T-004 | DDD-ADR-004 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_hierarchical_chunking_acceptance.ps1 |
+| KA-003 - Chunking traçable | Chaque chunk conserve SourceLocator et ContentHash. | Given un contenu canonique; When KA découpe le contenu; Then chaque chunk reste relié à la version canonique. | T-004 | ADR-001; ADR-006; DDD-ADR-003; DDD-ADR-004 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_hierarchical_chunking_acceptance.ps1 |
 | KA-004 - Métadonnées filtrables | Un filtre demandé est appliqué ou refusé explicitement. | Given une projection avec métadonnées; When SearchKnowledge reçoit des filtres; Then les filtres sont appliqués ou refusés. | T-005 | ADR-005; DDD-ADR-004 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_projection_metadata_filters_acceptance.ps1 |
-| KA-005 - Encodage dense et sparse | Les versions de modèles et paramètres sont obligatoires. | Given une projection construite; When l'encodage démarre; Then dense et sparse sont produits sans fallback silencieux. | T-006 | ADR-005; DDD-ADR-004 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_projection_encoding_acceptance.ps1 |
+| KA-005 - Encodage dense et sparse | Les versions de modèles et paramètres sont obligatoires. | Given une projection construite; When l'encodage démarre; Then dense et sparse sont produits sans fallback silencieux. | T-006 | ADR-005; ADR-007; ADR-009; DDD-ADR-004 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_projection_encoding_acceptance.ps1 |
 | KA-006 - Index Qdrant régénérable | Qdrant reste une projection technique reconstruisible. | Given des encodages complets; When l'index est publié; Then KnowledgeProjectionBecameSearchable est émis après publication complète. | T-007 | ADR-005; DDD-ADR-004; DDD-ADR-008 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_qdrant_projection_acceptance.ps1 |
-| KA-007 - Recherche hybride traçable | Chaque résultat contient SourceLocator, ContentHash, SearchScoreBundle et trace de fusion. | Given une projection SEARCHABLE; When SearchKnowledge exécute une recherche hybride; Then KA retourne des preuves candidates auditées. | T-008 | ADR-005; ADR-006; DDD-ADR-004; DDD-ADR-008 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_hybrid_search_acceptance.ps1 |
-| KA-008 - Commande de recherche publique | Le contrat POST /v1/search masque Qdrant et expose seulement KA. | Given un client appelle POST /v1/search; When la recherche est valide; Then la réponse contient seulement le contrat public KA. | T-009 | ADR-005; ADR-010; DDD-ADR-004 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_search_command_acceptance.ps1 |
+| KA-007 - Recherche hybride traçable | Chaque résultat contient SourceLocator, ContentHash, SearchScoreBundle et trace de fusion. | Given une projection SEARCHABLE; When SearchKnowledge exécute une recherche hybride; Then KA retourne des preuves candidates auditées. | T-008 | ADR-005; ADR-006; DDD-ADR-003; DDD-ADR-004; DDD-ADR-008 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_hybrid_search_acceptance.ps1 |
+| KA-008 - Commande de recherche publique | Le contrat POST /v1/search masque Qdrant et expose seulement KA. | Given un client appelle POST /v1/search; When la recherche est valide; Then la réponse contient seulement le contrat public KA. | T-009 | ADR-005; ADR-006; ADR-010; DDD-ADR-003; DDD-ADR-004 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_search_command_acceptance.ps1 |
 | KA-009 - Traçabilité et métriques M-005 | Aucun GREEN n'est implicite et les métriques ne sont pas des seuils V1. | Given les preuves M-005; When les gates s'exécutent; Then test, lint, traceability et validate_m005_specification sont enrôlés. | T-010 | ADR-005; ADR-006; ADR-010; DDD-ADR-004; DDD-ADR-008 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_m005_traceability_acceptance.ps1 |
 
 ## Commandes de validation

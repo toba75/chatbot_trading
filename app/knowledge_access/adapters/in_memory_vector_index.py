@@ -62,6 +62,10 @@ class InMemoryVectorIndex:
             existing_point_ids = tuple(existing_generation.keys())
             if existing_point_ids != requested_point_ids:
                 raise VectorIndexUnavailableError("generation existante incoherente")
+            requested_points_by_id = {point.point_id: point for point in parsed_request.points}
+            for point_id, existing_point in existing_generation.items():
+                if existing_point != requested_points_by_id[point_id]:
+                    raise VectorIndexUnavailableError("generation existante incoherente")
             return VectorIndexPublication(
                 collection_name=parsed_request.collection_name,
                 index_generation=parsed_request.index_generation,

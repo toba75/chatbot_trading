@@ -21,6 +21,7 @@ from app.knowledge_access.application.request_projection import (
     CanonicalSourceForProjection,
     RequestKnowledgeProjectionHandler,
 )
+from app.platform.event_bus import InMemoryTransactionalOutbox
 
 
 def assert_equal(actual, expected, message):
@@ -72,12 +73,13 @@ def build_adapter(records):
     handler = RequestKnowledgeProjectionHandler(
         canonical_source_reader=CanonicalReader(records),
         projection_repository=repository,
+        outbox=InMemoryTransactionalOutbox.empty(),
     )
     return KnowledgeProjectionHttpAdapter(projection_commands=handler), repository
 
 
 def request(method, path, body):
-    return HttpRequest(method=method, path=path, body=body)
+    return HttpRequest(method=method, path=path, body=body, authenticated_context="KA")
 
 
 published_ref = canonical_ref("PUBLISHED")

@@ -185,13 +185,13 @@ class ProjectionEncodingHandler:
                     profile=encoding_profile.dense,
                 )
             )
-            dense = DenseChunkEncoding.from_vector(
-                chunk=parsed_chunk,
-                profile=encoding_profile.dense,
-                vector=dense_vector,
-            )
         except Exception as exc:
             raise DenseEncodingFailedError(chunk_id=parsed_chunk.chunk_id, reason=str(exc)) from exc
+        dense = DenseChunkEncoding.from_vector(
+            chunk=parsed_chunk,
+            profile=encoding_profile.dense,
+            vector=dense_vector,
+        )
 
         try:
             sparse_vector = self._sparse_encoder.encode_sparse(
@@ -200,13 +200,13 @@ class ProjectionEncodingHandler:
                     profile=encoding_profile.sparse,
                 )
             )
-            sparse = SparseChunkEncoding.from_vector(
-                chunk=parsed_chunk,
-                profile=encoding_profile.sparse,
-                vector=sparse_vector,
-            )
         except Exception as exc:
             raise SparseEncodingFailedError(chunk_id=parsed_chunk.chunk_id, reason=str(exc)) from exc
+        sparse = SparseChunkEncoding.from_vector(
+            chunk=parsed_chunk,
+            profile=encoding_profile.sparse,
+            vector=sparse_vector,
+        )
 
         return EncodedProjectionChunk(
             chunk_id=parsed_chunk.chunk_id,
@@ -272,4 +272,3 @@ __all__ = [
     "SparseEncoder",
     "SparseEncodingRequest",
 ]
-

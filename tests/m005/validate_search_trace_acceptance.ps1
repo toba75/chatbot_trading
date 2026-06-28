@@ -16,11 +16,13 @@ from app.knowledge_access.adapters.in_memory_hybrid_search import (
     InMemoryReranker,
     InMemorySearchTraceStore,
 )
+from app.knowledge_access.adapters.in_memory_metrics import InMemoryKnowledgeAccessMetrics
 from app.knowledge_access.adapters.in_memory_projection_repository import InMemoryKnowledgeProjectionRepository
 from app.knowledge_access.application.search_knowledge import SearchKnowledge, SearchTracePersistenceError
 from app.knowledge_access.domain.knowledge_projection import BuildFingerprint, KnowledgeProjection, ProjectionProfile, ProjectionStatus
 from app.knowledge_access.domain.projection_metadata import EvidenceDiversificationPolicy, SearchFilter
 from app.knowledge_access.domain.search import HybridRetrievalPolicy, ParentContextExpansionPolicy, RetrievalDocument, SearchRequest
+from app.platform.event_bus import InMemoryTransactionalOutbox
 
 
 def assert_equal(actual, expected, message):
@@ -180,12 +182,16 @@ request = SearchRequest(
 
 # Given une recherche auditable avec trace store disponible.
 trace_store = InMemorySearchTraceStore.empty()
+outbox = InMemoryTransactionalOutbox.empty()
+metrics = InMemoryKnowledgeAccessMetrics()
 search = SearchKnowledge(
     projection_repository=InMemoryKnowledgeProjectionRepository(projections=(projection(),)),
     retrieval_index=InMemoryHybridRetrievalIndex(documents=(document,)),
     reranker=InMemoryReranker(scores_by_chunk_id={"KCHK-M005-T008-TRACE-001": 0.77}),
     source_locator_resolver=Resolver(),
     trace_store=trace_store,
+    outbox=outbox,
+    metrics=metrics,
 )
 
 # When SearchKnowledge retourne une preuve candidate.
@@ -211,6 +217,16 @@ assert_equal(payload["candidate_refs"][0]["source_locator"]["item_id"], "DOC-M00
 assert_false(text in repr(payload), "La trace ne doit pas stocker le passage complet.")
 assert_false("business_conclusion" in repr(payload).lower(), "La trace ne doit pas contenir de conclusion métier.")
 assert_false("verified_claim" in repr(payload).lower(), "La trace ne doit pas contenir de claim vérifié.")
+assert_equal(
+    tuple(entry.event.event_type for entry in outbox.pending_events()),
+    ("SearchKnowledgePerformed",),
+    "La recherche tracée doit publier son événement KA.",
+)
+assert_equal(
+    len(metrics.values_for("knowledge_search_latency_seconds")),
+    1,
+    "La latence doit être observée quand la trace est persistée.",
+)
 
 # Sans trace persistée, la recherche auditable est refusée explicitement.
 failing_search = SearchKnowledge(
@@ -219,6 +235,8 @@ failing_search = SearchKnowledge(
     reranker=InMemoryReranker(scores_by_chunk_id={"KCHK-M005-T008-TRACE-001": 0.77}),
     source_locator_resolver=Resolver(),
     trace_store=FailingTraceStore(),
+    outbox=InMemoryTransactionalOutbox.empty(),
+    metrics=InMemoryKnowledgeAccessMetrics(),
 )
 assert_raises(SearchTracePersistenceError, "SEARCH_TRACE_NOT_PERSISTED", lambda: failing_search.search(request))
 

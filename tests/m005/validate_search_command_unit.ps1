@@ -24,6 +24,7 @@ from app.knowledge_access.application.search_knowledge import (
     SearchProfileUnsupportedError,
     SearchProjectionNotFoundError,
     SearchProjectionStaleError,
+    SearchTracePersistenceError,
 )
 from app.knowledge_access.domain.projection_metadata import EvidenceDiversificationPolicy
 from app.knowledge_access.domain.search import (
@@ -35,6 +36,7 @@ from app.knowledge_access.domain.search import (
     SearchResponse,
     SearchScoreBundle,
 )
+from app.platform.local_runtime import _local_post_response
 
 
 def assert_equal(actual, expected, message):
@@ -139,7 +141,6 @@ def valid_body(**overrides):
         "filters": {"author": "Anne Durand"},
         "search_profile_id": "hybrid-search-public-m005-t009",
         "occurred_at": "2026-06-28T10:45:00Z",
-        "requested_by_context": "RA",
     }
     body.update(overrides)
     return body
@@ -218,14 +219,14 @@ def adapter_for(scripted_commands):
 
 # SearchRequestDto valide strictement le corps public sans profil par défaut.
 dto = SearchRequestDto.from_payload(valid_body())
-domain_request = dto.to_domain_request(hybrid_policy())
+domain_request = dto.to_domain_request(hybrid_policy(), authenticated_context="RA")
 assert_true(isinstance(domain_request, SearchRequest), "Le DTO doit produire une SearchRequest applicative.")
 assert_equal(domain_request.projection_id, "PROJ-M005-T009-UNIT", "La projection doit être conservée.")
 assert_equal(domain_request.query_text, "convex risk", "La requête doit être conservée.")
 assert_equal(domain_request.requested_by_context, "RA", "Le contexte demandeur doit être conservé.")
 assert_equal(domain_request.filters.author, ("Anne Durand",), "Les filtres publics doivent être convertis.")
 
-for field_name in ("projection_id", "query_text", "filters", "search_profile_id", "occurred_at", "requested_by_context"):
+for field_name in ("projection_id", "query_text", "filters", "search_profile_id", "occurred_at"):
     incomplete = valid_body()
     del incomplete[field_name]
     assert_raises(ValueError, f"{field_name} absent", lambda body=incomplete: SearchRequestDto.from_payload(body))
@@ -235,7 +236,10 @@ assert_raises(ValueError, "body champ interdit", lambda: SearchRequestDto.from_p
 assert_raises(ValueError, "body champ interdit", lambda: SearchRequestDto.from_payload({**valid_body(), "embedding_model": "private"}))
 assert_raises(ValueError, "filters non objet", lambda: SearchRequestDto.from_payload(valid_body(filters=[])))
 assert_raises(ValueError, "query_text vide", lambda: SearchRequestDto.from_payload(valid_body(query_text="")))
-assert_raises(ValueError, "requested_by_context inconnu", lambda: SearchRequestDto.from_payload(valid_body(requested_by_context="SP")))
+assert_raises(ValueError, "query_text trop long", lambda: SearchRequestDto.from_payload(valid_body(query_text="x" * 4097)))
+assert_raises(ValueError, "filters trop volumineux", lambda: SearchRequestDto.from_payload(valid_body(filters={"author": tuple(f"Auteur {index}" for index in range(51))})))
+assert_raises(ValueError, "body champ interdit", lambda: SearchRequestDto.from_payload(valid_body(requested_by_context="SP")))
+assert_raises(ValueError, "occurred_at invalide", lambda: SearchRequestDto.from_payload(valid_body(occurred_at="hier")))
 
 # SearchResponseDto sérialise seulement le contrat public.
 candidate = retrieval_candidate()
@@ -243,7 +247,7 @@ domain_response = SearchResponse(
     search_trace_id="STRC-11111111111111111111111111111111",
     projection_id="PROJ-M005-T009-UNIT",
     candidates=(candidate,),
-    warnings=("PROJECTION_SEARCHABLE_VERIFIED",),
+    warnings=(),
     applied_filters=({"dimension": "author", "operator": "IN", "requested_value": ("Anne Durand",), "eligible_count": 1},),
 )
 payload = SearchResponseDto.from_domain(domain_response).to_payload()
@@ -278,14 +282,14 @@ for forbidden in (
 # L'adaptateur mappe les erreurs publiques et ne retourne jamais 200 sur erreur métier.
 success_commands = ScriptedSearchCommands(response=domain_response)
 success = adapter_for(success_commands).handle(
-    HttpRequest(method="POST", path="/v1/search", body=valid_body())
+    HttpRequest(method="POST", path="/v1/search", body=valid_body(), authenticated_context="RA")
 )
 assert_equal(success.status_code, 200, "Le succès HTTP doit retourner 200.")
 assert_equal(len(success_commands.requests), 1, "Le transport doit appeler une seule recherche.")
 
 invalid_body_commands = ScriptedSearchCommands(response=domain_response)
 invalid_body = adapter_for(invalid_body_commands).handle(
-    HttpRequest(method="POST", path="/v1/search", body={**valid_body(), "query": "alias"})
+    HttpRequest(method="POST", path="/v1/search", body={**valid_body(), "query": "alias"}, authenticated_context="RA")
 )
 assert_equal(invalid_body.status_code, 400, "Le corps ambigu doit retourner 400.")
 assert_equal(len(invalid_body_commands.requests), 0, "Un corps invalide ne doit pas appeler SearchKnowledge.")
@@ -311,34 +315,61 @@ error_cases = (
         503,
         {"error_code": "SEARCH_INDEX_UNAVAILABLE", "reason": "aucun chunk eligible apres filtres"},
     ),
+    (
+        SearchTracePersistenceError("SEARCH_TRACE_NOT_PERSISTED"),
+        503,
+        {"error_code": "SEARCH_INDEX_UNAVAILABLE", "reason": "trace non persistee"},
+    ),
 )
 for error, status_code, expected_body in error_cases:
     response = adapter_for(ScriptedSearchCommands(error=error)).handle(
-        HttpRequest(method="POST", path="/v1/search", body=valid_body())
+        HttpRequest(method="POST", path="/v1/search", body=valid_body(), authenticated_context="RA")
     )
     assert_equal(response.status_code, status_code, f"{expected_body['error_code']} doit mapper le statut HTTP.")
     assert_equal(response.body, expected_body, f"{expected_body['error_code']} doit mapper le corps public.")
 
 unsupported_filter = adapter_for(ScriptedSearchCommands(response=domain_response)).handle(
-    HttpRequest(method="POST", path="/v1/search", body=valid_body(filters={"desk": "macro"}))
+    HttpRequest(method="POST", path="/v1/search", body=valid_body(filters={"desk": "macro"}), authenticated_context="RA")
 )
 assert_equal(unsupported_filter.status_code, 422, "Un filtre non supporté doit retourner 422.")
 assert_equal(unsupported_filter.body, {"error_code": "FILTER_NOT_SUPPORTED", "dimension": "desk"}, "La dimension refusée doit être nommée.")
 
 unsupported_profile = adapter_for(ScriptedSearchCommands(response=domain_response)).handle(
-    HttpRequest(method="POST", path="/v1/search", body=valid_body(search_profile_id="profil-absent"))
+    HttpRequest(method="POST", path="/v1/search", body=valid_body(search_profile_id="profil-absent"), authenticated_context="RA")
 )
 assert_equal(unsupported_profile.status_code, 422, "Un profil absent doit retourner 422.")
 assert_equal(unsupported_profile.body["error_code"], "SEARCH_PROFILE_UNSUPPORTED", "Le profil absent ne doit pas recevoir de fallback.")
 
 wrong_endpoint = adapter_for(ScriptedSearchCommands(response=domain_response)).handle(
-    HttpRequest(method="POST", path="/v1/research/deep", body=valid_body())
+    HttpRequest(method="POST", path="/v1/research/deep", body=valid_body(), authenticated_context="RA")
 )
 assert_equal(wrong_endpoint.status_code, 404, "T-009 ne doit pas ajouter d'endpoint RA.")
 index_endpoint = adapter_for(ScriptedSearchCommands(response=domain_response)).handle(
-    HttpRequest(method="POST", path="/v1/documents/DOC-M005-T009-UNIT/index", body=valid_body())
+    HttpRequest(method="POST", path="/v1/documents/DOC-M005-T009-UNIT/index", body=valid_body(), authenticated_context="RA")
 )
 assert_equal(index_endpoint.status_code, 404, "L'adaptateur de recherche ne doit pas router l'indexation KA.")
+
+local_search_status, local_search_body = _local_post_response(
+    service_id="orchestrator-api",
+    path="/v1/search",
+    body=valid_body(),
+)
+assert_equal(local_search_status, 503, "Le runtime local doit reconnaître POST /v1/search sans fallback.")
+assert_equal(local_search_body["error_code"], "SERVICE_NOT_CONFIGURED", "Le runtime local doit refuser explicitement tant que KA n'est pas câblé.")
+local_index_status, local_index_body = _local_post_response(
+    service_id="orchestrator-api",
+    path="/v1/documents/DOC-M005-T009-UNIT/index",
+    body=valid_body(),
+)
+assert_equal(local_index_status, 503, "Le runtime local doit reconnaître POST /v1/documents/{document_id}/index.")
+assert_equal(local_index_body["endpoint"], "POST /v1/documents/{document_id}/index", "L'endpoint local doit être nommé.")
+local_ui_status, local_ui_body = _local_post_response(
+    service_id="ui",
+    path="/v1/search",
+    body=valid_body(),
+)
+assert_equal(local_ui_status, 404, "Seul orchestrator-api doit porter les endpoints applicatifs locaux.")
+assert_equal(local_ui_body["error_code"], "ENDPOINT_NOT_FOUND", "Le runtime local ne doit pas router KA depuis UI.")
 
 # L'adaptateur ne journalise pas de texte documentaire complet.
 adapter_path = Path(sys.argv[1]) / "app" / "knowledge_access" / "adapters" / "search_http.py"

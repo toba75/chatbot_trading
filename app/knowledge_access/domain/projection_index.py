@@ -136,16 +136,20 @@ class VectorIndexPoint:
             payload={
                 "build_fingerprint": parsed_projection.build_fingerprint.value,
                 "canonical_version_id": parsed_projection.canonical_version_id,
-                "chunk_id": chunk.chunk_id,
-                "content_hash": chunk.content_hash,
-                "dense_profile_id": chunk.dense.profile_id,
-                "document_id": parsed_projection.document_id,
-                "index_schema_version": schema.schema_version,
-                "payload_schema_version": schema.payload_schema_version,
-                "projection_id": parsed_projection.projection_id,
-                "projection_profile_id": parsed_projection.projection_profile.projection_profile_id,
-                "sparse_profile_id": chunk.sparse.profile_id,
-            },
+            "chunk_id": chunk.chunk_id,
+            "content_hash": chunk.content_hash,
+            "dense_profile_id": chunk.dense.profile_id,
+            "dense_vector_hash": _sequence_hash(chunk.dense.values),
+            "document_id": parsed_projection.document_id,
+            "index_schema_version": schema.schema_version,
+            "payload_schema_version": schema.payload_schema_version,
+            "projection_id": parsed_projection.projection_id,
+            "projection_profile_id": parsed_projection.projection_profile.projection_profile_id,
+            "sparse_profile_id": chunk.sparse.profile_id,
+            "sparse_weights_hash": _sequence_hash(
+                tuple((weight.token, weight.weight) for weight in chunk.sparse.weights)
+            ),
+        },
         )
 
     def __post_init__(self) -> None:
@@ -278,8 +282,12 @@ def index_generation_for(
             "content_hash": chunk.content_hash,
             "dense_profile_id": chunk.dense.profile_id,
             "dense_model_version": chunk.dense.model_version,
+            "dense_vector_hash": _sequence_hash(chunk.dense.values),
             "sparse_profile_id": chunk.sparse.profile_id,
             "sparse_model_version": chunk.sparse.model_version,
+            "sparse_weights_hash": _sequence_hash(
+                tuple((weight.token, weight.weight) for weight in chunk.sparse.weights)
+            ),
         }
         for chunk in parsed_encoded_projection.encoded_chunks
     )
@@ -370,7 +378,7 @@ def _reject_forbidden_payload(payload: Mapping[str, Any]) -> None:
         if not isinstance(key, str):
             raise ValueError("payload key non textuelle")
         normalized_key = key.lower()
-        if normalized_key in _FORBIDDEN_PAYLOAD_KEYS:
+        if normalized_key in _FORBIDDEN_PAYLOAD_KEYS or "claim" in normalized_key:
             raise ValueError(f"{normalized_key} interdit dans payload index")
         if isinstance(value, Mapping):
             _reject_forbidden_payload(value)
@@ -468,6 +476,16 @@ def _ensure_sha256(value: Any, field_name: str) -> str:
         if character not in _HASH_HEX_ALPHABET:
             raise ValueError(f"{field_name} invalide")
     return text_value
+
+
+def _sequence_hash(value: Any) -> str:
+    serialized_payload = json.dumps(
+        value,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+    return hashlib.sha256(serialized_payload.encode("utf-8")).hexdigest()
 
 
 __all__ = [

@@ -22,6 +22,7 @@ from app.knowledge_access.application.request_projection import (
     RequestKnowledgeProjectionHandler,
 )
 from app.knowledge_access.domain.knowledge_projection import ProjectionStatus
+from app.platform.event_bus import InMemoryTransactionalOutbox
 
 
 def assert_equal(actual, expected, message):
@@ -82,12 +83,14 @@ class RecordingCanonicalSourceReader:
 def build_adapter(records):
     reader = RecordingCanonicalSourceReader(records)
     repository = InMemoryKnowledgeProjectionRepository.empty()
+    outbox = InMemoryTransactionalOutbox.empty()
     handler = RequestKnowledgeProjectionHandler(
         canonical_source_reader=reader,
         projection_repository=repository,
+        outbox=outbox,
     )
     adapter = KnowledgeProjectionHttpAdapter(projection_commands=handler)
-    return adapter, reader, repository
+    return adapter, reader, repository, outbox
 
 
 def post_index(adapter, document_id, body):
@@ -96,13 +99,14 @@ def post_index(adapter, document_id, body):
             method="POST",
             path=f"/v1/documents/{document_id}/index",
             body=body,
+            authenticated_context="KA",
         )
     )
 
 
 # Given une CanonicalSource publiee et non mise en quarantaine.
 published_ref = canonical_ref("PUBLISHED", "PUBLISHED-0001")
-adapter, reader, repository = build_adapter(
+adapter, reader, repository, outbox = build_adapter(
     {
         published_ref.document_id: CanonicalSourceForProjection(
             document_id=published_ref.document_id,
@@ -119,6 +123,11 @@ accepted = post_index(adapter, published_ref.document_id, profile_body())
 # Then une KnowledgeProjection REQUESTED est creee sans mutation SP ni donnees internes.
 assert_equal(accepted.status_code, 202, "L'indexation KA doit retourner 202 pour une version publiee.")
 assert_equal(accepted.body["document_id"], published_ref.document_id, "La reponse doit nommer le document.")
+assert_equal(
+    tuple(entry.event.event_type for entry in outbox.pending_events()),
+    ("KnowledgeProjectionRequested",),
+    "La demande de projection acceptée doit publier KnowledgeProjectionRequested.",
+)
 assert_equal(accepted.body["canonical_version_id"], published_ref.canonical_version_id, "La reponse doit nommer la version canonique.")
 assert_equal(accepted.body["projection_status"], "REQUESTED", "La projection doit naitre REQUESTED.")
 assert_true(str(accepted.body["projection_id"]).startswith("PROJ-"), "La reponse doit exposer un ProjectionId public.")
@@ -147,7 +156,7 @@ assert_equal(repository.projection_count(), 1, "Le doublon ne doit pas creer de 
 
 # Given une source est explicitement en quarantaine.
 quarantined_document_id = "DOC-M005-T003-QUARANTINED"
-quarantined_adapter, _, quarantined_repository = build_adapter(
+quarantined_adapter, _, quarantined_repository, _ = build_adapter(
     {
         quarantined_document_id: CanonicalSourceForProjection(
             document_id=quarantined_document_id,
@@ -164,7 +173,7 @@ assert_equal(quarantined_repository.projection_count(), 0, "Une source en quaran
 
 # Given une source connue ne porte aucune version canonique publiee.
 non_canonical_document_id = "DOC-M005-T003-NONCANONICAL"
-non_canonical_adapter, _, non_canonical_repository = build_adapter(
+non_canonical_adapter, _, non_canonical_repository, _ = build_adapter(
     {
         non_canonical_document_id: CanonicalSourceForProjection(
             document_id=non_canonical_document_id,

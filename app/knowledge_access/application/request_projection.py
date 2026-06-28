@@ -11,6 +11,11 @@ from app.contracts.source_references import (
     ACCEPTED_CANONICAL_VERSION_STATUS,
     CanonicalSourceRef,
 )
+from app.knowledge_access.application.projection_events import (
+    KnowledgeProjectionEventFactory,
+    ProjectionOutbox,
+    append_projection_events_to_outbox,
+)
 from app.knowledge_access.domain.knowledge_projection import (
     BuildFingerprint,
     KnowledgeProjection,
@@ -253,6 +258,7 @@ class RequestKnowledgeProjectionHandler:
         *,
         canonical_source_reader: CanonicalSourceReader,
         projection_repository: KnowledgeProjectionRepository,
+        outbox: ProjectionOutbox,
     ) -> None:
         if not callable(getattr(canonical_source_reader, "find_projection_source_by_document_id", None)):
             raise ValueError("canonical_source_reader sans lecture par document_id")
@@ -260,8 +266,13 @@ class RequestKnowledgeProjectionHandler:
             raise ValueError("projection_repository sans save_if_absent")
         if not callable(getattr(projection_repository, "require_absent_build_fingerprint", None)):
             raise ValueError("projection_repository sans controle d'empreinte")
+        if not callable(getattr(outbox, "has_event", None)):
+            raise ValueError("outbox invalide")
+        if not callable(getattr(outbox, "append_many_in_transaction", None)):
+            raise ValueError("outbox invalide")
         self._canonical_source_reader = canonical_source_reader
         self._projection_repository = projection_repository
+        self._outbox = outbox
         self._eligibility_policy = ProjectionEligibilityPolicy()
 
     def request_projection(
@@ -279,12 +290,23 @@ class RequestKnowledgeProjectionHandler:
             canonical_ref=canonical_ref,
             projection_profile=parsed_command.projection_profile,
         )
+        self._projection_repository.require_absent_build_fingerprint(projection.build_fingerprint)
         decision = self._projection_repository.save_if_absent(projection)
         if not decision.created:
             raise ProjectionAlreadyRequestedError(
                 projection_id=decision.projection.projection_id,
                 build_fingerprint=decision.projection.build_fingerprint,
             )
+        append_projection_events_to_outbox(
+            outbox=self._outbox,
+            events=(
+                KnowledgeProjectionEventFactory(
+                    occurred_at=canonical_ref.accepted_at,
+                    correlation_id=_correlation_id_for_projection(decision.projection.projection_id),
+                    causation_id=_causation_id_for_projection(decision.projection.projection_id),
+                ).requested(projection=decision.projection),
+            ),
+        )
         return RequestKnowledgeProjectionAcceptance.from_projection(decision.projection)
 
 
@@ -427,6 +449,18 @@ def _ensure_text(value: Any, field_name: str) -> str:
     if value != value.strip():
         raise ValueError(f"{field_name} non normalise")
     return value
+
+
+def _correlation_id_for_projection(projection_id: str) -> str:
+    return f"CORR-{_projection_suffix(projection_id)}"
+
+
+def _causation_id_for_projection(projection_id: str) -> str:
+    return f"CMD-{_projection_suffix(projection_id)}"
+
+
+def _projection_suffix(projection_id: str) -> str:
+    return _ensure_projection_id(projection_id).removeprefix("PROJ-")
 
 
 __all__ = [

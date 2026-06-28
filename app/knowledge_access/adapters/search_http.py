@@ -14,6 +14,7 @@ from app.knowledge_access.application.search_knowledge import (
     SearchProjectionNotFoundError,
     SearchProjectionStaleError,
     SearchProjectionUnavailableError,
+    SearchTracePersistenceError,
 )
 from app.knowledge_access.domain.projection_metadata import (
     SearchFilter,
@@ -25,6 +26,7 @@ from app.knowledge_access.domain.search import (
     SearchRequest,
     SearchResponse,
 )
+from app.knowledge_access.domain.time import ensure_utc_instant
 
 
 _SEARCH_BODY_FIELDS = frozenset(
@@ -34,11 +36,12 @@ _SEARCH_BODY_FIELDS = frozenset(
         "filters",
         "search_profile_id",
         "occurred_at",
-        "requested_by_context",
     }
 )
 _AMBIGUOUS_QUERY_FIELDS = frozenset({"query", "question", "prompt", "text"})
 _ALLOWED_REQUESTING_CONTEXTS = frozenset({"RA", "EG"})
+_MAX_QUERY_TEXT_CHARACTERS = 4096
+_MAX_FILTER_VALUES_PER_DIMENSION = 50
 
 
 class KnowledgeSearchCommandPort(Protocol):
@@ -72,7 +75,6 @@ class SearchRequestDto:
     filters: Mapping[str, Any]
     search_profile_id: str
     occurred_at: str
-    requested_by_context: str
 
     @classmethod
     def from_payload(cls, payload: Mapping[str, Any]) -> "SearchRequestDto":
@@ -103,37 +105,34 @@ class SearchRequestDto:
             filters=parsed_payload["filters"],
             search_profile_id=parsed_payload["search_profile_id"],
             occurred_at=parsed_payload["occurred_at"],
-            requested_by_context=parsed_payload["requested_by_context"],
         )
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "projection_id", _ensure_projection_id(self.projection_id))
-        object.__setattr__(self, "query_text", _ensure_text(self.query_text, "query_text"))
-        object.__setattr__(self, "filters", _ensure_mapping(self.filters, "filters"))
+        object.__setattr__(self, "query_text", _ensure_query_text(self.query_text))
+        object.__setattr__(self, "filters", _ensure_filter_mapping(self.filters))
         object.__setattr__(
             self,
             "search_profile_id",
             _ensure_text(self.search_profile_id, "search_profile_id"),
         )
-        object.__setattr__(self, "occurred_at", _ensure_text(self.occurred_at, "occurred_at"))
-        requesting_context = _ensure_text(self.requested_by_context, "requested_by_context")
-        if requesting_context not in _ALLOWED_REQUESTING_CONTEXTS:
-            raise SearchHttpRequestValidationError(
-                "requested_by_context inconnu",
-                field="requested_by_context",
-            )
-        object.__setattr__(self, "requested_by_context", requesting_context)
+        try:
+            occurred_at = ensure_utc_instant(self.occurred_at, "occurred_at")
+        except ValueError as exc:
+            raise SearchHttpRequestValidationError("occurred_at invalide", field="occurred_at") from exc
+        object.__setattr__(self, "occurred_at", occurred_at)
 
-    def to_domain_request(self, hybrid_policy: HybridRetrievalPolicy) -> SearchRequest:
+    def to_domain_request(self, hybrid_policy: HybridRetrievalPolicy, *, authenticated_context: str) -> SearchRequest:
         if not isinstance(hybrid_policy, HybridRetrievalPolicy):
             raise SearchProfileUnsupportedError(self.search_profile_id)
+        requesting_context = _ensure_authenticated_search_context(authenticated_context)
         return SearchRequest(
             projection_id=self.projection_id,
             query_text=self.query_text,
             filters=SearchFilter.from_payload(self.filters),
             hybrid_policy=hybrid_policy,
             occurred_at=self.occurred_at,
-            requested_by_context=self.requested_by_context,
+            requested_by_context=requesting_context,
         )
 
 
@@ -219,7 +218,10 @@ class KnowledgeSearchHttpAdapter:
         try:
             request_dto = SearchRequestDto.from_payload(request.body)
             hybrid_policy = self._profile_for_id(request_dto.search_profile_id)
-            domain_request = request_dto.to_domain_request(hybrid_policy)
+            domain_request = request_dto.to_domain_request(
+                hybrid_policy,
+                authenticated_context=request.authenticated_context,
+            )
         except SearchFilterNotSupportedError as exc:
             return HttpResponse(
                 status_code=422,
@@ -258,6 +260,11 @@ class KnowledgeSearchHttpAdapter:
             return HttpResponse(
                 status_code=503,
                 body={"error_code": "SEARCH_INDEX_UNAVAILABLE", "reason": exc.reason},
+            )
+        except SearchTracePersistenceError:
+            return HttpResponse(
+                status_code=503,
+                body={"error_code": "SEARCH_INDEX_UNAVAILABLE", "reason": "trace non persistee"},
             )
 
         return HttpResponse(
@@ -298,10 +305,44 @@ def _ensure_text(value: Any, field_name: str) -> str:
     return value
 
 
+def _ensure_authenticated_search_context(value: Any) -> str:
+    context = _ensure_text(value, "authenticated_context")
+    if context not in _ALLOWED_REQUESTING_CONTEXTS:
+        raise SearchHttpRequestValidationError(
+            "authenticated_context inconnu",
+            field="authenticated_context",
+        )
+    return context
+
+
 def _ensure_mapping(value: Any, field_name: str) -> dict[str, Any]:
     if not isinstance(value, Mapping):
         raise SearchHttpRequestValidationError(f"{field_name} non objet", field=field_name)
     return dict(value)
+
+
+def _ensure_query_text(value: Any) -> str:
+    text = _ensure_text(value, "query_text")
+    if len(text) > _MAX_QUERY_TEXT_CHARACTERS:
+        raise SearchHttpRequestValidationError("query_text trop long", field="query_text")
+    return text
+
+
+def _ensure_filter_mapping(value: Any) -> dict[str, Any]:
+    filters = _ensure_mapping(value, "filters")
+    for dimension, raw_filter_value in filters.items():
+        _ensure_text(dimension, "filters")
+        if isinstance(raw_filter_value, str):
+            value_count = 1
+        elif isinstance(raw_filter_value, Mapping):
+            value_count = len(raw_filter_value)
+        elif isinstance(raw_filter_value, tuple) or isinstance(raw_filter_value, list):
+            value_count = len(raw_filter_value)
+        else:
+            value_count = 1
+        if value_count > _MAX_FILTER_VALUES_PER_DIMENSION:
+            raise SearchHttpRequestValidationError("filters trop volumineux", field="filters")
+    return filters
 
 
 def _bad_request_response(field_name: str) -> HttpResponse:

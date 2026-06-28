@@ -221,6 +221,8 @@ class KnowledgeSearchAuditSignal:
         object.__setattr__(self, "query_hash", _ensure_sha256(self.query_hash, "query_hash"))
         object.__setattr__(self, "result_count", _ensure_non_negative_integer(self.result_count, "result_count"))
         object.__setattr__(self, "candidate_refs", _ensure_candidate_refs(self.candidate_refs))
+        if self.result_count != len(self.candidate_refs):
+            raise ValueError("result_count incoherent avec candidate_refs")
         if not isinstance(self.metric_snapshot, InitialSearchMetricSnapshot):
             raise ValueError("metric_snapshot invalide")
 
@@ -318,11 +320,10 @@ def _ensure_candidate_refs(value: Sequence[Mapping[str, Any]]) -> tuple[dict[str
     if value is None or isinstance(value, str) or not isinstance(value, Sequence):
         raise ValueError("candidate_refs invalides")
     candidate_refs = tuple(_ensure_mapping(item, "candidate_ref") for item in value)
-    if len(candidate_refs) == 0:
-        raise ValueError("candidate_refs absentes")
-    forbidden_keys = {"text", "passage", "full_text", "excerpt", "claim_id", "verified_claim_id"}
+    allowed_keys = frozenset({"chunk_id", "document_id", "canonical_version_id", "content_hash"})
     for candidate_ref in candidate_refs:
-        if forbidden_keys & {str(key) for key in candidate_ref}:
+        actual_keys = frozenset(str(key) for key in candidate_ref)
+        if actual_keys != allowed_keys:
             raise ValueError("contenu documentaire interdit dans candidate_refs")
         _ensure_prefixed_text(candidate_ref.get("chunk_id"), "KCHK-", "chunk_id")
         _ensure_prefixed_text(candidate_ref.get("document_id"), "DOC-", "document_id")

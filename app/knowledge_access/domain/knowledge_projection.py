@@ -241,6 +241,12 @@ class KnowledgeProjection:
             next_status=ProjectionStatus.FAILED,
         )
 
+    def retry_request(self) -> "KnowledgeProjection":
+        return self._transition(
+            allowed_statuses={ProjectionStatus.FAILED},
+            next_status=ProjectionStatus.REQUESTED,
+        )
+
     def retire(self) -> "KnowledgeProjection":
         return self._transition(
             allowed_statuses={

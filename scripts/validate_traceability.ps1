@@ -404,7 +404,7 @@ $requiredM005Requirements = @(
         Test = "tests/m005/validate_m005_specification_acceptance.ps1"
         CommandScript = "scripts/validate_m005_specification.ps1"
         Code = "docs/specs/m005_projection_connaissance_recherchable.md"
-        Adr = "ADR-005; ADR-006; ADR-010; DDD-ADR-004; DDD-ADR-008"
+        Adr = "ADR-001; ADR-005; ADR-006; ADR-007; ADR-009; ADR-010; DDD-ADR-003; DDD-ADR-004; DDD-ADR-008"
     },
     [ordered] @{
         Id = "REQ-M005-003"
@@ -416,6 +416,14 @@ $requiredM005Requirements = @(
     },
     [ordered] @{
         Id = "REQ-M005-004"
+        Source = "docs/tasks/milestone_005/0004_decouper_contenu_canonique_chunks_tracables.md"
+        Test = "tests/m005/validate_hierarchical_chunking_acceptance.ps1"
+        CommandScript = "tests/m005/validate_hierarchical_chunking_acceptance.ps1"
+        Code = "app/knowledge_access/domain/chunking.py; app/knowledge_access/application/chunk_canonical_source.py"
+        Adr = "ADR-001; ADR-006; DDD-ADR-003; DDD-ADR-004"
+    },
+    [ordered] @{
+        Id = "REQ-M005-005"
         Source = "docs/tasks/milestone_005/0005_enrichir_metadonnees_projection_filtrable.md"
         Test = "tests/m005/validate_projection_metadata_filters_acceptance.ps1"
         CommandScript = "tests/m005/validate_projection_metadata_filters_acceptance.ps1"
@@ -423,7 +431,7 @@ $requiredM005Requirements = @(
         Adr = "ADR-005; DDD-ADR-004"
     },
     [ordered] @{
-        Id = "REQ-M005-005"
+        Id = "REQ-M005-006"
         Source = "docs/tasks/milestone_005/0006_encoder_projection_dense_sparse.md"
         Test = "tests/m005/validate_projection_encoding_acceptance.ps1"
         CommandScript = "tests/m005/validate_projection_encoding_acceptance.ps1"
@@ -431,15 +439,15 @@ $requiredM005Requirements = @(
         Adr = "ADR-005; ADR-007; ADR-009; DDD-ADR-004"
     },
     [ordered] @{
-        Id = "REQ-M005-006"
+        Id = "REQ-M005-007"
         Source = "docs/tasks/milestone_005/0007_publier_index_qdrant_regenerable.md"
         Test = "tests/m005/validate_qdrant_projection_acceptance.ps1"
         CommandScript = "tests/m005/validate_qdrant_projection_acceptance.ps1"
-        Code = "app/knowledge_access/domain/projection_index.py; app/knowledge_access/application/publish_projection_index.py; app/knowledge_access/application/projection_events.py; app/knowledge_access/adapters/in_memory_vector_index.py"
+        Code = "app/knowledge_access/domain/projection_index.py; app/knowledge_access/application/publish_projection_index.py; app/knowledge_access/application/projection_events.py; app/knowledge_access/adapters/in_memory_vector_index.py; app/knowledge_access/adapters/qdrant_vector_index.py"
         Adr = "ADR-005; DDD-ADR-004; DDD-ADR-008"
     },
     [ordered] @{
-        Id = "REQ-M005-007"
+        Id = "REQ-M005-008"
         Source = "docs/tasks/milestone_005/0008_rechercher_preuves_candidates_hybrides.md"
         Test = "tests/m005/validate_hybrid_search_acceptance.ps1"
         CommandScript = "tests/m005/validate_hybrid_search_acceptance.ps1"
@@ -447,7 +455,7 @@ $requiredM005Requirements = @(
         Adr = "ADR-005; ADR-006; DDD-ADR-003; DDD-ADR-004; DDD-ADR-008"
     },
     [ordered] @{
-        Id = "REQ-M005-008"
+        Id = "REQ-M005-009"
         Source = "docs/tasks/milestone_005/0009_exposer_commande_recherche_knowledge_access.md"
         Test = "tests/m005/validate_search_command_acceptance.ps1"
         CommandScript = "tests/m005/validate_search_command_acceptance.ps1"
@@ -455,7 +463,7 @@ $requiredM005Requirements = @(
         Adr = "ADR-005; ADR-006; ADR-010; DDD-ADR-003; DDD-ADR-004"
     },
     [ordered] @{
-        Id = "REQ-M005-009"
+        Id = "REQ-M005-010"
         Source = "docs/tasks/milestone_005/0010_relier_m005_metriques_tracabilite_gates.md"
         Test = "tests/m005/validate_m005_traceability_acceptance.ps1"
         CommandScript = "tests/m005/validate_m005_traceability_acceptance.ps1"

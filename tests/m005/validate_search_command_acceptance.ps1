@@ -16,6 +16,7 @@ from app.knowledge_access.adapters.in_memory_hybrid_search import (
     InMemoryReranker,
     InMemorySearchTraceStore,
 )
+from app.knowledge_access.adapters.in_memory_metrics import InMemoryKnowledgeAccessMetrics
 from app.knowledge_access.adapters.in_memory_projection_repository import InMemoryKnowledgeProjectionRepository
 from app.knowledge_access.adapters.search_http import (
     HttpRequest,
@@ -25,6 +26,7 @@ from app.knowledge_access.application.search_knowledge import SearchKnowledge
 from app.knowledge_access.domain.knowledge_projection import BuildFingerprint, KnowledgeProjection, ProjectionProfile, ProjectionStatus
 from app.knowledge_access.domain.projection_metadata import EvidenceDiversificationPolicy
 from app.knowledge_access.domain.search import HybridRetrievalPolicy, ParentContextExpansionPolicy, RetrievalDocument
+from app.platform.event_bus import InMemoryTransactionalOutbox
 
 
 def assert_equal(actual, expected, message):
@@ -176,7 +178,6 @@ def search_request_body(**overrides):
         "filters": {"author": "Anne Durand", "content_type": "research_note"},
         "search_profile_id": "hybrid-search-public-m005-t009",
         "occurred_at": "2026-06-28T10:30:00Z",
-        "requested_by_context": "RA",
     }
     body.update(overrides)
     return body
@@ -281,6 +282,8 @@ def build_adapter(*, projection_status=ProjectionStatus.SEARCHABLE, projections=
         }
     )
     trace_store = InMemorySearchTraceStore.empty()
+    outbox = InMemoryTransactionalOutbox.empty()
+    metrics = InMemoryKnowledgeAccessMetrics()
     resolver = RecordingSourceLocatorResolver()
     search = SearchKnowledge(
         projection_repository=repository,
@@ -288,6 +291,8 @@ def build_adapter(*, projection_status=ProjectionStatus.SEARCHABLE, projections=
         reranker=reranker,
         source_locator_resolver=resolver,
         trace_store=trace_store,
+        outbox=outbox,
+        metrics=metrics,
     )
     adapter = KnowledgeSearchHttpAdapter(
         search_commands=search,
@@ -295,17 +300,19 @@ def build_adapter(*, projection_status=ProjectionStatus.SEARCHABLE, projections=
             {"hybrid-search-public-m005-t009": hybrid_policy()}
         ),
     )
-    return adapter, trace_store, resolver
+    return adapter, trace_store, resolver, outbox, metrics
 
 
 def post_search(adapter, body, path="/v1/search"):
-    return adapter.handle(HttpRequest(method="POST", path=path, body=body))
+    return adapter.handle(
+        HttpRequest(method="POST", path=path, body=body, authenticated_context="RA")
+    )
 
 
 # Given une projection actuelle est SEARCHABLE.
 # When un client appelle POST /v1/search avec une requête valide.
 # Then KA retourne des preuves candidates citées, scorées et traçables sans exposer Qdrant.
-adapter, trace_store, resolver = build_adapter()
+adapter, trace_store, resolver, outbox, metrics = build_adapter()
 accepted = post_search(adapter, search_request_body())
 
 assert_equal(accepted.status_code, 200, "POST /v1/search doit retourner 200 sur recherche valide.")
@@ -318,6 +325,15 @@ assert_equal(accepted.body["projection_id"], "PROJ-M005-T009-SEARCH", "La répon
 assert_true(accepted.body["search_trace_id"].startswith("STRC-"), "La réponse doit référencer une trace de recherche.")
 assert_equal(len(accepted.body["results"]), 2, "La recherche doit retourner les preuves candidates diversifiées.")
 assert_equal(trace_store.trace_count(), 1, "La commande publique doit persister une trace via SearchKnowledge.")
+assert_equal(
+    tuple(entry.event.event_type for entry in outbox.pending_events()),
+    ("SearchKnowledgePerformed",),
+    "La recherche publique doit publier SearchKnowledgePerformed.",
+)
+assert_true(
+    len(metrics.values_for("knowledge_search_latency_seconds")) == 1,
+    "La recherche publique doit publier la métrique de latence.",
+)
 assert_equal(
     tuple(resolver.resolved_item_ids),
     tuple(result["source_locator"]["item_id"] for result in accepted.body["results"]),
@@ -379,7 +395,7 @@ assert_equal(wrong_endpoint.body["error_code"], "ENDPOINT_NOT_FOUND", "Le mauvai
 
 # Given une projection absente.
 # Then KA retourne 404 sans fallback vers une recherche vide.
-missing_adapter, missing_trace_store, _ = build_adapter(projections=())
+missing_adapter, missing_trace_store, _, _, _ = build_adapter(projections=())
 missing_projection = post_search(
     missing_adapter,
     search_request_body(projection_id="PROJ-M005-T009-MISSING"),
@@ -394,11 +410,15 @@ assert_equal(missing_trace_store.trace_count(), 0, "Une projection absente ne do
 
 # Given une projection STALE.
 # Then KA retourne 409 sans servir l'ancienne génération.
-stale_adapter, stale_trace_store, _ = build_adapter(projection_status=ProjectionStatus.STALE)
+stale_adapter, stale_trace_store, _, _, stale_metrics = build_adapter(projection_status=ProjectionStatus.STALE)
 stale = post_search(stale_adapter, search_request_body())
 assert_equal(stale.status_code, 409, "Une projection STALE doit retourner 409.")
 assert_equal(stale.body, {"error_code": "PROJECTION_STALE", "projection_id": "PROJ-M005-T009-SEARCH"}, "PROJECTION_STALE doit être explicite.")
 assert_equal(stale_trace_store.trace_count(), 0, "Une projection STALE ne doit pas créer de trace.")
+assert_true(
+    len(stale_metrics.values_for("knowledge_search_stale_projection_total")) == 1,
+    "Une projection STALE doit publier la métrique de refus.",
+)
 
 # Given un filtre inconnu.
 # Then KA retourne FILTER_NOT_SUPPORTED et ne le convertit pas silencieusement.
@@ -414,13 +434,13 @@ assert_equal(
 )
 
 # Given un filtre valide mais sans résultat utile.
-# Then KA ne retourne pas 200 avec une liste vide.
+# Then KA retourne un succès vide tracé.
 empty_result = post_search(
     adapter,
     search_request_body(filters={"author": "Auteur absent"}),
 )
-assert_equal(empty_result.status_code, 503, "Une recherche sans chunk éligible ne doit pas retourner 200.")
-assert_equal(empty_result.body["error_code"], "SEARCH_INDEX_UNAVAILABLE", "L'indisponibilité de recherche doit être explicite.")
+assert_equal(empty_result.status_code, 200, "Une recherche sans résultat utile doit retourner 200.")
+assert_equal(empty_result.body["results"], (), "Une recherche sans résultat utile doit retourner une liste vide.")
 
 # Given un profil public inconnu.
 # Then KA refuse le profil sans fallback vers un profil par défaut.

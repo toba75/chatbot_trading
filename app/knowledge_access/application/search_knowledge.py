@@ -2,10 +2,16 @@
 
 from __future__ import annotations
 
+import time
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Any, Protocol
 
+from app.knowledge_access.application.projection_events import (
+    KnowledgeProjectionEventFactory,
+    ProjectionOutbox,
+    append_projection_events_to_outbox,
+)
 from app.contracts.source_references import SourceLocator
 from app.knowledge_access.domain.knowledge_projection import KnowledgeProjection, ProjectionStatus
 from app.knowledge_access.domain.projection_metadata import (
@@ -137,6 +143,16 @@ class SearchTraceStore(Protocol):
         """Persiste une trace."""
 
 
+class KnowledgeAccessMetrics(Protocol):
+    """Port minimal de métriques runtime KA."""
+
+    def increment(self, metric_name: str, *, labels: dict[str, str]) -> None:
+        """Incrémente un compteur nommé."""
+
+    def observe(self, metric_name: str, value: float, *, labels: dict[str, str]) -> None:
+        """Publie une observation numérique."""
+
+
 @dataclass(frozen=True)
 class SearchKnowledge:
     """Orchestre SearchKnowledge sans exposer Qdrant aux consommateurs."""
@@ -146,6 +162,8 @@ class SearchKnowledge:
     reranker: Reranker | None
     source_locator_resolver: SourceLocatorResolver
     trace_store: SearchTraceStore
+    outbox: ProjectionOutbox
+    metrics: KnowledgeAccessMetrics
 
     def __post_init__(self) -> None:
         if not callable(getattr(self.projection_repository, "projection_for_id", None)):
@@ -159,53 +177,72 @@ class SearchKnowledge:
             raise ValueError("source_locator_resolver sans resolve")
         if not callable(getattr(self.trace_store, "save", None)):
             raise ValueError("trace_store sans save")
+        if not callable(getattr(self.outbox, "has_event", None)):
+            raise ValueError("outbox invalide")
+        if not callable(getattr(self.outbox, "append_many_in_transaction", None)):
+            raise ValueError("outbox invalide")
+        if not callable(getattr(self.metrics, "increment", None)):
+            raise ValueError("metrics sans increment")
+        if not callable(getattr(self.metrics, "observe", None)):
+            raise ValueError("metrics sans observe")
 
     def search(self, request: SearchRequest) -> SearchResponse:
+        started_at = time.perf_counter()
         parsed_request = _ensure_search_request(request)
-        try:
-            projection = self.projection_repository.projection_for_id(parsed_request.projection_id)
-        except ValueError as exc:
-            if str(exc).startswith("projection inconnue:"):
-                raise SearchProjectionNotFoundError(parsed_request.projection_id) from exc
-            raise
-        _ensure_projection(projection)
-        self._ensure_searchable(projection)
+        projection = self._projection_for_id(parsed_request.projection_id)
+        self._ensure_current_searchable(parsed_request, projection)
 
-        all_metadata = self.retrieval_index.metadata_for_projection(parsed_request.projection_id)
+        try:
+            all_metadata = self.retrieval_index.metadata_for_projection(parsed_request.projection_id)
+        except ValueError as exc:
+            raise SearchIndexUnavailableError(str(exc)) from exc
         filtered_metadata, applied_filter_traces = parsed_request.filters.apply(all_metadata)
         eligible_chunk_ids = tuple(metadata.chunk_id for metadata in filtered_metadata)
         if len(eligible_chunk_ids) == 0:
-            raise SearchIndexUnavailableError("aucun chunk eligible apres filtres")
+            return self._empty_response(
+                request=parsed_request,
+                projection=projection,
+                applied_filter_traces=applied_filter_traces,
+                started_at=started_at,
+            )
 
         freshness = ProjectionFreshnessPolicy(require_current=True).evaluate(
             projection.status,
-            contractual_warning="PROJECTION_SEARCHABLE_VERIFIED",
         )
-        dense_hits = self.retrieval_index.search_dense(
-            projection_id=parsed_request.projection_id,
-            query_text=parsed_request.query_text,
-            eligible_chunk_ids=eligible_chunk_ids,
-            limit=parsed_request.hybrid_policy.dense_limit,
-        )
-        sparse_hits = self.retrieval_index.search_sparse(
-            projection_id=parsed_request.projection_id,
-            query_text=parsed_request.query_text,
-            eligible_chunk_ids=eligible_chunk_ids,
-            limit=parsed_request.hybrid_policy.sparse_limit,
-        )
-        fused_candidates = parsed_request.hybrid_policy.fuse(
-            dense_hits=dense_hits,
-            sparse_hits=sparse_hits,
-        )
+        try:
+            dense_hits = self.retrieval_index.search_dense(
+                projection_id=parsed_request.projection_id,
+                query_text=parsed_request.query_text,
+                eligible_chunk_ids=eligible_chunk_ids,
+                limit=parsed_request.hybrid_policy.dense_limit,
+            )
+            sparse_hits = self.retrieval_index.search_sparse(
+                projection_id=parsed_request.projection_id,
+                query_text=parsed_request.query_text,
+                eligible_chunk_ids=eligible_chunk_ids,
+                limit=parsed_request.hybrid_policy.sparse_limit,
+            )
+            fused_candidates = parsed_request.hybrid_policy.fuse(
+                dense_hits=dense_hits,
+                sparse_hits=sparse_hits,
+            )
+        except ValueError as exc:
+            raise SearchIndexUnavailableError(str(exc)) from exc
 
         candidates: list[RetrievalCandidate] = []
         for fused_candidate in fused_candidates:
             if fused_candidate.chunk_id not in eligible_chunk_ids:
                 continue
-            document = self.retrieval_index.document_for_chunk_id(fused_candidate.chunk_id)
+            try:
+                document = self.retrieval_index.document_for_chunk_id(fused_candidate.chunk_id)
+            except ValueError as exc:
+                raise SearchIndexUnavailableError(str(exc)) from exc
             if document.projection_id != parsed_request.projection_id:
                 raise SearchIndexUnavailableError("document hors projection")
-            parent_context = parsed_request.hybrid_policy.parent_context_policy.expand(document)
+            try:
+                parent_context = parsed_request.hybrid_policy.parent_context_policy.expand(document)
+            except ValueError as exc:
+                raise SearchIndexUnavailableError(str(exc)) from exc
             candidates.append(
                 RetrievalCandidate.from_document(
                     document=document,
@@ -228,8 +265,13 @@ class SearchKnowledge:
         if len(diversified_candidates) == 0:
             raise SearchIndexUnavailableError("aucun candidat apres diversification")
         for candidate in diversified_candidates:
-            self.source_locator_resolver.resolve(candidate.source_locator)
+            try:
+                self.source_locator_resolver.resolve(candidate.source_locator)
+            except ValueError as exc:
+                raise SearchIndexUnavailableError(str(exc)) from exc
 
+        projection = self._projection_for_id(parsed_request.projection_id)
+        self._ensure_current_searchable(parsed_request, projection)
         trace = SearchTraceRecord.from_search(
             request=parsed_request,
             projection_id=projection.projection_id,
@@ -243,16 +285,131 @@ class SearchKnowledge:
             fusion_trace=tuple(candidate.fusion_trace for candidate in diversified_candidates),
             diversification_trace=diversification_trace,
         )
-        persisted_trace = SearchTracePolicy(require_persisted_trace=True).persist(
-            trace=trace,
-            trace_store=self.trace_store,
-        )
-        return SearchResponse(
+        try:
+            persisted_trace = SearchTracePolicy(require_persisted_trace=True).persist(
+                trace=trace,
+                trace_store=self.trace_store,
+            )
+        except ValueError as exc:
+            raise SearchTracePersistenceError(str(exc)) from exc
+        response = SearchResponse(
             search_trace_id=persisted_trace.search_trace_id,
             projection_id=projection.projection_id,
             candidates=diversified_candidates,
             warnings=freshness.warnings,
             applied_filters=tuple(trace.to_payload() for trace in applied_filter_traces),
+        )
+        self._publish_search_performed(
+            request=parsed_request,
+            projection=projection,
+            response=response,
+        )
+        self.metrics.observe(
+            "knowledge_search_latency_seconds",
+            time.perf_counter() - started_at,
+            labels={"projection_id": projection.projection_id, "status": "SEARCH_COMPLETED"},
+        )
+        return response
+
+    def _projection_for_id(self, projection_id: str) -> KnowledgeProjection:
+        try:
+            projection = self.projection_repository.projection_for_id(projection_id)
+        except ValueError as exc:
+            if str(exc).startswith("projection inconnue:"):
+                raise SearchProjectionNotFoundError(projection_id) from exc
+            raise
+        return _ensure_projection(projection)
+
+    def _ensure_current_searchable(
+        self,
+        request: SearchRequest,
+        projection: KnowledgeProjection,
+    ) -> None:
+        try:
+            self._ensure_searchable(projection)
+        except SearchProjectionStaleError:
+            self.metrics.increment(
+                "knowledge_search_stale_projection_total",
+                labels={"projection_id": request.projection_id},
+            )
+            raise
+
+    def _empty_response(
+        self,
+        *,
+        request: SearchRequest,
+        projection: KnowledgeProjection,
+        applied_filter_traces: Sequence[Any],
+        started_at: float,
+    ) -> SearchResponse:
+        projection = self._projection_for_id(request.projection_id)
+        self._ensure_current_searchable(request, projection)
+        trace = SearchTraceRecord.from_search(
+            request=request,
+            projection_id=projection.projection_id,
+            projection_status=projection.status.value,
+            projection_profile_id=projection.projection_profile.projection_profile_id,
+            build_fingerprint=projection.build_fingerprint.value,
+            index_generation="NO_RESULT",
+            candidates=(),
+            applied_filters=tuple(trace.to_payload() for trace in applied_filter_traces),
+            freshness_warnings=(),
+            fusion_trace=(),
+            diversification_trace={
+                "mode": request.hybrid_policy.diversification_policy.mode,
+                "input_count": 0,
+                "output_count": 0,
+            },
+        )
+        try:
+            persisted_trace = SearchTracePolicy(require_persisted_trace=True).persist(
+                trace=trace,
+                trace_store=self.trace_store,
+            )
+        except ValueError as exc:
+            raise SearchTracePersistenceError(str(exc)) from exc
+        response = SearchResponse(
+            search_trace_id=persisted_trace.search_trace_id,
+            projection_id=projection.projection_id,
+            candidates=(),
+            warnings=(),
+            applied_filters=tuple(trace.to_payload() for trace in applied_filter_traces),
+        )
+        self._publish_search_performed(
+            request=request,
+            projection=projection,
+            response=response,
+        )
+        self.metrics.observe(
+            "knowledge_search_latency_seconds",
+            time.perf_counter() - started_at,
+            labels={"projection_id": projection.projection_id, "status": "SEARCH_COMPLETED_EMPTY"},
+        )
+        return response
+
+    def _publish_search_performed(
+        self,
+        *,
+        request: SearchRequest,
+        projection: KnowledgeProjection,
+        response: SearchResponse,
+    ) -> None:
+        factory = KnowledgeProjectionEventFactory(
+            occurred_at=request.occurred_at,
+            correlation_id=_correlation_id_for_search(response.search_trace_id),
+            causation_id=_causation_id_for_search(response.search_trace_id),
+        )
+        append_projection_events_to_outbox(
+            outbox=self.outbox,
+            events=(
+                factory.search_performed(
+                    projection=projection,
+                    search_trace_id=response.search_trace_id,
+                    query_hash=request.query_hash,
+                    filters_hash=request.filters_hash,
+                    result_count=response.result_count,
+                ),
+            ),
         )
 
     def _ensure_searchable(self, projection: KnowledgeProjection) -> None:
@@ -341,3 +498,15 @@ __all__ = [
 
 
 KnowledgeSearchPort = SearchKnowledge
+
+
+def _correlation_id_for_search(search_trace_id: str) -> str:
+    return f"CORR-{_search_trace_suffix(search_trace_id)}"
+
+
+def _causation_id_for_search(search_trace_id: str) -> str:
+    return f"CMD-{_search_trace_suffix(search_trace_id)}"
+
+
+def _search_trace_suffix(search_trace_id: str) -> str:
+    return _ensure_text(search_trace_id, "search_trace_id").removeprefix("STRC-")

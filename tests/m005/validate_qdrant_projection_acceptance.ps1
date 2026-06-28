@@ -36,7 +36,11 @@ from app.knowledge_access.domain.projection_encoding import (
     SparseChunkEncoding,
     SparseTokenWeight,
 )
-from app.knowledge_access.domain.projection_index import VectorIndexSchema, index_generation_for
+from app.knowledge_access.domain.projection_index import (
+    VectorIndexSchema,
+    VectorIndexUnavailableError,
+    index_generation_for,
+)
 from app.platform.event_bus import InMemoryTransactionalOutbox
 from scripts.validate_architecture_boundaries import (
     analyze_architecture,
@@ -251,6 +255,34 @@ assert_equal(
     ),
     2,
     "Les points ne doivent pas être dupliqués.",
+)
+
+requested_projection = projection(status=ProjectionStatus.REQUESTED)
+requested_repository = InMemoryKnowledgeProjectionRepository(projections=(requested_projection,))
+requested_index = InMemoryVectorIndex.empty()
+requested_outbox = InMemoryTransactionalOutbox.empty()
+requested_result = handler_for(requested_index, requested_repository, requested_outbox).publish(command)
+assert_equal(
+    requested_result.projection.status,
+    ProjectionStatus.SEARCHABLE,
+    "Une projection REQUESTED doit suivre REQUESTED -> BUILDING -> BUILT -> INDEXING -> SEARCHABLE.",
+)
+assert_equal(
+    tuple(entry.event.event_type for entry in requested_outbox.pending_events()),
+    ("KnowledgeProjectionBuilt", "KnowledgeProjectionBecameSearchable"),
+    "Le flux REQUESTED doit publier les événements métier de construction et publication.",
+)
+
+missing_generation_repository = InMemoryKnowledgeProjectionRepository(projections=(projection(status=ProjectionStatus.SEARCHABLE),))
+missing_generation_handler = handler_for(
+    InMemoryVectorIndex.empty(),
+    missing_generation_repository,
+    InMemoryTransactionalOutbox.empty(),
+)
+assert_raises(
+    VectorIndexUnavailableError,
+    "generation SEARCHABLE absente",
+    lambda: missing_generation_handler.publish(command),
 )
 
 # Une publication partielle échoue explicitement et ne rend pas la projection SEARCHABLE.

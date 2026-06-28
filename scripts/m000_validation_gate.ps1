@@ -203,18 +203,7 @@ function Convert-M000OutputLine {
         [object] $Line
     )
 
-    $text = [string] $Line
-    if (-not ($text.Contains("Ã") -or $text.Contains("Â"))) {
-        return $text
-    }
-
-    $windowsEncoding = [System.Text.Encoding]::GetEncoding(1252)
-    $candidate = [System.Text.Encoding]::UTF8.GetString($windowsEncoding.GetBytes($text))
-    if ($candidate.Contains([char] 0xFFFD)) {
-        return $text
-    }
-
-    return $candidate
+    return [string] $Line
 }
 
 function Invoke-M000ValidationGate {

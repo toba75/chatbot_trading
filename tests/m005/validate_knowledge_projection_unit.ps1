@@ -153,6 +153,10 @@ built = building.mark_built()
 indexing = built.start_indexing()
 searchable = indexing.mark_searchable()
 assert_equal(searchable.status, ProjectionStatus.SEARCHABLE, "SEARCHABLE n'est atteint qu'apres INDEXING.")
+failed = building.mark_failed()
+retry_requested = failed.retry_request()
+assert_equal(retry_requested.status, ProjectionStatus.REQUESTED, "FAILED doit revenir explicitement à REQUESTED pour retry.")
+assert_equal(retry_requested.start_build().status, ProjectionStatus.BUILDING, "Le retry REQUESTED doit relancer le build explicite.")
 
 # ProjectionEligibilityPolicy refuse la quarantaine et les sources non canoniques.
 policy = ProjectionEligibilityPolicy()

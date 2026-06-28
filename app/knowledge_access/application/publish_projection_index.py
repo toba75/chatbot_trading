@@ -7,6 +7,7 @@ from typing import Any, Protocol
 
 from app.knowledge_access.application.projection_events import (
     KnowledgeProjectionEventFactory,
+    ProjectionOutbox,
     append_projection_events_to_outbox,
 )
 from app.knowledge_access.domain.knowledge_projection import (
@@ -22,9 +23,10 @@ from app.knowledge_access.domain.projection_index import (
     VectorIndexPublication,
     VectorIndexPublishRequest,
     VectorIndexSchema,
+    VectorIndexUnavailableError,
     index_generation_for,
 )
-from app.platform.event_bus import InMemoryTransactionalOutbox
+from app.knowledge_access.domain.time import ensure_utc_instant
 
 
 class ProjectionStateRepository(Protocol):
@@ -46,6 +48,9 @@ class VectorIndex(Protocol):
     def delete_generation(self, *, collection_name: str, index_generation: str) -> VectorIndexDeletion:
         """Supprime une génération technique sans toucher la source canonique."""
 
+    def generation_exists(self, *, collection_name: str, index_generation: str) -> bool:
+        """Indique si une génération technique existe sans la créer."""
+
 
 @dataclass(frozen=True)
 class PublishProjectionIndexCommand:
@@ -66,13 +71,13 @@ class PublishProjectionIndexCommand:
             raise ValueError("projection_id encodage incoherent")
         if not isinstance(self.index_schema, VectorIndexSchema):
             raise ValueError("index_schema invalide")
-        object.__setattr__(self, "occurred_at", _ensure_text(self.occurred_at, "occurred_at"))
+        object.__setattr__(self, "occurred_at", ensure_utc_instant(self.occurred_at, "occurred_at"))
         object.__setattr__(
             self,
             "correlation_id",
-            _ensure_text(self.correlation_id, "correlation_id"),
+            _ensure_correlation_id(self.correlation_id),
         )
-        object.__setattr__(self, "causation_id", _ensure_text(self.causation_id, "causation_id"))
+        object.__setattr__(self, "causation_id", _ensure_causation_id(self.causation_id))
 
 
 @dataclass(frozen=True)
@@ -94,13 +99,13 @@ class MarkProjectionStaleCommand:
             "superseding_input_ref",
             _ensure_text(self.superseding_input_ref, "superseding_input_ref"),
         )
-        object.__setattr__(self, "occurred_at", _ensure_text(self.occurred_at, "occurred_at"))
+        object.__setattr__(self, "occurred_at", ensure_utc_instant(self.occurred_at, "occurred_at"))
         object.__setattr__(
             self,
             "correlation_id",
-            _ensure_text(self.correlation_id, "correlation_id"),
+            _ensure_correlation_id(self.correlation_id),
         )
-        object.__setattr__(self, "causation_id", _ensure_text(self.causation_id, "causation_id"))
+        object.__setattr__(self, "causation_id", _ensure_causation_id(self.causation_id))
 
 
 @dataclass(frozen=True)
@@ -128,13 +133,13 @@ class RetireProjectionIndexCommand:
             "retired_reason",
             _ensure_text(self.retired_reason, "retired_reason"),
         )
-        object.__setattr__(self, "occurred_at", _ensure_text(self.occurred_at, "occurred_at"))
+        object.__setattr__(self, "occurred_at", ensure_utc_instant(self.occurred_at, "occurred_at"))
         object.__setattr__(
             self,
             "correlation_id",
-            _ensure_text(self.correlation_id, "correlation_id"),
+            _ensure_correlation_id(self.correlation_id),
         )
-        object.__setattr__(self, "causation_id", _ensure_text(self.causation_id, "causation_id"))
+        object.__setattr__(self, "causation_id", _ensure_causation_id(self.causation_id))
 
 
 @dataclass(frozen=True)
@@ -184,7 +189,7 @@ class PublishProjectionIndexHandler:
         *,
         projection_repository: ProjectionStateRepository,
         vector_index: VectorIndex,
-        outbox: InMemoryTransactionalOutbox,
+        outbox: ProjectionOutbox,
     ) -> None:
         if not callable(getattr(projection_repository, "projection_for_id", None)):
             raise ValueError("projection_repository sans projection_for_id")
@@ -194,7 +199,11 @@ class PublishProjectionIndexHandler:
             raise ValueError("vector_index sans publish_generation")
         if not callable(getattr(vector_index, "delete_generation", None)):
             raise ValueError("vector_index sans delete_generation")
-        if not isinstance(outbox, InMemoryTransactionalOutbox):
+        if not callable(getattr(vector_index, "generation_exists", None)):
+            raise ValueError("vector_index sans generation_exists")
+        if not callable(getattr(outbox, "has_event", None)):
+            raise ValueError("outbox invalide")
+        if not callable(getattr(outbox, "append_many_in_transaction", None)):
             raise ValueError("outbox invalide")
         self._projection_repository = projection_repository
         self._vector_index = vector_index
@@ -217,6 +226,11 @@ class PublishProjectionIndexHandler:
         factory = _event_factory_for(parsed_command)
 
         if projection.status is ProjectionStatus.SEARCHABLE:
+            if not self._vector_index.generation_exists(
+                collection_name=request.collection_name,
+                index_generation=request.index_generation,
+            ):
+                raise VectorIndexUnavailableError("generation SEARCHABLE absente")
             publication = self._vector_index.publish_generation(request)
             return PublishProjectionIndexResult(
                 projection=projection,
@@ -227,7 +241,14 @@ class PublishProjectionIndexHandler:
             )
 
         built_event = None
-        if projection.status is ProjectionStatus.BUILDING:
+        if projection.status is ProjectionStatus.REQUESTED:
+            built_projection = projection.start_build().mark_built()
+            built_event = factory.built(
+                projection=built_projection,
+                chunk_count=len(parsed_command.encoded_projection.encoded_chunks),
+            )
+            indexing_projection = built_projection.start_indexing()
+        elif projection.status is ProjectionStatus.BUILDING:
             built_projection = projection.mark_built()
             built_event = factory.built(
                 projection=built_projection,
@@ -395,6 +416,20 @@ def _ensure_text(value: Any, field_name: str) -> str:
     if value != value.strip():
         raise ValueError(f"{field_name} non normalise")
     return value
+
+
+def _ensure_correlation_id(value: Any) -> str:
+    text = _ensure_text(value, "correlation_id")
+    if not text.startswith("CORR-"):
+        raise ValueError("correlation_id invalide")
+    return text
+
+
+def _ensure_causation_id(value: Any) -> str:
+    text = _ensure_text(value, "causation_id")
+    if not (text.startswith("CMD-") or text.startswith("EVT-")):
+        raise ValueError("causation_id invalide")
+    return text
 
 
 __all__ = [

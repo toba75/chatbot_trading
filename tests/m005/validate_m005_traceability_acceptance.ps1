@@ -57,7 +57,8 @@ foreach ($requirementId in @(
     "REQ-M005-006",
     "REQ-M005-007",
     "REQ-M005-008",
-    "REQ-M005-009"
+    "REQ-M005-009",
+    "REQ-M005-010"
 )) {
     Assert-Contains -Content $matrixContent -Expected $requirementId -Message "Exigence M-005 absente de la matrice."
     Assert-Contains -Content $traceabilityValidatorContent -Expected $requirementId -Message "Exigence M-005 absente du validateur de traçabilité."

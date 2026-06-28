@@ -55,9 +55,13 @@ $requiredSections = @(
 )
 
 $requiredAdrIds = @(
+    "ADR-001",
     "ADR-005",
     "ADR-006",
+    "ADR-007",
+    "ADR-009",
     "ADR-010",
+    "DDD-ADR-003",
     "DDD-ADR-004",
     "DDD-ADR-008"
 )
@@ -67,6 +71,9 @@ $requiredMarkers = @(
     "When la sp$($eAcute)cification M-005 est publi$($eAcute)e.",
     "Then chaque comportement de projection et recherche nomme son invariant, son sc$($eAcute)nario BDD, son test RED, ses ADR applicables et sa commande de validation.",
     "Qdrant reste une projection r$($eAcute)g$($eAcute)n$($eAcute)rable",
+    "QdrantVectorIndex",
+    "authenticated_context",
+    "requested_by_context",
     "aucun claim EG dans l'index documentaire",
     "RA consomme `KnowledgeSearchPort` sans acc$($eGrave)s direct $($aGrave) Qdrant",
     "un score n'est pas une v$($eAcute)rit$($eAcute) m$($eAcute)tier"
@@ -165,14 +172,14 @@ $expectedMetrics = @(
 )
 
 $expectedBehaviors = @(
-    @{ Name = "KA-001 - Sp$($eAcute)cification ex$($eAcute)cutable M-005"; Adr = @("ADR-005", "ADR-006", "ADR-010", "DDD-ADR-004", "DDD-ADR-008"); Test = "T-002"; Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m005_specification.ps1" },
+    @{ Name = "KA-001 - Sp$($eAcute)cification ex$($eAcute)cutable M-005"; Adr = @("ADR-001", "ADR-005", "ADR-006", "ADR-007", "ADR-009", "ADR-010", "DDD-ADR-003", "DDD-ADR-004", "DDD-ADR-008"); Test = "T-002"; Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m005_specification.ps1" },
     @{ Name = "KA-002 - Projection depuis version canonique"; Adr = @("DDD-ADR-004", "DDD-ADR-008", "ADR-010"); Test = "T-003"; Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_knowledge_projection_acceptance.ps1" },
-    @{ Name = "KA-003 - Chunking tra$($cCedilla)able"; Adr = @("DDD-ADR-004"); Test = "T-004"; Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_hierarchical_chunking_acceptance.ps1" },
+    @{ Name = "KA-003 - Chunking tra$($cCedilla)able"; Adr = @("ADR-001", "ADR-006", "DDD-ADR-003", "DDD-ADR-004"); Test = "T-004"; Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_hierarchical_chunking_acceptance.ps1" },
     @{ Name = "KA-004 - M$($eAcute)tadonn$($eAcute)es filtrables"; Adr = @("ADR-005", "DDD-ADR-004"); Test = "T-005"; Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_projection_metadata_filters_acceptance.ps1" },
-    @{ Name = "KA-005 - Encodage dense et sparse"; Adr = @("ADR-005", "DDD-ADR-004"); Test = "T-006"; Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_projection_encoding_acceptance.ps1" },
+    @{ Name = "KA-005 - Encodage dense et sparse"; Adr = @("ADR-005", "ADR-007", "ADR-009", "DDD-ADR-004"); Test = "T-006"; Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_projection_encoding_acceptance.ps1" },
     @{ Name = "KA-006 - Index Qdrant r$($eAcute)g$($eAcute)n$($eAcute)rable"; Adr = @("ADR-005", "DDD-ADR-004", "DDD-ADR-008"); Test = "T-007"; Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_qdrant_projection_acceptance.ps1" },
-    @{ Name = "KA-007 - Recherche hybride tra$($cCedilla)able"; Adr = @("ADR-005", "ADR-006", "DDD-ADR-004", "DDD-ADR-008"); Test = "T-008"; Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_hybrid_search_acceptance.ps1" },
-    @{ Name = "KA-008 - Commande de recherche publique"; Adr = @("ADR-005", "ADR-010", "DDD-ADR-004"); Test = "T-009"; Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_search_command_acceptance.ps1" },
+    @{ Name = "KA-007 - Recherche hybride tra$($cCedilla)able"; Adr = @("ADR-005", "ADR-006", "DDD-ADR-003", "DDD-ADR-004", "DDD-ADR-008"); Test = "T-008"; Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_hybrid_search_acceptance.ps1" },
+    @{ Name = "KA-008 - Commande de recherche publique"; Adr = @("ADR-005", "ADR-006", "ADR-010", "DDD-ADR-003", "DDD-ADR-004"); Test = "T-009"; Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_search_command_acceptance.ps1" },
     @{ Name = "KA-009 - Tra$($cCedilla)abilit$($eAcute) et m$($eAcute)triques M-005"; Adr = @("ADR-005", "ADR-006", "ADR-010", "DDD-ADR-004", "DDD-ADR-008"); Test = "T-010"; Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_m005_traceability_acceptance.ps1" }
 )
 

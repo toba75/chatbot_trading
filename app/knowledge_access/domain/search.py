@@ -7,6 +7,7 @@ import json
 import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
+from types import MappingProxyType
 from typing import Any
 
 from app.contracts.source_references import SourceLocator
@@ -15,6 +16,7 @@ from app.knowledge_access.domain.projection_metadata import (
     ProjectionMetadata,
     SearchFilter,
 )
+from app.knowledge_access.domain.time import ensure_utc_instant
 
 
 _HASH_HEX_ALPHABET = frozenset("0123456789abcdef")
@@ -284,9 +286,10 @@ class HybridRetrievalPolicy:
     ) -> tuple[tuple["RetrievalCandidate", ...], dict[str, Any]]:
         parsed_candidates = _ensure_candidates(candidates)
         if self.diversification_policy.mode == "NONE":
+            limited = tuple(parsed_candidates[: self.result_limit])
             ranked = tuple(
                 candidate.with_diversification_rank(index)
-                for index, candidate in enumerate(parsed_candidates, start=1)
+                for index, candidate in enumerate(limited, start=1)
             )
             return ranked, {
                 "mode": "NONE",
@@ -573,7 +576,7 @@ class SearchRequest:
             raise ValueError("filters invalides")
         if not isinstance(self.hybrid_policy, HybridRetrievalPolicy):
             raise ValueError("hybrid_policy invalide")
-        object.__setattr__(self, "occurred_at", _ensure_text(self.occurred_at, "occurred_at"))
+        object.__setattr__(self, "occurred_at", ensure_utc_instant(self.occurred_at, "occurred_at"))
         context = _ensure_text(self.requested_by_context, "requested_by_context")
         if context not in _ALLOWED_REQUESTING_CONTEXTS:
             raise ValueError("requested_by_context inconnu")
@@ -582,6 +585,16 @@ class SearchRequest:
     @property
     def query_hash(self) -> str:
         return _sha256_text(self.query_text)
+
+    @property
+    def filters_hash(self) -> str:
+        serialized_payload = json.dumps(
+            _json_ready(self.filters_payload()),
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+        return hashlib.sha256(serialized_payload.encode("utf-8")).hexdigest()
 
     def filters_payload(self) -> dict[str, Any]:
         return _filter_payload(self.filters)
@@ -679,7 +692,7 @@ class SearchTraceRecord:
             "fusion_payload",
             "diversification_trace",
         ):
-            object.__setattr__(self, field_name, _ensure_mapping(getattr(self, field_name), field_name))
+            object.__setattr__(self, field_name, _ensure_immutable_mapping(getattr(self, field_name), field_name))
         object.__setattr__(
             self,
             "applied_filters",
@@ -702,16 +715,16 @@ class SearchTraceRecord:
     def to_payload(self) -> dict[str, Any]:
         return {
             "search_trace_id": self.search_trace_id,
-            "request": dict(self.request_payload),
-            "projection": dict(self.projection_payload),
-            "search_profile": dict(self.search_profile_payload),
-            "models": dict(self.models_payload),
-            "filters": dict(self.filters_payload),
-            "applied_filters": tuple(dict(item) for item in self.applied_filters),
+            "request": _deep_thaw(self.request_payload),
+            "projection": _deep_thaw(self.projection_payload),
+            "search_profile": _deep_thaw(self.search_profile_payload),
+            "models": _deep_thaw(self.models_payload),
+            "filters": _deep_thaw(self.filters_payload),
+            "applied_filters": tuple(_deep_thaw(item) for item in self.applied_filters),
             "freshness_warnings": self.freshness_warnings,
-            "fusion": dict(self.fusion_payload),
-            "diversification": dict(self.diversification_trace),
-            "candidate_refs": tuple(dict(item) for item in self.candidate_refs),
+            "fusion": _deep_thaw(self.fusion_payload),
+            "diversification": _deep_thaw(self.diversification_trace),
+            "candidate_refs": tuple(_deep_thaw(item) for item in self.candidate_refs),
             "result_count": self.result_count,
         }
 
@@ -881,12 +894,32 @@ def _ensure_mapping(value: Any, field_name: str) -> dict[str, Any]:
     return dict(value)
 
 
+def _ensure_immutable_mapping(value: Any, field_name: str) -> Mapping[str, Any]:
+    return _deep_freeze(_ensure_mapping(value, field_name))
+
+
 def _ensure_mapping_tuple(value: Any, field_name: str) -> tuple[dict[str, Any], ...]:
     if value is None:
         raise ValueError(f"{field_name} absent")
     if isinstance(value, str) or not isinstance(value, Sequence):
         raise ValueError(f"{field_name} invalide")
-    return tuple(_ensure_mapping(item, field_name) for item in value)
+    return tuple(_ensure_immutable_mapping(item, field_name) for item in value)
+
+
+def _deep_freeze(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return MappingProxyType({str(key): _deep_freeze(item) for key, item in value.items()})
+    if isinstance(value, tuple) or isinstance(value, list):
+        return tuple(_deep_freeze(item) for item in value)
+    return value
+
+
+def _deep_thaw(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {str(key): _deep_thaw(item) for key, item in value.items()}
+    if isinstance(value, tuple) or isinstance(value, list):
+        return tuple(_deep_thaw(item) for item in value)
+    return value
 
 
 def _ensure_text_tuple(value: Any, field_name: str) -> tuple[str, ...]:

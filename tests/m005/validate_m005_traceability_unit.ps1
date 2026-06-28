@@ -121,7 +121,7 @@ signal = KnowledgeSearchAuditSignal.from_metric_snapshot(
     search_trace_id="STRC-M005-T010-000000000000000000000001",
     projection_id="PROJ-M005-T010",
     query_hash="a" * 64,
-    result_count=2,
+    result_count=1,
     candidate_refs=(
         {
             "chunk_id": "KCHK-M005-T010-A",
@@ -140,6 +140,39 @@ assert_equal(signal_payload["metrics"]["recall_at_k"], payload["metrics"]["recal
 assert_equal(signal_payload["candidate_refs"][0]["content_hash"], "b" * 64, "La référence candidate doit porter le hash.")
 assert_false(full_passage in repr(signal_payload), "Le signal ne doit pas contenir le passage complet.")
 assert_false("verified_claim" in repr(signal_payload).lower(), "Le signal KA ne doit pas publier de claim vérifié.")
+
+assert_raises(
+    "result_count incoherent",
+    lambda: KnowledgeSearchAuditSignal.from_metric_snapshot(
+        search_trace_id="STRC-M005-T010-000000000000000000000002",
+        projection_id="PROJ-M005-T010",
+        query_hash="a" * 64,
+        result_count=2,
+        candidate_refs=signal_payload["candidate_refs"],
+        metric_snapshot=snapshot,
+        forbidden_full_passages=(full_passage,),
+    ),
+)
+assert_raises(
+    "contenu documentaire interdit dans candidate_refs",
+    lambda: KnowledgeSearchAuditSignal.from_metric_snapshot(
+        search_trace_id="STRC-M005-T010-000000000000000000000003",
+        projection_id="PROJ-M005-T010",
+        query_hash="a" * 64,
+        result_count=1,
+        candidate_refs=(
+            {
+                "chunk_id": "KCHK-M005-T010-A",
+                "document_id": "DOC-M005-T010",
+                "canonical_version_id": "CVER-M005-T010-0001",
+                "content_hash": "b" * 64,
+                "source_locator": {"item_id": "DOC-M005-T010-P001-I001"},
+            },
+        ),
+        metric_snapshot=snapshot,
+        forbidden_full_passages=(full_passage,),
+    ),
+)
 
 # Un payload de log qui contient un passage complet doit être refusé.
 assert_raises(
