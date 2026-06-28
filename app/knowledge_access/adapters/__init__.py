@@ -1,6 +1,18 @@
 """Couche adaptateurs du contexte KA."""
 """Adaptateurs KA."""
 
+from app.knowledge_access.adapters.in_memory_hybrid_search import (
+    InMemoryHybridRetrievalIndex,
+    InMemoryReranker,
+    InMemorySearchTraceStore,
+)
+
+__all__ = [
+    "InMemoryHybridRetrievalIndex",
+    "InMemoryReranker",
+    "InMemorySearchTraceStore",
+]
+
 from app.knowledge_access.adapters.in_memory_projection_repository import (
     InMemoryKnowledgeProjectionRepository,
     InMemoryProjectionEventRegistry,

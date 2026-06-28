@@ -429,6 +429,14 @@ $requiredM005Requirements = @(
         CommandScript = "tests/m005/validate_qdrant_projection_acceptance.ps1"
         Code = "app/knowledge_access/domain/projection_index.py; app/knowledge_access/application/publish_projection_index.py; app/knowledge_access/application/projection_events.py; app/knowledge_access/adapters/in_memory_vector_index.py"
         Adr = "ADR-005; DDD-ADR-004; DDD-ADR-008"
+    },
+    [ordered] @{
+        Id = "REQ-M005-007"
+        Source = "docs/tasks/milestone_005/0008_rechercher_preuves_candidates_hybrides.md"
+        Test = "tests/m005/validate_hybrid_search_acceptance.ps1"
+        CommandScript = "tests/m005/validate_hybrid_search_acceptance.ps1"
+        Code = "app/knowledge_access/domain/search.py; app/knowledge_access/application/search_knowledge.py; app/knowledge_access/adapters/in_memory_hybrid_search.py"
+        Adr = "ADR-005; ADR-006; DDD-ADR-003; DDD-ADR-004; DDD-ADR-008"
     }
 )
 

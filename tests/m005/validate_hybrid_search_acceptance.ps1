@@ -72,20 +72,25 @@ def projection(status=ProjectionStatus.SEARCHABLE):
     return KnowledgeProjection(
         projection_id="PROJ-M005-T008-ACCEPTANCE",
         document_id="DOC-M005-T008-A",
-        canonical_version_id="CVER-M005-T008-ACCEPTANCE-0001",
+        canonical_version_id="CVER-M005-T008-A-0001",
         projection_profile=projection_profile(),
         build_fingerprint=BuildFingerprint("c" * 64),
         status=status,
     )
 
 
+def canonical_version_id_for(document_id):
+    suffix = document_id.split("-")[-1]
+    return f"CVER-M005-T008-{suffix}-0001"
+
+
 def canonical_ref(document_id="DOC-M005-T008-A"):
     return CanonicalSourceRef.from_payload(
         {
             "schema_version": "1.0",
-            "canonical_source_id": "CSRC-M005-T008-ACCEPTANCE",
+            "canonical_source_id": f"CSRC-M005-T008-{document_id.split('-')[-1]}",
             "document_id": document_id,
-            "canonical_version_id": "CVER-M005-T008-ACCEPTANCE-0001",
+            "canonical_version_id": canonical_version_id_for(document_id),
             "source_sha256": "a" * 64,
             "canonical_artifact_sha256": "b" * 64,
             "page_count": 3,
@@ -115,7 +120,7 @@ def locator(document_id, item_id, text, policy):
     return SourceLocator.from_payload(
         {
             "schema_version": "1.0",
-            "canonical_version_id": "CVER-M005-T008-ACCEPTANCE-0001",
+            "canonical_version_id": canonical_version_id_for(document_id),
             "document_id": document_id,
             "page_pdf": 1,
             "item_id": item_id,
@@ -186,7 +191,7 @@ documents = (
         build_fingerprint="c" * 64,
         index_generation="IDX-M005-T008-ACCEPTANCE",
         chunk_id="KCHK-M005-T008-A-001",
-        canonical_version_id="CVER-M005-T008-ACCEPTANCE-0001",
+        canonical_version_id="CVER-M005-T008-A-0001",
         document_id="DOC-M005-T008-A",
         text=texts["DOC-M005-T008-A-P001-I001"],
         source_locator=locator("DOC-M005-T008-A", "DOC-M005-T008-A-P001-I001", texts["DOC-M005-T008-A-P001-I001"], policy),
@@ -207,7 +212,7 @@ documents = (
         build_fingerprint="c" * 64,
         index_generation="IDX-M005-T008-ACCEPTANCE",
         chunk_id="KCHK-M005-T008-A-002",
-        canonical_version_id="CVER-M005-T008-ACCEPTANCE-0001",
+        canonical_version_id="CVER-M005-T008-A-0001",
         document_id="DOC-M005-T008-A",
         text=texts["DOC-M005-T008-A-P001-I002"],
         source_locator=locator("DOC-M005-T008-A", "DOC-M005-T008-A-P001-I002", texts["DOC-M005-T008-A-P001-I002"], policy),
@@ -228,7 +233,7 @@ documents = (
         build_fingerprint="c" * 64,
         index_generation="IDX-M005-T008-ACCEPTANCE",
         chunk_id="KCHK-M005-T008-B-001",
-        canonical_version_id="CVER-M005-T008-ACCEPTANCE-0001",
+        canonical_version_id="CVER-M005-T008-B-0001",
         document_id="DOC-M005-T008-B",
         text=texts["DOC-M005-T008-B-P001-I001"],
         source_locator=locator("DOC-M005-T008-B", "DOC-M005-T008-B-P001-I001", texts["DOC-M005-T008-B-P001-I001"], policy),
@@ -249,7 +254,7 @@ documents = (
         build_fingerprint="c" * 64,
         index_generation="IDX-M005-T008-ACCEPTANCE",
         chunk_id="KCHK-M005-T008-C-001",
-        canonical_version_id="CVER-M005-T008-ACCEPTANCE-0001",
+        canonical_version_id="CVER-M005-T008-C-0001",
         document_id="DOC-M005-T008-C",
         text=texts["DOC-M005-T008-C-P001-I001"],
         source_locator=locator("DOC-M005-T008-C", "DOC-M005-T008-C-P001-I001", texts["DOC-M005-T008-C-P001-I001"], policy),

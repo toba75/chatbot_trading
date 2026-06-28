@@ -25,6 +25,15 @@ from app.knowledge_access.application.publish_projection_index import (
     PublishProjectionIndexResult,
     RetireProjectionIndexCommand,
 )
+from app.knowledge_access.application.search_knowledge import (
+    KnowledgeSearchPort,
+    SearchIndexUnavailableError,
+    SearchKnowledge,
+    SearchProfileUnsupportedError,
+    SearchProjectionStaleError,
+    SearchProjectionUnavailableError,
+    SearchTracePersistenceError,
+)
 
 __all__ = [
     "CanonicalSourceForProjection",
@@ -42,5 +51,12 @@ __all__ = [
     "RequestKnowledgeProjectionCommand",
     "RequestKnowledgeProjectionHandler",
     "RetireProjectionIndexCommand",
+    "KnowledgeSearchPort",
+    "SearchIndexUnavailableError",
+    "SearchKnowledge",
+    "SearchProfileUnsupportedError",
+    "SearchProjectionStaleError",
+    "SearchProjectionUnavailableError",
+    "SearchTracePersistenceError",
     "append_projection_events_to_outbox",
 ]
