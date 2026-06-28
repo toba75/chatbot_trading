@@ -137,7 +137,7 @@ try {
 
     Assert-OutputContains `
         -Output $reportContent `
-        -Expected "98 test(s)" `
+        -Expected "100 test(s)" `
         -Message "Le rapport doit prouver le volume de tests courant."
 }
 finally {

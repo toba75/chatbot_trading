@@ -129,6 +129,21 @@ class BuildFingerprint:
         )
         return cls(hashlib.sha256(serialized_payload.encode("utf-8")).hexdigest())
 
+    def extend_with_payload(self, *, scope: str, payload: Mapping[str, Any]) -> "BuildFingerprint":
+        parsed_scope = _ensure_text(scope, "fingerprint_scope")
+        parsed_payload = _ensure_mapping(payload, "fingerprint_payload")
+        serialized_payload = json.dumps(
+            {
+                "base_build_fingerprint": self.value,
+                "payload": parsed_payload,
+                "scope": parsed_scope,
+            },
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+        return BuildFingerprint(hashlib.sha256(serialized_payload.encode("utf-8")).hexdigest())
+
     def __post_init__(self) -> None:
         _ensure_sha256(self.value, "build_fingerprint")
 
@@ -298,6 +313,12 @@ def _ensure_sha256(value: Any, field_name: str) -> str:
         if character not in _HASH_HEX_ALPHABET:
             raise ValueError(f"{field_name} invalide")
     return text_value
+
+
+def _ensure_mapping(value: Any, field_name: str) -> Mapping[str, Any]:
+    if not isinstance(value, Mapping):
+        raise ValueError(f"{field_name} non objet")
+    return dict(value)
 
 
 __all__ = [

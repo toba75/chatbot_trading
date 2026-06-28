@@ -77,9 +77,8 @@ def locator_for(text, *, item_suffix):
 
 def child_chunk(text, *, chunk_id, item_suffix):
     source_locator = locator_for(text, item_suffix=item_suffix)
-    return KnowledgeChunk.child(
+    return KnowledgeChunk.parent(
         chunk_id=chunk_id,
-        parent_chunk_id="KCHK-M005-T006-PARENT",
         canonical_version_id=source_locator.canonical_version_id,
         document_id=source_locator.document_id,
         profile_id="chunking-profile-m005-t006",
@@ -332,4 +331,3 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "Test d'acceptation T-006 encodage dense sparse M-005: OK"
-

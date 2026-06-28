@@ -71,9 +71,8 @@ def source_locator(text):
 def knowledge_chunk():
     text = "Un chunk unitaire encode dense et sparse."
     locator = source_locator(text)
-    return KnowledgeChunk.child(
+    return KnowledgeChunk.parent(
         chunk_id="KCHK-M005-T006-UNIT-001",
-        parent_chunk_id="KCHK-M005-T006-UNIT-PARENT",
         canonical_version_id=locator.canonical_version_id,
         document_id=locator.document_id,
         profile_id="chunking-profile-m005-t006-unit",
@@ -285,4 +284,3 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "Tests unitaires T-006 encodage dense sparse M-005: OK"
-

@@ -413,6 +413,14 @@ $requiredM005Requirements = @(
         CommandScript = "tests/m005/validate_projection_metadata_filters_acceptance.ps1"
         Code = "app/knowledge_access/domain/projection_metadata.py"
         Adr = "ADR-005; DDD-ADR-004"
+    },
+    [ordered] @{
+        Id = "REQ-M005-005"
+        Source = "docs/tasks/milestone_005/0006_encoder_projection_dense_sparse.md"
+        Test = "tests/m005/validate_projection_encoding_acceptance.ps1"
+        CommandScript = "tests/m005/validate_projection_encoding_acceptance.ps1"
+        Code = "app/knowledge_access/domain/projection_encoding.py; app/knowledge_access/application/encode_projection.py"
+        Adr = "ADR-005; ADR-007; ADR-009; DDD-ADR-004"
     }
 )
 
