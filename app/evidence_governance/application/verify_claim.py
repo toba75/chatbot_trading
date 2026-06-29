@@ -19,6 +19,8 @@ from app.evidence_governance.domain.claim_verification import (
     VerificationCase,
     VerificationDecisionRecorded,
     transition_claim_to,
+    transition_claim_to_rejected,
+    transition_claim_to_verified,
 )
 
 
@@ -175,16 +177,16 @@ class VerifyClaimHandler:
             occurred_at=parsed_command.occurred_at,
         )
         saved_case = self.verification_case_repository.save(recorded_case)
-        final_claim = self.claim_repository.save(
-            transition_claim_to(
-                claim=saved_under_verification_claim,
-                status=policy_decision.target_status,
-            )
-        )
-
-        if final_claim.status == ClaimStatus.VERIFIED:
+        if policy_decision.target_status == ClaimStatus.VERIFIED:
             if policy_decision.verified_claim_ref is None:
                 raise ValueError("verified_claim_ref absent")
+            final_claim = self.claim_repository.save(
+                transition_claim_to_verified(
+                    claim=saved_under_verification_claim,
+                    verified_claim_ref=policy_decision.verified_claim_ref,
+                    accepted_verification_id=parsed_command.verification_case_id,
+                )
+            )
             final_event = ClaimVerified(
                 claim_id=final_claim.claim_id,
                 claim_version=final_claim.claim_version,
@@ -193,6 +195,13 @@ class VerifyClaimHandler:
                 occurred_at=parsed_command.occurred_at,
             )
         else:
+            final_claim = self.claim_repository.save(
+                transition_claim_to_rejected(
+                    claim=saved_under_verification_claim,
+                    reason_codes=policy_decision.reason_codes,
+                    rejected_at=parsed_command.occurred_at,
+                )
+            )
             final_event = ClaimRejected(
                 claim_id=final_claim.claim_id,
                 claim_version=final_claim.claim_version,

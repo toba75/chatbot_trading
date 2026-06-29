@@ -673,8 +673,8 @@ def transition_claim_to(
         raise ValueError("status claim invalide")
     if status == ClaimStatus.UNDER_VERIFICATION and parsed_claim.status != ClaimStatus.EVIDENCE_ATTACHED:
         raise ValueError(f"transition claim interdite: {parsed_claim.status.value}")
-    if status in {ClaimStatus.VERIFIED, ClaimStatus.REJECTED} and parsed_claim.status != ClaimStatus.UNDER_VERIFICATION:
-        raise ValueError(f"transition claim interdite: {parsed_claim.status.value}")
+    if status in {ClaimStatus.VERIFIED, ClaimStatus.REJECTED}:
+        raise ValueError("transition claim exige decision explicite")
     return Claim(
         claim_id=parsed_claim.claim_id,
         claim_version=parsed_claim.claim_version,
@@ -685,6 +685,57 @@ def transition_claim_to(
         conditions=parsed_claim.conditions,
         limitations=parsed_claim.limitations,
         evidence_associations=parsed_claim.evidence_associations,
+    )
+
+
+def transition_claim_to_verified(
+    *,
+    claim: Claim,
+    verified_claim_ref: VerifiedClaimRef,
+    accepted_verification_id: str,
+) -> Claim:
+    parsed_claim = _ensure_claim(claim)
+    if parsed_claim.status != ClaimStatus.UNDER_VERIFICATION:
+        raise ValueError(f"transition claim interdite: {parsed_claim.status.value}")
+    if not isinstance(verified_claim_ref, VerifiedClaimRef):
+        raise ValueError("verified_claim_ref invalide")
+    return Claim(
+        claim_id=parsed_claim.claim_id,
+        claim_version=parsed_claim.claim_version,
+        status=ClaimStatus.VERIFIED,
+        claim_type=parsed_claim.claim_type,
+        canonical_proposition=parsed_claim.canonical_proposition,
+        scope=parsed_claim.scope,
+        conditions=parsed_claim.conditions,
+        limitations=parsed_claim.limitations,
+        evidence_associations=parsed_claim.evidence_associations,
+        verified_claim_ref=verified_claim_ref,
+        accepted_verification_id=_ensure_verification_case_id(accepted_verification_id),
+    )
+
+
+def transition_claim_to_rejected(
+    *,
+    claim: Claim,
+    reason_codes: Sequence[ReasonCode],
+    rejected_at: str,
+) -> Claim:
+    parsed_claim = _ensure_claim(claim)
+    if parsed_claim.status != ClaimStatus.UNDER_VERIFICATION:
+        raise ValueError(f"transition claim interdite: {parsed_claim.status.value}")
+    parsed_reason_codes = _ensure_non_empty_reason_codes(reason_codes)
+    return Claim(
+        claim_id=parsed_claim.claim_id,
+        claim_version=parsed_claim.claim_version,
+        status=ClaimStatus.REJECTED,
+        claim_type=parsed_claim.claim_type,
+        canonical_proposition=parsed_claim.canonical_proposition,
+        scope=parsed_claim.scope,
+        conditions=parsed_claim.conditions,
+        limitations=parsed_claim.limitations,
+        evidence_associations=parsed_claim.evidence_associations,
+        rejection_reason_codes=tuple(reason_code.value for reason_code in parsed_reason_codes),
+        rejected_at=_ensure_utc_instant(rejected_at, "rejected_at"),
     )
 
 
@@ -881,4 +932,6 @@ __all__ = [
     "VerificationDecisionRecorded",
     "VerificationVerdict",
     "transition_claim_to",
+    "transition_claim_to_rejected",
+    "transition_claim_to_verified",
 ]
