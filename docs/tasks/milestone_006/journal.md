@@ -71,3 +71,16 @@
 - ADR: non requise; T-006 applique ADR-006, DDD-ADR-005 et DDD-ADR-010 sans changer leur sens.
 - Validations GREEN: `tests/m006/validate_dependency_group_acceptance.ps1`; `tests/m006/validate_dependency_group_unit.ps1`; `scripts/validate_traceability.ps1` (`69 exigence(s)`); `scripts/lint.ps1` (`15 validation(s), 0 test(s)`); `scripts/test.ps1` (`15 validation(s), 126 test(s)`); `git diff --check`.
 - Risques résiduels: le repository mémoire reste un double local pour T-006; aucune persistance durable ni moteur graphe n'est introduit par cette tâche.
+
+## Clôture T-007
+
+- Scénario BDD: Given deux claims opposés portent sur des horizons différents; When EG évalue leur relation; Then aucune relation `CONTRADICTS` générale n'est créée et la raison de non-comparabilité de portée est enregistrée.
+- Commit RED: `38f07e8` (`test(m006): couvrir relations claims portee`).
+- RED T-007 confirmé: `tests/m006/validate_claim_relation_acceptance.ps1` et `tests/m006/validate_claim_relation_unit.ps1` échouaient sur `ModuleNotFoundError: app.evidence_governance.adapters.in_memory_claim_relation_repository`, car le repository, le modèle de relation et le handler EG n'existaient pas encore.
+- Implémentation: `app/evidence_governance/domain/claim_relation.py` ajoute `ClaimVersionRef`, `ScopeCompatibility`, `ClaimRelationType`, `ClaimRelation`, `ClaimRelationPolicy` et `ClaimRelationRecorded`; `app/evidence_governance/application/relate_claims.py` ajoute la commande `RelateClaims`, le port `ClaimRelationRepository` et `RelateClaimsHandler`; `app/evidence_governance/adapters/in_memory_claim_relation_repository.py` livre un repository mémoire strict avec détection de cycle.
+- Garde-fous livrés: aucun type de relation par défaut; versions source et cible obligatoires; aucune relation vers un claim inexistant; aucune contradiction `CONTRADICTS` sans portée comparable; les horizons différents deviennent `APPARENTLY_CONTRADICTS` avec raison `SCOPE_HORIZON_MISMATCH`; la similarité textuelle seule est refusée; les cycles relationnels sont interdits sans justification explicite.
+- Traçabilité et gates: `tests/m006/validate_claim_relation_acceptance.ps1` et `tests/m006/validate_claim_relation_unit.ps1` sont enrôlés dans `scripts/test.ps1`; `REQ-M006-007` est ajouté à `docs/traceability/matrix.md`; la gate globale attend désormais `15 validation(s), 128 test(s)` et la précondition M-003 imbriquée attend `122 test(s)` après exclusions de récursion.
+- ADR consultées: DDD-ADR-005 et DDD-ADR-010.
+- ADR: non requise; T-007 applique les types de relation et les invariants déjà spécifiés pour M-006 sans changer de décision structurante.
+- Validations GREEN: `tests/m006/validate_claim_relation_acceptance.ps1`; `tests/m006/validate_claim_relation_unit.ps1`; `scripts/validate_traceability.ps1` (`70 exigence(s)`); `scripts/lint.ps1` (`15 validation(s), 0 test(s)`); `scripts/test.ps1` (`15 validation(s), 128 test(s)`); `git diff --check`.
+- Risques résiduels: le repository mémoire reste un double local pour T-007; aucune persistance durable, moteur graphe spécialisé ni API HTTP de relations n'est introduit par cette tâche.

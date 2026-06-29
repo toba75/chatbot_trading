@@ -12,6 +12,9 @@ from app.evidence_governance.adapters.in_memory_claim_draft_repository import (
 from app.evidence_governance.adapters.in_memory_claim_repository import (
     InMemoryClaimRepository,
 )
+from app.evidence_governance.adapters.in_memory_claim_relation_repository import (
+    InMemoryClaimRelationRepository,
+)
 
 
 __all__ = [
@@ -19,4 +22,5 @@ __all__ = [
     "InMemoryCanonicalEvidenceReader",
     "InMemoryClaimDraftRepository",
     "InMemoryClaimRepository",
+    "InMemoryClaimRelationRepository",
 ]

@@ -22,6 +22,16 @@ from app.evidence_governance.domain.claim_extraction import (
     Limitation,
     claim_id_for,
 )
+from app.evidence_governance.domain.claim_relation import (
+    ClaimRelation,
+    ClaimRelationPolicy,
+    ClaimRelationPolicyDecision,
+    ClaimRelationRecorded,
+    ClaimRelationType,
+    ClaimVersionRef,
+    ScopeCompatibility,
+    ScopeCompatibilityStatus,
+)
 
 
 __all__ = [
@@ -33,8 +43,14 @@ __all__ = [
     "ClaimCondition",
     "ClaimDrafted",
     "ClaimExtractionProposal",
+    "ClaimRelation",
+    "ClaimRelationPolicy",
+    "ClaimRelationPolicyDecision",
+    "ClaimRelationRecorded",
+    "ClaimRelationType",
     "ClaimScope",
     "ClaimStatus",
+    "ClaimVersionRef",
     "DraftClaim",
     "DraftClaimStatus",
     "EvidenceAdmissibilityPolicy",
@@ -42,5 +58,7 @@ __all__ = [
     "EvidenceAttachedToClaim",
     "EvidenceSpan",
     "Limitation",
+    "ScopeCompatibility",
+    "ScopeCompatibilityStatus",
     "claim_id_for",
 ]

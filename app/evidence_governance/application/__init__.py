@@ -14,6 +14,12 @@ from app.evidence_governance.application.extract_claims import (
     ExtractClaimsFromEvidenceCommand,
     ExtractClaimsFromEvidenceHandler,
 )
+from app.evidence_governance.application.relate_claims import (
+    ClaimRelationRepository,
+    RelateClaims,
+    RelateClaimsHandler,
+    RelateClaimsResult,
+)
 
 
 __all__ = [
@@ -25,6 +31,10 @@ __all__ = [
     "ClaimExtractionResult",
     "ClaimExtractor",
     "ClaimRepository",
+    "ClaimRelationRepository",
     "ExtractClaimsFromEvidenceCommand",
     "ExtractClaimsFromEvidenceHandler",
+    "RelateClaims",
+    "RelateClaimsHandler",
+    "RelateClaimsResult",
 ]
