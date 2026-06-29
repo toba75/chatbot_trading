@@ -59,3 +59,15 @@
 - ADR: non requise; T-005 applique ADR-006, DDD-ADR-003, DDD-ADR-005 et DDD-ADR-007 sans changer leur sens.
 - Validations GREEN: `tests/m006/validate_claim_verification_acceptance.ps1`; `tests/m006/validate_claim_verification_unit.ps1`; `scripts/validate_traceability.ps1` (`68 exigence(s)`); `scripts/lint.ps1` (`15 validation(s), 0 test(s)`); `scripts/test.ps1` (`15 validation(s), 124 test(s)`); `git diff --check`.
 - Risques résiduels: le vérificateur indépendant est seulement un port et le repository mémoire est un double local pour T-005; aucune persistance durable ni API HTTP de vérification n'est introduite par cette tâche.
+
+## Clôture T-006
+
+- Scénario BDD: Given trois documents rattachés au même `DependencyGroup`; When le nombre de confirmations indépendantes est calculé; Then une seule confirmation indépendante est comptabilisée.
+- Commit RED: `2961e85` (`test(m006): couvrir confirmations independantes`).
+- RED T-006 confirmé: `tests/m006/validate_dependency_group_acceptance.ps1` et `tests/m006/validate_dependency_group_unit.ps1` échouaient sur `ModuleNotFoundError: app.evidence_governance.adapters.in_memory_dependency_group_repository`, car l'agrégat, le repository, le handler et le compteur EG n'existaient pas encore.
+- Implémentation: `app/evidence_governance/domain/dependency_group.py` ajoute `DependencyGroup`, `ClaimDependencyAssignment`, `ClaimDependencyAssigned`, `SourceIndependencePolicy` et `IndependentSupportCount`; `app/evidence_governance/application/dependency_groups.py` ajoute la commande `AssignClaimDependencyGroup`, son handler et la requête `CountIndependentSupport`; `app/evidence_governance/adapters/in_memory_dependency_group_repository.py` livre un repository mémoire strict.
+- Garde-fous livrés: aucun groupe par défaut; aucune affectation par titre proche ou heuristique silencieuse; tout document accepté sans groupe est refusé; tout doublon d'affectation est refusé; un claim `VERIFIED` et tout groupe déjà utilisé par un claim vérifié sont non modifiables; le repository n'expose aucune suppression et refuse les sauvegardes qui retirent des affectations.
+- Traçabilité et gates: `tests/m006/validate_dependency_group_acceptance.ps1` et `tests/m006/validate_dependency_group_unit.ps1` sont enrôlés dans `scripts/test.ps1`; `REQ-M006-006` est ajouté à `docs/traceability/matrix.md`; la gate globale attend désormais `15 validation(s), 126 test(s)` et la précondition M-003 imbriquée attend `120 test(s)` après exclusions de récursion.
+- ADR: non requise; T-006 applique ADR-006, DDD-ADR-005 et DDD-ADR-010 sans changer leur sens.
+- Validations GREEN: `tests/m006/validate_dependency_group_acceptance.ps1`; `tests/m006/validate_dependency_group_unit.ps1`; `scripts/validate_traceability.ps1` (`69 exigence(s)`); `scripts/lint.ps1` (`15 validation(s), 0 test(s)`); `scripts/test.ps1` (`15 validation(s), 126 test(s)`); `git diff --check`.
+- Risques résiduels: le repository mémoire reste un double local pour T-006; aucune persistance durable ni moteur graphe n'est introduit par cette tâche.
