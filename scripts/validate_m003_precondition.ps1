@@ -9,7 +9,8 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $legacyBranch = "codex/milestone-m003-source-routee"
 $postMergeBranches = @(
     "master",
-    "codex/milestone-m004-version-canonique-publiee"
+    "codex/milestone-m004-version-canonique-publiee",
+    "codex/milestone-m005-projection-connaissance"
 )
 $allowedBranches = @($legacyBranch) + $postMergeBranches
 $requiredMilestonePaths = @(

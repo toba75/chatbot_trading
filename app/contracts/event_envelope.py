@@ -35,10 +35,15 @@ ALLOWED_PAST_EVENT_SUFFIXES = frozenset(
         "Imported",
         "Indexed",
         "Processed",
+        "Performed",
         "Published",
         "Registered",
         "Rejected",
+        "Requested",
         "Resolved",
+        "Retired",
+        "Searchable",
+        "Stale",
         "Started",
         "Superseded",
         "Updated",
@@ -252,7 +257,7 @@ def _required_event_type(payload: Mapping[str, Any]) -> str:
         raise ValueError("event_type invalide: job technique")
     if _EVENT_TYPE_PATTERN.fullmatch(event_type) is None:
         raise ValueError("event_type invalide: fait passe attendu")
-    if event_type.startswith(_COMMAND_PREFIXES):
+    if event_type.startswith(_COMMAND_PREFIXES) and not event_type.endswith("Performed"):
         raise ValueError("event_type invalide: fait passe attendu")
     if not event_type.endswith(tuple(sorted(ALLOWED_PAST_EVENT_SUFFIXES))):
         raise ValueError("event_type invalide: fait passe attendu")

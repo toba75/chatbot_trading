@@ -14,12 +14,15 @@ $m001SpecificationPath = Join-Path $repoRoot "docs/specs/m001_frontieres_ddd_con
 $m002SpecificationPath = Join-Path $repoRoot "docs/specs/m002_plateforme_locale_sure.md"
 $m003SpecificationPath = Join-Path $repoRoot "docs/specs/m003_source_enregistree_diagnostiquee_routee.md"
 $m004SpecificationPath = Join-Path $repoRoot "docs/specs/m004_version_canonique_publiee.md"
+$m005SpecificationPath = Join-Path $repoRoot "docs/specs/m005_projection_connaissance_recherchable.md"
 $platformTopologyPath = Join-Path $repoRoot "app/platform/topology_registry.json"
 $sparkFirewallPath = Join-Path $repoRoot "deploy/spark-firewall/network-boundary.json"
 $appRoot = Join-Path $repoRoot "app"
 $contextRegistryPath = Join-Path $repoRoot "app/context_registry.json"
 $m003PreconditionAcceptancePath = "tests/m003/validate_m003_precondition_acceptance.ps1"
 $m004PreconditionAcceptancePath = "tests/m004/validate_m004_precondition_acceptance.ps1"
+$m005PreconditionAcceptancePath = "tests/m005/validate_m005_precondition_acceptance.ps1"
+$m005PreconditionUnitPath = "tests/m005/validate_m005_precondition_unit.ps1"
 
 $validationCommands = @(
     @{ Path = "scripts/validate_m000_precondition_report.ps1"; Arguments = @("-Path", $preconditionReportPath) },
@@ -31,6 +34,7 @@ $validationCommands = @(
     @{ Path = "scripts/validate_m002_specification.ps1"; Arguments = @("-Path", $m002SpecificationPath) },
     @{ Path = "scripts/validate_m003_specification.ps1"; Arguments = @("-Path", $m003SpecificationPath) },
     @{ Path = "scripts/validate_m004_specification.ps1"; Arguments = @("-Path", $m004SpecificationPath) },
+    @{ Path = "scripts/validate_m005_specification.ps1"; Arguments = @("-Path", $m005SpecificationPath) },
     @{ Path = "scripts/validate_platform_topology.ps1"; Arguments = @("-Path", $platformTopologyPath) },
     @{ Path = "scripts/validate_local_compose.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_network_boundary.ps1"; Arguments = @("-SparkFirewallPath", $sparkFirewallPath) },
@@ -129,7 +133,30 @@ $testCommands = @(
     @{ Path = "tests/m004/validate_document_conversion_command_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/m004/validate_document_conversion_command_unit.ps1"; Arguments = @() },
     @{ Path = "tests/m004/validate_m004_traceability_acceptance.ps1"; Arguments = @() },
-    @{ Path = "tests/m004/validate_m004_traceability_unit.ps1"; Arguments = @() }
+    @{ Path = "tests/m004/validate_m004_traceability_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m005/validate_m005_precondition_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m005/validate_m005_precondition_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m005/validate_m005_specification_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m005/validate_m005_specification_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m005/validate_knowledge_projection_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m005/validate_knowledge_projection_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m005/validate_index_command_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m005/validate_hierarchical_chunking_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m005/validate_hierarchical_chunking_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m005/validate_projection_metadata_filters_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m005/validate_projection_metadata_filters_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m005/validate_projection_encoding_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m005/validate_projection_encoding_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m005/validate_qdrant_projection_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m005/validate_qdrant_projection_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m005/validate_knowledge_projection_events_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m005/validate_hybrid_search_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m005/validate_hybrid_search_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m005/validate_search_trace_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m005/validate_search_command_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m005/validate_search_command_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m005/validate_m005_traceability_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m005/validate_m005_traceability_unit.ps1"; Arguments = @() }
 )
 
 function Get-GateCommandPaths {
@@ -141,23 +168,41 @@ function Get-GateCommandPaths {
     return @($Commands | ForEach-Object { $_.Path })
 }
 
-$excludedPreconditionAcceptancePaths = @()
+$excludedPreconditionTestPaths = @()
 if ($env:OST_M003_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     Write-Host "Test d'acceptation de précondition M-003 exclu explicitement: exécution imbriquée du validateur de précondition."
     Write-Host "Test d'acceptation de précondition M-004 exclu explicitement: M-003 reste indépendant du milestone aval."
-    $excludedPreconditionAcceptancePaths = @(
+    Write-Host "Tests de précondition M-005 exclus explicitement: M-003 reste indépendant du milestone aval."
+    $excludedPreconditionTestPaths = @(
         $m003PreconditionAcceptancePath,
-        $m004PreconditionAcceptancePath
+        $m004PreconditionAcceptancePath,
+        $m005PreconditionAcceptancePath,
+        $m005PreconditionUnitPath
     )
 }
 elseif ($env:OST_M004_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     Write-Host "Test d'acceptation de précondition M-004 exclu explicitement: exécution imbriquée du validateur de précondition."
-    $excludedPreconditionAcceptancePaths = @($m004PreconditionAcceptancePath)
+    Write-Host "Tests de précondition M-005 exclus explicitement: M-004 reste indépendant du milestone aval."
+    $excludedPreconditionTestPaths = @(
+        $m004PreconditionAcceptancePath,
+        $m005PreconditionAcceptancePath,
+        $m005PreconditionUnitPath
+    )
+}
+elseif ($env:OST_M005_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
+    Write-Host "Test d'acceptation de précondition M-003 exclu explicitement: M-005 s'appuie sur les preuves amont publiées dans master."
+    Write-Host "Test d'acceptation de précondition M-004 exclu explicitement: M-005 s'appuie sur les preuves amont publiées dans master."
+    Write-Host "Test d'acceptation de précondition M-005 exclu explicitement: exécution imbriquée du validateur de précondition."
+    $excludedPreconditionTestPaths = @(
+        $m003PreconditionAcceptancePath,
+        $m004PreconditionAcceptancePath,
+        $m005PreconditionAcceptancePath
+    )
 }
 
-if ($excludedPreconditionAcceptancePaths.Count -gt 0) {
+if ($excludedPreconditionTestPaths.Count -gt 0) {
     $testCommands = @(
-        $testCommands | Where-Object { $excludedPreconditionAcceptancePaths -notcontains $_.Path }
+        $testCommands | Where-Object { $excludedPreconditionTestPaths -notcontains $_.Path }
     )
 }
 

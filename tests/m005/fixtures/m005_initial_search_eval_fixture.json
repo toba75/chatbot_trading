@@ -1,0 +1,56 @@
+{
+  "schema_version": "1.0",
+  "corpus_id": "m005_initial_search_eval_fixture_v1",
+  "fixture_scope": "M-005 initial non definitive search evaluation",
+  "k": 3,
+  "questions": [
+    {
+      "question_id": "M005-Q001",
+      "query_text": "Quelle preuve décrit le risque convexe ?",
+      "relevant_chunk_ids": [
+        "KCHK-M005-T010-A",
+        "KCHK-M005-T010-C"
+      ]
+    },
+    {
+      "question_id": "M005-Q002",
+      "query_text": "Quel passage décrit la liquidité ?",
+      "relevant_chunk_ids": [
+        "KCHK-M005-T010-D"
+      ]
+    }
+  ],
+  "results": [
+    {
+      "question_id": "M005-Q001",
+      "ranked_chunk_ids": [
+        "KCHK-M005-T010-A",
+        "KCHK-M005-T010-B",
+        "KCHK-M005-T010-C"
+      ]
+    },
+    {
+      "question_id": "M005-Q002",
+      "ranked_chunk_ids": [
+        "KCHK-M005-T010-E",
+        "KCHK-M005-T010-F",
+        "KCHK-M005-T010-D"
+      ]
+    }
+  ],
+  "candidate_refs": [
+    {
+      "chunk_id": "KCHK-M005-T010-A",
+      "document_id": "DOC-M005-T010",
+      "canonical_version_id": "CVER-M005-T010-0001",
+      "content_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    {
+      "chunk_id": "KCHK-M005-T010-D",
+      "document_id": "DOC-M005-T010",
+      "canonical_version_id": "CVER-M005-T010-0001",
+      "content_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    }
+  ],
+  "forbidden_full_passage": "Passage complet documentaire M-005 qui ne doit jamais être journalisé."
+}

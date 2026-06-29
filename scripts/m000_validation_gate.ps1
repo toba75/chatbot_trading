@@ -186,7 +186,7 @@ function Invoke-M000RequiredCommand {
     }
 
     foreach ($line in $output) {
-        Write-Host $line
+        Write-Host (Convert-M000OutputLine -Line $line)
     }
 
     if ($exitCode -ne 0) {
@@ -194,6 +194,16 @@ function Invoke-M000RequiredCommand {
     }
 
     Write-Host "${greenMessage}: $($descriptor.DisplayPath)"
+}
+
+function Convert-M000OutputLine {
+    param(
+        [Parameter(Mandatory = $true)]
+        [AllowNull()]
+        [object] $Line
+    )
+
+    return [string] $Line
 }
 
 function Invoke-M000ValidationGate {

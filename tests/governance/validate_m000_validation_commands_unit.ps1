@@ -104,6 +104,11 @@ if (-not (Test-Path -LiteralPath $aggregatorPath -PathType Leaf)) {
     throw "Agrégateur de validation M-000 absent: scripts/m000_validation_gate.ps1"
 }
 
+$aggregatorContent = Get-Content -Raw -Encoding UTF8 -LiteralPath $aggregatorPath
+if ($aggregatorContent.Contains("GetEncoding(1252)") -or $aggregatorContent.Contains("UTF8.GetString")) {
+    throw "L'agrégateur M-000 ne doit pas réparer silencieusement l'encodage des sorties."
+}
+
 New-Item -ItemType Directory -Path $temporaryRoot | Out-Null
 
 try {
