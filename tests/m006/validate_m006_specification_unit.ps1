@@ -14,7 +14,7 @@ function New-ValidM006SpecificationContent {
         throw "Spécification canonique M-006 absente pour le fixture unitaire: docs/specs/m006_claims_verifiables.md"
     }
 
-    return Get-Content -Raw -Encoding UTF8 -LiteralPath $canonicalSpecPath
+    return Get-Content -Raw -LiteralPath $canonicalSpecPath
 }
 
 function Invoke-M006SpecificationValidator {
@@ -82,7 +82,7 @@ function New-TemporarySpec {
     )
 
     $specPath = Join-Path $temporaryRoot "$Name.md"
-    $Content | Set-Content -Encoding UTF8 -LiteralPath $specPath
+    $Content | Set-Content -LiteralPath $specPath
     return $specPath
 }
 
