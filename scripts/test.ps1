@@ -177,30 +177,51 @@ if ($env:OST_M003_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     Write-Host "Test d'acceptation de précondition M-003 exclu explicitement: exécution imbriquée du validateur de précondition."
     Write-Host "Test d'acceptation de précondition M-004 exclu explicitement: M-003 reste indépendant du milestone aval."
     Write-Host "Tests de précondition M-005 exclus explicitement: M-003 reste indépendant du milestone aval."
+    Write-Host "Tests de précondition M-006 exclus explicitement: M-003 reste indépendant du milestone aval."
     $excludedPreconditionTestPaths = @(
         $m003PreconditionAcceptancePath,
         $m004PreconditionAcceptancePath,
         $m005PreconditionAcceptancePath,
-        $m005PreconditionUnitPath
+        $m005PreconditionUnitPath,
+        $m006PreconditionAcceptancePath,
+        $m006PreconditionUnitPath
     )
 }
 elseif ($env:OST_M004_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     Write-Host "Test d'acceptation de précondition M-004 exclu explicitement: exécution imbriquée du validateur de précondition."
     Write-Host "Tests de précondition M-005 exclus explicitement: M-004 reste indépendant du milestone aval."
+    Write-Host "Tests de précondition M-006 exclus explicitement: M-004 reste indépendant du milestone aval."
     $excludedPreconditionTestPaths = @(
         $m004PreconditionAcceptancePath,
         $m005PreconditionAcceptancePath,
-        $m005PreconditionUnitPath
+        $m005PreconditionUnitPath,
+        $m006PreconditionAcceptancePath,
+        $m006PreconditionUnitPath
     )
 }
 elseif ($env:OST_M005_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     Write-Host "Test d'acceptation de précondition M-003 exclu explicitement: M-005 s'appuie sur les preuves amont publiées dans master."
     Write-Host "Test d'acceptation de précondition M-004 exclu explicitement: M-005 s'appuie sur les preuves amont publiées dans master."
     Write-Host "Test d'acceptation de précondition M-005 exclu explicitement: exécution imbriquée du validateur de précondition."
+    Write-Host "Tests de précondition M-006 exclus explicitement: M-005 reste indépendant du milestone aval."
     $excludedPreconditionTestPaths = @(
         $m003PreconditionAcceptancePath,
         $m004PreconditionAcceptancePath,
-        $m005PreconditionAcceptancePath
+        $m005PreconditionAcceptancePath,
+        $m006PreconditionAcceptancePath,
+        $m006PreconditionUnitPath
+    )
+}
+elseif ($env:OST_M006_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
+    Write-Host "Test d'acceptation de précondition M-003 exclu explicitement: M-006 s'appuie sur les preuves amont publiées dans master."
+    Write-Host "Test d'acceptation de précondition M-004 exclu explicitement: M-006 s'appuie sur les preuves amont publiées dans master."
+    Write-Host "Test d'acceptation de précondition M-005 exclu explicitement: M-006 s'appuie sur les preuves amont publiées dans master."
+    Write-Host "Test d'acceptation de précondition M-006 exclu explicitement: exécution imbriquée du validateur de précondition."
+    $excludedPreconditionTestPaths = @(
+        $m003PreconditionAcceptancePath,
+        $m004PreconditionAcceptancePath,
+        $m005PreconditionAcceptancePath,
+        $m006PreconditionAcceptancePath
     )
 }
 
