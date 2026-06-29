@@ -106,7 +106,9 @@ def _write_json_response(handler: BaseHTTPRequestHandler, *, status_code: int, b
 
 
 def _read_json_body(handler: BaseHTTPRequestHandler) -> tuple[int, dict[str, Any]]:
-    raw_length = handler.headers.get("Content-Length", "0")
+    raw_length = handler.headers.get("Content-Length")
+    if raw_length is None:
+        return 400, {"error_code": "HTTP_REQUEST_INVALID", "field": "content_length"}
     try:
         content_length = int(raw_length)
     except ValueError:

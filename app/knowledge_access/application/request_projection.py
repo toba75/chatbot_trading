@@ -291,22 +291,21 @@ class RequestKnowledgeProjectionHandler:
             projection_profile=parsed_command.projection_profile,
         )
         self._projection_repository.require_absent_build_fingerprint(projection.build_fingerprint)
+        requested_event = KnowledgeProjectionEventFactory(
+            occurred_at=canonical_ref.accepted_at,
+            correlation_id=_correlation_id_for_projection(projection.projection_id),
+            causation_id=_causation_id_for_projection(projection.projection_id),
+        ).requested(projection=projection)
+        append_projection_events_to_outbox(
+            outbox=self._outbox,
+            events=(requested_event,),
+        )
         decision = self._projection_repository.save_if_absent(projection)
         if not decision.created:
             raise ProjectionAlreadyRequestedError(
                 projection_id=decision.projection.projection_id,
                 build_fingerprint=decision.projection.build_fingerprint,
             )
-        append_projection_events_to_outbox(
-            outbox=self._outbox,
-            events=(
-                KnowledgeProjectionEventFactory(
-                    occurred_at=canonical_ref.accepted_at,
-                    correlation_id=_correlation_id_for_projection(decision.projection.projection_id),
-                    causation_id=_causation_id_for_projection(decision.projection.projection_id),
-                ).requested(projection=decision.projection),
-            ),
-        )
         return RequestKnowledgeProjectionAcceptance.from_projection(decision.projection)
 
 

@@ -266,7 +266,6 @@ class PublishProjectionIndexHandler:
             publication = self._vector_index.publish_generation(request)
         except VectorIndexError as exc:
             failed_projection = indexing_projection.mark_failed()
-            self._projection_repository.save_transition(failed_projection)
             failed_event = factory.failed(
                 projection=failed_projection,
                 failed_step="INDEXING",
@@ -275,6 +274,7 @@ class PublishProjectionIndexHandler:
             )
             events = (failed_event,) if built_event is None else (built_event, failed_event)
             append_projection_events_to_outbox(outbox=self._outbox, events=events)
+            self._projection_repository.save_transition(failed_projection)
             return PublishProjectionIndexResult(
                 projection=failed_projection,
                 index_generation=index_generation,
@@ -284,7 +284,6 @@ class PublishProjectionIndexHandler:
             )
 
         searchable_projection = indexing_projection.mark_searchable()
-        self._projection_repository.save_transition(searchable_projection)
         searchable_event = factory.became_searchable(
             projection=searchable_projection,
             index_generation=index_generation,
@@ -292,6 +291,7 @@ class PublishProjectionIndexHandler:
         )
         events = (searchable_event,) if built_event is None else (built_event, searchable_event)
         append_projection_events_to_outbox(outbox=self._outbox, events=events)
+        self._projection_repository.save_transition(searchable_projection)
         return PublishProjectionIndexResult(
             projection=searchable_projection,
             index_generation=index_generation,
@@ -304,7 +304,6 @@ class PublishProjectionIndexHandler:
         parsed_command = _ensure_stale_command(command)
         projection = self._projection_repository.projection_for_id(parsed_command.projection_id)
         stale_projection = projection.mark_stale()
-        self._projection_repository.save_transition(stale_projection)
         factory = KnowledgeProjectionEventFactory(
             occurred_at=parsed_command.occurred_at,
             correlation_id=parsed_command.correlation_id,
@@ -320,6 +319,7 @@ class PublishProjectionIndexHandler:
                 ),
             ),
         )
+        self._projection_repository.save_transition(stale_projection)
         return ProjectionLifecycleResult(projection=stale_projection)
 
     def retire(self, command: RetireProjectionIndexCommand) -> ProjectionLifecycleResult:
@@ -332,7 +332,6 @@ class PublishProjectionIndexHandler:
         if not deletion.deleted:
             raise ValueError("index_generation absente pour retrait")
         retired_projection = projection.retire()
-        self._projection_repository.save_transition(retired_projection)
         factory = KnowledgeProjectionEventFactory(
             occurred_at=parsed_command.occurred_at,
             correlation_id=parsed_command.correlation_id,
@@ -347,6 +346,7 @@ class PublishProjectionIndexHandler:
                 ),
             ),
         )
+        self._projection_repository.save_transition(retired_projection)
         return ProjectionLifecycleResult(projection=retired_projection)
 
     def _publish_request_for(

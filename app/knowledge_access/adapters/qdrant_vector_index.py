@@ -41,10 +41,16 @@ class QdrantVectorIndex:
 
     def publish_generation(self, request: VectorIndexPublishRequest) -> VectorIndexPublication:
         parsed_request = _ensure_publish_request(request)
-        if self.generation_exists(
+        existing_count = self._generation_count(
             collection_name=parsed_request.collection_name,
             index_generation=parsed_request.index_generation,
-        ):
+        )
+        if existing_count > 0:
+            if existing_count != parsed_request.expected_point_count:
+                raise PartialVectorIndexError(
+                    expected_point_count=parsed_request.expected_point_count,
+                    published_point_count=existing_count,
+                )
             return VectorIndexPublication(
                 collection_name=parsed_request.collection_name,
                 index_generation=parsed_request.index_generation,
