@@ -1,5 +1,13 @@
 """Couche domaine du contexte EG."""
 
+from app.evidence_governance.domain.claim_evidence import (
+    CanonicalEvidenceSpan,
+    Claim,
+    ClaimStatus,
+    EvidenceAdmissibilityPolicy,
+    EvidenceAssociation,
+    EvidenceAttachedToClaim,
+)
 from app.evidence_governance.domain.claim_extraction import (
     CanonicalProposition,
     ClaimAtomicityPolicy,
@@ -17,15 +25,21 @@ from app.evidence_governance.domain.claim_extraction import (
 
 
 __all__ = [
+    "CanonicalEvidenceSpan",
     "CanonicalProposition",
+    "Claim",
     "ClaimAtomicityPolicy",
     "ClaimCanonicalizationPolicy",
     "ClaimCondition",
     "ClaimDrafted",
     "ClaimExtractionProposal",
     "ClaimScope",
+    "ClaimStatus",
     "DraftClaim",
     "DraftClaimStatus",
+    "EvidenceAdmissibilityPolicy",
+    "EvidenceAssociation",
+    "EvidenceAttachedToClaim",
     "EvidenceSpan",
     "Limitation",
     "claim_id_for",
