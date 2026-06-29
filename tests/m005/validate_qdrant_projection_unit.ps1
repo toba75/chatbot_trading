@@ -165,11 +165,12 @@ def encoded_projection():
 
 
 class FakeQdrantClient:
-    def __init__(self, *, forced_count=None):
+    def __init__(self, *, forced_count=None, force_count_before_upsert=False):
         self.points_by_collection = {}
         self.deleted_filters = []
         self.count_calls = []
         self.forced_count = forced_count
+        self.force_count_before_upsert = force_count_before_upsert
 
     def upsert(self, *, collection_name, points):
         stored_points = self.points_by_collection.setdefault(collection_name, [])
@@ -188,7 +189,10 @@ class FakeQdrantClient:
 
     def count(self, *, collection_name, count_filter, exact):
         self.count_calls.append((collection_name, count_filter, exact))
-        if self.forced_count is not None and len(self.points_by_collection.get(collection_name, [])) > 0:
+        if self.forced_count is not None and (
+            self.force_count_before_upsert
+            or len(self.points_by_collection.get(collection_name, [])) > 0
+        ):
             return self.forced_count
         generation = count_filter["must"][0]["match"]["value"]
         return sum(
@@ -353,6 +357,18 @@ assert_equal(qdrant_point["payload"]["sparse_weights_hash"], point.payload["spar
 assert_false("claim" in repr(qdrant_point["payload"]).lower(), "Le payload Qdrant ne doit pas contenir de claim.")
 qdrant_second_publication = qdrant_index.publish_generation(request)
 assert_true(qdrant_second_publication.idempotent, "Une génération Qdrant déjà visible doit être idempotente.")
+preexisting_partial_client = FakeQdrantClient(forced_count=1, force_count_before_upsert=True)
+preexisting_partial_index = QdrantVectorIndex(client=preexisting_partial_client)
+assert_raises(
+    PartialVectorIndexError,
+    "INDEX_PARTIAL",
+    lambda: preexisting_partial_index.publish_generation(request),
+)
+assert_equal(
+    len(preexisting_partial_client.points_by_collection.get(base_schema.collection_name, ())),
+    0,
+    "Une génération Qdrant partielle déjà visible ne doit pas être traitée comme idempotente.",
+)
 qdrant_deleted = qdrant_index.delete_generation(
     collection_name=base_schema.collection_name,
     index_generation=first_generation,

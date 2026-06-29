@@ -197,6 +197,15 @@ def handler_for(vector_index, projection_repository, outbox):
     )
 
 
+class FailingOutbox:
+    def has_event(self, event_id):
+        return False
+
+    def append_many_in_transaction(self, mutations_and_events):
+        tuple(mutations_and_events)
+        raise ValueError("outbox indisponible")
+
+
 # Given une projection encodée avec tous ses chunks attendus.
 initial_projection = projection()
 repository = InMemoryKnowledgeProjectionRepository(projections=(initial_projection,))
@@ -359,6 +368,25 @@ assert_equal(
         "KnowledgeProjectionRetired",
     ),
     "Les transitions STALE et RETIRED doivent publier leurs événements.",
+)
+
+outbox_failure_projection = projection()
+outbox_failure_repository = InMemoryKnowledgeProjectionRepository(projections=(outbox_failure_projection,))
+outbox_failure_index = InMemoryVectorIndex.empty()
+outbox_failure_handler = handler_for(
+    outbox_failure_index,
+    outbox_failure_repository,
+    FailingOutbox(),
+)
+assert_raises(
+    ValueError,
+    "outbox indisponible",
+    lambda: outbox_failure_handler.publish(command),
+)
+assert_equal(
+    outbox_failure_repository.projection_for_id(outbox_failure_projection.projection_id).status,
+    ProjectionStatus.BUILDING,
+    "Une panne outbox ne doit pas persister SEARCHABLE sans evenement.",
 )
 
 # RA et EG ne doivent pas pouvoir dépendre directement du client Qdrant.

@@ -19,9 +19,10 @@ from app.knowledge_access.adapters.projection_http import (
 )
 from app.knowledge_access.application.request_projection import (
     CanonicalSourceForProjection,
+    RequestKnowledgeProjectionCommand,
     RequestKnowledgeProjectionHandler,
 )
-from app.knowledge_access.domain.knowledge_projection import ProjectionStatus
+from app.knowledge_access.domain.knowledge_projection import ProjectionProfile, ProjectionStatus
 from app.platform.event_bus import InMemoryTransactionalOutbox
 
 
@@ -33,6 +34,17 @@ def assert_equal(actual, expected, message):
 def assert_true(condition, message):
     if not condition:
         raise AssertionError(message)
+
+
+def assert_raises(expected_exception, expected_fragment, action):
+    try:
+        action()
+    except expected_exception as exc:
+        if expected_fragment not in str(exc):
+            raise AssertionError(f"Erreur inattendue: {exc}")
+        return exc
+    else:
+        raise AssertionError(f"Erreur attendue absente: {expected_exception.__name__}")
 
 
 def assert_absent(mapping, forbidden_key, message):
@@ -66,6 +78,10 @@ def profile_body():
     }
 
 
+def projection_profile():
+    return ProjectionProfile.from_payload(profile_body())
+
+
 class RecordingCanonicalSourceReader:
     def __init__(self, records):
         self.records = dict(records)
@@ -78,6 +94,15 @@ class RecordingCanonicalSourceReader:
 
     def mutate_source_processing(self, document_id):
         self.mutation_attempts.append(document_id)
+
+
+class FailingOutbox:
+    def has_event(self, event_id):
+        return False
+
+    def append_many_in_transaction(self, mutations_and_events):
+        tuple(mutations_and_events)
+        raise ValueError("outbox indisponible")
 
 
 def build_adapter(records):
@@ -145,6 +170,38 @@ stored_projection = repository.projection_for_id(accepted.body["projection_id"])
 assert_equal(stored_projection.status, ProjectionStatus.REQUESTED, "La projection stockee doit rester REQUESTED.")
 assert_equal(stored_projection.canonical_version_id, published_ref.canonical_version_id, "La projection doit viser la version canonique.")
 assert_equal(reader.mutation_attempts, [], "KA ne doit pas muter SP.")
+
+failing_reader = RecordingCanonicalSourceReader(
+    {
+        published_ref.document_id: CanonicalSourceForProjection(
+            document_id=published_ref.document_id,
+            canonical_ref=published_ref,
+            canonical_status="ACCEPTED",
+            quarantine_reason=None,
+        )
+    }
+)
+failing_repository = InMemoryKnowledgeProjectionRepository.empty()
+failing_handler = RequestKnowledgeProjectionHandler(
+    canonical_source_reader=failing_reader,
+    projection_repository=failing_repository,
+    outbox=FailingOutbox(),
+)
+assert_raises(
+    ValueError,
+    "outbox indisponible",
+    lambda: failing_handler.request_projection(
+        RequestKnowledgeProjectionCommand(
+            document_id=published_ref.document_id,
+            projection_profile=projection_profile(),
+        )
+    ),
+)
+assert_equal(
+    failing_repository.projection_count(),
+    0,
+    "Une panne outbox ne doit pas laisser une projection REQUESTED sans evenement.",
+)
 
 # Given la meme demande est rejouee.
 duplicate = post_index(adapter, published_ref.document_id, profile_body())

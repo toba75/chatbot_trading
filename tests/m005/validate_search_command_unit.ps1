@@ -36,7 +36,7 @@ from app.knowledge_access.domain.search import (
     SearchResponse,
     SearchScoreBundle,
 )
-from app.platform.local_runtime import _local_post_response
+from app.platform.local_runtime import _local_post_response, _read_json_body
 
 
 def assert_equal(actual, expected, message):
@@ -217,6 +217,20 @@ def adapter_for(scripted_commands):
     )
 
 
+class FakeBodyReader:
+    def __init__(self, payload=b""):
+        self.payload = payload
+
+    def read(self, length):
+        return self.payload[:length]
+
+
+class FakeRequestHandler:
+    def __init__(self, *, headers, payload=b""):
+        self.headers = headers
+        self.rfile = FakeBodyReader(payload)
+
+
 # SearchRequestDto valide strictement le corps public sans profil par défaut.
 dto = SearchRequestDto.from_payload(valid_body())
 domain_request = dto.to_domain_request(hybrid_policy(), authenticated_context="RA")
@@ -370,6 +384,19 @@ local_ui_status, local_ui_body = _local_post_response(
 )
 assert_equal(local_ui_status, 404, "Seul orchestrator-api doit porter les endpoints applicatifs locaux.")
 assert_equal(local_ui_body["error_code"], "ENDPOINT_NOT_FOUND", "Le runtime local ne doit pas router KA depuis UI.")
+
+missing_length_status, missing_length_body = _read_json_body(FakeRequestHandler(headers={}))
+assert_equal(missing_length_status, 400, "Content-Length absent doit etre refuse explicitement.")
+assert_equal(
+    missing_length_body,
+    {"error_code": "HTTP_REQUEST_INVALID", "field": "content_length"},
+    "Content-Length absent ne doit pas etre traite comme un corps vide.",
+)
+zero_length_status, zero_length_body = _read_json_body(
+    FakeRequestHandler(headers={"Content-Length": "0"})
+)
+assert_equal(zero_length_status, 200, "Content-Length explicite a zero doit rester valide.")
+assert_equal(zero_length_body, {}, "Un corps explicitement vide doit etre represente par un objet vide.")
 
 # L'adaptateur ne journalise pas de texte documentaire complet.
 adapter_path = Path(sys.argv[1]) / "app" / "knowledge_access" / "adapters" / "search_http.py"
