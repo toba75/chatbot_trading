@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 
-from app.evidence_governance.domain.claim_extraction import ClaimExtractionProposal
+from app.evidence_governance.domain.claim_extraction import EvidenceCandidate, ClaimExtractionProposal
 
 
 class DeterministicClaimExtractor:
@@ -22,7 +22,7 @@ class DeterministicClaimExtractor:
     def extract_claims(
         self,
         *,
-        evidence_candidates: Sequence[object],
+        evidence_candidates: Sequence[EvidenceCandidate],
         extraction_schema_version: str,
         requested_by_context: str,
     ) -> tuple[ClaimExtractionProposal, ...]:
@@ -69,7 +69,7 @@ def _ensure_proposals_mapping(
     return parsed
 
 
-def _ensure_candidates(value: Sequence[object]) -> tuple[object, ...]:
+def _ensure_candidates(value: Sequence[EvidenceCandidate]) -> tuple[EvidenceCandidate, ...]:
     if value is None:
         raise ValueError("evidence_candidates absents")
     if isinstance(value, str) or not isinstance(value, Sequence):
@@ -78,7 +78,8 @@ def _ensure_candidates(value: Sequence[object]) -> tuple[object, ...]:
     if len(candidates) == 0:
         raise ValueError("evidence_candidates absents")
     for candidate in candidates:
-        _ensure_chunk_id(getattr(candidate, "chunk_id", None))
+        if not isinstance(candidate, EvidenceCandidate):
+            raise ValueError("evidence_candidate invalide")
     return candidates
 
 

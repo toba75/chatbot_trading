@@ -11,6 +11,7 @@ from app.evidence_governance.domain.claim_extraction import (
     ClaimAtomicityPolicy,
     ClaimCanonicalizationPolicy,
     ClaimDrafted,
+    EvidenceCandidate,
     ClaimExtractionProposal,
     DraftClaim,
     claim_id_for,
@@ -29,7 +30,7 @@ class ClaimExtractor(Protocol):
     def extract_claims(
         self,
         *,
-        evidence_candidates: Sequence[object],
+        evidence_candidates: Sequence[EvidenceCandidate],
         extraction_schema_version: str,
         requested_by_context: str,
     ) -> tuple[ClaimExtractionProposal, ...]:
@@ -47,7 +48,7 @@ class ClaimDraftRepository(Protocol):
 class ExtractClaimsFromEvidenceCommand:
     """Commande d'extraction de claims candidats depuis des preuves KA."""
 
-    evidence_candidates: Sequence[object]
+    evidence_candidates: Sequence[EvidenceCandidate]
     extraction_schema_version: str
     requested_by_context: str
     idempotency_key: str
@@ -196,7 +197,7 @@ def _ensure_events(value: Sequence[ClaimDrafted]) -> tuple[ClaimDrafted, ...]:
     return events
 
 
-def _ensure_evidence_candidates(value: Sequence[object]) -> tuple[object, ...]:
+def _ensure_evidence_candidates(value: Sequence[EvidenceCandidate]) -> tuple[EvidenceCandidate, ...]:
     if value is None:
         raise ValueError("evidence_candidates absents")
     if isinstance(value, str) or not isinstance(value, Sequence):
@@ -206,9 +207,9 @@ def _ensure_evidence_candidates(value: Sequence[object]) -> tuple[object, ...]:
         raise ValueError("evidence_candidates absents")
     chunk_ids = []
     for candidate in candidates:
-        chunk_id = _ensure_text(getattr(candidate, "chunk_id", None), "chunk_id")
-        if not chunk_id.startswith("KCHK-"):
-            raise ValueError("chunk_id invalide")
+        if not isinstance(candidate, EvidenceCandidate):
+            raise ValueError("evidence_candidate invalide")
+        chunk_id = candidate.chunk_id
         chunk_ids.append(chunk_id)
     if len(chunk_ids) != len(set(chunk_ids)):
         raise ValueError("evidence_candidates dupliques")

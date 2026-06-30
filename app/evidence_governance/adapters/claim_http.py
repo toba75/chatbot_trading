@@ -14,11 +14,17 @@ from app.evidence_governance.application.extract_claims import (
     ExtractClaimsFromEvidenceCommand,
     ClaimExtractionResult,
 )
+from app.evidence_governance.application.read_claims import (
+    CanonicalEvidenceReaderPort,
+    ClaimReaderPort,
+    ReadPublicClaimHandler,
+)
 from app.evidence_governance.application.verify_claim import (
     SubmitClaimForVerification,
     VerifyClaimResult,
 )
-from app.evidence_governance.domain.claim_evidence import Claim, ClaimStatus, CanonicalEvidenceSpan
+from app.evidence_governance.domain.claim_evidence import Claim
+from app.evidence_governance.domain.claim_extraction import EvidenceCandidate
 
 
 _EXTRACT_BODY_FIELDS = frozenset(
@@ -60,13 +66,10 @@ _EXPLICITLY_FORBIDDEN_VERIFY_FIELDS = frozenset(
         "qdrant_point_id",
     }
 )
-_PUBLIC_CLAIM_STATUSES = frozenset(
-    {
-        ClaimStatus.VERIFIED,
-        ClaimStatus.REJECTED,
-        ClaimStatus.SUPERSEDED,
-    }
-)
+_MAX_EVIDENCE_CANDIDATES = 50
+_MAX_TEXT_LENGTH = 10_000
+_MAX_PUBLIC_IDENTIFIER_LENGTH = 128
+_MUTATING_CONTEXT = "EG"
 
 
 class ExtractClaimsHandlerPort(Protocol):
@@ -81,20 +84,6 @@ class VerifyClaimHandlerPort(Protocol):
 
     def verify(self, command: SubmitClaimForVerification) -> VerifyClaimResult:
         """Execute la commande de verification EG."""
-
-
-class ClaimReaderPort(Protocol):
-    """Port de lecture publique de claims EG."""
-
-    def read_claim(self, claim_id: str) -> Claim:
-        """Retourne le claim consultable par identifiant."""
-
-
-class CanonicalEvidenceReaderPort(Protocol):
-    """Port de resolution publique des preuves EG."""
-
-    def resolve(self, source_locator: SourceLocator) -> CanonicalEvidenceSpan:
-        """Retourne le span canonique associe au SourceLocator."""
 
 
 class ClaimHttpRequestValidationError(ValueError):
@@ -176,12 +165,24 @@ class EvidenceCandidateDto:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "chunk_id", _ensure_chunk_id(self.chunk_id))
-        object.__setattr__(self, "text", _ensure_text(self.text, "text"))
+        object.__setattr__(self, "text", _ensure_limited_text(self.text, "text", _MAX_TEXT_LENGTH))
         if not isinstance(self.source_locator, SourceLocator):
             raise ValueError("source_locator invalide")
-        object.__setattr__(self, "content_hash", _ensure_text(self.content_hash, "content_hash"))
+        object.__setattr__(
+            self,
+            "content_hash",
+            _ensure_limited_text(self.content_hash, "content_hash", _MAX_PUBLIC_IDENTIFIER_LENGTH),
+        )
         if self.content_hash != self.source_locator.content_hash:
             raise ValueError("content_hash incoherent avec SourceLocator")
+
+    def to_domain_candidate(self) -> EvidenceCandidate:
+        return EvidenceCandidate(
+            chunk_id=self.chunk_id,
+            text=self.text,
+            source_locator=self.source_locator,
+            content_hash=self.content_hash,
+        )
 
 
 @dataclass(frozen=True)
@@ -228,19 +229,23 @@ class ClaimExtractionRequestDto:
         object.__setattr__(
             self,
             "extraction_schema_version",
-            _ensure_text(self.extraction_schema_version, "extraction_schema_version"),
+            _ensure_public_identifier(self.extraction_schema_version, "extraction_schema_version"),
         )
         object.__setattr__(
             self,
             "requested_by_context",
-            _ensure_text(self.requested_by_context, "requested_by_context"),
+            _ensure_public_identifier(self.requested_by_context, "requested_by_context"),
         )
-        object.__setattr__(self, "idempotency_key", _ensure_text(self.idempotency_key, "idempotency_key"))
+        object.__setattr__(
+            self,
+            "idempotency_key",
+            _ensure_public_identifier(self.idempotency_key, "idempotency_key"),
+        )
         object.__setattr__(self, "occurred_at", _ensure_utc_instant(self.occurred_at, "occurred_at"))
 
     def to_command(self) -> ExtractClaimsFromEvidenceCommand:
         return ExtractClaimsFromEvidenceCommand(
-            evidence_candidates=self.evidence_candidates,
+            evidence_candidates=tuple(candidate.to_domain_candidate() for candidate in self.evidence_candidates),
             extraction_schema_version=self.extraction_schema_version,
             requested_by_context=self.requested_by_context,
             idempotency_key=self.idempotency_key,
@@ -276,14 +281,18 @@ class ClaimVerificationRequestDto:
         object.__setattr__(
             self,
             "verification_policy_version",
-            _ensure_text(self.verification_policy_version, "verification_policy_version"),
+            _ensure_public_identifier(self.verification_policy_version, "verification_policy_version"),
         )
         object.__setattr__(
             self,
             "verifier_profile_id",
-            _ensure_text(self.verifier_profile_id, "verifier_profile_id"),
+            _ensure_public_identifier(self.verifier_profile_id, "verifier_profile_id"),
         )
-        object.__setattr__(self, "idempotency_key", _ensure_text(self.idempotency_key, "idempotency_key"))
+        object.__setattr__(
+            self,
+            "idempotency_key",
+            _ensure_public_identifier(self.idempotency_key, "idempotency_key"),
+        )
         object.__setattr__(self, "occurred_at", _ensure_utc_instant(self.occurred_at, "occurred_at"))
 
     def to_command(self, *, claim_id: str) -> SubmitClaimForVerification:
@@ -326,16 +335,23 @@ class ClaimHttpAdapter:
         self._extract_claims_handler = extract_claims_handler
         self._verify_claim_handler = verify_claim_handler
         self._claim_reader = claim_reader
-        self._canonical_evidence_reader = canonical_evidence_reader
+        self._read_public_claim_handler = ReadPublicClaimHandler(
+            claim_reader=claim_reader,
+            canonical_evidence_reader=canonical_evidence_reader,
+        )
         self._source_locator_validation_policy = source_locator_validation_policy
 
     def handle(self, request: HttpRequest) -> HttpResponse:
         parsed_request = _ensure_http_request(request)
         if parsed_request.method == "POST" and parsed_request.path == "/v1/claims/extract":
+            if parsed_request.authenticated_context != _MUTATING_CONTEXT:
+                return _public_error_response("CLAIM_CONTEXT_FORBIDDEN", 403)
             return self._handle_extract(parsed_request)
 
         verify_claim_id = _claim_id_from_verify_path(parsed_request.path)
         if parsed_request.method == "POST" and verify_claim_id is not None:
+            if parsed_request.authenticated_context != _MUTATING_CONTEXT:
+                return _public_error_response("CLAIM_CONTEXT_FORBIDDEN", 403)
             return self._handle_verify(parsed_request, verify_claim_id)
 
         evidence_claim_id = _claim_id_from_evidence_path(parsed_request.path)
@@ -348,7 +364,7 @@ class ClaimHttpAdapter:
 
         return HttpResponse(
             status_code=404,
-            body={"error_code": "ENDPOINT_NOT_FOUND", "path": parsed_request.path},
+            body={"error_code": "ENDPOINT_NOT_FOUND"},
         )
 
     def _handle_extract(self, request: HttpRequest) -> HttpResponse:
@@ -357,6 +373,8 @@ class ClaimHttpAdapter:
                 request.body,
                 source_locator_validation_policy=self._source_locator_validation_policy,
             )
+            if request_dto.requested_by_context != request.authenticated_context:
+                return _public_error_response("CLAIM_CONTEXT_FORBIDDEN", 403)
             result = self._extract_claims_handler.extract(request_dto.to_command())
         except ClaimHttpRequestValidationError as exc:
             if exc.field == "source_locator":
@@ -405,11 +423,11 @@ class ClaimHttpAdapter:
 
     def _handle_read_claim(self, claim_id: str) -> HttpResponse:
         try:
-            claim = self._read_claim(claim_id)
-            _ensure_claim_publication_allowed(claim)
+            result = self._read_public_claim_handler.read_claim(claim_id)
         except ValueError as exc:
             return _domain_error_response(exc)
 
+        claim = result.claim
         return HttpResponse(
             status_code=200,
             body={
@@ -428,31 +446,20 @@ class ClaimHttpAdapter:
 
     def _handle_read_evidence(self, claim_id: str) -> HttpResponse:
         try:
-            claim = self._read_claim(claim_id)
-            _ensure_claim_publication_allowed(claim)
-            if claim.verified_claim_ref is None:
-                return _public_error_response("CLAIM_EVIDENCE_REQUIRED", 422)
-            for association in claim.evidence_associations:
-                canonical_span = self._canonical_evidence_reader.resolve(association.source_locator)
-                if not isinstance(canonical_span, CanonicalEvidenceSpan):
-                    return _public_error_response("CLAIM_EVIDENCE_SOURCE_UNRESOLVABLE", 422)
-                if canonical_span.source_locator != association.source_locator:
-                    return _public_error_response("CLAIM_EVIDENCE_SOURCE_UNRESOLVABLE", 422)
-                if canonical_span.quoted_span_hash != association.quoted_span_hash:
-                    return _public_error_response("CLAIM_EVIDENCE_SOURCE_UNRESOLVABLE", 422)
+            result = self._read_public_claim_handler.read_evidence(claim_id)
         except ValueError as exc:
             return _domain_error_response(exc)
 
         return HttpResponse(
             status_code=200,
             body={
-                "claim_id": claim.claim_id,
-                "claim_version": claim.claim_version,
+                "claim_id": result.claim.claim_id,
+                "claim_version": result.claim.claim_version,
                 "evidence_refs": tuple(
-                    association.evidence_ref.to_payload() for association in claim.evidence_associations
+                    evidence_ref.to_payload() for evidence_ref in result.evidence_refs
                 ),
-                "dependency_groups": claim.verified_claim_ref.dependency_group_ids,
-                "verification_cases": (claim.accepted_verification_id,),
+                "dependency_groups": result.dependency_group_ids,
+                "verification_cases": result.verification_case_ids,
             },
         )
 
@@ -481,6 +488,8 @@ def _evidence_candidates_from_payload(
     )
     if len(candidates) == 0:
         raise ClaimHttpRequestValidationError("evidence_candidates absents", field="evidence_candidates")
+    if len(candidates) > _MAX_EVIDENCE_CANDIDATES:
+        raise ClaimHttpRequestValidationError("evidence_candidates trop nombreux", field="evidence_candidates")
     return candidates
 
 
@@ -494,12 +503,14 @@ def _ensure_evidence_candidate_dtos(
     candidates = tuple(value)
     if len(candidates) == 0:
         raise ClaimHttpRequestValidationError("evidence_candidates absents", field="evidence_candidates")
-    chunk_ids = tuple(candidate.chunk_id for candidate in candidates)
-    if len(chunk_ids) != len(set(chunk_ids)):
-        raise ClaimHttpRequestValidationError("evidence_candidates dupliques", field="evidence_candidates")
+    if len(candidates) > _MAX_EVIDENCE_CANDIDATES:
+        raise ClaimHttpRequestValidationError("evidence_candidates trop nombreux", field="evidence_candidates")
     for candidate in candidates:
         if not isinstance(candidate, EvidenceCandidateDto):
             raise ClaimHttpRequestValidationError("evidence_candidate invalide", field="evidence_candidates")
+    chunk_ids = tuple(candidate.chunk_id for candidate in candidates)
+    if len(chunk_ids) != len(set(chunk_ids)):
+        raise ClaimHttpRequestValidationError("evidence_candidates dupliques", field="evidence_candidates")
     return candidates
 
 
@@ -523,11 +534,6 @@ def _optional_verified_claim_ref_payload(value: Any) -> Mapping[str, Any] | None
     return value.to_payload()
 
 
-def _ensure_claim_publication_allowed(claim: Claim) -> None:
-    if claim.status not in _PUBLIC_CLAIM_STATUSES:
-        raise ValueError("CLAIM_PUBLICATION_FORBIDDEN")
-
-
 def _domain_error_response(exc: ValueError) -> HttpResponse:
     message = str(exc)
     if "claim inconnu" in message:
@@ -536,8 +542,12 @@ def _domain_error_response(exc: ValueError) -> HttpResponse:
         if claim_id is not None:
             body["claim_id"] = claim_id
         return HttpResponse(status_code=404, body=body)
+    if "CLAIM_EVIDENCE_SOURCE_UNRESOLVABLE" in message:
+        return _public_error_response("CLAIM_EVIDENCE_SOURCE_UNRESOLVABLE", 422)
     if "source_locator" in message or "SourceLocator" in message or "quoted_span_hash incoherent" in message:
         return _public_error_response("CLAIM_EVIDENCE_SOURCE_UNRESOLVABLE", 422)
+    if "CLAIM_EVIDENCE_REQUIRED" in message:
+        return _public_error_response("CLAIM_EVIDENCE_REQUIRED", 422)
     if "CLAIM_SCOPE_EXCEEDS_EVIDENCE" in message:
         return _public_error_response("CLAIM_SCOPE_EXCEEDS_EVIDENCE", 422)
     if "INSUFFICIENT_DIRECT_EVIDENCE" in message:
@@ -614,20 +624,20 @@ def _verification_case_id_for(
     seed = "|".join(
         (
             _ensure_claim_id(claim_id),
-            _ensure_text(verification_policy_version, "verification_policy_version"),
-            _ensure_text(verifier_profile_id, "verifier_profile_id"),
-            _ensure_text(idempotency_key, "idempotency_key"),
+            _ensure_public_identifier(verification_policy_version, "verification_policy_version"),
+            _ensure_public_identifier(verifier_profile_id, "verifier_profile_id"),
+            _ensure_public_identifier(idempotency_key, "idempotency_key"),
         )
     )
     return f"VER-{hashlib.sha256(seed.encode('utf-8')).hexdigest()[:24].upper()}"
 
 
 def _request_id_for(idempotency_key: str) -> str:
-    return f"REQ-{hashlib.sha256(_ensure_text(idempotency_key, 'idempotency_key').encode('utf-8')).hexdigest()[:24].upper()}"
+    return f"REQ-{hashlib.sha256(_ensure_public_identifier(idempotency_key, 'idempotency_key').encode('utf-8')).hexdigest()[:24].upper()}"
 
 
 def _trace_id_for(idempotency_key: str) -> str:
-    return f"TRC-{hashlib.sha256(('trace|' + _ensure_text(idempotency_key, 'idempotency_key')).encode('utf-8')).hexdigest()[:24].upper()}"
+    return f"TRC-{hashlib.sha256(('trace|' + _ensure_public_identifier(idempotency_key, 'idempotency_key')).encode('utf-8')).hexdigest()[:24].upper()}"
 
 
 def _ensure_http_request(value: HttpRequest) -> HttpRequest:
@@ -718,8 +728,19 @@ def _ensure_text(value: Any, field_name: str) -> str:
     return value
 
 
+def _ensure_limited_text(value: Any, field_name: str, max_length: int) -> str:
+    text = _ensure_text(value, field_name)
+    if len(text) > max_length:
+        raise ClaimHttpRequestValidationError(f"{field_name} trop long", field=field_name)
+    return text
+
+
+def _ensure_public_identifier(value: Any, field_name: str) -> str:
+    return _ensure_limited_text(value, field_name, _MAX_PUBLIC_IDENTIFIER_LENGTH)
+
+
 def _ensure_chunk_id(value: Any) -> str:
-    text = _ensure_text(value, "chunk_id")
+    text = _ensure_public_identifier(value, "chunk_id")
     if not text.startswith("KCHK-"):
         raise ClaimHttpRequestValidationError("chunk_id invalide", field="chunk_id")
     return text

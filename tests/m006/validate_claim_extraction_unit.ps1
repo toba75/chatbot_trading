@@ -116,10 +116,13 @@ source_text = (
     "Elle ne réduit pas le coût de portage."
 )
 candidate = candidate_for(source_text)
+primary_span = "La couverture de queue peut réduire la perte extrême si la liquidité est quotidienne."
+primary_span_start = source_text.index(primary_span)
+primary_span_end = primary_span_start + len(primary_span)
 base_payload = {
     "claim_type": "EMPIRICAL_EFFECT",
-    "canonical_text": "La couverture de queue peut réduire la perte extrême si la liquidité est quotidienne.",
-    "source_text": "La couverture de queue peut réduire la perte extrême si la liquidité est quotidienne.",
+    "canonical_text": primary_span,
+    "source_text": primary_span,
     "scope": {
         "universe": "portefeuille avec couverture de queue",
         "horizon": "perte extrême",
@@ -129,9 +132,9 @@ base_payload = {
     "conditions": ("liquidité quotidienne",),
     "limitations": ("portée limitée à la liquidité quotidienne",),
     "evidence_span": {
-        "quoted_text": "La couverture de queue peut réduire la perte extrême si la liquidité est quotidienne.",
-        "start_char": 0,
-        "end_char": 80,
+        "quoted_text": primary_span,
+        "start_char": primary_span_start,
+        "end_char": primary_span_end,
     },
 }
 
@@ -174,14 +177,17 @@ assert_raises(
 
 # L'atomicité refuse les propositions composites.
 ClaimAtomicityPolicy().ensure_atomic(proposal)
+composite_span = "La couverture de queue peut réduire la perte extrême"
+composite_span_start = source_text.index(composite_span)
+composite_span_end = composite_span_start + len(composite_span)
 composite_payload = {
     **base_payload,
     "canonical_text": "La couverture de queue peut réduire la perte extrême et elle peut augmenter le coût de portage.",
-    "source_text": "La couverture de queue peut réduire la perte extrême",
+    "source_text": composite_span,
     "evidence_span": {
-        "quoted_text": "La couverture de queue peut réduire la perte extrême",
-        "start_char": 0,
-        "end_char": 49,
+        "quoted_text": composite_span,
+        "start_char": composite_span_start,
+        "end_char": composite_span_end,
     },
 }
 assert_raises(
@@ -205,14 +211,17 @@ assert_raises(
         ClaimExtractionProposal.from_payload({**base_payload, "canonical_text": "La couverture de queue peut réduire la perte extrême.", "conditions": ("liquidité quotidienne",)}, evidence_candidate=candidate, extractor_version="extractor-unit-v1")
     ),
 )
+negative_span = "Elle ne réduit pas le coût de portage."
+negative_span_start = source_text.index(negative_span)
+negative_span_end = negative_span_start + len(negative_span)
 negative_payload = {
     **base_payload,
     "canonical_text": "La couverture de queue réduit le coût de portage.",
-    "source_text": "Elle ne réduit pas le coût de portage.",
+    "source_text": negative_span,
     "evidence_span": {
-        "quoted_text": "Elle ne réduit pas le coût de portage.",
-        "start_char": 82,
-        "end_char": 120,
+        "quoted_text": negative_span,
+        "start_char": negative_span_start,
+        "end_char": negative_span_end,
     },
     "scope": {
         "universe": "portefeuille avec couverture de queue",

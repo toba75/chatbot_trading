@@ -121,6 +121,8 @@ class RelateClaimsHandler:
     ) -> None:
         if not callable(getattr(claim_repository, "claim_for_id", None)):
             raise ValueError("claim_repository sans claim_for_id")
+        if not callable(getattr(claim_repository, "claim_for_version", None)):
+            raise ValueError("claim_repository sans claim_for_version")
         if not callable(getattr(claim_relation_repository, "save", None)):
             raise ValueError("claim_relation_repository sans save")
         if not callable(getattr(claim_relation_repository, "relations_between", None)):
@@ -133,8 +135,14 @@ class RelateClaimsHandler:
 
     def relate(self, command: RelateClaims) -> RelateClaimsResult:
         parsed_command = _ensure_command(command)
-        source_claim = self.claim_repository.claim_for_id(parsed_command.source_claim_id)
-        target_claim = self.claim_repository.claim_for_id(parsed_command.target_claim_id)
+        source_claim = self.claim_repository.claim_for_version(
+            parsed_command.source_claim_id,
+            parsed_command.source_claim_version,
+        )
+        target_claim = self.claim_repository.claim_for_version(
+            parsed_command.target_claim_id,
+            parsed_command.target_claim_version,
+        )
         _ensure_claim_version(source_claim, parsed_command.source_claim_version)
         _ensure_claim_version(target_claim, parsed_command.target_claim_version)
 

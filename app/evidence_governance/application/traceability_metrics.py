@@ -27,6 +27,17 @@ _ALLOWED_STATUSES = (
 )
 _TERMINAL_VERIFICATION_STATUSES = frozenset({"VERIFIED", "REJECTED", "SUPERSEDED"})
 _ALLOWED_VERDICTS = ("ENTAILED", "PARTIALLY_ENTAILED", "NOT_ENTAILED")
+_NORMATIVE_SIGNAL_NAMES = (
+    "claims_drafted_total",
+    "claims_verified_total",
+    "claims_rejected_total",
+    "claim_verification_latency_seconds",
+    "claim_scope_refusal_total",
+    "claim_independent_support_groups",
+    "claim_superseded_total",
+    "claim_model_proposal_total",
+    "claim_public_evidence_resolution_failed_total",
+)
 
 
 @dataclass(frozen=True)
@@ -144,6 +155,7 @@ class EvidenceGovernanceMetricSnapshot:
     verdict_distribution: Mapping[str, int]
     dependency_group_count_distribution: Mapping[str, int]
     average_verification_latency_seconds: float
+    normative_signals: Mapping[str, int | float]
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "fixture_id", _ensure_text(self.fixture_id, "fixture_id"))
@@ -181,6 +193,11 @@ class EvidenceGovernanceMetricSnapshot:
                 "average_verification_latency_seconds",
             ),
         )
+        object.__setattr__(
+            self,
+            "normative_signals",
+            _ensure_normative_signals(self.normative_signals),
+        )
         if sum(self.status_counts.values()) != self.claim_count:
             raise ValueError("status_counts incoherents")
 
@@ -203,6 +220,7 @@ class EvidenceGovernanceMetricSnapshot:
             "verdict_distribution": dict(self.verdict_distribution),
             "dependency_group_count_distribution": dict(self.dependency_group_count_distribution),
             "average_verification_latency_seconds": self.average_verification_latency_seconds,
+            "normative_signals": dict(self.normative_signals),
         }
 
 
@@ -226,6 +244,11 @@ class EvidenceGovernanceMetricsPublisher:
         verdict_distribution = _verdict_distribution_for(parsed_observations)
         dependency_group_count_distribution = _dependency_group_count_distribution_for(parsed_observations)
         average_latency_seconds = _average_verification_latency_seconds(parsed_observations)
+        normative_signals = _normative_signals_for(
+            observations=parsed_observations,
+            status_counts=status_counts,
+            average_latency_seconds=average_latency_seconds,
+        )
 
         return EvidenceGovernanceMetricSnapshot(
             fixture_id=parsed_fixture_id,
@@ -243,6 +266,7 @@ class EvidenceGovernanceMetricsPublisher:
             verdict_distribution=verdict_distribution,
             dependency_group_count_distribution=dependency_group_count_distribution,
             average_verification_latency_seconds=average_latency_seconds,
+            normative_signals=normative_signals,
         )
 
 
@@ -364,6 +388,38 @@ def _average_verification_latency_seconds(observations: tuple[ClaimMetricObserva
     return sum(latencies) / len(latencies)
 
 
+def _normative_signals_for(
+    *,
+    observations: tuple[ClaimMetricObservation, ...],
+    status_counts: Mapping[str, int],
+    average_latency_seconds: float,
+) -> dict[str, int | float]:
+    return {
+        "claims_drafted_total": len(observations),
+        "claims_verified_total": status_counts["VERIFIED"],
+        "claims_rejected_total": status_counts["REJECTED"],
+        "claim_verification_latency_seconds": average_latency_seconds,
+        "claim_scope_refusal_total": _reason_code_count(
+            observations,
+            "CLAIM_SCOPE_EXCEEDS_EVIDENCE",
+        ),
+        "claim_independent_support_groups": sum(
+            observation.dependency_group_count for observation in observations
+        ),
+        "claim_superseded_total": status_counts["SUPERSEDED"],
+        "claim_model_proposal_total": len(observations),
+        "claim_public_evidence_resolution_failed_total": _reason_code_count(
+            observations,
+            "CLAIM_EVIDENCE_SOURCE_UNRESOLVABLE",
+        ),
+    }
+
+
+def _reason_code_count(observations: tuple[ClaimMetricObservation, ...], reason_code: str) -> int:
+    parsed_reason_code = _ensure_text(reason_code, "reason_code")
+    return sum(1 for observation in observations if parsed_reason_code in observation.reason_codes)
+
+
 def _ensure_observations(value: Sequence[ClaimMetricObservation]) -> tuple[ClaimMetricObservation, ...]:
     if value is None or isinstance(value, str) or not isinstance(value, Sequence):
         raise ValueError("observations invalides")
@@ -425,6 +481,22 @@ def _ensure_count_mapping(value: Mapping[str, int], field_name: str) -> dict[str
     parsed: dict[str, int] = {}
     for key, count in value.items():
         parsed[_ensure_text(key, field_name)] = _ensure_positive_integer(count, field_name)
+    return parsed
+
+
+def _ensure_normative_signals(value: Mapping[str, int | float]) -> dict[str, int | float]:
+    if not isinstance(value, Mapping):
+        raise ValueError("normative_signals non objet")
+    actual_keys = tuple(str(key) for key in value)
+    if actual_keys != _NORMATIVE_SIGNAL_NAMES:
+        raise ValueError("normative_signals incomplets")
+    parsed: dict[str, int | float] = {}
+    for signal_name in _NORMATIVE_SIGNAL_NAMES:
+        signal_value = value[signal_name]
+        if signal_name == "claim_verification_latency_seconds":
+            parsed[signal_name] = _ensure_non_negative_float(signal_value, signal_name)
+        else:
+            parsed[signal_name] = _ensure_non_negative_integer(signal_value, signal_name)
     return parsed
 
 

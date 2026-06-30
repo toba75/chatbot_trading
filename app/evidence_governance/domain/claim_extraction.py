@@ -7,7 +7,6 @@ import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import Enum
-from types import MappingProxyType
 from typing import Any
 
 from app.contracts.source_references import SourceLocator
@@ -28,6 +27,7 @@ _ALLOWED_PROPOSAL_FIELDS = frozenset(
 )
 _ALLOWED_SCOPE_FIELDS = frozenset({"universe", "horizon", "metric", "frequency"})
 _ALLOWED_EVIDENCE_SPAN_FIELDS = frozenset({"quoted_text", "start_char", "end_char"})
+_ALLOWED_EVIDENCE_CANDIDATE_FIELDS = frozenset({"chunk_id", "text", "source_locator", "content_hash"})
 _MODALITY_MARKERS = ("peut", "peuvent", "pourrait", "pourraient", "doit", "doivent")
 _NEGATION_MARKERS = (" ne ", " n'", " pas", " jamais", " aucun", " aucune")
 _COMPOSITE_MARKERS = (" et elle ", " et il ", " et elles ", " et ils ", " mais elle ", " mais il ", ";")
@@ -99,6 +99,45 @@ class Limitation:
 
 
 @dataclass(frozen=True)
+class EvidenceCandidate:
+    """Preuve candidate explicite consommée par EG depuis la frontière KA."""
+
+    chunk_id: str
+    text: str
+    source_locator: SourceLocator
+    content_hash: str
+
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, Any]) -> "EvidenceCandidate":
+        parsed_payload = _ensure_mapping(payload, "evidence_candidate")
+        _ensure_allowed_fields(parsed_payload, _ALLOWED_EVIDENCE_CANDIDATE_FIELDS, "evidence_candidate")
+        return cls(
+            chunk_id=_required_text(parsed_payload, "chunk_id"),
+            text=_required_text(parsed_payload, "text"),
+            source_locator=_required_source_locator(parsed_payload),
+            content_hash=_required_text(parsed_payload, "content_hash"),
+        )
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "chunk_id", _ensure_chunk_id(self.chunk_id))
+        object.__setattr__(self, "text", _ensure_text(self.text, "text"))
+        if not isinstance(self.source_locator, SourceLocator):
+            raise ValueError("source_locator invalide")
+        content_hash = _ensure_sha256(self.content_hash, "content_hash")
+        if self.source_locator.content_hash != content_hash:
+            raise ValueError("content_hash incoherent avec SourceLocator")
+        object.__setattr__(self, "content_hash", content_hash)
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "chunk_id": self.chunk_id,
+            "text": self.text,
+            "source_locator": self.source_locator.to_payload(),
+            "content_hash": self.content_hash,
+        }
+
+
+@dataclass(frozen=True)
 class EvidenceSpan:
     """Span documentaire cité par un brouillon de claim."""
 
@@ -119,19 +158,21 @@ class EvidenceSpan:
         _ensure_allowed_fields(parsed_payload, _ALLOWED_EVIDENCE_SPAN_FIELDS, "evidence_span")
         candidate = _ensure_evidence_candidate(evidence_candidate)
         quoted_text = _required_text(parsed_payload, "quoted_text")
-        if quoted_text not in candidate["text"]:
+        if quoted_text not in candidate.text:
             raise ValueError("quoted_text absent du texte source")
 
         start_char = _required_non_negative_integer(parsed_payload, "start_char")
         end_char = _required_positive_integer(parsed_payload, "end_char")
-        if start_char >= end_char or end_char > len(candidate["text"]):
+        if start_char >= end_char or end_char > len(candidate.text):
+            raise ValueError("evidence_span invalide")
+        if candidate.text[start_char:end_char] != quoted_text:
             raise ValueError("evidence_span invalide")
 
         return cls(
             quoted_text=quoted_text,
             start_char=start_char,
             end_char=end_char,
-            source_locator=candidate["source_locator"],
+            source_locator=candidate.source_locator,
             quoted_span_hash=_sha256_text(quoted_text),
         )
 
@@ -188,7 +229,7 @@ class ClaimExtractionProposal:
         _ensure_allowed_fields(parsed_payload, _ALLOWED_PROPOSAL_FIELDS, "claim_proposal")
         candidate = _ensure_evidence_candidate(evidence_candidate)
         source_text = _required_text(parsed_payload, "source_text")
-        if source_text not in candidate["text"]:
+        if source_text not in candidate.text:
             raise ValueError("source_text absent du texte source")
 
         return cls(
@@ -202,7 +243,7 @@ class ClaimExtractionProposal:
                 _required_value(parsed_payload, "evidence_span"),
                 evidence_candidate=evidence_candidate,
             ),
-            evidence_chunk_id=candidate["chunk_id"],
+            evidence_chunk_id=candidate.chunk_id,
             extractor_version=_ensure_text(extractor_version, "extractor_version"),
         )
 
@@ -454,27 +495,12 @@ def _ensure_draft_claim(value: DraftClaim) -> DraftClaim:
     return value
 
 
-def _ensure_evidence_candidate(value: Any) -> Mapping[str, Any]:
+def _ensure_evidence_candidate(value: Any) -> EvidenceCandidate:
     if value is None:
         raise ValueError("evidence_candidate absent")
-
-    chunk_id = _ensure_chunk_id(getattr(value, "chunk_id", None))
-    text = _ensure_text(getattr(value, "text", None), "text")
-    source_locator = getattr(value, "source_locator", None)
-    if not isinstance(source_locator, SourceLocator):
-        raise ValueError("source_locator invalide")
-    content_hash = _ensure_sha256(getattr(value, "content_hash", None), "content_hash")
-    if source_locator.content_hash != content_hash:
-        raise ValueError("content_hash incoherent avec SourceLocator")
-
-    return MappingProxyType(
-        {
-            "chunk_id": chunk_id,
-            "text": text,
-            "source_locator": source_locator,
-            "content_hash": content_hash,
-        }
-    )
+    if not isinstance(value, EvidenceCandidate):
+        raise ValueError("evidence_candidate invalide")
+    return value
 
 
 def _conditions_from_payload(value: Any) -> tuple[ClaimCondition, ...]:
@@ -521,6 +547,13 @@ def _required_value(payload: Mapping[str, Any], field_name: str) -> Any:
 
 def _required_text(payload: Mapping[str, Any], field_name: str) -> str:
     return _ensure_text(_required_value(payload, field_name), field_name)
+
+
+def _required_source_locator(payload: Mapping[str, Any]) -> SourceLocator:
+    source_locator = _required_value(payload, "source_locator")
+    if not isinstance(source_locator, SourceLocator):
+        raise ValueError("source_locator invalide")
+    return source_locator
 
 
 def _required_positive_integer(payload: Mapping[str, Any], field_name: str) -> int:
@@ -625,6 +658,7 @@ __all__ = [
     "ClaimCanonicalizationPolicy",
     "ClaimCondition",
     "ClaimDrafted",
+    "EvidenceCandidate",
     "ClaimExtractionProposal",
     "ClaimScope",
     "DraftClaim",

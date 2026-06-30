@@ -378,8 +378,10 @@ class Claim:
 
     def _ensure_status_decision_fields(self) -> None:
         if self.status == ClaimStatus.VERIFIED:
-            if (self.verified_claim_ref is None) != (self.accepted_verification_id is None):
+            if self.verified_claim_ref is None or self.accepted_verification_id is None:
                 raise ValueError("verification acceptee incomplete")
+            if len(self.evidence_associations) == 0:
+                raise ValueError("preuve directe requise pour VERIFIED")
             if self.rejection_reason_codes:
                 raise ValueError("reason_codes incompatibles avec VERIFIED")
             if self.rejected_at is not None:

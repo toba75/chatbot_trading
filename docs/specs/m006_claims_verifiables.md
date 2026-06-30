@@ -127,8 +127,8 @@ Les garde-fous de mission sont explicites: aucun claim EG stocké dans l'index d
 
 | Endpoint | Succès | Erreurs publiques | Corps public |
 |---|---|---|---|
-| POST /v1/claims/extract | 202 CLAIM_EXTRACTION_ACCEPTED quand les preuves candidates sont acceptées pour extraction. | 400 HTTP_REQUEST_INVALID; 422 CLAIM_EVIDENCE_SOURCE_UNRESOLVABLE; 422 CLAIM_PUBLICATION_FORBIDDEN. | request_id; draft_claims; rejected_candidates; trace_id. |
-| POST /v1/claims/{claim_id}/verify | 200 CLAIM_VERIFICATION_RECORDED quand une décision est enregistrée. | 400 HTTP_REQUEST_INVALID; 404 CLAIM_NOT_FOUND; 409 CLAIM_STATE_INVALID; 422 CLAIM_EVIDENCE_REQUIRED; 422 CLAIM_SCOPE_EXCEEDS_EVIDENCE; 422 INSUFFICIENT_DIRECT_EVIDENCE; 422 CLAIM_VERIFICATION_POLICY_MISSING. | claim_id; claim_version; verification_case_id; state; verdict; reason_codes; verified_claim_ref. |
+| POST /v1/claims/extract | 202 CLAIM_EXTRACTION_ACCEPTED quand les preuves candidates sont acceptées pour extraction. | 400 HTTP_REQUEST_INVALID; 403 CLAIM_CONTEXT_FORBIDDEN; 422 CLAIM_EVIDENCE_SOURCE_UNRESOLVABLE; 422 CLAIM_PUBLICATION_FORBIDDEN. | request_id; draft_claims; rejected_candidates; trace_id. |
+| POST /v1/claims/{claim_id}/verify | 200 CLAIM_VERIFICATION_RECORDED quand une décision est enregistrée. | 400 HTTP_REQUEST_INVALID; 403 CLAIM_CONTEXT_FORBIDDEN; 404 CLAIM_NOT_FOUND; 409 CLAIM_STATE_INVALID; 422 CLAIM_EVIDENCE_REQUIRED; 422 CLAIM_SCOPE_EXCEEDS_EVIDENCE; 422 INSUFFICIENT_DIRECT_EVIDENCE; 422 CLAIM_VERIFICATION_POLICY_MISSING. | status; claim_id; claim_version; verification_case_id; state; verdict; reason_codes; verified_claim_ref. |
 | GET /v1/claims/{claim_id} | 200 CLAIM_READ quand la version demandée est consultable. | 404 CLAIM_NOT_FOUND; 409 CLAIM_PUBLICATION_FORBIDDEN. | claim_id; claim_version; state; canonical_proposition; scope; superseded_by; verified_claim_ref. |
 | GET /v1/claims/{claim_id}/evidence | 200 CLAIM_EVIDENCE_READ quand les preuves publiques sont résolubles. | 404 CLAIM_NOT_FOUND; 409 CLAIM_PUBLICATION_FORBIDDEN; 422 CLAIM_EVIDENCE_SOURCE_UNRESOLVABLE. | claim_id; claim_version; evidence_refs; dependency_groups; verification_cases. |
 
@@ -136,14 +136,15 @@ Les garde-fous de mission sont explicites: aucun claim EG stocké dans l'index d
 
 | Endpoint | Champs acceptés | Champs interdits |
 |---|---|---|
-| POST /v1/claims/extract | evidence_candidates; extraction_schema_version; requested_by_context; idempotency_key | qdrant_collection; prompt_override; verified_state |
-| POST /v1/claims/{claim_id}/verify | verification_policy_version; verifier_profile_id; idempotency_key | verdict_override; calibrated_score_as_verdict; qdrant_point_id |
+| POST /v1/claims/extract | evidence_candidates; extraction_schema_version; requested_by_context; idempotency_key; occurred_at | qdrant_collection; prompt_override; verified_state |
+| POST /v1/claims/{claim_id}/verify | verification_policy_version; verifier_profile_id; idempotency_key; occurred_at | verdict_override; calibrated_score_as_verdict; qdrant_point_id |
 
 ## Erreurs publiques
 
 | Code | Statut HTTP | Sens public |
 |---|---|---|
 | HTTP_REQUEST_INVALID | 400 | Requête EG invalide. |
+| CLAIM_CONTEXT_FORBIDDEN | 403 | Contexte authentifié non autorisé à muter les claims EG. |
 | CLAIM_NOT_FOUND | 404 | Claim inconnu ou version absente. |
 | CLAIM_STATE_INVALID | 409 | Transition interdite pour l'état courant du claim. |
 | CLAIM_EVIDENCE_REQUIRED | 422 | Aucune preuve admissible n'est attachée. |

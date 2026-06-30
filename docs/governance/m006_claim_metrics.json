@@ -30,5 +30,16 @@
     "1": 2,
     "2": 1
   },
-  "average_verification_latency_seconds": 180.0
+  "average_verification_latency_seconds": 180.0,
+  "normative_signals": {
+    "claims_drafted_total": 4,
+    "claims_verified_total": 1,
+    "claims_rejected_total": 1,
+    "claim_verification_latency_seconds": 180.0,
+    "claim_scope_refusal_total": 1,
+    "claim_independent_support_groups": 4,
+    "claim_superseded_total": 1,
+    "claim_model_proposal_total": 4,
+    "claim_public_evidence_resolution_failed_total": 1
+  }
 }

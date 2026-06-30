@@ -91,6 +91,12 @@ candidate = EvidenceCandidate(
     source_locator=source_locator,
     content_hash=source_locator.content_hash,
 )
+drawdown_span = "les couvertures de queue peuvent réduire le drawdown"
+drawdown_span_start = source_text.index(drawdown_span)
+drawdown_span_end = drawdown_span_start + len(drawdown_span)
+carry_span = "Elles peuvent aussi augmenter le coût de portage"
+carry_span_start = source_text.index(carry_span)
+carry_span_end = carry_span_start + len(carry_span)
 
 extractor = DeterministicClaimExtractor(
     extractor_version="deterministic-claim-extractor-m006-t003-v1",
@@ -112,9 +118,9 @@ extractor = DeterministicClaimExtractor(
                 "conditions": ("liquidité quotidienne",),
                 "limitations": ("résultat limité aux crises de volatilité citées par la preuve",),
                 "evidence_span": {
-                    "quoted_text": "les couvertures de queue peuvent réduire le drawdown",
-                    "start_char": 33,
-                    "end_char": 90,
+                    "quoted_text": drawdown_span,
+                    "start_char": drawdown_span_start,
+                    "end_char": drawdown_span_end,
                 },
             },
             {
@@ -133,9 +139,9 @@ extractor = DeterministicClaimExtractor(
                 "conditions": ("liquidité quotidienne",),
                 "limitations": ("résultat limité aux crises de volatilité citées par la preuve",),
                 "evidence_span": {
-                    "quoted_text": "Elles peuvent aussi augmenter le coût de portage",
-                    "start_char": 92,
-                    "end_char": 140,
+                    "quoted_text": carry_span,
+                    "start_char": carry_span_start,
+                    "end_char": carry_span_end,
                 },
             },
         )
