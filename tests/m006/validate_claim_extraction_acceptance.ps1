@@ -17,8 +17,7 @@ from app.evidence_governance.application.extract_claims import (
     ExtractClaimsFromEvidenceCommand,
     ExtractClaimsFromEvidenceHandler,
 )
-from app.evidence_governance.domain.claim_extraction import DraftClaimStatus
-from app.knowledge_access.domain.search import ParentContext, RetrievalCandidate, SearchScoreBundle
+from app.evidence_governance.domain.claim_extraction import DraftClaimStatus, EvidenceCandidate
 
 
 def assert_equal(actual, expected, message):
@@ -86,29 +85,11 @@ source_text = (
     "Limite: le résultat suppose une liquidité quotidienne."
 )
 source_locator = locator_for(source_text)
-candidate = RetrievalCandidate(
-    projection_id="PROJ-M006-T003-ACCEPTANCE",
-    projection_profile_id="projection-profile-m006-t003",
-    build_fingerprint="c" * 64,
-    index_generation="IDX-M006-T003-ACCEPTANCE",
+candidate = EvidenceCandidate(
     chunk_id="KCHK-M006-T003-ACCEPTANCE-001",
-    canonical_version_id=source_locator.canonical_version_id,
-    document_id=source_locator.document_id,
     text=source_text,
     source_locator=source_locator,
     content_hash=source_locator.content_hash,
-    score_bundle=SearchScoreBundle(
-        dense_score=0.91,
-        sparse_score=8.0,
-        fusion_score=0.031,
-        rerank_score=0.84,
-        diversification_rank=1,
-    ),
-    fusion_trace={"algorithm": "RRF", "rank": 1},
-    parent_context=ParentContext(
-        parent_chunk_id="KCHK-M006-T003-ACCEPTANCE-PARENT",
-        parent_text="Section crise: couvertures de queue, drawdown, coût de portage et liquidité.",
-    ),
 )
 
 extractor = DeterministicClaimExtractor(

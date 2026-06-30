@@ -68,7 +68,11 @@ observations = (
         status="REJECTED",
         direct_evidence_count=0,
         verification_verdict="NOT_ENTAILED",
-        reason_codes=("INSUFFICIENT_DIRECT_EVIDENCE",),
+        reason_codes=(
+            "INSUFFICIENT_DIRECT_EVIDENCE",
+            "CLAIM_SCOPE_EXCEEDS_EVIDENCE",
+            "CLAIM_EVIDENCE_SOURCE_UNRESOLVABLE",
+        ),
         dependency_group_ids=(),
         submitted_at="2026-06-30T10:01:00Z",
         decided_at="2026-06-30T10:02:00Z",
@@ -116,6 +120,21 @@ assert_equal(payload["status_counts"]["VERIFIED"], 1, "Les claims vérifiés doi
 assert_equal(payload["status_counts"]["REJECTED"], 1, "Les claims rejetés doivent être comptés.")
 assert_equal(payload["status_counts"]["UNDER_VERIFICATION"], 1, "Les claims en revue doivent être comptés.")
 assert_equal(payload["status_counts"]["SUPERSEDED"], 1, "Les claims supersédés doivent être comptés.")
+assert_equal(
+    payload["normative_signals"],
+    {
+        "claims_drafted_total": 4,
+        "claims_verified_total": 1,
+        "claims_rejected_total": 1,
+        "claim_verification_latency_seconds": 180.0,
+        "claim_scope_refusal_total": 1,
+        "claim_independent_support_groups": 4,
+        "claim_superseded_total": 1,
+        "claim_model_proposal_total": 4,
+        "claim_public_evidence_resolution_failed_total": 1,
+    },
+    "Les signaux normatifs M-006 doivent être publiés explicitement.",
+)
 assert_close(payload["rates"]["verified_rate"], 0.25, "Le taux vérifié est incorrect.")
 assert_close(payload["rates"]["rejected_rate"], 0.25, "Le taux rejeté est incorrect.")
 assert_close(payload["rates"]["in_review_rate"], 0.25, "Le taux en revue est incorrect.")

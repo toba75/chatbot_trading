@@ -10,7 +10,7 @@ import sys
 
 sys.path.insert(0, sys.argv[1])
 
-from app.contracts.evidence_claims import EvidenceRef
+from app.contracts.evidence_claims import EvidenceRef, VerifiedClaimRef
 from app.contracts.source_references import CanonicalSourceRef, SourceLocator, SourceLocatorValidationPolicy
 from app.evidence_governance.adapters.in_memory_claim_repository import InMemoryClaimRepository
 from app.evidence_governance.adapters.in_memory_dependency_group_repository import InMemoryDependencyGroupRepository
@@ -114,6 +114,29 @@ def evidence_ref_for(*, suffix, evidence_id):
 
 
 def claim_for(*, claim_id, evidence_refs, status=ClaimStatus.EVIDENCE_ATTACHED):
+    scope = ClaimScope(
+        universe="portefeuille avec couvertures de queue",
+        horizon="crises de volatilité",
+        metric="drawdown",
+        frequency="quotidienne",
+    )
+    verified_fields = {}
+    if status == ClaimStatus.VERIFIED:
+        verification_id = f"VER-{claim_id.removeprefix('CLM-')}"
+        verified_fields = {
+            "verified_claim_ref": VerifiedClaimRef(
+                schema_version="1.0",
+                claim_id=claim_id,
+                claim_version=1,
+                canonical_text="Les couvertures de queue réduisent le drawdown pendant les crises de volatilité.",
+                scope=scope.to_payload(),
+                status="VERIFIED",
+                verification_id=verification_id,
+                evidence_refs=tuple(evidence_refs),
+                dependency_group_ids=("DEP-M006-T006-ACCEPTANCE-PRIMARY-STUDY",),
+            ),
+            "accepted_verification_id": verification_id,
+        }
     return Claim(
         claim_id=claim_id,
         claim_version=1,
@@ -122,18 +145,14 @@ def claim_for(*, claim_id, evidence_refs, status=ClaimStatus.EVIDENCE_ATTACHED):
         canonical_proposition=CanonicalProposition(
             "Les couvertures de queue réduisent le drawdown pendant les crises de volatilité."
         ),
-        scope=ClaimScope(
-            universe="portefeuille avec couvertures de queue",
-            horizon="crises de volatilité",
-            metric="drawdown",
-            frequency="quotidienne",
-        ),
+        scope=scope,
         conditions=(ClaimCondition("crises de volatilité"),),
         limitations=(Limitation("résultat limité au span cité"),),
         evidence_associations=tuple(
             EvidenceAssociation.from_evidence_ref(evidence_ref)
             for evidence_ref in evidence_refs
         ),
+        **verified_fields,
     )
 
 

@@ -138,6 +138,11 @@ expected = EvidenceGovernanceMetricsPublisher().publish(
 assert_equal(metrics_payload["fixture_id"], expected["fixture_id"], "La fixture publiée doit correspondre à la preuve.")
 assert_equal(metrics_payload["claim_count"], expected["claim_count"], "Le nombre de claims publié est incohérent.")
 assert_equal(metrics_payload["status_counts"], expected["status_counts"], "Les compteurs de statuts sont incohérents.")
+assert_equal(
+    metrics_payload["normative_signals"],
+    fixture["expected_normative_signals"],
+    "Les signaux normatifs publiés ne correspondent pas à la preuve attendue.",
+)
 assert_equal(metrics_payload["verdict_distribution"], expected["verdict_distribution"], "La distribution des verdicts est incohérente.")
 assert_equal(
     metrics_payload["dependency_group_count_distribution"],

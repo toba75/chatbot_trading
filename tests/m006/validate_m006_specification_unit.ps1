@@ -133,6 +133,13 @@ try {
     Assert-ExitCode -Actual $missingApiResult.ExitCode -Expected 1 -Message "L'API de vérification des claims doit être obligatoire."
     Assert-OutputContains -Output $missingApiResult.Output -Expected "POST /v1/claims/{claim_id}/verify" -Message "L'endpoint absent doit être nommé."
 
+    $missingReadApiSpecPath = New-TemporarySpec `
+        -Name "missing-claims-read-api" `
+        -Content ($validContent.Replace("GET /v1/claims/{claim_id}", "GET /v1/claims/{claim_id}/private"))
+    $missingReadApiResult = Invoke-M006SpecificationValidator -SpecPath $missingReadApiSpecPath
+    Assert-ExitCode -Actual $missingReadApiResult.ExitCode -Expected 1 -Message "L'API de lecture des claims doit être obligatoire."
+    Assert-OutputContains -Output $missingReadApiResult.Output -Expected "GET /v1/claims/{claim_id}" -Message "L'endpoint de lecture absent doit être nommé."
+
     $missingPublicErrorSpecPath = New-TemporarySpec `
         -Name "missing-public-error" `
         -Content ($validContent.Replace("CLAIM_SCOPE_EXCEEDS_EVIDENCE", "CLAIM_SCOPE_BROAD"))

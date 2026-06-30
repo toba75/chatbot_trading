@@ -22,6 +22,7 @@ from app.evidence_governance.domain.claim_extraction import (
     ClaimAtomicityPolicy,
     ClaimCanonicalizationPolicy,
     ClaimCondition,
+    EvidenceCandidate,
     ClaimExtractionProposal,
     ClaimScope,
     DraftClaim,
@@ -29,7 +30,6 @@ from app.evidence_governance.domain.claim_extraction import (
     EvidenceSpan,
     Limitation,
 )
-from app.knowledge_access.domain.search import ParentContext, RetrievalCandidate, SearchScoreBundle
 
 
 def assert_equal(actual, expected, message):
@@ -103,29 +103,11 @@ def locator_for(text):
 
 def candidate_for(text):
     locator = locator_for(text)
-    return RetrievalCandidate(
-        projection_id="PROJ-M006-T003-UNIT",
-        projection_profile_id="projection-profile-m006-t003-unit",
-        build_fingerprint="f" * 64,
-        index_generation="IDX-M006-T003-UNIT",
+    return EvidenceCandidate(
         chunk_id="KCHK-M006-T003-UNIT-001",
-        canonical_version_id=locator.canonical_version_id,
-        document_id=locator.document_id,
         text=text,
         source_locator=locator,
         content_hash=locator.content_hash,
-        score_bundle=SearchScoreBundle(
-            dense_score=0.90,
-            sparse_score=7.0,
-            fusion_score=0.030,
-            rerank_score=0.80,
-            diversification_rank=1,
-        ),
-        fusion_trace={"algorithm": "RRF", "rank": 1},
-        parent_context=ParentContext(
-            parent_chunk_id="KCHK-M006-T003-UNIT-PARENT",
-            parent_text="Parent: couverture de queue, volatilité et liquidité quotidienne.",
-        ),
     )
 
 
@@ -182,6 +164,13 @@ assert_raises("scope non objet", lambda: ClaimScope.from_payload("scope invalide
 assert_raises("condition vide", lambda: ClaimCondition(""))
 assert_raises("limitation vide", lambda: Limitation(""))
 assert_raises("evidence_span invalide", lambda: EvidenceSpan.from_payload({"quoted_text": "La couverture", "start_char": 12, "end_char": 4}, evidence_candidate=candidate))
+assert_raises(
+    "evidence_span invalide",
+    lambda: EvidenceSpan.from_payload(
+        {"quoted_text": "La couverture", "start_char": 4, "end_char": 17},
+        evidence_candidate=candidate,
+    ),
+)
 
 # L'atomicité refuse les propositions composites.
 ClaimAtomicityPolicy().ensure_atomic(proposal)
@@ -282,6 +271,16 @@ assert_raises(
         requested_by_context="EG",
         idempotency_key="CLAIM-EXTRACTION-M006-T003-UNIT-0002",
         occurred_at="2026-06-29T11:35:00Z",
+    ),
+)
+assert_raises(
+    "evidence_candidate invalide",
+    lambda: ExtractClaimsFromEvidenceCommand(
+        evidence_candidates=(object(),),
+        extraction_schema_version="claim-extraction-m006-t003-unit-v1",
+        requested_by_context="EG",
+        idempotency_key="CLAIM-EXTRACTION-M006-T003-UNIT-0003",
+        occurred_at="2026-06-29T11:36:00Z",
     ),
 )
 

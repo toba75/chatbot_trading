@@ -10,7 +10,7 @@ import sys
 
 sys.path.insert(0, sys.argv[1])
 
-from app.contracts.evidence_claims import EvidenceRef
+from app.contracts.evidence_claims import EvidenceRef, VerifiedClaimRef
 from app.contracts.source_references import CanonicalSourceRef, SourceLocator, SourceLocatorValidationPolicy
 from app.evidence_governance.adapters.in_memory_canonical_evidence_reader import InMemoryCanonicalEvidenceReader
 from app.evidence_governance.adapters.in_memory_claim_repository import InMemoryClaimRepository
@@ -192,6 +192,55 @@ assert_equal(association.evidence_ref, evidence_ref, "L'association doit conserv
 assert_equal(association.relation, "SUPPORTS_DIRECTLY", "La relation doit rester explicite.")
 assert_equal(association.source_locator, source_locator, "L'association doit exposer le SourceLocator.")
 assert_equal(association.quoted_span_hash, evidence_ref.quoted_span_hash, "L'association doit exposer le hash du span.")
+
+verified_claim_ref = VerifiedClaimRef.from_payload(
+    {
+        "schema_version": "1.0",
+        "claim_id": "CLM-M006-T004-UNIT-VERIFIED-INVARIANT",
+        "claim_version": 1,
+        "canonical_text": "Les couvertures de queue peuvent réduire le drawdown pendant les crises de volatilité.",
+        "scope": draft_claim_for(source_locator).scope.to_payload(),
+        "status": "VERIFIED",
+        "verification_id": "VER-M006-T004-UNIT-VERIFIED-INVARIANT",
+        "evidence_refs": (evidence_ref.to_payload(),),
+        "dependency_group_ids": ("DEP-M006-T004-UNIT-PRIMARY",),
+    },
+    source_locator_validation_policy=validation_policy,
+)
+assert_raises(
+    "verification acceptee incomplete",
+    lambda: Claim(
+        claim_id="CLM-M006-T004-UNIT-VERIFIED-MISSING-DECISION",
+        claim_version=1,
+        status=ClaimStatus.VERIFIED,
+        claim_type="EMPIRICAL_EFFECT",
+        canonical_proposition=CanonicalProposition(
+            "Les couvertures de queue peuvent réduire le drawdown pendant les crises de volatilité."
+        ),
+        scope=draft_claim_for(source_locator).scope,
+        conditions=(ClaimCondition("crises de volatilité"),),
+        limitations=(Limitation("résultat limité au span cité"),),
+        evidence_associations=(),
+    ),
+)
+assert_raises(
+    "preuve directe requise pour VERIFIED",
+    lambda: Claim(
+        claim_id="CLM-M006-T004-UNIT-VERIFIED-MISSING-EVIDENCE",
+        claim_version=1,
+        status=ClaimStatus.VERIFIED,
+        claim_type="EMPIRICAL_EFFECT",
+        canonical_proposition=CanonicalProposition(
+            "Les couvertures de queue peuvent réduire le drawdown pendant les crises de volatilité."
+        ),
+        scope=draft_claim_for(source_locator).scope,
+        conditions=(ClaimCondition("crises de volatilité"),),
+        limitations=(Limitation("résultat limité au span cité"),),
+        evidence_associations=(),
+        verified_claim_ref=verified_claim_ref,
+        accepted_verification_id="VER-M006-T004-UNIT-VERIFIED-INVARIANT",
+    ),
+)
 
 # Relation absente ou non autorisée: aucun fallback relationnel.
 missing_relation_payload = evidence_ref.to_payload()

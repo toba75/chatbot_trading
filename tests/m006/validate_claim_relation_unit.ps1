@@ -12,7 +12,7 @@ sys.path.insert(0, sys.argv[1])
 from app.evidence_governance.adapters.in_memory_claim_repository import InMemoryClaimRepository
 from app.evidence_governance.adapters.in_memory_claim_relation_repository import InMemoryClaimRelationRepository
 from app.evidence_governance.application.relate_claims import RelateClaims, RelateClaimsHandler
-from app.evidence_governance.domain.claim_evidence import Claim, ClaimStatus
+from app.evidence_governance.domain.claim_evidence import Claim, ClaimStatus, SupersededBy
 from app.evidence_governance.domain.claim_extraction import (
     CanonicalProposition,
     ClaimCondition,
@@ -59,17 +59,18 @@ def scope_for(*, universe, horizon, metric="rendement", frequency="mensuelle"):
     )
 
 
-def claim_for(*, claim_id, claim_version, proposition, scope):
+def claim_for(*, claim_id, claim_version, proposition, scope, status=ClaimStatus.EVIDENCE_ATTACHED, **extra):
     return Claim(
         claim_id=claim_id,
         claim_version=claim_version,
-        status=ClaimStatus.VERIFIED,
+        status=status,
         claim_type="EMPIRICAL_EFFECT",
         canonical_proposition=CanonicalProposition(proposition),
         scope=scope,
         conditions=(ClaimCondition("portée explicitement comparée"),),
         limitations=(Limitation("relation limitée aux versions citées"),),
         evidence_associations=(),
+        **extra,
     )
 
 
@@ -291,6 +292,50 @@ relation_repository = InMemoryClaimRelationRepository.empty()
 handler = RelateClaimsHandler(
     claim_repository=claim_repository,
     claim_relation_repository=relation_repository,
+)
+old_version = claim_for(
+    claim_id="CLM-M006-T007-UNIT-VERSIONED",
+    claim_version=1,
+    proposition="La couverture de queue améliore le rendement sur l'ancienne fenêtre.",
+    scope=same_scope,
+    status=ClaimStatus.SUPERSEDED,
+    superseded_by=SupersededBy(claim_id="CLM-M006-T007-UNIT-VERSIONED", claim_version=2),
+    supersession_reason="Nouvelle fenêtre de mesure.",
+    superseded_at="2026-06-29T19:05:00Z",
+)
+latest_version = claim_for(
+    claim_id=old_version.claim_id,
+    claim_version=2,
+    proposition="La couverture de queue améliore le rendement sur la nouvelle fenêtre.",
+    scope=same_scope,
+)
+version_target = claim_for(
+    claim_id="CLM-M006-T007-UNIT-VERSION-TARGET",
+    claim_version=1,
+    proposition="La couverture de queue améliore le rendement sur le témoin.",
+    scope=same_scope,
+)
+versioned_handler = RelateClaimsHandler(
+    claim_repository=InMemoryClaimRepository(claims=(old_version, latest_version, version_target)),
+    claim_relation_repository=InMemoryClaimRelationRepository.empty(),
+)
+versioned_result = versioned_handler.relate(
+    RelateClaims(
+        relation_id="REL-M006-T007-UNIT-EXPLICIT-VERSION",
+        source_claim_id=old_version.claim_id,
+        source_claim_version=old_version.claim_version,
+        target_claim_id=version_target.claim_id,
+        target_claim_version=version_target.claim_version,
+        requested_relation_type=ClaimRelationType.DERIVED_FROM,
+        relation_basis="EXPLICIT_SOURCE_DEPENDENCY",
+        policy_version="claim-relation-policy-m006-t007-v1",
+        occurred_at="2026-06-29T19:06:00Z",
+    )
+)
+assert_equal(
+    versioned_result.relation.source_claim_ref.claim_version,
+    1,
+    "Le handler doit charger la version source demandée, pas la dernière version.",
 )
 first = handler.relate(
     RelateClaims(

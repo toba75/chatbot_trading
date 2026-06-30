@@ -22,6 +22,7 @@ from app.evidence_governance.adapters.claim_http import (
 )
 from app.evidence_governance.application.extract_claims import ExtractClaimsFromEvidenceCommand
 from app.evidence_governance.application.verify_claim import SubmitClaimForVerification
+from app.evidence_governance.domain.claim_extraction import EvidenceCandidate
 
 
 def assert_equal(actual, expected, message):
@@ -142,6 +143,7 @@ extract_command = extract_dto.to_command()
 assert_true(isinstance(extract_command, ExtractClaimsFromEvidenceCommand), "Le DTO doit produire la commande applicative d'extraction.")
 assert_equal(extract_command.extraction_schema_version, "claim-extraction-schema-m006-t009-unit-v1", "La version de schéma doit être conservée.")
 assert_equal(extract_command.requested_by_context, "EG", "Le contexte demandeur doit être explicite.")
+assert_true(isinstance(extract_command.evidence_candidates[0], EvidenceCandidate), "Le DTO HTTP doit produire un candidat EG explicite.")
 assert_equal(extract_command.evidence_candidates[0].chunk_id, "KCHK-M006-T009-UNIT-001", "Le candidat de preuve doit rester public.")
 
 for field_name in ("evidence_candidates", "extraction_schema_version", "requested_by_context", "idempotency_key", "occurred_at"):
@@ -174,6 +176,39 @@ assert_raises(
     ),
 )
 
+too_many_candidates = tuple(
+    valid_candidate_payload(policy) | {"chunk_id": f"KCHK-M006-T009-UNIT-{index:03d}"}
+    for index in range(1, 52)
+)
+assert_raises(
+    ClaimHttpRequestValidationError,
+    "evidence_candidates trop nombreux",
+    lambda: ClaimExtractionRequestDto.from_payload(
+        valid_extract_body(policy, evidence_candidates=too_many_candidates),
+        source_locator_validation_policy=policy,
+    ),
+)
+
+too_long_candidate = valid_candidate_payload(policy)
+too_long_candidate["text"] = "x" * 10001
+assert_raises(
+    ClaimHttpRequestValidationError,
+    "text trop long",
+    lambda: ClaimExtractionRequestDto.from_payload(
+        valid_extract_body(policy, evidence_candidates=(too_long_candidate,)),
+        source_locator_validation_policy=policy,
+    ),
+)
+
+assert_raises(
+    ClaimHttpRequestValidationError,
+    "idempotency_key trop long",
+    lambda: ClaimExtractionRequestDto.from_payload(
+        valid_extract_body(policy, idempotency_key="k" * 129),
+        source_locator_validation_policy=policy,
+    ),
+)
+
 verify_dto = ClaimVerificationRequestDto.from_payload(valid_verify_body())
 verify_command = verify_dto.to_command(claim_id="CLM-M006-T009-UNIT-VERIFY")
 same_verify_command = verify_dto.to_command(claim_id="CLM-M006-T009-UNIT-VERIFY")
@@ -199,6 +234,11 @@ assert_raises(
     ClaimHttpRequestValidationError,
     "occurred_at invalide",
     lambda: ClaimVerificationRequestDto.from_payload(valid_verify_body(occurred_at="hier")),
+)
+assert_raises(
+    ClaimHttpRequestValidationError,
+    "verifier_profile_id trop long",
+    lambda: ClaimVerificationRequestDto.from_payload(valid_verify_body(verifier_profile_id="v" * 129)),
 )
 
 
@@ -251,9 +291,42 @@ invalid = adapter.handle(
 assert_equal(invalid.status_code, 400, "Un payload interdit doit retourner 400 avant toute lecture.")
 assert_equal(invalid.body, {"error_code": "HTTP_REQUEST_INVALID", "field": "body"}, "Le refus de transport doit être stable.")
 
-wrong_endpoint = adapter.handle(HttpRequest(method="POST", path="/v1/answer", body=valid_verify_body(), authenticated_context="EG"))
+forbidden_extract = adapter.handle(
+    HttpRequest(
+        method="POST",
+        path="/v1/claims/extract",
+        body=valid_extract_body(policy),
+        authenticated_context="RA",
+    )
+)
+assert_equal(forbidden_extract.status_code, 403, "L'extraction doit être réservée au contexte EG authentifié.")
+assert_equal(forbidden_extract.body, {"error_code": "CLAIM_CONTEXT_FORBIDDEN"}, "Le refus de contexte doit être stable.")
+
+forbidden_extract_mismatch = adapter.handle(
+    HttpRequest(
+        method="POST",
+        path="/v1/claims/extract",
+        body=valid_extract_body(policy, requested_by_context="SD"),
+        authenticated_context="EG",
+    )
+)
+assert_equal(forbidden_extract_mismatch.status_code, 403, "Le contexte demandé doit correspondre au contexte authentifié.")
+assert_equal(forbidden_extract_mismatch.body, {"error_code": "CLAIM_CONTEXT_FORBIDDEN"}, "Le refus de contexte demandé doit être stable.")
+
+forbidden_verify = adapter.handle(
+    HttpRequest(
+        method="POST",
+        path="/v1/claims/CLM-M006-T009-UNIT-MISSING/verify",
+        body=valid_verify_body(),
+        authenticated_context="SD",
+    )
+)
+assert_equal(forbidden_verify.status_code, 403, "La vérification doit être réservée au contexte EG authentifié.")
+assert_equal(forbidden_verify.body, {"error_code": "CLAIM_CONTEXT_FORBIDDEN"}, "Le refus de contexte de vérification doit être stable.")
+
+wrong_endpoint = adapter.handle(HttpRequest(method="POST", path="/v1/answer?token=secret", body=valid_verify_body(), authenticated_context="EG"))
 assert_equal(wrong_endpoint.status_code, 404, "L'adaptateur claims ne doit pas router RA.")
-assert_equal(wrong_endpoint.body["error_code"], "ENDPOINT_NOT_FOUND", "Le mauvais endpoint doit être explicite.")
+assert_equal(wrong_endpoint.body, {"error_code": "ENDPOINT_NOT_FOUND"}, "Le mauvais endpoint ne doit pas refléter le chemin brut.")
 
 adapter_path = Path(sys.argv[1]) / "app" / "evidence_governance" / "adapters" / "claim_http.py"
 tree = ast.parse(adapter_path.read_text(encoding="utf-8"))
@@ -284,6 +357,8 @@ for node in ast.walk(tree):
         raise AssertionError(f"Import interdit dans claim_http.py: {sorted(imported_roots & forbidden_imports)}")
 
 source = adapter_path.read_text(encoding="utf-8")
+assert_true("ReadPublicClaimHandler" in source, "L'adaptateur HTTP doit déléguer la lecture publique au cas d'usage applicatif.")
+assert_false("_ensure_claim_publication_allowed" in source, "La politique de publication ne doit pas rester dans l'adaptateur HTTP.")
 for forbidden_snippet in ("prompt_override", "calibrated_score_as_verdict"):
     assert_true(forbidden_snippet in source, f"Le champ interdit {forbidden_snippet} doit être refusé explicitement.")
 for forbidden_response_detail in ("prompt_version", "model_version", "calibrated_score"):

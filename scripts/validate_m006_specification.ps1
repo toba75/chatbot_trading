@@ -63,6 +63,7 @@ $requiredTerms = @(
     "SourceIndependencePolicy",
     "POST /v1/claims/extract",
     "POST /v1/claims/{claim_id}/verify",
+    "GET /v1/claims/{claim_id}",
     "GET /v1/claims/{claim_id}/evidence",
     "INSUFFICIENT_DIRECT_EVIDENCE",
     "CLAIM_SCOPE_EXCEEDS_EVIDENCE",
@@ -143,11 +144,13 @@ $expectedEvents = @(
 $expectedEndpoints = @(
     "POST /v1/claims/extract",
     "POST /v1/claims/{claim_id}/verify",
+    "GET /v1/claims/{claim_id}",
     "GET /v1/claims/{claim_id}/evidence"
 )
 
 $expectedPublicErrors = @(
     "HTTP_REQUEST_INVALID",
+    "CLAIM_CONTEXT_FORBIDDEN",
     "CLAIM_NOT_FOUND",
     "CLAIM_STATE_INVALID",
     "CLAIM_EVIDENCE_REQUIRED",

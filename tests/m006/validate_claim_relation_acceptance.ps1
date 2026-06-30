@@ -58,7 +58,7 @@ def claim_for(*, claim_id, claim_version, proposition, scope):
     return Claim(
         claim_id=claim_id,
         claim_version=claim_version,
-        status=ClaimStatus.VERIFIED,
+        status=ClaimStatus.EVIDENCE_ATTACHED,
         claim_type="EMPIRICAL_EFFECT",
         canonical_proposition=CanonicalProposition(proposition),
         scope=scope,
