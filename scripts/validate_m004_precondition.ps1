@@ -9,7 +9,8 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $allowedBranches = @(
     "master",
     "codex/milestone-m004-version-canonique-publiee",
-    "codex/milestone-m005-projection-connaissance"
+    "codex/milestone-m005-projection-connaissance",
+    "codex/milestone-m006-claims-verifiables"
 )
 $requiredMilestonePaths = @(
     "docs/tasks/milestone_000",
@@ -126,6 +127,38 @@ function Invoke-M004Process {
         OutputLines = $outputLines
         StartedAtUtc = $startedAtUtc
         CompletedAtUtc = $completedAtUtc
+    }
+}
+
+function Invoke-M004GateProcess {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object] $GateDefinition
+    )
+
+    $scriptPath = Join-Path $repoRoot $GateDefinition["Script"]
+    $previousRecursionGuard = $env:OST_M004_PRECONDITION_ACCEPTANCE_RUNNING
+
+    if ($GateDefinition["Name"] -eq "test") {
+        $env:OST_M004_PRECONDITION_ACCEPTANCE_RUNNING = "1"
+    }
+
+    try {
+        return Invoke-M004Process `
+            -Name $GateDefinition["Name"] `
+            -Command $GateDefinition["Command"] `
+            -Executable "powershell" `
+            -Arguments @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $scriptPath)
+    }
+    finally {
+        if ($GateDefinition["Name"] -eq "test") {
+            if ($null -eq $previousRecursionGuard) {
+                Remove-Item Env:\OST_M004_PRECONDITION_ACCEPTANCE_RUNNING -ErrorAction SilentlyContinue
+            }
+            else {
+                $env:OST_M004_PRECONDITION_ACCEPTANCE_RUNNING = $previousRecursionGuard
+            }
+        }
     }
 }
 
@@ -398,12 +431,7 @@ foreach ($requiredMilestonePath in $requiredMilestonePaths) {
 Stop-M004OnRedGitResult -GitResults $gitResults -GateResults $gateResults -ReportPath $reportPath
 
 foreach ($gateDefinition in $gateDefinitions) {
-    $scriptPath = Join-Path $repoRoot $gateDefinition["Script"]
-    $gateResult = Invoke-M004Process `
-        -Name $gateDefinition["Name"] `
-        -Command $gateDefinition["Command"] `
-        -Executable "powershell" `
-        -Arguments @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $scriptPath)
+    $gateResult = Invoke-M004GateProcess -GateDefinition $gateDefinition
 
     foreach ($outputLine in $gateResult.OutputLines) {
         Write-Host $outputLine

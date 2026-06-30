@@ -472,6 +472,89 @@ $requiredM005Requirements = @(
     }
 )
 
+$requiredM006Requirements = @(
+    [ordered] @{
+        Id = "REQ-M006-001"
+        Source = "docs/tasks/milestone_006/0001_verifier_precondition_green.md"
+        Test = "tests/m006/validate_m006_precondition_acceptance.ps1"
+        CommandScript = "scripts/validate_m006_precondition.ps1"
+        Code = "scripts/validate_m006_precondition.ps1"
+        Adr = "ADR-010"
+    },
+    [ordered] @{
+        Id = "REQ-M006-002"
+        Source = "docs/tasks/milestone_006/0002_publier_specification_claims_verifiables.md"
+        Test = "tests/m006/validate_m006_specification_acceptance.ps1"
+        CommandScript = "scripts/validate_m006_specification.ps1"
+        Code = "docs/specs/m006_claims_verifiables.md"
+        Adr = "ADR-006; ADR-010; DDD-ADR-003; DDD-ADR-005; DDD-ADR-007; DDD-ADR-010"
+    },
+    [ordered] @{
+        Id = "REQ-M006-003"
+        Source = "docs/tasks/milestone_006/0003_extraire_claims_atomiques_structures.md"
+        Test = "tests/m006/validate_claim_extraction_acceptance.ps1"
+        CommandScript = "tests/m006/validate_claim_extraction_acceptance.ps1"
+        Code = "app/evidence_governance/domain/claim_extraction.py; app/evidence_governance/application/extract_claims.py; app/evidence_governance/adapters/deterministic_claim_extractor.py; app/evidence_governance/adapters/in_memory_claim_draft_repository.py"
+        Adr = "ADR-006; DDD-ADR-005; DDD-ADR-007"
+    },
+    [ordered] @{
+        Id = "REQ-M006-004"
+        Source = "docs/tasks/milestone_006/0004_attacher_preuves_admissibles_claim.md"
+        Test = "tests/m006/validate_claim_evidence_attachment_acceptance.ps1"
+        CommandScript = "tests/m006/validate_claim_evidence_attachment_acceptance.ps1"
+        Code = "app/evidence_governance/domain/claim_evidence.py; app/evidence_governance/application/attach_evidence.py; app/evidence_governance/adapters/in_memory_canonical_evidence_reader.py; app/evidence_governance/adapters/in_memory_claim_repository.py"
+        Adr = "DDD-ADR-003; DDD-ADR-005"
+    },
+    [ordered] @{
+        Id = "REQ-M006-005"
+        Source = "docs/tasks/milestone_006/0005_verifier_claim_preuve_directe_portee.md"
+        Test = "tests/m006/validate_claim_verification_acceptance.ps1"
+        CommandScript = "tests/m006/validate_claim_verification_acceptance.ps1"
+        Code = "app/evidence_governance/domain/claim_verification.py; app/evidence_governance/application/verify_claim.py; app/evidence_governance/adapters/in_memory_verification_case_repository.py"
+        Adr = "ADR-006; DDD-ADR-005; DDD-ADR-007"
+    },
+    [ordered] @{
+        Id = "REQ-M006-006"
+        Source = "docs/tasks/milestone_006/0006_compter_confirmations_independantes.md"
+        Test = "tests/m006/validate_dependency_group_acceptance.ps1"
+        CommandScript = "tests/m006/validate_dependency_group_acceptance.ps1"
+        Code = "app/evidence_governance/domain/dependency_group.py; app/evidence_governance/application/dependency_groups.py; app/evidence_governance/adapters/in_memory_dependency_group_repository.py"
+        Adr = "ADR-006; DDD-ADR-005; DDD-ADR-010"
+    },
+    [ordered] @{
+        Id = "REQ-M006-007"
+        Source = "docs/tasks/milestone_006/0007_relier_claims_apres_comparaison_portee.md"
+        Test = "tests/m006/validate_claim_relation_acceptance.ps1"
+        CommandScript = "tests/m006/validate_claim_relation_acceptance.ps1"
+        Code = "app/evidence_governance/domain/claim_relation.py; app/evidence_governance/application/relate_claims.py; app/evidence_governance/adapters/in_memory_claim_relation_repository.py"
+        Adr = "DDD-ADR-005; DDD-ADR-010"
+    },
+    [ordered] @{
+        Id = "REQ-M006-008"
+        Source = "docs/tasks/milestone_006/0008_conserver_claims_rejetes_supersedes.md"
+        Test = "tests/m006/validate_claim_retention_acceptance.ps1"
+        CommandScript = "tests/m006/validate_claim_retention_acceptance.ps1"
+        Code = "app/evidence_governance/domain/claim_evidence.py; app/evidence_governance/domain/claim_verification.py; app/evidence_governance/application/verify_claim.py; app/evidence_governance/application/retain_claims.py; app/evidence_governance/adapters/in_memory_claim_repository.py"
+        Adr = "ADR-006; DDD-ADR-005; DDD-ADR-010"
+    },
+    [ordered] @{
+        Id = "REQ-M006-009"
+        Source = "docs/tasks/milestone_006/0009_exposer_commandes_claims_evidence.md"
+        Test = "tests/m006/validate_claim_http_contract_acceptance.ps1"
+        CommandScript = "tests/m006/validate_claim_http_contract_acceptance.ps1"
+        Code = "app/evidence_governance/adapters/claim_http.py; app/evidence_governance/application/extract_claims.py; app/evidence_governance/application/verify_claim.py"
+        Adr = "ADR-006; ADR-010; DDD-ADR-003; DDD-ADR-005"
+    },
+    [ordered] @{
+        Id = "REQ-M006-010"
+        Source = "docs/tasks/milestone_006/0010_relier_m006_metriques_tracabilite_gates.md"
+        Test = "tests/m006/validate_m006_traceability_acceptance.ps1"
+        CommandScript = "tests/m006/validate_m006_traceability_acceptance.ps1"
+        Code = "app/evidence_governance/application/traceability_metrics.py"
+        Adr = "ADR-006; ADR-010; DDD-ADR-005; DDD-ADR-010"
+    }
+)
+
 function Assert-Condition {
     param(
         [Parameter(Mandatory = $true)]
@@ -1200,6 +1283,99 @@ function Assert-M005RequirementRows {
     }
 }
 
+function Assert-M006PathCell {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object] $Row,
+
+        [Parameter(Mandatory = $true)]
+        [string] $RequirementId,
+
+        [Parameter(Mandatory = $true)]
+        [string] $CellName,
+
+        [Parameter(Mandatory = $true)]
+        [string] $ExpectedValue
+    )
+
+    $actualValue = Convert-ToMatrixRelativePathCell -RelativePath (Get-MatrixRowCell -Row $Row -CellName $CellName -RequirementId $RequirementId)
+
+    Assert-Condition `
+        -Condition ($actualValue -eq $ExpectedValue) `
+        -Message "$CellName M-006 invalide pour ${RequirementId}. Attendu: $ExpectedValue. Obtenu: $actualValue"
+}
+
+function Test-M006MilestoneIsPresent {
+    $milestoneDir = Join-Path $repoRoot "docs/tasks/milestone_006"
+    return (Test-Path -LiteralPath $milestoneDir -PathType Container)
+}
+
+function Assert-M006RequirementRows {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object[]] $Rows
+    )
+
+    if (-not (Test-M006MilestoneIsPresent)) {
+        return
+    }
+
+    $canonicalMatrixPath = [System.IO.Path]::GetFullPath((Join-Path $repoRoot "docs/traceability/matrix.md"))
+    $currentMatrixPath = [System.IO.Path]::GetFullPath($matrixPath)
+    if (-not $currentMatrixPath.Equals($canonicalMatrixPath, [System.StringComparison]::OrdinalIgnoreCase)) {
+        $containsM006Rows = @($Rows | Where-Object {
+            (Get-MatrixRowCell -Row $_ -CellName "Exigence" -RequirementId "ligne inconnue") -match "^REQ-M006-"
+        }).Count -gt 0
+        if (-not $containsM006Rows) {
+            Assert-Condition `
+                -Condition $AllowM000OnlyMatrix `
+                -Message "Matrice M-006 absente sans autorisation explicite."
+            return
+        }
+    }
+
+    $rowsByRequirementId = @{}
+    foreach ($row in $Rows) {
+        $requirementId = Get-MatrixRowCell -Row $row -CellName "Exigence" -RequirementId "ligne inconnue"
+        $rowsByRequirementId[$requirementId] = $row
+    }
+
+    foreach ($expected in $requiredM006Requirements) {
+        $requirementId = $expected["Id"]
+
+        Assert-Condition `
+            -Condition ($rowsByRequirementId.ContainsKey($requirementId)) `
+            -Message "Exigence M-006 livrée absente: $requirementId"
+
+        $row = $rowsByRequirementId[$requirementId]
+        $status = Get-MatrixRowCell -Row $row -CellName "Statut" -RequirementId $requirementId
+
+        Assert-Condition `
+            -Condition ($status -eq "Couvert") `
+            -Message "Exigence M-006 livrée non couverte: $requirementId"
+
+        $commandScript = Get-MatrixRowCell -Row $row -CellName "CommandeScript" -RequirementId $requirementId
+
+        Assert-M006PathCell -Row $row -RequirementId $requirementId -CellName "Source" -ExpectedValue $expected["Source"]
+        Assert-M006PathCell -Row $row -RequirementId $requirementId -CellName "Test" -ExpectedValue $expected["Test"]
+        Assert-M006PathCell -Row $row -RequirementId $requirementId -CellName "Code" -ExpectedValue $expected["Code"]
+
+        Assert-Condition `
+            -Condition ($commandScript -eq $expected["CommandScript"]) `
+            -Message "Commande M-006 invalide pour ${requirementId}. Attendu: $($expected["CommandScript"]). Obtenu: $commandScript"
+
+        $adr = Get-MatrixRowCell -Row $row -CellName "ADR" -RequirementId $requirementId
+        Assert-Condition `
+            -Condition ($adr -eq $expected["Adr"]) `
+            -Message "ADR M-006 invalide pour ${requirementId}. Attendu: $($expected["Adr"]). Obtenu: $adr"
+
+        $justification = Get-MatrixRowCell -Row $row -CellName "Justification ADR" -RequirementId $requirementId
+        Assert-Condition `
+            -Condition ($justification -match "^Décision structurante documentée:") `
+            -Message "Justification ADR M-006 invalide pour ${requirementId}: $justification"
+    }
+}
+
 if (-not $PSBoundParameters.ContainsKey("Path")) {
     $matrixPath = Join-Path $repoRoot "docs/traceability/matrix.md"
 }
@@ -1324,5 +1500,6 @@ Assert-M002RequirementRows -Rows $rows.ToArray()
 Assert-M003RequirementRows -Rows $rows.ToArray()
 Assert-M004RequirementRows -Rows $rows.ToArray()
 Assert-M005RequirementRows -Rows $rows.ToArray()
+Assert-M006RequirementRows -Rows $rows.ToArray()
 
 Write-Host "Matrice de $traceabilityLabel valide: $($rows.Count) exigence(s) contr$([char] 0x00F4)l$($eAcute)e(s)."

@@ -1,0 +1,78 @@
+{
+  "fixture_id": "m006_claim_metrics_fixture_v1",
+  "measured_at": "2026-06-30T10:30:00Z",
+  "forbidden_claim_text": "Les couvertures de queue réduisent le drawdown quotidien pendant les crises de volatilité.",
+  "forbidden_evidence_text": "Dans les crises de volatilité, les couvertures de queue réduisent le drawdown quotidien sur le portefeuille étudié.",
+  "observations": [
+    {
+      "claim_id": "CLM-M006-T010-VERIFIED",
+      "claim_version": 1,
+      "status": "VERIFIED",
+      "direct_evidence_count": 2,
+      "verification_verdict": "ENTAILED",
+      "reason_codes": [],
+      "dependency_group_ids": [
+        "DEP-M006-T010-PRIMARY",
+        "DEP-M006-T010-REPLICATION"
+      ],
+      "submitted_at": "2026-06-30T10:00:00Z",
+      "decided_at": "2026-06-30T10:03:00Z",
+      "superseded_by_claim_version": null
+    },
+    {
+      "claim_id": "CLM-M006-T010-REJECTED",
+      "claim_version": 1,
+      "status": "REJECTED",
+      "direct_evidence_count": 0,
+      "verification_verdict": "NOT_ENTAILED",
+      "reason_codes": [
+        "INSUFFICIENT_DIRECT_EVIDENCE",
+        "CLAIM_SCOPE_EXCEEDS_EVIDENCE",
+        "CLAIM_EVIDENCE_SOURCE_UNRESOLVABLE"
+      ],
+      "dependency_group_ids": [],
+      "submitted_at": "2026-06-30T10:01:00Z",
+      "decided_at": "2026-06-30T10:02:00Z",
+      "superseded_by_claim_version": null
+    },
+    {
+      "claim_id": "CLM-M006-T010-IN-REVIEW",
+      "claim_version": 1,
+      "status": "UNDER_VERIFICATION",
+      "direct_evidence_count": 1,
+      "verification_verdict": null,
+      "reason_codes": [],
+      "dependency_group_ids": [
+        "DEP-M006-T010-PRIMARY"
+      ],
+      "submitted_at": "2026-06-30T10:05:00Z",
+      "decided_at": null,
+      "superseded_by_claim_version": null
+    },
+    {
+      "claim_id": "CLM-M006-T010-SUPERSEDED",
+      "claim_version": 1,
+      "status": "SUPERSEDED",
+      "direct_evidence_count": 1,
+      "verification_verdict": "ENTAILED",
+      "reason_codes": [],
+      "dependency_group_ids": [
+        "DEP-M006-T010-SUPERSEDED"
+      ],
+      "submitted_at": "2026-06-30T09:55:00Z",
+      "decided_at": "2026-06-30T10:00:00Z",
+      "superseded_by_claim_version": 2
+    }
+  ],
+  "expected_normative_signals": {
+    "claims_drafted_total": 4,
+    "claims_verified_total": 1,
+    "claims_rejected_total": 1,
+    "claim_verification_latency_seconds": 180.0,
+    "claim_scope_refusal_total": 1,
+    "claim_independent_support_groups": 4,
+    "claim_superseded_total": 1,
+    "claim_model_proposal_total": 4,
+    "claim_public_evidence_resolution_failed_total": 1
+  }
+}

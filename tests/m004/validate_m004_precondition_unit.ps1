@@ -5,6 +5,7 @@ $validatorPath = Join-Path $repoRoot "scripts/validate_m004_precondition.ps1"
 $temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m004_precondition_unit_" + [System.Guid]::NewGuid().ToString("N"))
 $expectedBranch = "codex/milestone-m004-version-canonique-publiee"
 $postMergeBranch = "codex/milestone-m005-projection-connaissance"
+$postMergeM006Branch = "codex/milestone-m006-claims-verifiables"
 $masterBranch = "master"
 $invalidBranch = "codex/milestone-hors-contrat"
 
@@ -260,6 +261,12 @@ try {
     Assert-ExitCode -Actual $m005BranchResult.ExitCode -Expected 0 -Message "La précondition doit autoriser explicitement la branche M-005 post-merge."
     Assert-OutputContains -Output $m005BranchResult.Output -Expected "Branche M-004 autorisée: $postMergeBranch" -Message "La branche M-005 autorisée doit être nommée."
 
+    $m006BranchRoot = New-TemporaryProject -Name "m006-branch" -TestGateContent $greenTestGate -LintGateContent $greenLintGate -IncludeMilestone003 $true
+    Initialize-ProjectWithMasterAndBranch -ProjectRoot $m006BranchRoot -BranchName $postMergeM006Branch -DivergeMasterReference $false
+    $m006BranchResult = Invoke-Validator -ProjectRoot $m006BranchRoot
+    Assert-ExitCode -Actual $m006BranchResult.ExitCode -Expected 0 -Message "La précondition doit autoriser explicitement la branche M-006 post-merge."
+    Assert-OutputContains -Output $m006BranchResult.Output -Expected "Branche M-004 autorisée: $postMergeM006Branch" -Message "La branche M-006 autorisée doit être nommée."
+
     $masterBranchRoot = New-TemporaryProject -Name "master-branch" -TestGateContent $greenTestGate -LintGateContent $greenLintGate -IncludeMilestone003 $true
     Initialize-ProjectWithMasterAndBranch -ProjectRoot $masterBranchRoot -BranchName $masterBranch -DivergeMasterReference $false
     $masterBranchResult = Invoke-Validator -ProjectRoot $masterBranchRoot
@@ -290,7 +297,7 @@ try {
     Assert-ExitCode -Actual $invalidBranchResult.ExitCode -Expected 1 -Message "La précondition doit refuser une branche non autorisée."
     Assert-OutputContains `
         -Output $invalidBranchResult.Output `
-        -Expected "Branche courante invalide. Autorisées: master, $expectedBranch, $postMergeBranch. Obtenu: $invalidBranch" `
+        -Expected "Branche courante invalide. Autorisées: master, $expectedBranch, $postMergeBranch, $postMergeM006Branch. Obtenu: $invalidBranch" `
         -Message "La branche non autorisée doit être nommée explicitement."
 
     $redGateRoot = New-TemporaryProject -Name "red-gate" -TestGateContent $redTestGate -LintGateContent $greenLintGate -IncludeMilestone003 $true

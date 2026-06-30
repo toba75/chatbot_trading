@@ -1,0 +1,45 @@
+{
+  "schema_version": "1.0",
+  "metric_scope": "M006_CLAIMS_VERIFIABLES",
+  "fixture_id": "m006_claim_metrics_fixture_v1",
+  "fixture_path": "tests/m006/fixtures/m006_claim_metrics_fixture.json",
+  "measured_at": "2026-06-30T10:30:00Z",
+  "claim_count": 4,
+  "status_counts": {
+    "DRAFT": 0,
+    "EVIDENCE_ATTACHED": 0,
+    "UNDER_VERIFICATION": 1,
+    "VERIFIED": 1,
+    "REJECTED": 1,
+    "SUPERSEDED": 1,
+    "ABANDONED": 0
+  },
+  "rates": {
+    "verified_rate": 0.25,
+    "rejected_rate": 0.25,
+    "in_review_rate": 0.25,
+    "without_direct_evidence_ratio": 0.25,
+    "supersession_rate": 0.25
+  },
+  "verdict_distribution": {
+    "ENTAILED": 2,
+    "NOT_ENTAILED": 1
+  },
+  "dependency_group_count_distribution": {
+    "0": 1,
+    "1": 2,
+    "2": 1
+  },
+  "average_verification_latency_seconds": 180.0,
+  "normative_signals": {
+    "claims_drafted_total": 4,
+    "claims_verified_total": 1,
+    "claims_rejected_total": 1,
+    "claim_verification_latency_seconds": 180.0,
+    "claim_scope_refusal_total": 1,
+    "claim_independent_support_groups": 4,
+    "claim_superseded_total": 1,
+    "claim_model_proposal_total": 4,
+    "claim_public_evidence_resolution_failed_total": 1
+  }
+}
