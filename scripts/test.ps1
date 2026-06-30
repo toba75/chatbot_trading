@@ -189,10 +189,22 @@ $testCommands = @(
     @{ Path = "tests/m007/validate_m007_precondition_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/m007/validate_m007_specification_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/m007/validate_m007_specification_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m007/validate_research_case_mandate_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m007/validate_research_case_mandate_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m007/validate_evidence_set_sealing_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m007/validate_evidence_set_sealing_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m007/validate_contradiction_gap_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m007/validate_contradiction_gap_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m007/validate_answer_assertion_extraction_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m007/validate_answer_assertion_extraction_unit.ps1"; Arguments = @() },
     @{ Path = "tests/m007/validate_answer_support_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/m007/validate_answer_support_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m007/validate_current_data_abstention_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m007/validate_current_data_abstention_unit.ps1"; Arguments = @() },
     @{ Path = "tests/m007/validate_answer_http_contract_acceptance.ps1"; Arguments = @() },
-    @{ Path = "tests/m007/validate_answer_http_contract_unit.ps1"; Arguments = @() }
+    @{ Path = "tests/m007/validate_answer_http_contract_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m007/validate_m007_traceability_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m007/validate_m007_traceability_unit.ps1"; Arguments = @() }
 )
 
 function Get-GateCommandPaths {
