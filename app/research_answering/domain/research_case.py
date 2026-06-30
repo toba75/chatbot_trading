@@ -15,6 +15,21 @@ from app.research_answering.domain.evidence_set import (
     EvidenceSet,
     EvidenceSetSealed,
 )
+from app.research_answering.domain.contradiction_assessment import (
+    ContradictionAssessment,
+    ContradictionDetected,
+    KnowledgeGap,
+    KnowledgeGapRecorded,
+    ResearchEvidenceFoundConflicting,
+    ResearchEvidenceFoundInsufficient,
+    SupportStatus,
+    ensure_assessments,
+    ensure_knowledge_gaps,
+    ensure_missing_obligations,
+    ensure_reason_codes,
+    ensure_relation_ids,
+    ensure_support_status,
+)
 
 
 _HASH_HEX_LENGTH = 24
@@ -55,6 +70,8 @@ class ResearchCaseStatus(str, Enum):
     PLANNED = "PLANNED"
     EVIDENCE_ASSEMBLED = "EVIDENCE_ASSEMBLED"
     EVIDENCE_SET_SEALED = "EVIDENCE_SET_SEALED"
+    INSUFFICIENT_EVIDENCE = "INSUFFICIENT_EVIDENCE"
+    CONFLICTING_EVIDENCE = "CONFLICTING_EVIDENCE"
 
 
 @dataclass(frozen=True)
@@ -269,13 +286,19 @@ class ResearchCase:
     status: ResearchCaseStatus
     research_plan: ResearchPlan | None
     evidence_set: EvidenceSet | None
+    contradiction_assessments: tuple[ContradictionAssessment, ...]
+    knowledge_gaps: tuple[KnowledgeGap, ...]
     requested_by_context: str
     opened_at: str
     events: tuple[
         ResearchCaseOpened
         | ResearchPlanCreated
         | EvidenceCollectionCompleted
-        | EvidenceSetSealed,
+        | EvidenceSetSealed
+        | ContradictionDetected
+        | KnowledgeGapRecorded
+        | ResearchEvidenceFoundInsufficient
+        | ResearchEvidenceFoundConflicting,
         ...,
     ]
 
@@ -308,6 +331,8 @@ class ResearchCase:
             status=ResearchCaseStatus.CREATED,
             research_plan=None,
             evidence_set=None,
+            contradiction_assessments=(),
+            knowledge_gaps=(),
             requested_by_context=requested_by_context,
             opened_at=occurred_at,
             events=(opened,),
@@ -332,6 +357,12 @@ class ResearchCase:
             raise ValueError("research_plan invalide")
         if self.evidence_set is not None and not isinstance(self.evidence_set, EvidenceSet):
             raise ValueError("evidence_set invalide")
+        object.__setattr__(
+            self,
+            "contradiction_assessments",
+            ensure_assessments(self.contradiction_assessments),
+        )
+        object.__setattr__(self, "knowledge_gaps", ensure_knowledge_gaps(self.knowledge_gaps))
         if self.status is ResearchCaseStatus.CREATED and self.research_plan is not None:
             raise ValueError("research_plan interdit pour CREATED")
         if self.status is ResearchCaseStatus.CREATED and self.evidence_set is not None:
@@ -354,6 +385,28 @@ class ResearchCase:
                 raise ValueError("evidence_set absent pour EVIDENCE_SET_SEALED")
             if not self.evidence_set.sealed:
                 raise ValueError("evidence_set non scelle pour EVIDENCE_SET_SEALED")
+        if self.status in {
+            ResearchCaseStatus.CREATED,
+            ResearchCaseStatus.PLANNED,
+            ResearchCaseStatus.EVIDENCE_ASSEMBLED,
+        } and (
+            len(self.contradiction_assessments) > 0 or len(self.knowledge_gaps) > 0
+        ):
+            raise ValueError("diagnostics RA interdits avant evidence_set scelle")
+        if self.status in {
+            ResearchCaseStatus.INSUFFICIENT_EVIDENCE,
+            ResearchCaseStatus.CONFLICTING_EVIDENCE,
+        }:
+            if self.research_plan is None:
+                raise ValueError("research_plan absent pour statut terminal")
+            if self.evidence_set is None or not self.evidence_set.sealed:
+                raise ValueError("evidence_set non scelle pour statut terminal")
+        if self.status is ResearchCaseStatus.INSUFFICIENT_EVIDENCE and len(self.knowledge_gaps) == 0:
+            raise ValueError("knowledge_gap absent pour INSUFFICIENT_EVIDENCE")
+        if self.status is ResearchCaseStatus.CONFLICTING_EVIDENCE and not any(
+            assessment.blocks_publication for assessment in self.contradiction_assessments
+        ):
+            raise ValueError("contradiction bloquante absente pour CONFLICTING_EVIDENCE")
         object.__setattr__(
             self,
             "requested_by_context",
@@ -446,6 +499,148 @@ class ResearchCase:
             event,
         )
 
+    def ensure_contradiction_assessment_allowed(self) -> None:
+        if self.status is not ResearchCaseStatus.EVIDENCE_SET_SEALED:
+            raise ValueError("evidence_set non scelle")
+        if self.evidence_set is None or not self.evidence_set.sealed:
+            raise ValueError("evidence_set non scelle")
+
+    def record_contradiction_assessments(
+        self,
+        assessments: tuple[ContradictionAssessment, ...],
+        *,
+        occurred_at: str,
+    ) -> tuple["ResearchCase", tuple[ContradictionDetected, ...]]:
+        self.ensure_contradiction_assessment_allowed()
+        parsed_assessments = ensure_assessments(assessments)
+        if len(parsed_assessments) == 0:
+            raise ValueError("contradiction_assessments absents")
+        existing_ids = {
+            assessment.contradiction_id for assessment in self.contradiction_assessments
+        }
+        for assessment in parsed_assessments:
+            if assessment.contradiction_id in existing_ids:
+                raise ValueError("contradiction_assessment deja enregistre")
+        events = tuple(
+            ContradictionDetected.from_assessment(
+                research_case_id=self.research_case_id,
+                assessment=assessment,
+                occurred_at=occurred_at,
+            )
+            for assessment in parsed_assessments
+        )
+        return (
+            replace(
+                self,
+                contradiction_assessments=self.contradiction_assessments + parsed_assessments,
+                events=self.events + events,
+            ),
+            events,
+        )
+
+    def declare_insufficient_evidence(
+        self,
+        *,
+        missing_obligations: tuple[str, ...],
+        reason_codes: tuple[str, ...],
+        occurred_at: str,
+    ) -> tuple[
+        "ResearchCase",
+        tuple[KnowledgeGap, ...],
+        tuple[KnowledgeGapRecorded | ResearchEvidenceFoundInsufficient, ...],
+    ]:
+        self.ensure_contradiction_assessment_allowed()
+        parsed_missing = ensure_missing_obligations(missing_obligations)
+        parsed_reasons = ensure_reason_codes(reason_codes)
+        if len(parsed_missing) != len(parsed_reasons):
+            raise ValueError("reason_codes incoherents")
+        self._ensure_missing_obligations_in_plan(parsed_missing)
+        gaps = tuple(
+            KnowledgeGap.for_missing_obligation(
+                research_case_id=self.research_case_id,
+                affected_obligation=obligation,
+                reason_code=reason_code,
+            )
+            for obligation, reason_code in zip(parsed_missing, parsed_reasons, strict=True)
+        )
+        gap_events = tuple(
+            KnowledgeGapRecorded(
+                research_case_id=self.research_case_id,
+                gap_type=gap.gap_type,
+                affected_obligation=gap.affected_obligation,
+                reason_code=gap.reason_code,
+                occurred_at=occurred_at,
+            )
+            for gap in gaps
+        )
+        terminal_event = ResearchEvidenceFoundInsufficient(
+            research_case_id=self.research_case_id,
+            missing_obligations=parsed_missing,
+            reason_codes=parsed_reasons,
+            occurred_at=occurred_at,
+        )
+        events = gap_events + (terminal_event,)
+        return (
+            replace(
+                self,
+                status=ResearchCaseStatus.INSUFFICIENT_EVIDENCE,
+                knowledge_gaps=self.knowledge_gaps + gaps,
+                events=self.events + events,
+            ),
+            gaps,
+            events,
+        )
+
+    def declare_conflicting_evidence(
+        self,
+        *,
+        contradiction_ids: tuple[str, ...],
+        reason_codes: tuple[str, ...],
+        occurred_at: str,
+    ) -> tuple["ResearchCase", ResearchEvidenceFoundConflicting]:
+        self.ensure_contradiction_assessment_allowed()
+        parsed_ids = ensure_relation_ids(
+            contradiction_ids,
+            "contradiction_ids",
+            allow_empty=False,
+        )
+        parsed_reasons = ensure_reason_codes(reason_codes)
+        if len(parsed_ids) != len(parsed_reasons):
+            raise ValueError("reason_codes incoherents")
+        assessments_by_id = {
+            assessment.contradiction_id: assessment
+            for assessment in self.contradiction_assessments
+        }
+        for contradiction_id in parsed_ids:
+            assessment = assessments_by_id.get(contradiction_id)
+            if assessment is None:
+                raise ValueError("contradiction non enregistree")
+            if not assessment.blocks_publication:
+                raise ValueError("contradiction non bloquante")
+        event = ResearchEvidenceFoundConflicting(
+            research_case_id=self.research_case_id,
+            contradiction_ids=parsed_ids,
+            reason_codes=parsed_reasons,
+            occurred_at=occurred_at,
+        )
+        return (
+            replace(
+                self,
+                status=ResearchCaseStatus.CONFLICTING_EVIDENCE,
+                events=self.events + (event,),
+            ),
+            event,
+        )
+
+    def ensure_support_status_allowed(self, support_status: SupportStatus) -> None:
+        parsed_status = ensure_support_status(support_status)
+        if parsed_status is not SupportStatus.SUPPORTED:
+            return
+        if any(assessment.blocks_general_supported_status for assessment in self.contradiction_assessments):
+            raise ValueError("support_status SUPPORTED interdit par contradiction documentaire")
+        if len(self.knowledge_gaps) > 0:
+            raise ValueError("support_status SUPPORTED interdit par lacune documentaire")
+
     def to_payload(self) -> dict[str, Any]:
         return {
             "research_case_id": self.research_case_id,
@@ -458,10 +653,24 @@ class ResearchCase:
             "status": self.status.value,
             "research_plan": None if self.research_plan is None else self.research_plan.to_payload(),
             "evidence_set": None if self.evidence_set is None else self.evidence_set.to_payload(),
+            "contradiction_assessments": [
+                assessment.to_payload() for assessment in self.contradiction_assessments
+            ],
+            "knowledge_gaps": [gap.to_payload() for gap in self.knowledge_gaps],
             "requested_by_context": self.requested_by_context,
             "opened_at": self.opened_at,
             "events": [event.to_payload() for event in self.events],
         }
+
+    def _ensure_missing_obligations_in_plan(self, missing_obligations: tuple[str, ...]) -> None:
+        if self.research_plan is None:
+            raise ValueError("research_plan absent")
+        planned_obligations = {
+            obligation.name for obligation in self.research_plan.coverage_obligations
+        }
+        for obligation in missing_obligations:
+            if obligation not in planned_obligations:
+                raise ValueError(f"coverage_obligation inconnue: {obligation}")
 
 
 def research_case_id_for(
@@ -510,7 +719,11 @@ def _ensure_events(
     ResearchCaseOpened
     | ResearchPlanCreated
     | EvidenceCollectionCompleted
-    | EvidenceSetSealed,
+    | EvidenceSetSealed
+    | ContradictionDetected
+    | KnowledgeGapRecorded
+    | ResearchEvidenceFoundInsufficient
+    | ResearchEvidenceFoundConflicting,
     ...,
 ]:
     if value is None or isinstance(value, str) or not isinstance(value, Sequence):
@@ -526,6 +739,10 @@ def _ensure_events(
                 ResearchPlanCreated,
                 EvidenceCollectionCompleted,
                 EvidenceSetSealed,
+                ContradictionDetected,
+                KnowledgeGapRecorded,
+                ResearchEvidenceFoundInsufficient,
+                ResearchEvidenceFoundConflicting,
             ),
         ):
             raise ValueError("event research_case invalide")
