@@ -564,6 +564,14 @@ $requiredM007Requirements = @(
         Code = "scripts/validate_m007_precondition.ps1"
         Adr = "ADR-010"
     }
+    [ordered] @{
+        Id = "REQ-M007-002"
+        Source = "docs/tasks/milestone_007/0002_publier_specification_reponse_documentaire.md"
+        Test = "tests/m007/validate_m007_specification_acceptance.ps1"
+        CommandScript = "scripts/validate_m007_specification.ps1"
+        Code = "docs/specs/m007_reponse_documentaire_verifiee.md"
+        Adr = "ADR-006; ADR-010; DDD-ADR-003; DDD-ADR-005; DDD-ADR-007; DDD-ADR-008"
+    }
 )
 
 function Assert-Condition {
