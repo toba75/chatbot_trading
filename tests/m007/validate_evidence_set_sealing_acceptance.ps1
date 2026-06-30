@@ -205,6 +205,7 @@ candidate = CandidateEvidence(
     source_text="La preuve documentaire citée reste ouvrable et versionnée.",
     search_trace_id="STRC-M007T004ACCEPTANCE00000000000001",
     document_id=locator.document_id,
+    covered_obligations=("preuves_documentaires",),
 )
 claim_ref = verified_claim_ref(locator)
 case_repository, research_case_id = planned_case_repository()

@@ -10,6 +10,12 @@ from dataclasses import dataclass, replace
 from enum import Enum
 from typing import Any
 
+from app.research_answering.domain.evidence_set import (
+    EvidenceCollectionCompleted,
+    EvidenceSet,
+    EvidenceSetSealed,
+)
+
 
 _HASH_HEX_LENGTH = 24
 _RESEARCH_CASE_ID_PATTERN = re.compile(r"^RSC-[A-Z0-9][A-Z0-9-]*$")
@@ -47,6 +53,8 @@ class ResearchCaseStatus(str, Enum):
 
     CREATED = "CREATED"
     PLANNED = "PLANNED"
+    EVIDENCE_ASSEMBLED = "EVIDENCE_ASSEMBLED"
+    EVIDENCE_SET_SEALED = "EVIDENCE_SET_SEALED"
 
 
 @dataclass(frozen=True)
@@ -260,9 +268,16 @@ class ResearchCase:
     requested_mode: ResearchMode
     status: ResearchCaseStatus
     research_plan: ResearchPlan | None
+    evidence_set: EvidenceSet | None
     requested_by_context: str
     opened_at: str
-    events: tuple[ResearchCaseOpened | ResearchPlanCreated, ...]
+    events: tuple[
+        ResearchCaseOpened
+        | ResearchPlanCreated
+        | EvidenceCollectionCompleted
+        | EvidenceSetSealed,
+        ...,
+    ]
 
     @classmethod
     def open(
@@ -292,6 +307,7 @@ class ResearchCase:
             requested_mode=mode,
             status=ResearchCaseStatus.CREATED,
             research_plan=None,
+            evidence_set=None,
             requested_by_context=requested_by_context,
             opened_at=occurred_at,
             events=(opened,),
@@ -314,10 +330,30 @@ class ResearchCase:
             raise ValueError("research_case status invalide")
         if self.research_plan is not None and not isinstance(self.research_plan, ResearchPlan):
             raise ValueError("research_plan invalide")
+        if self.evidence_set is not None and not isinstance(self.evidence_set, EvidenceSet):
+            raise ValueError("evidence_set invalide")
         if self.status is ResearchCaseStatus.CREATED and self.research_plan is not None:
             raise ValueError("research_plan interdit pour CREATED")
+        if self.status is ResearchCaseStatus.CREATED and self.evidence_set is not None:
+            raise ValueError("evidence_set interdit pour CREATED")
         if self.status is ResearchCaseStatus.PLANNED and self.research_plan is None:
             raise ValueError("research_plan absent pour PLANNED")
+        if self.status is ResearchCaseStatus.PLANNED and self.evidence_set is not None:
+            raise ValueError("evidence_set interdit pour PLANNED")
+        if self.status is ResearchCaseStatus.EVIDENCE_ASSEMBLED:
+            if self.research_plan is None:
+                raise ValueError("research_plan absent pour EVIDENCE_ASSEMBLED")
+            if self.evidence_set is None:
+                raise ValueError("evidence_set absent pour EVIDENCE_ASSEMBLED")
+            if self.evidence_set.sealed:
+                raise ValueError("evidence_set scelle pour EVIDENCE_ASSEMBLED")
+        if self.status is ResearchCaseStatus.EVIDENCE_SET_SEALED:
+            if self.research_plan is None:
+                raise ValueError("research_plan absent pour EVIDENCE_SET_SEALED")
+            if self.evidence_set is None:
+                raise ValueError("evidence_set absent pour EVIDENCE_SET_SEALED")
+            if not self.evidence_set.sealed:
+                raise ValueError("evidence_set non scelle pour EVIDENCE_SET_SEALED")
         object.__setattr__(
             self,
             "requested_by_context",
@@ -353,6 +389,63 @@ class ResearchCase:
         if self.status is not ResearchCaseStatus.PLANNED:
             raise ValueError("recherche non planifiee")
 
+    def attach_evidence_set(
+        self,
+        evidence_set: EvidenceSet,
+        *,
+        occurred_at: str,
+    ) -> tuple["ResearchCase", EvidenceCollectionCompleted]:
+        self.ensure_evidence_collection_allowed()
+        if not isinstance(evidence_set, EvidenceSet):
+            raise ValueError("evidence_set invalide")
+        if evidence_set.research_case_id != self.research_case_id:
+            raise ValueError("evidence_set hors research_case")
+        if evidence_set.sealed:
+            raise ValueError("evidence_set deja scelle")
+        event = EvidenceCollectionCompleted(
+            research_case_id=self.research_case_id,
+            evidence_set_id=evidence_set.evidence_set_id,
+            evidence_count=len(evidence_set.evidence_refs),
+            verified_claim_count=len(evidence_set.verified_claim_refs),
+            occurred_at=occurred_at,
+        )
+        return (
+            replace(
+                self,
+                status=ResearchCaseStatus.EVIDENCE_ASSEMBLED,
+                evidence_set=evidence_set,
+                events=self.events + (event,),
+            ),
+            event,
+        )
+
+    def seal_evidence_set(
+        self,
+        *,
+        evidence_set_id: str,
+        citation_resolver: object,
+        occurred_at: str,
+    ) -> tuple["ResearchCase", EvidenceSetSealed]:
+        if self.status is not ResearchCaseStatus.EVIDENCE_ASSEMBLED:
+            raise ValueError("evidence_set non assemblé")
+        if self.evidence_set is None:
+            raise ValueError("evidence_set absent")
+        if self.evidence_set.evidence_set_id != evidence_set_id:
+            raise ValueError("evidence_set_id incoherent")
+        sealed_set, event = self.evidence_set.seal(
+            citation_resolver=citation_resolver,
+            occurred_at=occurred_at,
+        )
+        return (
+            replace(
+                self,
+                status=ResearchCaseStatus.EVIDENCE_SET_SEALED,
+                evidence_set=sealed_set,
+                events=self.events + (event,),
+            ),
+            event,
+        )
+
     def to_payload(self) -> dict[str, Any]:
         return {
             "research_case_id": self.research_case_id,
@@ -364,6 +457,7 @@ class ResearchCase:
             "requested_mode": self.requested_mode.value,
             "status": self.status.value,
             "research_plan": None if self.research_plan is None else self.research_plan.to_payload(),
+            "evidence_set": None if self.evidence_set is None else self.evidence_set.to_payload(),
             "requested_by_context": self.requested_by_context,
             "opened_at": self.opened_at,
             "events": [event.to_payload() for event in self.events],
@@ -410,14 +504,30 @@ def _ensure_research_plan(value: object) -> ResearchPlan:
     return value
 
 
-def _ensure_events(value: object) -> tuple[ResearchCaseOpened | ResearchPlanCreated, ...]:
+def _ensure_events(
+    value: object,
+) -> tuple[
+    ResearchCaseOpened
+    | ResearchPlanCreated
+    | EvidenceCollectionCompleted
+    | EvidenceSetSealed,
+    ...,
+]:
     if value is None or isinstance(value, str) or not isinstance(value, Sequence):
         raise ValueError("events invalides")
     events = tuple(value)
     if len(events) == 0:
         raise ValueError("events absents")
     for event in events:
-        if not isinstance(event, (ResearchCaseOpened, ResearchPlanCreated)):
+        if not isinstance(
+            event,
+            (
+                ResearchCaseOpened,
+                ResearchPlanCreated,
+                EvidenceCollectionCompleted,
+                EvidenceSetSealed,
+            ),
+        ):
             raise ValueError("event research_case invalide")
     return events
 
