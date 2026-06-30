@@ -111,6 +111,8 @@ class AssignClaimDependencyGroupHandler:
     ) -> None:
         if not callable(getattr(claim_repository, "claim_for_id", None)):
             raise ValueError("claim_repository sans claim_for_id")
+        if not callable(getattr(claim_repository, "claim_for_version", None)):
+            raise ValueError("claim_repository sans claim_for_version")
         if not callable(getattr(dependency_group_repository, "save", None)):
             raise ValueError("dependency_group_repository sans save")
         if not callable(getattr(dependency_group_repository, "group_for_id", None)):
@@ -126,7 +128,10 @@ class AssignClaimDependencyGroupHandler:
 
     def assign(self, command: AssignClaimDependencyGroup) -> AssignClaimDependencyGroupResult:
         parsed_command = _ensure_command(command)
-        claim = self.claim_repository.claim_for_id(parsed_command.claim_id)
+        claim = self.claim_repository.claim_for_version(
+            parsed_command.claim_id,
+            parsed_command.claim_version,
+        )
         _ensure_claim_version(claim, parsed_command.claim_version)
         if claim.status == ClaimStatus.VERIFIED:
             raise ValueError("claim verifie non modifiable")
@@ -212,13 +217,22 @@ def _dependency_group_used_by_verified_claim(
     claim_repository: ClaimRepository,
 ) -> bool:
     parsed_group = _ensure_dependency_group(dependency_group)
-    checked_claim_ids: list[str] = []
+    checked_claim_refs: list[tuple[str, int]] = []
     for assignment in parsed_group.assignments:
-        if assignment.claim_id in checked_claim_ids:
+        claim_ref = (assignment.claim_id, assignment.claim_version)
+        if claim_ref in checked_claim_refs:
             continue
-        checked_claim_ids.append(assignment.claim_id)
-        assigned_claim = claim_repository.claim_for_id(assignment.claim_id)
+        checked_claim_refs.append(claim_ref)
+        assigned_claim = claim_repository.claim_for_version(
+            assignment.claim_id,
+            assignment.claim_version,
+        )
         if assigned_claim.status == ClaimStatus.VERIFIED:
+            return True
+        if (
+            assigned_claim.status == ClaimStatus.SUPERSEDED
+            and assigned_claim.verified_claim_ref is not None
+        ):
             return True
     return False
 

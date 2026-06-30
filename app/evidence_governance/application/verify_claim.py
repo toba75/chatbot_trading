@@ -1,4 +1,4 @@
-"""Cas d'usage EG de verification de claims."""
+"""Cas d'usage EG de vérification de claims."""
 
 from __future__ import annotations
 

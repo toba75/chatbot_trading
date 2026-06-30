@@ -12,6 +12,7 @@ import sys
 
 sys.path.insert(0, sys.argv[1])
 
+from app.contracts.evidence_claims import EvidenceRef, VerifiedClaimRef
 from app.contracts.source_references import CanonicalSourceRef, SourceLocator, SourceLocatorValidationPolicy
 from app.evidence_governance.adapters.claim_http import (
     ClaimExtractionRequestDto,
@@ -21,7 +22,10 @@ from app.evidence_governance.adapters.claim_http import (
     HttpRequest,
 )
 from app.evidence_governance.application.extract_claims import ExtractClaimsFromEvidenceCommand
+from app.evidence_governance.application.read_claims import ReadPublicClaimHandler
 from app.evidence_governance.application.verify_claim import SubmitClaimForVerification
+from app.evidence_governance.domain.claim_evidence import CanonicalEvidenceSpan, Claim, ClaimStatus, EvidenceAssociation
+from app.evidence_governance.domain.claim_extraction import CanonicalProposition, ClaimCondition, ClaimScope, Limitation
 from app.evidence_governance.domain.claim_extraction import EvidenceCandidate
 
 
@@ -327,6 +331,123 @@ assert_equal(forbidden_verify.body, {"error_code": "CLAIM_CONTEXT_FORBIDDEN"}, "
 wrong_endpoint = adapter.handle(HttpRequest(method="POST", path="/v1/answer?token=secret", body=valid_verify_body(), authenticated_context="EG"))
 assert_equal(wrong_endpoint.status_code, 404, "L'adaptateur claims ne doit pas router RA.")
 assert_equal(wrong_endpoint.body, {"error_code": "ENDPOINT_NOT_FOUND"}, "Le mauvais endpoint ne doit pas refléter le chemin brut.")
+
+
+class SingleClaimReader:
+    def __init__(self, claim):
+        self.claim = claim
+
+    def read_claim(self, claim_id):
+        return self.claim
+
+
+class CanonicalReader:
+    def __init__(self, span):
+        self.span = span
+        self.resolved_item_ids = []
+
+    def resolve(self, source_locator):
+        self.resolved_item_ids.append(source_locator.item_id)
+        return self.span
+
+
+accepted_locator = source_locator(policy)
+non_accepted_text = SOURCE_TEXT + " Mention non retenue par la vérification."
+non_accepted_item_id = "DOC-M006-T009-UNIT-P001-I002"
+non_accepted_policy = SourceLocatorValidationPolicy(
+    canonical_sources_by_version_id={canonical_ref().canonical_version_id: canonical_ref()},
+    version_statuses_by_version_id={canonical_ref().canonical_version_id: "ACCEPTED"},
+    resolvable_item_ids_by_version_id={
+        canonical_ref().canonical_version_id: {
+            non_accepted_item_id: content_hash_for(non_accepted_text),
+        }
+    },
+)
+non_accepted_locator = SourceLocator.from_payload(
+    {
+        "schema_version": "1.0",
+        "canonical_version_id": canonical_ref().canonical_version_id,
+        "document_id": canonical_ref().document_id,
+        "page_pdf": 1,
+        "item_id": non_accepted_item_id,
+        "bbox": (0.1, 0.4, 0.8, 0.55),
+        "content_hash": content_hash_for(non_accepted_text),
+    },
+    validation_policy=non_accepted_policy,
+)
+accepted_evidence_ref = EvidenceRef.from_payload(
+    {
+        "schema_version": "1.0",
+        "evidence_id": "EVS-M006-T009-UNIT-ACCEPTED",
+        "source_locator": accepted_locator.to_payload(),
+        "relation": "SUPPORTS_DIRECTLY",
+        "quoted_span_hash": content_hash_for(SOURCE_TEXT),
+    },
+    source_locator_validation_policy=policy,
+)
+non_accepted_evidence_ref = EvidenceRef.from_payload(
+    {
+        "schema_version": "1.0",
+        "evidence_id": "EVS-M006-T009-UNIT-NON-ACCEPTED",
+        "source_locator": non_accepted_locator.to_payload(),
+        "relation": "SUPPORTS_DIRECTLY",
+        "quoted_span_hash": content_hash_for(non_accepted_text),
+    },
+    source_locator_validation_policy=non_accepted_policy,
+)
+accepted_scope = ClaimScope(
+    universe="portefeuille avec couvertures de queue",
+    horizon="crises de volatilité",
+    metric="drawdown quotidien",
+    frequency="quotidienne",
+)
+verified_claim_ref = VerifiedClaimRef(
+    schema_version="1.0",
+    claim_id="CLM-M006-T009-UNIT-PUBLIC-READ",
+    claim_version=1,
+    canonical_text=SOURCE_TEXT,
+    scope=accepted_scope.to_payload(),
+    status="VERIFIED",
+    verification_id="VER-M006-T009-UNIT-PUBLIC-READ",
+    evidence_refs=(accepted_evidence_ref,),
+    dependency_group_ids=("DEP-M006-T009-UNIT-ACCEPTED",),
+)
+claim_with_extra_association = Claim(
+    claim_id="CLM-M006-T009-UNIT-PUBLIC-READ",
+    claim_version=1,
+    status=ClaimStatus.VERIFIED,
+    claim_type="EMPIRICAL_EFFECT",
+    canonical_proposition=CanonicalProposition(SOURCE_TEXT),
+    scope=accepted_scope,
+    conditions=(ClaimCondition("crises de volatilité"),),
+    limitations=(Limitation("preuve acceptée seulement"),),
+    evidence_associations=(
+        EvidenceAssociation.from_evidence_ref(accepted_evidence_ref),
+        EvidenceAssociation.from_evidence_ref(non_accepted_evidence_ref),
+    ),
+    verified_claim_ref=verified_claim_ref,
+    accepted_verification_id="VER-M006-T009-UNIT-PUBLIC-READ",
+)
+canonical_reader = CanonicalReader(
+    CanonicalEvidenceSpan(
+        source_locator=accepted_locator,
+        quoted_span_hash=accepted_evidence_ref.quoted_span_hash,
+    )
+)
+public_evidence = ReadPublicClaimHandler(
+    claim_reader=SingleClaimReader(claim_with_extra_association),
+    canonical_evidence_reader=canonical_reader,
+).read_evidence(claim_with_extra_association.claim_id)
+assert_equal(
+    tuple(evidence_ref.evidence_id for evidence_ref in public_evidence.evidence_refs),
+    ("EVS-M006-T009-UNIT-ACCEPTED",),
+    "La lecture publique doit publier seulement les preuves acceptées par VerifiedClaimRef.",
+)
+assert_equal(
+    tuple(canonical_reader.resolved_item_ids),
+    (accepted_locator.item_id,),
+    "La lecture publique doit valider seulement les preuves acceptées par la vérification.",
+)
 
 adapter_path = Path(sys.argv[1]) / "app" / "evidence_governance" / "adapters" / "claim_http.py"
 tree = ast.parse(adapter_path.read_text(encoding="utf-8"))

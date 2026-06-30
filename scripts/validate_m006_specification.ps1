@@ -1,4 +1,4 @@
-param(
+﻿param(
     [Parameter(Mandatory = $false)]
     [string] $Path
 )
@@ -474,8 +474,11 @@ function Assert-M006Spec {
         throw "Spécification M-006 absente: $SpecPath"
     }
 
-    $content = Get-Content -Raw -LiteralPath $SpecPath
-    $lines = @(Get-Content -LiteralPath $SpecPath)
+    $content = (Get-Content -Raw -Encoding UTF8 -LiteralPath $SpecPath).TrimStart([char] 0xFEFF)
+    $lines = @(Get-Content -Encoding UTF8 -LiteralPath $SpecPath)
+    if ($lines.Count -gt 0) {
+        $lines[0] = $lines[0].TrimStart([char] 0xFEFF)
+    }
 
     Assert-M006ForbiddenPatterns -Content $content
 

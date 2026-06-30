@@ -19,7 +19,7 @@ from app.evidence_governance.application.dependency_groups import (
     AssignClaimDependencyGroupHandler,
     CountIndependentSupport,
 )
-from app.evidence_governance.domain.claim_evidence import Claim, ClaimStatus, EvidenceAssociation
+from app.evidence_governance.domain.claim_evidence import Claim, ClaimStatus, EvidenceAssociation, SupersededBy
 from app.evidence_governance.domain.claim_extraction import (
     CanonicalProposition,
     ClaimCondition,
@@ -110,7 +110,7 @@ def evidence_ref_for(*, suffix, evidence_id):
     )
 
 
-def claim_for(*, claim_id, evidence_refs, status=ClaimStatus.EVIDENCE_ATTACHED):
+def claim_for(*, claim_id, evidence_refs, status=ClaimStatus.EVIDENCE_ATTACHED, claim_version=1, **extra):
     scope = ClaimScope(
         universe="portefeuille avec couvertures de queue",
         horizon="crises de volatilité",
@@ -124,7 +124,7 @@ def claim_for(*, claim_id, evidence_refs, status=ClaimStatus.EVIDENCE_ATTACHED):
             "verified_claim_ref": VerifiedClaimRef(
                 schema_version="1.0",
                 claim_id=claim_id,
-                claim_version=1,
+                claim_version=claim_version,
                 canonical_text="Les couvertures de queue réduisent le drawdown.",
                 scope=scope.to_payload(),
                 status="VERIFIED",
@@ -136,7 +136,7 @@ def claim_for(*, claim_id, evidence_refs, status=ClaimStatus.EVIDENCE_ATTACHED):
         }
     return Claim(
         claim_id=claim_id,
-        claim_version=1,
+        claim_version=claim_version,
         status=status,
         claim_type="EMPIRICAL_EFFECT",
         canonical_proposition=CanonicalProposition(
@@ -150,6 +150,7 @@ def claim_for(*, claim_id, evidence_refs, status=ClaimStatus.EVIDENCE_ATTACHED):
             for evidence_ref in evidence_refs
         ),
         **verified_fields,
+        **extra,
     )
 
 
@@ -359,6 +360,68 @@ assert_raises(
             dependency_group_id=locked_group.dependency_group_id,
             dependency_kind="SECONDARY_REPRISE",
             occurred_at="2026-06-29T17:25:00Z",
+        )
+    ),
+)
+
+superseded_ref = evidence_ref_for(suffix="SUPERSEDED", evidence_id="EVS-M006-T006-UNIT-SUPERSEDED")
+superseded_scope = ClaimScope(
+    universe="portefeuille avec couvertures de queue",
+    horizon="crises de volatilité",
+    metric="drawdown",
+    frequency="quotidienne",
+)
+superseded_verified_ref = VerifiedClaimRef(
+    schema_version="1.0",
+    claim_id="CLM-M006-T006-UNIT-SUPERSEDED-LOCK",
+    claim_version=1,
+    canonical_text="Les couvertures de queue réduisent le drawdown.",
+    scope=superseded_scope.to_payload(),
+    status="VERIFIED",
+    verification_id="VER-M006-T006-UNIT-SUPERSEDED-LOCK-V1",
+    evidence_refs=(superseded_ref,),
+    dependency_group_ids=("DEP-M006-T006-UNIT-SUPERSEDED-LOCK",),
+)
+old_superseded_claim = claim_for(
+    claim_id="CLM-M006-T006-UNIT-SUPERSEDED-LOCK",
+    claim_version=1,
+    evidence_refs=(superseded_ref,),
+    status=ClaimStatus.SUPERSEDED,
+    verified_claim_ref=superseded_verified_ref,
+    accepted_verification_id="VER-M006-T006-UNIT-SUPERSEDED-LOCK-V1",
+    superseded_by=SupersededBy(claim_id="CLM-M006-T006-UNIT-SUPERSEDED-LOCK", claim_version=2),
+    supersession_reason="Nouvelle formulation conservant la décision publiée.",
+    superseded_at="2026-06-29T17:26:00Z",
+)
+latest_superseding_claim = claim_for(
+    claim_id="CLM-M006-T006-UNIT-SUPERSEDED-LOCK",
+    claim_version=2,
+    evidence_refs=(superseded_ref,),
+)
+superseded_locked_group = group_for(suffix="SUPERSEDED-LOCK")
+superseded_locked_group, _ = superseded_locked_group.assign_claim_evidence(
+    claim_id=old_superseded_claim.claim_id,
+    claim_version=old_superseded_claim.claim_version,
+    evidence_id=superseded_ref.evidence_id,
+    dependency_kind="PRIMARY_STUDY",
+    occurred_at="2026-06-29T17:27:00Z",
+)
+superseded_lock_handler = AssignClaimDependencyGroupHandler(
+    claim_repository=InMemoryClaimRepository(
+        claims=(old_superseded_claim, latest_superseding_claim, new_claim)
+    ),
+    dependency_group_repository=InMemoryDependencyGroupRepository(dependency_groups=(superseded_locked_group,)),
+)
+assert_raises(
+    f"dependency_group utilise par claim verifie: {superseded_locked_group.dependency_group_id}",
+    lambda: superseded_lock_handler.assign(
+        AssignClaimDependencyGroup(
+            claim_id=new_claim.claim_id,
+            claim_version=new_claim.claim_version,
+            evidence_id=new_ref.evidence_id,
+            dependency_group_id=superseded_locked_group.dependency_group_id,
+            dependency_kind="SECONDARY_REPRISE",
+            occurred_at="2026-06-29T17:28:00Z",
         )
     ),
 )

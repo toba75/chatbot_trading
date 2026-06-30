@@ -106,20 +106,20 @@ class ReadPublicClaimHandler:
         if claim.accepted_verification_id is None:
             raise ValueError("CLAIM_EVIDENCE_REQUIRED")
 
-        for association in claim.evidence_associations:
-            canonical_span = self.canonical_evidence_reader.resolve(association.source_locator)
+        accepted_evidence_refs = claim.verified_claim_ref.evidence_refs
+        for evidence_ref in accepted_evidence_refs:
+            _ensure_evidence_ref_attached(claim, evidence_ref)
+            canonical_span = self.canonical_evidence_reader.resolve(evidence_ref.source_locator)
             if not isinstance(canonical_span, CanonicalEvidenceSpan):
                 raise ValueError("CLAIM_EVIDENCE_SOURCE_UNRESOLVABLE")
-            if canonical_span.source_locator != association.source_locator:
+            if canonical_span.source_locator != evidence_ref.source_locator:
                 raise ValueError("CLAIM_EVIDENCE_SOURCE_UNRESOLVABLE")
-            if canonical_span.quoted_span_hash != association.quoted_span_hash:
+            if canonical_span.quoted_span_hash != evidence_ref.quoted_span_hash:
                 raise ValueError("CLAIM_EVIDENCE_SOURCE_UNRESOLVABLE")
 
         return ReadClaimEvidenceResult(
             claim=claim,
-            evidence_refs=tuple(
-                association.evidence_ref for association in claim.evidence_associations
-            ),
+            evidence_refs=accepted_evidence_refs,
             dependency_group_ids=claim.verified_claim_ref.dependency_group_ids,
             verification_case_ids=(claim.accepted_verification_id,),
         )
@@ -146,6 +146,13 @@ def _ensure_evidence_refs(value: Sequence[EvidenceRef]) -> tuple[EvidenceRef, ..
         if not isinstance(evidence_ref, EvidenceRef):
             raise ValueError("evidence_ref invalide")
     return evidence_refs
+
+
+def _ensure_evidence_ref_attached(claim: Claim, evidence_ref: EvidenceRef) -> None:
+    if not any(
+        association.evidence_ref == evidence_ref for association in claim.evidence_associations
+    ):
+        raise ValueError("CLAIM_EVIDENCE_SOURCE_UNRESOLVABLE")
 
 
 def _ensure_text_tuple(value: Sequence[str], field_name: str) -> tuple[str, ...]:
