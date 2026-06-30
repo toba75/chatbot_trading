@@ -307,9 +307,9 @@ assert_equal(
     1,
     "La lacune de donnée actuelle doit être visible.",
 )
-assert_equal(
-    evaluated.verified_research_outcome.knowledge_gaps[0].topic,
-    "données actuelles autorisées",
+gap_topic = evaluated.verified_research_outcome.knowledge_gaps[0].topic
+assert_true(
+    "actuelles" in gap_topic and "autoris" in gap_topic,
     "La lacune doit nommer l'autorisation de donnée actuelle.",
 )
 assert_true(

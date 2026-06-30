@@ -9,7 +9,9 @@ from typing import Protocol
 
 from app.contracts.research_outcomes import VerifiedResearchOutcome
 from app.research_answering.domain.answer import (
+    AbstentionPolicy,
     Answer,
+    AnswerAbstained,
     AnswerFreshnessPolicy,
     AnswerPartiallySupported,
     AnswerSupportEvaluated,
@@ -31,6 +33,9 @@ class ResearchCaseRepository(Protocol):
 
     def case_for_id(self, research_case_id: str) -> ResearchCase:
         """Retourne le cas de recherche existant."""
+
+    def update(self, research_case: ResearchCase) -> ResearchCase:
+        """Remplace un ResearchCase par sa nouvelle version métier."""
 
 
 class AnswerRepository(Protocol):
@@ -115,7 +120,7 @@ class EvaluateAnswerSupportResult:
     answer: Answer
     verified_answer_version: VerifiedAnswerVersion
     verified_research_outcome: VerifiedResearchOutcome
-    events: Sequence[AnswerSupportEvaluated | AnswerVerified | AnswerPartiallySupported]
+    events: Sequence[AnswerSupportEvaluated | AnswerVerified | AnswerPartiallySupported | AnswerAbstained]
 
     def __post_init__(self) -> None:
         if not isinstance(self.support_status, SupportStatus):
@@ -153,6 +158,8 @@ class EvaluateAnswerSupportHandler:
     def __post_init__(self) -> None:
         if not callable(getattr(self.research_case_repository, "case_for_id", None)):
             raise ValueError("research_case_repository sans case_for_id")
+        if not callable(getattr(self.research_case_repository, "update", None)):
+            raise ValueError("research_case_repository sans update")
         if not callable(getattr(self.answer_repository, "answer_for_id", None)):
             raise ValueError("answer_repository sans answer_for_id")
         if not callable(getattr(self.answer_repository, "update", None)):
@@ -185,17 +192,35 @@ class EvaluateAnswerSupportHandler:
             evidence_set=research_case.evidence_set,
             support_policy_version=parsed_command.support_policy_version,
         )
-        updated_answer, version, events = AnswerSupportPolicy(
-            policy_version=parsed_command.support_policy_version,
-        ).evaluate(
-            answer=answer,
-            research_case=research_case,
-            citation_policy=CitationIntegrityPolicy(
-                policy_version=parsed_command.citation_policy_version,
-                citation_resolver=self.citation_resolver,
-            ),
-            occurred_at=parsed_command.occurred_at,
+        abstention_reason = freshness_policy.current_data_abstention_reason(
+            question=research_case.resolved_question.text,
+            mandate=research_case.research_mandate.to_payload(),
         )
+        if abstention_reason is not None:
+            research_case, _, _ = research_case.record_current_data_required_gap(
+                occurred_at=parsed_command.occurred_at,
+            )
+            research_case = self.research_case_repository.update(research_case)
+            updated_answer, version, events = AbstentionPolicy(
+                policy_version=parsed_command.support_policy_version,
+            ).abstain(
+                answer=answer,
+                research_case=research_case,
+                reason=abstention_reason,
+                occurred_at=parsed_command.occurred_at,
+            )
+        else:
+            updated_answer, version, events = AnswerSupportPolicy(
+                policy_version=parsed_command.support_policy_version,
+            ).evaluate(
+                answer=answer,
+                research_case=research_case,
+                citation_policy=CitationIntegrityPolicy(
+                    policy_version=parsed_command.citation_policy_version,
+                    citation_resolver=self.citation_resolver,
+                ),
+                occurred_at=parsed_command.occurred_at,
+            )
         outcome = version.to_verified_research_outcome(
             question=research_case.resolved_question.text,
             mandate=research_case.research_mandate.to_payload(),
@@ -256,14 +281,14 @@ def _ensure_supersede_command(value: object) -> SupersedeAnswer:
 
 
 def _ensure_evaluation_events(
-    value: Sequence[AnswerSupportEvaluated | AnswerVerified | AnswerPartiallySupported],
-) -> tuple[AnswerSupportEvaluated | AnswerVerified | AnswerPartiallySupported, ...]:
+    value: Sequence[AnswerSupportEvaluated | AnswerVerified | AnswerPartiallySupported | AnswerAbstained],
+) -> tuple[AnswerSupportEvaluated | AnswerVerified | AnswerPartiallySupported | AnswerAbstained, ...]:
     if value is None or isinstance(value, str) or not isinstance(value, Sequence):
         raise ValueError("events invalides")
     events = tuple(value)
     if len(events) != 2 or not isinstance(events[0], AnswerSupportEvaluated):
         raise ValueError("events evaluation invalides")
-    if not isinstance(events[1], (AnswerVerified, AnswerPartiallySupported)):
+    if not isinstance(events[1], (AnswerVerified, AnswerPartiallySupported, AnswerAbstained)):
         raise ValueError("event publication absent")
     return events
 

@@ -48,6 +48,7 @@ class KnowledgeGapType(str, Enum):
     """Type public de lacune documentaire RA."""
 
     COVERAGE_OBLIGATION_MISSING = "COVERAGE_OBLIGATION_MISSING"
+    CURRENT_DATA_REQUIRED = "CURRENT_DATA_REQUIRED"
 
 
 @dataclass(frozen=True)
@@ -176,6 +177,22 @@ class KnowledgeGap:
             affected_obligation=obligation,
             reason_code=code,
             public_reason=f"Obligation documentaire non satisfaite: {obligation}.",
+        )
+
+    @classmethod
+    def for_current_data_required(cls, *, research_case_id: str) -> "KnowledgeGap":
+        obligation = "données actuelles autorisées"
+        reason_code = "CURRENT_DATA_REQUIRED"
+        return cls(
+            gap_id=_gap_id_for(
+                research_case_id=_ensure_research_case_id(research_case_id),
+                affected_obligation=obligation,
+                reason_code=reason_code,
+            ),
+            gap_type=KnowledgeGapType.CURRENT_DATA_REQUIRED,
+            affected_obligation=obligation,
+            reason_code=reason_code,
+            public_reason="La question requiert des données actuelles non autorisées.",
         )
 
     def __post_init__(self) -> None:

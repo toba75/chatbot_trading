@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import unicodedata
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from enum import Enum
@@ -34,6 +35,29 @@ _COMPOSITE_MARKERS = (
     re.compile(r"\s+alors\s+que\s+", re.IGNORECASE),
     re.compile(r";"),
 )
+_CURRENT_DATA_QUESTION_MARKERS = (
+    "prix actuel",
+    "prix récent",
+    "prix de marché récent",
+    "cours actuel",
+    "cours récent",
+    "cours recent",
+    "niveau de marché",
+    "temps réel",
+    "aujourd'hui",
+    "maintenant",
+    "current price",
+    "latest price",
+    "market price",
+)
+_CURRENT_DATA_AUTHORIZED_REQUIREMENT = "données de marché actuelles autorisées"
+_CURRENT_DATA_AUTHORIZED_SOURCE = "source de données de marché actuelle autorisée"
+_CURRENT_DATA_FORBIDDEN_MARKERS = (
+    "données de marché actuelles non autorisées",
+    "donnée de marché actuelle non autorisée",
+    "accès externe interdit",
+    "données temps réel interdites",
+)
 
 
 class AnswerStatus(str, Enum):
@@ -44,6 +68,7 @@ class AnswerStatus(str, Enum):
     SUPPORT_EVALUATED = "SUPPORT_EVALUATED"
     VERIFIED = "VERIFIED"
     PARTIALLY_SUPPORTED = "PARTIALLY_SUPPORTED"
+    ABSTAINED = "ABSTAINED"
     REJECTED = "REJECTED"
 
 
@@ -67,6 +92,28 @@ class AssertionPublicationStatus(str, Enum):
     SUPPORTED = "SUPPORTED"
     QUALIFIED = "QUALIFIED"
     REMOVED = "REMOVED"
+
+
+class AbstentionReason(str, Enum):
+    """Raison publique d'abstention RA."""
+
+    CURRENT_DATA_REQUIRED = "CURRENT_DATA_REQUIRED"
+
+    @property
+    def public_error_code(self) -> str:
+        return self.value
+
+    @property
+    def support_status(self) -> SupportStatus:
+        return SupportStatus.REQUIRES_CURRENT_DATA
+
+    @property
+    def affected_obligation(self) -> str:
+        return "données actuelles autorisées"
+
+    @property
+    def public_reason(self) -> str:
+        return "La question requiert des données actuelles non autorisées."
 
 
 @dataclass(frozen=True)
@@ -524,6 +571,50 @@ class AnswerPartiallySupported:
 
 
 @dataclass(frozen=True)
+class AnswerAbstained:
+    """Événement RA de publication d'une abstention explicite."""
+
+    answer_id: str
+    answer_version: int
+    abstention_reason: AbstentionReason
+    support_status: SupportStatus
+    occurred_at: str
+
+    @property
+    def event_type(self) -> str:
+        return "AnswerAbstained"
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "answer_id", _ensure_answer_id(self.answer_id))
+        object.__setattr__(
+            self,
+            "answer_version",
+            _ensure_positive_integer(self.answer_version, "answer_version"),
+        )
+        object.__setattr__(
+            self,
+            "abstention_reason",
+            _ensure_abstention_reason(self.abstention_reason),
+        )
+        object.__setattr__(self, "support_status", ensure_support_status(self.support_status))
+        if self.support_status is not self.abstention_reason.support_status:
+            raise ValueError("support_status incoherent avec abstention_reason")
+        object.__setattr__(self, "occurred_at", _ensure_utc_instant(self.occurred_at, "occurred_at"))
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "event_type": self.event_type,
+            "occurred_at": self.occurred_at,
+            "payload": {
+                "answer_id": self.answer_id,
+                "answer_version": self.answer_version,
+                "abstention_reason": self.abstention_reason.value,
+                "support_status": self.support_status.value,
+            },
+        }
+
+
+@dataclass(frozen=True)
 class AnswerSuperseded:
     """Événement RA de supersession explicite d'une réponse publiée."""
 
@@ -608,7 +699,12 @@ class VerifiedAnswerVersion:
         decisions = _ensure_assertion_support_decisions(self.assertion_decisions)
         object.__setattr__(self, "assertion_decisions", decisions)
         _ensure_assertion_decisions_cover(assertions=assertions, decisions=decisions)
-        object.__setattr__(self, "citations", _ensure_citation_sequence(self.citations, allow_empty=False))
+        allow_empty_citations = self.support_status is SupportStatus.REQUIRES_CURRENT_DATA
+        object.__setattr__(
+            self,
+            "citations",
+            _ensure_citation_sequence(self.citations, allow_empty=allow_empty_citations),
+        )
         object.__setattr__(
             self,
             "claim_refs",
@@ -618,6 +714,14 @@ class VerifiedAnswerVersion:
         object.__setattr__(self, "published_at", _ensure_utc_instant(self.published_at, "published_at"))
         if self.support_status is SupportStatus.SUPPORTED and not all(decision.supported for decision in decisions):
             raise ValueError("SUPPORTED avec assertion non supportee")
+        if self.support_status is SupportStatus.REQUIRES_CURRENT_DATA:
+            if any(decision.supported for decision in decisions):
+                raise ValueError("REQUIRES_CURRENT_DATA avec assertion supportee")
+            if len(self.claim_refs) > 0:
+                raise ValueError("claim_refs interdits pour REQUIRES_CURRENT_DATA")
+            for decision in decisions:
+                if decision.reason_code != AbstentionReason.CURRENT_DATA_REQUIRED.public_error_code:
+                    raise ValueError("reason_code CURRENT_DATA_REQUIRED requis")
         supported_citation_ids = {
             citation_id
             for decision in decisions
@@ -642,7 +746,10 @@ class VerifiedAnswerVersion:
         knowledge_gaps: Sequence[KnowledgeGap],
         completed_at: str,
     ) -> VerifiedResearchOutcome:
-        if len(self.claim_refs) == 0:
+        if (
+            len(self.claim_refs) == 0
+            and self.support_status is not SupportStatus.REQUIRES_CURRENT_DATA
+        ):
             raise ValueError("VerifiedResearchOutcome invalide: claim_refs vide")
         return VerifiedResearchOutcome.from_payload(
             {
@@ -745,6 +852,104 @@ class AnswerFreshnessPolicy:
         for citation in evidence_set.citations:
             if citation.source_locator.canonical_version_id not in accepted_ids:
                 raise ValueError("ANSWER_SOURCE_OBSOLETE")
+
+    def current_data_abstention_reason(
+        self,
+        *,
+        question: str,
+        mandate: Mapping[str, Any],
+    ) -> AbstentionReason | None:
+        parsed_question = _ensure_text(question, "question")
+        parsed_mandate = _ensure_mandate_mapping(mandate)
+        if not _question_requires_current_data(parsed_question):
+            return None
+        if _mandate_authorizes_current_data(parsed_mandate):
+            return None
+        return AbstentionReason.CURRENT_DATA_REQUIRED
+
+
+@dataclass(frozen=True)
+class AbstentionPolicy:
+    """Politique RA qui publie une abstention explicite."""
+
+    policy_version: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "policy_version", _ensure_text(self.policy_version, "abstention_policy_version"))
+
+    def answer_text_for(self, reason: AbstentionReason) -> str:
+        parsed_reason = _ensure_abstention_reason(reason)
+        return f"Abstention {parsed_reason.public_error_code}: la question requiert des données actuelles non autorisées."
+
+    def abstain(
+        self,
+        *,
+        answer: "Answer",
+        research_case: object,
+        reason: AbstentionReason,
+        occurred_at: str,
+    ) -> tuple["Answer", VerifiedAnswerVersion, tuple[AnswerSupportEvaluated | AnswerAbstained, ...]]:
+        parsed_answer = _ensure_answer(answer)
+        parsed_reason = _ensure_abstention_reason(reason)
+        if parsed_answer.status is not AnswerStatus.ASSERTIONS_EXTRACTED:
+            raise ValueError("answer non evaluable")
+        evidence_set = getattr(research_case, "evidence_set", None)
+        if not isinstance(evidence_set, EvidenceSet) or not evidence_set.sealed:
+            raise ValueError("evidence_set non scelle")
+        if parsed_answer.research_case_id != getattr(research_case, "research_case_id", None):
+            raise ValueError("answer hors research_case")
+        if parsed_answer.evidence_set_id != evidence_set.evidence_set_id:
+            raise ValueError("answer hors evidence_set")
+        if parsed_answer.evidence_set_version != evidence_set.version.value:
+            raise ValueError("answer evidence_set_version obsolete")
+
+        decisions = tuple(
+            AssertionSupportDecision(
+                assertion_id=assertion.assertion_id,
+                basis_refs=assertion.origin.basis_refs,
+                publication_status=AssertionPublicationStatus.REMOVED,
+                reason_code=parsed_reason.public_error_code,
+                public_reason=parsed_reason.public_reason,
+                claim_refs=(),
+                citation_ids=(),
+            )
+            for assertion in parsed_answer.assertions
+        )
+        version = VerifiedAnswerVersion(
+            answer_id=parsed_answer.answer_id,
+            answer_version=1,
+            research_case_id=parsed_answer.research_case_id,
+            evidence_set_id=parsed_answer.evidence_set_id,
+            evidence_set_version=parsed_answer.evidence_set_version,
+            evidence_set_snapshot=evidence_set,
+            support_status=parsed_reason.support_status,
+            answer_text=self.answer_text_for(parsed_reason),
+            source_assertions=parsed_answer.assertions,
+            assertion_decisions=decisions,
+            citations=(),
+            claim_refs=(),
+            policy_version=self.policy_version,
+            published_at=occurred_at,
+        )
+        evaluated = AnswerSupportEvaluated(
+            answer_id=parsed_answer.answer_id,
+            support_status=parsed_reason.support_status,
+            unsupported_assertion_count=len(decisions),
+            policy_version=self.policy_version,
+            occurred_at=occurred_at,
+        )
+        abstained = AnswerAbstained(
+            answer_id=parsed_answer.answer_id,
+            answer_version=version.answer_version,
+            abstention_reason=parsed_reason,
+            support_status=parsed_reason.support_status,
+            occurred_at=occurred_at,
+        )
+        updated_answer = parsed_answer.publish_verified_version(
+            verified_answer_version=version,
+            events=(evaluated, abstained),
+        )
+        return updated_answer, version, (evaluated, abstained)
 
 
 @dataclass(frozen=True)
@@ -871,6 +1076,7 @@ class Answer:
         | AnswerSupportEvaluated
         | AnswerVerified
         | AnswerPartiallySupported
+        | AnswerAbstained
         | AnswerSuperseded
     ]
 
@@ -940,16 +1146,17 @@ class Answer:
         if self.status in {AnswerStatus.DRAFT, AnswerStatus.ASSERTIONS_EXTRACTED}:
             if self.verified_answer_version is not None:
                 raise ValueError("verified_answer_version interdite avant publication")
-        if self.status in {AnswerStatus.VERIFIED, AnswerStatus.PARTIALLY_SUPPORTED}:
+        if self.status in {AnswerStatus.VERIFIED, AnswerStatus.PARTIALLY_SUPPORTED, AnswerStatus.ABSTAINED}:
             if self.verified_answer_version is None:
                 raise ValueError("verified_answer_version absente")
             if self.verified_answer_version.answer_id != self.answer_id:
                 raise ValueError("verified_answer_version hors answer")
-            expected_status = (
-                SupportStatus.SUPPORTED
-                if self.status is AnswerStatus.VERIFIED
-                else SupportStatus.PARTIALLY_SUPPORTED
-            )
+            if self.status is AnswerStatus.VERIFIED:
+                expected_status = SupportStatus.SUPPORTED
+            elif self.status is AnswerStatus.PARTIALLY_SUPPORTED:
+                expected_status = SupportStatus.PARTIALLY_SUPPORTED
+            else:
+                expected_status = SupportStatus.REQUIRES_CURRENT_DATA
             if self.verified_answer_version.support_status is not expected_status:
                 raise ValueError("answer_status incoherent avec support_status")
         if self.status is AnswerStatus.REJECTED and self.verified_answer_version is not None:
@@ -957,7 +1164,11 @@ class Answer:
 
     @property
     def is_published(self) -> bool:
-        return self.status in {AnswerStatus.VERIFIED, AnswerStatus.PARTIALLY_SUPPORTED}
+        return self.status in {
+            AnswerStatus.VERIFIED,
+            AnswerStatus.PARTIALLY_SUPPORTED,
+            AnswerStatus.ABSTAINED,
+        }
 
     @property
     def draft(self) -> AnswerDraft:
@@ -1007,7 +1218,7 @@ class Answer:
         self,
         *,
         verified_answer_version: VerifiedAnswerVersion,
-        events: Sequence[AnswerSupportEvaluated | AnswerVerified | AnswerPartiallySupported],
+        events: Sequence[AnswerSupportEvaluated | AnswerVerified | AnswerPartiallySupported | AnswerAbstained],
     ) -> "Answer":
         if self.status is not AnswerStatus.ASSERTIONS_EXTRACTED:
             raise ValueError("answer non publiable")
@@ -1021,6 +1232,8 @@ class Answer:
             next_status = AnswerStatus.VERIFIED
         elif parsed_version.support_status is SupportStatus.PARTIALLY_SUPPORTED:
             next_status = AnswerStatus.PARTIALLY_SUPPORTED
+        elif parsed_version.support_status is SupportStatus.REQUIRES_CURRENT_DATA:
+            next_status = AnswerStatus.ABSTAINED
         else:
             raise ValueError("support_status non publiable pour Answer")
         return replace(
@@ -1081,6 +1294,69 @@ def answer_id_for(*, research_case_id: str, evidence_set_id: str, draft_hash: st
         "draft_hash": _ensure_sha256(draft_hash, "draft_hash"),
     }
     return f"ANS-{_hash_payload(payload)[:_HASH_HEX_LENGTH].upper()}"
+
+
+def _ensure_abstention_reason(value: object) -> AbstentionReason:
+    if not isinstance(value, AbstentionReason):
+        raise ValueError("abstention_reason invalide")
+    return value
+
+
+def _question_requires_current_data(question: str) -> bool:
+    normalized_question = _normalize_policy_text(_ensure_text(question, "question"))
+    return any(
+        _normalize_policy_text(marker) in normalized_question
+        for marker in _CURRENT_DATA_QUESTION_MARKERS
+    )
+
+
+def _ensure_mandate_mapping(value: object) -> Mapping[str, Any]:
+    if not isinstance(value, Mapping):
+        raise ValueError("mandate non objet")
+    _mandate_text_tuple(value, "allowed_universe")
+    _mandate_text_tuple(value, "data_requirements")
+    _mandate_text_tuple(value, "exclusions")
+    return value
+
+
+def _mandate_authorizes_current_data(mandate: Mapping[str, Any]) -> bool:
+    parsed_mandate = _ensure_mandate_mapping(mandate)
+    exclusions = _mandate_text_tuple(parsed_mandate, "exclusions")
+    if _contains_policy_marker(exclusions, _CURRENT_DATA_FORBIDDEN_MARKERS):
+        return False
+    data_requirements = _mandate_text_tuple(parsed_mandate, "data_requirements")
+    allowed_universe = _mandate_text_tuple(parsed_mandate, "allowed_universe")
+    return _contains_policy_marker(
+        data_requirements,
+        (_CURRENT_DATA_AUTHORIZED_REQUIREMENT,),
+    ) and _contains_policy_marker(
+        allowed_universe,
+        (_CURRENT_DATA_AUTHORIZED_SOURCE,),
+    )
+
+
+def _mandate_text_tuple(mandate: Mapping[str, Any], field_name: str) -> tuple[str, ...]:
+    if field_name not in mandate:
+        raise ValueError(f"mandate {field_name} absent")
+    return _ensure_text_tuple(mandate[field_name], field_name, allow_empty=False)
+
+
+def _contains_policy_marker(values: Sequence[str], markers: Sequence[str]) -> bool:
+    normalized_values = tuple(_normalize_policy_text(_ensure_text(value, "mandate")) for value in values)
+    normalized_markers = tuple(
+        _normalize_policy_text(_ensure_text(marker, "policy_marker"))
+        for marker in markers
+    )
+    return any(
+        marker in value
+        for value in normalized_values
+        for marker in normalized_markers
+    )
+
+
+def _normalize_policy_text(value: str) -> str:
+    normalized = unicodedata.normalize("NFKD", value.casefold())
+    return "".join(character for character in normalized if not unicodedata.combining(character))
 
 
 def _ensure_answer(value: object) -> Answer:
@@ -1193,7 +1469,7 @@ def _ensure_citation_sequence(
 
 def _ensure_publication_events(
     value: object,
-) -> tuple[AnswerSupportEvaluated | AnswerVerified | AnswerPartiallySupported, ...]:
+) -> tuple[AnswerSupportEvaluated | AnswerVerified | AnswerPartiallySupported | AnswerAbstained, ...]:
     if value is None or isinstance(value, str) or not isinstance(value, Sequence):
         raise ValueError("events publication invalides")
     events = tuple(value)
@@ -1201,7 +1477,7 @@ def _ensure_publication_events(
         raise ValueError("events publication invalides")
     if not isinstance(events[0], AnswerSupportEvaluated):
         raise ValueError("event AnswerSupportEvaluated absent")
-    if not isinstance(events[1], (AnswerVerified, AnswerPartiallySupported)):
+    if not isinstance(events[1], (AnswerVerified, AnswerPartiallySupported, AnswerAbstained)):
         raise ValueError("event publication absent")
     return events
 
@@ -1247,6 +1523,7 @@ def _ensure_events(
     | AnswerSupportEvaluated
     | AnswerVerified
     | AnswerPartiallySupported
+    | AnswerAbstained
     | AnswerSuperseded,
     ...,
 ]:
@@ -1264,6 +1541,7 @@ def _ensure_events(
                 AnswerSupportEvaluated,
                 AnswerVerified,
                 AnswerPartiallySupported,
+                AnswerAbstained,
                 AnswerSuperseded,
             ),
         ):
@@ -1564,6 +1842,9 @@ def _json_ready(value: Any) -> Any:
 
 __all__ = [
     "Answer",
+    "AbstentionPolicy",
+    "AbstentionReason",
+    "AnswerAbstained",
     "AnswerAssertion",
     "AnswerAssertionCandidate",
     "AnswerAssertionsExtracted",

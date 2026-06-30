@@ -591,6 +591,32 @@ class ResearchCase:
             events,
         )
 
+    def record_current_data_required_gap(
+        self,
+        *,
+        occurred_at: str,
+    ) -> tuple["ResearchCase", KnowledgeGap, KnowledgeGapRecorded]:
+        self.ensure_contradiction_assessment_allowed()
+        gap = KnowledgeGap.for_current_data_required(research_case_id=self.research_case_id)
+        if any(existing.gap_id == gap.gap_id for existing in self.knowledge_gaps):
+            raise ValueError("knowledge_gap deja enregistre")
+        event = KnowledgeGapRecorded(
+            research_case_id=self.research_case_id,
+            gap_type=gap.gap_type,
+            affected_obligation=gap.affected_obligation,
+            reason_code=gap.reason_code,
+            occurred_at=occurred_at,
+        )
+        return (
+            replace(
+                self,
+                knowledge_gaps=self.knowledge_gaps + (gap,),
+                events=self.events + (event,),
+            ),
+            gap,
+            event,
+        )
+
     def declare_conflicting_evidence(
         self,
         *,
