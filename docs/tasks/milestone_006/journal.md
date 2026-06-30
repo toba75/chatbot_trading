@@ -110,3 +110,16 @@
 - ADR: non requise; T-009 applique le registre EG séparé, les gates PowerShell, `SourceLocator` comme langage publié et `Claim` comme agrégat central sans changer de décision structurante.
 - Validations GREEN: `tests/m006/validate_claim_http_contract_acceptance.ps1`; `tests/m006/validate_claim_http_contract_unit.ps1`; `scripts/validate_traceability.ps1` (`72 exigence(s)`); `scripts/lint.ps1` (`15 validation(s), 0 test(s)`); `tests/m004/validate_m004_traceability_acceptance.ps1`; `scripts/test.ps1` (`15 validation(s), 132 test(s)`); `git diff --check`.
 - Risques résiduels: l'adaptateur reste sans framework HTTP réel et dépend de handlers/ports injectés par composition; aucune persistance durable, authentification HTTP complète ni runtime orchestrator-api n'est introduit par T-009.
+
+## Clôture T-010
+
+- Scénario BDD: Given les comportements M-006 sont implémentés et testés; When la matrice de traçabilité et les gates sont exécutés; Then chaque exigence M-006 est rattachée à un test GREEN, une commande de validation et une ADR ou justification explicite.
+- Commit RED: `130c7745` (`test(m006): couvrir tracabilite metriques gates`).
+- RED T-010 confirmé: `tests/m006/validate_m006_traceability_acceptance.ps1` échouait sur l'absence de M-006 dans `scripts/validate_traceability.ps1`; `tests/m006/validate_m006_traceability_unit.ps1` échouait sur `ModuleNotFoundError: app.evidence_governance.application.traceability_metrics`.
+- Implémentation: `app/evidence_governance/application/traceability_metrics.py` publie `ClaimMetricObservation`, `EvidenceGovernanceMetricsPublisher`, `EvidenceGovernanceMetricSnapshot` et `EvidenceGovernanceAuditSignal`; `docs/governance/m006_claim_metrics.json` publie le snapshot calculé depuis `tests/m006/fixtures/m006_claim_metrics_fixture.json`.
+- Garde-fous livrés: les métriques exposent uniquement des identifiants, statuts, verdicts, compteurs, hashes et délais; aucun texte de claim complet, aucune preuve complète, aucun `SourceLocator` ni proposition canonique n'entre dans les signaux d'audit; un compteur de mentions documentaires ne peut pas remplacer les `DependencyGroup` indépendants.
+- Traçabilité et gates: `REQ-M006-010` est ajouté à `docs/traceability/matrix.md`; `scripts/validate_traceability.ps1` contrôle désormais les dix exigences M-006; `tests/m006/validate_m006_traceability_acceptance.ps1` et `tests/m006/validate_m006_traceability_unit.ps1` sont enrôlés dans `scripts/test.ps1`; les preuves de comptage M-003 et M-004 sont alignées sur `128 test(s)` imbriqués et `73 exigence(s)`.
+- ADR consultées: ADR-006, ADR-010, DDD-ADR-005 et DDD-ADR-010.
+- ADR: non requise; T-010 applique les décisions existantes sur le registre EG séparé, les gates PowerShell, Claim comme agrégat central et la conservation des versions négatives ou supersédées sans changer de politique durable.
+- Validations GREEN: `tests/m006/validate_m006_traceability_acceptance.ps1`; `tests/m006/validate_m006_traceability_unit.ps1`; `scripts/validate_traceability.ps1` (`73 exigence(s)`); `scripts/lint.ps1` (`15 validation(s), 0 test(s)`); `scripts/test.ps1` (`15 validation(s), 134 test(s)`); `git diff --check`.
+- Risques résiduels: `scripts/test.ps1` reste long car il réexécute les préconditions imbriquées; aucun risque fonctionnel bloquant identifié pour la clôture M-006.
