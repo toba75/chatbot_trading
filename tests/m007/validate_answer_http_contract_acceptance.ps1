@@ -51,15 +51,16 @@ def request_body(idempotency_key):
 
 
 def citation_payload(status):
+    status_id = status.replace("_", "-")
     return {
-        "citation_id": f"CIT-M007-T009-{status}",
-        "evidence_id": f"EVS-M007-T009-{status}",
+        "citation_id": f"CIT-M007-T009-{status_id}",
+        "evidence_id": f"EVS-M007-T009-{status_id}",
         "source_locator": {
             "schema_version": "1.0",
-            "canonical_version_id": f"CVER-M007-T009-{status}",
-            "document_id": f"DOC-M007-T009-{status}",
+            "canonical_version_id": f"CVER-M007-T009-{status_id}",
+            "document_id": f"DOC-M007-T009-{status_id}",
             "page_pdf": 1,
-            "item_id": f"item-m007-t009-{status.lower()}",
+            "item_id": f"item-m007-t009-{status_id.lower()}",
             "bbox": (0.1, 0.2, 0.8, 0.9),
             "content_hash": "1" * 64,
         },
@@ -68,14 +69,15 @@ def citation_payload(status):
 
 
 def outcome_payload(status):
+    status_id = status.replace("_", "-")
     payload = {
         "schema_version": "1.0",
-        "research_case_id": f"RSC-M007-T009-{status}",
+        "research_case_id": f"RSC-M007-T009-{status_id}",
         "question": "Quelle réponse documentaire publier ?",
         "mandate": mandate_payload(),
-        "answer_id": f"ANS-M007-T009-{status}",
+        "answer_id": f"ANS-M007-T009-{status_id}",
         "support_status": status,
-        "claim_refs": (f"CLM-M007-T009-{status}@1",),
+        "claim_refs": (f"CLM-M007-T009-{status_id}@1",),
         "unresolved_conflicts": (),
         "knowledge_gaps": (),
         "completed_at": "2026-06-30T18:01:00Z",
@@ -85,7 +87,7 @@ def outcome_payload(status):
             {
                 "summary": "Claims vérifiés opposés sur une portée comparable.",
                 "claim_refs": (
-                    f"CLM-M007-T009-{status}@1",
+                    f"CLM-M007-T009-{status_id}@1",
                     "CLM-M007-T009-CONFLICT-TARGET@1",
                 ),
                 "blocking": True,

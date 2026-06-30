@@ -190,7 +190,9 @@ $testCommands = @(
     @{ Path = "tests/m007/validate_m007_specification_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/m007/validate_m007_specification_unit.ps1"; Arguments = @() },
     @{ Path = "tests/m007/validate_answer_support_acceptance.ps1"; Arguments = @() },
-    @{ Path = "tests/m007/validate_answer_support_unit.ps1"; Arguments = @() }
+    @{ Path = "tests/m007/validate_answer_support_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m007/validate_answer_http_contract_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m007/validate_answer_http_contract_unit.ps1"; Arguments = @() }
 )
 
 function Get-GateCommandPaths {
