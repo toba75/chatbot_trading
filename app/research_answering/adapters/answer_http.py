@@ -216,7 +216,7 @@ class AnswerHttpAdapter:
         except AnswerHttpRequestValidationError as exc:
             return _validation_error_response(exc)
         except ValueError as exc:
-            if "research_mandate" in str(exc):
+            if _is_missing_research_mandate_error(exc):
                 return HttpResponse(
                     status_code=422,
                     body={"error_code": "RESEARCH_MANDATE_REQUIRED", "field": "research_mandate"},
@@ -258,6 +258,10 @@ def _public_domain_error_code(message: str) -> str | None:
         if candidate in _PUBLIC_DOMAIN_ERRORS:
             return candidate
     return None
+
+
+def _is_missing_research_mandate_error(exc: ValueError) -> bool:
+    return str(exc).strip() == "research_mandate absent"
 
 
 def _public_error_response(error_code: str, status_code: int) -> HttpResponse:

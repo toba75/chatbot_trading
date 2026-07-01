@@ -1388,6 +1388,28 @@ function Assert-M006PathCell {
         -Message "$CellName M-006 invalide pour ${RequirementId}. Attendu: $ExpectedValue. Obtenu: $actualValue"
 }
 
+function Assert-M007PathCell {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object] $Row,
+
+        [Parameter(Mandatory = $true)]
+        [string] $RequirementId,
+
+        [Parameter(Mandatory = $true)]
+        [string] $CellName,
+
+        [Parameter(Mandatory = $true)]
+        [string] $ExpectedValue
+    )
+
+    $actualValue = Convert-ToMatrixRelativePathCell -RelativePath (Get-MatrixRowCell -Row $Row -CellName $CellName -RequirementId $RequirementId)
+
+    Assert-Condition `
+        -Condition ($actualValue -eq $ExpectedValue) `
+        -Message "$CellName M-007 invalide pour ${RequirementId}. Attendu: $ExpectedValue. Obtenu: $actualValue"
+}
+
 function Test-M006MilestoneIsPresent {
     $milestoneDir = Join-Path $repoRoot "docs/tasks/milestone_006"
     return (Test-Path -LiteralPath $milestoneDir -PathType Container)
@@ -1506,9 +1528,9 @@ function Assert-M007RequirementRows {
 
         $commandScript = Get-MatrixRowCell -Row $row -CellName "CommandeScript" -RequirementId $requirementId
 
-        Assert-M006PathCell -Row $row -RequirementId $requirementId -CellName "Source" -ExpectedValue $expected["Source"]
-        Assert-M006PathCell -Row $row -RequirementId $requirementId -CellName "Test" -ExpectedValue $expected["Test"]
-        Assert-M006PathCell -Row $row -RequirementId $requirementId -CellName "Code" -ExpectedValue $expected["Code"]
+        Assert-M007PathCell -Row $row -RequirementId $requirementId -CellName "Source" -ExpectedValue $expected["Source"]
+        Assert-M007PathCell -Row $row -RequirementId $requirementId -CellName "Test" -ExpectedValue $expected["Test"]
+        Assert-M007PathCell -Row $row -RequirementId $requirementId -CellName "Code" -ExpectedValue $expected["Code"]
 
         Assert-Condition `
             -Condition ($commandScript -eq $expected["CommandScript"]) `

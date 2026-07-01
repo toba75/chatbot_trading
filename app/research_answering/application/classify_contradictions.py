@@ -32,13 +32,13 @@ _CONTRADICTION_POLICY_VERSION = "contradiction-classification-m007-v1"
 
 
 class ResearchCaseRepository(Protocol):
-    """Port RA de mise a jour du ResearchCase."""
+    """Port RA de mise à jour du ResearchCase."""
 
     def case_for_id(self, research_case_id: str) -> ResearchCase:
         """Retourne un cas de recherche existant."""
 
     def update(self, research_case: ResearchCase) -> ResearchCase:
-        """Remplace le cas de recherche par sa nouvelle version metier."""
+        """Remplace le cas de recherche par sa nouvelle version métier."""
 
 
 @dataclass(frozen=True)

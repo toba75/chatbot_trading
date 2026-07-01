@@ -276,6 +276,17 @@ for forbidden_field in (
     assert_equal(forbidden.status_code, 400, f"{forbidden_field} doit être refusé.")
     assert_equal(forbidden.body, {"error_code": "HTTP_REQUEST_INVALID", "field": "body"}, f"{forbidden_field} ne doit pas atteindre RA.")
 
+forbidden_mandate = valid_body()
+forbidden_mandate["research_mandate"] = mandate_payload()
+forbidden_mandate["research_mandate"]["conversation_history"] = ("message précédent",)
+forbidden_mandate_response = post(adapter, forbidden_mandate)
+assert_equal(forbidden_mandate_response.status_code, 400, "Un champ interdit du mandat ne doit pas être requalifié en mandat absent.")
+assert_equal(
+    forbidden_mandate_response.body,
+    {"error_code": "HTTP_REQUEST_INVALID", "field": "body"},
+    "Un mandat invalide doit conserver un diagnostic de requête générique.",
+)
+
 unauthorized_handler = RecordingAnswerQuestionHandler()
 unauthorized = post(AnswerHttpAdapter(answer_question_handler=unauthorized_handler), context="KA")
 assert_equal(unauthorized.status_code, 403, "Un contexte non autorisé doit être refusé.")
