@@ -13,3 +13,6 @@
 - Scénario BDD: Given M-007 est présent dans `master`; When les gates de précondition M-008 sont exécutées sur une branche M-008; Then M-008 ne peut commencer que si les validateurs amont acceptent explicitement la branche aval et si `test`, `lint`, traçabilité, ADR et frontières d'architecture sont GREEN.
 - Vérification initiale: `git fetch origin --prune` GREEN; `git ls-tree -r --name-only master -- docs/tasks/milestone_007 docs/specs/m007_reponse_documentaire_verifiee.md scripts tests/m007` GREEN; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1` RED sur `tests/m003/validate_m003_precondition_acceptance.ps1`, car la branche M-008 courante n'est pas encore autorisée par les validateurs amont.
 - ADR: non requise. La tâche n'introduit pas une nouvelle politique durable; elle applique la politique existante de précondition explicite au jalon aval M-008.
+- RED: `a148e192 test(m008): couvrir la precondition green conversation`.
+- GREEN: `tests/m008/validate_m008_precondition_unit.ps1` GREEN; `tests/m008/validate_m008_precondition_acceptance.ps1` GREEN; `scripts/validate_m008_precondition.ps1 -Path .\docs\governance\m008_precondition_green.md` GREEN avec `Gate test GREEN: 16 validation(s), 150 test(s).` et `Gate lint GREEN: 16 validation(s), 0 test(s).`
+- Rapport produit: `docs/governance/m008_precondition_green.md`.

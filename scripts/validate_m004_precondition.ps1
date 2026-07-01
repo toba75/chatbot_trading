@@ -11,7 +11,8 @@ $allowedBranches = @(
     "codex/milestone-m004-version-canonique-publiee",
     "codex/milestone-m005-projection-connaissance",
     "codex/milestone-m006-claims-verifiables",
-    "codex/milestone-m007-reponse-documentaire-verifiee"
+    "codex/milestone-m007-reponse-documentaire-verifiee",
+    "codex/milestone-m008-conversation-produit"
 )
 $requiredMilestonePaths = @(
     "docs/tasks/milestone_000",

@@ -8,6 +8,7 @@ $postMergeBranch = "codex/milestone-m004-version-canonique-publiee"
 $postMergeM005Branch = "codex/milestone-m005-projection-connaissance"
 $postMergeM006Branch = "codex/milestone-m006-claims-verifiables"
 $postMergeM007Branch = "codex/milestone-m007-reponse-documentaire-verifiee"
+$postMergeM008Branch = "codex/milestone-m008-conversation-produit"
 
 function New-ScriptFile {
     param(
@@ -280,6 +281,15 @@ try {
         -Output $postMergeM007BranchResult.Output `
         -Expected "Branche M-003 autorisée post-merge: $postMergeM007Branch" `
         -Message "La branche M-007 autorisée doit être nommée explicitement."
+
+    $postMergeM008BranchRoot = New-TemporaryProject -Name "post-merge-m008-branch" -TestGateContent $greenTestGate -LintGateContent $greenLintGate -IncludeMilestone002 $true
+    Initialize-ProjectWithMasterAndBranch -ProjectRoot $postMergeM008BranchRoot -DivergeMasterReference $false -BranchName $postMergeM008Branch
+    $postMergeM008BranchResult = Invoke-Validator -ProjectRoot $postMergeM008BranchRoot
+    Assert-ExitCode -Actual $postMergeM008BranchResult.ExitCode -Expected 0 -Message "La précondition M-003 doit autoriser explicitement la branche M-008 après merge."
+    Assert-OutputContains `
+        -Output $postMergeM008BranchResult.Output `
+        -Expected "Branche M-003 autorisée post-merge: $postMergeM008Branch" `
+        -Message "La branche M-008 autorisée doit être nommée explicitement."
 
     $missingMilestoneRoot = New-TemporaryProject -Name "missing-milestone" -TestGateContent $greenTestGate -LintGateContent $greenLintGate -IncludeMilestone002 $false
     Initialize-ProjectWithMasterAndBranch -ProjectRoot $missingMilestoneRoot -DivergeMasterReference $false
