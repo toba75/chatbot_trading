@@ -36,6 +36,8 @@ $m008SpecificationAcceptancePath = "tests/m008/validate_m008_specification_accep
 $m008SpecificationUnitPath = "tests/m008/validate_m008_specification_unit.ps1"
 $m008ConversationTurnAcceptancePath = "tests/m008/validate_conversation_turn_append_only_acceptance.ps1"
 $m008ConversationTurnUnitPath = "tests/m008/validate_conversation_turn_append_only_unit.ps1"
+$m008ContextSnapshotAcceptancePath = "tests/m008/validate_conversation_context_snapshot_acceptance.ps1"
+$m008ContextSnapshotUnitPath = "tests/m008/validate_conversation_context_snapshot_unit.ps1"
 
 $validationCommands = @(
     @{ Path = "scripts/validate_m000_precondition_report.ps1"; Arguments = @("-Path", $preconditionReportPath) },
@@ -218,7 +220,9 @@ $testCommands = @(
     @{ Path = "tests/m008/validate_m008_specification_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/m008/validate_m008_specification_unit.ps1"; Arguments = @() },
     @{ Path = "tests/m008/validate_conversation_turn_append_only_acceptance.ps1"; Arguments = @() },
-    @{ Path = "tests/m008/validate_conversation_turn_append_only_unit.ps1"; Arguments = @() }
+    @{ Path = "tests/m008/validate_conversation_turn_append_only_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m008/validate_conversation_context_snapshot_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m008/validate_conversation_context_snapshot_unit.ps1"; Arguments = @() }
 )
 
 function Get-GateCommandPaths {
@@ -252,7 +256,9 @@ if ($env:OST_M003_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m008SpecificationAcceptancePath,
         $m008SpecificationUnitPath,
         $m008ConversationTurnAcceptancePath,
-        $m008ConversationTurnUnitPath
+        $m008ConversationTurnUnitPath,
+        $m008ContextSnapshotAcceptancePath,
+        $m008ContextSnapshotUnitPath
     )
 }
 elseif ($env:OST_M004_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -274,7 +280,9 @@ elseif ($env:OST_M004_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m008SpecificationAcceptancePath,
         $m008SpecificationUnitPath,
         $m008ConversationTurnAcceptancePath,
-        $m008ConversationTurnUnitPath
+        $m008ConversationTurnUnitPath,
+        $m008ContextSnapshotAcceptancePath,
+        $m008ContextSnapshotUnitPath
     )
 }
 elseif ($env:OST_M005_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -297,7 +305,9 @@ elseif ($env:OST_M005_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m008SpecificationAcceptancePath,
         $m008SpecificationUnitPath,
         $m008ConversationTurnAcceptancePath,
-        $m008ConversationTurnUnitPath
+        $m008ConversationTurnUnitPath,
+        $m008ContextSnapshotAcceptancePath,
+        $m008ContextSnapshotUnitPath
     )
 }
 elseif ($env:OST_M006_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -319,7 +329,9 @@ elseif ($env:OST_M006_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m008SpecificationAcceptancePath,
         $m008SpecificationUnitPath,
         $m008ConversationTurnAcceptancePath,
-        $m008ConversationTurnUnitPath
+        $m008ConversationTurnUnitPath,
+        $m008ContextSnapshotAcceptancePath,
+        $m008ContextSnapshotUnitPath
     )
 }
 elseif ($env:OST_M007_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -340,7 +352,9 @@ elseif ($env:OST_M007_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m008SpecificationAcceptancePath,
         $m008SpecificationUnitPath,
         $m008ConversationTurnAcceptancePath,
-        $m008ConversationTurnUnitPath
+        $m008ConversationTurnUnitPath,
+        $m008ContextSnapshotAcceptancePath,
+        $m008ContextSnapshotUnitPath
     )
 }
 elseif ($env:OST_M008_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
