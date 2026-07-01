@@ -638,6 +638,17 @@ $requiredM007Requirements = @(
     }
 )
 
+$requiredM008Requirements = @(
+    [ordered] @{
+        Id = "REQ-M008-002"
+        Source = "docs/tasks/milestone_008/0002_publier_specification_conversation_produit.md"
+        Test = "tests/m008/validate_m008_specification_acceptance.ps1"
+        CommandScript = "scripts/validate_m008_specification.ps1"
+        Code = "docs/specs/m008_conversation_produit.md"
+        Adr = "ADR-010; DDD-ADR-001; DDD-ADR-002; DDD-ADR-003; DDD-ADR-007; DDD-ADR-008"
+    }
+)
+
 function Assert-Condition {
     param(
         [Parameter(Mandatory = $true)]
@@ -1410,6 +1421,28 @@ function Assert-M007PathCell {
         -Message "$CellName M-007 invalide pour ${RequirementId}. Attendu: $ExpectedValue. Obtenu: $actualValue"
 }
 
+function Assert-M008PathCell {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object] $Row,
+
+        [Parameter(Mandatory = $true)]
+        [string] $RequirementId,
+
+        [Parameter(Mandatory = $true)]
+        [string] $CellName,
+
+        [Parameter(Mandatory = $true)]
+        [string] $ExpectedValue
+    )
+
+    $actualValue = Convert-ToMatrixRelativePathCell -RelativePath (Get-MatrixRowCell -Row $Row -CellName $CellName -RequirementId $RequirementId)
+
+    Assert-Condition `
+        -Condition ($actualValue -eq $ExpectedValue) `
+        -Message "$CellName M-008 invalide pour ${RequirementId}. Attendu: $ExpectedValue. Obtenu: $actualValue"
+}
+
 function Test-M006MilestoneIsPresent {
     $milestoneDir = Join-Path $repoRoot "docs/tasks/milestone_006"
     return (Test-Path -LiteralPath $milestoneDir -PathType Container)
@@ -1548,6 +1581,73 @@ function Assert-M007RequirementRows {
     }
 }
 
+function Assert-M008RequirementRows {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object[]] $Rows
+    )
+
+    $milestoneDir = Join-Path $repoRoot "docs/tasks/milestone_008"
+    if (-not (Test-Path -LiteralPath $milestoneDir -PathType Container)) {
+        return
+    }
+
+    $canonicalMatrixPath = [System.IO.Path]::GetFullPath((Join-Path $repoRoot "docs/traceability/matrix.md"))
+    $currentMatrixPath = [System.IO.Path]::GetFullPath($matrixPath)
+    if (-not $currentMatrixPath.Equals($canonicalMatrixPath, [System.StringComparison]::OrdinalIgnoreCase)) {
+        $containsM008Rows = @($Rows | Where-Object {
+            (Get-MatrixRowCell -Row $_ -CellName "Exigence" -RequirementId "ligne inconnue") -match "^REQ-M008-"
+        }).Count -gt 0
+        if (-not $containsM008Rows) {
+            Assert-Condition `
+                -Condition $AllowM000OnlyMatrix `
+                -Message "Matrice M-008 absente sans autorisation explicite."
+            return
+        }
+    }
+
+    $rowsByRequirementId = @{}
+    foreach ($row in $Rows) {
+        $requirementId = Get-MatrixRowCell -Row $row -CellName "Exigence" -RequirementId "ligne inconnue"
+        $rowsByRequirementId[$requirementId] = $row
+    }
+
+    foreach ($expected in $requiredM008Requirements) {
+        $requirementId = $expected["Id"]
+
+        Assert-Condition `
+            -Condition ($rowsByRequirementId.ContainsKey($requirementId)) `
+            -Message "Exigence M-008 livrée absente: $requirementId"
+
+        $row = $rowsByRequirementId[$requirementId]
+        $status = Get-MatrixRowCell -Row $row -CellName "Statut" -RequirementId $requirementId
+
+        Assert-Condition `
+            -Condition ($status -eq "Couvert") `
+            -Message "Exigence M-008 livrée non couverte: $requirementId"
+
+        $commandScript = Get-MatrixRowCell -Row $row -CellName "CommandeScript" -RequirementId $requirementId
+
+        Assert-M008PathCell -Row $row -RequirementId $requirementId -CellName "Source" -ExpectedValue $expected["Source"]
+        Assert-M008PathCell -Row $row -RequirementId $requirementId -CellName "Test" -ExpectedValue $expected["Test"]
+        Assert-M008PathCell -Row $row -RequirementId $requirementId -CellName "Code" -ExpectedValue $expected["Code"]
+
+        Assert-Condition `
+            -Condition ($commandScript -eq $expected["CommandScript"]) `
+            -Message "Commande M-008 invalide pour ${requirementId}. Attendu: $($expected["CommandScript"]). Obtenu: $commandScript"
+
+        $adr = Get-MatrixRowCell -Row $row -CellName "ADR" -RequirementId $requirementId
+        Assert-Condition `
+            -Condition ($adr -eq $expected["Adr"]) `
+            -Message "ADR M-008 invalide pour ${requirementId}. Attendu: $($expected["Adr"]). Obtenu: $adr"
+
+        $justification = Get-MatrixRowCell -Row $row -CellName "Justification ADR" -RequirementId $requirementId
+        Assert-Condition `
+            -Condition ($justification -match "^Décision structurante documentée:") `
+            -Message "Justification ADR M-008 invalide pour ${requirementId}: $justification"
+    }
+}
+
 if (-not $PSBoundParameters.ContainsKey("Path")) {
     $matrixPath = Join-Path $repoRoot "docs/traceability/matrix.md"
 }
@@ -1674,5 +1774,6 @@ Assert-M004RequirementRows -Rows $rows.ToArray()
 Assert-M005RequirementRows -Rows $rows.ToArray()
 Assert-M006RequirementRows -Rows $rows.ToArray()
 Assert-M007RequirementRows -Rows $rows.ToArray()
+Assert-M008RequirementRows -Rows $rows.ToArray()
 
 Write-Host "Matrice de $traceabilityLabel valide: $($rows.Count) exigence(s) contr$([char] 0x00F4)l$($eAcute)e(s)."

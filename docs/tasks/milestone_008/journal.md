@@ -16,3 +16,11 @@
 - RED: `a148e192 test(m008): couvrir la precondition green conversation`.
 - GREEN: `tests/m008/validate_m008_precondition_unit.ps1` GREEN; `tests/m008/validate_m008_precondition_acceptance.ps1` GREEN; `scripts/validate_m008_precondition.ps1 -Path .\docs\governance\m008_precondition_green.md` GREEN avec `Gate test GREEN: 16 validation(s), 150 test(s).` et `Gate lint GREEN: 16 validation(s), 0 test(s).`
 - Rapport produit: `docs/governance/m008_precondition_green.md`.
+
+## T-002 - Publier la spécification de conversation produit
+
+- Scénario BDD: Given la mission M-008 est de permettre une conversation suivie sans preuve historique implicite; When la spécification de conversation produit est publiée; Then chaque comportement CV nomme son invariant, son scénario BDD, son test RED, ses ADR applicables et sa commande de validation.
+- ADR: non requise. La spécification M-008 applique ADR-010, DDD-ADR-001, DDD-ADR-002, DDD-ADR-003, DDD-ADR-007 et DDD-ADR-008 sans modifier leur sens.
+- RED: `7293b1f3 test(m008): couvrir la specification conversation produit`.
+- GREEN: `tests/m008/validate_m008_specification_acceptance.ps1` GREEN; `tests/m008/validate_m008_specification_unit.ps1` GREEN; `scripts/validate_m008_specification.ps1` GREEN; `scripts/validate_traceability.ps1` GREEN avec `84 exigence(s) contrôlée(s)`; `scripts/lint.ps1` GREEN avec `17 validation(s), 0 test(s)`; `scripts/test.ps1` GREEN après relance longue avec `17 validation(s), 158 test(s)`.
+- Garde-fous explicités: historique conversationnel non probant, revalidation RA obligatoire des assertions historiques sans `VerifiedAnswerVersion`, DTO public RA distinct de `VerifiedResearchOutcome`, absence de fallback de mode et archivage CV sans cascade hors CV.
