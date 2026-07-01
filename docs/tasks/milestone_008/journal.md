@@ -68,3 +68,12 @@
 - GREEN ciblé: `tests/m008/validate_verified_result_reuse_acceptance.ps1` GREEN; `tests/m008/validate_verified_answer_attachment_unit.ps1` GREEN; `scripts/validate_architecture_boundaries.ps1 -AppRoot .\app -ContextRegistryPath .\app\context_registry.json -SpecificationPath .\docs\specs\m001_frontieres_ddd_contrats_publies.md` GREEN avec `139 fichier(s), 807 import(s) contrôlé(s)`.
 - Gates: `scripts/lint.ps1` GREEN avec `17 validation(s), 0 test(s)`; `scripts/test.ps1` GREEN avec `17 validation(s), 168 test(s)`; `git diff --check` GREEN.
 - Garde-fous implémentés: assertion historique non versionnée envoyée à RA, port `ResearchFacade` sans import d'adaptateur RA interne, rattachement unique par tour, statut RA conservé, version `ANS-*@[n]` conservée, validation structurelle de `VerifiedResearchOutcome` sans enrichissement par `answer_text` ou `citations`.
+
+## T-008 - Présenter citations et statuts dans la réponse produit
+
+- Scénario BDD: Given un tour assistant référence une réponse RA `PARTIALLY_SUPPORTED` avec une citation et une lacune; When la réponse produit du tour est construite; Then le statut, la citation ouvrable et la lacune sont visibles sans publier de prompt ni de stockage interne.
+- ADR: non requise. La tâche livre un DTO produit minimal sans fixer un design system durable ni changer le format public RA.
+- RED: `3263069e test(m008): couvrir presentation citations statuts`, avec `ModuleNotFoundError` attendu sur `app.conversation.application.present_conversation_answer`.
+- GREEN ciblé: `tests/m008/validate_chat_answer_presentation_acceptance.ps1` GREEN; `tests/m008/validate_chat_answer_presentation_unit.ps1` GREEN.
+- Gates: `scripts/lint.ps1` GREEN avec `17 validation(s), 0 test(s)`; `scripts/test.ps1` GREEN avec `17 validation(s), 170 test(s)`; `git diff --check` GREEN.
+- Garde-fous implémentés: statut RA non réinterprété, citations prises depuis le DTO public RA et vérifiées ouvrables, lacunes et conflits conservés, abstention `REQUIRES_CURRENT_DATA` non transformée, refus des fuites `prompt`, `qdrant`, `ra_storage` et des `VerifiedResearchOutcome` enrichis.
