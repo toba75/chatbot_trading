@@ -105,6 +105,7 @@ class EvidenceSearchRequest:
     research_case_id: str
     query_text: str
     coverage_obligations: Sequence[str]
+    result_limit: int
     requested_by_context: str
     occurred_at: str
 
@@ -120,6 +121,7 @@ class EvidenceSearchRequest:
             "coverage_obligations",
             _ensure_text_tuple(self.coverage_obligations, "coverage_obligations"),
         )
+        object.__setattr__(self, "result_limit", _ensure_positive_integer(self.result_limit, "result_limit"))
         object.__setattr__(
             self,
             "requested_by_context",
@@ -134,6 +136,7 @@ class CollectEvidenceCommand:
 
     research_case_id: str
     coverage_obligations: Sequence[str]
+    result_limit: int
     occurred_at: str
 
     def __post_init__(self) -> None:
@@ -147,6 +150,7 @@ class CollectEvidenceCommand:
             "coverage_obligations",
             _ensure_text_tuple(self.coverage_obligations, "coverage_obligations"),
         )
+        object.__setattr__(self, "result_limit", _ensure_positive_integer(self.result_limit, "result_limit"))
         object.__setattr__(self, "occurred_at", _ensure_utc_instant(self.occurred_at, "occurred_at"))
 
 
@@ -232,8 +236,6 @@ class CollectEvidenceHandler:
             raise ValueError("verified_claim_catalog sans verified_claims_for_evidence")
         if not callable(getattr(self.citation_resolver, "resolve", None)):
             raise ValueError("citation_resolver sans resolve")
-        _ensure_no_direct_qdrant_access(self.knowledge_search)
-        _ensure_no_direct_eg_repository_access(self.verified_claim_catalog)
 
     def collect(self, command: CollectEvidenceCommand) -> CollectEvidenceResult:
         parsed_command = _ensure_collect_command(command)
@@ -246,10 +248,14 @@ class CollectEvidenceHandler:
             research_case_id=research_case.research_case_id,
             query_text=research_case.resolved_question.text,
             coverage_obligations=parsed_command.coverage_obligations,
+            result_limit=parsed_command.result_limit,
             requested_by_context="RA",
             occurred_at=parsed_command.occurred_at,
         )
-        candidates = _ensure_candidate_evidences(self.knowledge_search.search(request))
+        candidates = _ensure_candidate_evidences(
+            self.knowledge_search.search(request),
+            result_limit=parsed_command.result_limit,
+        )
         evidence_refs = tuple(candidate.evidence_ref for candidate in candidates)
         verified_claim_refs = self.verified_claim_catalog.verified_claims_for_evidence(evidence_refs)
         evidence_set = EvidenceSet.assemble(
@@ -305,12 +311,18 @@ class CollectEvidenceHandler:
                 raise ValueError(f"coverage_obligation inconnue: {obligation}")
 
 
-def _ensure_candidate_evidences(value: Sequence[CandidateEvidence]) -> tuple[CandidateEvidence, ...]:
+def _ensure_candidate_evidences(
+    value: Sequence[CandidateEvidence],
+    *,
+    result_limit: int,
+) -> tuple[CandidateEvidence, ...]:
     if value is None or isinstance(value, str) or not isinstance(value, Sequence):
         raise ValueError("evidence_candidates invalides")
     candidates = tuple(value)
     if len(candidates) == 0:
         raise ValueError("evidence_refs absentes")
+    if len(candidates) > _ensure_positive_integer(result_limit, "result_limit"):
+        raise ValueError("evidence_candidates depassent result_limit")
     for candidate in candidates:
         if not isinstance(candidate, CandidateEvidence):
             raise ValueError("candidate_evidence invalide")
@@ -353,25 +365,6 @@ def _ensure_sealed_events(value: Sequence[EvidenceSetSealed]) -> tuple[EvidenceS
     return events
 
 
-def _ensure_no_direct_qdrant_access(port: object) -> None:
-    for name in _port_member_names(port):
-        if "qdrant" in name.lower():
-            raise ValueError("acces direct Qdrant interdit")
-
-
-def _ensure_no_direct_eg_repository_access(port: object) -> None:
-    for name in _port_member_names(port):
-        lower_name = name.lower()
-        if "repository" in lower_name or "claim_repository" in lower_name:
-            raise ValueError("acces direct repository EG interdit")
-
-
-def _port_member_names(port: object) -> tuple[str, ...]:
-    names = set(vars(port).keys())
-    names.update(name for name in dir(type(port)) if not name.startswith("__"))
-    return tuple(names)
-
-
 def _ensure_text_tuple(value: object, field_name: str) -> tuple[str, ...]:
     if value is None or isinstance(value, str) or not isinstance(value, Sequence):
         raise ValueError(f"{field_name} invalides")
@@ -398,6 +391,14 @@ def _ensure_prefixed_text(value: object, field_name: str, prefix: str) -> str:
     if not text.startswith(prefix):
         raise ValueError(f"{field_name} invalide")
     return text
+
+
+def _ensure_positive_integer(value: object, field_name: str) -> int:
+    if not isinstance(value, int):
+        raise ValueError(f"{field_name} non entier")
+    if value <= 0:
+        raise ValueError(f"{field_name} invalide")
+    return value
 
 
 def _ensure_utc_instant(value: object, field_name: str) -> str:

@@ -6,6 +6,7 @@ import threading
 from collections.abc import Sequence
 
 from app.research_answering.domain.research_case import ResearchCase
+from app.research_answering.domain.research_case import ResearchCaseStatus
 
 
 class InMemoryResearchCaseRepository:
@@ -37,6 +38,8 @@ class InMemoryResearchCaseRepository:
             if existing is None:
                 raise ValueError(f"research_case inconnu: {parsed_case.research_case_id}")
             _ensure_same_case_identity(existing, parsed_case)
+            _ensure_terminal_status_not_regressed(existing, parsed_case)
+            _ensure_event_history_extends(existing.events, parsed_case.events)
             self._cases_by_id[parsed_case.research_case_id] = parsed_case
             return parsed_case
 
@@ -84,6 +87,23 @@ def _ensure_same_case_identity(existing: ResearchCase, updated: ResearchCase) ->
         raise ValueError("requested_by_context incoherent")
     if existing.opened_at != updated.opened_at:
         raise ValueError("opened_at incoherent")
+
+
+def _ensure_event_history_extends(existing_events: tuple[object, ...], updated_events: tuple[object, ...]) -> None:
+    if len(updated_events) < len(existing_events):
+        raise ValueError("research_case version obsolete")
+    if updated_events[: len(existing_events)] != existing_events:
+        raise ValueError("research_case version obsolete")
+
+
+def _ensure_terminal_status_not_regressed(existing: ResearchCase, updated: ResearchCase) -> None:
+    terminal_statuses = {
+        ResearchCaseStatus.COMPLETED,
+        ResearchCaseStatus.INSUFFICIENT_EVIDENCE,
+        ResearchCaseStatus.CONFLICTING_EVIDENCE,
+    }
+    if existing.status in terminal_statuses and updated.status is not existing.status:
+        raise ValueError("research_case version obsolete")
 
 
 def _ensure_research_case_id(value: object) -> str:

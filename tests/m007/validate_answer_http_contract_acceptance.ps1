@@ -101,7 +101,6 @@ def outcome_payload(status):
             },
         )
     if status == "REQUIRES_CURRENT_DATA":
-        payload["claim_refs"] = ()
         payload["knowledge_gaps"] = (
             {
                 "topic": "données actuelles autorisées",
@@ -179,6 +178,7 @@ for support_status in (
     if support_status == "REQUIRES_CURRENT_DATA":
         assert_equal(response.body["abstention_reason"], "CURRENT_DATA_REQUIRED", "L'abstention doit être publique.")
         assert_equal(response.body["citations"], (), "Une abstention données actuelles ne doit pas inventer de citation.")
+        assert_true(len(response.body["claim_refs"]) > 0, "Une abstention doit conserver sa provenance documentaire.")
     else:
         assert_true(len(response.body["citations"]) > 0, "Une réponse documentaire doit exposer ses citations.")
         assert_true(

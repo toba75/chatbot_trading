@@ -50,7 +50,7 @@ Les garde-fous de mission sont explicites: aucune assertion factuelle non suppor
 | Agrégat | Responsabilité M-007 | Invariants | Événements |
 |---|---|---|---|
 | ResearchCase | Porter la question autonome, le ResearchMandate, le plan, les obligations de couverture, l'EvidenceSet et les diagnostics de recherche. | Question et mandat obligatoires; EvidenceSet scellé avant publication; lacunes et contradictions pertinentes conservées. | ResearchCaseOpened; ResearchPlanCreated; EvidenceCollectionCompleted; EvidenceSetSealed; ContradictionDetected; KnowledgeGapRecorded; ResearchEvidenceFoundInsufficient; ResearchEvidenceFoundConflicting |
-| Answer | Porter le brouillon, les AnswerAssertion, les Citation, le SupportStatus et la version finale immuable. | SUPPORTED interdit si une assertion importante conservée n'est pas supportée; Citation ouvrable obligatoire; version finale immuable. | AnswerDrafted; AnswerAssertionsExtracted; AnswerSupportEvaluated; AnswerVerified; AnswerPartiallySupported; AnswerAbstained; AnswerSuperseded |
+| Answer | Porter le brouillon, les AnswerAssertion, les Citation, le SupportStatus et la version finale immuable. | SUPPORTED interdit si une assertion importante conservée n'est pas supportée; Citation ouvrable obligatoire; version finale immuable. | AnswerDrafted; AnswerAssertionsExtracted; AnswerSupportEvaluated; AnswerVerified; AnswerPartiallySupported; AnswerPublicationBlocked; AnswerAbstained; AnswerSuperseded |
 
 ## Objets-valeur RA
 
@@ -98,9 +98,10 @@ Les garde-fous de mission sont explicites: aucune assertion factuelle non suppor
 | CONFLICTING_EVIDENCE | ResearchCase | Contradiction non résolue empêchant une réponse supportée. | Terminal pour cette version. |
 | DRAFT | Answer | Brouillon révisable non public. | Vers ASSERTIONS_EXTRACTED. |
 | ASSERTIONS_EXTRACTED | Answer | AnswerAssertion atomiques extraites. | Vers SUPPORT_EVALUATED. |
-| SUPPORT_EVALUATED | Answer | Support, citations, contradictions et lacunes décidés. | Vers VERIFIED, PARTIALLY_SUPPORTED ou REJECTED. |
+| SUPPORT_EVALUATED | Answer | Support, citations, contradictions et lacunes décidés. | Vers VERIFIED, PARTIALLY_SUPPORTED, INSUFFICIENT_EVIDENCE, CONFLICTING_EVIDENCE, ABSTAINED ou REJECTED. |
 | VERIFIED | Answer | Réponse SUPPORTED publiée en version immuable. | Vers AnswerSuperseded par nouvelle version. |
 | PARTIALLY_SUPPORTED | Answer | Réponse publiée avec qualifications explicites. | Vers AnswerSuperseded par nouvelle version. |
+| ABSTAINED | Answer | Abstention REQUIRES_CURRENT_DATA publiée avec provenance documentaire. | Terminal pour cette version ou vers AnswerSuperseded. |
 | REJECTED | Answer | Brouillon non publiable. | Terminal pour ce brouillon. |
 
 ## Ports et adaptateurs RA
@@ -134,6 +135,7 @@ Les garde-fous de mission sont explicites: aucune assertion factuelle non suppor
 | AnswerSupportEvaluated | Support documentaire décidé. | answer_id; support_status; unsupported_assertion_count; policy_version |
 | AnswerVerified | Réponse SUPPORTED publiée. | answer_id; answer_version; evidence_set_version; citation_count |
 | AnswerPartiallySupported | Réponse qualifiée publiée. | answer_id; answer_version; knowledge_gap_count; citation_count |
+| AnswerPublicationBlocked | Réponse bloquée par preuves insuffisantes ou conflit. | answer_id; answer_version; support_status; reason_code; citation_count |
 | ResearchEvidenceFoundInsufficient | Preuves insuffisantes. | research_case_id; missing_obligations; reason_codes |
 | ResearchEvidenceFoundConflicting | Conflit non résolu. | research_case_id; contradiction_ids; reason_codes |
 | AnswerAbstained | Abstention RA publiée. | answer_id; abstention_reason; support_status |
@@ -143,7 +145,7 @@ Les garde-fous de mission sont explicites: aucune assertion factuelle non suppor
 
 | Endpoint | Succès | Erreurs publiques | Corps public |
 |---|---|---|---|
-| POST /v1/answer | 200 ANSWER_PUBLISHED quand une réponse supportée, qualifiée, conflictuelle, insuffisante ou abstinente est publiée. | 400 HTTP_REQUEST_INVALID; 422 RESEARCH_MANDATE_REQUIRED; 409 EVIDENCE_SET_NOT_SEALED; 422 ANSWER_ASSERTION_UNSUPPORTED; 422 ANSWER_CITATION_UNRESOLVABLE; 409 ANSWER_CONFLICT_UNRESOLVED; 422 INSUFFICIENT_EVIDENCE; 422 CURRENT_DATA_REQUIRED; 409 ANSWER_PUBLICATION_FORBIDDEN; 422 RA_POLICY_MISSING. | schema_version; research_case_id; answer_id; support_status; answer_text; citations; claim_refs; unresolved_conflicts; knowledge_gaps; abstention_reason; completed_at. |
+| POST /v1/answer | 200 ANSWER_PUBLISHED quand une réponse supportée, qualifiée, conflictuelle, insuffisante ou abstinente est publiée. | 400 HTTP_REQUEST_INVALID; 403 ANSWER_CONTEXT_FORBIDDEN; 404 ENDPOINT_NOT_FOUND; 422 RESEARCH_MANDATE_REQUIRED; 409 EVIDENCE_SET_NOT_SEALED; 422 ANSWER_ASSERTION_UNSUPPORTED; 422 ANSWER_CITATION_UNRESOLVABLE; 409 ANSWER_CONFLICT_UNRESOLVED; 422 INSUFFICIENT_EVIDENCE; 422 CURRENT_DATA_REQUIRED; 409 ANSWER_PUBLICATION_FORBIDDEN; 422 RA_POLICY_MISSING. | schema_version; research_case_id; answer_id; support_status; answer_text; citations; claim_refs; unresolved_conflicts; knowledge_gaps; abstention_reason; completed_at. |
 
 ### Corps de requête publics
 
@@ -156,6 +158,8 @@ Les garde-fous de mission sont explicites: aucune assertion factuelle non suppor
 | Code | Statut HTTP | Sens public |
 |---|---|---|
 | HTTP_REQUEST_INVALID | 400 | Requête RA invalide. |
+| ENDPOINT_NOT_FOUND | 404 | Endpoint RA absent pour la route demandée. |
+| ANSWER_CONTEXT_FORBIDDEN | 403 | Contexte authentifié non autorisé à publier une réponse RA. |
 | RESEARCH_MANDATE_REQUIRED | 422 | Mandat de recherche absent ou incomplet. |
 | RESEARCH_CASE_NOT_FOUND | 404 | Cas de recherche inconnu ou version absente. |
 | EVIDENCE_SET_NOT_SEALED | 409 | Publication demandée avant scellement du jeu de preuves. |
@@ -186,11 +190,11 @@ Les garde-fous de mission sont explicites: aucune assertion factuelle non suppor
 | Comportement | Invariant | Scénario BDD | Test RED | ADR | Commande |
 |---|---|---|---|---|---|
 | RA-001 - Spécification exécutable M-007 | La spécification nomme mission RA, agrégats, objets-valeur, politiques, états, ports, événements, API, erreurs, métriques, exclusions et garde-fous. | Given un brouillon contenant une assertion factuelle importante; When la spécification M-007 est publiée; Then elle est validée par commande PowerShell. | T-002 | ADR-006; ADR-010; DDD-ADR-003; DDD-ADR-005; DDD-ADR-007; DDD-ADR-008 | powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m007_specification.ps1 |
-| RA-002 - Cas de recherche avec mandat explicite | Un ResearchCase possède question autonome et ResearchMandate explicite. | Given une question autonome et un mandat explicite; When RA ouvre un ResearchCase; Then le cas est CREATED avec mandat figé. | T-003 | ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_research_case_opening_acceptance.ps1 |
-| RA-003 - Jeu de preuves scellé | EvidenceSet est scellé avant publication et ne change pas après réponse publiée. | Given des preuves candidates et claims vérifiés; When RA scelle le jeu de preuves; Then la version d'EvidenceSet est figée et rattachée à l'Answer. | T-004 | DDD-ADR-003; DDD-ADR-008 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_answer_evidence_set_acceptance.ps1 |
-| RA-004 - Contradictions et lacunes classées | ContradictionAssessment et KnowledgeGap conservent portée et conditions. | Given deux claims opposés sur des horizons différents; When RA analyse les contradictions; Then la relation est qualifiée sans contradiction générale abusive. | T-005 | DDD-ADR-005 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_contradictions_gaps_acceptance.ps1 |
-| RA-005 - Assertions de réponse extraites | Toute assertion importante du brouillon est évaluée. | Given un brouillon contenant une assertion factuelle importante; When RA extrait les assertions; Then chaque AnswerAssertion est reliée à origine, support attendu ou retrait. | T-006 | DDD-ADR-005; DDD-ADR-007 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_answer_assertions_acceptance.ps1 |
-| RA-006 - Support et citations évalués | SUPPORTED exige support et Citation ouvrable pour chaque assertion importante conservée. | Given une assertion non supportée et une citation absente; When RA évalue le support; Then ANSWER_ASSERTION_UNSUPPORTED ou ANSWER_CITATION_UNRESOLVABLE bloque SUPPORTED. | T-007 | ADR-006; DDD-ADR-003; DDD-ADR-005; DDD-ADR-007 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_answer_support_citations_acceptance.ps1 |
+| RA-002 - Cas de recherche avec mandat explicite | Un ResearchCase possède question autonome et ResearchMandate explicite. | Given une question autonome et un mandat explicite; When RA ouvre un ResearchCase; Then le cas est CREATED avec mandat figé. | T-003 | ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_research_case_mandate_acceptance.ps1 |
+| RA-003 - Jeu de preuves scellé | EvidenceSet est scellé avant publication et ne change pas après réponse publiée. | Given des preuves candidates et claims vérifiés; When RA scelle le jeu de preuves; Then la version d'EvidenceSet est figée et rattachée à l'Answer. | T-004 | DDD-ADR-003; DDD-ADR-008 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_evidence_set_sealing_acceptance.ps1 |
+| RA-004 - Contradictions et lacunes classées | ContradictionAssessment et KnowledgeGap conservent portée et conditions. | Given deux claims opposés sur des horizons différents; When RA analyse les contradictions; Then la relation est qualifiée sans contradiction générale abusive. | T-005 | DDD-ADR-005 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_contradiction_gap_acceptance.ps1 |
+| RA-005 - Assertions de réponse extraites | Toute assertion importante du brouillon est évaluée. | Given un brouillon contenant une assertion factuelle importante; When RA extrait les assertions; Then chaque AnswerAssertion est reliée à origine, support attendu ou retrait. | T-006 | DDD-ADR-005; DDD-ADR-007 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_answer_assertion_extraction_acceptance.ps1 |
+| RA-006 - Support et citations évalués | SUPPORTED exige support et Citation ouvrable pour chaque assertion importante conservée. | Given une assertion non supportée et une citation absente; When RA évalue le support; Then ANSWER_ASSERTION_UNSUPPORTED ou ANSWER_CITATION_UNRESOLVABLE bloque SUPPORTED. | T-007 | ADR-006; DDD-ADR-003; DDD-ADR-005; DDD-ADR-007 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_answer_support_acceptance.ps1 |
 | RA-007 - Abstention données actuelles | Une donnée actuelle requise mais non autorisée produit abstention explicite. | Given une question nécessitant des prix récents; When aucune donnée actuelle n'est autorisée; Then REQUIRES_CURRENT_DATA est publié sans niveau de marché fabriqué. | T-008 | DDD-ADR-007 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_current_data_abstention_acceptance.ps1 |
 | RA-008 - Commande publique de réponse documentaire | POST /v1/answer expose le contrat RA sans stockage interne ni prompt public. | Given un ResearchMandate valide; When POST /v1/answer est appelé; Then la réponse publique contient VerifiedResearchOutcome, SupportStatus, citations, conflits et lacunes. | T-009 | ADR-010; DDD-ADR-003; DDD-ADR-005 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_answer_http_contract_acceptance.ps1 |
 | RA-009 - Traçabilité et métriques M-007 | Chaque exigence M-007 possède test, commande, ADR et métrique sans payload documentaire complet. | Given les preuves M-007; When les gates s'exécutent; Then traceability, test, lint et validate_m007_specification sont enrôlés. | T-010 | ADR-006; ADR-010; DDD-ADR-005; DDD-ADR-008 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_m007_traceability_acceptance.ps1 |

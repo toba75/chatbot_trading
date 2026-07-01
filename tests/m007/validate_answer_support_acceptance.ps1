@@ -232,6 +232,7 @@ def sealed_case_with_claim():
         CollectEvidenceCommand(
             research_case_id=opened.research_case_id,
             coverage_obligations=("preuves_documentaires",),
+            result_limit=2,
             occurred_at="2026-06-30T15:15:00Z",
         )
     )

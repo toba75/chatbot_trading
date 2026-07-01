@@ -64,6 +64,7 @@ from app.research_answering.domain.contradiction_assessment import (
 from app.research_answering.domain.research_planning import (
     LocalDeterministicResearchPlanningPolicy,
 )
+from app.research_answering.domain.research_case import ResearchCaseStatus
 
 
 SOURCE_HASH = "5" * 64
@@ -265,6 +266,7 @@ def prepared_repositories(answer_content, *, claim_ids=(SUPPORTED_CLAIM_ID,)):
         CollectEvidenceCommand(
             research_case_id=opened.research_case_id,
             coverage_obligations=("preuves_documentaires",),
+            result_limit=2,
             occurred_at="2026-06-30T16:15:00Z",
         )
     )
@@ -340,6 +342,15 @@ def blocking_conflict_case(research_case):
     )
 
 
+def insufficient_evidence_case(research_case):
+    updated_case, _, _ = research_case.declare_insufficient_evidence(
+        missing_obligations=("preuves_documentaires",),
+        reason_codes=("ANSWER_ASSERTION_UNSUPPORTED",),
+        occurred_at="2026-06-30T16:20:00Z",
+    )
+    return updated_case
+
+
 supported_content = f"[source:{SUPPORTED_CLAIM_ID}] La couverture de queue réduit le drawdown maximal."
 unsupported_content = (
     f"[source:{SUPPORTED_CLAIM_ID}] La couverture de queue réduit le drawdown maximal.\n"
@@ -369,9 +380,37 @@ assert_raises(
 )
 
 # Un conflit direct non résolu n'est pas masqué par un statut global optimiste.
-assert_raises(
-    "ANSWER_CONFLICT_UNRESOLVED",
-    lambda: evaluate(supported_content, research_case_mutator=blocking_conflict_case),
+conflicting = evaluate(supported_content, research_case_mutator=blocking_conflict_case)
+assert_equal(
+    conflicting.support_status,
+    SupportStatus.CONFLICTING_EVIDENCE,
+    "Le conflit direct doit publier CONFLICTING_EVIDENCE.",
+)
+assert_equal(
+    conflicting.answer.status,
+    AnswerStatus.CONFLICTING_EVIDENCE,
+    "L'Answer doit porter le statut bloquant publié.",
+)
+assert_equal(
+    tuple(event.event_type for event in conflicting.events),
+    ("AnswerSupportEvaluated", "AnswerPublicationBlocked"),
+    "La publication conflictuelle doit exposer un événement bloquant.",
+)
+assert_equal(
+    len(conflicting.verified_research_outcome.unresolved_conflicts),
+    1,
+    "Le conflit non résolu doit rester visible dans le contrat public.",
+)
+
+# Une absence totale de claim supporté devient publiable seulement avec une lacune explicite.
+insufficient = evaluate(
+    f"[source:{UNSUPPORTED_CLAIM_ID}] Le portefeuille bat systématiquement le marché.",
+    research_case_mutator=insufficient_evidence_case,
+)
+assert_equal(
+    insufficient.support_status,
+    SupportStatus.INSUFFICIENT_EVIDENCE,
+    "La lacune explicite doit publier INSUFFICIENT_EVIDENCE.",
 )
 
 # Une preuve indirecte seule ne suffit pas pour SUPPORTED.
@@ -396,6 +435,35 @@ assert_raises(
     "cannot assign to field",
     lambda: setattr(supported.verified_answer_version, "answer_text", "mutation interdite"),
     accepted=(FrozenInstanceError,),
+)
+
+research_case_repository, answer_repository, research_case, answer = prepared_repositories(supported_content)
+EvaluateAnswerSupportHandler(
+    research_case_repository=research_case_repository,
+    answer_repository=answer_repository,
+    citation_resolver=OpeningCitationResolver(),
+).evaluate(
+    EvaluateAnswerSupport(
+        research_case_id=research_case.research_case_id,
+        answer_id=answer.answer_id,
+        support_policy_version="answer-support-m007-v1",
+        citation_policy_version="citation-integrity-m007-v1",
+        freshness_policy_version="answer-freshness-m007-v1",
+        occurred_at="2026-06-30T16:24:00Z",
+    )
+)
+completed_case = research_case_repository.case_for_id(research_case.research_case_id)
+assert_equal(
+    completed_case.status,
+    ResearchCaseStatus.COMPLETED,
+    "Le ResearchCase doit devenir terminal après publication.",
+)
+assert_raises(
+    "evidence_set non scelle",
+    lambda: completed_case.record_contradiction_assessments(
+        (),
+        occurred_at="2026-06-30T16:24:30Z",
+    ),
 )
 
 # Une source devenue obsolète impose revalidation ou supersession explicite.
@@ -457,9 +525,9 @@ assert_equal(
     "La référence remplaçante doit être explicite.",
 )
 
-# VerifiedResearchOutcome invalide: aucun claim supporté ne peut être projeté silencieusement.
+# Sans lacune explicite, aucun claim supporté ne peut être projeté silencieusement.
 assert_raises(
-    "VerifiedResearchOutcome invalide",
+    "INSUFFICIENT_EVIDENCE",
     lambda: evaluate(f"[source:{UNSUPPORTED_CLAIM_ID}] Le portefeuille bat systématiquement le marché."),
 )
 

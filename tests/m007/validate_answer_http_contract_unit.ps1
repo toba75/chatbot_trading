@@ -8,12 +8,16 @@ $pythonCode = @'
 import ast
 from pathlib import Path
 import sys
+from types import SimpleNamespace
 
 sys.path.insert(0, sys.argv[1])
 
 from app.contracts.research_outcomes import VerifiedResearchOutcome
 from app.research_answering.adapters.answer_http import AnswerHttpAdapter, HttpRequest
-from app.research_answering.application.answer_question import AnswerQuestionResult
+from app.research_answering.application.answer_question import (
+    AnswerQuestionResult,
+    DocumentaryAnswerWorkflow,
+)
 
 
 def assert_equal(actual, expected, message):
@@ -124,6 +128,72 @@ class RecordingAnswerQuestionHandler:
         return self.result
 
 
+class WorkflowOpenHandler:
+    def __init__(self):
+        self.commands = []
+
+    def open_and_plan(self, command):
+        self.commands.append(command)
+        return SimpleNamespace(research_case_id="RSC-M007-T009-WORKFLOW")
+
+
+class WorkflowCollectHandler:
+    def __init__(self):
+        self.collect_commands = []
+        self.seal_commands = []
+
+    def collect(self, command):
+        self.collect_commands.append(command)
+        return SimpleNamespace(evidence_set=SimpleNamespace(evidence_set_id="EVS-M007-T009-WORKFLOW"))
+
+    def seal(self, command):
+        self.seal_commands.append(command)
+        return SimpleNamespace(evidence_set=SimpleNamespace(evidence_set_id=command.evidence_set_id))
+
+
+class WorkflowDraftHandler:
+    def __init__(self):
+        self.commands = []
+
+    def draft(self, command):
+        self.commands.append(command)
+        return SimpleNamespace(answer=SimpleNamespace(answer_id="ANS-M007-T009-WORKFLOW"))
+
+
+class WorkflowExtractorHandler:
+    def __init__(self):
+        self.commands = []
+
+    def extract(self, command):
+        self.commands.append(command)
+        return SimpleNamespace(answer=SimpleNamespace(answer_id=command.answer_id))
+
+
+class WorkflowCitation:
+    def to_payload(self):
+        return citation_payload()
+
+
+class WorkflowEvaluateHandler:
+    def __init__(self):
+        self.commands = []
+
+    def evaluate(self, command):
+        self.commands.append(command)
+        return SimpleNamespace(
+            verified_answer_version=SimpleNamespace(
+                answer_text="Réponse documentaire orchestrée.",
+                citations=(WorkflowCitation(),),
+            ),
+            verified_research_outcome=VerifiedResearchOutcome.from_payload(
+                outcome_payload(
+                    research_case_id=command.research_case_id,
+                    answer_id=command.answer_id,
+                )
+            ),
+        )
+
+
 def post(adapter, body=None, *, method="POST", path="/v1/answer", context="API"):
     return adapter.handle(
         HttpRequest(
@@ -141,6 +211,31 @@ accepted = post(adapter)
 assert_equal(accepted.status_code, 200, "Une requête valide doit être publiée.")
 assert_equal(len(handler.commands), 1, "L'adaptateur doit déléguer exactement une commande RA.")
 assert_equal(handler.commands[0].idempotency_key, "answer-http-m007-t009-unit", "La clé d'idempotence doit être obligatoire.")
+
+workflow_open = WorkflowOpenHandler()
+workflow_collect = WorkflowCollectHandler()
+workflow_draft = WorkflowDraftHandler()
+workflow_extract = WorkflowExtractorHandler()
+workflow_evaluate = WorkflowEvaluateHandler()
+workflow = DocumentaryAnswerWorkflow(
+    open_research_case_handler=workflow_open,
+    collect_evidence_handler=workflow_collect,
+    draft_answer_handler=workflow_draft,
+    extract_answer_assertions_handler=workflow_extract,
+    evaluate_answer_support_handler=workflow_evaluate,
+    coverage_obligations=("preuves_documentaires",),
+    evidence_result_limit=3,
+    support_policy_version="answer-support-m007-v1",
+    citation_policy_version="citation-integrity-m007-v1",
+    freshness_policy_version="answer-freshness-m007-v1",
+)
+workflow_result = workflow.answer(handler.commands[0])
+assert_equal(workflow_result.to_public_payload()["support_status"], "SUPPORTED", "Le workflow concret doit retourner un résultat public RA.")
+assert_equal(workflow_collect.collect_commands[0].result_limit, 3, "Le workflow doit transmettre la limite de collecte.")
+assert_equal(workflow_collect.seal_commands[0].evidence_set_id, "EVS-M007-T009-WORKFLOW", "Le workflow doit sceller le jeu collecté.")
+assert_equal(workflow_draft.commands[0].evidence_set_id, "EVS-M007-T009-WORKFLOW", "Le workflow doit rédiger depuis le jeu scellé.")
+assert_equal(workflow_extract.commands[0].answer_id, "ANS-M007-T009-WORKFLOW", "Le workflow doit extraire les assertions de l'Answer rédigé.")
+assert_equal(workflow_evaluate.commands[0].support_policy_version, "answer-support-m007-v1", "Le workflow doit transmettre la politique de support.")
 
 wrong_method = post(adapter, method="GET")
 assert_equal(wrong_method.status_code, 404, "Une méthode invalide ne doit pas appeler RA.")
@@ -205,6 +300,41 @@ not_sealed = post(
 assert_equal(not_sealed.status_code, 409, "EVIDENCE_SET_NOT_SEALED doit retourner 409.")
 assert_equal(not_sealed.body, {"error_code": "EVIDENCE_SET_NOT_SEALED"}, "L'erreur de scellement doit rester stable.")
 
+for error_code, expected_status in (
+    ("RESEARCH_MANDATE_REQUIRED", 422),
+    ("EVIDENCE_SET_NOT_SEALED", 409),
+    ("ANSWER_ASSERTION_UNSUPPORTED", 422),
+    ("ANSWER_CITATION_UNRESOLVABLE", 422),
+    ("ANSWER_CONFLICT_UNRESOLVED", 409),
+    ("INSUFFICIENT_EVIDENCE", 422),
+    ("CURRENT_DATA_REQUIRED", 422),
+    ("ANSWER_PUBLICATION_FORBIDDEN", 409),
+    ("RA_POLICY_MISSING", 422),
+):
+    response = post(
+        AnswerHttpAdapter(
+            answer_question_handler=RecordingAnswerQuestionHandler(
+                error=ValueError(f"{error_code}: détail public"),
+            )
+        ),
+    )
+    assert_equal(response.status_code, expected_status, f"{error_code} doit mapper vers le statut HTTP attendu.")
+    assert_equal(response.body, {"error_code": error_code}, f"{error_code} doit rester un code public exact.")
+
+unknown_with_marker = post(
+    AnswerHttpAdapter(
+        answer_question_handler=RecordingAnswerQuestionHandler(
+            error=ValueError("wrapper ANSWER_CITATION_UNRESOLVABLE"),
+        )
+    ),
+)
+assert_equal(unknown_with_marker.status_code, 400, "Un marqueur en sous-chaîne ne doit pas être mappé.")
+assert_equal(
+    unknown_with_marker.body,
+    {"error_code": "HTTP_REQUEST_INVALID", "field": "body"},
+    "Une erreur inconnue doit rester une erreur de requête générique.",
+)
+
 public_body = accepted.body
 for forbidden_response_field in (
     "prompt",
@@ -233,10 +363,23 @@ assert_raises(
     ),
 )
 
+leaky_citation = citation_payload()
+leaky_citation["source_locator"] = dict(leaky_citation["source_locator"])
+leaky_citation["source_locator"]["qdrant_collection"] = "collection-interne"
+assert_raises(
+    ValueError,
+    "source_locator champ interdit",
+    lambda: AnswerQuestionResult(
+        verified_research_outcome=VerifiedResearchOutcome.from_payload(outcome_payload()),
+        answer_text="Réponse avec locator interne.",
+        citations=(leaky_citation,),
+        abstention_reason=None,
+    ),
+)
+
 abstention_outcome = VerifiedResearchOutcome.from_payload(
     outcome_payload(
         support_status="REQUIRES_CURRENT_DATA",
-        claim_refs=(),
         knowledge_gaps=(
             {
                 "topic": "données actuelles autorisées",

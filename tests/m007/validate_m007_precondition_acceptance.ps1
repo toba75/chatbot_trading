@@ -157,4 +157,3 @@ finally {
 }
 
 Write-Host "Test d'acceptation de précondition M-007: OK"
-

@@ -226,6 +226,7 @@ collected = handler.collect(
     CollectEvidenceCommand(
         research_case_id=research_case_id,
         coverage_obligations=("preuves_documentaires",),
+        result_limit=2,
         occurred_at="2026-06-30T09:20:00Z",
     )
 )

@@ -92,6 +92,8 @@ def source_locator_policy():
             ref.canonical_version_id: {
                 "item-m007-t004-unit-primary": CONTENT_HASH,
                 "item-m007-t004-unit-secondary": SECOND_CONTENT_HASH,
+                "item-m007-t004-unit-limit-secondary": SECOND_CONTENT_HASH,
+                "item-m007-t004-unit-limit-third": "7" * 64,
             },
         },
     )
@@ -165,8 +167,10 @@ def candidate_for(
 class FakeKnowledgeSearch:
     def __init__(self, candidates):
         self.candidates = tuple(candidates)
+        self.requests = []
 
     def search(self, request):
+        self.requests.append(request)
         return self.candidates
 
 
@@ -186,22 +190,6 @@ class OpeningCitationResolver:
 class FailingCitationResolver:
     def resolve(self, citation):
         raise ValueError("source_locator non resolvable")
-
-
-class DirectQdrantSearch:
-    def __init__(self):
-        self.qdrant_collection = "knowledge_access"
-
-    def search(self, request):
-        return ()
-
-
-class DirectEgRepositoryCatalog:
-    def __init__(self):
-        self.claim_repository = object()
-
-    def verified_claims_for_evidence(self, evidence_refs):
-        return ()
 
 
 @dataclass(frozen=True)
@@ -255,6 +243,7 @@ def collect_command(research_case_id):
     return CollectEvidenceCommand(
         research_case_id=research_case_id,
         coverage_obligations=("preuves_documentaires",),
+        result_limit=2,
         occurred_at="2026-06-30T10:20:00Z",
     )
 
@@ -299,25 +288,55 @@ assert_raises(
     ).validate((candidate_for(primary_evidence, covered_obligations=("question_autonome",)),)),
 )
 
-# Les ports techniques directs vers Qdrant ou le repository EG sont refusés au montage du handler.
-repository, research_case_id = planned_case_repository(idempotency_key="M007-T004-UNIT-QDRANT")
-assert_raises(
-    "acces direct Qdrant interdit",
-    lambda: CollectEvidenceHandler(
-        research_case_repository=repository,
-        knowledge_search=DirectQdrantSearch(),
-        verified_claim_catalog=FakeVerifiedClaimCatalog((primary_claim,)),
-        citation_resolver=OpeningCitationResolver(),
+# La limite de collecte est explicite et borne les candidats acceptés.
+repository, research_case_id = planned_case_repository(idempotency_key="M007-T004-UNIT-LIMIT")
+knowledge_search = FakeKnowledgeSearch((primary_candidate,))
+handler = CollectEvidenceHandler(
+    research_case_repository=repository,
+    knowledge_search=knowledge_search,
+    verified_claim_catalog=FakeVerifiedClaimCatalog((primary_claim,)),
+    citation_resolver=OpeningCitationResolver(),
+)
+handler.collect(collect_command(research_case_id))
+assert_equal(
+    knowledge_search.requests[0].result_limit,
+    2,
+    "La limite explicite doit etre transmise au port KA.",
+)
+
+repository, research_case_id = planned_case_repository(idempotency_key="M007-T004-UNIT-LIMIT-OVERFLOW")
+secondary_locator_for_limit = source_locator(
+    item_id="item-m007-t004-unit-limit-secondary",
+    content_hash=SECOND_CONTENT_HASH,
+)
+secondary_evidence_for_limit = evidence_ref_for(
+    secondary_locator_for_limit,
+    evidence_id="EVS-M007-T004-UNIT-LIMIT-0002",
+)
+third_locator_for_limit = source_locator(
+    item_id="item-m007-t004-unit-limit-third",
+    content_hash="7" * 64,
+)
+third_evidence_for_limit = evidence_ref_for(
+    third_locator_for_limit,
+    evidence_id="EVS-M007-T004-UNIT-LIMIT-0003",
+)
+overflow_handler = handler_for(
+    repository,
+    candidates=(
+        primary_candidate,
+        candidate_for(secondary_evidence_for_limit),
+        candidate_for(third_evidence_for_limit),
+    ),
+    claims=(
+        primary_claim,
+        verified_claim_ref_for(secondary_evidence_for_limit),
+        verified_claim_ref_for(third_evidence_for_limit),
     ),
 )
 assert_raises(
-    "acces direct repository EG interdit",
-    lambda: CollectEvidenceHandler(
-        research_case_repository=repository,
-        knowledge_search=FakeKnowledgeSearch((primary_candidate,)),
-        verified_claim_catalog=DirectEgRepositoryCatalog(),
-        citation_resolver=OpeningCitationResolver(),
-    ),
+    "evidence_candidates depassent result_limit",
+    lambda: overflow_handler.collect(collect_command(research_case_id)),
 )
 
 # Un claim non vérifié ne peut pas sceller un jeu de preuves.
@@ -339,7 +358,7 @@ handler = handler_for(
 )
 collected = handler.collect(collect_command(research_case_id))
 assert_raises(
-    "citation non resolvable",
+    "ANSWER_CITATION_UNRESOLVABLE",
     lambda: handler.seal(seal_command(research_case_id, collected.evidence_set.evidence_set_id)),
 )
 

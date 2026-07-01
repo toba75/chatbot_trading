@@ -12,13 +12,14 @@ from app.research_answering.domain.answer import (
     AbstentionPolicy,
     Answer,
     AnswerAbstained,
-    AnswerFreshnessPolicy,
     AnswerPartiallySupported,
+    AnswerPublicationBlocked,
     AnswerSupportEvaluated,
     AnswerSupportPolicy,
     AnswerSuperseded,
     AnswerVerified,
     CitationIntegrityPolicy,
+    CurrentDataAbstentionPolicy,
     VerifiedAnswerVersion,
 )
 from app.research_answering.domain.contradiction_assessment import SupportStatus
@@ -120,7 +121,13 @@ class EvaluateAnswerSupportResult:
     answer: Answer
     verified_answer_version: VerifiedAnswerVersion
     verified_research_outcome: VerifiedResearchOutcome
-    events: Sequence[AnswerSupportEvaluated | AnswerVerified | AnswerPartiallySupported | AnswerAbstained]
+    events: Sequence[
+        AnswerSupportEvaluated
+        | AnswerVerified
+        | AnswerPartiallySupported
+        | AnswerPublicationBlocked
+        | AnswerAbstained
+    ]
 
     def __post_init__(self) -> None:
         if not isinstance(self.support_status, SupportStatus):
@@ -180,36 +187,26 @@ class EvaluateAnswerSupportHandler:
         if research_case.evidence_set is None:
             raise ValueError("evidence_set absent")
 
-        freshness_policy = AnswerFreshnessPolicy(
+        abstention_reason = CurrentDataAbstentionPolicy(
             policy_version=parsed_command.freshness_policy_version,
-            current_support_policy_version=parsed_command.support_policy_version,
-            accepted_canonical_version_ids=tuple(
-                citation.source_locator.canonical_version_id
-                for citation in research_case.evidence_set.citations
-            ),
-        )
-        freshness_policy.ensure_fresh(
-            evidence_set=research_case.evidence_set,
-            support_policy_version=parsed_command.support_policy_version,
-        )
-        abstention_reason = freshness_policy.current_data_abstention_reason(
+        ).current_data_abstention_reason(
             question=research_case.resolved_question.text,
             mandate=research_case.research_mandate.to_payload(),
         )
         if abstention_reason is not None:
-            research_case, _, _ = research_case.record_current_data_required_gap(
+            research_case_for_publication, _, _ = research_case.record_current_data_required_gap(
                 occurred_at=parsed_command.occurred_at,
             )
-            research_case = self.research_case_repository.update(research_case)
             updated_answer, version, events = AbstentionPolicy(
                 policy_version=parsed_command.support_policy_version,
             ).abstain(
                 answer=answer,
-                research_case=research_case,
+                research_case=research_case_for_publication,
                 reason=abstention_reason,
                 occurred_at=parsed_command.occurred_at,
             )
         else:
+            research_case_for_publication = research_case
             updated_answer, version, events = AnswerSupportPolicy(
                 policy_version=parsed_command.support_policy_version,
             ).evaluate(
@@ -222,17 +219,21 @@ class EvaluateAnswerSupportHandler:
                 occurred_at=parsed_command.occurred_at,
             )
         outcome = version.to_verified_research_outcome(
-            question=research_case.resolved_question.text,
-            mandate=research_case.research_mandate.to_payload(),
+            question=research_case_for_publication.resolved_question.text,
+            mandate=research_case_for_publication.research_mandate.to_payload(),
             unresolved_conflicts=tuple(
                 assessment
-                for assessment in research_case.contradiction_assessments
+                for assessment in research_case_for_publication.contradiction_assessments
                 if assessment.blocks_publication
             ),
-            knowledge_gaps=research_case.knowledge_gaps,
+            knowledge_gaps=research_case_for_publication.knowledge_gaps,
             completed_at=parsed_command.occurred_at,
         )
         saved_answer = self.answer_repository.update(updated_answer)
+        completed_case = research_case_for_publication.complete_answer_publication(
+            support_status=version.support_status,
+        )
+        self.research_case_repository.update(completed_case)
         return EvaluateAnswerSupportResult(
             support_status=version.support_status,
             answer=saved_answer,
@@ -281,14 +282,35 @@ def _ensure_supersede_command(value: object) -> SupersedeAnswer:
 
 
 def _ensure_evaluation_events(
-    value: Sequence[AnswerSupportEvaluated | AnswerVerified | AnswerPartiallySupported | AnswerAbstained],
-) -> tuple[AnswerSupportEvaluated | AnswerVerified | AnswerPartiallySupported | AnswerAbstained, ...]:
+    value: Sequence[
+        AnswerSupportEvaluated
+        | AnswerVerified
+        | AnswerPartiallySupported
+        | AnswerPublicationBlocked
+        | AnswerAbstained
+    ],
+) -> tuple[
+    AnswerSupportEvaluated
+    | AnswerVerified
+    | AnswerPartiallySupported
+    | AnswerPublicationBlocked
+    | AnswerAbstained,
+    ...,
+]:
     if value is None or isinstance(value, str) or not isinstance(value, Sequence):
         raise ValueError("events invalides")
     events = tuple(value)
     if len(events) != 2 or not isinstance(events[0], AnswerSupportEvaluated):
         raise ValueError("events evaluation invalides")
-    if not isinstance(events[1], (AnswerVerified, AnswerPartiallySupported, AnswerAbstained)):
+    if not isinstance(
+        events[1],
+        (
+            AnswerVerified,
+            AnswerPartiallySupported,
+            AnswerPublicationBlocked,
+            AnswerAbstained,
+        ),
+    ):
         raise ValueError("event publication absent")
     return events
 

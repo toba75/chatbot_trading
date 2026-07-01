@@ -242,11 +242,22 @@ def _validation_error_response(exc: AnswerHttpRequestValidationError) -> HttpRes
 
 
 def _domain_error_response(exc: ValueError) -> HttpResponse:
-    message = str(exc)
-    for marker, (status_code, error_code) in _PUBLIC_DOMAIN_ERRORS.items():
-        if marker in message:
-            return _public_error_response(error_code, status_code)
+    error_code = _public_domain_error_code(str(exc))
+    if error_code is not None:
+        status_code, public_error_code = _PUBLIC_DOMAIN_ERRORS[error_code]
+        return _public_error_response(public_error_code, status_code)
     return _bad_request_response("body")
+
+
+def _public_domain_error_code(message: str) -> str | None:
+    normalized = message.strip()
+    if normalized in _PUBLIC_DOMAIN_ERRORS:
+        return normalized
+    for separator in (":", " "):
+        candidate = normalized.split(separator, 1)[0]
+        if candidate in _PUBLIC_DOMAIN_ERRORS:
+            return candidate
+    return None
 
 
 def _public_error_response(error_code: str, status_code: int) -> HttpResponse:

@@ -130,6 +130,7 @@ $expectedStates = @(
     "SUPPORT_EVALUATED",
     "VERIFIED",
     "PARTIALLY_SUPPORTED",
+    "ABSTAINED",
     "REJECTED"
 )
 
@@ -159,6 +160,7 @@ $expectedEvents = @(
     "AnswerSupportEvaluated",
     "AnswerVerified",
     "AnswerPartiallySupported",
+    "AnswerPublicationBlocked",
     "ResearchEvidenceFoundInsufficient",
     "ResearchEvidenceFoundConflicting",
     "AnswerAbstained",
@@ -171,6 +173,8 @@ $expectedEndpoints = @(
 
 $expectedPublicErrors = @(
     "HTTP_REQUEST_INVALID",
+    "ENDPOINT_NOT_FOUND",
+    "ANSWER_CONTEXT_FORBIDDEN",
     "RESEARCH_MANDATE_REQUIRED",
     "RESEARCH_CASE_NOT_FOUND",
     "EVIDENCE_SET_NOT_SEALED",
@@ -197,11 +201,11 @@ $expectedMetrics = @(
 
 $expectedBehaviors = @(
     @{ Name = "RA-001 - Spécification exécutable M-007"; Adr = @("ADR-006", "ADR-010", "DDD-ADR-003", "DDD-ADR-005", "DDD-ADR-007", "DDD-ADR-008"); Test = "T-002"; Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m007_specification.ps1" },
-    @{ Name = "RA-002 - Cas de recherche avec mandat explicite"; Adr = @("ADR-010"); Test = "T-003"; Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_research_case_opening_acceptance.ps1" },
-    @{ Name = "RA-003 - Jeu de preuves scellé"; Adr = @("DDD-ADR-003", "DDD-ADR-008"); Test = "T-004"; Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_answer_evidence_set_acceptance.ps1" },
-    @{ Name = "RA-004 - Contradictions et lacunes classées"; Adr = @("DDD-ADR-005"); Test = "T-005"; Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_contradictions_gaps_acceptance.ps1" },
-    @{ Name = "RA-005 - Assertions de réponse extraites"; Adr = @("DDD-ADR-005", "DDD-ADR-007"); Test = "T-006"; Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_answer_assertions_acceptance.ps1" },
-    @{ Name = "RA-006 - Support et citations évalués"; Adr = @("ADR-006", "DDD-ADR-003", "DDD-ADR-005", "DDD-ADR-007"); Test = "T-007"; Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_answer_support_citations_acceptance.ps1" },
+    @{ Name = "RA-002 - Cas de recherche avec mandat explicite"; Adr = @("ADR-010"); Test = "T-003"; Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_research_case_mandate_acceptance.ps1" },
+    @{ Name = "RA-003 - Jeu de preuves scellé"; Adr = @("DDD-ADR-003", "DDD-ADR-008"); Test = "T-004"; Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_evidence_set_sealing_acceptance.ps1" },
+    @{ Name = "RA-004 - Contradictions et lacunes classées"; Adr = @("DDD-ADR-005"); Test = "T-005"; Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_contradiction_gap_acceptance.ps1" },
+    @{ Name = "RA-005 - Assertions de réponse extraites"; Adr = @("DDD-ADR-005", "DDD-ADR-007"); Test = "T-006"; Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_answer_assertion_extraction_acceptance.ps1" },
+    @{ Name = "RA-006 - Support et citations évalués"; Adr = @("ADR-006", "DDD-ADR-003", "DDD-ADR-005", "DDD-ADR-007"); Test = "T-007"; Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_answer_support_acceptance.ps1" },
     @{ Name = "RA-007 - Abstention données actuelles"; Adr = @("DDD-ADR-007"); Test = "T-008"; Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_current_data_abstention_acceptance.ps1" },
     @{ Name = "RA-008 - Commande publique de réponse documentaire"; Adr = @("ADR-010", "DDD-ADR-003", "DDD-ADR-005"); Test = "T-009"; Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_answer_http_contract_acceptance.ps1" },
     @{ Name = "RA-009 - Traçabilité et métriques M-007"; Adr = @("ADR-006", "ADR-010", "DDD-ADR-005", "DDD-ADR-008"); Test = "T-010"; Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_m007_traceability_acceptance.ps1" }
@@ -460,6 +464,27 @@ function Assert-M007Policies {
     }
 }
 
+function Assert-M007CommandPathExists {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $Command,
+
+        [Parameter(Mandatory = $true)]
+        [string] $BehaviorName
+    )
+
+    if ($Command -notmatch "-File\s+(\S+)") {
+        throw "Commande sans chemin -File pour $BehaviorName."
+    }
+
+    $relativePath = $Matches[1].Trim()
+    $normalizedPath = $relativePath -replace "^\.[\\/]", ""
+    $candidatePath = Join-Path $repoRoot $normalizedPath
+    if (-not (Test-Path -LiteralPath $candidatePath -PathType Leaf)) {
+        throw "Commande de validation introuvable pour ${BehaviorName}: $relativePath"
+    }
+}
+
 function Assert-M007Behaviors {
     param(
         [Parameter(Mandatory = $true)]
@@ -481,6 +506,7 @@ function Assert-M007Behaviors {
         if ($row["Commande"] -ne $expectedBehavior.Command) {
             throw "Commande invalide pour $($expectedBehavior.Name). Attendu: $($expectedBehavior.Command). Obtenu: $($row["Commande"])"
         }
+        Assert-M007CommandPathExists -Command $row["Commande"] -BehaviorName $expectedBehavior.Name
         foreach ($adrId in $expectedBehavior.Adr) {
             Assert-M007AdrToken -Content $row["ADR"] -AdrId $adrId
         }
@@ -530,7 +556,7 @@ function Assert-M007Spec {
     $aggregateRows = Read-M007MarkdownTable -Lines $lines -RequiredHeaders @("Agrégat", "Responsabilité M-007", "Invariants", "Événements") -TableName "agrégats M-007"
     $aggregateNames = @("ResearchCase", "Answer")
     $aggregatesByName = Assert-M007NamedRows -Rows $aggregateRows -NameColumn "Agrégat" -RequiredColumns @("Responsabilité M-007", "Invariants", "Événements") -ExpectedNames $aggregateNames -Label "Agrégat M-007"
-    foreach ($expectedEvent in @("AnswerVerified", "AnswerPartiallySupported", "AnswerAbstained")) {
+    foreach ($expectedEvent in @("AnswerVerified", "AnswerPartiallySupported", "AnswerPublicationBlocked", "AnswerAbstained")) {
         if (-not $aggregatesByName["Answer"]["Événements"].Contains($expectedEvent)) {
             throw "Événement Answer attendu absent: $expectedEvent"
         }
@@ -568,4 +594,3 @@ $resolvedPath = Resolve-M007SpecificationPath -InputPath $Path
 Assert-M007Spec -SpecPath $resolvedPath
 
 Write-Host "Spécification M-007 valide: $($expectedBehaviors.Count) comportement(s), $($expectedPolicies.Count) politique(s), $($expectedStates.Count) état(s) contrôlé(s)."
-

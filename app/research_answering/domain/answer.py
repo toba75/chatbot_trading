@@ -68,6 +68,8 @@ class AnswerStatus(str, Enum):
     SUPPORT_EVALUATED = "SUPPORT_EVALUATED"
     VERIFIED = "VERIFIED"
     PARTIALLY_SUPPORTED = "PARTIALLY_SUPPORTED"
+    INSUFFICIENT_EVIDENCE = "INSUFFICIENT_EVIDENCE"
+    CONFLICTING_EVIDENCE = "CONFLICTING_EVIDENCE"
     ABSTAINED = "ABSTAINED"
     REJECTED = "REJECTED"
 
@@ -571,6 +573,56 @@ class AnswerPartiallySupported:
 
 
 @dataclass(frozen=True)
+class AnswerPublicationBlocked:
+    """Événement RA de publication d'un statut documentaire bloquant."""
+
+    answer_id: str
+    answer_version: int
+    support_status: SupportStatus
+    reason_code: str
+    citation_count: int
+    occurred_at: str
+
+    @property
+    def event_type(self) -> str:
+        return "AnswerPublicationBlocked"
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "answer_id", _ensure_answer_id(self.answer_id))
+        object.__setattr__(
+            self,
+            "answer_version",
+            _ensure_positive_integer(self.answer_version, "answer_version"),
+        )
+        object.__setattr__(self, "support_status", ensure_support_status(self.support_status))
+        if self.support_status not in {
+            SupportStatus.INSUFFICIENT_EVIDENCE,
+            SupportStatus.CONFLICTING_EVIDENCE,
+        }:
+            raise ValueError("support_status non bloquant")
+        object.__setattr__(self, "reason_code", _ensure_text(self.reason_code, "reason_code"))
+        object.__setattr__(
+            self,
+            "citation_count",
+            _ensure_positive_integer(self.citation_count, "citation_count"),
+        )
+        object.__setattr__(self, "occurred_at", _ensure_utc_instant(self.occurred_at, "occurred_at"))
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "event_type": self.event_type,
+            "occurred_at": self.occurred_at,
+            "payload": {
+                "answer_id": self.answer_id,
+                "answer_version": self.answer_version,
+                "support_status": self.support_status.value,
+                "reason_code": self.reason_code,
+                "citation_count": self.citation_count,
+            },
+        }
+
+
+@dataclass(frozen=True)
 class AnswerAbstained:
     """Événement RA de publication d'une abstention explicite."""
 
@@ -717,11 +769,14 @@ class VerifiedAnswerVersion:
         if self.support_status is SupportStatus.REQUIRES_CURRENT_DATA:
             if any(decision.supported for decision in decisions):
                 raise ValueError("REQUIRES_CURRENT_DATA avec assertion supportee")
-            if len(self.claim_refs) > 0:
-                raise ValueError("claim_refs interdits pour REQUIRES_CURRENT_DATA")
             for decision in decisions:
                 if decision.reason_code != AbstentionReason.CURRENT_DATA_REQUIRED.public_error_code:
                     raise ValueError("reason_code CURRENT_DATA_REQUIRED requis")
+        if self.support_status in {
+            SupportStatus.INSUFFICIENT_EVIDENCE,
+            SupportStatus.CONFLICTING_EVIDENCE,
+        } and any(decision.supported for decision in decisions):
+            raise ValueError("support_status bloquant avec assertion supportee")
         supported_citation_ids = {
             citation_id
             for decision in decisions
@@ -746,11 +801,6 @@ class VerifiedAnswerVersion:
         knowledge_gaps: Sequence[KnowledgeGap],
         completed_at: str,
     ) -> VerifiedResearchOutcome:
-        if (
-            len(self.claim_refs) == 0
-            and self.support_status is not SupportStatus.REQUIRES_CURRENT_DATA
-        ):
-            raise ValueError("VerifiedResearchOutcome invalide: claim_refs vide")
         return VerifiedResearchOutcome.from_payload(
             {
                 "schema_version": "1.0",
@@ -814,7 +864,11 @@ class CitationIntegrityPolicy:
 
     def ensure_openable(self, citations: Sequence[Citation]) -> None:
         for citation in _ensure_citation_sequence(citations, allow_empty=False):
-            if self.citation_resolver.resolve(citation) is None:
+            try:
+                resolved = self.citation_resolver.resolve(citation)
+            except ValueError as exc:
+                raise ValueError("ANSWER_CITATION_UNRESOLVABLE") from exc
+            if resolved is None:
                 raise ValueError("ANSWER_CITATION_UNRESOLVABLE")
 
 
@@ -852,6 +906,30 @@ class AnswerFreshnessPolicy:
         for citation in evidence_set.citations:
             if citation.source_locator.canonical_version_id not in accepted_ids:
                 raise ValueError("ANSWER_SOURCE_OBSOLETE")
+
+    def current_data_abstention_reason(
+        self,
+        *,
+        question: str,
+        mandate: Mapping[str, Any],
+    ) -> AbstentionReason | None:
+        parsed_question = _ensure_text(question, "question")
+        parsed_mandate = _ensure_mandate_mapping(mandate)
+        if not _question_requires_current_data(parsed_question):
+            return None
+        if _mandate_authorizes_current_data(parsed_mandate):
+            return None
+        return AbstentionReason.CURRENT_DATA_REQUIRED
+
+
+@dataclass(frozen=True)
+class CurrentDataAbstentionPolicy:
+    """Politique RA d'abstention quand une question requiert une donnée actuelle."""
+
+    policy_version: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "policy_version", _ensure_text(self.policy_version, "policy_version"))
 
     def current_data_abstention_reason(
         self,
@@ -927,7 +1005,7 @@ class AbstentionPolicy:
             source_assertions=parsed_answer.assertions,
             assertion_decisions=decisions,
             citations=(),
-            claim_refs=(),
+            claim_refs=tuple(evidence_set.verified_claim_refs),
             policy_version=self.policy_version,
             published_at=occurred_at,
         )
@@ -971,7 +1049,13 @@ class AnswerSupportPolicy:
     ) -> tuple[
         "Answer",
         VerifiedAnswerVersion,
-        tuple[AnswerSupportEvaluated | AnswerVerified | AnswerPartiallySupported, ...],
+        tuple[
+            AnswerSupportEvaluated
+            | AnswerVerified
+            | AnswerPartiallySupported
+            | AnswerPublicationBlocked,
+            ...,
+        ],
     ]:
         parsed_answer = _ensure_answer(answer)
         if parsed_answer.status is not AnswerStatus.ASSERTIONS_EXTRACTED:
@@ -985,28 +1069,57 @@ class AnswerSupportPolicy:
             raise ValueError("answer hors evidence_set")
         if parsed_answer.evidence_set_version != evidence_set.version.value:
             raise ValueError("answer evidence_set_version obsolete")
-        if any(
-            getattr(assessment, "blocks_publication", False)
-            for assessment in getattr(research_case, "contradiction_assessments", ())
-        ):
-            raise ValueError("ANSWER_CONFLICT_UNRESOLVED")
-
         citation_policy.ensure_openable(evidence_set.citations)
-        decisions = _support_decisions_for(
-            assertions=parsed_answer.assertions,
-            evidence_set=evidence_set,
+        blocking_assessments = tuple(
+            assessment
+            for assessment in getattr(research_case, "contradiction_assessments", ())
+            if getattr(assessment, "blocks_publication", False)
         )
-        unsupported_count = sum(1 for decision in decisions if not decision.supported)
-        claim_refs = _claim_refs_for_decisions(decisions)
-        if unsupported_count == 0:
-            support_status = SupportStatus.SUPPORTED
-            research_case.ensure_support_status_allowed(support_status)
+        if len(blocking_assessments) > 0:
+            support_status = SupportStatus.CONFLICTING_EVIDENCE
+            decisions = _blocking_decisions_for(
+                assertions=parsed_answer.assertions,
+                reason_code="ANSWER_CONFLICT_UNRESOLVED",
+                public_reason="Contradiction documentaire non resolue.",
+            )
+            unsupported_count = len(decisions)
+            claim_refs = tuple(evidence_set.verified_claim_refs)
+            citations = tuple(evidence_set.citations)
+            answer_text = "Réponse documentaire bloquée: contradiction non résolue."
         else:
-            if len(claim_refs) == 0:
-                raise ValueError("VerifiedResearchOutcome invalide: claim_refs vide")
-            support_status = SupportStatus.PARTIALLY_SUPPORTED
-
-        citations = _citations_for_decisions(evidence_set=evidence_set, decisions=decisions)
+            decisions = _support_decisions_for(
+                assertions=parsed_answer.assertions,
+                evidence_set=evidence_set,
+            )
+            unsupported_count = sum(1 for decision in decisions if not decision.supported)
+            claim_refs = _claim_refs_for_decisions(decisions)
+            if unsupported_count == 0:
+                support_status = SupportStatus.SUPPORTED
+                try:
+                    research_case.ensure_support_status_allowed(support_status)
+                except ValueError as exc:
+                    if "support_status SUPPORTED interdit" not in str(exc):
+                        raise
+                    support_status = SupportStatus.PARTIALLY_SUPPORTED
+                citations = _citations_for_decisions(evidence_set=evidence_set, decisions=decisions)
+                answer_text = _published_answer_text(
+                    assertions=parsed_answer.assertions,
+                    decisions=decisions,
+                )
+            elif len(claim_refs) == 0:
+                if len(getattr(research_case, "knowledge_gaps", ())) == 0:
+                    raise ValueError("INSUFFICIENT_EVIDENCE")
+                support_status = SupportStatus.INSUFFICIENT_EVIDENCE
+                claim_refs = tuple(evidence_set.verified_claim_refs)
+                citations = tuple(evidence_set.citations)
+                answer_text = "Réponse documentaire bloquée: preuves insuffisantes."
+            else:
+                support_status = SupportStatus.PARTIALLY_SUPPORTED
+                citations = _citations_for_decisions(evidence_set=evidence_set, decisions=decisions)
+                answer_text = _published_answer_text(
+                    assertions=parsed_answer.assertions,
+                    decisions=decisions,
+                )
         version = VerifiedAnswerVersion(
             answer_id=parsed_answer.answer_id,
             answer_version=1,
@@ -1015,10 +1128,7 @@ class AnswerSupportPolicy:
             evidence_set_version=parsed_answer.evidence_set_version,
             evidence_set_snapshot=evidence_set,
             support_status=support_status,
-            answer_text=_published_answer_text(
-                assertions=parsed_answer.assertions,
-                decisions=decisions,
-            ),
+            answer_text=answer_text,
             source_assertions=parsed_answer.assertions,
             assertion_decisions=decisions,
             citations=citations,
@@ -1041,11 +1151,25 @@ class AnswerSupportPolicy:
                 citation_count=len(version.citations),
                 occurred_at=occurred_at,
             )
-        else:
+        elif support_status is SupportStatus.PARTIALLY_SUPPORTED:
             published = AnswerPartiallySupported(
                 answer_id=parsed_answer.answer_id,
                 answer_version=version.answer_version,
                 knowledge_gap_count=len(getattr(research_case, "knowledge_gaps", ())),
+                citation_count=len(version.citations),
+                occurred_at=occurred_at,
+            )
+        else:
+            reason_code = (
+                "INSUFFICIENT_EVIDENCE"
+                if support_status is SupportStatus.INSUFFICIENT_EVIDENCE
+                else "ANSWER_CONFLICT_UNRESOLVED"
+            )
+            published = AnswerPublicationBlocked(
+                answer_id=parsed_answer.answer_id,
+                answer_version=version.answer_version,
+                support_status=support_status,
+                reason_code=reason_code,
                 citation_count=len(version.citations),
                 occurred_at=occurred_at,
             )
@@ -1076,6 +1200,7 @@ class Answer:
         | AnswerSupportEvaluated
         | AnswerVerified
         | AnswerPartiallySupported
+        | AnswerPublicationBlocked
         | AnswerAbstained
         | AnswerSuperseded
     ]
@@ -1146,7 +1271,13 @@ class Answer:
         if self.status in {AnswerStatus.DRAFT, AnswerStatus.ASSERTIONS_EXTRACTED}:
             if self.verified_answer_version is not None:
                 raise ValueError("verified_answer_version interdite avant publication")
-        if self.status in {AnswerStatus.VERIFIED, AnswerStatus.PARTIALLY_SUPPORTED, AnswerStatus.ABSTAINED}:
+        if self.status in {
+            AnswerStatus.VERIFIED,
+            AnswerStatus.PARTIALLY_SUPPORTED,
+            AnswerStatus.INSUFFICIENT_EVIDENCE,
+            AnswerStatus.CONFLICTING_EVIDENCE,
+            AnswerStatus.ABSTAINED,
+        }:
             if self.verified_answer_version is None:
                 raise ValueError("verified_answer_version absente")
             if self.verified_answer_version.answer_id != self.answer_id:
@@ -1155,6 +1286,10 @@ class Answer:
                 expected_status = SupportStatus.SUPPORTED
             elif self.status is AnswerStatus.PARTIALLY_SUPPORTED:
                 expected_status = SupportStatus.PARTIALLY_SUPPORTED
+            elif self.status is AnswerStatus.INSUFFICIENT_EVIDENCE:
+                expected_status = SupportStatus.INSUFFICIENT_EVIDENCE
+            elif self.status is AnswerStatus.CONFLICTING_EVIDENCE:
+                expected_status = SupportStatus.CONFLICTING_EVIDENCE
             else:
                 expected_status = SupportStatus.REQUIRES_CURRENT_DATA
             if self.verified_answer_version.support_status is not expected_status:
@@ -1167,6 +1302,8 @@ class Answer:
         return self.status in {
             AnswerStatus.VERIFIED,
             AnswerStatus.PARTIALLY_SUPPORTED,
+            AnswerStatus.INSUFFICIENT_EVIDENCE,
+            AnswerStatus.CONFLICTING_EVIDENCE,
             AnswerStatus.ABSTAINED,
         }
 
@@ -1218,7 +1355,13 @@ class Answer:
         self,
         *,
         verified_answer_version: VerifiedAnswerVersion,
-        events: Sequence[AnswerSupportEvaluated | AnswerVerified | AnswerPartiallySupported | AnswerAbstained],
+        events: Sequence[
+            AnswerSupportEvaluated
+            | AnswerVerified
+            | AnswerPartiallySupported
+            | AnswerPublicationBlocked
+            | AnswerAbstained
+        ],
     ) -> "Answer":
         if self.status is not AnswerStatus.ASSERTIONS_EXTRACTED:
             raise ValueError("answer non publiable")
@@ -1232,6 +1375,10 @@ class Answer:
             next_status = AnswerStatus.VERIFIED
         elif parsed_version.support_status is SupportStatus.PARTIALLY_SUPPORTED:
             next_status = AnswerStatus.PARTIALLY_SUPPORTED
+        elif parsed_version.support_status is SupportStatus.INSUFFICIENT_EVIDENCE:
+            next_status = AnswerStatus.INSUFFICIENT_EVIDENCE
+        elif parsed_version.support_status is SupportStatus.CONFLICTING_EVIDENCE:
+            next_status = AnswerStatus.CONFLICTING_EVIDENCE
         elif parsed_version.support_status is SupportStatus.REQUIRES_CURRENT_DATA:
             next_status = AnswerStatus.ABSTAINED
         else:
@@ -1347,11 +1494,7 @@ def _contains_policy_marker(values: Sequence[str], markers: Sequence[str]) -> bo
         _normalize_policy_text(_ensure_text(marker, "policy_marker"))
         for marker in markers
     )
-    return any(
-        marker in value
-        for value in normalized_values
-        for marker in normalized_markers
-    )
+    return any(value == marker for value in normalized_values for marker in normalized_markers)
 
 
 def _normalize_policy_text(value: str) -> str:
@@ -1469,7 +1612,14 @@ def _ensure_citation_sequence(
 
 def _ensure_publication_events(
     value: object,
-) -> tuple[AnswerSupportEvaluated | AnswerVerified | AnswerPartiallySupported | AnswerAbstained, ...]:
+) -> tuple[
+    AnswerSupportEvaluated
+    | AnswerVerified
+    | AnswerPartiallySupported
+    | AnswerPublicationBlocked
+    | AnswerAbstained,
+    ...,
+]:
     if value is None or isinstance(value, str) or not isinstance(value, Sequence):
         raise ValueError("events publication invalides")
     events = tuple(value)
@@ -1477,7 +1627,15 @@ def _ensure_publication_events(
         raise ValueError("events publication invalides")
     if not isinstance(events[0], AnswerSupportEvaluated):
         raise ValueError("event AnswerSupportEvaluated absent")
-    if not isinstance(events[1], (AnswerVerified, AnswerPartiallySupported, AnswerAbstained)):
+    if not isinstance(
+        events[1],
+        (
+            AnswerVerified,
+            AnswerPartiallySupported,
+            AnswerPublicationBlocked,
+            AnswerAbstained,
+        ),
+    ):
         raise ValueError("event publication absent")
     return events
 
@@ -1523,6 +1681,7 @@ def _ensure_events(
     | AnswerSupportEvaluated
     | AnswerVerified
     | AnswerPartiallySupported
+    | AnswerPublicationBlocked
     | AnswerAbstained
     | AnswerSuperseded,
     ...,
@@ -1541,6 +1700,7 @@ def _ensure_events(
                 AnswerSupportEvaluated,
                 AnswerVerified,
                 AnswerPartiallySupported,
+                AnswerPublicationBlocked,
                 AnswerAbstained,
                 AnswerSuperseded,
             ),
@@ -1620,6 +1780,26 @@ def _support_decisions_for(
             )
         )
     return tuple(decisions)
+
+
+def _blocking_decisions_for(
+    *,
+    assertions: Sequence[AnswerAssertion],
+    reason_code: str,
+    public_reason: str,
+) -> tuple[AssertionSupportDecision, ...]:
+    return tuple(
+        AssertionSupportDecision(
+            assertion_id=assertion.assertion_id,
+            basis_refs=assertion.origin.basis_refs,
+            publication_status=AssertionPublicationStatus.REMOVED,
+            reason_code=reason_code,
+            public_reason=public_reason,
+            claim_refs=(),
+            citation_ids=(),
+        )
+        for assertion in assertions
+    )
 
 
 def _support_refs_for_basis_refs(
@@ -1852,6 +2032,7 @@ __all__ = [
     "AnswerDrafted",
     "AnswerFreshnessPolicy",
     "AnswerPartiallySupported",
+    "AnswerPublicationBlocked",
     "AnswerStatus",
     "AnswerSupportEvaluated",
     "AnswerSupportPolicy",
@@ -1863,6 +2044,7 @@ __all__ = [
     "AssertionPublicationStatus",
     "AssertionSupportDecision",
     "CitationIntegrityPolicy",
+    "CurrentDataAbstentionPolicy",
     "VerifiedAnswerVersion",
     "answer_id_for",
 ]

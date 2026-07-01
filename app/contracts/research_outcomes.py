@@ -156,12 +156,6 @@ class VerifiedResearchOutcome:
             knowledge_gaps=knowledge_gaps,
         )
 
-        claim_refs = _required_claim_refs(
-            payload,
-            "claim_refs",
-            allow_empty=support_status == REQUIRES_CURRENT_DATA_STATUS,
-        )
-
         return cls(
             schema_version=str(schema_version),
             research_case_id=_required_domain_identifier(payload, "research_case_id", "RSC"),
@@ -169,7 +163,7 @@ class VerifiedResearchOutcome:
             mandate=_required_mandate(payload),
             answer_id=_required_domain_identifier(payload, "answer_id", "ANS"),
             support_status=support_status,
-            claim_refs=claim_refs,
+            claim_refs=_required_claim_refs(payload, "claim_refs"),
             unresolved_conflicts=unresolved_conflicts,
             knowledge_gaps=knowledge_gaps,
             completed_at=_required_utc_instant(payload, "completed_at"),
@@ -241,7 +235,7 @@ def _required_claim_refs(
     payload: Mapping[str, Any],
     field_name: str,
     *,
-    allow_empty: bool,
+    allow_empty: bool = False,
 ) -> tuple[VersionedClaimRef, ...]:
     if field_name not in payload:
         raise ValueError(f"{field_name} absent")

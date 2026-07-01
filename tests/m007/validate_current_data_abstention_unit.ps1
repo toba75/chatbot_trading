@@ -103,7 +103,7 @@ def requires_current_payload():
         "mandate": mandate_without_current_source(),
         "answer_id": "ANS-M007-T008-UNIT",
         "support_status": "REQUIRES_CURRENT_DATA",
-        "claim_refs": [],
+        "claim_refs": ["CLM-M007-T008-UNIT@1"],
         "unresolved_conflicts": [],
         "knowledge_gaps": [
             {
@@ -206,16 +206,24 @@ assert_equal(
     "Le contrat RA doit accepter l'abstention pour donnée actuelle.",
 )
 assert_equal(
-    tuple(outcome.claim_refs),
-    (),
-    "REQUIRES_CURRENT_DATA ne doit pas exiger de claim de marché inventé.",
+    tuple(str(claim_ref) for claim_ref in outcome.claim_refs),
+    ("CLM-M007-T008-UNIT@1",),
+    "REQUIRES_CURRENT_DATA doit conserver une provenance documentaire versionnée.",
 )
 
 partially_supported_without_claim = requires_current_payload()
 partially_supported_without_claim["support_status"] = "PARTIALLY_SUPPORTED"
+partially_supported_without_claim["claim_refs"] = []
 assert_raises(
     "claim_refs vide",
     lambda: VerifiedResearchOutcome.from_payload(partially_supported_without_claim),
+)
+
+requires_current_without_claim = requires_current_payload()
+requires_current_without_claim["claim_refs"] = []
+assert_raises(
+    "claim_refs vide",
+    lambda: VerifiedResearchOutcome.from_payload(requires_current_without_claim),
 )
 
 print("Tests unitaires T-008 abstention données actuelles M-007: OK")

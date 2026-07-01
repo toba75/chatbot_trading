@@ -72,6 +72,7 @@ class ResearchCaseStatus(str, Enum):
     EVIDENCE_SET_SEALED = "EVIDENCE_SET_SEALED"
     INSUFFICIENT_EVIDENCE = "INSUFFICIENT_EVIDENCE"
     CONFLICTING_EVIDENCE = "CONFLICTING_EVIDENCE"
+    COMPLETED = "COMPLETED"
 
 
 @dataclass(frozen=True)
@@ -385,6 +386,11 @@ class ResearchCase:
                 raise ValueError("evidence_set absent pour EVIDENCE_SET_SEALED")
             if not self.evidence_set.sealed:
                 raise ValueError("evidence_set non scelle pour EVIDENCE_SET_SEALED")
+        if self.status is ResearchCaseStatus.COMPLETED:
+            if self.research_plan is None:
+                raise ValueError("research_plan absent pour COMPLETED")
+            if self.evidence_set is None or not self.evidence_set.sealed:
+                raise ValueError("evidence_set non scelle pour COMPLETED")
         if self.status in {
             ResearchCaseStatus.CREATED,
             ResearchCaseStatus.PLANNED,
@@ -666,6 +672,27 @@ class ResearchCase:
             raise ValueError("support_status SUPPORTED interdit par contradiction documentaire")
         if len(self.knowledge_gaps) > 0:
             raise ValueError("support_status SUPPORTED interdit par lacune documentaire")
+
+    def complete_answer_publication(self, *, support_status: SupportStatus) -> "ResearchCase":
+        parsed_status = ensure_support_status(support_status)
+        if parsed_status is SupportStatus.CONFLICTING_EVIDENCE:
+            if self.status is ResearchCaseStatus.CONFLICTING_EVIDENCE:
+                return self
+            self.ensure_contradiction_assessment_allowed()
+            if not any(assessment.blocks_publication for assessment in self.contradiction_assessments):
+                raise ValueError("contradiction bloquante absente pour CONFLICTING_EVIDENCE")
+            return replace(self, status=ResearchCaseStatus.CONFLICTING_EVIDENCE)
+        if parsed_status is SupportStatus.INSUFFICIENT_EVIDENCE:
+            if self.status is ResearchCaseStatus.INSUFFICIENT_EVIDENCE:
+                return self
+            self.ensure_contradiction_assessment_allowed()
+            if len(self.knowledge_gaps) == 0:
+                raise ValueError("knowledge_gap absent pour INSUFFICIENT_EVIDENCE")
+            return replace(self, status=ResearchCaseStatus.INSUFFICIENT_EVIDENCE)
+        if self.status is ResearchCaseStatus.COMPLETED:
+            return self
+        self.ensure_contradiction_assessment_allowed()
+        return replace(self, status=ResearchCaseStatus.COMPLETED)
 
     def to_payload(self) -> dict[str, Any]:
         return {

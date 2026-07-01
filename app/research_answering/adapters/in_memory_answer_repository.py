@@ -6,6 +6,7 @@ import threading
 from collections.abc import Sequence
 
 from app.research_answering.domain.answer import Answer
+from app.research_answering.domain.answer import AnswerStatus
 
 
 class InMemoryAnswerRepository:
@@ -37,6 +38,8 @@ class InMemoryAnswerRepository:
             if existing is None:
                 raise ValueError(f"answer inconnu: {parsed_answer.answer_id}")
             _ensure_same_answer_identity(existing, parsed_answer)
+            _ensure_terminal_status_not_regressed(existing, parsed_answer)
+            _ensure_event_history_extends(existing.events, parsed_answer.events)
             self._answers_by_id[parsed_answer.answer_id] = parsed_answer
             return parsed_answer
 
@@ -84,6 +87,26 @@ def _ensure_same_answer_identity(existing: Answer, updated: Answer) -> None:
         raise ValueError("drafted_at incoherent")
     if existing.draft != updated.draft:
         raise ValueError("answer_draft incoherent")
+
+
+def _ensure_event_history_extends(existing_events: tuple[object, ...], updated_events: tuple[object, ...]) -> None:
+    if len(updated_events) < len(existing_events):
+        raise ValueError("answer version obsolete")
+    if updated_events[: len(existing_events)] != existing_events:
+        raise ValueError("answer version obsolete")
+
+
+def _ensure_terminal_status_not_regressed(existing: Answer, updated: Answer) -> None:
+    terminal_statuses = {
+        AnswerStatus.VERIFIED,
+        AnswerStatus.PARTIALLY_SUPPORTED,
+        AnswerStatus.INSUFFICIENT_EVIDENCE,
+        AnswerStatus.CONFLICTING_EVIDENCE,
+        AnswerStatus.ABSTAINED,
+        AnswerStatus.REJECTED,
+    }
+    if existing.status in terminal_statuses and updated.status is not existing.status:
+        raise ValueError("answer version obsolete")
 
 
 def _ensure_answer_id(value: object) -> str:

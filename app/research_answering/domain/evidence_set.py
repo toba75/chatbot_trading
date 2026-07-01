@@ -312,9 +312,9 @@ class EvidenceSet:
             try:
                 resolved = citation_resolver.resolve(citation)
             except ValueError as exc:
-                raise ValueError("citation non resolvable") from exc
+                raise ValueError("ANSWER_CITATION_UNRESOLVABLE") from exc
             if resolved is None:
-                raise ValueError("citation non resolvable")
+                raise ValueError("ANSWER_CITATION_UNRESOLVABLE")
         sealed_set = replace(self, sealed=True)
         event = EvidenceSetSealed(
             research_case_id=sealed_set.research_case_id,

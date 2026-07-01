@@ -50,6 +50,7 @@ from app.research_answering.domain.contradiction_assessment import SupportStatus
 from app.research_answering.domain.research_planning import (
     LocalDeterministicResearchPlanningPolicy,
 )
+from app.research_answering.domain.research_case import ResearchCaseStatus
 
 
 SOURCE_HASH = "1" * 64
@@ -228,6 +229,7 @@ def sealed_current_data_case():
         CollectEvidenceCommand(
             research_case_id=opened.research_case_id,
             coverage_obligations=("preuves_documentaires",),
+            result_limit=2,
             occurred_at="2026-06-30T17:15:00Z",
         )
     )
@@ -298,9 +300,14 @@ assert_equal(
     "Le contrat RA doit exposer REQUIRES_CURRENT_DATA.",
 )
 assert_equal(
-    tuple(evaluated.verified_research_outcome.claim_refs),
-    (),
-    "Une abstention pour donnée actuelle absente ne doit publier aucun claim de marché.",
+    tuple(str(claim_ref) for claim_ref in evaluated.verified_research_outcome.claim_refs),
+    ("CLM-M007-T008-ACCEPTANCE-STABLE@1",),
+    "Une abstention doit conserver la provenance documentaire scellée.",
+)
+assert_not_contains(
+    evaluated.verified_answer_version.answer_text,
+    "USD",
+    "Une abstention pour donnée actuelle absente ne doit publier aucune valeur de marché.",
 )
 assert_equal(
     len(evaluated.verified_research_outcome.knowledge_gaps),
@@ -332,6 +339,11 @@ assert_equal(
     "L'évaluation doit publier l'abstention RA explicite.",
 )
 recorded_case = research_case_repository.case_for_id(research_case.research_case_id)
+assert_equal(
+    recorded_case.status,
+    ResearchCaseStatus.COMPLETED,
+    "Le ResearchCase abstinent doit devenir terminal après publication.",
+)
 assert_equal(
     len(recorded_case.knowledge_gaps),
     1,

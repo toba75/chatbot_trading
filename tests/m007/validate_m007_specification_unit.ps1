@@ -165,4 +165,3 @@ finally {
 }
 
 Write-Host "Tests unitaires du validateur de spécification M-007: OK"
-
