@@ -86,3 +86,12 @@
 - GREEN ciblé: `tests/m008/validate_conversation_http_contract_acceptance.ps1` GREEN; `tests/m008/validate_conversation_http_contract_unit.ps1` GREEN.
 - Gates: `scripts/lint.ps1` GREEN avec `17 validation(s), 0 test(s)`; `scripts/test.ps1` GREEN avec `17 validation(s), 172 test(s)`; `git diff --check` GREEN.
 - Garde-fous implémentés: aucune création implicite depuis `POST /messages`, conversation absente en `CONVERSATION_NOT_FOUND`, conversation archivée en `CONVERSATION_ARCHIVED`, `idempotency_key` obligatoire, champs internes refusés, archivage CV sans cascade vers les rattachements RA.
+
+## T-010 - Exposer le contrat compatible chat completions
+
+- Scénario BDD: Given un client appelle `/v1/chat/completions` avec un `conversation_id` et un message utilisateur; When CV traite la requête compatible; Then un tour CV est créé et la réponse expose le texte assistant avec statut documentaire et citations dans les champs produit.
+- ADR: non requise. La tâche livre un adaptateur de compatibilité local sans stabiliser un contrat public OpenAI complet ni exposer vLLM comme décision durable.
+- RED: `b9ef73f0 test(m008): couvrir contrat chat completions`, avec `ModuleNotFoundError` attendu sur `app.conversation.adapters.chat_completions_http`.
+- GREEN ciblé: `tests/m008/validate_chat_completions_contract_acceptance.ps1` GREEN; `tests/m008/validate_chat_completions_contract_unit.ps1` GREEN.
+- Gates: `scripts/validate_architecture_boundaries.ps1 -AppRoot .\app -ContextRegistryPath .\app\context_registry.json -SpecificationPath .\docs\specs\m001_frontieres_ddd_contrats_publies.md` GREEN avec `142 fichier(s), 833 import(s) contrôlé(s)`; `scripts/lint.ps1` GREEN avec `17 validation(s), 0 test(s)`; `scripts/test.ps1` GREEN avec `17 validation(s), 174 test(s)`; `git diff --check` GREEN.
+- Garde-fous implémentés: conversation existante obligatoire, un seul message `user` accepté, `idempotency_key` obligatoire, champs non supportés refusés, `prompt_override` et accès LLM direct refusés, réponse impossible sans tour CV, extension `ost_product` alimentée par la présentation CV issue du DTO public RA.
