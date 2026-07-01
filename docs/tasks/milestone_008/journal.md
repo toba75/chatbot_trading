@@ -77,3 +77,12 @@
 - GREEN ciblé: `tests/m008/validate_chat_answer_presentation_acceptance.ps1` GREEN; `tests/m008/validate_chat_answer_presentation_unit.ps1` GREEN.
 - Gates: `scripts/lint.ps1` GREEN avec `17 validation(s), 0 test(s)`; `scripts/test.ps1` GREEN avec `17 validation(s), 170 test(s)`; `git diff --check` GREEN.
 - Garde-fous implémentés: statut RA non réinterprété, citations prises depuis le DTO public RA et vérifiées ouvrables, lacunes et conflits conservés, abstention `REQUIRES_CURRENT_DATA` non transformée, refus des fuites `prompt`, `qdrant`, `ra_storage` et des `VerifiedResearchOutcome` enrichis.
+
+## T-009 - Exposer les endpoints de conversation et l'archivage
+
+- Scénario BDD: Given une conversation contient un tour rattaché à une réponse vérifiée; When l'utilisateur archive la conversation; Then la conversation passe en statut archivé sans supprimer la réponse vérifiée ni les preuves référencées.
+- ADR: non requise. La tâche applique ADR-010, DDD-ADR-002 et DDD-ADR-008 sans décider de suppression physique ni de durée de rétention durable.
+- RED: `db18aac2 test(m008): couvrir contrat http conversation`, avec `ModuleNotFoundError` attendu sur `app.conversation.adapters.conversation_http`.
+- GREEN ciblé: `tests/m008/validate_conversation_http_contract_acceptance.ps1` GREEN; `tests/m008/validate_conversation_http_contract_unit.ps1` GREEN.
+- Gates: `scripts/lint.ps1` GREEN avec `17 validation(s), 0 test(s)`; `scripts/test.ps1` GREEN avec `17 validation(s), 172 test(s)`; `git diff --check` GREEN.
+- Garde-fous implémentés: aucune création implicite depuis `POST /messages`, conversation absente en `CONVERSATION_NOT_FOUND`, conversation archivée en `CONVERSATION_ARCHIVED`, `idempotency_key` obligatoire, champs internes refusés, archivage CV sans cascade vers les rattachements RA.
