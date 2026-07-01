@@ -41,3 +41,12 @@
 - GREEN ciblé: `tests/m008/validate_conversation_context_snapshot_acceptance.ps1` GREEN; `tests/m008/validate_conversation_context_snapshot_unit.ps1` GREEN.
 - Gates: `scripts/lint.ps1` GREEN avec `17 validation(s), 0 test(s)`; `scripts/test.ps1` GREEN avec `17 validation(s), 162 test(s)`; `git diff --check` GREEN.
 - Garde-fous implémentés: snapshot immuable, mandat actif obligatoire, préférences séparées des références vérifiées, assertions historiques sans `VerifiedAnswerVersion` conservées pour revalidation, clés sensibles refusées (`raw_turns`, `prompt`, `answer_text`, `document_text`) et store mémoire sans mutation silencieuse.
+
+## T-005 - Résoudre une référence de suivi en question autonome
+
+- Scénario BDD: Given une conversation portant sur le volatility targeting; When l'utilisateur écrit `compare-la maintenant à Kelly`; Then une question autonome mentionnant explicitement le volatility targeting et Kelly est produite avant tout appel à RA.
+- ADR: non requise. La tâche introduit un port `QuestionResolver` CV déterministe local, sans rendre obligatoire un modèle externe ni changer une décision structurante existante.
+- RED: `33d93245 test(m008): couvrir resolution reference suivi`, avec `ModuleNotFoundError` attendu sur `app.conversation.application.resolve_followup_question`.
+- GREEN ciblé: `tests/m008/validate_followup_question_resolution_acceptance.ps1` GREEN; `tests/m008/validate_followup_question_resolution_unit.ps1` GREEN.
+- Gates: `scripts/lint.ps1` GREEN avec `17 validation(s), 0 test(s)`; `scripts/test.ps1` GREEN avec `17 validation(s), 164 test(s)`; `git diff --check` GREEN.
+- Garde-fous implémentés: référence pronominale refusée sans antécédent unique, statut `CLARIFICATION_REQUIRED` sans payload aval en cas d'ambiguïté, question autonome avant routage, conservation du mandat actif, des documents sélectionnés et des références vérifiées, événement sans message brut.
