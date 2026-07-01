@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
@@ -163,6 +164,8 @@ def _freeze_value(value: object, field_name: str) -> Any:
     if isinstance(value, int):
         return value
     if isinstance(value, float):
+        if not math.isfinite(value):
+            raise ValueError(f"{field_name} invalide")
         return value
     if isinstance(value, Mapping):
         return _freeze_mapping(value, field_name)

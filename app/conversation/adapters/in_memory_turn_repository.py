@@ -5,6 +5,7 @@ from __future__ import annotations
 import threading
 from collections.abc import Sequence
 
+from app.contracts.identity import DomainIdentifier
 from app.conversation.domain.conversation import ConversationTurn
 
 
@@ -87,27 +88,20 @@ def _ensure_turn(value: object) -> ConversationTurn:
 
 
 def _ensure_conversation_id(value: object) -> str:
-    if not isinstance(value, str):
-        raise ValueError("conversation_id non textuel")
-    if value.strip() == "":
-        raise ValueError("conversation_id vide")
-    if value != value.strip():
-        raise ValueError("conversation_id non normalise")
-    if not value.startswith("CONV-"):
-        raise ValueError("conversation_id invalide")
-    return value
+    return _ensure_domain_identifier(value, "CONV", "conversation_id")
 
 
 def _ensure_turn_id(value: object) -> str:
+    return _ensure_domain_identifier(value, "TURN", "turn_id")
+
+
+def _ensure_domain_identifier(value: object, expected_prefix: str, field_name: str) -> str:
     if not isinstance(value, str):
-        raise ValueError("turn_id non textuel")
-    if value.strip() == "":
-        raise ValueError("turn_id vide")
-    if value != value.strip():
-        raise ValueError("turn_id non normalise")
-    if not value.startswith("TURN-"):
-        raise ValueError("turn_id invalide")
-    return value
+        raise ValueError(f"{field_name} invalide")
+    try:
+        return str(DomainIdentifier.parse_with_prefix(value, expected_prefix))
+    except ValueError as exc:
+        raise ValueError(f"{field_name} invalide: {exc}") from exc
 
 
 __all__ = ["InMemoryTurnRepository"]

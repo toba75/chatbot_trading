@@ -15,8 +15,8 @@ from app.conversation.application.answer_conversation_turn import PublicResearch
 from app.conversation.application.attach_verified_answer import (
     AttachVerifiedAnswerToTurnCommand,
     AttachVerifiedAnswerToTurnHandler,
-    InMemoryVerifiedAnswerAttachmentStore,
     VerifiedAnswerAttachment,
+    VerifiedAnswerAttachmentStore,
     VerifiedAnswerAttachedToTurn,
 )
 from app.conversation.application.resolve_followup_question import ResolvedQuestion
@@ -140,10 +140,11 @@ class ReuseVerifiedResultCommand:
 
 @dataclass(frozen=True)
 class ReuseVerifiedResultResult:
-    """Result of historical revalidation and answer attachment."""
+    """Result of historical reuse or RA revalidation."""
 
     status: str
-    attachment: VerifiedAnswerAttachment
+    attachment: VerifiedAnswerAttachment | None
+    reusable_answer_refs: tuple[str, ...]
     events: tuple[HistoricalAssertionRevalidationRequested | VerifiedAnswerAttachedToTurn, ...]
 
 
@@ -175,7 +176,7 @@ class ReuseVerifiedResultHandler:
         self,
         *,
         research_facade: ResearchFacade,
-        attachment_store: InMemoryVerifiedAnswerAttachmentStore,
+        attachment_store: VerifiedAnswerAttachmentStore,
         policy: VerifiedResultReusePolicy | None = None,
     ) -> None:
         if not callable(getattr(research_facade, "answer", None)):
@@ -193,7 +194,12 @@ class ReuseVerifiedResultHandler:
         parsed = _ensure_command(command)
         decision = self._policy.plan(parsed.historical_assertions)
         if len(decision.assertions_to_revalidate) == 0:
-            raise ValueError("revalidation RA non requise")
+            return ReuseVerifiedResultResult(
+                status="VERIFIED_RESULT_REUSED",
+                attachment=None,
+                reusable_answer_refs=decision.reusable_answer_refs,
+                events=(),
+            )
         revalidation_events = tuple(
             HistoricalAssertionRevalidationRequested(
                 conversation_id=parsed.conversation_id,
@@ -228,6 +234,7 @@ class ReuseVerifiedResultHandler:
         return ReuseVerifiedResultResult(
             status=attached.status,
             attachment=attached.attachment,
+            reusable_answer_refs=decision.reusable_answer_refs,
             events=revalidation_events + attached.events,
         )
 
