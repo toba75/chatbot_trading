@@ -44,6 +44,8 @@ $m008ModeRoutingAcceptancePath = "tests/m008/validate_conversation_mode_routing_
 $m008ModeRoutingUnitPath = "tests/m008/validate_conversation_mode_routing_unit.ps1"
 $m008VerifiedResultReuseAcceptancePath = "tests/m008/validate_verified_result_reuse_acceptance.ps1"
 $m008VerifiedAnswerAttachmentUnitPath = "tests/m008/validate_verified_answer_attachment_unit.ps1"
+$m008AnswerPresentationAcceptancePath = "tests/m008/validate_chat_answer_presentation_acceptance.ps1"
+$m008AnswerPresentationUnitPath = "tests/m008/validate_chat_answer_presentation_unit.ps1"
 
 $validationCommands = @(
     @{ Path = "scripts/validate_m000_precondition_report.ps1"; Arguments = @("-Path", $preconditionReportPath) },
@@ -234,7 +236,9 @@ $testCommands = @(
     @{ Path = "tests/m008/validate_conversation_mode_routing_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/m008/validate_conversation_mode_routing_unit.ps1"; Arguments = @() },
     @{ Path = "tests/m008/validate_verified_result_reuse_acceptance.ps1"; Arguments = @() },
-    @{ Path = "tests/m008/validate_verified_answer_attachment_unit.ps1"; Arguments = @() }
+    @{ Path = "tests/m008/validate_verified_answer_attachment_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m008/validate_chat_answer_presentation_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m008/validate_chat_answer_presentation_unit.ps1"; Arguments = @() }
 )
 
 function Get-GateCommandPaths {
@@ -276,7 +280,9 @@ if ($env:OST_M003_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m008ModeRoutingAcceptancePath,
         $m008ModeRoutingUnitPath,
         $m008VerifiedResultReuseAcceptancePath,
-        $m008VerifiedAnswerAttachmentUnitPath
+        $m008VerifiedAnswerAttachmentUnitPath,
+        $m008AnswerPresentationAcceptancePath,
+        $m008AnswerPresentationUnitPath
     )
 }
 elseif ($env:OST_M004_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -306,7 +312,9 @@ elseif ($env:OST_M004_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m008ModeRoutingAcceptancePath,
         $m008ModeRoutingUnitPath,
         $m008VerifiedResultReuseAcceptancePath,
-        $m008VerifiedAnswerAttachmentUnitPath
+        $m008VerifiedAnswerAttachmentUnitPath,
+        $m008AnswerPresentationAcceptancePath,
+        $m008AnswerPresentationUnitPath
     )
 }
 elseif ($env:OST_M005_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -337,7 +345,9 @@ elseif ($env:OST_M005_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m008ModeRoutingAcceptancePath,
         $m008ModeRoutingUnitPath,
         $m008VerifiedResultReuseAcceptancePath,
-        $m008VerifiedAnswerAttachmentUnitPath
+        $m008VerifiedAnswerAttachmentUnitPath,
+        $m008AnswerPresentationAcceptancePath,
+        $m008AnswerPresentationUnitPath
     )
 }
 elseif ($env:OST_M006_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -367,7 +377,9 @@ elseif ($env:OST_M006_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m008ModeRoutingAcceptancePath,
         $m008ModeRoutingUnitPath,
         $m008VerifiedResultReuseAcceptancePath,
-        $m008VerifiedAnswerAttachmentUnitPath
+        $m008VerifiedAnswerAttachmentUnitPath,
+        $m008AnswerPresentationAcceptancePath,
+        $m008AnswerPresentationUnitPath
     )
 }
 elseif ($env:OST_M007_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -396,7 +408,9 @@ elseif ($env:OST_M007_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m008ModeRoutingAcceptancePath,
         $m008ModeRoutingUnitPath,
         $m008VerifiedResultReuseAcceptancePath,
-        $m008VerifiedAnswerAttachmentUnitPath
+        $m008VerifiedAnswerAttachmentUnitPath,
+        $m008AnswerPresentationAcceptancePath,
+        $m008AnswerPresentationUnitPath
     )
 }
 elseif ($env:OST_M008_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
