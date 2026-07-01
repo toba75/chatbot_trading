@@ -87,7 +87,7 @@ class ResearchConflictRef:
         ensure_allowed_fields(payload, _RESEARCH_CONFLICT_REF_FIELDS, "ResearchConflictRef")
         return cls(
             summary=_required_text(payload, "summary"),
-            claim_refs=_required_claim_refs(payload, "claim_refs"),
+            claim_refs=_required_claim_refs(payload, "claim_refs", allow_empty=False),
             blocking=_required_bool(payload, "blocking"),
         )
 
@@ -234,6 +234,8 @@ def _required_mandate(payload: Mapping[str, Any]) -> dict[str, Any]:
 def _required_claim_refs(
     payload: Mapping[str, Any],
     field_name: str,
+    *,
+    allow_empty: bool = False,
 ) -> tuple[VersionedClaimRef, ...]:
     if field_name not in payload:
         raise ValueError(f"{field_name} absent")
@@ -249,7 +251,7 @@ def _required_claim_refs(
         except ValueError as exc:
             raise ValueError(f"{field_name} invalide: {exc}") from exc
 
-    if len(parsed_claim_refs) == 0:
+    if len(parsed_claim_refs) == 0 and not allow_empty:
         raise ValueError(f"{field_name} vide")
 
     return tuple(parsed_claim_refs)

@@ -1,8 +1,8 @@
-# Commandes de validation M-000 à M-004
+# Commandes de validation M-000 à M-007
 
 ## Scénario BDD
 
-- Given les artefacts de gouvernance M-000, les contrats M-001 et les spécifications M-002 à M-004 sont présents.
+- Given les artefacts de gouvernance M-000, les contrats M-001 et les spécifications M-002 à M-007 sont présents.
 - When `.\scripts\test.ps1` et `.\scripts\lint.ps1` sont exécutés.
 - Then les validateurs requis sont lancés sans omission et la gate retourne GREEN ou RED avec la commande fautive nommée.
 
@@ -32,11 +32,11 @@ Le wrapper `scripts/validate_architecture_boundaries.ps1` refuse explicitement u
 
 ## Périmètre des tests
 
-`scripts/test.ps1` exécute les validateurs M-000, les validateurs M-001, les validateurs de spécification M-002, M-003 et M-004, le validateur de topologie M-002, le validateur Compose local M-002 et le validateur de frontière réseau M-002, les tests d'acceptation et unitaires de gouvernance livrés par M-000, puis les tests d'acceptation et unitaires M-001 à M-004, dont le contrat du gateway LLM, les pannes d'inférence Spark, l'outbox idempotente, la file de jobs idempotente, l'observabilité gateway sans payload complet, la source enregistrée diagnostiquée routée, la version canonique publiée, la frontière réseau locale et les traçabilités de clôture M-002 à M-004.
+`scripts/test.ps1` exécute les validateurs M-000, les validateurs M-001, les validateurs de spécification M-002 à M-007, le validateur de topologie M-002, le validateur Compose local M-002 et le validateur de frontière réseau M-002, les tests d'acceptation et unitaires de gouvernance livrés par M-000, puis les tests d'acceptation et unitaires M-001 à M-007, dont le contrat du gateway LLM, les pannes d'inférence Spark, l'outbox idempotente, la file de jobs idempotente, l'observabilité gateway sans payload complet, la source enregistrée diagnostiquée routée, la version canonique publiée, l'index documentaire, les claims vérifiés et la réponse documentaire vérifiée, ainsi que les traçabilités de clôture M-002 à M-007.
 
 Le self-test d'acceptation `tests/governance/validate_m000_validation_commands_acceptance.ps1` reste exécuté explicitement hors `scripts/test.ps1` pour vérifier les gates sans récursion de `scripts/test.ps1` sur lui-même.
 
-`scripts/lint.ps1` exécute les validateurs M-000, M-001, M-002, M-003, M-004, Compose local et frontière réseau locale sans lancer de suite de tests.
+`scripts/lint.ps1` exécute les validateurs M-000 à M-007, Compose local et frontière réseau locale sans lancer de suite de tests.
 
 ## Validateurs requis
 
@@ -49,6 +49,9 @@ Le self-test d'acceptation `tests/governance/validate_m000_validation_commands_a
 - `scripts/validate_m002_specification.ps1`
 - `scripts/validate_m003_specification.ps1`
 - `scripts/validate_m004_specification.ps1`
+- `scripts/validate_m005_specification.ps1`
+- `scripts/validate_m006_specification.ps1`
+- `scripts/validate_m007_specification.ps1`
 - `scripts/validate_platform_topology.ps1`
 - `scripts/validate_local_compose.ps1`
 - `scripts/validate_network_boundary.ps1`
@@ -89,3 +92,21 @@ Les tests M-003 restent non récursifs hors acceptation explicite de préconditi
 M-004 ajoute la spécification de version canonique publiée, la précondition M-004, la conversion pagewise, l'autorité textuelle unique, la QA canonique, la publication immuable, la résolvabilité `SourceLocator`, l'événement `CanonicalSourcePublished`, la commande HTTP de conversion documentaire, les signaux d'audit canoniques et la traçabilité `REQ-M004-*` aux gates existantes sans changer les points d'entrée PowerShell ADR-010.
 
 Les tests M-004 restent non récursifs hors acceptation explicite de précondition: ils valident les comportements canoniques et la clôture M-004 avec des tests ciblés, tandis que `scripts/test.ps1` dérive ses chemins attendus depuis le manifeste exécuté pour éviter les listes dupliquées.
+
+## Extension M-005
+
+M-005 ajoute la recherche documentaire hybride, l'index de connaissance régénérable, les erreurs de recherche publiques et la traçabilité `REQ-M005-*` aux gates existantes sans changer les points d'entrée PowerShell ADR-010.
+
+Les tests M-005 restent non récursifs hors acceptation explicite de précondition: ils valident la recherche KA, les politiques d'index, les erreurs publiques, les métriques et la clôture M-005 avec des tests ciblés.
+
+## Extension M-006
+
+M-006 ajoute la gouvernance de claims vérifiés, les relations entre claims, les dépendances de preuves, les contrats EG et la traçabilité `REQ-M006-*` aux gates existantes sans changer les points d'entrée PowerShell ADR-010.
+
+Les tests M-006 restent non récursifs hors acceptation explicite de précondition: ils valident l'extraction, la vérification, les relations, la publication de claims et la clôture M-006 avec des tests ciblés.
+
+## Extension M-007
+
+M-007 ajoute la réponse documentaire vérifiée, le `ResearchCase`, l'`EvidenceSet` scellé, les contradictions et lacunes RA, les assertions de réponse, l'abstention pour données actuelles, `POST /v1/answer`, les métriques RA et la traçabilité `REQ-M007-*` aux gates existantes sans changer les points d'entrée PowerShell ADR-010.
+
+Les tests M-007 restent non récursifs hors acceptation explicite de précondition: ils valident la précondition, la spécification, les comportements RA, le contrat HTTP, les métriques, la traceabilité et la clôture M-007 avec des tests ciblés.

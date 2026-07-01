@@ -1,10 +1,9 @@
 ﻿$ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
-$validatorPath = Join-Path $repoRoot "scripts/validate_m006_precondition.ps1"
-$temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m006_precondition_unit_" + [System.Guid]::NewGuid().ToString("N"))
-$expectedBranch = "codex/milestone-m006-claims-verifiables"
-$postMergeM007Branch = "codex/milestone-m007-reponse-documentaire-verifiee"
+$validatorPath = Join-Path $repoRoot "scripts/validate_m007_precondition.ps1"
+$temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m007_precondition_unit_" + [System.Guid]::NewGuid().ToString("N"))
+$expectedBranch = "codex/milestone-m007-reponse-documentaire-verifiee"
 $masterBranch = "master"
 $invalidBranch = "codex/milestone-hors-contrat"
 
@@ -84,8 +83,8 @@ function Commit-TemporaryProject {
         [string] $Message
     )
 
-    Invoke-GitCommand -ProjectRoot $ProjectRoot -Arguments @("-c", "core.autocrlf=false", "-c", "user.email=m006@example.test", "-c", "user.name=M006", "add", ".")
-    Invoke-GitCommand -ProjectRoot $ProjectRoot -Arguments @("-c", "core.autocrlf=false", "-c", "user.email=m006@example.test", "-c", "user.name=M006", "commit", "-m", $Message)
+    Invoke-GitCommand -ProjectRoot $ProjectRoot -Arguments @("-c", "core.autocrlf=false", "-c", "user.email=m007@example.test", "-c", "user.name=M007", "add", ".")
+    Invoke-GitCommand -ProjectRoot $ProjectRoot -Arguments @("-c", "core.autocrlf=false", "-c", "user.email=m007@example.test", "-c", "user.name=M007", "commit", "-m", $Message)
 }
 
 function New-TemporaryProject {
@@ -102,10 +101,7 @@ function New-TemporaryProject {
         [string] $LintGateContent,
 
         [Parameter(Mandatory = $true)]
-        [bool] $IncludeM004Artifacts,
-
-        [Parameter(Mandatory = $true)]
-        [bool] $IncludeM005Artifacts
+        [bool] $IncludeM006Artifacts
     )
 
     $projectRoot = Join-Path $temporaryRoot $Name
@@ -113,19 +109,15 @@ function New-TemporaryProject {
     New-Item -ItemType Directory -Path (Join-Path $projectRoot "scripts") -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $projectRoot "docs/governance") -Force | Out-Null
 
-    Copy-Item -LiteralPath $validatorPath -Destination (Join-Path $projectRoot "scripts/validate_m006_precondition.ps1")
+    Copy-Item -LiteralPath $validatorPath -Destination (Join-Path $projectRoot "scripts/validate_m007_precondition.ps1")
     New-ScriptFile -Path (Join-Path $projectRoot "scripts/test.ps1") -Content $TestGateContent
     New-ScriptFile -Path (Join-Path $projectRoot "scripts/lint.ps1") -Content $LintGateContent
 
-    if ($IncludeM004Artifacts) {
-        New-ScriptFile -Path (Join-Path $projectRoot "docs/tasks/milestone_004/0001_verifier_precondition_green.md") -Content "# M-004"
-    }
-
-    if ($IncludeM005Artifacts) {
-        New-ScriptFile -Path (Join-Path $projectRoot "docs/tasks/milestone_005/0001_verifier_precondition_green.md") -Content "# M-005"
-        New-ScriptFile -Path (Join-Path $projectRoot "docs/specs/m005_projection_connaissance_recherchable.md") -Content "# Spécification M-005"
-        New-ScriptFile -Path (Join-Path $projectRoot "tests/m005/validate_m005_precondition_acceptance.ps1") -Content "# Test M-005"
-        New-ScriptFile -Path (Join-Path $projectRoot "docs/governance/m005_precondition_green.md") -Content "# Rapport M-005 GREEN"
+    if ($IncludeM006Artifacts) {
+        New-ScriptFile -Path (Join-Path $projectRoot "docs/tasks/milestone_006/0001_verifier_precondition_green.md") -Content "# M-006"
+        New-ScriptFile -Path (Join-Path $projectRoot "docs/specs/m006_claims_verifiables.md") -Content "# Spécification M-006"
+        New-ScriptFile -Path (Join-Path $projectRoot "tests/m006/validate_m006_precondition_acceptance.ps1") -Content "# Test M-006"
+        New-ScriptFile -Path (Join-Path $projectRoot "docs/governance/m006_precondition_green.md") -Content "# Rapport M-006 GREEN"
     }
 
     return $projectRoot
@@ -144,7 +136,7 @@ function Initialize-ProjectWithMasterAndBranch {
     )
 
     Invoke-GitCommand -ProjectRoot $ProjectRoot -Arguments @("init", "-b", "master")
-    Commit-TemporaryProject -ProjectRoot $ProjectRoot -Message "baseline m006 precondition"
+    Commit-TemporaryProject -ProjectRoot $ProjectRoot -Message "baseline m007 precondition"
     $baselineRevision = Get-GitOutput -ProjectRoot $ProjectRoot -Arguments @("rev-parse", "master")
     Invoke-GitCommand -ProjectRoot $ProjectRoot -Arguments @("update-ref", "refs/remotes/origin/master", $baselineRevision)
 
@@ -177,9 +169,9 @@ function Invoke-Validator {
         [int] $GateTimeoutSeconds
     )
 
-    $scriptPath = Join-Path $ProjectRoot "scripts/validate_m006_precondition.ps1"
+    $scriptPath = Join-Path $ProjectRoot "scripts/validate_m007_precondition.ps1"
     if ([string]::IsNullOrWhiteSpace($ReportPathOverride)) {
-        $reportPath = Join-Path $ProjectRoot "docs/governance/m006_precondition_green.md"
+        $reportPath = Join-Path $ProjectRoot "docs/governance/m007_precondition_green.md"
     }
     else {
         $reportPath = $ReportPathOverride
@@ -242,19 +234,19 @@ function Assert-OutputContains {
 }
 
 if (-not (Test-Path -LiteralPath $validatorPath -PathType Leaf)) {
-    throw "Validateur de précondition M-006 absent: scripts/validate_m006_precondition.ps1"
+    throw "Validateur de précondition M-007 absent: scripts/validate_m007_precondition.ps1"
 }
 
 $greenTestGate = @'
-Write-Host "Gate test GREEN: simulation M-006."
+Write-Host "Gate test GREEN: simulation M-007."
 '@
 
 $greenLintGate = @'
-Write-Host "Gate lint GREEN: simulation M-006."
+Write-Host "Gate lint GREEN: simulation M-007."
 '@
 
 $redTestGate = @'
-Write-Host "Gate test RED: simulation M-006."
+Write-Host "Gate test RED: simulation M-007."
 exit 1
 '@
 
@@ -262,7 +254,7 @@ $emptyTestGate = @'
 '@
 
 $slowTestGate = @'
-Write-Host "Gate test non concluant: simulation M-006."
+Write-Host "Gate test non concluant: simulation M-007."
 Start-Sleep -Seconds 3
 Write-Host "Sortie tardive interdite."
 '@
@@ -270,43 +262,38 @@ Write-Host "Sortie tardive interdite."
 New-Item -ItemType Directory -Path $temporaryRoot | Out-Null
 
 try {
-    $m006BranchRoot = New-TemporaryProject -Name "m006-branch" -TestGateContent $greenTestGate -LintGateContent $greenLintGate -IncludeM004Artifacts $true -IncludeM005Artifacts $true
-    Initialize-ProjectWithMasterAndBranch -ProjectRoot $m006BranchRoot -BranchName $expectedBranch -DivergeMasterReference $false
-    $m006BranchResult = Invoke-Validator -ProjectRoot $m006BranchRoot
-    Assert-ExitCode -Actual $m006BranchResult.ExitCode -Expected 0 -Message "La précondition doit autoriser explicitement la branche M-006."
-    Assert-OutputContains -Output $m006BranchResult.Output -Expected "Branche M-006 autorisée: $expectedBranch" -Message "La branche M-006 doit être nommée."
-
-    $m007BranchRoot = New-TemporaryProject -Name "m007-branch" -TestGateContent $greenTestGate -LintGateContent $greenLintGate -IncludeM004Artifacts $true -IncludeM005Artifacts $true
-    Initialize-ProjectWithMasterAndBranch -ProjectRoot $m007BranchRoot -BranchName $postMergeM007Branch -DivergeMasterReference $false
+    $m007BranchRoot = New-TemporaryProject -Name "m007-branch" -TestGateContent $greenTestGate -LintGateContent $greenLintGate -IncludeM006Artifacts $true
+    Initialize-ProjectWithMasterAndBranch -ProjectRoot $m007BranchRoot -BranchName $expectedBranch -DivergeMasterReference $false
     $m007BranchResult = Invoke-Validator -ProjectRoot $m007BranchRoot
-    Assert-ExitCode -Actual $m007BranchResult.ExitCode -Expected 0 -Message "La précondition doit autoriser explicitement la branche M-007 post-merge."
-    Assert-OutputContains -Output $m007BranchResult.Output -Expected "Branche M-006 autorisée: $postMergeM007Branch" -Message "La branche M-007 autorisée doit être nommée."
+    Assert-ExitCode -Actual $m007BranchResult.ExitCode -Expected 0 -Message "La précondition doit autoriser explicitement la branche M-007."
+    Assert-OutputContains -Output $m007BranchResult.Output -Expected "Branche M-007 autorisée: $expectedBranch" -Message "La branche M-007 doit être nommée."
 
-    $masterBranchRoot = New-TemporaryProject -Name "master-branch" -TestGateContent $greenTestGate -LintGateContent $greenLintGate -IncludeM004Artifacts $true -IncludeM005Artifacts $true
+    $masterBranchRoot = New-TemporaryProject -Name "master-branch" -TestGateContent $greenTestGate -LintGateContent $greenLintGate -IncludeM006Artifacts $true
     Initialize-ProjectWithMasterAndBranch -ProjectRoot $masterBranchRoot -BranchName $masterBranch -DivergeMasterReference $false
     $masterBranchResult = Invoke-Validator -ProjectRoot $masterBranchRoot
     Assert-ExitCode -Actual $masterBranchResult.ExitCode -Expected 0 -Message "La précondition doit autoriser explicitement master."
-    Assert-OutputContains -Output $masterBranchResult.Output -Expected "Branche M-006 autorisée: master" -Message "La branche master autorisée doit être nommée."
+    Assert-OutputContains -Output $masterBranchResult.Output -Expected "Branche M-007 autorisée: master" -Message "La branche master autorisée doit être nommée."
 
-    $missingM004Root = New-TemporaryProject -Name "missing-m004" -TestGateContent $greenTestGate -LintGateContent $greenLintGate -IncludeM004Artifacts $false -IncludeM005Artifacts $true
-    Initialize-ProjectWithMasterAndBranch -ProjectRoot $missingM004Root -BranchName $expectedBranch -DivergeMasterReference $false
-    $missingM004Result = Invoke-Validator -ProjectRoot $missingM004Root
-    Assert-ExitCode -Actual $missingM004Result.ExitCode -Expected 1 -Message "La précondition doit refuser une preuve M-004 absente."
+    $missingM006Root = New-TemporaryProject -Name "missing-m006" -TestGateContent $greenTestGate -LintGateContent $greenLintGate -IncludeM006Artifacts $false
+    Initialize-ProjectWithMasterAndBranch -ProjectRoot $missingM006Root -BranchName $expectedBranch -DivergeMasterReference $false
+    $missingM006Result = Invoke-Validator -ProjectRoot $missingM006Root
+    Assert-ExitCode -Actual $missingM006Result.ExitCode -Expected 1 -Message "La précondition doit refuser une preuve M-006 absente."
     Assert-OutputContains `
-        -Output $missingM004Result.Output `
-        -Expected "Milestone ou preuve amont absent de master: docs/tasks/milestone_004" `
-        -Message "Le RED M-004 absent doit nommer le dossier manquant."
+        -Output $missingM006Result.Output `
+        -Expected "Milestone ou preuve amont absent de master: docs/tasks/milestone_006" `
+        -Message "Le RED M-006 absent doit nommer le dossier manquant."
 
-    $missingM005Root = New-TemporaryProject -Name "missing-m005" -TestGateContent $greenTestGate -LintGateContent $greenLintGate -IncludeM004Artifacts $true -IncludeM005Artifacts $false
-    Initialize-ProjectWithMasterAndBranch -ProjectRoot $missingM005Root -BranchName $expectedBranch -DivergeMasterReference $false
-    $missingM005Result = Invoke-Validator -ProjectRoot $missingM005Root
-    Assert-ExitCode -Actual $missingM005Result.ExitCode -Expected 1 -Message "La précondition doit refuser une preuve M-005 absente."
+    $missingM006SpecRoot = New-TemporaryProject -Name "missing-m006-spec" -TestGateContent $greenTestGate -LintGateContent $greenLintGate -IncludeM006Artifacts $true
+    Remove-Item -LiteralPath (Join-Path $missingM006SpecRoot "docs/specs/m006_claims_verifiables.md") -Force
+    Initialize-ProjectWithMasterAndBranch -ProjectRoot $missingM006SpecRoot -BranchName $expectedBranch -DivergeMasterReference $false
+    $missingM006SpecResult = Invoke-Validator -ProjectRoot $missingM006SpecRoot
+    Assert-ExitCode -Actual $missingM006SpecResult.ExitCode -Expected 1 -Message "La précondition doit refuser une spécification M-006 absente."
     Assert-OutputContains `
-        -Output $missingM005Result.Output `
-        -Expected "Milestone ou preuve amont absent de master: docs/tasks/milestone_005" `
-        -Message "Le RED M-005 absent doit nommer le dossier manquant."
+        -Output $missingM006SpecResult.Output `
+        -Expected "Milestone ou preuve amont absent de master: docs/specs/m006_claims_verifiables.md" `
+        -Message "Le RED spécification M-006 absent doit nommer le fichier manquant."
 
-    $divergedMasterRoot = New-TemporaryProject -Name "diverged-master-reference" -TestGateContent $greenTestGate -LintGateContent $greenLintGate -IncludeM004Artifacts $true -IncludeM005Artifacts $true
+    $divergedMasterRoot = New-TemporaryProject -Name "diverged-master-reference" -TestGateContent $greenTestGate -LintGateContent $greenLintGate -IncludeM006Artifacts $true
     Initialize-ProjectWithMasterAndBranch -ProjectRoot $divergedMasterRoot -BranchName $expectedBranch -DivergeMasterReference $true
     $divergedMasterResult = Invoke-Validator -ProjectRoot $divergedMasterRoot
     Assert-ExitCode -Actual $divergedMasterResult.ExitCode -Expected 1 -Message "La précondition doit refuser une référence master divergente."
@@ -315,52 +302,52 @@ try {
         -Expected "Référence master divergente entre master et origin/master." `
         -Message "La divergence master doit être explicite."
 
-    $invalidBranchRoot = New-TemporaryProject -Name "invalid-branch" -TestGateContent $greenTestGate -LintGateContent $greenLintGate -IncludeM004Artifacts $true -IncludeM005Artifacts $true
+    $invalidBranchRoot = New-TemporaryProject -Name "invalid-branch" -TestGateContent $greenTestGate -LintGateContent $greenLintGate -IncludeM006Artifacts $true
     Initialize-ProjectWithMasterAndBranch -ProjectRoot $invalidBranchRoot -BranchName $invalidBranch -DivergeMasterReference $false
     $invalidBranchResult = Invoke-Validator -ProjectRoot $invalidBranchRoot
     Assert-ExitCode -Actual $invalidBranchResult.ExitCode -Expected 1 -Message "La précondition doit refuser une branche non autorisée."
     Assert-OutputContains `
         -Output $invalidBranchResult.Output `
-        -Expected "Branche courante invalide. Autorisées: master, $expectedBranch, $postMergeM007Branch. Obtenu: $invalidBranch" `
+        -Expected "Branche courante invalide. Autorisées: master, $expectedBranch. Obtenu: $invalidBranch" `
         -Message "La branche non autorisée doit être nommée explicitement."
 
-    $redGateRoot = New-TemporaryProject -Name "red-gate" -TestGateContent $redTestGate -LintGateContent $greenLintGate -IncludeM004Artifacts $true -IncludeM005Artifacts $true
+    $redGateRoot = New-TemporaryProject -Name "red-gate" -TestGateContent $redTestGate -LintGateContent $greenLintGate -IncludeM006Artifacts $true
     Initialize-ProjectWithMasterAndBranch -ProjectRoot $redGateRoot -BranchName $expectedBranch -DivergeMasterReference $false
     $redGateResult = Invoke-Validator -ProjectRoot $redGateRoot
     Assert-ExitCode -Actual $redGateResult.ExitCode -Expected 1 -Message "La précondition doit refuser une gate RED."
     Assert-OutputContains -Output $redGateResult.Output -Expected "Gate test RED" -Message "La sortie de gate RED doit être conservée."
-    Assert-OutputContains -Output $redGateResult.Output -Expected "Gate M-006 RED: test" -Message "Le validateur doit nommer la gate RED."
+    Assert-OutputContains -Output $redGateResult.Output -Expected "Gate M-007 RED: test" -Message "Le validateur doit nommer la gate RED."
 
-    $emptyOutputRoot = New-TemporaryProject -Name "empty-test-output" -TestGateContent $emptyTestGate -LintGateContent $greenLintGate -IncludeM004Artifacts $true -IncludeM005Artifacts $true
+    $emptyOutputRoot = New-TemporaryProject -Name "empty-test-output" -TestGateContent $emptyTestGate -LintGateContent $greenLintGate -IncludeM006Artifacts $true
     Initialize-ProjectWithMasterAndBranch -ProjectRoot $emptyOutputRoot -BranchName $expectedBranch -DivergeMasterReference $false
     $emptyOutputResult = Invoke-Validator -ProjectRoot $emptyOutputRoot
     Assert-ExitCode -Actual $emptyOutputResult.ExitCode -Expected 1 -Message "La précondition doit refuser un statut GREEN déclaré sans preuve."
     Assert-OutputContains `
         -Output $emptyOutputResult.Output `
-        -Expected "Gate M-006 RED: test sans sortie." `
+        -Expected "Gate M-007 RED: test sans sortie." `
         -Message "La sortie vide doit être nommée explicitement."
 
-    $timeoutGateRoot = New-TemporaryProject -Name "timeout-test-output" -TestGateContent $slowTestGate -LintGateContent $greenLintGate -IncludeM004Artifacts $true -IncludeM005Artifacts $true
+    $timeoutGateRoot = New-TemporaryProject -Name "timeout-test-output" -TestGateContent $slowTestGate -LintGateContent $greenLintGate -IncludeM006Artifacts $true
     Initialize-ProjectWithMasterAndBranch -ProjectRoot $timeoutGateRoot -BranchName $expectedBranch -DivergeMasterReference $false
     $timeoutGateResult = Invoke-Validator -ProjectRoot $timeoutGateRoot -GateTimeoutSeconds 1
     Assert-ExitCode -Actual $timeoutGateResult.ExitCode -Expected 1 -Message "La précondition doit refuser un scripts/test.ps1 non concluant."
     Assert-OutputContains `
         -Output $timeoutGateResult.Output `
-        -Expected "Gate M-006 RED: test non concluant après 1 seconde(s)." `
+        -Expected "Gate M-007 RED: test non concluant après 1 seconde(s)." `
         -Message "Le timeout doit être nommé explicitement."
 
-    $outsideReportRoot = New-TemporaryProject -Name "outside-report-path" -TestGateContent $greenTestGate -LintGateContent $greenLintGate -IncludeM004Artifacts $true -IncludeM005Artifacts $true
+    $outsideReportRoot = New-TemporaryProject -Name "outside-report-path" -TestGateContent $greenTestGate -LintGateContent $greenLintGate -IncludeM006Artifacts $true
     Initialize-ProjectWithMasterAndBranch -ProjectRoot $outsideReportRoot -BranchName $expectedBranch -DivergeMasterReference $false
-    $outsideReportPath = Join-Path $temporaryRoot "m006_precondition_outside.md"
+    $outsideReportPath = Join-Path $temporaryRoot "m007_precondition_outside.md"
     $outsideReportResult = Invoke-Validator -ProjectRoot $outsideReportRoot -ReportPathOverride $outsideReportPath
     Assert-ExitCode -Actual $outsideReportResult.ExitCode -Expected 1 -Message "La précondition doit refuser un rapport hors dépôt."
     Assert-OutputContains `
         -Output $outsideReportResult.Output `
-        -Expected "Chemin de rapport M-006 hors dépôt:" `
+        -Expected "Chemin de rapport M-007 hors dépôt:" `
         -Message "Le chemin hors dépôt doit être nommé explicitement."
 }
 finally {
     Remove-Item -LiteralPath $temporaryRoot -Recurse -Force
 }
 
-Write-Host "Tests unitaires du validateur de précondition M-006: OK"
+Write-Host "Tests unitaires du validateur de précondition M-007: OK"

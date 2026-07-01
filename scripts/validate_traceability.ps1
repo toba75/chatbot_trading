@@ -555,6 +555,89 @@ $requiredM006Requirements = @(
     }
 )
 
+$requiredM007Requirements = @(
+    [ordered] @{
+        Id = "REQ-M007-001"
+        Source = "docs/tasks/milestone_007/0001_verifier_precondition_green.md"
+        Test = "tests/m007/validate_m007_precondition_acceptance.ps1"
+        CommandScript = "scripts/validate_m007_precondition.ps1"
+        Code = "scripts/validate_m007_precondition.ps1"
+        Adr = "ADR-010"
+    }
+    [ordered] @{
+        Id = "REQ-M007-002"
+        Source = "docs/tasks/milestone_007/0002_publier_specification_reponse_documentaire.md"
+        Test = "tests/m007/validate_m007_specification_acceptance.ps1"
+        CommandScript = "scripts/validate_m007_specification.ps1"
+        Code = "docs/specs/m007_reponse_documentaire_verifiee.md"
+        Adr = "ADR-006; ADR-010; DDD-ADR-003; DDD-ADR-005; DDD-ADR-007; DDD-ADR-008"
+    }
+    [ordered] @{
+        Id = "REQ-M007-003"
+        Source = "docs/tasks/milestone_007/0003_ouvrir_cas_recherche_mandat_explicite.md"
+        Test = "tests/m007/validate_research_case_mandate_acceptance.ps1"
+        CommandScript = "tests/m007/validate_research_case_mandate_acceptance.ps1"
+        Code = "app/research_answering/domain/research_case.py; app/research_answering/application/open_research_case.py; app/research_answering/domain/research_planning.py; app/research_answering/adapters/in_memory_research_case_repository.py"
+        Adr = "ADR-010"
+    }
+    [ordered] @{
+        Id = "REQ-M007-004"
+        Source = "docs/tasks/milestone_007/0004_sceller_jeu_preuves_reponse.md"
+        Test = "tests/m007/validate_evidence_set_sealing_acceptance.ps1"
+        CommandScript = "tests/m007/validate_evidence_set_sealing_acceptance.ps1"
+        Code = "app/research_answering/domain/evidence_set.py; app/research_answering/application/collect_evidence.py"
+        Adr = "DDD-ADR-003; DDD-ADR-008"
+    }
+    [ordered] @{
+        Id = "REQ-M007-005"
+        Source = "docs/tasks/milestone_007/0005_classer_contradictions_lacunes.md"
+        Test = "tests/m007/validate_contradiction_gap_acceptance.ps1"
+        CommandScript = "tests/m007/validate_contradiction_gap_acceptance.ps1"
+        Code = "app/research_answering/domain/contradiction_assessment.py; app/research_answering/application/classify_contradictions.py; app/research_answering/domain/research_case.py"
+        Adr = "DDD-ADR-005"
+    }
+    [ordered] @{
+        Id = "REQ-M007-006"
+        Source = "docs/tasks/milestone_007/0006_extraire_assertions_reponse.md"
+        Test = "tests/m007/validate_answer_assertion_extraction_acceptance.ps1"
+        CommandScript = "tests/m007/validate_answer_assertion_extraction_acceptance.ps1"
+        Code = "app/research_answering/domain/answer.py; app/research_answering/application/draft_answer.py; app/research_answering/adapters/local_answer_assertion_extractor.py"
+        Adr = "DDD-ADR-005; DDD-ADR-007"
+    }
+    [ordered] @{
+        Id = "REQ-M007-007"
+        Source = "docs/tasks/milestone_007/0007_evaluer_support_citations_reponse.md"
+        Test = "tests/m007/validate_answer_support_acceptance.ps1"
+        CommandScript = "tests/m007/validate_answer_support_acceptance.ps1"
+        Code = "app/research_answering/domain/answer.py; app/research_answering/application/verify_answer.py"
+        Adr = "ADR-006; DDD-ADR-003; DDD-ADR-005; DDD-ADR-007"
+    }
+    [ordered] @{
+        Id = "REQ-M007-008"
+        Source = "docs/tasks/milestone_007/0008_declencher_abstention_donnees_actuelles.md"
+        Test = "tests/m007/validate_current_data_abstention_acceptance.ps1"
+        CommandScript = "tests/m007/validate_current_data_abstention_acceptance.ps1"
+        Code = "app/research_answering/domain/answer.py; app/research_answering/application/verify_answer.py"
+        Adr = "DDD-ADR-007"
+    }
+    [ordered] @{
+        Id = "REQ-M007-009"
+        Source = "docs/tasks/milestone_007/0009_exposer_commande_reponse_documentaire.md"
+        Test = "tests/m007/validate_answer_http_contract_acceptance.ps1"
+        CommandScript = "tests/m007/validate_answer_http_contract_acceptance.ps1"
+        Code = "app/research_answering/adapters/answer_http.py; app/research_answering/application/answer_question.py"
+        Adr = "ADR-010; DDD-ADR-003; DDD-ADR-005"
+    }
+    [ordered] @{
+        Id = "REQ-M007-010"
+        Source = "docs/tasks/milestone_007/0010_relier_m007_metriques_tracabilite_gates.md"
+        Test = "tests/m007/validate_m007_traceability_acceptance.ps1"
+        CommandScript = "tests/m007/validate_m007_traceability_acceptance.ps1"
+        Code = "app/research_answering/application/traceability_metrics.py"
+        Adr = "ADR-006; ADR-010; DDD-ADR-005; DDD-ADR-008"
+    }
+)
+
 function Assert-Condition {
     param(
         [Parameter(Mandatory = $true)]
@@ -1305,6 +1388,28 @@ function Assert-M006PathCell {
         -Message "$CellName M-006 invalide pour ${RequirementId}. Attendu: $ExpectedValue. Obtenu: $actualValue"
 }
 
+function Assert-M007PathCell {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object] $Row,
+
+        [Parameter(Mandatory = $true)]
+        [string] $RequirementId,
+
+        [Parameter(Mandatory = $true)]
+        [string] $CellName,
+
+        [Parameter(Mandatory = $true)]
+        [string] $ExpectedValue
+    )
+
+    $actualValue = Convert-ToMatrixRelativePathCell -RelativePath (Get-MatrixRowCell -Row $Row -CellName $CellName -RequirementId $RequirementId)
+
+    Assert-Condition `
+        -Condition ($actualValue -eq $ExpectedValue) `
+        -Message "$CellName M-007 invalide pour ${RequirementId}. Attendu: $ExpectedValue. Obtenu: $actualValue"
+}
+
 function Test-M006MilestoneIsPresent {
     $milestoneDir = Join-Path $repoRoot "docs/tasks/milestone_006"
     return (Test-Path -LiteralPath $milestoneDir -PathType Container)
@@ -1373,6 +1478,73 @@ function Assert-M006RequirementRows {
         Assert-Condition `
             -Condition ($justification -match "^Décision structurante documentée:") `
             -Message "Justification ADR M-006 invalide pour ${requirementId}: $justification"
+    }
+}
+
+function Assert-M007RequirementRows {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object[]] $Rows
+    )
+
+    $milestoneDir = Join-Path $repoRoot "docs/tasks/milestone_007"
+    if (-not (Test-Path -LiteralPath $milestoneDir -PathType Container)) {
+        return
+    }
+
+    $canonicalMatrixPath = [System.IO.Path]::GetFullPath((Join-Path $repoRoot "docs/traceability/matrix.md"))
+    $currentMatrixPath = [System.IO.Path]::GetFullPath($matrixPath)
+    if (-not $currentMatrixPath.Equals($canonicalMatrixPath, [System.StringComparison]::OrdinalIgnoreCase)) {
+        $containsM007Rows = @($Rows | Where-Object {
+            (Get-MatrixRowCell -Row $_ -CellName "Exigence" -RequirementId "ligne inconnue") -match "^REQ-M007-"
+        }).Count -gt 0
+        if (-not $containsM007Rows) {
+            Assert-Condition `
+                -Condition $AllowM000OnlyMatrix `
+                -Message "Matrice M-007 absente sans autorisation explicite."
+            return
+        }
+    }
+
+    $rowsByRequirementId = @{}
+    foreach ($row in $Rows) {
+        $requirementId = Get-MatrixRowCell -Row $row -CellName "Exigence" -RequirementId "ligne inconnue"
+        $rowsByRequirementId[$requirementId] = $row
+    }
+
+    foreach ($expected in $requiredM007Requirements) {
+        $requirementId = $expected["Id"]
+
+        Assert-Condition `
+            -Condition ($rowsByRequirementId.ContainsKey($requirementId)) `
+            -Message "Exigence M-007 livrée absente: $requirementId"
+
+        $row = $rowsByRequirementId[$requirementId]
+        $status = Get-MatrixRowCell -Row $row -CellName "Statut" -RequirementId $requirementId
+
+        Assert-Condition `
+            -Condition ($status -eq "Couvert") `
+            -Message "Exigence M-007 livrée non couverte: $requirementId"
+
+        $commandScript = Get-MatrixRowCell -Row $row -CellName "CommandeScript" -RequirementId $requirementId
+
+        Assert-M007PathCell -Row $row -RequirementId $requirementId -CellName "Source" -ExpectedValue $expected["Source"]
+        Assert-M007PathCell -Row $row -RequirementId $requirementId -CellName "Test" -ExpectedValue $expected["Test"]
+        Assert-M007PathCell -Row $row -RequirementId $requirementId -CellName "Code" -ExpectedValue $expected["Code"]
+
+        Assert-Condition `
+            -Condition ($commandScript -eq $expected["CommandScript"]) `
+            -Message "Commande M-007 invalide pour ${requirementId}. Attendu: $($expected["CommandScript"]). Obtenu: $commandScript"
+
+        $adr = Get-MatrixRowCell -Row $row -CellName "ADR" -RequirementId $requirementId
+        Assert-Condition `
+            -Condition ($adr -eq $expected["Adr"]) `
+            -Message "ADR M-007 invalide pour ${requirementId}. Attendu: $($expected["Adr"]). Obtenu: $adr"
+
+        $justification = Get-MatrixRowCell -Row $row -CellName "Justification ADR" -RequirementId $requirementId
+        Assert-Condition `
+            -Condition ($justification -match "^Décision structurante documentée:") `
+            -Message "Justification ADR M-007 invalide pour ${requirementId}: $justification"
     }
 }
 
@@ -1501,5 +1673,6 @@ Assert-M003RequirementRows -Rows $rows.ToArray()
 Assert-M004RequirementRows -Rows $rows.ToArray()
 Assert-M005RequirementRows -Rows $rows.ToArray()
 Assert-M006RequirementRows -Rows $rows.ToArray()
+Assert-M007RequirementRows -Rows $rows.ToArray()
 
 Write-Host "Matrice de $traceabilityLabel valide: $($rows.Count) exigence(s) contr$([char] 0x00F4)l$($eAcute)e(s)."
