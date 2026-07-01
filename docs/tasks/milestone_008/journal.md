@@ -50,3 +50,12 @@
 - GREEN ciblé: `tests/m008/validate_followup_question_resolution_acceptance.ps1` GREEN; `tests/m008/validate_followup_question_resolution_unit.ps1` GREEN.
 - Gates: `scripts/lint.ps1` GREEN avec `17 validation(s), 0 test(s)`; `scripts/test.ps1` GREEN avec `17 validation(s), 164 test(s)`; `git diff --check` GREEN.
 - Garde-fous implémentés: référence pronominale refusée sans antécédent unique, statut `CLARIFICATION_REQUIRED` sans payload aval en cas d'ambiguïté, question autonome avant routage, conservation du mandat actif, des documents sélectionnés et des références vérifiées, événement sans message brut.
+
+## T-006 - Sélectionner un mode conversationnel visible et justifié
+
+- Scénario BDD: Given une question autonome demande de tester une stratégie avec des coûts doublés; When le mode conversationnel est sélectionné; Then le tour enregistre `BACKTEST` avec une justification et ne bascule pas silencieusement vers `CHAT_DOCUMENTAIRE`.
+- ADR: non requise. La tâche applique ADR-010 et DDD-ADR-007 sans créer un nouveau contrat externe ni exécuter les contextes aval SD ou EX.
+- RED: `320ebd42 test(m008): couvrir routage modes conversation`, avec `ModuleNotFoundError` attendu sur `app.conversation.application.select_mode`.
+- GREEN ciblé: `tests/m008/validate_conversation_mode_routing_acceptance.ps1` GREEN; `tests/m008/validate_conversation_mode_routing_unit.ps1` GREEN.
+- Gates: `scripts/lint.ps1` GREEN avec `17 validation(s), 0 test(s)`; `scripts/test.ps1` GREEN avec `17 validation(s), 166 test(s)`; `git diff --check` GREEN.
+- Garde-fous implémentés: modes explicites `CHAT_DOCUMENTAIRE`, `RECHERCHE_APPROFONDIE`, `COMPARAISON`, `CONCEPTION_STRATEGIE`, `CALCUL`, `BACKTEST` et `CLARIFICATION_INTERNE`, mode forcé validé, mode indisponible refusé, justification obligatoire, aucune bascule documentaire implicite.
