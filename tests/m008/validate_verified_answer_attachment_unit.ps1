@@ -62,6 +62,15 @@ def citation_payload():
     }
 
 
+def citation_payload_with_bbox(bbox):
+    payload = citation_payload()
+    payload["source_locator"] = {
+        **payload["source_locator"],
+        "bbox": bbox,
+    }
+    return payload
+
+
 def outcome_payload(question, answer_id="ANS-M008-T007-UNIT", support_status="SUPPORTED"):
     return {
         "schema_version": "1.0",
@@ -129,6 +138,26 @@ assert_raises(
         abstention_reason=None,
     ),
 )
+assert_raises(
+    "citation invalide",
+    lambda: PublicResearchAnswerResult(
+        verified_research_outcome=VerifiedResearchOutcome.from_payload(outcome_payload("Question documentaire verifiee.")),
+        verified_answer_ref="ANS-M008-T007-UNIT@1",
+        answer_text="Reponse RA publique.",
+        citations=(citation_payload_with_bbox((0.1, float("nan"), 0.3, 0.4)),),
+        abstention_reason=None,
+    ),
+)
+assert_raises(
+    "citation invalide",
+    lambda: PublicResearchAnswerResult(
+        verified_research_outcome=VerifiedResearchOutcome.from_payload(outcome_payload("Question documentaire verifiee.")),
+        verified_answer_ref="ANS-M008-T007-UNIT@1",
+        answer_text="Reponse RA publique.",
+        citations=(citation_payload_with_bbox((0.1, float("inf"), 0.3, 0.4)),),
+        abstention_reason=None,
+    ),
+)
 
 store = InMemoryVerifiedAnswerAttachmentStore(known_turn_ids=("TURN-M008-T007-UNIT",))
 handler = AttachVerifiedAnswerToTurnHandler(attachment_store=store)
@@ -178,6 +207,7 @@ assert_raises(
 source = inspect.getsource(reuse_verified_result)
 assert_false("app.research_answering.adapters" in source, "CV ne doit pas importer un adaptateur RA interne.")
 assert_false("AnswerRepository" in source, "CV ne doit pas acceder au stockage RA.")
+assert_false("InMemoryVerifiedAnswerAttachmentStore" in source, "ReuseVerifiedResultHandler doit dependre du port VerifiedAnswerAttachmentStore.")
 
 print("Tests unitaires T-007 rattachement reponse verifiee M-008: OK")
 '@

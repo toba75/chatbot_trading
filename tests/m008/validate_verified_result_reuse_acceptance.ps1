@@ -11,7 +11,6 @@ sys.path.insert(0, sys.argv[1])
 
 from app.contracts.research_outcomes import VerifiedResearchOutcome
 from app.conversation.application.answer_conversation_turn import PublicResearchAnswerResult
-from app.conversation.application.attach_verified_answer import InMemoryVerifiedAnswerAttachmentStore
 from app.conversation.application.resolve_followup_question import ResolvedQuestion
 from app.conversation.application.reuse_verified_result import (
     HistoricalAssertionRef,
@@ -79,6 +78,18 @@ class ScriptedResearchFacade:
         return self.result
 
 
+class RecordingAttachmentStore:
+    def __init__(self):
+        self.attachments = {}
+
+    def save(self, attachment):
+        self.attachments[attachment.turn_id] = attachment
+        return attachment
+
+    def attachment_for_turn(self, turn_id):
+        return self.attachments[turn_id]
+
+
 resolved_question = ResolvedQuestion(
     conversation_id="CONV-M008-T007-ACCEPTANCE",
     turn_id="TURN-M008-T007-ACCEPTANCE",
@@ -96,7 +107,7 @@ public_result = PublicResearchAnswerResult(
     abstention_reason=None,
 )
 research_facade = ScriptedResearchFacade(public_result)
-store = InMemoryVerifiedAnswerAttachmentStore(known_turn_ids=("TURN-M008-T007-ACCEPTANCE",))
+store = RecordingAttachmentStore()
 handler = ReuseVerifiedResultHandler(research_facade=research_facade, attachment_store=store)
 
 # Given une reponse precedente contient une assertion sans VerifiedAnswerVersion.
@@ -129,6 +140,34 @@ assert_equal(result.attachment.answer_id, "ANS-M008-T007-A", "L'identifiant RA d
 assert_equal(store.attachment_for_turn("TURN-M008-T007-ACCEPTANCE"), result.attachment, "Le rattachement doit etre persiste.")
 assert_false(hasattr(result.attachment.verified_research_outcome, "answer_text"), "VerifiedResearchOutcome ne doit pas porter answer_text.")
 assert_equal(tuple(event.event_type for event in result.events), ("HistoricalAssertionRevalidationRequested", "VerifiedAnswerAttachedToTurn"), "Les evenements CV doivent tracer revalidation puis rattachement.")
+
+reuse_only_facade = ScriptedResearchFacade(public_result)
+reuse_only_store = RecordingAttachmentStore()
+reuse_only_handler = ReuseVerifiedResultHandler(
+    research_facade=reuse_only_facade,
+    attachment_store=reuse_only_store,
+)
+reuse_only_result = reuse_only_handler.reuse_or_revalidate(
+    ReuseVerifiedResultCommand(
+        conversation_id="CONV-M008-T007-ACCEPTANCE",
+        turn_id="TURN-M008-T007-ACCEPTANCE",
+        resolved_question=resolved_question,
+        historical_assertions=(
+            HistoricalAssertionRef(
+                assertion_text="Le volatility targeting reduit certains drawdowns.",
+                verified_answer_ref="ANS-M008-T007-A@1",
+            ),
+        ),
+        research_mandate={"allowed_universe": ("documents canoniques OSTrading",)},
+        occurred_at="2026-07-01T14:01:00Z",
+    )
+)
+assert_equal(len(reuse_only_facade.requests), 0, "Une assertion deja versionnee ne doit pas declencher RA.")
+assert_equal(reuse_only_result.status, "VERIFIED_RESULT_REUSED", "Le chemin reutilisable doit etre explicite.")
+assert_equal(reuse_only_result.attachment, None, "Aucun rattachement RA nouveau ne doit etre invente sans resultat public.")
+assert_equal(tuple(reuse_only_result.reusable_answer_refs), ("ANS-M008-T007-A@1",), "La version reutilisable doit etre retournee.")
+assert_equal(tuple(reuse_only_result.events), (), "La reutilisation sans revalidation ne doit pas emettre d'evenement de rattachement.")
+assert_equal(len(reuse_only_store.attachments), 0, "Le store d'attachement ne doit pas etre appele sans resultat RA public.")
 
 print("Test d'acceptation T-007 revalidation historique M-008: OK")
 '@

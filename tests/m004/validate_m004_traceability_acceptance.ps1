@@ -268,7 +268,7 @@ try {
     Assert-OutputContains `
         -Output $validResult.Output `
         -Expected "Matrice de tra$($cCedilla)abilit$($eAcute) valide:" `
-        -Message "La matrice doit compter les exigences M-004 de précondition et de clôture."
+        -Message "La matrice doit confirmer la validité des exigences M-004."
 
     $missingPreconditionProjectRoot = New-TemporaryProject -Name "missing-precondition"
     Remove-MatrixRow `

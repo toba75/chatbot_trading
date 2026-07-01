@@ -89,6 +89,8 @@ conversation_repository.save(conversation)
 assert_equal(conversation_repository.conversation_count(), 1, "La conversation doit etre persistee.")
 assert_raises("conversation deja enregistree", lambda: conversation_repository.save(Conversation.start(**{**conversation_payload(), "title": "Autre titre"})))
 assert_raises("conversation inconnue", lambda: conversation_repository.conversation_for_id("CONV-M008-T003-UNKNOWN"))
+assert_raises("conversation_id invalide", lambda: turn_repository.next_sequence_for_conversation("CONV-invalid"))
+assert_raises("turn_id invalide", lambda: turn_repository.turn_for_id("TURN-invalid"))
 
 turn_repository.save(turn)
 assert_equal(turn_repository.next_sequence_for_conversation(conversation.conversation_id), 2, "La sequence suivante doit etre stricte.")
