@@ -32,3 +32,12 @@
 - RED: `7b8a5470 test(m008): couvrir conversations tours append only`, avec `ModuleNotFoundError` attendu sur `app.conversation.adapters.in_memory_conversation_repository`.
 - GREEN ciblé: `tests/m008/validate_conversation_turn_append_only_acceptance.ps1` GREEN; `tests/m008/validate_conversation_turn_append_only_unit.ps1` GREEN; `scripts/validate_architecture_boundaries.ps1 -AppRoot .\app -ContextRegistryPath .\app\context_registry.json -SpecificationPath .\docs\specs\m001_frontieres_ddd_contrats_publies.md` GREEN avec `130 fichier(s), 734 import(s) contrôlé(s)`.
 - Garde-fous implémentés: identifiants explicites `CONV-*` et `TURN-*`, aucune conversation anonyme, tours immuables, ordre strict par conversation, refus des tours orphelins et refus d'ajout sur conversation archivée.
+
+## T-004 - Compacter le contexte sans preuve factuelle
+
+- Scénario BDD: Given une conversation contient une préférence utilisateur et une réponse précédente vérifiée; When le contexte conversationnel est compacté; Then le snapshot conserve la préférence et la référence vérifiée sans recopier l'historique comme preuve factuelle.
+- ADR: non requise. La tâche applique DDD-ADR-003 et DDD-ADR-007 sans décider une nouvelle politique durable de rétention, chiffrement ou purge.
+- RED: `ba2a91a1 test(m008): couvrir snapshot contexte sans preuve`, avec `ModuleNotFoundError` attendu sur `app.conversation.adapters.in_memory_context_store`.
+- GREEN ciblé: `tests/m008/validate_conversation_context_snapshot_acceptance.ps1` GREEN; `tests/m008/validate_conversation_context_snapshot_unit.ps1` GREEN.
+- Gates: `scripts/lint.ps1` GREEN avec `17 validation(s), 0 test(s)`; `scripts/test.ps1` GREEN avec `17 validation(s), 162 test(s)`; `git diff --check` GREEN.
+- Garde-fous implémentés: snapshot immuable, mandat actif obligatoire, préférences séparées des références vérifiées, assertions historiques sans `VerifiedAnswerVersion` conservées pour revalidation, clés sensibles refusées (`raw_turns`, `prompt`, `answer_text`, `document_text`) et store mémoire sans mutation silencieuse.
