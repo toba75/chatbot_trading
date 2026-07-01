@@ -24,3 +24,11 @@
 - RED: `7293b1f3 test(m008): couvrir la specification conversation produit`.
 - GREEN: `tests/m008/validate_m008_specification_acceptance.ps1` GREEN; `tests/m008/validate_m008_specification_unit.ps1` GREEN; `scripts/validate_m008_specification.ps1` GREEN; `scripts/validate_traceability.ps1` GREEN avec `84 exigence(s) contrôlée(s)`; `scripts/lint.ps1` GREEN avec `17 validation(s), 0 test(s)`; `scripts/test.ps1` GREEN après relance longue avec `17 validation(s), 158 test(s)`.
 - Garde-fous explicités: historique conversationnel non probant, revalidation RA obligatoire des assertions historiques sans `VerifiedAnswerVersion`, DTO public RA distinct de `VerifiedResearchOutcome`, absence de fallback de mode et archivage CV sans cascade hors CV.
+
+## T-003 - Créer les conversations et tours append-only
+
+- Scénario BDD: Given une conversation active existe pour un mandat documentaire; When l'utilisateur ajoute un message dans cette conversation; Then un nouveau tour append-only est créé avec son ordre, son horodatage et son appartenance à la conversation sans modifier les tours précédents.
+- ADR: non requise. La tâche introduit des repositories mémoire stricts CV sans nouvelle persistance durable ni politique de purge.
+- RED: `7b8a5470 test(m008): couvrir conversations tours append only`, avec `ModuleNotFoundError` attendu sur `app.conversation.adapters.in_memory_conversation_repository`.
+- GREEN ciblé: `tests/m008/validate_conversation_turn_append_only_acceptance.ps1` GREEN; `tests/m008/validate_conversation_turn_append_only_unit.ps1` GREEN; `scripts/validate_architecture_boundaries.ps1 -AppRoot .\app -ContextRegistryPath .\app\context_registry.json -SpecificationPath .\docs\specs\m001_frontieres_ddd_contrats_publies.md` GREEN avec `130 fichier(s), 734 import(s) contrôlé(s)`.
+- Garde-fous implémentés: identifiants explicites `CONV-*` et `TURN-*`, aucune conversation anonyme, tours immuables, ordre strict par conversation, refus des tours orphelins et refus d'ajout sur conversation archivée.
