@@ -59,3 +59,12 @@
 - GREEN ciblé: `tests/m008/validate_conversation_mode_routing_acceptance.ps1` GREEN; `tests/m008/validate_conversation_mode_routing_unit.ps1` GREEN.
 - Gates: `scripts/lint.ps1` GREEN avec `17 validation(s), 0 test(s)`; `scripts/test.ps1` GREEN avec `17 validation(s), 166 test(s)`; `git diff --check` GREEN.
 - Garde-fous implémentés: modes explicites `CHAT_DOCUMENTAIRE`, `RECHERCHE_APPROFONDIE`, `COMPARAISON`, `CONCEPTION_STRATEGIE`, `CALCUL`, `BACKTEST` et `CLARIFICATION_INTERNE`, mode forcé validé, mode indisponible refusé, justification obligatoire, aucune bascule documentaire implicite.
+
+## T-007 - Revalider une assertion historique et rattacher la réponse
+
+- Scénario BDD: Given une réponse précédente contient une assertion sans `VerifiedAnswerVersion`; When l'utilisateur réutilise cette assertion dans un nouveau tour documentaire; Then CV appelle `ResearchFacade` pour rechercher et vérifier à nouveau l'assertion avant de rattacher le résultat public RA au tour.
+- ADR: non requise. La tâche applique DDD-ADR-003, DDD-ADR-007 et DDD-ADR-008 sans modifier `VerifiedResearchOutcome` ni introduire un accès au stockage RA.
+- RED: `e50a51ce test(m008): couvrir revalidation historique`, avec module `answer_conversation_turn` absent côté CV.
+- GREEN ciblé: `tests/m008/validate_verified_result_reuse_acceptance.ps1` GREEN; `tests/m008/validate_verified_answer_attachment_unit.ps1` GREEN; `scripts/validate_architecture_boundaries.ps1 -AppRoot .\app -ContextRegistryPath .\app\context_registry.json -SpecificationPath .\docs\specs\m001_frontieres_ddd_contrats_publies.md` GREEN avec `139 fichier(s), 807 import(s) contrôlé(s)`.
+- Gates: `scripts/lint.ps1` GREEN avec `17 validation(s), 0 test(s)`; `scripts/test.ps1` GREEN avec `17 validation(s), 168 test(s)`; `git diff --check` GREEN.
+- Garde-fous implémentés: assertion historique non versionnée envoyée à RA, port `ResearchFacade` sans import d'adaptateur RA interne, rattachement unique par tour, statut RA conservé, version `ANS-*@[n]` conservée, validation structurelle de `VerifiedResearchOutcome` sans enrichissement par `answer_text` ou `citations`.
