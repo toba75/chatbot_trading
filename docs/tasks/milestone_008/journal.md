@@ -95,3 +95,13 @@
 - GREEN ciblé: `tests/m008/validate_chat_completions_contract_acceptance.ps1` GREEN; `tests/m008/validate_chat_completions_contract_unit.ps1` GREEN.
 - Gates: `scripts/validate_architecture_boundaries.ps1 -AppRoot .\app -ContextRegistryPath .\app\context_registry.json -SpecificationPath .\docs\specs\m001_frontieres_ddd_contrats_publies.md` GREEN avec `142 fichier(s), 833 import(s) contrôlé(s)`; `scripts/lint.ps1` GREEN avec `17 validation(s), 0 test(s)`; `scripts/test.ps1` GREEN avec `17 validation(s), 174 test(s)`; `git diff --check` GREEN.
 - Garde-fous implémentés: conversation existante obligatoire, un seul message `user` accepté, `idempotency_key` obligatoire, champs non supportés refusés, `prompt_override` et accès LLM direct refusés, réponse impossible sans tour CV, extension `ost_product` alimentée par la présentation CV issue du DTO public RA.
+
+## T-011 - Relier M-008 aux métriques, à la traçabilité et aux gates
+
+- Scénario BDD: Given les comportements M-008 sont implémentés et testés; When la matrice de traçabilité et les gates sont exécutées; Then chaque exigence M-008 est rattachée à un test GREEN, une commande de validation et une ADR ou justification explicite.
+- ADR: non requise. La tâche applique ADR-010 et DDD-ADR-008 sans introduire une solution d'observabilité durable ni une rétention persistante de logs.
+- RED: `88b1dd21 test(m008): couvrir tracabilite metriques gates`, avec `ModuleNotFoundError` attendu sur `app.conversation.application.traceability_metrics` et matrice M-008 incomplète.
+- GREEN ciblé: `tests/m008/validate_m008_traceability_acceptance.ps1` GREEN; `tests/m008/validate_m008_traceability_unit.ps1` GREEN; `scripts/validate_traceability.ps1` GREEN avec `94 exigence(s) contrôlée(s)`.
+- Gates: `scripts/validate_architecture_boundaries.ps1 -AppRoot .\app -ContextRegistryPath .\app\context_registry.json -SpecificationPath .\docs\specs\m001_frontieres_ddd_contrats_publies.md` GREEN avec `143 fichier(s), 840 import(s) contrôlé(s)`; `scripts/lint.ps1` GREEN avec `17 validation(s), 0 test(s)`; `scripts/test.ps1` GREEN avec `17 validation(s), 176 test(s)`; `git diff --check` GREEN.
+- Artefacts publiés: `app/conversation/application/traceability_metrics.py`, `docs/governance/m008_conversation_metrics.json`, `tests/m008/fixtures/m008_conversation_metrics_fixture.json`, matrice `docs/traceability/matrix.md` complétée de `REQ-M008-001` à `REQ-M008-011`.
+- Garde-fous implémentés: métriques par événements agrégés, hashes et compteurs uniquement; aucun message complet, prompt, historique brut, réponse complète ni texte documentaire dans les signaux; tests M-008 enrôlés dans `scripts/test.ps1`; traçabilité M-008 imposée par `scripts/validate_traceability.ps1`.
