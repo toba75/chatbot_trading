@@ -753,6 +753,14 @@ $requiredM009Requirements = @(
         CommandScript = "tests/m009/validate_deep_research_planning_acceptance.ps1"
         Code = "app/research_answering/domain/research_case.py; app/research_answering/domain/research_planning.py; app/research_answering/application/open_research_case.py"
         Adr = "ADR-006; ADR-010; DDD-ADR-005"
+    },
+    [ordered] @{
+        Id = "REQ-M009-004"
+        Source = "docs/tasks/milestone_009/0004_collecter_preuves_multi_requetes_diversifiees.md"
+        Test = "tests/m009/validate_multi_query_evidence_collection_acceptance.ps1"
+        CommandScript = "tests/m009/validate_multi_query_evidence_collection_acceptance.ps1"
+        Code = "app/research_answering/application/collect_evidence.py"
+        Adr = "ADR-006; DDD-ADR-003; DDD-ADR-005"
     }
 )
 

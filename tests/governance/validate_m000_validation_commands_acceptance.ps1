@@ -5,7 +5,7 @@ $testCommandPath = Join-Path $repoRoot "scripts/test.ps1"
 $lintCommandPath = Join-Path $repoRoot "scripts/lint.ps1"
 $temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m000_validation_commands_acceptance_" + [System.Guid]::NewGuid().ToString("N"))
 $eAcute = [char] 0x00E9
-$expectedTestCount = 128
+$expectedTestCount = 130
 if ($env:OST_M003_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     $expectedTestCount = 114
 }
@@ -308,6 +308,8 @@ try {
     Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m009/validate_m009_specification_unit.ps1" -Message "La gate de test doit exécuter le test unitaire de spécification M-009."
     Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m009/validate_deep_research_planning_acceptance.ps1" -Message "La gate de test doit exécuter le test d'acceptation de planification approfondie M-009."
     Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m009/validate_deep_research_planning_unit.ps1" -Message "La gate de test doit exécuter le test unitaire de planification approfondie M-009."
+    Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m009/validate_multi_query_evidence_collection_acceptance.ps1" -Message "La gate de test doit exécuter le test d'acceptation de collecte multi-requêtes M-009."
+    Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m009/validate_multi_query_evidence_collection_unit.ps1" -Message "La gate de test doit exécuter le test unitaire de collecte multi-requêtes M-009."
     Assert-OutputNotContains -Output $testResult.Output -Forbidden "Ã" -Message "La sortie de la gate de test doit rester lisible en français accentué."
 
     $lintResult = Invoke-ProjectCommand -ProjectRoot $validProjectRoot -RelativePath "scripts/lint.ps1"

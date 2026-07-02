@@ -54,7 +54,8 @@ def hash_for(seed):
     return format(seed, "x") * 64
 
 
-def source_locator_policy(*, suffix, document_id, canonical_version_id, content_hash):
+def source_locator_policy(*, suffix, document_id, canonical_version_id, content_hash, item_id=None):
+    resolved_item_id = item_id or f"item-m009-t004-unit-{suffix.lower()}"
     canonical_source = CanonicalSourceRef(
         schema_version="1.0",
         canonical_source_id=f"CSRC-M009-T004-UNIT-{suffix}",
@@ -72,7 +73,7 @@ def source_locator_policy(*, suffix, document_id, canonical_version_id, content_
             canonical_source.canonical_version_id: ACCEPTED_CANONICAL_VERSION_STATUS,
         },
         resolvable_item_ids_by_version_id={
-            canonical_source.canonical_version_id: {f"item-m009-t004-unit-{suffix.lower()}": content_hash},
+            canonical_source.canonical_version_id: {resolved_item_id: content_hash},
         },
     )
 
@@ -111,6 +112,7 @@ def evidence_ref(*, suffix, locator, span_seed):
             document_id=locator.document_id,
             canonical_version_id=locator.canonical_version_id,
             content_hash=locator.content_hash,
+            item_id=locator.item_id,
         ),
     )
 
@@ -133,6 +135,7 @@ def verified_claim_ref(*, suffix, evidence):
             document_id=evidence.source_locator.document_id,
             canonical_version_id=evidence.source_locator.canonical_version_id,
             content_hash=evidence.source_locator.content_hash,
+            item_id=evidence.source_locator.item_id,
         ),
     )
 
@@ -245,13 +248,15 @@ def deep_result(*, projection_suffix, candidates):
 
 def collect_with_candidates(candidates_by_sub_question, *, result_limit=2):
     repository, research_case_id = planned_deep_case_repository()
+    complete_candidates_by_sub_question = dict(valid_candidates_by_sub_question)
+    complete_candidates_by_sub_question.update(candidates_by_sub_question)
     responses = {
         sub_question_id: deep_result(projection_suffix=sub_question_id, candidates=candidates)
-        for sub_question_id, candidates in candidates_by_sub_question.items()
+        for sub_question_id, candidates in complete_candidates_by_sub_question.items()
     }
     all_candidates = tuple(
         candidate
-        for candidates in candidates_by_sub_question.values()
+        for candidates in complete_candidates_by_sub_question.values()
         for candidate in candidates
         if isinstance(candidate, CandidateEvidence)
     )
@@ -301,6 +306,13 @@ limites = candidate(
     obligations=("limites", "zones_non_documentees"),
     content_seed=4,
     span_seed=8,
+)
+limites_partielles = candidate(
+    suffix="LIMITES-PARTIELLES",
+    document_suffix="LIMITES-PARTIELLES",
+    obligations=("limites",),
+    content_seed=12,
+    span_seed=13,
 )
 
 valid_candidates_by_sub_question = {
@@ -402,6 +414,7 @@ assert_raises(
             "RSQ-METHODES": (methodes,),
             "RSQ-PREUVES-FAVORABLES": (favorables,),
             "RSQ-PREUVES-DEFAVORABLES": (defavorables,),
+            "RSQ-LIMITES-LACUNES": (limites_partielles,),
         }
     ),
 )

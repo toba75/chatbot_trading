@@ -59,6 +59,8 @@ $m009SpecificationAcceptancePath = "tests/m009/validate_m009_specification_accep
 $m009SpecificationUnitPath = "tests/m009/validate_m009_specification_unit.ps1"
 $m009DeepResearchPlanningAcceptancePath = "tests/m009/validate_deep_research_planning_acceptance.ps1"
 $m009DeepResearchPlanningUnitPath = "tests/m009/validate_deep_research_planning_unit.ps1"
+$m009MultiQueryEvidenceAcceptancePath = "tests/m009/validate_multi_query_evidence_collection_acceptance.ps1"
+$m009MultiQueryEvidenceUnitPath = "tests/m009/validate_multi_query_evidence_collection_unit.ps1"
 
 $validationCommands = @(
     @{ Path = "scripts/validate_m000_precondition_report.ps1"; Arguments = @("-Path", $preconditionReportPath) },
@@ -264,7 +266,9 @@ $testCommands = @(
     @{ Path = "tests/m009/validate_m009_specification_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/m009/validate_m009_specification_unit.ps1"; Arguments = @() },
     @{ Path = "tests/m009/validate_deep_research_planning_acceptance.ps1"; Arguments = @() },
-    @{ Path = "tests/m009/validate_deep_research_planning_unit.ps1"; Arguments = @() }
+    @{ Path = "tests/m009/validate_deep_research_planning_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m009/validate_multi_query_evidence_collection_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m009/validate_multi_query_evidence_collection_unit.ps1"; Arguments = @() }
 )
 
 function Get-GateCommandPaths {
@@ -321,7 +325,9 @@ if ($env:OST_M003_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m009SpecificationAcceptancePath,
         $m009SpecificationUnitPath,
         $m009DeepResearchPlanningAcceptancePath,
-        $m009DeepResearchPlanningUnitPath
+        $m009DeepResearchPlanningUnitPath,
+        $m009MultiQueryEvidenceAcceptancePath,
+        $m009MultiQueryEvidenceUnitPath
     )
 }
 elseif ($env:OST_M004_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -366,7 +372,9 @@ elseif ($env:OST_M004_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m009SpecificationAcceptancePath,
         $m009SpecificationUnitPath,
         $m009DeepResearchPlanningAcceptancePath,
-        $m009DeepResearchPlanningUnitPath
+        $m009DeepResearchPlanningUnitPath,
+        $m009MultiQueryEvidenceAcceptancePath,
+        $m009MultiQueryEvidenceUnitPath
     )
 }
 elseif ($env:OST_M005_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -412,7 +420,9 @@ elseif ($env:OST_M005_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m009SpecificationAcceptancePath,
         $m009SpecificationUnitPath,
         $m009DeepResearchPlanningAcceptancePath,
-        $m009DeepResearchPlanningUnitPath
+        $m009DeepResearchPlanningUnitPath,
+        $m009MultiQueryEvidenceAcceptancePath,
+        $m009MultiQueryEvidenceUnitPath
     )
 }
 elseif ($env:OST_M006_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -457,7 +467,9 @@ elseif ($env:OST_M006_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m009SpecificationAcceptancePath,
         $m009SpecificationUnitPath,
         $m009DeepResearchPlanningAcceptancePath,
-        $m009DeepResearchPlanningUnitPath
+        $m009DeepResearchPlanningUnitPath,
+        $m009MultiQueryEvidenceAcceptancePath,
+        $m009MultiQueryEvidenceUnitPath
     )
 }
 elseif ($env:OST_M007_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -501,7 +513,9 @@ elseif ($env:OST_M007_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m009SpecificationAcceptancePath,
         $m009SpecificationUnitPath,
         $m009DeepResearchPlanningAcceptancePath,
-        $m009DeepResearchPlanningUnitPath
+        $m009DeepResearchPlanningUnitPath,
+        $m009MultiQueryEvidenceAcceptancePath,
+        $m009MultiQueryEvidenceUnitPath
     )
 }
 elseif ($env:OST_M008_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -524,7 +538,9 @@ elseif ($env:OST_M008_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m009SpecificationAcceptancePath,
         $m009SpecificationUnitPath,
         $m009DeepResearchPlanningAcceptancePath,
-        $m009DeepResearchPlanningUnitPath
+        $m009DeepResearchPlanningUnitPath,
+        $m009MultiQueryEvidenceAcceptancePath,
+        $m009MultiQueryEvidenceUnitPath
     )
 }
 elseif ($env:OST_M009_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -546,7 +562,9 @@ elseif ($env:OST_M009_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m009SpecificationAcceptancePath,
         $m009SpecificationUnitPath,
         $m009DeepResearchPlanningAcceptancePath,
-        $m009DeepResearchPlanningUnitPath
+        $m009DeepResearchPlanningUnitPath,
+        $m009MultiQueryEvidenceAcceptancePath,
+        $m009MultiQueryEvidenceUnitPath
     )
 }
 

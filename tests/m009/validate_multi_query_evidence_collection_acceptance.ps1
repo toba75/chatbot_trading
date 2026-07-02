@@ -73,7 +73,8 @@ def hash_for(seed):
     return format(seed, "x") * 64
 
 
-def source_locator_policy(*, suffix, document_id, canonical_version_id, content_hash):
+def source_locator_policy(*, suffix, document_id, canonical_version_id, content_hash, item_id=None):
+    resolved_item_id = item_id or f"item-m009-t004-{suffix.lower()}"
     canonical_source = CanonicalSourceRef(
         schema_version="1.0",
         canonical_source_id=f"CSRC-M009-T004-{suffix}",
@@ -91,7 +92,7 @@ def source_locator_policy(*, suffix, document_id, canonical_version_id, content_
             canonical_source.canonical_version_id: ACCEPTED_CANONICAL_VERSION_STATUS,
         },
         resolvable_item_ids_by_version_id={
-            canonical_source.canonical_version_id: {f"item-m009-t004-{suffix.lower()}": content_hash},
+            canonical_source.canonical_version_id: {resolved_item_id: content_hash},
         },
     )
 
@@ -130,6 +131,7 @@ def evidence_ref(*, suffix, locator, span_seed):
             document_id=locator.document_id,
             canonical_version_id=locator.canonical_version_id,
             content_hash=locator.content_hash,
+            item_id=locator.item_id,
         ),
     )
 
@@ -152,6 +154,7 @@ def verified_claim_ref(*, suffix, evidence):
             document_id=evidence.source_locator.document_id,
             canonical_version_id=evidence.source_locator.canonical_version_id,
             content_hash=evidence.source_locator.content_hash,
+            item_id=evidence.source_locator.item_id,
         ),
     )
 
