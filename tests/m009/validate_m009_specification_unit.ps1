@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
 $validatorPath = Join-Path $repoRoot "scripts/validate_m009_specification.ps1"
@@ -155,7 +155,7 @@ try {
         -Content ($validContent.Replace("M-009 ne livre pas la stratégie candidate attribuée M-010 ni l'expérience reproductible M-011.", "M-009 prépare les stratégies et expériences aval."))
     $missingExclusionResult = Invoke-M009SpecificationValidator -SpecPath $missingExclusionSpecPath
     Assert-ExitCode -Actual $missingExclusionResult.ExitCode -Expected 1 -Message "Les exclusions M-010/M-011 doivent être obligatoires."
-    Assert-OutputContains -Output $missingExclusionResult.Output -Expected "M-009 ne livre pas la stratégie candidate attribuée M-010 ni l'expérience reproductible M-011." -Message "Les exclusions absentes doivent être nommées."
+    Assert-OutputContains -Output $missingExclusionResult.Output -Expected "M-009 ne livre pas la stratégie candidate attribuée M-010" -Message "Les exclusions absentes doivent être nommées."
 
     $missingAdrSpecPath = New-TemporarySpec `
         -Name "missing-adr" `

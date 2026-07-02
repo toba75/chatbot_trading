@@ -737,6 +737,14 @@ $requiredM009Requirements = @(
         CommandScript = "scripts/validate_m009_precondition.ps1"
         Code = "scripts/validate_m009_precondition.ps1"
         Adr = "ADR-010"
+    },
+    [ordered] @{
+        Id = "REQ-M009-002"
+        Source = "docs/tasks/milestone_009/0002_publier_specification_recherche_approfondie.md"
+        Test = "tests/m009/validate_m009_specification_acceptance.ps1"
+        CommandScript = "scripts/validate_m009_specification.ps1"
+        Code = "docs/specs/m009_recherche_approfondie_multi_sources.md"
+        Adr = "ADR-006; ADR-010; DDD-ADR-003; DDD-ADR-005; DDD-ADR-007; DDD-ADR-008"
     }
 )
 

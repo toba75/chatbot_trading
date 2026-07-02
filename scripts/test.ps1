@@ -18,6 +18,7 @@ $m005SpecificationPath = Join-Path $repoRoot "docs/specs/m005_projection_connais
 $m006SpecificationPath = Join-Path $repoRoot "docs/specs/m006_claims_verifiables.md"
 $m007SpecificationPath = Join-Path $repoRoot "docs/specs/m007_reponse_documentaire_verifiee.md"
 $m008SpecificationPath = Join-Path $repoRoot "docs/specs/m008_conversation_produit.md"
+$m009SpecificationPath = Join-Path $repoRoot "docs/specs/m009_recherche_approfondie_multi_sources.md"
 $platformTopologyPath = Join-Path $repoRoot "app/platform/topology_registry.json"
 $sparkFirewallPath = Join-Path $repoRoot "deploy/spark-firewall/network-boundary.json"
 $appRoot = Join-Path $repoRoot "app"
@@ -54,6 +55,8 @@ $m008TraceabilityAcceptancePath = "tests/m008/validate_m008_traceability_accepta
 $m008TraceabilityUnitPath = "tests/m008/validate_m008_traceability_unit.ps1"
 $m009PreconditionAcceptancePath = "tests/m009/validate_m009_precondition_acceptance.ps1"
 $m009PreconditionUnitPath = "tests/m009/validate_m009_precondition_unit.ps1"
+$m009SpecificationAcceptancePath = "tests/m009/validate_m009_specification_acceptance.ps1"
+$m009SpecificationUnitPath = "tests/m009/validate_m009_specification_unit.ps1"
 
 $validationCommands = @(
     @{ Path = "scripts/validate_m000_precondition_report.ps1"; Arguments = @("-Path", $preconditionReportPath) },
@@ -69,6 +72,7 @@ $validationCommands = @(
     @{ Path = "scripts/validate_m006_specification.ps1"; Arguments = @("-Path", $m006SpecificationPath) },
     @{ Path = "scripts/validate_m007_specification.ps1"; Arguments = @("-Path", $m007SpecificationPath) },
     @{ Path = "scripts/validate_m008_specification.ps1"; Arguments = @("-Path", $m008SpecificationPath) },
+    @{ Path = "scripts/validate_m009_specification.ps1"; Arguments = @("-Path", $m009SpecificationPath) },
     @{ Path = "scripts/validate_platform_topology.ps1"; Arguments = @("-Path", $platformTopologyPath) },
     @{ Path = "scripts/validate_local_compose.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_network_boundary.ps1"; Arguments = @("-SparkFirewallPath", $sparkFirewallPath) },
@@ -254,7 +258,9 @@ $testCommands = @(
     @{ Path = "tests/m008/validate_m008_traceability_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/m008/validate_m008_traceability_unit.ps1"; Arguments = @() },
     @{ Path = "tests/m009/validate_m009_precondition_unit.ps1"; Arguments = @() },
-    @{ Path = "tests/m009/validate_m009_precondition_acceptance.ps1"; Arguments = @() }
+    @{ Path = "tests/m009/validate_m009_precondition_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m009/validate_m009_specification_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m009/validate_m009_specification_unit.ps1"; Arguments = @() }
 )
 
 function Get-GateCommandPaths {
@@ -307,7 +313,9 @@ if ($env:OST_M003_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m008TraceabilityAcceptancePath,
         $m008TraceabilityUnitPath,
         $m009PreconditionAcceptancePath,
-        $m009PreconditionUnitPath
+        $m009PreconditionUnitPath,
+        $m009SpecificationAcceptancePath,
+        $m009SpecificationUnitPath
     )
 }
 elseif ($env:OST_M004_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -348,7 +356,9 @@ elseif ($env:OST_M004_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m008TraceabilityAcceptancePath,
         $m008TraceabilityUnitPath,
         $m009PreconditionAcceptancePath,
-        $m009PreconditionUnitPath
+        $m009PreconditionUnitPath,
+        $m009SpecificationAcceptancePath,
+        $m009SpecificationUnitPath
     )
 }
 elseif ($env:OST_M005_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -390,7 +400,9 @@ elseif ($env:OST_M005_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m008TraceabilityAcceptancePath,
         $m008TraceabilityUnitPath,
         $m009PreconditionAcceptancePath,
-        $m009PreconditionUnitPath
+        $m009PreconditionUnitPath,
+        $m009SpecificationAcceptancePath,
+        $m009SpecificationUnitPath
     )
 }
 elseif ($env:OST_M006_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -431,7 +443,9 @@ elseif ($env:OST_M006_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m008TraceabilityAcceptancePath,
         $m008TraceabilityUnitPath,
         $m009PreconditionAcceptancePath,
-        $m009PreconditionUnitPath
+        $m009PreconditionUnitPath,
+        $m009SpecificationAcceptancePath,
+        $m009SpecificationUnitPath
     )
 }
 elseif ($env:OST_M007_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -471,7 +485,9 @@ elseif ($env:OST_M007_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m008TraceabilityAcceptancePath,
         $m008TraceabilityUnitPath,
         $m009PreconditionAcceptancePath,
-        $m009PreconditionUnitPath
+        $m009PreconditionUnitPath,
+        $m009SpecificationAcceptancePath,
+        $m009SpecificationUnitPath
     )
 }
 elseif ($env:OST_M008_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -490,7 +506,9 @@ elseif ($env:OST_M008_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m007PreconditionAcceptancePath,
         $m008PreconditionAcceptancePath,
         $m009PreconditionAcceptancePath,
-        $m009PreconditionUnitPath
+        $m009PreconditionUnitPath,
+        $m009SpecificationAcceptancePath,
+        $m009SpecificationUnitPath
     )
 }
 elseif ($env:OST_M009_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -508,7 +526,9 @@ elseif ($env:OST_M009_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m006PreconditionAcceptancePath,
         $m007PreconditionAcceptancePath,
         $m008PreconditionAcceptancePath,
-        $m009PreconditionAcceptancePath
+        $m009PreconditionAcceptancePath,
+        $m009SpecificationAcceptancePath,
+        $m009SpecificationUnitPath
     )
 }
 
