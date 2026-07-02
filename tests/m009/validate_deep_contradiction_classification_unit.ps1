@@ -52,6 +52,17 @@ def assert_raises(expected_fragment, action):
         raise AssertionError(f"Erreur attendue absente: {expected_fragment}")
 
 
+def assert_no_frequency_consensus(value, path="payload"):
+    forbidden_markers = {"raw_frequency_count", "raw_mention_count", "frequency_consensus"}
+    if isinstance(value, dict):
+        for key, child in value.items():
+            assert_false(key.lower() in forbidden_markers, f"Consensus par fréquence publié dans {path}.{key}.")
+            assert_no_frequency_consensus(child, f"{path}.{key}")
+    elif isinstance(value, (list, tuple)):
+        for index, child in enumerate(value):
+            assert_no_frequency_consensus(child, f"{path}[{index}]")
+
+
 def claim_ref(suffix):
     return ClaimVersionRef(claim_id=f"CLM-M009-T006-{suffix}", claim_version=1)
 
@@ -131,7 +142,7 @@ assert_equal(
 assert_equal(support_assessment.relation_type, "SUPPORTS", "Le type de relation public doit être conservé.")
 assert_equal(support_assessment.compared_dimensions, SCOPE_DIMENSIONS, "Les dimensions comparées doivent être conservées.")
 assert_false(support_assessment.blocks_publication, "Une compatibilité positive ne doit pas bloquer la publication.")
-assert_false("frequency" in repr(support_assessment.to_payload()).lower(), "Aucun consensus par fréquence ne doit être publié.")
+assert_no_frequency_consensus(support_assessment.to_payload())
 
 # QUALIFIES compatible reste une compatibilité positive qualifiée.
 qualifies_relation = relation_for(
@@ -197,8 +208,9 @@ assert_true(genuine_assessment.blocks_publication, "Un conflit réel non qualifi
 
 
 def assert_apparent(reason_code, expected_classification):
+    relation_suffix = expected_classification.value.replace("_", "-")
     relation = relation_for(
-        relation_id=f"REL-M009-T006-{expected_classification.value}",
+        relation_id=f"REL-M009-T006-{relation_suffix}",
         relation_type=ClaimRelationType.APPARENTLY_CONTRADICTS,
         compatibility=non_comparable_scope(reason_code),
     )

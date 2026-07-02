@@ -278,10 +278,10 @@ def sealed_case_with_claims():
         research_case_id=research_case_id,
         coverage_obligations=tuple(obligation.name for obligation in research_case.research_plan.coverage_obligations),
         candidates=(
-            candidate_for(support_a_evidence, suffix="1", text="Preuve favorable sur la couverture de queue.", obligations=("preuves_favorables",)),
+            candidate_for(support_a_evidence, suffix="1", text="Preuve favorable sur la couverture de queue.", obligations=("methodes", "preuves_favorables")),
             candidate_for(support_b_evidence, suffix="2", text="Preuve favorable indépendante sur la diversification.", obligations=("preuves_favorables", "dependances")),
             candidate_for(short_evidence, suffix="3", text="Preuve défavorable limitée au choc mensuel.", obligations=("preuves_defavorables", "limites")),
-            candidate_for(long_evidence, suffix="4", text="Preuve défavorable après coûts sur cycle complet.", obligations=("preuves_defavorables", "limites")),
+            candidate_for(long_evidence, suffix="4", text="Preuve défavorable après coûts sur cycle complet.", obligations=("preuves_defavorables", "limites", "zones_non_documentees")),
         ),
         verified_claim_refs=(support_a, support_b, short_claim, long_claim),
         coverage_policy_version="deep-evidence-coverage-m009-v1",

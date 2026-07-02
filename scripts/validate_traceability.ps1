@@ -769,6 +769,14 @@ $requiredM009Requirements = @(
         CommandScript = "tests/m009/validate_verified_claim_dependency_resolution_acceptance.ps1"
         Code = "app/research_answering/application/resolve_claim_dependencies.py"
         Adr = "ADR-006; DDD-ADR-005; DDD-ADR-008"
+    },
+    [ordered] @{
+        Id = "REQ-M009-006"
+        Source = "docs/tasks/milestone_009/0006_classifier_contradictions_conditions_limites.md"
+        Test = "tests/m009/validate_deep_contradiction_classification_acceptance.ps1"
+        CommandScript = "tests/m009/validate_deep_contradiction_classification_acceptance.ps1"
+        Code = "app/evidence_governance/domain/claim_relation.py; app/research_answering/domain/contradiction_assessment.py; app/research_answering/application/classify_contradictions.py"
+        Adr = "DDD-ADR-005; DDD-ADR-007"
     }
 )
 

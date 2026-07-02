@@ -19,11 +19,13 @@ _TEXTUAL_SIMILARITY_ONLY = "TEXTUAL_SIMILARITY_ONLY"
 _EXPLICIT_SCOPE_COMPARISON = "EXPLICIT_SCOPE_COMPARISON"
 _EXPLICIT_SOURCE_DEPENDENCY = "EXPLICIT_SOURCE_DEPENDENCY"
 _EXPLICIT_SUPPORT_EVIDENCE = "EXPLICIT_SUPPORT_EVIDENCE"
+_EXPLICIT_SCOPE_QUALIFICATION = "EXPLICIT_SCOPE_QUALIFICATION"
 _ALLOWED_RELATION_BASES = frozenset(
     {
         _EXPLICIT_SCOPE_COMPARISON,
         _EXPLICIT_SOURCE_DEPENDENCY,
         _EXPLICIT_SUPPORT_EVIDENCE,
+        _EXPLICIT_SCOPE_QUALIFICATION,
     }
 )
 _SCOPE_STOPWORDS = frozenset(
@@ -49,6 +51,7 @@ class ClaimRelationType(str, Enum):
     APPARENTLY_CONTRADICTS = "APPARENTLY_CONTRADICTS"
     MORE_GENERAL_THAN = "MORE_GENERAL_THAN"
     DERIVED_FROM = "DERIVED_FROM"
+    QUALIFIES = "QUALIFIES"
 
 
 class ScopeCompatibilityStatus(str, Enum):
@@ -248,6 +251,18 @@ class ClaimRelationPolicy:
         if relation_type == ClaimRelationType.SUPPORTS:
             if basis != _EXPLICIT_SUPPORT_EVIDENCE:
                 raise ValueError("support explicite absent")
+            if compatibility.status != ScopeCompatibilityStatus.COMPARABLE:
+                raise ValueError("support_scope non compatible")
+            return ClaimRelationPolicyDecision(
+                relation_type=relation_type,
+                scope_compatibility=compatibility,
+            )
+
+        if relation_type == ClaimRelationType.QUALIFIES:
+            if basis != _EXPLICIT_SCOPE_QUALIFICATION:
+                raise ValueError("qualification explicite absente")
+            if compatibility.status != ScopeCompatibilityStatus.COMPARABLE:
+                raise ValueError("qualification_scope non compatible")
             return ClaimRelationPolicyDecision(
                 relation_type=relation_type,
                 scope_compatibility=compatibility,
@@ -311,6 +326,18 @@ class ClaimRelation:
             self.relation_basis != _EXPLICIT_SUPPORT_EVIDENCE
         ):
             raise ValueError("support explicite absent")
+        if self.relation_type == ClaimRelationType.SUPPORTS and (
+            self.scope_compatibility.status != ScopeCompatibilityStatus.COMPARABLE
+        ):
+            raise ValueError("support_scope non compatible")
+        if self.relation_type == ClaimRelationType.QUALIFIES and (
+            self.relation_basis != _EXPLICIT_SCOPE_QUALIFICATION
+        ):
+            raise ValueError("qualification explicite absente")
+        if self.relation_type == ClaimRelationType.QUALIFIES and (
+            self.scope_compatibility.status != ScopeCompatibilityStatus.COMPARABLE
+        ):
+            raise ValueError("qualification_scope non compatible")
         object.__setattr__(self, "policy_version", _ensure_text(self.policy_version, "policy_version"))
         object.__setattr__(self, "recorded_at", _ensure_utc_instant(self.recorded_at))
         if self.cycle_justification is not None:
