@@ -53,12 +53,12 @@ def mandate_payload():
         ),
         "horizon": "connaissances documentaires stables",
         "data_requirements": (
-            "méthodes",
+            "methodes",
             "preuves favorables",
-            "preuves défavorables",
+            "preuves defavorables",
             "dépendances",
             "limites",
-            "zones non documentées",
+            "zones non documentees",
         ),
         "exclusions": (
             "données de marché actuelles",
@@ -66,7 +66,7 @@ def mandate_payload():
             "extension hors mandat utilisateur",
         ),
         "language": "fr",
-        "detail_level": "synthèse approfondie multi-sources",
+        "detail_level": "synthese approfondie multi-sources",
     }
 
 
@@ -111,7 +111,7 @@ def valid_sub_questions():
             sub_question_id="RSQ-METHODES",
             text="Quelles méthodes du mandat comparent Kelly et volatility targeting ?",
             coverage_obligation_names=("methodes", "dependances"),
-            mandate_terms=("méthodes", "Kelly", "volatility targeting"),
+            mandate_terms=("methodes", "Kelly", "volatility targeting"),
         ),
         ResearchSubQuestion(
             sub_question_id="RSQ-PREUVES-FAVORABLES",
@@ -123,13 +123,13 @@ def valid_sub_questions():
             sub_question_id="RSQ-PREUVES-DEFAVORABLES",
             text="Quelles preuves défavorables documentent Kelly et volatility targeting ?",
             coverage_obligation_names=("preuves_defavorables",),
-            mandate_terms=("preuves défavorables", "Kelly", "volatility targeting"),
+            mandate_terms=("preuves defavorables", "Kelly", "volatility targeting"),
         ),
         ResearchSubQuestion(
             sub_question_id="RSQ-LIMITES-LACUNES",
             text="Quelles limites et zones non documentées bornent la synthèse ?",
             coverage_obligation_names=("limites", "zones_non_documentees"),
-            mandate_terms=("limites", "zones non documentées", "synthèse approfondie multi-sources"),
+            mandate_terms=("limites", "zones non documentees", "synthese approfondie multi-sources"),
         ),
     )
 

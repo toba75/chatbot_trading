@@ -745,6 +745,14 @@ $requiredM009Requirements = @(
         CommandScript = "scripts/validate_m009_specification.ps1"
         Code = "docs/specs/m009_recherche_approfondie_multi_sources.md"
         Adr = "ADR-006; ADR-010; DDD-ADR-003; DDD-ADR-005; DDD-ADR-007; DDD-ADR-008"
+    },
+    [ordered] @{
+        Id = "REQ-M009-003"
+        Source = "docs/tasks/milestone_009/0003_planifier_recherche_couverture.md"
+        Test = "tests/m009/validate_deep_research_planning_acceptance.ps1"
+        CommandScript = "tests/m009/validate_deep_research_planning_acceptance.ps1"
+        Code = "app/research_answering/domain/research_case.py; app/research_answering/domain/research_planning.py; app/research_answering/application/open_research_case.py"
+        Adr = "ADR-006; ADR-010; DDD-ADR-005"
     }
 )
 

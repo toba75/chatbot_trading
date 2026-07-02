@@ -35,6 +35,7 @@ from app.research_answering.domain.contradiction_assessment import (
 _HASH_HEX_LENGTH = 24
 _RESEARCH_CASE_ID_PATTERN = re.compile(r"^RSC-[A-Z0-9][A-Z0-9-]*$")
 _RESEARCH_PLAN_ID_PATTERN = re.compile(r"^RPLAN-[A-Z0-9][A-Z0-9-]*$")
+_RESEARCH_SUB_QUESTION_ID_PATTERN = re.compile(r"^RSQ-[A-Z0-9][A-Z0-9-]*$")
 _UTC_INSTANT_PATTERN = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
 _ALLOWED_REQUESTING_CONTEXTS = frozenset({"API", "CV", "RA"})
 _MANDATE_FIELDS = frozenset(
@@ -53,6 +54,7 @@ class ResearchMode(str, Enum):
     """Mode de recherche demandé explicitement à RA."""
 
     DOCUMENTARY_SIMPLE = "DOCUMENTARY_SIMPLE"
+    DEEP_RESEARCH = "DEEP_RESEARCH"
 
     @classmethod
     def from_value(cls, value: object) -> "ResearchMode":
@@ -169,6 +171,40 @@ class CoverageObligation:
 
 
 @dataclass(frozen=True)
+class ResearchSubQuestion:
+    """Sous-question autonome rattachée aux obligations de couverture."""
+
+    sub_question_id: str
+    text: str
+    coverage_obligation_names: tuple[str, ...]
+    mandate_terms: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "sub_question_id", _ensure_sub_question_id(self.sub_question_id))
+        object.__setattr__(self, "text", _ensure_text(self.text, "research_sub_question text"))
+        if not self.text.endswith("?"):
+            raise ValueError("research_sub_question non interrogative")
+        object.__setattr__(
+            self,
+            "coverage_obligation_names",
+            _ensure_text_tuple(self.coverage_obligation_names, "coverage_obligation_names"),
+        )
+        object.__setattr__(
+            self,
+            "mandate_terms",
+            _ensure_text_tuple(self.mandate_terms, "mandate_terms"),
+        )
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "sub_question_id": self.sub_question_id,
+            "text": self.text,
+            "coverage_obligation_names": self.coverage_obligation_names,
+            "mandate_terms": self.mandate_terms,
+        }
+
+
+@dataclass(frozen=True)
 class ResearchPlan:
     """Plan RA local publié dans le ResearchCase avant collecte."""
 
@@ -197,6 +233,34 @@ class ResearchPlan:
             ],
             "policy_version": self.policy_version,
         }
+
+
+@dataclass(frozen=True)
+class DeepResearchPlan(ResearchPlan):
+    """Plan RA approfondi avec sous-questions et obligations explicites."""
+
+    sub_questions: tuple[ResearchSubQuestion, ...]
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        if self.mode is not ResearchMode.DEEP_RESEARCH:
+            raise ValueError("research_mode approfondi requis")
+        object.__setattr__(
+            self,
+            "sub_questions",
+            _ensure_research_sub_questions(self.sub_questions),
+        )
+        _ensure_sub_question_obligations_in_plan(
+            coverage_obligations=self.coverage_obligations,
+            sub_questions=self.sub_questions,
+        )
+
+    def to_payload(self) -> dict[str, Any]:
+        payload = super().to_payload()
+        payload["sub_questions"] = [
+            sub_question.to_payload() for sub_question in self.sub_questions
+        ]
+        return payload
 
 
 @dataclass(frozen=True)
@@ -846,6 +910,38 @@ def _ensure_coverage_obligations(value: object) -> tuple[CoverageObligation, ...
     return obligations
 
 
+def _ensure_research_sub_questions(value: object) -> tuple[ResearchSubQuestion, ...]:
+    if value is None or isinstance(value, str) or not isinstance(value, Sequence):
+        raise ValueError("research_sub_questions invalides")
+    sub_questions = tuple(value)
+    if len(sub_questions) == 0:
+        raise ValueError("research_sub_questions absentes")
+    for sub_question in sub_questions:
+        if not isinstance(sub_question, ResearchSubQuestion):
+            raise ValueError("research_sub_question invalide")
+    ids = tuple(sub_question.sub_question_id for sub_question in sub_questions)
+    if len(ids) != len(set(ids)):
+        raise ValueError("research_sub_question dupliquee")
+    return sub_questions
+
+
+def _ensure_sub_question_obligations_in_plan(
+    *,
+    coverage_obligations: tuple[CoverageObligation, ...],
+    sub_questions: tuple[ResearchSubQuestion, ...],
+) -> None:
+    planned_obligations = {obligation.name for obligation in coverage_obligations}
+    referenced_obligations: set[str] = set()
+    for sub_question in sub_questions:
+        for obligation_name in sub_question.coverage_obligation_names:
+            if obligation_name not in planned_obligations:
+                raise ValueError(f"coverage_obligation hors plan: {obligation_name}")
+            referenced_obligations.add(obligation_name)
+    for obligation_name in planned_obligations:
+        if obligation_name not in referenced_obligations:
+            raise ValueError(f"coverage_obligation non rattachee: {obligation_name}")
+
+
 def _ensure_requesting_context(value: object) -> str:
     context = _ensure_text(value, "requested_by_context")
     if context not in _ALLOWED_REQUESTING_CONTEXTS:
@@ -864,6 +960,13 @@ def _ensure_plan_id(value: object) -> str:
     text = _ensure_text(value, "plan_id")
     if _RESEARCH_PLAN_ID_PATTERN.fullmatch(text) is None:
         raise ValueError("plan_id invalide")
+    return text
+
+
+def _ensure_sub_question_id(value: object) -> str:
+    text = _ensure_text(value, "sub_question_id")
+    if _RESEARCH_SUB_QUESTION_ID_PATTERN.fullmatch(text) is None:
+        raise ValueError("sub_question_id invalide")
     return text
 
 
@@ -917,6 +1020,7 @@ def _json_ready(value: Any) -> Any:
 
 __all__ = [
     "CoverageObligation",
+    "DeepResearchPlan",
     "ResearchCase",
     "ResearchCaseOpened",
     "ResearchCaseStatus",
@@ -924,6 +1028,7 @@ __all__ = [
     "ResearchMode",
     "ResearchPlan",
     "ResearchPlanCreated",
+    "ResearchSubQuestion",
     "ResolvedQuestion",
     "research_case_id_for",
 ]

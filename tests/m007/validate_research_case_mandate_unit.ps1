@@ -120,7 +120,7 @@ assert_raises(
     ),
 )
 assert_raises("requested_mode absent", lambda: OpenResearchCaseCommand.from_payload({key: value for key, value in command_payload().items() if key != "requested_mode"}))
-assert_raises("research_mode inconnu", lambda: ResearchMode.from_value("DEEP_RESEARCH"))
+assert_equal(ResearchMode.from_value("DEEP_RESEARCH"), ResearchMode.DEEP_RESEARCH, "Le mode approfondi M-009 doit être reconnu sans être traité par M-007.")
 assert_raises("coverage_obligation name vide", lambda: CoverageObligation(name="", description="description"))
 assert_raises(
     "coverage_obligations absentes",
@@ -186,6 +186,19 @@ assert_equal(
     tuple(obligation.name for obligation in policy_plan.coverage_obligations),
     ("question_autonome", "mandat_documentaire", "preuves_documentaires"),
     "Les obligations M-007 doivent être nommées et déterministes.",
+)
+assert_raises(
+    "research_mode non supporte par politique",
+    lambda: policy.plan_for(
+        ResearchCase.open(
+            research_case_id="RSC-M007-T003-DEEP-REFUSED",
+            resolved_question=ResolvedQuestion("Quels documents comparer en profondeur ?"),
+            research_mandate=ResearchMandate.from_payload(mandate_payload()),
+            requested_mode=ResearchMode.DEEP_RESEARCH,
+            requested_by_context="CV",
+            occurred_at="2026-06-30T08:25:00Z",
+        )
+    ),
 )
 
 # Le handler orchestre commande, agrégat, politique et repository strict sans accès KA/EG direct.
