@@ -793,6 +793,14 @@ $requiredM009Requirements = @(
         CommandScript = "tests/m009/validate_multi_source_synthesis_acceptance.ps1"
         Code = "app/research_answering/domain/answer.py; app/research_answering/application/draft_answer.py"
         Adr = "DDD-ADR-003; DDD-ADR-005; DDD-ADR-007"
+    },
+    [ordered] @{
+        Id = "REQ-M009-009"
+        Source = "docs/tasks/milestone_009/0009_exposer_endpoint_recherche_approfondie.md"
+        Test = "tests/m009/validate_deep_research_http_contract_acceptance.ps1"
+        CommandScript = "tests/m009/validate_deep_research_http_contract_acceptance.ps1"
+        Code = "app/research_answering/adapters/answer_http.py; app/research_answering/application/deep_research.py; app/conversation/application/answer_deep_research_turn.py"
+        Adr = "ADR-010; DDD-ADR-003; DDD-ADR-005"
     }
 )
 

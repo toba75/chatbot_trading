@@ -10,6 +10,10 @@ from app.research_answering.application.answer_question import (
     AnswerQuestion,
     AnswerQuestionResult,
 )
+from app.research_answering.application.deep_research import (
+    DeepResearchRequest,
+    DeepResearchResult,
+)
 
 
 _ANSWER_BODY_FIELDS = frozenset(
@@ -34,6 +38,7 @@ _EXPLICITLY_FORBIDDEN_BODY_FIELDS = frozenset(
 )
 _KNOWN_AUTHENTICATED_CONTEXTS = frozenset({"API", "CV", "RA", "KA", "EG", "SP", "SD", "EX"})
 _ALLOWED_ANSWER_CONTEXTS = frozenset({"API", "CV", "RA"})
+_ALLOWED_DEEP_RESEARCH_CONTEXTS = frozenset({"API", "CV", "RA"})
 _PUBLIC_DOMAIN_ERRORS = {
     "RESEARCH_MANDATE_REQUIRED": (422, "RESEARCH_MANDATE_REQUIRED"),
     "EVIDENCE_SET_NOT_SEALED": (409, "EVIDENCE_SET_NOT_SEALED"),
@@ -52,6 +57,13 @@ class AnswerQuestionHandlerPort(Protocol):
 
     def answer(self, command: AnswerQuestion) -> AnswerQuestionResult:
         """Exécute la commande de réponse documentaire."""
+
+
+class DeepResearchHandlerPort(Protocol):
+    """Port applicatif RA appele par l'adaptateur HTTP approfondi."""
+
+    def research(self, command: DeepResearchRequest) -> DeepResearchResult:
+        """Execute la commande de recherche approfondie."""
 
 
 class AnswerHttpRequestValidationError(ValueError):
@@ -192,15 +204,27 @@ class AnswerRequestDto:
 class AnswerHttpAdapter:
     """Route explicitement POST /v1/answer côté RA."""
 
-    def __init__(self, *, answer_question_handler: AnswerQuestionHandlerPort) -> None:
+    def __init__(
+        self,
+        *,
+        answer_question_handler: AnswerQuestionHandlerPort,
+        deep_research_handler: DeepResearchHandlerPort | None = None,
+    ) -> None:
         if not callable(getattr(answer_question_handler, "answer", None)):
             raise ValueError("answer_question_handler sans AnswerQuestion")
+        if deep_research_handler is not None and not callable(
+            getattr(deep_research_handler, "research", None)
+        ):
+            raise ValueError("deep_research_handler sans DeepResearchRequest")
         self._answer_question_handler = answer_question_handler
+        self._deep_research_handler = deep_research_handler
 
     def handle(self, request: HttpRequest) -> HttpResponse:
         parsed_request = _ensure_http_request(request)
         if parsed_request.method == "POST" and parsed_request.path == "/v1/answer":
             return self._handle_answer(parsed_request)
+        if parsed_request.method == "POST" and parsed_request.path == "/v1/research/deep":
+            return self._handle_deep_research(parsed_request)
         return HttpResponse(
             status_code=404,
             body={"error_code": "ENDPOINT_NOT_FOUND", "path": parsed_request.path},
@@ -232,6 +256,78 @@ class AnswerHttpAdapter:
             return _domain_error_response(exc)
 
         return HttpResponse(status_code=200, body=public_payload)
+
+    def _handle_deep_research(self, request: HttpRequest) -> HttpResponse:
+        if self._deep_research_handler is None:
+            return HttpResponse(
+                status_code=404,
+                body={"error_code": "ENDPOINT_NOT_FOUND", "path": request.path},
+            )
+        if request.authenticated_context not in _ALLOWED_DEEP_RESEARCH_CONTEXTS:
+            return _public_error_response("DEEP_RESEARCH_CONTEXT_FORBIDDEN", 403)
+
+        try:
+            command = DeepResearchRequest.from_payload(
+                request.body,
+                requested_by_context=request.authenticated_context,
+            )
+        except ValueError as exc:
+            return _deep_research_request_error_response(exc)
+
+        try:
+            result = self._deep_research_handler.research(command)
+            if not isinstance(result, DeepResearchResult):
+                raise ValueError("deep_research_result invalide")
+            public_payload = result.to_public_payload()
+        except ValueError as exc:
+            return _deep_research_domain_error_response(exc)
+
+        return HttpResponse(status_code=200, body=public_payload)
+
+
+def _deep_research_request_error_response(exc: ValueError) -> HttpResponse:
+    message = str(exc)
+    if message.startswith("body champ stockage interdit:"):
+        return HttpResponse(
+            status_code=400,
+            body={"error_code": "PUBLIC_STORAGE_FIELD_FORBIDDEN", "field": "body"},
+        )
+    if message in {"research_mandate absent", "research_mandate vide"}:
+        return HttpResponse(
+            status_code=422,
+            body={"error_code": "DEEP_RESEARCH_MANDATE_REQUIRED", "field": "research_mandate"},
+        )
+    if message.startswith("research_mandate "):
+        return HttpResponse(
+            status_code=422,
+            body={"error_code": "DEEP_RESEARCH_MANDATE_REQUIRED", "field": "research_mandate"},
+        )
+    if message.startswith("research_mode ") or message.startswith("requested_mode "):
+        return HttpResponse(
+            status_code=422,
+            body={"error_code": "DEEP_RESEARCH_MODE_REQUIRED", "field": "research_mode"},
+        )
+    return _bad_request_response("body")
+
+
+def _deep_research_domain_error_response(exc: ValueError) -> HttpResponse:
+    message = str(exc).strip()
+    public_errors = {
+        "DEEP_RESEARCH_PLAN_REQUIRED": (409, "DEEP_RESEARCH_PLAN_REQUIRED"),
+        "COVERAGE_OBLIGATION_MISSING": (422, "COVERAGE_OBLIGATION_MISSING"),
+        "COVERAGE_INSUFFICIENT": (422, "COVERAGE_INSUFFICIENT"),
+        "SOURCE_DIVERSIFICATION_INSUFFICIENT": (422, "SOURCE_DIVERSIFICATION_INSUFFICIENT"),
+        "CLAIM_DEPENDENCY_UNRESOLVED": (409, "CLAIM_DEPENDENCY_UNRESOLVED"),
+        "CONTRADICTION_UNCLASSIFIED": (409, "CONTRADICTION_UNCLASSIFIED"),
+        "DEEP_RESEARCH_SYNTHESIS_UNSUPPORTED": (422, "DEEP_RESEARCH_SYNTHESIS_UNSUPPORTED"),
+        "CURRENT_DATA_REQUIRED": (422, "CURRENT_DATA_REQUIRED"),
+        "DEEP_RESEARCH_POLICY_MISSING": (422, "DEEP_RESEARCH_POLICY_MISSING"),
+    }
+    error_code = message.split(":", 1)[0].split(" ", 1)[0]
+    if error_code in public_errors:
+        status_code, public_error_code = public_errors[error_code]
+        return _public_error_response(public_error_code, status_code)
+    return _bad_request_response("body")
 
 
 def _validation_error_response(exc: AnswerHttpRequestValidationError) -> HttpResponse:
@@ -372,6 +468,7 @@ __all__ = [
     "AnswerHttpRequestValidationError",
     "AnswerQuestionHandlerPort",
     "AnswerRequestDto",
+    "DeepResearchHandlerPort",
     "HttpRequest",
     "HttpResponse",
 ]
