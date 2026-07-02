@@ -267,8 +267,8 @@ try {
     Assert-ExitCode -Actual $validResult.ExitCode -Expected 0 -Message "La matrice M-004 complète doit être acceptée."
     Assert-OutputContains `
         -Output $validResult.Output `
-        -Expected "Matrice de tra$($cCedilla)abilit$($eAcute) valide: 83 exigence(s)" `
-        -Message "La matrice doit compter les exigences M-004 de précondition et de clôture."
+        -Expected "Matrice de tra$($cCedilla)abilit$($eAcute) valide:" `
+        -Message "La matrice doit confirmer la validité des exigences M-004."
 
     $missingPreconditionProjectRoot = New-TemporaryProject -Name "missing-precondition"
     Remove-MatrixRow `

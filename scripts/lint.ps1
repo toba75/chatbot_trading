@@ -17,6 +17,7 @@ $m004SpecificationPath = Join-Path $repoRoot "docs/specs/m004_version_canonique_
 $m005SpecificationPath = Join-Path $repoRoot "docs/specs/m005_projection_connaissance_recherchable.md"
 $m006SpecificationPath = Join-Path $repoRoot "docs/specs/m006_claims_verifiables.md"
 $m007SpecificationPath = Join-Path $repoRoot "docs/specs/m007_reponse_documentaire_verifiee.md"
+$m008SpecificationPath = Join-Path $repoRoot "docs/specs/m008_conversation_produit.md"
 $platformTopologyPath = Join-Path $repoRoot "app/platform/topology_registry.json"
 $sparkFirewallPath = Join-Path $repoRoot "deploy/spark-firewall/network-boundary.json"
 $appRoot = Join-Path $repoRoot "app"
@@ -35,6 +36,7 @@ $validationCommands = @(
     @{ Path = "scripts/validate_m005_specification.ps1"; Arguments = @("-Path", $m005SpecificationPath) },
     @{ Path = "scripts/validate_m006_specification.ps1"; Arguments = @("-Path", $m006SpecificationPath) },
     @{ Path = "scripts/validate_m007_specification.ps1"; Arguments = @("-Path", $m007SpecificationPath) },
+    @{ Path = "scripts/validate_m008_specification.ps1"; Arguments = @("-Path", $m008SpecificationPath) },
     @{ Path = "scripts/validate_platform_topology.ps1"; Arguments = @("-Path", $platformTopologyPath) },
     @{ Path = "scripts/validate_local_compose.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_network_boundary.ps1"; Arguments = @("-SparkFirewallPath", $sparkFirewallPath) },
@@ -56,6 +58,7 @@ $expectedValidationPaths = @(
     "scripts/validate_m005_specification.ps1",
     "scripts/validate_m006_specification.ps1",
     "scripts/validate_m007_specification.ps1",
+    "scripts/validate_m008_specification.ps1",
     "scripts/validate_platform_topology.ps1",
     "scripts/validate_local_compose.ps1",
     "scripts/validate_network_boundary.ps1",
@@ -69,7 +72,7 @@ Invoke-M000ValidationGate `
     -RepositoryRoot $repoRoot `
     -ValidationCommands $validationCommands `
     -TestCommands $testCommands `
-    -ExpectedValidationCount 16 `
+    -ExpectedValidationCount 17 `
     -ExpectedTestCount 0 `
     -ExpectedValidationPaths $expectedValidationPaths `
     -ExpectedTestPaths $expectedTestPaths

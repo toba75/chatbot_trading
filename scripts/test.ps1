@@ -17,6 +17,7 @@ $m004SpecificationPath = Join-Path $repoRoot "docs/specs/m004_version_canonique_
 $m005SpecificationPath = Join-Path $repoRoot "docs/specs/m005_projection_connaissance_recherchable.md"
 $m006SpecificationPath = Join-Path $repoRoot "docs/specs/m006_claims_verifiables.md"
 $m007SpecificationPath = Join-Path $repoRoot "docs/specs/m007_reponse_documentaire_verifiee.md"
+$m008SpecificationPath = Join-Path $repoRoot "docs/specs/m008_conversation_produit.md"
 $platformTopologyPath = Join-Path $repoRoot "app/platform/topology_registry.json"
 $sparkFirewallPath = Join-Path $repoRoot "deploy/spark-firewall/network-boundary.json"
 $appRoot = Join-Path $repoRoot "app"
@@ -29,6 +30,28 @@ $m006PreconditionAcceptancePath = "tests/m006/validate_m006_precondition_accepta
 $m006PreconditionUnitPath = "tests/m006/validate_m006_precondition_unit.ps1"
 $m007PreconditionAcceptancePath = "tests/m007/validate_m007_precondition_acceptance.ps1"
 $m007PreconditionUnitPath = "tests/m007/validate_m007_precondition_unit.ps1"
+$m008PreconditionAcceptancePath = "tests/m008/validate_m008_precondition_acceptance.ps1"
+$m008PreconditionUnitPath = "tests/m008/validate_m008_precondition_unit.ps1"
+$m008SpecificationAcceptancePath = "tests/m008/validate_m008_specification_acceptance.ps1"
+$m008SpecificationUnitPath = "tests/m008/validate_m008_specification_unit.ps1"
+$m008ConversationTurnAcceptancePath = "tests/m008/validate_conversation_turn_append_only_acceptance.ps1"
+$m008ConversationTurnUnitPath = "tests/m008/validate_conversation_turn_append_only_unit.ps1"
+$m008ContextSnapshotAcceptancePath = "tests/m008/validate_conversation_context_snapshot_acceptance.ps1"
+$m008ContextSnapshotUnitPath = "tests/m008/validate_conversation_context_snapshot_unit.ps1"
+$m008FollowupResolutionAcceptancePath = "tests/m008/validate_followup_question_resolution_acceptance.ps1"
+$m008FollowupResolutionUnitPath = "tests/m008/validate_followup_question_resolution_unit.ps1"
+$m008ModeRoutingAcceptancePath = "tests/m008/validate_conversation_mode_routing_acceptance.ps1"
+$m008ModeRoutingUnitPath = "tests/m008/validate_conversation_mode_routing_unit.ps1"
+$m008VerifiedResultReuseAcceptancePath = "tests/m008/validate_verified_result_reuse_acceptance.ps1"
+$m008VerifiedAnswerAttachmentUnitPath = "tests/m008/validate_verified_answer_attachment_unit.ps1"
+$m008AnswerPresentationAcceptancePath = "tests/m008/validate_chat_answer_presentation_acceptance.ps1"
+$m008AnswerPresentationUnitPath = "tests/m008/validate_chat_answer_presentation_unit.ps1"
+$m008ConversationHttpAcceptancePath = "tests/m008/validate_conversation_http_contract_acceptance.ps1"
+$m008ConversationHttpUnitPath = "tests/m008/validate_conversation_http_contract_unit.ps1"
+$m008ChatCompletionsAcceptancePath = "tests/m008/validate_chat_completions_contract_acceptance.ps1"
+$m008ChatCompletionsUnitPath = "tests/m008/validate_chat_completions_contract_unit.ps1"
+$m008TraceabilityAcceptancePath = "tests/m008/validate_m008_traceability_acceptance.ps1"
+$m008TraceabilityUnitPath = "tests/m008/validate_m008_traceability_unit.ps1"
 
 $validationCommands = @(
     @{ Path = "scripts/validate_m000_precondition_report.ps1"; Arguments = @("-Path", $preconditionReportPath) },
@@ -43,6 +66,7 @@ $validationCommands = @(
     @{ Path = "scripts/validate_m005_specification.ps1"; Arguments = @("-Path", $m005SpecificationPath) },
     @{ Path = "scripts/validate_m006_specification.ps1"; Arguments = @("-Path", $m006SpecificationPath) },
     @{ Path = "scripts/validate_m007_specification.ps1"; Arguments = @("-Path", $m007SpecificationPath) },
+    @{ Path = "scripts/validate_m008_specification.ps1"; Arguments = @("-Path", $m008SpecificationPath) },
     @{ Path = "scripts/validate_platform_topology.ps1"; Arguments = @("-Path", $platformTopologyPath) },
     @{ Path = "scripts/validate_local_compose.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_network_boundary.ps1"; Arguments = @("-SparkFirewallPath", $sparkFirewallPath) },
@@ -204,7 +228,29 @@ $testCommands = @(
     @{ Path = "tests/m007/validate_answer_http_contract_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/m007/validate_answer_http_contract_unit.ps1"; Arguments = @() },
     @{ Path = "tests/m007/validate_m007_traceability_acceptance.ps1"; Arguments = @() },
-    @{ Path = "tests/m007/validate_m007_traceability_unit.ps1"; Arguments = @() }
+    @{ Path = "tests/m007/validate_m007_traceability_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m008/validate_m008_precondition_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m008/validate_m008_precondition_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m008/validate_m008_specification_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m008/validate_m008_specification_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m008/validate_conversation_turn_append_only_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m008/validate_conversation_turn_append_only_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m008/validate_conversation_context_snapshot_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m008/validate_conversation_context_snapshot_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m008/validate_followup_question_resolution_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m008/validate_followup_question_resolution_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m008/validate_conversation_mode_routing_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m008/validate_conversation_mode_routing_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m008/validate_verified_result_reuse_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m008/validate_verified_answer_attachment_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m008/validate_chat_answer_presentation_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m008/validate_chat_answer_presentation_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m008/validate_conversation_http_contract_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m008/validate_conversation_http_contract_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m008/validate_chat_completions_contract_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m008/validate_chat_completions_contract_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m008/validate_m008_traceability_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m008/validate_m008_traceability_unit.ps1"; Arguments = @() }
 )
 
 function Get-GateCommandPaths {
@@ -223,6 +269,7 @@ if ($env:OST_M003_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     Write-Host "Tests de précondition M-005 exclus explicitement: M-003 reste indépendant du milestone aval."
     Write-Host "Tests de précondition M-006 exclus explicitement: M-003 reste indépendant du milestone aval."
     Write-Host "Tests de précondition M-007 exclus explicitement: M-003 reste indépendant du milestone aval."
+    Write-Host "Tests de précondition M-008 exclus explicitement: M-003 reste indépendant du milestone aval."
     $excludedPreconditionTestPaths = @(
         $m003PreconditionAcceptancePath,
         $m004PreconditionAcceptancePath,
@@ -231,7 +278,29 @@ if ($env:OST_M003_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m006PreconditionAcceptancePath,
         $m006PreconditionUnitPath,
         $m007PreconditionAcceptancePath,
-        $m007PreconditionUnitPath
+        $m007PreconditionUnitPath,
+        $m008PreconditionAcceptancePath,
+        $m008PreconditionUnitPath,
+        $m008SpecificationAcceptancePath,
+        $m008SpecificationUnitPath,
+        $m008ConversationTurnAcceptancePath,
+        $m008ConversationTurnUnitPath,
+        $m008ContextSnapshotAcceptancePath,
+        $m008ContextSnapshotUnitPath,
+        $m008FollowupResolutionAcceptancePath,
+        $m008FollowupResolutionUnitPath,
+        $m008ModeRoutingAcceptancePath,
+        $m008ModeRoutingUnitPath,
+        $m008VerifiedResultReuseAcceptancePath,
+        $m008VerifiedAnswerAttachmentUnitPath,
+        $m008AnswerPresentationAcceptancePath,
+        $m008AnswerPresentationUnitPath,
+        $m008ConversationHttpAcceptancePath,
+        $m008ConversationHttpUnitPath,
+        $m008ChatCompletionsAcceptancePath,
+        $m008ChatCompletionsUnitPath,
+        $m008TraceabilityAcceptancePath,
+        $m008TraceabilityUnitPath
     )
 }
 elseif ($env:OST_M004_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -239,6 +308,7 @@ elseif ($env:OST_M004_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     Write-Host "Tests de précondition M-005 exclus explicitement: M-004 reste indépendant du milestone aval."
     Write-Host "Tests de précondition M-006 exclus explicitement: M-004 reste indépendant du milestone aval."
     Write-Host "Tests de précondition M-007 exclus explicitement: M-004 reste indépendant du milestone aval."
+    Write-Host "Tests de précondition M-008 exclus explicitement: M-004 reste indépendant du milestone aval."
     $excludedPreconditionTestPaths = @(
         $m004PreconditionAcceptancePath,
         $m005PreconditionAcceptancePath,
@@ -246,7 +316,29 @@ elseif ($env:OST_M004_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m006PreconditionAcceptancePath,
         $m006PreconditionUnitPath,
         $m007PreconditionAcceptancePath,
-        $m007PreconditionUnitPath
+        $m007PreconditionUnitPath,
+        $m008PreconditionAcceptancePath,
+        $m008PreconditionUnitPath,
+        $m008SpecificationAcceptancePath,
+        $m008SpecificationUnitPath,
+        $m008ConversationTurnAcceptancePath,
+        $m008ConversationTurnUnitPath,
+        $m008ContextSnapshotAcceptancePath,
+        $m008ContextSnapshotUnitPath,
+        $m008FollowupResolutionAcceptancePath,
+        $m008FollowupResolutionUnitPath,
+        $m008ModeRoutingAcceptancePath,
+        $m008ModeRoutingUnitPath,
+        $m008VerifiedResultReuseAcceptancePath,
+        $m008VerifiedAnswerAttachmentUnitPath,
+        $m008AnswerPresentationAcceptancePath,
+        $m008AnswerPresentationUnitPath,
+        $m008ConversationHttpAcceptancePath,
+        $m008ConversationHttpUnitPath,
+        $m008ChatCompletionsAcceptancePath,
+        $m008ChatCompletionsUnitPath,
+        $m008TraceabilityAcceptancePath,
+        $m008TraceabilityUnitPath
     )
 }
 elseif ($env:OST_M005_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -255,6 +347,7 @@ elseif ($env:OST_M005_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     Write-Host "Test d'acceptation de précondition M-005 exclu explicitement: exécution imbriquée du validateur de précondition."
     Write-Host "Tests de précondition M-006 exclus explicitement: M-005 reste indépendant du milestone aval."
     Write-Host "Tests de précondition M-007 exclus explicitement: M-005 reste indépendant du milestone aval."
+    Write-Host "Tests de précondition M-008 exclus explicitement: M-005 reste indépendant du milestone aval."
     $excludedPreconditionTestPaths = @(
         $m003PreconditionAcceptancePath,
         $m004PreconditionAcceptancePath,
@@ -262,7 +355,29 @@ elseif ($env:OST_M005_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m006PreconditionAcceptancePath,
         $m006PreconditionUnitPath,
         $m007PreconditionAcceptancePath,
-        $m007PreconditionUnitPath
+        $m007PreconditionUnitPath,
+        $m008PreconditionAcceptancePath,
+        $m008PreconditionUnitPath,
+        $m008SpecificationAcceptancePath,
+        $m008SpecificationUnitPath,
+        $m008ConversationTurnAcceptancePath,
+        $m008ConversationTurnUnitPath,
+        $m008ContextSnapshotAcceptancePath,
+        $m008ContextSnapshotUnitPath,
+        $m008FollowupResolutionAcceptancePath,
+        $m008FollowupResolutionUnitPath,
+        $m008ModeRoutingAcceptancePath,
+        $m008ModeRoutingUnitPath,
+        $m008VerifiedResultReuseAcceptancePath,
+        $m008VerifiedAnswerAttachmentUnitPath,
+        $m008AnswerPresentationAcceptancePath,
+        $m008AnswerPresentationUnitPath,
+        $m008ConversationHttpAcceptancePath,
+        $m008ConversationHttpUnitPath,
+        $m008ChatCompletionsAcceptancePath,
+        $m008ChatCompletionsUnitPath,
+        $m008TraceabilityAcceptancePath,
+        $m008TraceabilityUnitPath
     )
 }
 elseif ($env:OST_M006_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -271,13 +386,36 @@ elseif ($env:OST_M006_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     Write-Host "Test d'acceptation de précondition M-005 exclu explicitement: M-006 s'appuie sur les preuves amont publiées dans master."
     Write-Host "Test d'acceptation de précondition M-006 exclu explicitement: exécution imbriquée du validateur de précondition."
     Write-Host "Tests de précondition M-007 exclus explicitement: M-006 reste indépendant du milestone aval."
+    Write-Host "Tests de précondition M-008 exclus explicitement: M-006 reste indépendant du milestone aval."
     $excludedPreconditionTestPaths = @(
         $m003PreconditionAcceptancePath,
         $m004PreconditionAcceptancePath,
         $m005PreconditionAcceptancePath,
         $m006PreconditionAcceptancePath,
         $m007PreconditionAcceptancePath,
-        $m007PreconditionUnitPath
+        $m007PreconditionUnitPath,
+        $m008PreconditionAcceptancePath,
+        $m008PreconditionUnitPath,
+        $m008SpecificationAcceptancePath,
+        $m008SpecificationUnitPath,
+        $m008ConversationTurnAcceptancePath,
+        $m008ConversationTurnUnitPath,
+        $m008ContextSnapshotAcceptancePath,
+        $m008ContextSnapshotUnitPath,
+        $m008FollowupResolutionAcceptancePath,
+        $m008FollowupResolutionUnitPath,
+        $m008ModeRoutingAcceptancePath,
+        $m008ModeRoutingUnitPath,
+        $m008VerifiedResultReuseAcceptancePath,
+        $m008VerifiedAnswerAttachmentUnitPath,
+        $m008AnswerPresentationAcceptancePath,
+        $m008AnswerPresentationUnitPath,
+        $m008ConversationHttpAcceptancePath,
+        $m008ConversationHttpUnitPath,
+        $m008ChatCompletionsAcceptancePath,
+        $m008ChatCompletionsUnitPath,
+        $m008TraceabilityAcceptancePath,
+        $m008TraceabilityUnitPath
     )
 }
 elseif ($env:OST_M007_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -286,12 +424,51 @@ elseif ($env:OST_M007_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     Write-Host "Test d'acceptation de précondition M-005 exclu explicitement: M-007 s'appuie sur les claims vérifiables M-006 publiés dans master."
     Write-Host "Test d'acceptation de précondition M-006 exclu explicitement: M-007 s'appuie sur les claims vérifiables M-006 publiés dans master."
     Write-Host "Test d'acceptation de précondition M-007 exclu explicitement: exécution imbriquée du validateur de précondition."
+    Write-Host "Tests de précondition M-008 exclus explicitement: M-007 reste indépendant du milestone aval."
     $excludedPreconditionTestPaths = @(
         $m003PreconditionAcceptancePath,
         $m004PreconditionAcceptancePath,
         $m005PreconditionAcceptancePath,
         $m006PreconditionAcceptancePath,
-        $m007PreconditionAcceptancePath
+        $m007PreconditionAcceptancePath,
+        $m008PreconditionAcceptancePath,
+        $m008PreconditionUnitPath,
+        $m008SpecificationAcceptancePath,
+        $m008SpecificationUnitPath,
+        $m008ConversationTurnAcceptancePath,
+        $m008ConversationTurnUnitPath,
+        $m008ContextSnapshotAcceptancePath,
+        $m008ContextSnapshotUnitPath,
+        $m008FollowupResolutionAcceptancePath,
+        $m008FollowupResolutionUnitPath,
+        $m008ModeRoutingAcceptancePath,
+        $m008ModeRoutingUnitPath,
+        $m008VerifiedResultReuseAcceptancePath,
+        $m008VerifiedAnswerAttachmentUnitPath,
+        $m008AnswerPresentationAcceptancePath,
+        $m008AnswerPresentationUnitPath,
+        $m008ConversationHttpAcceptancePath,
+        $m008ConversationHttpUnitPath,
+        $m008ChatCompletionsAcceptancePath,
+        $m008ChatCompletionsUnitPath,
+        $m008TraceabilityAcceptancePath,
+        $m008TraceabilityUnitPath
+    )
+}
+elseif ($env:OST_M008_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
+    Write-Host "Test d'acceptation de précondition M-003 exclu explicitement: M-008 s'appuie sur les réponses documentaires vérifiées M-007 publiées dans master."
+    Write-Host "Test d'acceptation de précondition M-004 exclu explicitement: M-008 s'appuie sur les réponses documentaires vérifiées M-007 publiées dans master."
+    Write-Host "Test d'acceptation de précondition M-005 exclu explicitement: M-008 s'appuie sur les réponses documentaires vérifiées M-007 publiées dans master."
+    Write-Host "Test d'acceptation de précondition M-006 exclu explicitement: M-008 s'appuie sur les réponses documentaires vérifiées M-007 publiées dans master."
+    Write-Host "Test d'acceptation de précondition M-007 exclu explicitement: M-008 s'appuie sur les réponses documentaires vérifiées M-007 publiées dans master."
+    Write-Host "Test d'acceptation de précondition M-008 exclu explicitement: exécution imbriquée du validateur de précondition."
+    $excludedPreconditionTestPaths = @(
+        $m003PreconditionAcceptancePath,
+        $m004PreconditionAcceptancePath,
+        $m005PreconditionAcceptancePath,
+        $m006PreconditionAcceptancePath,
+        $m007PreconditionAcceptancePath,
+        $m008PreconditionAcceptancePath
     )
 }
 
