@@ -761,6 +761,14 @@ $requiredM009Requirements = @(
         CommandScript = "tests/m009/validate_multi_query_evidence_collection_acceptance.ps1"
         Code = "app/research_answering/application/collect_evidence.py"
         Adr = "ADR-006; DDD-ADR-003; DDD-ADR-005"
+    },
+    [ordered] @{
+        Id = "REQ-M009-005"
+        Source = "docs/tasks/milestone_009/0005_resoudre_claims_dependances_independantes.md"
+        Test = "tests/m009/validate_verified_claim_dependency_resolution_acceptance.ps1"
+        CommandScript = "tests/m009/validate_verified_claim_dependency_resolution_acceptance.ps1"
+        Code = "app/research_answering/application/resolve_claim_dependencies.py"
+        Adr = "ADR-006; DDD-ADR-005; DDD-ADR-008"
     }
 )
 
