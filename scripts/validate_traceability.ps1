@@ -785,6 +785,14 @@ $requiredM009Requirements = @(
         CommandScript = "tests/m009/validate_insufficient_deep_coverage_acceptance.ps1"
         Code = "app/research_answering/domain/evidence_set.py; app/research_answering/domain/research_case.py; app/research_answering/application/classify_contradictions.py"
         Adr = "ADR-006; DDD-ADR-005; DDD-ADR-007"
+    },
+    [ordered] @{
+        Id = "REQ-M009-008"
+        Source = "docs/tasks/milestone_009/0008_produire_synthese_multi_sources_tracable.md"
+        Test = "tests/m009/validate_multi_source_synthesis_acceptance.ps1"
+        CommandScript = "tests/m009/validate_multi_source_synthesis_acceptance.ps1"
+        Code = "app/research_answering/domain/answer.py; app/research_answering/application/draft_answer.py"
+        Adr = "DDD-ADR-003; DDD-ADR-005; DDD-ADR-007"
     }
 )
 

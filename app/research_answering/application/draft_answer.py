@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Any, Protocol
 
 from app.research_answering.domain.answer import (
     Answer,
@@ -14,9 +14,21 @@ from app.research_answering.domain.answer import (
     AnswerAssertionsExtracted,
     AnswerDraft,
     AnswerDrafted,
+    DeepResearchReport,
+    DeepResearchReportSection,
+    DeepResearchReportSectionName,
     answer_id_for,
 )
+from app.research_answering.application.verify_answer import (
+    EvaluateAnswerSupport,
+    EvaluateAnswerSupportHandler,
+)
+from app.contracts.research_outcomes import VerifiedResearchOutcome
+from app.research_answering.domain.evidence_set import EvidenceSet
 from app.research_answering.domain.research_case import ResearchCase
+from app.research_answering.domain.research_case import DeepResearchPlan
+from app.research_answering.domain.research_case import ResearchCaseStatus
+from app.research_answering.domain.research_case import ResearchMode
 
 
 _UTC_INSTANT_PATTERN = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
@@ -49,6 +61,13 @@ class AnswerGenerator(Protocol):
         """Produit un brouillon structuré."""
 
 
+class DeepSynthesisGenerator(Protocol):
+    """Port RA de génération de synthèse approfondie sans autorité de support."""
+
+    def draft(self, request: "DeepSynthesisDraftRequest") -> object:
+        """Produit une proposition de synthèse multi-sources."""
+
+
 class AnswerAssertionExtractor(Protocol):
     """Port RA d'extraction des assertions importantes."""
 
@@ -74,6 +93,38 @@ class GeneratedAnswerDraft:
             "model_provenance",
             _ensure_text(self.model_provenance, "model_provenance"),
         )
+
+
+@dataclass(frozen=True)
+class GeneratedDeepResearchDraft:
+    """Sortie autorisée du port de synthèse RA approfondie."""
+
+    sections: Mapping[str, str]
+    assertion_lines: Sequence[str]
+    section_citation_ids: Mapping[str, Sequence[str]]
+    model_provenance: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "sections", _ensure_deep_section_texts(self.sections))
+        object.__setattr__(
+            self,
+            "assertion_lines",
+            _ensure_text_sequence(self.assertion_lines, "assertion_lines", allow_empty=False),
+        )
+        object.__setattr__(
+            self,
+            "section_citation_ids",
+            _ensure_deep_section_citation_ids(self.section_citation_ids),
+        )
+        object.__setattr__(
+            self,
+            "model_provenance",
+            _ensure_text(self.model_provenance, "model_provenance"),
+        )
+
+    @property
+    def answer_draft_content(self) -> str:
+        return "\n".join(self.assertion_lines)
 
 
 @dataclass(frozen=True)
@@ -117,6 +168,59 @@ class DraftAnswerRequest:
 
 
 @dataclass(frozen=True)
+class DeepSynthesisDraftRequest:
+    """Requête transmise au générateur de synthèse approfondie."""
+
+    research_case_id: str
+    resolved_question: str
+    research_mandate: Mapping[str, Any]
+    research_plan: DeepResearchPlan
+    evidence_set_id: str
+    evidence_set_version: int
+    verified_claim_refs: Sequence[object]
+    citations: Sequence[object]
+    occurred_at: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "research_case_id",
+            _ensure_prefixed_text(self.research_case_id, "research_case_id", "RSC-"),
+        )
+        object.__setattr__(
+            self,
+            "resolved_question",
+            _ensure_text(self.resolved_question, "resolved_question"),
+        )
+        if not isinstance(self.research_mandate, Mapping) or len(self.research_mandate) == 0:
+            raise ValueError("research_mandate invalide")
+        object.__setattr__(self, "research_mandate", dict(self.research_mandate))
+        if not isinstance(self.research_plan, DeepResearchPlan):
+            raise ValueError("deep_research_plan absent")
+        object.__setattr__(
+            self,
+            "evidence_set_id",
+            _ensure_prefixed_text(self.evidence_set_id, "evidence_set_id", "EVS-"),
+        )
+        object.__setattr__(
+            self,
+            "evidence_set_version",
+            _ensure_positive_integer(self.evidence_set_version, "evidence_set_version"),
+        )
+        object.__setattr__(
+            self,
+            "verified_claim_refs",
+            _ensure_object_sequence(self.verified_claim_refs, "verified_claim_refs"),
+        )
+        object.__setattr__(
+            self,
+            "citations",
+            _ensure_object_sequence(self.citations, "citations"),
+        )
+        object.__setattr__(self, "occurred_at", _ensure_utc_instant(self.occurred_at, "occurred_at"))
+
+
+@dataclass(frozen=True)
 class DraftAnswer:
     """Commande RA de génération d'un brouillon Answer."""
 
@@ -155,6 +259,52 @@ class ExtractAnswerAssertions:
 
 
 @dataclass(frozen=True)
+class ProduceMultiSourceSynthesis:
+    """Commande RA M-009 de production d'une synthèse multi-sources."""
+
+    research_case_id: str
+    evidence_set_id: str
+    synthesis_policy_version: str
+    support_policy_version: str
+    citation_policy_version: str
+    freshness_policy_version: str
+    occurred_at: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "research_case_id",
+            _ensure_prefixed_text(self.research_case_id, "research_case_id", "RSC-"),
+        )
+        object.__setattr__(
+            self,
+            "evidence_set_id",
+            _ensure_prefixed_text(self.evidence_set_id, "evidence_set_id", "EVS-"),
+        )
+        object.__setattr__(
+            self,
+            "synthesis_policy_version",
+            _ensure_text(self.synthesis_policy_version, "synthesis_policy_version"),
+        )
+        object.__setattr__(
+            self,
+            "support_policy_version",
+            _ensure_text(self.support_policy_version, "support_policy_version"),
+        )
+        object.__setattr__(
+            self,
+            "citation_policy_version",
+            _ensure_text(self.citation_policy_version, "citation_policy_version"),
+        )
+        object.__setattr__(
+            self,
+            "freshness_policy_version",
+            _ensure_text(self.freshness_policy_version, "freshness_policy_version"),
+        )
+        object.__setattr__(self, "occurred_at", _ensure_utc_instant(self.occurred_at, "occurred_at"))
+
+
+@dataclass(frozen=True)
 class DraftAnswerResult:
     """Résultat observable de génération du brouillon."""
 
@@ -186,6 +336,58 @@ class ExtractAnswerAssertionsResult:
             raise ValueError("answer invalide")
         object.__setattr__(self, "assertions", _ensure_answer_assertions(self.assertions))
         object.__setattr__(self, "events", _ensure_extraction_events(self.events))
+
+
+@dataclass(frozen=True)
+class ProduceMultiSourceSynthesisResult:
+    """Résultat observable de publication d'une synthèse approfondie."""
+
+    status: str
+    answer: Answer
+    deep_research_report: DeepResearchReport
+    verified_research_outcome: VerifiedResearchOutcome
+    events: Sequence[object]
+
+    def __post_init__(self) -> None:
+        if self.status != "MULTI_SOURCE_SYNTHESIS_PUBLISHED":
+            raise ValueError("status ProduceMultiSourceSynthesis invalide")
+        if not isinstance(self.answer, Answer):
+            raise ValueError("answer invalide")
+        if not isinstance(self.deep_research_report, DeepResearchReport):
+            raise ValueError("deep_research_report invalide")
+        if not isinstance(self.verified_research_outcome, VerifiedResearchOutcome):
+            raise ValueError("verified_research_outcome invalide")
+        object.__setattr__(self, "events", _ensure_object_sequence(self.events, "events"))
+
+
+@dataclass(frozen=True)
+class ProduceMultiSourceSynthesisFailedResult:
+    """Résultat explicite d'échec du générateur de synthèse."""
+
+    status: str
+    failure_reason_code: str
+    failure_detail: str
+    research_case: ResearchCase
+    research_plan: DeepResearchPlan
+    evidence_set: EvidenceSet
+
+    def __post_init__(self) -> None:
+        if self.status != "SYNTHESIS_DRAFT_FAILED":
+            raise ValueError("status ProduceMultiSourceSynthesisFailed invalide")
+        object.__setattr__(
+            self,
+            "failure_reason_code",
+            _ensure_text(self.failure_reason_code, "failure_reason_code"),
+        )
+        if self.failure_reason_code != "DEEP_RESEARCH_DRAFT_GENERATION_FAILED":
+            raise ValueError("failure_reason_code synthese invalide")
+        object.__setattr__(self, "failure_detail", _ensure_text(self.failure_detail, "failure_detail"))
+        if not isinstance(self.research_case, ResearchCase):
+            raise ValueError("research_case invalide")
+        if not isinstance(self.research_plan, DeepResearchPlan):
+            raise ValueError("deep_research_plan absent")
+        if not isinstance(self.evidence_set, EvidenceSet) or not self.evidence_set.sealed:
+            raise ValueError("evidence_set scelle absent")
 
 
 @dataclass(frozen=True)
@@ -288,6 +490,209 @@ class ExtractAnswerAssertionsHandler:
         )
 
 
+@dataclass(frozen=True)
+class ProduceMultiSourceSynthesisHandler:
+    """Orchestre une synthèse RA approfondie sans fallback vers réponse simple."""
+
+    research_case_repository: ResearchCaseRepository
+    answer_repository: AnswerRepository
+    deep_synthesis_generator: DeepSynthesisGenerator
+    answer_assertion_extractor: AnswerAssertionExtractor
+    citation_resolver: object
+
+    def __post_init__(self) -> None:
+        if not callable(getattr(self.research_case_repository, "case_for_id", None)):
+            raise ValueError("research_case_repository sans case_for_id")
+        if not callable(getattr(self.research_case_repository, "update", None)):
+            raise ValueError("research_case_repository sans update")
+        if not callable(getattr(self.answer_repository, "save", None)):
+            raise ValueError("answer_repository sans save")
+        if not callable(getattr(self.answer_repository, "update", None)):
+            raise ValueError("answer_repository sans update")
+        if not callable(getattr(self.answer_repository, "answer_for_id", None)):
+            raise ValueError("answer_repository sans answer_for_id")
+        if not callable(getattr(self.deep_synthesis_generator, "draft", None)):
+            raise ValueError("deep_synthesis_generator sans draft")
+        if not callable(getattr(self.answer_assertion_extractor, "extract", None)):
+            raise ValueError("answer_assertion_extractor sans extract")
+        _ensure_text(
+            getattr(self.answer_assertion_extractor, "extractor_version", None),
+            "extractor_version",
+        )
+        if not callable(getattr(self.citation_resolver, "resolve", None)):
+            raise ValueError("citation_resolver sans resolve")
+
+    def produce(
+        self,
+        command: ProduceMultiSourceSynthesis,
+    ) -> ProduceMultiSourceSynthesisResult | ProduceMultiSourceSynthesisFailedResult:
+        parsed_command = _ensure_produce_multi_source_command(command)
+        research_case = self.research_case_repository.case_for_id(parsed_command.research_case_id)
+        research_case = _ensure_deep_synthesis_case(
+            research_case=research_case,
+            evidence_set_id=parsed_command.evidence_set_id,
+        )
+        evidence_set = research_case.evidence_set
+        if evidence_set is None:
+            raise ValueError("evidence_set absent")
+        plan = research_case.research_plan
+        if not isinstance(plan, DeepResearchPlan):
+            raise ValueError("deep_research_plan absent")
+        request = DeepSynthesisDraftRequest(
+            research_case_id=research_case.research_case_id,
+            resolved_question=research_case.resolved_question.text,
+            research_mandate=research_case.research_mandate.to_payload(),
+            research_plan=plan,
+            evidence_set_id=evidence_set.evidence_set_id,
+            evidence_set_version=evidence_set.version.value,
+            verified_claim_refs=evidence_set.verified_claim_refs,
+            citations=evidence_set.citations,
+            occurred_at=parsed_command.occurred_at,
+        )
+        try:
+            generated = _ensure_generated_deep_draft(self.deep_synthesis_generator.draft(request))
+        except Exception as exc:
+            return ProduceMultiSourceSynthesisFailedResult(
+                status="SYNTHESIS_DRAFT_FAILED",
+                failure_reason_code="DEEP_RESEARCH_DRAFT_GENERATION_FAILED",
+                failure_detail=_failure_detail_for(exc),
+                research_case=research_case,
+                research_plan=plan,
+                evidence_set=evidence_set,
+            )
+
+        draft = AnswerDraft(
+            draft_version=1,
+            content=generated.answer_draft_content,
+            model_provenance=generated.model_provenance,
+        )
+        answer = Answer.create_draft(
+            answer_id=answer_id_for(
+                research_case_id=research_case.research_case_id,
+                evidence_set_id=evidence_set.evidence_set_id,
+                draft_hash=draft.draft_hash,
+            ),
+            research_case_id=research_case.research_case_id,
+            evidence_set_id=evidence_set.evidence_set_id,
+            evidence_set_version=evidence_set.version.value,
+            draft=draft,
+            occurred_at=parsed_command.occurred_at,
+        )
+        saved_answer = self.answer_repository.save(answer)
+        candidates = _ensure_assertion_candidates(
+            self.answer_assertion_extractor.extract(saved_answer.draft)
+        )
+        extracted_answer, extraction_event = saved_answer.extract_assertions(
+            assertions=candidates,
+            extractor_version=self.answer_assertion_extractor.extractor_version,
+            occurred_at=parsed_command.occurred_at,
+        )
+        self.answer_repository.update(extracted_answer)
+        evaluated = EvaluateAnswerSupportHandler(
+            research_case_repository=self.research_case_repository,
+            answer_repository=self.answer_repository,
+            citation_resolver=self.citation_resolver,
+        ).evaluate(
+            EvaluateAnswerSupport(
+                research_case_id=research_case.research_case_id,
+                answer_id=extracted_answer.answer_id,
+                support_policy_version=parsed_command.support_policy_version,
+                citation_policy_version=parsed_command.citation_policy_version,
+                freshness_policy_version=parsed_command.freshness_policy_version,
+                occurred_at=parsed_command.occurred_at,
+            )
+        )
+        report = DeepResearchReport(
+            answer_id=evaluated.answer.answer_id,
+            research_case_id=evaluated.answer.research_case_id,
+            evidence_set_id=evaluated.answer.evidence_set_id,
+            evidence_set_version=evaluated.answer.evidence_set_version,
+            evidence_hash=evidence_set.evidence_hash,
+            support_status=evaluated.support_status,
+            sections=_sections_from_generated(generated),
+            final_assertions=evaluated.answer.assertions,
+            final_assertion_decisions=evaluated.verified_answer_version.assertion_decisions,
+            citations=evidence_set.citations,
+            claim_refs=evidence_set.verified_claim_refs,
+            policy_version=parsed_command.synthesis_policy_version,
+            published_at=parsed_command.occurred_at,
+        )
+        return ProduceMultiSourceSynthesisResult(
+            status="MULTI_SOURCE_SYNTHESIS_PUBLISHED",
+            answer=evaluated.answer,
+            deep_research_report=report,
+            verified_research_outcome=evaluated.verified_research_outcome,
+            events=(saved_answer.events[-1], extraction_event) + tuple(evaluated.events),
+        )
+
+
+def _ensure_generated_deep_draft(value: object) -> GeneratedDeepResearchDraft:
+    for forbidden_field in (
+        "support_status",
+        "final_status",
+        "answer_status",
+        "strategy_parameter",
+        "strategy_parameters",
+        "candidate_strategy",
+        "kelly_fraction",
+        "volatility_target",
+        "rebalance_rule",
+    ):
+        if hasattr(value, forbidden_field):
+            if "strategy" in forbidden_field or forbidden_field in {
+                "kelly_fraction",
+                "volatility_target",
+                "rebalance_rule",
+            }:
+                raise ValueError("parametre de strategie interdit")
+            raise ValueError("support_status fourni par le generateur")
+    if isinstance(value, GeneratedDeepResearchDraft):
+        return value
+    return GeneratedDeepResearchDraft(
+        sections=getattr(value, "sections", None),
+        assertion_lines=getattr(value, "assertion_lines", None),
+        section_citation_ids=getattr(value, "section_citation_ids", None),
+        model_provenance=getattr(value, "model_provenance", None),
+    )
+
+
+def _ensure_produce_multi_source_command(value: object) -> ProduceMultiSourceSynthesis:
+    if not isinstance(value, ProduceMultiSourceSynthesis):
+        raise ValueError("commande ProduceMultiSourceSynthesis invalide")
+    return value
+
+
+def _ensure_deep_synthesis_case(
+    *,
+    research_case: object,
+    evidence_set_id: str,
+) -> ResearchCase:
+    if not isinstance(research_case, ResearchCase):
+        raise ValueError("research_case invalide")
+    if research_case.requested_mode is not ResearchMode.DEEP_RESEARCH:
+        raise ValueError("research_mode approfondi requis")
+    if not isinstance(research_case.research_plan, DeepResearchPlan):
+        raise ValueError("deep_research_plan absent")
+    if research_case.status is not ResearchCaseStatus.EVIDENCE_SET_SEALED:
+        raise ValueError("evidence_set non scelle")
+    if research_case.evidence_set is None or not research_case.evidence_set.sealed:
+        raise ValueError("evidence_set non scelle")
+    if research_case.evidence_set.evidence_set_id != evidence_set_id:
+        raise ValueError("evidence_set_id incoherent")
+    return research_case
+
+
+def _sections_from_generated(generated: GeneratedDeepResearchDraft) -> tuple[DeepResearchReportSection, ...]:
+    return tuple(
+        DeepResearchReportSection(
+            section_name=section_name,
+            content=generated.sections[section_name.value],
+            citation_ids=generated.section_citation_ids[section_name.value],
+        )
+        for section_name in DeepResearchReportSectionName
+    )
+
+
 def _ensure_generated_draft(value: object) -> GeneratedAnswerDraft:
     for forbidden_field in ("support_status", "final_status", "answer_status"):
         if hasattr(value, forbidden_field):
@@ -354,6 +759,71 @@ def _ensure_extraction_events(value: object) -> tuple[AnswerAssertionsExtracted,
     return events
 
 
+def _ensure_deep_section_texts(value: object) -> dict[str, str]:
+    if not isinstance(value, Mapping):
+        raise ValueError("deep_report_sections invalides")
+    expected_keys = {section_name.value for section_name in DeepResearchReportSectionName}
+    actual_keys = {str(key) for key in value}
+    missing_keys = expected_keys.difference(actual_keys)
+    if len(missing_keys) > 0:
+        raise ValueError(f"section obligatoire absente: {sorted(missing_keys)[0]}")
+    extra_keys = actual_keys.difference(expected_keys)
+    if len(extra_keys) > 0:
+        raise ValueError(f"deep_report_section inattendue: {sorted(extra_keys)[0]}")
+    return {
+        section_name.value: _ensure_text(value[section_name.value], "deep_report_section")
+        for section_name in DeepResearchReportSectionName
+    }
+
+
+def _ensure_deep_section_citation_ids(value: object) -> dict[str, tuple[str, ...]]:
+    if not isinstance(value, Mapping):
+        raise ValueError("section_citation_ids invalides")
+    expected_keys = {section_name.value for section_name in DeepResearchReportSectionName}
+    actual_keys = {str(key) for key in value}
+    missing_keys = expected_keys.difference(actual_keys)
+    if len(missing_keys) > 0:
+        raise ValueError(f"section_citation_ids absents: {sorted(missing_keys)[0]}")
+    extra_keys = actual_keys.difference(expected_keys)
+    if len(extra_keys) > 0:
+        raise ValueError(f"section_citation_ids inattendus: {sorted(extra_keys)[0]}")
+    return {
+        section_name.value: _ensure_text_sequence(
+            value[section_name.value],
+            "section_citation_ids",
+            allow_empty=False,
+        )
+        for section_name in DeepResearchReportSectionName
+    }
+
+
+def _ensure_text_sequence(value: object, field_name: str, *, allow_empty: bool) -> tuple[str, ...]:
+    if value is None or isinstance(value, str) or not isinstance(value, Sequence):
+        raise ValueError(f"{field_name} invalides")
+    parsed = tuple(_ensure_text(item, field_name) for item in value)
+    if not allow_empty and len(parsed) == 0:
+        raise ValueError(f"{field_name} absentes")
+    if len(parsed) != len(set(parsed)):
+        raise ValueError(f"{field_name} dupliquees")
+    return parsed
+
+
+def _ensure_object_sequence(value: object, field_name: str) -> tuple[object, ...]:
+    if value is None or isinstance(value, str) or not isinstance(value, Sequence):
+        raise ValueError(f"{field_name} invalides")
+    parsed = tuple(value)
+    if len(parsed) == 0:
+        raise ValueError(f"{field_name} absents")
+    return parsed
+
+
+def _failure_detail_for(exc: Exception) -> str:
+    detail = str(exc)
+    if detail.strip() == "":
+        detail = exc.__class__.__name__
+    return _ensure_text(detail, "failure_detail")
+
+
 def _ensure_text(value: object, field_name: str) -> str:
     if not isinstance(value, str):
         raise ValueError(f"{field_name} non textuel")
@@ -388,6 +858,8 @@ __all__ = [
     "AnswerAssertionExtractor",
     "AnswerGenerator",
     "AnswerRepository",
+    "DeepSynthesisDraftRequest",
+    "DeepSynthesisGenerator",
     "DraftAnswer",
     "DraftAnswerHandler",
     "DraftAnswerRequest",
@@ -396,5 +868,10 @@ __all__ = [
     "ExtractAnswerAssertionsHandler",
     "ExtractAnswerAssertionsResult",
     "GeneratedAnswerDraft",
+    "GeneratedDeepResearchDraft",
+    "ProduceMultiSourceSynthesis",
+    "ProduceMultiSourceSynthesisFailedResult",
+    "ProduceMultiSourceSynthesisHandler",
+    "ProduceMultiSourceSynthesisResult",
     "ResearchCaseRepository",
 ]
