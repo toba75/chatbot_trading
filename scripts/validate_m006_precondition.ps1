@@ -13,7 +13,8 @@ $allowedBranches = @(
     "master",
     "codex/milestone-m006-claims-verifiables",
     "codex/milestone-m007-reponse-documentaire-verifiee",
-    "codex/milestone-m008-conversation-produit"
+    "codex/milestone-m008-conversation-produit",
+    "codex/milestone-m009-recherche-approfondie"
 )
 $requiredMasterArtifacts = @(
     [ordered] @{ Path = "docs/tasks/milestone_004"; Kind = "Directory" },

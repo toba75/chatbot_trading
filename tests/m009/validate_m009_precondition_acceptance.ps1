@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
 $validatorPath = Join-Path $repoRoot "scripts/validate_m009_precondition.ps1"
@@ -148,12 +148,12 @@ try {
 
     Assert-OutputContains `
         -Output $generatedReport `
-        -Expected "Test GREEN: tests/m003/validate_m003_precondition_acceptance.ps1" `
+        -Expected "scripts/validate_m003_precondition.ps1 accepte M-009" `
         -Message "Le rapport doit prouver que la précondition M-003 accepte le jalon M-009."
 
     Assert-OutputContains `
         -Output $generatedReport `
-        -Expected "Test GREEN: tests/m008/validate_m008_precondition_acceptance.ps1" `
+        -Expected "scripts/validate_m008_precondition.ps1 accepte M-009" `
         -Message "Le rapport doit prouver que la précondition M-008 accepte le jalon M-009."
 
     Assert-OutputContains `

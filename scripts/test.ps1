@@ -52,6 +52,8 @@ $m008ChatCompletionsAcceptancePath = "tests/m008/validate_chat_completions_contr
 $m008ChatCompletionsUnitPath = "tests/m008/validate_chat_completions_contract_unit.ps1"
 $m008TraceabilityAcceptancePath = "tests/m008/validate_m008_traceability_acceptance.ps1"
 $m008TraceabilityUnitPath = "tests/m008/validate_m008_traceability_unit.ps1"
+$m009PreconditionAcceptancePath = "tests/m009/validate_m009_precondition_acceptance.ps1"
+$m009PreconditionUnitPath = "tests/m009/validate_m009_precondition_unit.ps1"
 
 $validationCommands = @(
     @{ Path = "scripts/validate_m000_precondition_report.ps1"; Arguments = @("-Path", $preconditionReportPath) },
@@ -250,7 +252,9 @@ $testCommands = @(
     @{ Path = "tests/m008/validate_chat_completions_contract_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/m008/validate_chat_completions_contract_unit.ps1"; Arguments = @() },
     @{ Path = "tests/m008/validate_m008_traceability_acceptance.ps1"; Arguments = @() },
-    @{ Path = "tests/m008/validate_m008_traceability_unit.ps1"; Arguments = @() }
+    @{ Path = "tests/m008/validate_m008_traceability_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m009/validate_m009_precondition_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m009/validate_m009_precondition_acceptance.ps1"; Arguments = @() }
 )
 
 function Get-GateCommandPaths {
@@ -270,6 +274,7 @@ if ($env:OST_M003_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     Write-Host "Tests de précondition M-006 exclus explicitement: M-003 reste indépendant du milestone aval."
     Write-Host "Tests de précondition M-007 exclus explicitement: M-003 reste indépendant du milestone aval."
     Write-Host "Tests de précondition M-008 exclus explicitement: M-003 reste indépendant du milestone aval."
+    Write-Host "Tests de précondition M-009 exclus explicitement: M-003 reste indépendant du milestone aval."
     $excludedPreconditionTestPaths = @(
         $m003PreconditionAcceptancePath,
         $m004PreconditionAcceptancePath,
@@ -300,7 +305,9 @@ if ($env:OST_M003_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m008ChatCompletionsAcceptancePath,
         $m008ChatCompletionsUnitPath,
         $m008TraceabilityAcceptancePath,
-        $m008TraceabilityUnitPath
+        $m008TraceabilityUnitPath,
+        $m009PreconditionAcceptancePath,
+        $m009PreconditionUnitPath
     )
 }
 elseif ($env:OST_M004_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -309,6 +316,7 @@ elseif ($env:OST_M004_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     Write-Host "Tests de précondition M-006 exclus explicitement: M-004 reste indépendant du milestone aval."
     Write-Host "Tests de précondition M-007 exclus explicitement: M-004 reste indépendant du milestone aval."
     Write-Host "Tests de précondition M-008 exclus explicitement: M-004 reste indépendant du milestone aval."
+    Write-Host "Tests de précondition M-009 exclus explicitement: M-004 reste indépendant du milestone aval."
     $excludedPreconditionTestPaths = @(
         $m004PreconditionAcceptancePath,
         $m005PreconditionAcceptancePath,
@@ -338,7 +346,9 @@ elseif ($env:OST_M004_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m008ChatCompletionsAcceptancePath,
         $m008ChatCompletionsUnitPath,
         $m008TraceabilityAcceptancePath,
-        $m008TraceabilityUnitPath
+        $m008TraceabilityUnitPath,
+        $m009PreconditionAcceptancePath,
+        $m009PreconditionUnitPath
     )
 }
 elseif ($env:OST_M005_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -348,6 +358,7 @@ elseif ($env:OST_M005_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     Write-Host "Tests de précondition M-006 exclus explicitement: M-005 reste indépendant du milestone aval."
     Write-Host "Tests de précondition M-007 exclus explicitement: M-005 reste indépendant du milestone aval."
     Write-Host "Tests de précondition M-008 exclus explicitement: M-005 reste indépendant du milestone aval."
+    Write-Host "Tests de précondition M-009 exclus explicitement: M-005 reste indépendant du milestone aval."
     $excludedPreconditionTestPaths = @(
         $m003PreconditionAcceptancePath,
         $m004PreconditionAcceptancePath,
@@ -377,7 +388,9 @@ elseif ($env:OST_M005_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m008ChatCompletionsAcceptancePath,
         $m008ChatCompletionsUnitPath,
         $m008TraceabilityAcceptancePath,
-        $m008TraceabilityUnitPath
+        $m008TraceabilityUnitPath,
+        $m009PreconditionAcceptancePath,
+        $m009PreconditionUnitPath
     )
 }
 elseif ($env:OST_M006_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -387,6 +400,7 @@ elseif ($env:OST_M006_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     Write-Host "Test d'acceptation de précondition M-006 exclu explicitement: exécution imbriquée du validateur de précondition."
     Write-Host "Tests de précondition M-007 exclus explicitement: M-006 reste indépendant du milestone aval."
     Write-Host "Tests de précondition M-008 exclus explicitement: M-006 reste indépendant du milestone aval."
+    Write-Host "Tests de précondition M-009 exclus explicitement: M-006 reste indépendant du milestone aval."
     $excludedPreconditionTestPaths = @(
         $m003PreconditionAcceptancePath,
         $m004PreconditionAcceptancePath,
@@ -415,7 +429,9 @@ elseif ($env:OST_M006_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m008ChatCompletionsAcceptancePath,
         $m008ChatCompletionsUnitPath,
         $m008TraceabilityAcceptancePath,
-        $m008TraceabilityUnitPath
+        $m008TraceabilityUnitPath,
+        $m009PreconditionAcceptancePath,
+        $m009PreconditionUnitPath
     )
 }
 elseif ($env:OST_M007_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -425,6 +441,7 @@ elseif ($env:OST_M007_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     Write-Host "Test d'acceptation de précondition M-006 exclu explicitement: M-007 s'appuie sur les claims vérifiables M-006 publiés dans master."
     Write-Host "Test d'acceptation de précondition M-007 exclu explicitement: exécution imbriquée du validateur de précondition."
     Write-Host "Tests de précondition M-008 exclus explicitement: M-007 reste indépendant du milestone aval."
+    Write-Host "Tests de précondition M-009 exclus explicitement: M-007 reste indépendant du milestone aval."
     $excludedPreconditionTestPaths = @(
         $m003PreconditionAcceptancePath,
         $m004PreconditionAcceptancePath,
@@ -452,7 +469,9 @@ elseif ($env:OST_M007_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m008ChatCompletionsAcceptancePath,
         $m008ChatCompletionsUnitPath,
         $m008TraceabilityAcceptancePath,
-        $m008TraceabilityUnitPath
+        $m008TraceabilityUnitPath,
+        $m009PreconditionAcceptancePath,
+        $m009PreconditionUnitPath
     )
 }
 elseif ($env:OST_M008_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -462,13 +481,34 @@ elseif ($env:OST_M008_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     Write-Host "Test d'acceptation de précondition M-006 exclu explicitement: M-008 s'appuie sur les réponses documentaires vérifiées M-007 publiées dans master."
     Write-Host "Test d'acceptation de précondition M-007 exclu explicitement: M-008 s'appuie sur les réponses documentaires vérifiées M-007 publiées dans master."
     Write-Host "Test d'acceptation de précondition M-008 exclu explicitement: exécution imbriquée du validateur de précondition."
+    Write-Host "Tests de précondition M-009 exclus explicitement: M-008 reste indépendant du milestone aval."
     $excludedPreconditionTestPaths = @(
         $m003PreconditionAcceptancePath,
         $m004PreconditionAcceptancePath,
         $m005PreconditionAcceptancePath,
         $m006PreconditionAcceptancePath,
         $m007PreconditionAcceptancePath,
-        $m008PreconditionAcceptancePath
+        $m008PreconditionAcceptancePath,
+        $m009PreconditionAcceptancePath,
+        $m009PreconditionUnitPath
+    )
+}
+elseif ($env:OST_M009_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
+    Write-Host "Test d'acceptation de précondition M-003 exclu explicitement: M-009 vérifie les validateurs amont sans récursion."
+    Write-Host "Test d'acceptation de précondition M-004 exclu explicitement: M-009 vérifie les validateurs amont sans récursion."
+    Write-Host "Test d'acceptation de précondition M-005 exclu explicitement: M-009 vérifie les validateurs amont sans récursion."
+    Write-Host "Test d'acceptation de précondition M-006 exclu explicitement: M-009 vérifie les validateurs amont sans récursion."
+    Write-Host "Test d'acceptation de précondition M-007 exclu explicitement: M-009 vérifie les validateurs amont sans récursion."
+    Write-Host "Test d'acceptation de précondition M-008 exclu explicitement: M-009 vérifie les validateurs amont sans récursion."
+    Write-Host "Test d'acceptation de précondition M-009 exclu explicitement: exécution imbriquée du validateur de précondition."
+    $excludedPreconditionTestPaths = @(
+        $m003PreconditionAcceptancePath,
+        $m004PreconditionAcceptancePath,
+        $m005PreconditionAcceptancePath,
+        $m006PreconditionAcceptancePath,
+        $m007PreconditionAcceptancePath,
+        $m008PreconditionAcceptancePath,
+        $m009PreconditionAcceptancePath
     )
 }
 

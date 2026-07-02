@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
 $validatorPath = Join-Path $repoRoot "scripts/validate_m009_precondition.ps1"
@@ -113,6 +113,19 @@ function New-TemporaryProject {
     New-ScriptFile -Path (Join-Path $projectRoot "scripts/test.ps1") -Content $TestGateContent
     New-ScriptFile -Path (Join-Path $projectRoot "scripts/lint.ps1") -Content $LintGateContent
     New-ScriptFile -Path (Join-Path $projectRoot "scripts/validate_task_system.ps1") -Content "Write-Host 'Système de tâches simulé GREEN.'"
+
+    foreach ($upstreamValidatorName in @(
+        "validate_m003_precondition.ps1",
+        "validate_m004_precondition.ps1",
+        "validate_m005_precondition.ps1",
+        "validate_m006_precondition.ps1",
+        "validate_m007_precondition.ps1",
+        "validate_m008_precondition.ps1"
+    )) {
+        New-ScriptFile `
+            -Path (Join-Path $projectRoot "scripts/$upstreamValidatorName") `
+            -Content '$allowedBranches = @("codex/milestone-m009-recherche-approfondie")'
+    }
 
     if ($IncludeM008Artifacts) {
         New-ScriptFile -Path (Join-Path $projectRoot "docs/tasks/milestone_008/0001_verifier_precondition_green.md") -Content "# M-008"
@@ -288,13 +301,6 @@ Start-Sleep -Seconds 3
 Write-Host "Sortie tardive interdite."
 '@
 
-$missingUpstreamGate = @'
-Write-Host "Validation GREEN: scripts/validate_traceability.ps1"
-Write-Host "Validation GREEN: scripts/validate_adr_system.ps1"
-Write-Host "Validation GREEN: scripts/validate_architecture_boundaries.ps1"
-Write-Host "Gate test GREEN: simulation sans précondition amont M-008."
-'@
-
 New-Item -ItemType Directory -Path $temporaryRoot | Out-Null
 
 try {
@@ -302,7 +308,8 @@ try {
     Initialize-ProjectWithMasterAndBranch -ProjectRoot $m009BranchRoot -BranchName $expectedBranch -DivergeMasterReference $false -AdvanceMasterAfterBranch $false
     $m009BranchResult = Invoke-Validator -ProjectRoot $m009BranchRoot
     Assert-ExitCode -Actual $m009BranchResult.ExitCode -Expected 0 -Message "La précondition doit autoriser explicitement la branche M-009."
-    Assert-OutputContains -Output $m009BranchResult.Output -Expected "Branche M-009 autorisée: $expectedBranch" -Message "La branche M-009 doit être nommée."
+    Assert-OutputContains -Output $m009BranchResult.Output -Expected "Branche M-009" -Message "La sortie doit annoncer une branche M-009 autorisée."
+    Assert-OutputContains -Output $m009BranchResult.Output -Expected $expectedBranch -Message "La branche M-009 doit être nommée."
 
     $masterBranchRoot = New-TemporaryProject -Name "master-branch" -TestGateContent $greenTestGate -LintGateContent $greenLintGate -IncludeM008Artifacts $true
     Initialize-ProjectWithMasterAndBranch -ProjectRoot $masterBranchRoot -BranchName $masterBranch -DivergeMasterReference $false -AdvanceMasterAfterBranch $false
@@ -381,13 +388,16 @@ try {
         -Expected "Gate M-009 RED: test non concluant après 1 seconde(s)." `
         -Message "Le timeout doit être nommé explicitement."
 
-    $missingUpstreamRoot = New-TemporaryProject -Name "missing-upstream-acceptance" -TestGateContent $missingUpstreamGate -LintGateContent $greenLintGate -IncludeM008Artifacts $true
+    $missingUpstreamRoot = New-TemporaryProject -Name "missing-upstream-acceptance" -TestGateContent $greenTestGate -LintGateContent $greenLintGate -IncludeM008Artifacts $true
+    New-ScriptFile `
+        -Path (Join-Path $missingUpstreamRoot "scripts/validate_m003_precondition.ps1") `
+        -Content '$allowedBranches = @("master")'
     Initialize-ProjectWithMasterAndBranch -ProjectRoot $missingUpstreamRoot -BranchName $expectedBranch -DivergeMasterReference $false -AdvanceMasterAfterBranch $false
     $missingUpstreamResult = Invoke-Validator -ProjectRoot $missingUpstreamRoot
     Assert-ExitCode -Actual $missingUpstreamResult.ExitCode -Expected 1 -Message "La précondition doit refuser une gate qui ne prouve pas l'acceptation amont de M-009."
     Assert-OutputContains `
         -Output $missingUpstreamResult.Output `
-        -Expected "Gate M-009 RED: test sans preuve d'acceptation amont pour tests/m003/validate_m003_precondition_acceptance.ps1." `
+        -Expected "Validateur amont M-003 n'accepte pas la branche M-009: scripts/validate_m003_precondition.ps1" `
         -Message "L'acceptation amont manquante doit être explicite."
 
     $outsideReportRoot = New-TemporaryProject -Name "outside-report-path" -TestGateContent $greenTestGate -LintGateContent $greenLintGate -IncludeM008Artifacts $true
