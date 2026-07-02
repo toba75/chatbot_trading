@@ -639,6 +639,7 @@ class ResearchCase:
                 gap_type=gap.gap_type,
                 affected_obligation=gap.affected_obligation,
                 reason_code=gap.reason_code,
+                public_reason=gap.public_reason,
                 occurred_at=occurred_at,
             )
             for gap in gaps
@@ -647,6 +648,80 @@ class ResearchCase:
             research_case_id=self.research_case_id,
             missing_obligations=parsed_missing,
             reason_codes=parsed_reasons,
+            support_status=SupportStatus.INSUFFICIENT_EVIDENCE,
+            public_reasons=tuple(gap.public_reason for gap in gaps),
+            occurred_at=occurred_at,
+        )
+        events = gap_events + (terminal_event,)
+        return (
+            replace(
+                self,
+                status=ResearchCaseStatus.INSUFFICIENT_EVIDENCE,
+                knowledge_gaps=self.knowledge_gaps + gaps,
+                events=self.events + events,
+            ),
+            gaps,
+            events,
+        )
+
+    def declare_insufficient_deep_coverage(
+        self,
+        *,
+        missing_obligations: tuple[str, ...],
+        reason_codes: tuple[str, ...],
+        public_reasons: tuple[str, ...],
+        occurred_at: str,
+    ) -> tuple[
+        "ResearchCase",
+        tuple[KnowledgeGap, ...],
+        tuple[KnowledgeGapRecorded | ResearchEvidenceFoundInsufficient, ...],
+    ]:
+        self.ensure_contradiction_assessment_allowed()
+        parsed_missing = ensure_missing_obligations(missing_obligations)
+        parsed_reasons = ensure_reason_codes(reason_codes)
+        parsed_public_reasons = _ensure_text_tuple(public_reasons, "public_reasons")
+        if len(parsed_missing) != len(parsed_reasons):
+            raise ValueError("reason_codes incoherents")
+        if len(parsed_missing) != len(parsed_public_reasons):
+            raise ValueError("public_reasons incoherentes")
+        self._ensure_missing_obligations_in_plan(parsed_missing)
+        existing_obligations = {
+            gap.affected_obligation for gap in self.knowledge_gaps
+        }
+        for obligation in parsed_missing:
+            if obligation in existing_obligations:
+                raise ValueError("knowledge_gap deja enregistre")
+        gaps = tuple(
+            KnowledgeGap.for_missing_coverage_obligation(
+                research_case_id=self.research_case_id,
+                affected_obligation=obligation,
+                reason_code=reason_code,
+                public_reason=public_reason,
+            )
+            for obligation, reason_code, public_reason in zip(
+                parsed_missing,
+                parsed_reasons,
+                parsed_public_reasons,
+                strict=True,
+            )
+        )
+        gap_events = tuple(
+            KnowledgeGapRecorded(
+                research_case_id=self.research_case_id,
+                gap_type=gap.gap_type,
+                affected_obligation=gap.affected_obligation,
+                reason_code=gap.reason_code,
+                public_reason=gap.public_reason,
+                occurred_at=occurred_at,
+            )
+            for gap in gaps
+        )
+        terminal_event = ResearchEvidenceFoundInsufficient(
+            research_case_id=self.research_case_id,
+            missing_obligations=parsed_missing,
+            reason_codes=parsed_reasons,
+            support_status=SupportStatus.INSUFFICIENT_EVIDENCE,
+            public_reasons=parsed_public_reasons,
             occurred_at=occurred_at,
         )
         events = gap_events + (terminal_event,)
@@ -675,6 +750,7 @@ class ResearchCase:
             gap_type=gap.gap_type,
             affected_obligation=gap.affected_obligation,
             reason_code=gap.reason_code,
+            public_reason=gap.public_reason,
             occurred_at=occurred_at,
         )
         return (

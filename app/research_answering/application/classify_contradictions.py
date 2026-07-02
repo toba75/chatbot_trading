@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Protocol
 
+from app.contracts.evidence_claims import VerifiedClaimRef
 from app.research_answering.domain.contradiction_assessment import (
     ConditionalContradictionDetected,
     ContradictionAssessment,
@@ -18,6 +19,7 @@ from app.research_answering.domain.contradiction_assessment import (
     KnowledgeGapRecorded,
     ResearchEvidenceFoundConflicting,
     ResearchEvidenceFoundInsufficient,
+    SupportStatus,
     claim_refs_for_relation,
     ensure_classification_basis,
     ensure_conflicting_decision_basis,
@@ -28,6 +30,14 @@ from app.research_answering.domain.contradiction_assessment import (
     ensure_relation_sequence,
     ensure_research_case_id,
     ensure_utc_instant,
+)
+from app.research_answering.domain.evidence_set import (
+    DeepCoverageRequirement,
+    DeepEvidenceCoverageEvaluation,
+    DeepEvidenceCoveragePolicy,
+    EvidenceCollectionCompleted,
+    EvidenceSet,
+    EvidenceSetSealed,
 )
 from app.research_answering.domain.research_case import ResearchCase
 
@@ -136,6 +146,50 @@ class DeclareInsufficientEvidence:
 
 
 @dataclass(frozen=True)
+class DeclareInsufficientDeepCoverage:
+    """Commande RA M-009 de declaration d'une couverture approfondie insuffisante."""
+
+    research_case_id: str
+    candidates: Sequence[object]
+    verified_claim_refs: Sequence[VerifiedClaimRef]
+    coverage_requirements: Sequence[DeepCoverageRequirement]
+    decision_basis: str
+    coverage_policy_version: str
+    diversification_policy_version: str
+    occurred_at: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "research_case_id", ensure_research_case_id(self.research_case_id))
+        object.__setattr__(self, "candidates", _ensure_deep_coverage_candidates(self.candidates))
+        object.__setattr__(
+            self,
+            "verified_claim_refs",
+            _ensure_verified_claim_refs(self.verified_claim_refs),
+        )
+        object.__setattr__(
+            self,
+            "coverage_requirements",
+            _ensure_deep_coverage_requirements(self.coverage_requirements),
+        )
+        object.__setattr__(
+            self,
+            "decision_basis",
+            ensure_insufficient_decision_basis(self.decision_basis),
+        )
+        object.__setattr__(
+            self,
+            "coverage_policy_version",
+            _ensure_text(self.coverage_policy_version, "coverage_policy_version"),
+        )
+        object.__setattr__(
+            self,
+            "diversification_policy_version",
+            _ensure_text(self.diversification_policy_version, "diversification_policy_version"),
+        )
+        object.__setattr__(self, "occurred_at", ensure_utc_instant(self.occurred_at, "occurred_at"))
+
+
+@dataclass(frozen=True)
 class DeclareConflictingEvidence:
     """Commande RA de declaration de conflit documentaire non resolu."""
 
@@ -217,6 +271,38 @@ class DeclareInsufficientEvidenceResult:
             raise ValueError("research_case invalide")
         object.__setattr__(self, "knowledge_gaps", _ensure_knowledge_gaps(self.knowledge_gaps))
         object.__setattr__(self, "events", _ensure_insufficient_events(self.events))
+
+
+@dataclass(frozen=True)
+class DeclareInsufficientDeepCoverageResult:
+    """Résultat observable d'insuffisance de couverture approfondie M-009."""
+
+    status: str
+    support_status: SupportStatus
+    research_case: ResearchCase
+    evidence_set: EvidenceSet
+    coverage_evaluation: DeepEvidenceCoverageEvaluation
+    knowledge_gaps: Sequence[KnowledgeGap]
+    events: Sequence[
+        EvidenceCollectionCompleted
+        | EvidenceSetSealed
+        | KnowledgeGapRecorded
+        | ResearchEvidenceFoundInsufficient
+    ]
+
+    def __post_init__(self) -> None:
+        if self.status != "INSUFFICIENT_EVIDENCE":
+            raise ValueError("status DeclareInsufficientDeepCoverage invalide")
+        if self.support_status is not SupportStatus.INSUFFICIENT_EVIDENCE:
+            raise ValueError("support_status DeclareInsufficientDeepCoverage invalide")
+        if not isinstance(self.research_case, ResearchCase):
+            raise ValueError("research_case invalide")
+        if not isinstance(self.evidence_set, EvidenceSet):
+            raise ValueError("evidence_set invalide")
+        if not isinstance(self.coverage_evaluation, DeepEvidenceCoverageEvaluation):
+            raise ValueError("coverage_evaluation invalide")
+        object.__setattr__(self, "knowledge_gaps", _ensure_knowledge_gaps(self.knowledge_gaps))
+        object.__setattr__(self, "events", _ensure_deep_insufficient_events(self.events))
 
 
 @dataclass(frozen=True)
@@ -345,6 +431,75 @@ class RecordContradictionAssessmentHandler:
 
 
 @dataclass(frozen=True)
+class DeclareInsufficientDeepCoverageHandler:
+    """Orchestre la politique RA M-009 de couverture insuffisante explicite."""
+
+    research_case_repository: ResearchCaseRepository
+    citation_resolver: object
+
+    def __post_init__(self) -> None:
+        if not callable(getattr(self.research_case_repository, "case_for_id", None)):
+            raise ValueError("research_case_repository sans case_for_id")
+        if not callable(getattr(self.research_case_repository, "update", None)):
+            raise ValueError("research_case_repository sans update")
+        if not callable(getattr(self.citation_resolver, "resolve", None)):
+            raise ValueError("citation_resolver sans resolve")
+
+    def declare(
+        self,
+        command: DeclareInsufficientDeepCoverage,
+    ) -> DeclareInsufficientDeepCoverageResult:
+        parsed_command = _ensure_deep_insufficient_command(command)
+        research_case = self.research_case_repository.case_for_id(parsed_command.research_case_id)
+        if not isinstance(research_case, ResearchCase):
+            raise ValueError("research_case invalide")
+        coverage_policy = DeepEvidenceCoveragePolicy(
+            coverage_requirements=parsed_command.coverage_requirements,
+            policy_version=parsed_command.coverage_policy_version,
+        )
+        coverage_evaluation = coverage_policy.evaluate(parsed_command.candidates)
+        if coverage_evaluation.support_status is not SupportStatus.INSUFFICIENT_EVIDENCE:
+            raise ValueError("couverture critique suffisante")
+        if len(coverage_evaluation.covered_obligations) == 0:
+            raise ValueError("coverage_obligations couvertes absentes")
+        evidence_set = EvidenceSet.assemble(
+            research_case_id=research_case.research_case_id,
+            coverage_obligations=coverage_evaluation.covered_obligations,
+            candidates=parsed_command.candidates,
+            verified_claim_refs=parsed_command.verified_claim_refs,
+            coverage_policy_version=parsed_command.coverage_policy_version,
+            diversification_policy_version=parsed_command.diversification_policy_version,
+        )
+        assembled_case, collection_event = research_case.attach_evidence_set(
+            evidence_set,
+            occurred_at=parsed_command.occurred_at,
+        )
+        sealed_case, sealed_event = assembled_case.seal_evidence_set(
+            evidence_set_id=evidence_set.evidence_set_id,
+            citation_resolver=self.citation_resolver,
+            occurred_at=parsed_command.occurred_at,
+        )
+        terminal_case, gaps, insufficient_events = sealed_case.declare_insufficient_deep_coverage(
+            missing_obligations=coverage_evaluation.missing_obligations,
+            reason_codes=coverage_evaluation.reason_codes,
+            public_reasons=coverage_evaluation.public_reasons,
+            occurred_at=parsed_command.occurred_at,
+        )
+        saved_case = self.research_case_repository.update(terminal_case)
+        if saved_case.evidence_set is None:
+            raise ValueError("evidence_set absent")
+        return DeclareInsufficientDeepCoverageResult(
+            status="INSUFFICIENT_EVIDENCE",
+            support_status=coverage_evaluation.support_status,
+            research_case=saved_case,
+            evidence_set=saved_case.evidence_set,
+            coverage_evaluation=coverage_evaluation,
+            knowledge_gaps=gaps,
+            events=(collection_event, sealed_event) + insufficient_events,
+        )
+
+
+@dataclass(frozen=True)
 class RecordDeepContradictionAssessmentHandler:
     """Orchestre la classification approfondie M-009 sans accès au stockage EG interne."""
 
@@ -442,6 +597,12 @@ def _ensure_insufficient_command(value: object) -> DeclareInsufficientEvidence:
     return value
 
 
+def _ensure_deep_insufficient_command(value: object) -> DeclareInsufficientDeepCoverage:
+    if not isinstance(value, DeclareInsufficientDeepCoverage):
+        raise ValueError("commande DeclareInsufficientDeepCoverage invalide")
+    return value
+
+
 def _ensure_conflicting_command(value: object) -> DeclareConflictingEvidence:
     if not isinstance(value, DeclareConflictingEvidence):
         raise ValueError("commande DeclareConflictingEvidence invalide")
@@ -508,6 +669,50 @@ def _ensure_knowledge_gaps(value: Sequence[KnowledgeGap]) -> tuple[KnowledgeGap,
     return gaps
 
 
+def _ensure_deep_coverage_candidates(value: Sequence[object]) -> tuple[object, ...]:
+    if value is None or isinstance(value, str) or not isinstance(value, Sequence):
+        raise ValueError("evidence_candidates invalides")
+    candidates = tuple(value)
+    if len(candidates) == 0:
+        raise ValueError("evidence_refs absentes")
+    return candidates
+
+
+def _ensure_verified_claim_refs(value: Sequence[VerifiedClaimRef]) -> tuple[VerifiedClaimRef, ...]:
+    if value is None or isinstance(value, str) or not isinstance(value, Sequence):
+        raise ValueError("verified_claim_refs invalides")
+    verified_claim_refs = tuple(value)
+    if len(verified_claim_refs) == 0:
+        raise ValueError("verified_claim_refs absents")
+    claim_keys: list[tuple[str, int]] = []
+    for verified_claim_ref in verified_claim_refs:
+        if not isinstance(verified_claim_ref, VerifiedClaimRef):
+            raise ValueError("verified_claim_ref invalide")
+        claim_key = (verified_claim_ref.claim_id, verified_claim_ref.claim_version)
+        if claim_key in claim_keys:
+            raise ValueError("verified_claim_ref duplique")
+        claim_keys.append(claim_key)
+    return verified_claim_refs
+
+
+def _ensure_deep_coverage_requirements(
+    value: Sequence[DeepCoverageRequirement],
+) -> tuple[DeepCoverageRequirement, ...]:
+    if value is None or isinstance(value, str) or not isinstance(value, Sequence):
+        raise ValueError("coverage_requirements invalides")
+    requirements = tuple(value)
+    if len(requirements) == 0:
+        raise ValueError("coverage_requirements absentes")
+    obligation_names: list[str] = []
+    for requirement in requirements:
+        if not isinstance(requirement, DeepCoverageRequirement):
+            raise ValueError("coverage_requirement invalide")
+        if requirement.obligation_name in obligation_names:
+            raise ValueError("coverage_requirement dupliquee")
+        obligation_names.append(requirement.obligation_name)
+    return requirements
+
+
 def _ensure_contradiction_events(value: Sequence[ContradictionDetected]) -> tuple[ContradictionDetected, ...]:
     if value is None or isinstance(value, str) or not isinstance(value, Sequence):
         raise ValueError("events invalides")
@@ -550,6 +755,37 @@ def _ensure_insufficient_events(
     return events
 
 
+def _ensure_deep_insufficient_events(
+    value: Sequence[
+        EvidenceCollectionCompleted
+        | EvidenceSetSealed
+        | KnowledgeGapRecorded
+        | ResearchEvidenceFoundInsufficient
+    ],
+) -> tuple[
+    EvidenceCollectionCompleted
+    | EvidenceSetSealed
+    | KnowledgeGapRecorded
+    | ResearchEvidenceFoundInsufficient,
+    ...,
+]:
+    if value is None or isinstance(value, str) or not isinstance(value, Sequence):
+        raise ValueError("events invalides")
+    events = tuple(value)
+    if len(events) < 4:
+        raise ValueError("events insuffisance approfondie absents")
+    if not isinstance(events[0], EvidenceCollectionCompleted):
+        raise ValueError("EvidenceCollectionCompleted absent")
+    if not isinstance(events[1], EvidenceSetSealed):
+        raise ValueError("EvidenceSetSealed absent")
+    for event in events[2:]:
+        if not isinstance(event, (KnowledgeGapRecorded, ResearchEvidenceFoundInsufficient)):
+            raise ValueError("event insuffisance approfondie invalide")
+    if not isinstance(events[-1], ResearchEvidenceFoundInsufficient):
+        raise ValueError("ResearchEvidenceFoundInsufficient absent")
+    return events
+
+
 def _ensure_conflicting_events(
     value: Sequence[ResearchEvidenceFoundConflicting],
 ) -> tuple[ResearchEvidenceFoundConflicting, ...]:
@@ -563,9 +799,22 @@ def _ensure_conflicting_events(
     return events
 
 
+def _ensure_text(value: object, field_name: str) -> str:
+    if not isinstance(value, str):
+        raise ValueError(f"{field_name} non textuel")
+    if value.strip() == "":
+        raise ValueError(f"{field_name} vide")
+    if value != value.strip():
+        raise ValueError(f"{field_name} non normalise")
+    return value
+
+
 __all__ = [
     "DeclareConflictingEvidence",
     "DeclareConflictingEvidenceResult",
+    "DeclareInsufficientDeepCoverage",
+    "DeclareInsufficientDeepCoverageHandler",
+    "DeclareInsufficientDeepCoverageResult",
     "DeclareInsufficientEvidence",
     "DeclareInsufficientEvidenceResult",
     "RecordDeepContradictionAssessment",

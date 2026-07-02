@@ -11,12 +11,16 @@ from typing import Any
 
 from app.contracts.evidence_claims import EvidenceRef, VerifiedClaimRef
 from app.contracts.source_references import SourceLocator
+from app.research_answering.domain.contradiction_assessment import SupportStatus
 
 
 _HASH_HEX_LENGTH = 24
 _UTC_INSTANT_PATTERN = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
 _EVIDENCE_SET_ID_PATTERN = re.compile(r"^EVS-[A-Z0-9][A-Z0-9-]*$")
 _CITATION_ID_PATTERN = re.compile(r"^CIT-[A-Z0-9][A-Z0-9-]*$")
+_DEEP_COVERAGE_POLARITIES = frozenset({"ANY", "FAVORABLE", "UNFAVORABLE", "NEUTRAL"})
+_DEEP_COVERAGE_SOURCE_KINDS = frozenset({"PRIMARY", "SECONDARY"})
+_CURRENT_DATA_REQUIRED_REASON = "CURRENT_DATA_REQUIRED"
 
 
 @dataclass(frozen=True)
@@ -100,6 +104,184 @@ class EvidenceCoveragePolicy:
         )
         if len(missing) > 0:
             raise ValueError(f"coverage_obligation non couverte: {missing[0]}")
+
+
+@dataclass(frozen=True)
+class DeepCoverageRequirement:
+    """Obligation RA approfondie évaluée avant synthèse multi-sources."""
+
+    obligation_name: str
+    critical: bool
+    required_polarity: str
+    requires_primary_source: bool
+    reason_code: str
+    public_reason: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "obligation_name", _ensure_text(self.obligation_name, "obligation_name"))
+        if not isinstance(self.critical, bool):
+            raise ValueError("critical non booleen")
+        object.__setattr__(self, "required_polarity", _ensure_deep_polarity(self.required_polarity))
+        if not isinstance(self.requires_primary_source, bool):
+            raise ValueError("requires_primary_source non booleen")
+        reason_code = _ensure_text(self.reason_code, "reason_code")
+        if reason_code == _CURRENT_DATA_REQUIRED_REASON:
+            raise ValueError("CURRENT_DATA_REQUIRED separe de couverture documentaire")
+        object.__setattr__(self, "reason_code", reason_code)
+        object.__setattr__(self, "public_reason", _ensure_text(self.public_reason, "public_reason"))
+
+
+@dataclass(frozen=True)
+class DeepEvidenceCoverageEvaluation:
+    """Décision publique de couverture documentaire approfondie."""
+
+    support_status: SupportStatus
+    missing_obligations: Sequence[str]
+    critical_missing_obligations: Sequence[str]
+    qualified_obligations: Sequence[str]
+    reason_codes: Sequence[str]
+    public_reasons: Sequence[str]
+    covered_obligations: Sequence[str]
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.support_status, SupportStatus):
+            raise ValueError("support_status invalide")
+        object.__setattr__(
+            self,
+            "missing_obligations",
+            _ensure_text_sequence_allow_empty(self.missing_obligations, "missing_obligations"),
+        )
+        object.__setattr__(
+            self,
+            "critical_missing_obligations",
+            _ensure_text_sequence_allow_empty(
+                self.critical_missing_obligations,
+                "critical_missing_obligations",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "qualified_obligations",
+            _ensure_text_sequence_allow_empty(self.qualified_obligations, "qualified_obligations"),
+        )
+        object.__setattr__(
+            self,
+            "reason_codes",
+            _ensure_text_sequence_allow_empty(self.reason_codes, "reason_codes"),
+        )
+        object.__setattr__(
+            self,
+            "public_reasons",
+            _ensure_text_sequence_allow_empty(self.public_reasons, "public_reasons"),
+        )
+        object.__setattr__(
+            self,
+            "covered_obligations",
+            _ensure_text_sequence_allow_empty(self.covered_obligations, "covered_obligations"),
+        )
+        if len(self.missing_obligations) != len(self.reason_codes):
+            raise ValueError("reason_codes incoherents")
+        if len(self.missing_obligations) != len(self.public_reasons):
+            raise ValueError("public_reasons incoherentes")
+        if self.support_status is SupportStatus.INSUFFICIENT_EVIDENCE:
+            if len(self.critical_missing_obligations) == 0:
+                raise ValueError("obligation critique manquante absente")
+            return
+        if self.support_status is SupportStatus.PARTIALLY_SUPPORTED:
+            if len(self.critical_missing_obligations) > 0:
+                raise ValueError("PARTIALLY_SUPPORTED avec obligation critique manquante")
+            if len(self.qualified_obligations) == 0:
+                raise ValueError("qualified_obligations absentes")
+            return
+        if self.support_status is SupportStatus.SUPPORTED:
+            if len(self.missing_obligations) > 0:
+                raise ValueError("SUPPORTED avec couverture manquante")
+            return
+        raise ValueError("support_status couverture non supporte")
+
+
+@dataclass(frozen=True)
+class DeepEvidenceCoveragePolicy:
+    """Politique RA M-009 qui rend les lacunes de couverture auditables."""
+
+    coverage_requirements: Sequence[DeepCoverageRequirement]
+    policy_version: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "coverage_requirements",
+            _ensure_deep_coverage_requirements(self.coverage_requirements),
+        )
+        object.__setattr__(
+            self,
+            "policy_version",
+            _ensure_text(self.policy_version, "coverage_policy_version"),
+        )
+
+    def evaluate(self, candidates: Sequence[object]) -> DeepEvidenceCoverageEvaluation:
+        parsed_candidates = _ensure_deep_coverage_candidates(candidates)
+        missing_obligations: list[str] = []
+        critical_missing_obligations: list[str] = []
+        qualified_obligations: list[str] = []
+        reason_codes: list[str] = []
+        public_reasons: list[str] = []
+        covered_obligations: list[str] = []
+
+        for requirement in self.coverage_requirements:
+            matching_candidates = tuple(
+                candidate
+                for candidate in parsed_candidates
+                if requirement.obligation_name in _candidate_covered_obligations(candidate)
+            )
+            if len(matching_candidates) > 0:
+                covered_obligations.append(requirement.obligation_name)
+            if self._is_requirement_satisfied(requirement, matching_candidates):
+                continue
+
+            missing_obligations.append(requirement.obligation_name)
+            reason_codes.append(requirement.reason_code)
+            public_reasons.append(requirement.public_reason)
+            if requirement.critical:
+                critical_missing_obligations.append(requirement.obligation_name)
+            else:
+                qualified_obligations.append(requirement.obligation_name)
+
+        if len(critical_missing_obligations) > 0:
+            support_status = SupportStatus.INSUFFICIENT_EVIDENCE
+        elif len(qualified_obligations) > 0:
+            support_status = SupportStatus.PARTIALLY_SUPPORTED
+        else:
+            support_status = SupportStatus.SUPPORTED
+
+        return DeepEvidenceCoverageEvaluation(
+            support_status=support_status,
+            missing_obligations=tuple(missing_obligations),
+            critical_missing_obligations=tuple(critical_missing_obligations),
+            qualified_obligations=tuple(qualified_obligations),
+            reason_codes=tuple(reason_codes),
+            public_reasons=tuple(public_reasons),
+            covered_obligations=tuple(covered_obligations),
+        )
+
+    def _is_requirement_satisfied(
+        self,
+        requirement: DeepCoverageRequirement,
+        candidates: tuple[object, ...],
+    ) -> bool:
+        if len(candidates) == 0:
+            return False
+        if requirement.required_polarity != "ANY" and not any(
+            _candidate_evidence_polarity(candidate) == requirement.required_polarity
+            for candidate in candidates
+        ):
+            return False
+        if requirement.requires_primary_source and not any(
+            _candidate_source_kind(candidate) == "PRIMARY"
+            for candidate in candidates
+        ):
+            return False
+        return True
 
 
 @dataclass(frozen=True)
@@ -380,6 +562,43 @@ def _candidate_covered_obligations(candidate: object) -> tuple[str, ...]:
     )
 
 
+def _candidate_evidence_polarity(candidate: object) -> str:
+    return _ensure_deep_polarity(getattr(candidate, "evidence_polarity", None))
+
+
+def _candidate_source_kind(candidate: object) -> str:
+    return _ensure_deep_source_kind(getattr(candidate, "source_kind", None))
+
+
+def _ensure_deep_coverage_requirements(value: object) -> tuple[DeepCoverageRequirement, ...]:
+    if value is None or isinstance(value, str) or not isinstance(value, Sequence):
+        raise ValueError("coverage_requirements invalides")
+    requirements = tuple(value)
+    if len(requirements) == 0:
+        raise ValueError("coverage_requirements absentes")
+    obligation_names: list[str] = []
+    for requirement in requirements:
+        if not isinstance(requirement, DeepCoverageRequirement):
+            raise ValueError("coverage_requirement invalide")
+        if requirement.obligation_name in obligation_names:
+            raise ValueError("coverage_requirement dupliquee")
+        obligation_names.append(requirement.obligation_name)
+    return requirements
+
+
+def _ensure_deep_coverage_candidates(value: object) -> tuple[object, ...]:
+    if value is None or isinstance(value, str) or not isinstance(value, Sequence):
+        raise ValueError("evidence_candidates invalides")
+    candidates = tuple(value)
+    if len(candidates) == 0:
+        raise ValueError("evidence_refs absentes")
+    for candidate in candidates:
+        _candidate_covered_obligations(candidate)
+        _candidate_evidence_polarity(candidate)
+        _candidate_source_kind(candidate)
+    return candidates
+
+
 def _ensure_evidence_refs(value: Sequence[EvidenceRef]) -> tuple[EvidenceRef, ...]:
     if value is None or isinstance(value, str) or not isinstance(value, Sequence):
         raise ValueError("evidence_refs invalides")
@@ -487,6 +706,15 @@ def _ensure_text_tuple(value: object, field_name: str) -> tuple[str, ...]:
     return parsed
 
 
+def _ensure_text_sequence_allow_empty(value: object, field_name: str) -> tuple[str, ...]:
+    if value is None or isinstance(value, str) or not isinstance(value, Sequence):
+        raise ValueError(f"{field_name} invalides")
+    parsed = tuple(_ensure_text(item, field_name) for item in value)
+    if len(parsed) != len(set(parsed)):
+        raise ValueError(f"{field_name} dupliquees")
+    return parsed
+
+
 def _ensure_text(value: object, field_name: str) -> str:
     if not isinstance(value, str):
         raise ValueError(f"{field_name} non textuel")
@@ -495,6 +723,20 @@ def _ensure_text(value: object, field_name: str) -> str:
     if value != value.strip():
         raise ValueError(f"{field_name} non normalise")
     return value
+
+
+def _ensure_deep_polarity(value: object) -> str:
+    text = _ensure_text(value, "evidence_polarity")
+    if text not in _DEEP_COVERAGE_POLARITIES:
+        raise ValueError(f"evidence_polarity invalide: {text}")
+    return text
+
+
+def _ensure_deep_source_kind(value: object) -> str:
+    text = _ensure_text(value, "source_kind")
+    if text not in _DEEP_COVERAGE_SOURCE_KINDS:
+        raise ValueError(f"source_kind invalide: {text}")
+    return text
 
 
 def _ensure_utc_instant(value: object, field_name: str) -> str:
@@ -582,6 +824,9 @@ def _json_ready(value: Any) -> Any:
 
 __all__ = [
     "Citation",
+    "DeepCoverageRequirement",
+    "DeepEvidenceCoverageEvaluation",
+    "DeepEvidenceCoveragePolicy",
     "EvidenceCollectionCompleted",
     "EvidenceCoveragePolicy",
     "EvidenceDiversificationPolicy",

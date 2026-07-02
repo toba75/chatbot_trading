@@ -302,6 +302,30 @@ class KnowledgeGap:
         )
 
     @classmethod
+    def for_missing_coverage_obligation(
+        cls,
+        *,
+        research_case_id: str,
+        affected_obligation: str,
+        reason_code: str,
+        public_reason: str,
+    ) -> "KnowledgeGap":
+        obligation = _ensure_text(affected_obligation, "affected_obligation")
+        code = _ensure_text(reason_code, "reason_code")
+        reason = _ensure_text(public_reason, "public_reason")
+        return cls(
+            gap_id=_gap_id_for(
+                research_case_id=_ensure_research_case_id(research_case_id),
+                affected_obligation=obligation,
+                reason_code=code,
+            ),
+            gap_type=KnowledgeGapType.COVERAGE_OBLIGATION_MISSING,
+            affected_obligation=obligation,
+            reason_code=code,
+            public_reason=reason,
+        )
+
+    @classmethod
     def for_current_data_required(cls, *, research_case_id: str) -> "KnowledgeGap":
         obligation = "données actuelles autorisées"
         reason_code = "CURRENT_DATA_REQUIRED"
@@ -469,6 +493,7 @@ class KnowledgeGapRecorded:
     gap_type: KnowledgeGapType
     affected_obligation: str
     reason_code: str
+    public_reason: str
     occurred_at: str
 
     @property
@@ -485,6 +510,7 @@ class KnowledgeGapRecorded:
             _ensure_text(self.affected_obligation, "affected_obligation"),
         )
         object.__setattr__(self, "reason_code", _ensure_text(self.reason_code, "reason_code"))
+        object.__setattr__(self, "public_reason", _ensure_text(self.public_reason, "public_reason"))
         object.__setattr__(self, "occurred_at", _ensure_utc_instant(self.occurred_at, "occurred_at"))
 
     def to_payload(self) -> dict[str, Any]:
@@ -496,6 +522,7 @@ class KnowledgeGapRecorded:
                 "gap_type": self.gap_type.value,
                 "affected_obligation": self.affected_obligation,
                 "reason_code": self.reason_code,
+                "public_reason": self.public_reason,
             },
         }
 
@@ -507,6 +534,8 @@ class ResearchEvidenceFoundInsufficient:
     research_case_id: str
     missing_obligations: tuple[str, ...]
     reason_codes: tuple[str, ...]
+    support_status: SupportStatus
+    public_reasons: tuple[str, ...]
     occurred_at: str
 
     @property
@@ -525,6 +554,18 @@ class ResearchEvidenceFoundInsufficient:
             "reason_codes",
             _ensure_text_tuple(self.reason_codes, "reason_codes"),
         )
+        object.__setattr__(self, "support_status", ensure_support_status(self.support_status))
+        if self.support_status is not SupportStatus.INSUFFICIENT_EVIDENCE:
+            raise ValueError("support_status insuffisance invalide")
+        object.__setattr__(
+            self,
+            "public_reasons",
+            _ensure_text_tuple(self.public_reasons, "public_reasons"),
+        )
+        if len(self.missing_obligations) != len(self.reason_codes):
+            raise ValueError("reason_codes incoherents")
+        if len(self.missing_obligations) != len(self.public_reasons):
+            raise ValueError("public_reasons incoherentes")
         object.__setattr__(self, "occurred_at", _ensure_utc_instant(self.occurred_at, "occurred_at"))
 
     def to_payload(self) -> dict[str, Any]:
@@ -535,6 +576,8 @@ class ResearchEvidenceFoundInsufficient:
                 "research_case_id": self.research_case_id,
                 "missing_obligations": self.missing_obligations,
                 "reason_codes": self.reason_codes,
+                "support_status": self.support_status.value,
+                "public_reasons": self.public_reasons,
             },
         }
 
