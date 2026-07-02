@@ -777,6 +777,14 @@ $requiredM009Requirements = @(
         CommandScript = "tests/m009/validate_deep_contradiction_classification_acceptance.ps1"
         Code = "app/evidence_governance/domain/claim_relation.py; app/research_answering/domain/contradiction_assessment.py; app/research_answering/application/classify_contradictions.py"
         Adr = "DDD-ADR-005; DDD-ADR-007"
+    },
+    [ordered] @{
+        Id = "REQ-M009-007"
+        Source = "docs/tasks/milestone_009/0007_declarer_couverture_insuffisante.md"
+        Test = "tests/m009/validate_insufficient_deep_coverage_acceptance.ps1"
+        CommandScript = "tests/m009/validate_insufficient_deep_coverage_acceptance.ps1"
+        Code = "app/research_answering/domain/evidence_set.py; app/research_answering/domain/research_case.py; app/research_answering/application/classify_contradictions.py"
+        Adr = "ADR-006; DDD-ADR-005; DDD-ADR-007"
     }
 )
 

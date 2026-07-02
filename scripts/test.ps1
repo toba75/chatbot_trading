@@ -65,6 +65,8 @@ $m009VerifiedClaimDependencyAcceptancePath = "tests/m009/validate_verified_claim
 $m009VerifiedClaimDependencyUnitPath = "tests/m009/validate_verified_claim_dependency_resolution_unit.ps1"
 $m009DeepContradictionClassificationAcceptancePath = "tests/m009/validate_deep_contradiction_classification_acceptance.ps1"
 $m009DeepContradictionClassificationUnitPath = "tests/m009/validate_deep_contradiction_classification_unit.ps1"
+$m009InsufficientDeepCoverageAcceptancePath = "tests/m009/validate_insufficient_deep_coverage_acceptance.ps1"
+$m009InsufficientDeepCoverageUnitPath = "tests/m009/validate_insufficient_deep_coverage_unit.ps1"
 
 $validationCommands = @(
     @{ Path = "scripts/validate_m000_precondition_report.ps1"; Arguments = @("-Path", $preconditionReportPath) },
@@ -276,7 +278,9 @@ $testCommands = @(
     @{ Path = "tests/m009/validate_verified_claim_dependency_resolution_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/m009/validate_verified_claim_dependency_resolution_unit.ps1"; Arguments = @() },
     @{ Path = $m009DeepContradictionClassificationAcceptancePath; Arguments = @() },
-    @{ Path = $m009DeepContradictionClassificationUnitPath; Arguments = @() }
+    @{ Path = $m009DeepContradictionClassificationUnitPath; Arguments = @() },
+    @{ Path = $m009InsufficientDeepCoverageAcceptancePath; Arguments = @() },
+    @{ Path = $m009InsufficientDeepCoverageUnitPath; Arguments = @() }
 )
 
 function Get-GateCommandPaths {
@@ -339,7 +343,9 @@ if ($env:OST_M003_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m009VerifiedClaimDependencyAcceptancePath,
         $m009VerifiedClaimDependencyUnitPath,
         $m009DeepContradictionClassificationAcceptancePath,
-        $m009DeepContradictionClassificationUnitPath
+        $m009DeepContradictionClassificationUnitPath,
+        $m009InsufficientDeepCoverageAcceptancePath,
+        $m009InsufficientDeepCoverageUnitPath
     )
 }
 elseif ($env:OST_M004_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -390,7 +396,9 @@ elseif ($env:OST_M004_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m009VerifiedClaimDependencyAcceptancePath,
         $m009VerifiedClaimDependencyUnitPath,
         $m009DeepContradictionClassificationAcceptancePath,
-        $m009DeepContradictionClassificationUnitPath
+        $m009DeepContradictionClassificationUnitPath,
+        $m009InsufficientDeepCoverageAcceptancePath,
+        $m009InsufficientDeepCoverageUnitPath
     )
 }
 elseif ($env:OST_M005_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -442,7 +450,9 @@ elseif ($env:OST_M005_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m009VerifiedClaimDependencyAcceptancePath,
         $m009VerifiedClaimDependencyUnitPath,
         $m009DeepContradictionClassificationAcceptancePath,
-        $m009DeepContradictionClassificationUnitPath
+        $m009DeepContradictionClassificationUnitPath,
+        $m009InsufficientDeepCoverageAcceptancePath,
+        $m009InsufficientDeepCoverageUnitPath
     )
 }
 elseif ($env:OST_M006_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -493,7 +503,9 @@ elseif ($env:OST_M006_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m009VerifiedClaimDependencyAcceptancePath,
         $m009VerifiedClaimDependencyUnitPath,
         $m009DeepContradictionClassificationAcceptancePath,
-        $m009DeepContradictionClassificationUnitPath
+        $m009DeepContradictionClassificationUnitPath,
+        $m009InsufficientDeepCoverageAcceptancePath,
+        $m009InsufficientDeepCoverageUnitPath
     )
 }
 elseif ($env:OST_M007_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -543,7 +555,9 @@ elseif ($env:OST_M007_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m009VerifiedClaimDependencyAcceptancePath,
         $m009VerifiedClaimDependencyUnitPath,
         $m009DeepContradictionClassificationAcceptancePath,
-        $m009DeepContradictionClassificationUnitPath
+        $m009DeepContradictionClassificationUnitPath,
+        $m009InsufficientDeepCoverageAcceptancePath,
+        $m009InsufficientDeepCoverageUnitPath
     )
 }
 elseif ($env:OST_M008_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -572,7 +586,9 @@ elseif ($env:OST_M008_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m009VerifiedClaimDependencyAcceptancePath,
         $m009VerifiedClaimDependencyUnitPath,
         $m009DeepContradictionClassificationAcceptancePath,
-        $m009DeepContradictionClassificationUnitPath
+        $m009DeepContradictionClassificationUnitPath,
+        $m009InsufficientDeepCoverageAcceptancePath,
+        $m009InsufficientDeepCoverageUnitPath
     )
 }
 elseif ($env:OST_M009_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -600,7 +616,9 @@ elseif ($env:OST_M009_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m009VerifiedClaimDependencyAcceptancePath,
         $m009VerifiedClaimDependencyUnitPath,
         $m009DeepContradictionClassificationAcceptancePath,
-        $m009DeepContradictionClassificationUnitPath
+        $m009DeepContradictionClassificationUnitPath,
+        $m009InsufficientDeepCoverageAcceptancePath,
+        $m009InsufficientDeepCoverageUnitPath
     )
 }
 
