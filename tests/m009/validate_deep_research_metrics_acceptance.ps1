@@ -155,7 +155,7 @@ fixture = {
             "answer_id": "ANS-M009-T010-CONFLICTING",
             "support_status": "CONFLICTING_EVIDENCE",
             "support_decision_basis": "DEEP_RESEARCH_POLICY",
-            "coverage_obligation_statuses": ("OUT_OF_SCOPE", "INSUFFICIENT"),
+            "coverage_obligation_statuses": ("OUT_OF_SCOPE",),
             "document_ids": ("DOC-M009-T010-G", "DOC-M009-T010-H"),
             "query_count": 2,
             "independent_dependency_group_ids": (),

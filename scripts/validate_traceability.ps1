@@ -801,6 +801,14 @@ $requiredM009Requirements = @(
         CommandScript = "tests/m009/validate_deep_research_http_contract_acceptance.ps1"
         Code = "app/research_answering/adapters/answer_http.py; app/research_answering/application/deep_research.py; app/conversation/application/answer_deep_research_turn.py"
         Adr = "ADR-010; DDD-ADR-003; DDD-ADR-005"
+    },
+    [ordered] @{
+        Id = "REQ-M009-010"
+        Source = "docs/tasks/milestone_009/0010_publier_metriques_couverture_audit.md"
+        Test = "tests/m009/validate_deep_research_metrics_acceptance.ps1"
+        CommandScript = "tests/m009/validate_deep_research_metrics_acceptance.ps1"
+        Code = "app/research_answering/application/deep_research_metrics.py"
+        Adr = "ADR-010; DDD-ADR-008"
     }
 )
 

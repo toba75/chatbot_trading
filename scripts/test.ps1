@@ -71,6 +71,8 @@ $m009MultiSourceSynthesisAcceptancePath = "tests/m009/validate_multi_source_synt
 $m009MultiSourceSynthesisUnitPath = "tests/m009/validate_multi_source_synthesis_unit.ps1"
 $m009DeepResearchHttpAcceptancePath = "tests/m009/validate_deep_research_http_contract_acceptance.ps1"
 $m009DeepResearchHttpUnitPath = "tests/m009/validate_deep_research_http_contract_unit.ps1"
+$m009DeepResearchMetricsAcceptancePath = "tests/m009/validate_deep_research_metrics_acceptance.ps1"
+$m009DeepResearchMetricsUnitPath = "tests/m009/validate_deep_research_metrics_unit.ps1"
 
 $validationCommands = @(
     @{ Path = "scripts/validate_m000_precondition_report.ps1"; Arguments = @("-Path", $preconditionReportPath) },
@@ -288,7 +290,9 @@ $testCommands = @(
     @{ Path = $m009MultiSourceSynthesisAcceptancePath; Arguments = @() },
     @{ Path = $m009MultiSourceSynthesisUnitPath; Arguments = @() },
     @{ Path = $m009DeepResearchHttpAcceptancePath; Arguments = @() },
-    @{ Path = $m009DeepResearchHttpUnitPath; Arguments = @() }
+    @{ Path = $m009DeepResearchHttpUnitPath; Arguments = @() },
+    @{ Path = $m009DeepResearchMetricsAcceptancePath; Arguments = @() },
+    @{ Path = $m009DeepResearchMetricsUnitPath; Arguments = @() }
 )
 
 function Get-GateCommandPaths {
@@ -357,7 +361,9 @@ if ($env:OST_M003_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m009MultiSourceSynthesisAcceptancePath,
         $m009MultiSourceSynthesisUnitPath,
         $m009DeepResearchHttpAcceptancePath,
-        $m009DeepResearchHttpUnitPath
+        $m009DeepResearchHttpUnitPath,
+        $m009DeepResearchMetricsAcceptancePath,
+        $m009DeepResearchMetricsUnitPath
     )
 }
 elseif ($env:OST_M004_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -414,7 +420,9 @@ elseif ($env:OST_M004_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m009MultiSourceSynthesisAcceptancePath,
         $m009MultiSourceSynthesisUnitPath,
         $m009DeepResearchHttpAcceptancePath,
-        $m009DeepResearchHttpUnitPath
+        $m009DeepResearchHttpUnitPath,
+        $m009DeepResearchMetricsAcceptancePath,
+        $m009DeepResearchMetricsUnitPath
     )
 }
 elseif ($env:OST_M005_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -472,7 +480,9 @@ elseif ($env:OST_M005_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m009MultiSourceSynthesisAcceptancePath,
         $m009MultiSourceSynthesisUnitPath,
         $m009DeepResearchHttpAcceptancePath,
-        $m009DeepResearchHttpUnitPath
+        $m009DeepResearchHttpUnitPath,
+        $m009DeepResearchMetricsAcceptancePath,
+        $m009DeepResearchMetricsUnitPath
     )
 }
 elseif ($env:OST_M006_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -529,7 +539,9 @@ elseif ($env:OST_M006_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m009MultiSourceSynthesisAcceptancePath,
         $m009MultiSourceSynthesisUnitPath,
         $m009DeepResearchHttpAcceptancePath,
-        $m009DeepResearchHttpUnitPath
+        $m009DeepResearchHttpUnitPath,
+        $m009DeepResearchMetricsAcceptancePath,
+        $m009DeepResearchMetricsUnitPath
     )
 }
 elseif ($env:OST_M007_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -585,7 +597,9 @@ elseif ($env:OST_M007_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m009MultiSourceSynthesisAcceptancePath,
         $m009MultiSourceSynthesisUnitPath,
         $m009DeepResearchHttpAcceptancePath,
-        $m009DeepResearchHttpUnitPath
+        $m009DeepResearchHttpUnitPath,
+        $m009DeepResearchMetricsAcceptancePath,
+        $m009DeepResearchMetricsUnitPath
     )
 }
 elseif ($env:OST_M008_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -620,7 +634,9 @@ elseif ($env:OST_M008_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m009MultiSourceSynthesisAcceptancePath,
         $m009MultiSourceSynthesisUnitPath,
         $m009DeepResearchHttpAcceptancePath,
-        $m009DeepResearchHttpUnitPath
+        $m009DeepResearchHttpUnitPath,
+        $m009DeepResearchMetricsAcceptancePath,
+        $m009DeepResearchMetricsUnitPath
     )
 }
 elseif ($env:OST_M009_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -654,7 +670,9 @@ elseif ($env:OST_M009_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m009MultiSourceSynthesisAcceptancePath,
         $m009MultiSourceSynthesisUnitPath,
         $m009DeepResearchHttpAcceptancePath,
-        $m009DeepResearchHttpUnitPath
+        $m009DeepResearchHttpUnitPath,
+        $m009DeepResearchMetricsAcceptancePath,
+        $m009DeepResearchMetricsUnitPath
     )
 }
 

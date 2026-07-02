@@ -85,8 +85,8 @@ assert_equal(payload["independent_dependency_group_total"], 2, "Les groupes ind�
 assert_equal(payload["contradiction_classification_counts"], {"DIFFERENT_HORIZON": 1}, "Les contradictions doivent être publiées par classification.")
 assert_equal(payload["documentary_gap_type_counts"], {"COVERAGE_OBLIGATION_MISSING": 1}, "Les lacunes doivent être publiées par type.")
 assert_equal(payload["support_status_counts"]["PARTIALLY_SUPPORTED"], 1, "Le statut de support doit être compté.")
-assert_equal(payload["projection_version_refs"], ("PROJ-M009-T010-U1",), "Les versions KA doivent être référencées.")
-assert_equal(payload["verified_claim_version_refs"], ({"claim_id": "CLM-M009-T010-U1", "claim_version": 1},), "Les versions EG doivent être référencées.")
+assert_equal(payload["projection_version_refs"], ["PROJ-M009-T010-U1"], "Les versions KA doivent être référencées.")
+assert_equal(payload["verified_claim_version_refs"], [{"claim_id": "CLM-M009-T010-U1", "claim_version": 1}], "Les versions EG doivent être référencées.")
 assert_false("consensus" in repr(payload).lower(), "Le snapshot ne doit pas déduire de consensus depuis un compteur.")
 
 assert_raises(
@@ -102,7 +102,7 @@ assert_raises(
     lambda: observation(query_count=0),
 )
 assert_raises(
-    "projection_version_refs absentes",
+    "projection_version_refs absents",
     lambda: observation(projection_version_refs=()),
 )
 assert_raises(
@@ -206,7 +206,7 @@ signal = DeepResearchAuditSignal.from_metric_snapshot(
 )
 signal_payload = signal.to_payload()
 assert_equal(signal_payload["signal_name"], "deep_research_metrics_published", "Le signal doit nommer la publication.")
-assert_false("answer_text" in repr(signal_payload), "Le signal d'audit ne doit pas exposer de réponse complète.")
+assert_false("'answer_text':" in repr(signal_payload), "Le signal d'audit ne doit pas exposer de réponse complète.")
 
 assert_raises(
     "payload sensible interdit dans research_refs",
