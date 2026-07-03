@@ -144,6 +144,8 @@ def candidate(*, evidence, suffix):
         search_trace_id=f"STRC-M009T005UNIT{suffix:0>20}",
         document_id=evidence.source_locator.document_id,
         covered_obligations=("dependances",),
+        evidence_polarity="NEUTRAL",
+        source_kind="PRIMARY",
     )
 
 

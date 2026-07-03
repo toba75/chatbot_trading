@@ -175,6 +175,8 @@ def candidate(*, suffix, document_suffix, obligations, text, trace_suffix, conte
         search_trace_id=f"STRC-M009T004{trace_suffix:024d}",
         document_id=document_id,
         covered_obligations=obligations,
+        evidence_polarity=("UNFAVORABLE" if "preuves_defavorables" in obligations else "FAVORABLE" if "preuves_favorables" in obligations else "NEUTRAL"),
+        source_kind="PRIMARY",
     )
 
 

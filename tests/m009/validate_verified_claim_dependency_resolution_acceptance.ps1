@@ -135,6 +135,8 @@ def candidate(*, evidence, suffix):
         search_trace_id=f"STRC-M009T005{suffix:0>24}",
         document_id=evidence.source_locator.document_id,
         covered_obligations=("dependances",),
+        evidence_polarity="NEUTRAL",
+        source_kind="PRIMARY",
     )
 
 
@@ -178,8 +180,8 @@ class FakePublicVerifiedClaimCatalog:
         self.internal_reads = 0
         self.mutations = 0
 
-    def read_evidence(self, claim_id):
-        self.requests.append(claim_id)
+    def read_evidence(self, claim_id, claim_version):
+        self.requests.append((claim_id, claim_version))
         return PublicClaimEvidenceResult(self.verified_claim_ref)
 
     def read_internal_registry(self, claim_id):
@@ -262,7 +264,7 @@ assert_equal(
 payload = result.dependency_set.to_payload()
 assert_no_forbidden_storage_payload(payload)
 assert_false("frequency" in repr(payload).lower(), "La résolution ne doit pas publier de fréquence brute.")
-assert_equal(catalog.requests, [claim_ref.claim_id], "RA doit lire EG via le contrat public read_evidence.")
+assert_equal(catalog.requests, [(claim_ref.claim_id, 3)], "RA doit lire EG via le contrat public read_evidence versionne.")
 assert_equal(catalog.internal_reads, 0, "RA ne doit pas lire le registre EG interne.")
 assert_equal(catalog.mutations, 0, "RA ne doit pas muter EG.")
 

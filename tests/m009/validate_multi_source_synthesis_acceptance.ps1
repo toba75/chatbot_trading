@@ -40,6 +40,10 @@ from app.research_answering.application.open_research_case import (
     OpenResearchCaseCommand,
     OpenResearchCaseHandler,
 )
+from app.research_answering.application.resolve_claim_dependencies import (
+    ResolveVerifiedClaimDependenciesCommand,
+    ResolveVerifiedClaimDependenciesHandler,
+)
 from app.research_answering.domain.answer import (
     AssertionOriginType,
     DeepResearchReportSectionName,
@@ -192,6 +196,8 @@ def candidate(*, suffix, obligations, text, trace_suffix, content_seed, span_see
         search_trace_id=f"STRC-M009T008{trace_suffix:024d}",
         document_id=document_id,
         covered_obligations=obligations,
+        evidence_polarity=("UNFAVORABLE" if "preuves_defavorables" in obligations else "FAVORABLE" if "preuves_favorables" in obligations else "NEUTRAL"),
+        source_kind="PRIMARY",
     )
 
 
@@ -209,9 +215,31 @@ class FakeVerifiedClaimCatalog:
             claim.evidence_refs[0].evidence_id: claim
             for claim in claim_refs
         }
+        self.claims_by_ref = {
+            (claim.claim_id, claim.claim_version): claim
+            for claim in claim_refs
+        }
 
     def verified_claims_for_evidence(self, evidence_refs):
         return tuple(self.claims_by_evidence_id[evidence.evidence_id] for evidence in evidence_refs)
+
+    def read_evidence(self, claim_id, claim_version):
+        return PublicClaimEvidenceResult(self.claims_by_ref[(claim_id, claim_version)])
+
+
+class PublicClaim:
+    def __init__(self, verified_claim_ref):
+        self.status = "VERIFIED"
+        self.verified_claim_ref = verified_claim_ref
+        self.accepted_verification_id = verified_claim_ref.verification_id
+
+
+class PublicClaimEvidenceResult:
+    def __init__(self, verified_claim_ref):
+        self.claim = PublicClaim(verified_claim_ref)
+        self.evidence_refs = tuple(verified_claim_ref.evidence_refs)
+        self.dependency_group_ids = tuple(verified_claim_ref.dependency_group_ids)
+        self.verification_case_ids = (verified_claim_ref.verification_id,)
 
 
 class OpeningCitationResolver:
@@ -255,7 +283,14 @@ class StructuredDeepSynthesisGenerator:
 
 class FailingDeepSynthesisGenerator:
     def draft(self, request):
-        raise ValueError("LLM_DRAFT_FAILED")
+        raise ValueError("api_key=SECRET prompt=contenu source interne")
+
+
+class FailingAnswerAssertionExtractor:
+    extractor_version = "failing-assertion-extractor-m009-v1"
+
+    def extract(self, draft):
+        raise ValueError("ASSERTION_EXTRACTION_FAILED")
 
 
 def planned_deep_case_repository():
@@ -300,7 +335,7 @@ def planned_deep_case_repository():
     return repository, result.research_case_id
 
 
-def sealed_deep_case():
+def sealed_deep_case(*, resolve_dependencies=True):
     repository, research_case_id = planned_deep_case_repository()
     candidates_by_sub_question = {
         "RSQ-METHODES": candidate(
@@ -366,10 +401,11 @@ def sealed_deep_case():
         )
         for index, sub_question_id in enumerate(candidates_by_sub_question, start=1)
     }
+    verified_claim_catalog = FakeVerifiedClaimCatalog(claims)
     CollectDeepResearchEvidenceHandler(
         research_case_repository=repository,
         knowledge_search=FakeDeepKnowledgeSearch(responses),
-        verified_claim_catalog=FakeVerifiedClaimCatalog(claims),
+        verified_claim_catalog=verified_claim_catalog,
         citation_resolver=OpeningCitationResolver(),
     ).collect(
         CollectDeepResearchEvidenceCommand(
@@ -384,7 +420,18 @@ def sealed_deep_case():
         citation_resolver=OpeningCitationResolver(),
         occurred_at="2026-07-02T15:11:00Z",
     )
-    repository.update(sealed)
+    sealed = repository.update(sealed)
+    if resolve_dependencies:
+        ResolveVerifiedClaimDependenciesHandler(
+            verified_claim_catalog=verified_claim_catalog,
+            research_case_repository=repository,
+        ).resolve(
+            ResolveVerifiedClaimDependenciesCommand(
+                evidence_set=sealed.evidence_set,
+                occurred_at="2026-07-02T15:12:00Z",
+            )
+        )
+        sealed = repository.case_for_id(sealed.research_case_id)
     return repository, sealed
 
 
@@ -485,6 +532,11 @@ assert_equal(
     "DEEP_RESEARCH_DRAFT_GENERATION_FAILED",
     "L'échec ne doit pas être masqué par un fallback.",
 )
+assert_equal(
+    failure.failure_detail,
+    "DEEP_RESEARCH_DRAFT_GENERATION_FAILED",
+    "Le détail fournisseur sensible doit être rédigé.",
+)
 assert_equal(failure_answer_repository.answer_count(), 0, "Aucune réponse simple ne doit être créée.")
 stored_failure_case = failure_repository.case_for_id(failure_case.research_case_id)
 assert_equal(stored_failure_case.status, ResearchCaseStatus.EVIDENCE_SET_SEALED, "Le statut scellé doit être conservé.")
@@ -492,6 +544,58 @@ assert_equal(stored_failure_case.research_plan, sealed_plan, "Le DeepResearchPla
 assert_equal(stored_failure_case.evidence_set.evidence_hash, sealed_evidence_hash, "L'EvidenceSet scellé ne doit pas être détruit.")
 assert_equal(failure.research_case, stored_failure_case, "Le résultat d'échec doit référencer le cas inchangé.")
 assert_equal(failure.evidence_set.evidence_hash, sealed_evidence_hash, "Le résultat d'échec doit exposer l'EvidenceSet scellé.")
+
+# Given un EvidenceSet scellé avec claims n'a pas de dépendances EG résolues dans l'état RA.
+unresolved_repository, unresolved_case = sealed_deep_case(resolve_dependencies=False)
+try:
+    ProduceMultiSourceSynthesisHandler(
+        research_case_repository=unresolved_repository,
+        answer_repository=InMemoryAnswerRepository.empty(),
+        deep_synthesis_generator=StructuredDeepSynthesisGenerator(),
+        answer_assertion_extractor=LocalDeterministicAnswerAssertionExtractor.for_m007(),
+        citation_resolver=OpeningCitationResolver(),
+    ).produce(
+        ProduceMultiSourceSynthesis(
+            research_case_id=unresolved_case.research_case_id,
+            evidence_set_id=unresolved_case.evidence_set.evidence_set_id,
+            synthesis_policy_version="multi-source-synthesis-m009-v1",
+            support_policy_version="answer-support-m009-v1",
+            citation_policy_version="citation-integrity-m009-v1",
+            freshness_policy_version="answer-freshness-m009-v1",
+            occurred_at="2026-07-02T15:30:00Z",
+        )
+    )
+except ValueError as exc:
+    assert_true("CLAIM_DEPENDENCY_UNRESOLVED" in str(exc), "La synthèse doit refuser les dépendances EG non résolues.")
+else:
+    raise AssertionError("La synthèse ne doit pas contourner la résolution des dépendances EG.")
+
+# Given l'extraction d'assertions échoue après génération structurée.
+partial_repository, partial_case = sealed_deep_case()
+partial_answer_repository = InMemoryAnswerRepository.empty()
+try:
+    ProduceMultiSourceSynthesisHandler(
+        research_case_repository=partial_repository,
+        answer_repository=partial_answer_repository,
+        deep_synthesis_generator=StructuredDeepSynthesisGenerator(),
+        answer_assertion_extractor=FailingAnswerAssertionExtractor(),
+        citation_resolver=OpeningCitationResolver(),
+    ).produce(
+        ProduceMultiSourceSynthesis(
+            research_case_id=partial_case.research_case_id,
+            evidence_set_id=partial_case.evidence_set.evidence_set_id,
+            synthesis_policy_version="multi-source-synthesis-m009-v1",
+            support_policy_version="answer-support-m009-v1",
+            citation_policy_version="citation-integrity-m009-v1",
+            freshness_policy_version="answer-freshness-m009-v1",
+            occurred_at="2026-07-02T15:35:00Z",
+        )
+    )
+except ValueError as exc:
+    assert_true("DEEP_RESEARCH_SYNTHESIS_UNSUPPORTED" in str(exc), "L'échec post-génération doit être public et stable.")
+else:
+    raise AssertionError("Un échec d'extraction ne doit pas laisser une réponse partielle implicite.")
+assert_equal(partial_answer_repository.answer_count(), 0, "Aucun brouillon partiel ne doit rester persisté après échec.")
 
 print("Test d'acceptation T-008 synthèse multi-sources traçable M-009: OK")
 '@

@@ -161,6 +161,16 @@ class RecordingDeepResearchHandler:
         return deep_result(command.resolved_question.text)
 
 
+class FailingDeepResearchHandler:
+    def __init__(self, error_code):
+        self.error_code = error_code
+        self.commands = []
+
+    def research(self, command):
+        self.commands.append(command)
+        raise ValueError(self.error_code)
+
+
 class RecordingDeepResearchConversationFacade:
     def __init__(self):
         self.requests = []
@@ -246,6 +256,8 @@ for invalid_body, expected_status, expected_code in (
     ({**deep_request_body(), "support_status": "SUPPORTED"}, 400, "HTTP_REQUEST_INVALID"),
     ({key: value for key, value in deep_request_body().items() if key != "research_mandate"}, 422, "DEEP_RESEARCH_MANDATE_REQUIRED"),
     ({**deep_request_body(), "research_mode": "DOCUMENTARY_SIMPLE"}, 422, "DEEP_RESEARCH_MODE_REQUIRED"),
+    ({**deep_request_body(), "selected_documents": ("DOC-../../SECRET",)}, 400, "HTTP_REQUEST_INVALID"),
+    ({**deep_request_body(), "research_mandate": {**mandate_payload(), "conversation_history": ("secret",)}}, 400, "HTTP_REQUEST_INVALID"),
     ({**deep_request_body(), "qdrant_collection": "collection-interne"}, 400, "PUBLIC_STORAGE_FIELD_FORBIDDEN"),
 ):
     invalid_response = adapter.handle(
@@ -258,6 +270,28 @@ for invalid_body, expected_status, expected_code in (
     )
     assert_equal(invalid_response.status_code, expected_status, f"Statut attendu pour {expected_code}.")
     assert_equal(invalid_response.body["error_code"], expected_code, f"Erreur publique attendue pour {expected_code}.")
+
+for domain_error_code, expected_status in (
+    ("DEEP_RESEARCH_PLAN_REQUIRED", 409),
+    ("COVERAGE_INSUFFICIENT", 422),
+    ("CLAIM_DEPENDENCY_UNRESOLVED", 409),
+    ("CONTRADICTION_UNCLASSIFIED", 409),
+    ("DEEP_RESEARCH_SYNTHESIS_UNSUPPORTED", 422),
+):
+    domain_adapter = AnswerHttpAdapter(
+        answer_question_handler=RecordingAnswerQuestionHandler(),
+        deep_research_handler=FailingDeepResearchHandler(domain_error_code),
+    )
+    domain_response = domain_adapter.handle(
+        HttpRequest(
+            method="POST",
+            path="/v1/research/deep",
+            body=deep_request_body(),
+            authenticated_context="API",
+        )
+    )
+    assert_equal(domain_response.status_code, expected_status, f"Statut attendu pour {domain_error_code}.")
+    assert_equal(domain_response.body["error_code"], domain_error_code, f"Code public attendu pour {domain_error_code}.")
 
 # Given CV force le mode RECHERCHE_APPROFONDIE sur une question resolue.
 resolved_question = ResolvedQuestion(
@@ -322,6 +356,31 @@ assert_equal(
     ("ConversationModeSelected", "VerifiedAnswerAttachedToTurn"),
     "Les evenements doivent tracer selection puis rattachement.",
 )
+
+broader_mandate = {
+    **mandate_payload(),
+    "allowed_universe": (
+        "Kelly",
+        "volatility targeting",
+        "documents canoniques OSTrading",
+        "hors mandat CV",
+    ),
+}
+try:
+    handler.answer(
+        AnswerDeepResearchConversationTurnCommand(
+            conversation_id="CONV-M009-T009-A",
+            turn_id="TURN-M009-T009-A",
+            resolved_question=resolved_question,
+            requested_mode=ConversationMode.RECHERCHE_APPROFONDIE,
+            research_mandate=broader_mandate,
+            occurred_at="2026-07-02T16:03:00Z",
+        )
+    )
+except ValueError as exc:
+    assert_true("research_mandate incoherent" in str(exc), "Le refus doit nommer le mandat incoherent.")
+else:
+    raise AssertionError("CV ne doit pas transmettre a RA un mandat plus large que la question resolue.")
 
 print("Test d'acceptation T-009 endpoint recherche approfondie M-009: OK")
 '@

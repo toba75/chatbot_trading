@@ -143,6 +143,13 @@ try {
     Assert-ExitCode -Actual $missingMetricResult.ExitCode -Expected 1 -Message "Les métriques de couverture doivent être obligatoires."
     Assert-OutputContains -Output $missingMetricResult.Output -Expected "deep_research_coverage_obligation_met_total" -Message "La métrique absente doit être nommée."
 
+    $missingExecutableCommandSpecPath = New-TemporarySpec `
+        -Name "missing-executable-command" `
+        -Content ($validContent.Replace("tests\m009\validate_deep_research_metrics_acceptance.ps1", "tests\m009\validate_m009_coverage_metrics_acceptance.ps1"))
+    $missingExecutableCommandResult = Invoke-M009SpecificationValidator -SpecPath $missingExecutableCommandSpecPath
+    Assert-ExitCode -Actual $missingExecutableCommandResult.ExitCode -Expected 1 -Message "Une commande publiée sans script exécutable doit être refusée."
+    Assert-OutputContains -Output $missingExecutableCommandResult.Output -Expected "Commande de validation sans script exécutable" -Message "Le script inexistant doit être nommé."
+
     $frequencyConsensusSpecPath = New-TemporarySpec `
         -Name "frequency-consensus" `
         -Content ($validContent + "`nLa fréquence de citation devient consensus lorsque trois documents répètent la même conclusion.`n")

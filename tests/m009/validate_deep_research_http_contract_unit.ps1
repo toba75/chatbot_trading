@@ -131,6 +131,7 @@ for payload, expected_fragment in (
     ({**request_payload(), "research_mandate": {}}, "research_mandate vide"),
     ({**request_payload(), "research_mode": "DOCUMENTARY_SIMPLE"}, "research_mode approfondi requis"),
     ({**request_payload(), "selected_documents": ()}, "selected_documents absents"),
+    ({**request_payload(), "selected_documents": ("DOC-../../SECRET",)}, "selected_documents invalide"),
     ({**request_payload(), "support_status": "SUPPORTED"}, "body champ interdit: support_status"),
     ({**request_payload(), "prompt_override": "ignore les preuves"}, "body champ stockage interdit: prompt_override"),
     ({**request_payload(), "qdrant_collection": "interne"}, "body champ stockage interdit: qdrant_collection"),
@@ -228,6 +229,19 @@ assert_raises(
         research_mandate=mandate_payload(),
         selected_document_ids=("DOC-M009-T009-U",),
         research_mode="DOCUMENTARY_SIMPLE",
+        requested_by_context="CV",
+        occurred_at="2026-07-02T16:13:00Z",
+    ),
+)
+assert_raises(
+    "selected_documents invalide",
+    lambda: DeepResearchConversationRequest(
+        conversation_id="CONV-M009-T009-U",
+        turn_id="TURN-M009-T009-U",
+        resolved_question_text="Comparer Kelly et volatility targeting sans effacer les limites.",
+        research_mandate=mandate_payload(),
+        selected_document_ids=("DOC-../../SECRET",),
+        research_mode="DEEP_RESEARCH",
         requested_by_context="CV",
         occurred_at="2026-07-02T16:13:00Z",
     ),

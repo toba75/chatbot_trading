@@ -156,6 +156,8 @@ def candidate(*, suffix, document_suffix, obligations, content_seed, span_seed):
         search_trace_id=f"STRC-M009T004UNIT{content_seed:020d}",
         document_id=document_id,
         covered_obligations=obligations,
+        evidence_polarity=("UNFAVORABLE" if "preuves_defavorables" in obligations else "FAVORABLE" if "preuves_favorables" in obligations else "NEUTRAL"),
+        source_kind="PRIMARY",
     )
 
 
@@ -387,6 +389,8 @@ same_locator_other_evidence = CandidateEvidence(
     search_trace_id="STRC-M009T004UNIT000000000009",
     document_id=methodes.document_id,
     covered_obligations=("dependances",),
+    evidence_polarity="NEUTRAL",
+    source_kind="PRIMARY",
 )
 assert_raises(
     "source_locator duplique",

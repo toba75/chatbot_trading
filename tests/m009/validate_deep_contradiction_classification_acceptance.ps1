@@ -174,6 +174,8 @@ def candidate_for(evidence, *, suffix, text, obligations):
         search_trace_id=f"STRC-M009T006{suffix:0>24}",
         document_id=evidence.source_locator.document_id,
         covered_obligations=obligations,
+        evidence_polarity=("UNFAVORABLE" if "preuves_defavorables" in obligations else "FAVORABLE" if "preuves_favorables" in obligations else "NEUTRAL"),
+        source_kind="PRIMARY",
     )
 
 
@@ -396,6 +398,16 @@ assert_equal(len(result.assessments), 2, "Les deux relations EG publiques doiven
 by_relation_id = {assessment.relation_id: assessment for assessment in result.assessments}
 support_assessment = by_relation_id[support_relation.relation_id]
 conditional_assessment = by_relation_id[conditional_relation.relation_id]
+stored_case = repository.case_for_id(research_case.research_case_id)
+stored_by_relation_id = {
+    assessment.relation_id: assessment
+    for assessment in stored_case.contradiction_assessments
+}
+assert_equal(
+    tuple(stored_by_relation_id.keys()),
+    (support_relation.relation_id, conditional_relation.relation_id),
+    "Les diagnostics M-009 doivent etre persistés sur le ResearchCase avant synthese.",
+)
 
 assert_equal(
     support_assessment.classification,
