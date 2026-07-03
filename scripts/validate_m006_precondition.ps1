@@ -197,8 +197,10 @@ function Invoke-M006TimedProcess {
     $timeoutMilliseconds = $TimeoutSeconds * 1000
     if (-not $process.WaitForExit($timeoutMilliseconds)) {
         $timedOut = $true
-        & taskkill.exe /PID $process.Id /T /F 2>&1 | Out-Null
-        $process.WaitForExit() | Out-Null
+        & taskkill.exe /PID $process.Id /T /F 2>$null | Out-Null
+        if (-not $process.WaitForExit(5000)) {
+            throw "Processus de gate M-006 non arrêté après timeout: $($process.Id)"
+        }
         $exitCode = 124
     }
     else {
