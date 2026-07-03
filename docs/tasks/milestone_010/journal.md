@@ -33,3 +33,12 @@
 - Validations GREEN: `tests/m010/validate_m010_precondition_unit.ps1`, `scripts/validate_m010_precondition.ps1 -Path .\docs\governance\m010_precondition_green.md`, `tests/m010/validate_m010_precondition_acceptance.ps1`.
 - Gate M-010: le rapport canonique `docs/governance/m010_precondition_green.md` consigne `scripts/test.ps1` GREEN avec `18 validation(s), 192 test(s)` et `scripts/lint.ps1` GREEN avec `18 validation(s), 0 test(s)`.
 - Contrôle de propreté: `git diff --check` GREEN après retrait des lignes vides finales ajoutées par le worker.
+
+### T-002 - Spécification de stratégie candidate attribuée
+
+- Précondition ciblée: `tests/m010/validate_m010_precondition_acceptance.ps1` GREEN et `tests/m010/validate_m010_precondition_unit.ps1` GREEN.
+- Commit RED: `159db19c test(m010): couvrir la specification strategie candidate`.
+- RED utile: `tests/m010/validate_m010_specification_acceptance.ps1` échoue sur le contrat exécutable absent; `tests/m010/validate_m010_specification_unit.ps1` échoue sur le validateur absent.
+- ADR: aucune nouvelle ADR; T-002 applique `ADR-010`, `DDD-ADR-009` et `DDD-ADR-010` sans changer leur décision.
+- Implémentation: publication de `docs/specs/m010_strategie_candidate_attribuee.md`, création de `scripts/validate_m010_specification.ps1`, enrôlement dans `scripts/test.ps1` et `scripts/lint.ps1`, et rattachement `REQ-M010-002` dans `docs/traceability/matrix.md`.
+- Validations ciblées GREEN: `tests/m010/validate_m010_specification_acceptance.ps1`, `tests/m010/validate_m010_specification_unit.ps1`, `scripts/validate_m010_specification.ps1`, `scripts/validate_traceability.ps1` avec `106 exigence(s) contrôlée(s)`, et `scripts/lint.ps1` avec `19 validation(s), 0 test(s)`.
