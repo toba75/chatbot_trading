@@ -42,3 +42,17 @@
 - ADR: aucune nouvelle ADR; T-002 applique `ADR-010`, `DDD-ADR-009` et `DDD-ADR-010` sans changer leur décision.
 - Implémentation: publication de `docs/specs/m010_strategie_candidate_attribuee.md`, création de `scripts/validate_m010_specification.ps1`, enrôlement dans `scripts/test.ps1` et `scripts/lint.ps1`, et rattachement `REQ-M010-002` dans `docs/traceability/matrix.md`.
 - Validations ciblées GREEN: `tests/m010/validate_m010_specification_acceptance.ps1`, `tests/m010/validate_m010_specification_unit.ps1`, `scripts/validate_m010_specification.ps1`, `scripts/validate_traceability.ps1` avec `106 exigence(s) contrôlée(s)`, et `scripts/lint.ps1` avec `19 validation(s), 0 test(s)`.
+- Gate global GREEN: `scripts/test.ps1` avec `19 validation(s), 202 test(s)`.
+- Commit GREEN: `4856c8d4 docs(m010): publier la specification strategie candidate`.
+
+### T-003 - Ouverture de stratégie candidate depuis résultat vérifié
+
+- Précondition ciblée: les tests M-010 de précondition et de spécification restent GREEN avant ouverture de l'agrégat SD.
+- Commit RED: `52f186a4 test(m010): couvrir ouverture strategie candidate`.
+- RED utile: les tests T-003 échouaient sur le module d'ouverture de stratégie candidate absent et sur le dépôt mémoire SD absent.
+- Reprise main-agent: arrêt de l'arbre `scripts/test.ps1` laissé actif par le worker après plus de 60 minutes sans verdict exploitable, puis nettoyage des répertoires générés `.tmp` et `__pycache__`.
+- Implémentation: création de l'agrégat `StrategyCandidate`, du mandat SD, de la référence `VerifiedResearchRef`, des diagnostics issus de traduction RA vers SD, du cas d'usage `CreateStrategyCandidateHandler` et du dépôt mémoire avec concurrence optimiste explicite.
+- Alignement documentaire: ajout de la table `Relations intercontextes publiées` dans la spécification unifiée v4.1 afin que le gate d'architecture exécuté avec cette source canonique lise les contrats RA -> SD, EG -> SD et SD -> EX sans dépendre d'un modèle interne.
+- ADR: aucune nouvelle ADR; T-003 applique `ADR-010` et `DDD-ADR-010` sans changer leur décision.
+- Validations ciblées GREEN: `tests/m010/validate_strategy_candidate_creation_acceptance.ps1`, `tests/m010/validate_strategy_candidate_creation_unit.ps1`, `scripts/validate_architecture_boundaries.ps1 -AppRoot .\app -ContextRegistryPath .\app\context_registry.json -SpecificationPath .\docs\specs\specification_unifiee_ddd_technique_chatbot_trading_v4_1.md`.
+- Gates GREEN: `scripts/lint.ps1` avec `19 validation(s), 0 test(s)`, `git diff --check`, et `scripts/test.ps1` avec `19 validation(s), 204 test(s)`.

@@ -117,7 +117,7 @@ forbidden_decision = ResearchOutcomeTranslationDecision(
     details={"reason": "rule_creation_forbidden"},
 )
 expect_raises(
-    "decision de traduction interdite",
+    "d\u00e9cision de traduction interdite",
     lambda: StrategyCandidate.create_from_verified_research(
         strategy_id="STRAT-UNIT-FORBIDDEN",
         verified_research=outcome,
@@ -131,7 +131,7 @@ repository.save_new(candidate, expected_version=0)
 assert repository.get("STRAT-UNIT-CARRY") == candidate
 
 expect_raises(
-    "identite strategie deja ouverte",
+    "identit\u00e9 strat\u00e9gie d\u00e9j\u00e0 ouverte",
     lambda: repository.save_new(candidate, expected_version=1),
 )
 
@@ -142,7 +142,7 @@ stale_candidate = StrategyCandidate.create_from_verified_research(
     expected_version=0,
 )
 stale_error = expect_raises(
-    "version obsolete",
+    "version obsol\u00e8te",
     lambda: repository.save_new(stale_candidate, expected_version=2),
 )
 assert isinstance(stale_error, StrategyConcurrencyError)
@@ -150,7 +150,7 @@ assert stale_error.expected_version == 2
 assert stale_error.actual_version == 0
 
 existing_stale_error = expect_raises(
-    "version obsolete",
+    "version obsol\u00e8te",
     lambda: repository.save(candidate, expected_version=0),
 )
 assert isinstance(existing_stale_error, StrategyConcurrencyError)
