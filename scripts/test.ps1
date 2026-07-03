@@ -73,6 +73,8 @@ $m009DeepResearchHttpAcceptancePath = "tests/m009/validate_deep_research_http_co
 $m009DeepResearchHttpUnitPath = "tests/m009/validate_deep_research_http_contract_unit.ps1"
 $m009DeepResearchMetricsAcceptancePath = "tests/m009/validate_deep_research_metrics_acceptance.ps1"
 $m009DeepResearchMetricsUnitPath = "tests/m009/validate_deep_research_metrics_unit.ps1"
+$m009TraceabilityAcceptancePath = "tests/m009/validate_m009_traceability_acceptance.ps1"
+$m009TraceabilityUnitPath = "tests/m009/validate_m009_traceability_unit.ps1"
 
 $validationCommands = @(
     @{ Path = "scripts/validate_m000_precondition_report.ps1"; Arguments = @("-Path", $preconditionReportPath) },
@@ -292,7 +294,9 @@ $testCommands = @(
     @{ Path = $m009DeepResearchHttpAcceptancePath; Arguments = @() },
     @{ Path = $m009DeepResearchHttpUnitPath; Arguments = @() },
     @{ Path = $m009DeepResearchMetricsAcceptancePath; Arguments = @() },
-    @{ Path = $m009DeepResearchMetricsUnitPath; Arguments = @() }
+    @{ Path = $m009DeepResearchMetricsUnitPath; Arguments = @() },
+    @{ Path = $m009TraceabilityAcceptancePath; Arguments = @() },
+    @{ Path = $m009TraceabilityUnitPath; Arguments = @() }
 )
 
 function Get-GateCommandPaths {
@@ -363,7 +367,9 @@ if ($env:OST_M003_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m009DeepResearchHttpAcceptancePath,
         $m009DeepResearchHttpUnitPath,
         $m009DeepResearchMetricsAcceptancePath,
-        $m009DeepResearchMetricsUnitPath
+        $m009DeepResearchMetricsUnitPath,
+        $m009TraceabilityAcceptancePath,
+        $m009TraceabilityUnitPath
     )
 }
 elseif ($env:OST_M004_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -422,7 +428,9 @@ elseif ($env:OST_M004_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m009DeepResearchHttpAcceptancePath,
         $m009DeepResearchHttpUnitPath,
         $m009DeepResearchMetricsAcceptancePath,
-        $m009DeepResearchMetricsUnitPath
+        $m009DeepResearchMetricsUnitPath,
+        $m009TraceabilityAcceptancePath,
+        $m009TraceabilityUnitPath
     )
 }
 elseif ($env:OST_M005_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -482,7 +490,9 @@ elseif ($env:OST_M005_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m009DeepResearchHttpAcceptancePath,
         $m009DeepResearchHttpUnitPath,
         $m009DeepResearchMetricsAcceptancePath,
-        $m009DeepResearchMetricsUnitPath
+        $m009DeepResearchMetricsUnitPath,
+        $m009TraceabilityAcceptancePath,
+        $m009TraceabilityUnitPath
     )
 }
 elseif ($env:OST_M006_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -541,7 +551,9 @@ elseif ($env:OST_M006_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m009DeepResearchHttpAcceptancePath,
         $m009DeepResearchHttpUnitPath,
         $m009DeepResearchMetricsAcceptancePath,
-        $m009DeepResearchMetricsUnitPath
+        $m009DeepResearchMetricsUnitPath,
+        $m009TraceabilityAcceptancePath,
+        $m009TraceabilityUnitPath
     )
 }
 elseif ($env:OST_M007_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -599,7 +611,9 @@ elseif ($env:OST_M007_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m009DeepResearchHttpAcceptancePath,
         $m009DeepResearchHttpUnitPath,
         $m009DeepResearchMetricsAcceptancePath,
-        $m009DeepResearchMetricsUnitPath
+        $m009DeepResearchMetricsUnitPath,
+        $m009TraceabilityAcceptancePath,
+        $m009TraceabilityUnitPath
     )
 }
 elseif ($env:OST_M008_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -636,7 +650,9 @@ elseif ($env:OST_M008_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m009DeepResearchHttpAcceptancePath,
         $m009DeepResearchHttpUnitPath,
         $m009DeepResearchMetricsAcceptancePath,
-        $m009DeepResearchMetricsUnitPath
+        $m009DeepResearchMetricsUnitPath,
+        $m009TraceabilityAcceptancePath,
+        $m009TraceabilityUnitPath
     )
 }
 elseif ($env:OST_M009_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -672,7 +688,9 @@ elseif ($env:OST_M009_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m009DeepResearchHttpAcceptancePath,
         $m009DeepResearchHttpUnitPath,
         $m009DeepResearchMetricsAcceptancePath,
-        $m009DeepResearchMetricsUnitPath
+        $m009DeepResearchMetricsUnitPath,
+        $m009TraceabilityAcceptancePath,
+        $m009TraceabilityUnitPath
     )
 }
 

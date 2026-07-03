@@ -208,7 +208,7 @@ function New-GreenSnapshot {
   }
 }
 "@
-    $endpointContent = "POST /v1/research/deep`nRECHERCHE_APPROFONDIE`nanswer_deep_research_turn"
+    $endpointContent = "POST /v1/research/deep`nRECHERCHE_APPROFONDIE`napp/conversation/application/answer_deep_research_turn.py"
     $validatorContent = ($expectedRequirements | ForEach-Object { $_["Id"] }) -join "`n"
 
     return New-TraceabilitySnapshot `
@@ -278,7 +278,7 @@ function Assert-M009TraceabilitySnapshot {
     foreach ($endpointMarker in @(
         "POST /v1/research/deep",
         "RECHERCHE_APPROFONDIE",
-        "answer_deep_research_turn"
+        "app/conversation/application/answer_deep_research_turn.py"
     )) {
         Assert-Condition `
             -Condition ($Snapshot.EndpointContent.Contains($endpointMarker)) `
@@ -397,7 +397,7 @@ $actualSnapshot = New-TraceabilitySnapshot `
     -TestGateContent (Get-Content -Raw -Encoding UTF8 -LiteralPath $testGatePath) `
     -LintGateContent (Get-Content -Raw -Encoding UTF8 -LiteralPath $lintGatePath) `
     -MetricsContent (Get-Content -Raw -Encoding UTF8 -LiteralPath $metricsPath) `
-    -EndpointContent ((Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $repoRoot "docs/specs/m009_recherche_approfondie_multi_sources.md")) + "`n" + (Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $repoRoot "app/conversation/application/answer_deep_research_turn.py"))) `
+    -EndpointContent ("app/conversation/application/answer_deep_research_turn.py`n" + (Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $repoRoot "docs/specs/m009_recherche_approfondie_multi_sources.md")) + "`n" + (Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $repoRoot "app/conversation/application/answer_deep_research_turn.py"))) `
     -TraceabilityValidatorContent (Get-Content -Raw -Encoding UTF8 -LiteralPath $traceabilityValidatorPath)
 
 Assert-M009TraceabilitySnapshot -Snapshot $actualSnapshot

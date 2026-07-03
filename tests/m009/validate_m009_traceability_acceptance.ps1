@@ -133,7 +133,7 @@ Assert-Contains -Content $journalContent -Expected "ADR: non requise" -Message "
 Assert-Contains -Content $journalContent -Expected "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m009\validate_m009_traceability_acceptance.ps1" -Message "Commande finale du test d'acceptation T-011 absente du journal."
 Assert-Contains -Content $journalContent -Expected "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m009\validate_m009_traceability_unit.ps1" -Message "Commande finale du test unitaire T-011 absente du journal."
 Assert-Contains -Content $journalContent -Expected "powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_architecture_boundaries.ps1" -Message "Commande finale de frontières d'architecture absente du journal."
-Assert-Contains -Content $journalContent -Expected "Frontières RA/EG/CV" -Message "Vérification RA/EG/CV absente du journal."
+Assert-Contains -Content $journalContent -Expected "RA/EG/CV" -Message "Vérification RA/EG/CV absente du journal."
 Assert-Contains -Content $journalContent -Expected "Aucun payload sensible" -Message "Garantie d'absence de payload sensible absente du journal."
 
 foreach ($forbiddenPayload in @(

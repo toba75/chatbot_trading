@@ -809,6 +809,14 @@ $requiredM009Requirements = @(
         CommandScript = "tests/m009/validate_deep_research_metrics_acceptance.ps1"
         Code = "app/research_answering/application/deep_research_metrics.py"
         Adr = "ADR-010; DDD-ADR-008"
+    },
+    [ordered] @{
+        Id = "REQ-M009-011"
+        Source = "docs/tasks/milestone_009/0011_relier_m009_tracabilite_gates.md"
+        Test = "tests/m009/validate_m009_traceability_acceptance.ps1"
+        CommandScript = "tests/m009/validate_m009_traceability_acceptance.ps1"
+        Code = "scripts/validate_traceability.ps1; docs/tasks/milestone_009/journal.md"
+        Adr = "ADR-006; ADR-010; DDD-ADR-005; DDD-ADR-008"
     }
 )
 
