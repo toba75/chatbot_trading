@@ -67,6 +67,13 @@ def mandate_payload():
     }
 
 
+def mandate_payload_with_lists():
+    return {
+        key: list(value) if isinstance(value, tuple) else value
+        for key, value in mandate_payload().items()
+    }
+
+
 def deep_request_body():
     return {
         "resolved_question": "Comparer Kelly et volatility targeting sans effacer les limites.",
@@ -356,6 +363,36 @@ assert_equal(
     ("ConversationModeSelected", "VerifiedAnswerAttachedToTurn"),
     "Les evenements doivent tracer selection puis rattachement.",
 )
+
+normalized_facade = RecordingDeepResearchConversationFacade()
+normalized_handler = AnswerDeepResearchConversationTurnHandler(
+    deep_research_facade=normalized_facade,
+    attachment_store=InMemoryVerifiedAnswerAttachmentStore(known_turn_ids=("TURN-M009-T009-B",)),
+)
+normalized_result = normalized_handler.answer(
+    AnswerDeepResearchConversationTurnCommand(
+        conversation_id="CONV-M009-T009-B",
+        turn_id="TURN-M009-T009-B",
+        resolved_question=ResolvedQuestion(
+            conversation_id="CONV-M009-T009-B",
+            turn_id="TURN-M009-T009-B",
+            text="Comparer Kelly et volatility targeting sans effacer les limites.",
+            active_mandate=mandate_payload(),
+            selected_document_ids=("DOC-M009-T009-A", "DOC-M009-T009-B"),
+            verified_answer_refs=(),
+            occurred_at="2026-07-02T16:03:00Z",
+        ),
+        requested_mode=ConversationMode.RECHERCHE_APPROFONDIE,
+        research_mandate=mandate_payload_with_lists(),
+        occurred_at="2026-07-02T16:04:00Z",
+    )
+)
+assert_equal(
+    normalized_result.status,
+    "DEEP_RESEARCH_RESULT_ATTACHED",
+    "Un mandat equivalent normalise ne doit pas bloquer CV.",
+)
+assert_equal(len(normalized_facade.requests), 1, "CV doit appeler RA apres normalisation du mandat.")
 
 broader_mandate = {
     **mandate_payload(),

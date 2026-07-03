@@ -591,7 +591,7 @@ def _ensure_deep_coverage_candidates(value: object) -> tuple[object, ...]:
         raise ValueError("evidence_candidates invalides")
     candidates = tuple(value)
     if len(candidates) == 0:
-        raise ValueError("evidence_refs absentes")
+        raise ValueError("evidence_candidates absentes")
     for candidate in candidates:
         _candidate_covered_obligations(candidate)
         _candidate_evidence_polarity(candidate)

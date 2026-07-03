@@ -231,9 +231,16 @@ def _ensure_command(
         raise ValueError("resolved_question conversation incoherente")
     if command.resolved_question.turn_id != turn_id:
         raise ValueError("resolved_question turn incoherent")
-    _freeze_mapping(command.research_mandate, "research_mandate")
-    _ensure_utc(command.occurred_at, "occurred_at")
-    return command
+    research_mandate = _freeze_mapping(command.research_mandate, "research_mandate")
+    occurred_at = _ensure_utc(command.occurred_at, "occurred_at")
+    return AnswerDeepResearchConversationTurnCommand(
+        conversation_id=conversation_id,
+        turn_id=turn_id,
+        resolved_question=command.resolved_question,
+        requested_mode=command.requested_mode,
+        research_mandate=research_mandate,
+        occurred_at=occurred_at,
+    )
 
 
 def _ensure_events(

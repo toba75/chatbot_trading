@@ -215,6 +215,10 @@ supported = policy_for(
 assert_equal(supported.support_status, SupportStatus.SUPPORTED, "Une couverture complete doit rester supportable.")
 assert_equal(supported.missing_obligations, (), "Aucune lacune ne doit etre inventee.")
 assert_true("methodes" in supported.covered_obligations, "Les obligations couvertes doivent rester auditables.")
+assert_raises(
+    "evidence_candidates absentes",
+    lambda: policy_for(requirement(obligation="methodes", critical=True)).evaluate(()),
+)
 
 print("Tests unitaires T-007 couverture approfondie insuffisante M-009: OK")
 '@
