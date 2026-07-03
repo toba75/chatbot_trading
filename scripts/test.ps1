@@ -82,6 +82,8 @@ $m010SpecificationAcceptancePath = "tests/m010/validate_m010_specification_accep
 $m010SpecificationUnitPath = "tests/m010/validate_m010_specification_unit.ps1"
 $m010StrategyCandidateCreationAcceptancePath = "tests/m010/validate_strategy_candidate_creation_acceptance.ps1"
 $m010StrategyCandidateCreationUnitPath = "tests/m010/validate_strategy_candidate_creation_unit.ps1"
+$m010StrategyRuleOriginAcceptancePath = "tests/m010/validate_strategy_rule_origin_acceptance.ps1"
+$m010StrategyRuleOriginUnitPath = "tests/m010/validate_strategy_rule_origin_unit.ps1"
 
 $validationCommands = @(
     @{ Path = "scripts/validate_m000_precondition_report.ps1"; Arguments = @("-Path", $preconditionReportPath) },
@@ -291,6 +293,8 @@ $testCommands = @(
     @{ Path = "tests/m010/validate_m010_specification_unit.ps1"; Arguments = @() },
     @{ Path = "tests/m010/validate_strategy_candidate_creation_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/m010/validate_strategy_candidate_creation_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m010/validate_strategy_rule_origin_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m010/validate_strategy_rule_origin_unit.ps1"; Arguments = @() },
     @{ Path = "tests/m009/validate_m009_specification_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/m009/validate_m009_specification_unit.ps1"; Arguments = @() },
     @{ Path = "tests/m009/validate_deep_research_planning_acceptance.ps1"; Arguments = @() },
