@@ -22,3 +22,14 @@
 - T-009 crée le snapshot immuable de stratégie.
 - T-010 expose les endpoints de stratégie.
 - T-011 relie M-010 aux métriques, à la traçabilité et aux gates.
+
+## Exécution
+
+### T-001 - Précondition GREEN M-010
+
+- Commit RED: `938ec5d5 test(m010): couvrir la precondition green strategie candidate`.
+- Reprise main-agent: arrêt de l'ancien arbre `scripts/test.ps1` lancé par le worker après plus de 60 minutes sans verdict exploitable.
+- Implémentation: création de `scripts/validate_m010_precondition.ps1`, création de `docs/governance/m010_precondition_green.md`, enrôlement des tests M-010 et autorisation explicite de la branche `codex/milestone-m010-strategie-candidate-attribuee` dans les validateurs de précondition M-003 à M-009.
+- Validations GREEN: `tests/m010/validate_m010_precondition_unit.ps1`, `scripts/validate_m010_precondition.ps1 -Path .\docs\governance\m010_precondition_green.md`, `tests/m010/validate_m010_precondition_acceptance.ps1`.
+- Gate M-010: le rapport canonique `docs/governance/m010_precondition_green.md` consigne `scripts/test.ps1` GREEN avec `18 validation(s), 192 test(s)` et `scripts/lint.ps1` GREEN avec `18 validation(s), 0 test(s)`.
+- Contrôle de propreté: `git diff --check` GREEN après retrait des lignes vides finales ajoutées par le worker.
