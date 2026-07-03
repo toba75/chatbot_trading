@@ -846,17 +846,22 @@ def ensure_support_status(value: object) -> SupportStatus:
     return value
 
 
-def ensure_assessments(value: object) -> tuple[ContradictionAssessment, ...]:
+def ensure_assessments(value: object) -> tuple[ContradictionAssessment | DeepContradictionAssessment, ...]:
     if value is None or isinstance(value, str) or not isinstance(value, Sequence):
         raise ValueError("contradiction_assessments invalides")
     assessments = tuple(value)
     ids: list[str] = []
     for assessment in assessments:
-        if not isinstance(assessment, ContradictionAssessment):
+        if not isinstance(assessment, (ContradictionAssessment, DeepContradictionAssessment)):
             raise ValueError("contradiction_assessment invalide")
-        if assessment.contradiction_id in ids:
+        assessment_id = (
+            assessment.contradiction_id
+            if isinstance(assessment, ContradictionAssessment)
+            else assessment.assessment_id
+        )
+        if assessment_id in ids:
             raise ValueError("contradiction_assessment duplique")
-        ids.append(assessment.contradiction_id)
+        ids.append(assessment_id)
     return assessments
 
 

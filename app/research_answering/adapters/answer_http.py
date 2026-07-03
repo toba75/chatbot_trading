@@ -297,11 +297,13 @@ def _deep_research_request_error_response(exc: ValueError) -> HttpResponse:
             status_code=422,
             body={"error_code": "DEEP_RESEARCH_MANDATE_REQUIRED", "field": "research_mandate"},
         )
-    if message.startswith("research_mandate "):
+    if message.startswith("research_mandate absent") or message.startswith("research_mandate vide"):
         return HttpResponse(
             status_code=422,
             body={"error_code": "DEEP_RESEARCH_MANDATE_REQUIRED", "field": "research_mandate"},
         )
+    if message.startswith("research_mandate "):
+        return _bad_request_response("body")
     if message.startswith("research_mode ") or message.startswith("requested_mode "):
         return HttpResponse(
             status_code=422,
@@ -314,10 +316,12 @@ def _deep_research_domain_error_response(exc: ValueError) -> HttpResponse:
     message = str(exc).strip()
     public_errors = {
         "DEEP_RESEARCH_PLAN_REQUIRED": (409, "DEEP_RESEARCH_PLAN_REQUIRED"),
+        "deep_research_plan": (409, "DEEP_RESEARCH_PLAN_REQUIRED"),
         "COVERAGE_OBLIGATION_MISSING": (422, "COVERAGE_OBLIGATION_MISSING"),
         "COVERAGE_INSUFFICIENT": (422, "COVERAGE_INSUFFICIENT"),
         "SOURCE_DIVERSIFICATION_INSUFFICIENT": (422, "SOURCE_DIVERSIFICATION_INSUFFICIENT"),
         "CLAIM_DEPENDENCY_UNRESOLVED": (409, "CLAIM_DEPENDENCY_UNRESOLVED"),
+        "dependency_group": (409, "CLAIM_DEPENDENCY_UNRESOLVED"),
         "CONTRADICTION_UNCLASSIFIED": (409, "CONTRADICTION_UNCLASSIFIED"),
         "DEEP_RESEARCH_SYNTHESIS_UNSUPPORTED": (422, "DEEP_RESEARCH_SYNTHESIS_UNSUPPORTED"),
         "CURRENT_DATA_REQUIRED": (422, "CURRENT_DATA_REQUIRED"),

@@ -578,16 +578,18 @@ class ProduceMultiSourceSynthesisHandler:
             draft=draft,
             occurred_at=parsed_command.occurred_at,
         )
-        saved_answer = self.answer_repository.save(answer)
-        candidates = _ensure_assertion_candidates(
-            self.answer_assertion_extractor.extract(saved_answer.draft)
-        )
-        extracted_answer, extraction_event = saved_answer.extract_assertions(
-            assertions=candidates,
-            extractor_version=self.answer_assertion_extractor.extractor_version,
-            occurred_at=parsed_command.occurred_at,
-        )
-        self.answer_repository.update(extracted_answer)
+        try:
+            candidates = _ensure_assertion_candidates(
+                self.answer_assertion_extractor.extract(answer.draft)
+            )
+            extracted_answer, extraction_event = answer.extract_assertions(
+                assertions=candidates,
+                extractor_version=self.answer_assertion_extractor.extractor_version,
+                occurred_at=parsed_command.occurred_at,
+            )
+        except Exception as exc:
+            raise ValueError("DEEP_RESEARCH_SYNTHESIS_UNSUPPORTED") from exc
+        saved_answer = self.answer_repository.save(extracted_answer)
         evaluated = EvaluateAnswerSupportHandler(
             research_case_repository=self.research_case_repository,
             answer_repository=self.answer_repository,
@@ -595,7 +597,7 @@ class ProduceMultiSourceSynthesisHandler:
         ).evaluate(
             EvaluateAnswerSupport(
                 research_case_id=research_case.research_case_id,
-                answer_id=extracted_answer.answer_id,
+                answer_id=saved_answer.answer_id,
                 support_policy_version=parsed_command.support_policy_version,
                 citation_policy_version=parsed_command.citation_policy_version,
                 freshness_policy_version=parsed_command.freshness_policy_version,
@@ -622,7 +624,7 @@ class ProduceMultiSourceSynthesisHandler:
             answer=evaluated.answer,
             deep_research_report=report,
             verified_research_outcome=evaluated.verified_research_outcome,
-            events=(saved_answer.events[-1], extraction_event) + tuple(evaluated.events),
+            events=(saved_answer.events[0], extraction_event) + tuple(evaluated.events),
         )
 
 
@@ -679,6 +681,8 @@ def _ensure_deep_synthesis_case(
         raise ValueError("evidence_set non scelle")
     if research_case.evidence_set.evidence_set_id != evidence_set_id:
         raise ValueError("evidence_set_id incoherent")
+    research_case.ensure_deep_collection_trace_recorded(evidence_set_id=evidence_set_id)
+    research_case.ensure_claim_dependencies_resolved(evidence_set_id=evidence_set_id)
     return research_case
 
 
@@ -818,10 +822,7 @@ def _ensure_object_sequence(value: object, field_name: str) -> tuple[object, ...
 
 
 def _failure_detail_for(exc: Exception) -> str:
-    detail = str(exc)
-    if detail.strip() == "":
-        detail = exc.__class__.__name__
-    return _ensure_text(detail, "failure_detail")
+    return "DEEP_RESEARCH_DRAFT_GENERATION_FAILED"
 
 
 def _ensure_text(value: object, field_name: str) -> str:

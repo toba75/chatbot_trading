@@ -17,9 +17,9 @@
 
 ## Mission RA approfondie
 
-RA étend le mode `ResearchMode` avec `RECHERCHE_APPROFONDIE` pour transformer une question autonome et un `ResearchMandate` explicite en recherche approfondie multi-sources. Une recherche approfondie possède un plan et des obligations de couverture. Les versions de projection et de claims sont enregistrées. Une contradiction pertinente n'est pas omise. La fréquence de citation ne devient pas consensus. Source, déduction et choix de conception restent distingués.
+RA utilise le mode `ResearchMode.DEEP_RESEARCH` pour transformer une question autonome et un `ResearchMandate` explicite en recherche approfondie multi-sources. CV expose le mode conversationnel `RECHERCHE_APPROFONDIE` et le traduit explicitement vers `DEEP_RESEARCH` à la frontière RA. Une recherche approfondie possède un plan et des obligations de couverture. Les versions de projection et de claims sont enregistrées. Une contradiction pertinente n'est pas omise. La fréquence de citation ne devient pas consensus. Source, déduction et choix de conception restent distingués.
 
-RA consomme KnowledgeSearch sans accès direct à Qdrant et RA consomme VerifiedClaimCatalog sans lecture du registre EG interne. RA conserve les preuves favorables, preuves défavorables, groupes de dépendance, contradictions conditionnelles et lacunes documentaires avant toute synthèse. Aucune synthèse SUPPORTED n'est publiée sans couverture minimale. Aucun paramètre de stratégie n'est inventé et aucune valeur de marché actuelle n'est fabriquée.
+RA consomme DeepKnowledgeSearch sans accès direct à Qdrant et RA consomme VerifiedClaimCatalog sans lecture du registre EG interne. RA conserve les preuves favorables, preuves défavorables, groupes de dépendance, contradictions conditionnelles et lacunes documentaires avant toute synthèse. Aucune synthèse SUPPORTED n'est publiée sans couverture minimale. Aucun paramètre de stratégie n'est inventé et aucune valeur de marché actuelle n'est fabriquée.
 
 Le contrat public M-009 définit le mode approfondi, le plan de recherche, les obligations de couverture, la diversification des recherches, les dépendances EG, les contradictions, les lacunes, la synthèse multi-sources, l'endpoint `POST /v1/research/deep`, les erreurs publiques, les métriques et les exclusions vers SD et EX.
 
@@ -28,17 +28,17 @@ Le contrat public M-009 définit le mode approfondi, le plan de recherche, les o
 - Domaine: recherche et réponse vérifiée approfondie.
 - Bounded context: RA, avec intégration EG et consommation par CV.
 - Objectif métier: couvrir, comparer et synthétiser plusieurs sources sans effacer conditions, limites, dépendances ou contradictions.
-- Intégrations: RA consomme `KnowledgeSearch`, `VerifiedClaimCatalog`, `ProjectionVersionCatalog` et `SourceLocator`; RA publie un résultat vérifié ou qualifié vers CV.
+- Intégrations: RA consomme `DeepKnowledgeSearch`, `VerifiedClaimCatalog`, `ProjectionVersionCatalog` et `SourceLocator`; RA publie un résultat vérifié ou qualifié vers CV.
 - Garde-fous: aucun mandat implicite; aucun accès direct aux stockages internes SP, KA ou EG; aucun consensus dérivé du nombre brut de mentions; aucune sortie de modèle publiée sans décision de politique RA.
 
 ## Langage ubiquitaire RA approfondie
 
 | Terme | Sens M-009 |
 |---|---|
-| ResearchCase | Agrégat RA qui porte le mode `RECHERCHE_APPROFONDIE`, le plan, les obligations, les preuves, les contradictions, les lacunes et l'issue. |
+| ResearchCase | Agrégat RA qui porte le mode RA `DEEP_RESEARCH`, le plan, les obligations, les preuves, les contradictions, les lacunes et l'issue. |
 | Answer | Agrégat RA qui porte la synthèse publiée, le statut de support, les citations et les qualifications. |
 | ResearchMandate | Mandat explicite qui borne l'univers, l'horizon, les sources autorisées, les exclusions, la langue et le niveau de détail. |
-| ResearchMode | Objet-valeur qui contient le mode `RECHERCHE_APPROFONDIE` sans fallback vers le mode documentaire simple. |
+| ResearchMode | Objet-valeur RA qui contient `DEEP_RESEARCH`; CV sélectionne `RECHERCHE_APPROFONDIE` puis traduit explicitement vers RA sans fallback vers le mode documentaire simple. |
 | DeepResearchPlan | Plan ordonné de sous-questions, requêtes, obligations de couverture et critères d'arrêt. |
 | ResearchSubQuestion | Sous-question autonome rattachée à une obligation de couverture. |
 | CoverageObligation | Obligation vérifiable de couvrir un angle, une période, un univers, une méthode, une preuve favorable ou une preuve défavorable. |
@@ -49,13 +49,13 @@ Le contrat public M-009 définit le mode approfondi, le plan de recherche, les o
 | ConditionalContradiction | Contradiction qualifiée par conditions, horizon, univers, métrique, coûts ou dépendances. |
 | DocumentaryGap | Lacune documentaire empêchant une conclusion supportée ou imposant une qualification. |
 | MultiSourceSynthesis | Synthèse qui distingue source, déduction, choix de conception, conditions, limites et contradictions. |
-| DeepResearchSupportStatus | Statut publié parmi SUPPORTED, PARTIALLY_SUPPORTED, INSUFFICIENT_COVERAGE, CONFLICTING_EVIDENCE et REQUIRES_CURRENT_DATA. |
+| DeepResearchSupportStatus | Statut publié parmi SUPPORTED, PARTIALLY_SUPPORTED, INSUFFICIENT_EVIDENCE, CONFLICTING_EVIDENCE et REQUIRES_CURRENT_DATA. |
 
 ## Agrégats RA approfondie
 
 | Agrégat | Responsabilité M-009 | Invariants | Événements |
 |---|---|---|---|
-| ResearchCase | Porter la question autonome, le ResearchMandate, le ResearchMode `RECHERCHE_APPROFONDIE`, le DeepResearchPlan, les CoverageObligation, les versions consultées, les preuves et les diagnostics. | Mandat explicite obligatoire; plan obligatoire avant collecte; obligation de couverture tracée avant synthèse; contradiction pertinente conservée. | DeepResearchRequested; DeepResearchPlanCreated; CoverageObligationDeclared; DeepResearchEvidenceCollected; ClaimDependencyGroupResolved; ConditionalContradictionDetected; DocumentaryGapRecorded; DeepResearchCoverageInsufficient |
+| ResearchCase | Porter la question autonome, le ResearchMandate, le ResearchMode RA `DEEP_RESEARCH`, le DeepResearchPlan, les CoverageObligation, les versions consultées, les preuves et les diagnostics. | Mandat explicite obligatoire; plan obligatoire avant collecte; obligation de couverture tracée avant synthèse; contradiction pertinente conservée. | DeepResearchRequested; DeepResearchPlanCreated; CoverageObligationDeclared; DeepResearchEvidenceCollected; ClaimDependencyGroupResolved; ConditionalContradictionDetected; DocumentaryGapRecorded; DeepResearchCoverageInsufficient |
 | Answer | Porter la MultiSourceSynthesis, les citations, le DeepResearchSupportStatus et la version finale immuable. | SUPPORTED interdit si couverture minimale absente; citations ouvrables obligatoires; fréquence de citation jamais traitée comme consensus; source, déduction et choix de conception séparés. | MultiSourceSynthesisDrafted; DeepResearchSupportEvaluated; DeepResearchCompleted; DeepResearchPublicationBlocked |
 
 ## Objets-valeur RA approfondie
@@ -63,7 +63,7 @@ Le contrat public M-009 définit le mode approfondi, le plan de recherche, les o
 | Objet-valeur | Sens M-009 | Invariants |
 |---|---|---|
 | ResearchMandate | Mandat explicite de recherche approfondie. | Obligatoire; bornes et exclusions enregistrées; aucune recherche approfondie implicite. |
-| ResearchMode | Mode demandé ou sélectionné par CV. | `RECHERCHE_APPROFONDIE` requis pour `POST /v1/research/deep`; aucun fallback silencieux. |
+| ResearchMode | Mode demandé à RA ou sélectionné par CV. | `DEEP_RESEARCH` requis pour `POST /v1/research/deep`; `RECHERCHE_APPROFONDIE` reste le mode CV traduit explicitement; aucun fallback silencieux. |
 | DeepResearchPlan | Plan ordonné de sous-questions et d'obligations. | Au moins une ResearchSubQuestion et une CoverageObligation avant collecte. |
 | ResearchSubQuestion | Question autonome de couverture. | Rattachée à une obligation et à un objectif de preuve. |
 | CoverageObligation | Unité vérifiable de couverture documentaire. | Statut explicite: couverte, insuffisante ou hors mandat. |
@@ -81,7 +81,7 @@ Le contrat public M-009 définit le mode approfondi, le plan de recherche, les o
 | Politique | Décision | Invariants | ADR |
 |---|---|---|---|
 | DeepResearchMandatePolicy | Exige un ResearchMandate explicite pour toute recherche approfondie. | Aucune recherche approfondie sans mandat explicite. | ADR-010; DDD-ADR-007 |
-| ResearchModePolicy | Valide `RECHERCHE_APPROFONDIE` comme mode RA explicite. | Aucun fallback vers CHAT_DOCUMENTAIRE ou réponse rapide. | ADR-010; DDD-ADR-007 |
+| ResearchModePolicy | Valide `DEEP_RESEARCH` comme mode RA explicite et `RECHERCHE_APPROFONDIE` comme mode CV traduit. | Aucun fallback vers CHAT_DOCUMENTAIRE ou réponse rapide. | ADR-010; DDD-ADR-007 |
 | DeepResearchPlanningPolicy | Produit un DeepResearchPlan avant collecte. | Plan et obligations obligatoires avant toute synthèse. | ADR-006; DDD-ADR-005 |
 | CoverageObligationPolicy | Évalue chaque CoverageObligation. | Une obligation non couverte bloque SUPPORTED ou impose qualification. | ADR-006; DDD-ADR-003; DDD-ADR-005 |
 | SourceDiversificationPolicy | Diversifie les requêtes, sources, horizons et polarités de preuve. | La fréquence de citation ne devient pas consensus. | ADR-006; DDD-ADR-005 |
@@ -112,7 +112,7 @@ Le contrat public M-009 définit le mode approfondi, le plan de recherche, les o
 
 | Port | Responsabilité | Interdiction |
 |---|---|---|
-| KnowledgeSearch | Obtenir des preuves candidates KA par contrat publié. | Aucun accès à Qdrant, collection, point id ou profil de stockage. |
+| DeepKnowledgeSearch | Obtenir des preuves candidates KA approfondies avec version de projection et trace d'audit par contrat publié. | Aucun accès à Qdrant, collection, point id ou profil de stockage. |
 | ProjectionVersionCatalog | Fournir les versions de projection consultées. | Ne donne pas accès aux tables internes KA. |
 | VerifiedClaimCatalog | Lire VerifiedClaimRef, VerifiedClaimVersionRef et dépendances publiées par EG. | Aucune lecture du registre EG interne ni mutation de claim. |
 | DeepResearchPlanner | Proposer un DeepResearchPlan structuré. | Ne collecte pas de preuves et ne publie pas de synthèse. |
@@ -162,7 +162,7 @@ Le contrat public M-009 définit le mode approfondi, le plan de recherche, les o
 | HTTP_REQUEST_INVALID | 400 | Requête invalide ou champ public interdit. |
 | ENDPOINT_NOT_FOUND | 404 | Endpoint RA approfondi inconnu. |
 | DEEP_RESEARCH_MANDATE_REQUIRED | 422 | Mandat explicite absent. |
-| DEEP_RESEARCH_MODE_REQUIRED | 422 | Mode `RECHERCHE_APPROFONDIE` absent ou incohérent. |
+| DEEP_RESEARCH_MODE_REQUIRED | 422 | Mode RA `DEEP_RESEARCH` absent ou incohérent. |
 | DEEP_RESEARCH_PLAN_REQUIRED | 409 | Plan approfondi absent avant collecte ou synthèse. |
 | COVERAGE_OBLIGATION_MISSING | 422 | Obligation de couverture absente ou vide. |
 | COVERAGE_INSUFFICIENT | 422 | Couverture minimale non atteinte. |
@@ -203,7 +203,7 @@ Le contrat public M-009 définit le mode approfondi, le plan de recherche, les o
 | DRA-006 - Couverture insuffisante explicite | Une couverture minimale absente bloque SUPPORTED. | Given une obligation critique sans preuve admissible; When RA évalue la couverture; Then COVERAGE_INSUFFICIENT est publié avec la lacune documentaire. | T-007 | ADR-006; DDD-ADR-005; DDD-ADR-007 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m009\validate_insufficient_deep_coverage_acceptance.ps1 |
 | DRA-007 - Synthèse multi-sources traçable | La synthèse distingue source, déduction et choix de conception. | Given une collecte avec preuves, contradictions et lacunes; When RA synthétise; Then chaque conclusion est rattachée à provenance et qualification. | T-008 | DDD-ADR-003; DDD-ADR-005; DDD-ADR-007 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m009\validate_multi_source_synthesis_acceptance.ps1 |
 | DRA-008 - Endpoint recherche approfondie | POST /v1/research/deep expose le contrat RA sans stockage interne. | Given un mandat approfondi valide; When l'endpoint est appelé; Then le corps public ne contient ni Qdrant, ni table EG, ni champ de stockage SP. | T-009 | ADR-010; DDD-ADR-003; DDD-ADR-005 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m009\validate_deep_research_http_contract_acceptance.ps1 |
-| DRA-009 - Métriques de couverture et audit | Les métriques relient couverture, contradictions, lacunes, versions et statuts sans payload complet. | Given une recherche approfondie terminée ou bloquée; When les signaux sont publiés; Then ils exposent versions et compteurs sans contenu documentaire complet. | T-010 | ADR-010; DDD-ADR-008 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m009\validate_m009_coverage_metrics_acceptance.ps1 |
+| DRA-009 - Métriques de couverture et audit | Les métriques relient couverture, contradictions, lacunes, versions et statuts sans payload complet. | Given une recherche approfondie terminée ou bloquée; When les signaux sont publiés; Then ils exposent versions et compteurs sans contenu documentaire complet. | T-010 | ADR-010; DDD-ADR-008 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m009\validate_deep_research_metrics_acceptance.ps1 |
 | DRA-010 - Traçabilité et gates M-009 | Chaque exigence M-009 possède test, commande, ADR et artefact cible. | Given les comportements M-009 sont implémentés; When les gates s'exécutent; Then traceability, test, lint et validate_m009_specification sont enrôlés. | T-011 | ADR-006; ADR-010; DDD-ADR-005; DDD-ADR-008 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m009\validate_m009_traceability_acceptance.ps1 |
 
 ## Commandes de validation

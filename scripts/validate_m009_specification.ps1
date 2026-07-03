@@ -47,7 +47,7 @@ $requiredMarkers = @(
     "Une contradiction pertinente n'est pas omise.",
     "La fréquence de citation ne devient pas consensus.",
     "Source, déduction et choix de conception restent distingués.",
-    "RA consomme KnowledgeSearch sans accès direct à Qdrant",
+    "RA consomme DeepKnowledgeSearch sans accès direct à Qdrant",
     "RA consomme VerifiedClaimCatalog sans lecture du registre EG interne",
     "Aucune synthèse SUPPORTED n'est publiée sans couverture minimale.",
     "M-009 ne livre pas la stratégie candidate attribuée M-010 ni l'expérience reproductible M-011."
@@ -58,6 +58,7 @@ $requiredTerms = @(
     "Answer",
     "ResearchMandate",
     "ResearchMode",
+    "DEEP_RESEARCH",
     "RECHERCHE_APPROFONDIE",
     "DeepResearchPlan",
     "ResearchSubQuestion",
@@ -71,13 +72,13 @@ $requiredTerms = @(
     "DocumentaryGap",
     "MultiSourceSynthesis",
     "DeepResearchSupportStatus",
-    "KnowledgeSearch",
+    "DeepKnowledgeSearch",
     "VerifiedClaimCatalog",
     "ProjectionVersionCatalog",
     "POST /v1/research/deep",
     "SUPPORTED",
     "PARTIALLY_SUPPORTED",
-    "INSUFFICIENT_COVERAGE",
+    "INSUFFICIENT_EVIDENCE",
     "CONFLICTING_EVIDENCE",
     "REQUIRES_CURRENT_DATA",
     "DEEP_RESEARCH_MANDATE_REQUIRED",
@@ -147,7 +148,7 @@ $expectedStates = @(
 )
 
 $expectedPorts = @(
-    "KnowledgeSearch",
+    "DeepKnowledgeSearch",
     "ProjectionVersionCatalog",
     "VerifiedClaimCatalog",
     "DeepResearchPlanner",
@@ -222,7 +223,7 @@ $expectedBehaviors = @(
     @{ Name = "DRA-006 - Couverture insuffisante explicite"; Adr = @("ADR-006", "DDD-ADR-005", "DDD-ADR-007"); Test = "T-007"; Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m009\validate_insufficient_deep_coverage_acceptance.ps1" },
     @{ Name = "DRA-007 - Synthèse multi-sources traçable"; Adr = @("DDD-ADR-003", "DDD-ADR-005", "DDD-ADR-007"); Test = "T-008"; Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m009\validate_multi_source_synthesis_acceptance.ps1" },
     @{ Name = "DRA-008 - Endpoint recherche approfondie"; Adr = @("ADR-010", "DDD-ADR-003", "DDD-ADR-005"); Test = "T-009"; Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m009\validate_deep_research_http_contract_acceptance.ps1" },
-    @{ Name = "DRA-009 - Métriques de couverture et audit"; Adr = @("ADR-010", "DDD-ADR-008"); Test = "T-010"; Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m009\validate_m009_coverage_metrics_acceptance.ps1" },
+    @{ Name = "DRA-009 - Métriques de couverture et audit"; Adr = @("ADR-010", "DDD-ADR-008"); Test = "T-010"; Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m009\validate_deep_research_metrics_acceptance.ps1" },
     @{ Name = "DRA-010 - Traçabilité et gates M-009"; Adr = @("ADR-006", "ADR-010", "DDD-ADR-005", "DDD-ADR-008"); Test = "T-011"; Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m009\validate_m009_traceability_acceptance.ps1" }
 )
 
@@ -499,6 +500,12 @@ function Assert-M009Behaviors {
         $row = $behaviorsByName[$expectedBehavior.Name]
         if ($row["Test RED"] -ne $expectedBehavior.Test) {
             throw "Test RED invalide pour $($expectedBehavior.Name). Attendu: $($expectedBehavior.Test). Obtenu: $($row["Test RED"])"
+        }
+        if ($row["Commande"] -match "-File\s+\.\\(?<script>\S+\.ps1)") {
+            $scriptPath = Join-Path $repoRoot $Matches["script"]
+            if (-not (Test-Path -LiteralPath $scriptPath -PathType Leaf)) {
+                throw "Commande de validation sans script exécutable: $($Matches["script"])"
+            }
         }
         if ($row["Commande"] -ne $expectedBehavior.Command) {
             throw "Commande invalide pour $($expectedBehavior.Name). Attendu: $($expectedBehavior.Command). Obtenu: $($row["Commande"])"

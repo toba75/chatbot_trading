@@ -7,6 +7,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Protocol
 
+from app.contracts.identity import DomainIdentifier
 from app.contracts.research_outcomes import VerifiedResearchOutcome
 from app.research_answering.domain.research_case import (
     ResearchMandate,
@@ -410,6 +411,11 @@ def _ensure_ref(value: object, field_name: str, prefix: str) -> str:
     text = _ensure_text(value, field_name)
     if not text.startswith(prefix):
         raise ValueError(f"{field_name} invalide")
+    if prefix == "DOC-":
+        try:
+            return str(DomainIdentifier.parse_with_prefix(text, "DOC"))
+        except ValueError as exc:
+            raise ValueError(f"{field_name} invalide") from exc
     return text
 
 

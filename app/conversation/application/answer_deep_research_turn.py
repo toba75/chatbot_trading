@@ -170,12 +170,14 @@ class AnswerDeepResearchConversationTurnHandler:
             raise ValueError("mode conversation non execute par T-009")
         if self._deep_research_facade is None:
             raise ValueError("mode conversation indisponible")
+        if parsed.resolved_question.active_mandate != parsed.research_mandate:
+            raise ValueError("research_mandate incoherent avec question resolue")
 
         request = DeepResearchConversationRequest(
             conversation_id=parsed.conversation_id,
             turn_id=parsed.turn_id,
             resolved_question_text=parsed.resolved_question.text,
-            research_mandate=parsed.research_mandate,
+            research_mandate=parsed.resolved_question.active_mandate,
             selected_document_ids=parsed.resolved_question.selected_document_ids,
             research_mode="DEEP_RESEARCH",
             requested_by_context="CV",
@@ -249,7 +251,7 @@ def _ensure_events(
 def _ensure_document_ids(value: object) -> tuple[str, ...]:
     if value is None or isinstance(value, (str, bytes)) or not isinstance(value, Sequence):
         raise ValueError("selected_documents invalides")
-    document_ids = tuple(_ensure_domain_identifier(item, "DOC", "selected_document") for item in value)
+    document_ids = tuple(_ensure_domain_identifier(item, "DOC", "selected_documents") for item in value)
     if len(document_ids) == 0:
         raise ValueError("selected_documents absents")
     if len(document_ids) != len(set(document_ids)):

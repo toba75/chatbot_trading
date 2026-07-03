@@ -547,7 +547,8 @@ class RecordDeepContradictionAssessmentHandler:
             )
             for assessment in assessments
         )
-        saved_case = self.research_case_repository.update(research_case)
+        updated_case = research_case.record_deep_contradiction_assessments(assessments)
+        saved_case = self.research_case_repository.update(updated_case)
         return RecordDeepContradictionAssessmentResult(
             status="DEEP_CONTRADICTION_CLASSIFICATION_RECORDED",
             research_case=saved_case,

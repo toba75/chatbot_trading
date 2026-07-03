@@ -9,6 +9,7 @@ from typing import Protocol
 
 from app.contracts.evidence_claims import EvidenceRef
 from app.research_answering.domain.evidence_set import EvidenceSet
+from app.research_answering.domain.research_case import ResearchCase
 
 
 _UTC_INSTANT_PATTERN = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
@@ -22,8 +23,18 @@ _RESEARCH_CASE_ID_PATTERN = re.compile(r"^RSC-[A-Z0-9][A-Z0-9-]*$")
 class PublicVerifiedClaimEvidenceCatalog(Protocol):
     """Port RA vers la lecture publique des preuves de claim EG."""
 
-    def read_evidence(self, claim_id: str) -> object:
+    def read_evidence(self, claim_id: str, claim_version: int) -> object:
         """Retourne le claim et ses preuves publiques publiées par EG."""
+
+
+class ResearchCaseRepository(Protocol):
+    """Port RA de persistance du ResearchCase après résolution EG."""
+
+    def case_for_id(self, research_case_id: str) -> ResearchCase:
+        """Retourne le cas de recherche existant."""
+
+    def update(self, research_case: ResearchCase) -> ResearchCase:
+        """Remplace le cas de recherche par sa nouvelle version métier."""
 
 
 @dataclass(frozen=True)
@@ -198,10 +209,16 @@ class ResolveVerifiedClaimDependenciesHandler:
     """Résout les dépendances EG publiées sans accès au registre propriétaire."""
 
     verified_claim_catalog: PublicVerifiedClaimEvidenceCatalog
+    research_case_repository: ResearchCaseRepository | None = None
 
     def __post_init__(self) -> None:
         if not callable(getattr(self.verified_claim_catalog, "read_evidence", None)):
             raise ValueError("verified_claim_catalog sans read_evidence")
+        if self.research_case_repository is not None:
+            if not callable(getattr(self.research_case_repository, "case_for_id", None)):
+                raise ValueError("research_case_repository sans case_for_id")
+            if not callable(getattr(self.research_case_repository, "update", None)):
+                raise ValueError("research_case_repository sans update")
 
     def resolve(
         self,
@@ -235,6 +252,15 @@ class ResolveVerifiedClaimDependenciesHandler:
             for dependency in dependencies
             for dependency_group_id in dependency.dependency_group_ids
         )
+        if self.research_case_repository is not None:
+            research_case = self.research_case_repository.case_for_id(evidence_set.research_case_id)
+            if not isinstance(research_case, ResearchCase):
+                raise ValueError("research_case invalide")
+            updated_case = research_case.record_claim_dependency_resolutions(
+                evidence_set_id=evidence_set.evidence_set_id,
+                claim_dependencies=dependencies,
+            )
+            self.research_case_repository.update(updated_case)
         return ResolveVerifiedClaimDependenciesResult(
             status="VERIFIED_CLAIM_DEPENDENCIES_RESOLVED",
             dependency_set=dependency_set,
@@ -251,7 +277,10 @@ class ResolveVerifiedClaimDependenciesHandler:
         expected_claim_version = _ensure_claim_version(getattr(claim_ref, "claim_version", None))
         _ensure_verified_status(getattr(claim_ref, "status", None))
 
-        public_result = self.verified_claim_catalog.read_evidence(expected_claim_id)
+        public_result = self.verified_claim_catalog.read_evidence(
+            expected_claim_id,
+            expected_claim_version,
+        )
         public_claim = getattr(public_result, "claim", None)
         if public_claim is None:
             raise ValueError("claim public absent")
@@ -518,6 +547,7 @@ def _ensure_text(value: object, field_name: str) -> str:
 __all__ = [
     "ClaimDependencyGroupResolved",
     "PublicVerifiedClaimEvidenceCatalog",
+    "ResearchCaseRepository",
     "ResolveVerifiedClaimDependenciesCommand",
     "ResolveVerifiedClaimDependenciesHandler",
     "ResolveVerifiedClaimDependenciesResult",

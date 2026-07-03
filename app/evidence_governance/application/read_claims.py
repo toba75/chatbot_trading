@@ -99,8 +99,8 @@ class ReadPublicClaimHandler:
         _ensure_claim_publication_allowed(claim)
         return ReadPublicClaimResult(claim=claim)
 
-    def read_evidence(self, claim_id: str) -> ReadClaimEvidenceResult:
-        claim = self.read_claim(claim_id).claim
+    def read_evidence(self, claim_id: str, claim_version: int | None = None) -> ReadClaimEvidenceResult:
+        claim = self._read_claim_for_evidence(claim_id, claim_version)
         if claim.verified_claim_ref is None:
             raise ValueError("CLAIM_EVIDENCE_REQUIRED")
         if claim.accepted_verification_id is None:
@@ -128,6 +128,22 @@ class ReadPublicClaimHandler:
         claim = self.claim_reader.read_claim(_ensure_claim_id(claim_id))
         if not isinstance(claim, Claim):
             raise ValueError("claim invalide")
+        return claim
+
+    def _read_claim_for_evidence(self, claim_id: str, claim_version: int | None) -> Claim:
+        parsed_claim_id = _ensure_claim_id(claim_id)
+        if claim_version is None:
+            return self.read_claim(parsed_claim_id).claim
+        parsed_claim_version = _ensure_positive_integer(claim_version, "claim_version")
+        if callable(getattr(self.claim_reader, "claim_for_version", None)):
+            claim = self.claim_reader.claim_for_version(parsed_claim_id, parsed_claim_version)
+            if not isinstance(claim, Claim):
+                raise ValueError("claim invalide")
+            _ensure_claim_publication_allowed(claim)
+            return claim
+        claim = self.read_claim(parsed_claim_id).claim
+        if claim.claim_version != parsed_claim_version:
+            raise ValueError("claim_version incoherente")
         return claim
 
 
@@ -169,6 +185,12 @@ def _ensure_claim_id(value: object) -> str:
     if not text.startswith("CLM-"):
         raise ValueError("claim_id invalide")
     return text
+
+
+def _ensure_positive_integer(value: object, field_name: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise ValueError(f"{field_name} invalide")
+    return value
 
 
 def _ensure_text(value: object, field_name: str) -> str:

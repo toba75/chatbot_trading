@@ -9,10 +9,13 @@ from typing import Any, Protocol
 
 from app.contracts.evidence_claims import EvidenceRef, VerifiedClaimRef
 from app.research_answering.domain.evidence_set import (
+    DeepCoverageRequirement,
+    DeepEvidenceCoveragePolicy,
     EvidenceCollectionCompleted,
     EvidenceSet,
     EvidenceSetSealed,
 )
+from app.research_answering.domain.contradiction_assessment import SupportStatus
 from app.research_answering.domain.research_case import ResearchCase
 from app.research_answering.domain.research_case import DeepResearchPlan
 
@@ -22,6 +25,50 @@ _DIVERSIFICATION_POLICY_VERSION = "evidence-diversification-m007-v1"
 _DEEP_COVERAGE_POLICY_VERSION = "deep-evidence-coverage-m009-v1"
 _DEEP_DIVERSIFICATION_POLICY_VERSION = "deep-evidence-diversification-m009-v1"
 _UTC_INSTANT_PATTERN = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
+_DEEP_COVERAGE_REQUIREMENT_CONTRACT = {
+    "methodes": {
+        "critical": True,
+        "required_polarity": "ANY",
+        "requires_primary_source": True,
+        "reason_code": "PRIMARY_SOURCE_MISSING",
+        "public_reason": "Aucune source primaire admissible ne documente les methodes comparees.",
+    },
+    "preuves_favorables": {
+        "critical": True,
+        "required_polarity": "FAVORABLE",
+        "requires_primary_source": False,
+        "reason_code": "FAVORABLE_EVIDENCE_MISSING",
+        "public_reason": "Aucune preuve favorable admissible n'est disponible.",
+    },
+    "preuves_defavorables": {
+        "critical": True,
+        "required_polarity": "UNFAVORABLE",
+        "requires_primary_source": False,
+        "reason_code": "UNFAVORABLE_EVIDENCE_MISSING",
+        "public_reason": "Aucune preuve defavorable admissible ne couvre le mandat.",
+    },
+    "dependances": {
+        "critical": True,
+        "required_polarity": "ANY",
+        "requires_primary_source": False,
+        "reason_code": "DEPENDENCY_COVERAGE_MISSING",
+        "public_reason": "Les dependances documentaires ne sont pas couvertes.",
+    },
+    "limites": {
+        "critical": False,
+        "required_polarity": "ANY",
+        "requires_primary_source": False,
+        "reason_code": "LIMIT_COVERAGE_MISSING",
+        "public_reason": "Les limites documentaires doivent qualifier la synthese.",
+    },
+    "zones_non_documentees": {
+        "critical": False,
+        "required_polarity": "ANY",
+        "requires_primary_source": False,
+        "reason_code": "DOCUMENTARY_ZONE_UNCOVERED",
+        "public_reason": "Les zones non documentees doivent rester visibles dans la reponse.",
+    },
+}
 
 
 class ResearchCaseRepository(Protocol):
@@ -39,6 +86,13 @@ class KnowledgeSearch(Protocol):
 
     def search(self, request: "EvidenceSearchRequest") -> Sequence["CandidateEvidence"]:
         """Retourne des preuves candidates sans exposer Qdrant."""
+
+
+class DeepKnowledgeSearch(Protocol):
+    """Port RA de recherche approfondie KA avec trace de projection publiée."""
+
+    def search(self, request: "DeepEvidenceSearchRequest") -> "DeepEvidenceSearchResult":
+        """Retourne les candidats et versions KA pour une sous-question M-009."""
 
 
 class VerifiedClaimCatalog(Protocol):
@@ -67,6 +121,8 @@ class CandidateEvidence:
     search_trace_id: str
     document_id: str
     covered_obligations: Sequence[str]
+    evidence_polarity: str
+    source_kind: str
 
     def __post_init__(self) -> None:
         if getattr(self.evidence_ref, "source_locator", None) is None:
@@ -91,6 +147,12 @@ class CandidateEvidence:
             "covered_obligations",
             _ensure_text_tuple(self.covered_obligations, "covered_obligations"),
         )
+        object.__setattr__(
+            self,
+            "evidence_polarity",
+            _ensure_deep_polarity(self.evidence_polarity),
+        )
+        object.__setattr__(self, "source_kind", _ensure_deep_source_kind(self.source_kind))
 
     def to_payload(self) -> dict[str, object]:
         return {
@@ -98,6 +160,8 @@ class CandidateEvidence:
             "search_trace_id": self.search_trace_id,
             "document_id": self.document_id,
             "covered_obligations": self.covered_obligations,
+            "evidence_polarity": self.evidence_polarity,
+            "source_kind": self.source_kind,
         }
 
 
@@ -480,7 +544,7 @@ class CollectDeepResearchEvidenceHandler:
     """Orchestre la collecte RA approfondie sans exposer les internes KA."""
 
     research_case_repository: ResearchCaseRepository
-    knowledge_search: KnowledgeSearch
+    knowledge_search: DeepKnowledgeSearch
     verified_claim_catalog: VerifiedClaimCatalog
     citation_resolver: CitationResolver
 
@@ -532,6 +596,12 @@ class CollectDeepResearchEvidenceHandler:
 
         candidates = tuple(collected_candidates)
         _ensure_deep_candidate_diversity(candidates)
+        coverage_evaluation = DeepEvidenceCoveragePolicy(
+            coverage_requirements=_deep_coverage_requirements_for_plan(plan),
+            policy_version=_DEEP_COVERAGE_POLICY_VERSION,
+        ).evaluate(candidates)
+        if coverage_evaluation.support_status is SupportStatus.INSUFFICIENT_EVIDENCE:
+            raise ValueError("COVERAGE_INSUFFICIENT")
         coverage_obligations = tuple(obligation.name for obligation in plan.coverage_obligations)
         evidence_refs = tuple(_deep_candidate_evidence_ref(candidate) for candidate in candidates)
         verified_claim_refs = self.verified_claim_catalog.verified_claims_for_evidence(evidence_refs)
@@ -547,7 +617,12 @@ class CollectDeepResearchEvidenceHandler:
             evidence_set,
             occurred_at=parsed_command.occurred_at,
         )
-        saved_case = self.research_case_repository.update(updated_case)
+        traced_case = updated_case.record_deep_collection_trace(
+            evidence_set_id=evidence_set.evidence_set_id,
+            projection_version_refs=tuple(projection_version_refs),
+            audit_trace_ids=tuple(audit_trace_ids),
+        )
+        saved_case = self.research_case_repository.update(traced_case)
         deep_event = DeepResearchEvidenceCollected(
             research_case_id=research_case.research_case_id,
             evidence_set_id=evidence_set.evidence_set_id,
@@ -595,6 +670,8 @@ def _ensure_deep_candidates(value: Sequence[object]) -> tuple[object, ...]:
         _deep_candidate_evidence_ref(candidate)
         _deep_candidate_covered_obligations(candidate)
         _deep_candidate_document_id(candidate)
+        _deep_candidate_evidence_polarity(candidate)
+        _deep_candidate_source_kind(candidate)
     return candidates
 
 
@@ -628,6 +705,25 @@ def _ensure_deep_research_plan(value: object) -> DeepResearchPlan:
     if not isinstance(value, DeepResearchPlan):
         raise ValueError("deep_research_plan absent")
     return value
+
+
+def _deep_coverage_requirements_for_plan(plan: DeepResearchPlan) -> tuple[DeepCoverageRequirement, ...]:
+    requirements: list[DeepCoverageRequirement] = []
+    for obligation in plan.coverage_obligations:
+        contract = _DEEP_COVERAGE_REQUIREMENT_CONTRACT.get(obligation.name)
+        if contract is None:
+            raise ValueError(f"coverage_obligation M-009 inconnue: {obligation.name}")
+        requirements.append(
+            DeepCoverageRequirement(
+                obligation_name=obligation.name,
+                critical=contract["critical"],
+                required_polarity=contract["required_polarity"],
+                requires_primary_source=contract["requires_primary_source"],
+                reason_code=contract["reason_code"],
+                public_reason=contract["public_reason"],
+            )
+        )
+    return tuple(requirements)
 
 
 def _ensure_collection_events(value: Sequence[EvidenceCollectionCompleted]) -> tuple[EvidenceCollectionCompleted, ...]:
@@ -726,6 +822,14 @@ def _deep_candidate_document_id(candidate: object) -> str:
     return document_id
 
 
+def _deep_candidate_evidence_polarity(candidate: object) -> str:
+    return _ensure_deep_polarity(getattr(candidate, "evidence_polarity", None))
+
+
+def _deep_candidate_source_kind(candidate: object) -> str:
+    return _ensure_deep_source_kind(getattr(candidate, "source_kind", None))
+
+
 def _deep_source_locator_key(source_locator: object) -> tuple[object, ...]:
     if source_locator is None:
         raise ValueError("source_locator absent")
@@ -748,6 +852,20 @@ def _ensure_text_tuple(value: object, field_name: str) -> tuple[str, ...]:
     if len(parsed) != len(set(parsed)):
         raise ValueError(f"{field_name} dupliquees")
     return parsed
+
+
+def _ensure_deep_polarity(value: object) -> str:
+    text = _ensure_text(value, "evidence_polarity")
+    if text not in {"ANY", "FAVORABLE", "UNFAVORABLE", "NEUTRAL"}:
+        raise ValueError(f"evidence_polarity invalide: {text}")
+    return text
+
+
+def _ensure_deep_source_kind(value: object) -> str:
+    text = _ensure_text(value, "source_kind")
+    if text not in {"PRIMARY", "SECONDARY"}:
+        raise ValueError(f"source_kind invalide: {text}")
+    return text
 
 
 def _ensure_text_sequence(value: object, field_name: str) -> tuple[str, ...]:
@@ -811,6 +929,7 @@ __all__ = [
     "CollectEvidenceResult",
     "DeepEvidenceSearchRequest",
     "DeepEvidenceSearchResult",
+    "DeepKnowledgeSearch",
     "DeepResearchEvidenceCollected",
     "EvidenceSearchRequest",
     "KnowledgeSearch",

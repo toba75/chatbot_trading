@@ -195,8 +195,8 @@ class FakePublicVerifiedClaimCatalog:
         self.internal_reads = 0
         self.mutations = 0
 
-    def read_evidence(self, claim_id):
-        self.requests.append(claim_id)
+    def read_evidence(self, claim_id, claim_version):
+        self.requests.append((claim_id, claim_version))
         return self.result
 
     def groups_for_claim(self, claim_id):
@@ -368,7 +368,7 @@ result = handler.resolve(
     )
 )
 assert_equal(result.dependency_set.claim_dependencies[0].independent_confirmation_count, 1, "Le compteur doit suivre les groupes.")
-assert_equal(catalog.requests, [valid_claim_ref.claim_id], "La lecture doit passer par read_evidence.")
+assert_equal(catalog.requests, [(valid_claim_ref.claim_id, valid_claim_ref.claim_version)], "La lecture doit passer par read_evidence versionne.")
 assert_equal(catalog.internal_reads, 0, "Aucune lecture interne EG ne doit être appelée.")
 assert_equal(catalog.mutations, 0, "Aucune mutation EG ne doit être appelée.")
 
