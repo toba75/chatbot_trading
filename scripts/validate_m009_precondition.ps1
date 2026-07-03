@@ -208,7 +208,16 @@ function Invoke-M009TimedProcess {
     $timeoutMilliseconds = $TimeoutSeconds * 1000
     if (-not $process.WaitForExit($timeoutMilliseconds)) {
         $timedOut = $true
-        & taskkill.exe /PID $process.Id /T /F 2>$null | Out-Null
+        $previousKillErrorActionPreference = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        try {
+            if (-not $process.HasExited) {
+                $taskKillOutput = & taskkill.exe /PID $process.Id /T /F 2>&1
+            }
+        }
+        finally {
+            $ErrorActionPreference = $previousKillErrorActionPreference
+        }
         if (-not $process.WaitForExit(5000)) {
             throw "Processus de gate M-009 non arrêté après timeout: $($process.Id)"
         }
