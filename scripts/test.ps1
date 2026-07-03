@@ -394,7 +394,9 @@ if ($env:OST_M003_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m010SpecificationAcceptancePath,
         $m010SpecificationUnitPath,
         $m010StrategyCandidateCreationAcceptancePath,
-        $m010StrategyCandidateCreationUnitPath
+        $m010StrategyCandidateCreationUnitPath,
+        $m010StrategyRuleOriginAcceptancePath,
+        $m010StrategyRuleOriginUnitPath
     )
 }
 elseif ($env:OST_M004_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -462,7 +464,9 @@ elseif ($env:OST_M004_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m010SpecificationAcceptancePath,
         $m010SpecificationUnitPath,
         $m010StrategyCandidateCreationAcceptancePath,
-        $m010StrategyCandidateCreationUnitPath
+        $m010StrategyCandidateCreationUnitPath,
+        $m010StrategyRuleOriginAcceptancePath,
+        $m010StrategyRuleOriginUnitPath
     )
 }
 elseif ($env:OST_M005_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -531,7 +535,9 @@ elseif ($env:OST_M005_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m010SpecificationAcceptancePath,
         $m010SpecificationUnitPath,
         $m010StrategyCandidateCreationAcceptancePath,
-        $m010StrategyCandidateCreationUnitPath
+        $m010StrategyCandidateCreationUnitPath,
+        $m010StrategyRuleOriginAcceptancePath,
+        $m010StrategyRuleOriginUnitPath
     )
 }
 elseif ($env:OST_M006_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -599,7 +605,9 @@ elseif ($env:OST_M006_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m010SpecificationAcceptancePath,
         $m010SpecificationUnitPath,
         $m010StrategyCandidateCreationAcceptancePath,
-        $m010StrategyCandidateCreationUnitPath
+        $m010StrategyCandidateCreationUnitPath,
+        $m010StrategyRuleOriginAcceptancePath,
+        $m010StrategyRuleOriginUnitPath
     )
 }
 elseif ($env:OST_M007_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -666,7 +674,9 @@ elseif ($env:OST_M007_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m010SpecificationAcceptancePath,
         $m010SpecificationUnitPath,
         $m010StrategyCandidateCreationAcceptancePath,
-        $m010StrategyCandidateCreationUnitPath
+        $m010StrategyCandidateCreationUnitPath,
+        $m010StrategyRuleOriginAcceptancePath,
+        $m010StrategyRuleOriginUnitPath
     )
 }
 elseif ($env:OST_M008_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -712,7 +722,9 @@ elseif ($env:OST_M008_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m010SpecificationAcceptancePath,
         $m010SpecificationUnitPath,
         $m010StrategyCandidateCreationAcceptancePath,
-        $m010StrategyCandidateCreationUnitPath
+        $m010StrategyCandidateCreationUnitPath,
+        $m010StrategyRuleOriginAcceptancePath,
+        $m010StrategyRuleOriginUnitPath
     )
 }
 elseif ($env:OST_M009_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -757,7 +769,9 @@ elseif ($env:OST_M009_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m010SpecificationAcceptancePath,
         $m010SpecificationUnitPath,
         $m010StrategyCandidateCreationAcceptancePath,
-        $m010StrategyCandidateCreationUnitPath
+        $m010StrategyCandidateCreationUnitPath,
+        $m010StrategyRuleOriginAcceptancePath,
+        $m010StrategyRuleOriginUnitPath
     )
 }
 elseif ($env:OST_M010_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -781,7 +795,9 @@ elseif ($env:OST_M010_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m010SpecificationAcceptancePath,
         $m010SpecificationUnitPath,
         $m010StrategyCandidateCreationAcceptancePath,
-        $m010StrategyCandidateCreationUnitPath
+        $m010StrategyCandidateCreationUnitPath,
+        $m010StrategyRuleOriginAcceptancePath,
+        $m010StrategyRuleOriginUnitPath
     )
 }
 

@@ -56,3 +56,14 @@
 - ADR: aucune nouvelle ADR; T-003 applique `ADR-010` et `DDD-ADR-010` sans changer leur décision.
 - Validations ciblées GREEN: `tests/m010/validate_strategy_candidate_creation_acceptance.ps1`, `tests/m010/validate_strategy_candidate_creation_unit.ps1`, `scripts/validate_architecture_boundaries.ps1 -AppRoot .\app -ContextRegistryPath .\app\context_registry.json -SpecificationPath .\docs\specs\specification_unifiee_ddd_technique_chatbot_trading_v4_1.md`.
 - Gates GREEN: `scripts/lint.ps1` avec `19 validation(s), 0 test(s)`, `git diff --check`, et `scripts/test.ps1` avec `19 validation(s), 204 test(s)`.
+
+### T-004 - Origines des règles de stratégie
+
+- Précondition ciblée: `tests/m010/validate_strategy_candidate_creation_acceptance.ps1` et `tests/m010/validate_strategy_candidate_creation_unit.ps1` restent GREEN avant extension de l'agrégat SD.
+- Commit RED: `53f6b5e9 test(m010): couvrir origines regles strategie`.
+- RED utile: `tests/m010/validate_strategy_rule_origin_acceptance.ps1` échoue sur le cas d'usage d'ajout et d'attribution absent; `tests/m010/validate_strategy_rule_origin_unit.ps1` échoue sur les objets de domaine `RuleExpression`, `RuleOrigin`, `StrategyRule` et `RuleOriginPolicy` absents.
+- Implémentation: ajout de `StrategyRule`, `RuleExpression`, `RuleOrigin`, `RuleOriginType`, `CompilationDiagnostic`, `RuleOriginPolicy`, des événements `StrategyRuleAdded` et `RuleOriginAssigned`, des transitions versionnées d'ajout, d'attribution et de validation de compilation, et des commandes applicatives `AddStrategyRule` / `AssignRuleOrigin`.
+- Ajustement de gate: enrôlement des tests T-004 dans `scripts/test.ps1` et exclusion explicite des exécutions imbriquées de précondition M-003 à M-010 pour conserver l'indépendance des préconditions amont.
+- ADR: aucune nouvelle ADR; T-004 applique `ADR-010`, `DDD-ADR-005` et `DDD-ADR-010` sans changer leur décision.
+- Validations ciblées GREEN: `tests/m010/validate_strategy_rule_origin_acceptance.ps1`, `tests/m010/validate_strategy_rule_origin_unit.ps1`, puis non-régression `tests/m010/validate_strategy_candidate_creation_acceptance.ps1` et `tests/m010/validate_strategy_candidate_creation_unit.ps1`.
+- Gate global GREEN: `scripts/test.ps1` avec `19 validation(s), 206 test(s)`.
