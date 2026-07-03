@@ -10,6 +10,7 @@ from typing import Any, Protocol
 from app.research_answering.domain.research_case import (
     ResearchCase,
     ResearchCaseOpened,
+    ResearchCaseStatus,
     ResearchMandate,
     ResearchMode,
     ResearchPlanCreated,
@@ -113,6 +114,8 @@ class OpenResearchCaseResult:
             raise ValueError("research_case invalide")
         if self.research_case_id != self.research_case.research_case_id:
             raise ValueError("research_case_id incoherent")
+        if self.research_case.status is not ResearchCaseStatus.PLANNED:
+            raise ValueError("research_case non planifie")
         object.__setattr__(self, "events", _ensure_events(self.events))
 
 

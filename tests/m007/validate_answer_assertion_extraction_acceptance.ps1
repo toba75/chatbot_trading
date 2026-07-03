@@ -162,6 +162,8 @@ def candidate_for(evidence_ref):
         search_trace_id=f"STRC-{evidence_ref.evidence_id.removeprefix('EVS-')}",
         document_id=evidence_ref.source_locator.document_id,
         covered_obligations=("preuves_documentaires",),
+        evidence_polarity="NEUTRAL",
+        source_kind="PRIMARY",
     )
 
 

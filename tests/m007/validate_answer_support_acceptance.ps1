@@ -163,6 +163,8 @@ def candidate_for(ref):
         search_trace_id="STRC-M007-T007-ACCEPTANCE-0001",
         document_id=ref.source_locator.document_id,
         covered_obligations=("preuves_documentaires",),
+        evidence_polarity="NEUTRAL",
+        source_kind="PRIMARY",
     )
 
 

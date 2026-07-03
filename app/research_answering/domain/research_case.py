@@ -18,6 +18,7 @@ from app.research_answering.domain.evidence_set import (
 from app.research_answering.domain.contradiction_assessment import (
     ContradictionAssessment,
     ContradictionDetected,
+    DeepContradictionAssessment,
     KnowledgeGap,
     KnowledgeGapRecorded,
     ResearchEvidenceFoundConflicting,
@@ -35,6 +36,13 @@ from app.research_answering.domain.contradiction_assessment import (
 _HASH_HEX_LENGTH = 24
 _RESEARCH_CASE_ID_PATTERN = re.compile(r"^RSC-[A-Z0-9][A-Z0-9-]*$")
 _RESEARCH_PLAN_ID_PATTERN = re.compile(r"^RPLAN-[A-Z0-9][A-Z0-9-]*$")
+_RESEARCH_SUB_QUESTION_ID_PATTERN = re.compile(r"^RSQ-[A-Z0-9][A-Z0-9-]*$")
+_EVIDENCE_SET_ID_PATTERN = re.compile(r"^EVS-[A-Z0-9][A-Z0-9-]*$")
+_PROJECTION_VERSION_REF_PATTERN = re.compile(r"^PROJ-[A-Z0-9][A-Z0-9-]*$")
+_AUDIT_TRACE_ID_PATTERN = re.compile(r"^STRC-[A-Z0-9][A-Z0-9-]*$")
+_CLAIM_ID_PATTERN = re.compile(r"^CLM-[A-Z0-9][A-Z0-9-]*$")
+_VERIFICATION_CASE_ID_PATTERN = re.compile(r"^VER-[A-Z0-9][A-Z0-9-]*$")
+_DEPENDENCY_GROUP_ID_PATTERN = re.compile(r"^DEP-[A-Z0-9][A-Z0-9-]*$")
 _UTC_INSTANT_PATTERN = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
 _ALLOWED_REQUESTING_CONTEXTS = frozenset({"API", "CV", "RA"})
 _MANDATE_FIELDS = frozenset(
@@ -53,6 +61,7 @@ class ResearchMode(str, Enum):
     """Mode de recherche demandé explicitement à RA."""
 
     DOCUMENTARY_SIMPLE = "DOCUMENTARY_SIMPLE"
+    DEEP_RESEARCH = "DEEP_RESEARCH"
 
     @classmethod
     def from_value(cls, value: object) -> "ResearchMode":
@@ -169,6 +178,40 @@ class CoverageObligation:
 
 
 @dataclass(frozen=True)
+class ResearchSubQuestion:
+    """Sous-question autonome rattachée aux obligations de couverture."""
+
+    sub_question_id: str
+    text: str
+    coverage_obligation_names: tuple[str, ...]
+    mandate_terms: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "sub_question_id", _ensure_sub_question_id(self.sub_question_id))
+        object.__setattr__(self, "text", _ensure_text(self.text, "research_sub_question text"))
+        if not self.text.endswith("?"):
+            raise ValueError("research_sub_question non interrogative")
+        object.__setattr__(
+            self,
+            "coverage_obligation_names",
+            _ensure_text_tuple(self.coverage_obligation_names, "coverage_obligation_names"),
+        )
+        object.__setattr__(
+            self,
+            "mandate_terms",
+            _ensure_text_tuple(self.mandate_terms, "mandate_terms"),
+        )
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "sub_question_id": self.sub_question_id,
+            "text": self.text,
+            "coverage_obligation_names": self.coverage_obligation_names,
+            "mandate_terms": self.mandate_terms,
+        }
+
+
+@dataclass(frozen=True)
 class ResearchPlan:
     """Plan RA local publié dans le ResearchCase avant collecte."""
 
@@ -197,6 +240,34 @@ class ResearchPlan:
             ],
             "policy_version": self.policy_version,
         }
+
+
+@dataclass(frozen=True)
+class DeepResearchPlan(ResearchPlan):
+    """Plan RA approfondi avec sous-questions et obligations explicites."""
+
+    sub_questions: tuple[ResearchSubQuestion, ...]
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        if self.mode is not ResearchMode.DEEP_RESEARCH:
+            raise ValueError("research_mode approfondi requis")
+        object.__setattr__(
+            self,
+            "sub_questions",
+            _ensure_research_sub_questions(self.sub_questions),
+        )
+        _ensure_sub_question_obligations_in_plan(
+            coverage_obligations=self.coverage_obligations,
+            sub_questions=self.sub_questions,
+        )
+
+    def to_payload(self) -> dict[str, Any]:
+        payload = super().to_payload()
+        payload["sub_questions"] = [
+            sub_question.to_payload() for sub_question in self.sub_questions
+        ]
+        return payload
 
 
 @dataclass(frozen=True)
@@ -277,6 +348,80 @@ class ResearchPlanCreated:
 
 
 @dataclass(frozen=True)
+class DeepEvidenceCollectionTrace:
+    """Trace KA publique conservée avant synthèse approfondie."""
+
+    evidence_set_id: str
+    projection_version_refs: tuple[str, ...]
+    audit_trace_ids: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "evidence_set_id", _ensure_evidence_set_id(self.evidence_set_id))
+        object.__setattr__(
+            self,
+            "projection_version_refs",
+            _ensure_projection_version_refs(self.projection_version_refs),
+        )
+        object.__setattr__(
+            self,
+            "audit_trace_ids",
+            _ensure_audit_trace_ids(self.audit_trace_ids),
+        )
+
+    def to_payload(self) -> dict[str, object]:
+        return {
+            "evidence_set_id": self.evidence_set_id,
+            "projection_version_refs": self.projection_version_refs,
+            "audit_trace_ids": self.audit_trace_ids,
+        }
+
+
+@dataclass(frozen=True)
+class ClaimDependencyResolution:
+    """Résolution EG publique conservée par RA pour une version de claim."""
+
+    evidence_set_id: str
+    claim_id: str
+    claim_version: int
+    verification_case_id: str
+    dependency_group_ids: tuple[str, ...]
+
+    @classmethod
+    def from_dependency(cls, *, evidence_set_id: str, dependency: object) -> "ClaimDependencyResolution":
+        return cls(
+            evidence_set_id=evidence_set_id,
+            claim_id=getattr(dependency, "claim_id", None),
+            claim_version=getattr(dependency, "claim_version", None),
+            verification_case_id=getattr(dependency, "verification_case_id", None),
+            dependency_group_ids=getattr(dependency, "dependency_group_ids", None),
+        )
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "evidence_set_id", _ensure_evidence_set_id(self.evidence_set_id))
+        object.__setattr__(self, "claim_id", _ensure_claim_id(self.claim_id))
+        object.__setattr__(self, "claim_version", _ensure_positive_integer(self.claim_version, "claim_version"))
+        object.__setattr__(
+            self,
+            "verification_case_id",
+            _ensure_verification_case_id(self.verification_case_id),
+        )
+        object.__setattr__(
+            self,
+            "dependency_group_ids",
+            _ensure_dependency_group_ids(self.dependency_group_ids),
+        )
+
+    def to_payload(self) -> dict[str, object]:
+        return {
+            "evidence_set_id": self.evidence_set_id,
+            "claim_id": self.claim_id,
+            "claim_version": self.claim_version,
+            "verification_case_id": self.verification_case_id,
+            "dependency_group_ids": self.dependency_group_ids,
+        }
+
+
+@dataclass(frozen=True)
 class ResearchCase:
     """Agrégat RA qui fige question, mandat et plan avant les preuves."""
 
@@ -287,7 +432,7 @@ class ResearchCase:
     status: ResearchCaseStatus
     research_plan: ResearchPlan | None
     evidence_set: EvidenceSet | None
-    contradiction_assessments: tuple[ContradictionAssessment, ...]
+    contradiction_assessments: tuple[ContradictionAssessment | DeepContradictionAssessment, ...]
     knowledge_gaps: tuple[KnowledgeGap, ...]
     requested_by_context: str
     opened_at: str
@@ -302,6 +447,8 @@ class ResearchCase:
         | ResearchEvidenceFoundConflicting,
         ...,
     ]
+    deep_collection_traces: tuple[DeepEvidenceCollectionTrace, ...] = ()
+    claim_dependency_resolutions: tuple[ClaimDependencyResolution, ...] = ()
 
     @classmethod
     def open(
@@ -337,6 +484,8 @@ class ResearchCase:
             requested_by_context=requested_by_context,
             opened_at=occurred_at,
             events=(opened,),
+            deep_collection_traces=(),
+            claim_dependency_resolutions=(),
         )
 
     def __post_init__(self) -> None:
@@ -364,6 +513,16 @@ class ResearchCase:
             ensure_assessments(self.contradiction_assessments),
         )
         object.__setattr__(self, "knowledge_gaps", ensure_knowledge_gaps(self.knowledge_gaps))
+        object.__setattr__(
+            self,
+            "deep_collection_traces",
+            _ensure_deep_collection_traces(self.deep_collection_traces),
+        )
+        object.__setattr__(
+            self,
+            "claim_dependency_resolutions",
+            _ensure_claim_dependency_resolutions(self.claim_dependency_resolutions),
+        )
         if self.status is ResearchCaseStatus.CREATED and self.research_plan is not None:
             raise ValueError("research_plan interdit pour CREATED")
         if self.status is ResearchCaseStatus.CREATED and self.evidence_set is not None:
@@ -505,6 +664,92 @@ class ResearchCase:
             event,
         )
 
+    def record_deep_collection_trace(
+        self,
+        *,
+        evidence_set_id: str,
+        projection_version_refs: tuple[str, ...],
+        audit_trace_ids: tuple[str, ...],
+    ) -> "ResearchCase":
+        if self.evidence_set is None:
+            raise ValueError("evidence_set absent")
+        parsed_evidence_set_id = _ensure_evidence_set_id(evidence_set_id)
+        if self.evidence_set.evidence_set_id != parsed_evidence_set_id:
+            raise ValueError("evidence_set_id incoherent")
+        if any(trace.evidence_set_id == parsed_evidence_set_id for trace in self.deep_collection_traces):
+            raise ValueError("deep_collection_trace deja enregistree")
+        trace = DeepEvidenceCollectionTrace(
+            evidence_set_id=parsed_evidence_set_id,
+            projection_version_refs=projection_version_refs,
+            audit_trace_ids=audit_trace_ids,
+        )
+        return replace(self, deep_collection_traces=self.deep_collection_traces + (trace,))
+
+    def record_claim_dependency_resolutions(
+        self,
+        *,
+        evidence_set_id: str,
+        claim_dependencies: Sequence[object],
+    ) -> "ResearchCase":
+        if self.evidence_set is None:
+            raise ValueError("evidence_set absent")
+        parsed_evidence_set_id = _ensure_evidence_set_id(evidence_set_id)
+        if self.evidence_set.evidence_set_id != parsed_evidence_set_id:
+            raise ValueError("evidence_set_id incoherent")
+        resolutions = tuple(
+            ClaimDependencyResolution.from_dependency(
+                evidence_set_id=parsed_evidence_set_id,
+                dependency=dependency,
+            )
+            for dependency in claim_dependencies
+        )
+        if len(resolutions) == 0 and len(self.evidence_set.verified_claim_refs) > 0:
+            raise ValueError("claim_dependency_resolution absente")
+        expected_refs = {
+            (claim_ref.claim_id, claim_ref.claim_version)
+            for claim_ref in self.evidence_set.verified_claim_refs
+        }
+        resolved_refs = {
+            (resolution.claim_id, resolution.claim_version)
+            for resolution in resolutions
+        }
+        if resolved_refs != expected_refs:
+            raise ValueError("CLAIM_DEPENDENCY_UNRESOLVED")
+        existing_refs = {
+            (resolution.claim_id, resolution.claim_version)
+            for resolution in self.claim_dependency_resolutions
+            if resolution.evidence_set_id == parsed_evidence_set_id
+        }
+        if len(existing_refs & resolved_refs) > 0:
+            raise ValueError("claim_dependency_resolution deja enregistree")
+        return replace(
+            self,
+            claim_dependency_resolutions=self.claim_dependency_resolutions + resolutions,
+        )
+
+    def ensure_deep_collection_trace_recorded(self, *, evidence_set_id: str) -> None:
+        parsed_evidence_set_id = _ensure_evidence_set_id(evidence_set_id)
+        if not any(trace.evidence_set_id == parsed_evidence_set_id for trace in self.deep_collection_traces):
+            raise ValueError("DEEP_RESEARCH_PLAN_REQUIRED")
+
+    def ensure_claim_dependencies_resolved(self, *, evidence_set_id: str) -> None:
+        parsed_evidence_set_id = _ensure_evidence_set_id(evidence_set_id)
+        if self.evidence_set is None:
+            raise ValueError("evidence_set absent")
+        expected_refs = {
+            (claim_ref.claim_id, claim_ref.claim_version)
+            for claim_ref in self.evidence_set.verified_claim_refs
+        }
+        if len(expected_refs) == 0:
+            return
+        resolved_refs = {
+            (resolution.claim_id, resolution.claim_version)
+            for resolution in self.claim_dependency_resolutions
+            if resolution.evidence_set_id == parsed_evidence_set_id
+        }
+        if not expected_refs.issubset(resolved_refs):
+            raise ValueError("CLAIM_DEPENDENCY_UNRESOLVED")
+
     def ensure_contradiction_assessment_allowed(self) -> None:
         if self.status is not ResearchCaseStatus.EVIDENCE_SET_SEALED:
             raise ValueError("evidence_set non scelle")
@@ -544,6 +789,33 @@ class ResearchCase:
             events,
         )
 
+    def record_deep_contradiction_assessments(
+        self,
+        assessments: tuple[DeepContradictionAssessment, ...],
+    ) -> "ResearchCase":
+        self.ensure_contradiction_assessment_allowed()
+        parsed_assessments = ensure_assessments(assessments)
+        if len(parsed_assessments) == 0:
+            raise ValueError("deep_contradiction_assessments absents")
+        existing_ids = {
+            assessment.contradiction_id
+            if isinstance(assessment, ContradictionAssessment)
+            else assessment.assessment_id
+            for assessment in self.contradiction_assessments
+        }
+        for assessment in parsed_assessments:
+            assessment_id = (
+                assessment.contradiction_id
+                if isinstance(assessment, ContradictionAssessment)
+                else assessment.assessment_id
+            )
+            if assessment_id in existing_ids:
+                raise ValueError("contradiction_assessment deja enregistre")
+        return replace(
+            self,
+            contradiction_assessments=self.contradiction_assessments + parsed_assessments,
+        )
+
     def declare_insufficient_evidence(
         self,
         *,
@@ -575,6 +847,7 @@ class ResearchCase:
                 gap_type=gap.gap_type,
                 affected_obligation=gap.affected_obligation,
                 reason_code=gap.reason_code,
+                public_reason=gap.public_reason,
                 occurred_at=occurred_at,
             )
             for gap in gaps
@@ -583,6 +856,80 @@ class ResearchCase:
             research_case_id=self.research_case_id,
             missing_obligations=parsed_missing,
             reason_codes=parsed_reasons,
+            support_status=SupportStatus.INSUFFICIENT_EVIDENCE,
+            public_reasons=tuple(gap.public_reason for gap in gaps),
+            occurred_at=occurred_at,
+        )
+        events = gap_events + (terminal_event,)
+        return (
+            replace(
+                self,
+                status=ResearchCaseStatus.INSUFFICIENT_EVIDENCE,
+                knowledge_gaps=self.knowledge_gaps + gaps,
+                events=self.events + events,
+            ),
+            gaps,
+            events,
+        )
+
+    def declare_insufficient_deep_coverage(
+        self,
+        *,
+        missing_obligations: tuple[str, ...],
+        reason_codes: tuple[str, ...],
+        public_reasons: tuple[str, ...],
+        occurred_at: str,
+    ) -> tuple[
+        "ResearchCase",
+        tuple[KnowledgeGap, ...],
+        tuple[KnowledgeGapRecorded | ResearchEvidenceFoundInsufficient, ...],
+    ]:
+        self.ensure_contradiction_assessment_allowed()
+        parsed_missing = ensure_missing_obligations(missing_obligations)
+        parsed_reasons = ensure_reason_codes(reason_codes)
+        parsed_public_reasons = _ensure_text_tuple(public_reasons, "public_reasons")
+        if len(parsed_missing) != len(parsed_reasons):
+            raise ValueError("reason_codes incoherents")
+        if len(parsed_missing) != len(parsed_public_reasons):
+            raise ValueError("public_reasons incoherentes")
+        self._ensure_missing_obligations_in_plan(parsed_missing)
+        existing_obligations = {
+            gap.affected_obligation for gap in self.knowledge_gaps
+        }
+        for obligation in parsed_missing:
+            if obligation in existing_obligations:
+                raise ValueError("knowledge_gap deja enregistre")
+        gaps = tuple(
+            KnowledgeGap.for_missing_coverage_obligation(
+                research_case_id=self.research_case_id,
+                affected_obligation=obligation,
+                reason_code=reason_code,
+                public_reason=public_reason,
+            )
+            for obligation, reason_code, public_reason in zip(
+                parsed_missing,
+                parsed_reasons,
+                parsed_public_reasons,
+                strict=True,
+            )
+        )
+        gap_events = tuple(
+            KnowledgeGapRecorded(
+                research_case_id=self.research_case_id,
+                gap_type=gap.gap_type,
+                affected_obligation=gap.affected_obligation,
+                reason_code=gap.reason_code,
+                public_reason=gap.public_reason,
+                occurred_at=occurred_at,
+            )
+            for gap in gaps
+        )
+        terminal_event = ResearchEvidenceFoundInsufficient(
+            research_case_id=self.research_case_id,
+            missing_obligations=parsed_missing,
+            reason_codes=parsed_reasons,
+            support_status=SupportStatus.INSUFFICIENT_EVIDENCE,
+            public_reasons=parsed_public_reasons,
             occurred_at=occurred_at,
         )
         events = gap_events + (terminal_event,)
@@ -611,6 +958,7 @@ class ResearchCase:
             gap_type=gap.gap_type,
             affected_obligation=gap.affected_obligation,
             reason_code=gap.reason_code,
+            public_reason=gap.public_reason,
             occurred_at=occurred_at,
         )
         return (
@@ -710,6 +1058,12 @@ class ResearchCase:
                 assessment.to_payload() for assessment in self.contradiction_assessments
             ],
             "knowledge_gaps": [gap.to_payload() for gap in self.knowledge_gaps],
+            "deep_collection_traces": [
+                trace.to_payload() for trace in self.deep_collection_traces
+            ],
+            "claim_dependency_resolutions": [
+                resolution.to_payload() for resolution in self.claim_dependency_resolutions
+            ],
             "requested_by_context": self.requested_by_context,
             "opened_at": self.opened_at,
             "events": [event.to_payload() for event in self.events],
@@ -846,6 +1200,38 @@ def _ensure_coverage_obligations(value: object) -> tuple[CoverageObligation, ...
     return obligations
 
 
+def _ensure_research_sub_questions(value: object) -> tuple[ResearchSubQuestion, ...]:
+    if value is None or isinstance(value, str) or not isinstance(value, Sequence):
+        raise ValueError("research_sub_questions invalides")
+    sub_questions = tuple(value)
+    if len(sub_questions) == 0:
+        raise ValueError("research_sub_questions absentes")
+    for sub_question in sub_questions:
+        if not isinstance(sub_question, ResearchSubQuestion):
+            raise ValueError("research_sub_question invalide")
+    ids = tuple(sub_question.sub_question_id for sub_question in sub_questions)
+    if len(ids) != len(set(ids)):
+        raise ValueError("research_sub_question dupliquee")
+    return sub_questions
+
+
+def _ensure_sub_question_obligations_in_plan(
+    *,
+    coverage_obligations: tuple[CoverageObligation, ...],
+    sub_questions: tuple[ResearchSubQuestion, ...],
+) -> None:
+    planned_obligations = {obligation.name for obligation in coverage_obligations}
+    referenced_obligations: set[str] = set()
+    for sub_question in sub_questions:
+        for obligation_name in sub_question.coverage_obligation_names:
+            if obligation_name not in planned_obligations:
+                raise ValueError(f"coverage_obligation hors plan: {obligation_name}")
+            referenced_obligations.add(obligation_name)
+    for obligation_name in planned_obligations:
+        if obligation_name not in referenced_obligations:
+            raise ValueError(f"coverage_obligation non rattachee: {obligation_name}")
+
+
 def _ensure_requesting_context(value: object) -> str:
     context = _ensure_text(value, "requested_by_context")
     if context not in _ALLOWED_REQUESTING_CONTEXTS:
@@ -860,10 +1246,115 @@ def _ensure_research_case_id(value: object) -> str:
     return text
 
 
+def _ensure_evidence_set_id(value: object) -> str:
+    text = _ensure_text(value, "evidence_set_id")
+    if _EVIDENCE_SET_ID_PATTERN.fullmatch(text) is None:
+        raise ValueError("evidence_set_id invalide")
+    return text
+
+
+def _ensure_claim_id(value: object) -> str:
+    text = _ensure_text(value, "claim_id")
+    if _CLAIM_ID_PATTERN.fullmatch(text) is None:
+        raise ValueError("claim_id invalide")
+    return text
+
+
+def _ensure_positive_integer(value: object, field_name: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise ValueError(f"{field_name} invalide")
+    return value
+
+
+def _ensure_verification_case_id(value: object) -> str:
+    text = _ensure_text(value, "verification_case_id")
+    if _VERIFICATION_CASE_ID_PATTERN.fullmatch(text) is None:
+        raise ValueError("verification_case_id invalide")
+    return text
+
+
+def _ensure_projection_version_refs(value: object) -> tuple[str, ...]:
+    if value is None or isinstance(value, str) or not isinstance(value, Sequence):
+        raise ValueError("projection_version_refs invalides")
+    refs = tuple(_ensure_text(item, "projection_version_ref") for item in value)
+    if len(refs) == 0:
+        raise ValueError("projection_version_refs absentes")
+    for ref in refs:
+        if _PROJECTION_VERSION_REF_PATTERN.fullmatch(ref) is None:
+            raise ValueError("projection_version_ref invalide")
+    if len(refs) != len(set(refs)):
+        raise ValueError("projection_version_ref dupliquee")
+    return refs
+
+
+def _ensure_audit_trace_ids(value: object) -> tuple[str, ...]:
+    if value is None or isinstance(value, str) or not isinstance(value, Sequence):
+        raise ValueError("audit_trace_ids invalides")
+    ids = tuple(_ensure_text(item, "audit_trace_id") for item in value)
+    if len(ids) == 0:
+        raise ValueError("audit_trace_ids absents")
+    for audit_id in ids:
+        if _AUDIT_TRACE_ID_PATTERN.fullmatch(audit_id) is None:
+            raise ValueError("audit_trace_id invalide")
+    if len(ids) != len(set(ids)):
+        raise ValueError("audit_trace_id duplique")
+    return ids
+
+
+def _ensure_dependency_group_ids(value: object) -> tuple[str, ...]:
+    if value is None or isinstance(value, str) or not isinstance(value, Sequence):
+        raise ValueError("dependency_group_ids invalides")
+    ids = tuple(_ensure_text(item, "dependency_group_id") for item in value)
+    if len(ids) == 0:
+        raise ValueError("dependency_group_id absent")
+    for dependency_group_id in ids:
+        if _DEPENDENCY_GROUP_ID_PATTERN.fullmatch(dependency_group_id) is None:
+            raise ValueError("dependency_group_id invalide")
+    if len(ids) != len(set(ids)):
+        raise ValueError("dependency_group_id duplique")
+    return ids
+
+
+def _ensure_deep_collection_traces(value: object) -> tuple[DeepEvidenceCollectionTrace, ...]:
+    if value is None or isinstance(value, str) or not isinstance(value, Sequence):
+        raise ValueError("deep_collection_traces invalides")
+    traces = tuple(value)
+    evidence_set_ids: list[str] = []
+    for trace in traces:
+        if not isinstance(trace, DeepEvidenceCollectionTrace):
+            raise ValueError("deep_collection_trace invalide")
+        if trace.evidence_set_id in evidence_set_ids:
+            raise ValueError("deep_collection_trace dupliquee")
+        evidence_set_ids.append(trace.evidence_set_id)
+    return traces
+
+
+def _ensure_claim_dependency_resolutions(value: object) -> tuple[ClaimDependencyResolution, ...]:
+    if value is None or isinstance(value, str) or not isinstance(value, Sequence):
+        raise ValueError("claim_dependency_resolutions invalides")
+    resolutions = tuple(value)
+    refs: list[tuple[str, int]] = []
+    for resolution in resolutions:
+        if not isinstance(resolution, ClaimDependencyResolution):
+            raise ValueError("claim_dependency_resolution invalide")
+        ref = (resolution.claim_id, resolution.claim_version)
+        if ref in refs:
+            raise ValueError("claim_dependency_resolution dupliquee")
+        refs.append(ref)
+    return resolutions
+
+
 def _ensure_plan_id(value: object) -> str:
     text = _ensure_text(value, "plan_id")
     if _RESEARCH_PLAN_ID_PATTERN.fullmatch(text) is None:
         raise ValueError("plan_id invalide")
+    return text
+
+
+def _ensure_sub_question_id(value: object) -> str:
+    text = _ensure_text(value, "sub_question_id")
+    if _RESEARCH_SUB_QUESTION_ID_PATTERN.fullmatch(text) is None:
+        raise ValueError("sub_question_id invalide")
     return text
 
 
@@ -917,6 +1408,9 @@ def _json_ready(value: Any) -> Any:
 
 __all__ = [
     "CoverageObligation",
+    "ClaimDependencyResolution",
+    "DeepEvidenceCollectionTrace",
+    "DeepResearchPlan",
     "ResearchCase",
     "ResearchCaseOpened",
     "ResearchCaseStatus",
@@ -924,6 +1418,7 @@ __all__ = [
     "ResearchMode",
     "ResearchPlan",
     "ResearchPlanCreated",
+    "ResearchSubQuestion",
     "ResolvedQuestion",
     "research_case_id_for",
 ]

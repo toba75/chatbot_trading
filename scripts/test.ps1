@@ -18,6 +18,7 @@ $m005SpecificationPath = Join-Path $repoRoot "docs/specs/m005_projection_connais
 $m006SpecificationPath = Join-Path $repoRoot "docs/specs/m006_claims_verifiables.md"
 $m007SpecificationPath = Join-Path $repoRoot "docs/specs/m007_reponse_documentaire_verifiee.md"
 $m008SpecificationPath = Join-Path $repoRoot "docs/specs/m008_conversation_produit.md"
+$m009SpecificationPath = Join-Path $repoRoot "docs/specs/m009_recherche_approfondie_multi_sources.md"
 $platformTopologyPath = Join-Path $repoRoot "app/platform/topology_registry.json"
 $sparkFirewallPath = Join-Path $repoRoot "deploy/spark-firewall/network-boundary.json"
 $appRoot = Join-Path $repoRoot "app"
@@ -52,6 +53,28 @@ $m008ChatCompletionsAcceptancePath = "tests/m008/validate_chat_completions_contr
 $m008ChatCompletionsUnitPath = "tests/m008/validate_chat_completions_contract_unit.ps1"
 $m008TraceabilityAcceptancePath = "tests/m008/validate_m008_traceability_acceptance.ps1"
 $m008TraceabilityUnitPath = "tests/m008/validate_m008_traceability_unit.ps1"
+$m009PreconditionAcceptancePath = "tests/m009/validate_m009_precondition_acceptance.ps1"
+$m009PreconditionUnitPath = "tests/m009/validate_m009_precondition_unit.ps1"
+$m009SpecificationAcceptancePath = "tests/m009/validate_m009_specification_acceptance.ps1"
+$m009SpecificationUnitPath = "tests/m009/validate_m009_specification_unit.ps1"
+$m009DeepResearchPlanningAcceptancePath = "tests/m009/validate_deep_research_planning_acceptance.ps1"
+$m009DeepResearchPlanningUnitPath = "tests/m009/validate_deep_research_planning_unit.ps1"
+$m009MultiQueryEvidenceAcceptancePath = "tests/m009/validate_multi_query_evidence_collection_acceptance.ps1"
+$m009MultiQueryEvidenceUnitPath = "tests/m009/validate_multi_query_evidence_collection_unit.ps1"
+$m009VerifiedClaimDependencyAcceptancePath = "tests/m009/validate_verified_claim_dependency_resolution_acceptance.ps1"
+$m009VerifiedClaimDependencyUnitPath = "tests/m009/validate_verified_claim_dependency_resolution_unit.ps1"
+$m009DeepContradictionClassificationAcceptancePath = "tests/m009/validate_deep_contradiction_classification_acceptance.ps1"
+$m009DeepContradictionClassificationUnitPath = "tests/m009/validate_deep_contradiction_classification_unit.ps1"
+$m009InsufficientDeepCoverageAcceptancePath = "tests/m009/validate_insufficient_deep_coverage_acceptance.ps1"
+$m009InsufficientDeepCoverageUnitPath = "tests/m009/validate_insufficient_deep_coverage_unit.ps1"
+$m009MultiSourceSynthesisAcceptancePath = "tests/m009/validate_multi_source_synthesis_acceptance.ps1"
+$m009MultiSourceSynthesisUnitPath = "tests/m009/validate_multi_source_synthesis_unit.ps1"
+$m009DeepResearchHttpAcceptancePath = "tests/m009/validate_deep_research_http_contract_acceptance.ps1"
+$m009DeepResearchHttpUnitPath = "tests/m009/validate_deep_research_http_contract_unit.ps1"
+$m009DeepResearchMetricsAcceptancePath = "tests/m009/validate_deep_research_metrics_acceptance.ps1"
+$m009DeepResearchMetricsUnitPath = "tests/m009/validate_deep_research_metrics_unit.ps1"
+$m009TraceabilityAcceptancePath = "tests/m009/validate_m009_traceability_acceptance.ps1"
+$m009TraceabilityUnitPath = "tests/m009/validate_m009_traceability_unit.ps1"
 
 $validationCommands = @(
     @{ Path = "scripts/validate_m000_precondition_report.ps1"; Arguments = @("-Path", $preconditionReportPath) },
@@ -67,6 +90,7 @@ $validationCommands = @(
     @{ Path = "scripts/validate_m006_specification.ps1"; Arguments = @("-Path", $m006SpecificationPath) },
     @{ Path = "scripts/validate_m007_specification.ps1"; Arguments = @("-Path", $m007SpecificationPath) },
     @{ Path = "scripts/validate_m008_specification.ps1"; Arguments = @("-Path", $m008SpecificationPath) },
+    @{ Path = "scripts/validate_m009_specification.ps1"; Arguments = @("-Path", $m009SpecificationPath) },
     @{ Path = "scripts/validate_platform_topology.ps1"; Arguments = @("-Path", $platformTopologyPath) },
     @{ Path = "scripts/validate_local_compose.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_network_boundary.ps1"; Arguments = @("-SparkFirewallPath", $sparkFirewallPath) },
@@ -250,7 +274,29 @@ $testCommands = @(
     @{ Path = "tests/m008/validate_chat_completions_contract_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/m008/validate_chat_completions_contract_unit.ps1"; Arguments = @() },
     @{ Path = "tests/m008/validate_m008_traceability_acceptance.ps1"; Arguments = @() },
-    @{ Path = "tests/m008/validate_m008_traceability_unit.ps1"; Arguments = @() }
+    @{ Path = "tests/m008/validate_m008_traceability_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m009/validate_m009_precondition_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m009/validate_m009_precondition_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m009/validate_m009_specification_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m009/validate_m009_specification_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m009/validate_deep_research_planning_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m009/validate_deep_research_planning_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m009/validate_multi_query_evidence_collection_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m009/validate_multi_query_evidence_collection_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m009/validate_verified_claim_dependency_resolution_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m009/validate_verified_claim_dependency_resolution_unit.ps1"; Arguments = @() },
+    @{ Path = $m009DeepContradictionClassificationAcceptancePath; Arguments = @() },
+    @{ Path = $m009DeepContradictionClassificationUnitPath; Arguments = @() },
+    @{ Path = $m009InsufficientDeepCoverageAcceptancePath; Arguments = @() },
+    @{ Path = $m009InsufficientDeepCoverageUnitPath; Arguments = @() },
+    @{ Path = $m009MultiSourceSynthesisAcceptancePath; Arguments = @() },
+    @{ Path = $m009MultiSourceSynthesisUnitPath; Arguments = @() },
+    @{ Path = $m009DeepResearchHttpAcceptancePath; Arguments = @() },
+    @{ Path = $m009DeepResearchHttpUnitPath; Arguments = @() },
+    @{ Path = $m009DeepResearchMetricsAcceptancePath; Arguments = @() },
+    @{ Path = $m009DeepResearchMetricsUnitPath; Arguments = @() },
+    @{ Path = $m009TraceabilityAcceptancePath; Arguments = @() },
+    @{ Path = $m009TraceabilityUnitPath; Arguments = @() }
 )
 
 function Get-GateCommandPaths {
@@ -270,6 +316,7 @@ if ($env:OST_M003_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     Write-Host "Tests de précondition M-006 exclus explicitement: M-003 reste indépendant du milestone aval."
     Write-Host "Tests de précondition M-007 exclus explicitement: M-003 reste indépendant du milestone aval."
     Write-Host "Tests de précondition M-008 exclus explicitement: M-003 reste indépendant du milestone aval."
+    Write-Host "Tests de précondition M-009 exclus explicitement: M-003 reste indépendant du milestone aval."
     $excludedPreconditionTestPaths = @(
         $m003PreconditionAcceptancePath,
         $m004PreconditionAcceptancePath,
@@ -300,7 +347,29 @@ if ($env:OST_M003_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m008ChatCompletionsAcceptancePath,
         $m008ChatCompletionsUnitPath,
         $m008TraceabilityAcceptancePath,
-        $m008TraceabilityUnitPath
+        $m008TraceabilityUnitPath,
+        $m009PreconditionAcceptancePath,
+        $m009PreconditionUnitPath,
+        $m009SpecificationAcceptancePath,
+        $m009SpecificationUnitPath,
+        $m009DeepResearchPlanningAcceptancePath,
+        $m009DeepResearchPlanningUnitPath,
+        $m009MultiQueryEvidenceAcceptancePath,
+        $m009MultiQueryEvidenceUnitPath,
+        $m009VerifiedClaimDependencyAcceptancePath,
+        $m009VerifiedClaimDependencyUnitPath,
+        $m009DeepContradictionClassificationAcceptancePath,
+        $m009DeepContradictionClassificationUnitPath,
+        $m009InsufficientDeepCoverageAcceptancePath,
+        $m009InsufficientDeepCoverageUnitPath,
+        $m009MultiSourceSynthesisAcceptancePath,
+        $m009MultiSourceSynthesisUnitPath,
+        $m009DeepResearchHttpAcceptancePath,
+        $m009DeepResearchHttpUnitPath,
+        $m009DeepResearchMetricsAcceptancePath,
+        $m009DeepResearchMetricsUnitPath,
+        $m009TraceabilityAcceptancePath,
+        $m009TraceabilityUnitPath
     )
 }
 elseif ($env:OST_M004_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -309,6 +378,7 @@ elseif ($env:OST_M004_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     Write-Host "Tests de précondition M-006 exclus explicitement: M-004 reste indépendant du milestone aval."
     Write-Host "Tests de précondition M-007 exclus explicitement: M-004 reste indépendant du milestone aval."
     Write-Host "Tests de précondition M-008 exclus explicitement: M-004 reste indépendant du milestone aval."
+    Write-Host "Tests de précondition M-009 exclus explicitement: M-004 reste indépendant du milestone aval."
     $excludedPreconditionTestPaths = @(
         $m004PreconditionAcceptancePath,
         $m005PreconditionAcceptancePath,
@@ -338,7 +408,29 @@ elseif ($env:OST_M004_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m008ChatCompletionsAcceptancePath,
         $m008ChatCompletionsUnitPath,
         $m008TraceabilityAcceptancePath,
-        $m008TraceabilityUnitPath
+        $m008TraceabilityUnitPath,
+        $m009PreconditionAcceptancePath,
+        $m009PreconditionUnitPath,
+        $m009SpecificationAcceptancePath,
+        $m009SpecificationUnitPath,
+        $m009DeepResearchPlanningAcceptancePath,
+        $m009DeepResearchPlanningUnitPath,
+        $m009MultiQueryEvidenceAcceptancePath,
+        $m009MultiQueryEvidenceUnitPath,
+        $m009VerifiedClaimDependencyAcceptancePath,
+        $m009VerifiedClaimDependencyUnitPath,
+        $m009DeepContradictionClassificationAcceptancePath,
+        $m009DeepContradictionClassificationUnitPath,
+        $m009InsufficientDeepCoverageAcceptancePath,
+        $m009InsufficientDeepCoverageUnitPath,
+        $m009MultiSourceSynthesisAcceptancePath,
+        $m009MultiSourceSynthesisUnitPath,
+        $m009DeepResearchHttpAcceptancePath,
+        $m009DeepResearchHttpUnitPath,
+        $m009DeepResearchMetricsAcceptancePath,
+        $m009DeepResearchMetricsUnitPath,
+        $m009TraceabilityAcceptancePath,
+        $m009TraceabilityUnitPath
     )
 }
 elseif ($env:OST_M005_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -348,6 +440,7 @@ elseif ($env:OST_M005_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     Write-Host "Tests de précondition M-006 exclus explicitement: M-005 reste indépendant du milestone aval."
     Write-Host "Tests de précondition M-007 exclus explicitement: M-005 reste indépendant du milestone aval."
     Write-Host "Tests de précondition M-008 exclus explicitement: M-005 reste indépendant du milestone aval."
+    Write-Host "Tests de précondition M-009 exclus explicitement: M-005 reste indépendant du milestone aval."
     $excludedPreconditionTestPaths = @(
         $m003PreconditionAcceptancePath,
         $m004PreconditionAcceptancePath,
@@ -377,7 +470,29 @@ elseif ($env:OST_M005_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m008ChatCompletionsAcceptancePath,
         $m008ChatCompletionsUnitPath,
         $m008TraceabilityAcceptancePath,
-        $m008TraceabilityUnitPath
+        $m008TraceabilityUnitPath,
+        $m009PreconditionAcceptancePath,
+        $m009PreconditionUnitPath,
+        $m009SpecificationAcceptancePath,
+        $m009SpecificationUnitPath,
+        $m009DeepResearchPlanningAcceptancePath,
+        $m009DeepResearchPlanningUnitPath,
+        $m009MultiQueryEvidenceAcceptancePath,
+        $m009MultiQueryEvidenceUnitPath,
+        $m009VerifiedClaimDependencyAcceptancePath,
+        $m009VerifiedClaimDependencyUnitPath,
+        $m009DeepContradictionClassificationAcceptancePath,
+        $m009DeepContradictionClassificationUnitPath,
+        $m009InsufficientDeepCoverageAcceptancePath,
+        $m009InsufficientDeepCoverageUnitPath,
+        $m009MultiSourceSynthesisAcceptancePath,
+        $m009MultiSourceSynthesisUnitPath,
+        $m009DeepResearchHttpAcceptancePath,
+        $m009DeepResearchHttpUnitPath,
+        $m009DeepResearchMetricsAcceptancePath,
+        $m009DeepResearchMetricsUnitPath,
+        $m009TraceabilityAcceptancePath,
+        $m009TraceabilityUnitPath
     )
 }
 elseif ($env:OST_M006_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -387,6 +502,7 @@ elseif ($env:OST_M006_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     Write-Host "Test d'acceptation de précondition M-006 exclu explicitement: exécution imbriquée du validateur de précondition."
     Write-Host "Tests de précondition M-007 exclus explicitement: M-006 reste indépendant du milestone aval."
     Write-Host "Tests de précondition M-008 exclus explicitement: M-006 reste indépendant du milestone aval."
+    Write-Host "Tests de précondition M-009 exclus explicitement: M-006 reste indépendant du milestone aval."
     $excludedPreconditionTestPaths = @(
         $m003PreconditionAcceptancePath,
         $m004PreconditionAcceptancePath,
@@ -415,7 +531,29 @@ elseif ($env:OST_M006_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m008ChatCompletionsAcceptancePath,
         $m008ChatCompletionsUnitPath,
         $m008TraceabilityAcceptancePath,
-        $m008TraceabilityUnitPath
+        $m008TraceabilityUnitPath,
+        $m009PreconditionAcceptancePath,
+        $m009PreconditionUnitPath,
+        $m009SpecificationAcceptancePath,
+        $m009SpecificationUnitPath,
+        $m009DeepResearchPlanningAcceptancePath,
+        $m009DeepResearchPlanningUnitPath,
+        $m009MultiQueryEvidenceAcceptancePath,
+        $m009MultiQueryEvidenceUnitPath,
+        $m009VerifiedClaimDependencyAcceptancePath,
+        $m009VerifiedClaimDependencyUnitPath,
+        $m009DeepContradictionClassificationAcceptancePath,
+        $m009DeepContradictionClassificationUnitPath,
+        $m009InsufficientDeepCoverageAcceptancePath,
+        $m009InsufficientDeepCoverageUnitPath,
+        $m009MultiSourceSynthesisAcceptancePath,
+        $m009MultiSourceSynthesisUnitPath,
+        $m009DeepResearchHttpAcceptancePath,
+        $m009DeepResearchHttpUnitPath,
+        $m009DeepResearchMetricsAcceptancePath,
+        $m009DeepResearchMetricsUnitPath,
+        $m009TraceabilityAcceptancePath,
+        $m009TraceabilityUnitPath
     )
 }
 elseif ($env:OST_M007_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -425,6 +563,7 @@ elseif ($env:OST_M007_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     Write-Host "Test d'acceptation de précondition M-006 exclu explicitement: M-007 s'appuie sur les claims vérifiables M-006 publiés dans master."
     Write-Host "Test d'acceptation de précondition M-007 exclu explicitement: exécution imbriquée du validateur de précondition."
     Write-Host "Tests de précondition M-008 exclus explicitement: M-007 reste indépendant du milestone aval."
+    Write-Host "Tests de précondition M-009 exclus explicitement: M-007 reste indépendant du milestone aval."
     $excludedPreconditionTestPaths = @(
         $m003PreconditionAcceptancePath,
         $m004PreconditionAcceptancePath,
@@ -452,7 +591,29 @@ elseif ($env:OST_M007_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m008ChatCompletionsAcceptancePath,
         $m008ChatCompletionsUnitPath,
         $m008TraceabilityAcceptancePath,
-        $m008TraceabilityUnitPath
+        $m008TraceabilityUnitPath,
+        $m009PreconditionAcceptancePath,
+        $m009PreconditionUnitPath,
+        $m009SpecificationAcceptancePath,
+        $m009SpecificationUnitPath,
+        $m009DeepResearchPlanningAcceptancePath,
+        $m009DeepResearchPlanningUnitPath,
+        $m009MultiQueryEvidenceAcceptancePath,
+        $m009MultiQueryEvidenceUnitPath,
+        $m009VerifiedClaimDependencyAcceptancePath,
+        $m009VerifiedClaimDependencyUnitPath,
+        $m009DeepContradictionClassificationAcceptancePath,
+        $m009DeepContradictionClassificationUnitPath,
+        $m009InsufficientDeepCoverageAcceptancePath,
+        $m009InsufficientDeepCoverageUnitPath,
+        $m009MultiSourceSynthesisAcceptancePath,
+        $m009MultiSourceSynthesisUnitPath,
+        $m009DeepResearchHttpAcceptancePath,
+        $m009DeepResearchHttpUnitPath,
+        $m009DeepResearchMetricsAcceptancePath,
+        $m009DeepResearchMetricsUnitPath,
+        $m009TraceabilityAcceptancePath,
+        $m009TraceabilityUnitPath
     )
 }
 elseif ($env:OST_M008_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -462,13 +623,74 @@ elseif ($env:OST_M008_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     Write-Host "Test d'acceptation de précondition M-006 exclu explicitement: M-008 s'appuie sur les réponses documentaires vérifiées M-007 publiées dans master."
     Write-Host "Test d'acceptation de précondition M-007 exclu explicitement: M-008 s'appuie sur les réponses documentaires vérifiées M-007 publiées dans master."
     Write-Host "Test d'acceptation de précondition M-008 exclu explicitement: exécution imbriquée du validateur de précondition."
+    Write-Host "Tests de précondition M-009 exclus explicitement: M-008 reste indépendant du milestone aval."
     $excludedPreconditionTestPaths = @(
         $m003PreconditionAcceptancePath,
         $m004PreconditionAcceptancePath,
         $m005PreconditionAcceptancePath,
         $m006PreconditionAcceptancePath,
         $m007PreconditionAcceptancePath,
-        $m008PreconditionAcceptancePath
+        $m008PreconditionAcceptancePath,
+        $m009PreconditionAcceptancePath,
+        $m009PreconditionUnitPath,
+        $m009SpecificationAcceptancePath,
+        $m009SpecificationUnitPath,
+        $m009DeepResearchPlanningAcceptancePath,
+        $m009DeepResearchPlanningUnitPath,
+        $m009MultiQueryEvidenceAcceptancePath,
+        $m009MultiQueryEvidenceUnitPath,
+        $m009VerifiedClaimDependencyAcceptancePath,
+        $m009VerifiedClaimDependencyUnitPath,
+        $m009DeepContradictionClassificationAcceptancePath,
+        $m009DeepContradictionClassificationUnitPath,
+        $m009InsufficientDeepCoverageAcceptancePath,
+        $m009InsufficientDeepCoverageUnitPath,
+        $m009MultiSourceSynthesisAcceptancePath,
+        $m009MultiSourceSynthesisUnitPath,
+        $m009DeepResearchHttpAcceptancePath,
+        $m009DeepResearchHttpUnitPath,
+        $m009DeepResearchMetricsAcceptancePath,
+        $m009DeepResearchMetricsUnitPath,
+        $m009TraceabilityAcceptancePath,
+        $m009TraceabilityUnitPath
+    )
+}
+elseif ($env:OST_M009_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
+    Write-Host "Test d'acceptation de précondition M-003 exclu explicitement: M-009 vérifie les validateurs amont sans récursion."
+    Write-Host "Test d'acceptation de précondition M-004 exclu explicitement: M-009 vérifie les validateurs amont sans récursion."
+    Write-Host "Test d'acceptation de précondition M-005 exclu explicitement: M-009 vérifie les validateurs amont sans récursion."
+    Write-Host "Test d'acceptation de précondition M-006 exclu explicitement: M-009 vérifie les validateurs amont sans récursion."
+    Write-Host "Test d'acceptation de précondition M-007 exclu explicitement: M-009 vérifie les validateurs amont sans récursion."
+    Write-Host "Test d'acceptation de précondition M-008 exclu explicitement: M-009 vérifie les validateurs amont sans récursion."
+    Write-Host "Test d'acceptation de précondition M-009 exclu explicitement: exécution imbriquée du validateur de précondition."
+    $excludedPreconditionTestPaths = @(
+        $m003PreconditionAcceptancePath,
+        $m004PreconditionAcceptancePath,
+        $m005PreconditionAcceptancePath,
+        $m006PreconditionAcceptancePath,
+        $m007PreconditionAcceptancePath,
+        $m008PreconditionAcceptancePath,
+        $m009PreconditionAcceptancePath,
+        $m009SpecificationAcceptancePath,
+        $m009SpecificationUnitPath,
+        $m009DeepResearchPlanningAcceptancePath,
+        $m009DeepResearchPlanningUnitPath,
+        $m009MultiQueryEvidenceAcceptancePath,
+        $m009MultiQueryEvidenceUnitPath,
+        $m009VerifiedClaimDependencyAcceptancePath,
+        $m009VerifiedClaimDependencyUnitPath,
+        $m009DeepContradictionClassificationAcceptancePath,
+        $m009DeepContradictionClassificationUnitPath,
+        $m009InsufficientDeepCoverageAcceptancePath,
+        $m009InsufficientDeepCoverageUnitPath,
+        $m009MultiSourceSynthesisAcceptancePath,
+        $m009MultiSourceSynthesisUnitPath,
+        $m009DeepResearchHttpAcceptancePath,
+        $m009DeepResearchHttpUnitPath,
+        $m009DeepResearchMetricsAcceptancePath,
+        $m009DeepResearchMetricsUnitPath,
+        $m009TraceabilityAcceptancePath,
+        $m009TraceabilityUnitPath
     )
 }
 

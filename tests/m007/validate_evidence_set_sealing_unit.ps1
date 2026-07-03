@@ -161,6 +161,8 @@ def candidate_for(
         search_trace_id="STRC-M007T004UNIT00000000000000000001",
         document_id=evidence_ref.source_locator.document_id,
         covered_obligations=covered_obligations,
+        evidence_polarity="NEUTRAL",
+        source_kind="PRIMARY",
     )
 
 
@@ -270,6 +272,8 @@ assert_raises(
         search_trace_id="STRC-M007T004UNIT00000000000000000002",
         document_id="DOC-M007-T004-UNIT",
         covered_obligations=("preuves_documentaires",),
+        evidence_polarity="NEUTRAL",
+        source_kind="PRIMARY",
     ),
 )
 

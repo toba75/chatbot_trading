@@ -96,6 +96,173 @@ class AssertionPublicationStatus(str, Enum):
     REMOVED = "REMOVED"
 
 
+class DeepResearchReportSectionName(str, Enum):
+    """Sections obligatoires d'une synthèse RA approfondie M-009."""
+
+    MANDATE = "MANDATE"
+    DOCUMENTARY_SCOPE = "DOCUMENTARY_SCOPE"
+    METHODS = "METHODS"
+    APPLICATION_CONDITIONS = "APPLICATION_CONDITIONS"
+    FAVORABLE_EVIDENCE = "FAVORABLE_EVIDENCE"
+    UNFAVORABLE_EVIDENCE = "UNFAVORABLE_EVIDENCE"
+    DEPENDENCIES = "DEPENDENCIES"
+    CONTRADICTIONS = "CONTRADICTIONS"
+    LIMITS = "LIMITS"
+    UNDOCUMENTED_ZONES = "UNDOCUMENTED_ZONES"
+    CONCLUSION = "CONCLUSION"
+    UNCERTAINTY = "UNCERTAINTY"
+
+
+@dataclass(frozen=True)
+class DeepResearchReportSection:
+    """Section structurée et citée du rapport RA approfondi."""
+
+    section_name: DeepResearchReportSectionName
+    content: str
+    citation_ids: Sequence[str]
+
+    def __post_init__(self) -> None:
+        section_name = _ensure_deep_report_section_name(self.section_name)
+        if not isinstance(self.content, str) or self.content.strip() == "":
+            if section_name is DeepResearchReportSectionName.UNFAVORABLE_EVIDENCE:
+                raise ValueError("preuves defavorables absentes")
+            if section_name is DeepResearchReportSectionName.CONTRADICTIONS:
+                raise ValueError("contradictions absentes")
+            if section_name is DeepResearchReportSectionName.UNDOCUMENTED_ZONES:
+                raise ValueError("zones non documentees absentes")
+        object.__setattr__(self, "section_name", section_name)
+        object.__setattr__(self, "content", _ensure_text(self.content, "deep_report_section"))
+        object.__setattr__(
+            self,
+            "citation_ids",
+            _ensure_text_tuple(self.citation_ids, "section_citation_ids", allow_empty=False),
+        )
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "section_name": self.section_name.value,
+            "content": self.content,
+            "citation_ids": self.citation_ids,
+        }
+
+
+@dataclass(frozen=True)
+class DeepResearchReport:
+    """Rapport final de synthèse multi-sources RA M-009."""
+
+    answer_id: str
+    research_case_id: str
+    evidence_set_id: str
+    evidence_set_version: int
+    evidence_hash: str
+    support_status: SupportStatus
+    sections: Sequence[DeepResearchReportSection]
+    final_assertions: Sequence[AnswerAssertion]
+    final_assertion_decisions: Sequence[AssertionSupportDecision]
+    citations: Sequence[Citation]
+    claim_refs: Sequence[VerifiedClaimRef]
+    policy_version: str
+    published_at: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "answer_id", _ensure_answer_id(self.answer_id))
+        object.__setattr__(self, "research_case_id", _ensure_research_case_id(self.research_case_id))
+        object.__setattr__(self, "evidence_set_id", _ensure_evidence_set_id(self.evidence_set_id))
+        object.__setattr__(
+            self,
+            "evidence_set_version",
+            _ensure_positive_integer(self.evidence_set_version, "evidence_set_version"),
+        )
+        if not isinstance(self.evidence_hash, str) or self.evidence_hash.strip() == "":
+            raise ValueError("evidence_hash absent")
+        object.__setattr__(self, "evidence_hash", _ensure_sha256(self.evidence_hash, "evidence_hash"))
+        object.__setattr__(self, "support_status", ensure_support_status(self.support_status))
+        sections = _ensure_deep_report_sections(self.sections)
+        object.__setattr__(self, "sections", sections)
+        assertions = _ensure_assertions(self.final_assertions)
+        if len(assertions) == 0:
+            raise ValueError("assertions finales absentes")
+        object.__setattr__(self, "final_assertions", assertions)
+        decisions = _ensure_assertion_support_decisions(self.final_assertion_decisions)
+        _ensure_assertion_decisions_cover(assertions=assertions, decisions=decisions)
+        object.__setattr__(self, "final_assertion_decisions", decisions)
+        citations = _ensure_citation_sequence(self.citations, allow_empty=False)
+        object.__setattr__(self, "citations", citations)
+        object.__setattr__(
+            self,
+            "claim_refs",
+            _ensure_verified_claim_refs(self.claim_refs, allow_empty=True),
+        )
+        object.__setattr__(self, "policy_version", _ensure_text(self.policy_version, "policy_version"))
+        object.__setattr__(self, "published_at", _ensure_utc_instant(self.published_at, "published_at"))
+        _ensure_deep_report_section_citations(sections=sections, citations=citations)
+        _ensure_deep_report_origins(assertions)
+        _ensure_source_assertions_supported(assertions=assertions, decisions=decisions)
+        if self.support_status is SupportStatus.SUPPORTED and not all(
+            decision.supported for decision in decisions
+        ):
+            raise ValueError("SUPPORTED avec assertion finale non supportee")
+
+    @classmethod
+    def from_generated_payload(cls, payload: Mapping[str, Any]) -> "DeepResearchReport":
+        _ensure_no_strategy_payload(payload)
+        raise ValueError("deep_research_report payload non construit")
+
+    @property
+    def section_names(self) -> tuple[DeepResearchReportSectionName, ...]:
+        return tuple(section.section_name for section in self.sections)
+
+    def has_origin_type(self, origin_type: AssertionOriginType) -> bool:
+        if not isinstance(origin_type, AssertionOriginType):
+            raise ValueError("assertion_origin_type invalide")
+        return any(assertion.origin.origin_type is origin_type for assertion in self.final_assertions)
+
+    def to_constructor_payload(self) -> dict[str, Any]:
+        return {
+            "answer_id": self.answer_id,
+            "research_case_id": self.research_case_id,
+            "evidence_set_id": self.evidence_set_id,
+            "evidence_set_version": self.evidence_set_version,
+            "evidence_hash": self.evidence_hash,
+            "support_status": self.support_status,
+            "sections": self.sections,
+            "final_assertions": self.final_assertions,
+            "final_assertion_decisions": self.final_assertion_decisions,
+            "citations": self.citations,
+            "claim_refs": self.claim_refs,
+            "policy_version": self.policy_version,
+            "published_at": self.published_at,
+        }
+
+    def to_payload(self) -> dict[str, Any]:
+        payload = {
+            "answer_id": self.answer_id,
+            "research_case_id": self.research_case_id,
+            "evidence_set_id": self.evidence_set_id,
+            "evidence_set_version": self.evidence_set_version,
+            "evidence_hash": self.evidence_hash,
+            "support_status": self.support_status.value,
+            "sections": [section.to_payload() for section in self.sections],
+            "final_assertions": [
+                assertion.to_payload()
+                for assertion in self.final_assertions
+            ],
+            "final_assertion_decisions": [
+                decision.to_payload()
+                for decision in self.final_assertion_decisions
+            ],
+            "citations": [citation.to_payload() for citation in self.citations],
+            "claim_refs": [
+                f"{claim_ref.claim_id}@{claim_ref.claim_version}"
+                for claim_ref in self.claim_refs
+            ],
+            "policy_version": self.policy_version,
+            "published_at": self.published_at,
+        }
+        _ensure_no_strategy_payload(payload)
+        return payload
+
+
 class AbstentionReason(str, Enum):
     """Raison publique d'abstention RA."""
 
@@ -1502,6 +1669,98 @@ def _normalize_policy_text(value: str) -> str:
     return "".join(character for character in normalized if not unicodedata.combining(character))
 
 
+def _ensure_deep_report_section_name(value: object) -> DeepResearchReportSectionName:
+    if isinstance(value, DeepResearchReportSectionName):
+        return value
+    if isinstance(value, str):
+        for section_name in DeepResearchReportSectionName:
+            if value == section_name.value:
+                return section_name
+    raise ValueError("deep_report_section_name invalide")
+
+
+def _ensure_deep_report_sections(value: object) -> tuple[DeepResearchReportSection, ...]:
+    if value is None or isinstance(value, str) or not isinstance(value, Sequence):
+        raise ValueError("deep_report_sections invalides")
+    sections = tuple(value)
+    if len(sections) == 0:
+        raise ValueError("deep_report_sections absentes")
+    parsed: list[DeepResearchReportSection] = []
+    seen: set[DeepResearchReportSectionName] = set()
+    for section in sections:
+        if not isinstance(section, DeepResearchReportSection):
+            raise ValueError("deep_report_section invalide")
+        if section.section_name in seen:
+            raise ValueError("deep_report_section dupliquee")
+        seen.add(section.section_name)
+        parsed.append(section)
+    expected_names = tuple(DeepResearchReportSectionName)
+    for expected_name in expected_names:
+        if expected_name not in seen:
+            raise ValueError(f"section obligatoire absente: {expected_name.value}")
+    actual_names = tuple(section.section_name for section in parsed)
+    if actual_names != expected_names:
+        raise ValueError("deep_report_sections ordre invalide")
+    return tuple(parsed)
+
+
+def _ensure_deep_report_section_citations(
+    *,
+    sections: Sequence[DeepResearchReportSection],
+    citations: Sequence[Citation],
+) -> None:
+    citation_ids = {citation.citation_id for citation in citations}
+    for section in sections:
+        missing = set(section.citation_ids).difference(citation_ids)
+        if len(missing) > 0:
+            raise ValueError(f"citation de section absente: {sorted(missing)[0]}")
+
+
+def _ensure_deep_report_origins(assertions: Sequence[AnswerAssertion]) -> None:
+    origin_types = {assertion.origin.origin_type for assertion in assertions}
+    for required_origin_type in (
+        AssertionOriginType.SOURCE,
+        AssertionOriginType.DEDUCTION,
+        AssertionOriginType.DESIGN_CHOICE,
+    ):
+        if required_origin_type not in origin_types:
+            raise ValueError(f"assertion_origin_type absent: {required_origin_type.value}")
+
+
+def _ensure_source_assertions_supported(
+    *,
+    assertions: Sequence[AnswerAssertion],
+    decisions: Sequence[AssertionSupportDecision],
+) -> None:
+    decisions_by_assertion_id = {decision.assertion_id: decision for decision in decisions}
+    for assertion in assertions:
+        if assertion.origin.origin_type is not AssertionOriginType.SOURCE:
+            continue
+        decision = decisions_by_assertion_id[assertion.assertion_id]
+        if not decision.supported or len(decision.citation_ids) == 0:
+            raise ValueError("assertion source finale non supportee")
+
+
+def _ensure_no_strategy_payload(value: object) -> None:
+    forbidden_keys = {
+        "strategy_parameter",
+        "strategy_parameters",
+        "candidate_strategy",
+        "kelly_fraction",
+        "volatility_target",
+        "rebalance_rule",
+    }
+    if isinstance(value, Mapping):
+        for key, child in value.items():
+            if str(key).lower() in forbidden_keys:
+                raise ValueError("parametre de strategie interdit")
+            _ensure_no_strategy_payload(child)
+        return
+    if isinstance(value, (list, tuple)):
+        for child in value:
+            _ensure_no_strategy_payload(child)
+
+
 def _ensure_answer(value: object) -> Answer:
     if not isinstance(value, Answer):
         raise ValueError("answer invalide")
@@ -2045,6 +2304,9 @@ __all__ = [
     "AssertionSupportDecision",
     "CitationIntegrityPolicy",
     "CurrentDataAbstentionPolicy",
+    "DeepResearchReport",
+    "DeepResearchReportSection",
+    "DeepResearchReportSectionName",
     "VerifiedAnswerVersion",
     "answer_id_for",
 ]

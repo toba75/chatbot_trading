@@ -16,9 +16,11 @@ _RESEARCH_CASE_ID_PATTERN = re.compile(r"^RSC-[A-Z0-9][A-Z0-9-]*$")
 _RELATION_ID_PATTERN = re.compile(r"^REL-[A-Z0-9][A-Z0-9-]*$")
 _CLAIM_ID_PATTERN = re.compile(r"^CLM-[A-Z0-9][A-Z0-9-]*$")
 _GAP_ID_PATTERN = re.compile(r"^KGP-[A-Z0-9][A-Z0-9-]*$")
+_DEPENDENCY_GROUP_ID_PATTERN = re.compile(r"^DEP-[A-Z0-9][A-Z0-9-]*$")
 _REQUIRED_SCOPE_DIMENSIONS = ("universe", "horizon", "metric", "frequency")
 _EG_SCOPE_RELATION_BASIS = "EG_SCOPE_RELATION"
 _FREQUENCY_CONSENSUS_BASIS = "FREQUENCY_CONSENSUS"
+_TEXTUAL_SIMILARITY_ONLY = "TEXTUAL_SIMILARITY_ONLY"
 _RECORDED_CONTRADICTION_BASIS = "RECORDED_CONTRADICTION_ASSESSMENT"
 _COVERAGE_OBLIGATION_BASIS = "COVERAGE_OBLIGATION_ASSESSMENT"
 
@@ -37,10 +39,16 @@ class ContradictionClassification(str, Enum):
     """Classement RA d'une opposition documentaire."""
 
     DIRECT_CONFLICT = "DIRECT_CONFLICT"
+    POSITIVE_COMPATIBILITY = "POSITIVE_COMPATIBILITY"
+    GENUINE_CONTRADICTION = "GENUINE_CONTRADICTION"
+    APPARENT_CONTRADICTION = "APPARENT_CONTRADICTION"
+    CONTEXT_DEPENDENT = "CONTEXT_DEPENDENT"
     DIFFERENT_HORIZON = "DIFFERENT_HORIZON"
     DIFFERENT_METRIC = "DIFFERENT_METRIC"
     DIFFERENT_FREQUENCY = "DIFFERENT_FREQUENCY"
     DIFFERENT_UNIVERSE = "DIFFERENT_UNIVERSE"
+    DIFFERENT_COST_ASSUMPTION = "DIFFERENT_COST_ASSUMPTION"
+    DIFFERENT_REGIME = "DIFFERENT_REGIME"
     RESOLVED_BY_QUALIFICATION = "RESOLVED_BY_QUALIFICATION"
 
 
@@ -148,6 +156,120 @@ class ContradictionAssessment:
 
 
 @dataclass(frozen=True)
+class DeepRelationClassificationContext:
+    """Contexte public requis pour qualifier une relation EG en recherche approfondie."""
+
+    relation_id: str
+    conditions: Sequence[str]
+    limits: Sequence[str]
+    public_reason: str
+    reason_codes: Sequence[str]
+    independent_dependency_group_ids: Sequence[str]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "relation_id", _ensure_relation_id(self.relation_id))
+        object.__setattr__(self, "conditions", _ensure_text_tuple(self.conditions, "conditions"))
+        object.__setattr__(self, "limits", _ensure_text_tuple(self.limits, "limits"))
+        object.__setattr__(self, "public_reason", _ensure_text(self.public_reason, "public_reason"))
+        object.__setattr__(self, "reason_codes", _ensure_deep_reason_codes(self.reason_codes))
+        object.__setattr__(
+            self,
+            "independent_dependency_group_ids",
+            _ensure_dependency_group_ids(
+                self.independent_dependency_group_ids,
+                allow_empty=True,
+            ),
+        )
+
+
+@dataclass(frozen=True)
+class DeepContradictionAssessment:
+    """Diagnostic RA M-009 conservant portée, conditions, limites et raisons publiques."""
+
+    assessment_id: str
+    relation_id: str
+    source_claim_ref: ClaimRef
+    target_claim_ref: ClaimRef
+    relation_type: str
+    classification: ContradictionClassification
+    reason_codes: Sequence[str]
+    compared_dimensions: Sequence[str]
+    conditions: Sequence[str]
+    limits: Sequence[str]
+    public_reason: str
+    policy_version: str
+    independent_dependency_group_ids: Sequence[str]
+    requires_public_explanation: bool
+    blocks_general_supported_status: bool
+    blocks_publication: bool
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "assessment_id", _ensure_relation_id(self.assessment_id))
+        object.__setattr__(self, "relation_id", _ensure_relation_id(self.relation_id))
+        if self.assessment_id != self.relation_id:
+            raise ValueError("assessment_id incoherent")
+        if not isinstance(self.source_claim_ref, ClaimRef):
+            raise ValueError("source_claim_ref invalide")
+        if not isinstance(self.target_claim_ref, ClaimRef):
+            raise ValueError("target_claim_ref invalide")
+        if self.source_claim_ref == self.target_claim_ref:
+            raise ValueError("assessment reflexif interdit")
+        object.__setattr__(self, "relation_type", _ensure_text(self.relation_type, "relation_type"))
+        object.__setattr__(self, "classification", _ensure_classification(self.classification))
+        object.__setattr__(self, "reason_codes", _ensure_deep_reason_codes(self.reason_codes))
+        object.__setattr__(
+            self,
+            "compared_dimensions",
+            _ensure_scope_dimensions(self.compared_dimensions),
+        )
+        object.__setattr__(self, "conditions", _ensure_text_tuple(self.conditions, "conditions"))
+        object.__setattr__(self, "limits", _ensure_text_tuple(self.limits, "limits"))
+        object.__setattr__(self, "public_reason", _ensure_text(self.public_reason, "public_reason"))
+        object.__setattr__(self, "policy_version", _ensure_text(self.policy_version, "policy_version"))
+        object.__setattr__(
+            self,
+            "independent_dependency_group_ids",
+            _ensure_dependency_group_ids(
+                self.independent_dependency_group_ids,
+                allow_empty=True,
+            ),
+        )
+        for field_name in (
+            "requires_public_explanation",
+            "blocks_general_supported_status",
+            "blocks_publication",
+        ):
+            if not isinstance(getattr(self, field_name), bool):
+                raise ValueError(f"{field_name} non booleen")
+        if self.classification == ContradictionClassification.GENUINE_CONTRADICTION:
+            if not self.blocks_publication:
+                raise ValueError("contradiction reelle non bloquante")
+            return
+        if self.blocks_publication:
+            raise ValueError("classification conditionnelle bloquante")
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "assessment_id": self.assessment_id,
+            "relation_id": self.relation_id,
+            "source_claim_ref": self.source_claim_ref.to_payload(),
+            "target_claim_ref": self.target_claim_ref.to_payload(),
+            "relation_type": self.relation_type,
+            "classification": self.classification.value,
+            "reason_codes": self.reason_codes,
+            "compared_dimensions": self.compared_dimensions,
+            "conditions": self.conditions,
+            "limits": self.limits,
+            "public_reason": self.public_reason,
+            "policy_version": self.policy_version,
+            "independent_dependency_group_ids": self.independent_dependency_group_ids,
+            "requires_public_explanation": self.requires_public_explanation,
+            "blocks_general_supported_status": self.blocks_general_supported_status,
+            "blocks_publication": self.blocks_publication,
+        }
+
+
+@dataclass(frozen=True)
 class KnowledgeGap:
     """Lacune documentaire visible dans l'issue RA."""
 
@@ -177,6 +299,30 @@ class KnowledgeGap:
             affected_obligation=obligation,
             reason_code=code,
             public_reason=f"Obligation documentaire non satisfaite: {obligation}.",
+        )
+
+    @classmethod
+    def for_missing_coverage_obligation(
+        cls,
+        *,
+        research_case_id: str,
+        affected_obligation: str,
+        reason_code: str,
+        public_reason: str,
+    ) -> "KnowledgeGap":
+        obligation = _ensure_text(affected_obligation, "affected_obligation")
+        code = _ensure_text(reason_code, "reason_code")
+        reason = _ensure_text(public_reason, "public_reason")
+        return cls(
+            gap_id=_gap_id_for(
+                research_case_id=_ensure_research_case_id(research_case_id),
+                affected_obligation=obligation,
+                reason_code=code,
+            ),
+            gap_type=KnowledgeGapType.COVERAGE_OBLIGATION_MISSING,
+            affected_obligation=obligation,
+            reason_code=code,
+            public_reason=reason,
         )
 
     @classmethod
@@ -277,6 +423,69 @@ class ContradictionDetected:
 
 
 @dataclass(frozen=True)
+class ConditionalContradictionDetected:
+    """Événement RA M-009 exposant une classification conditionnelle approfondie."""
+
+    research_case_id: str
+    relation_id: str
+    classification: ContradictionClassification
+    affected_claim_refs: tuple[ClaimRef, ClaimRef]
+    condition_summary: str
+    occurred_at: str
+
+    @classmethod
+    def from_assessment(
+        cls,
+        *,
+        research_case_id: str,
+        assessment: DeepContradictionAssessment,
+        occurred_at: str,
+    ) -> "ConditionalContradictionDetected":
+        if not isinstance(assessment, DeepContradictionAssessment):
+            raise ValueError("deep_contradiction_assessment invalide")
+        return cls(
+            research_case_id=research_case_id,
+            relation_id=assessment.relation_id,
+            classification=assessment.classification,
+            affected_claim_refs=(assessment.source_claim_ref, assessment.target_claim_ref),
+            condition_summary="; ".join(assessment.conditions),
+            occurred_at=occurred_at,
+        )
+
+    @property
+    def event_type(self) -> str:
+        return "ConditionalContradictionDetected"
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "research_case_id", _ensure_research_case_id(self.research_case_id))
+        object.__setattr__(self, "relation_id", _ensure_relation_id(self.relation_id))
+        object.__setattr__(self, "classification", _ensure_classification(self.classification))
+        refs = _ensure_claim_refs(self.affected_claim_refs, "affected_claim_refs")
+        if len(refs) != 2:
+            raise ValueError("affected_claim_refs invalides")
+        object.__setattr__(self, "affected_claim_refs", refs)
+        object.__setattr__(
+            self,
+            "condition_summary",
+            _ensure_text(self.condition_summary, "condition_summary"),
+        )
+        object.__setattr__(self, "occurred_at", _ensure_utc_instant(self.occurred_at, "occurred_at"))
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "event_type": self.event_type,
+            "occurred_at": self.occurred_at,
+            "payload": {
+                "research_case_id": self.research_case_id,
+                "relation_id": self.relation_id,
+                "classification": self.classification.value,
+                "affected_claim_refs": [ref.to_payload() for ref in self.affected_claim_refs],
+                "condition_summary": self.condition_summary,
+            },
+        }
+
+
+@dataclass(frozen=True)
 class KnowledgeGapRecorded:
     """Evenement RA de lacune documentaire."""
 
@@ -284,6 +493,7 @@ class KnowledgeGapRecorded:
     gap_type: KnowledgeGapType
     affected_obligation: str
     reason_code: str
+    public_reason: str
     occurred_at: str
 
     @property
@@ -300,6 +510,7 @@ class KnowledgeGapRecorded:
             _ensure_text(self.affected_obligation, "affected_obligation"),
         )
         object.__setattr__(self, "reason_code", _ensure_text(self.reason_code, "reason_code"))
+        object.__setattr__(self, "public_reason", _ensure_text(self.public_reason, "public_reason"))
         object.__setattr__(self, "occurred_at", _ensure_utc_instant(self.occurred_at, "occurred_at"))
 
     def to_payload(self) -> dict[str, Any]:
@@ -311,6 +522,7 @@ class KnowledgeGapRecorded:
                 "gap_type": self.gap_type.value,
                 "affected_obligation": self.affected_obligation,
                 "reason_code": self.reason_code,
+                "public_reason": self.public_reason,
             },
         }
 
@@ -322,6 +534,8 @@ class ResearchEvidenceFoundInsufficient:
     research_case_id: str
     missing_obligations: tuple[str, ...]
     reason_codes: tuple[str, ...]
+    support_status: SupportStatus
+    public_reasons: tuple[str, ...]
     occurred_at: str
 
     @property
@@ -340,6 +554,18 @@ class ResearchEvidenceFoundInsufficient:
             "reason_codes",
             _ensure_text_tuple(self.reason_codes, "reason_codes"),
         )
+        object.__setattr__(self, "support_status", ensure_support_status(self.support_status))
+        if self.support_status is not SupportStatus.INSUFFICIENT_EVIDENCE:
+            raise ValueError("support_status insuffisance invalide")
+        object.__setattr__(
+            self,
+            "public_reasons",
+            _ensure_text_tuple(self.public_reasons, "public_reasons"),
+        )
+        if len(self.missing_obligations) != len(self.reason_codes):
+            raise ValueError("reason_codes incoherents")
+        if len(self.missing_obligations) != len(self.public_reasons):
+            raise ValueError("public_reasons incoherentes")
         object.__setattr__(self, "occurred_at", _ensure_utc_instant(self.occurred_at, "occurred_at"))
 
     def to_payload(self) -> dict[str, Any]:
@@ -350,6 +576,8 @@ class ResearchEvidenceFoundInsufficient:
                 "research_case_id": self.research_case_id,
                 "missing_obligations": self.missing_obligations,
                 "reason_codes": self.reason_codes,
+                "support_status": self.support_status.value,
+                "public_reasons": self.public_reasons,
             },
         }
 
@@ -487,6 +715,106 @@ class ContradictionClassificationPolicy:
         )
 
 
+@dataclass(frozen=True)
+class DeepContradictionClassificationPolicy:
+    """Politique RA M-009 de classification des convergences et oppositions conditionnelles."""
+
+    policy_version: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "policy_version", _ensure_text(self.policy_version, "policy_version"))
+
+    def classify(
+        self,
+        claim_relation: object,
+        *,
+        classification_context: DeepRelationClassificationContext,
+    ) -> DeepContradictionAssessment:
+        relation = _relation_snapshot(claim_relation)
+        context = _ensure_deep_context(classification_context)
+        if relation["relation_id"] != context.relation_id:
+            raise ValueError("classification_context relation incoherente")
+        relation_basis = relation["relation_basis"]
+        if relation_basis == _TEXTUAL_SIMILARITY_ONLY:
+            raise ValueError("classification par similarite textuelle seule interdite")
+
+        if relation["relation_type"] in {"SUPPORTS", "QUALIFIES"}:
+            if relation["scope_status"] != "COMPARABLE":
+                raise ValueError("compatibilite_positive_scope non compatible")
+            return self._assessment_for(
+                relation=relation,
+                context=context,
+                classification=ContradictionClassification.POSITIVE_COMPATIBILITY,
+                blocks_general_supported_status=False,
+                blocks_publication=False,
+            )
+
+        if relation["relation_type"] == "CONTRADICTS":
+            if relation["scope_status"] != "COMPARABLE":
+                raise ValueError("contradiction_reelle_scope non comparable")
+            return self._assessment_for(
+                relation=relation,
+                context=context,
+                classification=ContradictionClassification.GENUINE_CONTRADICTION,
+                blocks_general_supported_status=True,
+                blocks_publication=True,
+            )
+
+        if relation["relation_type"] == "APPARENTLY_CONTRADICTS":
+            if relation["scope_status"] != "NON_COMPARABLE":
+                raise ValueError("contradiction_apparente_scope comparable")
+            reason_code = _ensure_text(relation["scope_reason_code"], "scope_reason_code")
+            classification_by_reason = {
+                "SCOPE_APPARENT_CONTRADICTION": ContradictionClassification.APPARENT_CONTRADICTION,
+                "SCOPE_CONTEXT_DEPENDENT": ContradictionClassification.CONTEXT_DEPENDENT,
+                "SCOPE_HORIZON_MISMATCH": ContradictionClassification.DIFFERENT_HORIZON,
+                "SCOPE_UNIVERSE_MISMATCH": ContradictionClassification.DIFFERENT_UNIVERSE,
+                "SCOPE_METRIC_MISMATCH": ContradictionClassification.DIFFERENT_METRIC,
+                "SCOPE_FREQUENCY_MISMATCH": ContradictionClassification.DIFFERENT_FREQUENCY,
+                "SCOPE_COST_ASSUMPTION_MISMATCH": ContradictionClassification.DIFFERENT_COST_ASSUMPTION,
+                "SCOPE_MARKET_REGIME_MISMATCH": ContradictionClassification.DIFFERENT_REGIME,
+            }
+            if reason_code not in classification_by_reason:
+                raise ValueError(f"scope_reason_code non supporte: {reason_code}")
+            return self._assessment_for(
+                relation=relation,
+                context=context,
+                classification=classification_by_reason[reason_code],
+                blocks_general_supported_status=True,
+                blocks_publication=False,
+            )
+
+        raise ValueError("relation non classifiable m009")
+
+    def _assessment_for(
+        self,
+        *,
+        relation: Mapping[str, Any],
+        context: DeepRelationClassificationContext,
+        classification: ContradictionClassification,
+        blocks_general_supported_status: bool,
+        blocks_publication: bool,
+    ) -> DeepContradictionAssessment:
+        return DeepContradictionAssessment(
+            assessment_id=relation["relation_id"],
+            relation_id=relation["relation_id"],
+            source_claim_ref=relation["source_claim_ref"],
+            target_claim_ref=relation["target_claim_ref"],
+            relation_type=relation["relation_type"],
+            classification=classification,
+            reason_codes=context.reason_codes,
+            compared_dimensions=relation["compared_dimensions"],
+            conditions=context.conditions,
+            limits=context.limits,
+            public_reason=context.public_reason,
+            policy_version=self.policy_version,
+            independent_dependency_group_ids=context.independent_dependency_group_ids,
+            requires_public_explanation=True,
+            blocks_general_supported_status=blocks_general_supported_status,
+            blocks_publication=blocks_publication,
+        )
+
+
 def ensure_classification_basis(value: object) -> str:
     text = _ensure_text(value, "classification_basis")
     if text == _FREQUENCY_CONSENSUS_BASIS:
@@ -518,17 +846,22 @@ def ensure_support_status(value: object) -> SupportStatus:
     return value
 
 
-def ensure_assessments(value: object) -> tuple[ContradictionAssessment, ...]:
+def ensure_assessments(value: object) -> tuple[ContradictionAssessment | DeepContradictionAssessment, ...]:
     if value is None or isinstance(value, str) or not isinstance(value, Sequence):
         raise ValueError("contradiction_assessments invalides")
     assessments = tuple(value)
     ids: list[str] = []
     for assessment in assessments:
-        if not isinstance(assessment, ContradictionAssessment):
+        if not isinstance(assessment, (ContradictionAssessment, DeepContradictionAssessment)):
             raise ValueError("contradiction_assessment invalide")
-        if assessment.contradiction_id in ids:
+        assessment_id = (
+            assessment.contradiction_id
+            if isinstance(assessment, ContradictionAssessment)
+            else assessment.assessment_id
+        )
+        if assessment_id in ids:
             raise ValueError("contradiction_assessment duplique")
-        ids.append(assessment.contradiction_id)
+        ids.append(assessment_id)
     return assessments
 
 
@@ -595,6 +928,7 @@ def _relation_snapshot(value: object) -> dict[str, Any]:
         raise ValueError("claim_relation absent")
     relation_id = _ensure_relation_id(getattr(value, "relation_id", None))
     relation_type = _enum_text(getattr(value, "relation_type", None), "relation_type")
+    relation_basis = _ensure_text(getattr(value, "relation_basis", None), "relation_basis")
     scope_compatibility = getattr(value, "scope_compatibility", None)
     if scope_compatibility is None:
         raise ValueError("scope_compatibility absente")
@@ -614,6 +948,8 @@ def _relation_snapshot(value: object) -> dict[str, Any]:
             getattr(value, "target_claim_ref", None),
             "target_claim_ref",
         ),
+        "relation_basis": relation_basis,
+        "compared_dimensions": tuple(compared_dimensions),
         "scope_status": scope_status,
         "scope_reason_code": scope_reason_code,
     }
@@ -650,6 +986,44 @@ def _ensure_text_tuple(value: object, field_name: str) -> tuple[str, ...]:
         raise ValueError(f"{field_name} absents")
     if len(parsed) != len(set(parsed)):
         raise ValueError(f"{field_name} dupliques")
+    return parsed
+
+
+def _ensure_deep_context(value: object) -> DeepRelationClassificationContext:
+    if not isinstance(value, DeepRelationClassificationContext):
+        raise ValueError("classification_context invalide")
+    return value
+
+
+def _ensure_deep_reason_codes(value: object) -> tuple[str, ...]:
+    reason_codes = _ensure_text_tuple(value, "reason_codes")
+    for reason_code in reason_codes:
+        if reason_code == _FREQUENCY_CONSENSUS_BASIS:
+            raise ValueError("consensus par frequence interdit")
+        if reason_code == _TEXTUAL_SIMILARITY_ONLY:
+            raise ValueError("classification par similarite textuelle seule interdite")
+    return reason_codes
+
+
+def _ensure_scope_dimensions(value: Sequence[str]) -> tuple[str, ...]:
+    if value is None:
+        raise ValueError("scope_dimensions absentes")
+    if isinstance(value, str) or not isinstance(value, Sequence):
+        raise ValueError("scope_dimensions invalides")
+    dimensions = tuple(value)
+    if dimensions != _REQUIRED_SCOPE_DIMENSIONS:
+        raise ValueError("scope_dimensions incompletes")
+    return dimensions
+
+
+def _ensure_dependency_group_ids(value: object, *, allow_empty: bool) -> tuple[str, ...]:
+    if value is None or isinstance(value, str) or not isinstance(value, Sequence):
+        raise ValueError("dependency_group_ids invalides")
+    parsed = tuple(_ensure_dependency_group_id(item) for item in value)
+    if not allow_empty and len(parsed) == 0:
+        raise ValueError("dependency_group_ids absents")
+    if len(parsed) != len(set(parsed)):
+        raise ValueError("dependency_group_ids dupliques")
     return parsed
 
 
@@ -695,6 +1069,13 @@ def _ensure_claim_id(value: object) -> str:
     return text
 
 
+def _ensure_dependency_group_id(value: object) -> str:
+    text = _ensure_text(value, "dependency_group_id")
+    if _DEPENDENCY_GROUP_ID_PATTERN.fullmatch(text) is None:
+        raise ValueError("dependency_group_id invalide")
+    return text
+
+
 def _ensure_gap_id(value: object) -> str:
     text = _ensure_text(value, "gap_id")
     if _GAP_ID_PATTERN.fullmatch(text) is None:
@@ -734,10 +1115,14 @@ def _gap_id_for(
 
 __all__ = [
     "ClaimRef",
+    "ConditionalContradictionDetected",
     "ContradictionAssessment",
     "ContradictionClassification",
     "ContradictionClassificationPolicy",
     "ContradictionDetected",
+    "DeepContradictionAssessment",
+    "DeepContradictionClassificationPolicy",
+    "DeepRelationClassificationContext",
     "KnowledgeGap",
     "KnowledgeGapRecorded",
     "KnowledgeGapType",

@@ -206,6 +206,8 @@ candidate = CandidateEvidence(
     search_trace_id="STRC-M007T004ACCEPTANCE00000000000001",
     document_id=locator.document_id,
     covered_obligations=("preuves_documentaires",),
+    evidence_polarity="NEUTRAL",
+    source_kind="PRIMARY",
 )
 claim_ref = verified_claim_ref(locator)
 case_repository, research_case_id = planned_case_repository()
