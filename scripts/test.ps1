@@ -80,6 +80,8 @@ $m010PreconditionAcceptancePath = "tests/m010/validate_m010_precondition_accepta
 $m010PreconditionUnitPath = "tests/m010/validate_m010_precondition_unit.ps1"
 $m010SpecificationAcceptancePath = "tests/m010/validate_m010_specification_acceptance.ps1"
 $m010SpecificationUnitPath = "tests/m010/validate_m010_specification_unit.ps1"
+$m010StrategyCandidateCreationAcceptancePath = "tests/m010/validate_strategy_candidate_creation_acceptance.ps1"
+$m010StrategyCandidateCreationUnitPath = "tests/m010/validate_strategy_candidate_creation_unit.ps1"
 
 $validationCommands = @(
     @{ Path = "scripts/validate_m000_precondition_report.ps1"; Arguments = @("-Path", $preconditionReportPath) },
@@ -287,6 +289,8 @@ $testCommands = @(
     @{ Path = "tests/m010/validate_m010_precondition_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/m010/validate_m010_specification_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/m010/validate_m010_specification_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m010/validate_strategy_candidate_creation_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m010/validate_strategy_candidate_creation_unit.ps1"; Arguments = @() },
     @{ Path = "tests/m009/validate_m009_specification_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/m009/validate_m009_specification_unit.ps1"; Arguments = @() },
     @{ Path = "tests/m009/validate_deep_research_planning_acceptance.ps1"; Arguments = @() },
@@ -384,7 +388,9 @@ if ($env:OST_M003_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m010PreconditionAcceptancePath,
         $m010PreconditionUnitPath,
         $m010SpecificationAcceptancePath,
-        $m010SpecificationUnitPath
+        $m010SpecificationUnitPath,
+        $m010StrategyCandidateCreationAcceptancePath,
+        $m010StrategyCandidateCreationUnitPath
     )
 }
 elseif ($env:OST_M004_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -450,7 +456,9 @@ elseif ($env:OST_M004_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m010PreconditionAcceptancePath,
         $m010PreconditionUnitPath,
         $m010SpecificationAcceptancePath,
-        $m010SpecificationUnitPath
+        $m010SpecificationUnitPath,
+        $m010StrategyCandidateCreationAcceptancePath,
+        $m010StrategyCandidateCreationUnitPath
     )
 }
 elseif ($env:OST_M005_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -517,7 +525,9 @@ elseif ($env:OST_M005_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m010PreconditionAcceptancePath,
         $m010PreconditionUnitPath,
         $m010SpecificationAcceptancePath,
-        $m010SpecificationUnitPath
+        $m010SpecificationUnitPath,
+        $m010StrategyCandidateCreationAcceptancePath,
+        $m010StrategyCandidateCreationUnitPath
     )
 }
 elseif ($env:OST_M006_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -583,7 +593,9 @@ elseif ($env:OST_M006_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m010PreconditionAcceptancePath,
         $m010PreconditionUnitPath,
         $m010SpecificationAcceptancePath,
-        $m010SpecificationUnitPath
+        $m010SpecificationUnitPath,
+        $m010StrategyCandidateCreationAcceptancePath,
+        $m010StrategyCandidateCreationUnitPath
     )
 }
 elseif ($env:OST_M007_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -648,7 +660,9 @@ elseif ($env:OST_M007_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m010PreconditionAcceptancePath,
         $m010PreconditionUnitPath,
         $m010SpecificationAcceptancePath,
-        $m010SpecificationUnitPath
+        $m010SpecificationUnitPath,
+        $m010StrategyCandidateCreationAcceptancePath,
+        $m010StrategyCandidateCreationUnitPath
     )
 }
 elseif ($env:OST_M008_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -692,7 +706,9 @@ elseif ($env:OST_M008_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m010PreconditionAcceptancePath,
         $m010PreconditionUnitPath,
         $m010SpecificationAcceptancePath,
-        $m010SpecificationUnitPath
+        $m010SpecificationUnitPath,
+        $m010StrategyCandidateCreationAcceptancePath,
+        $m010StrategyCandidateCreationUnitPath
     )
 }
 elseif ($env:OST_M009_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -735,7 +751,9 @@ elseif ($env:OST_M009_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m010PreconditionAcceptancePath,
         $m010PreconditionUnitPath,
         $m010SpecificationAcceptancePath,
-        $m010SpecificationUnitPath
+        $m010SpecificationUnitPath,
+        $m010StrategyCandidateCreationAcceptancePath,
+        $m010StrategyCandidateCreationUnitPath
     )
 }
 elseif ($env:OST_M010_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
@@ -757,7 +775,9 @@ elseif ($env:OST_M010_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m009PreconditionAcceptancePath,
         $m010PreconditionAcceptancePath,
         $m010SpecificationAcceptancePath,
-        $m010SpecificationUnitPath
+        $m010SpecificationUnitPath,
+        $m010StrategyCandidateCreationAcceptancePath,
+        $m010StrategyCandidateCreationUnitPath
     )
 }
 
