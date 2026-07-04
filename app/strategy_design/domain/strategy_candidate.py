@@ -52,6 +52,7 @@ class CompilationDiagnostic:
     description: str
     blocking: bool
     rule_id: str | None
+    parameter_id: str | None
 
     def __post_init__(self) -> None:
         _ensure_text(self.code, "code diagnostic")
@@ -60,6 +61,10 @@ class CompilationDiagnostic:
             raise ValueError("blocking diagnostic non booléen")
         if self.rule_id is not None:
             _ensure_text(self.rule_id, "rule_id diagnostic")
+        if self.parameter_id is not None:
+            _ensure_text(self.parameter_id, "parameter_id diagnostic")
+        if self.rule_id is not None and self.parameter_id is not None:
+            raise ValueError("diagnostic de compilation à cible multiple")
 
 
 @dataclass(frozen=True)
@@ -405,6 +410,253 @@ class RuleOriginPolicy:
 
 
 @dataclass(frozen=True)
+class ParameterDomain:
+    lower_bound: int | float
+    upper_bound: int | float
+    unit: str
+
+    @classmethod
+    def from_bounds(
+        cls,
+        *,
+        lower_bound: int | float,
+        upper_bound: int | float,
+        unit: str,
+    ) -> "ParameterDomain":
+        return cls(
+            lower_bound=lower_bound,
+            upper_bound=upper_bound,
+            unit=unit,
+        )
+
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, Any]) -> "ParameterDomain":
+        if not isinstance(payload, Mapping) or len(payload) == 0:
+            raise ValueError("domaine de calibration vide")
+        allowed_fields = frozenset({"lower_bound", "upper_bound", "unit"})
+        unexpected_fields = sorted(set(payload).difference(allowed_fields))
+        if unexpected_fields:
+            raise ValueError(f"champ domaine de calibration inattendu: {unexpected_fields[0]}")
+        if "lower_bound" not in payload:
+            raise ValueError("lower_bound absent")
+        if "upper_bound" not in payload:
+            raise ValueError("upper_bound absent")
+        if "unit" not in payload:
+            raise ValueError("unit absent")
+        return cls.from_bounds(
+            lower_bound=payload["lower_bound"],
+            upper_bound=payload["upper_bound"],
+            unit=payload["unit"],
+        )
+
+    def __post_init__(self) -> None:
+        lower_bound = _ensure_parameter_number(self.lower_bound, "borne basse")
+        upper_bound = _ensure_parameter_number(self.upper_bound, "borne haute")
+        if lower_bound >= upper_bound:
+            raise ValueError("borne basse superieure ou egale a la borne haute")
+        object.__setattr__(self, "lower_bound", lower_bound)
+        object.__setattr__(self, "upper_bound", upper_bound)
+        object.__setattr__(self, "unit", _normalize_parameter_unit(self.unit))
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "lower_bound": self.lower_bound,
+            "upper_bound": self.upper_bound,
+            "unit": self.unit,
+        }
+
+    def hash(self) -> str:
+        serialized_payload = json.dumps(
+            self.to_payload(),
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+        return hashlib.sha256(serialized_payload.encode("utf-8")).hexdigest()
+
+
+@dataclass(frozen=True)
+class ValidationPlan:
+    calibration_protocol: str
+    expected_sensitivity: str
+
+    def __post_init__(self) -> None:
+        _ensure_text(self.calibration_protocol, "protocole de calibration")
+        _ensure_text(self.expected_sensitivity, "sensibilite attendue")
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "calibration_protocol": self.calibration_protocol,
+            "expected_sensitivity": self.expected_sensitivity,
+        }
+
+
+@dataclass(frozen=True)
+class StrategyParameter:
+    parameter_id: str
+    name: str
+    origin_type: RuleOriginType
+    value: Any | None
+    domain: ParameterDomain | None
+    validation_plan: ValidationPlan | None
+    blocking: bool
+    resolution_status: str
+    unresolved_reason: str | None
+
+    @classmethod
+    def fixed_value(
+        cls,
+        *,
+        parameter_id: str,
+        name: str,
+        value: Any,
+        origin_type: RuleOriginType,
+        blocking: bool,
+    ) -> "StrategyParameter":
+        return cls(
+            parameter_id=parameter_id,
+            name=name,
+            origin_type=origin_type,
+            value=value,
+            domain=None,
+            validation_plan=None,
+            blocking=blocking,
+            resolution_status="RESOLVED",
+            unresolved_reason=None,
+        )
+
+    @classmethod
+    def to_calibrate(
+        cls,
+        *,
+        parameter_id: str,
+        name: str,
+        domain: ParameterDomain,
+        validation_plan: ValidationPlan,
+        blocking: bool,
+    ) -> "StrategyParameter":
+        return cls(
+            parameter_id=parameter_id,
+            name=name,
+            origin_type=RuleOriginType.PARAMETER_TO_CALIBRATE,
+            value=None,
+            domain=domain,
+            validation_plan=validation_plan,
+            blocking=blocking,
+            resolution_status="RESOLVED",
+            unresolved_reason=None,
+        )
+
+    @classmethod
+    def unresolved(
+        cls,
+        *,
+        parameter_id: str,
+        name: str,
+        origin_type: RuleOriginType,
+        blocking: bool,
+        unresolved_reason: str,
+    ) -> "StrategyParameter":
+        return cls(
+            parameter_id=parameter_id,
+            name=name,
+            origin_type=origin_type,
+            value=None,
+            domain=None,
+            validation_plan=None,
+            blocking=blocking,
+            resolution_status="UNRESOLVED",
+            unresolved_reason=unresolved_reason,
+        )
+
+    def __post_init__(self) -> None:
+        _ensure_text(self.parameter_id, "parameter_id")
+        _ensure_text(self.name, "nom de paramètre")
+        if isinstance(self.origin_type, str) and not isinstance(self.origin_type, RuleOriginType):
+            raise ValueError("origin_type de parametre invalide")
+        if not isinstance(self.origin_type, RuleOriginType):
+            raise ValueError("origin_type de parametre invalide")
+        if self.value is not None:
+            object.__setattr__(self, "value", _freeze_parameter_value(self.value))
+        if self.domain is not None and not isinstance(self.domain, ParameterDomain):
+            raise ValueError("ParameterDomain attendu")
+        if self.validation_plan is not None and not isinstance(self.validation_plan, ValidationPlan):
+            raise ValueError("ValidationPlan attendu")
+        if not isinstance(self.blocking, bool):
+            raise ValueError("blocking paramètre non booléen")
+        if self.resolution_status not in {"RESOLVED", "UNRESOLVED"}:
+            raise ValueError(f"statut de résolution paramètre inconnu: {self.resolution_status}")
+        object.__setattr__(
+            self,
+            "unresolved_reason",
+            _ensure_parameter_optional_text(self.unresolved_reason, "raison de non-resolution"),
+        )
+
+        has_value = self.value is not None
+        has_domain = self.domain is not None
+        has_unresolved_reason = self.unresolved_reason is not None
+        if not has_value and not has_domain and not has_unresolved_reason:
+            raise ValueError("parametre sans valeur, domaine ni raison de non-resolution")
+        if has_value and (has_domain or self.validation_plan is not None or has_unresolved_reason):
+            raise ValueError("parametre a valeur fixe avec calibration ou non-resolution")
+        if has_unresolved_reason and (has_domain or self.validation_plan is not None):
+            raise ValueError("parametre non resolu avec plan de calibration")
+        if self.resolution_status == "RESOLVED" and has_unresolved_reason:
+            raise ValueError("parametre resolu avec raison de non-resolution")
+        if self.resolution_status == "UNRESOLVED" and has_value:
+            raise ValueError("parametre non resolu avec valeur fixe")
+        if self.origin_type is RuleOriginType.PARAMETER_TO_CALIBRATE and has_value:
+            raise ValueError("parametre a calibrer avec valeur fixe interdite")
+
+    def define_calibration_plan(
+        self,
+        *,
+        domain: ParameterDomain,
+        validation_plan: ValidationPlan,
+    ) -> "StrategyParameter":
+        if self.origin_type is not RuleOriginType.PARAMETER_TO_CALIBRATE:
+            raise ValueError("plan de calibration interdit pour une origine non calibrable")
+        if not isinstance(domain, ParameterDomain):
+            raise ValueError("ParameterDomain attendu")
+        if not isinstance(validation_plan, ValidationPlan):
+            raise ValueError("ValidationPlan attendu")
+        return replace(
+            self,
+            domain=domain,
+            validation_plan=validation_plan,
+            resolution_status="RESOLVED",
+            unresolved_reason=None,
+        )
+
+
+class ParameterCalibrationPolicy:
+    def validate_parameter(self, parameter: StrategyParameter) -> tuple[CompilationDiagnostic, ...]:
+        if not isinstance(parameter, StrategyParameter):
+            raise ValueError("StrategyParameter attendu")
+
+        if parameter.origin_type is RuleOriginType.PARAMETER_TO_CALIBRATE:
+            if parameter.domain is None or parameter.validation_plan is None:
+                return (
+                    _parameter_diagnostic(
+                        code="PARAMETER_CALIBRATION_REQUIRED",
+                        parameter_id=parameter.parameter_id,
+                        description="Paramètre à calibrer sans domaine ou protocole.",
+                    ),
+                )
+            return ()
+
+        if parameter.blocking and parameter.resolution_status != "RESOLVED":
+            return (
+                _parameter_diagnostic(
+                    code="PARAMETER_CALIBRATION_REQUIRED",
+                    parameter_id=parameter.parameter_id,
+                    description="Paramètre bloquant non résolu.",
+                ),
+            )
+        return ()
+
+
+@dataclass(frozen=True)
 class StrategyMandate:
     payload: Mapping[str, Any]
 
@@ -567,6 +819,31 @@ class RuleOriginAssigned:
 
 
 @dataclass(frozen=True)
+class StrategyParameterAdded:
+    strategy_id: str
+    strategy_version: int
+    parameter_id: str
+    origin_type: str
+    blocking_status: bool
+
+    @property
+    def event_type(self) -> str:
+        return "StrategyParameterAdded"
+
+
+@dataclass(frozen=True)
+class CalibrationPlanDefined:
+    strategy_id: str
+    parameter_id: str
+    domain_hash: str
+    protocol_version: str
+
+    @property
+    def event_type(self) -> str:
+        return "CalibrationPlanDefined"
+
+
+@dataclass(frozen=True)
 class StrategyCandidate:
     strategy_id: str
     version: int
@@ -577,6 +854,7 @@ class StrategyCandidate:
     translation_diagnostics: tuple[StrategyTranslationDiagnostic, ...]
     compilation_diagnostics: tuple[CompilationDiagnostic, ...]
     rules: tuple[StrategyRule, ...]
+    parameters: tuple[StrategyParameter, ...]
     domain_events: tuple[object, ...]
 
     @classmethod
@@ -614,6 +892,7 @@ class StrategyCandidate:
             translation_diagnostics=diagnostics,
             compilation_diagnostics=(),
             rules=(),
+            parameters=(),
             domain_events=(created_event,),
         )
 
@@ -687,12 +966,95 @@ class StrategyCandidate:
             ),
         )
 
+    def add_parameter(
+        self,
+        *,
+        parameter: StrategyParameter,
+        expected_version: int,
+    ) -> "StrategyCandidate":
+        _ensure_current_candidate_version(self, expected_version)
+        if not isinstance(parameter, StrategyParameter):
+            raise ValueError("StrategyParameter attendu")
+        if any(existing_parameter.parameter_id == parameter.parameter_id for existing_parameter in self.parameters):
+            raise ValueError(f"paramètre de stratégie déjà présent: {parameter.parameter_id}")
+
+        new_version = self.version + 1
+        return replace(
+            self,
+            version=new_version,
+            status=StrategyCandidateStatus.SPECIFIED,
+            compilation_diagnostics=(),
+            parameters=self.parameters + (parameter,),
+            domain_events=self.domain_events
+            + (
+                StrategyParameterAdded(
+                    strategy_id=self.strategy_id,
+                    strategy_version=new_version,
+                    parameter_id=parameter.parameter_id,
+                    origin_type=parameter.origin_type.value,
+                    blocking_status=parameter.blocking,
+                ),
+            ),
+        )
+
+    def define_calibration_plan(
+        self,
+        *,
+        parameter_id: str,
+        domain: ParameterDomain,
+        validation_plan: ValidationPlan,
+        expected_version: int,
+    ) -> "StrategyCandidate":
+        _ensure_current_candidate_version(self, expected_version)
+        _ensure_text(parameter_id, "parameter_id")
+        if not isinstance(domain, ParameterDomain):
+            raise ValueError("ParameterDomain attendu")
+        if not isinstance(validation_plan, ValidationPlan):
+            raise ValueError("ValidationPlan attendu")
+
+        updated_parameters = []
+        matched = False
+        for parameter in self.parameters:
+            if parameter.parameter_id == parameter_id:
+                updated_parameters.append(
+                    parameter.define_calibration_plan(
+                        domain=domain,
+                        validation_plan=validation_plan,
+                    )
+                )
+                matched = True
+            else:
+                updated_parameters.append(parameter)
+        if not matched:
+            raise ValueError(f"paramètre de stratégie absent: {parameter_id}")
+
+        return replace(
+            self,
+            version=self.version + 1,
+            status=StrategyCandidateStatus.SPECIFIED,
+            compilation_diagnostics=(),
+            parameters=tuple(updated_parameters),
+            domain_events=self.domain_events
+            + (
+                CalibrationPlanDefined(
+                    strategy_id=self.strategy_id,
+                    parameter_id=parameter_id,
+                    domain_hash=domain.hash(),
+                    protocol_version=validation_plan.calibration_protocol,
+                ),
+            ),
+        )
+
     def validate_for_compilation(self, *, expected_version: int) -> "StrategyCandidate":
         _ensure_current_candidate_version(self, expected_version)
         diagnostics = tuple(
             diagnostic
             for rule in self.rules
             for diagnostic in RuleOriginPolicy().validate_rule(rule)
+        ) + tuple(
+            diagnostic
+            for parameter in self.parameters
+            for diagnostic in ParameterCalibrationPolicy().validate_parameter(parameter)
         )
         next_status = (
             StrategyCandidateStatus.INCOMPLETE
@@ -790,6 +1152,22 @@ def _rule_diagnostic(
         description=description,
         blocking=True,
         rule_id=rule_id,
+        parameter_id=None,
+    )
+
+
+def _parameter_diagnostic(
+    *,
+    code: str,
+    parameter_id: str,
+    description: str,
+) -> CompilationDiagnostic:
+    return CompilationDiagnostic(
+        code=code,
+        description=description,
+        blocking=True,
+        rule_id=None,
+        parameter_id=parameter_id,
     )
 
 
@@ -890,6 +1268,58 @@ def _freeze_origin_value(value: Any) -> Any:
     if isinstance(value, tuple):
         return tuple(_freeze_origin_value(child_value) for child_value in value)
     raise ValueError("valeur d'origine invalide")
+
+
+def _ensure_parameter_number(value: Any, field_name: str) -> int | float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{field_name} invalide")
+    if isinstance(value, float) and not math.isfinite(value):
+        raise ValueError(f"{field_name} invalide")
+    return value
+
+
+def _normalize_parameter_unit(value: Any) -> str:
+    unit = _ensure_text(value, "unité de paramètre")
+    return unit.lower()
+
+
+def _ensure_parameter_optional_text(value: Any, field_name: str) -> str | None:
+    if value is None:
+        return None
+    return _ensure_text(value, field_name)
+
+
+def _freeze_parameter_value(value: Any) -> Any:
+    if value is None:
+        raise ValueError("valeur de paramètre invalide")
+    if isinstance(value, str):
+        return _ensure_text(value, "valeur de paramètre")
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise ValueError("valeur de paramètre invalide")
+        return value
+    if isinstance(value, Mapping):
+        if len(value) == 0:
+            raise ValueError("valeur de paramètre vide")
+        return MappingProxyType(
+            {
+                _ensure_text(key, "clé de paramètre"): _freeze_parameter_value(child_value)
+                for key, child_value in value.items()
+            }
+        )
+    if isinstance(value, list):
+        if len(value) == 0:
+            raise ValueError("valeur de paramètre vide")
+        return tuple(_freeze_parameter_value(child_value) for child_value in value)
+    if isinstance(value, tuple):
+        if len(value) == 0:
+            raise ValueError("valeur de paramètre vide")
+        return tuple(_freeze_parameter_value(child_value) for child_value in value)
+    raise ValueError("valeur de paramètre invalide")
 
 
 def _required_attribute(value: Any, attribute_name: str) -> Any:

@@ -67,3 +67,14 @@
 - ADR: aucune nouvelle ADR; T-004 applique `ADR-010`, `DDD-ADR-005` et `DDD-ADR-010` sans changer leur décision.
 - Validations ciblées GREEN: `tests/m010/validate_strategy_rule_origin_acceptance.ps1`, `tests/m010/validate_strategy_rule_origin_unit.ps1`, puis non-régression `tests/m010/validate_strategy_candidate_creation_acceptance.ps1` et `tests/m010/validate_strategy_candidate_creation_unit.ps1`.
 - Gate global GREEN: `scripts/test.ps1` avec `19 validation(s), 206 test(s)`.
+
+### T-005 - Paramètres à calibrer
+
+- Précondition ciblée: les tests T-003 et T-004 restent GREEN avant extension de l'agrégat SD aux paramètres.
+- Commit RED: `1273f698 test(m010): couvrir parametres calibration strategie`.
+- RED utile: `tests/m010/validate_strategy_parameter_calibration_acceptance.ps1` échoue sur le cas d'usage de gestion des paramètres absent; `tests/m010/validate_strategy_parameter_calibration_unit.ps1` échoue sur `ParameterCalibrationPolicy` absent.
+- Reprise main-agent: arrêt de l'arbre `scripts/test.ps1` laissé actif par le worker après plus de 60 minutes sans verdict exploitable, puis nettoyage des répertoires générés `.tmp` et `__pycache__`.
+- Implémentation: ajout de `StrategyParameter`, `ParameterDomain`, `ValidationPlan`, `ParameterCalibrationPolicy`, des événements `StrategyParameterAdded` et `CalibrationPlanDefined`, des transitions versionnées d'ajout de paramètre et de définition de plan de calibration, et des commandes applicatives `DeclareStrategyParameter` / `DefineCalibrationPlan`.
+- ADR: aucune nouvelle ADR; T-005 applique `ADR-010` et `DDD-ADR-010` sans changer leur décision.
+- Validations ciblées GREEN: `tests/m010/validate_strategy_parameter_calibration_acceptance.ps1`, `tests/m010/validate_strategy_parameter_calibration_unit.ps1`, puis non-régression T-003/T-004.
+- Gates GREEN: `python -m compileall app\strategy_design`, `scripts/lint.ps1` avec `19 validation(s), 0 test(s)`, `git diff --check`, et `scripts/test.ps1` avec `19 validation(s), 208 test(s)`.
