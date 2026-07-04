@@ -1,4 +1,4 @@
-"""Cas d'usage SD de compilation deterministe d'une strategie candidate."""
+"""Cas d'usage SD de compilation déterministe d'une stratégie candidate."""
 
 from __future__ import annotations
 
@@ -60,4 +60,4 @@ def _ensure_expected_version(value: int) -> None:
     if not isinstance(value, int) or isinstance(value, bool):
         raise ValueError("expected_version non entier")
     if value < 0:
-        raise ValueError("expected_version negatif")
+        raise ValueError("expected_version négatif")

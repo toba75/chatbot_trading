@@ -1,4 +1,4 @@
-"""Cas d'usage SD de creation de snapshot immuable de strategie."""
+"""Cas d'usage SD de création de snapshot immuable de stratégie."""
 
 from __future__ import annotations
 
@@ -114,7 +114,7 @@ def _ensure_expected_version(value: int) -> None:
     if not isinstance(value, int) or isinstance(value, bool):
         raise ValueError("expected_version non entier")
     if value < 0:
-        raise ValueError("expected_version negatif")
+        raise ValueError("expected_version négatif")
 
 
 def _ensure_text(value: str, field_name: str) -> str:
@@ -123,5 +123,5 @@ def _ensure_text(value: str, field_name: str) -> str:
     if value.strip() == "":
         raise ValueError(f"{field_name} vide")
     if value != value.strip():
-        raise ValueError(f"{field_name} non normalise")
+        raise ValueError(f"{field_name} non normalisé")
     return value

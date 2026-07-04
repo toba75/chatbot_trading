@@ -1,4 +1,4 @@
-"""Metriques SD et signaux d'audit de cloture M-010."""
+"""Métriques SD et signaux d'audit de clôture M-010."""
 
 from __future__ import annotations
 
@@ -50,7 +50,7 @@ _NORMATIVE_METRIC_NAMES = (
 
 @dataclass(frozen=True)
 class StrategyDesignMetricObservation:
-    """Observation SD agregee sans prompt, texte source complet ni payload documentaire."""
+    """Observation SD agrégée sans prompt, texte source complet ni payload documentaire."""
 
     trace_id: str
     strategy_id: str
@@ -86,7 +86,7 @@ class StrategyDesignMetricObservation:
             _ensure_allowed_text(self.rule_origin_type, "rule_origin_type", _ALLOWED_ORIGIN_TYPES),
         )
         if not isinstance(self.parameter_without_calibration_plan, bool):
-            raise ValueError("parameter_without_calibration_plan non booleen")
+            raise ValueError("parameter_without_calibration_plan non booléen")
         if self.compatibility_conflict_category is not None:
             object.__setattr__(
                 self,
@@ -126,7 +126,7 @@ class StrategyDesignMetricObservation:
 
 @dataclass(frozen=True)
 class StrategyDesignMetricSnapshot:
-    """Snapshot de metriques M-010 sans contenu de recherche, prompt ou strategie mutable complete."""
+    """Snapshot de métriques M-010 sans contenu de recherche, prompt ou stratégie mutable complète."""
 
     fixture_id: str
     fixture_path: str
@@ -165,7 +165,7 @@ class StrategyDesignMetricSnapshot:
 
 
 class StrategyDesignMetricsPublisher:
-    """Calcule les six metriques normatives SD depuis des observations agregees."""
+    """Calcule les six métriques normatives SD depuis des observations agrégées."""
 
     def publish(
         self,
@@ -191,7 +191,7 @@ class StrategyDesignMetricsPublisher:
 
 @dataclass(frozen=True)
 class StrategyDesignAuditSignal:
-    """Signal SD de publication des metriques sans payload sensible."""
+    """Signal SD de publication des métriques sans payload sensible."""
 
     audit_signal_id: str
     trace_id: str
@@ -283,7 +283,7 @@ def _ensure_observations(
         if not isinstance(observation, StrategyDesignMetricObservation):
             raise ValueError("observation invalide")
         if observation.trace_id in trace_ids:
-            raise ValueError("trace_id duplique")
+            raise ValueError("trace_id dupliqué")
         trace_ids.append(observation.trace_id)
     return observations
 
@@ -386,7 +386,7 @@ def _ensure_normative_metrics(value: Mapping[str, Any]) -> dict[str, Any]:
         raise ValueError("normative_metrics non objet")
     actual_keys = tuple(str(key) for key in value)
     if actual_keys != _NORMATIVE_METRIC_NAMES:
-        raise ValueError("normative_metrics incompletes")
+        raise ValueError("normative_metrics incomplètes")
     return {
         "strategy_compilable_rate": _ensure_ratio(
             value["strategy_compilable_rate"],
@@ -437,7 +437,7 @@ def _ensure_ratio_mapping(value: Any, field_name: str) -> dict[str, float]:
         parsed[_ensure_text(key, field_name)] = _ensure_ratio(ratio, field_name)
     total = sum(parsed.values())
     if not math.isclose(total, 1.0, rel_tol=0.0, abs_tol=0.000001):
-        raise ValueError(f"{field_name} incoherent")
+        raise ValueError(f"{field_name} incohérent")
     return parsed
 
 
@@ -454,7 +454,7 @@ def _ensure_text_tuple(value: Sequence[str], field_name: str, *, allow_empty: bo
     if not allow_empty and len(parsed) == 0:
         raise ValueError(f"{field_name} absents")
     if len(parsed) != len(set(parsed)):
-        raise ValueError(f"{field_name} dupliques")
+        raise ValueError(f"{field_name} dupliqués")
     return parsed
 
 
@@ -523,7 +523,7 @@ def _ensure_text(value: Any, field_name: str) -> str:
     if value.strip() == "":
         raise ValueError(f"{field_name} vide")
     if value != value.strip():
-        raise ValueError(f"{field_name} non normalise")
+        raise ValueError(f"{field_name} non normalisé")
     return value
 
 
