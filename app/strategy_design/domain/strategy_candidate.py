@@ -9,7 +9,7 @@ from dataclasses import dataclass, replace
 from datetime import datetime
 from enum import Enum
 from types import MappingProxyType
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping, Protocol, Sequence
 
 from app.contracts.evidence_claims import EvidenceRef, VerifiedClaimRef
 from app.contracts.identity import DomainIdentifier
@@ -69,7 +69,11 @@ class CompilationDiagnosticCode(str, Enum):
     DESIGN_CHOICE_JUSTIFICATION_REQUIRED = "DESIGN_CHOICE_JUSTIFICATION_REQUIRED"
     STRATEGY_MANDATE_REQUIRED = "STRATEGY_MANDATE_REQUIRED"
     PARAMETER_CALIBRATION_REQUIRED = "PARAMETER_CALIBRATION_REQUIRED"
+    VALIDATION_PLAN_REQUIRED = "VALIDATION_PLAN_REQUIRED"
     STRATEGY_CONFLICT_BLOCKING = "STRATEGY_CONFLICT_BLOCKING"
+    STRATEGY_NOT_COMPILABLE = "STRATEGY_NOT_COMPILABLE"
+    RULE_EXPRESSION_INVALID = "RULE_EXPRESSION_INVALID"
+    RULE_NON_DETERMINISTIC = "RULE_NON_DETERMINISTIC"
 
 
 @dataclass(frozen=True)
@@ -667,12 +671,20 @@ class ParameterCalibrationPolicy:
             raise ValueError("StrategyParameter attendu")
 
         if parameter.origin_type is RuleOriginType.PARAMETER_TO_CALIBRATE:
-            if parameter.domain is None or parameter.validation_plan is None:
+            if parameter.domain is None:
                 return (
                     _parameter_diagnostic(
                         code=CompilationDiagnosticCode.PARAMETER_CALIBRATION_REQUIRED,
                         parameter_id=parameter.parameter_id,
                         description="Paramètre à calibrer sans domaine ou protocole.",
+                    ),
+                )
+            if parameter.validation_plan is None:
+                return (
+                    _parameter_diagnostic(
+                        code=CompilationDiagnosticCode.VALIDATION_PLAN_REQUIRED,
+                        parameter_id=parameter.parameter_id,
+                        description="Plan de validation absent pour un paramÃ¨tre Ã  calibrer.",
                     ),
                 )
             return ()
@@ -1712,6 +1724,577 @@ class StrategyCandidate:
         )
 
 
+class StrategyCompilationStatus:
+    COMPILED = "COMPILED"
+    REJECTED = "REJECTED"
+
+
+@dataclass(frozen=True)
+class RuleExpressionValidation:
+    rule_id: str
+    valid: bool
+    is_deterministic: bool
+    normalized_expression: str | None
+    random_mechanism: str | None
+    seed: str | None
+    reason: str | None
+
+    @classmethod
+    def deterministic(
+        cls,
+        *,
+        rule_id: str,
+        normalized_expression: str,
+    ) -> "RuleExpressionValidation":
+        return cls(
+            rule_id=rule_id,
+            valid=True,
+            is_deterministic=True,
+            normalized_expression=normalized_expression,
+            random_mechanism=None,
+            seed=None,
+            reason=None,
+        )
+
+    @classmethod
+    def invalid(
+        cls,
+        *,
+        rule_id: str,
+        reason: str,
+    ) -> "RuleExpressionValidation":
+        return cls(
+            rule_id=rule_id,
+            valid=False,
+            is_deterministic=False,
+            normalized_expression=None,
+            random_mechanism=None,
+            seed=None,
+            reason=reason,
+        )
+
+    @classmethod
+    def non_deterministic(
+        cls,
+        *,
+        rule_id: str,
+        random_mechanism: str | None,
+        seed: str | None,
+        reason: str,
+    ) -> "RuleExpressionValidation":
+        return cls(
+            rule_id=rule_id,
+            valid=True,
+            is_deterministic=False,
+            normalized_expression=None,
+            random_mechanism=random_mechanism,
+            seed=seed,
+            reason=reason,
+        )
+
+    def __post_init__(self) -> None:
+        _ensure_text(self.rule_id, "rule_id validation expression")
+        if not isinstance(self.valid, bool):
+            raise ValueError("valid expression non boolÃ©en")
+        if not isinstance(self.is_deterministic, bool):
+            raise ValueError("deterministic expression non boolÃ©en")
+        object.__setattr__(
+            self,
+            "normalized_expression",
+            _ensure_parameter_optional_text(self.normalized_expression, "expression normalisÃ©e"),
+        )
+        object.__setattr__(
+            self,
+            "random_mechanism",
+            _ensure_parameter_optional_text(self.random_mechanism, "mÃ©canisme alÃ©atoire"),
+        )
+        object.__setattr__(
+            self,
+            "seed",
+            _ensure_parameter_optional_text(self.seed, "graine alÃ©atoire"),
+        )
+        object.__setattr__(
+            self,
+            "reason",
+            _ensure_parameter_optional_text(self.reason, "raison validation expression"),
+        )
+        if self.valid and self.is_deterministic and self.normalized_expression is None:
+            raise ValueError("expression dÃ©terministe sans forme normalisÃ©e")
+        if not self.valid and self.reason is None:
+            raise ValueError("expression invalide sans raison")
+        if self.is_deterministic and (self.random_mechanism is not None or self.seed is not None):
+            raise ValueError("expression dÃ©terministe avec alÃ©a dÃ©clarÃ©")
+        if self.seed is not None and self.random_mechanism is None:
+            raise ValueError("graine sans mÃ©canisme alÃ©atoire")
+
+    @property
+    def has_explicit_randomness(self) -> bool:
+        return self.random_mechanism is not None and self.seed is not None
+
+    @property
+    def is_compilable(self) -> bool:
+        return self.valid and (self.is_deterministic or self.has_explicit_randomness)
+
+
+class RuleExpressionValidator(Protocol):
+    def validate(self, rule: StrategyRule) -> RuleExpressionValidation:
+        raise NotImplementedError
+
+
+@dataclass(frozen=True)
+class CompiledRule:
+    rule_id: str
+    rule_kind: str
+    normalized_expression: str
+    origin_type: str
+    origin_hash: str
+    deterministic: bool
+    random_mechanism: str | None
+    seed: str | None
+
+    @classmethod
+    def from_rule(
+        cls,
+        *,
+        rule: StrategyRule,
+        validation: RuleExpressionValidation,
+    ) -> "CompiledRule":
+        if not isinstance(rule, StrategyRule):
+            raise ValueError("StrategyRule attendue")
+        if not isinstance(validation, RuleExpressionValidation):
+            raise ValueError("RuleExpressionValidation attendue")
+        if validation.rule_id != rule.rule_id:
+            raise ValueError("validation expression hors rÃ¨gle")
+        if not validation.is_compilable:
+            raise ValueError("validation expression non compilable")
+        if rule.origin is None:
+            raise ValueError("rÃ¨gle sans origine non compilable")
+
+        normalized_expression = (
+            validation.normalized_expression
+            if validation.normalized_expression is not None
+            else rule.expression.text
+        )
+        return cls(
+            rule_id=rule.rule_id,
+            rule_kind=rule.rule_kind,
+            normalized_expression=normalized_expression,
+            origin_type=rule.origin.origin_type.value,
+            origin_hash=_hash_payload(_rule_origin_payload(rule.origin)),
+            deterministic=validation.is_deterministic,
+            random_mechanism=validation.random_mechanism,
+            seed=validation.seed,
+        )
+
+    def __post_init__(self) -> None:
+        _ensure_text(self.rule_id, "rule_id compilÃ©")
+        _ensure_text(self.rule_kind, "rule_kind compilÃ©")
+        _ensure_text(self.normalized_expression, "expression compilÃ©e")
+        _ensure_text(self.origin_type, "origin_type compilÃ©")
+        _ensure_text(self.origin_hash, "origin_hash compilÃ©")
+        if not isinstance(self.deterministic, bool):
+            raise ValueError("deterministic compilÃ© non boolÃ©en")
+        object.__setattr__(
+            self,
+            "random_mechanism",
+            _ensure_parameter_optional_text(self.random_mechanism, "mÃ©canisme alÃ©atoire compilÃ©"),
+        )
+        object.__setattr__(
+            self,
+            "seed",
+            _ensure_parameter_optional_text(self.seed, "graine compilÃ©e"),
+        )
+        if self.deterministic and (self.random_mechanism is not None or self.seed is not None):
+            raise ValueError("rÃ¨gle compilÃ©e dÃ©terministe avec alÃ©a")
+        if not self.deterministic and (self.random_mechanism is None or self.seed is None):
+            raise ValueError("rÃ¨gle compilÃ©e alÃ©atoire sans mÃ©canisme ou graine")
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "rule_id": self.rule_id,
+            "rule_kind": self.rule_kind,
+            "normalized_expression": self.normalized_expression,
+            "origin_type": self.origin_type,
+            "origin_hash": self.origin_hash,
+            "deterministic": self.deterministic,
+            "random_mechanism": self.random_mechanism,
+            "seed": self.seed,
+        }
+
+
+@dataclass(frozen=True)
+class CompiledParameter:
+    parameter_id: str
+    name: str
+    origin_type: str
+    value_hash: str | None
+    domain_hash: str | None
+    validation_plan_hash: str | None
+    blocking: bool
+
+    @classmethod
+    def from_parameter(cls, parameter: StrategyParameter) -> "CompiledParameter":
+        if not isinstance(parameter, StrategyParameter):
+            raise ValueError("StrategyParameter attendu")
+        value_hash = (
+            _hash_payload(_thaw_strategy_value(parameter.value))
+            if parameter.value is not None
+            else None
+        )
+        domain_hash = parameter.domain.hash() if parameter.domain is not None else None
+        validation_plan_hash = (
+            _hash_payload(parameter.validation_plan.to_payload())
+            if parameter.validation_plan is not None
+            else None
+        )
+        return cls(
+            parameter_id=parameter.parameter_id,
+            name=parameter.name,
+            origin_type=parameter.origin_type.value,
+            value_hash=value_hash,
+            domain_hash=domain_hash,
+            validation_plan_hash=validation_plan_hash,
+            blocking=parameter.blocking,
+        )
+
+    def __post_init__(self) -> None:
+        _ensure_text(self.parameter_id, "parameter_id compilÃ©")
+        _ensure_text(self.name, "nom paramÃ¨tre compilÃ©")
+        _ensure_text(self.origin_type, "origin_type paramÃ¨tre compilÃ©")
+        object.__setattr__(
+            self,
+            "value_hash",
+            _ensure_parameter_optional_text(self.value_hash, "hash valeur paramÃ¨tre"),
+        )
+        object.__setattr__(
+            self,
+            "domain_hash",
+            _ensure_parameter_optional_text(self.domain_hash, "hash domaine paramÃ¨tre"),
+        )
+        object.__setattr__(
+            self,
+            "validation_plan_hash",
+            _ensure_parameter_optional_text(
+                self.validation_plan_hash,
+                "hash plan validation paramÃ¨tre",
+            ),
+        )
+        if not isinstance(self.blocking, bool):
+            raise ValueError("blocking paramÃ¨tre compilÃ© non boolÃ©en")
+        if self.value_hash is None and self.domain_hash is None:
+            raise ValueError("paramÃ¨tre compilÃ© sans valeur ni domaine")
+        if self.origin_type == RuleOriginType.PARAMETER_TO_CALIBRATE.value and self.validation_plan_hash is None:
+            raise ValueError("paramÃ¨tre compilÃ© sans plan de validation")
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "parameter_id": self.parameter_id,
+            "name": self.name,
+            "origin_type": self.origin_type,
+            "value_hash": self.value_hash,
+            "domain_hash": self.domain_hash,
+            "validation_plan_hash": self.validation_plan_hash,
+            "blocking": self.blocking,
+        }
+
+
+@dataclass(frozen=True)
+class CompiledStrategyRepresentation:
+    strategy_id: str
+    strategy_version: int
+    compiler_version: str
+    mandate_hash: str
+    verified_research_hash: str
+    rules: tuple[CompiledRule, ...]
+    parameters: tuple[CompiledParameter, ...]
+    representation_hash: str
+
+    @classmethod
+    def from_candidate(
+        cls,
+        *,
+        candidate: "StrategyCandidate",
+        rule_validations: Sequence[RuleExpressionValidation],
+        compiler_version: str,
+    ) -> "CompiledStrategyRepresentation":
+        if not isinstance(candidate, StrategyCandidate):
+            raise ValueError("StrategyCandidate attendue")
+        compiler_version = _ensure_text(compiler_version, "version compilateur")
+        validation_by_rule_id = {
+            validation.rule_id: validation
+            for validation in rule_validations
+            if isinstance(validation, RuleExpressionValidation)
+        }
+        if len(validation_by_rule_id) != len(tuple(rule_validations)):
+            raise ValueError("RuleExpressionValidation attendue")
+
+        compiled_rules = tuple(
+            CompiledRule.from_rule(
+                rule=rule,
+                validation=_required_rule_validation(validation_by_rule_id, rule.rule_id),
+            )
+            for rule in sorted(candidate.rules, key=lambda current_rule: current_rule.rule_id)
+        )
+        compiled_parameters = tuple(
+            CompiledParameter.from_parameter(parameter)
+            for parameter in sorted(
+                candidate.parameters,
+                key=lambda current_parameter: current_parameter.parameter_id,
+            )
+        )
+        verified_research_hash = _hash_payload(
+            _verified_research_ref_payload(candidate.verified_research_ref)
+        )
+        representation_payload = {
+            "schema_version": "strategy_compiled_representation.v1",
+            "strategy_id": candidate.strategy_id,
+            "strategy_version": candidate.version,
+            "compiler_version": compiler_version,
+            "mandate_hash": candidate.mandate.hash(),
+            "verified_research_hash": verified_research_hash,
+            "rules": [rule.to_payload() for rule in compiled_rules],
+            "parameters": [parameter.to_payload() for parameter in compiled_parameters],
+        }
+        return cls(
+            strategy_id=candidate.strategy_id,
+            strategy_version=candidate.version,
+            compiler_version=compiler_version,
+            mandate_hash=candidate.mandate.hash(),
+            verified_research_hash=verified_research_hash,
+            rules=compiled_rules,
+            parameters=compiled_parameters,
+            representation_hash=_hash_payload(representation_payload),
+        )
+
+    def __post_init__(self) -> None:
+        _ensure_strategy_id(self.strategy_id)
+        if not isinstance(self.strategy_version, int) or isinstance(self.strategy_version, bool):
+            raise ValueError("strategy_version compilÃ©e non entiÃ¨re")
+        if self.strategy_version < 0:
+            raise ValueError("strategy_version compilÃ©e nÃ©gative")
+        _ensure_text(self.compiler_version, "version compilateur")
+        _ensure_text(self.mandate_hash, "hash mandat compilÃ©")
+        _ensure_text(self.verified_research_hash, "hash recherche compilÃ©e")
+        _ensure_text(self.representation_hash, "hash reprÃ©sentation")
+        if not isinstance(self.rules, tuple) or any(not isinstance(rule, CompiledRule) for rule in self.rules):
+            raise ValueError("rÃ¨gles compilÃ©es invalides")
+        if not isinstance(self.parameters, tuple) or any(
+            not isinstance(parameter, CompiledParameter)
+            for parameter in self.parameters
+        ):
+            raise ValueError("paramÃ¨tres compilÃ©s invalides")
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "schema_version": "strategy_compiled_representation.v1",
+            "strategy_id": self.strategy_id,
+            "strategy_version": self.strategy_version,
+            "compiler_version": self.compiler_version,
+            "mandate_hash": self.mandate_hash,
+            "verified_research_hash": self.verified_research_hash,
+            "rules": [rule.to_payload() for rule in self.rules],
+            "parameters": [parameter.to_payload() for parameter in self.parameters],
+            "representation_hash": self.representation_hash,
+        }
+
+
+@dataclass(frozen=True)
+class StrategyCompilationRejected:
+    strategy_id: str
+    strategy_version: int
+    public_error_code: CompilationDiagnosticCode | CompatibilityFindingCode
+    diagnostic_count: int
+
+    @property
+    def event_type(self) -> str:
+        return "StrategyCompilationRejected"
+
+
+@dataclass(frozen=True)
+class StrategyCompiled:
+    strategy_id: str
+    strategy_version: int
+    compiler_version: str
+    representation_hash: str
+
+    @property
+    def event_type(self) -> str:
+        return "StrategyCompiled"
+
+
+@dataclass(frozen=True)
+class StrategyCompilationResult:
+    compilation_status: str
+    strategy_id: str
+    strategy_version: int
+    representation: CompiledStrategyRepresentation | None
+    diagnostics: tuple[CompilationDiagnostic, ...]
+    event: StrategyCompiled | StrategyCompilationRejected
+
+    def __post_init__(self) -> None:
+        if self.compilation_status not in {
+            StrategyCompilationStatus.COMPILED,
+            StrategyCompilationStatus.REJECTED,
+        }:
+            raise ValueError("statut de compilation inconnu")
+        _ensure_strategy_id(self.strategy_id)
+        if not isinstance(self.strategy_version, int) or isinstance(self.strategy_version, bool):
+            raise ValueError("strategy_version resultat non entiÃ¨re")
+        if self.representation is not None and not isinstance(self.representation, CompiledStrategyRepresentation):
+            raise ValueError("CompiledStrategyRepresentation attendue")
+        if not isinstance(self.diagnostics, tuple) or any(
+            not isinstance(diagnostic, CompilationDiagnostic)
+            for diagnostic in self.diagnostics
+        ):
+            raise ValueError("diagnostics de compilation invalides")
+        if self.compilation_status == StrategyCompilationStatus.COMPILED:
+            if self.representation is None or self.diagnostics != ():
+                raise ValueError("resultat compile incoherent")
+            if not isinstance(self.event, StrategyCompiled):
+                raise ValueError("StrategyCompiled attendu")
+        if self.compilation_status == StrategyCompilationStatus.REJECTED:
+            if self.representation is not None or len(self.diagnostics) == 0:
+                raise ValueError("resultat rejet incoherent")
+            if not isinstance(self.event, StrategyCompilationRejected):
+                raise ValueError("StrategyCompilationRejected attendu")
+
+
+@dataclass(frozen=True)
+class StrategyCompilationAssessment:
+    diagnostics: tuple[CompilationDiagnostic, ...]
+    rule_validations: tuple[RuleExpressionValidation, ...]
+
+
+class StrategyCompilationPolicy:
+    def __init__(self, *, expression_validator: RuleExpressionValidator) -> None:
+        if expression_validator is None or not hasattr(expression_validator, "validate"):
+            raise ValueError("RuleExpressionValidator requis")
+        self._expression_validator = expression_validator
+
+    def evaluate(self, candidate: "StrategyCandidate") -> StrategyCompilationAssessment:
+        if not isinstance(candidate, StrategyCandidate):
+            raise ValueError("StrategyCandidate attendue")
+
+        diagnostics: list[CompilationDiagnostic] = []
+        if candidate.status != StrategyCandidateStatus.COMPILABLE:
+            diagnostics.append(
+                CompilationDiagnostic(
+                    code=CompilationDiagnosticCode.STRATEGY_NOT_COMPILABLE,
+                    description="Statut de stratÃ©gie non compilable.",
+                    blocking=True,
+                    rule_id=None,
+                    parameter_id=None,
+                )
+            )
+        diagnostics.extend(StrategyCompletenessPolicy().evaluate(candidate))
+
+        rule_validations: list[RuleExpressionValidation] = []
+        for rule in candidate.rules:
+            validation = self._expression_validator.validate(rule)
+            if not isinstance(validation, RuleExpressionValidation):
+                raise ValueError("RuleExpressionValidation attendue")
+            if validation.rule_id != rule.rule_id:
+                raise ValueError("validation expression hors rÃ¨gle")
+            rule_validations.append(validation)
+            if not validation.valid:
+                diagnostics.append(
+                    _rule_diagnostic(
+                        code=CompilationDiagnosticCode.RULE_EXPRESSION_INVALID,
+                        rule_id=rule.rule_id,
+                        description=validation.reason
+                        if validation.reason is not None
+                        else "Expression de rÃ¨gle invalide.",
+                    )
+                )
+            elif not validation.is_compilable:
+                diagnostics.append(
+                    _rule_diagnostic(
+                        code=CompilationDiagnosticCode.RULE_NON_DETERMINISTIC,
+                        rule_id=rule.rule_id,
+                        description=validation.reason
+                        if validation.reason is not None
+                        else "RÃ¨gle non dÃ©terministe sans mÃ©canisme et graine explicites.",
+                    )
+                )
+
+        return StrategyCompilationAssessment(
+            diagnostics=tuple(diagnostics),
+            rule_validations=tuple(rule_validations),
+        )
+
+
+class StrategyCompilerBackend(Protocol):
+    def compile_representation(
+        self,
+        *,
+        candidate: "StrategyCandidate",
+        rule_validations: Sequence[RuleExpressionValidation],
+        compiler_version: str,
+    ) -> CompiledStrategyRepresentation:
+        raise NotImplementedError
+
+
+class StrategyCompiler:
+    def __init__(
+        self,
+        *,
+        backend: StrategyCompilerBackend,
+        expression_validator: RuleExpressionValidator,
+        compiler_version: str,
+    ) -> None:
+        if backend is None or not hasattr(backend, "compile_representation"):
+            raise ValueError("StrategyCompilerBackend requis")
+        self._backend = backend
+        self._compiler_version = _ensure_text(compiler_version, "version compilateur")
+        self._policy = StrategyCompilationPolicy(expression_validator=expression_validator)
+
+    def compile(
+        self,
+        candidate: "StrategyCandidate",
+        *,
+        expected_version: int,
+    ) -> StrategyCompilationResult:
+        _ensure_current_candidate_version(candidate, expected_version)
+        assessment = self._policy.evaluate(candidate)
+        if assessment.diagnostics:
+            event = StrategyCompilationRejected(
+                strategy_id=candidate.strategy_id,
+                strategy_version=candidate.version,
+                public_error_code=assessment.diagnostics[0].code,
+                diagnostic_count=len(assessment.diagnostics),
+            )
+            return StrategyCompilationResult(
+                compilation_status=StrategyCompilationStatus.REJECTED,
+                strategy_id=candidate.strategy_id,
+                strategy_version=candidate.version,
+                representation=None,
+                diagnostics=assessment.diagnostics,
+                event=event,
+            )
+
+        representation = self._backend.compile_representation(
+            candidate=candidate,
+            rule_validations=assessment.rule_validations,
+            compiler_version=self._compiler_version,
+        )
+        if not isinstance(representation, CompiledStrategyRepresentation):
+            raise ValueError("CompiledStrategyRepresentation attendue")
+        event = StrategyCompiled(
+            strategy_id=candidate.strategy_id,
+            strategy_version=candidate.version,
+            compiler_version=self._compiler_version,
+            representation_hash=representation.representation_hash,
+        )
+        return StrategyCompilationResult(
+            compilation_status=StrategyCompilationStatus.COMPILED,
+            strategy_id=candidate.strategy_id,
+            strategy_version=candidate.version,
+            representation=representation,
+            diagnostics=(),
+            event=event,
+        )
+
+
 _FORBIDDEN_DECISION_TYPES = frozenset({"RULE_EXPRESSION", "STRATEGY_RULE"})
 _FORBIDDEN_DETAIL_KEYS = frozenset(
     {
@@ -1732,6 +2315,7 @@ _INCOMPLETE_DIAGNOSTIC_CODES = frozenset(
         CompilationDiagnosticCode.DESIGN_CHOICE_JUSTIFICATION_REQUIRED,
         CompilationDiagnosticCode.STRATEGY_MANDATE_REQUIRED,
         CompilationDiagnosticCode.PARAMETER_CALIBRATION_REQUIRED,
+        CompilationDiagnosticCode.VALIDATION_PLAN_REQUIRED,
     }
 )
 
@@ -1809,6 +2393,55 @@ def _strategy_status_from_diagnostics(
 
 def _hash_text(value: str) -> str:
     return hashlib.sha256(_ensure_text(value, "valeur à hacher").encode("utf-8")).hexdigest()
+
+
+def _hash_payload(value: Any) -> str:
+    serialized_payload = json.dumps(
+        value,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+    return hashlib.sha256(serialized_payload.encode("utf-8")).hexdigest()
+
+
+def _verified_research_ref_payload(value: VerifiedResearchRef) -> dict[str, Any]:
+    if not isinstance(value, VerifiedResearchRef):
+        raise ValueError("VerifiedResearchRef attendue")
+    return {
+        "research_case_id": value.research_case_id,
+        "answer_id": value.answer_id,
+        "claim_refs": list(value.claim_refs),
+        "support_status": value.support_status,
+    }
+
+
+def _rule_origin_payload(value: RuleOrigin) -> dict[str, Any]:
+    if not isinstance(value, RuleOrigin):
+        raise ValueError("RuleOrigin attendue")
+    return {
+        "origin_type": value.origin_type.value,
+        "verified_claim_refs": list(value.verified_claim_refs),
+        "evidence_refs": list(value.evidence_refs),
+        "premises": list(value.premises),
+        "transformation": value.transformation,
+        "justification": value.justification,
+        "mandate_impact": value.mandate_impact,
+        "calibration_domain": _thaw_strategy_value(value.calibration_domain)
+        if value.calibration_domain is not None
+        else None,
+        "calibration_protocol": value.calibration_protocol,
+        "mandate_refs": list(value.mandate_refs),
+    }
+
+
+def _required_rule_validation(
+    validations: Mapping[str, RuleExpressionValidation],
+    rule_id: str,
+) -> RuleExpressionValidation:
+    if rule_id not in validations:
+        raise ValueError(f"validation expression absente: {rule_id}")
+    return validations[rule_id]
 
 
 def _rule_diagnostic(

@@ -101,3 +101,15 @@
 - Ajustement de gate: enrôlement des tests T-007 dans `scripts/test.ps1` et mise à jour du volume imbriqué M-003 attendu à `150 test(s)`.
 - Validations ciblées GREEN: `tests/m010/validate_strategy_candidate_diagnostics_acceptance.ps1`, `tests/m010/validate_strategy_candidate_diagnostics_unit.ps1`, `tests/m003/validate_m003_precondition_acceptance.ps1`, puis non-régression T-004/T-005/T-006.
 - Gates GREEN: `python -m compileall app\strategy_design`, `scripts/lint.ps1` avec `19 validation(s), 0 test(s)`, `git diff --check`, et `scripts/test.ps1` avec `19 validation(s), 212 test(s)`.
+
+### T-008 - Compilation déterministe de stratégie candidate
+
+- Précondition ciblée: `tests/m010/validate_strategy_candidate_diagnostics_acceptance.ps1` et `tests/m010/validate_strategy_candidate_diagnostics_unit.ps1` GREEN avant écriture des tests RED T-008.
+- Commit RED: `c2a03b91 test(m010): couvrir compilation strategie deterministe`.
+- RED utile: `tests/m010/validate_strategy_compilation_acceptance.ps1` échoue sur le backend déterministe absent; `tests/m010/validate_strategy_compilation_unit.ps1` échoue sur `CompiledStrategyRepresentation` absent.
+- Implémentation: ajout de `StrategyCompiler`, `StrategyCompilationPolicy`, `RuleExpressionValidation`, `CompiledStrategyRepresentation`, des événements `StrategyCompiled` / `StrategyCompilationRejected`, de la commande applicative `CompileStrategyCandidate`, et d'un backend SD déterministe interne sans appel EX.
+- Garde-fous: compilation refusée si statut différent de `COMPILABLE`, expression invalide, règle non déterministe sans mécanisme et graine, paramètre bloquant ou plan de validation absent; aucun backend implicite; aucun import du bounded context EX.
+- ADR: aucune nouvelle ADR; T-008 applique `ADR-010` et `DDD-ADR-009` sans changer leur décision.
+- Ajustement de gate: enrôlement des tests T-008 dans `scripts/test.ps1` et mise à jour du volume imbriqué M-003 attendu à `152 test(s)`.
+- Validations ciblées GREEN: `tests/m010/validate_strategy_compilation_acceptance.ps1`, `tests/m010/validate_strategy_compilation_unit.ps1`, puis non-régression T-005/T-006/T-007.
+- Gates GREEN: `python -m compileall app\strategy_design`, `scripts/validate_architecture_boundaries.ps1 -AppRoot .\app -ContextRegistryPath .\app\context_registry.json -SpecificationPath .\docs\specs\m001_frontieres_ddd_contrats_publies.md`, `scripts/lint.ps1` avec `19 validation(s), 0 test(s)`, `git diff --check`, `tests/m003/validate_m003_precondition_acceptance.ps1`, et `scripts/test.ps1` avec `19 validation(s), 214 test(s)`.
