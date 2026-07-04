@@ -740,6 +740,23 @@ Tout contrat intercontexte DOIT :
 - préciser les versions d’artefacts et politiques pertinentes ;
 - rester compatible en lecture pendant la durée de rétention convenue.
 
+### Relations intercontextes publiées
+
+| Relation | Producteur | Consommateur | Contrat publié | Statut M-001 | Type | Modèle interne interdit |
+|---|---|---|---|---|---|---|
+| SP -> KA | SP | KA | CanonicalSourcePublished | Livré | Published Language | tables, agrégats, diagnostics et chemins internes SP |
+| SP -> EG | SP | EG | CanonicalSourcePublished | Livré | Published Language | tables, agrégats, diagnostics et chemins internes SP |
+| KA -> RA | KA | RA | SearchEvidence API | Réservé | Customer/Supplier | Qdrant, embeddings, scores bruts et logique de fusion KA |
+| EG -> RA | EG | RA | VerifiedClaimRef | Livré | Published Language | graphe de claims, cas de vérification et états internes EG |
+| EG -> SD | EG | SD | VerifiedClaimRef | Livré | Published Language | graphe de claims, cas de vérification et états internes EG |
+| RA -> SD | RA | SD | VerifiedResearchOutcome | Livré | Anti-Corruption Layer | brouillons de réponse, jeux de preuves et états de recherche RA |
+| SD -> EX | SD | EX | StrategySnapshot | Livré | Published Language immuable | stratégie candidate mutable, paramètres ouverts et règles internes SD |
+| EX -> RA | EX | RA | ExperimentResult | Livré | Published Language | registre d'expérience, diagnostics et artefacts internes EX |
+| EX -> CV | EX | CV | ExperimentResult | Livré | Published Language | registre d'expérience, diagnostics et artefacts internes EX |
+| CV -> RA | CV | RA | ResolvedQuestion | Réservé | façade applicative | historique conversationnel, tours et snapshots internes CV |
+| CV -> SD | CV | SD | StrategyRequest | Réservé | façade applicative | historique conversationnel, préférences et tours internes CV |
+| CV -> EX | EX | CV | GetExperiment | Réservé | façade applicative | registre d'expérience, diagnostics et artefacts internes EX |
+
 ### `CanonicalSourceRef`
 
 ```json

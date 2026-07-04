@@ -14,7 +14,8 @@ $postMergeBranches = @(
     "codex/milestone-m006-claims-verifiables",
     "codex/milestone-m007-reponse-documentaire-verifiee",
     "codex/milestone-m008-conversation-produit",
-    "codex/milestone-m009-recherche-approfondie"
+    "codex/milestone-m009-recherche-approfondie",
+    "codex/milestone-m010-strategie-candidate-attribuee"
 )
 $allowedBranches = @($legacyBranch) + $postMergeBranches
 $requiredMilestonePaths = @(
