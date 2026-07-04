@@ -222,6 +222,9 @@ candidate_without_claim = candidate.assign_rule_origin(
     origin=RuleOrigin.source(verified_claim_refs=(), evidence_refs=("EVS-SNAPSHOT-UNIT",)),
     expected_version=candidate.version,
 )
+candidate_without_claim = candidate_without_claim.validate_candidate(
+    expected_version=candidate_without_claim.version
+)
 expect_raises(
     "claim versionne requis",
     lambda: policy.create_snapshot(

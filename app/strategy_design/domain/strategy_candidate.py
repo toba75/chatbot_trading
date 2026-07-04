@@ -11,9 +11,11 @@ from enum import Enum
 from types import MappingProxyType
 from typing import Any, Mapping, Protocol, Sequence
 
+from app.contracts.event_envelope import EventEnvelope
 from app.contracts.evidence_claims import EvidenceRef, VerifiedClaimRef
 from app.contracts.identity import DomainIdentifier
 from app.contracts.research_outcomes import VerifiedResearchOutcome, VersionedClaimRef
+from app.contracts.strategy_experiments import StrategySnapshot
 
 
 class StrategyCandidateStatus:
@@ -23,6 +25,8 @@ class StrategyCandidateStatus:
     COMPILABLE = "COMPILABLE"
     INCOMPLETE = "INCOMPLETE"
     INCONSISTENT = "INCONSISTENT"
+    SNAPSHOTTED = "SNAPSHOTTED"
+    SUPERSEDED = "SUPERSEDED"
 
 
 class StrategyConcurrencyError(RuntimeError):
@@ -1723,6 +1727,32 @@ class StrategyCandidate:
             compilation_diagnostics=diagnostics,
         )
 
+    def mark_snapshotted(
+        self,
+        *,
+        snapshot_id: str,
+        snapshot_hash: str,
+        expected_version: int,
+    ) -> "StrategyCandidate":
+        _ensure_current_candidate_version(self, expected_version)
+        if self.status != StrategyCandidateStatus.COMPILABLE:
+            raise ValueError("strategie non compilable")
+        _ensure_strategy_version_id(snapshot_id)
+        _ensure_hash_text(snapshot_hash, "snapshot_hash")
+        return replace(
+            self,
+            status=StrategyCandidateStatus.SNAPSHOTTED,
+            domain_events=self.domain_events
+            + (
+                StrategySnapshotCreated(
+                    strategy_id=self.strategy_id,
+                    strategy_version=self.version,
+                    snapshot_id=snapshot_id,
+                    snapshot_hash=snapshot_hash,
+                ),
+            ),
+        )
+
 
 class StrategyCompilationStatus:
     COMPILED = "COMPILED"
@@ -2123,6 +2153,30 @@ class StrategyCompiled:
 
 
 @dataclass(frozen=True)
+class StrategySnapshotCreated:
+    strategy_id: str
+    strategy_version: int
+    snapshot_id: str
+    snapshot_hash: str
+
+    @property
+    def event_type(self) -> str:
+        return "StrategySnapshotCreated"
+
+
+@dataclass(frozen=True)
+class StrategyVersionSuperseded:
+    strategy_id: str
+    old_snapshot_id: str
+    new_snapshot_id: str
+    reason_code: str
+
+    @property
+    def event_type(self) -> str:
+        return "StrategyVersionSuperseded"
+
+
+@dataclass(frozen=True)
 class StrategyCompilationResult:
     compilation_status: str
     strategy_id: str
@@ -2157,6 +2211,140 @@ class StrategyCompilationResult:
                 raise ValueError("resultat rejet incoherent")
             if not isinstance(self.event, StrategyCompilationRejected):
                 raise ValueError("StrategyCompilationRejected attendu")
+
+
+@dataclass(frozen=True)
+class StrategySnapshotPublication:
+    snapshot_id: str
+    snapshot_hash: str
+    snapshot: StrategySnapshot
+    created_event: EventEnvelope
+    superseded_event: EventEnvelope | None
+    supersedes_snapshot_id: str | None
+
+    def __post_init__(self) -> None:
+        _ensure_strategy_version_id(self.snapshot_id)
+        _ensure_hash_text(self.snapshot_hash, "snapshot_hash")
+        if not isinstance(self.snapshot, StrategySnapshot):
+            raise ValueError("StrategySnapshot attendu")
+        if self.snapshot.strategy_version_id != self.snapshot_id:
+            raise ValueError("snapshot_id incoherent")
+        if self.snapshot.spec_hash != self.snapshot_hash:
+            raise ValueError("snapshot_hash incoherent")
+        if not isinstance(self.created_event, EventEnvelope):
+            raise ValueError("event StrategySnapshotCreated attendu")
+        if self.created_event.event_type != "StrategySnapshotCreated":
+            raise ValueError("event StrategySnapshotCreated attendu")
+        if self.superseded_event is not None:
+            if not isinstance(self.superseded_event, EventEnvelope):
+                raise ValueError("event StrategyVersionSuperseded invalide")
+            if self.superseded_event.event_type != "StrategyVersionSuperseded":
+                raise ValueError("event StrategyVersionSuperseded attendu")
+        if self.supersedes_snapshot_id is not None:
+            _ensure_strategy_version_id(self.supersedes_snapshot_id)
+            if self.supersedes_snapshot_id == self.snapshot_id:
+                raise ValueError("snapshot supersede identique")
+
+
+class StrategySnapshotPolicy:
+    def create_snapshot(
+        self,
+        *,
+        candidate: StrategyCandidate,
+        compiled_representation: CompiledStrategyRepresentation,
+        created_at: str,
+        correlation_id: str,
+        causation_id: str,
+        supersedes_snapshot_id: str | None,
+    ) -> StrategySnapshotPublication:
+        if not isinstance(candidate, StrategyCandidate):
+            raise ValueError("StrategyCandidate attendue")
+        if candidate.status != StrategyCandidateStatus.COMPILABLE:
+            raise ValueError("strategie non compilable")
+        if not isinstance(compiled_representation, CompiledStrategyRepresentation):
+            raise ValueError("compilation disponible requise")
+        if compiled_representation.strategy_id != candidate.strategy_id:
+            raise ValueError("compilation hors strategie")
+        if compiled_representation.strategy_version != candidate.version:
+            raise ValueError("compilation hors version")
+        _parse_utc_instant(created_at, "created_at")
+        if supersedes_snapshot_id is not None:
+            _ensure_strategy_version_id(supersedes_snapshot_id)
+
+        snapshot_id = _strategy_version_id(candidate)
+        payload_without_hash = {
+            "schema_version": "1.0",
+            "strategy_id": candidate.strategy_id,
+            "strategy_version_id": snapshot_id,
+            "status": StrategyCandidateStatus.COMPILABLE,
+            "rules": _snapshot_rule_payloads(
+                candidate=candidate,
+                compiled_representation=compiled_representation,
+            ),
+            "parameters": _snapshot_parameter_payloads(candidate),
+            "constraints": _snapshot_constraints(candidate),
+            "data_requirements": _snapshot_data_requirements(candidate),
+            "validation_plan": _snapshot_validation_plan(
+                candidate=candidate,
+                compiled_representation=compiled_representation,
+            ),
+            "evidence_refs": _snapshot_evidence_refs(candidate),
+            "created_at": created_at,
+        }
+        snapshot_hash = _hash_payload(payload_without_hash)
+        snapshot = StrategySnapshot.from_payload(
+            {
+                **payload_without_hash,
+                "spec_hash": snapshot_hash,
+            }
+        )
+        created_event = _snapshot_event_envelope(
+            event_type="StrategySnapshotCreated",
+            snapshot_id=snapshot_id,
+            snapshot_hash=snapshot_hash,
+            candidate=candidate,
+            occurred_at=created_at,
+            correlation_id=correlation_id,
+            causation_id=causation_id,
+            payload={
+                "schema_version": "1.0",
+                "strategy_id": candidate.strategy_id,
+                "strategy_version": candidate.version,
+                "strategy_version_id": snapshot_id,
+                "snapshot_id": snapshot_id,
+                "snapshot_hash": snapshot_hash,
+                "aggregate_version": candidate.version,
+            },
+        )
+        superseded_event = (
+            _snapshot_event_envelope(
+                event_type="StrategyVersionSuperseded",
+                snapshot_id=snapshot_id,
+                snapshot_hash=snapshot_hash,
+                candidate=candidate,
+                occurred_at=created_at,
+                correlation_id=correlation_id,
+                causation_id=created_event.event_id,
+                payload={
+                    "schema_version": "1.0",
+                    "strategy_id": candidate.strategy_id,
+                    "old_snapshot_id": supersedes_snapshot_id,
+                    "new_snapshot_id": snapshot_id,
+                    "reason_code": "STRATEGY_VERSION_REPLACED",
+                    "aggregate_version": candidate.version,
+                },
+            )
+            if supersedes_snapshot_id is not None
+            else None
+        )
+        return StrategySnapshotPublication(
+            snapshot_id=snapshot_id,
+            snapshot_hash=snapshot_hash,
+            snapshot=snapshot,
+            created_event=created_event,
+            superseded_event=superseded_event,
+            supersedes_snapshot_id=supersedes_snapshot_id,
+        )
 
 
 @dataclass(frozen=True)
@@ -2293,6 +2481,251 @@ class StrategyCompiler:
             diagnostics=(),
             event=event,
         )
+
+
+def _strategy_version_id(candidate: StrategyCandidate) -> str:
+    if not isinstance(candidate, StrategyCandidate):
+        raise ValueError("StrategyCandidate attendue")
+    opaque_strategy_id = candidate.strategy_id.removeprefix("STRAT-")
+    return f"SVER-{opaque_strategy_id}-V{candidate.version:06d}"
+
+
+def _ensure_strategy_version_id(value: str) -> str:
+    try:
+        return str(DomainIdentifier.parse_with_prefix(value, "SVER"))
+    except ValueError as exc:
+        raise ValueError(f"strategy_version_id invalide: {exc}") from exc
+
+
+def _ensure_hash_text(value: str, field_name: str) -> str:
+    text_value = _ensure_text(value, field_name)
+    if len(text_value) not in {32, 64}:
+        raise ValueError(f"{field_name} invalide")
+    if any(character.lower() not in "0123456789abcdef" for character in text_value):
+        raise ValueError(f"{field_name} invalide")
+    return text_value
+
+
+def _snapshot_rule_payloads(
+    *,
+    candidate: StrategyCandidate,
+    compiled_representation: CompiledStrategyRepresentation,
+) -> list[dict[str, Any]]:
+    compiled_rules_by_id = {
+        compiled_rule.rule_id: compiled_rule
+        for compiled_rule in compiled_representation.rules
+    }
+    rule_payloads: list[dict[str, Any]] = []
+    for rule in sorted(candidate.rules, key=lambda current_rule: current_rule.rule_id):
+        if rule.origin is None:
+            raise ValueError("origine de regle requise")
+        if rule.rule_id not in compiled_rules_by_id:
+            raise ValueError(f"regle compilee absente: {rule.rule_id}")
+        compiled_rule = compiled_rules_by_id[rule.rule_id]
+        if not compiled_rule.deterministic:
+            raise ValueError("regle non deterministe")
+
+        claim_refs = _snapshot_rule_claim_refs(rule.origin)
+        first_claim_ref = VersionedClaimRef.parse(claim_refs[0])
+        payload = {
+            "rule_id": rule.rule_id,
+            "kind": rule.rule_kind,
+            "expression": compiled_rule.normalized_expression,
+            "origin": rule.origin.origin_type.value,
+            "evidence_refs": claim_refs,
+            "claim_id": first_claim_ref.claim_id,
+            "claim_version": first_claim_ref.claim_version,
+            "deterministic": True,
+            "origin_hash": compiled_rule.origin_hash,
+        }
+        if len(rule.origin.evidence_refs) > 0:
+            payload["source_evidence_refs"] = list(rule.origin.evidence_refs)
+        rule_payloads.append(payload)
+
+    if len(rule_payloads) == 0:
+        raise ValueError("regles snapshot absentes")
+    return rule_payloads
+
+
+def _snapshot_rule_claim_refs(origin: RuleOrigin) -> list[str]:
+    if not isinstance(origin, RuleOrigin):
+        raise ValueError("RuleOrigin attendue")
+    claim_refs = [str(VersionedClaimRef.parse(claim_ref)) for claim_ref in origin.verified_claim_refs]
+    if len(claim_refs) == 0:
+        raise ValueError("claim versionne requis")
+    return sorted(set(claim_refs))
+
+
+def _snapshot_parameter_payloads(candidate: StrategyCandidate) -> list[dict[str, Any]]:
+    parameter_payloads: list[dict[str, Any]] = []
+    for parameter in sorted(candidate.parameters, key=lambda current_parameter: current_parameter.parameter_id):
+        payload: dict[str, Any] = {
+            "parameter_id": parameter.parameter_id,
+            "name": parameter.name,
+            "origin": parameter.origin_type.value,
+            "blocking": parameter.blocking,
+            "resolution_status": parameter.resolution_status,
+        }
+        if parameter.value is not None:
+            payload["value"] = _thaw_strategy_value(parameter.value)
+        if parameter.domain is not None:
+            payload["domain"] = parameter.domain.to_payload()
+        if parameter.validation_plan is not None:
+            payload["calibration_rule"] = parameter.validation_plan.to_payload()
+        if parameter.unresolved_reason is not None:
+            payload["unresolved_reason"] = parameter.unresolved_reason
+        parameter_payloads.append(payload)
+
+    if len(parameter_payloads) == 0:
+        raise ValueError("parametres snapshot absents")
+    return parameter_payloads
+
+
+def _snapshot_constraints(candidate: StrategyCandidate) -> list[dict[str, Any]]:
+    mandate_payload = candidate.mandate.to_payload()
+    if "constraints" not in mandate_payload:
+        raise ValueError("contraintes mandat absentes")
+    constraints = mandate_payload["constraints"]
+    if isinstance(constraints, Mapping):
+        if len(constraints) == 0:
+            raise ValueError("contraintes mandat vides")
+        return [
+            {
+                "name": _ensure_text(name, "nom contrainte"),
+                "origin": RuleOriginType.USER_CONSTRAINT.value,
+                "value": _freeze_strategy_payload(value, "contrainte mandat"),
+            }
+            for name, value in sorted(constraints.items(), key=lambda item: item[0])
+        ]
+    if isinstance(constraints, str) or not isinstance(constraints, Sequence):
+        raise ValueError("contraintes mandat invalides")
+    payloads = []
+    for constraint in constraints:
+        if not isinstance(constraint, Mapping):
+            raise ValueError("contrainte mandat invalide")
+        if "name" not in constraint:
+            raise ValueError("nom contrainte absent")
+        payload = {
+            "name": _ensure_text(constraint["name"], "nom contrainte"),
+            "origin": RuleOriginType.USER_CONSTRAINT.value,
+        }
+        if "value" in constraint:
+            payload["value"] = _freeze_strategy_payload(constraint["value"], "contrainte mandat")
+        payloads.append(payload)
+    if len(payloads) == 0:
+        raise ValueError("contraintes mandat vides")
+    return sorted(payloads, key=lambda item: item["name"])
+
+
+def _snapshot_data_requirements(candidate: StrategyCandidate) -> list[dict[str, Any]]:
+    mandate_payload = candidate.mandate.to_payload()
+    if "data_requirements" not in mandate_payload:
+        raise ValueError("data_requirements absents")
+    data_requirements = mandate_payload["data_requirements"]
+    if isinstance(data_requirements, str) or not isinstance(data_requirements, Sequence):
+        raise ValueError("data_requirements invalides")
+    payloads = []
+    for data_requirement in data_requirements:
+        if not isinstance(data_requirement, Mapping):
+            raise ValueError("data_requirement invalide")
+        payloads.append(
+            {
+                "name": _required_mapping_text(data_requirement, "name"),
+                "frequency": _required_mapping_text(data_requirement, "frequency"),
+                "point_in_time": _required_mapping_bool(data_requirement, "point_in_time"),
+            }
+        )
+    if len(payloads) == 0:
+        raise ValueError("data_requirements vides")
+    return sorted(payloads, key=lambda item: item["name"])
+
+
+def _snapshot_validation_plan(
+    *,
+    candidate: StrategyCandidate,
+    compiled_representation: CompiledStrategyRepresentation,
+) -> dict[str, Any]:
+    plans = []
+    for parameter in sorted(candidate.parameters, key=lambda current_parameter: current_parameter.parameter_id):
+        if parameter.validation_plan is not None:
+            plans.append(
+                {
+                    "parameter_id": parameter.parameter_id,
+                    **parameter.validation_plan.to_payload(),
+                }
+            )
+    if len(plans) == 0:
+        raise ValueError("plan de validation absent")
+    return {
+        "compiled_representation_hash": compiled_representation.representation_hash,
+        "compiler_version": compiled_representation.compiler_version,
+        "parameter_validation_plans": plans,
+    }
+
+
+def _snapshot_evidence_refs(candidate: StrategyCandidate) -> list[str]:
+    claim_refs = set(candidate.verified_research_ref.claim_refs)
+    for rule in candidate.rules:
+        if rule.origin is not None:
+            claim_refs.update(str(VersionedClaimRef.parse(claim_ref)) for claim_ref in rule.origin.verified_claim_refs)
+    if len(claim_refs) == 0:
+        raise ValueError("evidence_refs snapshot absentes")
+    return sorted(claim_refs)
+
+
+def _snapshot_event_envelope(
+    *,
+    event_type: str,
+    snapshot_id: str,
+    snapshot_hash: str,
+    candidate: StrategyCandidate,
+    occurred_at: str,
+    correlation_id: str,
+    causation_id: str,
+    payload: Mapping[str, Any],
+) -> EventEnvelope:
+    _ensure_strategy_version_id(snapshot_id)
+    _ensure_hash_text(snapshot_hash, "snapshot_hash")
+    event_payload = dict(payload)
+    event_id = _snapshot_event_id(
+        event_type=event_type,
+        snapshot_id=snapshot_id,
+        snapshot_hash=snapshot_hash,
+        payload=event_payload,
+    )
+    return EventEnvelope.from_payload(
+        {
+            "event_id": event_id,
+            "event_type": event_type,
+            "event_version": 1,
+            "occurred_at": occurred_at,
+            "aggregate_type": "StrategySnapshot",
+            "aggregate_id": snapshot_id,
+            "aggregate_version": candidate.version,
+            "correlation_id": correlation_id,
+            "causation_id": causation_id,
+            "producer_context": "SD",
+            "payload": event_payload,
+        }
+    )
+
+
+def _snapshot_event_id(
+    *,
+    event_type: str,
+    snapshot_id: str,
+    snapshot_hash: str,
+    payload: Mapping[str, Any],
+) -> str:
+    event_token = _hash_payload(
+        {
+            "event_type": event_type,
+            "snapshot_id": snapshot_id,
+            "snapshot_hash": snapshot_hash,
+            "payload": payload,
+        }
+    ).upper()[:16]
+    return f"EVT-SD-{event_type.upper()}-{snapshot_id}-{event_token}"
 
 
 _FORBIDDEN_DECISION_TYPES = frozenset({"RULE_EXPRESSION", "STRATEGY_RULE"})
@@ -2701,6 +3134,14 @@ def _required_mapping_text(value: Mapping[str, Any], field_name: str) -> str:
     if field_name not in value:
         raise ValueError(f"{field_name} absent")
     return _ensure_text(value[field_name], field_name)
+
+
+def _required_mapping_bool(value: Mapping[str, Any], field_name: str) -> bool:
+    if field_name not in value:
+        raise ValueError(f"{field_name} absent")
+    if not isinstance(value[field_name], bool):
+        raise ValueError(f"{field_name} non booleen")
+    return value[field_name]
 
 
 def _required_claim_ref_tuple(value: Any) -> tuple[str, ...]:

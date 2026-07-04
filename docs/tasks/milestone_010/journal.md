@@ -113,3 +113,16 @@
 - Ajustement de gate: enrôlement des tests T-008 dans `scripts/test.ps1` et mise à jour du volume imbriqué M-003 attendu à `152 test(s)`.
 - Validations ciblées GREEN: `tests/m010/validate_strategy_compilation_acceptance.ps1`, `tests/m010/validate_strategy_compilation_unit.ps1`, puis non-régression T-005/T-006/T-007.
 - Gates GREEN: `python -m compileall app\strategy_design`, `scripts/validate_architecture_boundaries.ps1 -AppRoot .\app -ContextRegistryPath .\app\context_registry.json -SpecificationPath .\docs\specs\m001_frontieres_ddd_contrats_publies.md`, `scripts/lint.ps1` avec `19 validation(s), 0 test(s)`, `git diff --check`, `tests/m003/validate_m003_precondition_acceptance.ps1`, et `scripts/test.ps1` avec `19 validation(s), 214 test(s)`.
+
+### T-009 - Snapshot immuable de stratégie
+
+- Précondition ciblée: `tests/m010/validate_strategy_compilation_acceptance.ps1` et `tests/m010/validate_strategy_compilation_unit.ps1` GREEN avant écriture des tests RED T-009.
+- Commit RED: `68caeb11 test(m010): couvrir snapshot strategie immuable`.
+- RED utile: `tests/m010/validate_strategy_snapshot_acceptance.ps1` et `tests/m010/validate_strategy_snapshot_unit.ps1` échouaient sur le store/application de snapshot absents.
+- Implémentation: ajout de `StrategySnapshotPolicy`, `StrategySnapshotPublication`, du statut `SNAPSHOTTED`, des événements `StrategySnapshotCreated` et `StrategyVersionSuperseded`, du cas d'usage `CreateStrategySnapshot`, et du store mémoire append-only `InMemoryStrategySnapshotStore` avec outbox et idempotence par `snapshot_id`/`event_id`.
+- Garde-fous: snapshot seulement depuis une stratégie `COMPILABLE` et une compilation disponible; payload sans `/current` ni `latest`; conservation des `ClaimId`, versions et `EvidenceRefs` par règle documentaire; hash déterministe; relation `supersedes`/`superseded_by` résoluble; aucun doublon de snapshot ni d'événement outbox lors d'une republication.
+- ADR: aucune nouvelle ADR; T-009 applique `DDD-ADR-009` et `DDD-ADR-010` sans changer leur décision.
+- Ajustement de gate: enrôlement des tests T-009 dans `scripts/test.ps1` et mise à jour du volume imbriqué M-003 attendu à `154 test(s)`.
+- Validations ciblées GREEN: `tests/m010/validate_strategy_snapshot_acceptance.ps1`, `tests/m010/validate_strategy_snapshot_unit.ps1`, puis non-régression T-008 et `tests/m001/validate_strategy_experiment_contracts_acceptance.ps1`.
+- Gates GREEN: `python -m compileall app\strategy_design`, `scripts/lint.ps1` avec `19 validation(s), 0 test(s)`, `git diff --check`, `tests/m003/validate_m003_precondition_acceptance.ps1`, et `scripts/test.ps1` avec `19 validation(s), 216 test(s)`.
+- Commit GREEN: `feat(m010): creer snapshot strategie immuable`.
