@@ -19,6 +19,8 @@ from app.contracts.research_outcomes import VerifiedResearchOutcome, VersionedCl
 class StrategyCandidateStatus:
     DRAFT = "DRAFT"
     SPECIFIED = "SPECIFIED"
+    VALIDATING = "VALIDATING"
+    COMPILABLE = "COMPILABLE"
     INCOMPLETE = "INCOMPLETE"
     INCONSISTENT = "INCONSISTENT"
 
@@ -60,16 +62,32 @@ class CompatibilityFindingCode(str, Enum):
     EVIDENCE_SCOPE_MISMATCH = "EVIDENCE_SCOPE_MISMATCH"
 
 
+class CompilationDiagnosticCode(str, Enum):
+    STRATEGY_RULE_REQUIRED = "STRATEGY_RULE_REQUIRED"
+    RULE_ORIGIN_REQUIRED = "RULE_ORIGIN_REQUIRED"
+    SOURCE_EVIDENCE_REQUIRED = "SOURCE_EVIDENCE_REQUIRED"
+    DESIGN_CHOICE_JUSTIFICATION_REQUIRED = "DESIGN_CHOICE_JUSTIFICATION_REQUIRED"
+    STRATEGY_MANDATE_REQUIRED = "STRATEGY_MANDATE_REQUIRED"
+    PARAMETER_CALIBRATION_REQUIRED = "PARAMETER_CALIBRATION_REQUIRED"
+    STRATEGY_CONFLICT_BLOCKING = "STRATEGY_CONFLICT_BLOCKING"
+
+
 @dataclass(frozen=True)
 class CompilationDiagnostic:
-    code: str
+    code: CompilationDiagnosticCode | CompatibilityFindingCode
     description: str
     blocking: bool
     rule_id: str | None
     parameter_id: str | None
 
     def __post_init__(self) -> None:
-        _ensure_text(self.code, "code diagnostic")
+        if isinstance(self.code, str) and not isinstance(
+            self.code,
+            (CompilationDiagnosticCode, CompatibilityFindingCode),
+        ):
+            raise ValueError("code diagnostic libre interdit")
+        if not isinstance(self.code, (CompilationDiagnosticCode, CompatibilityFindingCode)):
+            raise ValueError("code diagnostic invalide")
         _ensure_text(self.description, "description diagnostic")
         if not isinstance(self.blocking, bool):
             raise ValueError("blocking diagnostic non booléen")
@@ -361,7 +379,7 @@ class RuleOriginPolicy:
         if rule.origin is None:
             return (
                 _rule_diagnostic(
-                    code="RULE_ORIGIN_REQUIRED",
+                    code=CompilationDiagnosticCode.RULE_ORIGIN_REQUIRED,
                     rule_id=rule.rule_id,
                     description="Règle de stratégie sans origine autorisée.",
                 ),
@@ -372,7 +390,7 @@ class RuleOriginPolicy:
             if origin.evidence_ref_count == 0:
                 return (
                     _rule_diagnostic(
-                        code="SOURCE_EVIDENCE_REQUIRED",
+                        code=CompilationDiagnosticCode.SOURCE_EVIDENCE_REQUIRED,
                         rule_id=rule.rule_id,
                         description="Origine SOURCE sans VerifiedClaimRef versionné ni EvidenceRef.",
                     ),
@@ -383,7 +401,7 @@ class RuleOriginPolicy:
             if len(origin.premises) == 0 or _is_blank_origin_text(origin.transformation):
                 return (
                     _rule_diagnostic(
-                        code="RULE_ORIGIN_REQUIRED",
+                        code=CompilationDiagnosticCode.RULE_ORIGIN_REQUIRED,
                         rule_id=rule.rule_id,
                         description="Déduction sans prémisses explicites ou transformation.",
                     ),
@@ -394,7 +412,7 @@ class RuleOriginPolicy:
             if _is_blank_origin_text(origin.justification) or _is_blank_origin_text(origin.mandate_impact):
                 return (
                     _rule_diagnostic(
-                        code="DESIGN_CHOICE_JUSTIFICATION_REQUIRED",
+                        code=CompilationDiagnosticCode.DESIGN_CHOICE_JUSTIFICATION_REQUIRED,
                         rule_id=rule.rule_id,
                         description="Choix de conception sans justification opérationnelle.",
                     ),
@@ -405,7 +423,7 @@ class RuleOriginPolicy:
             if _is_empty_mapping(origin.calibration_domain) or _is_blank_origin_text(origin.calibration_protocol):
                 return (
                     _rule_diagnostic(
-                        code="PARAMETER_CALIBRATION_REQUIRED",
+                        code=CompilationDiagnosticCode.PARAMETER_CALIBRATION_REQUIRED,
                         rule_id=rule.rule_id,
                         description="Paramètre à calibrer sans domaine ou protocole.",
                     ),
@@ -415,7 +433,7 @@ class RuleOriginPolicy:
         if len(origin.mandate_refs) == 0:
             return (
                 _rule_diagnostic(
-                    code="STRATEGY_MANDATE_REQUIRED",
+                    code=CompilationDiagnosticCode.STRATEGY_MANDATE_REQUIRED,
                     rule_id=rule.rule_id,
                     description="Contrainte utilisateur sans référence au mandat.",
                 ),
@@ -652,7 +670,7 @@ class ParameterCalibrationPolicy:
             if parameter.domain is None or parameter.validation_plan is None:
                 return (
                     _parameter_diagnostic(
-                        code="PARAMETER_CALIBRATION_REQUIRED",
+                        code=CompilationDiagnosticCode.PARAMETER_CALIBRATION_REQUIRED,
                         parameter_id=parameter.parameter_id,
                         description="Paramètre à calibrer sans domaine ou protocole.",
                     ),
@@ -662,12 +680,107 @@ class ParameterCalibrationPolicy:
         if parameter.blocking and parameter.resolution_status != "RESOLVED":
             return (
                 _parameter_diagnostic(
-                    code="PARAMETER_CALIBRATION_REQUIRED",
+                    code=CompilationDiagnosticCode.PARAMETER_CALIBRATION_REQUIRED,
                     parameter_id=parameter.parameter_id,
                     description="Paramètre bloquant non résolu.",
                 ),
             )
         return ()
+
+
+@dataclass(frozen=True)
+class StrategyConflict:
+    conflict_id: str
+    diagnostic: CompilationDiagnostic
+    resolution_status: str
+    resolution_summary: str | None
+
+    @classmethod
+    def blocking_documentary_conflict(
+        cls,
+        *,
+        conflict_id: str,
+        description: str,
+    ) -> "StrategyConflict":
+        return cls(
+            conflict_id=conflict_id,
+            diagnostic=CompilationDiagnostic(
+                code=CompilationDiagnosticCode.STRATEGY_CONFLICT_BLOCKING,
+                description=description,
+                blocking=True,
+                rule_id=None,
+                parameter_id=None,
+            ),
+            resolution_status="OPEN",
+            resolution_summary=None,
+        )
+
+    def __post_init__(self) -> None:
+        _ensure_text(self.conflict_id, "conflict_id")
+        if not isinstance(self.diagnostic, CompilationDiagnostic):
+            raise ValueError("CompilationDiagnostic attendu")
+        if self.diagnostic.code is not CompilationDiagnosticCode.STRATEGY_CONFLICT_BLOCKING:
+            raise ValueError("diagnostic de conflit de stratégie invalide")
+        if self.resolution_status not in {"OPEN", "RESOLVED"}:
+            raise ValueError(f"statut de résolution conflit inconnu: {self.resolution_status}")
+        object.__setattr__(
+            self,
+            "resolution_summary",
+            _ensure_parameter_optional_text(self.resolution_summary, "résumé de résolution"),
+        )
+        if self.resolution_status == "OPEN" and self.resolution_summary is not None:
+            raise ValueError("conflit ouvert avec résumé de résolution")
+        if self.resolution_status == "RESOLVED" and self.resolution_summary is None:
+            raise ValueError("conflit résolu sans résumé de résolution")
+
+    @property
+    def is_blocking_unresolved(self) -> bool:
+        return self.resolution_status == "OPEN" and self.diagnostic.blocking
+
+    def resolve(self, *, resolution_summary: str) -> "StrategyConflict":
+        return replace(
+            self,
+            resolution_status="RESOLVED",
+            resolution_summary=_ensure_text(resolution_summary, "résumé de résolution"),
+        )
+
+    def to_diagnostic(self) -> CompilationDiagnostic:
+        return self.diagnostic
+
+
+class StrategyCompletenessPolicy:
+    def evaluate(self, candidate: "StrategyCandidate") -> tuple[CompilationDiagnostic, ...]:
+        if not isinstance(candidate, StrategyCandidate):
+            raise ValueError("StrategyCandidate attendue")
+
+        diagnostics: list[CompilationDiagnostic] = []
+        if len(candidate.rules) == 0:
+            diagnostics.append(
+                CompilationDiagnostic(
+                    code=CompilationDiagnosticCode.STRATEGY_RULE_REQUIRED,
+                    description="Stratégie candidate sans règle formalisée.",
+                    blocking=True,
+                    rule_id=None,
+                    parameter_id=None,
+                )
+            )
+        diagnostics.extend(
+            diagnostic
+            for rule in candidate.rules
+            for diagnostic in RuleOriginPolicy().validate_rule(rule)
+        )
+        diagnostics.extend(
+            diagnostic
+            for parameter in candidate.parameters
+            for diagnostic in ParameterCalibrationPolicy().validate_parameter(parameter)
+        )
+        diagnostics.extend(
+            conflict.to_diagnostic()
+            for conflict in candidate.conflicts
+            if conflict.is_blocking_unresolved
+        )
+        diagnostics.extend(finding.to_diagnostic() for finding in candidate.compatibility_findings)
+        return tuple(diagnostics)
 
 
 @dataclass(frozen=True)
@@ -695,7 +808,7 @@ class CompatibilityFinding:
 
     def to_diagnostic(self) -> CompilationDiagnostic:
         return CompilationDiagnostic(
-            code=self.code.value,
+            code=self.code,
             description=self.description,
             blocking=self.blocking,
             rule_id=self.rule_id,
@@ -1223,6 +1336,44 @@ class CalibrationPlanDefined:
 
 
 @dataclass(frozen=True)
+class StrategyConflictRecorded:
+    strategy_id: str
+    strategy_version: int
+    conflict_id: str
+    diagnostic_code: CompilationDiagnosticCode
+    blocking_status: bool
+
+    @property
+    def event_type(self) -> str:
+        return "StrategyConflictRecorded"
+
+
+@dataclass(frozen=True)
+class StrategyConflictResolved:
+    strategy_id: str
+    previous_version: int
+    new_version: int
+    conflict_id: str
+    resolution_summary_hash: str
+
+    @property
+    def event_type(self) -> str:
+        return "StrategyConflictResolved"
+
+
+@dataclass(frozen=True)
+class StrategyCandidateValidated:
+    strategy_id: str
+    strategy_version: int
+    status: str
+    diagnostic_count: int
+
+    @property
+    def event_type(self) -> str:
+        return "StrategyCandidateValidated"
+
+
+@dataclass(frozen=True)
 class StrategyCandidate:
     strategy_id: str
     version: int
@@ -1233,6 +1384,7 @@ class StrategyCandidate:
     translation_diagnostics: tuple[StrategyTranslationDiagnostic, ...]
     compilation_diagnostics: tuple[CompilationDiagnostic, ...]
     compatibility_findings: tuple[CompatibilityFinding, ...]
+    conflicts: tuple[StrategyConflict, ...]
     rules: tuple[StrategyRule, ...]
     parameters: tuple[StrategyParameter, ...]
     domain_events: tuple[object, ...]
@@ -1272,6 +1424,7 @@ class StrategyCandidate:
             translation_diagnostics=diagnostics,
             compilation_diagnostics=(),
             compatibility_findings=(),
+            conflicts=(),
             rules=(),
             parameters=(),
             domain_events=(created_event,),
@@ -1430,6 +1583,99 @@ class StrategyCandidate:
             ),
         )
 
+    def record_conflict(
+        self,
+        *,
+        conflict: StrategyConflict,
+        expected_version: int,
+    ) -> "StrategyCandidate":
+        _ensure_current_candidate_version(self, expected_version)
+        if not isinstance(conflict, StrategyConflict):
+            raise ValueError("StrategyConflict attendu")
+        if any(existing.conflict_id == conflict.conflict_id for existing in self.conflicts):
+            raise ValueError(f"conflit de stratégie déjà enregistré: {conflict.conflict_id}")
+
+        new_version = self.version + 1
+        return replace(
+            self,
+            version=new_version,
+            status=StrategyCandidateStatus.SPECIFIED,
+            compilation_diagnostics=(),
+            conflicts=self.conflicts + (conflict,),
+            domain_events=self.domain_events
+            + (
+                StrategyConflictRecorded(
+                    strategy_id=self.strategy_id,
+                    strategy_version=new_version,
+                    conflict_id=conflict.conflict_id,
+                    diagnostic_code=conflict.diagnostic.code,
+                    blocking_status=conflict.diagnostic.blocking,
+                ),
+            ),
+        )
+
+    def resolve_conflict(
+        self,
+        *,
+        conflict_id: str,
+        resolution_summary: str,
+        expected_version: int,
+    ) -> "StrategyCandidate":
+        _ensure_current_candidate_version(self, expected_version)
+        _ensure_text(conflict_id, "conflict_id")
+        _ensure_text(resolution_summary, "résumé de résolution")
+
+        updated_conflicts = []
+        matched = False
+        for conflict in self.conflicts:
+            if conflict.conflict_id == conflict_id:
+                updated_conflicts.append(conflict.resolve(resolution_summary=resolution_summary))
+                matched = True
+            else:
+                updated_conflicts.append(conflict)
+        if not matched:
+            raise ValueError(f"conflit de stratégie absent: {conflict_id}")
+
+        new_version = self.version + 1
+        return replace(
+            self,
+            version=new_version,
+            status=StrategyCandidateStatus.SPECIFIED,
+            compilation_diagnostics=(),
+            conflicts=tuple(updated_conflicts),
+            domain_events=self.domain_events
+            + (
+                StrategyConflictResolved(
+                    strategy_id=self.strategy_id,
+                    previous_version=self.version,
+                    new_version=new_version,
+                    conflict_id=conflict_id,
+                    resolution_summary_hash=_hash_text(resolution_summary),
+                ),
+            ),
+        )
+
+    def validate_candidate(self, *, expected_version: int) -> "StrategyCandidate":
+        _ensure_current_candidate_version(self, expected_version)
+        diagnostics = StrategyCompletenessPolicy().evaluate(self)
+        next_status = _strategy_status_from_diagnostics(diagnostics)
+        new_version = self.version + 1
+        return replace(
+            self,
+            version=new_version,
+            status=next_status,
+            compilation_diagnostics=diagnostics,
+            domain_events=self.domain_events
+            + (
+                StrategyCandidateValidated(
+                    strategy_id=self.strategy_id,
+                    strategy_version=new_version,
+                    status=next_status,
+                    diagnostic_count=len(diagnostics),
+                ),
+            ),
+        )
+
     def validate_for_compilation(self, *, expected_version: int) -> "StrategyCandidate":
         _ensure_current_candidate_version(self, expected_version)
         rule_parameter_diagnostics = tuple(
@@ -1441,15 +1687,21 @@ class StrategyCandidate:
             for parameter in self.parameters
             for diagnostic in ParameterCalibrationPolicy().validate_parameter(parameter)
         )
+        conflict_diagnostics = tuple(
+            conflict.to_diagnostic()
+            for conflict in self.conflicts
+            if conflict.is_blocking_unresolved
+        )
         compatibility_diagnostics = tuple(finding.to_diagnostic() for finding in self.compatibility_findings)
-        diagnostics = rule_parameter_diagnostics + compatibility_diagnostics
+        diagnostics = rule_parameter_diagnostics + conflict_diagnostics + compatibility_diagnostics
         has_rule_or_parameter_blocking = any(diagnostic.blocking for diagnostic in rule_parameter_diagnostics)
+        has_conflict_blocking = any(diagnostic.blocking for diagnostic in conflict_diagnostics)
         has_compatibility_blocking = any(finding.blocking for finding in self.compatibility_findings)
         next_status = (
             StrategyCandidateStatus.INCOMPLETE
             if has_rule_or_parameter_blocking
             else StrategyCandidateStatus.INCONSISTENT
-            if has_compatibility_blocking
+            if has_conflict_blocking or has_compatibility_blocking
             else StrategyCandidateStatus.SPECIFIED
         )
         return replace(
@@ -1472,6 +1724,16 @@ _FORBIDDEN_DETAIL_KEYS = frozenset(
     }
 )
 _SENSITIVE_DETAIL_SUFFIXES = ("_api_key", "_password", "_secret", "_token")
+_INCOMPLETE_DIAGNOSTIC_CODES = frozenset(
+    {
+        CompilationDiagnosticCode.STRATEGY_RULE_REQUIRED,
+        CompilationDiagnosticCode.RULE_ORIGIN_REQUIRED,
+        CompilationDiagnosticCode.SOURCE_EVIDENCE_REQUIRED,
+        CompilationDiagnosticCode.DESIGN_CHOICE_JUSTIFICATION_REQUIRED,
+        CompilationDiagnosticCode.STRATEGY_MANDATE_REQUIRED,
+        CompilationDiagnosticCode.PARAMETER_CALIBRATION_REQUIRED,
+    }
+)
 
 
 def _create_translation_decisions(
@@ -1532,9 +1794,26 @@ def _ensure_current_candidate_version(
         )
 
 
+def _strategy_status_from_diagnostics(
+    diagnostics: tuple[CompilationDiagnostic, ...],
+) -> str:
+    if any(
+        diagnostic.blocking and diagnostic.code in _INCOMPLETE_DIAGNOSTIC_CODES
+        for diagnostic in diagnostics
+    ):
+        return StrategyCandidateStatus.INCOMPLETE
+    if any(diagnostic.blocking for diagnostic in diagnostics):
+        return StrategyCandidateStatus.INCONSISTENT
+    return StrategyCandidateStatus.COMPILABLE
+
+
+def _hash_text(value: str) -> str:
+    return hashlib.sha256(_ensure_text(value, "valeur à hacher").encode("utf-8")).hexdigest()
+
+
 def _rule_diagnostic(
     *,
-    code: str,
+    code: CompilationDiagnosticCode,
     rule_id: str,
     description: str,
 ) -> CompilationDiagnostic:
@@ -1549,7 +1828,7 @@ def _rule_diagnostic(
 
 def _parameter_diagnostic(
     *,
-    code: str,
+    code: CompilationDiagnosticCode,
     parameter_id: str,
     description: str,
 ) -> CompilationDiagnostic:

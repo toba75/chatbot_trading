@@ -27,6 +27,16 @@ from app.strategy_design.domain.strategy_candidate import (
 )
 
 
+class TranslationDecision:
+    decision_type = "SUPPORT_STATUS"
+    source_research_case_id = "RSC-DIAGNOSTICS-UNIT"
+    source_answer_id = "ANS-DIAGNOSTICS-UNIT"
+    source_claim_refs = ("CLM-DIAGNOSTICS-UNIT@1",)
+    description = "Réponse vérifiée traduite en hypothèse SD sans règle automatique."
+    blocking = False
+    details = {"support_status": "SUPPORTED"}
+
+
 def expect_raises(expected_fragment, action):
     try:
         action()
@@ -64,7 +74,7 @@ def build_candidate():
     candidate = StrategyCandidate.create_from_verified_research(
         strategy_id="STRAT-DIAGNOSTICS-UNIT",
         verified_research=build_outcome(),
-        translation_decisions=(),
+        translation_decisions=(TranslationDecision(),),
         expected_version=0,
     )
     candidate = candidate.add_rule(
@@ -95,7 +105,7 @@ assert validated_complete_candidate.compilation_diagnostics == ()
 draft_candidate = StrategyCandidate.create_from_verified_research(
     strategy_id="STRAT-DIAGNOSTICS-DRAFT",
     verified_research=build_outcome(),
-    translation_decisions=(),
+    translation_decisions=(TranslationDecision(),),
     expected_version=0,
 )
 validated_draft_candidate = draft_candidate.validate_candidate(
@@ -180,7 +190,7 @@ expect_raises(
     ),
 )
 expect_raises(
-    "conflit de stratégie déjà enregistré",
+    "CONFLICT-DOCUMENTARY-UNIT",
     lambda: candidate_with_conflict.record_conflict(
         conflict=StrategyConflict.blocking_documentary_conflict(
             conflict_id="CONFLICT-DOCUMENTARY-UNIT",
@@ -190,7 +200,7 @@ expect_raises(
     ),
 )
 expect_raises(
-    "conflit de stratégie absent",
+    "CONFLICT-ABSENT",
     lambda: complete_candidate.resolve_conflict(
         conflict_id="CONFLICT-ABSENT",
         resolution_summary="Impossible à résoudre sans conflit enregistré.",
@@ -198,7 +208,7 @@ expect_raises(
     ),
 )
 expect_raises(
-    "version obsolète",
+    "version obsol",
     lambda: complete_candidate.validate_candidate(
         expected_version=complete_candidate.version - 1
     ),

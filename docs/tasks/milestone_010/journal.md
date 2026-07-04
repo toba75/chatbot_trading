@@ -90,3 +90,14 @@
 - Ajustement de gate: enrôlement des tests T-006 dans `scripts/test.ps1` et mise à jour du volume imbriqué M-003 attendu à `148 test(s)`.
 - Validations ciblées GREEN: `tests/m010/validate_strategy_compatibility_acceptance.ps1`, `tests/m010/validate_strategy_compatibility_unit.ps1`, puis non-régression T-004/T-005.
 - Gates GREEN: `python -m compileall app\strategy_design`, `scripts/lint.ps1` avec `19 validation(s), 0 test(s)`, `git diff --check`, `tests/m003/validate_m003_precondition_acceptance.ps1`, et `scripts/test.ps1` avec `19 validation(s), 210 test(s)`.
+
+### T-007 - Diagnostics de validation de stratégie candidate
+
+- Précondition ciblée: `tests/m010/validate_strategy_compatibility_acceptance.ps1` et `tests/m010/validate_strategy_compatibility_unit.ps1` GREEN avant écriture des tests RED T-007.
+- Commit RED: `c33bb852 test(m010): couvrir diagnostics strategie candidate`.
+- RED utile: `tests/m010/validate_strategy_candidate_diagnostics_acceptance.ps1` échoue sur la commande applicative de validation absente; `tests/m010/validate_strategy_candidate_diagnostics_unit.ps1` échoue sur le type `CompilationDiagnosticCode` absent.
+- Implémentation: ajout de diagnostics de compilation typés, du statut `COMPILABLE`, des conflits SD enregistrables et résolubles, de la politique `StrategyCompletenessPolicy`, des événements `StrategyConflictRecorded`, `StrategyConflictResolved`, `StrategyCandidateValidated`, et des commandes applicatives `ValidateStrategyCandidate`, `RecordStrategyConflict` et `ResolveStrategyConflict`.
+- ADR: aucune nouvelle ADR; T-007 applique `ADR-010` et `DDD-ADR-010` sans changer leur décision.
+- Ajustement de gate: enrôlement des tests T-007 dans `scripts/test.ps1` et mise à jour du volume imbriqué M-003 attendu à `150 test(s)`.
+- Validations ciblées GREEN: `tests/m010/validate_strategy_candidate_diagnostics_acceptance.ps1`, `tests/m010/validate_strategy_candidate_diagnostics_unit.ps1`, `tests/m003/validate_m003_precondition_acceptance.ps1`, puis non-régression T-004/T-005/T-006.
+- Gates GREEN: `python -m compileall app\strategy_design`, `scripts/lint.ps1` avec `19 validation(s), 0 test(s)`, `git diff --check`, et `scripts/test.ps1` avec `19 validation(s), 212 test(s)`.
