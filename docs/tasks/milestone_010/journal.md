@@ -78,3 +78,15 @@
 - ADR: aucune nouvelle ADR; T-005 applique `ADR-010` et `DDD-ADR-010` sans changer leur décision.
 - Validations ciblées GREEN: `tests/m010/validate_strategy_parameter_calibration_acceptance.ps1`, `tests/m010/validate_strategy_parameter_calibration_unit.ps1`, puis non-régression T-003/T-004.
 - Gates GREEN: `python -m compileall app\strategy_design`, `scripts/lint.ps1` avec `19 validation(s), 0 test(s)`, `git diff --check`, et `scripts/test.ps1` avec `19 validation(s), 208 test(s)`.
+
+### T-006 - Compatibilité de stratégie
+
+- Précondition ciblée: `scripts/test.ps1` GREEN avec `19 validation(s), 208 test(s)` avant écriture des tests RED T-006.
+- Commit RED: `682a6837 test(m010): couvrir compatibilite strategie`.
+- RED utile: `tests/m010/validate_strategy_compatibility_acceptance.ps1` échoue sur `CompatibilityFindingCode` absent; `tests/m010/validate_strategy_compatibility_unit.ps1` échoue sur `CompatibilityFinding` absent.
+- Reprise main-agent: le worker a été interrompu après plus de 60 minutes sans final exploitable; aucun fichier de production n'avait été modifié après le commit RED.
+- Implémentation: ajout de findings de compatibilité typés, exigences et disponibilité de données, profil d'exécution, politiques point-in-time et faisabilité d'exécution, politique de compatibilité, analyseur SD et statut `INCONSISTENT` raccordé aux diagnostics de compilation.
+- ADR: aucune nouvelle ADR; T-006 applique `ADR-010`, `DDD-ADR-007` et `DDD-ADR-010` sans changer leur décision.
+- Ajustement de gate: enrôlement des tests T-006 dans `scripts/test.ps1` et mise à jour du volume imbriqué M-003 attendu à `148 test(s)`.
+- Validations ciblées GREEN: `tests/m010/validate_strategy_compatibility_acceptance.ps1`, `tests/m010/validate_strategy_compatibility_unit.ps1`, puis non-régression T-004/T-005.
+- Gates GREEN: `python -m compileall app\strategy_design`, `scripts/lint.ps1` avec `19 validation(s), 0 test(s)`, `git diff --check`, `tests/m003/validate_m003_precondition_acceptance.ps1`, et `scripts/test.ps1` avec `19 validation(s), 210 test(s)`.

@@ -6,6 +6,7 @@ import hashlib
 import json
 import math
 from dataclasses import dataclass, replace
+from datetime import datetime
 from enum import Enum
 from types import MappingProxyType
 from typing import Any, Mapping, Sequence
@@ -19,6 +20,7 @@ class StrategyCandidateStatus:
     DRAFT = "DRAFT"
     SPECIFIED = "SPECIFIED"
     INCOMPLETE = "INCOMPLETE"
+    INCONSISTENT = "INCONSISTENT"
 
 
 class StrategyConcurrencyError(RuntimeError):
@@ -44,6 +46,18 @@ class RuleOriginType(str, Enum):
     DESIGN_CHOICE = "DESIGN_CHOICE"
     PARAMETER_TO_CALIBRATE = "PARAMETER_TO_CALIBRATE"
     USER_CONSTRAINT = "USER_CONSTRAINT"
+
+
+class CompatibilityFindingCode(str, Enum):
+    POINT_IN_TIME_VIOLATION = "POINT_IN_TIME_VIOLATION"
+    DATA_FREQUENCY_INCOMPATIBLE = "DATA_FREQUENCY_INCOMPATIBLE"
+    CALENDAR_UNAVAILABLE = "CALENDAR_UNAVAILABLE"
+    IMPLICIT_COST_MODEL = "IMPLICIT_COST_MODEL"
+    TURNOVER_CONSTRAINT_VIOLATION = "TURNOVER_CONSTRAINT_VIOLATION"
+    LIQUIDITY_CONSTRAINT_VIOLATION = "LIQUIDITY_CONSTRAINT_VIOLATION"
+    LEVERAGE_CONSTRAINT_VIOLATION = "LEVERAGE_CONSTRAINT_VIOLATION"
+    HORIZON_MISMATCH = "HORIZON_MISMATCH"
+    EVIDENCE_SCOPE_MISMATCH = "EVIDENCE_SCOPE_MISMATCH"
 
 
 @dataclass(frozen=True)
@@ -657,6 +671,371 @@ class ParameterCalibrationPolicy:
 
 
 @dataclass(frozen=True)
+class CompatibilityFinding:
+    code: CompatibilityFindingCode
+    description: str
+    blocking: bool
+    rule_id: str | None
+    parameter_id: str | None
+
+    def __post_init__(self) -> None:
+        if isinstance(self.code, str) and not isinstance(self.code, CompatibilityFindingCode):
+            raise ValueError("code finding compatibilitÃ© libre interdit")
+        if not isinstance(self.code, CompatibilityFindingCode):
+            raise ValueError("code finding compatibilitÃ© invalide")
+        _ensure_text(self.description, "description finding compatibilitÃ©")
+        if not isinstance(self.blocking, bool):
+            raise ValueError("blocking finding compatibilitÃ© non boolÃ©en")
+        if self.rule_id is not None:
+            _ensure_text(self.rule_id, "rule_id finding compatibilitÃ©")
+        if self.parameter_id is not None:
+            _ensure_text(self.parameter_id, "parameter_id finding compatibilitÃ©")
+        if self.rule_id is not None and self.parameter_id is not None:
+            raise ValueError("finding de compatibilitÃ© Ã  cible multiple")
+
+    def to_diagnostic(self) -> CompilationDiagnostic:
+        return CompilationDiagnostic(
+            code=self.code.value,
+            description=self.description,
+            blocking=self.blocking,
+            rule_id=self.rule_id,
+            parameter_id=self.parameter_id,
+        )
+
+
+@dataclass(frozen=True)
+class DataAvailability:
+    requirement_id: str
+    available_at: str
+
+    def __post_init__(self) -> None:
+        _ensure_text(self.requirement_id, "requirement_id")
+        _parse_utc_instant(self.available_at, "available_at")
+
+
+@dataclass(frozen=True)
+class DataRequirement:
+    requirement_id: str
+    data_name: str
+    frequency: str
+    evidence_scope_refs: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        _ensure_text(self.requirement_id, "requirement_id")
+        _ensure_text(self.data_name, "data_name")
+        object.__setattr__(self, "frequency", _normalize_temporal_bucket(self.frequency, "frequency"))
+        if isinstance(self.evidence_scope_refs, str) or not isinstance(self.evidence_scope_refs, tuple):
+            raise ValueError("evidence_scope_refs non tuple")
+        if len(self.evidence_scope_refs) == 0:
+            raise ValueError("evidence_scope_refs vide")
+        object.__setattr__(
+            self,
+            "evidence_scope_refs",
+            tuple(_ensure_text(scope_ref, "evidence_scope_refs") for scope_ref in self.evidence_scope_refs),
+        )
+
+
+@dataclass(frozen=True)
+class ExecutionProfile:
+    signal_horizon: str
+    holding_horizon: str
+    decision_frequency: str
+    calendar_id: str
+    cost_model_id: str | None
+    expected_turnover: int | float
+    expected_liquidity_usage: int | float
+    expected_leverage: int | float
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "signal_horizon",
+            _normalize_temporal_bucket(self.signal_horizon, "signal_horizon"),
+        )
+        object.__setattr__(
+            self,
+            "holding_horizon",
+            _normalize_temporal_bucket(self.holding_horizon, "holding_horizon"),
+        )
+        object.__setattr__(
+            self,
+            "decision_frequency",
+            _normalize_temporal_bucket(self.decision_frequency, "decision_frequency"),
+        )
+        _ensure_text(self.calendar_id, "calendar_id")
+        if self.cost_model_id is not None:
+            _ensure_text(self.cost_model_id, "cost_model_id")
+        object.__setattr__(
+            self,
+            "expected_turnover",
+            _ensure_non_negative_measure(self.expected_turnover, "coÃ»t attendu invalide"),
+        )
+        object.__setattr__(
+            self,
+            "expected_liquidity_usage",
+            _ensure_non_negative_measure(self.expected_liquidity_usage, "coÃ»t attendu invalide"),
+        )
+        object.__setattr__(
+            self,
+            "expected_leverage",
+            _ensure_non_negative_measure(self.expected_leverage, "coÃ»t attendu invalide"),
+        )
+
+
+@dataclass(frozen=True)
+class StrategyCompatibilityContext:
+    rule_id: str
+    decision_at: str
+    data_requirements: tuple[DataRequirement, ...]
+    execution: ExecutionProfile
+
+    def __post_init__(self) -> None:
+        _ensure_text(self.rule_id, "rule_id")
+        _parse_utc_instant(self.decision_at, "decision_at")
+        if isinstance(self.data_requirements, str) or not isinstance(self.data_requirements, tuple):
+            raise ValueError("data_requirements non tuple")
+        if len(self.data_requirements) == 0:
+            raise ValueError("data_requirements vide")
+        for requirement in self.data_requirements:
+            if not isinstance(requirement, DataRequirement):
+                raise ValueError("DataRequirement attendu")
+        if not isinstance(self.execution, ExecutionProfile):
+            raise ValueError("ExecutionProfile attendu")
+
+
+class PointInTimeDataPolicy:
+    def __init__(self, *, data_availability_catalog: Any) -> None:
+        if not hasattr(data_availability_catalog, "availability_for"):
+            raise ValueError("DataAvailabilityCatalog attendu")
+        self._data_availability_catalog = data_availability_catalog
+
+    def evaluate(
+        self,
+        *,
+        rule_id: str,
+        decision_at: str,
+        data_requirements: tuple[DataRequirement, ...],
+        signal_horizon: str,
+    ) -> tuple[CompatibilityFinding, ...]:
+        _ensure_text(rule_id, "rule_id")
+        decision_time = _parse_utc_instant(decision_at, "decision_at")
+        normalized_signal_horizon = _normalize_temporal_bucket(signal_horizon, "signal_horizon")
+
+        findings: list[CompatibilityFinding] = []
+        for requirement in data_requirements:
+            if not isinstance(requirement, DataRequirement):
+                raise ValueError("DataRequirement attendu")
+            availability = self._data_availability_catalog.availability_for(requirement)
+            if not isinstance(availability, DataAvailability):
+                raise ValueError("DataAvailability attendu")
+            if availability.requirement_id != requirement.requirement_id:
+                raise ValueError("disponibilitÃ© de donnÃ©e incohÃ©rente")
+            if _parse_utc_instant(availability.available_at, "available_at") > decision_time:
+                findings.append(
+                    CompatibilityFinding(
+                        code=CompatibilityFindingCode.POINT_IN_TIME_VIOLATION,
+                        description="DonnÃ©e indisponible au moment de dÃ©cision.",
+                        blocking=True,
+                        rule_id=rule_id,
+                        parameter_id=None,
+                    )
+                )
+            if _temporal_rank(requirement.frequency) > _temporal_rank(normalized_signal_horizon):
+                findings.append(
+                    CompatibilityFinding(
+                        code=CompatibilityFindingCode.DATA_FREQUENCY_INCOMPATIBLE,
+                        description="FrÃ©quence de donnÃ©e incompatible avec l'horizon du signal.",
+                        blocking=True,
+                        rule_id=rule_id,
+                        parameter_id=None,
+                    )
+                )
+        return tuple(findings)
+
+
+class ExecutionFeasibilityPolicy:
+    def __init__(self, *, market_calendar_catalog: Any) -> None:
+        if not hasattr(market_calendar_catalog, "has_calendar"):
+            raise ValueError("MarketCalendarCatalog attendu")
+        self._market_calendar_catalog = market_calendar_catalog
+
+    def evaluate(
+        self,
+        *,
+        rule_id: str,
+        mandate: "StrategyMandate",
+        execution: ExecutionProfile,
+    ) -> tuple[CompatibilityFinding, ...]:
+        _ensure_text(rule_id, "rule_id")
+        if not isinstance(mandate, StrategyMandate):
+            raise ValueError("StrategyMandate attendu")
+        if not isinstance(execution, ExecutionProfile):
+            raise ValueError("ExecutionProfile attendu")
+
+        findings: list[CompatibilityFinding] = []
+        if not self._market_calendar_catalog.has_calendar(execution.calendar_id):
+            findings.append(
+                CompatibilityFinding(
+                    code=CompatibilityFindingCode.CALENDAR_UNAVAILABLE,
+                    description="Calendrier de marchÃ© absent.",
+                    blocking=True,
+                    rule_id=rule_id,
+                    parameter_id=None,
+                )
+            )
+        if execution.cost_model_id is None:
+            findings.append(
+                CompatibilityFinding(
+                    code=CompatibilityFindingCode.IMPLICIT_COST_MODEL,
+                    description="ModÃ¨le de coÃ»ts explicite absent.",
+                    blocking=True,
+                    rule_id=rule_id,
+                    parameter_id=None,
+                )
+            )
+        max_turnover = _optional_mandate_number(mandate, "max_turnover")
+        if max_turnover is not None and execution.expected_turnover > max_turnover:
+            findings.append(
+                CompatibilityFinding(
+                    code=CompatibilityFindingCode.TURNOVER_CONSTRAINT_VIOLATION,
+                    description="Turnover attendu supÃ©rieur au mandat.",
+                    blocking=True,
+                    rule_id=rule_id,
+                    parameter_id=None,
+                )
+            )
+        max_liquidity_usage = _optional_mandate_number(mandate, "max_liquidity_usage")
+        if max_liquidity_usage is not None and execution.expected_liquidity_usage > max_liquidity_usage:
+            findings.append(
+                CompatibilityFinding(
+                    code=CompatibilityFindingCode.LIQUIDITY_CONSTRAINT_VIOLATION,
+                    description="Usage de liquiditÃ© attendu supÃ©rieur au mandat.",
+                    blocking=True,
+                    rule_id=rule_id,
+                    parameter_id=None,
+                )
+            )
+        max_leverage = _optional_mandate_number(mandate, "max_leverage")
+        if max_leverage is not None and execution.expected_leverage > max_leverage:
+            findings.append(
+                CompatibilityFinding(
+                    code=CompatibilityFindingCode.LEVERAGE_CONSTRAINT_VIOLATION,
+                    description="Levier attendu supÃ©rieur au mandat.",
+                    blocking=True,
+                    rule_id=rule_id,
+                    parameter_id=None,
+                )
+            )
+        return tuple(findings)
+
+
+class StrategyCompatibilityPolicy:
+    def __init__(
+        self,
+        *,
+        point_in_time_policy: PointInTimeDataPolicy,
+        execution_feasibility_policy: ExecutionFeasibilityPolicy,
+    ) -> None:
+        if not isinstance(point_in_time_policy, PointInTimeDataPolicy):
+            raise ValueError("PointInTimeDataPolicy attendue")
+        if not isinstance(execution_feasibility_policy, ExecutionFeasibilityPolicy):
+            raise ValueError("ExecutionFeasibilityPolicy attendue")
+        self._point_in_time_policy = point_in_time_policy
+        self._execution_feasibility_policy = execution_feasibility_policy
+
+    def evaluate(
+        self,
+        *,
+        mandate: "StrategyMandate",
+        context: StrategyCompatibilityContext,
+    ) -> tuple[CompatibilityFinding, ...]:
+        if not isinstance(mandate, StrategyMandate):
+            raise ValueError("StrategyMandate attendu")
+        if not isinstance(context, StrategyCompatibilityContext):
+            raise ValueError("StrategyCompatibilityContext attendu")
+
+        findings = list(
+            self._point_in_time_policy.evaluate(
+                rule_id=context.rule_id,
+                decision_at=context.decision_at,
+                data_requirements=context.data_requirements,
+                signal_horizon=context.execution.signal_horizon,
+            )
+        )
+        findings.extend(
+            self._execution_feasibility_policy.evaluate(
+                rule_id=context.rule_id,
+                mandate=mandate,
+                execution=context.execution,
+            )
+        )
+        mandate_horizon = _optional_mandate_text(mandate, "horizon")
+        if mandate_horizon is not None and _normalize_temporal_bucket(
+            mandate_horizon,
+            "horizon mandat",
+        ) != context.execution.holding_horizon:
+            findings.append(
+                CompatibilityFinding(
+                    code=CompatibilityFindingCode.HORIZON_MISMATCH,
+                    description="Horizon de dÃ©tention incompatible avec le mandat.",
+                    blocking=True,
+                    rule_id=context.rule_id,
+                    parameter_id=None,
+                )
+            )
+        allowed_scope_refs = _optional_mandate_text_tuple(mandate, "allowed_evidence_scope_refs")
+        if allowed_scope_refs is not None:
+            allowed_scope_set = frozenset(allowed_scope_refs)
+            for requirement in context.data_requirements:
+                if not set(requirement.evidence_scope_refs).issubset(allowed_scope_set):
+                    findings.append(
+                        CompatibilityFinding(
+                            code=CompatibilityFindingCode.EVIDENCE_SCOPE_MISMATCH,
+                            description="PortÃ©e des preuves incompatible avec le mandat.",
+                            blocking=True,
+                            rule_id=context.rule_id,
+                            parameter_id=None,
+                        )
+                    )
+                    break
+        return tuple(findings)
+
+
+class StrategyCompatibilityAnalyzer:
+    def __init__(self, *, policy: StrategyCompatibilityPolicy) -> None:
+        if not isinstance(policy, StrategyCompatibilityPolicy):
+            raise ValueError("StrategyCompatibilityPolicy attendue")
+        self._policy = policy
+
+    def analyze(
+        self,
+        candidate: "StrategyCandidate",
+        *,
+        context: StrategyCompatibilityContext,
+        expected_version: int,
+    ) -> "StrategyCandidate":
+        if not isinstance(candidate, StrategyCandidate):
+            raise ValueError("StrategyCandidate attendue")
+        _ensure_current_candidate_version(candidate, expected_version)
+        findings = self._policy.evaluate(mandate=candidate.mandate, context=context)
+        diagnostics = candidate.compilation_diagnostics + tuple(
+            finding.to_diagnostic() for finding in findings
+        )
+        next_status = (
+            StrategyCandidateStatus.INCONSISTENT
+            if any(finding.blocking for finding in findings)
+            else StrategyCandidateStatus.SPECIFIED
+        )
+        return replace(
+            candidate,
+            version=candidate.version + 1,
+            status=next_status,
+            compatibility_findings=findings,
+            compilation_diagnostics=diagnostics,
+        )
+
+
+@dataclass(frozen=True)
 class StrategyMandate:
     payload: Mapping[str, Any]
 
@@ -853,6 +1232,7 @@ class StrategyCandidate:
     translation_decisions: tuple[StrategyTranslationDecision, ...]
     translation_diagnostics: tuple[StrategyTranslationDiagnostic, ...]
     compilation_diagnostics: tuple[CompilationDiagnostic, ...]
+    compatibility_findings: tuple[CompatibilityFinding, ...]
     rules: tuple[StrategyRule, ...]
     parameters: tuple[StrategyParameter, ...]
     domain_events: tuple[object, ...]
@@ -891,6 +1271,7 @@ class StrategyCandidate:
             translation_decisions=decisions,
             translation_diagnostics=diagnostics,
             compilation_diagnostics=(),
+            compatibility_findings=(),
             rules=(),
             parameters=(),
             domain_events=(created_event,),
@@ -914,6 +1295,7 @@ class StrategyCandidate:
             version=new_version,
             status=StrategyCandidateStatus.SPECIFIED,
             compilation_diagnostics=(),
+            compatibility_findings=(),
             rules=self.rules + (rule,),
             domain_events=self.domain_events
             + (
@@ -954,6 +1336,7 @@ class StrategyCandidate:
             version=self.version + 1,
             status=StrategyCandidateStatus.SPECIFIED,
             compilation_diagnostics=(),
+            compatibility_findings=(),
             rules=tuple(updated_rules),
             domain_events=self.domain_events
             + (
@@ -984,6 +1367,7 @@ class StrategyCandidate:
             version=new_version,
             status=StrategyCandidateStatus.SPECIFIED,
             compilation_diagnostics=(),
+            compatibility_findings=(),
             parameters=self.parameters + (parameter,),
             domain_events=self.domain_events
             + (
@@ -1033,6 +1417,7 @@ class StrategyCandidate:
             version=self.version + 1,
             status=StrategyCandidateStatus.SPECIFIED,
             compilation_diagnostics=(),
+            compatibility_findings=(),
             parameters=tuple(updated_parameters),
             domain_events=self.domain_events
             + (
@@ -1047,7 +1432,7 @@ class StrategyCandidate:
 
     def validate_for_compilation(self, *, expected_version: int) -> "StrategyCandidate":
         _ensure_current_candidate_version(self, expected_version)
-        diagnostics = tuple(
+        rule_parameter_diagnostics = tuple(
             diagnostic
             for rule in self.rules
             for diagnostic in RuleOriginPolicy().validate_rule(rule)
@@ -1056,9 +1441,15 @@ class StrategyCandidate:
             for parameter in self.parameters
             for diagnostic in ParameterCalibrationPolicy().validate_parameter(parameter)
         )
+        compatibility_diagnostics = tuple(finding.to_diagnostic() for finding in self.compatibility_findings)
+        diagnostics = rule_parameter_diagnostics + compatibility_diagnostics
+        has_rule_or_parameter_blocking = any(diagnostic.blocking for diagnostic in rule_parameter_diagnostics)
+        has_compatibility_blocking = any(finding.blocking for finding in self.compatibility_findings)
         next_status = (
             StrategyCandidateStatus.INCOMPLETE
-            if any(diagnostic.blocking for diagnostic in diagnostics)
+            if has_rule_or_parameter_blocking
+            else StrategyCandidateStatus.INCONSISTENT
+            if has_compatibility_blocking
             else StrategyCandidateStatus.SPECIFIED
         )
         return replace(
@@ -1169,6 +1560,68 @@ def _parameter_diagnostic(
         rule_id=None,
         parameter_id=parameter_id,
     )
+
+
+_TEMPORAL_BUCKET_RANK = {
+    "INTRADAY": 0,
+    "DAILY": 1,
+    "SWING": 2,
+    "WEEKLY": 2,
+    "MONTHLY": 3,
+    "QUARTERLY": 4,
+    "YEARLY": 5,
+}
+
+
+def _parse_utc_instant(value: Any, field_name: str) -> datetime:
+    text_value = _ensure_text(value, field_name)
+    try:
+        return datetime.strptime(text_value, "%Y-%m-%dT%H:%M:%SZ")
+    except ValueError as exc:
+        raise ValueError(f"{field_name} instant UTC invalide") from exc
+
+
+def _normalize_temporal_bucket(value: Any, field_name: str) -> str:
+    normalized_value = _ensure_text(value, field_name).upper()
+    if normalized_value not in _TEMPORAL_BUCKET_RANK:
+        raise ValueError(f"{field_name} inconnu: {value}")
+    return normalized_value
+
+
+def _temporal_rank(value: str) -> int:
+    normalized_value = _normalize_temporal_bucket(value, "horizon temporel")
+    return _TEMPORAL_BUCKET_RANK[normalized_value]
+
+
+def _ensure_non_negative_measure(value: Any, error_message: str) -> int | float:
+    number_value = _ensure_parameter_number(value, error_message)
+    if number_value < 0:
+        raise ValueError(error_message)
+    return number_value
+
+
+def _optional_mandate_number(mandate: "StrategyMandate", field_name: str) -> int | float | None:
+    if field_name not in mandate.payload:
+        return None
+    return _ensure_non_negative_measure(mandate.payload[field_name], f"{field_name} mandat invalide")
+
+
+def _optional_mandate_text(mandate: "StrategyMandate", field_name: str) -> str | None:
+    if field_name not in mandate.payload:
+        return None
+    return _ensure_text(mandate.payload[field_name], field_name)
+
+
+def _optional_mandate_text_tuple(mandate: "StrategyMandate", field_name: str) -> tuple[str, ...] | None:
+    if field_name not in mandate.payload:
+        return None
+    values = mandate.payload[field_name]
+    if isinstance(values, str) or not hasattr(values, "__iter__"):
+        raise ValueError(f"{field_name} non liste")
+    parsed_values = tuple(_ensure_text(value, field_name) for value in values)
+    if len(parsed_values) == 0:
+        raise ValueError(f"{field_name} vide")
+    return parsed_values
 
 
 def _required_origin_tuple(payload: Mapping[str, Any], field_name: str) -> tuple[Any, ...]:
