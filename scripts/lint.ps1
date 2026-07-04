@@ -41,6 +41,7 @@ $validationCommands = @(
     @{ Path = "scripts/validate_m008_specification.ps1"; Arguments = @("-Path", $m008SpecificationPath) },
     @{ Path = "scripts/validate_m009_specification.ps1"; Arguments = @("-Path", $m009SpecificationPath) },
     @{ Path = "scripts/validate_m010_specification.ps1"; Arguments = @("-Path", $m010SpecificationPath) },
+    @{ Path = "scripts/validate_m010_traceability.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_platform_topology.ps1"; Arguments = @("-Path", $platformTopologyPath) },
     @{ Path = "scripts/validate_local_compose.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_network_boundary.ps1"; Arguments = @("-SparkFirewallPath", $sparkFirewallPath) },
@@ -65,6 +66,7 @@ $expectedValidationPaths = @(
     "scripts/validate_m008_specification.ps1",
     "scripts/validate_m009_specification.ps1",
     "scripts/validate_m010_specification.ps1",
+    "scripts/validate_m010_traceability.ps1",
     "scripts/validate_platform_topology.ps1",
     "scripts/validate_local_compose.ps1",
     "scripts/validate_network_boundary.ps1",
@@ -78,7 +80,7 @@ Invoke-M000ValidationGate `
     -RepositoryRoot $repoRoot `
     -ValidationCommands $validationCommands `
     -TestCommands $testCommands `
-    -ExpectedValidationCount 19 `
+    -ExpectedValidationCount 20 `
     -ExpectedTestCount 0 `
     -ExpectedValidationPaths $expectedValidationPaths `
     -ExpectedTestPaths $expectedTestPaths

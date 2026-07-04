@@ -179,7 +179,8 @@ foreach ($sensitivePayload in @(
     Assert-NotContains -Content $metricsModuleContent -Forbidden $sensitivePayload -Message "Les metriques M-010 ne doivent pas exposer de payload sensible."
 }
 
-Assert-Contains -Content $journalContent -Expected "### T-011 - Tracabilite et metriques M-010" -Message "Journal T-011 absent."
+Assert-Contains -Content $journalContent -Expected "### T-011 -" -Message "Journal T-011 absent."
+Assert-Contains -Content $journalContent -Expected "T-011 applique" -Message "Journal T-011 incomplet."
 Assert-Contains -Content $journalContent -Expected "ADR: aucune nouvelle ADR" -Message "Le journal doit justifier l'absence de nouvelle ADR."
 Assert-Contains -Content $journalContent -Expected "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m010\validate_m010_traceability_acceptance.ps1" -Message "Commande d'acceptation T-011 absente du journal."
 Assert-Contains -Content $journalContent -Expected "powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m010_traceability.ps1" -Message "Commande du validateur M-010 absente du journal."

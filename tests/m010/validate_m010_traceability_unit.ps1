@@ -176,7 +176,7 @@ try {
 
     $missingRequirementFixture = Copy-CanonicalFixture -TemporaryRoot (Join-Path $temporaryRoot "missing_requirement")
     New-Item -ItemType Directory -Path (Split-Path -Parent $missingRequirementFixture.Matrix) -Force | Out-Null
-    $missingRequirementContent = (($missingRequirementFixture.Matrix | Get-Content -Encoding UTF8) | Where-Object {
+    $missingRequirementContent = ((Get-Content -Encoding UTF8 -LiteralPath $missingRequirementFixture.Matrix) | Where-Object {
         -not $_.StartsWith("| REQ-M010-011 ")
     }) -join "`n"
     Set-Text -Path $missingRequirementFixture.Matrix -Content $missingRequirementContent
@@ -214,7 +214,7 @@ try {
     New-Item -ItemType Directory -Path (Split-Path -Parent $inconsistentCounterFixture.Matrix) -Force | Out-Null
     Set-Text `
         -Path $inconsistentCounterFixture.MetricsModule `
-        -Content ((Get-Content -Raw -Encoding UTF8 -LiteralPath $inconsistentCounterFixture.MetricsModule).Replace('"strategy_versions_per_strategy"', '"strategy_versions_per_strategy", "metric_extra_total"'))
+        -Content ((Get-Content -Raw -Encoding UTF8 -LiteralPath $inconsistentCounterFixture.MetricsModule).Replace('"strategy_versions_per_strategy"', '"strategy_versions_per_strategy", "strategy_metric_extra_total"'))
     Assert-ValidatorRejects -Fixture $inconsistentCounterFixture -ExpectedFragment "Compteur normatif M-010 incoherent" -Message "Un compteur de metriques incoherent doit etre refuse."
 
     $missingConcurrencyFixture = Copy-CanonicalFixture -TemporaryRoot (Join-Path $temporaryRoot "missing_concurrency")

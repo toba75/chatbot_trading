@@ -96,6 +96,8 @@ $m010StrategySnapshotAcceptancePath = "tests/m010/validate_strategy_snapshot_acc
 $m010StrategySnapshotUnitPath = "tests/m010/validate_strategy_snapshot_unit.ps1"
 $m010StrategyHttpContractAcceptancePath = "tests/m010/validate_strategy_http_contract_acceptance.ps1"
 $m010StrategyHttpContractUnitPath = "tests/m010/validate_strategy_http_contract_unit.ps1"
+$m010TraceabilityAcceptancePath = "tests/m010/validate_m010_traceability_acceptance.ps1"
+$m010TraceabilityUnitPath = "tests/m010/validate_m010_traceability_unit.ps1"
 
 $validationCommands = @(
     @{ Path = "scripts/validate_m000_precondition_report.ps1"; Arguments = @("-Path", $preconditionReportPath) },
@@ -319,6 +321,8 @@ $testCommands = @(
     @{ Path = $m010StrategySnapshotUnitPath; Arguments = @() },
     @{ Path = $m010StrategyHttpContractAcceptancePath; Arguments = @() },
     @{ Path = $m010StrategyHttpContractUnitPath; Arguments = @() },
+    @{ Path = $m010TraceabilityAcceptancePath; Arguments = @() },
+    @{ Path = $m010TraceabilityUnitPath; Arguments = @() },
     @{ Path = "tests/m009/validate_m009_specification_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/m009/validate_m009_specification_unit.ps1"; Arguments = @() },
     @{ Path = "tests/m009/validate_deep_research_planning_acceptance.ps1"; Arguments = @() },

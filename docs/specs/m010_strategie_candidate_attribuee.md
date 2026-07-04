@@ -183,6 +183,17 @@
 | strategy_compatibility_finding_total | Trace | Compte les CompatibilityFinding par type sans payload de marché complet. |
 | strategy_version_superseded_total | Trace | Compte les versions remplacées et conservées. |
 
+### Métriques normatives de clôture M-010
+
+| Métrique normative | Signal publié | Invariant |
+|---|---|---|
+| Taux de stratégies compilables | strategy_compilable_rate | Ratio agrégé de versions SD `COMPILABLE` ou `SNAPSHOTTED`, sans contenu de stratégie mutable complet. |
+| Raisons principales de rejet | strategy_rejection_reason_top | Comptage agrégé par code public de rejet, sans prompt ni texte source complet. |
+| Proportion de règles par origine | strategy_rule_origin_proportion | Proportions agrégées par `RuleOriginType`, sans payload de preuve complet. |
+| Paramètres sans plan de calibration | strategy_parameter_without_calibration_plan_total | Comptage des paramètres bloquants sans plan, jamais comptés comme succès de compilation. |
+| Conflits de compatibilité par catégorie | strategy_compatibility_conflict_by_category | Comptage par catégorie de `CompatibilityFinding`, sans donnée de marché complète. |
+| Nombre de versions par stratégie | strategy_versions_per_strategy | Nombre de versions conservées par `strategy_id`, incluant versions invalides ou supersédées. |
+
 ## Comportements vérifiables M-010
 
 | Comportement | Invariant | Scénario BDD | Test RED | ADR | Commande |
