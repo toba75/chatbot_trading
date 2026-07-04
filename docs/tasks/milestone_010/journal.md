@@ -126,3 +126,16 @@
 - Validations ciblées GREEN: `tests/m010/validate_strategy_snapshot_acceptance.ps1`, `tests/m010/validate_strategy_snapshot_unit.ps1`, puis non-régression T-008 et `tests/m001/validate_strategy_experiment_contracts_acceptance.ps1`.
 - Gates GREEN: `python -m compileall app\strategy_design`, `scripts/lint.ps1` avec `19 validation(s), 0 test(s)`, `git diff --check`, `tests/m003/validate_m003_precondition_acceptance.ps1`, et `scripts/test.ps1` avec `19 validation(s), 216 test(s)`.
 - Commit GREEN: `feat(m010): creer snapshot strategie immuable`.
+
+### T-010 - Endpoints publics de stratégie
+
+- Précondition ciblée: `tests/m010/validate_strategy_snapshot_acceptance.ps1` et `tests/m010/validate_strategy_snapshot_unit.ps1` GREEN avant écriture des tests RED T-010.
+- Commit RED: `c8e8dddf test(m010): couvrir contrat http strategies`.
+- RED utile: `tests/m010/validate_strategy_http_contract_acceptance.ps1` et `tests/m010/validate_strategy_http_contract_unit.ps1` échouaient sur l'adaptateur `app.strategy_design.adapters.strategy_http` absent.
+- Implémentation: ajout de l'adaptateur HTTP SD framework-free `StrategyHttpAdapter`, des DTO stricts de compilation, du routage explicite `POST /v1/strategies/compile` et `GET /v1/strategies/{id}`, de la lecture de snapshots via store fourni, et du mapping explicite des diagnostics vers `STRATEGY_RULE_ORIGIN_MISSING`, `STRATEGY_CONFLICT_UNRESOLVED` et `CURRENT_DATA_REQUIRED`.
+- Garde-fous: aucun backtest ni import EX; aucun dépôt global caché; aucun GET créateur; rejet des champs inconnus, de stockage interne et de rentabilité; publication limitée aux diagnostics, origines, références de représentation et références de snapshot.
+- ADR: aucune nouvelle ADR; T-010 applique `ADR-010`, `DDD-ADR-009` et `DDD-ADR-010` sans changer leur décision.
+- Ajustement de gate: enrôlement des tests T-010 dans `scripts/test.ps1` et mise à jour du volume imbriqué M-003 attendu à `156 test(s)`.
+- Validations ciblées GREEN: `tests/m010/validate_strategy_http_contract_acceptance.ps1`, `tests/m010/validate_strategy_http_contract_unit.ps1`, puis non-régression T-008/T-009 et `tests/m003/validate_m003_precondition_acceptance.ps1`.
+- Gates GREEN: `python -m compileall app\strategy_design`, `scripts/validate_architecture_boundaries.ps1 -AppRoot .\app -ContextRegistryPath .\app\context_registry.json -SpecificationPath .\docs\specs\m001_frontieres_ddd_contrats_publies.md` avec `158 fichier(s), 954 import(s)`, `scripts/lint.ps1` avec `19 validation(s), 0 test(s)`, `git diff --check`, et `scripts/test.ps1` avec `19 validation(s), 218 test(s)`.
+- Commit GREEN: `feat(m010): exposer endpoints strategies`.
