@@ -12,7 +12,8 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $allowedBranches = @(
     "master",
     "codex/milestone-m009-recherche-approfondie",
-    "codex/milestone-m010-strategie-candidate-attribuee"
+    "codex/milestone-m010-strategie-candidate-attribuee",
+    "codex/milestone-m011-experience-reproductible"
 )
 $requiredMasterArtifacts = @(
     [ordered] @{ Path = "docs/tasks/milestone_008"; Kind = "Directory" },

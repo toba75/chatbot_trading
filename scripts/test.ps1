@@ -20,6 +20,7 @@ $m007SpecificationPath = Join-Path $repoRoot "docs/specs/m007_reponse_documentai
 $m008SpecificationPath = Join-Path $repoRoot "docs/specs/m008_conversation_produit.md"
 $m009SpecificationPath = Join-Path $repoRoot "docs/specs/m009_recherche_approfondie_multi_sources.md"
 $m010SpecificationPath = Join-Path $repoRoot "docs/specs/m010_strategie_candidate_attribuee.md"
+$m011SpecificationPath = Join-Path $repoRoot "docs/specs/m011_experience_reproductible.md"
 $platformTopologyPath = Join-Path $repoRoot "app/platform/topology_registry.json"
 $sparkFirewallPath = Join-Path $repoRoot "deploy/spark-firewall/network-boundary.json"
 $appRoot = Join-Path $repoRoot "app"
@@ -98,6 +99,30 @@ $m010StrategyHttpContractAcceptancePath = "tests/m010/validate_strategy_http_con
 $m010StrategyHttpContractUnitPath = "tests/m010/validate_strategy_http_contract_unit.ps1"
 $m010TraceabilityAcceptancePath = "tests/m010/validate_m010_traceability_acceptance.ps1"
 $m010TraceabilityUnitPath = "tests/m010/validate_m010_traceability_unit.ps1"
+$m011PreconditionAcceptancePath = "tests/m011/validate_m011_precondition_acceptance.ps1"
+$m011PreconditionUnitPath = "tests/m011/validate_m011_precondition_unit.ps1"
+$m011SpecificationAcceptancePath = "tests/m011/validate_m011_specification_acceptance.ps1"
+$m011SpecificationUnitPath = "tests/m011/validate_m011_specification_unit.ps1"
+$m011ExperimentPlanningAcceptancePath = "tests/m011/validate_experiment_planning_acceptance.ps1"
+$m011ExperimentPlanningUnitPath = "tests/m011/validate_experiment_planning_unit.ps1"
+$m011DataSnapshotFreezeAcceptancePath = "tests/m011/validate_data_snapshot_freeze_acceptance.ps1"
+$m011DataSnapshotFreezeUnitPath = "tests/m011/validate_data_snapshot_freeze_unit.ps1"
+$m011CostEnvironmentFreezeAcceptancePath = "tests/m011/validate_cost_environment_freeze_acceptance.ps1"
+$m011CostEnvironmentFreezeUnitPath = "tests/m011/validate_cost_environment_freeze_unit.ps1"
+$m011ExperimentStartLockAcceptancePath = "tests/m011/validate_experiment_start_lock_acceptance.ps1"
+$m011ExperimentStartLockUnitPath = "tests/m011/validate_experiment_start_lock_unit.ps1"
+$m011DeterministicBacktestAcceptancePath = "tests/m011/validate_deterministic_backtest_acceptance.ps1"
+$m011DeterministicBacktestUnitPath = "tests/m011/validate_deterministic_backtest_unit.ps1"
+$m011ExperimentResultAcceptancePath = "tests/m011/validate_experiment_result_acceptance.ps1"
+$m011ExperimentResultUnitPath = "tests/m011/validate_experiment_result_unit.ps1"
+$m011ExperimentRetentionAcceptancePath = "tests/m011/validate_experiment_retention_acceptance.ps1"
+$m011ExperimentRetentionUnitPath = "tests/m011/validate_experiment_retention_unit.ps1"
+$m011ExperimentReproducibilityAcceptancePath = "tests/m011/validate_experiment_reproducibility_acceptance.ps1"
+$m011ExperimentReproducibilityUnitPath = "tests/m011/validate_experiment_reproducibility_unit.ps1"
+$m011ExperimentHttpContractAcceptancePath = "tests/m011/validate_experiment_http_contract_acceptance.ps1"
+$m011ExperimentHttpContractUnitPath = "tests/m011/validate_experiment_http_contract_unit.ps1"
+$m011TraceabilityAcceptancePath = "tests/m011/validate_m011_traceability_acceptance.ps1"
+$m011TraceabilityUnitPath = "tests/m011/validate_m011_traceability_unit.ps1"
 
 $validationCommands = @(
     @{ Path = "scripts/validate_m000_precondition_report.ps1"; Arguments = @("-Path", $preconditionReportPath) },
@@ -115,6 +140,8 @@ $validationCommands = @(
     @{ Path = "scripts/validate_m008_specification.ps1"; Arguments = @("-Path", $m008SpecificationPath) },
     @{ Path = "scripts/validate_m009_specification.ps1"; Arguments = @("-Path", $m009SpecificationPath) },
     @{ Path = "scripts/validate_m010_specification.ps1"; Arguments = @("-Path", $m010SpecificationPath) },
+    @{ Path = "scripts/validate_m011_specification.ps1"; Arguments = @("-Path", $m011SpecificationPath) },
+    @{ Path = "scripts/validate_m011_traceability.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_platform_topology.ps1"; Arguments = @("-Path", $platformTopologyPath) },
     @{ Path = "scripts/validate_local_compose.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_network_boundary.ps1"; Arguments = @("-SparkFirewallPath", $sparkFirewallPath) },
@@ -323,6 +350,30 @@ $testCommands = @(
     @{ Path = $m010StrategyHttpContractUnitPath; Arguments = @() },
     @{ Path = $m010TraceabilityAcceptancePath; Arguments = @() },
     @{ Path = $m010TraceabilityUnitPath; Arguments = @() },
+    @{ Path = $m011PreconditionUnitPath; Arguments = @() },
+    @{ Path = $m011PreconditionAcceptancePath; Arguments = @() },
+    @{ Path = $m011SpecificationAcceptancePath; Arguments = @() },
+    @{ Path = $m011SpecificationUnitPath; Arguments = @() },
+    @{ Path = $m011ExperimentPlanningAcceptancePath; Arguments = @() },
+    @{ Path = $m011ExperimentPlanningUnitPath; Arguments = @() },
+    @{ Path = $m011DataSnapshotFreezeAcceptancePath; Arguments = @() },
+    @{ Path = $m011DataSnapshotFreezeUnitPath; Arguments = @() },
+    @{ Path = $m011CostEnvironmentFreezeAcceptancePath; Arguments = @() },
+    @{ Path = $m011CostEnvironmentFreezeUnitPath; Arguments = @() },
+    @{ Path = $m011ExperimentStartLockAcceptancePath; Arguments = @() },
+    @{ Path = $m011ExperimentStartLockUnitPath; Arguments = @() },
+    @{ Path = $m011DeterministicBacktestAcceptancePath; Arguments = @() },
+    @{ Path = $m011DeterministicBacktestUnitPath; Arguments = @() },
+    @{ Path = $m011ExperimentResultAcceptancePath; Arguments = @() },
+    @{ Path = $m011ExperimentResultUnitPath; Arguments = @() },
+    @{ Path = $m011ExperimentRetentionAcceptancePath; Arguments = @() },
+    @{ Path = $m011ExperimentRetentionUnitPath; Arguments = @() },
+    @{ Path = $m011ExperimentReproducibilityAcceptancePath; Arguments = @() },
+    @{ Path = $m011ExperimentReproducibilityUnitPath; Arguments = @() },
+    @{ Path = $m011ExperimentHttpContractAcceptancePath; Arguments = @() },
+    @{ Path = $m011ExperimentHttpContractUnitPath; Arguments = @() },
+    @{ Path = $m011TraceabilityAcceptancePath; Arguments = @() },
+    @{ Path = $m011TraceabilityUnitPath; Arguments = @() },
     @{ Path = "tests/m009/validate_m009_specification_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/m009/validate_m009_specification_unit.ps1"; Arguments = @() },
     @{ Path = "tests/m009/validate_deep_research_planning_acceptance.ps1"; Arguments = @() },
@@ -842,6 +893,45 @@ elseif ($env:OST_M010_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m010StrategyRuleOriginUnitPath,
         $m010StrategyParameterCalibrationAcceptancePath,
         $m010StrategyParameterCalibrationUnitPath
+    )
+}
+
+if (
+    ($env:OST_M003_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") -or
+    ($env:OST_M004_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") -or
+    ($env:OST_M005_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") -or
+    ($env:OST_M006_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") -or
+    ($env:OST_M007_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") -or
+    ($env:OST_M008_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") -or
+    ($env:OST_M009_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") -or
+    ($env:OST_M010_PRECONDITION_ACCEPTANCE_RUNNING -eq "1")
+) {
+    Write-Host "Tests M-011 exclus explicitement: les préconditions amont restent indépendantes du milestone aval."
+    $excludedPreconditionTestPaths += @(
+        $m011PreconditionAcceptancePath,
+        $m011PreconditionUnitPath,
+        $m011SpecificationAcceptancePath,
+        $m011SpecificationUnitPath,
+        $m011ExperimentPlanningAcceptancePath,
+        $m011ExperimentPlanningUnitPath,
+        $m011DataSnapshotFreezeAcceptancePath,
+        $m011DataSnapshotFreezeUnitPath,
+        $m011CostEnvironmentFreezeAcceptancePath,
+        $m011CostEnvironmentFreezeUnitPath,
+        $m011ExperimentStartLockAcceptancePath,
+        $m011ExperimentStartLockUnitPath,
+        $m011DeterministicBacktestAcceptancePath,
+        $m011DeterministicBacktestUnitPath,
+        $m011ExperimentResultAcceptancePath,
+        $m011ExperimentResultUnitPath,
+        $m011ExperimentRetentionAcceptancePath,
+        $m011ExperimentRetentionUnitPath,
+        $m011ExperimentReproducibilityAcceptancePath,
+        $m011ExperimentReproducibilityUnitPath,
+        $m011ExperimentHttpContractAcceptancePath,
+        $m011ExperimentHttpContractUnitPath,
+        $m011TraceabilityAcceptancePath,
+        $m011TraceabilityUnitPath
     )
 }
 

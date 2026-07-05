@@ -235,7 +235,8 @@ def precondition_acceptance() -> None:
 
 def precondition_unit() -> None:
     validator = REPO_ROOT / "scripts" / "validate_m011_precondition.ps1"
-    with tempfile.TemporaryDirectory(prefix="ost_m011_precondition_") as temporary:
+    temporary_parent = REPO_ROOT / "docs" / "governance"
+    with tempfile.TemporaryDirectory(prefix=".tmp_m011_precondition_", dir=temporary_parent) as temporary:
         report_path = Path(temporary) / "m011_precondition_green.md"
         result = run_powershell(validator, "-Path", str(report_path))
         assert_failure(result, "Rapport de precondition M-011 absent", "Un rapport absent doit etre refuse.")
@@ -253,7 +254,8 @@ def specification_acceptance() -> None:
 def specification_unit() -> None:
     validator = REPO_ROOT / "scripts" / "validate_m011_specification.ps1"
     spec = REPO_ROOT / "docs" / "specs" / "m011_experience_reproductible.md"
-    with tempfile.TemporaryDirectory(prefix="ost_m011_spec_") as temporary:
+    temporary_parent = REPO_ROOT / "docs" / "specs"
+    with tempfile.TemporaryDirectory(prefix=".tmp_m011_spec_", dir=temporary_parent) as temporary:
         temp_spec = Path(temporary) / "m011_spec.md"
         shutil.copyfile(spec, temp_spec)
         valid = run_powershell(validator, "-Path", str(temp_spec))
@@ -792,7 +794,8 @@ def traceability_unit() -> None:
     test_gate = REPO_ROOT / "scripts" / "test.ps1"
     lint_gate = REPO_ROOT / "scripts" / "lint.ps1"
     metrics_module = REPO_ROOT / "app" / "experimentation" / "application" / "traceability_metrics.py"
-    with tempfile.TemporaryDirectory(prefix="ost_m011_trace_") as temporary:
+    temporary_parent = REPO_ROOT / "docs" / "traceability"
+    with tempfile.TemporaryDirectory(prefix=".tmp_m011_trace_", dir=temporary_parent) as temporary:
         temp = Path(temporary)
         copied_matrix = temp / "matrix.md"
         shutil.copyfile(matrix, copied_matrix)
