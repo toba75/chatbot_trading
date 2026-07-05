@@ -27,7 +27,15 @@
 
 ## Exécution
 
-- À renseigner pendant l'implémentation M-011.
+- Commit RED: `994ad933 test(m011): couvrir experience reproductible`.
+- Implémentation réalisée sur la branche courante `codex/milestone-m011-experience-reproductible`, comme autorisé par l'utilisateur.
+- `python -m compileall app\experimentation` GREEN.
+- `scripts/validate_m011_precondition.ps1` GREEN.
+- `scripts/validate_m011_specification.ps1` GREEN avec `Specification M-011 valide: 12 comportement(s), 6 metrique(s), 6 etat(s) controles.`
+- `scripts/validate_m011_traceability.ps1` GREEN avec `Tracabilite M-011 valide: 12 exigence(s), 6 metrique(s).`
+- Suite `tests/m011/*.ps1` GREEN.
+- `scripts/lint.ps1` GREEN avec `Gate lint GREEN: 22 validation(s), 0 test(s).`
+- `scripts/test.ps1` GREEN avec `Gate test GREEN: 21 validation(s), 244 test(s).`
 
 ## Revue d'adhérence
 

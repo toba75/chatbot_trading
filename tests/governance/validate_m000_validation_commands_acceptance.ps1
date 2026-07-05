@@ -5,7 +5,7 @@ $testCommandPath = Join-Path $repoRoot "scripts/test.ps1"
 $lintCommandPath = Join-Path $repoRoot "scripts/lint.ps1"
 $temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m000_validation_commands_acceptance_" + [System.Guid]::NewGuid().ToString("N"))
 $eAcute = [char] 0x00E9
-$expectedTestCount = 220
+$expectedTestCount = 244
 if ($env:OST_M003_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     $expectedTestCount = 146
 }
@@ -30,7 +30,7 @@ elseif ($env:OST_M009_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
 elseif ($env:OST_M010_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     $expectedTestCount = 192
 }
-$expectedTestSummary = "Gate test GREEN: 19 validation(s), $expectedTestCount test(s)."
+$expectedTestSummary = "Gate test GREEN: 21 validation(s), $expectedTestCount test(s)."
 
 function Split-MarkdownRow {
     param(
@@ -328,7 +328,7 @@ try {
     $lintResult = Invoke-ProjectCommand -ProjectRoot $validProjectRoot -RelativePath "scripts/lint.ps1"
     Assert-ExitCode -Actual $lintResult.ExitCode -Expected 0 -Message "La gate de lint M-000 conforme doit réussir."
     Assert-OutputContains -Output $lintResult.Output -Expected "Gate lint GREEN" -Message "La gate de lint doit annoncer son état GREEN."
-    Assert-OutputContains -Output $lintResult.Output -Expected "Gate lint GREEN: 20 validation(s), 0 test(s)." -Message "La gate de lint doit prouver le nombre exact de validations et tests."
+    Assert-OutputContains -Output $lintResult.Output -Expected "Gate lint GREEN: 22 validation(s), 0 test(s)." -Message "La gate de lint doit prouver le nombre exact de validations et tests."
     Assert-OutputContains -Output $lintResult.Output -Expected "Validation GREEN: scripts/validate_local_compose.ps1" -Message "La gate de lint doit exécuter le validateur Compose local M-002."
     Assert-OutputContains -Output $lintResult.Output -Expected "Validation GREEN: scripts/validate_network_boundary.ps1" -Message "La gate de lint doit exécuter le validateur de frontière réseau M-002."
     Assert-OutputContains -Output $lintResult.Output -Expected "Validation GREEN: scripts/validate_m004_specification.ps1" -Message "La gate de lint doit exécuter le validateur de spécification M-004."
@@ -338,6 +338,8 @@ try {
     Assert-OutputContains -Output $lintResult.Output -Expected "Validation GREEN: scripts/validate_m008_specification.ps1" -Message "La gate de lint doit exécuter le validateur de spécification M-008."
     Assert-OutputContains -Output $lintResult.Output -Expected "Validation GREEN: scripts/validate_m009_specification.ps1" -Message "La gate de lint doit exécuter le validateur de spécification M-009."
     Assert-OutputContains -Output $lintResult.Output -Expected "Validation GREEN: scripts/validate_m010_specification.ps1" -Message "La gate de lint doit exécuter le validateur de spécification M-010."
+    Assert-OutputContains -Output $lintResult.Output -Expected "Validation GREEN: scripts/validate_m011_specification.ps1" -Message "La gate de lint doit exécuter le validateur de spécification M-011."
+    Assert-OutputContains -Output $lintResult.Output -Expected "Validation GREEN: scripts/validate_m011_traceability.ps1" -Message "La gate de lint doit exécuter le validateur de traçabilité M-011."
     Assert-OutputContains -Output $lintResult.Output -Expected "Validation GREEN: scripts/validate_m010_traceability.ps1" -Message "La gate de lint doit exécuter le validateur de traçabilité M-010."
     Assert-OutputNotContains -Output $lintResult.Output -Forbidden "Ã" -Message "La sortie de la gate de lint doit rester lisible en français accentué."
 

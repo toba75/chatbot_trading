@@ -252,6 +252,11 @@ class ExperimentResult:
     def to_json(self) -> str:
         return _dumps_contract_json(self.to_payload())
 
+    def with_hash(self, result_hash: str) -> "ExperimentResult":
+        payload = self.to_payload()
+        payload["result_hash"] = result_hash
+        return ExperimentResult.from_payload(payload)
+
 
 def _required_strategy_status(payload: Mapping[str, Any]) -> str:
     status = _required_text(payload, "status")
