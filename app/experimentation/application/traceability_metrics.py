@@ -230,8 +230,8 @@ def _ensure_observations(value: Sequence[ExperimentMetricObservation]) -> tuple[
 def _ensure_normative_metrics(value: Mapping[str, Any]) -> dict[str, Any]:
     if not isinstance(value, Mapping):
         raise ValueError("normative_metrics non objet")
-    actual_keys = tuple(str(key) for key in value)
-    if actual_keys != _NORMATIVE_METRIC_NAMES:
+    actual_keys = frozenset(str(key) for key in value)
+    if actual_keys != frozenset(_NORMATIVE_METRIC_NAMES):
         raise ValueError("normative_metrics incompletes")
     return {
         "experiment_reproducible_rate": _ensure_ratio(value["experiment_reproducible_rate"], "experiment_reproducible_rate"),

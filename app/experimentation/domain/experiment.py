@@ -474,8 +474,9 @@ class Experiment:
 
     def cancel(self, *, cancelled_at: str, reason: str, expected_version: int) -> "Experiment":
         self._ensure_expected_version(expected_version)
-        if self.status not in {PLANNED, SCHEDULED}:
-            raise ValueError("transition interdite")
+        self._ensure_status(SCHEDULED)
+        if self.frozen_inputs is None:
+            raise ValueError("entrees verrouillees requises")
         parsed_reason = _ensure_text(reason, "reason")
         return self._replace_with_event(
             event_type="ExperimentCancelled",

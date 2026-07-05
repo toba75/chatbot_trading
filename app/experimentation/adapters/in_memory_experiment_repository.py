@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import threading
-from dataclasses import replace
 
 from app.contracts.strategy_experiments import StrategySnapshot
 from app.experimentation.domain.experiment import Experiment
@@ -168,10 +167,6 @@ def _experiment_signature(experiment: Experiment) -> str:
 def _result_signature(result: object) -> str:
     payload = result.to_payload() if callable(getattr(result, "to_payload", None)) else vars(result)
     return json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
-
-
-def _experiment_result_with_hash(result: object, result_hash: str) -> object:
-    return replace(result, result_hash=result_hash)
 
 
 __all__ = [

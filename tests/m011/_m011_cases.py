@@ -451,6 +451,14 @@ def experiment_start_lock_unit() -> None:
     experiment = ready_experiment("STARTUNIT")
     expect_raises(
         "transition interdite",
+        lambda: planned_experiment("CANCELPLANNED").cancel(
+            cancelled_at="2026-07-04T12:08:30Z",
+            reason="Annulation avant planification verrouillee.",
+            expected_version=1,
+        ),
+    )
+    expect_raises(
+        "transition interdite",
         lambda: experiment.start(
             started_at="2026-07-04T12:09:00Z",
             expected_version=experiment.version,
@@ -788,6 +796,37 @@ def traceability_acceptance() -> None:
 
 
 def traceability_unit() -> None:
+    from app.experimentation.application.traceability_metrics import ExperimentMetricSnapshot
+
+    unordered_metrics = {
+        "invalidated_result_ratio": 0.0,
+        "coherent_repeat_count": 1,
+        "experiment_without_complete_cost_model_total": 0,
+        "negative_experiment_retention_ratio": 1.0,
+        "experiment_failure_rate_by_cause": {},
+        "experiment_reproducible_rate": 1.0,
+    }
+    snapshot = ExperimentMetricSnapshot(
+        fixture_id="m011-traceability-unit",
+        fixture_path="docs/traceability/matrix.md",
+        measured_at="2026-07-04T12:30:00Z",
+        observation_count=1,
+        normative_metrics=unordered_metrics,
+    )
+    assert snapshot.normative_metrics["experiment_reproducible_rate"] == 1.0
+    with_extra_key = dict(unordered_metrics)
+    with_extra_key["unexpected_metric"] = 1.0
+    expect_raises(
+        "normative_metrics incompletes",
+        lambda: ExperimentMetricSnapshot(
+            fixture_id="m011-traceability-extra",
+            fixture_path="docs/traceability/matrix.md",
+            measured_at="2026-07-04T12:30:00Z",
+            observation_count=1,
+            normative_metrics=with_extra_key,
+        ),
+    )
+
     validator = REPO_ROOT / "scripts" / "validate_m011_traceability.ps1"
     matrix = REPO_ROOT / "docs" / "traceability" / "matrix.md"
     spec = REPO_ROOT / "docs" / "specs" / "m011_experience_reproductible.md"
