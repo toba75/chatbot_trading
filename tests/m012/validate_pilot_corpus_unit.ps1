@@ -73,10 +73,12 @@ def base_document(index, path, strata):
 
 
 def valid_manifest(root, count=50, duplicate_binary=False):
+    manifest_root = root / f"manifest_{len([path for path in root.iterdir() if path.is_dir()]):03d}_{count}_{int(duplicate_binary)}"
+    manifest_root.mkdir()
     documents = []
     for index in range(1, count + 1):
         duplicate_of = 1 if duplicate_binary and index == 2 else None
-        path = write_fixture_pdf(root, index, duplicate_of=duplicate_of)
+        path = write_fixture_pdf(manifest_root, index, duplicate_of=duplicate_of)
         strata = [REQUIRED_STRATA[(index - 1) % len(REQUIRED_STRATA)]]
         if index in (13, 26):
             strata = ["DIFFERENT_EDITION"]
@@ -113,8 +115,12 @@ def expect_raises(expected_fragment, action):
 
 def without_stratum(payload, stratum):
     clone = deepcopy(payload)
+    replacement = "CLEAN_SCAN" if stratum == "DIGITAL_NATIVE_CLEAN" else "DIGITAL_NATIVE_CLEAN"
     for document in clone["documents"]:
-        document["strata"] = [item for item in document["strata"] if item != stratum]
+        document["strata"] = [
+            item if item != stratum else replacement
+            for item in document["strata"]
+        ]
     return freeze_pilot_corpus_manifest(clone)
 
 

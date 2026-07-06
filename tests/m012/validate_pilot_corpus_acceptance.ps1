@@ -72,9 +72,11 @@ def base_document(index, path, strata):
 
 
 def valid_manifest(root, count=50):
+    manifest_root = root / f"manifest_{len([path for path in root.iterdir() if path.is_dir()]):03d}_{count}"
+    manifest_root.mkdir()
     documents = []
     for index in range(1, count + 1):
-        path = write_fixture_pdf(root, index)
+        path = write_fixture_pdf(manifest_root, index)
         strata = [REQUIRED_STRATA[(index - 1) % len(REQUIRED_STRATA)]]
         if index in (13, 26):
             strata = ["DIFFERENT_EDITION"]
@@ -145,7 +147,10 @@ with TemporaryDirectory() as temporary_directory:
 
     missing_stratum = valid_manifest(fixture_root, count=50)
     for document in missing_stratum["documents"]:
-        document["strata"] = [item for item in document["strata"] if item != "NOISY_SCAN"]
+        document["strata"] = [
+            item if item != "NOISY_SCAN" else "DIGITAL_NATIVE_CLEAN"
+            for item in document["strata"]
+        ]
     missing_stratum = freeze_pilot_corpus_manifest(missing_stratum)
     expect_raises(
         "NOISY_SCAN",
