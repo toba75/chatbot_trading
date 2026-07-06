@@ -227,7 +227,6 @@ with TemporaryDirectory() as temporary_directory:
     empty_page_not_declared = deepcopy(valid)
     empty_page_not_declared["annotations"][0]["expected_state"] = "EMPTY_DECLARED"
     empty_page_not_declared["annotations"][0]["expected_route"] = "NO_ROUTE"
-    empty_page_not_declared["annotations"][0]["reference_transcription"] = " "
     empty_page_not_declared["annotations"][0]["critical_numeric_values"] = []
     empty_page_not_declared["annotations"][0]["table_cells"] = []
     empty_page_not_declared = freeze_page_annotation_set(empty_page_not_declared)

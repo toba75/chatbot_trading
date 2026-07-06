@@ -1,5 +1,24 @@
 """Domaine d'evaluation pilote M-012."""
 
+from app.evaluation.domain.page_annotation import (
+    EMPTY_DECLARED,
+    EVALUABLE,
+    EXPECTED_PAGE_STATES,
+    EXPECTED_ROUTES,
+    HUMAN_REVIEWER,
+    NO_ROUTE,
+    REJECTED_DECLARED,
+    AnnotationCompletenessPolicy,
+    AnnotationSet,
+    AnnotationSetManifestValidator,
+    CriticalNumericValue,
+    PageAnnotation,
+    PageReference,
+    ProvenanceZone,
+    ReadingOrderItem,
+    TableCellAnnotation,
+    freeze_page_annotation_set,
+)
 from app.evaluation.domain.pilot_corpus import (
     DOCUMENTARY_STRATA,
     REQUIRED_DOCUMENTARY_STRATA,
@@ -12,12 +31,29 @@ from app.evaluation.domain.pilot_corpus import (
 )
 
 __all__ = [
+    "AnnotationCompletenessPolicy",
+    "AnnotationSet",
+    "AnnotationSetManifestValidator",
+    "CriticalNumericValue",
     "DOCUMENTARY_STRATA",
+    "EMPTY_DECLARED",
+    "EVALUABLE",
+    "EXPECTED_PAGE_STATES",
+    "EXPECTED_ROUTES",
+    "HUMAN_REVIEWER",
+    "NO_ROUTE",
+    "PageAnnotation",
+    "PageReference",
     "REQUIRED_DOCUMENTARY_STRATA",
+    "REJECTED_DECLARED",
     "PilotCorpus",
     "PilotCorpusManifestValidator",
     "PilotCoveragePolicy",
     "PilotDocument",
     "PilotExclusion",
+    "ProvenanceZone",
+    "ReadingOrderItem",
+    "TableCellAnnotation",
+    "freeze_page_annotation_set",
     "freeze_pilot_corpus_manifest",
 ]
