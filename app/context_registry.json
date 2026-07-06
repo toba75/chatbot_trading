@@ -225,6 +225,30 @@
           "description": "rapports d'expérience"
         }
       ]
+    },
+    {
+      "code": "EV",
+      "module": "evaluation",
+      "name": "Évaluation pilote et calibration",
+      "responsibility": "mesurer les contextes existants sur un corpus pilote, publier les écarts V1 et conserver les décisions de calibration",
+      "data_owner": "evaluation",
+      "layers": [
+        "domain",
+        "application",
+        "adapters"
+      ],
+      "owned_storages": [
+        {
+          "id": "artifact:evaluation.pilot_corpus",
+          "owner": "EV",
+          "description": "manifestes de corpus pilote"
+        },
+        {
+          "id": "report:evaluation.m012_reports",
+          "owner": "EV",
+          "description": "rapports de benchmark et de calibration M-012"
+        }
+      ]
     }
   ],
   "platform": {

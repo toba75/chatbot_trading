@@ -21,6 +21,7 @@ $m008SpecificationPath = Join-Path $repoRoot "docs/specs/m008_conversation_produ
 $m009SpecificationPath = Join-Path $repoRoot "docs/specs/m009_recherche_approfondie_multi_sources.md"
 $m010SpecificationPath = Join-Path $repoRoot "docs/specs/m010_strategie_candidate_attribuee.md"
 $m011SpecificationPath = Join-Path $repoRoot "docs/specs/m011_experience_reproductible.md"
+$m012SpecificationPath = Join-Path $repoRoot "docs/specs/m012_evaluation_pilote_calibration.md"
 $platformTopologyPath = Join-Path $repoRoot "app/platform/topology_registry.json"
 $sparkFirewallPath = Join-Path $repoRoot "deploy/spark-firewall/network-boundary.json"
 $appRoot = Join-Path $repoRoot "app"
@@ -123,6 +124,30 @@ $m011ExperimentHttpContractAcceptancePath = "tests/m011/validate_experiment_http
 $m011ExperimentHttpContractUnitPath = "tests/m011/validate_experiment_http_contract_unit.ps1"
 $m011TraceabilityAcceptancePath = "tests/m011/validate_m011_traceability_acceptance.ps1"
 $m011TraceabilityUnitPath = "tests/m011/validate_m011_traceability_unit.ps1"
+$m012PreconditionAcceptancePath = "tests/m012/validate_m012_precondition_acceptance.ps1"
+$m012PreconditionUnitPath = "tests/m012/validate_m012_precondition_unit.ps1"
+$m012SpecificationAcceptancePath = "tests/m012/validate_m012_specification_acceptance.ps1"
+$m012SpecificationUnitPath = "tests/m012/validate_m012_specification_unit.ps1"
+$m012PilotCorpusAcceptancePath = "tests/m012/validate_pilot_corpus_acceptance.ps1"
+$m012PilotCorpusUnitPath = "tests/m012/validate_pilot_corpus_unit.ps1"
+$m012PageAnnotationAcceptancePath = "tests/m012/validate_page_annotation_set_acceptance.ps1"
+$m012PageAnnotationUnitPath = "tests/m012/validate_page_annotation_set_unit.ps1"
+$m012DocumentRouteAcceptancePath = "tests/m012/validate_document_route_benchmark_acceptance.ps1"
+$m012DocumentRouteUnitPath = "tests/m012/validate_document_route_benchmark_unit.ps1"
+$m012DocumentQualityAcceptancePath = "tests/m012/validate_document_quality_calibration_acceptance.ps1"
+$m012DocumentQualityUnitPath = "tests/m012/validate_document_quality_calibration_unit.ps1"
+$m012KnowledgeSearchAcceptancePath = "tests/m012/validate_knowledge_search_benchmark_acceptance.ps1"
+$m012KnowledgeSearchUnitPath = "tests/m012/validate_knowledge_search_benchmark_unit.ps1"
+$m012VerifiedAnswerAcceptancePath = "tests/m012/validate_verified_answer_benchmark_acceptance.ps1"
+$m012VerifiedAnswerUnitPath = "tests/m012/validate_verified_answer_benchmark_unit.ps1"
+$m012LlmBenchmarkAcceptancePath = "tests/m012/validate_llm_benchmark_real_path_acceptance.ps1"
+$m012LlmBenchmarkUnitPath = "tests/m012/validate_llm_benchmark_real_path_unit.ps1"
+$m012StrategyBacktestAcceptancePath = "tests/m012/validate_strategy_backtest_benchmark_acceptance.ps1"
+$m012StrategyBacktestUnitPath = "tests/m012/validate_strategy_backtest_benchmark_unit.ps1"
+$m012CalibrationDecisionsAcceptancePath = "tests/m012/validate_calibration_decisions_acceptance.ps1"
+$m012CalibrationDecisionsUnitPath = "tests/m012/validate_calibration_decisions_unit.ps1"
+$m012TraceabilityAcceptancePath = "tests/m012/validate_m012_traceability_acceptance.ps1"
+$m012TraceabilityUnitPath = "tests/m012/validate_m012_traceability_unit.ps1"
 
 $validationCommands = @(
     @{ Path = "scripts/validate_m000_precondition_report.ps1"; Arguments = @("-Path", $preconditionReportPath) },
@@ -142,6 +167,8 @@ $validationCommands = @(
     @{ Path = "scripts/validate_m010_specification.ps1"; Arguments = @("-Path", $m010SpecificationPath) },
     @{ Path = "scripts/validate_m011_specification.ps1"; Arguments = @("-Path", $m011SpecificationPath) },
     @{ Path = "scripts/validate_m011_traceability.ps1"; Arguments = @() },
+    @{ Path = "scripts/validate_m012_specification.ps1"; Arguments = @("-Path", $m012SpecificationPath) },
+    @{ Path = "scripts/validate_m012_traceability.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_platform_topology.ps1"; Arguments = @("-Path", $platformTopologyPath) },
     @{ Path = "scripts/validate_local_compose.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_network_boundary.ps1"; Arguments = @("-SparkFirewallPath", $sparkFirewallPath) },
@@ -374,6 +401,30 @@ $testCommands = @(
     @{ Path = $m011ExperimentHttpContractUnitPath; Arguments = @() },
     @{ Path = $m011TraceabilityAcceptancePath; Arguments = @() },
     @{ Path = $m011TraceabilityUnitPath; Arguments = @() },
+    @{ Path = $m012PreconditionUnitPath; Arguments = @() },
+    @{ Path = $m012PreconditionAcceptancePath; Arguments = @() },
+    @{ Path = $m012SpecificationAcceptancePath; Arguments = @() },
+    @{ Path = $m012SpecificationUnitPath; Arguments = @() },
+    @{ Path = $m012PilotCorpusAcceptancePath; Arguments = @() },
+    @{ Path = $m012PilotCorpusUnitPath; Arguments = @() },
+    @{ Path = $m012PageAnnotationAcceptancePath; Arguments = @() },
+    @{ Path = $m012PageAnnotationUnitPath; Arguments = @() },
+    @{ Path = $m012DocumentRouteAcceptancePath; Arguments = @() },
+    @{ Path = $m012DocumentRouteUnitPath; Arguments = @() },
+    @{ Path = $m012DocumentQualityAcceptancePath; Arguments = @() },
+    @{ Path = $m012DocumentQualityUnitPath; Arguments = @() },
+    @{ Path = $m012KnowledgeSearchAcceptancePath; Arguments = @() },
+    @{ Path = $m012KnowledgeSearchUnitPath; Arguments = @() },
+    @{ Path = $m012VerifiedAnswerAcceptancePath; Arguments = @() },
+    @{ Path = $m012VerifiedAnswerUnitPath; Arguments = @() },
+    @{ Path = $m012LlmBenchmarkAcceptancePath; Arguments = @() },
+    @{ Path = $m012LlmBenchmarkUnitPath; Arguments = @() },
+    @{ Path = $m012StrategyBacktestAcceptancePath; Arguments = @() },
+    @{ Path = $m012StrategyBacktestUnitPath; Arguments = @() },
+    @{ Path = $m012CalibrationDecisionsAcceptancePath; Arguments = @() },
+    @{ Path = $m012CalibrationDecisionsUnitPath; Arguments = @() },
+    @{ Path = $m012TraceabilityAcceptancePath; Arguments = @() },
+    @{ Path = $m012TraceabilityUnitPath; Arguments = @() },
     @{ Path = "tests/m009/validate_m009_specification_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/m009/validate_m009_specification_unit.ps1"; Arguments = @() },
     @{ Path = "tests/m009/validate_deep_research_planning_acceptance.ps1"; Arguments = @() },
@@ -895,6 +946,32 @@ elseif ($env:OST_M010_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m010StrategyParameterCalibrationUnitPath
     )
 }
+elseif ($env:OST_M012_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
+    Write-Host "Test d'acceptation de précondition M-003 exclu explicitement: M-012 vérifie les validateurs amont sans récursion."
+    Write-Host "Test d'acceptation de précondition M-004 exclu explicitement: M-012 vérifie les validateurs amont sans récursion."
+    Write-Host "Test d'acceptation de précondition M-005 exclu explicitement: M-012 vérifie les validateurs amont sans récursion."
+    Write-Host "Test d'acceptation de précondition M-006 exclu explicitement: M-012 vérifie les validateurs amont sans récursion."
+    Write-Host "Test d'acceptation de précondition M-007 exclu explicitement: M-012 vérifie les validateurs amont sans récursion."
+    Write-Host "Test d'acceptation de précondition M-008 exclu explicitement: M-012 vérifie les validateurs amont sans récursion."
+    Write-Host "Test d'acceptation de précondition M-009 exclu explicitement: M-012 vérifie les validateurs amont sans récursion."
+    Write-Host "Test d'acceptation de précondition M-010 exclu explicitement: M-012 vérifie les validateurs amont sans récursion."
+    Write-Host "Test d'acceptation de précondition M-011 exclu explicitement: M-012 vérifie les validateurs amont sans récursion."
+    Write-Host "Test d'acceptation de précondition M-012 exclu explicitement: exécution imbriquée du validateur de précondition."
+    $excludedPreconditionTestPaths = @(
+        $m003PreconditionAcceptancePath,
+        $m004PreconditionAcceptancePath,
+        $m005PreconditionAcceptancePath,
+        $m006PreconditionAcceptancePath,
+        $m007PreconditionAcceptancePath,
+        $m008PreconditionAcceptancePath,
+        $m009PreconditionAcceptancePath,
+        $m010PreconditionAcceptancePath,
+        $m011PreconditionAcceptancePath,
+        $m012PreconditionAcceptancePath,
+        $m012SpecificationAcceptancePath,
+        $m012SpecificationUnitPath
+    )
+}
 
 if (
     ($env:OST_M003_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") -or
@@ -932,6 +1009,46 @@ if (
         $m011ExperimentHttpContractUnitPath,
         $m011TraceabilityAcceptancePath,
         $m011TraceabilityUnitPath
+    )
+}
+
+if (
+    ($env:OST_M003_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") -or
+    ($env:OST_M004_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") -or
+    ($env:OST_M005_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") -or
+    ($env:OST_M006_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") -or
+    ($env:OST_M007_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") -or
+    ($env:OST_M008_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") -or
+    ($env:OST_M009_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") -or
+    ($env:OST_M010_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") -or
+    ($env:OST_M011_PRECONDITION_ACCEPTANCE_RUNNING -eq "1")
+) {
+    Write-Host "Tests M-012 exclus explicitement: les préconditions amont restent indépendantes du milestone aval."
+    $excludedPreconditionTestPaths += @(
+        $m012PreconditionAcceptancePath,
+        $m012PreconditionUnitPath,
+        $m012SpecificationAcceptancePath,
+        $m012SpecificationUnitPath,
+        $m012PilotCorpusAcceptancePath,
+        $m012PilotCorpusUnitPath,
+        $m012PageAnnotationAcceptancePath,
+        $m012PageAnnotationUnitPath,
+        $m012DocumentRouteAcceptancePath,
+        $m012DocumentRouteUnitPath,
+        $m012DocumentQualityAcceptancePath,
+        $m012DocumentQualityUnitPath,
+        $m012KnowledgeSearchAcceptancePath,
+        $m012KnowledgeSearchUnitPath,
+        $m012VerifiedAnswerAcceptancePath,
+        $m012VerifiedAnswerUnitPath,
+        $m012LlmBenchmarkAcceptancePath,
+        $m012LlmBenchmarkUnitPath,
+        $m012StrategyBacktestAcceptancePath,
+        $m012StrategyBacktestUnitPath,
+        $m012CalibrationDecisionsAcceptancePath,
+        $m012CalibrationDecisionsUnitPath,
+        $m012TraceabilityAcceptancePath,
+        $m012TraceabilityUnitPath
     )
 }
 

@@ -33,12 +33,13 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 | [DDD-ADR-008](DDD-ADR-008-coherence-eventuelle-entre-contextes.md) | Cohérence éventuelle entre contextes | Acceptée | 2026-06-21 | Aucun | Aucune |
 | [DDD-ADR-009](DDD-ADR-009-snapshots-immuables-experimentation.md) | Snapshots immuables pour l'expérimentation | Acceptée | 2026-06-21 | Aucun | Aucune |
 | [DDD-ADR-010](DDD-ADR-010-conservation-versions-negatives-supersedees.md) | Conservation des versions négatives et supersédées | Acceptée | 2026-06-21 | Aucun | Aucune |
+| [DDD-ADR-011](DDD-ADR-011-contexte-evaluation-pilote.md) | Contexte transverse d'évaluation pilote | Acceptée | 2026-07-06 | Aucun | Aucune |
 
 ## Prochains numéros disponibles
 
 ```text
 Prochaine ADR technique: ADR-013
-Prochaine DDD-ADR: DDD-ADR-011
+Prochaine DDD-ADR: DDD-ADR-012
 ```
 
 ## Règles de maintenance

@@ -14,7 +14,8 @@ $allowedBranches = @(
     "codex/milestone-m008-conversation-produit",
     "codex/milestone-m009-recherche-approfondie",
     "codex/milestone-m010-strategie-candidate-attribuee",
-    "codex/milestone-m011-experience-reproductible"
+    "codex/milestone-m011-experience-reproductible",
+    "codex/milestone-m012-evaluation-pilote-calibration"
 )
 $requiredMasterArtifacts = @(
     [ordered] @{ Path = "docs/tasks/milestone_000"; Kind = "Directory" },
@@ -493,3 +494,4 @@ foreach ($gateDefinition in $gateDefinitions) {
 
 Write-M005PreconditionReport -ReportPath $reportPath -OverallStatus "GREEN" -GitResults $gitResults.ToArray() -GateResults $gateResults.ToArray()
 Write-Host "Précondition M-005 GREEN: 2 gate(s), $($requiredMasterArtifacts.Count) artefact(s) amont vérifié(s). Rapport: $reportPath"
+exit 0
