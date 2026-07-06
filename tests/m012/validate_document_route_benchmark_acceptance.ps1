@@ -270,8 +270,9 @@ expect_raises(
 
 without_time = all_outputs()
 bad_page = without_time["Docling standard"][0]
-without_time["Docling standard"] = (
-    DocumentRouteOutput(
+expect_raises(
+    "temps par page absent",
+    lambda: DocumentRouteOutput(
         output_id=bad_page.output_id,
         route_name=bad_page.route_name,
         page_ref=bad_page.page_ref,
@@ -285,16 +286,6 @@ without_time["Docling standard"] = (
         memory_bytes=bad_page.memory_bytes,
         status=bad_page.status,
         failure_reason=bad_page.failure_reason,
-    ),
-    without_time["Docling standard"][1],
-)
-expect_raises(
-    "temps par page absent",
-    lambda: benchmark.measure(
-        run_id="RBRUN-M012-BENCH-0003",
-        corpus=corpus(),
-        annotation_set=annotation_set(),
-        route_outputs_by_route=without_time,
     ),
 )
 

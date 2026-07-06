@@ -222,16 +222,28 @@ expect_raises("temps par page absent", lambda: output("Docling standard", proces
 expect_raises("memoire absente", lambda: output("Docling standard", memory_bytes=None))
 expect_raises("route obligatoire absente", lambda: DocumentRouteBenchmark(policy_version="DocumentRouteBenchmarkPolicy-1.0").measure(run_id="RBRUN-M012-UNIT-MISSING", corpus=corpus(), annotation_set=annotation_set(), route_outputs_by_route={}))
 expect_raises("strate vide", lambda: DocumentRouteBenchmark(policy_version="DocumentRouteBenchmarkPolicy-1.0").measure(run_id="RBRUN-M012-UNIT-STRATA", corpus=corpus(frozenset()), annotation_set=annotation_set(), route_outputs_by_route=outputs_for_all_routes()))
-expect_raises("sortie manquante", lambda: DocumentRouteBenchmark(policy_version="DocumentRouteBenchmarkPolicy-1.0").measure(run_id="RBRUN-M012-UNIT-INCOMPLETE", corpus=corpus(), annotation_set=annotation_set(), route_outputs_by_route={"Docling standard": ()}))
+incomplete_outputs = outputs_for_all_routes()
+incomplete_outputs["Docling standard"] = ()
+expect_raises(
+    "sortie manquante",
+    lambda: DocumentRouteBenchmark(policy_version="DocumentRouteBenchmarkPolicy-1.0").measure(
+        run_id="RBRUN-M012-UNIT-INCOMPLETE",
+        corpus=corpus(),
+        annotation_set=annotation_set(),
+        route_outputs_by_route=incomplete_outputs,
+    ),
+)
 
 duplicated_output = output("Docling standard")
+duplicated_outputs = outputs_for_all_routes()
+duplicated_outputs["Docling standard"] = (duplicated_output, duplicated_output)
 expect_raises(
     "sortie dupliquee",
     lambda: DocumentRouteBenchmark(policy_version="DocumentRouteBenchmarkPolicy-1.0").measure(
         run_id="RBRUN-M012-UNIT-DUP",
         corpus=corpus(),
         annotation_set=annotation_set(),
-        route_outputs_by_route={"Docling standard": (duplicated_output, duplicated_output)},
+        route_outputs_by_route=duplicated_outputs,
     ),
 )
 

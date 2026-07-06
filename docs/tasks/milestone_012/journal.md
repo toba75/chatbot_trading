@@ -28,7 +28,13 @@
 
 ## Exécution
 
-- À compléter pendant l'implémentation M-012.
+- T-005 - Mesurer les routes documentaires:
+  - Scénario BDD: Given un corpus pilote figé et un jeu annoté page par page; When les routes `Docling standard`, `Granite-Docling direct`, `prétraitement + Granite-Docling` et `double conversion et adjudication` sont mesurées; Then chaque route publie CER/WER, exactitude numérique, signes, formules, cellules, ordre de lecture, temps, mémoire, stabilité, échecs au dénominateur et détails par strate.
+  - Commit RED: `f3ee7537a test(m012): couvrir les benchmarks de routes documentaires`.
+  - Commit GREEN: `feat(m012): mesurer les routes documentaires`.
+  - ADR: non requise; T-005 applique ADR-002 et ADR-010 sans ajouter de route documentaire structurante.
+  - Fichiers livrés: `app/evaluation/domain/document_route_benchmark.py`, `app/evaluation/domain/__init__.py`, `tests/m012/validate_document_route_benchmark_acceptance.ps1`, `tests/m012/validate_document_route_benchmark_unit.ps1`, `docs/traceability/matrix.md`.
+  - Validations ciblées GREEN: `tests/m012/validate_document_route_benchmark_acceptance.ps1`, `tests/m012/validate_document_route_benchmark_unit.ps1`.
 
 ## Revue d'adhérence
 
