@@ -1,8 +1,11 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
 . (Join-Path $repoRoot "scripts/require_python.ps1")
 $pythonExecutable = Get-RequiredPythonExecutable
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+[Console]::OutputEncoding = $utf8NoBom
+$OutputEncoding = $utf8NoBom
 
 $pythonCode = @'
 import sys
