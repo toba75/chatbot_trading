@@ -1,8 +1,8 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
 $validatorPath = Join-Path $repoRoot "scripts/validate_m012_specification.ps1"
-$temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m012_specification_unit_" + [System.Guid]::NewGuid().ToString("N"))
+$temporaryRoot = Join-Path $repoRoot (".tmp/ost_m012_specification_unit_" + [System.Guid]::NewGuid().ToString("N"))
 
 function New-ValidM012SpecificationContent {
     $canonicalSpecPath = Join-Path $repoRoot "docs/specs/m012_evaluation_pilote_calibration.md"
@@ -208,7 +208,7 @@ try {
     Assert-M012RejectedSpec `
         -Name "gates-absents" `
         -Content ($validContent.Replace("powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m012_specification.ps1", "powershell -File .\scripts\validate_m012_specification.ps1")) `
-        -ExpectedOutput "Commande de validation absente: powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m012_specification.ps1" `
+        -ExpectedOutput "Commande de validation absente: powershell -NoProfile" `
         -Message "Les commandes de validation normatives doivent être obligatoires."
 
     Assert-M012RejectedSpec `

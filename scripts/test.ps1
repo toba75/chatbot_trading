@@ -21,6 +21,7 @@ $m008SpecificationPath = Join-Path $repoRoot "docs/specs/m008_conversation_produ
 $m009SpecificationPath = Join-Path $repoRoot "docs/specs/m009_recherche_approfondie_multi_sources.md"
 $m010SpecificationPath = Join-Path $repoRoot "docs/specs/m010_strategie_candidate_attribuee.md"
 $m011SpecificationPath = Join-Path $repoRoot "docs/specs/m011_experience_reproductible.md"
+$m012SpecificationPath = Join-Path $repoRoot "docs/specs/m012_evaluation_pilote_calibration.md"
 $platformTopologyPath = Join-Path $repoRoot "app/platform/topology_registry.json"
 $sparkFirewallPath = Join-Path $repoRoot "deploy/spark-firewall/network-boundary.json"
 $appRoot = Join-Path $repoRoot "app"
@@ -125,6 +126,8 @@ $m011TraceabilityAcceptancePath = "tests/m011/validate_m011_traceability_accepta
 $m011TraceabilityUnitPath = "tests/m011/validate_m011_traceability_unit.ps1"
 $m012PreconditionAcceptancePath = "tests/m012/validate_m012_precondition_acceptance.ps1"
 $m012PreconditionUnitPath = "tests/m012/validate_m012_precondition_unit.ps1"
+$m012SpecificationAcceptancePath = "tests/m012/validate_m012_specification_acceptance.ps1"
+$m012SpecificationUnitPath = "tests/m012/validate_m012_specification_unit.ps1"
 
 $validationCommands = @(
     @{ Path = "scripts/validate_m000_precondition_report.ps1"; Arguments = @("-Path", $preconditionReportPath) },
@@ -144,6 +147,7 @@ $validationCommands = @(
     @{ Path = "scripts/validate_m010_specification.ps1"; Arguments = @("-Path", $m010SpecificationPath) },
     @{ Path = "scripts/validate_m011_specification.ps1"; Arguments = @("-Path", $m011SpecificationPath) },
     @{ Path = "scripts/validate_m011_traceability.ps1"; Arguments = @() },
+    @{ Path = "scripts/validate_m012_specification.ps1"; Arguments = @("-Path", $m012SpecificationPath) },
     @{ Path = "scripts/validate_platform_topology.ps1"; Arguments = @("-Path", $platformTopologyPath) },
     @{ Path = "scripts/validate_local_compose.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_network_boundary.ps1"; Arguments = @("-SparkFirewallPath", $sparkFirewallPath) },
@@ -378,6 +382,8 @@ $testCommands = @(
     @{ Path = $m011TraceabilityUnitPath; Arguments = @() },
     @{ Path = $m012PreconditionUnitPath; Arguments = @() },
     @{ Path = $m012PreconditionAcceptancePath; Arguments = @() },
+    @{ Path = $m012SpecificationAcceptancePath; Arguments = @() },
+    @{ Path = $m012SpecificationUnitPath; Arguments = @() },
     @{ Path = "tests/m009/validate_m009_specification_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/m009/validate_m009_specification_unit.ps1"; Arguments = @() },
     @{ Path = "tests/m009/validate_deep_research_planning_acceptance.ps1"; Arguments = @() },
@@ -920,7 +926,9 @@ elseif ($env:OST_M012_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m009PreconditionAcceptancePath,
         $m010PreconditionAcceptancePath,
         $m011PreconditionAcceptancePath,
-        $m012PreconditionAcceptancePath
+        $m012PreconditionAcceptancePath,
+        $m012SpecificationAcceptancePath,
+        $m012SpecificationUnitPath
     )
 }
 
@@ -977,7 +985,9 @@ if (
     Write-Host "Tests M-012 exclus explicitement: les préconditions amont restent indépendantes du milestone aval."
     $excludedPreconditionTestPaths += @(
         $m012PreconditionAcceptancePath,
-        $m012PreconditionUnitPath
+        $m012PreconditionUnitPath,
+        $m012SpecificationAcceptancePath,
+        $m012SpecificationUnitPath
     )
 }
 
