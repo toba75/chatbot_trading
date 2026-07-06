@@ -1,1 +1,1 @@
-"""Contexte transverse d'evaluation M-012."""
+"""Contexte transverse d'évaluation M-012."""

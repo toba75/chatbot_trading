@@ -775,7 +775,7 @@ def analyze_architecture(
         if source is None:
             relative_parts = path.relative_to(app_root).parts
             if relative_parts != ("__init__.py",):
-                violations.append(f"Module app non declare dans le registre: {path.relative_to(REPOSITORY_ROOT)}.")
+                violations.append(f"Module app non déclaré dans le registre : {path.relative_to(REPOSITORY_ROOT)}.")
             continue
 
         analyzed_file_count += 1

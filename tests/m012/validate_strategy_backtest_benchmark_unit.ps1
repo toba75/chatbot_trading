@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
 . (Join-Path $repoRoot "scripts/require_python.ps1")
@@ -144,7 +144,7 @@ assert_raises(
     lambda: result(data_snapshot_id="DATA-LATEST"),
 )
 assert_raises(
-    "source metrique LLM interdite",
+    "source métrique LLM interdite",
     lambda: result(metric_source="LLM"),
 )
 assert_raises(
@@ -174,17 +174,17 @@ non_compilable = strategy_case(
     parameters_without_calibration_plan=("lookback",),
     compatibility_conflicts=("data",),
 )
-assert_equal(non_compilable.compilable, False, "Une strategie INCOMPLETE ne doit pas etre compilable.")
+assert_equal(non_compilable.compilable, False, "Une stratégie INCOMPLETE ne doit pas être compilable.")
 assert_raises(
     "raison de rejet requise",
     lambda: strategy_case(compilation_status="INCOMPLETE", rejection_reasons=()),
 )
 assert_raises(
-    "source metrique LLM interdite",
+    "source métrique LLM interdite",
     lambda: strategy_case(metric_source="LLM"),
 )
 assert_raises(
-    "origine de regle requise",
+    "origine de règle requise",
     lambda: strategy_case(rule_origins=()),
 )
 
@@ -213,35 +213,35 @@ run = measure(
     ),
 )
 
-assert_equal(run.sd_metrics[STRATEGY_COMPILABLE_RATE].value, "0.500000000000", "Le taux compilable doit garder le rejet au denominateur.")
-assert_equal(run.sd_metrics[STRATEGY_REJECTION_REASON_DISTRIBUTION].counts, {"PARAMETER_CALIBRATION_REQUIRED": 1}, "Les rejets doivent etre comptes.")
-assert_equal(run.sd_metrics[STRATEGY_RULE_ORIGIN_RATIO].ratios["SOURCE"], "0.400000000000", "Les origines doivent etre agregees.")
-assert_equal(run.sd_metrics[STRATEGY_PARAMETER_WITHOUT_CALIBRATION_PLAN_TOTAL].numerator, 1, "Les parametres sans plan doivent etre comptes.")
-assert_equal(run.sd_metrics[STRATEGY_COMPATIBILITY_CONFLICT_TOTAL].counts, {"data": 1}, "Les conflits doivent etre categorises.")
+assert_equal(run.sd_metrics[STRATEGY_COMPILABLE_RATE].value, "0.500000000000", "Le taux compilable doit garder le rejet au dénominateur.")
+assert_equal(run.sd_metrics[STRATEGY_REJECTION_REASON_DISTRIBUTION].counts, {"PARAMETER_CALIBRATION_REQUIRED": 1}, "Les rejets doivent être comptés.")
+assert_equal(run.sd_metrics[STRATEGY_RULE_ORIGIN_RATIO].ratios["SOURCE"], "0.400000000000", "Les origines doivent être agrégées.")
+assert_equal(run.sd_metrics[STRATEGY_PARAMETER_WITHOUT_CALIBRATION_PLAN_TOTAL].numerator, 1, "Les paramètres sans plan doivent être comptés.")
+assert_equal(run.sd_metrics[STRATEGY_COMPATIBILITY_CONFLICT_TOTAL].counts, {"data": 1}, "Les conflits doivent être catégorisés.")
 assert_equal(run.sd_metrics[STRATEGY_VERSION_COUNT].counts, {"STRAT-UNIT": 2}, "Les versions invalides doivent rester visibles.")
-assert_equal(run.ex_metrics[EXPERIMENT_REPRODUCIBLE_RATE].value, "0.333333333333", "Le taux reproductible doit utiliser tous les resultats.")
-assert_equal(run.ex_metrics[EXPERIMENT_FAILURE_RATE_BY_CAUSE].counts, {"DATA_SNAPSHOT_REJECTED": 1}, "Les echecs doivent etre par cause.")
-assert_equal(run.ex_metrics[NEGATIVE_EXPERIMENT_RETENTION_RATIO].value, "1.000000000000", "Les negatifs et echecs conserves doivent etre comptes.")
-assert_equal(run.ex_metrics[EXPERIMENT_WITHOUT_COMPLETE_COST_MODEL_TOTAL].numerator, 1, "Les couts incomplets doivent etre signales.")
-assert_equal(run.ex_metrics[INVALIDATED_RESULT_RATIO].value, "0.333333333333", "Les resultats invalides doivent rester dans le denominateur.")
-assert_equal(run.ex_metrics[BACKTEST_ASSUMPTION_COUNT].numerator, 3, "Les hypotheses doivent rester publiees.")
+assert_equal(run.ex_metrics[EXPERIMENT_REPRODUCIBLE_RATE].value, "0.333333333333", "Le taux reproductible doit utiliser tous les résultats.")
+assert_equal(run.ex_metrics[EXPERIMENT_FAILURE_RATE_BY_CAUSE].counts, {"DATA_SNAPSHOT_REJECTED": 1}, "Les échecs doivent être par cause.")
+assert_equal(run.ex_metrics[NEGATIVE_EXPERIMENT_RETENTION_RATIO].value, "1.000000000000", "Les négatifs et échecs conservés doivent être comptés.")
+assert_equal(run.ex_metrics[EXPERIMENT_WITHOUT_COMPLETE_COST_MODEL_TOTAL].numerator, 1, "Les coûts incomplets doivent être signalés.")
+assert_equal(run.ex_metrics[INVALIDATED_RESULT_RATIO].value, "0.333333333333", "Les résultats invalides doivent rester dans le dénominateur.")
+assert_equal(run.ex_metrics[BACKTEST_ASSUMPTION_COUNT].numerator, 3, "Les hypothèses doivent rester publiées.")
 
 assert_raises(
-    "resultat de strategie absente du benchmark SD",
+    "résultat de stratégie absente du benchmark SD",
     lambda: measure(
         (strategy_case(),),
         (result(strategy_version_id="SVER-M012-T010-UNKNOWN"),),
     ),
 )
 assert_raises(
-    "strategie dupliquee dans le benchmark",
+    "stratégie dupliquée dans le benchmark",
     lambda: measure(
         (strategy_case(case_id="CASE-A"), strategy_case(case_id="CASE-A")),
         (result(),),
     ),
 )
 assert_raises(
-    "version strategie dupliquee dans le benchmark",
+    "version stratégie dupliquée dans le benchmark",
     lambda: measure(
         (
             strategy_case(case_id="CASE-A", strategy_version_id="SVER-M012-T010-DUP"),
@@ -251,21 +251,21 @@ assert_raises(
     ),
 )
 assert_raises(
-    "resultat duplique dans le benchmark",
+    "résultat dupliqué dans le benchmark",
     lambda: measure(
         (strategy_case(),),
         (result(experiment_id="EXP-M012-T010-DUP"), result(experiment_id="EXP-M012-T010-DUP")),
     ),
 )
 assert_raises(
-    "resultat negatif absent",
+    "résultat négatif absent",
     lambda: measure(
         (strategy_case(),),
         (result(result_negative=False, repeat_coherent=True),),
     ),
 )
 
-print("Tests unitaires T-010 benchmark strategies et backtests M-012: OK")
+print("Tests unitaires T-010 benchmark stratégies et backtests M-012: OK")
 '@
 
 $pythonScriptPath = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m012_strategy_backtest_benchmark_unit_" + [System.Guid]::NewGuid().ToString("N") + ".py")
@@ -283,7 +283,7 @@ try {
     }
 
     if ($exitCode -ne 0) {
-        throw "Tests unitaires T-010 benchmark strategies et backtests M-012 invalides. Sortie: $($output -join "`n")"
+        throw "Tests unitaires T-010 benchmark stratégies et backtests M-012 invalides. Sortie: $($output -join "`n")"
     }
     Write-Host ($output -join "`n")
 }

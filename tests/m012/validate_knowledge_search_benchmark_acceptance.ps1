@@ -182,11 +182,11 @@ def expect_raises(expected_fragment, action):
     raise AssertionError(f"Erreur attendue absente: {expected_fragment}")
 
 
-# Given un jeu de 100 a 300 questions avec pages attendues.
+# Given un jeu de 100 à 300 questions avec pages attendues.
 search_set = evaluation_set()
 benchmark = KnowledgeSearchBenchmark(policy_version=POLICY_VERSION)
 
-# When la recherche de connaissances est executee sur la projection versionnee du corpus pilote.
+# When la recherche de connaissances est exécutée sur la projection versionnée du corpus pilote.
 run = benchmark.measure(
     run_id="KSRUN-M012-KA-0001",
     evaluation_set=search_set,
@@ -194,7 +194,7 @@ run = benchmark.measure(
     candidates_by_question=candidates_by_question(search_set),
 )
 
-# Then les metriques de rappel, rang, diversite et couverture sont publiees avec les echecs visibles.
+# Then les métriques de rappel, rang, diversité et couverture sont publiées avec les échecs visibles.
 expected_metrics = {
     KNOWLEDGE_RECALL_AT_5,
     KNOWLEDGE_RECALL_AT_10,

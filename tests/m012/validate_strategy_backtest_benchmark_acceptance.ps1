@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
 . (Join-Path $repoRoot "scripts/require_python.ps1")
@@ -106,7 +106,7 @@ def backtest_result(
         period_end="2023-12-31",
         universe=("CAC40", "STOXX600"),
         cost_model={"commission_bps": "5.000000000000", "slippage_bps": "3.000000000000", "currency": "EUR"},
-        assumptions=("hors echantillon declare", "dividendes ajustes", "liquidite pilote limitee"),
+        assumptions=("hors échantillon déclaré", "dividendes ajustés", "liquidité pilote limitée"),
         calibration_protocols=(calibration_protocol(),),
         status=status,
         metrics={"return_pct": return_pct, "max_drawdown_pct": "-0.080000000000"},
@@ -116,14 +116,14 @@ def backtest_result(
         cost_model_complete=cost_complete,
         repeat_coherent=repeat_coherent,
         invalidated_after_audit=invalidated,
-        profitability_verdict="resultat pilote descriptif",
+        profitability_verdict="résultat pilote descriptif",
         profitability_qualification="qualification explicite: mesure pilote non generalisable et sans promesse de rentabilite",
         result_hash=HASH,
         metric_source="EX",
     )
 
 
-# Given des strategies candidates snapshotees et des experiences reproductibles M-011.
+# Given des stratégies candidates snapshotées et des expériences reproductibles M-011.
 compiled_case = strategy_case(
     "CASE-M012-T010-COMPILED",
     "STRAT-A",
@@ -183,10 +183,10 @@ run = StrategyDesignBenchmark(policy_version=POLICY_VERSION).measure(
     metric_source="SD_EX",
 )
 
-# Then les metriques SD et EX conservent limites, couts, periodes, univers, resultats negatifs et echecs.
-assert_equal(run.strategy_case_count, 3, "Toutes les versions SD doivent rester dans le denominateur.")
-assert_equal(run.result_count, 3, "Tous les resultats EX doivent rester dans le benchmark.")
-assert_equal(run.sd_metrics[STRATEGY_COMPILABLE_RATE].value, "0.666666666667", "Le taux compilable doit compter les strategies non compilables.")
+# Then les métriques SD et EX conservent limites, coûts, périodes, univers, résultats négatifs et échecs.
+assert_equal(run.strategy_case_count, 3, "Toutes les versions SD doivent rester dans le dénominateur.")
+assert_equal(run.result_count, 3, "Tous les résultats EX doivent rester dans le benchmark.")
+assert_equal(run.sd_metrics[STRATEGY_COMPILABLE_RATE].value, "0.666666666667", "Le taux compilable doit compter les stratégies non compilables.")
 assert_equal(
     run.sd_metrics[STRATEGY_REJECTION_REASON_DISTRIBUTION].counts,
     {"PARAMETER_CALIBRATION_REQUIRED": 1, "STRATEGY_CONFLICT_BLOCKING": 1},
@@ -201,12 +201,12 @@ assert_equal(
         "SOURCE": "0.285714285714",
         "USER_CONSTRAINT": "0.142857142857",
     },
-    "Les origines de regles doivent etre proportionnees.",
+    "Les origines de règles doivent être proportionnées.",
 )
 assert_equal(
     run.sd_metrics[STRATEGY_PARAMETER_WITHOUT_CALIBRATION_PLAN_TOTAL].numerator,
     1,
-    "Les parametres sans plan doivent rester visibles.",
+    "Les paramètres sans plan doivent rester visibles.",
 )
 assert_equal(
     run.sd_metrics[STRATEGY_COMPATIBILITY_CONFLICT_TOTAL].counts,
@@ -216,7 +216,7 @@ assert_equal(
 assert_equal(
     run.sd_metrics[STRATEGY_VERSION_COUNT].counts,
     {"STRAT-A": 2, "STRAT-B": 1},
-    "Les versions par strategie doivent inclure les versions rejetees.",
+    "Les versions par stratégie doivent inclure les versions rejetées.",
 )
 assert_equal(
     run.ex_metrics[EXPERIMENT_REPRODUCIBLE_RATE].value,
@@ -226,42 +226,42 @@ assert_equal(
 assert_equal(
     run.ex_metrics[EXPERIMENT_FAILURE_RATE_BY_CAUSE].counts,
     {"ENGINE_INPUT_REJECTED": 1},
-    "Les echecs doivent rester comptes par cause.",
+    "Les échecs doivent rester comptés par cause.",
 )
 assert_equal(
     run.ex_metrics[NEGATIVE_EXPERIMENT_RETENTION_RATIO].value,
     "1.000000000000",
-    "Les resultats negatifs et echoues doivent etre conserves.",
+    "Les résultats négatifs et échoués doivent être conservés.",
 )
 assert_equal(
     run.ex_metrics[EXPERIMENT_WITHOUT_COMPLETE_COST_MODEL_TOTAL].numerator,
     1,
     "Le cout complet doit etre controle.",
 )
-assert_equal(run.coherent_repeat_count, 2, "Les repetitions coherentes doivent etre publiees.")
+assert_equal(run.coherent_repeat_count, 2, "Les répétitions cohérentes doivent être publiées.")
 assert_equal(
     run.ex_metrics[INVALIDATED_RESULT_RATIO].value,
     "0.333333333333",
-    "Les invalidations apres audit doivent rester au denominateur.",
+    "Les invalidations après audit doivent rester au dénominateur.",
 )
 assert_equal(
     run.ex_metrics[BACKTEST_ASSUMPTION_COUNT].numerator,
     9,
-    "Les hypotheses de backtest doivent etre publiees.",
+    "Les hypothèses de backtest doivent être publiées.",
 )
 assert_equal(
     run.results_by_experiment_id["EXP-M012-T010-NEGATIVE"].result_negative,
     True,
-    "Le resultat negatif ne doit pas etre retire.",
+    "Le résultat négatif ne doit pas être retiré.",
 )
 assert_equal(
     run.results_by_experiment_id["EXP-M012-T010-FAILED"].status,
     "FAILED",
-    "L'echec EX doit rester publie.",
+    "L'échec EX doit rester publié.",
 )
 
 assert_raises(
-    "source metrique LLM interdite",
+    "source métrique LLM interdite",
     lambda: StrategyDesignBenchmark(policy_version=POLICY_VERSION).measure(
         run_id="SBRUN-M012-T010-LLM",
         strategy_cases=(strategy_case("CASE-M012-T010-LLM", "STRAT-C", 1, compilable=True),),
@@ -306,10 +306,10 @@ assert_raises(
     lambda: backtest_result(
         "EXP-M012-T010-PROFITABILITY",
         compiled_case.strategy_version_id,
-    ).with_profitability_verdict("strategie rentable", None),
+    ).with_profitability_verdict("stratégie rentable", None),
 )
 
-print("Test d'acceptation T-010 benchmark strategies et backtests M-012: OK")
+print("Test d'acceptation T-010 benchmark stratégies et backtests M-012: OK")
 '@
 
 $pythonScriptPath = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m012_strategy_backtest_benchmark_acceptance_" + [System.Guid]::NewGuid().ToString("N") + ".py")
@@ -327,7 +327,7 @@ try {
     }
 
     if ($exitCode -ne 0) {
-        throw "Test d'acceptation T-010 benchmark strategies et backtests M-012 invalide. Sortie: $($output -join "`n")"
+        throw "Test d'acceptation T-010 benchmark stratégies et backtests M-012 invalide. Sortie: $($output -join "`n")"
     }
     Write-Host ($output -join "`n")
 }

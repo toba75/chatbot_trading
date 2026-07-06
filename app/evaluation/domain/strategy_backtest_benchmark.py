@@ -374,14 +374,14 @@ def _sd_metrics(cases: tuple[StrategyEvaluationCase, ...]) -> Mapping[str, Any]:
             _counts_for(case.strategy_id for case in cases),
         ),
     }
-    _ensure_metric_keys(sd_metrics, REQUIRED_SD_METRICS, "metrique SD absente")
+    _ensure_metric_keys(sd_metrics, REQUIRED_SD_METRICS, "métrique SD absente")
     return sd_metrics
 
 
 def _ex_metrics(results: tuple[BacktestBenchmarkResult, ...]) -> Mapping[str, Any]:
     negative_results = tuple(result for result in results if result.result_negative or result.status == "FAILED")
     if len(negative_results) == 0:
-        raise ValueError("resultat negatif absent")
+        raise ValueError("résultat négatif absent")
     ex_metrics = {
         EXPERIMENT_REPRODUCIBLE_RATE: _ratio_metric(
             EXPERIMENT_REPRODUCIBLE_RATE,
@@ -415,7 +415,7 @@ def _ex_metrics(results: tuple[BacktestBenchmarkResult, ...]) -> Mapping[str, An
             sum(len(result.assumptions) for result in results),
         ),
     }
-    _ensure_metric_keys(ex_metrics, REQUIRED_EX_METRICS, "metrique EX absente")
+    _ensure_metric_keys(ex_metrics, REQUIRED_EX_METRICS, "métrique EX absente")
     return ex_metrics
 
 
@@ -431,9 +431,9 @@ def _required_strategy_cases(values: Sequence[StrategyEvaluationCase]) -> tuple[
         if not isinstance(case, StrategyEvaluationCase):
             raise ValueError("StrategyEvaluationCase requis")
         if case.case_id in case_ids:
-            raise ValueError("strategie dupliquee dans le benchmark")
+            raise ValueError("stratégie dupliquée dans le benchmark")
         if case.strategy_version_id in strategy_version_ids:
-            raise ValueError("version strategie dupliquee dans le benchmark")
+            raise ValueError("version stratégie dupliquée dans le benchmark")
         case_ids.add(case.case_id)
         strategy_version_ids.add(case.strategy_version_id)
     return cases
@@ -450,7 +450,7 @@ def _required_backtest_results(values: Sequence[BacktestBenchmarkResult]) -> tup
         if not isinstance(result, BacktestBenchmarkResult):
             raise ValueError("BacktestBenchmarkResult requis")
         if result.experiment_id in experiment_ids:
-            raise ValueError("resultat duplique dans le benchmark")
+            raise ValueError("résultat dupliqué dans le benchmark")
         experiment_ids.add(result.experiment_id)
     return results
 
@@ -462,7 +462,7 @@ def _ensure_results_reference_strategy_cases(
     strategy_version_ids = {case.strategy_version_id for case in strategy_cases}
     for result in results:
         if result.strategy_version_id not in strategy_version_ids:
-            raise ValueError("resultat de strategie absente du benchmark SD")
+            raise ValueError("résultat de stratégie absente du benchmark SD")
 
 
 def _required_policy_version(value: Any) -> str:
@@ -487,28 +487,28 @@ def _required_backtest_status(value: Any) -> str:
 
 
 def _required_rule_origins(values: Sequence[str]) -> tuple[str, ...]:
-    origins = _required_text_tuple(values, "origine de regle requise", allow_empty=False)
+    origins = _required_text_tuple(values, "origine de règle requise", allow_empty=False)
     for origin in origins:
         if origin not in _RULE_ORIGINS:
-            raise ValueError("origine de regle invalide")
+            raise ValueError("origine de règle invalide")
     return origins
 
 
 def _required_metric_source(value: Any, *, expected: str) -> str:
     text = _required_text(value, "metric_source")
     if text == "LLM":
-        raise ValueError("source metrique LLM interdite")
+        raise ValueError("source métrique LLM interdite")
     if text != expected:
-        raise ValueError("source metrique invalide")
+        raise ValueError("source métrique invalide")
     return text
 
 
 def _ensure_not_llm_metric_source(value: Any) -> None:
     text = _required_text(value, "metric_source")
     if text == "LLM":
-        raise ValueError("source metrique LLM interdite")
+        raise ValueError("source métrique LLM interdite")
     if text != "SD_EX":
-        raise ValueError("source metrique invalide")
+        raise ValueError("source métrique invalide")
 
 
 def _required_calibration_domain(value: Mapping[str, Any]) -> Mapping[str, Any]:
