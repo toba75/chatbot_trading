@@ -56,6 +56,13 @@
   - ADR: non requise; T-008 applique ADR-010 et DDD-ADR-007 sans changer leur sens.
   - Fichiers livrés: `app/evaluation/domain/verified_answer_benchmark.py`, `app/evaluation/domain/__init__.py`, `tests/m012/validate_verified_answer_benchmark_acceptance.ps1`, `tests/m012/validate_verified_answer_benchmark_unit.ps1`, `docs/evaluation/m012/verified_answer_benchmark_report.md`, `docs/evaluation/m012/evidence_governance_benchmark_report.md`, `docs/traceability/matrix.md`.
   - Validations ciblées GREEN: `tests/m012/validate_verified_answer_benchmark_acceptance.ps1`, `tests/m012/validate_verified_answer_benchmark_unit.ps1`.
+- T-009 - Mesurer le LLM principal par le chemin réel:
+  - Scénario BDD: Given les checkpoints principaux obligatoires; When ils sont évalués par `docker-local -> llm-gateway -> réseau privé -> vLLM sur Spark`; Then la promotion communautaire est refusée sans tâches obligatoires au moins égales aux références officielles et sans métriques techniques exploitables.
+  - Commit RED: `45a07bda3 test(m012): couvrir le benchmark llm chemin reel`.
+  - Commit GREEN: `feat(m012): mesurer le llm principal`.
+  - ADR: non requise; T-009 applique ADR-008, ADR-010 et DDD-ADR-007 sans changer leur sens.
+  - Fichiers livrés: `app/evaluation/domain/llm_real_path_benchmark.py`, `app/evaluation/domain/__init__.py`, `tests/m012/validate_llm_benchmark_real_path_acceptance.ps1`, `tests/m012/validate_llm_benchmark_real_path_unit.ps1`, `docs/evaluation/m012/llm_real_path_benchmark_report.md`, `docs/traceability/matrix.md`.
+  - Validations ciblées GREEN: `tests/m012/validate_llm_benchmark_real_path_acceptance.ps1`, `tests/m012/validate_llm_benchmark_real_path_unit.ps1`.
 
 ## Revue d'adhérence
 
