@@ -47,14 +47,16 @@ def assert_raises(expected_fragment, action):
     raise AssertionError(f"Erreur attendue absente: {expected_fragment}")
 
 
-def source(context="KA", metric_names=("knowledge_recall_at_10",), benchmark_id="RUN-M012-KA"):
-    return BenchmarkSourceLink(
-        benchmark_id=benchmark_id,
-        context=context,
-        artifact_path=f"docs/evaluation/m012/{context.lower()}_benchmark_report.md",
-        policy_version="BenchmarkPolicy-M012-1.0",
-        metric_names=metric_names,
-    )
+def source(context="KA", metric_names=("knowledge_recall_at_10",), benchmark_id="RUN-M012-KA", **overrides):
+    payload = {
+        "benchmark_id": benchmark_id,
+        "context": context,
+        "artifact_path": f"docs/evaluation/m012/{context.lower()}_benchmark_report.md",
+        "policy_version": "BenchmarkPolicy-M012-1.0",
+        "metric_names": metric_names,
+    }
+    payload.update(overrides)
+    return BenchmarkSourceLink(**payload)
 
 
 def threshold(metric_name="knowledge_recall_at_10"):
@@ -67,27 +69,30 @@ def threshold(metric_name="knowledge_recall_at_10"):
     )
 
 
-def verdict(status=SCIENTIFIC_RED, metric_name="knowledge_recall_at_10"):
+def verdict(status=SCIENTIFIC_RED, metric_name="knowledge_recall_at_10", benchmark_source_id="RUN-M012-KA"):
     return ScientificGateVerdict(
         verdict_id=f"SCI-M012-{metric_name}",
         status=status,
         metric_name=metric_name,
-        benchmark_source_id="RUN-M012-KA",
+        benchmark_source_id=benchmark_source_id,
         software_gate_status="GREEN",
         reason="mesure scientifique sous seuil conservee",
     )
 
 
 def decision(**overrides):
+    context = overrides.get("context", "KA")
+    benchmark_id = f"RUN-M012-{context}"
+    metric_name = "knowledge_recall_at_10"
     payload = {
         "decision_id": "DEC-M012-KA-RECALL",
         "policy_version": POLICY_VERSION,
-        "context": "KA",
+        "context": context,
         "status": REJECTED,
-        "benchmark_sources": (source(),),
-        "thresholds": (threshold(),),
+        "benchmark_sources": (source(context=context, benchmark_id=benchmark_id, metric_names=(metric_name,)),),
+        "thresholds": (threshold(metric_name),),
         "criteria": (),
-        "scientific_verdicts": (verdict(),),
+        "scientific_verdicts": (verdict(metric_name=metric_name, benchmark_source_id=benchmark_id),),
         "adr_refs": ADR_REFS,
         "v1_gap_refs": ("V1-GAP-M012-KA-RECALL",),
         "justification": "Recall@10 pilote sous le seuil de promotion.",

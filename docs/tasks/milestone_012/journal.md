@@ -70,6 +70,13 @@
   - ADR: non requise; T-010 applique ADR-010, DDD-ADR-009 et DDD-ADR-010 sans changer leur sens.
   - Fichiers livrés: `app/evaluation/domain/strategy_backtest_benchmark.py`, `app/evaluation/domain/__init__.py`, `tests/m012/validate_strategy_backtest_benchmark_acceptance.ps1`, `tests/m012/validate_strategy_backtest_benchmark_unit.ps1`, `docs/evaluation/m012/strategy_backtest_benchmark_report.md`, `docs/traceability/matrix.md`.
   - Validations ciblées GREEN: `tests/m012/validate_strategy_backtest_benchmark_acceptance.ps1`, `tests/m012/validate_strategy_backtest_benchmark_unit.ps1`.
+- T-011 - Publier les décisions de calibration et de promotion:
+  - Scénario BDD: Given les benchmarks documentaires, recherche, gouvernance des preuves, réponses, conversation, stratégies, LLM et backtests sont terminés; When les décisions de calibration et promotion sont publiées; Then chaque décision référence ses métriques sources, conserve les refus et reports, et empêche qu'un test scientifique RED soit caché par un gate logiciel GREEN.
+  - Commit RED: `b55920721 test(m012): couvrir decisions calibration promotion`.
+  - Commit GREEN: `feat(m012): publier decisions calibration promotion`.
+  - ADR: non requise; T-011 applique ADR-010 et DDD-ADR-010 sans changer leur sens.
+  - Fichiers livrés: `app/evaluation/domain/calibration_decisions.py`, `app/evaluation/domain/__init__.py`, `tests/m012/validate_calibration_decisions_acceptance.ps1`, `tests/m012/validate_calibration_decisions_unit.ps1`, `docs/evaluation/m012/calibration_promotion_decisions_report.md`, `docs/traceability/matrix.md`.
+  - Validations ciblées attendues: `tests/m012/validate_calibration_decisions_acceptance.ps1`, `tests/m012/validate_calibration_decisions_unit.ps1`, `scripts/validate_m012_specification.ps1`, `scripts/validate_adr_system.ps1`, `scripts/lint.ps1`.
 
 ## Revue d'adhérence
 
