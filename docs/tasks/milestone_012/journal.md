@@ -42,6 +42,13 @@
   - ADR: non requise; T-006 applique ADR-002, ADR-004 et ADR-010 sans changer leur sens.
   - Fichiers livrés: `app/evaluation/domain/document_quality_calibration.py`, `app/evaluation/domain/__init__.py`, `tests/m012/validate_document_quality_calibration_acceptance.ps1`, `tests/m012/validate_document_quality_calibration_unit.ps1`, `docs/evaluation/m012/document_quality_calibration_report.md`, `docs/traceability/matrix.md`.
   - Validations ciblées GREEN: `tests/m012/validate_document_quality_calibration_acceptance.ps1`, `tests/m012/validate_document_quality_calibration_unit.ps1`.
+- T-007 - Mesurer la recherche de connaissances:
+  - Scénario BDD: Given un jeu de 100 à 300 questions avec pages attendues; When la recherche KA est exécutée sur la projection versionnée du corpus pilote; Then les métriques de rappel, rang, diversité, couverture et FR vers source EN sont publiées avec les échecs visibles.
+  - Commit RED: `e4251e367 test(m012): couvrir le benchmark recherche`.
+  - Commit GREEN: `feat(m012): mesurer la recherche de connaissances`.
+  - ADR: non requise; T-007 applique ADR-005, ADR-010 et DDD-ADR-004 sans changer leur sens.
+  - Fichiers livrés: `app/evaluation/domain/knowledge_search_benchmark.py`, `app/evaluation/domain/__init__.py`, `tests/m012/validate_knowledge_search_benchmark_acceptance.ps1`, `tests/m012/validate_knowledge_search_benchmark_unit.ps1`, `docs/evaluation/m012/knowledge_search_benchmark_report.md`, `docs/traceability/matrix.md`.
+  - Validations ciblées GREEN: `tests/m012/validate_knowledge_search_benchmark_acceptance.ps1`, `tests/m012/validate_knowledge_search_benchmark_unit.ps1`.
 
 ## Revue d'adhérence
 

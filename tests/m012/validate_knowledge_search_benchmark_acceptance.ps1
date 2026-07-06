@@ -139,11 +139,12 @@ def candidate(question_id, rank, page_pdf, *, suffix):
 
 def candidates_for_question(search_question, index):
     expected_page_pdf = search_question.expected_pages.pages[0].page_ref.page_pdf
+    wrong_page_pdf = (expected_page_pdf % 10) + 1
     candidates = []
     if index <= 70:
         candidates.append(candidate(search_question.question_id, 1, expected_page_pdf, suffix=index))
     else:
-        candidates.append(candidate(search_question.question_id, 1, 10, suffix=index))
+        candidates.append(candidate(search_question.question_id, 1, wrong_page_pdf, suffix=index))
 
     if 71 <= index <= 90:
         candidates.append(candidate(search_question.question_id, 8, expected_page_pdf, suffix=index + 100))
