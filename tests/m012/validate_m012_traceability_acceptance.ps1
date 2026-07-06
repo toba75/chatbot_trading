@@ -53,4 +53,3 @@ if ($outputText.Contains("Ã")) {
 }
 
 Write-Host "Test d'acceptation T-012 traçabilité M-012: OK"
-

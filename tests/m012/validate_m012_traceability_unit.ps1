@@ -140,7 +140,7 @@ try {
         -Mutate {
             param($projectRoot)
             $path = Join-Path $projectRoot "docs/governance/m012_v1_gap_report.md"
-            (Get-Content -Raw -Encoding UTF8 -LiteralPath $path).Replace("answer_accuracy_score", "answer_accuracy_score_absente") |
+            (Get-Content -Raw -Encoding UTF8 -LiteralPath $path).Replace("answer_accuracy_score", "answer_exactitude_score_absente") |
                 Set-Content -Encoding UTF8 -LiteralPath $path
         }
 
@@ -169,7 +169,7 @@ try {
         -Mutate {
             param($projectRoot)
             $path = Join-Path $projectRoot "scripts/test.ps1"
-            (Get-Content -Raw -Encoding UTF8 -LiteralPath $path).Replace('    @{ Path = "tests/m012/validate_m012_traceability_acceptance.ps1"; Arguments = @() },', "") |
+            (Get-Content -Raw -Encoding UTF8 -LiteralPath $path).Replace('$m012TraceabilityAcceptancePath = "tests/m012/validate_m012_traceability_acceptance.ps1"', '$m012TraceabilityAcceptancePath = "tests/m012/traceability_acceptance_absent.ps1"') |
                 Set-Content -Encoding UTF8 -LiteralPath $path
         }
 
@@ -179,7 +179,7 @@ try {
         -Mutate {
             param($projectRoot)
             $path = Join-Path $projectRoot "scripts/lint.ps1"
-            (Get-Content -Raw -Encoding UTF8 -LiteralPath $path).Replace('    @{ Path = "scripts/validate_m012_traceability.ps1"; Arguments = @() },', "") |
+            (Get-Content -Raw -Encoding UTF8 -LiteralPath $path).Replace("scripts/validate_m012_traceability.ps1", "scripts/validate_m012_traceability_absent.ps1") |
                 Set-Content -Encoding UTF8 -LiteralPath $path
         }
 
@@ -189,7 +189,7 @@ try {
         -Mutate {
             param($projectRoot)
             $path = Join-Path $projectRoot "tests/governance/validate_m000_validation_commands_acceptance.ps1"
-            (Get-Content -Raw -Encoding UTF8 -LiteralPath $path).Replace('$expectedTestCount = 250', '$expectedTestCount = 249') |
+            (Get-Content -Raw -Encoding UTF8 -LiteralPath $path).Replace('$expectedTestCount = 268', '$expectedTestCount = 267') |
                 Set-Content -Encoding UTF8 -LiteralPath $path
         }
 }
@@ -198,4 +198,3 @@ finally {
 }
 
 Write-Host "Tests unitaires T-012 traçabilité M-012: OK"
-
