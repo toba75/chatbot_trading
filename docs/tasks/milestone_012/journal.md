@@ -35,6 +35,13 @@
   - ADR: non requise; T-005 applique ADR-002 et ADR-010 sans ajouter de route documentaire structurante.
   - Fichiers livrés: `app/evaluation/domain/document_route_benchmark.py`, `app/evaluation/domain/__init__.py`, `tests/m012/validate_document_route_benchmark_acceptance.ps1`, `tests/m012/validate_document_route_benchmark_unit.ps1`, `docs/traceability/matrix.md`.
   - Validations ciblées GREEN: `tests/m012/validate_document_route_benchmark_acceptance.ps1`, `tests/m012/validate_document_route_benchmark_unit.ps1`.
+- T-006 - Calibrer les seuils de conversion canonique:
+  - Scénario BDD: Given les routes documentaires ont été mesurées sur le corpus pilote; When les seuils de conversion canonique sont calibrés; Then chaque seuil publié référence les métriques qui le justifient et toute insuffisance reste visible comme écart V1.
+  - Commit RED: `2209bf6e1 test(m012): couvrir la calibration documentaire`.
+  - Commit GREEN: `feat(m012): calibrer les seuils documentaires`.
+  - ADR: non requise; T-006 applique ADR-002, ADR-004 et ADR-010 sans changer leur sens.
+  - Fichiers livrés: `app/evaluation/domain/document_quality_calibration.py`, `app/evaluation/domain/__init__.py`, `tests/m012/validate_document_quality_calibration_acceptance.ps1`, `tests/m012/validate_document_quality_calibration_unit.ps1`, `docs/evaluation/m012/document_quality_calibration_report.md`, `docs/traceability/matrix.md`.
+  - Validations ciblées GREEN: `tests/m012/validate_document_quality_calibration_acceptance.ps1`, `tests/m012/validate_document_quality_calibration_unit.ps1`.
 
 ## Revue d'adhérence
 

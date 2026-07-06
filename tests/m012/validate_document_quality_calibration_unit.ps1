@@ -157,7 +157,16 @@ def expect_raises(expected_fragment, action):
 
 expect_raises("benchmark source absent", lambda: threshold(benchmark_result_id=""))
 expect_raises("corpus seuil incoherent", lambda: decision((threshold(corpus_id="PCORP-AUTRE"),)))
-expect_raises("version de politique incoherente", lambda: threshold(policy_version="DocumentQualityCalibrationPolicy-2.0"))
+expect_raises(
+    "version de politique incoherente",
+    lambda: DocumentQualityThresholdReport(
+        report_id="SP-DOCUMENT-THRESHOLDS-M012-UNIT-VERSION",
+        policy_version=POLICY_VERSION,
+        benchmark_run_id=RUN_ID,
+        corpus_id=CORPUS_ID,
+        thresholds=(threshold(policy_version="DocumentQualityCalibrationPolicy-2.0"),),
+    ),
+)
 expect_raises("justification par strate absente", lambda: threshold(justification_by_stratum={"FINANCIAL_TABLES": "Tableaux."}))
 expect_raises("valeur de developpement non promouvable", lambda: threshold(source_kind=SOURCE_DEVELOPMENT_VALUE))
 expect_raises("operateur de seuil inconnu", lambda: threshold(operator="APPROXIMATE"))
