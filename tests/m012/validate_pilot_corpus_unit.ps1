@@ -6,6 +6,7 @@ $pythonExecutable = Get-RequiredPythonExecutable
 
 $pythonCode = @'
 import hashlib
+import json
 import sys
 from copy import deepcopy
 from pathlib import Path
@@ -16,6 +17,7 @@ if repo_root not in sys.path:
     sys.path.insert(0, repo_root)
 
 from app.evaluation.domain.pilot_corpus import (
+    PilotCorpusManifestValidator,
     PilotCoveragePolicy,
     freeze_pilot_corpus_manifest,
 )
@@ -59,11 +61,15 @@ def base_document(index, path, strata):
         "original_immutable": True,
         "source_processing_status": "DIAGNOSED_ROUTED_CANONICAL_PUBLISHED",
         "source_processing_ref": {
+            "schema_version": "1.0",
+            "canonical_source_id": f"CSRC-M012-UNIT-{index:04d}",
             "document_id": f"DOC-M012-UNIT-{index:04d}",
-            "diagnostic_run_id": f"SPRUN-M012-UNIT-{index:04d}",
-            "route_plan_id": f"RPLAN-M012-UNIT-{index:04d}",
             "canonical_version_id": f"CVER-M012-UNIT-{index:04d}",
+            "source_sha256": content_hash,
             "canonical_artifact_sha256": content_hash,
+            "page_count": 1,
+            "accepted_at": "2026-07-06T00:00:00Z",
+            "quality_policy_version": "CanonicalQualityPolicy-1.0",
         },
         "strata": list(strata),
         "edition_family_id": "EDITION-M012-UNIT-PAIR" if "DIFFERENT_EDITION" in strata else f"EDITION-M012-UNIT-{index:04d}",
@@ -167,6 +173,20 @@ with TemporaryDirectory() as temporary_directory:
     del missing_sp_reference["documents"][0]["source_processing_ref"]
     missing_sp_reference = freeze_pilot_corpus_manifest(missing_sp_reference)
     expect_raises("reference SP", lambda: policy.validate_manifest_payload(missing_sp_reference))
+
+    manifest_root = Path(valid["documents"][0]["original_path"]).parent
+    external_original = fixture_root / "outside_manifest.pdf"
+    external_original.write_bytes(b"%PDF-1.4\n% outside pilot corpus\n")
+    external_hash = file_sha256(external_original)
+    external_path_manifest = deepcopy(valid)
+    external_path_manifest["documents"][0]["original_path"] = str(external_original)
+    external_path_manifest["documents"][0]["original_sha256"] = external_hash
+    external_path_manifest["documents"][0]["source_processing_ref"]["source_sha256"] = external_hash
+    external_path_manifest["documents"][0]["source_processing_ref"]["canonical_artifact_sha256"] = external_hash
+    external_path_manifest = freeze_pilot_corpus_manifest(external_path_manifest)
+    manifest_path = manifest_root / "manifest_outside_path.json"
+    manifest_path.write_text(json.dumps(external_path_manifest), encoding="utf-8")
+    expect_raises("chemin hors corpus pilote", lambda: PilotCorpusManifestValidator().validate_file(manifest_path))
 
     unmotivated_exclusion = deepcopy(valid)
     unmotivated_exclusion["exclusions"][0]["exclusion_reason"] = ""

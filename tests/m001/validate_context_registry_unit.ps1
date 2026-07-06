@@ -7,7 +7,7 @@ $eAcute = [char] 0x00E9
 $eGrave = [char] 0x00E8
 $aGrave = [char] 0x00E0
 
-$expectedContextCodes = @("SP", "KA", "EG", "RA", "CV", "SD", "EX")
+$expectedContextCodes = @("SP", "KA", "EG", "RA", "CV", "SD", "EX", "EV")
 $requiredLayers = @("domain", "application", "adapters")
 
 function Copy-RegistryObject {

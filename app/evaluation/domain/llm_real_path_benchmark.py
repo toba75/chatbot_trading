@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation, ROUND_HALF_EVEN
+import hashlib
 import json
 from typing import Any
 
@@ -77,13 +78,22 @@ PROMOTION_REJECTED = "REJECTED"
 REAL_PATH_SEGMENTS = ("docker-local", "llm-gateway", "reseau-prive", "vllm-spark")
 _DECIMAL_SCALE = Decimal("0.000000000001")
 _SENSITIVE_PUBLIC_FRAGMENTS = (
+    "api key",
+    "api_key",
+    "apikey",
+    "authorization",
+    "bearer",
+    "mot de passe",
+    "password",
     "prompt complet",
     "preuve complète",
     "preuve complete",
     "réponse complète",
     "reponse complete",
+    "sk-",
     "secret",
     "payload sensible",
+    "token",
 )
 
 
@@ -190,11 +200,13 @@ class LlmTechnicalMetric:
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, init=False)
 class StructuredOutputEvaluation:
     evaluation_id: str
     task_name: str
-    response_json: str
+    response_json_sha256: str
+    response_json_valid: bool
+    response_top_level_keys: tuple[str, ...]
     atomic_extraction_complete: bool
     negations_preserved: bool
     numeric_values_exact: bool
@@ -210,58 +222,89 @@ class StructuredOutputEvaluation:
     retry_limit: int
     retry_idempotency_key: str
 
-    def __post_init__(self) -> None:
-        object.__setattr__(self, "evaluation_id", _required_text_value(self.evaluation_id, "evaluation_id"))
-        task_name = _required_text_value(self.task_name, "task_name")
+    def __init__(
+        self,
+        *,
+        evaluation_id: str,
+        task_name: str,
+        response_json: str,
+        atomic_extraction_complete: bool,
+        negations_preserved: bool,
+        numeric_values_exact: bool,
+        conditions_preserved: bool,
+        limits_preserved: bool,
+        entailment_correct: bool,
+        contradiction_detected: bool,
+        fr_en_synthesis_valid: bool,
+        tool_call_valid: bool,
+        citations_resolved: bool,
+        retry_before_first_token_total: int,
+        retry_after_first_token_total: int,
+        retry_limit: int,
+        retry_idempotency_key: str,
+    ) -> None:
+        object.__setattr__(self, "evaluation_id", _required_text_value(evaluation_id, "evaluation_id"))
+        task_name = _required_text_value(task_name, "task_name")
         if task_name not in REQUIRED_LLM_TASKS:
             raise ValueError("tache LLM inconnue")
         object.__setattr__(self, "task_name", task_name)
-        object.__setattr__(self, "response_json", _required_text_value(self.response_json, "response_json"))
-        for field_name in (
-            "atomic_extraction_complete",
-            "negations_preserved",
-            "numeric_values_exact",
-            "conditions_preserved",
-            "limits_preserved",
-            "entailment_correct",
-            "contradiction_detected",
-            "fr_en_synthesis_valid",
-            "tool_call_valid",
-            "citations_resolved",
-        ):
-            object.__setattr__(self, field_name, _required_bool(getattr(self, field_name), field_name))
+        parsed_response_json = _required_text_value(response_json, "response_json")
+        object.__setattr__(
+            self,
+            "response_json_sha256",
+            hashlib.sha256(parsed_response_json.encode("utf-8")).hexdigest(),
+        )
+        try:
+            parsed_json = json.loads(parsed_response_json)
+        except json.JSONDecodeError:
+            object.__setattr__(self, "response_json_valid", False)
+            object.__setattr__(self, "response_top_level_keys", ())
+        else:
+            object.__setattr__(self, "response_json_valid", True)
+            if isinstance(parsed_json, Mapping):
+                object.__setattr__(
+                    self,
+                    "response_top_level_keys",
+                    tuple(sorted(str(key) for key in parsed_json.keys())),
+                )
+            else:
+                object.__setattr__(self, "response_top_level_keys", ())
+        object.__setattr__(self, "atomic_extraction_complete", _required_bool(atomic_extraction_complete, "atomic_extraction_complete"))
+        object.__setattr__(self, "negations_preserved", _required_bool(negations_preserved, "negations_preserved"))
+        object.__setattr__(self, "numeric_values_exact", _required_bool(numeric_values_exact, "numeric_values_exact"))
+        object.__setattr__(self, "conditions_preserved", _required_bool(conditions_preserved, "conditions_preserved"))
+        object.__setattr__(self, "limits_preserved", _required_bool(limits_preserved, "limits_preserved"))
+        object.__setattr__(self, "entailment_correct", _required_bool(entailment_correct, "entailment_correct"))
+        object.__setattr__(self, "contradiction_detected", _required_bool(contradiction_detected, "contradiction_detected"))
+        object.__setattr__(self, "fr_en_synthesis_valid", _required_bool(fr_en_synthesis_valid, "fr_en_synthesis_valid"))
+        object.__setattr__(self, "tool_call_valid", _required_bool(tool_call_valid, "tool_call_valid"))
+        object.__setattr__(self, "citations_resolved", _required_bool(citations_resolved, "citations_resolved"))
         object.__setattr__(
             self,
             "retry_before_first_token_total",
-            _required_non_negative_integer(self.retry_before_first_token_total, "retry_before_first_token_total"),
+            _required_non_negative_integer(retry_before_first_token_total, "retry_before_first_token_total"),
         )
         retry_after_first_token_total = _required_non_negative_integer(
-            self.retry_after_first_token_total,
+            retry_after_first_token_total,
             "retry_after_first_token_total",
         )
         if retry_after_first_token_total > 0:
             raise ValueError("retry après premier token interdit")
         object.__setattr__(self, "retry_after_first_token_total", retry_after_first_token_total)
-        if isinstance(self.retry_limit, bool) or not isinstance(self.retry_limit, int) or self.retry_limit < 1:
+        if isinstance(retry_limit, bool) or not isinstance(retry_limit, int) or retry_limit < 1:
             raise ValueError("retry illimité interdit")
-        retry_limit = self.retry_limit
         object.__setattr__(self, "retry_limit", retry_limit)
         if self.retry_before_first_token_total > retry_limit:
             raise ValueError("retry illimité interdit")
-        if not isinstance(self.retry_idempotency_key, str):
+        if not isinstance(retry_idempotency_key, str):
             raise ValueError("retry_idempotency_key non textuel")
-        if self.retry_before_first_token_total > 0 and self.retry_idempotency_key.strip() == "":
+        if self.retry_before_first_token_total > 0 and retry_idempotency_key.strip() == "":
             raise ValueError("clé idempotence retry requise")
-        retry_idempotency_key = _required_text_value(self.retry_idempotency_key, "retry_idempotency_key")
-        object.__setattr__(self, "retry_idempotency_key", retry_idempotency_key)
+        object.__setattr__(self, "retry_idempotency_key", _required_text_value(retry_idempotency_key, "retry_idempotency_key"))
 
     @property
     def json_valid(self) -> bool:
-        try:
-            json.loads(self.response_json)
-        except json.JSONDecodeError:
-            return False
-        return True
+        return self.response_json_valid
 
     @property
     def passed(self) -> bool:
@@ -348,7 +391,12 @@ class LlmBenchmarkRun:
 
 @dataclass(frozen=True)
 class CheckpointComparisonReport:
+    run_id: str
     checkpoint_id: str
+    path_id: str
+    gateway_trace_id: str
+    network_policy_id: str
+    vllm_route_id: str
     official_reference_checkpoint_ids: tuple[str, ...]
     task_success_rates: Mapping[str, BenchmarkMetric]
     reference_task_success_rates: Mapping[str, BenchmarkMetric]
@@ -398,7 +446,12 @@ class CheckpointPromotionPolicy:
             reasons.append("métriques techniques exploitables absentes")
 
         report = CheckpointComparisonReport(
+            run_id=run.run_id,
             checkpoint_id=parsed_checkpoint_id,
+            path_id=measurement.path_attestation.path_id,
+            gateway_trace_id=measurement.path_attestation.gateway_trace_id,
+            network_policy_id=measurement.path_attestation.network_policy_id,
+            vllm_route_id=measurement.path_attestation.vllm_route_id,
             official_reference_checkpoint_ids=tuple(
                 official_measurement.candidate.checkpoint_id for official_measurement in official_measurements
             ),
@@ -459,7 +512,7 @@ class LlmBenchmarkSuite:
 def _reference_task_rates(measurements: Sequence[CheckpointMeasurement]) -> Mapping[str, BenchmarkMetric]:
     reference_rates: dict[str, BenchmarkMetric] = {}
     for task_name in REQUIRED_LLM_TASKS:
-        numerator = min(measurement.task_success_rates[task_name].numerator for measurement in measurements)
+        numerator = max(measurement.task_success_rates[task_name].numerator for measurement in measurements)
         reference_rates[task_name] = BenchmarkMetric(
             name=f"llm_reference_task_{task_name}_success_rate",
             value=_metric_value(numerator, 1),

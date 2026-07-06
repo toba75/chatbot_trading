@@ -25,6 +25,7 @@ from app.evaluation.domain.calibration_decisions import (
     ContextDecisionCriteria,
     PromotionDecision,
     ScientificGateVerdict,
+    build_m012_calibration_decision_register,
 )
 
 
@@ -140,13 +141,7 @@ assert_raises(
     ),
 )
 
-register = policy.publish_register(
-    register_id="REG-M012-UNIT",
-    decisions=(
-        decision(decision_id="DEC-M012-KA-REJECTED", status=REJECTED),
-        decision(decision_id="DEC-M012-SP-DEFERRED", context="SP", status=DEFERRED),
-    ),
-)
+register = build_m012_calibration_decision_register()
 assert_equal(register.statuses_by_decision_id["DEC-M012-KA-REJECTED"], REJECTED, "Un refus doit rester dans le registre.")
 assert_equal(register.statuses_by_decision_id["DEC-M012-SP-DEFERRED"], DEFERRED, "Un report doit rester dans le registre.")
 
@@ -218,11 +213,7 @@ assert_raises(
     lambda: policy.publish_register(register_id="REG-M012-MISSING-LLM", decisions=(accepted_llm,)),
 )
 
-red_register = policy.publish_register(
-    register_id="REG-M012-SCIENCE-RED",
-    decisions=(decision(decision_id="DEC-M012-RED", status=REJECTED),),
-)
-report = policy.render_markdown_report(red_register)
+report = policy.render_markdown_report(register)
 assert "Test scientifique RED" in report
 assert "gate logiciel GREEN" in report
 

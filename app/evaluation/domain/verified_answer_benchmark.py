@@ -335,6 +335,10 @@ class EvidenceClaimMeasurement:
     def _ensure_consistency(self) -> None:
         if self.status == EG_VERIFIED and not self.has_direct_evidence:
             raise ValueError("preuve directe requise pour claim VERIFIED")
+        if self.status == EG_VERIFIED and self.verdict not in {"ENTAILED", "PARTIALLY_ENTAILED"}:
+            raise ValueError("verdict incompatible avec claim VERIFIED")
+        if self.status == EG_REJECTED and self.verdict == "ENTAILED":
+            raise ValueError("verdict incompatible avec claim REJECTED")
         if self.status == EG_IN_REVIEW and self.decided_at is not None:
             raise ValueError("decided_at incompatible avec IN_REVIEW")
         if self.status != EG_IN_REVIEW and self.decided_at is None:
@@ -598,6 +602,12 @@ def _required_answer_cases(values: Sequence[AnswerEvaluationCase]) -> tuple[Answ
         if case.case_id in case_ids:
             raise ValueError("cas evaluation duplique")
         case_ids.add(case.case_id)
+    if not any(case.expected_abstention for case in cases):
+        raise ValueError("cas abstention attendue absent")
+    if not any(case.contradiction_expected for case in cases):
+        raise ValueError("cas contradiction attendue absent")
+    if not any(assertion.invented_parameter_detected for case in cases for assertion in case.assertions):
+        raise ValueError("cas parametre invente absent")
     return cases
 
 

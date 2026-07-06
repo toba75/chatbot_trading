@@ -330,11 +330,19 @@ class AnnotationCompletenessPolicy:
             self._validate_annotation(annotation, known_pages)
 
     def _known_pages(self, pilot_corpus: PilotCorpus, annotation_set: AnnotationSet) -> set[tuple[str, str, str, int]]:
-        canonical_versions = {document.source_processing_ref["canonical_version_id"] for document in pilot_corpus.documents}
+        corpus_document_refs = {
+            (
+                document.pilot_document_id,
+                document.source_document_id,
+                document.source_processing_ref["canonical_version_id"],
+            )
+            for document in pilot_corpus.documents
+        }
         known_pages: set[tuple[str, str, str, int]] = set()
         for page_ref in annotation_set.benchmark_pages:
-            if page_ref.canonical_version_id not in canonical_versions:
-                raise ValueError(f"page benchmark hors corpus pilote: {page_ref.canonical_version_id}")
+            document_ref = (page_ref.pilot_document_id, page_ref.source_document_id, page_ref.canonical_version_id)
+            if document_ref not in corpus_document_refs:
+                raise ValueError(f"page benchmark hors corpus pilote: {page_ref.pilot_document_id}")
             known_pages.add(page_ref.key)
         return known_pages
 
@@ -396,6 +404,8 @@ class AnnotationCompletenessPolicy:
         if annotation.expected_state == EVALUABLE:
             if annotation.expected_route == NO_ROUTE:
                 raise ValueError("conflit entre route attendue et etat attendu")
+            if annotation.empty_or_rejection_reason is not None:
+                raise ValueError("raison de rejet interdite sur page evaluable")
             if annotation.reference_transcription is None:
                 raise ValueError("transcription de reference absente")
             if len(annotation.reading_order) == 0:
@@ -408,6 +418,10 @@ class AnnotationCompletenessPolicy:
             if annotation.expected_state == EMPTY_DECLARED:
                 raise ValueError("page vide non declaree")
             raise ValueError("page rejetee non declaree")
+        if annotation.reference_transcription is not None:
+            raise ValueError("transcription interdite sur page non evaluable")
+        if len(annotation.critical_numeric_values) > 0 or len(annotation.table_cells) > 0 or len(annotation.reading_order) > 0:
+            raise ValueError("oracle de contenu interdit sur page non evaluable")
 
     def _validate_references_to_zones(self, annotation: PageAnnotation, zone_ids: set[str]) -> None:
         for numeric_value in annotation.critical_numeric_values:

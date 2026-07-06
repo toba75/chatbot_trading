@@ -61,6 +61,29 @@ _EXPECTED_VERDICT_STATUSES = frozenset({SCIENTIFIC_GREEN, SCIENTIFIC_RED})
 _EXPECTED_THRESHOLD_OPERATORS = frozenset({THRESHOLD_MINIMUM, THRESHOLD_MAXIMUM})
 _EXPECTED_SOFTWARE_GATE_STATUSES = frozenset({"GREEN", "RED"})
 _OBSOLETE_REFERENCE_FRAGMENTS = ("/current", "/latest", ":latest", "current", "latest")
+_BENCHMARK_POLICY_VERSION_BY_CONTEXT = {
+    CONTEXT_SP: "DocumentRouteBenchmarkPolicy-M012-1.0",
+    CONTEXT_KA: "KnowledgeBenchmarkPolicy-M012-1.0",
+    CONTEXT_EG: "EvidenceGovernanceBenchmarkPolicy-M012-1.0",
+    CONTEXT_RA: "EvidenceAnswerBenchmarkPolicy-M012-1.0",
+    CONTEXT_CV: "ConversationCriteriaPolicy-M012-1.0",
+    CONTEXT_SD: "StrategyExperimentBenchmarkPolicy-M012-1.0",
+    CONTEXT_LLM: "LlmRealPathBenchmarkPolicy-M012-1.0",
+    CONTEXT_EX: "StrategyExperimentBenchmarkPolicy-M012-1.0",
+}
+_THRESHOLD_BY_METRIC = {
+    "document_cell_accuracy": (THRESHOLD_MINIMUM, "0.950000000000"),
+    "document_formula_fidelity": (THRESHOLD_MINIMUM, "0.950000000000"),
+    "knowledge_recall_at_10": (THRESHOLD_MINIMUM, "0.850000000000"),
+    "knowledge_mrr": (THRESHOLD_MINIMUM, "0.700000000000"),
+    "evidence_claim_verified_rate": (THRESHOLD_MINIMUM, "0.900000000000"),
+    "evidence_claim_rejected_rate": (THRESHOLD_MINIMUM, "0.050000000000"),
+    "answer_citation_precision": (THRESHOLD_MINIMUM, "0.950000000000"),
+    "answer_correct_abstention_rate": (THRESHOLD_MINIMUM, "0.900000000000"),
+    "strategy_compilable_rate": (THRESHOLD_MINIMUM, "0.900000000000"),
+    "experiment_reproducible_rate": (THRESHOLD_MINIMUM, "0.950000000000"),
+    "negative_experiment_retention_ratio": (THRESHOLD_MINIMUM, "1.000000000000"),
+}
 
 
 @dataclass(frozen=True)
@@ -256,8 +279,9 @@ class CalibrationDecisionPolicy:
                 raise ValueError("conflit de decisions")
             decisions_by_context[decision.context] = decision
             statuses_by_decision_id[decision.decision_id] = decision.status
-            if decision.status == ACCEPTED:
-                self._validate_favorable_decision(decision)
+
+        for decision in parsed_decisions:
+            self._validate_decision_coverage(decision)
 
         return CalibrationDecisionRegister(
             register_id=parsed_register_id,
@@ -276,8 +300,7 @@ class CalibrationDecisionPolicy:
         if missing_contexts:
             raise ValueError("decision M-012 absente: " + ", ".join(missing_contexts))
         for decision in register.decisions:
-            if decision.status == ACCEPTED:
-                self._validate_favorable_decision(decision)
+            self._validate_decision_coverage(decision)
         if not any(decision.status == REJECTED for decision in register.decisions):
             raise ValueError("refus absent du registre")
         if not any(decision.status == DEFERRED for decision in register.decisions):
@@ -290,8 +313,7 @@ class CalibrationDecisionPolicy:
             raise ValueError("CalibrationDecisionRegister requis")
         if register.policy_version != self.policy_version:
             raise ValueError("version de politique incoherente")
-        if len(register.decisions) == 0:
-            raise ValueError("decision absente")
+        self.validate_register(register)
         lines = [
             "# Rapport T-011 - Decisions de calibration et promotion M-012",
             "",
@@ -343,7 +365,7 @@ class CalibrationDecisionPolicy:
         )
         return "\n".join(lines)
 
-    def _validate_favorable_decision(self, decision: PromotionDecision) -> None:
+    def _validate_decision_coverage(self, decision: PromotionDecision) -> None:
         metric_names = _benchmark_metric_names(decision.benchmark_sources)
         criteria_names = _criteria_names(decision.criteria)
         if decision.context == CONTEXT_SP:
@@ -422,7 +444,7 @@ def build_m012_calibration_decision_register() -> CalibrationDecisionRegister:
                 context=CONTEXT_CV,
                 status=ACCEPTED,
                 benchmark_id="CVRUN-M012-CRITERIA-0001",
-                artifact_path="docs/evaluation/m012/verified_answer_benchmark_report.md",
+                artifact_path="docs/evaluation/m012/conversation_criteria_report.md",
                 metric_names=tuple(sorted(REQUIRED_CONVERSATION_CRITERIA)),
                 threshold_metric_names=(),
                 red_metric_name=None,
@@ -440,7 +462,7 @@ def build_m012_calibration_decision_register() -> CalibrationDecisionRegister:
                 benchmark_id="SBRUN-M012-STRATEGY-BACKTEST-0001",
                 artifact_path="docs/evaluation/m012/strategy_backtest_benchmark_report.md",
                 metric_names=tuple(sorted(REQUIRED_SD_METRICS)),
-                threshold_metric_names=("strategy_compilable_rate", "strategy_parameter_without_calibration_plan_total"),
+                threshold_metric_names=("strategy_compilable_rate",),
                 red_metric_name="strategy_parameter_without_calibration_plan_total",
                 v1_gap_refs=("V1-GAP-M012-SD-CALIBRATION-PLAN",),
                 justification="Parametres sans plan de calibration conserves comme refus pilote.",
@@ -494,15 +516,15 @@ def _decision(
         benchmark_id=benchmark_id,
         context=context,
         artifact_path=artifact_path,
-        policy_version=f"{context}BenchmarkPolicy-M012-1.0",
+        policy_version=_BENCHMARK_POLICY_VERSION_BY_CONTEXT[context],
         metric_names=metric_names,
     )
     thresholds = tuple(
         CalibrationThreshold(
             threshold_id=f"THR-M012-{context}-{metric_name}",
             metric_name=metric_name,
-            operator=THRESHOLD_MINIMUM,
-            value="0.800000000000",
+            operator=_THRESHOLD_BY_METRIC[metric_name][0],
+            value=_THRESHOLD_BY_METRIC[metric_name][1],
             policy_version=POLICY_VERSION_M012,
         )
         for metric_name in threshold_metric_names

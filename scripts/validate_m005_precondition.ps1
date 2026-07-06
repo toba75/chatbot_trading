@@ -494,3 +494,4 @@ foreach ($gateDefinition in $gateDefinitions) {
 
 Write-M005PreconditionReport -ReportPath $reportPath -OverallStatus "GREEN" -GitResults $gitResults.ToArray() -GateResults $gateResults.ToArray()
 Write-Host "Précondition M-005 GREEN: 2 gate(s), $($requiredMasterArtifacts.Count) artefact(s) amont vérifié(s). Rapport: $reportPath"
+exit 0

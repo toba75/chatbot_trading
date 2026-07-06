@@ -78,7 +78,8 @@ $expectedMetricsByContext = @{
         "source_adjudication_rate",
         "source_quality_supersession_total",
         "source_publication_delay_seconds",
-        "document_cer_wer",
+        "document_cer",
+        "document_wer",
         "document_numeric_token_accuracy",
         "document_sign_accuracy",
         "document_formula_fidelity",
@@ -86,12 +87,13 @@ $expectedMetricsByContext = @{
         "document_reading_order_accuracy",
         "document_page_time_seconds",
         "document_memory_bytes",
-        "document_route_stability_rate"
+        "document_route_stability_rate",
+        "document_failure_rate"
     )
     KA = @(
         "knowledge_projection_current_ratio",
         "knowledge_unresolvable_locator_rate",
-        "knowledge_result_diversity_average",
+        "knowledge_document_diversity",
         "knowledge_stale_projection_search_rate",
         "knowledge_recall_at_5",
         "knowledge_recall_at_10",
@@ -99,8 +101,8 @@ $expectedMetricsByContext = @{
         "knowledge_mrr",
         "knowledge_ndcg",
         "knowledge_expected_page_accuracy",
-        "knowledge_subtopic_coverage_rate",
-        "knowledge_fr_to_en_performance"
+        "knowledge_subtheme_coverage",
+        "knowledge_fr_to_en_recall_at_10"
     )
     EG = @(
         "evidence_claim_verified_rate",

@@ -281,6 +281,14 @@ assert_raises(
     lambda: claim(has_direct_evidence=False),
 )
 assert_raises(
+    "verdict incompatible avec claim VERIFIED",
+    lambda: claim(verdict="NOT_ENTAILED"),
+)
+assert_raises(
+    "verdict incompatible avec claim REJECTED",
+    lambda: claim(status="REJECTED", verdict="ENTAILED", has_direct_evidence=False),
+)
+assert_raises(
     "d\u00e9nominateur m\u00e9trique invalide",
     lambda: EvidenceGovernanceBenchmark(policy_version=POLICY_VERSION).measure(
         run_id="EGRUN-M012-T008-EMPTY",

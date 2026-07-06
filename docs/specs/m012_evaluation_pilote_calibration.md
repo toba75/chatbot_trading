@@ -113,7 +113,8 @@ Les annotations produites par le système évalué ne peuvent pas servir d'oracl
 | source_adjudication_rate | SP | Section 19, traitement des sources. | Taux d'adjudication séparé par route. |
 | source_quality_supersession_total | SP | Section 19, traitement des sources. | Versions supersédées pour défaut de qualité conservées. |
 | source_publication_delay_seconds | SP | Section 19, traitement des sources. | Délai entre enregistrement et publication canonique. |
-| document_cer_wer | SP | Section 20, évaluation des routes documentaires. | CER/WER sur échantillon annoté. |
+| document_cer | SP | Section 20, évaluation des routes documentaires. | CER sur échantillon annoté. |
+| document_wer | SP | Section 20, évaluation des routes documentaires. | WER sur échantillon annoté. |
 | document_numeric_token_accuracy | SP | Section 20, évaluation des routes documentaires. | Exactitude des tokens numériques. |
 | document_sign_accuracy | SP | Section 20, évaluation des routes documentaires. | Exactitude des signes. |
 | document_formula_fidelity | SP | Section 20, évaluation des routes documentaires. | Fidélité des formules. |
@@ -122,9 +123,10 @@ Les annotations produites par le système évalué ne peuvent pas servir d'oracl
 | document_page_time_seconds | SP | Section 20, évaluation des routes documentaires. | Temps par page publié. |
 | document_memory_bytes | SP | Section 20, évaluation des routes documentaires. | Mémoire consommée publiée sans payload. |
 | document_route_stability_rate | SP | Section 20, évaluation des routes documentaires. | Stabilité de route mesurée. |
+| document_failure_rate | SP | Section 20, évaluation des routes documentaires. | Pages échouées conservées dans le dénominateur. |
 | knowledge_projection_current_ratio | KA | Section 19, accès aux connaissances. | Part des versions canoniques avec projection actuelle. |
 | knowledge_unresolvable_locator_rate | KA | Section 19, accès aux connaissances. | Taux de localisateurs non résolvables. |
-| knowledge_result_diversity_average | KA | Section 19, accès aux connaissances. | Diversité moyenne des résultats. |
+| knowledge_document_diversity | KA | Section 19, accès aux connaissances. | Diversité documentaire des résultats. |
 | knowledge_stale_projection_search_rate | KA | Section 19, accès aux connaissances. | Recherches sur projection stale visibles. |
 | knowledge_recall_at_5 | KA | Section 20, évaluation de la recherche. | Recall@5 sur questions annotées. |
 | knowledge_recall_at_10 | KA | Section 20, évaluation de la recherche. | Recall@10 sur questions annotées. |
@@ -132,8 +134,8 @@ Les annotations produites par le système évalué ne peuvent pas servir d'oracl
 | knowledge_mrr | KA | Section 20, évaluation de la recherche. | MRR publié. |
 | knowledge_ndcg | KA | Section 20, évaluation de la recherche. | nDCG publié. |
 | knowledge_expected_page_accuracy | KA | Section 20, évaluation de la recherche. | Exactitude de page attendue. |
-| knowledge_subtopic_coverage_rate | KA | Section 20, évaluation de la recherche. | Couverture des sous-thèmes. |
-| knowledge_fr_to_en_performance | KA | Section 20, évaluation de la recherche. | Performance FR vers source EN. |
+| knowledge_subtheme_coverage | KA | Section 20, évaluation de la recherche. | Couverture des sous-thèmes. |
+| knowledge_fr_to_en_recall_at_10 | KA | Section 20, évaluation de la recherche. | Recall@10 des questions FR vers source EN. |
 | evidence_claim_verified_rate | EG | Section 19, gouvernance des preuves. | Taux de claims vérifiés. |
 | evidence_claim_rejected_rate | EG | Section 19, gouvernance des preuves. | Taux de claims rejetés. |
 | evidence_claim_review_rate | EG | Section 19, gouvernance des preuves. | Taux de claims en revue. |
@@ -230,6 +232,8 @@ Un écart ne peut pas être supprimé parce qu'une gate logicielle est GREEN.
 
 ## Erreurs publiques
 
+M-012 ne crée pas d'endpoint HTTP. Les statuts ci-dessous décrivent les diagnostics publics à exposer par un adaptateur existant si un cas M-012 est rendu accessible via API; ils ne constituent pas un nouveau contrat HTTP.
+
 | Code | Statut HTTP | Sens public |
 |---|---|---|
 | HTTP_REQUEST_INVALID | 400 | Requête d'évaluation invalide. |
@@ -238,7 +242,7 @@ Un écart ne peut pas être supprimé parce qu'une gate logicielle est GREEN.
 | PILOT_DOCUMENT_STRATUM_REQUIRED | 422 | Strate de document pilote absente. |
 | PAGE_ANNOTATION_REQUIRED | 422 | Annotation page par page absente. |
 | BENCHMARK_RESULT_REQUIRED | 422 | Benchmark source absent pour une mesure ou décision. |
-| SCIENTIFIC_RESULT_RED | 422 | Résultat scientifique RED conservé et visible. |
+| SCIENTIFIC_RESULT_RED | 422 | Diagnostic scientifique RED conservé et visible, sans transformer le RED en erreur logicielle. |
 | CALIBRATION_DECISION_REQUIRED | 422 | Décision de calibration absente. |
 | V1_GAP_REPORT_REQUIRED | 422 | Rapport d'écarts V1 absent. |
 | PUBLIC_STORAGE_FIELD_FORBIDDEN | 422 | Champ de stockage interne interdit dans le contrat public. |

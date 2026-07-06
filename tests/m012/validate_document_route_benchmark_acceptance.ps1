@@ -8,9 +8,9 @@ $pythonCode = @'
 import sys
 from pathlib import Path
 
-repo_root = sys.argv[1]
-if repo_root not in sys.path:
-    sys.path.insert(0, repo_root)
+repo_root = Path(sys.argv[1])
+if str(repo_root) not in sys.path:
+    sys.path.insert(0, str(repo_root))
 
 from app.evaluation.domain.document_route_benchmark import (
     DocumentRouteBenchmark,
@@ -46,11 +46,15 @@ def corpus():
                 original_sha256=HASH,
                 source_processing_status="DIAGNOSED_ROUTED_CANONICAL_PUBLISHED",
                 source_processing_ref={
+                    "schema_version": "1.0",
+                    "canonical_source_id": "CSRC-M012-BENCH-0001",
                     "document_id": "DOC-M012-BENCH-0001",
-                    "diagnostic_run_id": "SPRUN-M012-BENCH-0001",
-                    "route_plan_id": "RPLAN-M012-BENCH-0001",
                     "canonical_version_id": "CVER-M012-BENCH-0001",
+                    "source_sha256": HASH,
                     "canonical_artifact_sha256": HASH,
+                    "page_count": 2,
+                    "accepted_at": "2026-07-06T00:00:00Z",
+                    "quality_policy_version": "CanonicalQualityPolicy-1.0",
                 },
                 strata=frozenset({"FINANCIAL_TABLES", "FRENCH_TEXT"}),
                 edition_family_id="EDITION-M012-BENCH",
@@ -292,6 +296,12 @@ expect_raises(
 ledger = RouteBenchmarkLedger()
 ledger.append(run)
 expect_raises("resultat de benchmark duplique", lambda: ledger.append(run))
+
+report = (repo_root / "docs" / "evaluation" / "m012" / "document_route_benchmark_report.md").read_text(encoding="utf-8")
+assert "document_cer" in report
+assert "document_wer" in report
+assert "document_failure_rate" in report
+assert "failure_reason" in report
 
 print("Test d'acceptation T-005 benchmarks de routes documentaires M-012: OK")
 '@

@@ -78,6 +78,12 @@ for decision in register.decisions:
 llm_decision = register.decisions_by_context["LLM"]
 assert_equal(llm_decision.status, REJECTED, "La promotion communautaire pilote doit rester refusee.")
 assert_equal(set(llm_decision.compared_llm_tasks), set(policy.required_llm_tasks), "Toutes les taches LLM doivent etre comparees.")
+cv_decision = register.decisions_by_context["CV"]
+assert_equal(
+    cv_decision.benchmark_sources[0].artifact_path,
+    "docs/evaluation/m012/conversation_criteria_report.md",
+    "La decision CV doit pointer le rapport de criteres conversationnels.",
+)
 
 # Then un test scientifique RED reste visible malgre les gates logiciels GREEN.
 red_verdicts = [verdict for decision in register.decisions for verdict in decision.scientific_verdicts if verdict.status == SCIENTIFIC_RED]
@@ -85,11 +91,13 @@ assert red_verdicts, "Un test scientifique RED doit rester visible."
 assert any(verdict.software_gate_status == "GREEN" for verdict in red_verdicts), "Le gate logiciel GREEN ne doit pas cacher le RED scientifique."
 
 report = REPORT_PATH.read_text(encoding="utf-8")
+cv_report = (repo_root / "docs" / "evaluation" / "m012" / "conversation_criteria_report.md").read_text(encoding="utf-8")
 assert_contains(report, "Test scientifique RED", "Le rapport doit mentionner les tests scientifiques RED.")
 assert_contains(report, "gate logiciel GREEN", "Le rapport doit distinguer RED scientifique et GREEN logiciel.")
 assert_contains(report, "REJECTED", "Le rapport doit conserver les refus.")
 assert_contains(report, "DEFERRED", "Le rapport doit conserver les reports.")
 assert_contains(report, "ADR-010", "Le rapport doit referencer les ADR applicables.")
+assert_contains(cv_report, "conversation_follow_up_resolution_rate", "Le rapport CV doit publier les criteres conversationnels.")
 
 # Garde-fous explicites: aucune decision favorable sans metriques critiques, EG/RA/SD/CV/LLM obligatoires.
 def source(context, metric_names):

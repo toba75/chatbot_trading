@@ -113,6 +113,7 @@ def measure(strategy_cases, results):
         strategy_cases=strategy_cases,
         backtest_results=results,
         measured_at="2026-07-06T10:00:00Z",
+        metric_source="SD_EX",
     )
 
 
@@ -240,10 +241,27 @@ assert_raises(
     ),
 )
 assert_raises(
+    "version strategie dupliquee dans le benchmark",
+    lambda: measure(
+        (
+            strategy_case(case_id="CASE-A", strategy_version_id="SVER-M012-T010-DUP"),
+            strategy_case(case_id="CASE-B", strategy_version_id="SVER-M012-T010-DUP"),
+        ),
+        (result(strategy_version_id="SVER-M012-T010-DUP"),),
+    ),
+)
+assert_raises(
     "resultat duplique dans le benchmark",
     lambda: measure(
         (strategy_case(),),
         (result(experiment_id="EXP-M012-T010-DUP"), result(experiment_id="EXP-M012-T010-DUP")),
+    ),
+)
+assert_raises(
+    "resultat negatif absent",
+    lambda: measure(
+        (strategy_case(),),
+        (result(result_negative=False, repeat_coherent=True),),
     ),
 )
 

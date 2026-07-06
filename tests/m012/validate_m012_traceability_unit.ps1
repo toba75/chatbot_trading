@@ -2,7 +2,8 @@
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
 $validatorPath = Join-Path $repoRoot "scripts/validate_m012_traceability.ps1"
-$temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m012_traceability_unit_" + [System.Guid]::NewGuid().ToString("N"))
+$temporaryRoot = Join-Path $repoRoot (".tmp_m012_traceability_unit_" + [System.Guid]::NewGuid().ToString("N"))
+$outsideRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m012_traceability_outside_" + [System.Guid]::NewGuid().ToString("N"))
 
 function Assert-OutputContains {
     param(
@@ -67,12 +68,14 @@ function New-FixtureProject {
     $projectRoot = Join-Path $temporaryRoot $Name
     New-Item -ItemType Directory -Path (Join-Path $projectRoot "docs/traceability") -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $projectRoot "docs/governance") -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $projectRoot "docs/evaluation") -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $projectRoot "docs/specs") -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $projectRoot "scripts") -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $projectRoot "tests/governance") -Force | Out-Null
 
     Copy-Item -LiteralPath (Join-Path $repoRoot "docs/traceability/matrix.md") -Destination (Join-Path $projectRoot "docs/traceability/matrix.md")
     Copy-Item -LiteralPath (Join-Path $repoRoot "docs/governance/m012_v1_gap_report.md") -Destination (Join-Path $projectRoot "docs/governance/m012_v1_gap_report.md")
+    Copy-Item -LiteralPath (Join-Path $repoRoot "docs/evaluation/m012") -Destination (Join-Path $projectRoot "docs/evaluation/m012") -Recurse
     Copy-Item -LiteralPath (Join-Path $repoRoot "docs/specs/m012_evaluation_pilote_calibration.md") -Destination (Join-Path $projectRoot "docs/specs/m012_evaluation_pilote_calibration.md")
     Copy-Item -LiteralPath (Join-Path $repoRoot "scripts/test.ps1") -Destination (Join-Path $projectRoot "scripts/test.ps1")
     Copy-Item -LiteralPath (Join-Path $repoRoot "scripts/lint.ps1") -Destination (Join-Path $projectRoot "scripts/lint.ps1")
@@ -107,6 +110,30 @@ function Assert-ValidatorFails {
         -Message "Le cas RED $Name doit nommer la règle violée."
 }
 
+function Remove-TreeWithRetry {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $Path
+    )
+
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return
+    }
+
+    $lastError = $null
+    for ($attempt = 1; $attempt -le 5; $attempt++) {
+        try {
+            Remove-Item -LiteralPath $Path -Recurse -Force
+            return
+        }
+        catch {
+            $lastError = $_
+            Start-Sleep -Milliseconds 250
+        }
+    }
+    throw $lastError
+}
+
 if (-not (Test-Path -LiteralPath $validatorPath -PathType Leaf)) {
     throw "Validateur de traçabilité M-012 absent: scripts/validate_m012_traceability.ps1"
 }
@@ -123,6 +150,35 @@ try {
         -Output $validResult.Output `
         -Expected "Traçabilité M-012 valide" `
         -Message "La fixture valide doit annoncer le GREEN M-012."
+
+    New-Item -ItemType Directory -Path $outsideRoot | Out-Null
+    $outsideMatrixPath = Join-Path $outsideRoot "outside_matrix.md"
+    Copy-Item -LiteralPath (Join-Path $validProjectRoot "docs/traceability/matrix.md") -Destination $outsideMatrixPath
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $outsideResult = & powershell `
+            -NoProfile `
+            -ExecutionPolicy Bypass `
+            -File $validatorPath `
+            -MatrixPath $outsideMatrixPath `
+            -GapReportPath (Join-Path $validProjectRoot "docs/governance/m012_v1_gap_report.md") `
+            -TestGatePath (Join-Path $validProjectRoot "scripts/test.ps1") `
+            -LintGatePath (Join-Path $validProjectRoot "scripts/lint.ps1") `
+            -GovernanceTestPath (Join-Path $validProjectRoot "tests/governance/validate_m000_validation_commands_acceptance.ps1") `
+            -SpecificationPath (Join-Path $validProjectRoot "docs/specs/m012_evaluation_pilote_calibration.md") 2>&1
+        $outsideExitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+    if ($outsideExitCode -eq 0) {
+        throw "Un chemin absolu hors dépôt doit être refusé."
+    }
+    Assert-OutputContains `
+        -Output ($outsideResult -join "`n") `
+        -Expected "Chemin hors dépôt interdit (matrix)" `
+        -Message "Le chemin hors dépôt doit être nommé."
 
     Assert-ValidatorFails `
         -Name "missing-requirement" `
@@ -164,6 +220,15 @@ try {
         }
 
     Assert-ValidatorFails `
+        -Name "sensitive-public-report" `
+        -ExpectedMessage "Payload sensible M-012 exposé: PROMPT_COMPLET_INTERDIT_M012" `
+        -Mutate {
+            param($projectRoot)
+            $path = Join-Path $projectRoot "docs/evaluation/m012/llm_real_path_benchmark_report.md"
+            Add-Content -Encoding UTF8 -LiteralPath $path -Value "PROMPT_COMPLET_INTERDIT_M012"
+        }
+
+    Assert-ValidatorFails `
         -Name "test-gate-missing" `
         -ExpectedMessage "Gate test sans test M-012: tests/m012/validate_m012_traceability_acceptance.ps1" `
         -Mutate {
@@ -194,7 +259,8 @@ try {
         }
 }
 finally {
-    Remove-Item -LiteralPath $temporaryRoot -Recurse -Force
+    Remove-TreeWithRetry -Path $temporaryRoot
+    Remove-TreeWithRetry -Path $outsideRoot
 }
 
 Write-Host "Tests unitaires T-012 traçabilité M-012: OK"

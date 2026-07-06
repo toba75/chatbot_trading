@@ -279,4 +279,3 @@ try {
 finally {
     Remove-Item -LiteralPath $pythonScriptPath -Force
 }
-

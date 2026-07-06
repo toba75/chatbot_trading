@@ -401,6 +401,7 @@ with tempfile.TemporaryDirectory(prefix="ost_m005_t007_architecture_") as temp_d
         "conversation",
         "strategy_design",
         "experimentation",
+        "evaluation",
     ):
         for layer in ("domain", "application", "adapters"):
             package = app_root / module / layer

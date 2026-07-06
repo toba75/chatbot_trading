@@ -319,7 +319,7 @@ class StrategyDesignBenchmark:
         strategy_cases: Sequence[StrategyEvaluationCase],
         backtest_results: Sequence[BacktestBenchmarkResult],
         measured_at: str,
-        metric_source: str = "SD_EX",
+        metric_source: str,
     ) -> BacktestBenchmarkRun:
         _ensure_not_llm_metric_source(metric_source)
         parsed_strategy_cases = _required_strategy_cases(strategy_cases)
@@ -380,6 +380,8 @@ def _sd_metrics(cases: tuple[StrategyEvaluationCase, ...]) -> Mapping[str, Any]:
 
 def _ex_metrics(results: tuple[BacktestBenchmarkResult, ...]) -> Mapping[str, Any]:
     negative_results = tuple(result for result in results if result.result_negative or result.status == "FAILED")
+    if len(negative_results) == 0:
+        raise ValueError("resultat negatif absent")
     ex_metrics = {
         EXPERIMENT_REPRODUCIBLE_RATE: _ratio_metric(
             EXPERIMENT_REPRODUCIBLE_RATE,
@@ -424,12 +426,16 @@ def _required_strategy_cases(values: Sequence[StrategyEvaluationCase]) -> tuple[
     if len(cases) == 0:
         raise ValueError("strategy_cases absentes")
     case_ids: set[str] = set()
+    strategy_version_ids: set[str] = set()
     for case in cases:
         if not isinstance(case, StrategyEvaluationCase):
             raise ValueError("StrategyEvaluationCase requis")
         if case.case_id in case_ids:
             raise ValueError("strategie dupliquee dans le benchmark")
+        if case.strategy_version_id in strategy_version_ids:
+            raise ValueError("version strategie dupliquee dans le benchmark")
         case_ids.add(case.case_id)
+        strategy_version_ids.add(case.strategy_version_id)
     return cases
 
 

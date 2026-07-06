@@ -180,6 +180,7 @@ run = StrategyDesignBenchmark(policy_version=POLICY_VERSION).measure(
     strategy_cases=(compiled_case, rejected_case, second_strategy_case),
     backtest_results=results,
     measured_at="2026-07-06T10:00:00Z",
+    metric_source="SD_EX",
 )
 
 # Then les metriques SD et EX conservent limites, couts, periodes, univers, resultats negatifs et echecs.

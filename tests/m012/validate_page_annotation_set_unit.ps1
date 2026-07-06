@@ -88,11 +88,15 @@ def corpus(original_path):
                 original_sha256=SOURCE_HASH,
                 source_processing_status="DIAGNOSED_ROUTED_CANONICAL_PUBLISHED",
                 source_processing_ref={
+                    "schema_version": "1.0",
+                    "canonical_source_id": "CSRC-M012-UNIT-0001",
                     "document_id": "DOC-M012-UNIT-0001",
-                    "diagnostic_run_id": "SPRUN-M012-UNIT-0001",
-                    "route_plan_id": "RPLAN-M012-UNIT-0001",
                     "canonical_version_id": "CVER-M012-UNIT-0001",
+                    "source_sha256": SOURCE_HASH,
                     "canonical_artifact_sha256": ARTIFACT_HASH,
+                    "page_count": 3,
+                    "accepted_at": "2026-07-06T00:00:00Z",
+                    "quality_policy_version": "CanonicalQualityPolicy-1.0",
                 },
                 strata=frozenset({"DIGITAL_NATIVE_CLEAN"}),
                 edition_family_id="EDITION-M012-UNIT",
@@ -196,6 +200,12 @@ with TemporaryDirectory() as temporary_directory:
     missing_annotation["annotations"] = []
     missing_annotation = freeze_page_annotation_set(missing_annotation)
     expect_raises("annotation absente", lambda: validate(missing_annotation, original_path))
+
+    unknown_pilot_document = deepcopy(valid)
+    unknown_pilot_document["benchmark_pages"][0]["pilot_document_id"] = "PDOC-M012-UNIT-ABSENT"
+    unknown_pilot_document["annotations"][0]["page_ref"]["pilot_document_id"] = "PDOC-M012-UNIT-ABSENT"
+    unknown_pilot_document = freeze_page_annotation_set(unknown_pilot_document)
+    expect_raises("page benchmark hors corpus pilote", lambda: validate(unknown_pilot_document, original_path))
 
     missing_route = deepcopy(valid)
     del missing_route["annotations"][0]["expected_route"]

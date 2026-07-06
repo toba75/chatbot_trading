@@ -138,6 +138,7 @@ class RoutePageMeasurement:
     page_ref: PageReference
     strata: frozenset[str]
     status: str
+    failure_reason: str | None
     metrics: Mapping[str, RouteMetric]
 
 
@@ -353,6 +354,7 @@ def _measure_page(
         page_ref=output.page_ref,
         strata=strata,
         status=output.status,
+        failure_reason=output.failure_reason,
         metrics=metrics,
     )
 
@@ -556,6 +558,8 @@ def _outputs_by_page(
 def _annotations_by_page(annotation_set: AnnotationSet) -> Mapping[tuple[str, str, str, int], PageAnnotation]:
     annotations_by_page: dict[tuple[str, str, str, int], PageAnnotation] = {}
     for annotation in annotation_set.annotations:
+        if annotation.page_ref.key in annotations_by_page:
+            raise ValueError("annotation dupliquee")
         annotations_by_page[annotation.page_ref.key] = annotation
     return annotations_by_page
 
@@ -563,6 +567,8 @@ def _annotations_by_page(annotation_set: AnnotationSet) -> Mapping[tuple[str, st
 def _documents_by_pilot_id(corpus: PilotCorpus) -> Mapping[str, PilotDocument]:
     documents_by_pilot_id: dict[str, PilotDocument] = {}
     for document in corpus.documents:
+        if document.pilot_document_id in documents_by_pilot_id:
+            raise ValueError("document pilote duplique")
         documents_by_pilot_id[document.pilot_document_id] = document
     return documents_by_pilot_id
 

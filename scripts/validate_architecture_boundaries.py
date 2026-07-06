@@ -29,8 +29,8 @@ CONTEXT_LAYERS = {"domain", "application", "adapters"}
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 SPECIAL_SOURCE_CONTRACTS = "CONTRACTS"
 SPECIAL_SOURCE_PLATFORM = "PLATFORM"
-ALL_CONTEXT_CODES = frozenset({"SP", "KA", "EG", "RA", "CV", "SD", "EX"})
-SOURCE_REFERENCE_CONSUMERS = frozenset({"SP", "KA", "EG", "RA", "CV"})
+ALL_CONTEXT_CODES = frozenset({"SP", "KA", "EG", "RA", "CV", "SD", "EX", "EV"})
+SOURCE_REFERENCE_CONSUMERS = frozenset({"SP", "KA", "EG", "RA", "CV", "EV"})
 EVIDENCE_CLAIM_CONSUMERS = frozenset({"EG", "RA", "SD"})
 RESEARCH_OUTCOME_CONSUMERS = frozenset({"RA", "SD"})
 STRATEGY_SNAPSHOT_CONSUMERS = frozenset({"SD", "EX"})
@@ -773,6 +773,9 @@ def analyze_architecture(
     for path in sorted(app_root.rglob("*.py")):
         source = classify_source_module(app_root, path, contexts_by_module)
         if source is None:
+            relative_parts = path.relative_to(app_root).parts
+            if relative_parts != ("__init__.py",):
+                violations.append(f"Module app non declare dans le registre: {path.relative_to(REPOSITORY_ROOT)}.")
             continue
 
         analyzed_file_count += 1

@@ -80,12 +80,13 @@
 - T-012 - Relier M-012 aux écarts V1, à la traçabilité et aux gates:
   - Scénario BDD: Given M-012 a livré corpus, annotations, benchmarks SP, KA, EG, RA, CV, SD, LLM et EX, seuils et décisions; When les gates transverses sont exécutés; Then chaque exigence M-012 est reliée à un test GREEN ou à un écart scientifique explicite, et M-013 reçoit un rapport V1 exploitable.
   - Commit RED: `772a1c7b7 test(m012): couvrir ecarts v1 tracabilite gates`.
-  - Commit GREEN: à compléter après validation.
+  - Commit GREEN: à consolider dans le commit final M-012.
   - ADR: non requise; T-012 applique ADR-010 et DDD-ADR-010 sans changer leur sens.
   - Fichiers livrés: `scripts/validate_m012_traceability.ps1`, `tests/m012/validate_m012_traceability_acceptance.ps1`, `tests/m012/validate_m012_traceability_unit.ps1`, `docs/governance/m012_v1_gap_report.md`, `docs/traceability/matrix.md`, `scripts/test.ps1`, `scripts/lint.ps1`, `tests/governance/validate_m000_validation_commands_acceptance.ps1`.
   - Enrôlement final: tous les tests M-012 sont listés dans `scripts/test.ps1`; le validateur `scripts/validate_m012_traceability.ps1` est listé dans `scripts/test.ps1` et `scripts/lint.ps1`; les compteurs attendus sont consolidés à `23 validation(s), 268 test(s)` pour `scripts/test.ps1` et `24 validation(s), 0 test(s)` pour `scripts/lint.ps1`.
   - Validations ciblées GREEN: `tests/m012/validate_m012_traceability_acceptance.ps1`, `tests/m012/validate_m012_traceability_unit.ps1`, `scripts/validate_m012_traceability.ps1`, `scripts/validate_traceability.ps1`, `scripts/lint.ps1`, `git diff --check`.
-  - Gate global `scripts/test.ps1`: non conclusif après plus de 60 minutes; dernier arbre observé dans `tests/m009/validate_m009_precondition_acceptance.ps1` -> `scripts/validate_m009_precondition.ps1` -> `scripts/test.ps1` imbriqué, rendu jusqu'à `tests/m006/validate_m006_specification_unit.ps1` avant arrêt manuel des processus de test orphelins.
+  - Remédiations post-revue: `tests/m005/validate_qdrant_projection_acceptance.ps1` enrôle désormais le contexte `evaluation` dans son registre temporaire, et `scripts/validate_m005_precondition.ps1` retourne explicitement `exit 0` après rapport GREEN pour stabiliser les validations imbriquées.
+  - Gate global `scripts/test.ps1`: GREEN le 2026-07-06 avec `23 validation(s), 268 test(s)`.
 
 ## Revue d'adhérence
 

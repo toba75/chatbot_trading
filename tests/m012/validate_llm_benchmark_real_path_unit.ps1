@@ -133,7 +133,10 @@ def measurement(checkpoint=None, evaluations=None, metrics=None):
     )
 
 
-assert_equal(evaluation("json_valide").passed, True, "Un JSON valide doit réussir la tâche JSON.")
+valid_json_evaluation = evaluation("json_valide")
+assert_equal(valid_json_evaluation.passed, True, "Un JSON valide doit réussir la tâche JSON.")
+assert_equal(hasattr(valid_json_evaluation, "response_json"), False, "Le JSON brut ne doit pas rester exposé.")
+assert_equal(len(valid_json_evaluation.response_json_sha256), 64, "Le hash du JSON doit rester traçable.")
 assert_equal(evaluation("json_valide", response_json="not-json").passed, False, "Un JSON invalide doit échouer.")
 assert_equal(evaluation("extraction_atomique", atomic_extraction_complete=False).passed, False, "Une extraction atomique incomplète doit échouer.")
 assert_equal(evaluation("conservation_negations", negations_preserved=False).passed, False, "Une négation perdue doit échouer.")
@@ -153,6 +156,11 @@ assert_raises("checkpoint inconnu", lambda: candidate("autre/checkpoint", OFFICI
 assert_raises("origine checkpoint invalide", lambda: candidate(origin="MIRROR"))
 assert_raises("métrique technique LLM inconnue", lambda: metric("llm_prompt_payload"))
 assert_raises("payload sensible interdit", lambda: metric("llm_gateway_latency_ms", public_labels=("réponse complète: secret",)))
+for forbidden_label in ("Authorization: Bearer secret", "api_key=secret", "password=secret", "mot de passe: secret", "sk-secret"):
+    assert_raises(
+        "payload sensible interdit",
+        lambda forbidden_label=forbidden_label: metric("llm_gateway_latency_ms", public_labels=(forbidden_label,)),
+    )
 assert_raises("valeur métrique invalide", lambda: metric("llm_gateway_latency_ms", "NaN"))
 assert_raises("dénominateur métrique invalide", lambda: metric("llm_gateway_latency_ms", denominator=0))
 assert_raises(
@@ -217,4 +225,3 @@ try {
 finally {
     Remove-Item -LiteralPath $pythonScriptPath -Force
 }
-

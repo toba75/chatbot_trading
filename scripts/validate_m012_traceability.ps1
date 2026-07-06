@@ -60,7 +60,7 @@ $expectedRequirements = @(
         Source = "docs/tasks/milestone_012/0005_mesurer_routes_documentaires.md"
         Test = "tests/m012/validate_document_route_benchmark_acceptance.ps1"
         Command = "tests/m012/validate_document_route_benchmark_acceptance.ps1"
-        Code = "app/evaluation/domain/document_route_benchmark.py"
+        Code = "app/evaluation/domain/document_route_benchmark.py; docs/evaluation/m012/document_route_benchmark_report.md"
         Adr = "ADR-002; ADR-010"
     },
     [ordered] @{
@@ -108,7 +108,7 @@ $expectedRequirements = @(
         Source = "docs/tasks/milestone_012/0011_publier_decisions_calibration_promotions.md"
         Test = "tests/m012/validate_calibration_decisions_acceptance.ps1"
         Command = "tests/m012/validate_calibration_decisions_acceptance.ps1"
-        Code = "app/evaluation/domain/calibration_decisions.py; docs/evaluation/m012/calibration_promotion_decisions_report.md"
+        Code = "app/evaluation/domain/calibration_decisions.py; docs/evaluation/m012/calibration_promotion_decisions_report.md; docs/evaluation/m012/conversation_criteria_report.md"
         Adr = "ADR-010; DDD-ADR-010"
     },
     [ordered] @{
@@ -155,7 +155,8 @@ $requiredMetricNames = @(
     "source_adjudication_rate",
     "source_quality_supersession_total",
     "source_publication_delay_seconds",
-    "document_cer_wer",
+    "document_cer",
+    "document_wer",
     "document_numeric_token_accuracy",
     "document_sign_accuracy",
     "document_formula_fidelity",
@@ -164,9 +165,10 @@ $requiredMetricNames = @(
     "document_page_time_seconds",
     "document_memory_bytes",
     "document_route_stability_rate",
+    "document_failure_rate",
     "knowledge_projection_current_ratio",
     "knowledge_unresolvable_locator_rate",
-    "knowledge_result_diversity_average",
+    "knowledge_document_diversity",
     "knowledge_stale_projection_search_rate",
     "knowledge_recall_at_5",
     "knowledge_recall_at_10",
@@ -174,8 +176,8 @@ $requiredMetricNames = @(
     "knowledge_mrr",
     "knowledge_ndcg",
     "knowledge_expected_page_accuracy",
-    "knowledge_subtopic_coverage_rate",
-    "knowledge_fr_to_en_performance",
+    "knowledge_subtheme_coverage",
+    "knowledge_fr_to_en_recall_at_10",
     "evidence_claim_verified_rate",
     "evidence_claim_rejected_rate",
     "evidence_claim_review_rate",
@@ -269,7 +271,7 @@ function Resolve-RequiredPath {
     $resolvedPath = [System.IO.Path]::GetFullPath($candidatePath)
     $repositoryPrefix = $resolvedRepositoryRoot.TrimEnd("\", "/") + [System.IO.Path]::DirectorySeparatorChar
     Assert-Condition `
-        -Condition ($resolvedPath.StartsWith($repositoryPrefix, [System.StringComparison]::OrdinalIgnoreCase) -or [System.IO.Path]::IsPathRooted($Path)) `
+        -Condition ($resolvedPath.StartsWith($repositoryPrefix, [System.StringComparison]::OrdinalIgnoreCase)) `
         -Message "Chemin hors dépôt interdit ($Label): $resolvedPath"
     Assert-Condition `
         -Condition (Test-Path -LiteralPath $resolvedPath -PathType Leaf) `
@@ -369,10 +371,18 @@ $resolvedGapReportPath = Resolve-RequiredPath -Path $GapReportPath -DefaultRelat
 $resolvedTestGatePath = Resolve-RequiredPath -Path $TestGatePath -DefaultRelativePath "scripts/test.ps1" -Label "test gate"
 $resolvedLintGatePath = Resolve-RequiredPath -Path $LintGatePath -DefaultRelativePath "scripts/lint.ps1" -Label "lint gate"
 $resolvedGovernanceTestPath = Resolve-RequiredPath -Path $GovernanceTestPath -DefaultRelativePath "tests/governance/validate_m000_validation_commands_acceptance.ps1" -Label "governance test"
+$validationRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $resolvedMatrixPath))
+$evaluationReportRoot = Join-Path $validationRoot "docs/evaluation/m012"
+Assert-Condition `
+    -Condition (Test-Path -LiteralPath $evaluationReportRoot -PathType Container) `
+    -Message "Répertoire de rapports M-012 absent: $evaluationReportRoot"
 
 $matrixContent = Get-Content -Raw -Encoding UTF8 -LiteralPath $resolvedMatrixPath
 $specificationContent = Get-Content -Raw -Encoding UTF8 -LiteralPath $resolvedSpecificationPath
 $gapReportContent = Get-Content -Raw -Encoding UTF8 -LiteralPath $resolvedGapReportPath
+$evaluationReportContents = Get-ChildItem -LiteralPath $evaluationReportRoot -Filter "*.md" |
+    Sort-Object -Property FullName |
+    ForEach-Object { Get-Content -Raw -Encoding UTF8 -LiteralPath $_.FullName }
 $testGateContent = Get-Content -Raw -Encoding UTF8 -LiteralPath $resolvedTestGatePath
 $lintGateContent = Get-Content -Raw -Encoding UTF8 -LiteralPath $resolvedLintGatePath
 $governanceTestContent = Get-Content -Raw -Encoding UTF8 -LiteralPath $resolvedGovernanceTestPath
@@ -400,7 +410,7 @@ foreach ($context in $expectedGapContexts) {
 
 foreach ($metricName in $requiredMetricNames) {
     Assert-Condition -Condition ($gapReportContent.Contains($metricName)) -Message "Métrique V1 absente du rapport: $metricName"
-    Assert-Condition -Condition ($specificationContent.Contains($metricName) -or $metricName -in @("knowledge_document_diversity", "knowledge_subtheme_coverage", "knowledge_fr_to_en_recall_at_10", "json_valide", "extraction_atomique", "conservation_negations", "exactitude_nombres", "conditions_application", "limites", "entailment", "contradiction", "synthese_fr_en", "tool_calling", "citations")) -Message "Métrique V1 absente de la spécification: $metricName"
+    Assert-Condition -Condition ($specificationContent.Contains($metricName) -or $metricName -in @("json_valide", "extraction_atomique", "conservation_negations", "exactitude_nombres", "conditions_application", "limites", "entailment", "contradiction", "synthese_fr_en", "tool_calling", "citations")) -Message "Métrique V1 absente de la spécification: $metricName"
 }
 
 foreach ($marker in @("Benchmark source", "Corpus", "Décision liée", "Commande de preuve", "Test scientifique RED", "gate logiciel GREEN")) {
@@ -409,6 +419,9 @@ foreach ($marker in @("Benchmark source", "Corpus", "Décision liée", "Commande
 
 foreach ($sensitivePayload in $forbiddenSensitivePayloads) {
     Assert-Condition -Condition (-not $gapReportContent.Contains($sensitivePayload)) -Message "Payload sensible M-012 exposé: $sensitivePayload"
+    foreach ($evaluationReportContent in $evaluationReportContents) {
+        Assert-Condition -Condition (-not $evaluationReportContent.Contains($sensitivePayload)) -Message "Payload sensible M-012 exposé: $sensitivePayload"
+    }
 }
 
 Write-Host "Traçabilité M-012 valide: $($expectedRequirements.Count) exigence(s), $($expectedGapContexts.Count) écart(s) V1, $($requiredMetricNames.Count) métrique(s)."

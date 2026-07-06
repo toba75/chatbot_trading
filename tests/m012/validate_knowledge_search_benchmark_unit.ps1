@@ -213,6 +213,18 @@ expect_raises(
     ),
 )
 
+extra_result = candidates_by_question(search_set)
+extra_result["Q-M012-KA-UNIT-HORS-JEU"] = (first_candidate,)
+expect_raises(
+    "resultat de recherche hors jeu evaluation",
+    lambda: benchmark.measure(
+        run_id="KSRUN-M012-KA-EXTRA",
+        evaluation_set=search_set,
+        projection_snapshot=projection(),
+        candidates_by_question=extra_result,
+    ),
+)
+
 expect_raises(
     "projection obsolete",
     lambda: benchmark.measure(

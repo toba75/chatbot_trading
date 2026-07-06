@@ -285,6 +285,10 @@ class KnowledgeSearchBenchmark:
         projection_snapshot.ensure_promotable()
         if not isinstance(candidates_by_question, Mapping):
             raise ValueError("resultats de recherche invalides")
+        expected_question_ids = {question.question_id for question in evaluation_set.questions}
+        extra_question_ids = sorted(set(candidates_by_question.keys()).difference(expected_question_ids))
+        if extra_question_ids:
+            raise ValueError(f"resultat de recherche hors jeu evaluation: {extra_question_ids[0]}")
 
         question_results = tuple(
             self._measure_question(

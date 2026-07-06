@@ -15,7 +15,8 @@ $expectedContexts = @(
     @{ Code = "RA"; Module = "research_answering"; Name = "Recherche et r$($eAcute)ponse"; Responsibility = "planifier" },
     @{ Code = "CV"; Module = "conversation"; Name = "Conversation"; Responsibility = "conserver" },
     @{ Code = "SD"; Module = "strategy_design"; Name = "Conception de strat$($eAcute)gies"; Responsibility = "formaliser" },
-    @{ Code = "EX"; Module = "experimentation"; Name = "Exp$($eAcute)rimentation"; Responsibility = "ex$($eAcute)cuter" }
+    @{ Code = "EX"; Module = "experimentation"; Name = "Exp$($eAcute)rimentation"; Responsibility = "ex$($eAcute)cuter" },
+    @{ Code = "EV"; Module = "evaluation"; Name = "$($eAcute.ToString().ToUpper())valuation pilote et calibration"; Responsibility = "mesurer" }
 )
 
 $requiredLayers = @("domain", "application", "adapters")
@@ -94,7 +95,7 @@ function Get-ContextByCode {
     return $matches[0]
 }
 
-# Given les sept bounded contexts ont une responsabilite exclusive.
+# Given les huit bounded contexts ont une responsabilite exclusive.
 # When l'arborescence applicative est controlee.
 # Then chaque contexte possede ses couches canoniques et aucun stockage n'a plusieurs proprietaires.
 Assert-DirectoryExists -Path $appRoot -Message "Module racine absent: app"

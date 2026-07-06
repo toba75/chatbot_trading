@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from app.contracts.source_references import CanonicalSourceRef
+
 
 DIGITAL_NATIVE_CLEAN = "DIGITAL_NATIVE_CLEAN"
 CLEAN_SCAN = "CLEAN_SCAN"
@@ -73,11 +75,15 @@ _DOCUMENT_FIELDS = frozenset(
 )
 _SOURCE_PROCESSING_REF_FIELDS = frozenset(
     {
+        "schema_version",
+        "canonical_source_id",
         "document_id",
-        "diagnostic_run_id",
-        "route_plan_id",
         "canonical_version_id",
+        "source_sha256",
         "canonical_artifact_sha256",
+        "page_count",
+        "accepted_at",
+        "quality_policy_version",
     }
 )
 _EXCLUSION_FIELDS = frozenset({"candidate_document_id", "exclusion_reason"})
@@ -342,12 +348,17 @@ def _source_processing_ref(payload: Mapping[str, Any], pilot_document_id: str) -
         raise ValueError(f"reference SP absente: {pilot_document_id}")
     source_processing_ref = _ensure_mapping(payload["source_processing_ref"], "source_processing_ref")
     _ensure_allowed_fields(source_processing_ref, _SOURCE_PROCESSING_REF_FIELDS, "source_processing_ref")
+    canonical_ref = CanonicalSourceRef.from_payload(source_processing_ref)
     return {
-        "document_id": _required_identifier(source_processing_ref, "document_id", "DOC"),
-        "diagnostic_run_id": _required_identifier(source_processing_ref, "diagnostic_run_id", "SPRUN"),
-        "route_plan_id": _required_identifier(source_processing_ref, "route_plan_id", "RPLAN"),
-        "canonical_version_id": _required_identifier(source_processing_ref, "canonical_version_id", "CVER"),
-        "canonical_artifact_sha256": _required_sha256(source_processing_ref, "canonical_artifact_sha256"),
+        "schema_version": canonical_ref.schema_version,
+        "canonical_source_id": canonical_ref.canonical_source_id,
+        "document_id": canonical_ref.document_id,
+        "canonical_version_id": canonical_ref.canonical_version_id,
+        "source_sha256": canonical_ref.source_sha256,
+        "canonical_artifact_sha256": canonical_ref.canonical_artifact_sha256,
+        "page_count": str(canonical_ref.page_count),
+        "accepted_at": canonical_ref.accepted_at,
+        "quality_policy_version": canonical_ref.quality_policy_version,
     }
 
 
@@ -437,13 +448,23 @@ def _resolve_existing_file(path_value: str, *, manifest_directory: Path | None) 
             raise ValueError(f"chemin non resolvable: {path_value}")
         path = manifest_directory / path
     resolved_path = path.resolve()
+    if manifest_directory is not None:
+        resolved_manifest_directory = manifest_directory.resolve()
+        try:
+            resolved_path.relative_to(resolved_manifest_directory)
+        except ValueError as exc:
+            raise ValueError(f"chemin hors corpus pilote: {path_value}") from exc
     if not resolved_path.is_file():
         raise ValueError(f"chemin non resolvable: {path_value}")
     return resolved_path
 
 
 def _sha256_file(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _json_ready(value: Any) -> Any:

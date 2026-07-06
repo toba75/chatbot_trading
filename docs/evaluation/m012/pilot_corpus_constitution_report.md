@@ -20,7 +20,8 @@ Le manifeste du corpus pilote est un JSON figé contenant:
 
 - `corpus_id`, `policy_version`, `frozen`, `frozen_at` et `frozen_manifest_sha256`;
 - 50 à 100 `documents`;
-- pour chaque document, `pilot_document_id`, référence SP, chemin original résolvable, hash SHA-256 de l'original, statut SP diagnostiqué, version canonique, strates couvertes et justification d'inclusion;
+- pour chaque document, `pilot_document_id`, chemin original résolvable dans le répertoire du manifeste, hash SHA-256 de l'original, statut SP diagnostiqué, strates couvertes et justification d'inclusion;
+- pour chaque référence SP canonique, les champs publics `schema_version`, `canonical_source_id`, `document_id`, `canonical_version_id`, `source_sha256`, `canonical_artifact_sha256`, `page_count`, `accepted_at` et `quality_policy_version`;
 - les exclusions candidates avec justification explicite.
 
 Le hash `frozen_manifest_sha256` est calculé sur le manifeste sans ce champ. Une modification après gel rend le manifeste RED.
@@ -46,7 +47,9 @@ Le hash `frozen_manifest_sha256` est calculé sur le manifeste sans ce champ. Un
 - Aucune entrée n'est créée par fallback.
 - Aucun document non diagnostiqué et routé par SP n'est promu.
 - Aucun chemin non résolvable n'est accepté.
+- Aucun chemin extérieur au répertoire du manifeste n'est accepté.
 - Aucun doublon binaire n'est accepté.
+- Le hash SHA-256 de l'original est calculé par lecture bornée en flux et non par chargement complet en mémoire.
 - Aucune écriture dans le stockage SP n'est effectuée.
 
 ## Commandes de preuve
