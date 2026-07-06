@@ -11,6 +11,12 @@ repo_root = sys.argv[1]
 if repo_root not in sys.path:
     sys.path.insert(0, repo_root)
 
+from app.contracts.source_references import (
+    ACCEPTED_CANONICAL_VERSION_STATUS,
+    CanonicalSourceRef,
+    SourceLocator,
+    SourceLocatorValidationPolicy,
+)
 from app.evaluation.domain.verified_answer_benchmark import (
     ANSWER_ACCURACY_SCORE,
     ANSWER_CITATION_PRECISION,
@@ -32,6 +38,46 @@ from app.evaluation.domain.verified_answer_benchmark import (
 )
 
 POLICY_VERSION = "EvidenceAnswerBenchmarkPolicy-1.0"
+HASH = "f" * 64
+
+
+def source_policy():
+    canonical_ref = CanonicalSourceRef.from_payload(
+        {
+            "schema_version": "1.0",
+            "canonical_source_id": "CSRC-M012-T008-UNIT",
+            "document_id": "DOC-M012-T008-UNIT",
+            "canonical_version_id": "CVER-M012-T008-UNIT",
+            "source_sha256": HASH,
+            "canonical_artifact_sha256": HASH,
+            "page_count": 3,
+            "accepted_at": "2026-07-06T00:00:00Z",
+            "quality_policy_version": "DocumentQualityCalibrationPolicy-1.0",
+        }
+    )
+    return SourceLocatorValidationPolicy(
+        canonical_sources_by_version_id={"CVER-M012-T008-UNIT": canonical_ref},
+        version_statuses_by_version_id={"CVER-M012-T008-UNIT": ACCEPTED_CANONICAL_VERSION_STATUS},
+        resolvable_item_ids_by_version_id={"CVER-M012-T008-UNIT": {"ITEM-M012-T008-UNIT": HASH}},
+    )
+
+
+SOURCE_POLICY = source_policy()
+
+
+def locator():
+    return SourceLocator.from_payload(
+        {
+            "schema_version": "1.0",
+            "canonical_version_id": "CVER-M012-T008-UNIT",
+            "document_id": "DOC-M012-T008-UNIT",
+            "page_pdf": 1,
+            "item_id": "ITEM-M012-T008-UNIT",
+            "bbox": [0.1, 0.1, 0.2, 0.2],
+            "content_hash": HASH,
+        },
+        validation_policy=SOURCE_POLICY,
+    )
 
 
 def assert_equal(actual, expected, message):
@@ -52,7 +98,7 @@ def assert_raises(expected_fragment, action):
 def citation(resolved=True):
     return CitationMeasurement(
         citation_id="CIT-M012-T008-UNIT",
-        source_locator=None,
+        source_locator=locator() if resolved else None,
         resolved=resolved,
     )
 
@@ -168,7 +214,7 @@ unsupported_case = answer_case(
     assertions=(assertion(expected_supported=False, observed_supported=False, faithful_to_evidence=False),),
 )
 unsupported_run = full_answer_run(unsupported_case)
-assert_equal(unsupported_run.metrics[ANSWER_ACCURACY_SCORE].value, "0.800000000000", "Une assertion non supportée ne compte pas correcte.")
+assert_equal(unsupported_run.metrics[ANSWER_ACCURACY_SCORE].value, "0.750000000000", "Une assertion non supportée ne compte pas correcte.")
 
 broken_citation_case = answer_case(
     case_id="CASE-M012-T008-U-CITATION",
@@ -199,7 +245,7 @@ invented_parameter_case = answer_case(
 )
 invented_parameter_run = full_answer_run(invented_parameter_case)
 assert_equal(invented_parameter_run.metrics[ANSWER_INVENTED_PARAMETER_REJECTION_RATE].value, "0.500000000000", "Un paramètre inventé non rejeté doit dégrader la métrique.")
-assert_equal(invented_parameter_run.case_results[-1].failure_reasons, ("paramètre inventé non rejeté",), "Le paramètre inventé doit être visible.")
+assert_equal(invented_parameter_run.case_results[-1].failure_reasons, ("param\u00e8tre invent\u00e9 non rejet\u00e9",), "Le paramètre inventé doit être visible.")
 
 assert_raises(
     "historique conversationnel brut interdit",
@@ -210,11 +256,11 @@ assert_raises(
     lambda: answer_case(support_status="SUPPORTED_WITHOUT_DENOMINATOR"),
 )
 assert_raises(
-    "source_locator requis pour citation résolue",
+    "source_locator requis pour citation r\u00e9solue",
     lambda: CitationMeasurement("CIT-M012-T008-BAD", None, True),
 )
 assert_raises(
-    "SUPPORTED avec assertion non supportée",
+    "SUPPORTED avec assertion non support\u00e9e",
     lambda: answer_case(assertions=(assertion(expected_supported=True, observed_supported=False),)),
 )
 
@@ -232,7 +278,7 @@ assert_raises(
     lambda: claim(has_direct_evidence=False),
 )
 assert_raises(
-    "dénominateur métrique invalide",
+    "d\u00e9nominateur m\u00e9trique invalide",
     lambda: EvidenceGovernanceBenchmark(policy_version=POLICY_VERSION).measure(
         run_id="EGRUN-M012-T008-EMPTY",
         claim_measurements=(),

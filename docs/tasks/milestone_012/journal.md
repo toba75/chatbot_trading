@@ -49,6 +49,13 @@
   - ADR: non requise; T-007 applique ADR-005, ADR-010 et DDD-ADR-004 sans changer leur sens.
   - Fichiers livrés: `app/evaluation/domain/knowledge_search_benchmark.py`, `app/evaluation/domain/__init__.py`, `tests/m012/validate_knowledge_search_benchmark_acceptance.ps1`, `tests/m012/validate_knowledge_search_benchmark_unit.ps1`, `docs/evaluation/m012/knowledge_search_benchmark_report.md`, `docs/traceability/matrix.md`.
   - Validations ciblées GREEN: `tests/m012/validate_knowledge_search_benchmark_acceptance.ps1`, `tests/m012/validate_knowledge_search_benchmark_unit.ps1`.
+- T-008 - Mesurer les réponses vérifiées et l'abstention:
+  - Scénario BDD: Given des questions d'évaluation avec preuves, contradictions ou insuffisances attendues; When RA produit des réponses vérifiées et EG publie les états de claims associés au corpus pilote; Then chaque réponse est mesurée sur support, citations, abstention et limites, et les métriques EG sont publiées sans traiter une réponse plausible comme preuve.
+  - Commit RED: `10f769679 test(m012): couvrir le benchmark reponses`.
+  - Commit GREEN: `feat(m012): mesurer les reponses verifiees`.
+  - ADR: non requise; T-008 applique ADR-010 et DDD-ADR-007 sans changer leur sens.
+  - Fichiers livrés: `app/evaluation/domain/verified_answer_benchmark.py`, `app/evaluation/domain/__init__.py`, `tests/m012/validate_verified_answer_benchmark_acceptance.ps1`, `tests/m012/validate_verified_answer_benchmark_unit.ps1`, `docs/evaluation/m012/verified_answer_benchmark_report.md`, `docs/evaluation/m012/evidence_governance_benchmark_report.md`, `docs/traceability/matrix.md`.
+  - Validations ciblées GREEN: `tests/m012/validate_verified_answer_benchmark_acceptance.ps1`, `tests/m012/validate_verified_answer_benchmark_unit.ps1`.
 
 ## Revue d'adhérence
 
