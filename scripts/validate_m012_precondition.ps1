@@ -11,16 +11,17 @@ $ErrorActionPreference = "Stop"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $allowedBranches = @(
     "master",
-    "codex/milestone-m009-recherche-approfondie",
-    "codex/milestone-m010-strategie-candidate-attribuee",
-    "codex/milestone-m011-experience-reproductible",
     "codex/milestone-m012-evaluation-pilote-calibration"
 )
 $requiredMasterArtifacts = @(
-    [ordered] @{ Path = "docs/tasks/milestone_008"; Kind = "Directory" },
-    [ordered] @{ Path = "docs/specs/m008_conversation_produit.md"; Kind = "File" },
-    [ordered] @{ Path = "scripts/validate_m008_specification.ps1"; Kind = "File" },
-    [ordered] @{ Path = "tests/m008"; Kind = "Directory" },
+    [ordered] @{ Path = "docs/tasks/milestone_011"; Kind = "Directory" },
+    [ordered] @{ Path = "docs/specs/m011_experience_reproductible.md"; Kind = "File" },
+    [ordered] @{ Path = "scripts/validate_m011_precondition.ps1"; Kind = "File" },
+    [ordered] @{ Path = "scripts/validate_m011_specification.ps1"; Kind = "File" },
+    [ordered] @{ Path = "scripts/validate_m011_traceability.ps1"; Kind = "File" },
+    [ordered] @{ Path = "tests/m011"; Kind = "Directory" },
+    [ordered] @{ Path = "app/experimentation"; Kind = "Directory" },
+    [ordered] @{ Path = "app/contracts/strategy_experiments.py"; Kind = "File" },
     [ordered] @{ Path = "scripts/test.ps1"; Kind = "File" },
     [ordered] @{ Path = "scripts/lint.ps1"; Kind = "File" },
     [ordered] @{ Path = "scripts/validate_task_system.ps1"; Kind = "File" }
@@ -43,16 +44,19 @@ $requiredUpstreamPreconditionValidators = @(
     [ordered] @{ Name = "M-005"; Path = "scripts/validate_m005_precondition.ps1" },
     [ordered] @{ Name = "M-006"; Path = "scripts/validate_m006_precondition.ps1" },
     [ordered] @{ Name = "M-007"; Path = "scripts/validate_m007_precondition.ps1" },
-    [ordered] @{ Name = "M-008"; Path = "scripts/validate_m008_precondition.ps1" }
+    [ordered] @{ Name = "M-008"; Path = "scripts/validate_m008_precondition.ps1" },
+    [ordered] @{ Name = "M-009"; Path = "scripts/validate_m009_precondition.ps1" },
+    [ordered] @{ Name = "M-010"; Path = "scripts/validate_m010_precondition.ps1" },
+    [ordered] @{ Name = "M-011"; Path = "scripts/validate_m011_precondition.ps1" }
 )
 $requiredTestGateEvidence = @(
-    "Test GREEN: tests/m009/validate_m009_precondition_unit.ps1",
+    "Test GREEN: tests/m012/validate_m012_precondition_unit.ps1",
     "Validation GREEN: scripts/validate_traceability.ps1",
     "Validation GREEN: scripts/validate_adr_system.ps1",
     "Validation GREEN: scripts/validate_architecture_boundaries.ps1"
 )
 
-function Assert-M009Condition {
+function Assert-M012Condition {
     param(
         [Parameter(Mandatory = $true)]
         [bool] $Condition,
@@ -66,16 +70,16 @@ function Assert-M009Condition {
     }
 }
 
-function Resolve-M009ReportPath {
+function Resolve-M012ReportPath {
     param(
         [Parameter(Mandatory = $true)]
         [AllowEmptyString()]
         [string] $ReportPath
     )
 
-    Assert-M009Condition `
+    Assert-M012Condition `
         -Condition (-not [string]::IsNullOrWhiteSpace($ReportPath)) `
-        -Message "Chemin de rapport M-009 obligatoire via -Path."
+        -Message "Chemin de rapport M-012 obligatoire via -Path."
 
     if ([System.IO.Path]::IsPathRooted($ReportPath)) {
         $resolvedReportPath = [System.IO.Path]::GetFullPath($ReportPath)
@@ -89,23 +93,23 @@ function Resolve-M009ReportPath {
         [System.IO.Path]::AltDirectorySeparatorChar
     )
     $repoRootPrefix = $repoRootPath + [System.IO.Path]::DirectorySeparatorChar
-    Assert-M009Condition `
+    Assert-M012Condition `
         -Condition ($resolvedReportPath.StartsWith($repoRootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) `
-        -Message "Chemin de rapport M-009 hors dépôt: $resolvedReportPath"
+        -Message "Chemin de rapport M-012 hors dépôt: $resolvedReportPath"
 
     $reportDirectory = Split-Path -Parent $resolvedReportPath
-    Assert-M009Condition `
+    Assert-M012Condition `
         -Condition (-not [string]::IsNullOrWhiteSpace($reportDirectory)) `
-        -Message "Répertoire de rapport M-009 introuvable pour le chemin: $ReportPath"
+        -Message "Répertoire de rapport M-012 introuvable pour le chemin: $ReportPath"
 
-    Assert-M009Condition `
+    Assert-M012Condition `
         -Condition (Test-Path -LiteralPath $reportDirectory -PathType Container) `
-        -Message "Répertoire de rapport M-009 absent: $reportDirectory"
+        -Message "Répertoire de rapport M-012 absent: $reportDirectory"
 
     return $resolvedReportPath
 }
 
-function Invoke-M009Process {
+function Invoke-M012Process {
     param(
         [Parameter(Mandatory = $true)]
         [string] $Name,
@@ -152,7 +156,7 @@ function Invoke-M009Process {
     }
 }
 
-function Invoke-M009TimedProcess {
+function Invoke-M012TimedProcess {
     param(
         [Parameter(Mandatory = $true)]
         [string] $Name,
@@ -170,9 +174,9 @@ function Invoke-M009TimedProcess {
         [int] $TimeoutSeconds
     )
 
-    Assert-M009Condition `
+    Assert-M012Condition `
         -Condition ($TimeoutSeconds -gt 0) `
-        -Message "Timeout de gate M-009 invalide: $TimeoutSeconds"
+        -Message "Timeout de gate M-012 invalide: $TimeoutSeconds"
 
     $startedAtUtc = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
     $timedOut = $false
@@ -222,7 +226,7 @@ function Invoke-M009TimedProcess {
             $ErrorActionPreference = $previousKillErrorActionPreference
         }
         if (-not $process.WaitForExit(5000)) {
-            throw "Processus de gate M-009 non arrêté après timeout: $($process.Id)"
+            throw "Processus de gate M-012 non arrêté après timeout: $($process.Id)"
         }
         $exitCode = 124
     }
@@ -265,17 +269,17 @@ function Invoke-M009TimedProcess {
     }
 }
 
-function Invoke-M009GateProcess {
+function Invoke-M012GateProcess {
     param(
         [Parameter(Mandatory = $true)]
         [object] $GateDefinition
     )
 
     $scriptPath = Join-Path $repoRoot $GateDefinition["Script"]
-    $previousRecursionGuard = $env:OST_M009_PRECONDITION_ACCEPTANCE_RUNNING
+    $previousRecursionGuard = $env:OST_M012_PRECONDITION_ACCEPTANCE_RUNNING
 
     if ($GateDefinition["Name"] -eq "test") {
-        $env:OST_M009_PRECONDITION_ACCEPTANCE_RUNNING = "1"
+        $env:OST_M012_PRECONDITION_ACCEPTANCE_RUNNING = "1"
     }
 
     try {
@@ -283,7 +287,7 @@ function Invoke-M009GateProcess {
         $commandText = "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; `$env:PYTHONIOENCODING = 'utf-8'; & '$escapedScriptPath'; exit `$LASTEXITCODE"
         $encodedCommand = [Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes($commandText))
 
-        return Invoke-M009TimedProcess `
+        return Invoke-M012TimedProcess `
             -Name $GateDefinition["Name"] `
             -Command $GateDefinition["Command"] `
             -Executable "powershell" `
@@ -293,16 +297,16 @@ function Invoke-M009GateProcess {
     finally {
         if ($GateDefinition["Name"] -eq "test") {
             if ($null -eq $previousRecursionGuard) {
-                Remove-Item Env:\OST_M009_PRECONDITION_ACCEPTANCE_RUNNING -ErrorAction SilentlyContinue
+                Remove-Item Env:\OST_M012_PRECONDITION_ACCEPTANCE_RUNNING -ErrorAction SilentlyContinue
             }
             else {
-                $env:OST_M009_PRECONDITION_ACCEPTANCE_RUNNING = $previousRecursionGuard
+                $env:OST_M012_PRECONDITION_ACCEPTANCE_RUNNING = $previousRecursionGuard
             }
         }
     }
 }
 
-function ConvertTo-M009MarkdownCell {
+function ConvertTo-M012MarkdownCell {
     param(
         [Parameter(Mandatory = $true)]
         [AllowEmptyString()]
@@ -312,7 +316,7 @@ function ConvertTo-M009MarkdownCell {
     return $Value.Replace("|", "\|").Replace("`r", " ").Replace("`n", " ")
 }
 
-function Add-M009Result {
+function Add-M012Result {
     param(
         [Parameter(Mandatory = $true)]
         [ValidateNotNull()]
@@ -356,7 +360,7 @@ function Add-M009Result {
     }) | Out-Null
 }
 
-function Add-M009ResultTable {
+function Add-M012ResultTable {
     param(
         [Parameter(Mandatory = $true)]
         [ValidateNotNull()]
@@ -371,11 +375,11 @@ function Add-M009ResultTable {
     $Lines.Add("|---|---|---|---|---|")
 
     foreach ($result in $Results) {
-        $Lines.Add("| ``$($result.Name)`` | ``$($result.Command)`` | ``$($result.CompletedAtUtc)`` | ``$($result.Status)`` | $(ConvertTo-M009MarkdownCell -Value $result.Observation) |")
+        $Lines.Add("| ``$($result.Name)`` | ``$($result.Command)`` | ``$($result.CompletedAtUtc)`` | ``$($result.Status)`` | $(ConvertTo-M012MarkdownCell -Value $result.Observation) |")
     }
 }
 
-function Write-M009PreconditionReport {
+function Write-M012PreconditionReport {
     param(
         [Parameter(Mandatory = $true)]
         [string] $ReportPath,
@@ -393,24 +397,24 @@ function Write-M009PreconditionReport {
     )
 
     $lines = New-Object System.Collections.Generic.List[string]
-    $lines.Add("# Rapport de précondition GREEN M-009")
+    $lines.Add("# Rapport de précondition GREEN M-012")
     $lines.Add("")
     $lines.Add("## Scénario BDD")
     $lines.Add("")
-    $lines.Add("- Given M-008 est présent dans ``master``.")
-    $lines.Add("- When les gates de précondition M-009 sont exécutées.")
-    $lines.Add("- Then M-009 ne peut commencer que si les préconditions amont acceptent explicitement le jalon aval et si test, lint, traçabilité, ADR et frontières d'architecture ont un verdict GREEN exploitable.")
+    $lines.Add("- Given M-011 est présent dans ``master`` avec sa spécification, ses tâches, ses tests, ses contrats EX et ses expériences reproductibles.")
+    $lines.Add("- When les gates de précondition M-012 sont exécutées.")
+    $lines.Add("- Then M-012 ne peut commencer que si les préconditions amont acceptent explicitement le jalon aval et si test, lint, traçabilité, ADR et frontières d'architecture ont un verdict GREEN exploitable.")
     $lines.Add("")
     $lines.Add("## Résultat")
     $lines.Add("")
     $lines.Add("- Statut: ``$OverallStatus``")
     $allowedBranchLabel = $allowedBranches -join "; "
     $lines.Add("- Branches autorisées: ``$allowedBranchLabel``")
-    $lines.Add("- M-009 s'appuie sur la conversation produit M-008 publiée dans master et sur le socle RA/EG déjà vérifiable.")
+    $lines.Add("- M-012 s'appuie sur l'expérience reproductible M-011 publiée dans master, sur les contrats SD/EX et sur les preuves d'exécution déterministe déjà disponibles.")
     $lines.Add("")
     $lines.Add("## Vérifications Git")
     $lines.Add("")
-    Add-M009ResultTable -Lines $lines -Results $GitResults
+    Add-M012ResultTable -Lines $lines -Results $GitResults
     $lines.Add("")
     $lines.Add("## Gates exécutées")
     $lines.Add("")
@@ -420,7 +424,7 @@ function Write-M009PreconditionReport {
         $lines.Add("")
     }
     else {
-        Add-M009ResultTable -Lines $lines -Results $GateResults
+        Add-M012ResultTable -Lines $lines -Results $GateResults
         $lines.Add("")
         $lines.Add("## Sorties des gates")
         $lines.Add("")
@@ -449,7 +453,7 @@ function Write-M009PreconditionReport {
     Set-Content -Encoding UTF8 -LiteralPath $ReportPath -Value $lines
 }
 
-function Stop-M009OnRedGitResult {
+function Stop-M012OnRedGitResult {
     param(
         [Parameter(Mandatory = $true)]
         [ValidateNotNull()]
@@ -465,13 +469,13 @@ function Stop-M009OnRedGitResult {
 
     $redGitResult = @($GitResults | Where-Object { $_.Status -eq "RED" } | Select-Object -First 1)
     if ($redGitResult.Count -gt 0) {
-        Write-M009PreconditionReport -ReportPath $ReportPath -OverallStatus "RED" -GitResults $GitResults.ToArray() -GateResults $GateResults.ToArray()
-        Write-Host "Précondition M-009 RED: $($redGitResult[0].Observation)"
-        throw "Précondition M-009 RED: $($redGitResult[0].Observation)"
+        Write-M012PreconditionReport -ReportPath $ReportPath -OverallStatus "RED" -GitResults $GitResults.ToArray() -GateResults $GateResults.ToArray()
+        Write-Host "Précondition M-012 RED: $($redGitResult[0].Observation)"
+        throw "Précondition M-012 RED: $($redGitResult[0].Observation)"
     }
 }
 
-function Test-M009MasterArtifactPresent {
+function Test-M012MasterArtifactPresent {
     param(
         [Parameter(Mandatory = $true)]
         [AllowEmptyCollection()]
@@ -492,10 +496,10 @@ function Test-M009MasterArtifactPresent {
         return ($OutputLines -contains $ArtifactPath)
     }
 
-    throw "Type d'artefact M-009 inconnu: $Kind"
+    throw "Type d'artefact M-012 inconnu: $Kind"
 }
 
-function Test-M009GateEvidencePresent {
+function Test-M012GateEvidencePresent {
     param(
         [Parameter(Mandatory = $true)]
         [AllowEmptyCollection()]
@@ -508,7 +512,7 @@ function Test-M009GateEvidencePresent {
     return (@($OutputLines | Where-Object { $_.Contains($ExpectedEvidence) }).Count -gt 0)
 }
 
-function Test-M009UpstreamValidatorAcceptsBranch {
+function Test-M012UpstreamValidatorAcceptsBranch {
     param(
         [Parameter(Mandatory = $true)]
         [string] $ValidatorPath,
@@ -518,171 +522,171 @@ function Test-M009UpstreamValidatorAcceptsBranch {
     )
 
     $fullValidatorPath = Join-Path $repoRoot $ValidatorPath
-    Assert-M009Condition `
+    Assert-M012Condition `
         -Condition (Test-Path -LiteralPath $fullValidatorPath -PathType Leaf) `
-        -Message "Validateur amont M-009 absent: $ValidatorPath"
+        -Message "Validateur amont M-012 absent: $ValidatorPath"
 
     $content = Get-Content -Raw -Encoding UTF8 -LiteralPath $fullValidatorPath
     return $content.Contains($BranchName)
 }
 
-$reportPath = Resolve-M009ReportPath -ReportPath $Path
+$reportPath = Resolve-M012ReportPath -ReportPath $Path
 $gitResults = New-Object System.Collections.Generic.List[object]
 $gateResults = New-Object System.Collections.Generic.List[object]
 
-$currentBranchResult = Invoke-M009Process `
+$currentBranchResult = Invoke-M012Process `
     -Name "branche courante" `
     -Command "git rev-parse --abbrev-ref HEAD" `
     -Executable "git" `
     -Arguments @("-C", $repoRoot, "rev-parse", "--abbrev-ref", "HEAD")
 $currentBranch = if ($currentBranchResult.OutputLines.Count -eq 0) { "" } else { $currentBranchResult.OutputLines[0].Trim() }
 if (($currentBranchResult.ExitCode -eq 0) -and ($allowedBranches -contains $currentBranch)) {
-    $branchObservation = "Branche M-009 autorisée: $currentBranch"
-    Add-M009Result -Results $gitResults -Name "branche courante" -Command $currentBranchResult.Command -ExitCode 0 -OutputLines $currentBranchResult.OutputLines -Status "GREEN" -Observation $branchObservation -StartedAtUtc $currentBranchResult.StartedAtUtc -CompletedAtUtc $currentBranchResult.CompletedAtUtc
+    $branchObservation = "Branche M-012 autorisée: $currentBranch"
+    Add-M012Result -Results $gitResults -Name "branche courante" -Command $currentBranchResult.Command -ExitCode 0 -OutputLines $currentBranchResult.OutputLines -Status "GREEN" -Observation $branchObservation -StartedAtUtc $currentBranchResult.StartedAtUtc -CompletedAtUtc $currentBranchResult.CompletedAtUtc
     Write-Host $branchObservation
 }
 else {
     $allowedBranchList = $allowedBranches -join ", "
-    Add-M009Result -Results $gitResults -Name "branche courante" -Command $currentBranchResult.Command -ExitCode $currentBranchResult.ExitCode -OutputLines $currentBranchResult.OutputLines -Status "RED" -Observation "Branche courante invalide. Autorisées: $allowedBranchList. Obtenu: $currentBranch" -StartedAtUtc $currentBranchResult.StartedAtUtc -CompletedAtUtc $currentBranchResult.CompletedAtUtc
+    Add-M012Result -Results $gitResults -Name "branche courante" -Command $currentBranchResult.Command -ExitCode $currentBranchResult.ExitCode -OutputLines $currentBranchResult.OutputLines -Status "RED" -Observation "Branche courante invalide. Autorisées: $allowedBranchList. Obtenu: $currentBranch" -StartedAtUtc $currentBranchResult.StartedAtUtc -CompletedAtUtc $currentBranchResult.CompletedAtUtc
 }
 
-Stop-M009OnRedGitResult -GitResults $gitResults -GateResults $gateResults -ReportPath $reportPath
+Stop-M012OnRedGitResult -GitResults $gitResults -GateResults $gateResults -ReportPath $reportPath
 
-$masterResult = Invoke-M009Process `
+$masterResult = Invoke-M012Process `
     -Name "master local" `
     -Command "git rev-parse --verify master^{commit}" `
     -Executable "git" `
     -Arguments @("-C", $repoRoot, "rev-parse", "--verify", "master^{commit}")
 if ($masterResult.ExitCode -eq 0) {
     $masterRevision = $masterResult.OutputLines[0].Trim()
-    Add-M009Result -Results $gitResults -Name "master local" -Command $masterResult.Command -ExitCode 0 -OutputLines $masterResult.OutputLines -Status "GREEN" -Observation "Révision locale master: $masterRevision" -StartedAtUtc $masterResult.StartedAtUtc -CompletedAtUtc $masterResult.CompletedAtUtc
+    Add-M012Result -Results $gitResults -Name "master local" -Command $masterResult.Command -ExitCode 0 -OutputLines $masterResult.OutputLines -Status "GREEN" -Observation "Révision locale master: $masterRevision" -StartedAtUtc $masterResult.StartedAtUtc -CompletedAtUtc $masterResult.CompletedAtUtc
 }
 else {
     $masterRevision = ""
-    Add-M009Result -Results $gitResults -Name "master local" -Command $masterResult.Command -ExitCode $masterResult.ExitCode -OutputLines $masterResult.OutputLines -Status "RED" -Observation "Référence locale master absente." -StartedAtUtc $masterResult.StartedAtUtc -CompletedAtUtc $masterResult.CompletedAtUtc
+    Add-M012Result -Results $gitResults -Name "master local" -Command $masterResult.Command -ExitCode $masterResult.ExitCode -OutputLines $masterResult.OutputLines -Status "RED" -Observation "Référence locale master absente." -StartedAtUtc $masterResult.StartedAtUtc -CompletedAtUtc $masterResult.CompletedAtUtc
 }
 
-Stop-M009OnRedGitResult -GitResults $gitResults -GateResults $gateResults -ReportPath $reportPath
+Stop-M012OnRedGitResult -GitResults $gitResults -GateResults $gateResults -ReportPath $reportPath
 
-$originMasterResult = Invoke-M009Process `
+$originMasterResult = Invoke-M012Process `
     -Name "origin/master" `
     -Command "git rev-parse --verify origin/master^{commit}" `
     -Executable "git" `
     -Arguments @("-C", $repoRoot, "rev-parse", "--verify", "origin/master^{commit}")
 if ($originMasterResult.ExitCode -eq 0) {
     $originMasterRevision = $originMasterResult.OutputLines[0].Trim()
-    Add-M009Result -Results $gitResults -Name "origin/master" -Command $originMasterResult.Command -ExitCode 0 -OutputLines $originMasterResult.OutputLines -Status "GREEN" -Observation "Révision origin/master: $originMasterRevision" -StartedAtUtc $originMasterResult.StartedAtUtc -CompletedAtUtc $originMasterResult.CompletedAtUtc
+    Add-M012Result -Results $gitResults -Name "origin/master" -Command $originMasterResult.Command -ExitCode 0 -OutputLines $originMasterResult.OutputLines -Status "GREEN" -Observation "Révision origin/master: $originMasterRevision" -StartedAtUtc $originMasterResult.StartedAtUtc -CompletedAtUtc $originMasterResult.CompletedAtUtc
 }
 else {
     $originMasterRevision = ""
-    Add-M009Result -Results $gitResults -Name "origin/master" -Command $originMasterResult.Command -ExitCode $originMasterResult.ExitCode -OutputLines $originMasterResult.OutputLines -Status "RED" -Observation "Référence origin/master absente." -StartedAtUtc $originMasterResult.StartedAtUtc -CompletedAtUtc $originMasterResult.CompletedAtUtc
+    Add-M012Result -Results $gitResults -Name "origin/master" -Command $originMasterResult.Command -ExitCode $originMasterResult.ExitCode -OutputLines $originMasterResult.OutputLines -Status "RED" -Observation "Référence origin/master absente." -StartedAtUtc $originMasterResult.StartedAtUtc -CompletedAtUtc $originMasterResult.CompletedAtUtc
 }
 
-Stop-M009OnRedGitResult -GitResults $gitResults -GateResults $gateResults -ReportPath $reportPath
+Stop-M012OnRedGitResult -GitResults $gitResults -GateResults $gateResults -ReportPath $reportPath
 
-$masterContainsOriginResult = Invoke-M009Process `
+$masterContainsOriginResult = Invoke-M012Process `
     -Name "master contient origin/master" `
     -Command "git merge-base --is-ancestor origin/master master" `
     -Executable "git" `
     -Arguments @("-C", $repoRoot, "merge-base", "--is-ancestor", "origin/master", "master")
 if ($masterContainsOriginResult.ExitCode -eq 0) {
-    Add-M009Result -Results $gitResults -Name "master contient origin/master" -Command $masterContainsOriginResult.Command -ExitCode 0 -OutputLines @($masterRevision, $originMasterRevision) -Status "GREEN" -Observation "La référence master contient origin/master." -StartedAtUtc $masterContainsOriginResult.StartedAtUtc -CompletedAtUtc $masterContainsOriginResult.CompletedAtUtc
+    Add-M012Result -Results $gitResults -Name "master contient origin/master" -Command $masterContainsOriginResult.Command -ExitCode 0 -OutputLines @($masterRevision, $originMasterRevision) -Status "GREEN" -Observation "La référence master contient origin/master." -StartedAtUtc $masterContainsOriginResult.StartedAtUtc -CompletedAtUtc $masterContainsOriginResult.CompletedAtUtc
 }
 else {
-    Add-M009Result -Results $gitResults -Name "master contient origin/master" -Command $masterContainsOriginResult.Command -ExitCode $masterContainsOriginResult.ExitCode -OutputLines @($masterRevision, $originMasterRevision) -Status "RED" -Observation "Référence master divergente entre master et origin/master." -StartedAtUtc $masterContainsOriginResult.StartedAtUtc -CompletedAtUtc $masterContainsOriginResult.CompletedAtUtc
+    Add-M012Result -Results $gitResults -Name "master contient origin/master" -Command $masterContainsOriginResult.Command -ExitCode $masterContainsOriginResult.ExitCode -OutputLines @($masterRevision, $originMasterRevision) -Status "RED" -Observation "Référence master divergente entre master et origin/master." -StartedAtUtc $masterContainsOriginResult.StartedAtUtc -CompletedAtUtc $masterContainsOriginResult.CompletedAtUtc
 }
 
-Stop-M009OnRedGitResult -GitResults $gitResults -GateResults $gateResults -ReportPath $reportPath
+Stop-M012OnRedGitResult -GitResults $gitResults -GateResults $gateResults -ReportPath $reportPath
 
-$ancestorResult = Invoke-M009Process `
+$ancestorResult = Invoke-M012Process `
     -Name "branche contient master" `
     -Command "git merge-base --is-ancestor master HEAD" `
     -Executable "git" `
     -Arguments @("-C", $repoRoot, "merge-base", "--is-ancestor", "master", "HEAD")
 if ($ancestorResult.ExitCode -eq 0) {
-    Add-M009Result -Results $gitResults -Name "branche contient master" -Command $ancestorResult.Command -ExitCode 0 -OutputLines $ancestorResult.OutputLines -Status "GREEN" -Observation "La branche courante contient la révision locale master." -StartedAtUtc $ancestorResult.StartedAtUtc -CompletedAtUtc $ancestorResult.CompletedAtUtc
+    Add-M012Result -Results $gitResults -Name "branche contient master" -Command $ancestorResult.Command -ExitCode 0 -OutputLines $ancestorResult.OutputLines -Status "GREEN" -Observation "La branche courante contient la révision locale master." -StartedAtUtc $ancestorResult.StartedAtUtc -CompletedAtUtc $ancestorResult.CompletedAtUtc
 }
 else {
-    Add-M009Result -Results $gitResults -Name "branche contient master" -Command $ancestorResult.Command -ExitCode $ancestorResult.ExitCode -OutputLines $ancestorResult.OutputLines -Status "RED" -Observation "La branche courante ne contient pas la révision locale master." -StartedAtUtc $ancestorResult.StartedAtUtc -CompletedAtUtc $ancestorResult.CompletedAtUtc
+    Add-M012Result -Results $gitResults -Name "branche contient master" -Command $ancestorResult.Command -ExitCode $ancestorResult.ExitCode -OutputLines $ancestorResult.OutputLines -Status "RED" -Observation "La branche courante ne contient pas la révision locale master." -StartedAtUtc $ancestorResult.StartedAtUtc -CompletedAtUtc $ancestorResult.CompletedAtUtc
 }
 
-Stop-M009OnRedGitResult -GitResults $gitResults -GateResults $gateResults -ReportPath $reportPath
+Stop-M012OnRedGitResult -GitResults $gitResults -GateResults $gateResults -ReportPath $reportPath
 
 foreach ($upstreamValidator in $requiredUpstreamPreconditionValidators) {
     $validatorPath = $upstreamValidator["Path"]
     $validatorName = $upstreamValidator["Name"]
     $startedAtUtc = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
-    $acceptsM009Branch = Test-M009UpstreamValidatorAcceptsBranch -ValidatorPath $validatorPath -BranchName "codex/milestone-m009-recherche-approfondie"
+    $acceptsM012Branch = Test-M012UpstreamValidatorAcceptsBranch -ValidatorPath $validatorPath -BranchName "codex/milestone-m012-evaluation-pilote-calibration"
     $completedAtUtc = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
 
-    if ($acceptsM009Branch) {
-        Add-M009Result `
+    if ($acceptsM012Branch) {
+        Add-M012Result `
             -Results $gitResults `
-            -Name "$validatorPath accepte M-009" `
-            -Command "Select-String -Path $validatorPath -Pattern codex/milestone-m009-recherche-approfondie" `
+            -Name "$validatorPath accepte M-012" `
+            -Command "Select-String -Path $validatorPath -Pattern codex/milestone-m012-evaluation-pilote-calibration" `
             -ExitCode 0 `
-            -OutputLines @($validatorPath, "codex/milestone-m009-recherche-approfondie") `
+            -OutputLines @($validatorPath, "codex/milestone-m012-evaluation-pilote-calibration") `
             -Status "GREEN" `
-            -Observation "Validateur amont $validatorName autorise explicitement la branche M-009." `
+            -Observation "Validateur amont $validatorName autorise explicitement la branche M-012." `
             -StartedAtUtc $startedAtUtc `
             -CompletedAtUtc $completedAtUtc
     }
     else {
-        Add-M009Result `
+        Add-M012Result `
             -Results $gitResults `
-            -Name "$validatorPath accepte M-009" `
-            -Command "Select-String -Path $validatorPath -Pattern codex/milestone-m009-recherche-approfondie" `
+            -Name "$validatorPath accepte M-012" `
+            -Command "Select-String -Path $validatorPath -Pattern codex/milestone-m012-evaluation-pilote-calibration" `
             -ExitCode 1 `
             -OutputLines @($validatorPath) `
             -Status "RED" `
-            -Observation "Validateur amont $validatorName n'accepte pas la branche M-009: $validatorPath" `
+            -Observation "Validateur amont $validatorName n'accepte pas la branche M-012: $validatorPath" `
             -StartedAtUtc $startedAtUtc `
             -CompletedAtUtc $completedAtUtc
     }
 }
 
-Stop-M009OnRedGitResult -GitResults $gitResults -GateResults $gateResults -ReportPath $reportPath
+Stop-M012OnRedGitResult -GitResults $gitResults -GateResults $gateResults -ReportPath $reportPath
 
 foreach ($requiredArtifact in $requiredMasterArtifacts) {
     $artifactPath = $requiredArtifact["Path"]
     $artifactKind = $requiredArtifact["Kind"]
-    $artifactResult = Invoke-M009Process `
+    $artifactResult = Invoke-M012Process `
         -Name "$artifactPath dans master" `
         -Command "git ls-tree -r --name-only master -- $artifactPath" `
         -Executable "git" `
         -Arguments @("-C", $repoRoot, "ls-tree", "-r", "--name-only", "master", "--", $artifactPath)
 
-    if (($artifactResult.ExitCode -eq 0) -and (Test-M009MasterArtifactPresent -OutputLines $artifactResult.OutputLines -ArtifactPath $artifactPath -Kind $artifactKind)) {
-        Add-M009Result -Results $gitResults -Name "$artifactPath dans master" -Command $artifactResult.Command -ExitCode 0 -OutputLines $artifactResult.OutputLines -Status "GREEN" -Observation "Milestone ou preuve amont présent dans master: $artifactPath" -StartedAtUtc $artifactResult.StartedAtUtc -CompletedAtUtc $artifactResult.CompletedAtUtc
+    if (($artifactResult.ExitCode -eq 0) -and (Test-M012MasterArtifactPresent -OutputLines $artifactResult.OutputLines -ArtifactPath $artifactPath -Kind $artifactKind)) {
+        Add-M012Result -Results $gitResults -Name "$artifactPath dans master" -Command $artifactResult.Command -ExitCode 0 -OutputLines $artifactResult.OutputLines -Status "GREEN" -Observation "Milestone ou preuve amont présent dans master: $artifactPath" -StartedAtUtc $artifactResult.StartedAtUtc -CompletedAtUtc $artifactResult.CompletedAtUtc
     }
     else {
-        Add-M009Result -Results $gitResults -Name "$artifactPath dans master" -Command $artifactResult.Command -ExitCode $artifactResult.ExitCode -OutputLines $artifactResult.OutputLines -Status "RED" -Observation "Milestone ou preuve amont absent de master: $artifactPath" -StartedAtUtc $artifactResult.StartedAtUtc -CompletedAtUtc $artifactResult.CompletedAtUtc
+        Add-M012Result -Results $gitResults -Name "$artifactPath dans master" -Command $artifactResult.Command -ExitCode $artifactResult.ExitCode -OutputLines $artifactResult.OutputLines -Status "RED" -Observation "Milestone ou preuve amont absent de master: $artifactPath" -StartedAtUtc $artifactResult.StartedAtUtc -CompletedAtUtc $artifactResult.CompletedAtUtc
     }
 }
 
-Stop-M009OnRedGitResult -GitResults $gitResults -GateResults $gateResults -ReportPath $reportPath
+Stop-M012OnRedGitResult -GitResults $gitResults -GateResults $gateResults -ReportPath $reportPath
 
-Write-M009PreconditionReport -ReportPath $reportPath -OverallStatus "PENDING" -GitResults $gitResults.ToArray() -GateResults $gateResults.ToArray()
+Write-M012PreconditionReport -ReportPath $reportPath -OverallStatus "PENDING" -GitResults $gitResults.ToArray() -GateResults $gateResults.ToArray()
 
 foreach ($gateDefinition in $gateDefinitions) {
-    $gateResult = Invoke-M009GateProcess -GateDefinition $gateDefinition
+    $gateResult = Invoke-M012GateProcess -GateDefinition $gateDefinition
 
     foreach ($outputLine in $gateResult.OutputLines) {
         Write-Host $outputLine
     }
 
     if ($gateResult.TimedOut) {
-        $observation = "Gate M-009 RED: $($gateDefinition["Name"]) non concluant après $GateTimeoutSeconds seconde(s)."
-        Add-M009Result -Results $gateResults -Name $gateResult.Name -Command $gateResult.Command -ExitCode $gateResult.ExitCode -OutputLines $gateResult.OutputLines -Status "RED" -Observation $observation -StartedAtUtc $gateResult.StartedAtUtc -CompletedAtUtc $gateResult.CompletedAtUtc
-        Write-M009PreconditionReport -ReportPath $reportPath -OverallStatus "RED" -GitResults $gitResults.ToArray() -GateResults $gateResults.ToArray()
+        $observation = "Gate M-012 RED: $($gateDefinition["Name"]) non concluant après $GateTimeoutSeconds seconde(s)."
+        Add-M012Result -Results $gateResults -Name $gateResult.Name -Command $gateResult.Command -ExitCode $gateResult.ExitCode -OutputLines $gateResult.OutputLines -Status "RED" -Observation $observation -StartedAtUtc $gateResult.StartedAtUtc -CompletedAtUtc $gateResult.CompletedAtUtc
+        Write-M012PreconditionReport -ReportPath $reportPath -OverallStatus "RED" -GitResults $gitResults.ToArray() -GateResults $gateResults.ToArray()
         Write-Host $observation
         throw $observation
     }
 
     if ($gateResult.OutputLines.Count -eq 0) {
-        $observation = "Gate M-009 RED: $($gateDefinition["Name"]) sans sortie."
-        Add-M009Result -Results $gateResults -Name $gateResult.Name -Command $gateResult.Command -ExitCode $gateResult.ExitCode -OutputLines $gateResult.OutputLines -Status "RED" -Observation $observation -StartedAtUtc $gateResult.StartedAtUtc -CompletedAtUtc $gateResult.CompletedAtUtc
-        Write-M009PreconditionReport -ReportPath $reportPath -OverallStatus "RED" -GitResults $gitResults.ToArray() -GateResults $gateResults.ToArray()
+        $observation = "Gate M-012 RED: $($gateDefinition["Name"]) sans sortie."
+        Add-M012Result -Results $gateResults -Name $gateResult.Name -Command $gateResult.Command -ExitCode $gateResult.ExitCode -OutputLines $gateResult.OutputLines -Status "RED" -Observation $observation -StartedAtUtc $gateResult.StartedAtUtc -CompletedAtUtc $gateResult.CompletedAtUtc
+        Write-M012PreconditionReport -ReportPath $reportPath -OverallStatus "RED" -GitResults $gitResults.ToArray() -GateResults $gateResults.ToArray()
         Write-Host $observation
         throw $observation
     }
@@ -690,26 +694,28 @@ foreach ($gateDefinition in $gateDefinitions) {
     if ($gateResult.ExitCode -eq 0) {
         if ($gateDefinition["Name"] -eq "test") {
             foreach ($expectedEvidence in $requiredTestGateEvidence) {
-                if (-not (Test-M009GateEvidencePresent -OutputLines $gateResult.OutputLines -ExpectedEvidence $expectedEvidence)) {
+                if (-not (Test-M012GateEvidencePresent -OutputLines $gateResult.OutputLines -ExpectedEvidence $expectedEvidence)) {
                     $evidenceLabel = $expectedEvidence.Replace("Test GREEN: ", "").Replace("Validation GREEN: ", "")
-                    $observation = "Gate M-009 RED: test sans preuve obligatoire pour $evidenceLabel."
-                    Add-M009Result -Results $gateResults -Name $gateResult.Name -Command $gateResult.Command -ExitCode $gateResult.ExitCode -OutputLines $gateResult.OutputLines -Status "RED" -Observation $observation -StartedAtUtc $gateResult.StartedAtUtc -CompletedAtUtc $gateResult.CompletedAtUtc
-                    Write-M009PreconditionReport -ReportPath $reportPath -OverallStatus "RED" -GitResults $gitResults.ToArray() -GateResults $gateResults.ToArray()
+                    $observation = "Gate M-012 RED: test sans preuve obligatoire pour $evidenceLabel."
+                    Add-M012Result -Results $gateResults -Name $gateResult.Name -Command $gateResult.Command -ExitCode $gateResult.ExitCode -OutputLines $gateResult.OutputLines -Status "RED" -Observation $observation -StartedAtUtc $gateResult.StartedAtUtc -CompletedAtUtc $gateResult.CompletedAtUtc
+                    Write-M012PreconditionReport -ReportPath $reportPath -OverallStatus "RED" -GitResults $gitResults.ToArray() -GateResults $gateResults.ToArray()
                     Write-Host $observation
                     throw $observation
                 }
             }
         }
 
-        Add-M009Result -Results $gateResults -Name $gateResult.Name -Command $gateResult.Command -ExitCode $gateResult.ExitCode -OutputLines $gateResult.OutputLines -Status "GREEN" -Observation "Gate $($gateDefinition["Name"]) GREEN." -StartedAtUtc $gateResult.StartedAtUtc -CompletedAtUtc $gateResult.CompletedAtUtc
+        Add-M012Result -Results $gateResults -Name $gateResult.Name -Command $gateResult.Command -ExitCode $gateResult.ExitCode -OutputLines $gateResult.OutputLines -Status "GREEN" -Observation "Gate $($gateDefinition["Name"]) GREEN." -StartedAtUtc $gateResult.StartedAtUtc -CompletedAtUtc $gateResult.CompletedAtUtc
     }
     else {
-        Add-M009Result -Results $gateResults -Name $gateResult.Name -Command $gateResult.Command -ExitCode $gateResult.ExitCode -OutputLines $gateResult.OutputLines -Status "RED" -Observation "Gate M-009 RED: $($gateDefinition["Name"])" -StartedAtUtc $gateResult.StartedAtUtc -CompletedAtUtc $gateResult.CompletedAtUtc
-        Write-M009PreconditionReport -ReportPath $reportPath -OverallStatus "RED" -GitResults $gitResults.ToArray() -GateResults $gateResults.ToArray()
-        Write-Host "Gate M-009 RED: $($gateDefinition["Name"])"
-        throw "Gate M-009 RED: $($gateDefinition["Name"])"
+        Add-M012Result -Results $gateResults -Name $gateResult.Name -Command $gateResult.Command -ExitCode $gateResult.ExitCode -OutputLines $gateResult.OutputLines -Status "RED" -Observation "Gate M-012 RED: $($gateDefinition["Name"])" -StartedAtUtc $gateResult.StartedAtUtc -CompletedAtUtc $gateResult.CompletedAtUtc
+        Write-M012PreconditionReport -ReportPath $reportPath -OverallStatus "RED" -GitResults $gitResults.ToArray() -GateResults $gateResults.ToArray()
+        Write-Host "Gate M-012 RED: $($gateDefinition["Name"])"
+        throw "Gate M-012 RED: $($gateDefinition["Name"])"
     }
 }
 
-Write-M009PreconditionReport -ReportPath $reportPath -OverallStatus "GREEN" -GitResults $gitResults.ToArray() -GateResults $gateResults.ToArray()
-Write-Host "Précondition M-009 GREEN: 2 gate(s), $($requiredMasterArtifacts.Count) artefact(s) amont vérifié(s). Rapport: $reportPath"
+Write-M012PreconditionReport -ReportPath $reportPath -OverallStatus "GREEN" -GitResults $gitResults.ToArray() -GateResults $gateResults.ToArray()
+Write-Host "Précondition M-012 GREEN: 2 gate(s), $($requiredMasterArtifacts.Count) artefact(s) amont vérifié(s). Rapport: $reportPath"
+
+

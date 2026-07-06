@@ -14,7 +14,8 @@ $allowedBranches = @(
     "codex/milestone-m008-conversation-produit",
     "codex/milestone-m009-recherche-approfondie",
     "codex/milestone-m010-strategie-candidate-attribuee",
-    "codex/milestone-m011-experience-reproductible"
+    "codex/milestone-m011-experience-reproductible",
+    "codex/milestone-m012-evaluation-pilote-calibration"
 )
 $requiredMasterArtifacts = @(
     [ordered] @{ Path = "docs/tasks/milestone_000"; Kind = "Directory" },

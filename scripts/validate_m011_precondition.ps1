@@ -1,4 +1,4 @@
-param(
+﻿param(
     [Parameter(Mandatory = $false)]
     [string] $Path
 )
@@ -8,7 +8,8 @@ $ErrorActionPreference = "Stop"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $defaultReportPath = "docs/governance/m011_precondition_green.md"
 $m011Branch = "codex/milestone-m011-experience-reproductible"
-$allowedBranches = @("master", $m011Branch)
+$m012Branch = "codex/milestone-m012-evaluation-pilote-calibration"
+$allowedBranches = @("master", $m011Branch, $m012Branch)
 $requiredMasterArtifacts = @(
     "docs/tasks/milestone_010",
     "docs/specs/m010_strategie_candidate_attribuee.md",

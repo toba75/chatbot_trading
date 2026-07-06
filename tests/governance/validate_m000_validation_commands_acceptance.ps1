@@ -5,7 +5,7 @@ $testCommandPath = Join-Path $repoRoot "scripts/test.ps1"
 $lintCommandPath = Join-Path $repoRoot "scripts/lint.ps1"
 $temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m000_validation_commands_acceptance_" + [System.Guid]::NewGuid().ToString("N"))
 $eAcute = [char] 0x00E9
-$expectedTestCount = 244
+$expectedTestCount = 246
 if ($env:OST_M003_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     $expectedTestCount = 146
 }
@@ -29,6 +29,12 @@ elseif ($env:OST_M009_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
 }
 elseif ($env:OST_M010_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     $expectedTestCount = 192
+}
+elseif ($env:OST_M011_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
+    $expectedTestCount = 244
+}
+elseif ($env:OST_M012_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
+    $expectedTestCount = 236
 }
 $expectedTestSummary = "Gate test GREEN: 21 validation(s), $expectedTestCount test(s)."
 
