@@ -63,6 +63,13 @@
   - ADR: non requise; T-009 applique ADR-008, ADR-010 et DDD-ADR-007 sans changer leur sens.
   - Fichiers livrés: `app/evaluation/domain/llm_real_path_benchmark.py`, `app/evaluation/domain/__init__.py`, `tests/m012/validate_llm_benchmark_real_path_acceptance.ps1`, `tests/m012/validate_llm_benchmark_real_path_unit.ps1`, `docs/evaluation/m012/llm_real_path_benchmark_report.md`, `docs/traceability/matrix.md`.
   - Validations ciblées GREEN: `tests/m012/validate_llm_benchmark_real_path_acceptance.ps1`, `tests/m012/validate_llm_benchmark_real_path_unit.ps1`.
+- T-010 - Mesurer les stratégies et backtests pilotes:
+  - Scénario BDD: Given des stratégies candidates snapshotées et des expériences reproductibles M-011; When les backtests pilotes sont mesurés selon un protocole M-012; Then les métriques SD, les métriques EX, limites, coûts, périodes, univers et résultats négatifs sont publiés sans promotion implicite de rentabilité.
+  - Commit RED: `fd689a6ef test(m012): couvrir le benchmark backtests`.
+  - Commit GREEN: `feat(m012): mesurer strategies et backtests pilotes`.
+  - ADR: non requise; T-010 applique ADR-010, DDD-ADR-009 et DDD-ADR-010 sans changer leur sens.
+  - Fichiers livrés: `app/evaluation/domain/strategy_backtest_benchmark.py`, `app/evaluation/domain/__init__.py`, `tests/m012/validate_strategy_backtest_benchmark_acceptance.ps1`, `tests/m012/validate_strategy_backtest_benchmark_unit.ps1`, `docs/evaluation/m012/strategy_backtest_benchmark_report.md`, `docs/traceability/matrix.md`.
+  - Validations ciblées GREEN: `tests/m012/validate_strategy_backtest_benchmark_acceptance.ps1`, `tests/m012/validate_strategy_backtest_benchmark_unit.ps1`.
 
 ## Revue d'adhérence
 
