@@ -55,3 +55,9 @@
 - T-005 précise désormais que le point d'entrée utilisateur `docker-local` doit être lié à `127.0.0.1` par défaut et refuse tout binding `0.0.0.0` hors profil explicitement documenté.
 - T-006 couvre désormais l'ouverture et la fermeture du circuit breaker, ainsi que le maintien des fonctions locales qui ne nécessitent pas Gemma pendant une panne Spark.
 - T-009 couvre désormais le profil de ressources V1: optimisation Gemma sur DGX Spark, capacité CPU/GPU/I/O sur `docker-local`, digest ou version de l'image vLLM, révision du modèle, concurrence et longueur de contexte justifiées par benchmark.
+
+## Exécution T-002
+
+- RED: ajout de `tests/m013/validate_m013_specification_acceptance.ps1` et `tests/m013/validate_m013_specification_unit.ps1`.
+- GREEN: publication de `docs/specs/m013_durcissement_acceptation_v1.md`, création de `scripts/validate_m013_specification.ps1`, enrôlement dans `scripts/test.ps1` et `scripts/lint.ps1`, et rattachement `REQ-M013-002` dans `docs/traceability/matrix.md`.
+- ADR: non requise; T-002 applique ADR-007, ADR-008, ADR-009, ADR-010, DDD-ADR-006, DDD-ADR-010 et DDD-ADR-011 sans imposer de nouvelle politique de rétention, sans rendre mTLS obligatoire et sans remplacer la topologie existante.

@@ -22,6 +22,7 @@ $m009SpecificationPath = Join-Path $repoRoot "docs/specs/m009_recherche_approfon
 $m010SpecificationPath = Join-Path $repoRoot "docs/specs/m010_strategie_candidate_attribuee.md"
 $m011SpecificationPath = Join-Path $repoRoot "docs/specs/m011_experience_reproductible.md"
 $m012SpecificationPath = Join-Path $repoRoot "docs/specs/m012_evaluation_pilote_calibration.md"
+$m013SpecificationPath = Join-Path $repoRoot "docs/specs/m013_durcissement_acceptation_v1.md"
 $platformTopologyPath = Join-Path $repoRoot "app/platform/topology_registry.json"
 $sparkFirewallPath = Join-Path $repoRoot "deploy/spark-firewall/network-boundary.json"
 $appRoot = Join-Path $repoRoot "app"
@@ -150,6 +151,8 @@ $m012TraceabilityAcceptancePath = "tests/m012/validate_m012_traceability_accepta
 $m012TraceabilityUnitPath = "tests/m012/validate_m012_traceability_unit.ps1"
 $m013PreconditionAcceptancePath = "tests/m013/validate_m013_precondition_acceptance.ps1"
 $m013PreconditionUnitPath = "tests/m013/validate_m013_precondition_unit.ps1"
+$m013SpecificationAcceptancePath = "tests/m013/validate_m013_specification_acceptance.ps1"
+$m013SpecificationUnitPath = "tests/m013/validate_m013_specification_unit.ps1"
 
 $validationCommands = @(
     @{ Path = "scripts/validate_m000_precondition_report.ps1"; Arguments = @("-Path", $preconditionReportPath) },
@@ -171,6 +174,7 @@ $validationCommands = @(
     @{ Path = "scripts/validate_m011_traceability.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_m012_specification.ps1"; Arguments = @("-Path", $m012SpecificationPath) },
     @{ Path = "scripts/validate_m012_traceability.ps1"; Arguments = @() },
+    @{ Path = "scripts/validate_m013_specification.ps1"; Arguments = @("-Path", $m013SpecificationPath) },
     @{ Path = "scripts/validate_platform_topology.ps1"; Arguments = @("-Path", $platformTopologyPath) },
     @{ Path = "scripts/validate_local_compose.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_network_boundary.ps1"; Arguments = @("-SparkFirewallPath", $sparkFirewallPath) },
@@ -429,6 +433,8 @@ $testCommands = @(
     @{ Path = $m012TraceabilityUnitPath; Arguments = @() },
     @{ Path = $m013PreconditionUnitPath; Arguments = @() },
     @{ Path = $m013PreconditionAcceptancePath; Arguments = @() },
+    @{ Path = $m013SpecificationAcceptancePath; Arguments = @() },
+    @{ Path = $m013SpecificationUnitPath; Arguments = @() },
     @{ Path = "tests/m009/validate_m009_specification_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/m009/validate_m009_specification_unit.ps1"; Arguments = @() },
     @{ Path = "tests/m009/validate_deep_research_planning_acceptance.ps1"; Arguments = @() },
@@ -1097,7 +1103,9 @@ if (
     Write-Host "Tests M-013 exclus explicitement: les préconditions amont restent indépendantes du milestone aval."
     $excludedPreconditionTestPaths += @(
         $m013PreconditionAcceptancePath,
-        $m013PreconditionUnitPath
+        $m013PreconditionUnitPath,
+        $m013SpecificationAcceptancePath,
+        $m013SpecificationUnitPath
     )
 }
 
