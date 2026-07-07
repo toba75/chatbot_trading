@@ -76,3 +76,10 @@
 - Décision livrée: la suite couvre huit critères V1 et dix parcours produit; EG, CV et EX obtiennent un verdict logiciel `GREEN`; SP, KA, RA, SD et LLM restent des écarts non acceptés visibles et reliés au rapport M-012.
 - Limite explicite: T-004 ne corrige pas les tests scientifiques RED M-012 et ne rend pas la V1 acceptable tant que SD et LLM restent bloquants.
 - ADR: non requise; T-004 applique ADR-010 et DDD-ADR-011 sans changer la politique d'exécution des gates ni la propriété EV des écarts V1.
+
+## Exécution T-005
+
+- RED: ajout de `tests/m013/validate_m013_network_security_acceptance.ps1`; commit RED `2b32c6c1f`.
+- GREEN: publication de `docs/governance/m013_security_audit.md`, création de `scripts/validate_m013_security.ps1`, ajout de `tests/m013/validate_m013_network_security_unit.ps1`, enrôlement dans `scripts/test.ps1` et `scripts/lint.ps1`, alignement du comportement V1-004 dans la spécification M-013, et rattachement `REQ-M013-005` dans `docs/traceability/matrix.md`.
+- Décision livrée: le point d'entrée utilisateur reste lié à `127.0.0.1` par défaut; aucun service interne n'est publié; le navigateur, les workers, les stockages et Internet ne peuvent pas joindre Spark; seul `llm-gateway -> spark-inference` est autorisé avec TLS, certificat et clé API par fichier secret.
+- ADR: non requise; T-005 applique ADR-007, ADR-008 et ADR-009 sans remplacer la topologie locale, sans changer le chemin LLM et sans rendre mTLS obligatoire.

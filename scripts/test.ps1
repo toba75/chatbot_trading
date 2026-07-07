@@ -157,6 +157,8 @@ $m013V1GapDecisionsAcceptancePath = "tests/m013/validate_v1_gap_decisions_accept
 $m013V1GapDecisionsUnitPath = "tests/m013/validate_v1_gap_decisions_unit.ps1"
 $m013RegressionAcceptancePath = "tests/m013/validate_v1_regression_suite_acceptance.ps1"
 $m013RegressionUnitPath = "tests/m013/validate_v1_regression_suite_unit.ps1"
+$m013NetworkSecurityAcceptancePath = "tests/m013/validate_m013_network_security_acceptance.ps1"
+$m013NetworkSecurityUnitPath = "tests/m013/validate_m013_network_security_unit.ps1"
 
 $validationCommands = @(
     @{ Path = "scripts/validate_m000_precondition_report.ps1"; Arguments = @("-Path", $preconditionReportPath) },
@@ -181,6 +183,7 @@ $validationCommands = @(
     @{ Path = "scripts/validate_m013_specification.ps1"; Arguments = @("-Path", $m013SpecificationPath) },
     @{ Path = "scripts/validate_m013_v1_gap_decisions.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_m013_regression.ps1"; Arguments = @() },
+    @{ Path = "scripts/validate_m013_security.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_platform_topology.ps1"; Arguments = @("-Path", $platformTopologyPath) },
     @{ Path = "scripts/validate_local_compose.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_network_boundary.ps1"; Arguments = @("-SparkFirewallPath", $sparkFirewallPath) },
@@ -445,6 +448,8 @@ $testCommands = @(
     @{ Path = $m013V1GapDecisionsUnitPath; Arguments = @() },
     @{ Path = $m013RegressionAcceptancePath; Arguments = @() },
     @{ Path = $m013RegressionUnitPath; Arguments = @() },
+    @{ Path = $m013NetworkSecurityAcceptancePath; Arguments = @() },
+    @{ Path = $m013NetworkSecurityUnitPath; Arguments = @() },
     @{ Path = "tests/m009/validate_m009_specification_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/m009/validate_m009_specification_unit.ps1"; Arguments = @() },
     @{ Path = "tests/m009/validate_deep_research_planning_acceptance.ps1"; Arguments = @() },
@@ -1119,7 +1124,9 @@ if (
         $m013V1GapDecisionsAcceptancePath,
         $m013V1GapDecisionsUnitPath,
         $m013RegressionAcceptancePath,
-        $m013RegressionUnitPath
+        $m013RegressionUnitPath,
+        $m013NetworkSecurityAcceptancePath,
+        $m013NetworkSecurityUnitPath
     )
 }
 
