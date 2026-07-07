@@ -35,12 +35,13 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 | [DDD-ADR-009](DDD-ADR-009-snapshots-immuables-experimentation.md) | Snapshots immuables pour l'expérimentation | Acceptée | 2026-06-21 | Aucun | Aucune |
 | [DDD-ADR-010](DDD-ADR-010-conservation-versions-negatives-supersedees.md) | Conservation des versions négatives et supersédées | Acceptée | 2026-06-21 | Aucun | Aucune |
 | [DDD-ADR-011](DDD-ADR-011-contexte-evaluation-pilote.md) | Contexte transverse d'évaluation pilote | Acceptée | 2026-07-06 | Aucun | Aucune |
+| [DDD-ADR-012](DDD-ADR-012-politique-retention-purge-administrative-v1.md) | Politique V1 de rétention et purge administrative | Acceptée | 2026-07-08 | Aucun | Aucune |
 
 ## Prochains numéros disponibles
 
 ```text
 Prochaine ADR technique: ADR-014
-Prochaine DDD-ADR: DDD-ADR-012
+Prochaine DDD-ADR: DDD-ADR-013
 ```
 
 ## Règles de maintenance
