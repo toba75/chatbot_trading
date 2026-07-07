@@ -53,6 +53,7 @@ $validationCommands = @(
     @{ Path = "scripts/validate_m013_v1_gap_decisions.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_m013_regression.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_m013_security.ps1"; Arguments = @() },
+    @{ Path = "scripts/validate_m013_spark_failures.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_platform_topology.ps1"; Arguments = @("-Path", $platformTopologyPath) },
     @{ Path = "scripts/validate_local_compose.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_network_boundary.ps1"; Arguments = @("-SparkFirewallPath", $sparkFirewallPath) },
@@ -86,6 +87,7 @@ $expectedValidationPaths = @(
     "scripts/validate_m013_v1_gap_decisions.ps1",
     "scripts/validate_m013_regression.ps1",
     "scripts/validate_m013_security.ps1",
+    "scripts/validate_m013_spark_failures.ps1",
     "scripts/validate_platform_topology.ps1",
     "scripts/validate_local_compose.ps1",
     "scripts/validate_network_boundary.ps1",
@@ -99,7 +101,7 @@ Invoke-M000ValidationGate `
     -RepositoryRoot $repoRoot `
     -ValidationCommands $validationCommands `
     -TestCommands $testCommands `
-    -ExpectedValidationCount 28 `
+    -ExpectedValidationCount 29 `
     -ExpectedTestCount 0 `
     -ExpectedValidationPaths $expectedValidationPaths `
     -ExpectedTestPaths $expectedTestPaths

@@ -159,6 +159,8 @@ $m013RegressionAcceptancePath = "tests/m013/validate_v1_regression_suite_accepta
 $m013RegressionUnitPath = "tests/m013/validate_v1_regression_suite_unit.ps1"
 $m013NetworkSecurityAcceptancePath = "tests/m013/validate_m013_network_security_acceptance.ps1"
 $m013NetworkSecurityUnitPath = "tests/m013/validate_m013_network_security_unit.ps1"
+$m013SparkFailureAcceptancePath = "tests/m013/validate_spark_failure_acceptance.ps1"
+$m013SparkFailureUnitPath = "tests/m013/validate_spark_failure_unit.ps1"
 
 $validationCommands = @(
     @{ Path = "scripts/validate_m000_precondition_report.ps1"; Arguments = @("-Path", $preconditionReportPath) },
@@ -184,6 +186,7 @@ $validationCommands = @(
     @{ Path = "scripts/validate_m013_v1_gap_decisions.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_m013_regression.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_m013_security.ps1"; Arguments = @() },
+    @{ Path = "scripts/validate_m013_spark_failures.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_platform_topology.ps1"; Arguments = @("-Path", $platformTopologyPath) },
     @{ Path = "scripts/validate_local_compose.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_network_boundary.ps1"; Arguments = @("-SparkFirewallPath", $sparkFirewallPath) },
@@ -450,6 +453,8 @@ $testCommands = @(
     @{ Path = $m013RegressionUnitPath; Arguments = @() },
     @{ Path = $m013NetworkSecurityAcceptancePath; Arguments = @() },
     @{ Path = $m013NetworkSecurityUnitPath; Arguments = @() },
+    @{ Path = $m013SparkFailureAcceptancePath; Arguments = @() },
+    @{ Path = $m013SparkFailureUnitPath; Arguments = @() },
     @{ Path = "tests/m009/validate_m009_specification_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/m009/validate_m009_specification_unit.ps1"; Arguments = @() },
     @{ Path = "tests/m009/validate_deep_research_planning_acceptance.ps1"; Arguments = @() },
@@ -1126,7 +1131,9 @@ if (
         $m013RegressionAcceptancePath,
         $m013RegressionUnitPath,
         $m013NetworkSecurityAcceptancePath,
-        $m013NetworkSecurityUnitPath
+        $m013NetworkSecurityUnitPath,
+        $m013SparkFailureAcceptancePath,
+        $m013SparkFailureUnitPath
     )
 }
 

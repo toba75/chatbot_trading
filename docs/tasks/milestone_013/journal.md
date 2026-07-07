@@ -83,3 +83,11 @@
 - GREEN: publication de `docs/governance/m013_security_audit.md`, création de `scripts/validate_m013_security.ps1`, ajout de `tests/m013/validate_m013_network_security_unit.ps1`, enrôlement dans `scripts/test.ps1` et `scripts/lint.ps1`, alignement du comportement V1-004 dans la spécification M-013, et rattachement `REQ-M013-005` dans `docs/traceability/matrix.md`.
 - Décision livrée: le point d'entrée utilisateur reste lié à `127.0.0.1` par défaut; aucun service interne n'est publié; le navigateur, les workers, les stockages et Internet ne peuvent pas joindre Spark; seul `llm-gateway -> spark-inference` est autorisé avec TLS, certificat et clé API par fichier secret.
 - ADR: non requise; T-005 applique ADR-007, ADR-008 et ADR-009 sans remplacer la topologie locale, sans changer le chemin LLM et sans rendre mTLS obligatoire.
+
+## Exécution T-006
+
+- RED: ajout de `tests/m013/validate_spark_failure_acceptance.ps1`; commit RED `10f3c94c8`.
+- GREEN: publication de `app/platform/llm_gateway/spark_failure_drill.py`, `docs/governance/m013_spark_failure_drill.md` et `scripts/validate_m013_spark_failures.ps1`; ajout de `tests/m013/validate_spark_failure_unit.ps1`; enrôlement dans `scripts/test.ps1` et `scripts/lint.ps1`; rattachement `REQ-M013-006` dans `docs/traceability/matrix.md`.
+- Décision livrée: les pannes Spark produisent `LLM_UNAVAILABLE` ou un diagnostic explicite, ne publient aucune réponse factuelle incomplète, ne snapshotent aucune stratégie, ne promeuvent aucun benchmark LLM, n'appellent aucun provider alternatif, interdisent le retry après premier token et exposent le circuit breaker ouvrable et refermable.
+- Garde-fous conservés: les fonctions locales hors Gemma restent disponibles, les métriques ne contiennent aucun prompt complet et l'outbox reste idempotente sans double publication.
+- ADR: non requise; T-006 applique ADR-008, ADR-009 et DDD-ADR-006 sans changer le chemin LLM principal et sans introduire de nouveau mode de dégradation fonctionnelle.
