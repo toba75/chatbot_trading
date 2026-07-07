@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
 $validatorPath = Join-Path $repoRoot "scripts/validate_m013_regression.ps1"
@@ -112,5 +112,4 @@ Assert-OutputContains `
     -Output $matrixContent `
     -Expected "scripts/validate_m013_regression.ps1" `
     -Message "La matrice doit tracer le validateur T-004."
-
 Write-Host "Test d'acceptation T-004 suite de régression V1 M-013: OK"

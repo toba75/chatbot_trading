@@ -68,3 +68,11 @@
 - GREEN: publication de `app/evaluation/domain/v1_gap_decisions.py`, `docs/governance/m013_v1_gap_decisions.md` et `scripts/validate_m013_v1_gap_decisions.ps1`; enrôlement dans `scripts/test.ps1` et `scripts/lint.ps1`; rattachement `REQ-M013-003` dans `docs/traceability/matrix.md`.
 - Décision livrée: SP, KA et RA restent `différé`; SD et LLM restent `bloquant`; EG, CV et EX sont explicitement `accepté`; les cinq écarts non acceptés sont transmis au futur `V1AcceptanceReport`.
 - ADR: non requise; T-003 applique ADR-010 et DDD-ADR-011 sans changer critère d'acceptation, politique de calibration ou frontière de bounded context.
+
+## Exécution T-004
+
+- RED: ajout de `tests/m013/validate_v1_regression_suite_acceptance.ps1`; commit RED `1a890109c`.
+- GREEN: publication de `docs/evaluation/m013/v1_regression_suite.json`, création de `scripts/validate_m013_regression.ps1`, ajout de `tests/m013/validate_v1_regression_suite_unit.ps1`, enrôlement dans `scripts/test.ps1` et `scripts/lint.ps1`, alignement du comportement V1-003 dans la spécification M-013, et rattachement `REQ-M013-004` dans `docs/traceability/matrix.md`.
+- Décision livrée: la suite couvre huit critères V1 et dix parcours produit; EG, CV et EX obtiennent un verdict logiciel `GREEN`; SP, KA, RA, SD et LLM restent des écarts non acceptés visibles et reliés au rapport M-012.
+- Limite explicite: T-004 ne corrige pas les tests scientifiques RED M-012 et ne rend pas la V1 acceptable tant que SD et LLM restent bloquants.
+- ADR: non requise; T-004 applique ADR-010 et DDD-ADR-011 sans changer la politique d'exécution des gates ni la propriété EV des écarts V1.
