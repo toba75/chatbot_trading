@@ -91,3 +91,11 @@
 - Décision livrée: les pannes Spark produisent `LLM_UNAVAILABLE` ou un diagnostic explicite, ne publient aucune réponse factuelle incomplète, ne snapshotent aucune stratégie, ne promeuvent aucun benchmark LLM, n'appellent aucun provider alternatif, interdisent le retry après premier token et exposent le circuit breaker ouvrable et refermable.
 - Garde-fous conservés: les fonctions locales hors Gemma restent disponibles, les métriques ne contiennent aucun prompt complet et l'outbox reste idempotente sans double publication.
 - ADR: non requise; T-006 applique ADR-008, ADR-009 et DDD-ADR-006 sans changer le chemin LLM principal et sans introduire de nouveau mode de dégradation fonctionnelle.
+
+## Exécution T-007
+
+- RED: ajout de `tests/m013/validate_backup_restore_acceptance.ps1`, `tests/m013/validate_backup_restore_unit.ps1` et `docs/adr/ADR-013-contrat-manifeste-sauvegarde-restauration.md`; commit RED `572140b47`.
+- GREEN: publication de `app/platform/backup_restore.py`, `docs/governance/m013_backup_restore_drill.md` et `scripts/validate_m013_backup_restore.ps1`; enrôlement dans `scripts/test.ps1` et `scripts/lint.ps1`; rattachement `REQ-M013-007` dans `docs/traceability/matrix.md`.
+- Décision livrée: la V1 utilise le manifeste `M013-BackupManifest-1.0`, vérifie les hashes restaurés, garde la clé hors dépôt, refuse les secrets versionnés, conserve les résultats négatifs et supersédés, traite Qdrant comme projection régénérable non autorité et confirme qu'aucune donnée métier n'est restaurée sur Spark.
+- Garde-fous conservés: aucune sauvegarde partielle déclarée complète, aucune restauration destructive silencieuse et aucun `restore_test_result` sans commande de restauration.
+- ADR: ADR-013 créée pour le contrat durable de manifeste de sauvegarde et restauration; T-007 applique aussi ADR-009, DDD-ADR-004 et DDD-ADR-010.

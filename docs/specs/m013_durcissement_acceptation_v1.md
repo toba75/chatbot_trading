@@ -6,7 +6,7 @@
 - Tâche source: `docs/tasks/milestone_013/0002_publier_specification_durcissement_v1.md`.
 - Sources normatives: `docs/specs/plan_implementation_milestones_workstreams.md`, M-013; `docs/specs/specification_unifiee_ddd_technique_chatbot_trading_v4_1.md`, sections 18, 19, 20, 21, 22, 23 et 24; `docs/governance/m012_v1_gap_report.md`.
 - Statut: spécification exécutable publiée pour guider T-003 à T-012.
-- ADR applicables: ADR-007; ADR-008; ADR-009; ADR-010; DDD-ADR-006; DDD-ADR-010; DDD-ADR-011.
+- ADR applicables: ADR-007; ADR-008; ADR-009; ADR-010; ADR-013; DDD-ADR-004; DDD-ADR-006; DDD-ADR-010; DDD-ADR-011.
 - ADR: non requise pour T-002; la présente spécification applique les décisions existantes sans imposer de nouvelle politique de rétention, sans rendre mTLS obligatoire et sans remplacer la topologie `docker-local` / `spark-inference`.
 
 ## Scénario BDD
@@ -86,7 +86,7 @@ Aucune valeur de seuil non sourcée n'est créée par T-002. Les seuils et promo
 | V1AcceptanceGatePolicy | Agrège critères, preuves, écarts et décisions. | Aucun GREEN si écart bloquant ou preuve absente. | ADR-010; DDD-ADR-010 |
 | RegressionSuitePolicy | Contrôle les non-régressions logicielles. | Un test scientifique RED n'est pas masqué par un test logiciel GREEN. | ADR-010 |
 | SecurityAuditPolicy | Vérifie la frontière `docker-local` / `spark-inference`. | Aucun port public, navigateur incapable d'appeler le Spark, gateway unique. | ADR-007; ADR-008; ADR-009 |
-| BackupRestorePolicy | Exige sauvegarde chiffrée et restauration testée. | Le rapport contient `restore_test_result` avant acceptation. | ADR-009; DDD-ADR-010 |
+| BackupRestorePolicy | Exige sauvegarde chiffrée et restauration testée. | Le rapport contient `restore_test_result` avant acceptation et le manifeste distingue autorité métier et projection régénérable. | ADR-009; ADR-013; DDD-ADR-004; DDD-ADR-010 |
 | RetentionPolicy | Encadre conservation et purge administrative. | Toute durée structurante nouvelle crée une ADR dédiée. | DDD-ADR-010 |
 | MonitoringPolicy | Publie les signaux d'exploitation locaux. | Aucun prompt, preuve, réponse complète ou secret dans les signaux. | ADR-008; ADR-009 |
 | RunbookPolicy | Publie des procédures d'exploitation vérifiables. | Aucun fallback silencieux documenté. | ADR-010 |
@@ -114,6 +114,7 @@ Le `BackupRestoreDrill` couvre les données durables de `docker-local`: PostgreS
 
 Chaque exercice publie:
 
+- manifeste de sauvegarde `M013-BackupManifest-1.0` selon ADR-013;
 - périmètre sauvegardé;
 - commande de sauvegarde;
 - preuve de chiffrement;
@@ -216,7 +217,7 @@ Le verdict final est refusé si un écart bloquant existe, si un écart différ�
 | V1-003 - Suite de régression V1 | La RegressionSuite couvre les comportements livrés sans masquer les tests scientifiques RED. | Given les comportements M-000 à M-012 sont livrés; When la suite de régression V1 est exécutée; Then les tests logiciels passent et les écarts scientifiques restent visibles. | T-004 | ADR-010; DDD-ADR-011 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_v1_regression_suite_acceptance.ps1 |
 | V1-004 - Audit réseau et sécurité Spark | Le Spark est accessible uniquement depuis llm-gateway et aucune donnée métier durable n'y réside. | Given docker-local et spark-inference sont configurés; When SecurityAuditReport est produit; Then aucun port public, accès navigateur direct ou stockage métier Spark n'est accepté. | T-005 | ADR-007; ADR-008; ADR-009 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_m013_network_security_acceptance.ps1 |
 | V1-005 - Pannes Spark sans fallback | Une panne Spark produit un état explicite sans corruption d'état. | Given une demande nécessitant Gemma; When le Spark est indisponible ou le flux est coupé; Then LLM_UNAVAILABLE ou l'erreur TLS explicite est publiée sans fallback silencieux. | T-006 | ADR-008; ADR-009; DDD-ADR-006 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_spark_failure_acceptance.ps1 |
-| V1-006 - Sauvegarde chiffrée et restauration testée | BackupRestoreDrill produit une preuve de restauration avant acceptation. | Given les données docker-local sont sauvegardées; When la restauration isolée est exécutée; Then restore_test_result prouve la restauration chiffrée et exploitable. | T-007 | ADR-009; DDD-ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_backup_restore_acceptance.ps1 |
+| V1-006 - Sauvegarde chiffrée et restauration testée | BackupRestoreDrill produit une preuve de restauration avant acceptation. | Given les données docker-local sont sauvegardées; When la restauration isolée est exécutée; Then restore_test_result prouve la restauration chiffrée et exploitable. | T-007 | ADR-009; ADR-013; DDD-ADR-004; DDD-ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_backup_restore_acceptance.ps1 |
 | V1-007 - Rétention et purge administrative | Les versions négatives et supersédées restent consultables. | Given des artefacts négatifs ou supersédés existent; When la rétention est validée; Then aucune purge implicite ne les supprime. | T-008 | DDD-ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_retention_policy_acceptance.ps1 |
 | V1-008 - Monitoring local d'exploitation | LocalMonitoringProfile publie les signaux sans payload sensible. | Given la plateforme locale est exécutée; When les métriques sont collectées; Then latence, erreurs, ressources et circuit breaker sont visibles sans secrets ni contenus complets. | T-009 | ADR-008; ADR-009; ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_local_monitoring_acceptance.ps1 |
 | V1-009 - Runbooks et documentation utilisateur | Les procédures et la documentation décrivent des actions vérifiables sans fallback. | Given l'utilisateur exploite la V1 locale; When il lit runbooks et documentation; Then chaque action sensible nomme commande, résultat attendu, erreur explicite et preuve. | T-010 | ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_runbooks_user_docs_acceptance.ps1 |

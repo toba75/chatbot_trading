@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
 . (Join-Path $repoRoot "scripts/require_python.ps1")
@@ -94,15 +94,15 @@ def manifest(**overrides):
         "key_git_tracked": False,
         "complete": True,
         "entries": (
-            entry(context=CONTEXT_SP, artifact_kind="corpus_original", stable_identifier="SRC-M013-UNIT-001"),
-            entry(context=CONTEXT_KA, artifact_kind="qdrant_projection", stable_identifier="PROJ-M013-UNIT-001", authority=False, immutable=False, regenerable_projection=True),
-            entry(context=CONTEXT_EG, artifact_kind="claim_registry", stable_identifier="CLAIM-M013-UNIT-001", retained_negative_or_superseded=True),
-            entry(context=CONTEXT_RA, artifact_kind="verified_answers", stable_identifier="ANSWER-M013-UNIT-001", retained_negative_or_superseded=True),
-            entry(context=CONTEXT_CV, artifact_kind="conversation_turns", stable_identifier="CONV-M013-UNIT-001"),
-            entry(context=CONTEXT_SD, artifact_kind="strategy_snapshots", stable_identifier="STRAT-M013-UNIT-001", retained_negative_or_superseded=True),
-            entry(context=CONTEXT_EX, artifact_kind="experiment_results", stable_identifier="EXP-M013-UNIT-001", retained_negative_or_superseded=True),
-            entry(context=CONTEXT_EV, artifact_kind="evaluation_reports", stable_identifier="EVAL-M013-UNIT-001", retained_negative_or_superseded=True),
-            entry(context=CONTEXT_PLATFORM, artifact_kind="governance_artifacts", stable_identifier="GOV-M013-UNIT-001"),
+            entry(entry_id="BACKUP-ENTRY-UNIT-SP", context=CONTEXT_SP, artifact_kind="corpus_original", stable_identifier="SRC-M013-UNIT-001"),
+            entry(entry_id="BACKUP-ENTRY-UNIT-KA", context=CONTEXT_KA, artifact_kind="qdrant_projection", stable_identifier="PROJ-M013-UNIT-001", authority=False, immutable=False, regenerable_projection=True),
+            entry(entry_id="BACKUP-ENTRY-UNIT-EG", context=CONTEXT_EG, artifact_kind="claim_registry", stable_identifier="CLAIM-M013-UNIT-001", retained_negative_or_superseded=True),
+            entry(entry_id="BACKUP-ENTRY-UNIT-RA", context=CONTEXT_RA, artifact_kind="verified_answers", stable_identifier="ANSWER-M013-UNIT-001", retained_negative_or_superseded=True),
+            entry(entry_id="BACKUP-ENTRY-UNIT-CV", context=CONTEXT_CV, artifact_kind="conversation_turns", stable_identifier="CONV-M013-UNIT-001"),
+            entry(entry_id="BACKUP-ENTRY-UNIT-SD", context=CONTEXT_SD, artifact_kind="strategy_snapshots", stable_identifier="STRAT-M013-UNIT-001", retained_negative_or_superseded=True),
+            entry(entry_id="BACKUP-ENTRY-UNIT-EX", context=CONTEXT_EX, artifact_kind="experiment_results", stable_identifier="EXP-M013-UNIT-001", retained_negative_or_superseded=True),
+            entry(entry_id="BACKUP-ENTRY-UNIT-EV", context=CONTEXT_EV, artifact_kind="evaluation_reports", stable_identifier="EVAL-M013-UNIT-001", retained_negative_or_superseded=True),
+            entry(entry_id="BACKUP-ENTRY-UNIT-PLATFORM", context=CONTEXT_PLATFORM, artifact_kind="governance_artifacts", stable_identifier="GOV-M013-UNIT-001"),
         ),
     }
     payload.update(overrides)
