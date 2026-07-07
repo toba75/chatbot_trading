@@ -96,7 +96,7 @@ $expectedPolicies = @(
 
 $expectedBehaviors = @(
     @{ Name = "V1-001 - Spécification exécutable M-013"; Test = "T-002"; Adr = @("ADR-007", "ADR-008", "ADR-009", "ADR-010", "DDD-ADR-006", "DDD-ADR-010", "DDD-ADR-011"); Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_specification.ps1" },
-    @{ Name = "V1-002 - Contrôle des écarts V1 M-012"; Test = "T-003"; Adr = @("ADR-010", "DDD-ADR-010", "DDD-ADR-011"); Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_v1_gap_gate_acceptance.ps1" },
+    @{ Name = "V1-002 - Contrôle des écarts V1 M-012"; Test = "T-003"; Adr = @("ADR-010", "DDD-ADR-010", "DDD-ADR-011"); Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_v1_gap_decisions_acceptance.ps1" },
     @{ Name = "V1-003 - Suite de régression V1"; Test = "T-004"; Adr = @("ADR-010", "DDD-ADR-011"); Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_regression_suite_acceptance.ps1" },
     @{ Name = "V1-004 - Audit réseau et sécurité Spark"; Test = "T-005"; Adr = @("ADR-007", "ADR-008", "ADR-009"); Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_spark_network_security_acceptance.ps1" },
     @{ Name = "V1-005 - Pannes Spark sans fallback"; Test = "T-006"; Adr = @("ADR-008", "ADR-009", "DDD-ADR-006"); Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_spark_failure_acceptance.ps1" },

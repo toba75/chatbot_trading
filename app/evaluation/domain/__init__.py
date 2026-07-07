@@ -240,6 +240,21 @@ from app.evaluation.domain.calibration_decisions import (
     ScientificGateVerdict,
     build_m012_calibration_decision_register,
 )
+from app.evaluation.domain.v1_gap_decisions import (
+    V1_GAP_DECISION_ACCEPTED,
+    V1_GAP_DECISION_BLOCKING,
+    V1_GAP_DECISION_CORRECTED,
+    V1_GAP_DECISION_DEFERRED,
+    V1_GAP_DECISION_POLICY_VERSION,
+    V1_GAP_STATUS_ACCEPTED,
+    V1_GAP_STATUS_BLOCKING,
+    V1_GAP_STATUS_DEFERRED,
+    V1_GAP_STATUS_SATISFIED,
+    V1GapDecision,
+    V1GapDecisionPolicy,
+    V1GapDecisionRegister,
+    build_m013_v1_gap_decision_register,
+)
 
 __all__ = [
     "ANSWER_ACCURACY_SCORE",
@@ -464,4 +479,17 @@ __all__ = [
     "PromotionDecision",
     "ScientificGateVerdict",
     "build_m012_calibration_decision_register",
+    "V1_GAP_DECISION_ACCEPTED",
+    "V1_GAP_DECISION_BLOCKING",
+    "V1_GAP_DECISION_CORRECTED",
+    "V1_GAP_DECISION_DEFERRED",
+    "V1_GAP_DECISION_POLICY_VERSION",
+    "V1_GAP_STATUS_ACCEPTED",
+    "V1_GAP_STATUS_BLOCKING",
+    "V1_GAP_STATUS_DEFERRED",
+    "V1_GAP_STATUS_SATISFIED",
+    "V1GapDecision",
+    "V1GapDecisionPolicy",
+    "V1GapDecisionRegister",
+    "build_m013_v1_gap_decision_register",
 ]

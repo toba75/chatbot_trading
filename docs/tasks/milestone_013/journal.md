@@ -61,3 +61,10 @@
 - RED: ajout de `tests/m013/validate_m013_specification_acceptance.ps1` et `tests/m013/validate_m013_specification_unit.ps1`.
 - GREEN: publication de `docs/specs/m013_durcissement_acceptation_v1.md`, création de `scripts/validate_m013_specification.ps1`, enrôlement dans `scripts/test.ps1` et `scripts/lint.ps1`, et rattachement `REQ-M013-002` dans `docs/traceability/matrix.md`.
 - ADR: non requise; T-002 applique ADR-007, ADR-008, ADR-009, ADR-010, DDD-ADR-006, DDD-ADR-010 et DDD-ADR-011 sans imposer de nouvelle politique de rétention, sans rendre mTLS obligatoire et sans remplacer la topologie existante.
+
+## Exécution T-003
+
+- RED: ajout de `tests/m013/validate_v1_gap_decisions_acceptance.ps1` et `tests/m013/validate_v1_gap_decisions_unit.ps1`; commit RED `2c697fb7e`.
+- GREEN: publication de `app/evaluation/domain/v1_gap_decisions.py`, `docs/governance/m013_v1_gap_decisions.md` et `scripts/validate_m013_v1_gap_decisions.ps1`; enrôlement dans `scripts/test.ps1` et `scripts/lint.ps1`; rattachement `REQ-M013-003` dans `docs/traceability/matrix.md`.
+- Décision livrée: SP, KA et RA restent `différé`; SD et LLM restent `bloquant`; EG, CV et EX sont explicitement `accepté`; les cinq écarts non acceptés sont transmis au futur `V1AcceptanceReport`.
+- ADR: non requise; T-003 applique ADR-010 et DDD-ADR-011 sans changer critère d'acceptation, politique de calibration ou frontière de bounded context.
