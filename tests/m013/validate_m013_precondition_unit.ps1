@@ -87,17 +87,20 @@ function Commit-TemporaryProject {
 }
 
 function New-M013GapReport {
-    return @'
+    $eAcute = [char] 0x00E9
+    $deferredStatus = "diff$eAcute" + "r$eAcute"
+
+    return @"
 # Rapport des écarts V1 M-012
 
 ## Statut des écarts V1
 
 | Contexte | Statut | Critère V1 | Benchmark source | Corpus | Décision liée | Commande de preuve | Justification |
 |---|---|---|---|---|---|---|---|
-| SP | différé | Qualité documentaire. | RBRUN-M012-DOCUMENT-ROUTES-0001 | CORPUS-M012-PILOTE-0001 | DEC-M012-SP-DEFERRED | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m012\validate_document_quality_calibration_acceptance.ps1 | Test scientifique RED conservé. |
-| KA | différé | Recherche de connaissances. | KSRUN-M012-KNOWLEDGE-0001 | CORPUS-M012-PILOTE-0001 | DEC-M012-KA-REJECTED | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m012\validate_knowledge_search_benchmark_acceptance.ps1 | Test scientifique RED conservé. |
+| SP | $deferredStatus | Qualité documentaire. | RBRUN-M012-DOCUMENT-ROUTES-0001 | CORPUS-M012-PILOTE-0001 | DEC-M012-SP-DEFERRED | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m012\validate_document_quality_calibration_acceptance.ps1 | Test scientifique RED conservé. |
+| KA | $deferredStatus | Recherche de connaissances. | KSRUN-M012-KNOWLEDGE-0001 | CORPUS-M012-PILOTE-0001 | DEC-M012-KA-REJECTED | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m012\validate_knowledge_search_benchmark_acceptance.ps1 | Test scientifique RED conservé. |
 | EG | satisfait | Gouvernance des preuves. | EGRUN-M012-0001 | CORPUS-M012-PILOTE-0001 | DEC-M012-EG-ACCEPTED | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m012\validate_verified_answer_benchmark_acceptance.ps1 | Mesure satisfaite. |
-| RA | différé | Réponses vérifiées. | VARUN-M012-VERIFIED-ANSWERS-0001 | CORPUS-M012-PILOTE-0001 | DEC-M012-RA-DEFERRED | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m012\validate_verified_answer_benchmark_acceptance.ps1 | Test scientifique RED conservé. |
+| RA | $deferredStatus | Réponses vérifiées. | VARUN-M012-VERIFIED-ANSWERS-0001 | CORPUS-M012-PILOTE-0001 | DEC-M012-RA-DEFERRED | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m012\validate_verified_answer_benchmark_acceptance.ps1 | Test scientifique RED conservé. |
 | CV | satisfait | Conversation. | CVRUN-M012-CRITERIA-0001 | CORPUS-M012-PILOTE-0001 | DEC-M012-CV-ACCEPTED | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m012\validate_calibration_decisions_acceptance.ps1 | Mesure satisfaite. |
 | SD | bloquant | Stratégies candidates. | SBRUN-M012-STRATEGY-BACKTEST-0001 | CORPUS-M012-PILOTE-0001 | DEC-M012-SD-REJECTED | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m012\validate_strategy_backtest_benchmark_acceptance.ps1 | Test scientifique RED conservé. |
 | LLM | bloquant | Promotion du checkpoint. | LLMRUN-M012-REAL-PATH-0001 | CORPUS-M012-PILOTE-0001 | DEC-M012-LLM-REJECTED | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m012\validate_llm_benchmark_real_path_acceptance.ps1 | Test scientifique RED conservé. |
@@ -106,7 +109,7 @@ function New-M013GapReport {
 ## Tests scientifiques RED conservés
 
 - Test scientifique RED conservé.
-'@
+"@
 }
 
 function New-TemporaryProject {

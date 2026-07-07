@@ -148,6 +148,8 @@ $m012CalibrationDecisionsAcceptancePath = "tests/m012/validate_calibration_decis
 $m012CalibrationDecisionsUnitPath = "tests/m012/validate_calibration_decisions_unit.ps1"
 $m012TraceabilityAcceptancePath = "tests/m012/validate_m012_traceability_acceptance.ps1"
 $m012TraceabilityUnitPath = "tests/m012/validate_m012_traceability_unit.ps1"
+$m013PreconditionAcceptancePath = "tests/m013/validate_m013_precondition_acceptance.ps1"
+$m013PreconditionUnitPath = "tests/m013/validate_m013_precondition_unit.ps1"
 
 $validationCommands = @(
     @{ Path = "scripts/validate_m000_precondition_report.ps1"; Arguments = @("-Path", $preconditionReportPath) },
@@ -425,6 +427,8 @@ $testCommands = @(
     @{ Path = $m012CalibrationDecisionsUnitPath; Arguments = @() },
     @{ Path = $m012TraceabilityAcceptancePath; Arguments = @() },
     @{ Path = $m012TraceabilityUnitPath; Arguments = @() },
+    @{ Path = $m013PreconditionUnitPath; Arguments = @() },
+    @{ Path = $m013PreconditionAcceptancePath; Arguments = @() },
     @{ Path = "tests/m009/validate_m009_specification_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/m009/validate_m009_specification_unit.ps1"; Arguments = @() },
     @{ Path = "tests/m009/validate_deep_research_planning_acceptance.ps1"; Arguments = @() },
@@ -972,6 +976,32 @@ elseif ($env:OST_M012_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m012SpecificationUnitPath
     )
 }
+elseif ($env:OST_M013_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
+    Write-Host "Test d'acceptation de précondition M-003 exclu explicitement: M-013 vérifie les validateurs amont sans récursion."
+    Write-Host "Test d'acceptation de précondition M-004 exclu explicitement: M-013 vérifie les validateurs amont sans récursion."
+    Write-Host "Test d'acceptation de précondition M-005 exclu explicitement: M-013 vérifie les validateurs amont sans récursion."
+    Write-Host "Test d'acceptation de précondition M-006 exclu explicitement: M-013 vérifie les validateurs amont sans récursion."
+    Write-Host "Test d'acceptation de précondition M-007 exclu explicitement: M-013 vérifie les validateurs amont sans récursion."
+    Write-Host "Test d'acceptation de précondition M-008 exclu explicitement: M-013 vérifie les validateurs amont sans récursion."
+    Write-Host "Test d'acceptation de précondition M-009 exclu explicitement: M-013 vérifie les validateurs amont sans récursion."
+    Write-Host "Test d'acceptation de précondition M-010 exclu explicitement: M-013 vérifie les validateurs amont sans récursion."
+    Write-Host "Test d'acceptation de précondition M-011 exclu explicitement: M-013 vérifie les validateurs amont sans récursion."
+    Write-Host "Test d'acceptation de précondition M-012 exclu explicitement: M-013 vérifie les validateurs amont sans récursion."
+    Write-Host "Test d'acceptation de précondition M-013 exclu explicitement: exécution imbriquée du validateur de précondition."
+    $excludedPreconditionTestPaths = @(
+        $m003PreconditionAcceptancePath,
+        $m004PreconditionAcceptancePath,
+        $m005PreconditionAcceptancePath,
+        $m006PreconditionAcceptancePath,
+        $m007PreconditionAcceptancePath,
+        $m008PreconditionAcceptancePath,
+        $m009PreconditionAcceptancePath,
+        $m010PreconditionAcceptancePath,
+        $m011PreconditionAcceptancePath,
+        $m012PreconditionAcceptancePath,
+        $m013PreconditionAcceptancePath
+    )
+}
 
 if (
     ($env:OST_M003_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") -or
@@ -1049,6 +1079,25 @@ if (
         $m012CalibrationDecisionsUnitPath,
         $m012TraceabilityAcceptancePath,
         $m012TraceabilityUnitPath
+    )
+}
+
+if (
+    ($env:OST_M003_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") -or
+    ($env:OST_M004_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") -or
+    ($env:OST_M005_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") -or
+    ($env:OST_M006_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") -or
+    ($env:OST_M007_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") -or
+    ($env:OST_M008_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") -or
+    ($env:OST_M009_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") -or
+    ($env:OST_M010_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") -or
+    ($env:OST_M011_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") -or
+    ($env:OST_M012_PRECONDITION_ACCEPTANCE_RUNNING -eq "1")
+) {
+    Write-Host "Tests M-013 exclus explicitement: les préconditions amont restent indépendantes du milestone aval."
+    $excludedPreconditionTestPaths += @(
+        $m013PreconditionAcceptancePath,
+        $m013PreconditionUnitPath
     )
 }
 

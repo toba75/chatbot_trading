@@ -5,7 +5,7 @@ $testCommandPath = Join-Path $repoRoot "scripts/test.ps1"
 $lintCommandPath = Join-Path $repoRoot "scripts/lint.ps1"
 $temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m000_validation_commands_acceptance_" + [System.Guid]::NewGuid().ToString("N"))
 $eAcute = [char] 0x00E9
-$expectedTestCount = 268
+$expectedTestCount = 270
 if ($env:OST_M003_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     $expectedTestCount = 146
 }
@@ -35,6 +35,9 @@ elseif ($env:OST_M011_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
 }
 elseif ($env:OST_M012_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     $expectedTestCount = 256
+}
+elseif ($env:OST_M013_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
+    $expectedTestCount = 259
 }
 $expectedTestSummary = "Gate test GREEN: 23 validation(s), $expectedTestCount test(s)."
 
@@ -336,6 +339,8 @@ try {
     Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m012/validate_verified_answer_benchmark_acceptance.ps1" -Message "La gate de test doit exécuter le test d'acceptation RA/EG M-012."
     Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m012/validate_llm_benchmark_real_path_acceptance.ps1" -Message "La gate de test doit exécuter le test d'acceptation LLM M-012."
     Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m012/validate_m012_traceability_acceptance.ps1" -Message "La gate de test doit exécuter le test d'acceptation de traçabilité M-012."
+    Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m013/validate_m013_precondition_unit.ps1" -Message "La gate de test doit exécuter le test unitaire de précondition M-013."
+    Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m013/validate_m013_precondition_acceptance.ps1" -Message "La gate de test doit exécuter le test d'acceptation de précondition M-013."
     Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m009/validate_deep_research_planning_acceptance.ps1" -Message "La gate de test doit exécuter le test d'acceptation de planification approfondie M-009."
     Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m009/validate_deep_research_planning_unit.ps1" -Message "La gate de test doit exécuter le test unitaire de planification approfondie M-009."
     Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m009/validate_multi_query_evidence_collection_acceptance.ps1" -Message "La gate de test doit exécuter le test d'acceptation de collecte multi-requêtes M-009."
