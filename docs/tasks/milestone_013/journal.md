@@ -107,3 +107,11 @@
 - Décision livrée: la V1 conserve les artefacts d'autorité hors conversation pendant 120 mois, les conversations pendant 18 mois et les projections régénérables pendant 3 mois; toute purge administrative exige justification, audit, opérateur, date, identifiants stables et preuve de compatibilité de lecture.
 - Garde-fous conservés: aucune purge ordinaire, aucun effacement de résultat négatif ou supersédé, aucune cascade CV vers KA, EG, RA, SD ou EX, et aucune purge de projection sans commande de reconstruction depuis les artefacts d'autorité conservés.
 - ADR: DDD-ADR-012 créée pour la politique V1 de rétention et purge administrative; T-008 ne modifie pas le sens de DDD-ADR-010.
+
+## Exécution T-009
+
+- RED: ajout de `tests/m013/validate_local_monitoring_acceptance.ps1` et `tests/m013/validate_local_monitoring_unit.ps1`; commit RED `49de59b15`.
+- GREEN: publication de `MonitoringSignalPolicy` et `ResourceProfilePolicy` dans `app/platform/observability/__init__.py`, de `docs/governance/m013_local_monitoring.md`, de `docs/governance/m013_resource_profile.md` et de `scripts/validate_m013_monitoring.ps1`; enrôlement dans `scripts/test.ps1` et `scripts/lint.ps1`; rattachement `REQ-M013-009` dans `docs/traceability/matrix.md`.
+- Décision livrée: le monitoring V1 reste local, sans export externe par défaut, sans endpoint public, avec métriques de santé, erreurs, latence, jobs, outbox, gateway, Spark, sauvegarde, restauration, écarts et sécurité; les journaux techniques ont une rétention courte et une corrélation explicite.
+- Profil ressources livré: CPU, GPU, mémoire, I/O et stockage `docker-local` sont mesurés; l'image vLLM est épinglée par digest, le modèle Gemma est révisionné, la concurrence et la longueur de contexte sont sourcées par le benchmark M-012.
+- ADR: non requise; T-009 applique ADR-008, ADR-009 et ADR-010 sans introduire de composant d'observabilité structurant ni export externe.

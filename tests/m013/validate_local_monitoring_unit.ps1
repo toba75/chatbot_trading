@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
 . (Join-Path $repoRoot "scripts/require_python.ps1")
@@ -18,7 +18,7 @@ if repo_root not in sys.path:
     sys.path.insert(0, repo_root)
 
 from app.platform.observability import (
-    DEFAULT_LOCAL_LOG_RETENTION_HOURS,
+    M013_LOCAL_LOG_RETENTION_HOURS,
     MonitoringSignal,
     MonitoringSignalPolicy,
     ResourceProfilePolicy,
@@ -57,7 +57,7 @@ def signal(**overrides):
         "metric_family": "latence",
         "owner": "platform",
         "correlation_field": "trace_id",
-        "retention_hours": DEFAULT_LOCAL_LOG_RETENTION_HOURS,
+        "retention_hours": M013_LOCAL_LOG_RETENTION_HOURS,
         "local_only": True,
         "external_export_enabled_by_default": False,
         "contains_full_prompt": False,
@@ -96,7 +96,7 @@ def measurement(**overrides):
 # When MonitoringSignalPolicy construit le profil local M-013.
 # Then chaque signal porte propriétaire, corrélation, rétention courte, statut d'écart
 # et garde-fous de non-divulgation.
-monitoring_policy = MonitoringSignalPolicy()
+monitoring_policy = MonitoringSignalPolicy(public_endpoint_enabled=False)
 monitoring_profile = build_m013_local_monitoring_profile()
 monitoring_policy.validate_profile(monitoring_profile)
 
@@ -119,9 +119,9 @@ for context in ("SP", "KA", "EG", "RA", "CV", "SD", "EX", "EV", "platform"):
 
 assert_equal(monitoring_profile.local_only, True, "Le monitoring V1 doit rester local.")
 assert_equal(monitoring_profile.external_export_enabled_by_default, False, "Aucun export externe par défaut.")
-assert_equal(monitoring_profile.retention_hours, DEFAULT_LOCAL_LOG_RETENTION_HOURS, "La rétention courte doit être explicite.")
+assert_equal(monitoring_profile.retention_hours, M013_LOCAL_LOG_RETENTION_HOURS, "La rétention courte doit être explicite.")
 
-assert_raises("métrique absente", lambda: MonitoringSignalPolicy().validate_profile(monitoring_profile.without_metric("v1_health_status")))
+assert_raises("métrique absente", lambda: MonitoringSignalPolicy(public_endpoint_enabled=False).validate_profile(monitoring_profile.without_metric("v1_health_status")))
 assert_raises("payload sensible interdit", lambda: signal(contains_full_prompt=True))
 assert_raises("payload sensible interdit", lambda: signal(contains_full_evidence=True))
 assert_raises("payload sensible interdit", lambda: signal(contains_secret=True))
@@ -307,7 +307,7 @@ try {
         -Mutate {
             param($projectRoot)
             $path = Join-Path $projectRoot "docs/governance/m013_local_monitoring.md"
-            (Get-Content -Raw -Encoding UTF8 -LiteralPath $path).Replace("v1_health_status", "v1_health_status_masque") |
+            (Get-Content -Raw -Encoding UTF8 -LiteralPath $path).Replace("v1_health_status", "health_status_masque") |
                 Set-Content -Encoding UTF8 -LiteralPath $path
         }
 
