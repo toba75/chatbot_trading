@@ -123,3 +123,11 @@
 - Décision livrée: les runbooks couvrent démarrage local, arrêt local, sauvegarde, restauration, audit réseau, panne Spark, monitoring, ingestion PDF, conversation, recherche approfondie, stratégie, backtest, statuts publics, limites V1 et commandes vérifiées.
 - Garde-fous conservés: aucune publication de service interne, aucun secret, aucune commande destructive sans précondition, aucun fallback textuel, aucun fallback silencieux et aucune promesse financière.
 - ADR: non requise; T-010 documente les décisions existantes sans nouvelle topologie, nouvelle politique de rétention, nouvelle politique d'observabilité ou nouveau contrat durable.
+
+## Exécution T-011
+
+- RED: ajout de `tests/m013/validate_v1_antipatterns_acceptance.ps1` et `tests/m013/validate_v1_antipatterns_unit.ps1`; commit RED `d11e36a17`.
+- GREEN: publication de `scripts/validate_m013_antipatterns.ps1` et `docs/governance/m013_antipattern_review.md`; enrôlement dans `scripts/test.ps1` et `scripts/lint.ps1`; alignement de la commande V1-010 dans la spécification M-013; rattachement `REQ-M013-011` dans `docs/traceability/matrix.md`.
+- Décision livrée: les anti-patterns V1 section 23 sont reliés à des contrôles automatisés ou à une revue documentée datée avec preuve et périmètre; toute violation active bloque l'acceptation V1.
+- Questions ouvertes: les questions non tranchées restent ouvertes contrôlées; la conservation est marquée résolue par DDD-ADR-012; aucune nouvelle résolution implicite n'est introduite.
+- ADR: non requise; T-011 applique ADR-007, ADR-008, ADR-009, DDD-ADR-004, DDD-ADR-006, DDD-ADR-010 et DDD-ADR-012 sans trancher de nouvelle question structurante.

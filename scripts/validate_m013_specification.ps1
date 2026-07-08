@@ -107,7 +107,7 @@ $expectedBehaviors = @(
     @{ Name = "V1-007 - Rétention et purge administrative"; Test = "T-008"; Adr = @("DDD-ADR-010", "DDD-ADR-012"); Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_retention_purge_acceptance.ps1" },
     @{ Name = "V1-008 - Monitoring local d'exploitation"; Test = "T-009"; Adr = @("ADR-008", "ADR-009", "ADR-010"); Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_local_monitoring_acceptance.ps1" },
     @{ Name = "V1-009 - Runbooks et documentation utilisateur"; Test = "T-010"; Adr = @("ADR-010"); Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_runbooks_user_docs_acceptance.ps1" },
-    @{ Name = "V1-010 - Anti-patterns interdits V1"; Test = "T-011"; Adr = @("ADR-007", "ADR-008", "ADR-009", "DDD-ADR-006", "DDD-ADR-010"); Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_forbidden_antipatterns_acceptance.ps1" },
+    @{ Name = "V1-010 - Anti-patterns interdits V1"; Test = "T-011"; Adr = @("ADR-007", "ADR-008", "ADR-009", "DDD-ADR-006", "DDD-ADR-010"); Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_v1_antipatterns_acceptance.ps1" },
     @{ Name = "V1-011 - Rapport d'acceptation V1"; Test = "T-012"; Adr = @("ADR-010", "DDD-ADR-010", "DDD-ADR-011"); Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_v1_acceptance_report_acceptance.ps1" }
 )
 

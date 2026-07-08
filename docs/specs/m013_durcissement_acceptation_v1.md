@@ -193,6 +193,8 @@ M-013 contrôle les anti-patterns de la section 23, notamment:
 
 Chaque anti-pattern interdit doit être couvert par un test, une validation statique ou une revue documentée avant `V1AcceptanceReport`.
 
+La preuve T-011 est `docs/governance/m013_antipattern_review.md`, contrôlée par `scripts/validate_m013_antipatterns.ps1` et par `tests/m013/validate_v1_antipatterns_acceptance.ps1`. Les questions ouvertes de la section 23 restent ouvertes contrôlées tant qu'une ADR ne les résout pas explicitement.
+
 ## Rapport d'acceptation V1
 
 Le `V1AcceptanceReport` contient:
@@ -221,7 +223,7 @@ Le verdict final est refusé si un écart bloquant existe, si un écart différ�
 | V1-007 - Rétention et purge administrative | Les versions négatives et supersédées restent consultables. | Given des artefacts négatifs ou supersédés existent; When la rétention est validée; Then aucune purge implicite ne les supprime. | T-008 | DDD-ADR-010; DDD-ADR-012 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_retention_purge_acceptance.ps1 |
 | V1-008 - Monitoring local d'exploitation | LocalMonitoringProfile publie les signaux sans payload sensible. | Given la plateforme locale est exécutée; When les métriques sont collectées; Then latence, erreurs, ressources et circuit breaker sont visibles sans secrets ni contenus complets. | T-009 | ADR-008; ADR-009; ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_local_monitoring_acceptance.ps1 |
 | V1-009 - Runbooks et documentation utilisateur | Les procédures et la documentation décrivent des actions vérifiables sans fallback. | Given l'utilisateur exploite la V1 locale; When il lit runbooks et documentation; Then chaque action sensible nomme commande, résultat attendu, erreur explicite et preuve. | T-010 | ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_runbooks_user_docs_acceptance.ps1 |
-| V1-010 - Anti-patterns interdits V1 | Chaque anti-pattern interdit est testé ou revu. | Given les anti-patterns section 23 sont publiés; When la revue M-013 est exécutée; Then aucun anti-pattern interdit n'est ignoré. | T-011 | ADR-007; ADR-008; ADR-009; DDD-ADR-006; DDD-ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_forbidden_antipatterns_acceptance.ps1 |
+| V1-010 - Anti-patterns interdits V1 | Chaque anti-pattern interdit est testé ou revu. | Given les anti-patterns section 23 sont publiés; When la revue M-013 est exécutée; Then aucun anti-pattern interdit n'est ignoré. | T-011 | ADR-007; ADR-008; ADR-009; DDD-ADR-006; DDD-ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_v1_antipatterns_acceptance.ps1 |
 | V1-011 - Rapport d'acceptation V1 | V1AcceptanceReport référence preuves, commandes, décisions et écarts. | Given toutes les preuves M-013 sont produites; When le rapport d'acceptation est publié; Then le verdict refuse tout écart bloquant ou non accepté. | T-012 | ADR-010; DDD-ADR-010; DDD-ADR-011 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_v1_acceptance_report_acceptance.ps1 |
 
 ## Commandes de validation
