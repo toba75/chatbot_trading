@@ -82,6 +82,18 @@ La définition de terminé est reliée à `docs/governance/definition_of_done.md
 | Lint | powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1 | GREEN | scripts/lint.ps1 |
 | Test | powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1 | GREEN | scripts/test.ps1 |
 
+## Preuves de sortie des gates finales
+
+| Commande | Sortie capturée |
+|---|---|
+| powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_v1_acceptance_report_acceptance.ps1 | Test d'acceptation T-012 rapport d'acceptation V1 M-013: OK |
+| powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_v1_acceptance_report_unit.ps1 | Tests unitaires V1AcceptanceReportPolicy M-013: OK; Tests unitaires du validateur rapport d'acceptation V1 M-013: OK |
+| powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_acceptance.ps1 | Rapport d'acceptation V1 M-013 valide: 8 critère(s), 5 écart(s) non accepté(s), 2 écart(s) bloquant(s), verdict V1 non acceptée. |
+| powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_traceability.ps1 | Matrice de traçabilité valide: 152 exigence(s) contrôlée(s). |
+| powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_specification.ps1 | Spécification M-013 valide: 11 comportement(s), 8 objet(s), 8 écart(s) V1 contrôlé(s). |
+| powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1 | Gate lint GREEN: 35 validation(s), 0 test(s). |
+| powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1 | Gate test GREEN: 34 validation(s), 292 test(s). |
+
 ## Absence de secret
 
 Le rapport ne publie aucun secret, clé API, token bearer, certificat privé, prompt complet, preuve complète, réponse complète ou donnée de marché complète. Les preuves sont référencées par chemin et commande, pas copiées en clair.

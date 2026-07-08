@@ -56,6 +56,18 @@ _ALLOWED_ARTIFACT_KINDS = (
     "evaluation_reports",
     "governance_artifacts",
 )
+_EXPECTED_CONTEXT_BY_ARTIFACT_KIND = {
+    "corpus_original": CONTEXT_SP,
+    "canonical_versions": CONTEXT_SP,
+    "qdrant_projection": CONTEXT_KA,
+    "claim_registry": CONTEXT_EG,
+    "verified_answers": CONTEXT_RA,
+    "conversation_turns": CONTEXT_CV,
+    "strategy_snapshots": CONTEXT_SD,
+    "experiment_results": CONTEXT_EX,
+    "evaluation_reports": CONTEXT_EV,
+    "governance_artifacts": CONTEXT_PLATFORM,
+}
 _SENSITIVE_FRAGMENTS = (
     "api key",
     "api_key",
@@ -70,6 +82,7 @@ _SENSITIVE_FRAGMENTS = (
     "secret_interdit_m013",
 )
 _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+_SHA256_PLACEHOLDER_PATTERN = re.compile(r"^([0-9a-f])\1{63}$")
 
 
 @dataclass(frozen=True)
@@ -115,6 +128,8 @@ class BackupManifestEntry:
         parsed_authority = _required_bool(authority, "authority")
         parsed_regenerable_projection = _required_bool(regenerable_projection, "regenerable_projection")
 
+        if _EXPECTED_CONTEXT_BY_ARTIFACT_KIND[parsed_artifact_kind] != parsed_context:
+            raise ValueError("catégorie artefact contexte incohérente")
         if parsed_storage_host == STORAGE_SPARK:
             raise ValueError("stockage métier Spark interdit")
         if _required_bool(spark_business_storage, "spark_business_storage"):
@@ -204,8 +219,10 @@ class BackupManifest:
 
         parsed_encryption_proof = _required_text(encryption_proof, "preuve de chiffrement requise")
         _assert_no_sensitive_text(parsed_encryption_proof, "secret en clair interdit")
-        if "ciphertext_sha256=" not in parsed_encryption_proof:
+        ciphertext_hash_match = re.search(r"ciphertext_sha256=([0-9a-f]{64})", parsed_encryption_proof)
+        if ciphertext_hash_match is None:
             raise ValueError("preuve de chiffrement requise")
+        _required_sha256(ciphertext_hash_match.group(1), "preuve de chiffrement requise")
 
         parsed_key_reference = _required_text(key_reference, "key_reference")
         _assert_no_sensitive_text(parsed_key_reference, "secret en clair interdit")
@@ -225,6 +242,7 @@ class BackupManifest:
 
         contexts = tuple(sorted({item.context for item in parsed_entries}))
         _assert_manifest_contexts(contexts)
+        _assert_manifest_artifact_kinds(parsed_entries)
         _assert_retained_negative_or_superseded(parsed_entries)
         _assert_regenerable_projection(parsed_entries)
 
@@ -342,6 +360,8 @@ class BackupRestoreDrillPolicy:
         self.validate_manifest(drill.manifest)
         if not isinstance(drill.restore_test_result, RestoreTestResult):
             raise ValueError("restore_test_result requis")
+        if drill.restore_test_result.command != drill.manifest.restore_command:
+            raise ValueError("commande restauration incohérente")
         if not drill.acceptance_allowed:
             raise ValueError("acceptation restauration interdite")
 
@@ -360,7 +380,7 @@ def build_m013_backup_restore_drill() -> BackupRestoreDrill:
         ),
         restore_target="local_isolated",
         archive_encrypted=True,
-        encryption_proof="ciphertext_sha256=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        encryption_proof="ciphertext_sha256=305531dcc50ebca31cf1d5b31e9fc76ed51f66b3b6dd5a030c6539ae6532f979",
         key_reference="hors_depot://cle-restauration/m013",
         key_git_tracked=False,
         complete=True,
@@ -374,7 +394,7 @@ def build_m013_backup_restore_drill() -> BackupRestoreDrill:
                 immutable=True,
                 regenerable_projection=False,
                 retained_negative_or_superseded=False,
-                digest="1" * 64,
+                digest="41afbc972e3965ef7af89ccc1cb76033d684c363224e408b001d4ad6fe53d762",
             ),
             _entry(
                 entry_id="BACKUP-SP-CANONICAL-001",
@@ -385,7 +405,7 @@ def build_m013_backup_restore_drill() -> BackupRestoreDrill:
                 immutable=True,
                 regenerable_projection=False,
                 retained_negative_or_superseded=False,
-                digest="2" * 64,
+                digest="07aa716c5e229e8502dcbefdc41c1dad332376a9204286b50ce59ba8573121ab",
             ),
             _entry(
                 entry_id="BACKUP-KA-QDRANT-001",
@@ -396,7 +416,7 @@ def build_m013_backup_restore_drill() -> BackupRestoreDrill:
                 immutable=False,
                 regenerable_projection=True,
                 retained_negative_or_superseded=False,
-                digest="3" * 64,
+                digest="24c11cc03fa691edfee932d7d7fe8e2322b59df3f5e2f78f43de2d22ece1586a",
             ),
             _entry(
                 entry_id="BACKUP-EG-CLAIMS-001",
@@ -407,7 +427,7 @@ def build_m013_backup_restore_drill() -> BackupRestoreDrill:
                 immutable=True,
                 regenerable_projection=False,
                 retained_negative_or_superseded=True,
-                digest="4" * 64,
+                digest="5e6f1f718dd111612c9a39f99e6106962cb672581760346ee7f438f0daacee0a",
             ),
             _entry(
                 entry_id="BACKUP-RA-ANSWERS-001",
@@ -418,7 +438,7 @@ def build_m013_backup_restore_drill() -> BackupRestoreDrill:
                 immutable=True,
                 regenerable_projection=False,
                 retained_negative_or_superseded=True,
-                digest="5" * 64,
+                digest="6ac74cb4c5842dc58c4a36595f8505dd11cc601ee7435d0c12b5ca300c9a9d12",
             ),
             _entry(
                 entry_id="BACKUP-CV-TURNS-001",
@@ -429,7 +449,7 @@ def build_m013_backup_restore_drill() -> BackupRestoreDrill:
                 immutable=True,
                 regenerable_projection=False,
                 retained_negative_or_superseded=False,
-                digest="6" * 64,
+                digest="ad2171f2d64fb2e0b97dead7a371940a39cee49ffd82ab431875700dfdbeab5a",
             ),
             _entry(
                 entry_id="BACKUP-SD-STRATEGY-001",
@@ -440,7 +460,7 @@ def build_m013_backup_restore_drill() -> BackupRestoreDrill:
                 immutable=True,
                 regenerable_projection=False,
                 retained_negative_or_superseded=True,
-                digest="7" * 64,
+                digest="2522c33fb81d48560c3350a3b2ff244fa22639c64aa071afc0a340225bced7ca",
             ),
             _entry(
                 entry_id="BACKUP-EX-RESULTS-001",
@@ -451,7 +471,7 @@ def build_m013_backup_restore_drill() -> BackupRestoreDrill:
                 immutable=True,
                 regenerable_projection=False,
                 retained_negative_or_superseded=True,
-                digest="8" * 64,
+                digest="cb56bed550ec21f510dba2aacc349910069dcf4b9d3055528fbad6f73e912c3c",
             ),
             _entry(
                 entry_id="BACKUP-EV-REPORTS-001",
@@ -462,7 +482,7 @@ def build_m013_backup_restore_drill() -> BackupRestoreDrill:
                 immutable=True,
                 regenerable_projection=False,
                 retained_negative_or_superseded=True,
-                digest="9" * 64,
+                digest="cd5fa46828c77876760ff84260c850b7769e191a18008a97cbd8381a90501717",
             ),
             _entry(
                 entry_id="BACKUP-PLATFORM-GOV-001",
@@ -473,7 +493,7 @@ def build_m013_backup_restore_drill() -> BackupRestoreDrill:
                 immutable=True,
                 regenerable_projection=False,
                 retained_negative_or_superseded=False,
-                digest="a" * 64,
+                digest="217a94c41d0a66989fde831fd643d76daf7cae412593f3d634fb02ba6aecc32d",
             ),
         ),
     )
@@ -537,6 +557,13 @@ def _assert_manifest_contexts(contexts: Sequence[str]) -> None:
     for context in _REQUIRED_CONTEXTS:
         if context not in parsed_contexts:
             raise ValueError("contexte V1 absent")
+
+
+def _assert_manifest_artifact_kinds(entries: Sequence[BackupManifestEntry]) -> None:
+    artifact_kinds = {item.artifact_kind for item in entries}
+    for artifact_kind in _ALLOWED_ARTIFACT_KINDS:
+        if artifact_kind not in artifact_kinds:
+            raise ValueError("catégorie artefact V1 absente")
 
 
 def _assert_retained_negative_or_superseded(entries: Sequence[BackupManifestEntry]) -> None:
@@ -603,6 +630,8 @@ def _required_sha256(value: Any, empty_message: str) -> str:
     text = _required_text(value, empty_message)
     if not _SHA256_PATTERN.match(text):
         raise ValueError(empty_message)
+    if _SHA256_PLACEHOLDER_PATTERN.match(text):
+        raise ValueError("hash placeholder interdit")
     return text
 
 

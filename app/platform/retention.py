@@ -48,6 +48,17 @@ _EXPECTED_CATEGORY_IDS = (
 )
 
 _EXPECTED_CONTEXTS = (CONTEXT_SP, CONTEXT_KA, CONTEXT_EG, CONTEXT_RA, CONTEXT_CV, CONTEXT_SD, CONTEXT_EX, CONTEXT_EV)
+_EXPECTED_CONTEXT_BY_CATEGORY = {
+    CATEGORY_SP_ORIGINALS: CONTEXT_SP,
+    CATEGORY_SP_CANONICAL_VERSIONS: CONTEXT_SP,
+    CATEGORY_KA_REGENERABLE_PROJECTIONS: CONTEXT_KA,
+    CATEGORY_EG_CLAIMS: CONTEXT_EG,
+    CATEGORY_RA_VERIFIED_ANSWERS: CONTEXT_RA,
+    CATEGORY_CV_CONVERSATIONS: CONTEXT_CV,
+    CATEGORY_SD_STRATEGY_SNAPSHOTS: CONTEXT_SD,
+    CATEGORY_EX_EXPERIMENT_RESULTS: CONTEXT_EX,
+    CATEGORY_EV_GOVERNANCE_DECISIONS: CONTEXT_EV,
+}
 _ALLOWED_OPERATIONS = (LOGICAL_ARCHIVE, PURGE_CONVERSATION_CONTENT, PURGE_REGENERABLE_PROJECTION)
 _REQUIRED_NEGATIVE_RETENTION_CATEGORIES = (
     CATEGORY_SP_CANONICAL_VERSIONS,
@@ -57,6 +68,17 @@ _REQUIRED_NEGATIVE_RETENTION_CATEGORIES = (
     CATEGORY_EX_EXPERIMENT_RESULTS,
     CATEGORY_EV_GOVERNANCE_DECISIONS,
 )
+_EXPECTED_RETENTION_MONTHS_BY_CATEGORY = {
+    CATEGORY_SP_ORIGINALS: 120,
+    CATEGORY_SP_CANONICAL_VERSIONS: 120,
+    CATEGORY_KA_REGENERABLE_PROJECTIONS: 3,
+    CATEGORY_EG_CLAIMS: 120,
+    CATEGORY_RA_VERIFIED_ANSWERS: 120,
+    CATEGORY_CV_CONVERSATIONS: 18,
+    CATEGORY_SD_STRATEGY_SNAPSHOTS: 120,
+    CATEGORY_EX_EXPERIMENT_RESULTS: 120,
+    CATEGORY_EV_GOVERNANCE_DECISIONS: 120,
+}
 _COMMAND_PREFIX = "powershell -NoProfile -ExecutionPolicy Bypass -File .\\"
 
 
@@ -101,9 +123,14 @@ class RetentionCategory:
         parsed_regenerable_projection = _required_bool(regenerable_projection, "regenerable_projection")
         parsed_reconstruction_command = _required_text(reconstruction_command, "commande de reconstruction")
         parsed_ordinary_purge_allowed = _required_bool(ordinary_purge_allowed, "ordinary_purge_allowed")
+        parsed_retention_months = _required_positive_int(retention_months, "durée de rétention absente")
 
         if parsed_ordinary_purge_allowed:
             raise ValueError("suppression ordinaire interdite")
+        if _EXPECTED_CONTEXT_BY_CATEGORY[parsed_category_id] != parsed_context:
+            raise ValueError("contexte de catégorie durable incohérent")
+        if parsed_retention_months != _EXPECTED_RETENTION_MONTHS_BY_CATEGORY[parsed_category_id]:
+            raise ValueError("durée de rétention incohérente")
         if parsed_regenerable_projection and not _is_command(parsed_reconstruction_command):
             raise ValueError("projection régénérable avec reconstruction requise")
         if not parsed_regenerable_projection and parsed_reconstruction_command.startswith(_COMMAND_PREFIX):
@@ -117,7 +144,7 @@ class RetentionCategory:
         object.__setattr__(self, "category_id", parsed_category_id)
         object.__setattr__(self, "context", parsed_context)
         object.__setattr__(self, "artifact_kind", _required_text(artifact_kind, "artifact_kind"))
-        object.__setattr__(self, "retention_months", _required_positive_int(retention_months, "durée de rétention absente"))
+        object.__setattr__(self, "retention_months", parsed_retention_months)
         object.__setattr__(self, "allowed_operation", parsed_allowed_operation)
         object.__setattr__(self, "requires_justification", _required_bool(requires_justification, "requires_justification"))
         object.__setattr__(self, "requires_audit", _required_bool(requires_audit, "requires_audit"))
@@ -327,7 +354,10 @@ def build_m013_retention_policy() -> RetentionPolicy:
                 allowed_operation=PURGE_REGENERABLE_PROJECTION,
                 preserve_negative_or_superseded=False,
                 regenerable_projection=True,
-                reconstruction_command="powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\rebuild_knowledge_projection.ps1 -Source SP",
+                reconstruction_command=(
+                    "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\rebuild_knowledge_projection.ps1 "
+                    "-Source SP -SourceRoot .\\data\\sp-authority -Target .\\data\\ka-projection"
+                ),
                 read_compatibility_rule="La projection est reconstruite depuis les originaux et versions canoniques conservés.",
             ),
             _category(
@@ -487,6 +517,8 @@ def _required_text_tuple(values: Sequence[str], field_name: str) -> tuple[str, .
     parsed = tuple(_required_text(value, field_name) for value in values)
     if len(parsed) == 0:
         raise ValueError(field_name)
+    if len(set(parsed)) != len(parsed):
+        raise ValueError(f"{field_name} dupliqué")
     return parsed
 
 

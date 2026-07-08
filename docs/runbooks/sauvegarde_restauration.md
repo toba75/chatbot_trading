@@ -18,16 +18,17 @@
 
 ## Sauvegarde
 
-- Précondition: vérifier le périmètre avec le drill publié; une sauvegarde partielle ne peut pas être déclarée complète.
+- Précondition: disposer d'un manifeste `M013-BackupManifest-1.0` produit avec l'archive chiffrée; une sauvegarde partielle ne peut pas être déclarée complète.
 - Commande vérifiée:
 
 ```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\backup_v1.ps1 -Manifest .\restore\manifest.json
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_backup_restore.ps1
 ```
 
-- Résultat attendu: le validateur confirme `M013-BackupManifest-1.0`, archive chiffrée, clé hors dépôt, hashes restaurés, projections régénérables et absence de stockage métier sur Spark.
-- Erreur explicite: si `scripts\validate_m013_backup_restore.ps1` échoue, conserver la sortie RED et ne pas déclarer la sauvegarde exploitable.
-- Preuve à conserver: sortie du validateur, `docs/governance/m013_backup_restore_drill.md`, identifiant `restore_test_result` et preuve `ciphertext_sha256` sans clé versionnée.
+- Résultat attendu: `backup_v1.ps1` vérifie le manifeste de sauvegarde, la preuve `ciphertext_sha256`, les paires contexte/catégorie, les hashes non placeholders et l'absence de secret.
+- Erreur explicite: si `scripts\backup_v1.ps1` ou `scripts\validate_m013_backup_restore.ps1` échoue, conserver la sortie RED et ne pas déclarer la sauvegarde exploitable.
+- Preuve à conserver: sortie du contrôle de manifeste, sortie du validateur, `docs/governance/m013_backup_restore_drill.md`, identifiant `restore_test_result` et preuve `ciphertext_sha256` sans clé versionnée.
 
 ## Restauration
 
@@ -35,10 +36,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_back
 - Commande vérifiée:
 
 ```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\restore_v1.ps1 -Manifest .\restore\manifest.json -Target C:\restore\m013-isolated
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_backup_restore.ps1
 ```
 
-- Résultat attendu: `restore_test_result` reste GREEN, les identifiants stables sont préservés, les artefacts immuables ne sont pas réécrits et les résultats négatifs ou supersédés restent consultables.
+- Résultat attendu: `restore_v1.ps1` matérialise `restore-proof.json`, `restore_test_result` reste GREEN, les identifiants stables sont préservés, les artefacts immuables ne sont pas réécrits et les résultats négatifs ou supersédés restent consultables.
 - Erreur explicite: si un hash restauré diverge, si une clé est suivie par Git ou si Spark devient requis pour restaurer les données métier, la restauration V1 est refusée.
 - Preuve à conserver: sortie GREEN du validateur, liste des identifiants stables restaurés et mention de la cible isolée.
 

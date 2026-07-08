@@ -82,7 +82,7 @@ function Assert-OutputContains {
 $result = Invoke-M013RunbookValidator
 Assert-ExitCode -Actual $result.ExitCode -Expected 0 -Message "Les runbooks et la documentation utilisateur V1 doivent être acceptés."
 Assert-OutputContains -Output $result.Output -Expected "Runbooks documentation utilisateur M-013 valides" -Message "Le validateur doit annoncer le GREEN T-010."
-Assert-OutputContains -Output $result.Output -Expected "8 runbook(s)" -Message "Le validateur doit compter les runbooks critiques."
+Assert-OutputContains -Output $result.Output -Expected "11 runbook(s)" -Message "Le validateur doit compter les runbooks critiques."
 Assert-OutputContains -Output $result.Output -Expected "documentation utilisateur V1" -Message "Le validateur doit contrôler la documentation utilisateur V1."
 Assert-OutputContains -Output $result.Output -Expected "aucun secret" -Message "Le validateur doit prouver l'absence de secret."
 Assert-OutputContains -Output $result.Output -Expected "aucune promesse financière" -Message "Le validateur doit refuser les promesses de rentabilité."

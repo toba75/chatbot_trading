@@ -149,6 +149,10 @@ class SparkFailureCase:
         )
         retry_limit = _required_non_negative_integer(retry_limit, "retry_limit")
         first_token = _required_bool(first_token_emitted, "first_token_emitted")
+        if parsed_failure_mode == FAILURE_STREAM_CUT_AFTER_FIRST_TOKEN and not first_token:
+            raise ValueError("premier token requis")
+        if parsed_failure_mode == FAILURE_STREAM_CUT_BEFORE_FIRST_TOKEN and first_token:
+            raise ValueError("premier token interdit avant coupure")
         if retry_after > 0:
             raise ValueError("retry après premier token interdit")
         if retry_before > retry_limit:
@@ -276,7 +280,9 @@ def build_m013_spark_failure_drill() -> SparkFailureDrill:
             consumer_context="RA",
             public_status="LLM_UNAVAILABLE",
             retry_before_first_token_count=1,
+            first_token_emitted=False,
             circuit_breaker_open_visible=True,
+            circuit_breaker_close_visible=False,
         ),
         _case(
             case_id="SPARK-FAIL-TIMEOUT-CV",
@@ -284,6 +290,9 @@ def build_m013_spark_failure_drill() -> SparkFailureDrill:
             consumer_context="CV",
             public_status="LLM_FIRST_TOKEN_TIMEOUT",
             retry_before_first_token_count=1,
+            first_token_emitted=False,
+            circuit_breaker_open_visible=False,
+            circuit_breaker_close_visible=False,
         ),
         _case(
             case_id="SPARK-FAIL-TLS-SD",
@@ -291,6 +300,9 @@ def build_m013_spark_failure_drill() -> SparkFailureDrill:
             consumer_context="SD",
             public_status="LLM_TLS_CERTIFICATE_INVALID",
             retry_before_first_token_count=0,
+            first_token_emitted=False,
+            circuit_breaker_open_visible=False,
+            circuit_breaker_close_visible=False,
         ),
         _case(
             case_id="SPARK-FAIL-AUTH-EV",
@@ -298,6 +310,9 @@ def build_m013_spark_failure_drill() -> SparkFailureDrill:
             consumer_context="EV",
             public_status="LLM_AUTHENTICATION_FAILED",
             retry_before_first_token_count=0,
+            first_token_emitted=False,
+            circuit_breaker_open_visible=False,
+            circuit_breaker_close_visible=False,
         ),
         _case(
             case_id="SPARK-FAIL-CUT-BEFORE-RA",
@@ -305,6 +320,9 @@ def build_m013_spark_failure_drill() -> SparkFailureDrill:
             consumer_context="RA",
             public_status="LLM_UNAVAILABLE",
             retry_before_first_token_count=1,
+            first_token_emitted=False,
+            circuit_breaker_open_visible=False,
+            circuit_breaker_close_visible=False,
         ),
         _case(
             case_id="SPARK-FAIL-CUT-AFTER-CV",
@@ -313,6 +331,8 @@ def build_m013_spark_failure_drill() -> SparkFailureDrill:
             public_status="LLM_PARTIAL_OUTPUT",
             first_token_emitted=True,
             retry_before_first_token_count=0,
+            circuit_breaker_open_visible=False,
+            circuit_breaker_close_visible=False,
         ),
         _case(
             case_id="SPARK-FAIL-CIRCUIT-OPEN",
@@ -320,7 +340,9 @@ def build_m013_spark_failure_drill() -> SparkFailureDrill:
             consumer_context="SD",
             public_status="LLM_CIRCUIT_OPEN",
             retry_before_first_token_count=0,
+            first_token_emitted=False,
             circuit_breaker_open_visible=True,
+            circuit_breaker_close_visible=False,
         ),
         _case(
             case_id="SPARK-FAIL-CIRCUIT-CLOSED",
@@ -328,6 +350,8 @@ def build_m013_spark_failure_drill() -> SparkFailureDrill:
             consumer_context="EV",
             public_status="LLM_RECOVERED",
             retry_before_first_token_count=0,
+            first_token_emitted=False,
+            circuit_breaker_open_visible=False,
             circuit_breaker_close_visible=True,
         ),
     )
@@ -347,9 +371,9 @@ def _case(
     consumer_context: str,
     public_status: str,
     retry_before_first_token_count: int,
-    first_token_emitted: bool = False,
-    circuit_breaker_open_visible: bool = False,
-    circuit_breaker_close_visible: bool = False,
+    first_token_emitted: bool,
+    circuit_breaker_open_visible: bool,
+    circuit_breaker_close_visible: bool,
 ) -> SparkFailureCase:
     return SparkFailureCase(
         case_id=case_id,

@@ -53,6 +53,17 @@ $expectedDurations = @{
     EX_EXPERIMENT_RESULTS = "120"
     EV_GOVERNANCE_DECISIONS = "120"
 }
+$expectedContexts = @{
+    SP_ORIGINALS = "SP"
+    SP_CANONICAL_VERSIONS = "SP"
+    KA_REGENERABLE_PROJECTIONS = "KA"
+    EG_CLAIMS = "EG"
+    RA_VERIFIED_ANSWERS = "RA"
+    CV_CONVERSATIONS = "CV"
+    SD_STRATEGY_SNAPSHOTS = "SD"
+    EX_EXPERIMENT_RESULTS = "EX"
+    EV_GOVERNANCE_DECISIONS = "EV"
+}
 $eAcute = [char] 0x00E9
 $categoryHeader = "Cat$($eAcute)gorie"
 $durationHeader = "Dur$($eAcute)e mois"
@@ -224,6 +235,68 @@ print(f"{len(policy.categories)} catégories durables contrôlées")
     }
 }
 
+function Assert-M013ReconstructionCommand {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $ScriptDirectory
+    )
+
+    $rebuildScriptPath = Join-Path $ScriptDirectory "rebuild_knowledge_projection.ps1"
+    Assert-M013Condition `
+        -Condition (Test-Path -LiteralPath $rebuildScriptPath -PathType Leaf) `
+        -Message "Commande de reconstruction introuvable: scripts/rebuild_knowledge_projection.ps1"
+
+    $temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m013_rebuild_projection_" + [System.Guid]::NewGuid().ToString("N"))
+    New-Item -ItemType Directory -Path $temporaryRoot | Out-Null
+    try {
+        $sourceRoot = Join-Path $temporaryRoot "sp-authority"
+        $targetRoot = Join-Path $temporaryRoot "ka-projection"
+        New-Item -ItemType Directory -Path $sourceRoot | Out-Null
+        Set-Content -Encoding UTF8 -LiteralPath (Join-Path $sourceRoot "corpus_originals.marker") -Value "SRC-M013-RETENTION-001"
+        Set-Content -Encoding UTF8 -LiteralPath (Join-Path $sourceRoot "canonical_versions.marker") -Value "CANON-M013-RETENTION-001"
+
+        $output = & powershell `
+            -NoProfile `
+            -ExecutionPolicy Bypass `
+            -File $rebuildScriptPath `
+            -Source SP `
+            -SourceRoot $sourceRoot `
+            -Target $targetRoot 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            throw "Commande de reconstruction invalide: $($output -join "`n")"
+        }
+
+        Assert-M013Condition `
+            -Condition (Test-Path -LiteralPath (Join-Path $targetRoot "projection_manifest.json") -PathType Leaf) `
+            -Message "Commande de reconstruction sans preuve matérialisée"
+
+        $targetUnderSource = Join-Path $sourceRoot "ka-projection-interdite"
+        $previousErrorActionPreference = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        try {
+            $invalidOutput = & powershell `
+                -NoProfile `
+                -ExecutionPolicy Bypass `
+                -File $rebuildScriptPath `
+                -Source SP `
+                -SourceRoot $sourceRoot `
+                -Target $targetUnderSource 2>&1
+            $invalidExitCode = $LASTEXITCODE
+        }
+        finally {
+            $ErrorActionPreference = $previousErrorActionPreference
+        }
+        if ($invalidExitCode -eq 0) {
+            throw "Commande de reconstruction accepte une cible sous la source SP: $($invalidOutput -join "`n")"
+        }
+    }
+    finally {
+        if (Test-Path -LiteralPath $temporaryRoot) {
+            Remove-Item -LiteralPath $temporaryRoot -Recurse -Force
+        }
+    }
+}
+
 function Assert-M013RetentionPolicyDocument {
     param(
         [Parameter(Mandatory = $true)]
@@ -257,7 +330,7 @@ function Assert-M013RetentionPolicyDocument {
         -Condition ($PolicyContent.Contains("cascade interdite vers KA, EG, RA, SD et EX")) `
         -Message "Conversation sans cascade vers connaissances ou expériences"
     Assert-M013Condition `
-        -Condition ($PolicyContent.Contains("powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\rebuild_knowledge_projection.ps1 -Source SP")) `
+        -Condition ($PolicyContent.Contains("powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\rebuild_knowledge_projection.ps1 -Source SP -SourceRoot .\data\sp-authority -Target .\data\ka-projection")) `
         -Message "Projection régénérable sans reconstruction"
 
     $categoryRows = Read-M013MarkdownTable `
@@ -277,6 +350,7 @@ function Assert-M013RetentionPolicyDocument {
         $row = $rowsByCategory[$category]
         Assert-M013Condition -Condition (-not [string]::IsNullOrWhiteSpace($row[$durationHeader])) -Message "Durée de rétention absente"
         Assert-M013Condition -Condition ($row[$durationHeader] -eq $expectedDurations[$category]) -Message "Durée de rétention invalide pour ${category}: $($row[$durationHeader])"
+        Assert-M013Condition -Condition ($row["Contexte"].Trim("``") -eq $expectedContexts[$category]) -Message "Contexte de catégorie durable incohérent: $category"
         foreach ($column in @("Contexte", "Artefact durable", $operationHeader, "Justification", "Audit", "Lecture compatible", "Garde-fou")) {
             Assert-M013Condition -Condition (-not [string]::IsNullOrWhiteSpace($row[$column])) -Message "Colonne $column absente pour $category"
         }
@@ -358,6 +432,7 @@ $resolvedTestGatePath = Resolve-M013RequiredPath -Path $TestGatePath -DefaultRel
 $resolvedLintGatePath = Resolve-M013RequiredPath -Path $LintGatePath -DefaultRelativePath $defaultLintGatePath -Label "gate lint"
 
 Invoke-M013RetentionDomainCheck
+Assert-M013ReconstructionCommand -ScriptDirectory (Split-Path -Parent $resolvedTestGatePath)
 
 $policyContent = (Get-Content -Raw -Encoding UTF8 -LiteralPath $resolvedPolicyPath).TrimStart([char] 0xFEFF)
 $policyLines = @(Get-Content -Encoding UTF8 -LiteralPath $resolvedPolicyPath)

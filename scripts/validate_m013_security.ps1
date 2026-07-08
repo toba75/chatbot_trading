@@ -99,6 +99,7 @@ $forbiddenAuditPatterns = @(
     "QDRANT_API_KEY\s*=",
     "GEMMA_API_KEY\s*=",
     "VLLM_API_KEY\s*=",
+    "Authorization:\s*Bearer",
     "SECRET_INTERDIT_M013"
 )
 

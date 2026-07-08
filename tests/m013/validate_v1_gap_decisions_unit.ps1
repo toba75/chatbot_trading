@@ -71,6 +71,21 @@ def decision(**overrides):
     return V1GapDecision(**payload)
 
 
+def source_statuses(**overrides):
+    payload = {
+        "SP": V1_GAP_STATUS_DEFERRED,
+        "KA": V1_GAP_STATUS_DEFERRED,
+        "EG": V1_GAP_STATUS_SATISFIED,
+        "RA": V1_GAP_STATUS_DEFERRED,
+        "CV": V1_GAP_STATUS_SATISFIED,
+        "SD": V1_GAP_STATUS_BLOCKING,
+        "LLM": V1_GAP_STATUS_BLOCKING,
+        "EX": V1_GAP_STATUS_SATISFIED,
+    }
+    payload.update(overrides)
+    return payload
+
+
 policy = V1GapDecisionPolicy(policy_version=V1_GAP_DECISION_POLICY_VERSION)
 
 assert_raises("statut M-012 inconnu", lambda: decision(m012_status="ouvert"))
@@ -94,7 +109,15 @@ assert_raises(
     "décision contredit M-012",
     lambda: policy.publish_register(
         register_id="REG-M013-CONTRADICTION",
-        source_statuses_by_context={"KA": V1_GAP_STATUS_SATISFIED},
+        source_statuses_by_context=source_statuses(KA=V1_GAP_STATUS_SATISFIED),
+        decisions=(decision(),),
+    ),
+)
+assert_raises(
+    "statut source M-012 absent: SP",
+    lambda: policy.publish_register(
+        register_id="REG-M013-SOURCE-INCOMPLETE",
+        source_statuses_by_context={"KA": V1_GAP_STATUS_DEFERRED},
         decisions=(decision(),),
     ),
 )
@@ -102,8 +125,15 @@ assert_raises(
     "écart V1 dupliqué",
     lambda: policy.publish_register(
         register_id="REG-M013-DUPLICATE",
-        source_statuses_by_context={"KA": V1_GAP_STATUS_DEFERRED},
-        decisions=(decision(), decision(context="SP", gap_id="V1-GAP-M012-KA-RECALL")),
+        source_statuses_by_context=source_statuses(),
+        decisions=(
+            decision(),
+            decision(
+                context="SP",
+                v1_criterion_id="V1-SP-QUALITE-DOCUMENTAIRE",
+                gap_id="V1-GAP-M012-KA-RECALL",
+            ),
+        ),
     ),
 )
 

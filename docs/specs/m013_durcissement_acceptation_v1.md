@@ -17,7 +17,7 @@
 
 ## Mission M-013
 
-M-013 transforme les critères V1, les écarts M-012 et les exigences d'exploitation locale en gates testables. La mission ne déclare jamais une acceptation implicite: chaque critère V1 possède un test, une preuve ou un écart explicite, et un écart bloquant ou un écart non accepté interdit le V1AcceptanceReport.
+M-013 transforme les critères V1, les écarts M-012 et les exigences d'exploitation locale en gates testables. La mission ne déclare jamais une acceptation implicite: chaque critère V1 possède un test, une preuve ou un écart explicite, et un écart bloquant ou un écart non accepté interdit le verdict `acceptée` du `V1AcceptanceReport`.
 
 M-013 consomme les preuves de SP, KA, EG, RA, CV, SD, EX, EV et `platform`. Elle ne prend pas possession des données métier de ces contextes et ne requalifie pas les tests scientifiques RED conservés par M-012.
 

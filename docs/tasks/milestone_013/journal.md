@@ -139,3 +139,9 @@
 - Verdict livré: V1 non acceptée; EG, CV et EX sont acceptés, SP, KA et RA restent différés non acceptés, SD et LLM restent bloquants et interdisent explicitement le verdict `acceptée`.
 - Preuves agrégées: décisions d'écarts, régression, sécurité réseau, panne Spark, sauvegarde/restauration, rétention, monitoring, runbooks, anti-patterns, traçabilité et gates finales.
 - ADR: non requise; T-012 agrège ADR-010, DDD-ADR-010 et DDD-ADR-011 sans changer de décision structurante.
+
+## Revue locale M-013 - corrections post-implémentation
+
+- RED: la revue locale a ajouté des cas de régression sur rapports V1 fabriqués, registres d'écarts factices, hashes de sauvegarde de remplissage, incohérences contexte/artefact, monitoring mal corrélé, sortie de gate finale incomplète et commandes de régression vides.
+- GREEN: les validateurs M-013 refusent désormais les preuves synthétiques, les contextes incompatibles, les digests non probants, les restaurations destructives, les rapports d'acceptation incomplets et les commandes vides avant exécution réelle; les runbooks de certificats Spark, purge administrative et rapport d'acceptation V1 sont publiés.
+- Validation finale: `scripts/test.ps1` GREEN avec `Gate test GREEN: 34 validation(s), 292 test(s).`; le rapport d'acceptation V1 conserve ce comptage réel.

@@ -339,6 +339,27 @@ foreach ($row in $gateRows) {
     Assert-Command -Command $row["Commande"] -Message "commande finale absente: $($row["Gate"])"
 }
 
+$outputProofRows = Read-MarkdownTable `
+    -Lines $reportLines `
+    -RequiredHeaders @("Commande", "Sortie capturée") `
+    -TableName "preuves de sortie des gates finales"
+$outputProofByCommand = @{}
+foreach ($row in $outputProofRows) {
+    $command = $row["Commande"]
+    Assert-Command -Command $command -Message "commande finale absente: preuve de sortie"
+    Assert-Condition -Condition (-not [string]::IsNullOrWhiteSpace($row["Sortie capturée"])) -Message "preuve de sortie absente: $command"
+    if ($command -eq "powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1") {
+        Assert-Contains -Content $row["Sortie capturée"] -Expected "Gate lint GREEN:" -Message "preuve de sortie lint incomplète"
+    }
+    if ($command -eq "powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1") {
+        Assert-Contains -Content $row["Sortie capturée"] -Expected "Gate test GREEN:" -Message "preuve de sortie test incomplète"
+    }
+    $outputProofByCommand[$command] = $row["Sortie capturée"]
+}
+foreach ($command in $requiredFinalCommands) {
+    Assert-Condition -Condition ($outputProofByCommand.ContainsKey($command)) -Message "preuve de sortie absente: $command"
+}
+
 foreach ($marker in @(
     "REQ-M013-012",
     "tests/m013/validate_v1_acceptance_report_acceptance.ps1",

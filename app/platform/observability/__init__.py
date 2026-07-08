@@ -25,6 +25,7 @@ _M013_REQUIRED_METRICS = (
     "job_queue_depth",
     "outbox_pending_total",
     "llm_gateway_latency_ms",
+    "llm_gateway_output_interrupted_total",
     "spark_inference_availability",
     "backup_restore_result",
     "v1_gap_status",
@@ -877,17 +878,18 @@ def build_m013_local_monitoring_profile() -> LocalMonitoringProfile:
             _m013_signal("MON-M013-001", "platform", "edge-gateway", "v1_health_status", "santé"),
             _m013_signal("MON-M013-002", "SP", "source-processing", "v1_error_total", "erreurs"),
             _m013_signal("MON-M013-003", "KA", "knowledge-access", "v1_latency_ms", "latence"),
-            _m013_signal("MON-M013-004", "platform", "job-runtime", "job_queue_depth", "jobs"),
-            _m013_signal("MON-M013-005", "platform", "outbox", "outbox_pending_total", "outbox"),
+            _m013_signal("MON-M013-004", "platform", "job-runtime", "job_queue_depth", "jobs", "job_id"),
+            _m013_signal("MON-M013-005", "platform", "outbox", "outbox_pending_total", "outbox", "event_id"),
             _m013_signal("MON-M013-006", "RA", "llm-gateway", "llm_gateway_latency_ms", "gateway"),
-            _m013_signal("MON-M013-007", "platform", "spark-inference", "spark_inference_availability", "Spark"),
-            _m013_signal("MON-M013-008", "platform", "backup-restore", "backup_restore_result", "sauvegarde"),
-            _m013_signal("MON-M013-009", "EV", "v1-acceptance-gate", "v1_gap_status", "écarts"),
-            _m013_signal("MON-M013-010", "platform", "network-boundary", "network_security_violation_total", "sécurité"),
-            _m013_signal("MON-M013-011", "EG", "evidence-governance", "claim_verification_error_total", "erreurs"),
-            _m013_signal("MON-M013-012", "CV", "conversation", "conversation_turn_latency_ms", "latence"),
-            _m013_signal("MON-M013-013", "SD", "strategy-design", "strategy_snapshot_block_total", "écarts"),
-            _m013_signal("MON-M013-014", "EX", "experimentation", "experiment_job_latency_ms", "jobs"),
+            _m013_signal("MON-M013-007", "RA", "llm-gateway", "llm_gateway_output_interrupted_total", "gateway"),
+            _m013_signal("MON-M013-008", "platform", "spark-inference", "spark_inference_availability", "Spark"),
+            _m013_signal("MON-M013-009", "platform", "backup-restore", "backup_restore_result", "sauvegarde", "restore_test_result"),
+            _m013_signal("MON-M013-010", "EV", "v1-acceptance-gate", "v1_gap_status", "écarts", "gap_id"),
+            _m013_signal("MON-M013-011", "platform", "network-boundary", "network_security_violation_total", "sécurité"),
+            _m013_signal("MON-M013-012", "EG", "evidence-governance", "claim_verification_error_total", "erreurs", "claim_id"),
+            _m013_signal("MON-M013-013", "CV", "conversation", "conversation_turn_latency_ms", "latence", "conversation_id"),
+            _m013_signal("MON-M013-014", "SD", "strategy-design", "strategy_snapshot_block_total", "écarts", "strategy_id"),
+            _m013_signal("MON-M013-015", "EX", "experimentation", "experiment_job_latency_ms", "jobs", "experiment_id"),
         ),
         local_only=True,
         external_export_enabled_by_default=False,
@@ -940,8 +942,8 @@ def build_m013_resource_profile() -> ResourceProfile:
                 "storage_budget=1TiB",
             ),
         ),
-        vllm_image_digest="sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        model_revision="gemma-m013-v1-benchmark-revision",
+        vllm_image_digest="sha256:6d1f6e9126b8cf23f2ac089a21e2f39c57ef8b5fcb16f312c5e00bb05cda73a9",
+        model_revision="nvidia/Gemma-4-31B-IT-NVFP4@LLMRUN-M012-REAL-PATH-0001",
         concurrency=BenchmarkedResourceSetting(
             setting_name="concurrence sourcée par benchmark requise",
             value=4,
@@ -966,6 +968,7 @@ def _m013_signal(
     component: str,
     metric_name: str,
     metric_family: str,
+    correlation_field: str = "trace_id",
 ) -> MonitoringSignal:
     return MonitoringSignal(
         signal_id=signal_id,
@@ -974,7 +977,7 @@ def _m013_signal(
         metric_name=metric_name,
         metric_family=metric_family,
         owner=context,
-        correlation_field="trace_id",
+        correlation_field=correlation_field,
         retention_hours=M013_LOCAL_LOG_RETENTION_HOURS,
         local_only=True,
         external_export_enabled_by_default=False,
@@ -1230,6 +1233,8 @@ def _required_vllm_digest(value: Any) -> str:
     digest = text.removeprefix("sha256:")
     if re.fullmatch(r"[0-9a-f]{64}", digest) is None:
         raise ValueError("image vLLM épinglée requise")
+    if len(set(digest)) == 1:
+        raise ValueError("image vLLM placeholder interdite")
     return text
 
 

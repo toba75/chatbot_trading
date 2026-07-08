@@ -40,8 +40,13 @@
 | `INSUFFICIENT_EVIDENCE` | Les preuves sont insuffisantes; l'abstention est attendue. |
 | `CONFLICTING_EVIDENCE` | Des preuves contradictoires empêchent une conclusion simple. |
 | `LLM_UNAVAILABLE` | Spark est indisponible avant génération complète. |
+| `LLM_FIRST_TOKEN_TIMEOUT` | Le premier token n'est pas arrivé dans le délai attendu; aucune réponse factuelle n'est publiée. |
+| `LLM_TLS_CERTIFICATE_INVALID` | Le certificat TLS Spark est refusé; l'appel LLM reste bloqué. |
+| `LLM_AUTHENTICATION_FAILED` | L'authentification Spark échoue; aucun provider de remplacement n'est utilisé. |
 | `LLM_PARTIAL_OUTPUT` | Une sortie partielle n'est pas publiable comme fait. |
-| `BLOCKED` | Un écart bloquant ou une preuve absente interdit l'acceptation V1. |
+| `LLM_CIRCUIT_OPEN` | Le circuit breaker est ouvert après panne explicite; la récupération doit être prouvée. |
+| `LLM_RECOVERED` | Spark est de nouveau disponible après validation explicite du chemin gateway. |
+| `BLOCKED` | Un écart différé non accepté, un écart bloquant ou une preuve absente interdit l'acceptation V1. |
 
 ## Limites V1 et écarts V1
 
@@ -61,17 +66,20 @@
 - Démarrage local et arrêt: `docs/runbooks/exploitation_locale.md`.
 - Sauvegarde et restauration: `docs/runbooks/sauvegarde_restauration.md`.
 - Audit réseau et panne Spark: `docs/runbooks/spark_reseau_incidents.md`.
+- Certificats Spark: `docs/runbooks/certificats_spark.md`.
 - Monitoring local: `docs/runbooks/monitoring_local.md`.
 - Ingestion PDF: `docs/runbooks/ingestion_pdf.md`.
 - Conversation V1: `docs/runbooks/conversation_v1.md`.
 - Recherche approfondie: `docs/runbooks/recherche_approfondie.md`.
 - Stratégie et backtest: `docs/runbooks/strategie_backtest.md`.
+- Purge administrative: `docs/runbooks/purge_administrative.md`.
+- Rapport d'acceptation V1: `docs/runbooks/rapport_acceptation_v1.md`.
 
 ## Garde-fous utilisateur
 
 - Les résultats de stratégie et backtest sont des mesures pilotes descriptives.
 - Aucune promesse financière.
 - Aucun conseil d'investissement.
-- Aucun secret, prompt complet, preuve complète, réponse complète ou donnée de marché complète n'est publié.
+- Aucun secret, prompt complet, preuve complète, réponse complète ou donnée de marché complète n'est publié dans les logs, métriques ou preuves d'exploitation.
 - Aucun fallback silencieux: une panne ou une limite produit un statut public explicite.
 - Les services internes restent locaux et non publiés.

@@ -19,10 +19,10 @@
 
 Le manifeste `M013-BackupManifest-1.0` est la preuve versionnée de périmètre et d'intégrité. Il déclare pour chaque entrée: contexte propriétaire, catégorie d'artefact, identifiant stable, hôte de stockage, statut d'autorité, statut de projection régénérable, hash sauvegardé, hash restauré et preuve de conservation.
 
-- Commande de sauvegarde: `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\backup_v1.ps1 -Manifest .\restore\manifest.json`
+- Commande de contrôle du manifeste de sauvegarde: `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\backup_v1.ps1 -Manifest .\restore\manifest.json`
 - Commande de restauration: `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\restore_v1.ps1 -Manifest .\restore\manifest.json -Target C:\restore\m013-isolated`
 - Cible: cible locale isolée.
-- Chiffrement: archive chiffrée requise avec preuve `ciphertext_sha256`.
+- Chiffrement: archive chiffrée requise avec preuve `ciphertext_sha256` non placeholder.
 - Clé: clé hors dépôt, jamais versionnée, sans valeur de secret publiée.
 - Résultat requis: `restore_test_result`.
 
@@ -60,7 +60,7 @@ Le manifeste `M013-BackupManifest-1.0` est la preuve versionnée de périmètre 
 | CTRL-M013-BACKUP-002 | archive chiffrée requise | Le manifeste porte une preuve `ciphertext_sha256` sans clé publiée. |
 | CTRL-M013-BACKUP-003 | clé hors dépôt | Le champ de clé référence `hors_depot://cle-restauration/m013` sans secret versionné. |
 | CTRL-M013-BACKUP-004 | aucun secret en Git | Le drill ne contient aucun mot de passe, clé API, token bearer ou clé privée. |
-| CTRL-M013-BACKUP-005 | hashes restaurés vérifiés | Chaque entrée porte un hash sauvegardé et un hash restauré identiques. |
+| CTRL-M013-BACKUP-005 | hashes restaurés vérifiés | Chaque entrée porte un hash sauvegardé et un hash restauré identiques, calculés et non placeholders. |
 | CTRL-M013-BACKUP-006 | identifiants stables préservés | Les identifiants restaurés restent ceux du manifeste. |
 | CTRL-M013-BACKUP-007 | résultats négatifs et supersédés conservés | EG, RA, SD, EX et EV restent consultables après restauration. |
 | CTRL-M013-BACKUP-008 | projections régénérables non autorité | KA/Qdrant est restaurable ou reconstruisible, sans devenir source métier. |

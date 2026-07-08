@@ -15,7 +15,10 @@
     [string] $TestGatePath,
 
     [Parameter(Mandatory = $false)]
-    [string] $LintGatePath
+    [string] $LintGatePath,
+
+    [Parameter(Mandatory = $false)]
+    [switch] $ExecuteRegressionCommands
 )
 
 $ErrorActionPreference = "Stop"
@@ -237,6 +240,55 @@ function Assert-Command {
     }
 }
 
+function Resolve-CommandScript {
+    param(
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyString()]
+        [string] $Command,
+
+        [Parameter(Mandatory = $true)]
+        [string] $Label
+    )
+
+    Assert-Command -Command $Command -Label $Label
+    if ($Command -notmatch "^powershell -NoProfile -ExecutionPolicy Bypass -File \.\\(?<script>[^\s]+)(?<args>.*)$") {
+        throw "commande invalide: $Label"
+    }
+
+    $scriptPath = $Matches["script"].Replace("\", "/")
+    return [pscustomobject] @{
+        ScriptPath = Resolve-RequiredPath -Path $scriptPath -DefaultRelativePath $scriptPath -Label "commande regression $Label"
+        Arguments = $Matches["args"].Trim()
+    }
+}
+
+function Invoke-RegressionCommand {
+    param(
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyString()]
+        [string] $Command,
+
+        [Parameter(Mandatory = $true)]
+        [string] $Label
+    )
+
+    if (-not $ExecuteRegressionCommands.IsPresent) {
+        Resolve-CommandScript -Command $Command -Label $Label | Out-Null
+        return
+    }
+
+    if (-not $executedRegressionCommands.Add($Command)) {
+        return
+    }
+
+    $resolvedCommand = Resolve-CommandScript -Command $Command -Label $Label
+    Assert-Condition -Condition ([string]::IsNullOrWhiteSpace($resolvedCommand.Arguments)) -Message "commande de régression avec arguments non supportés: $Label"
+    $output = & powershell -NoProfile -ExecutionPolicy Bypass -File $resolvedCommand.ScriptPath 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        throw "commande de régression RED: $Label`n$($output -join "`n")"
+    }
+}
+
 function Assert-ArtifactMarker {
     param(
         [Parameter(Mandatory = $true)]
@@ -275,6 +327,7 @@ $resolvedSourceGapReportPath = Resolve-RequiredPath -Path $SourceGapReportPath -
 $resolvedMatrixPath = Resolve-RequiredPath -Path $MatrixPath -DefaultRelativePath "docs/traceability/matrix.md" -Label "matrix"
 $resolvedTestGatePath = Resolve-RequiredPath -Path $TestGatePath -DefaultRelativePath "scripts/test.ps1" -Label "test gate"
 $resolvedLintGatePath = Resolve-RequiredPath -Path $LintGatePath -DefaultRelativePath "scripts/lint.ps1" -Label "lint gate"
+$executedRegressionCommands = New-Object "System.Collections.Generic.HashSet[string]"
 
 $suiteContent = Get-Content -Raw -Encoding UTF8 -LiteralPath $resolvedSuitePath
 Assert-NoSensitivePayload -Content $suiteContent -ForbiddenMarkers $defaultForbiddenSensitiveMarkers
@@ -372,7 +425,7 @@ foreach ($criterionId in $expectedCriteria.Keys) {
     Assert-Condition -Condition ($context -eq $expected.Context) -Message "contexte invalide pour critère: $criterionId"
     Assert-Condition -Condition ($allowedVerdicts -contains $verdict) -Message "verdict invalide pour critère: $criterionId"
     Assert-Condition -Condition ($verdict -eq $expected.Verdict) -Message "verdict contredit les décisions M-013: $criterionId"
-    Assert-Command -Command ([string] $criterion.regression_command) -Label $criterionId
+    Invoke-RegressionCommand -Command ([string] $criterion.regression_command) -Label $criterionId
     $criterionEvidence = Assert-ArtifactMarker `
         -Path ([string] $criterion.evidence_artifact_path) `
         -Marker ([string] $criterion.evidence_marker) `
@@ -405,7 +458,7 @@ foreach ($journey in $journeys) {
 
     $fixtureId = [string] $journey.fixture_id
     Assert-Condition -Condition ($fixturesById.ContainsKey($fixtureId)) -Message "fixture non déclarée: $fixtureId"
-    Assert-Command -Command ([string] $journey.command) -Label $journeyId
+    Invoke-RegressionCommand -Command ([string] $journey.command) -Label $journeyId
 
     Assert-Condition -Condition ([bool] $journey.uses_internal_contract -eq $false) -Message "dépendance directe à un stockage interne: $journeyId"
     Assert-Condition -Condition ([bool] $journey.mutates_immutable_artifacts -eq $false) -Message "artefact immuable muté: $journeyId"

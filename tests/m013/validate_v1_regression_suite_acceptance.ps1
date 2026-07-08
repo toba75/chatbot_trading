@@ -22,7 +22,8 @@ function Invoke-M013RegressionValidator {
             -SourceGapReportPath $sourceGapReportPath `
             -MatrixPath $matrixPath `
             -TestGatePath $testGatePath `
-            -LintGatePath $lintGatePath 2>&1
+            -LintGatePath $lintGatePath `
+            -ExecuteRegressionCommands 2>&1
         $exitCode = $LASTEXITCODE
     }
     finally {

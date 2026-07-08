@@ -33,6 +33,7 @@ $requiredMetrics = @(
     "job_queue_depth",
     "outbox_pending_total",
     "llm_gateway_latency_ms",
+    "llm_gateway_output_interrupted_total",
     "spark_inference_availability",
     "backup_restore_result",
     "v1_gap_status",
@@ -60,6 +61,7 @@ $requiredMonitoringMarkers = @(
     "restore_test_result",
     "circuit breaker",
     "retry avant premier token",
+    "llm_gateway_output_interrupted_total",
     "v1_gap_status",
     "network_security_violation_total"
 )
@@ -70,8 +72,8 @@ $requiredResourceMarkers = @(
     "ResourceProfilePolicy",
     "Profil CPU/GPU/I/O docker-local",
     "DGX Spark",
-    "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    "gemma-m013-v1-benchmark-revision",
+    "sha256:6d1f6e9126b8cf23f2ac089a21e2f39c57ef8b5fcb16f312c5e00bb05cda73a9",
+    "nvidia/Gemma-4-31B-IT-NVFP4@LLMRUN-M012-REAL-PATH-0001",
     "Concurrence sourcée par benchmark",
     "Longueur de contexte sourcée par benchmark",
     "docs/evaluation/m012/llm_real_path_benchmark_report.md",
@@ -245,6 +247,9 @@ function Assert-M013ResourceProfileDocument {
 
     if (-not [regex]::IsMatch($ResourceProfileContent, "sha256:[0-9a-f]{64}")) {
         throw "Image vLLM épinglée requise"
+    }
+    if ([regex]::IsMatch($ResourceProfileContent, "sha256:([0-9a-f])\1{63}")) {
+        throw "Image vLLM placeholder interdite"
     }
 
     foreach ($marker in $requiredResourceMarkers) {

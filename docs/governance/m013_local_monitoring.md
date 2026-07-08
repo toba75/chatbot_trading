@@ -39,6 +39,7 @@
 | `job_queue_depth` | `platform` | `job-runtime` | jobs | `platform` | `job_id` | 72 heures | benchmark M-012 et validation M-013 | interdit |
 | `outbox_pending_total` | `platform` | `outbox` | outbox | `platform` | `event_id` | 72 heures | benchmark M-012 et validation M-013 | interdit |
 | `llm_gateway_latency_ms` | `RA` | `llm-gateway` | gateway | `RA` | `trace_id` | 72 heures | `docs/evaluation/m012/llm_real_path_benchmark_report.md` | interdit |
+| `llm_gateway_output_interrupted_total` | `RA` | `llm-gateway` | gateway | `RA` | `trace_id` | 72 heures | `docs/governance/m013_spark_failure_drill.md` | interdit |
 | `spark_inference_availability` | `platform` | `spark-inference` | Spark | `platform` | `trace_id` | 72 heures | `docs/governance/m013_spark_failure_drill.md` | interdit |
 | `backup_restore_result` | `platform` | `backup-restore` | sauvegarde restauration | `platform` | `restore_test_result` | 72 heures | `docs/governance/m013_backup_restore_drill.md` | interdit |
 | `v1_gap_status` | `EV` | `v1-acceptance-gate` | écarts | `EV` | `gap_id` | 72 heures | `docs/governance/m013_v1_gap_decisions.md` | interdit |

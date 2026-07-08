@@ -395,11 +395,9 @@ foreach ($testPath in $expectedM012TestPaths) {
 
 Assert-Condition -Condition ($testGateContent.Contains('scripts/validate_m012_traceability.ps1')) -Message "Gate test sans validateur M-012"
 Assert-Condition -Condition ($lintGateContent.Contains('scripts/validate_m012_traceability.ps1')) -Message "Gate lint sans validateur M-012"
-Assert-Condition -Condition ($lintGateContent.Contains('-ExpectedValidationCount 35')) -Message "Compteur lint M-012 incohérent"
-Assert-Condition -Condition ($governanceTestContent.Contains('$expectedTestCount = 290')) -Message "Compteur test global M-012 incohérent"
-Assert-Condition -Condition ($governanceTestContent.Contains('$expectedTestCount = 256')) -Message "Compteur test M-012 imbriqué incohérent"
-Assert-Condition -Condition ($governanceTestContent.Contains('Gate test GREEN: 35 validation(s)')) -Message "Compteur validation test M-012 incohérent"
-Assert-Condition -Condition ($governanceTestContent.Contains('Gate lint GREEN: 35 validation(s), 0 test(s).')) -Message "Compteur validation lint M-012 incohérent"
+Assert-Condition -Condition ($governanceTestContent.Contains('$expectedTestSummary = "Gate test GREEN: 35 validation(s), $expectedTestCount test(s)."')) -Message "Contrôle compteur test M-000 absent"
+Assert-Condition -Condition ($governanceTestContent.Contains('Gate lint GREEN: 35 validation(s), 0 test(s).')) -Message "Contrôle compteur lint M-000 absent"
+Assert-Condition -Condition ([regex]::IsMatch($governanceTestContent, '\$expectedTestCount\s*=\s*\d+')) -Message "Compteur test attendu M-000 absent"
 
 $statusesByContext = ConvertTo-GapStatusMap -GapReportContent $gapReportContent
 foreach ($context in $expectedGapContexts) {

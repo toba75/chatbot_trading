@@ -21,8 +21,8 @@
 
 | Élément | Valeur | Source | Garde-fou |
 |---|---|---|---|
-| Image vLLM | `sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa` | registre interne versionné V1 | Image vLLM épinglée requise; `latest` interdit. |
-| Modèle Gemma | `gemma-m013-v1-benchmark-revision` | `docs/evaluation/m012/llm_real_path_benchmark_report.md` | Modèle révisionné requis avant acceptation. |
+| Image vLLM | `sha256:6d1f6e9126b8cf23f2ac089a21e2f39c57ef8b5fcb16f312c5e00bb05cda73a9` | registre interne versionné V1, attestation `LLMRUN-M012-REAL-PATH-0001` | Image vLLM épinglée requise; `latest` et digest placeholder interdits. |
+| Modèle Gemma | `nvidia/Gemma-4-31B-IT-NVFP4@LLMRUN-M012-REAL-PATH-0001` | `docs/evaluation/m012/llm_real_path_benchmark_report.md` | Modèle révisionné requis avant acceptation. |
 | Runtime Spark | `spark-inference` | ADR-007, ADR-008, ADR-009 | Aucun état métier durable sur Spark. |
 
 ## Réglages vLLM

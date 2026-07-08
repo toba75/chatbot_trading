@@ -12,11 +12,20 @@ $temporaryRoot = Join-Path $repoRoot (".tmp_m013_acceptance_report_unit_" + [Sys
 
 $pythonCode = @'
 import sys
+from types import SimpleNamespace
 
 repo_root = sys.argv[1]
 if repo_root not in sys.path:
     sys.path.insert(0, repo_root)
 
+from app.evaluation.domain.v1_gap_decisions import (
+    V1_GAP_DECISION_ACCEPTED,
+    V1_GAP_DECISION_POLICY_VERSION,
+    V1_GAP_STATUS_SATISFIED,
+    V1GapDecision,
+    V1GapDecisionPolicy,
+    build_m013_v1_gap_decision_register,
+)
 from app.evaluation.domain.v1_acceptance_report import (
     V1_ACCEPTANCE_REPORT_POLICY_VERSION,
     V1_ACCEPTANCE_STATUS_ACCEPTED,
@@ -25,6 +34,7 @@ from app.evaluation.domain.v1_acceptance_report import (
     V1_ACCEPTANCE_STATUS_REJECTED,
     V1AcceptanceCriterionVerdict,
     V1AcceptanceFinalGate,
+    V1AcceptanceReport,
     V1AcceptanceReportPolicy,
     build_m013_v1_acceptance_report,
 )
@@ -75,6 +85,32 @@ def final_gate(**overrides):
     return V1AcceptanceFinalGate(**payload)
 
 
+def accepted_gap_register(criteria):
+    policy = V1GapDecisionPolicy(policy_version=V1_GAP_DECISION_POLICY_VERSION)
+    return policy.publish_register(
+        register_id="REG-M013-V1-GAP-DECISIONS-ACCEPTED-UNIT",
+        source_statuses_by_context={item.context: V1_GAP_STATUS_SATISFIED for item in criteria},
+        decisions=tuple(
+            V1GapDecision(
+                gap_id=f"V1-GAP-M013-ACCEPTED-{item.context}",
+                context=item.context,
+                m012_status=V1_GAP_STATUS_SATISFIED,
+                decision_status=V1_GAP_DECISION_ACCEPTED,
+                v1_criterion_id=item.criterion_id,
+                benchmark_source_id=f"BENCH-M013-ACCEPTED-{item.context}",
+                calibration_decision_id=f"DEC-M013-ACCEPTED-{item.context}",
+                source_report_path="docs/governance/m012_v1_gap_report.md",
+                evidence_command=item.evidence_command,
+                correction_command="Non applicable: écart accepté.",
+                m013_green_proof="Preuve acceptée M-013.",
+                non_acceptance_justification="Non applicable: écart satisfait et accepté.",
+                acceptance_impact="Ne bloque pas l'acceptation V1.",
+            )
+            for item in criteria
+        ),
+    )
+
+
 # Given les décisions M-013 contiennent des critères satisfaits, différés et bloquants.
 # When V1AcceptanceReportPolicy publie le rapport final.
 # Then chaque critère possède verdict, preuve, ADR et commande, et tout bloquant
@@ -101,6 +137,24 @@ assert_equal(report.acceptance_allowed, False, "L'acceptation V1 doit être refu
 assert any(item.verdict == V1_ACCEPTANCE_STATUS_DEFERRED for item in report.criteria), "Un verdict différé doit rester distingué."
 assert any(item.verdict == V1_ACCEPTANCE_STATUS_BLOCKING for item in report.criteria), "Un verdict bloquant doit rester distingué."
 assert any(item.verdict == V1_ACCEPTANCE_STATUS_ACCEPTED for item in report.criteria), "Les critères satisfaits doivent rester acceptés explicitement."
+assert_raises(
+    "critères V1 requis",
+    lambda: policy.validate_report(
+        V1AcceptanceReport(
+            report_id="REPORT-M013-FABRIQUE",
+            policy_version=V1_ACCEPTANCE_REPORT_POLICY_VERSION,
+            specification_version="docs/specs/m013_durcissement_acceptation_v1.md",
+            criteria=(),
+            final_gates=(),
+            non_accepted_gaps=(),
+            blocking_gaps=(),
+            traceability_requirement_id="REQ-M013-012",
+            definition_of_done_ref="docs/governance/definition_of_done.md",
+            acceptance_allowed=True,
+            final_verdict=V1_ACCEPTANCE_STATUS_ACCEPTED,
+        )
+    ),
+)
 
 assert_raises(
     "critère V1 absent: V1-LLM-CHECKPOINT-PRINCIPAL",
@@ -109,6 +163,49 @@ assert_raises(
         specification_version="docs/specs/m013_durcissement_acceptation_v1.md",
         criteria=tuple(item for item in report.criteria if item.criterion_id != "V1-LLM-CHECKPOINT-PRINCIPAL"),
         final_gates=report.final_gates,
+        gap_decision_register=build_m013_v1_gap_decision_register(),
+        traceability_requirement_id="REQ-M013-012",
+        definition_of_done_ref="docs/governance/definition_of_done.md",
+    ),
+)
+assert_raises(
+    "registre d'écarts V1 requis",
+    lambda: policy.publish_report(
+        report_id="REPORT-M013-FAUX-REGISTRE",
+        specification_version="docs/specs/m013_durcissement_acceptation_v1.md",
+        criteria=report.criteria,
+        final_gates=report.final_gates,
+        gap_decision_register=SimpleNamespace(
+            decisions_by_context={
+                context: SimpleNamespace(decision_status="accepté")
+                for context in ("SP", "KA", "EG", "RA", "CV", "SD", "LLM", "EX")
+            }
+        ),
+        traceability_requirement_id="REQ-M013-012",
+        definition_of_done_ref="docs/governance/definition_of_done.md",
+    ),
+)
+assert_raises(
+    "écart non accepté toujours actif: SP",
+    lambda: policy.publish_report(
+        report_id="REPORT-M013-ACCEPTE-OBSOLETE",
+        specification_version="docs/specs/m013_durcissement_acceptation_v1.md",
+        criteria=tuple(
+            criterion(
+                criterion_id=item.criterion_id,
+                context=item.context,
+                verdict=V1_ACCEPTANCE_STATUS_ACCEPTED,
+                evidence_artifact=item.evidence_artifact,
+                evidence_command=item.evidence_command,
+                adr_refs=item.adr_refs,
+                gap_status="satisfait",
+                decision="accepté",
+                final_impact="Critère V1 satisfait et accepté.",
+            )
+            for item in report.criteria
+        ),
+        final_gates=report.final_gates,
+        gap_decision_register=build_m013_v1_gap_decision_register(),
         traceability_requirement_id="REQ-M013-012",
         definition_of_done_ref="docs/governance/definition_of_done.md",
     ),
@@ -139,6 +236,7 @@ accepted_report = policy.publish_report(
         )
         for item in report.final_gates
     ),
+    gap_decision_register=accepted_gap_register(report.criteria),
     traceability_requirement_id="REQ-M013-012",
     definition_of_done_ref="docs/governance/definition_of_done.md",
 )
@@ -321,6 +419,26 @@ try {
             param($projectRoot)
             $path = Join-Path $projectRoot "docs/governance/m013_v1_acceptance_report.md"
             (Get-Content -Raw -Encoding UTF8 -LiteralPath $path).Replace("powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_acceptance.ps1", "") |
+                Set-Content -Encoding UTF8 -LiteralPath $path
+        }
+
+    Assert-ValidatorFails `
+        -Name "preuve-sortie-absente" `
+        -ExpectedMessage "preuve de sortie absente" `
+        -Mutate {
+            param($projectRoot)
+            $path = Join-Path $projectRoot "docs/governance/m013_v1_acceptance_report.md"
+            (Get-Content -Raw -Encoding UTF8 -LiteralPath $path).Replace("Gate test GREEN: 34 validation(s), 292 test(s).", "") |
+                Set-Content -Encoding UTF8 -LiteralPath $path
+        }
+
+    Assert-ValidatorFails `
+        -Name "preuve-test-incomplete" `
+        -ExpectedMessage "preuve de sortie test incomplète" `
+        -Mutate {
+            param($projectRoot)
+            $path = Join-Path $projectRoot "docs/governance/m013_v1_acceptance_report.md"
+            (Get-Content -Raw -Encoding UTF8 -LiteralPath $path).Replace("Gate test GREEN: 34 validation(s), 292 test(s).", "Sortie test sans verdict") |
                 Set-Content -Encoding UTF8 -LiteralPath $path
         }
 

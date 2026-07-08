@@ -25,6 +25,7 @@ from app.platform.retention import (
     PURGE_CONVERSATION_CONTENT,
     PURGE_REGENERABLE_PROJECTION,
     RETENTION_POLICY_VERSION,
+    RetentionCategory,
     RetentionOperationRequest,
     RetentionPolicy,
     build_m013_retention_policy,
@@ -111,7 +112,7 @@ policy.validate_operation(
         category_id="KA_REGENERABLE_PROJECTIONS",
         operation=PURGE_REGENERABLE_PROJECTION,
         target_stable_identifiers=("PROJ-M013-UNIT-001",),
-        reconstruction_command="powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\rebuild_knowledge_projection.ps1 -Source SP",
+        reconstruction_command="powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\rebuild_knowledge_projection.ps1 -Source SP -SourceRoot .\\data\\sp-authority -Target .\\data\\ka-projection",
         read_compatibility_proof="Projection reconstruite depuis corpus et versions canoniques.",
         retains_negative_or_superseded=False,
     )
@@ -127,14 +128,41 @@ def policy_with_category(replacement):
     )
 
 
+def category_with_context(source, context):
+    return RetentionCategory(
+        category_id=source.category_id,
+        context=context,
+        artifact_kind=source.artifact_kind,
+        retention_months=source.retention_months,
+        allowed_operation=source.allowed_operation,
+        requires_justification=source.requires_justification,
+        requires_audit=source.requires_audit,
+        preserve_negative_or_superseded=source.preserve_negative_or_superseded,
+        regenerable_projection=source.regenerable_projection,
+        reconstruction_command=source.reconstruction_command,
+        read_compatibility_rule=source.read_compatibility_rule,
+        ordinary_purge_allowed=source.ordinary_purge_allowed,
+        cascade_allowed_to_knowledge=source.cascade_allowed_to_knowledge,
+        cascade_allowed_to_experiments=source.cascade_allowed_to_experiments,
+    )
+
+
 assert_raises(
-    "durée de rétention incohérente",
+    "incoh",
     lambda: policy_with_category(policy.categories_by_id["CV_CONVERSATIONS"].with_retention_months(1)),
+)
+assert_raises(
+    "incoh",
+    lambda: category_with_context(policy.categories_by_id["EG_CLAIMS"], "SP"),
 )
 assert_raises("durable inconnue", lambda: request(category_id="UNKNOWN"))
 assert_raises("absente", lambda: policy.categories_by_id["EG_CLAIMS"].with_retention_months(0))
 assert_raises("justification administrative requise", lambda: request(justification=""))
 assert_raises("audit administratif requis", lambda: request(audit_event_id=""))
+assert_raises(
+    "dupliqu",
+    lambda: request(target_stable_identifiers=("CLAIM-M013-UNIT-001", "CLAIM-M013-UNIT-001")),
+)
 assert_raises("suppression ordinaire interdite", lambda: request(operation=ORDINARY_PURGE))
 assert_raises("administrative non", lambda: request(operation=ADMINISTRATIVE_PURGE))
 assert_raises(
@@ -257,6 +285,7 @@ function New-FixtureProject {
     Copy-Item -LiteralPath (Join-Path $repoRoot "docs/adr/index.md") -Destination (Join-Path $projectRoot "docs/adr/index.md")
     Copy-Item -LiteralPath (Join-Path $repoRoot "scripts/test.ps1") -Destination (Join-Path $projectRoot "scripts/test.ps1")
     Copy-Item -LiteralPath (Join-Path $repoRoot "scripts/lint.ps1") -Destination (Join-Path $projectRoot "scripts/lint.ps1")
+    Copy-Item -LiteralPath (Join-Path $repoRoot "scripts/rebuild_knowledge_projection.ps1") -Destination (Join-Path $projectRoot "scripts/rebuild_knowledge_projection.ps1")
 
     return $projectRoot
 }
@@ -314,6 +343,16 @@ try {
         }
 
     Assert-ValidatorFails `
+        -Name "contexte-categorie-incoherent" `
+        -ExpectedMessage "EG_CLAIMS" `
+        -Mutate {
+            param($projectRoot)
+            $path = Join-Path $projectRoot "docs/governance/m013_retention_policy.md"
+            (Get-Content -Raw -Encoding UTF8 -LiteralPath $path).Replace("| EG_CLAIMS | 120 | EG |", "| EG_CLAIMS | 120 | SP |") |
+                Set-Content -Encoding UTF8 -LiteralPath $path
+        }
+
+    Assert-ValidatorFails `
         -Name "purge-ordinaire" `
         -ExpectedMessage "Purge ordinaire interdite" `
         -Mutate {
@@ -339,7 +378,7 @@ try {
         -Mutate {
             param($projectRoot)
             $path = Join-Path $projectRoot "docs/governance/m013_retention_policy.md"
-            (Get-Content -Raw -Encoding UTF8 -LiteralPath $path).Replace("powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\rebuild_knowledge_projection.ps1 -Source SP", "Non documenté") |
+            (Get-Content -Raw -Encoding UTF8 -LiteralPath $path).Replace("powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\rebuild_knowledge_projection.ps1 -Source SP -SourceRoot .\data\sp-authority -Target .\data\ka-projection", "Non documenté") |
                 Set-Content -Encoding UTF8 -LiteralPath $path
         }
 

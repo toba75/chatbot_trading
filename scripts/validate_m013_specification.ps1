@@ -38,7 +38,7 @@ $requiredMarkers = @(
     "Then chaque comportement de durcissement nomme son invariant, son scénario BDD, son test RED, ses ADR applicables et sa commande de validation.",
     "Aucun fallback silencieux n'est autorisé dans M-013.",
     "Aucun critère V1 n'est supprimé.",
-    "écart non accepté interdit le V1AcceptanceReport"
+    'écart non accepté interdit le verdict `acceptée` du `V1AcceptanceReport`'
 )
 
 $requiredArtifacts = @(

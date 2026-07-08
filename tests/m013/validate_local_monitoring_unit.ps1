@@ -107,6 +107,7 @@ for metric in (
     "job_queue_depth",
     "outbox_pending_total",
     "llm_gateway_latency_ms",
+    "llm_gateway_output_interrupted_total",
     "spark_inference_availability",
     "backup_restore_result",
     "v1_gap_status",
@@ -120,6 +121,10 @@ for context in ("SP", "KA", "EG", "RA", "CV", "SD", "EX", "EV", "platform"):
 assert_equal(monitoring_profile.local_only, True, "Le monitoring V1 doit rester local.")
 assert_equal(monitoring_profile.external_export_enabled_by_default, False, "Aucun export externe par défaut.")
 assert_equal(monitoring_profile.retention_hours, M013_LOCAL_LOG_RETENTION_HOURS, "La rétention courte doit être explicite.")
+assert_equal(monitoring_profile.metrics_by_name["job_queue_depth"].correlation_field, "job_id", "Les jobs doivent être corrélables par job_id.")
+assert_equal(monitoring_profile.metrics_by_name["outbox_pending_total"].correlation_field, "event_id", "L'outbox doit être corrélable par event_id.")
+assert_equal(monitoring_profile.metrics_by_name["backup_restore_result"].correlation_field, "restore_test_result", "La restauration doit être corrélable par restore_test_result.")
+assert_equal(monitoring_profile.metrics_by_name["v1_gap_status"].correlation_field, "gap_id", "Les écarts V1 doivent être corrélables par gap_id.")
 
 assert_raises("métrique absente", lambda: MonitoringSignalPolicy(public_endpoint_enabled=False).validate_profile(monitoring_profile.without_metric("v1_health_status")))
 assert_raises("payload sensible interdit", lambda: signal(contains_full_prompt=True))
@@ -148,12 +153,13 @@ for resource_kind in ("CPU", "GPU", "MEMORY", "IO", "STORAGE"):
 
 assert_equal(resource_profile.docker_local_profiled, True, "Le profil docker-local doit être mesuré.")
 assert_equal(resource_profile.vllm_image_digest.startswith("sha256:"), True, "Image vLLM non épinglée.")
-assert_equal(resource_profile.model_revision, "gemma-m013-v1-benchmark-revision", "Révision modèle absente.")
+assert_equal(resource_profile.model_revision, "nvidia/Gemma-4-31B-IT-NVFP4@LLMRUN-M012-REAL-PATH-0001", "Révision modèle absente.")
 assert_equal(resource_profile.concurrency.benchmark_source.endswith("llm_real_path_benchmark_report.md"), True, "Concurrence non sourcée.")
 assert_equal(resource_profile.context_length.benchmark_source.endswith("llm_real_path_benchmark_report.md"), True, "Longueur de contexte non sourcée.")
 
 assert_raises("mesure CPU/GPU/I/O absente", lambda: resource_policy.validate_profile(resource_profile.without_resource("GPU")))
 assert_raises("image vLLM épinglée requise", lambda: resource_profile.with_vllm_image_digest("vllm-openai:latest"))
+assert_raises("image vLLM placeholder interdite", lambda: resource_profile.with_vllm_image_digest("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"))
 assert_raises("révision modèle requise", lambda: resource_profile.with_model_revision(""))
 assert_raises("concurrence sourcée par benchmark requise", lambda: resource_profile.with_concurrency_source(""))
 assert_raises("longueur de contexte sourcée par benchmark requise", lambda: resource_profile.with_context_length_source(""))
@@ -336,7 +342,17 @@ try {
         -Mutate {
             param($projectRoot)
             $path = Join-Path $projectRoot "docs/governance/m013_resource_profile.md"
-            (Get-Content -Raw -Encoding UTF8 -LiteralPath $path).Replace("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "latest") |
+            (Get-Content -Raw -Encoding UTF8 -LiteralPath $path).Replace("sha256:6d1f6e9126b8cf23f2ac089a21e2f39c57ef8b5fcb16f312c5e00bb05cda73a9", "latest") |
+                Set-Content -Encoding UTF8 -LiteralPath $path
+        }
+
+    Assert-ValidatorFails `
+        -Name "image-vllm-placeholder" `
+        -ExpectedMessage "Image vLLM placeholder interdite" `
+        -Mutate {
+            param($projectRoot)
+            $path = Join-Path $projectRoot "docs/governance/m013_resource_profile.md"
+            (Get-Content -Raw -Encoding UTF8 -LiteralPath $path).Replace("sha256:6d1f6e9126b8cf23f2ac089a21e2f39c57ef8b5fcb16f312c5e00bb05cda73a9", "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") |
                 Set-Content -Encoding UTF8 -LiteralPath $path
         }
 

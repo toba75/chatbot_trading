@@ -6,6 +6,17 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from app.evaluation.domain.v1_gap_decisions import (
+    EXPECTED_CONTEXT_BY_V1_CRITERION,
+    V1_GAP_DECISION_ACCEPTED,
+    V1_GAP_DECISION_BLOCKING,
+    V1_GAP_DECISION_CORRECTED,
+    V1_GAP_DECISION_DEFERRED,
+    V1_GAP_DECISION_POLICY_VERSION,
+    V1GapDecisionPolicy,
+    V1GapDecisionRegister,
+)
+
 
 V1_ACCEPTANCE_STATUS_ACCEPTED = "accepté"
 V1_ACCEPTANCE_STATUS_DEFERRED = "différé"
@@ -24,6 +35,7 @@ _EXPECTED_CRITERIA = (
     "V1-EX-BACKTESTS-REPRODUCTIBLES",
 )
 _EXPECTED_CONTEXTS = ("SP", "KA", "EG", "RA", "CV", "SD", "LLM", "EX")
+_EXPECTED_CONTEXT_BY_CRITERION = EXPECTED_CONTEXT_BY_V1_CRITERION
 _ALLOWED_VERDICTS = frozenset(
     {V1_ACCEPTANCE_STATUS_ACCEPTED, V1_ACCEPTANCE_STATUS_DEFERRED, V1_ACCEPTANCE_STATUS_BLOCKING}
 )
@@ -52,6 +64,8 @@ class V1AcceptanceCriterionVerdict:
             raise ValueError("critère V1 inconnu")
         if context not in _EXPECTED_CONTEXTS:
             raise ValueError("contexte V1 inconnu")
+        if _EXPECTED_CONTEXT_BY_CRITERION[criterion_id] != context:
+            raise ValueError("contexte V1 incohérent")
 
         object.__setattr__(self, "criterion_id", criterion_id)
         object.__setattr__(self, "context", context)
@@ -116,29 +130,15 @@ class V1AcceptanceReportPolicy:
         specification_version: str,
         criteria: Sequence[V1AcceptanceCriterionVerdict],
         final_gates: Sequence[V1AcceptanceFinalGate],
+        gap_decision_register: V1GapDecisionRegister,
         traceability_requirement_id: str,
         definition_of_done_ref: str,
     ) -> V1AcceptanceReport:
         parsed_criteria = _required_criteria_tuple(criteria)
         parsed_final_gates = _required_gate_tuple(final_gates)
-        criteria_by_id: dict[str, V1AcceptanceCriterionVerdict] = {}
-        contexts: set[str] = set()
-
-        for criterion in parsed_criteria:
-            if criterion.criterion_id in criteria_by_id:
-                raise ValueError("critère V1 dupliqué")
-            if criterion.context in contexts:
-                raise ValueError("contexte V1 dupliqué")
-            criteria_by_id[criterion.criterion_id] = criterion
-            contexts.add(criterion.context)
-
-        for criterion_id in _EXPECTED_CRITERIA:
-            if criterion_id not in criteria_by_id:
-                raise ValueError(f"critère V1 absent: {criterion_id}")
-
-        for context in _EXPECTED_CONTEXTS:
-            if context not in contexts:
-                raise ValueError(f"contexte V1 absent: {context}")
+        parsed_gap_decision_register = _required_gap_decision_register(gap_decision_register)
+        _assert_complete_criteria(parsed_criteria)
+        _assert_criteria_match_gap_register(parsed_criteria, parsed_gap_decision_register)
 
         non_accepted = tuple(
             criterion
@@ -146,10 +146,6 @@ class V1AcceptanceReportPolicy:
             if criterion.verdict in {V1_ACCEPTANCE_STATUS_DEFERRED, V1_ACCEPTANCE_STATUS_BLOCKING}
         )
         blocking = tuple(criterion for criterion in parsed_criteria if criterion.verdict == V1_ACCEPTANCE_STATUS_BLOCKING)
-
-        for expected_context in ("SP", "KA", "RA", "SD", "LLM"):
-            if not any(criterion.context == expected_context for criterion in non_accepted):
-                raise ValueError(f"écart non accepté absent: {expected_context}")
 
         acceptance_allowed = len(non_accepted) == 0 and all(gate.status == "GREEN" for gate in parsed_final_gates)
         final_verdict = V1_ACCEPTANCE_STATUS_ACCEPTED if acceptance_allowed else V1_ACCEPTANCE_STATUS_REJECTED
@@ -173,15 +169,47 @@ class V1AcceptanceReportPolicy:
             raise ValueError("V1AcceptanceReport requis")
         if report.policy_version != self.policy_version:
             raise ValueError("version de politique incohérente")
+        _required_text(report.report_id, "rapport d'acceptation")
+        _required_text(report.specification_version, "version de spécification")
+        parsed_criteria = _required_criteria_tuple(report.criteria)
+        parsed_final_gates = _required_gate_tuple(report.final_gates)
+        _assert_complete_criteria(parsed_criteria)
+
+        expected_non_accepted = tuple(
+            criterion
+            for criterion in parsed_criteria
+            if criterion.verdict in {V1_ACCEPTANCE_STATUS_DEFERRED, V1_ACCEPTANCE_STATUS_BLOCKING}
+        )
+        expected_blocking = tuple(
+            criterion for criterion in parsed_criteria if criterion.verdict == V1_ACCEPTANCE_STATUS_BLOCKING
+        )
+        if report.non_accepted_gaps != expected_non_accepted:
+            raise ValueError("écarts non acceptés incohérents")
+        if report.blocking_gaps != expected_blocking:
+            raise ValueError("écarts bloquants incohérents")
+
+        expected_acceptance_allowed = len(expected_non_accepted) == 0 and all(
+            gate.status == "GREEN" for gate in parsed_final_gates
+        )
+        if report.acceptance_allowed != expected_acceptance_allowed:
+            raise ValueError("autorisation d'acceptation incohérente")
+
+        expected_final_verdict = (
+            V1_ACCEPTANCE_STATUS_ACCEPTED
+            if expected_acceptance_allowed
+            else V1_ACCEPTANCE_STATUS_REJECTED
+        )
+        if report.final_verdict != expected_final_verdict:
+            raise ValueError("verdict final incohérent")
+        _required_text(report.traceability_requirement_id, "exigence de traçabilité")
+        _required_text(report.definition_of_done_ref, "définition de terminé")
         if report.acceptance_allowed and report.blocking_gaps:
             raise ValueError("verdict acceptée avec écart bloquant")
-        if report.acceptance_allowed and report.final_verdict == V1_ACCEPTANCE_STATUS_REJECTED:
-            raise ValueError("verdict final incohérent")
-        if (not report.acceptance_allowed) and report.final_verdict != V1_ACCEPTANCE_STATUS_REJECTED:
-            raise ValueError("verdict final incohérent")
 
 
 def build_m013_v1_acceptance_report() -> V1AcceptanceReport:
+    from app.evaluation.domain.v1_gap_decisions import build_m013_v1_gap_decision_register
+
     policy = V1AcceptanceReportPolicy(policy_version=V1_ACCEPTANCE_REPORT_POLICY_VERSION)
     return policy.publish_report(
         report_id="M013-V1AcceptanceReport-1.0",
@@ -277,6 +305,7 @@ def build_m013_v1_acceptance_report() -> V1AcceptanceReport:
             _gate("GATE-M013-ACCEPTANCE-006", "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\lint.ps1", "GREEN"),
             _gate("GATE-M013-ACCEPTANCE-007", "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\test.ps1", "GREEN"),
         ),
+        gap_decision_register=build_m013_v1_gap_decision_register(),
         traceability_requirement_id="REQ-M013-012",
         definition_of_done_ref="docs/governance/definition_of_done.md",
     )
@@ -377,6 +406,55 @@ def _required_gate_tuple(values: Sequence[V1AcceptanceFinalGate]) -> tuple[V1Acc
         if not isinstance(gate, V1AcceptanceFinalGate):
             raise ValueError("V1AcceptanceFinalGate requis")
     return parsed
+
+
+def _required_gap_decision_register(value: Any) -> V1GapDecisionRegister:
+    if not isinstance(value, V1GapDecisionRegister):
+        raise ValueError("registre d'écarts V1 requis")
+    V1GapDecisionPolicy(policy_version=V1_GAP_DECISION_POLICY_VERSION).validate_register(value)
+    decisions_by_context = value.decisions_by_context
+    for context in _EXPECTED_CONTEXTS:
+        if context not in decisions_by_context:
+            raise ValueError(f"écart M-012 absent: {context}")
+    return value
+
+
+def _assert_complete_criteria(criteria: Sequence[V1AcceptanceCriterionVerdict]) -> None:
+    criteria_by_id: dict[str, V1AcceptanceCriterionVerdict] = {}
+    contexts: set[str] = set()
+
+    for criterion in criteria:
+        if criterion.criterion_id in criteria_by_id:
+            raise ValueError("critère V1 dupliqué")
+        if criterion.context in contexts:
+            raise ValueError("contexte V1 dupliqué")
+        criteria_by_id[criterion.criterion_id] = criterion
+        contexts.add(criterion.context)
+
+    for criterion_id in _EXPECTED_CRITERIA:
+        if criterion_id not in criteria_by_id:
+            raise ValueError(f"critère V1 absent: {criterion_id}")
+
+    for context in _EXPECTED_CONTEXTS:
+        if context not in contexts:
+            raise ValueError(f"contexte V1 absent: {context}")
+
+
+def _assert_criteria_match_gap_register(
+    criteria: Sequence[V1AcceptanceCriterionVerdict],
+    gap_decision_register: V1GapDecisionRegister,
+) -> None:
+    decisions_by_context = gap_decision_register.decisions_by_context
+    for criterion in criteria:
+        decision = decisions_by_context[criterion.context]
+        decision_status = decision.decision_status
+        if decision_status in {V1_GAP_DECISION_DEFERRED, V1_GAP_DECISION_BLOCKING}:
+            if criterion.verdict == V1_ACCEPTANCE_STATUS_ACCEPTED:
+                raise ValueError(f"écart non accepté toujours actif: {criterion.context}")
+            if criterion.gap_status != decision_status or criterion.decision != decision_status:
+                raise ValueError(f"rapport contredit registre d'écarts: {criterion.context}")
+        elif decision_status not in {V1_GAP_DECISION_ACCEPTED, V1_GAP_DECISION_CORRECTED}:
+            raise ValueError(f"décision V1 inconnue: {criterion.context}")
 
 
 __all__ = [

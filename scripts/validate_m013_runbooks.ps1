@@ -57,6 +57,8 @@ $requiredRunbooks = @(
             "M013-BackupManifest-1.0",
             "restore_test_result",
             "docs/governance/m013_backup_restore_drill.md",
+            "scripts\backup_v1.ps1",
+            "scripts\restore_v1.ps1",
             "scripts\validate_m013_backup_restore.ps1",
             "clé hors dépôt",
             "restauration isolée",
@@ -80,6 +82,24 @@ $requiredRunbooks = @(
             "docs/governance/m013_spark_failure_drill.md",
             "scripts\validate_m013_security.ps1",
             "scripts\validate_m013_spark_failures.ps1"
+        )
+    },
+    @{
+        Id = "certificats_spark"
+        File = "certificats_spark.md"
+        Markers = @(
+            "# Runbook certificats Spark M-013",
+            "M013-Runbook-SparkCertificates-1.0",
+            "rotation certificat",
+            "validation de certificat",
+            "LLM_TLS_CERTIFICATE_INVALID",
+            "LLM_AUTHENTICATION_FAILED",
+            "llm-gateway -> spark-inference",
+            "docs/governance/m013_security_audit.md",
+            "scripts\validate_m013_security.ps1",
+            "scripts\validate_network_boundary.ps1",
+            "aucune clé privée",
+            "Aucun endpoint public Spark"
         )
     },
     @{
@@ -177,6 +197,42 @@ $requiredRunbooks = @(
             "scripts\validate_m011_specification.ps1",
             "tests\m012\validate_strategy_backtest_benchmark_acceptance.ps1"
         )
+    },
+    @{
+        Id = "purge_administrative"
+        File = "purge_administrative.md"
+        Markers = @(
+            "# Runbook purge administrative M-013",
+            "M013-Runbook-AdministrativePurge-1.0",
+            "purge administrative",
+            "M013-RetentionPolicy-1.0",
+            "LOGICAL_ARCHIVE",
+            "PURGE_CONVERSATION_CONTENT",
+            "PURGE_REGENERABLE_PROJECTION",
+            "scripts\validate_m013_retention.ps1",
+            "scripts\rebuild_knowledge_projection.ps1",
+            "docs/governance/m013_retention_policy.md",
+            "Aucune purge ordinaire",
+            "cascade conversationnelle interdite"
+        )
+    },
+    @{
+        Id = "rapport_acceptation_v1"
+        File = "rapport_acceptation_v1.md"
+        Markers = @(
+            "# Runbook lecture du rapport d'acceptation V1 M-013",
+            "M013-Runbook-V1AcceptanceReport-1.0",
+            "rapport d'acceptation V1",
+            "M013-V1AcceptanceReport-1.0",
+            "non acceptée",
+            "écarts différés ou bloquants",
+            "REQ-M013-012",
+            "scripts\validate_m013_acceptance.ps1",
+            "scripts\validate_traceability.ps1",
+            "docs/governance/m013_v1_acceptance_report.md",
+            "Aucune acceptation implicite",
+            "Aucune correction silencieuse"
+        )
     }
 )
 
@@ -205,11 +261,14 @@ $requiredIndexMarkers = @(
     "docs/runbooks/exploitation_locale.md",
     "docs/runbooks/sauvegarde_restauration.md",
     "docs/runbooks/spark_reseau_incidents.md",
+    "docs/runbooks/certificats_spark.md",
     "docs/runbooks/monitoring_local.md",
     "docs/runbooks/ingestion_pdf.md",
     "docs/runbooks/conversation_v1.md",
     "docs/runbooks/recherche_approfondie.md",
     "docs/runbooks/strategie_backtest.md",
+    "docs/runbooks/purge_administrative.md",
+    "docs/runbooks/rapport_acceptation_v1.md",
     "docs/user/v1_guide_utilisateur.md",
     "Commandes vérifiées",
     "Limites et écarts V1",
@@ -227,11 +286,14 @@ $requiredGlobalMarkers = @(
     "audit réseau",
     "panne Spark",
     "monitoring",
+    "certificat",
     "ingestion PDF",
     "conversation",
     "recherche approfondie",
     "stratégie",
     "backtest",
+    "purge administrative",
+    "rapport d'acceptation",
     "statuts publics",
     "limites V1",
     "écarts V1",
@@ -527,7 +589,16 @@ function Assert-M013Traceability {
         "tests/m013/validate_runbooks_user_docs_unit.ps1",
         "scripts/validate_m013_runbooks.ps1",
         "docs/runbooks/exploitation_locale.md",
+        "docs/runbooks/sauvegarde_restauration.md",
         "docs/runbooks/spark_reseau_incidents.md",
+        "docs/runbooks/certificats_spark.md",
+        "docs/runbooks/monitoring_local.md",
+        "docs/runbooks/ingestion_pdf.md",
+        "docs/runbooks/conversation_v1.md",
+        "docs/runbooks/recherche_approfondie.md",
+        "docs/runbooks/strategie_backtest.md",
+        "docs/runbooks/purge_administrative.md",
+        "docs/runbooks/rapport_acceptation_v1.md",
         "docs/governance/m013_documentation_index.md",
         "docs/user/v1_guide_utilisateur.md",
         "ADR-010"

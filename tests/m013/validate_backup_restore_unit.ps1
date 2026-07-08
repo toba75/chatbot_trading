@@ -33,6 +33,7 @@ from app.platform.backup_restore import (
     STORAGE_SPARK,
     BackupManifest,
     BackupManifestEntry,
+    BackupRestoreDrill,
     BackupRestoreDrillPolicy,
     RestoreTestResult,
     build_m013_backup_restore_drill,
@@ -70,8 +71,8 @@ def entry(**overrides):
         "immutable": True,
         "regenerable_projection": False,
         "retained_negative_or_superseded": False,
-        "backup_sha256": "a" * 64,
-        "restored_sha256": "a" * 64,
+        "backup_sha256": "84d869d9810d2c65f4f8b2c3ed1df5e531e1c7fcd920636440e6f02a1ff9d67f",
+        "restored_sha256": "84d869d9810d2c65f4f8b2c3ed1df5e531e1c7fcd920636440e6f02a1ff9d67f",
         "contains_plain_secret": False,
         "git_tracked_key_material": False,
         "spark_business_storage": False,
@@ -89,12 +90,13 @@ def manifest(**overrides):
         "restore_command": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\restore_v1.ps1 -Manifest .\\restore\\manifest.json -Target C:\\restore\\m013-isolated",
         "restore_target": "local_isolated",
         "archive_encrypted": True,
-        "encryption_proof": "ciphertext_sha256=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "encryption_proof": "ciphertext_sha256=305531dcc50ebca31cf1d5b31e9fc76ed51f66b3b6dd5a030c6539ae6532f979",
         "key_reference": "hors_depot://cle-restauration/m013",
         "key_git_tracked": False,
         "complete": True,
         "entries": (
             entry(entry_id="BACKUP-ENTRY-UNIT-SP", context=CONTEXT_SP, artifact_kind="corpus_original", stable_identifier="SRC-M013-UNIT-001"),
+            entry(entry_id="BACKUP-ENTRY-UNIT-SP-CANON", context=CONTEXT_SP, artifact_kind="canonical_versions", stable_identifier="CANON-M013-UNIT-001", retained_negative_or_superseded=True),
             entry(entry_id="BACKUP-ENTRY-UNIT-KA", context=CONTEXT_KA, artifact_kind="qdrant_projection", stable_identifier="PROJ-M013-UNIT-001", authority=False, immutable=False, regenerable_projection=True),
             entry(entry_id="BACKUP-ENTRY-UNIT-EG", context=CONTEXT_EG, artifact_kind="claim_registry", stable_identifier="CLAIM-M013-UNIT-001", retained_negative_or_superseded=True),
             entry(entry_id="BACKUP-ENTRY-UNIT-RA", context=CONTEXT_RA, artifact_kind="verified_answers", stable_identifier="ANSWER-M013-UNIT-001", retained_negative_or_superseded=True),
@@ -144,8 +146,23 @@ assert_raises("archive chiffrée requise", lambda: manifest(archive_encrypted=Fa
 assert_raises("clé hors dépôt requise", lambda: manifest(key_reference="repo://secrets/m013.key"))
 assert_raises("clé versionnée interdite", lambda: manifest(key_git_tracked=True))
 assert_raises("secret en clair interdit", lambda: entry(contains_plain_secret=True))
-assert_raises("contexte V1 absent", lambda: policy.validate_manifest(manifest(entries=tuple(item for item in manifest().entries if item.context != CONTEXT_RA))))
 complete_manifest = manifest()
+assert_raises(
+    "contexte V1 absent",
+    lambda: policy.validate_manifest(
+        manifest(entries=tuple(item for item in complete_manifest.entries if item.context != CONTEXT_RA))
+    ),
+)
+assert_raises(
+    "catégorie artefact contexte incohérente",
+    lambda: entry(
+        entry_id="BACKUP-ENTRY-UNIT-RA-REPLACED",
+        context=CONTEXT_SP,
+        artifact_kind="verified_answers",
+        stable_identifier="ANSWER-M013-UNIT-RA-REPLACED",
+        retained_negative_or_superseded=True,
+    ),
+)
 assert_raises(
     "catégorie artefact V1 absente",
     lambda: policy.validate_manifest(
@@ -153,12 +170,29 @@ assert_raises(
     ),
 )
 assert_raises("hash restauré absent", lambda: entry(restored_sha256=""))
-assert_raises("hash restauré divergent", lambda: entry(restored_sha256="b" * 64))
+assert_raises("hash placeholder interdit", lambda: entry(backup_sha256="a" * 64, restored_sha256="a" * 64))
+assert_raises("hash restauré divergent", lambda: entry(restored_sha256="41afbc972e3965ef7af89ccc1cb76033d684c363224e408b001d4ad6fe53d762"))
+assert_raises(
+    "hash placeholder interdit",
+    lambda: manifest(encryption_proof="ciphertext_sha256=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
+)
 assert_raises("projection régénérable non autorité", lambda: entry(context=CONTEXT_KA, artifact_kind="qdrant_projection", authority=True, regenerable_projection=True))
 assert_raises("restauration destructive interdite", lambda: entry(destructive_restore=True))
 assert_raises("stockage métier Spark interdit", lambda: entry(storage_host=STORAGE_SPARK))
 assert_raises("stockage métier Spark interdit", lambda: entry(spark_business_storage=True))
 assert_raises("commande de restauration requise", lambda: restore_result(command=""))
+assert_raises(
+    "commande restauration incohérente",
+    lambda: policy.validate_drill(
+        BackupRestoreDrill(
+            drill_id="M013-BACKUP-RESTORE-DRILL-UNIT",
+            policy_version=BACKUP_RESTORE_DRILL_POLICY_VERSION,
+            manifest=manifest(),
+            restore_test_result=restore_result(command="powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\restore_v1.ps1 -Manifest .\\restore\\autre.json -Target C:\\restore\\autre"),
+            acceptance_allowed=True,
+        )
+    ),
+)
 assert_raises("résultats négatifs et supersédés conservés", lambda: restore_result(negative_and_superseded_available=False))
 assert_raises("projections régénérables non autorité", lambda: restore_result(projections_rebuilt_from_authority=False))
 assert_raises("Spark interdit pour les données métier", lambda: restore_result(spark_required_for_business_data=True))
@@ -255,6 +289,10 @@ function New-FixtureProject {
     Copy-Item -LiteralPath (Join-Path $repoRoot "docs/traceability/matrix.md") -Destination (Join-Path $projectRoot "docs/traceability/matrix.md")
     Copy-Item -LiteralPath (Join-Path $repoRoot "scripts/test.ps1") -Destination (Join-Path $projectRoot "scripts/test.ps1")
     Copy-Item -LiteralPath (Join-Path $repoRoot "scripts/lint.ps1") -Destination (Join-Path $projectRoot "scripts/lint.ps1")
+    New-Item -ItemType Directory -Path (Join-Path $projectRoot "scripts/lib") -Force | Out-Null
+    Copy-Item -LiteralPath (Join-Path $repoRoot "scripts/backup_v1.ps1") -Destination (Join-Path $projectRoot "scripts/backup_v1.ps1")
+    Copy-Item -LiteralPath (Join-Path $repoRoot "scripts/restore_v1.ps1") -Destination (Join-Path $projectRoot "scripts/restore_v1.ps1")
+    Copy-Item -LiteralPath (Join-Path $repoRoot "scripts/lib/m013_backup_manifest.ps1") -Destination (Join-Path $projectRoot "scripts/lib/m013_backup_manifest.ps1")
 
     return $projectRoot
 }

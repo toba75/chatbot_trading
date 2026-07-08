@@ -47,6 +47,17 @@ _SOURCE_STATUSES_BY_CONTEXT = {
     CONTEXT_LLM: V1_GAP_STATUS_BLOCKING,
     CONTEXT_EX: V1_GAP_STATUS_SATISFIED,
 }
+EXPECTED_CONTEXT_BY_V1_CRITERION = {
+    "V1-SP-QUALITE-DOCUMENTAIRE": CONTEXT_SP,
+    "V1-KA-RECHERCHE-PAGES": CONTEXT_KA,
+    "V1-EG-GOUVERNANCE-PREUVES": CONTEXT_EG,
+    "V1-RA-REPONSES-VERIFIEES": CONTEXT_RA,
+    "V1-CV-CONVERSATION-PRODUIT": CONTEXT_CV,
+    "V1-SD-PARAMETRES-CALIBRABLES": CONTEXT_SD,
+    "V1-LLM-CHECKPOINT-PRINCIPAL": CONTEXT_LLM,
+    "V1-EX-BACKTESTS-REPRODUCTIBLES": CONTEXT_EX,
+}
+_EXPECTED_CONTEXT_BY_CRITERION = EXPECTED_CONTEXT_BY_V1_CRITERION
 
 
 @dataclass(frozen=True)
@@ -69,12 +80,17 @@ class V1GapDecision:
         context = _required_context(self.context)
         m012_status = _required_status(self.m012_status, _EXPECTED_M012_STATUSES, "statut M-012")
         decision_status = _required_status(self.decision_status, _EXPECTED_DECISION_STATUSES, "décision V1")
+        criterion_id = _required_text(self.v1_criterion_id, "critère V1 absent")
+        if criterion_id not in _EXPECTED_CONTEXT_BY_CRITERION:
+            raise ValueError("critère V1 inconnu")
+        if _EXPECTED_CONTEXT_BY_CRITERION[criterion_id] != context:
+            raise ValueError("contexte V1 incohérent")
 
         object.__setattr__(self, "gap_id", _required_text(self.gap_id, "écart V1"))
         object.__setattr__(self, "context", context)
         object.__setattr__(self, "m012_status", m012_status)
         object.__setattr__(self, "decision_status", decision_status)
-        object.__setattr__(self, "v1_criterion_id", _required_text(self.v1_criterion_id, "critère V1 absent"))
+        object.__setattr__(self, "v1_criterion_id", criterion_id)
         object.__setattr__(self, "benchmark_source_id", _required_text(self.benchmark_source_id, "benchmark source manque"))
         object.__setattr__(self, "calibration_decision_id", _required_text(self.calibration_decision_id, "décision calibration"))
         object.__setattr__(self, "source_report_path", _required_text(self.source_report_path, "rapport source"))
@@ -168,6 +184,7 @@ class V1GapDecisionPolicy:
             non_accepted_decisions=non_accepted,
             acceptance_allowed=len(non_accepted) == 0,
         )
+        self.validate_register(register)
         return register
 
     def validate_register(self, register: V1GapDecisionRegister) -> None:
@@ -374,6 +391,9 @@ def _required_source_statuses(values: Mapping[str, str]) -> Mapping[str, str]:
         parsed[_required_context(context)] = _required_status(status, _EXPECTED_M012_STATUSES, "statut M-012")
     if len(parsed) == 0:
         raise ValueError("statuts source M-012 requis")
+    for context in _EXPECTED_CONTEXTS:
+        if context not in parsed:
+            raise ValueError(f"statut source M-012 absent: {context}")
     return parsed
 
 
@@ -407,6 +427,7 @@ __all__ = [
     "CONTEXT_RA",
     "CONTEXT_SD",
     "CONTEXT_SP",
+    "EXPECTED_CONTEXT_BY_V1_CRITERION",
     "V1_GAP_DECISION_ACCEPTED",
     "V1_GAP_DECISION_BLOCKING",
     "V1_GAP_DECISION_CORRECTED",
