@@ -171,6 +171,8 @@ $m013RunbooksUserDocsAcceptancePath = "tests/m013/validate_runbooks_user_docs_ac
 $m013RunbooksUserDocsUnitPath = "tests/m013/validate_runbooks_user_docs_unit.ps1"
 $m013AntipatternsAcceptancePath = "tests/m013/validate_v1_antipatterns_acceptance.ps1"
 $m013AntipatternsUnitPath = "tests/m013/validate_v1_antipatterns_unit.ps1"
+$m013AcceptanceReportAcceptancePath = "tests/m013/validate_v1_acceptance_report_acceptance.ps1"
+$m013AcceptanceReportUnitPath = "tests/m013/validate_v1_acceptance_report_unit.ps1"
 
 $validationCommands = @(
     @{ Path = "scripts/validate_m000_precondition_report.ps1"; Arguments = @("-Path", $preconditionReportPath) },
@@ -202,6 +204,7 @@ $validationCommands = @(
     @{ Path = "scripts/validate_m013_monitoring.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_m013_runbooks.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_m013_antipatterns.ps1"; Arguments = @() },
+    @{ Path = "scripts/validate_m013_acceptance.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_platform_topology.ps1"; Arguments = @("-Path", $platformTopologyPath) },
     @{ Path = "scripts/validate_local_compose.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_network_boundary.ps1"; Arguments = @("-SparkFirewallPath", $sparkFirewallPath) },
@@ -480,6 +483,8 @@ $testCommands = @(
     @{ Path = $m013RunbooksUserDocsUnitPath; Arguments = @() },
     @{ Path = $m013AntipatternsAcceptancePath; Arguments = @() },
     @{ Path = $m013AntipatternsUnitPath; Arguments = @() },
+    @{ Path = $m013AcceptanceReportAcceptancePath; Arguments = @() },
+    @{ Path = $m013AcceptanceReportUnitPath; Arguments = @() },
     @{ Path = "tests/m009/validate_m009_specification_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/m009/validate_m009_specification_unit.ps1"; Arguments = @() },
     @{ Path = "tests/m009/validate_deep_research_planning_acceptance.ps1"; Arguments = @() },
@@ -1168,7 +1173,9 @@ if (
         $m013RunbooksUserDocsAcceptancePath,
         $m013RunbooksUserDocsUnitPath,
         $m013AntipatternsAcceptancePath,
-        $m013AntipatternsUnitPath
+        $m013AntipatternsUnitPath,
+        $m013AcceptanceReportAcceptancePath,
+        $m013AcceptanceReportUnitPath
     )
 }
 

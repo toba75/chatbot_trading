@@ -131,3 +131,11 @@
 - Décision livrée: les anti-patterns V1 section 23 sont reliés à des contrôles automatisés ou à une revue documentée datée avec preuve et périmètre; toute violation active bloque l'acceptation V1.
 - Questions ouvertes: les questions non tranchées restent ouvertes contrôlées; la conservation est marquée résolue par DDD-ADR-012; aucune nouvelle résolution implicite n'est introduite.
 - ADR: non requise; T-011 applique ADR-007, ADR-008, ADR-009, DDD-ADR-004, DDD-ADR-006, DDD-ADR-010 et DDD-ADR-012 sans trancher de nouvelle question structurante.
+
+## Exécution T-012
+
+- RED: ajout de `tests/m013/validate_v1_acceptance_report_acceptance.ps1` et `tests/m013/validate_v1_acceptance_report_unit.ps1`; commit RED `63307920f`.
+- GREEN: publication de `app/evaluation/domain/v1_acceptance_report.py`, `docs/governance/m013_v1_acceptance_report.md` et `scripts/validate_m013_acceptance.ps1`; enrôlement dans `scripts/test.ps1` et `scripts/lint.ps1`; rattachement `REQ-M013-012` dans `docs/traceability/matrix.md`.
+- Verdict livré: V1 non acceptée; EG, CV et EX sont acceptés, SP, KA et RA restent différés non acceptés, SD et LLM restent bloquants et interdisent explicitement le verdict `acceptée`.
+- Preuves agrégées: décisions d'écarts, régression, sécurité réseau, panne Spark, sauvegarde/restauration, rétention, monitoring, runbooks, anti-patterns, traçabilité et gates finales.
+- ADR: non requise; T-012 agrège ADR-010, DDD-ADR-010 et DDD-ADR-011 sans changer de décision structurante.

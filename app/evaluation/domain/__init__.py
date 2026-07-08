@@ -255,6 +255,18 @@ from app.evaluation.domain.v1_gap_decisions import (
     V1GapDecisionRegister,
     build_m013_v1_gap_decision_register,
 )
+from app.evaluation.domain.v1_acceptance_report import (
+    V1_ACCEPTANCE_REPORT_POLICY_VERSION,
+    V1_ACCEPTANCE_STATUS_ACCEPTED,
+    V1_ACCEPTANCE_STATUS_BLOCKING,
+    V1_ACCEPTANCE_STATUS_DEFERRED,
+    V1_ACCEPTANCE_STATUS_REJECTED,
+    V1AcceptanceCriterionVerdict,
+    V1AcceptanceFinalGate,
+    V1AcceptanceReport,
+    V1AcceptanceReportPolicy,
+    build_m013_v1_acceptance_report,
+)
 
 __all__ = [
     "ANSWER_ACCURACY_SCORE",
@@ -492,4 +504,14 @@ __all__ = [
     "V1GapDecisionPolicy",
     "V1GapDecisionRegister",
     "build_m013_v1_gap_decision_register",
+    "V1_ACCEPTANCE_REPORT_POLICY_VERSION",
+    "V1_ACCEPTANCE_STATUS_ACCEPTED",
+    "V1_ACCEPTANCE_STATUS_BLOCKING",
+    "V1_ACCEPTANCE_STATUS_DEFERRED",
+    "V1_ACCEPTANCE_STATUS_REJECTED",
+    "V1AcceptanceCriterionVerdict",
+    "V1AcceptanceFinalGate",
+    "V1AcceptanceReport",
+    "V1AcceptanceReportPolicy",
+    "build_m013_v1_acceptance_report",
 ]
