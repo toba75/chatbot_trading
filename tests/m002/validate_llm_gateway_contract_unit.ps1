@@ -43,10 +43,12 @@ class ManualClock:
 
 def valid_configuration() -> GatewayConfiguration:
     return GatewayConfiguration(
-        base_url="https://spark-inference.test:8443/v1",
+        base_url="http://spark-inference.test:8000/v1",
         served_model="gemma-research",
-        api_key="unit-secret-key",
-        tls_ca_bundle_path="C:/spark/ca.pem",
+        auth_mode="none",
+        api_key=None,
+        tls_mode="disabled",
+        tls_ca_bundle_path=None,
         timeout_seconds=9,
     )
 
@@ -87,12 +89,14 @@ def assert_gateway_error_code(expected_code, callback):
 
 
 assert_raises_code(
-    "LLM_GATEWAY_TLS_REQUIRED",
+    "LLM_GATEWAY_SPARK_ENDPOINT_REQUIRED",
     lambda: GatewayConfiguration(
-        base_url="http://spark-inference.test:8443/v1",
+        base_url="ftp://spark-inference.test:8000/v1",
         served_model="gemma-research",
-        api_key="unit-secret-key",
-        tls_ca_bundle_path="C:/spark/ca.pem",
+        auth_mode="none",
+        api_key=None,
+        tls_mode="disabled",
+        tls_ca_bundle_path=None,
         timeout_seconds=9,
     ),
 )
@@ -102,30 +106,49 @@ assert_raises_code(
     lambda: GatewayConfiguration(
         base_url="https://attacker.example:443/v1",
         served_model="gemma-research",
-        api_key="unit-secret-key",
-        tls_ca_bundle_path="C:/spark/ca.pem",
+        auth_mode="none",
+        api_key=None,
+        tls_mode="disabled",
+        tls_ca_bundle_path=None,
         timeout_seconds=9,
     ),
 )
 
 assert_raises_code(
-    "LLM_GATEWAY_API_KEY_REQUIRED",
+    "LLM_GATEWAY_AUTH_MODE_REQUIRED",
     lambda: GatewayConfiguration(
-        base_url="https://spark-inference.test:8443/v1",
+        base_url="http://spark-inference.test:8000/v1",
         served_model="gemma-research",
-        api_key="",
-        tls_ca_bundle_path="C:/spark/ca.pem",
+        auth_mode="",
+        api_key=None,
+        tls_mode="disabled",
+        tls_ca_bundle_path=None,
         timeout_seconds=9,
     ),
 )
 
 assert_raises_code(
-    "LLM_GATEWAY_TLS_CA_REQUIRED",
+    "LLM_GATEWAY_API_KEY_FORBIDDEN",
     lambda: GatewayConfiguration(
-        base_url="https://spark-inference.test:8443/v1",
+        base_url="http://spark-inference.test:8000/v1",
         served_model="gemma-research",
+        auth_mode="none",
         api_key="unit-secret-key",
-        tls_ca_bundle_path="",
+        tls_mode="disabled",
+        tls_ca_bundle_path=None,
+        timeout_seconds=9,
+    ),
+)
+
+assert_raises_code(
+    "LLM_GATEWAY_TLS_CA_FORBIDDEN",
+    lambda: GatewayConfiguration(
+        base_url="http://spark-inference.test:8000/v1",
+        served_model="gemma-research",
+        auth_mode="none",
+        api_key=None,
+        tls_mode="disabled",
+        tls_ca_bundle_path="C:/spark/ca.pem",
         timeout_seconds=9,
     ),
 )
@@ -169,10 +192,19 @@ immutable_payload = build_openai_chat_completion_request(
 if immutable_payload["model"] != "gemma-research":
     raise AssertionError(f"Paramètres de sampling mutables: {immutable_payload}")
 
-masked = configuration.masked_for_logs()
+api_key_configuration = GatewayConfiguration(
+    base_url="https://spark-inference.test:8443/v1",
+    served_model="gemma-research",
+    auth_mode="api_key_file",
+    api_key="unit-secret-key",
+    tls_mode="ca_bundle",
+    tls_ca_bundle_path="C:/spark/ca.pem",
+    timeout_seconds=9,
+)
+masked = api_key_configuration.masked_for_logs()
 if masked["api_key"] != "<secret-masked>":
     raise AssertionError(f"Secret non masqué: {masked}")
-if "unit-secret-key" in repr(configuration) or "unit-secret-key" in str(masked):
+if "unit-secret-key" in repr(api_key_configuration) or "unit-secret-key" in str(masked):
     raise AssertionError("La clé d'API ne doit jamais apparaître dans les représentations journalisables.")
 
 
@@ -239,6 +271,10 @@ if result.provenance.schema_version != "answer_schema.v1":
     raise AssertionError(f"schema_version absent: {result.provenance}")
 if result.provenance.sampling_parameters != {"temperature": 0, "top_p": 1}:
     raise AssertionError(f"sampling_parameters absents: {result.provenance}")
+if successful_transport.call["headers"].get("Authorization") is not None:
+    raise AssertionError(f"Header Authorization interdit en auth none: {successful_transport.call['headers']}")
+if successful_transport.call["tls_ca_bundle_path"] is not None:
+    raise AssertionError(f"Bundle TLS interdit en mode disabled: {successful_transport.call}")
 
 header_provenance_transport = FixedTransport(
     {

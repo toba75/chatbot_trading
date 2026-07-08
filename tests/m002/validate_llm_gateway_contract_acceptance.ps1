@@ -53,14 +53,14 @@ class ControlledOpenAIDouble:
             }
         )
 
-        if str(base_url) != "https://spark-inference.test:8443/v1":
+        if str(base_url) != "http://spark-inference.test:8000/v1":
             raise AssertionError(f"URL Spark inattendue: {base_url}")
-        if tls_ca_bundle_path != "C:/spark/ca.pem":
+        if tls_ca_bundle_path is not None:
             raise AssertionError(f"Bundle TLS inattendu: {tls_ca_bundle_path}")
         if timeout_seconds != 7:
             raise AssertionError(f"Timeout inattendu: {timeout_seconds}")
-        if headers.get("Authorization") != "Bearer test-api-key":
-            raise AssertionError(f"Authentification Spark absente: {headers}")
+        if "Authorization" in headers:
+            raise AssertionError(f"Authentification Spark interdite en mode none: {headers}")
         if headers.get("X-OST-Client") != "llm-gateway":
             raise AssertionError(f"Appel Spark hors gateway: {headers}")
         if headers.get("X-Trace-Id") != "trace-t005":
@@ -116,10 +116,12 @@ class ControlledOpenAIDouble:
 
 
 configuration = GatewayConfiguration(
-    base_url="https://spark-inference.test:8443/v1",
+    base_url="http://spark-inference.test:8000/v1",
     served_model="gemma-research",
-    api_key="test-api-key",
-    tls_ca_bundle_path="C:/spark/ca.pem",
+    auth_mode="none",
+    api_key=None,
+    tls_mode="disabled",
+    tls_ca_bundle_path=None,
     timeout_seconds=7,
 )
 transport = ControlledOpenAIDouble()

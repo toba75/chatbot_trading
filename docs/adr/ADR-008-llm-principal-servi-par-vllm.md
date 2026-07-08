@@ -1,10 +1,10 @@
 ﻿# ADR-008 - LLM principal servi par vLLM sur le DGX Spark
 
-**Statut :** Acceptée
+**Statut :** Remplacée
 **Date :** 2026-06-21
 **Décideurs :** Propriétaire du projet
 **Remplace :** Aucun
-**Remplacée par :** Aucune
+**Remplacée par :** ADR-014
 **Source :** `docs/specs/specification_unifiee_ddd_technique_chatbot_trading_v4_1.md`, sections 3, 13 et 16
 
 ## Contexte

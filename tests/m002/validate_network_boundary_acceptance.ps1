@@ -214,7 +214,7 @@ New-Item -ItemType Directory -Path $temporaryRoot | Out-Null
 try {
     # Given la stack locale et le service vLLM Spark sont configurés.
     # When les règles réseau M-002 sont validées.
-    # Then seul llm-gateway peut joindre spark-inference:8443 et aucun stockage
+    # Then seul llm-gateway peut joindre spark-inference et aucun stockage
     # local n'est accessible hors réseau Docker privé.
     $validResult = Invoke-NetworkBoundaryValidator `
         -ComposePath $composePath `
@@ -269,18 +269,18 @@ try {
     Assert-ExitCode -Actual $extraSparkSourceResult.ExitCode -Expected 1 -Message "Le pare-feu Spark ne doit autoriser que llm-gateway."
     Assert-OutputContains -Output $extraSparkSourceResult.Output -Expected "Source Spark non autoris" -Message "La source Spark non autorisée doit être nommée."
 
-    $tlsDisabledPath = New-TemporaryFile `
-        -Name "spark-tls-disabled.json" `
+    $tlsIncoherentPath = New-TemporaryFile `
+        -Name "spark-tls-incoherent.json" `
         -Content (Replace-FirewallText `
             -Content $validFirewall `
-            -ExpectedText '"tls_required": true' `
-            -ReplacementText '"tls_required": false')
-    $tlsDisabledResult = Invoke-NetworkBoundaryValidator `
+            -ExpectedText '"tls_mode": "disabled"' `
+            -ReplacementText '"tls_mode": "ca_bundle"')
+    $tlsIncoherentResult = Invoke-NetworkBoundaryValidator `
         -ComposePath $composePath `
         -TopologyPath $topologyPath `
-        -SparkFirewallPath $tlsDisabledPath
-    Assert-ExitCode -Actual $tlsDisabledResult.ExitCode -Expected 1 -Message "TLS Spark ne doit pas être désactivé."
-    Assert-OutputContains -Output $tlsDisabledResult.Output -Expected "TLS Spark obligatoire" -Message "Le contournement TLS doit être explicite."
+        -SparkFirewallPath $tlsIncoherentPath
+    Assert-ExitCode -Actual $tlsIncoherentResult.ExitCode -Expected 1 -Message "Le mode TLS Spark doit rester cohérent."
+    Assert-OutputContains -Output $tlsIncoherentResult.Output -Expected "Mode TLS Spark incohérent" -Message "L'incohérence TLS doit être explicite."
 
     $callbackEnabledPath = New-TemporaryFile `
         -Name "spark-callback-enabled.json" `

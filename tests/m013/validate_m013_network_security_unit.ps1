@@ -244,26 +244,14 @@ try {
         }
 
     Assert-ValidatorFails `
-        -Name "tls-absent" `
-        -ExpectedMessage "Endpoint Spark invalide" `
+        -Name "auth-mode-absent" `
+        -ExpectedMessage "Variable gateway Spark absente: GEMMA_AUTH_MODE" `
         -Mutate {
             param($projectRoot)
             $composePath = Join-Path $projectRoot "deploy/local-compose/compose.yaml"
             Set-FixtureText -Path $composePath -Mutate {
                 param($content)
-                return $content.Replace('GEMMA_BASE_URL: "https://spark-inference:8443/v1"', 'GEMMA_BASE_URL: "http://spark-inference:8443/v1"')
-            }
-        }
-
-    Assert-ValidatorFails `
-        -Name "cle-api-absente" `
-        -ExpectedMessage "Variable gateway Spark absente: GEMMA_API_KEY_FILE" `
-        -Mutate {
-            param($projectRoot)
-            $composePath = Join-Path $projectRoot "deploy/local-compose/compose.yaml"
-            Set-FixtureText -Path $composePath -Mutate {
-                param($content)
-                return [regex]::Replace($content, '(?m)^\s{6}GEMMA_API_KEY_FILE: "/run/secrets/gemma_api_key"\r?\n', "", 1)
+                return [regex]::Replace($content, '(?m)^\s{6}GEMMA_AUTH_MODE: "none"\r?\n', "", 1)
             }
         }
 

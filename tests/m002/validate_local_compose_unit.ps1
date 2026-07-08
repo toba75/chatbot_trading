@@ -45,12 +45,11 @@ BASE_SERVICES = {
         "expose": ["8090"],
         "networks": ["core", "spark-egress"],
         "environment": {
-            "GEMMA_BASE_URL": "https://spark-inference:8443/v1",
+            "GEMMA_BASE_URL": "${GEMMA_BASE_URL?GEMMA_BASE_URL requis}",
             "GEMMA_MODEL": "${GEMMA_MODEL?GEMMA_MODEL requis}",
-            "GEMMA_API_KEY_FILE": "/run/secrets/gemma_api_key",
-            "GEMMA_CA_BUNDLE": "/run/secrets/spark_ca",
+            "GEMMA_AUTH_MODE": "none",
+            "GEMMA_TLS_MODE": "disabled",
         },
-        "secrets": ["gemma_api_key", "spark_ca"],
     },
     "postgres": {
         "image": "postgres@sha256:" + "b" * 64,
@@ -155,7 +154,7 @@ def valid_compose(service_overrides=None, top_level_secrets=None):
             if value is None:
                 services[service_id].pop(key, None)
 
-    secret_names = top_level_secrets or ["gemma_api_key", "spark_ca", "postgres_password"]
+    secret_names = top_level_secrets or ["postgres_password"]
     lines = ["name: trading-research-assistant", "services:"]
     for service_id, definition in services.items():
         lines.extend(service_lines(service_id, definition))
@@ -219,8 +218,8 @@ assert_raises(
     valid_compose({"llm-gateway": {"environment": {
         "GEMMA_BASE_URL": "https://api.openai.com/v1",
         "GEMMA_MODEL": "${GEMMA_MODEL?GEMMA_MODEL requis}",
-        "GEMMA_API_KEY_FILE": "/run/secrets/gemma_api_key",
-        "GEMMA_CA_BUNDLE": "/run/secrets/spark_ca",
+        "GEMMA_AUTH_MODE": "none",
+        "GEMMA_TLS_MODE": "disabled",
     }}}),
 )
 
@@ -235,8 +234,12 @@ assert_raises(
 )
 
 assert_raises(
-    "Secret Spark absent pour llm-gateway: gemma_api_key",
-    valid_compose({"llm-gateway": {"secrets": ["spark_ca"]}}),
+    "Variable gateway Spark absente: GEMMA_AUTH_MODE",
+    valid_compose({"llm-gateway": {"environment": {
+        "GEMMA_BASE_URL": "${GEMMA_BASE_URL?GEMMA_BASE_URL requis}",
+        "GEMMA_MODEL": "${GEMMA_MODEL?GEMMA_MODEL requis}",
+        "GEMMA_TLS_MODE": "disabled",
+    }}}),
 )
 
 assert_raises(
@@ -245,8 +248,32 @@ assert_raises(
 )
 
 assert_raises(
-    "Secret Compose absent: spark_ca",
-    valid_compose(top_level_secrets=["gemma_api_key", "postgres_password"]),
+    "GEMMA_API_KEY_FILE interdit quand GEMMA_AUTH_MODE=none",
+    valid_compose({"llm-gateway": {"environment": {
+        "GEMMA_BASE_URL": "${GEMMA_BASE_URL?GEMMA_BASE_URL requis}",
+        "GEMMA_MODEL": "${GEMMA_MODEL?GEMMA_MODEL requis}",
+        "GEMMA_AUTH_MODE": "none",
+        "GEMMA_API_KEY_FILE": "/run/secrets/gemma_api_key",
+        "GEMMA_TLS_MODE": "disabled",
+    }}}),
+)
+
+assert_raises(
+    "Secret Spark interdit pour llm-gateway: gemma_api_key",
+    valid_compose(
+        {"llm-gateway": {"secrets": ["gemma_api_key"]}},
+        top_level_secrets=["postgres_password", "gemma_api_key"],
+    ),
+)
+
+assert_raises(
+    "Mode TLS Spark invalide",
+    valid_compose({"llm-gateway": {"environment": {
+        "GEMMA_BASE_URL": "${GEMMA_BASE_URL?GEMMA_BASE_URL requis}",
+        "GEMMA_MODEL": "${GEMMA_MODEL?GEMMA_MODEL requis}",
+        "GEMMA_AUTH_MODE": "none",
+        "GEMMA_TLS_MODE": "implicit",
+    }}}),
 )
 
 print("Tests unitaires Compose local M-002: OK")

@@ -137,19 +137,19 @@ function Add-SparkEgressToService {
     return $Content.Remove($networkIndex, $networkBlock.Length).Insert($networkIndex, $mutatedNetworkBlock)
 }
 
-function Remove-GatewaySparkSecret {
+function Remove-GatewayAuthMode {
     param(
         [Parameter(Mandatory = $true)]
         [string] $Content
     )
 
     $lineEnding = Get-ComposeLineEnding -Content $Content
-    $secretLine = "      - gemma_api_key${lineEnding}"
-    if (-not $Content.Contains($secretLine)) {
-        throw "Secret Spark fixture absent: gemma_api_key"
+    $authModeLine = "      GEMMA_AUTH_MODE: `"none`"${lineEnding}"
+    if (-not $Content.Contains($authModeLine)) {
+        throw "Mode d'authentification Spark fixture absent: GEMMA_AUTH_MODE"
     }
 
-    return $Content.Replace($secretLine, "")
+    return $Content.Replace($authModeLine, "")
 }
 
 function Add-VllmPrincipalService {
@@ -228,10 +228,10 @@ try {
     Assert-ExitCode -Actual $vllmResult.ExitCode -Expected 1 -Message "Un vLLM principal local doit être refusé."
     Assert-OutputContains -Output $vllmResult.Output -Expected "Service Gemma/vLLM principal interdit dans Compose local: vllm-main" -Message "Le refus vLLM local doit être explicite."
 
-    $missingSecretPath = New-TemporaryCompose -Name "gateway-without-gemma-secret" -Content (Remove-GatewaySparkSecret -Content $validCompose)
-    $missingSecretResult = Invoke-LocalComposeValidator -ComposePath $missingSecretPath
-    Assert-ExitCode -Actual $missingSecretResult.ExitCode -Expected 1 -Message "Le secret Spark du gateway doit être requis."
-    Assert-OutputContains -Output $missingSecretResult.Output -Expected "Secret Spark absent pour llm-gateway: gemma_api_key" -Message "Le secret Spark absent doit être nommé."
+    $missingAuthModePath = New-TemporaryCompose -Name "gateway-without-auth-mode" -Content (Remove-GatewayAuthMode -Content $validCompose)
+    $missingAuthModeResult = Invoke-LocalComposeValidator -ComposePath $missingAuthModePath
+    Assert-ExitCode -Actual $missingAuthModeResult.ExitCode -Expected 1 -Message "Le mode d'authentification Spark doit être requis."
+    Assert-OutputContains -Output $missingAuthModeResult.Output -Expected "Variable gateway Spark absente: GEMMA_AUTH_MODE" -Message "Le mode d'authentification absent doit être nommé."
 
     $workerEgressPath = New-TemporaryCompose -Name "worker-spark-egress" -Content (Add-SparkEgressToService -Content $validCompose -ServiceId "worker-documents")
     $workerEgressResult = Invoke-LocalComposeValidator -ComposePath $workerEgressPath

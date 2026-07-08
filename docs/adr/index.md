@@ -12,13 +12,14 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 | [ADR-004](ADR-004-autorite-textuelle-unique-par-page.md) | Autorité textuelle unique par page | Acceptée | 2026-06-21 | Aucun | Aucune |
 | [ADR-005](ADR-005-recherche-hybride.md) | Recherche hybride | Acceptée | 2026-06-21 | Aucun | Aucune |
 | [ADR-006](ADR-006-registre-affirmations-separe-index-documentaire.md) | Registre d'affirmations séparé de l'index documentaire | Acceptée | 2026-06-21 | Aucun | Aucune |
-| [ADR-007](ADR-007-deploiement-local-sur-dgx-spark.md) | Topologie physique locale à deux plans | Acceptée | 2026-06-21 | Aucun | Aucune |
-| [ADR-008](ADR-008-llm-principal-servi-par-vllm.md) | LLM principal servi par vLLM sur le DGX Spark | Acceptée | 2026-06-21 | Aucun | Aucune |
+| [ADR-007](ADR-007-deploiement-local-sur-dgx-spark.md) | Topologie physique locale à deux plans | Remplacée | 2026-06-21 | Aucun | ADR-014 |
+| [ADR-008](ADR-008-llm-principal-servi-par-vllm.md) | LLM principal servi par vLLM sur le DGX Spark | Remplacée | 2026-06-21 | Aucun | ADR-014 |
 | [ADR-009](ADR-009-spark-sans-etat-metier.md) | Le Spark est sans état métier | Acceptée | 2026-06-21 | Aucun | Aucune |
 | [ADR-010](ADR-010-gates-gouvernance-powershell.md) | Gates de gouvernance PowerShell | Acceptée | 2026-06-21 | Aucun | Aucune |
 | [ADR-011](ADR-011-python-outille-pour-validateurs-architecture.md) | Python outillé pour les validateurs d'architecture | Acceptée | 2026-06-25 | Aucun | Aucune |
 | [ADR-012](ADR-012-python-outille-pour-validateurs-plateforme.md) | Python outillé pour les validateurs de plateforme | Acceptée | 2026-06-25 | Aucun | Aucune |
 | [ADR-013](ADR-013-contrat-manifeste-sauvegarde-restauration.md) | Contrat de manifeste de sauvegarde et restauration | Acceptée | 2026-07-08 | Aucun | Aucune |
+| [ADR-014](ADR-014-spark-docker-externe-sans-cle-api.md) | Endpoint Docker Spark externe sans clé API | Acceptée | 2026-07-08 | ADR-007; ADR-008 | Aucune |
 
 ## ADR DDD
 
@@ -40,7 +41,7 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 ## Prochains numéros disponibles
 
 ```text
-Prochaine ADR technique: ADR-014
+Prochaine ADR technique: ADR-015
 Prochaine DDD-ADR: DDD-ADR-013
 ```
 

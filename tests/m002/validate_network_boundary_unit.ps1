@@ -32,14 +32,16 @@ topology = load_platform_topology(repo_root / "app/platform/topology_registry.js
 
 VALID_FIREWALL_PAYLOAD = {
     "schema_version": "1.0",
-    "architecture_decisions": ["ADR-007", "ADR-008", "ADR-009"],
+    "architecture_decisions": ["ADR-007", "ADR-008", "ADR-009", "ADR-014"],
     "spark_endpoint": {
         "host": "spark-inference",
         "service": "gemma-vllm",
-        "port": 8443,
+        "port": 8000,
         "protocol": "tcp",
-        "tls_required": True,
-        "certificate_authority_required": True,
+        "auth_mode": "none",
+        "tls_mode": "disabled",
+        "tls_required": False,
+        "certificate_authority_required": False,
     },
     "allowed_ingress": [
         {
@@ -47,7 +49,7 @@ VALID_FIREWALL_PAYLOAD = {
             "source_service": "llm-gateway",
             "destination_host": "spark-inference",
             "destination_service": "gemma-vllm",
-            "destination_port": 8443,
+            "destination_port": 8000,
             "purpose": "llm-gateway-to-vllm",
         }
     ],
@@ -151,7 +153,7 @@ def add_gateway_environment_line(document: str, line: str) -> str:
 
 
 def replace_gateway_base_url(document: str, value: str) -> str:
-    current = '      GEMMA_BASE_URL: "https://spark-inference:8443/v1"'
+    current = '      GEMMA_BASE_URL: "${GEMMA_BASE_URL?GEMMA_BASE_URL requis}"'
     replacement = f'      GEMMA_BASE_URL: "{value}"'
     if current not in document:
         raise AssertionError("Variable GEMMA_BASE_URL absente du fixture")
@@ -189,7 +191,7 @@ allowed_flow = allowed_flows[0]
 if (
     allowed_flow.source_service != "llm-gateway"
     or allowed_flow.destination_host != "spark-inference"
-    or allowed_flow.destination_port != 8443
+    or allowed_flow.destination_port != 8000
 ):
     raise AssertionError(f"Flux Spark autorisé invalide: {allowed_flow}")
 if not any(flow.source_service == "browser" and not flow.allowed for flow in flows):
@@ -215,12 +217,12 @@ firewall_payload["allowed_ingress"][0]["source_service"] = "worker-research"
 assert_boundary_error("Source Spark non autoris", firewall_payload=firewall_payload)
 
 firewall_payload = copy.deepcopy(VALID_FIREWALL_PAYLOAD)
-firewall_payload["spark_endpoint"]["tls_required"] = False
-assert_boundary_error("TLS Spark obligatoire", firewall_payload=firewall_payload)
+firewall_payload["spark_endpoint"]["auth_mode"] = "api_key_file"
+assert_boundary_error("Mode d'authentification Spark invalide", firewall_payload=firewall_payload)
 
 firewall_payload = copy.deepcopy(VALID_FIREWALL_PAYLOAD)
-firewall_payload["spark_endpoint"]["certificate_authority_required"] = False
-assert_boundary_error("Certificat Spark obligatoire", firewall_payload=firewall_payload)
+firewall_payload["spark_endpoint"]["tls_mode"] = "ca_bundle"
+assert_boundary_error("Mode TLS Spark incohérent", firewall_payload=firewall_payload)
 
 firewall_payload = copy.deepcopy(VALID_FIREWALL_PAYLOAD)
 firewall_payload["callbacks_from_spark_allowed"] = True
