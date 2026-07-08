@@ -117,6 +117,20 @@ policy.validate_operation(
     )
 )
 
+def policy_with_category(replacement):
+    return RetentionPolicy(
+        policy_version=RETENTION_POLICY_VERSION,
+        categories=tuple(
+            replacement if item.category_id == replacement.category_id else item
+            for item in policy.categories
+        ),
+    )
+
+
+assert_raises(
+    "durée de rétention incohérente",
+    lambda: policy_with_category(policy.categories_by_id["CV_CONVERSATIONS"].with_retention_months(1)),
+)
 assert_raises("durable inconnue", lambda: request(category_id="UNKNOWN"))
 assert_raises("absente", lambda: policy.categories_by_id["EG_CLAIMS"].with_retention_months(0))
 assert_raises("justification administrative requise", lambda: request(justification=""))
@@ -337,6 +351,14 @@ try {
             $path = Join-Path $projectRoot "docs/adr/index.md"
             (Get-Content -Raw -Encoding UTF8 -LiteralPath $path).Replace("DDD-ADR-012", "DDD-ADR-999") |
                 Set-Content -Encoding UTF8 -LiteralPath $path
+        }
+
+    Assert-ValidatorFails `
+        -Name "commande-reconstruction-introuvable" `
+        -ExpectedMessage "Commande de reconstruction introuvable" `
+        -Mutate {
+            param($projectRoot)
+            Remove-Item -LiteralPath (Join-Path $projectRoot "scripts/rebuild_knowledge_projection.ps1") -Force -ErrorAction SilentlyContinue
         }
 }
 finally {

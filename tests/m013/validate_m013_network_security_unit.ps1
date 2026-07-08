@@ -305,6 +305,15 @@ try {
         }
 
     Assert-ValidatorFails `
+        -Name "bearer-rapport" `
+        -ExpectedMessage "Secret complet interdit dans le rapport d'audit M-013" `
+        -Mutate {
+            param($projectRoot)
+            $auditPath = Join-Path $projectRoot "docs/governance/m013_security_audit.md"
+            Add-Content -Encoding UTF8 -LiteralPath $auditPath -Value "`nAuthorization: Bearer secret-interdit"
+        }
+
+    Assert-ValidatorFails `
         -Name "mono-hote-non-dev" `
         -ExpectedMessage "Hôte attendu absent: spark-inference" `
         -Mutate {

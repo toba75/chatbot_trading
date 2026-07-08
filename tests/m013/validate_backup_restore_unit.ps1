@@ -145,6 +145,13 @@ assert_raises("clé hors dépôt requise", lambda: manifest(key_reference="repo:
 assert_raises("clé versionnée interdite", lambda: manifest(key_git_tracked=True))
 assert_raises("secret en clair interdit", lambda: entry(contains_plain_secret=True))
 assert_raises("contexte V1 absent", lambda: policy.validate_manifest(manifest(entries=tuple(item for item in manifest().entries if item.context != CONTEXT_RA))))
+complete_manifest = manifest()
+assert_raises(
+    "catégorie artefact V1 absente",
+    lambda: policy.validate_manifest(
+        manifest(entries=tuple(item for item in complete_manifest.entries if item.artifact_kind != "canonical_versions"))
+    ),
+)
 assert_raises("hash restauré absent", lambda: entry(restored_sha256=""))
 assert_raises("hash restauré divergent", lambda: entry(restored_sha256="b" * 64))
 assert_raises("projection régénérable non autorité", lambda: entry(context=CONTEXT_KA, artifact_kind="qdrant_projection", authority=True, regenerable_projection=True))
@@ -321,6 +328,22 @@ try {
             $path = Join-Path $projectRoot "docs/traceability/matrix.md"
             (Get-Content -Raw -Encoding UTF8 -LiteralPath $path).Replace("REQ-M013-007", "REQ-M013-XXX") |
                 Set-Content -Encoding UTF8 -LiteralPath $path
+        }
+
+    Assert-ValidatorFails `
+        -Name "script-sauvegarde-absent" `
+        -ExpectedMessage "Script sauvegarde V1 absent" `
+        -Mutate {
+            param($projectRoot)
+            Remove-Item -LiteralPath (Join-Path $projectRoot "scripts/backup_v1.ps1") -Force -ErrorAction SilentlyContinue
+        }
+
+    Assert-ValidatorFails `
+        -Name "script-restauration-absent" `
+        -ExpectedMessage "Script restauration V1 absent" `
+        -Mutate {
+            param($projectRoot)
+            Remove-Item -LiteralPath (Join-Path $projectRoot "scripts/restore_v1.ps1") -Force -ErrorAction SilentlyContinue
         }
 }
 finally {

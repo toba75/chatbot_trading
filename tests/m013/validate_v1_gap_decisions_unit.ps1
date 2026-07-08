@@ -89,6 +89,7 @@ assert_raises(
     lambda: decision(decision_status=V1_GAP_DECISION_DEFERRED, non_acceptance_justification=""),
 )
 assert_raises("critère V1 absent", lambda: decision(v1_criterion_id=""))
+assert_raises("contexte V1 incohérent", lambda: decision(v1_criterion_id="V1-SP-QUALITE-DOCUMENTAIRE"))
 assert_raises(
     "décision contredit M-012",
     lambda: policy.publish_register(

@@ -123,6 +123,26 @@ assert_raises("snapshot", lambda: case(strategy_snapshot_created=True))
 assert_raises("benchmark LLM promu interdit", lambda: case(llm_benchmark_promoted=True))
 assert_raises("provider alternatif interdit", lambda: case(alternative_provider_calls=("openai-remote",)))
 assert_raises("premier token interdit", lambda: case(first_token_emitted=True, retry_after_first_token_count=1))
+assert_raises(
+    "premier token requis",
+    lambda: case(
+        failure_mode=FAILURE_STREAM_CUT_AFTER_FIRST_TOKEN,
+        public_status="LLM_PARTIAL_OUTPUT",
+        diagnostic_code="LLM_PARTIAL_OUTPUT",
+        retry_before_first_token_count=0,
+        first_token_emitted=False,
+    ),
+)
+assert_raises(
+    "premier token interdit",
+    lambda: case(
+        failure_mode=FAILURE_STREAM_CUT_BEFORE_FIRST_TOKEN,
+        public_status="LLM_UNAVAILABLE",
+        diagnostic_code="LLM_UNAVAILABLE",
+        retry_before_first_token_count=1,
+        first_token_emitted=True,
+    ),
+)
 assert_raises("retry", lambda: case(retry_before_first_token_count=2, retry_limit=1))
 assert_raises("idempotence retry requise", lambda: case(idempotency_key=""))
 assert_raises("prompt complet interdit", lambda: case(metric_public_labels=("prompt complet: secret",)))

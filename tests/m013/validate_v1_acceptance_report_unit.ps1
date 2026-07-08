@@ -87,6 +87,7 @@ assert_raises("commande finale absente", lambda: criterion(evidence_command=""))
 assert_raises("ADR reliée absente", lambda: criterion(adr_refs=()))
 assert_raises("écart bloquant accepté", lambda: criterion(gap_status="bloquant", verdict=V1_ACCEPTANCE_STATUS_ACCEPTED))
 assert_raises("écart différé accepté sans décision", lambda: criterion(gap_status="différé", verdict=V1_ACCEPTANCE_STATUS_ACCEPTED, decision="différé"))
+assert_raises("contexte V1 incohérent", lambda: criterion(criterion_id="V1-SP-QUALITE-DOCUMENTAIRE", context="KA"))
 assert_raises("statut de gate finale inconnu", lambda: final_gate(status="UNKNOWN"))
 assert_raises("commande finale absente", lambda: final_gate(command=""))
 
@@ -112,32 +113,38 @@ assert_raises(
         definition_of_done_ref="docs/governance/definition_of_done.md",
     ),
 )
-assert_raises(
-    "écart non accepté absent: SD",
-    lambda: policy.publish_report(
-        report_id="REPORT-M013-SD-MASQUE",
-        specification_version="docs/specs/m013_durcissement_acceptation_v1.md",
-        criteria=tuple(
-            criterion(
-                criterion_id=item.criterion_id,
-                context=item.context,
-                verdict=V1_ACCEPTANCE_STATUS_ACCEPTED,
-                evidence_artifact=item.evidence_artifact,
-                evidence_command=item.evidence_command,
-                adr_refs=item.adr_refs,
-                gap_status="satisfait",
-                decision="accepté",
-                final_impact=item.final_impact,
-            )
-            if item.context == "SD"
-            else item
-            for item in report.criteria
-        ),
-        final_gates=report.final_gates,
-        traceability_requirement_id="REQ-M013-012",
-        definition_of_done_ref="docs/governance/definition_of_done.md",
+accepted_report = policy.publish_report(
+    report_id="REPORT-M013-ACCEPTE",
+    specification_version="docs/specs/m013_durcissement_acceptation_v1.md",
+    criteria=tuple(
+        criterion(
+            criterion_id=item.criterion_id,
+            context=item.context,
+            verdict=V1_ACCEPTANCE_STATUS_ACCEPTED,
+            evidence_artifact=item.evidence_artifact,
+            evidence_command=item.evidence_command,
+            adr_refs=item.adr_refs,
+            gap_status="satisfait",
+            decision="accepté",
+            final_impact="Critère V1 satisfait et accepté.",
+        )
+        for item in report.criteria
     ),
+    final_gates=tuple(
+        final_gate(
+            gate_id=item.gate_id,
+            command=item.command,
+            status="GREEN",
+            evidence_artifact=item.evidence_artifact,
+        )
+        for item in report.final_gates
+    ),
+    traceability_requirement_id="REQ-M013-012",
+    definition_of_done_ref="docs/governance/definition_of_done.md",
 )
+policy.validate_report(accepted_report)
+assert_equal(accepted_report.final_verdict, V1_ACCEPTANCE_STATUS_ACCEPTED, "Un rapport sans écart et avec gates GREEN doit être accepté.")
+assert_equal(accepted_report.acceptance_allowed, True, "La politique ne doit pas imposer d'écart non accepté durable.")
 
 print("Tests unitaires V1AcceptanceReportPolicy M-013: OK")
 '@
