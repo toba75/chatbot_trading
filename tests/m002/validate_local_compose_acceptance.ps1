@@ -3,6 +3,7 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
 $validatorPath = Join-Path $repoRoot "scripts/validate_local_compose.ps1"
 $composePath = Join-Path $repoRoot "deploy/local-compose/compose.yaml"
+$caddyfilePath = Join-Path $repoRoot "deploy/local-compose/Caddyfile"
 $temporaryRoot = Join-Path $repoRoot (".tmp/ost_m002_local_compose_acceptance_" + [System.Guid]::NewGuid().ToString("N"))
 
 function Invoke-LocalComposeValidator {
@@ -193,6 +194,10 @@ if (-not (Test-Path -LiteralPath $composePath -PathType Leaf)) {
     throw "Compose local M-002 absent: deploy/local-compose/compose.yaml"
 }
 
+if (-not (Test-Path -LiteralPath $caddyfilePath -PathType Leaf)) {
+    throw "Caddyfile local M-002 absent: deploy/local-compose/Caddyfile"
+}
+
 New-Item -ItemType Directory -Path $temporaryRoot | Out-Null
 
 try {
@@ -205,6 +210,12 @@ try {
     Assert-OutputContains -Output $validResult.Output -Expected "Compose local M-002 valide" -Message "Le validateur doit annoncer le GREEN Compose local."
 
     $validCompose = Get-Content -Raw -Encoding UTF8 -LiteralPath $composePath
+    $validCaddyfile = Get-Content -Raw -Encoding UTF8 -LiteralPath $caddyfilePath
+
+    Assert-OutputContains -Output $validCaddyfile -Expected "localhost:8443" -Message "Le Caddyfile doit nommer localhost pour le TLS interne."
+    if ($validCaddyfile -match "(?m)^:8443\s*\{") {
+        throw "Le Caddyfile ne doit pas déclarer le site TLS sans hostname."
+    }
 
     foreach ($serviceId in @(
         "postgres",
