@@ -58,7 +58,7 @@ def main() -> int:
         "Frontière réseau M-002 valide: "
         f"{len(compose.services)} service(s) Compose, "
         f"{len(spark_firewall.allowed_ingress)} règle(s) Spark, "
-        "TLS et egress contrôlés."
+        "transport Spark et egress contrôlés."
     )
     return 0
 

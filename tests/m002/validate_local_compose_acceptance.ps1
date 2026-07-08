@@ -143,13 +143,12 @@ function Remove-GatewayAuthMode {
         [string] $Content
     )
 
-    $lineEnding = Get-ComposeLineEnding -Content $Content
-    $authModeLine = "      GEMMA_AUTH_MODE: `"none`"${lineEnding}"
-    if (-not $Content.Contains($authModeLine)) {
+    $updatedContent = [regex]::Replace($Content, '(?m)^\s+GEMMA_AUTH_MODE: "none"\r?\n', "", 1)
+    if ($updatedContent -eq $Content) {
         throw "Mode d'authentification Spark fixture absent: GEMMA_AUTH_MODE"
     }
 
-    return $Content.Replace($authModeLine, "")
+    return $updatedContent
 }
 
 function Add-VllmPrincipalService {

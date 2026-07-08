@@ -64,6 +64,7 @@ $requiredAuditMarkers = @(
     "ADR-007",
     "ADR-008",
     "ADR-009",
+    "ADR-014",
     "deploy/local-compose/compose.yaml",
     "app/platform/topology_registry.json",
     "deploy/spark-firewall/network-boundary.json",
@@ -72,10 +73,10 @@ $requiredAuditMarkers = @(
     "llm-gateway -> spark-inference",
     "browser -> spark-inference | refusé",
     "worker-research -> spark-inference | refusé",
-    "TLS Spark requis",
-    "clé API par fichier secret",
+    "Authentification Spark none explicite",
+    "TLS Spark disabled explicite",
     "aucun corpus, base, expérience ou secret métier sur Spark",
-    "ADR: non requise"
+    "ADR-014"
 )
 
 $requiredAuditControls = @(
@@ -237,16 +238,18 @@ function Assert-M013FirewallPolicy {
     )
 
     Assert-M013Condition -Condition ($Firewall.schema_version -eq "1.0") -Message "Version de politique pare-feu Spark invalide."
-    foreach ($adrId in @("ADR-007", "ADR-008", "ADR-009")) {
+    foreach ($adrId in @("ADR-007", "ADR-008", "ADR-009", "ADR-014")) {
         Assert-M013Condition -Condition (@($Firewall.architecture_decisions) -contains $adrId) -Message "ADR pare-feu Spark absente: $adrId"
     }
 
     Assert-M013Condition -Condition ($Firewall.spark_endpoint.host -eq "spark-inference") -Message "Endpoint Spark hors spark-inference."
     Assert-M013Condition -Condition ($Firewall.spark_endpoint.service -eq "gemma-vllm") -Message "Service Spark attendu absent: gemma-vllm."
-    Assert-M013Condition -Condition ([int] $Firewall.spark_endpoint.port -eq 8443) -Message "Port Spark attendu absent: 8443."
+    Assert-M013Condition -Condition ([int] $Firewall.spark_endpoint.port -gt 0) -Message "Port Spark explicite absent."
     Assert-M013Condition -Condition ($Firewall.spark_endpoint.protocol -eq "tcp") -Message "Protocole Spark attendu absent: tcp."
-    Assert-M013Condition -Condition ([bool] $Firewall.spark_endpoint.tls_required) -Message "TLS Spark requis absent."
-    Assert-M013Condition -Condition ([bool] $Firewall.spark_endpoint.certificate_authority_required) -Message "Autorité de certificat Spark requise absente."
+    Assert-M013Condition -Condition ($Firewall.spark_endpoint.auth_mode -eq "none") -Message "Mode authentification Spark attendu absent: none."
+    Assert-M013Condition -Condition ($Firewall.spark_endpoint.tls_mode -eq "disabled") -Message "Mode TLS Spark attendu absent: disabled."
+    Assert-M013Condition -Condition (-not [bool] $Firewall.spark_endpoint.tls_required) -Message "TLS Spark activé malgré le mode disabled."
+    Assert-M013Condition -Condition (-not [bool] $Firewall.spark_endpoint.certificate_authority_required) -Message "Autorité de certificat Spark déclarée malgré le mode disabled."
 
     $allowedIngress = @($Firewall.allowed_ingress)
     Assert-M013Condition -Condition ($allowedIngress.Count -eq 1) -Message "Allow-list Spark invalide: une seule règle llm-gateway est attendue."
@@ -255,7 +258,7 @@ function Assert-M013FirewallPolicy {
     Assert-M013Condition -Condition ($ingressRule.source_service -eq "llm-gateway") -Message "Seul llm-gateway peut joindre Spark."
     Assert-M013Condition -Condition ($ingressRule.destination_host -eq "spark-inference") -Message "Destination Spark invalide: $($ingressRule.destination_host)"
     Assert-M013Condition -Condition ($ingressRule.destination_service -eq "gemma-vllm") -Message "Destination vLLM invalide: $($ingressRule.destination_service)"
-    Assert-M013Condition -Condition ([int] $ingressRule.destination_port -eq 8443) -Message "Port de destination Spark invalide: $($ingressRule.destination_port)"
+    Assert-M013Condition -Condition ([int] $ingressRule.destination_port -eq [int] $Firewall.spark_endpoint.port) -Message "Port de destination Spark invalide: $($ingressRule.destination_port)"
 
     $deniedInitiators = @($Firewall.denied_initiators | ForEach-Object { [string] $_ })
     foreach ($initiator in $requiredDeniedInitiators) {
@@ -386,4 +389,4 @@ Assert-M013SparkStatelessTopology -Topology $topology
 Assert-M013AuditReport -AuditContent $auditContent
 Assert-M013Traceability -MatrixContent $matrixContent -TestGateContent $testGateContent -LintGateContent $lintGateContent
 
-Write-Host "Audit sécurité réseau M-013 valide: 127.0.0.1 par défaut, llm-gateway -> spark-inference, $($requiredAuditControls.Count) contrôle(s), ADR-007/ADR-008/ADR-009."
+Write-Host "Audit sécurité réseau M-013 valide: 127.0.0.1 par défaut, llm-gateway -> spark-inference, $($requiredAuditControls.Count) contrôle(s), ADR-014."

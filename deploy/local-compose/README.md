@@ -3,11 +3,11 @@
 ## Préconditions
 
 - Exécuter les commandes depuis la racine du dépôt.
-- Fournir les secrets hors dépôt dans `deploy/local-compose/secrets/`:
-  - `gemma_api_key`
-  - `spark_ca.pem`
+- Fournir le secret hors dépôt dans `deploy/local-compose/secrets/`:
   - `postgres_password`
-- Le gateway LLM cible uniquement `https://spark-inference:8443/v1`.
+- Le gateway LLM cible uniquement l'endpoint Docker Spark déclaré par `GEMMA_BASE_URL`.
+- Le conteneur Gemma sur la machine Spark n'exige pas de clé API: `GEMMA_AUTH_MODE` vaut `none` dans le Compose local.
+- Le transport Spark actuel n'exige pas de bundle CA: `GEMMA_TLS_MODE` vaut `disabled` dans le Compose local.
 
 ## Variables requises
 
@@ -19,6 +19,7 @@ Le Compose refuse les valeurs par défaut silencieuses. Les variables non secrè
 - `DATABASE_URL`
 - `QDRANT_URL`
 - `LLM_GATEWAY_URL`
+- `GEMMA_BASE_URL`
 - `GEMMA_MODEL`
 - `POSTGRES_DB`
 - `POSTGRES_USER`

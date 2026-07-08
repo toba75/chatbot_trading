@@ -155,7 +155,7 @@ $requiredM002Requirements = @(
         Test = "tests/m002/validate_local_compose_acceptance.ps1"
         CommandScript = "scripts/validate_local_compose.ps1"
         Code = "deploy/local-compose/compose.yaml"
-        Adr = "ADR-007; ADR-008; ADR-009; ADR-012"
+        Adr = "ADR-007; ADR-008; ADR-009; ADR-012; ADR-014"
     },
     [ordered] @{
         Id = "REQ-M002-005"
@@ -163,7 +163,7 @@ $requiredM002Requirements = @(
         Test = "tests/m002/validate_llm_gateway_contract_acceptance.ps1"
         CommandScript = "tests/m002/validate_llm_gateway_contract_acceptance.ps1"
         Code = "app/platform/llm_gateway/__init__.py"
-        Adr = "ADR-008; ADR-009"
+        Adr = "ADR-008; ADR-009; ADR-014"
     },
     [ordered] @{
         Id = "REQ-M002-006"
@@ -195,7 +195,7 @@ $requiredM002Requirements = @(
         Test = "tests/m002/validate_network_boundary_acceptance.ps1"
         CommandScript = "scripts/validate_network_boundary.ps1"
         Code = "app/platform/security/network_boundary.py"
-        Adr = "ADR-007; ADR-008; ADR-009; ADR-012"
+        Adr = "ADR-007; ADR-008; ADR-009; ADR-012; ADR-014"
     },
     [ordered] @{
         Id = "REQ-M002-010"
@@ -859,7 +859,7 @@ $requiredM013Requirements = @(
         Test = "tests/m013/validate_m013_network_security_acceptance.ps1"
         CommandScript = "scripts/validate_m013_security.ps1"
         Code = "docs/governance/m013_security_audit.md; scripts/validate_m013_security.ps1; tests/m013/validate_m013_network_security_unit.ps1; scripts/validate_network_boundary.ps1; docs/tasks/milestone_013/journal.md"
-        Adr = "ADR-007; ADR-008; ADR-009"
+        Adr = "ADR-007; ADR-008; ADR-009; ADR-014"
     },
     [ordered] @{
         Id = "REQ-M013-006"

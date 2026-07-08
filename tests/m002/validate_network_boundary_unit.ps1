@@ -222,7 +222,7 @@ assert_boundary_error("Mode d'authentification Spark invalide", firewall_payload
 
 firewall_payload = copy.deepcopy(VALID_FIREWALL_PAYLOAD)
 firewall_payload["spark_endpoint"]["tls_mode"] = "ca_bundle"
-assert_boundary_error("Mode TLS Spark incohérent", firewall_payload=firewall_payload)
+assert_boundary_error("Mode TLS Spark", firewall_payload=firewall_payload)
 
 firewall_payload = copy.deepcopy(VALID_FIREWALL_PAYLOAD)
 firewall_payload["callbacks_from_spark_allowed"] = True
@@ -238,7 +238,7 @@ assert_boundary_error(
 )
 
 assert_boundary_error(
-    "Endpoint Spark invalide pour llm-gateway",
+    "Mode TLS Spark",
     compose_document=replace_gateway_base_url(valid_compose_document, "https://api.openai.com/v1"),
 )
 

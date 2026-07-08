@@ -7,6 +7,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
+from urllib.parse import urlparse
 
 
 REQUIRED_SERVICE_IDS = (
@@ -46,13 +47,18 @@ WORKER_SERVICE_IDS = frozenset(
 )
 
 REQUIRED_NETWORK_IDS = ("edge", "core", "spark-egress")
-REQUIRED_COMPOSE_SECRETS = ("gemma_api_key", "spark_ca", "postgres_password")
-REQUIRED_SPARK_SECRETS = ("gemma_api_key", "spark_ca")
+REQUIRED_COMPOSE_SECRETS = ("postgres_password",)
+SPARK_API_KEY_SECRET = "gemma_api_key"
+SPARK_CA_SECRET = "spark_ca"
 FORBIDDEN_MODEL_SERVICE_PATTERN = re.compile(r"(^|[-_])(gemma|vllm)([-_]|$)")
 REQUIRED_ENVIRONMENT_PATTERN = re.compile(r"^\$\{[A-Z][A-Z0-9_]*\?[^}]+\}$")
 SECRET_ENVIRONMENT_MARKERS = ("PASSWORD", "TOKEN", "SECRET", "API_KEY")
 INTERNAL_IMAGE_PREFIX = "ostrading/"
-LLM_GATEWAY_SPARK_BASE_URL = "https://spark-inference:8443/v1"
+SPARK_AUTH_MODE_NONE = "none"
+SPARK_AUTH_MODE_API_KEY_FILE = "api_key_file"
+SPARK_TLS_MODE_DISABLED = "disabled"
+SPARK_TLS_MODE_CA_BUNDLE = "ca_bundle"
+SPARK_ENDPOINT_PATH = "/v1"
 EXPECTED_SERVICE_COMMANDS = {
     "ui": ("python", "-m", "app.platform.local_runtime", "serve-http", "ui", "8081"),
     "orchestrator-api": ("python", "-m", "app.platform.local_runtime", "serve-http", "orchestrator-api", "8080"),
@@ -339,9 +345,16 @@ def _validate_service_secrets(service: ComposeService, secrets: Mapping[str, Map
             raise ValueError(f"Secret référencé absent pour service {service.id}: {secret_id}")
 
     if service.id == "llm-gateway":
-        for secret_id in REQUIRED_SPARK_SECRETS:
-            if secret_id not in service.secrets:
-                raise ValueError(f"Secret Spark absent pour llm-gateway: {secret_id}")
+        auth_mode = service.environment.get("GEMMA_AUTH_MODE")
+        tls_mode = service.environment.get("GEMMA_TLS_MODE")
+        if auth_mode == SPARK_AUTH_MODE_API_KEY_FILE and SPARK_API_KEY_SECRET not in service.secrets:
+            raise ValueError(f"Secret Spark absent pour llm-gateway: {SPARK_API_KEY_SECRET}")
+        if auth_mode == SPARK_AUTH_MODE_NONE and SPARK_API_KEY_SECRET in service.secrets:
+            raise ValueError(f"Secret Spark interdit pour llm-gateway: {SPARK_API_KEY_SECRET}")
+        if tls_mode == SPARK_TLS_MODE_CA_BUNDLE and SPARK_CA_SECRET not in service.secrets:
+            raise ValueError(f"Secret Spark absent pour llm-gateway: {SPARK_CA_SECRET}")
+        if tls_mode == SPARK_TLS_MODE_DISABLED and SPARK_CA_SECRET in service.secrets:
+            raise ValueError(f"Secret Spark interdit pour llm-gateway: {SPARK_CA_SECRET}")
 
     if service.id == "postgres" and "postgres_password" not in service.secrets:
         raise ValueError("Secret PostgreSQL absent pour postgres: postgres_password")
@@ -363,8 +376,11 @@ def _validate_service_environment(service: ComposeService) -> None:
             continue
 
         if service.id == "llm-gateway" and key == "GEMMA_BASE_URL":
-            if value != LLM_GATEWAY_SPARK_BASE_URL:
-                raise ValueError(f"Endpoint Spark invalide pour service {service.id}: {key}")
+            if not REQUIRED_ENVIRONMENT_PATTERN.match(value):
+                _validate_explicit_spark_base_url(value, service.environment.get("GEMMA_TLS_MODE"))
+            continue
+
+        if service.id == "llm-gateway" and key in {"GEMMA_AUTH_MODE", "GEMMA_TLS_MODE"}:
             continue
 
         if not REQUIRED_ENVIRONMENT_PATTERN.match(value):
@@ -372,6 +388,57 @@ def _validate_service_environment(service: ComposeService) -> None:
 
         if ":-" in value or "-" in value.split("?", 1)[0]:
             raise ValueError(f"Valeur par défaut interdite pour service {service.id}: {key}")
+
+    if service.id == "llm-gateway":
+        _validate_llm_gateway_spark_environment(service)
+
+
+def _validate_llm_gateway_spark_environment(service: ComposeService) -> None:
+    for key in ("GEMMA_BASE_URL", "GEMMA_MODEL", "GEMMA_AUTH_MODE", "GEMMA_TLS_MODE"):
+        if key not in service.environment:
+            raise ValueError(f"Variable gateway Spark absente: {key}")
+        if service.environment[key].strip() == "":
+            raise ValueError(f"Variable gateway Spark vide: {key}")
+
+    auth_mode = service.environment["GEMMA_AUTH_MODE"]
+    if auth_mode not in {SPARK_AUTH_MODE_NONE, SPARK_AUTH_MODE_API_KEY_FILE}:
+        raise ValueError(f"Mode d'authentification Spark invalide: {auth_mode}")
+
+    tls_mode = service.environment["GEMMA_TLS_MODE"]
+    if tls_mode not in {SPARK_TLS_MODE_DISABLED, SPARK_TLS_MODE_CA_BUNDLE}:
+        raise ValueError(f"Mode TLS Spark invalide: {tls_mode}")
+
+    has_api_key_file = "GEMMA_API_KEY_FILE" in service.environment
+    if auth_mode == SPARK_AUTH_MODE_NONE and has_api_key_file:
+        raise ValueError("GEMMA_API_KEY_FILE interdit quand GEMMA_AUTH_MODE=none")
+    if auth_mode == SPARK_AUTH_MODE_API_KEY_FILE and not has_api_key_file:
+        raise ValueError("GEMMA_API_KEY_FILE requis quand GEMMA_AUTH_MODE=api_key_file")
+
+    has_ca_bundle = "GEMMA_CA_BUNDLE" in service.environment
+    if tls_mode == SPARK_TLS_MODE_DISABLED and has_ca_bundle:
+        raise ValueError("GEMMA_CA_BUNDLE interdit quand GEMMA_TLS_MODE=disabled")
+    if tls_mode == SPARK_TLS_MODE_CA_BUNDLE and not has_ca_bundle:
+        raise ValueError("GEMMA_CA_BUNDLE requis quand GEMMA_TLS_MODE=ca_bundle")
+
+    base_url = service.environment["GEMMA_BASE_URL"]
+    if not REQUIRED_ENVIRONMENT_PATTERN.match(base_url):
+        _validate_explicit_spark_base_url(base_url, tls_mode)
+
+
+def _validate_explicit_spark_base_url(value: str, tls_mode: str | None) -> None:
+    parsed = urlparse(value)
+    if parsed.scheme not in {"http", "https"} or parsed.netloc == "":
+        raise ValueError("Endpoint Spark invalide pour service llm-gateway: GEMMA_BASE_URL")
+    if parsed.username is not None or parsed.password is not None:
+        raise ValueError("Endpoint Spark invalide pour service llm-gateway: GEMMA_BASE_URL")
+    if parsed.path != SPARK_ENDPOINT_PATH:
+        raise ValueError("Endpoint Spark invalide pour service llm-gateway: GEMMA_BASE_URL")
+    if parsed.hostname in {"api.openai.com", "openai.com"}:
+        raise ValueError("Endpoint Spark invalide pour service llm-gateway: GEMMA_BASE_URL")
+    if tls_mode == SPARK_TLS_MODE_DISABLED and parsed.scheme != "http":
+        raise ValueError("Mode TLS Spark incohérent pour service llm-gateway: GEMMA_BASE_URL")
+    if tls_mode == SPARK_TLS_MODE_CA_BUNDLE and parsed.scheme != "https":
+        raise ValueError("Mode TLS Spark incohérent pour service llm-gateway: GEMMA_BASE_URL")
 
 
 def _is_pinned_image(image: str) -> bool:

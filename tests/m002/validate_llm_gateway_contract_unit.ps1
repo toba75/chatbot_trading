@@ -104,7 +104,7 @@ assert_raises_code(
 assert_raises_code(
     "LLM_GATEWAY_SPARK_ENDPOINT_REQUIRED",
     lambda: GatewayConfiguration(
-        base_url="https://attacker.example:443/v1",
+        base_url="http://attacker.example:8000/v1",
         served_model="gemma-research",
         auth_mode="none",
         api_key=None,

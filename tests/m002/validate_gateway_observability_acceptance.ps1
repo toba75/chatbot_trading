@@ -72,7 +72,9 @@ def configuration() -> GatewayConfiguration:
     return GatewayConfiguration(
         base_url="https://spark-inference.test:8443/v1",
         served_model="gemma-research-t010",
+        auth_mode="api_key_file",
         api_key=SECRET_CANARY,
+        tls_mode="ca_bundle",
         tls_ca_bundle_path="C:/spark/ca-t010.pem",
         timeout_seconds=7,
     )

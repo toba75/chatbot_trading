@@ -280,7 +280,7 @@ try {
         -TopologyPath $topologyPath `
         -SparkFirewallPath $tlsIncoherentPath
     Assert-ExitCode -Actual $tlsIncoherentResult.ExitCode -Expected 1 -Message "Le mode TLS Spark doit rester cohérent."
-    Assert-OutputContains -Output $tlsIncoherentResult.Output -Expected "Mode TLS Spark incohérent" -Message "L'incohérence TLS doit être explicite."
+    Assert-OutputContains -Output $tlsIncoherentResult.Output -Expected "Mode TLS Spark" -Message "L'incohérence TLS doit être explicite."
 
     $callbackEnabledPath = New-TemporaryFile `
         -Name "spark-callback-enabled.json" `

@@ -81,8 +81,8 @@
 
 - RED: ajout de `tests/m013/validate_m013_network_security_acceptance.ps1`; commit RED `2b32c6c1f`.
 - GREEN: publication de `docs/governance/m013_security_audit.md`, création de `scripts/validate_m013_security.ps1`, ajout de `tests/m013/validate_m013_network_security_unit.ps1`, enrôlement dans `scripts/test.ps1` et `scripts/lint.ps1`, alignement du comportement V1-004 dans la spécification M-013, et rattachement `REQ-M013-005` dans `docs/traceability/matrix.md`.
-- Décision livrée: le point d'entrée utilisateur reste lié à `127.0.0.1` par défaut; aucun service interne n'est publié; le navigateur, les workers, les stockages et Internet ne peuvent pas joindre Spark; seul `llm-gateway -> spark-inference` est autorisé avec TLS, certificat et clé API par fichier secret.
-- ADR: non requise; T-005 applique ADR-007, ADR-008 et ADR-009 sans remplacer la topologie locale, sans changer le chemin LLM et sans rendre mTLS obligatoire.
+- Décision livrée: le point d'entrée utilisateur reste lié à `127.0.0.1` par défaut; aucun service interne n'est publié; le navigateur, les workers, les stockages et Internet ne peuvent pas joindre Spark; seul `llm-gateway -> spark-inference` est autorisé avec `GEMMA_AUTH_MODE=none` et `GEMMA_TLS_MODE=disabled` explicites pour le conteneur Docker Gemma distant.
+- ADR: ADR-014 remplace le transport Spark avec clé API et CA obligatoires tout en conservant ADR-007, ADR-008 et ADR-009 comme invariants de topologie, chemin LLM et Spark sans état métier.
 
 ## Exécution T-006
 

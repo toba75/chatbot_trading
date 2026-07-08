@@ -6,8 +6,8 @@
 - Rapports sources: `docs/governance/m013_security_audit.md` et `docs/governance/m013_spark_failure_drill.md`
 - Politique réseau: `M013-SecurityAuditReport-1.0`
 - Drill incident: `M013-SPARK-FAILURE-DRILL-0001`
-- ADR applicables: ADR-007, ADR-008, ADR-009, DDD-ADR-006
-- ADR: non requise; ce runbook applique la frontière réseau et les statuts de panne existants.
+- ADR applicables: ADR-007, ADR-008, ADR-009, ADR-014, DDD-ADR-006
+- ADR: ADR-014; ce runbook applique la frontière réseau, l'endpoint Docker Spark externe sans clé API et les statuts de panne existants.
 
 ## Scénario BDD
 
@@ -25,7 +25,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_secu
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_network_boundary.ps1
 ```
 
-- Résultat attendu: seul `llm-gateway -> spark-inference` est autorisé, TLS reste requis, PostgreSQL, Qdrant, workers et Spark ne sont pas publiés.
+- Résultat attendu: seul `llm-gateway -> spark-inference` est autorisé, `GEMMA_AUTH_MODE=none` et `GEMMA_TLS_MODE=disabled` sont explicites, PostgreSQL, Qdrant, workers et Spark ne sont pas publiés.
 - Erreur explicite: toute exposition interne, tout accès navigateur direct ou tout secret Spark côté interface rend l'audit RED.
 - Preuve à conserver: sortie des validateurs, `docs/governance/m013_security_audit.md` et horodatage de l'audit.
 

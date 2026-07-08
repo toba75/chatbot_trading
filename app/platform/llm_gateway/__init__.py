@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import ipaddress
 import json
 import ssl
 import time
@@ -22,7 +23,11 @@ GATEWAY_CLIENT_ID = "llm-gateway"
 SECRET_MASK = "<secret-masked>"
 _FORBIDDEN_SAMPLING_KEYS = frozenset({"model", "messages", "response_format"})
 _ALLOWED_SPARK_HOSTS = frozenset({"spark-inference", "spark-inference.test"})
-_SPARK_HTTPS_PORT = 8443
+_SPARK_API_PATH = "/v1"
+_AUTH_MODE_NONE = "none"
+_AUTH_MODE_API_KEY_FILE = "api_key_file"
+_TLS_MODE_DISABLED = "disabled"
+_TLS_MODE_CA_BUNDLE = "ca_bundle"
 _MODEL_REVISION_HEADER = "x-model-revision"
 _RUNTIME_VERSION_HEADER = "x-runtime-version"
 _TTFT_HEADER = "x-ttft-ms"
@@ -261,31 +266,73 @@ def classify_gateway_failure(error: BaseException) -> GatewayFailureClassificati
 class GatewayConfiguration:
     base_url: str
     served_model: str
-    api_key: str
-    tls_ca_bundle_path: str
+    auth_mode: str
+    api_key: str | None
+    tls_mode: str
+    tls_ca_bundle_path: str | None
     timeout_seconds: int
 
     def __post_init__(self) -> None:
         _require_text(self.base_url, "base_url", "LLM_GATEWAY_BASE_URL_REQUIRED")
         _require_text(self.served_model, "served_model", "LLM_GATEWAY_MODEL_REQUIRED")
-        _require_text(self.api_key, "api_key", "LLM_GATEWAY_API_KEY_REQUIRED")
-        _require_text(self.tls_ca_bundle_path, "tls_ca_bundle_path", "LLM_GATEWAY_TLS_CA_REQUIRED")
+        _require_text(self.auth_mode, "auth_mode", "LLM_GATEWAY_AUTH_MODE_REQUIRED")
+        _require_text(self.tls_mode, "tls_mode", "LLM_GATEWAY_TLS_MODE_REQUIRED")
+
+        if self.auth_mode not in {_AUTH_MODE_NONE, _AUTH_MODE_API_KEY_FILE}:
+            raise LLMGatewayContractError(
+                "LLM_GATEWAY_AUTH_MODE_REQUIRED",
+                "Le mode d'authentification Spark du gateway LLM est invalide.",
+            )
+        if self.tls_mode not in {_TLS_MODE_DISABLED, _TLS_MODE_CA_BUNDLE}:
+            raise LLMGatewayContractError(
+                "LLM_GATEWAY_TLS_MODE_REQUIRED",
+                "Le mode TLS Spark du gateway LLM est invalide.",
+            )
+        if self.auth_mode == _AUTH_MODE_NONE and self.api_key is not None:
+            raise LLMGatewayContractError(
+                "LLM_GATEWAY_API_KEY_FORBIDDEN",
+                "La clé API Spark est interdite quand auth_mode vaut none.",
+            )
+        if self.auth_mode == _AUTH_MODE_API_KEY_FILE:
+            _require_text(self.api_key, "api_key", "LLM_GATEWAY_API_KEY_REQUIRED")
+        if self.tls_mode == _TLS_MODE_DISABLED and self.tls_ca_bundle_path is not None:
+            raise LLMGatewayContractError(
+                "LLM_GATEWAY_TLS_CA_FORBIDDEN",
+                "Le bundle CA Spark est interdit quand tls_mode vaut disabled.",
+            )
+        if self.tls_mode == _TLS_MODE_CA_BUNDLE:
+            _require_text(self.tls_ca_bundle_path, "tls_ca_bundle_path", "LLM_GATEWAY_TLS_CA_REQUIRED")
 
         parsed_base_url = urlparse(self.base_url)
-        if parsed_base_url.scheme != "https" or parsed_base_url.netloc == "":
+        if parsed_base_url.scheme not in {"http", "https"} or parsed_base_url.netloc == "":
+            raise LLMGatewayContractError(
+                "LLM_GATEWAY_SPARK_ENDPOINT_REQUIRED",
+                "Le gateway LLM exige une URL Spark explicite.",
+            )
+        if self.tls_mode == _TLS_MODE_DISABLED and parsed_base_url.scheme != "http":
+            raise LLMGatewayContractError(
+                "LLM_GATEWAY_TLS_MODE_REQUIRED",
+                "Le mode TLS disabled exige une URL Spark HTTP explicite.",
+            )
+        if self.tls_mode == _TLS_MODE_CA_BUNDLE and parsed_base_url.scheme != "https":
             raise LLMGatewayContractError(
                 "LLM_GATEWAY_TLS_REQUIRED",
-                "Le gateway LLM exige une URL Spark HTTPS explicite.",
+                "Le mode TLS ca_bundle exige une URL Spark HTTPS explicite.",
             )
         if parsed_base_url.username is not None or parsed_base_url.password is not None:
             raise LLMGatewayContractError(
                 "LLM_GATEWAY_SPARK_ENDPOINT_REQUIRED",
                 "L'URL Spark du gateway LLM ne doit pas contenir d'identifiant.",
             )
-        if parsed_base_url.hostname not in _ALLOWED_SPARK_HOSTS:
+        if parsed_base_url.path != _SPARK_API_PATH:
             raise LLMGatewayContractError(
                 "LLM_GATEWAY_SPARK_ENDPOINT_REQUIRED",
-                "Le gateway LLM doit cibler explicitement spark-inference.",
+                "Le gateway LLM doit cibler le chemin Spark /v1.",
+            )
+        if not _is_allowed_spark_host(parsed_base_url.hostname):
+            raise LLMGatewayContractError(
+                "LLM_GATEWAY_SPARK_ENDPOINT_REQUIRED",
+                "Le gateway LLM doit cibler explicitement spark-inference ou une adresse privée Spark.",
             )
         try:
             parsed_port = parsed_base_url.port
@@ -294,10 +341,10 @@ class GatewayConfiguration:
                 "LLM_GATEWAY_SPARK_ENDPOINT_REQUIRED",
                 "Le port Spark du gateway LLM est invalide.",
             ) from exc
-        if parsed_port != _SPARK_HTTPS_PORT:
+        if parsed_port is None or parsed_port <= 0 or parsed_port > 65535:
             raise LLMGatewayContractError(
                 "LLM_GATEWAY_SPARK_ENDPOINT_REQUIRED",
-                "Le gateway LLM doit cibler spark-inference sur le port 8443.",
+                "Le port Spark du gateway LLM est invalide.",
             )
 
         if not isinstance(self.timeout_seconds, int) or self.timeout_seconds <= 0:
@@ -310,13 +357,27 @@ class GatewayConfiguration:
         return {
             "base_url": self.base_url,
             "served_model": self.served_model,
-            "api_key": SECRET_MASK,
+            "auth_mode": self.auth_mode,
+            "api_key": SECRET_MASK if self.api_key is not None else None,
+            "tls_mode": self.tls_mode,
             "tls_ca_bundle_path": self.tls_ca_bundle_path,
             "timeout_seconds": self.timeout_seconds,
         }
 
     def __repr__(self) -> str:
         return f"GatewayConfiguration({self.masked_for_logs()!r})"
+
+
+def _is_allowed_spark_host(hostname: str | None) -> bool:
+    if hostname is None:
+        return False
+    if hostname in _ALLOWED_SPARK_HOSTS:
+        return True
+    try:
+        parsed_ip = ipaddress.ip_address(hostname)
+    except ValueError:
+        return False
+    return parsed_ip.is_private
 
 
 @dataclass(frozen=True)
@@ -433,7 +494,7 @@ class OpenAICompatibleTransport(Protocol):
         headers: Mapping[str, str],
         body: Mapping[str, Any],
         timeout_seconds: int,
-        tls_ca_bundle_path: str,
+        tls_ca_bundle_path: str | None,
     ) -> OpenAICompatibleResponse:
         raise NotImplementedError
 
@@ -686,7 +747,7 @@ class UrllibOpenAICompatibleTransport:
         headers: Mapping[str, str],
         body: Mapping[str, Any],
         timeout_seconds: int,
-        tls_ca_bundle_path: str,
+        tls_ca_bundle_path: str | None,
     ) -> OpenAICompatibleResponse:
         url = f"{base_url.rstrip('/')}/chat/completions"
         request = urllib.request.Request(
@@ -696,8 +757,12 @@ class UrllibOpenAICompatibleTransport:
             method="POST",
         )
         try:
-            context = ssl.create_default_context(cafile=tls_ca_bundle_path)
-            with urllib.request.urlopen(request, timeout=timeout_seconds, context=context) as response:
+            if tls_ca_bundle_path is None:
+                response_context = urllib.request.urlopen(request, timeout=timeout_seconds)
+            else:
+                context = ssl.create_default_context(cafile=tls_ca_bundle_path)
+                response_context = urllib.request.urlopen(request, timeout=timeout_seconds, context=context)
+            with response_context as response:
                 response_body = response.read().decode("utf-8")
                 try:
                     payload = json.loads(response_body)
@@ -760,14 +825,16 @@ def _build_headers(
     configuration: GatewayConfiguration,
     request: InferenceRequest,
 ) -> dict[str, str]:
-    return {
-        "Authorization": f"Bearer {configuration.api_key}",
+    headers = {
         "Content-Type": "application/json",
         "X-OST-Client": GATEWAY_CLIENT_ID,
         "X-Trace-Id": request.trace_id,
         "X-Request-Id": request.request_id,
         "Idempotency-Key": request.idempotency_key,
     }
+    if configuration.auth_mode == _AUTH_MODE_API_KEY_FILE:
+        headers["Authorization"] = f"Bearer {configuration.api_key}"
+    return headers
 
 
 def _build_failure_metric_event(

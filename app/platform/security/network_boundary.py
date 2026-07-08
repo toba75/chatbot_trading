@@ -18,11 +18,10 @@ LLM_GATEWAY_SERVICE_ID = "llm-gateway"
 SPARK_SERVICE_ID = "gemma-vllm"
 SPARK_EGRESS_NETWORK_ID = "spark-egress"
 EDGE_GATEWAY_SERVICE_ID = "edge-gateway"
-SPARK_PORT = 8443
 SPARK_PROTOCOL = "tcp"
 EXPECTED_SPARK_BASE_PATH = "/v1"
 
-REQUIRED_ADR_IDS = ("ADR-007", "ADR-008", "ADR-009")
+REQUIRED_ADR_IDS = ("ADR-007", "ADR-008", "ADR-009", "ADR-014")
 PRIVATE_STORAGE_SERVICE_IDS = frozenset(
     {
         "postgres",
@@ -63,6 +62,10 @@ FALSE_VALUES = frozenset(("false", "0", "no", "off", "disabled"))
 TRUE_VALUES = frozenset(("true", "1", "yes", "on", "enabled"))
 VLLM_SECRET_MARKERS = ("GEMMA", "VLLM", "OPENAI_API_KEY", "LLM_API_KEY")
 BROWSER_REACHABLE_SERVICE_IDS = frozenset(("ui", "edge-gateway"))
+SPARK_AUTH_MODE_NONE = "none"
+SPARK_AUTH_MODE_API_KEY_FILE = "api_key_file"
+SPARK_TLS_MODE_DISABLED = "disabled"
+SPARK_TLS_MODE_CA_BUNDLE = "ca_bundle"
 
 
 @dataclass(frozen=True)
@@ -71,6 +74,8 @@ class SparkEndpoint:
     service: str
     port: int
     protocol: str
+    auth_mode: str
+    tls_mode: str
     tls_required: bool
     certificate_authority_required: bool
 
@@ -153,6 +158,8 @@ def parse_spark_firewall_policy(payload: Mapping[str, Any]) -> SparkFirewallPoli
             service=_required_text(spark_endpoint_payload, "service", "endpoint Spark"),
             port=_required_int(spark_endpoint_payload, "port", "endpoint Spark"),
             protocol=_required_text(spark_endpoint_payload, "protocol", "endpoint Spark"),
+            auth_mode=_required_text(spark_endpoint_payload, "auth_mode", "endpoint Spark"),
+            tls_mode=_required_text(spark_endpoint_payload, "tls_mode", "endpoint Spark"),
             tls_required=_required_bool(spark_endpoint_payload, "tls_required", "endpoint Spark"),
             certificate_authority_required=_required_bool(
                 spark_endpoint_payload,
@@ -218,14 +225,20 @@ def validate_spark_firewall_policy(policy: SparkFirewallPolicy) -> None:
         raise ValueError(f"Hôte Spark invalide: {endpoint.host}")
     if endpoint.service != SPARK_SERVICE_ID:
         raise ValueError(f"Service Spark invalide: {endpoint.service}")
-    if endpoint.port != SPARK_PORT:
+    if endpoint.port <= 0 or endpoint.port > 65535:
         raise ValueError(f"Port Spark invalide: {endpoint.port}")
     if endpoint.protocol != SPARK_PROTOCOL:
         raise ValueError(f"Protocole Spark invalide: {endpoint.protocol}")
-    if not endpoint.tls_required:
-        raise ValueError("TLS Spark obligatoire")
-    if not endpoint.certificate_authority_required:
-        raise ValueError("Certificat Spark obligatoire")
+    if endpoint.auth_mode != SPARK_AUTH_MODE_NONE:
+        raise ValueError(f"Mode d'authentification Spark invalide: {endpoint.auth_mode}")
+    if endpoint.tls_mode not in {SPARK_TLS_MODE_DISABLED, SPARK_TLS_MODE_CA_BUNDLE}:
+        raise ValueError(f"Mode TLS Spark invalide: {endpoint.tls_mode}")
+    if endpoint.tls_mode == SPARK_TLS_MODE_DISABLED:
+        if endpoint.tls_required or endpoint.certificate_authority_required:
+            raise ValueError("Mode TLS Spark incohérent")
+    if endpoint.tls_mode == SPARK_TLS_MODE_CA_BUNDLE:
+        if not endpoint.tls_required or not endpoint.certificate_authority_required:
+            raise ValueError("Mode TLS Spark incohérent")
 
     if len(policy.allowed_ingress) != 1:
         raise ValueError("Une seule règle ingress Spark est autorisée.")
@@ -239,7 +252,7 @@ def validate_spark_firewall_policy(policy: SparkFirewallPolicy) -> None:
         raise ValueError(f"Destination Spark invalide: {rule.destination_host}")
     if rule.destination_service != SPARK_SERVICE_ID:
         raise ValueError(f"Service destination Spark invalide: {rule.destination_service}")
-    if rule.destination_port != SPARK_PORT:
+    if rule.destination_port != endpoint.port:
         raise ValueError(f"Port destination Spark invalide: {rule.destination_port}")
 
     denied_initiators = frozenset(policy.denied_initiators)
@@ -268,7 +281,10 @@ def validate_network_boundary(
     _validate_compose_ports(compose, spark_firewall.remote_user_access)
     _validate_compose_spark_egress(compose)
     _validate_gateway_tls_and_secret_scope(compose, spark_firewall)
-    _validate_flow_matrix(build_network_flow_matrix(compose=compose, spark_firewall=spark_firewall))
+    _validate_flow_matrix(
+        build_network_flow_matrix(compose=compose, spark_firewall=spark_firewall),
+        spark_firewall.spark_endpoint,
+    )
 
 
 def build_network_flow_matrix(
@@ -412,13 +428,25 @@ def _validate_compose_spark_egress(compose: LocalCompose) -> None:
 def _validate_gateway_tls_and_secret_scope(compose: LocalCompose, spark_firewall: SparkFirewallPolicy) -> None:
     gateway = compose.service(LLM_GATEWAY_SERVICE_ID)
     _require_gateway_environment(gateway, "GEMMA_BASE_URL")
-    _require_gateway_environment(gateway, "GEMMA_API_KEY_FILE")
-    _require_gateway_environment(gateway, "GEMMA_CA_BUNDLE")
+    _require_gateway_environment(gateway, "GEMMA_AUTH_MODE")
+    _require_gateway_environment(gateway, "GEMMA_TLS_MODE")
 
     base_url = gateway.environment["GEMMA_BASE_URL"]
     _validate_gateway_base_url(base_url, spark_firewall)
-    if base_url.lower().startswith("http://"):
-        raise ValueError("TLS Spark désactivé pour llm-gateway: GEMMA_BASE_URL")
+    auth_mode = gateway.environment["GEMMA_AUTH_MODE"]
+    tls_mode = gateway.environment["GEMMA_TLS_MODE"]
+    if auth_mode != spark_firewall.spark_endpoint.auth_mode:
+        raise ValueError(f"Mode d'authentification Spark invalide pour llm-gateway: {auth_mode}")
+    if tls_mode != spark_firewall.spark_endpoint.tls_mode:
+        raise ValueError(f"Mode TLS Spark incohérent pour llm-gateway: {tls_mode}")
+    if auth_mode == SPARK_AUTH_MODE_NONE and "GEMMA_API_KEY_FILE" in gateway.environment:
+        raise ValueError("GEMMA_API_KEY_FILE interdit quand GEMMA_AUTH_MODE=none")
+    if auth_mode == SPARK_AUTH_MODE_API_KEY_FILE and "GEMMA_API_KEY_FILE" not in gateway.environment:
+        raise ValueError("GEMMA_API_KEY_FILE requis quand GEMMA_AUTH_MODE=api_key_file")
+    if tls_mode == SPARK_TLS_MODE_DISABLED and "GEMMA_CA_BUNDLE" in gateway.environment:
+        raise ValueError("GEMMA_CA_BUNDLE interdit quand GEMMA_TLS_MODE=disabled")
+    if tls_mode == SPARK_TLS_MODE_CA_BUNDLE and "GEMMA_CA_BUNDLE" not in gateway.environment:
+        raise ValueError("GEMMA_CA_BUNDLE requis quand GEMMA_TLS_MODE=ca_bundle")
 
     for key, value in gateway.environment.items():
         key_upper = key.upper()
@@ -442,9 +470,15 @@ def _validate_gateway_tls_and_secret_scope(compose: LocalCompose, spark_firewall
 
 
 def _validate_gateway_base_url(base_url: str, spark_firewall: SparkFirewallPolicy) -> None:
+    if _is_required_environment_reference(base_url):
+        return
+
     parsed_base_url = urlparse(base_url)
-    if parsed_base_url.scheme != "https":
-        raise ValueError("TLS Spark désactivé pour llm-gateway: GEMMA_BASE_URL")
+    expected_scheme = "http"
+    if spark_firewall.spark_endpoint.tls_mode == SPARK_TLS_MODE_CA_BUNDLE:
+        expected_scheme = "https"
+    if parsed_base_url.scheme != expected_scheme:
+        raise ValueError("Mode TLS Spark incohérent pour llm-gateway: GEMMA_BASE_URL")
     if parsed_base_url.hostname != spark_firewall.spark_endpoint.host:
         raise ValueError("Endpoint Spark invalide pour llm-gateway: GEMMA_BASE_URL")
     if parsed_base_url.port != spark_firewall.spark_endpoint.port:
@@ -455,7 +489,11 @@ def _validate_gateway_base_url(base_url: str, spark_firewall: SparkFirewallPolic
         raise ValueError("Endpoint Spark invalide pour llm-gateway: GEMMA_BASE_URL")
 
 
-def _validate_flow_matrix(flows: tuple[NetworkFlow, ...]) -> None:
+def _is_required_environment_reference(value: str) -> bool:
+    return value.startswith("${") and "?" in value and value.endswith("}")
+
+
+def _validate_flow_matrix(flows: tuple[NetworkFlow, ...], spark_endpoint: SparkEndpoint) -> None:
     allowed_flows = tuple(flow for flow in flows if flow.allowed)
     if len(allowed_flows) != 1:
         raise ValueError("Matrice de flux Spark invalide: une seule autorisation attendue.")
@@ -463,7 +501,7 @@ def _validate_flow_matrix(flows: tuple[NetworkFlow, ...]) -> None:
     flow = allowed_flows[0]
     if flow.source_service != LLM_GATEWAY_SERVICE_ID:
         raise ValueError(f"Matrice de flux Spark invalide: {flow.source_service}")
-    if flow.destination_host != SPARK_INFERENCE_HOST or flow.destination_port != SPARK_PORT:
+    if flow.destination_host != spark_endpoint.host or flow.destination_port != spark_endpoint.port:
         raise ValueError("Matrice de flux Spark cible invalide.")
 
 
