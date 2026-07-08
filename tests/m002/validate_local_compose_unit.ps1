@@ -20,6 +20,7 @@ BASE_SERVICES = {
         "image": "caddy@sha256:" + "a" * 64,
         "ports": ["127.0.0.1:${OST_EDGE_HTTPS_PORT?OST_EDGE_HTTPS_PORT requis}:443"],
         "networks": ["edge", "core"],
+        "tmpfs": ["/tmp"],
     },
     "ui": {
         "image": "ostrading/ui:0.0.0-m002",
@@ -123,6 +124,12 @@ def service_lines(service_id, definition):
             for value in values:
                 lines.append(f'      - "{value}"')
 
+    tmpfs = definition.get("tmpfs", [])
+    if tmpfs:
+        lines.append("    tmpfs:")
+        for value in tmpfs:
+            lines.append(f'      - "{value}"')
+
     environment = definition.get("environment", {})
     if environment:
         lines.append("    environment:")
@@ -197,6 +204,13 @@ if postgres.expose != ("5432",):
 edge_gateway = compose.service("edge-gateway")
 if edge_gateway.ports != ("127.0.0.1:${OST_EDGE_HTTPS_PORT?OST_EDGE_HTTPS_PORT requis}:443",):
     raise AssertionError(f"Ports edge-gateway incorrects: {edge_gateway.ports}")
+if edge_gateway.tmpfs != ("/tmp",):
+    raise AssertionError(f"tmpfs edge-gateway incorrect: {edge_gateway.tmpfs}")
+
+assert_raises(
+    "tmpfs /tmp requis pour edge-gateway",
+    valid_compose({"edge-gateway": {"tmpfs": []}}),
+)
 
 assert_raises(
     "interdit pour service interne: postgres",
