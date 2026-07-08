@@ -11,7 +11,8 @@ $ErrorActionPreference = "Stop"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $allowedBranches = @(
     "master",
-    "codex/milestone-m012-evaluation-pilote-calibration"
+    "codex/milestone-m012-evaluation-pilote-calibration",
+    "codex/milestone-m013-durcissement-acceptation-v1"
 )
 $requiredMasterArtifacts = @(
     [ordered] @{ Path = "docs/tasks/milestone_011"; Kind = "Directory" },

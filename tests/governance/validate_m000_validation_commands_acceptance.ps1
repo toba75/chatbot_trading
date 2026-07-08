@@ -5,7 +5,7 @@ $testCommandPath = Join-Path $repoRoot "scripts/test.ps1"
 $lintCommandPath = Join-Path $repoRoot "scripts/lint.ps1"
 $temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m000_validation_commands_acceptance_" + [System.Guid]::NewGuid().ToString("N"))
 $eAcute = [char] 0x00E9
-$expectedTestCount = 268
+$expectedTestCount = 290
 if ($env:OST_M003_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     $expectedTestCount = 146
 }
@@ -36,7 +36,10 @@ elseif ($env:OST_M011_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
 elseif ($env:OST_M012_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     $expectedTestCount = 256
 }
-$expectedTestSummary = "Gate test GREEN: 23 validation(s), $expectedTestCount test(s)."
+elseif ($env:OST_M013_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
+    $expectedTestCount = 279
+}
+$expectedTestSummary = "Gate test GREEN: 35 validation(s), $expectedTestCount test(s)."
 
 function Split-MarkdownRow {
     param(
@@ -127,9 +130,11 @@ function New-TemporaryProject {
     Copy-Item -LiteralPath (Join-Path $repoRoot "docs/adr") -Destination (Join-Path $projectRoot "docs/adr") -Recurse
     Copy-Item -LiteralPath (Join-Path $repoRoot "docs/governance") -Destination (Join-Path $projectRoot "docs/governance") -Recurse
     Copy-Item -LiteralPath (Join-Path $repoRoot "docs/evaluation") -Destination (Join-Path $projectRoot "docs/evaluation") -Recurse
+    Copy-Item -LiteralPath (Join-Path $repoRoot "docs/runbooks") -Destination (Join-Path $projectRoot "docs/runbooks") -Recurse
     Copy-Item -LiteralPath (Join-Path $repoRoot "docs/specs") -Destination (Join-Path $projectRoot "docs/specs") -Recurse
     Copy-Item -LiteralPath (Join-Path $repoRoot "docs/tasks") -Destination (Join-Path $projectRoot "docs/tasks") -Recurse
     Copy-Item -LiteralPath (Join-Path $repoRoot "docs/traceability") -Destination (Join-Path $projectRoot "docs/traceability") -Recurse
+    Copy-Item -LiteralPath (Join-Path $repoRoot "docs/user") -Destination (Join-Path $projectRoot "docs/user") -Recurse
     Copy-Item -LiteralPath (Join-Path $repoRoot "app") -Destination (Join-Path $projectRoot "app") -Recurse
     Copy-Item -LiteralPath (Join-Path $repoRoot "deploy") -Destination (Join-Path $projectRoot "deploy") -Recurse
 
@@ -326,6 +331,17 @@ try {
     Assert-OutputContains -Output $testResult.Output -Expected "Validation GREEN: scripts/validate_m010_specification.ps1" -Message "La gate de test doit exécuter le validateur de spécification M-010."
     Assert-OutputContains -Output $testResult.Output -Expected "Validation GREEN: scripts/validate_m012_specification.ps1" -Message "La gate de test doit exécuter le validateur de spécification M-012."
     Assert-OutputContains -Output $testResult.Output -Expected "Validation GREEN: scripts/validate_m012_traceability.ps1" -Message "La gate de test doit exécuter le validateur de traçabilité M-012."
+    Assert-OutputContains -Output $testResult.Output -Expected "Validation GREEN: scripts/validate_m013_specification.ps1" -Message "La gate de test doit exécuter le validateur de spécification M-013."
+    Assert-OutputContains -Output $testResult.Output -Expected "Validation GREEN: scripts/validate_m013_v1_gap_decisions.ps1" -Message "La gate de test doit exécuter le validateur de décisions d'écarts V1 M-013."
+    Assert-OutputContains -Output $testResult.Output -Expected "Validation GREEN: scripts/validate_m013_regression.ps1" -Message "La gate de test doit exécuter le validateur de régression V1 M-013."
+    Assert-OutputContains -Output $testResult.Output -Expected "Validation GREEN: scripts/validate_m013_security.ps1" -Message "La gate de test doit exécuter le validateur de sécurité réseau M-013."
+    Assert-OutputContains -Output $testResult.Output -Expected "Validation GREEN: scripts/validate_m013_spark_failures.ps1" -Message "La gate de test doit exécuter le validateur de pannes Spark M-013."
+    Assert-OutputContains -Output $testResult.Output -Expected "Validation GREEN: scripts/validate_m013_backup_restore.ps1" -Message "La gate de test doit exécuter le validateur de sauvegarde restauration M-013."
+    Assert-OutputContains -Output $testResult.Output -Expected "Validation GREEN: scripts/validate_m013_retention.ps1" -Message "La gate de test doit exécuter le validateur de rétention purge M-013."
+    Assert-OutputContains -Output $testResult.Output -Expected "Validation GREEN: scripts/validate_m013_monitoring.ps1" -Message "La gate de test doit exécuter le validateur de monitoring local M-013."
+    Assert-OutputContains -Output $testResult.Output -Expected "Validation GREEN: scripts/validate_m013_runbooks.ps1" -Message "La gate de test doit exécuter le validateur de runbooks documentation M-013."
+    Assert-OutputContains -Output $testResult.Output -Expected "Validation GREEN: scripts/validate_m013_antipatterns.ps1" -Message "La gate de test doit exécuter le validateur des anti-patterns V1 M-013."
+    Assert-OutputContains -Output $testResult.Output -Expected "Validation GREEN: scripts/validate_m013_acceptance.ps1" -Message "La gate de test doit exécuter le validateur de rapport d'acceptation V1 M-013."
     Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m009/validate_m009_specification_acceptance.ps1" -Message "La gate de test doit exécuter le test d'acceptation de spécification M-009."
     Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m009/validate_m009_specification_unit.ps1" -Message "La gate de test doit exécuter le test unitaire de spécification M-009."
     Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m012/validate_m012_specification_acceptance.ps1" -Message "La gate de test doit exécuter le test d'acceptation de spécification M-012."
@@ -336,6 +352,30 @@ try {
     Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m012/validate_verified_answer_benchmark_acceptance.ps1" -Message "La gate de test doit exécuter le test d'acceptation RA/EG M-012."
     Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m012/validate_llm_benchmark_real_path_acceptance.ps1" -Message "La gate de test doit exécuter le test d'acceptation LLM M-012."
     Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m012/validate_m012_traceability_acceptance.ps1" -Message "La gate de test doit exécuter le test d'acceptation de traçabilité M-012."
+    Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m013/validate_m013_precondition_unit.ps1" -Message "La gate de test doit exécuter le test unitaire de précondition M-013."
+    Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m013/validate_m013_precondition_acceptance.ps1" -Message "La gate de test doit exécuter le test d'acceptation de précondition M-013."
+    Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m013/validate_m013_specification_acceptance.ps1" -Message "La gate de test doit exécuter le test d'acceptation de spécification M-013."
+    Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m013/validate_m013_specification_unit.ps1" -Message "La gate de test doit exécuter le test unitaire de spécification M-013."
+    Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m013/validate_v1_gap_decisions_acceptance.ps1" -Message "La gate de test doit exécuter le test d'acceptation de décisions d'écarts V1 M-013."
+    Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m013/validate_v1_gap_decisions_unit.ps1" -Message "La gate de test doit exécuter le test unitaire de décisions d'écarts V1 M-013."
+    Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m013/validate_v1_regression_suite_acceptance.ps1" -Message "La gate de test doit exécuter le test d'acceptation de régression V1 M-013."
+    Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m013/validate_v1_regression_suite_unit.ps1" -Message "La gate de test doit exécuter le test unitaire de régression V1 M-013."
+    Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m013/validate_m013_network_security_acceptance.ps1" -Message "La gate de test doit exécuter le test d'acceptation sécurité réseau M-013."
+    Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m013/validate_m013_network_security_unit.ps1" -Message "La gate de test doit exécuter le test unitaire sécurité réseau M-013."
+    Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m013/validate_spark_failure_acceptance.ps1" -Message "La gate de test doit exécuter le test d'acceptation pannes Spark M-013."
+    Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m013/validate_spark_failure_unit.ps1" -Message "La gate de test doit exécuter le test unitaire pannes Spark M-013."
+    Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m013/validate_backup_restore_acceptance.ps1" -Message "La gate de test doit exécuter le test d'acceptation sauvegarde restauration M-013."
+    Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m013/validate_backup_restore_unit.ps1" -Message "La gate de test doit exécuter le test unitaire sauvegarde restauration M-013."
+    Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m013/validate_retention_purge_acceptance.ps1" -Message "La gate de test doit exécuter le test d'acceptation rétention purge M-013."
+    Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m013/validate_retention_purge_unit.ps1" -Message "La gate de test doit exécuter le test unitaire rétention purge M-013."
+    Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m013/validate_local_monitoring_acceptance.ps1" -Message "La gate de test doit exécuter le test d'acceptation monitoring local M-013."
+    Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m013/validate_local_monitoring_unit.ps1" -Message "La gate de test doit exécuter le test unitaire monitoring local M-013."
+    Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m013/validate_runbooks_user_docs_acceptance.ps1" -Message "La gate de test doit exécuter le test d'acceptation runbooks documentation M-013."
+    Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m013/validate_runbooks_user_docs_unit.ps1" -Message "La gate de test doit exécuter le test unitaire runbooks documentation M-013."
+    Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m013/validate_v1_antipatterns_acceptance.ps1" -Message "La gate de test doit exécuter le test d'acceptation anti-patterns V1 M-013."
+    Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m013/validate_v1_antipatterns_unit.ps1" -Message "La gate de test doit exécuter le test unitaire anti-patterns V1 M-013."
+    Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m013/validate_v1_acceptance_report_acceptance.ps1" -Message "La gate de test doit exécuter le test d'acceptation rapport d'acceptation V1 M-013."
+    Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m013/validate_v1_acceptance_report_unit.ps1" -Message "La gate de test doit exécuter le test unitaire rapport d'acceptation V1 M-013."
     Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m009/validate_deep_research_planning_acceptance.ps1" -Message "La gate de test doit exécuter le test d'acceptation de planification approfondie M-009."
     Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m009/validate_deep_research_planning_unit.ps1" -Message "La gate de test doit exécuter le test unitaire de planification approfondie M-009."
     Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m009/validate_multi_query_evidence_collection_acceptance.ps1" -Message "La gate de test doit exécuter le test d'acceptation de collecte multi-requêtes M-009."
@@ -345,7 +385,7 @@ try {
     $lintResult = Invoke-ProjectCommand -ProjectRoot $validProjectRoot -RelativePath "scripts/lint.ps1"
     Assert-ExitCode -Actual $lintResult.ExitCode -Expected 0 -Message "La gate de lint M-000 conforme doit réussir."
     Assert-OutputContains -Output $lintResult.Output -Expected "Gate lint GREEN" -Message "La gate de lint doit annoncer son état GREEN."
-    Assert-OutputContains -Output $lintResult.Output -Expected "Gate lint GREEN: 24 validation(s), 0 test(s)." -Message "La gate de lint doit prouver le nombre exact de validations et tests."
+    Assert-OutputContains -Output $lintResult.Output -Expected "Gate lint GREEN: 35 validation(s), 0 test(s)." -Message "La gate de lint doit prouver le nombre exact de validations et tests."
     Assert-OutputContains -Output $lintResult.Output -Expected "Validation GREEN: scripts/validate_local_compose.ps1" -Message "La gate de lint doit exécuter le validateur Compose local M-002."
     Assert-OutputContains -Output $lintResult.Output -Expected "Validation GREEN: scripts/validate_network_boundary.ps1" -Message "La gate de lint doit exécuter le validateur de frontière réseau M-002."
     Assert-OutputContains -Output $lintResult.Output -Expected "Validation GREEN: scripts/validate_m004_specification.ps1" -Message "La gate de lint doit exécuter le validateur de spécification M-004."
@@ -358,6 +398,17 @@ try {
     Assert-OutputContains -Output $lintResult.Output -Expected "Validation GREEN: scripts/validate_m011_specification.ps1" -Message "La gate de lint doit exécuter le validateur de spécification M-011."
     Assert-OutputContains -Output $lintResult.Output -Expected "Validation GREEN: scripts/validate_m012_specification.ps1" -Message "La gate de lint doit exécuter le validateur de spécification M-012."
     Assert-OutputContains -Output $lintResult.Output -Expected "Validation GREEN: scripts/validate_m012_traceability.ps1" -Message "La gate de lint doit exécuter le validateur de traçabilité M-012."
+    Assert-OutputContains -Output $lintResult.Output -Expected "Validation GREEN: scripts/validate_m013_specification.ps1" -Message "La gate de lint doit exécuter le validateur de spécification M-013."
+    Assert-OutputContains -Output $lintResult.Output -Expected "Validation GREEN: scripts/validate_m013_v1_gap_decisions.ps1" -Message "La gate de lint doit exécuter le validateur de décisions d'écarts V1 M-013."
+    Assert-OutputContains -Output $lintResult.Output -Expected "Validation GREEN: scripts/validate_m013_regression.ps1" -Message "La gate de lint doit exécuter le validateur de régression V1 M-013."
+    Assert-OutputContains -Output $lintResult.Output -Expected "Validation GREEN: scripts/validate_m013_security.ps1" -Message "La gate de lint doit exécuter le validateur de sécurité réseau M-013."
+    Assert-OutputContains -Output $lintResult.Output -Expected "Validation GREEN: scripts/validate_m013_spark_failures.ps1" -Message "La gate de lint doit exécuter le validateur de pannes Spark M-013."
+    Assert-OutputContains -Output $lintResult.Output -Expected "Validation GREEN: scripts/validate_m013_backup_restore.ps1" -Message "La gate de lint doit exécuter le validateur de sauvegarde restauration M-013."
+    Assert-OutputContains -Output $lintResult.Output -Expected "Validation GREEN: scripts/validate_m013_retention.ps1" -Message "La gate de lint doit exécuter le validateur de rétention purge M-013."
+    Assert-OutputContains -Output $lintResult.Output -Expected "Validation GREEN: scripts/validate_m013_monitoring.ps1" -Message "La gate de lint doit exécuter le validateur de monitoring local M-013."
+    Assert-OutputContains -Output $lintResult.Output -Expected "Validation GREEN: scripts/validate_m013_runbooks.ps1" -Message "La gate de lint doit exécuter le validateur de runbooks documentation M-013."
+    Assert-OutputContains -Output $lintResult.Output -Expected "Validation GREEN: scripts/validate_m013_antipatterns.ps1" -Message "La gate de lint doit exécuter le validateur des anti-patterns V1 M-013."
+    Assert-OutputContains -Output $lintResult.Output -Expected "Validation GREEN: scripts/validate_m013_acceptance.ps1" -Message "La gate de lint doit exécuter le validateur de rapport d'acceptation V1 M-013."
     Assert-OutputContains -Output $lintResult.Output -Expected "Validation GREEN: scripts/validate_m011_traceability.ps1" -Message "La gate de lint doit exécuter le validateur de traçabilité M-011."
     Assert-OutputContains -Output $lintResult.Output -Expected "Validation GREEN: scripts/validate_m010_traceability.ps1" -Message "La gate de lint doit exécuter le validateur de traçabilité M-010."
     Assert-OutputNotContains -Output $lintResult.Output -Forbidden "Ã" -Message "La sortie de la gate de lint doit rester lisible en français accentué."

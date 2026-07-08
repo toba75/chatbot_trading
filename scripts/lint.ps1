@@ -22,6 +22,7 @@ $m009SpecificationPath = Join-Path $repoRoot "docs/specs/m009_recherche_approfon
 $m010SpecificationPath = Join-Path $repoRoot "docs/specs/m010_strategie_candidate_attribuee.md"
 $m011SpecificationPath = Join-Path $repoRoot "docs/specs/m011_experience_reproductible.md"
 $m012SpecificationPath = Join-Path $repoRoot "docs/specs/m012_evaluation_pilote_calibration.md"
+$m013SpecificationPath = Join-Path $repoRoot "docs/specs/m013_durcissement_acceptation_v1.md"
 $platformTopologyPath = Join-Path $repoRoot "app/platform/topology_registry.json"
 $sparkFirewallPath = Join-Path $repoRoot "deploy/spark-firewall/network-boundary.json"
 $appRoot = Join-Path $repoRoot "app"
@@ -48,6 +49,17 @@ $validationCommands = @(
     @{ Path = "scripts/validate_m011_traceability.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_m012_specification.ps1"; Arguments = @("-Path", $m012SpecificationPath) },
     @{ Path = "scripts/validate_m012_traceability.ps1"; Arguments = @() },
+    @{ Path = "scripts/validate_m013_specification.ps1"; Arguments = @("-Path", $m013SpecificationPath) },
+    @{ Path = "scripts/validate_m013_v1_gap_decisions.ps1"; Arguments = @() },
+    @{ Path = "scripts/validate_m013_regression.ps1"; Arguments = @() },
+    @{ Path = "scripts/validate_m013_security.ps1"; Arguments = @() },
+    @{ Path = "scripts/validate_m013_spark_failures.ps1"; Arguments = @() },
+    @{ Path = "scripts/validate_m013_backup_restore.ps1"; Arguments = @() },
+    @{ Path = "scripts/validate_m013_retention.ps1"; Arguments = @() },
+    @{ Path = "scripts/validate_m013_monitoring.ps1"; Arguments = @() },
+    @{ Path = "scripts/validate_m013_runbooks.ps1"; Arguments = @() },
+    @{ Path = "scripts/validate_m013_antipatterns.ps1"; Arguments = @() },
+    @{ Path = "scripts/validate_m013_acceptance.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_platform_topology.ps1"; Arguments = @("-Path", $platformTopologyPath) },
     @{ Path = "scripts/validate_local_compose.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_network_boundary.ps1"; Arguments = @("-SparkFirewallPath", $sparkFirewallPath) },
@@ -77,6 +89,17 @@ $expectedValidationPaths = @(
     "scripts/validate_m011_traceability.ps1",
     "scripts/validate_m012_specification.ps1",
     "scripts/validate_m012_traceability.ps1",
+    "scripts/validate_m013_specification.ps1",
+    "scripts/validate_m013_v1_gap_decisions.ps1",
+    "scripts/validate_m013_regression.ps1",
+    "scripts/validate_m013_security.ps1",
+    "scripts/validate_m013_spark_failures.ps1",
+    "scripts/validate_m013_backup_restore.ps1",
+    "scripts/validate_m013_retention.ps1",
+    "scripts/validate_m013_monitoring.ps1",
+    "scripts/validate_m013_runbooks.ps1",
+    "scripts/validate_m013_antipatterns.ps1",
+    "scripts/validate_m013_acceptance.ps1",
     "scripts/validate_platform_topology.ps1",
     "scripts/validate_local_compose.ps1",
     "scripts/validate_network_boundary.ps1",
@@ -90,7 +113,7 @@ Invoke-M000ValidationGate `
     -RepositoryRoot $repoRoot `
     -ValidationCommands $validationCommands `
     -TestCommands $testCommands `
-    -ExpectedValidationCount 24 `
+    -ExpectedValidationCount 35 `
     -ExpectedTestCount 0 `
     -ExpectedValidationPaths $expectedValidationPaths `
     -ExpectedTestPaths $expectedTestPaths

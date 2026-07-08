@@ -55,3 +55,93 @@
 - T-005 précise désormais que le point d'entrée utilisateur `docker-local` doit être lié à `127.0.0.1` par défaut et refuse tout binding `0.0.0.0` hors profil explicitement documenté.
 - T-006 couvre désormais l'ouverture et la fermeture du circuit breaker, ainsi que le maintien des fonctions locales qui ne nécessitent pas Gemma pendant une panne Spark.
 - T-009 couvre désormais le profil de ressources V1: optimisation Gemma sur DGX Spark, capacité CPU/GPU/I/O sur `docker-local`, digest ou version de l'image vLLM, révision du modèle, concurrence et longueur de contexte justifiées par benchmark.
+
+## Exécution T-002
+
+- RED: ajout de `tests/m013/validate_m013_specification_acceptance.ps1` et `tests/m013/validate_m013_specification_unit.ps1`.
+- GREEN: publication de `docs/specs/m013_durcissement_acceptation_v1.md`, création de `scripts/validate_m013_specification.ps1`, enrôlement dans `scripts/test.ps1` et `scripts/lint.ps1`, et rattachement `REQ-M013-002` dans `docs/traceability/matrix.md`.
+- ADR: non requise; T-002 applique ADR-007, ADR-008, ADR-009, ADR-010, DDD-ADR-006, DDD-ADR-010 et DDD-ADR-011 sans imposer de nouvelle politique de rétention, sans rendre mTLS obligatoire et sans remplacer la topologie existante.
+
+## Exécution T-003
+
+- RED: ajout de `tests/m013/validate_v1_gap_decisions_acceptance.ps1` et `tests/m013/validate_v1_gap_decisions_unit.ps1`; commit RED `2c697fb7e`.
+- GREEN: publication de `app/evaluation/domain/v1_gap_decisions.py`, `docs/governance/m013_v1_gap_decisions.md` et `scripts/validate_m013_v1_gap_decisions.ps1`; enrôlement dans `scripts/test.ps1` et `scripts/lint.ps1`; rattachement `REQ-M013-003` dans `docs/traceability/matrix.md`.
+- Décision livrée: SP, KA et RA restent `différé`; SD et LLM restent `bloquant`; EG, CV et EX sont explicitement `accepté`; les cinq écarts non acceptés sont transmis au futur `V1AcceptanceReport`.
+- ADR: non requise; T-003 applique ADR-010 et DDD-ADR-011 sans changer critère d'acceptation, politique de calibration ou frontière de bounded context.
+
+## Exécution T-004
+
+- RED: ajout de `tests/m013/validate_v1_regression_suite_acceptance.ps1`; commit RED `1a890109c`.
+- GREEN: publication de `docs/evaluation/m013/v1_regression_suite.json`, création de `scripts/validate_m013_regression.ps1`, ajout de `tests/m013/validate_v1_regression_suite_unit.ps1`, enrôlement dans `scripts/test.ps1` et `scripts/lint.ps1`, alignement du comportement V1-003 dans la spécification M-013, et rattachement `REQ-M013-004` dans `docs/traceability/matrix.md`.
+- Décision livrée: la suite couvre huit critères V1 et dix parcours produit; EG, CV et EX obtiennent un verdict logiciel `GREEN`; SP, KA, RA, SD et LLM restent des écarts non acceptés visibles et reliés au rapport M-012.
+- Limite explicite: T-004 ne corrige pas les tests scientifiques RED M-012 et ne rend pas la V1 acceptable tant que SD et LLM restent bloquants.
+- ADR: non requise; T-004 applique ADR-010 et DDD-ADR-011 sans changer la politique d'exécution des gates ni la propriété EV des écarts V1.
+
+## Exécution T-005
+
+- RED: ajout de `tests/m013/validate_m013_network_security_acceptance.ps1`; commit RED `2b32c6c1f`.
+- GREEN: publication de `docs/governance/m013_security_audit.md`, création de `scripts/validate_m013_security.ps1`, ajout de `tests/m013/validate_m013_network_security_unit.ps1`, enrôlement dans `scripts/test.ps1` et `scripts/lint.ps1`, alignement du comportement V1-004 dans la spécification M-013, et rattachement `REQ-M013-005` dans `docs/traceability/matrix.md`.
+- Décision livrée: le point d'entrée utilisateur reste lié à `127.0.0.1` par défaut; aucun service interne n'est publié; le navigateur, les workers, les stockages et Internet ne peuvent pas joindre Spark; seul `llm-gateway -> spark-inference` est autorisé avec TLS, certificat et clé API par fichier secret.
+- ADR: non requise; T-005 applique ADR-007, ADR-008 et ADR-009 sans remplacer la topologie locale, sans changer le chemin LLM et sans rendre mTLS obligatoire.
+
+## Exécution T-006
+
+- RED: ajout de `tests/m013/validate_spark_failure_acceptance.ps1`; commit RED `10f3c94c8`.
+- GREEN: publication de `app/platform/llm_gateway/spark_failure_drill.py`, `docs/governance/m013_spark_failure_drill.md` et `scripts/validate_m013_spark_failures.ps1`; ajout de `tests/m013/validate_spark_failure_unit.ps1`; enrôlement dans `scripts/test.ps1` et `scripts/lint.ps1`; rattachement `REQ-M013-006` dans `docs/traceability/matrix.md`.
+- Décision livrée: les pannes Spark produisent `LLM_UNAVAILABLE` ou un diagnostic explicite, ne publient aucune réponse factuelle incomplète, ne snapshotent aucune stratégie, ne promeuvent aucun benchmark LLM, n'appellent aucun provider alternatif, interdisent le retry après premier token et exposent le circuit breaker ouvrable et refermable.
+- Garde-fous conservés: les fonctions locales hors Gemma restent disponibles, les métriques ne contiennent aucun prompt complet et l'outbox reste idempotente sans double publication.
+- ADR: non requise; T-006 applique ADR-008, ADR-009 et DDD-ADR-006 sans changer le chemin LLM principal et sans introduire de nouveau mode de dégradation fonctionnelle.
+
+## Exécution T-007
+
+- RED: ajout de `tests/m013/validate_backup_restore_acceptance.ps1`, `tests/m013/validate_backup_restore_unit.ps1` et `docs/adr/ADR-013-contrat-manifeste-sauvegarde-restauration.md`; commit RED `572140b47`.
+- GREEN: publication de `app/platform/backup_restore.py`, `docs/governance/m013_backup_restore_drill.md` et `scripts/validate_m013_backup_restore.ps1`; enrôlement dans `scripts/test.ps1` et `scripts/lint.ps1`; rattachement `REQ-M013-007` dans `docs/traceability/matrix.md`.
+- Décision livrée: la V1 utilise le manifeste `M013-BackupManifest-1.0`, vérifie les hashes restaurés, garde la clé hors dépôt, refuse les secrets versionnés, conserve les résultats négatifs et supersédés, traite Qdrant comme projection régénérable non autorité et confirme qu'aucune donnée métier n'est restaurée sur Spark.
+- Garde-fous conservés: aucune sauvegarde partielle déclarée complète, aucune restauration destructive silencieuse et aucun `restore_test_result` sans commande de restauration.
+- ADR: ADR-013 créée pour le contrat durable de manifeste de sauvegarde et restauration; T-007 applique aussi ADR-009, DDD-ADR-004 et DDD-ADR-010.
+
+## Exécution T-008
+
+- RED: ajout de `tests/m013/validate_retention_purge_acceptance.ps1`, `tests/m013/validate_retention_purge_unit.ps1` et `docs/adr/DDD-ADR-012-politique-retention-purge-administrative-v1.md`; commit RED `4a38c072c`.
+- GREEN: publication de `app/platform/retention.py`, `docs/governance/m013_retention_policy.md` et `scripts/validate_m013_retention.ps1`; enrôlement dans `scripts/test.ps1` et `scripts/lint.ps1`; alignement de la spécification M-013, des compteurs M-012 et rattachement `REQ-M013-008` dans `docs/traceability/matrix.md`.
+- Décision livrée: la V1 conserve les artefacts d'autorité hors conversation pendant 120 mois, les conversations pendant 18 mois et les projections régénérables pendant 3 mois; toute purge administrative exige justification, audit, opérateur, date, identifiants stables et preuve de compatibilité de lecture.
+- Garde-fous conservés: aucune purge ordinaire, aucun effacement de résultat négatif ou supersédé, aucune cascade CV vers KA, EG, RA, SD ou EX, et aucune purge de projection sans commande de reconstruction depuis les artefacts d'autorité conservés.
+- ADR: DDD-ADR-012 créée pour la politique V1 de rétention et purge administrative; T-008 ne modifie pas le sens de DDD-ADR-010.
+
+## Exécution T-009
+
+- RED: ajout de `tests/m013/validate_local_monitoring_acceptance.ps1` et `tests/m013/validate_local_monitoring_unit.ps1`; commit RED `49de59b15`.
+- GREEN: publication de `MonitoringSignalPolicy` et `ResourceProfilePolicy` dans `app/platform/observability/__init__.py`, de `docs/governance/m013_local_monitoring.md`, de `docs/governance/m013_resource_profile.md` et de `scripts/validate_m013_monitoring.ps1`; enrôlement dans `scripts/test.ps1` et `scripts/lint.ps1`; rattachement `REQ-M013-009` dans `docs/traceability/matrix.md`.
+- Décision livrée: le monitoring V1 reste local, sans export externe par défaut, sans endpoint public, avec métriques de santé, erreurs, latence, jobs, outbox, gateway, Spark, sauvegarde, restauration, écarts et sécurité; les journaux techniques ont une rétention courte et une corrélation explicite.
+- Profil ressources livré: CPU, GPU, mémoire, I/O et stockage `docker-local` sont mesurés; l'image vLLM est épinglée par digest, le modèle Gemma est révisionné, la concurrence et la longueur de contexte sont sourcées par le benchmark M-012.
+- ADR: non requise; T-009 applique ADR-008, ADR-009 et ADR-010 sans introduire de composant d'observabilité structurant ni export externe.
+
+## Exécution T-010
+
+- RED: ajout de `tests/m013/validate_runbooks_user_docs_acceptance.ps1` et `tests/m013/validate_runbooks_user_docs_unit.ps1`; commit RED `65376e1e4`.
+- GREEN: publication de `scripts/validate_m013_runbooks.ps1`, de huit runbooks sous `docs/runbooks/`, du guide `docs/user/v1_guide_utilisateur.md` et de l'index `docs/governance/m013_documentation_index.md`; enrôlement dans `scripts/test.ps1` et `scripts/lint.ps1`; rattachement `REQ-M013-010` dans `docs/traceability/matrix.md`.
+- Décision livrée: les runbooks couvrent démarrage local, arrêt local, sauvegarde, restauration, audit réseau, panne Spark, monitoring, ingestion PDF, conversation, recherche approfondie, stratégie, backtest, statuts publics, limites V1 et commandes vérifiées.
+- Garde-fous conservés: aucune publication de service interne, aucun secret, aucune commande destructive sans précondition, aucun fallback textuel, aucun fallback silencieux et aucune promesse financière.
+- ADR: non requise; T-010 documente les décisions existantes sans nouvelle topologie, nouvelle politique de rétention, nouvelle politique d'observabilité ou nouveau contrat durable.
+
+## Exécution T-011
+
+- RED: ajout de `tests/m013/validate_v1_antipatterns_acceptance.ps1` et `tests/m013/validate_v1_antipatterns_unit.ps1`; commit RED `d11e36a17`.
+- GREEN: publication de `scripts/validate_m013_antipatterns.ps1` et `docs/governance/m013_antipattern_review.md`; enrôlement dans `scripts/test.ps1` et `scripts/lint.ps1`; alignement de la commande V1-010 dans la spécification M-013; rattachement `REQ-M013-011` dans `docs/traceability/matrix.md`.
+- Décision livrée: les anti-patterns V1 section 23 sont reliés à des contrôles automatisés ou à une revue documentée datée avec preuve et périmètre; toute violation active bloque l'acceptation V1.
+- Questions ouvertes: les questions non tranchées restent ouvertes contrôlées; la conservation est marquée résolue par DDD-ADR-012; aucune nouvelle résolution implicite n'est introduite.
+- ADR: non requise; T-011 applique ADR-007, ADR-008, ADR-009, DDD-ADR-004, DDD-ADR-006, DDD-ADR-010 et DDD-ADR-012 sans trancher de nouvelle question structurante.
+
+## Exécution T-012
+
+- RED: ajout de `tests/m013/validate_v1_acceptance_report_acceptance.ps1` et `tests/m013/validate_v1_acceptance_report_unit.ps1`; commit RED `63307920f`.
+- GREEN: publication de `app/evaluation/domain/v1_acceptance_report.py`, `docs/governance/m013_v1_acceptance_report.md` et `scripts/validate_m013_acceptance.ps1`; enrôlement dans `scripts/test.ps1` et `scripts/lint.ps1`; rattachement `REQ-M013-012` dans `docs/traceability/matrix.md`.
+- Verdict livré: V1 non acceptée; EG, CV et EX sont acceptés, SP, KA et RA restent différés non acceptés, SD et LLM restent bloquants et interdisent explicitement le verdict `acceptée`.
+- Preuves agrégées: décisions d'écarts, régression, sécurité réseau, panne Spark, sauvegarde/restauration, rétention, monitoring, runbooks, anti-patterns, traçabilité et gates finales.
+- ADR: non requise; T-012 agrège ADR-010, DDD-ADR-010 et DDD-ADR-011 sans changer de décision structurante.
+
+## Revue locale M-013 - corrections post-implémentation
+
+- RED: la revue locale a ajouté des cas de régression sur rapports V1 fabriqués, registres d'écarts factices, hashes de sauvegarde de remplissage, incohérences contexte/artefact, monitoring mal corrélé, sortie de gate finale incomplète et commandes de régression vides.
+- GREEN: les validateurs M-013 refusent désormais les preuves synthétiques, les contextes incompatibles, les digests non probants, les restaurations destructives, les rapports d'acceptation incomplets et les commandes vides avant exécution réelle; les runbooks de certificats Spark, purge administrative et rapport d'acceptation V1 sont publiés.
+- Validation finale: `scripts/test.ps1` GREEN avec `Gate test GREEN: 34 validation(s), 292 test(s).`; le rapport d'acceptation V1 conserve ce comptage réel.

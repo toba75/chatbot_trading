@@ -249,14 +249,25 @@ try {
         }
 
     Assert-ValidatorFails `
-        -Name "counter-drift" `
-        -ExpectedMessage "Compteur test global M-012 incohérent" `
+        -Name "governance-test-count-missing" `
+        -ExpectedMessage "Contrôle compteur test M-000 absent" `
         -Mutate {
             param($projectRoot)
             $path = Join-Path $projectRoot "tests/governance/validate_m000_validation_commands_acceptance.ps1"
-            (Get-Content -Raw -Encoding UTF8 -LiteralPath $path).Replace('$expectedTestCount = 268', '$expectedTestCount = 267') |
+            (Get-Content -Raw -Encoding UTF8 -LiteralPath $path).Replace('$expectedTestSummary = "Gate test GREEN: 35 validation(s), $expectedTestCount test(s)."', '$expectedTestSummary = "Gate test GREEN"') |
                 Set-Content -Encoding UTF8 -LiteralPath $path
         }
+
+    Assert-ValidatorFails `
+        -Name "governance-lint-count-missing" `
+        -ExpectedMessage "Contrôle compteur lint M-000 absent" `
+        -Mutate {
+            param($projectRoot)
+            $path = Join-Path $projectRoot "tests/governance/validate_m000_validation_commands_acceptance.ps1"
+            (Get-Content -Raw -Encoding UTF8 -LiteralPath $path).Replace('Gate lint GREEN: 35 validation(s), 0 test(s).', 'Gate lint GREEN') |
+                Set-Content -Encoding UTF8 -LiteralPath $path
+        }
+
 }
 finally {
     Remove-TreeWithRetry -Path $temporaryRoot

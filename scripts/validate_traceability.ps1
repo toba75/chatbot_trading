@@ -820,6 +820,105 @@ $requiredM009Requirements = @(
     }
 )
 
+$requiredM013Requirements = @(
+    [ordered] @{
+        Id = "REQ-M013-001"
+        Source = "docs/tasks/milestone_013/0001_verifier_precondition_green.md"
+        Test = "tests/m013/validate_m013_precondition_acceptance.ps1"
+        CommandScript = "scripts/validate_m013_precondition.ps1"
+        Code = "scripts/validate_m013_precondition.ps1; docs/governance/m013_precondition_green.md; docs/tasks/milestone_013/journal.md"
+        Adr = "ADR-010"
+    },
+    [ordered] @{
+        Id = "REQ-M013-002"
+        Source = "docs/tasks/milestone_013/0002_publier_specification_durcissement_v1.md"
+        Test = "tests/m013/validate_m013_specification_acceptance.ps1"
+        CommandScript = "scripts/validate_m013_specification.ps1"
+        Code = "docs/specs/m013_durcissement_acceptation_v1.md; scripts/validate_m013_specification.ps1"
+        Adr = "ADR-007; ADR-008; ADR-009; ADR-010; DDD-ADR-006; DDD-ADR-010; DDD-ADR-011"
+    },
+    [ordered] @{
+        Id = "REQ-M013-003"
+        Source = "docs/tasks/milestone_013/0003_controler_ecarts_v1_m012.md"
+        Test = "tests/m013/validate_v1_gap_decisions_acceptance.ps1"
+        CommandScript = "scripts/validate_m013_v1_gap_decisions.ps1"
+        Code = "app/evaluation/domain/v1_gap_decisions.py; docs/governance/m013_v1_gap_decisions.md; scripts/validate_m013_v1_gap_decisions.ps1; tests/m013/validate_v1_gap_decisions_unit.ps1; docs/tasks/milestone_013/journal.md"
+        Adr = "ADR-010; DDD-ADR-011"
+    },
+    [ordered] @{
+        Id = "REQ-M013-004"
+        Source = "docs/tasks/milestone_013/0004_construire_suite_regression_v1.md"
+        Test = "tests/m013/validate_v1_regression_suite_acceptance.ps1"
+        CommandScript = "scripts/validate_m013_regression.ps1"
+        Code = "docs/evaluation/m013/v1_regression_suite.json; scripts/validate_m013_regression.ps1; tests/m013/validate_v1_regression_suite_unit.ps1; docs/tasks/milestone_013/journal.md"
+        Adr = "ADR-010; DDD-ADR-011"
+    },
+    [ordered] @{
+        Id = "REQ-M013-005"
+        Source = "docs/tasks/milestone_013/0005_auditer_frontiere_reseau_spark.md"
+        Test = "tests/m013/validate_m013_network_security_acceptance.ps1"
+        CommandScript = "scripts/validate_m013_security.ps1"
+        Code = "docs/governance/m013_security_audit.md; scripts/validate_m013_security.ps1; tests/m013/validate_m013_network_security_unit.ps1; scripts/validate_network_boundary.ps1; docs/tasks/milestone_013/journal.md"
+        Adr = "ADR-007; ADR-008; ADR-009"
+    },
+    [ordered] @{
+        Id = "REQ-M013-006"
+        Source = "docs/tasks/milestone_013/0006_eprouver_pannes_spark_sans_fallback.md"
+        Test = "tests/m013/validate_spark_failure_acceptance.ps1"
+        CommandScript = "scripts/validate_m013_spark_failures.ps1"
+        Code = "app/platform/llm_gateway/spark_failure_drill.py; docs/governance/m013_spark_failure_drill.md; scripts/validate_m013_spark_failures.ps1; tests/m013/validate_spark_failure_unit.ps1; docs/tasks/milestone_013/journal.md"
+        Adr = "ADR-008; ADR-009; DDD-ADR-006"
+    },
+    [ordered] @{
+        Id = "REQ-M013-007"
+        Source = "docs/tasks/milestone_013/0007_valider_sauvegardes_chiffrees_restauration.md"
+        Test = "tests/m013/validate_backup_restore_acceptance.ps1"
+        CommandScript = "scripts/validate_m013_backup_restore.ps1"
+        Code = "app/platform/backup_restore.py; docs/governance/m013_backup_restore_drill.md; scripts/backup_v1.ps1; scripts/restore_v1.ps1; scripts/lib/m013_backup_manifest.ps1; scripts/validate_m013_backup_restore.ps1; tests/m013/validate_backup_restore_unit.ps1; docs/adr/ADR-013-contrat-manifeste-sauvegarde-restauration.md; docs/tasks/milestone_013/journal.md"
+        Adr = "ADR-009; ADR-013; DDD-ADR-004; DDD-ADR-010"
+    },
+    [ordered] @{
+        Id = "REQ-M013-008"
+        Source = "docs/tasks/milestone_013/0008_decider_retention_purge_administrative.md"
+        Test = "tests/m013/validate_retention_purge_acceptance.ps1"
+        CommandScript = "scripts/validate_m013_retention.ps1"
+        Code = "app/platform/retention.py; docs/governance/m013_retention_policy.md; scripts/validate_m013_retention.ps1; tests/m013/validate_retention_purge_unit.ps1; docs/adr/DDD-ADR-012-politique-retention-purge-administrative-v1.md; docs/tasks/milestone_013/journal.md"
+        Adr = "DDD-ADR-010; DDD-ADR-012; DDD-ADR-004; ADR-010"
+    },
+    [ordered] @{
+        Id = "REQ-M013-009"
+        Source = "docs/tasks/milestone_013/0009_publier_monitoring_local_exploitation.md"
+        Test = "tests/m013/validate_local_monitoring_acceptance.ps1"
+        CommandScript = "scripts/validate_m013_monitoring.ps1"
+        Code = "app/platform/observability/__init__.py; docs/governance/m013_local_monitoring.md; docs/governance/m013_resource_profile.md; scripts/validate_m013_monitoring.ps1; tests/m013/validate_local_monitoring_unit.ps1; docs/tasks/milestone_013/journal.md"
+        Adr = "ADR-008; ADR-009; ADR-010"
+    },
+    [ordered] @{
+        Id = "REQ-M013-010"
+        Source = "docs/tasks/milestone_013/0010_publier_runbooks_documentation_utilisateur.md"
+        Test = "tests/m013/validate_runbooks_user_docs_acceptance.ps1"
+        CommandScript = "scripts/validate_m013_runbooks.ps1"
+        Code = "docs/runbooks/exploitation_locale.md; docs/runbooks/sauvegarde_restauration.md; docs/runbooks/spark_reseau_incidents.md; docs/runbooks/certificats_spark.md; docs/runbooks/monitoring_local.md; docs/runbooks/ingestion_pdf.md; docs/runbooks/conversation_v1.md; docs/runbooks/recherche_approfondie.md; docs/runbooks/strategie_backtest.md; docs/runbooks/purge_administrative.md; docs/runbooks/rapport_acceptation_v1.md; docs/governance/m013_documentation_index.md; docs/user/v1_guide_utilisateur.md; scripts/validate_m013_runbooks.ps1; tests/m013/validate_runbooks_user_docs_unit.ps1; docs/tasks/milestone_013/journal.md"
+        Adr = "ADR-010"
+    },
+    [ordered] @{
+        Id = "REQ-M013-011"
+        Source = "docs/tasks/milestone_013/0011_verifier_antipatterns_v1.md"
+        Test = "tests/m013/validate_v1_antipatterns_acceptance.ps1"
+        CommandScript = "scripts/validate_m013_antipatterns.ps1"
+        Code = "docs/governance/m013_antipattern_review.md; scripts/validate_m013_antipatterns.ps1; tests/m013/validate_v1_antipatterns_unit.ps1; docs/specs/m013_durcissement_acceptation_v1.md; docs/tasks/milestone_013/journal.md"
+        Adr = "ADR-007; ADR-008; ADR-009; DDD-ADR-006; DDD-ADR-010"
+    },
+    [ordered] @{
+        Id = "REQ-M013-012"
+        Source = "docs/tasks/milestone_013/0012_publier_rapport_acceptation_v1.md"
+        Test = "tests/m013/validate_v1_acceptance_report_acceptance.ps1"
+        CommandScript = "scripts/validate_m013_acceptance.ps1"
+        Code = "app/evaluation/domain/v1_acceptance_report.py; docs/governance/m013_v1_acceptance_report.md; scripts/validate_m013_acceptance.ps1; tests/m013/validate_v1_acceptance_report_unit.ps1; docs/tasks/milestone_013/journal.md"
+        Adr = "ADR-010; DDD-ADR-010; DDD-ADR-011"
+    }
+)
+
 function Assert-Condition {
     param(
         [Parameter(Mandatory = $true)]
@@ -1908,6 +2007,62 @@ function Assert-M009RequirementRows {
     }
 }
 
+function Assert-M013RequirementRows {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object[]] $Rows
+    )
+
+    $rowsByRequirementId = @{}
+    foreach ($row in $Rows) {
+        $requirementId = Get-MatrixRowCell -Row $row -CellName "Exigence" -RequirementId "ligne inconnue"
+        if ($requirementId -match "^REQ-M013-") {
+            $rowsByRequirementId[$requirementId] = $row
+        }
+    }
+
+    if ($rowsByRequirementId.Count -eq 0) {
+        if (Test-Path -LiteralPath (Join-Path $repoRoot "docs/tasks/milestone_013") -PathType Container) {
+            throw "Exigence M-013 absente: REQ-M013-001"
+        }
+        return
+    }
+
+    foreach ($expected in $requiredM013Requirements) {
+        $requirementId = $expected["Id"]
+
+        Assert-Condition `
+            -Condition ($rowsByRequirementId.ContainsKey($requirementId)) `
+            -Message "Exigence M-013 absente: $requirementId"
+
+        $row = $rowsByRequirementId[$requirementId]
+        $status = Get-MatrixRowCell -Row $row -CellName "Statut" -RequirementId $requirementId
+        Assert-Condition `
+            -Condition ($status -eq "Couvert") `
+            -Message "Exigence M-013 non couverte: $requirementId"
+
+        $commandScript = Get-MatrixRowCell -Row $row -CellName "CommandeScript" -RequirementId $requirementId
+
+        Assert-M009PathCell -Row $row -RequirementId $requirementId -CellName "Source" -ExpectedValue $expected["Source"]
+        Assert-M009PathCell -Row $row -RequirementId $requirementId -CellName "Test" -ExpectedValue $expected["Test"]
+        Assert-M009PathCell -Row $row -RequirementId $requirementId -CellName "Code" -ExpectedValue $expected["Code"]
+
+        Assert-Condition `
+            -Condition ($commandScript -eq $expected["CommandScript"]) `
+            -Message "Commande M-013 invalide pour ${requirementId}. Attendu: $($expected["CommandScript"]). Obtenu: $commandScript"
+
+        $adr = Get-MatrixRowCell -Row $row -CellName "ADR" -RequirementId $requirementId
+        Assert-Condition `
+            -Condition ($adr -eq $expected["Adr"]) `
+            -Message "ADR M-013 invalide pour ${requirementId}. Attendu: $($expected["Adr"]). Obtenu: $adr"
+
+        $justification = Get-MatrixRowCell -Row $row -CellName "Justification ADR" -RequirementId $requirementId
+        Assert-Condition `
+            -Condition ($justification -match "^Décision structurante documentée:") `
+            -Message "Justification ADR M-013 invalide pour ${requirementId}: $justification"
+    }
+}
+
 if (-not $PSBoundParameters.ContainsKey("Path")) {
     $matrixPath = Join-Path $repoRoot "docs/traceability/matrix.md"
 }
@@ -2036,5 +2191,6 @@ Assert-M006RequirementRows -Rows $rows.ToArray()
 Assert-M007RequirementRows -Rows $rows.ToArray()
 Assert-M008RequirementRows -Rows $rows.ToArray()
 Assert-M009RequirementRows -Rows $rows.ToArray()
+Assert-M013RequirementRows -Rows $rows.ToArray()
 
 Write-Host "Matrice de $traceabilityLabel valide: $($rows.Count) exigence(s) contr$([char] 0x00F4)l$($eAcute)e(s)."

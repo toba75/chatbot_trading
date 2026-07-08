@@ -134,6 +134,31 @@ function Set-Text {
     Set-Content -Encoding UTF8 -LiteralPath $Path -Value $Content
 }
 
+function Remove-M010TemporaryRoot {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $Path
+    )
+
+    if (-not (Test-Path -LiteralPath $Path -PathType Container)) {
+        return
+    }
+
+    $lastError = $null
+    for ($attempt = 1; $attempt -le 5; $attempt++) {
+        try {
+            Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction Stop
+            return
+        }
+        catch {
+            $lastError = $_
+            Start-Sleep -Milliseconds (200 * $attempt)
+        }
+    }
+
+    throw "Nettoyage temporaire M-010 impossible après 5 tentatives: $Path. Dernière erreur: $lastError"
+}
+
 function Assert-ValidatorRejects {
     param(
         [Parameter(Mandatory = $true)]
@@ -253,7 +278,7 @@ try {
     Assert-ValidatorRejects -Fixture $missingLintFixture -ExpectedFragment "Gate lint sans validateur M-010" -Message "Le validateur M-010 hors scripts/lint.ps1 doit etre refuse."
 }
 finally {
-    Remove-Item -LiteralPath $temporaryRoot -Recurse -Force
+    Remove-M010TemporaryRoot -Path $temporaryRoot
 }
 
 . (Join-Path $repoRoot "scripts/require_python.ps1")

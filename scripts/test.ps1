@@ -22,6 +22,7 @@ $m009SpecificationPath = Join-Path $repoRoot "docs/specs/m009_recherche_approfon
 $m010SpecificationPath = Join-Path $repoRoot "docs/specs/m010_strategie_candidate_attribuee.md"
 $m011SpecificationPath = Join-Path $repoRoot "docs/specs/m011_experience_reproductible.md"
 $m012SpecificationPath = Join-Path $repoRoot "docs/specs/m012_evaluation_pilote_calibration.md"
+$m013SpecificationPath = Join-Path $repoRoot "docs/specs/m013_durcissement_acceptation_v1.md"
 $platformTopologyPath = Join-Path $repoRoot "app/platform/topology_registry.json"
 $sparkFirewallPath = Join-Path $repoRoot "deploy/spark-firewall/network-boundary.json"
 $appRoot = Join-Path $repoRoot "app"
@@ -148,6 +149,30 @@ $m012CalibrationDecisionsAcceptancePath = "tests/m012/validate_calibration_decis
 $m012CalibrationDecisionsUnitPath = "tests/m012/validate_calibration_decisions_unit.ps1"
 $m012TraceabilityAcceptancePath = "tests/m012/validate_m012_traceability_acceptance.ps1"
 $m012TraceabilityUnitPath = "tests/m012/validate_m012_traceability_unit.ps1"
+$m013PreconditionAcceptancePath = "tests/m013/validate_m013_precondition_acceptance.ps1"
+$m013PreconditionUnitPath = "tests/m013/validate_m013_precondition_unit.ps1"
+$m013SpecificationAcceptancePath = "tests/m013/validate_m013_specification_acceptance.ps1"
+$m013SpecificationUnitPath = "tests/m013/validate_m013_specification_unit.ps1"
+$m013V1GapDecisionsAcceptancePath = "tests/m013/validate_v1_gap_decisions_acceptance.ps1"
+$m013V1GapDecisionsUnitPath = "tests/m013/validate_v1_gap_decisions_unit.ps1"
+$m013RegressionAcceptancePath = "tests/m013/validate_v1_regression_suite_acceptance.ps1"
+$m013RegressionUnitPath = "tests/m013/validate_v1_regression_suite_unit.ps1"
+$m013NetworkSecurityAcceptancePath = "tests/m013/validate_m013_network_security_acceptance.ps1"
+$m013NetworkSecurityUnitPath = "tests/m013/validate_m013_network_security_unit.ps1"
+$m013SparkFailureAcceptancePath = "tests/m013/validate_spark_failure_acceptance.ps1"
+$m013SparkFailureUnitPath = "tests/m013/validate_spark_failure_unit.ps1"
+$m013BackupRestoreAcceptancePath = "tests/m013/validate_backup_restore_acceptance.ps1"
+$m013BackupRestoreUnitPath = "tests/m013/validate_backup_restore_unit.ps1"
+$m013RetentionPurgeAcceptancePath = "tests/m013/validate_retention_purge_acceptance.ps1"
+$m013RetentionPurgeUnitPath = "tests/m013/validate_retention_purge_unit.ps1"
+$m013LocalMonitoringAcceptancePath = "tests/m013/validate_local_monitoring_acceptance.ps1"
+$m013LocalMonitoringUnitPath = "tests/m013/validate_local_monitoring_unit.ps1"
+$m013RunbooksUserDocsAcceptancePath = "tests/m013/validate_runbooks_user_docs_acceptance.ps1"
+$m013RunbooksUserDocsUnitPath = "tests/m013/validate_runbooks_user_docs_unit.ps1"
+$m013AntipatternsAcceptancePath = "tests/m013/validate_v1_antipatterns_acceptance.ps1"
+$m013AntipatternsUnitPath = "tests/m013/validate_v1_antipatterns_unit.ps1"
+$m013AcceptanceReportAcceptancePath = "tests/m013/validate_v1_acceptance_report_acceptance.ps1"
+$m013AcceptanceReportUnitPath = "tests/m013/validate_v1_acceptance_report_unit.ps1"
 
 $validationCommands = @(
     @{ Path = "scripts/validate_m000_precondition_report.ps1"; Arguments = @("-Path", $preconditionReportPath) },
@@ -169,6 +194,17 @@ $validationCommands = @(
     @{ Path = "scripts/validate_m011_traceability.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_m012_specification.ps1"; Arguments = @("-Path", $m012SpecificationPath) },
     @{ Path = "scripts/validate_m012_traceability.ps1"; Arguments = @() },
+    @{ Path = "scripts/validate_m013_specification.ps1"; Arguments = @("-Path", $m013SpecificationPath) },
+    @{ Path = "scripts/validate_m013_v1_gap_decisions.ps1"; Arguments = @() },
+    @{ Path = "scripts/validate_m013_regression.ps1"; Arguments = @() },
+    @{ Path = "scripts/validate_m013_security.ps1"; Arguments = @() },
+    @{ Path = "scripts/validate_m013_spark_failures.ps1"; Arguments = @() },
+    @{ Path = "scripts/validate_m013_backup_restore.ps1"; Arguments = @() },
+    @{ Path = "scripts/validate_m013_retention.ps1"; Arguments = @() },
+    @{ Path = "scripts/validate_m013_monitoring.ps1"; Arguments = @() },
+    @{ Path = "scripts/validate_m013_runbooks.ps1"; Arguments = @() },
+    @{ Path = "scripts/validate_m013_antipatterns.ps1"; Arguments = @() },
+    @{ Path = "scripts/validate_m013_acceptance.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_platform_topology.ps1"; Arguments = @("-Path", $platformTopologyPath) },
     @{ Path = "scripts/validate_local_compose.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_network_boundary.ps1"; Arguments = @("-SparkFirewallPath", $sparkFirewallPath) },
@@ -425,6 +461,30 @@ $testCommands = @(
     @{ Path = $m012CalibrationDecisionsUnitPath; Arguments = @() },
     @{ Path = $m012TraceabilityAcceptancePath; Arguments = @() },
     @{ Path = $m012TraceabilityUnitPath; Arguments = @() },
+    @{ Path = $m013PreconditionUnitPath; Arguments = @() },
+    @{ Path = $m013PreconditionAcceptancePath; Arguments = @() },
+    @{ Path = $m013SpecificationAcceptancePath; Arguments = @() },
+    @{ Path = $m013SpecificationUnitPath; Arguments = @() },
+    @{ Path = $m013V1GapDecisionsAcceptancePath; Arguments = @() },
+    @{ Path = $m013V1GapDecisionsUnitPath; Arguments = @() },
+    @{ Path = $m013RegressionAcceptancePath; Arguments = @() },
+    @{ Path = $m013RegressionUnitPath; Arguments = @() },
+    @{ Path = $m013NetworkSecurityAcceptancePath; Arguments = @() },
+    @{ Path = $m013NetworkSecurityUnitPath; Arguments = @() },
+    @{ Path = $m013SparkFailureAcceptancePath; Arguments = @() },
+    @{ Path = $m013SparkFailureUnitPath; Arguments = @() },
+    @{ Path = $m013BackupRestoreAcceptancePath; Arguments = @() },
+    @{ Path = $m013BackupRestoreUnitPath; Arguments = @() },
+    @{ Path = $m013RetentionPurgeAcceptancePath; Arguments = @() },
+    @{ Path = $m013RetentionPurgeUnitPath; Arguments = @() },
+    @{ Path = $m013LocalMonitoringAcceptancePath; Arguments = @() },
+    @{ Path = $m013LocalMonitoringUnitPath; Arguments = @() },
+    @{ Path = $m013RunbooksUserDocsAcceptancePath; Arguments = @() },
+    @{ Path = $m013RunbooksUserDocsUnitPath; Arguments = @() },
+    @{ Path = $m013AntipatternsAcceptancePath; Arguments = @() },
+    @{ Path = $m013AntipatternsUnitPath; Arguments = @() },
+    @{ Path = $m013AcceptanceReportAcceptancePath; Arguments = @() },
+    @{ Path = $m013AcceptanceReportUnitPath; Arguments = @() },
     @{ Path = "tests/m009/validate_m009_specification_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/m009/validate_m009_specification_unit.ps1"; Arguments = @() },
     @{ Path = "tests/m009/validate_deep_research_planning_acceptance.ps1"; Arguments = @() },
@@ -972,6 +1032,32 @@ elseif ($env:OST_M012_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
         $m012SpecificationUnitPath
     )
 }
+elseif ($env:OST_M013_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
+    Write-Host "Test d'acceptation de précondition M-003 exclu explicitement: M-013 vérifie les validateurs amont sans récursion."
+    Write-Host "Test d'acceptation de précondition M-004 exclu explicitement: M-013 vérifie les validateurs amont sans récursion."
+    Write-Host "Test d'acceptation de précondition M-005 exclu explicitement: M-013 vérifie les validateurs amont sans récursion."
+    Write-Host "Test d'acceptation de précondition M-006 exclu explicitement: M-013 vérifie les validateurs amont sans récursion."
+    Write-Host "Test d'acceptation de précondition M-007 exclu explicitement: M-013 vérifie les validateurs amont sans récursion."
+    Write-Host "Test d'acceptation de précondition M-008 exclu explicitement: M-013 vérifie les validateurs amont sans récursion."
+    Write-Host "Test d'acceptation de précondition M-009 exclu explicitement: M-013 vérifie les validateurs amont sans récursion."
+    Write-Host "Test d'acceptation de précondition M-010 exclu explicitement: M-013 vérifie les validateurs amont sans récursion."
+    Write-Host "Test d'acceptation de précondition M-011 exclu explicitement: M-013 vérifie les validateurs amont sans récursion."
+    Write-Host "Test d'acceptation de précondition M-012 exclu explicitement: M-013 vérifie les validateurs amont sans récursion."
+    Write-Host "Test d'acceptation de précondition M-013 exclu explicitement: exécution imbriquée du validateur de précondition."
+    $excludedPreconditionTestPaths = @(
+        $m003PreconditionAcceptancePath,
+        $m004PreconditionAcceptancePath,
+        $m005PreconditionAcceptancePath,
+        $m006PreconditionAcceptancePath,
+        $m007PreconditionAcceptancePath,
+        $m008PreconditionAcceptancePath,
+        $m009PreconditionAcceptancePath,
+        $m010PreconditionAcceptancePath,
+        $m011PreconditionAcceptancePath,
+        $m012PreconditionAcceptancePath,
+        $m013PreconditionAcceptancePath
+    )
+}
 
 if (
     ($env:OST_M003_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") -or
@@ -1049,6 +1135,47 @@ if (
         $m012CalibrationDecisionsUnitPath,
         $m012TraceabilityAcceptancePath,
         $m012TraceabilityUnitPath
+    )
+}
+
+if (
+    ($env:OST_M003_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") -or
+    ($env:OST_M004_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") -or
+    ($env:OST_M005_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") -or
+    ($env:OST_M006_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") -or
+    ($env:OST_M007_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") -or
+    ($env:OST_M008_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") -or
+    ($env:OST_M009_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") -or
+    ($env:OST_M010_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") -or
+    ($env:OST_M011_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") -or
+    ($env:OST_M012_PRECONDITION_ACCEPTANCE_RUNNING -eq "1")
+) {
+    Write-Host "Tests M-013 exclus explicitement: les préconditions amont restent indépendantes du milestone aval."
+    $excludedPreconditionTestPaths += @(
+        $m013PreconditionAcceptancePath,
+        $m013PreconditionUnitPath,
+        $m013SpecificationAcceptancePath,
+        $m013SpecificationUnitPath,
+        $m013V1GapDecisionsAcceptancePath,
+        $m013V1GapDecisionsUnitPath,
+        $m013RegressionAcceptancePath,
+        $m013RegressionUnitPath,
+        $m013NetworkSecurityAcceptancePath,
+        $m013NetworkSecurityUnitPath,
+        $m013SparkFailureAcceptancePath,
+        $m013SparkFailureUnitPath,
+        $m013BackupRestoreAcceptancePath,
+        $m013BackupRestoreUnitPath,
+        $m013RetentionPurgeAcceptancePath,
+        $m013RetentionPurgeUnitPath,
+        $m013LocalMonitoringAcceptancePath,
+        $m013LocalMonitoringUnitPath,
+        $m013RunbooksUserDocsAcceptancePath,
+        $m013RunbooksUserDocsUnitPath,
+        $m013AntipatternsAcceptancePath,
+        $m013AntipatternsUnitPath,
+        $m013AcceptanceReportAcceptancePath,
+        $m013AcceptanceReportUnitPath
     )
 }
 

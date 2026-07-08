@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import math
 import re
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any
@@ -13,6 +13,26 @@ from typing import Any
 
 SECRET_MASK = "<secret-masked>"
 _HASH_PATTERN = re.compile(r"^[a-f0-9]{64}$")
+M013_LOCAL_MONITORING_PROFILE_VERSION = "M013-LocalMonitoringProfile-1.0"
+M013_RESOURCE_PROFILE_VERSION = "M013-ResourceProfile-1.0"
+M013_LOCAL_LOG_RETENTION_HOURS = 72
+
+_M013_CONTEXTS = ("SP", "KA", "EG", "RA", "CV", "SD", "EX", "EV", "platform")
+_M013_REQUIRED_METRICS = (
+    "v1_health_status",
+    "v1_error_total",
+    "v1_latency_ms",
+    "job_queue_depth",
+    "outbox_pending_total",
+    "llm_gateway_latency_ms",
+    "llm_gateway_output_interrupted_total",
+    "spark_inference_availability",
+    "backup_restore_result",
+    "v1_gap_status",
+    "network_security_violation_total",
+)
+_M013_REQUIRED_RESOURCE_KINDS = ("CPU", "GPU", "MEMORY", "IO", "STORAGE")
+_M013_BENCHMARK_SOURCE = "docs/evaluation/m012/llm_real_path_benchmark_report.md"
 
 
 class ObservabilityContractError(ValueError):
@@ -471,6 +491,531 @@ class InMemoryObservabilityCollector:
         )
 
 
+@dataclass(frozen=True)
+class MonitoringSignal:
+    signal_id: str
+    context: str
+    component: str
+    metric_name: str
+    metric_family: str
+    owner: str
+    correlation_field: str
+    retention_hours: int
+    local_only: bool
+    external_export_enabled_by_default: bool
+    contains_full_prompt: bool
+    contains_full_evidence: bool
+    contains_full_response: bool
+    contains_secret: bool
+    contains_market_payload: bool
+    gap_status_visible: bool
+    spark_failure_visible: bool
+    backup_restore_visible: bool
+    security_boundary_visible: bool
+    alert_threshold: str
+    threshold_source: str
+
+    def __init__(
+        self,
+        *,
+        signal_id: str,
+        context: str,
+        component: str,
+        metric_name: str,
+        metric_family: str,
+        owner: str,
+        correlation_field: str,
+        retention_hours: int,
+        local_only: bool,
+        external_export_enabled_by_default: bool,
+        contains_full_prompt: bool,
+        contains_full_evidence: bool,
+        contains_full_response: bool,
+        contains_secret: bool,
+        contains_market_payload: bool,
+        gap_status_visible: bool,
+        spark_failure_visible: bool,
+        backup_restore_visible: bool,
+        security_boundary_visible: bool,
+        alert_threshold: str,
+        threshold_source: str,
+    ) -> None:
+        parsed_context = _required_m013_context(context)
+        parsed_retention_hours = _required_positive_int_m013(retention_hours, "rétention courte requise")
+        if parsed_retention_hours > M013_LOCAL_LOG_RETENTION_HOURS:
+            raise ValueError("rétention courte requise")
+        if not _required_bool_m013(local_only, "local_only"):
+            raise ValueError("monitoring local requis")
+        if _required_bool_m013(external_export_enabled_by_default, "external_export_enabled_by_default"):
+            raise ValueError("export externe par défaut interdit")
+        if (
+            _required_bool_m013(contains_full_prompt, "contains_full_prompt")
+            or _required_bool_m013(contains_full_evidence, "contains_full_evidence")
+            or _required_bool_m013(contains_full_response, "contains_full_response")
+            or _required_bool_m013(contains_secret, "contains_secret")
+            or _required_bool_m013(contains_market_payload, "contains_market_payload")
+        ):
+            raise ValueError("payload sensible interdit")
+        if not _required_bool_m013(gap_status_visible, "gap_status_visible"):
+            raise ValueError("statut d'écart visible requis")
+        if not _required_bool_m013(spark_failure_visible, "spark_failure_visible"):
+            raise ValueError("panne Spark visible requise")
+        if not _required_bool_m013(backup_restore_visible, "backup_restore_visible"):
+            raise ValueError("sauvegarde restauration visible requise")
+        if not _required_bool_m013(security_boundary_visible, "security_boundary_visible"):
+            raise ValueError("sécurité réseau visible requise")
+
+        object.__setattr__(self, "signal_id", _required_text_m013(signal_id, "signal_id"))
+        object.__setattr__(self, "context", parsed_context)
+        object.__setattr__(self, "component", _required_text_m013(component, "component"))
+        object.__setattr__(self, "metric_name", _required_text_m013(metric_name, "metric_name"))
+        object.__setattr__(self, "metric_family", _required_text_m013(metric_family, "metric_family"))
+        object.__setattr__(self, "owner", _required_text_m013(owner, "owner"))
+        object.__setattr__(self, "correlation_field", _required_text_m013(correlation_field, "corrélation requise"))
+        object.__setattr__(self, "retention_hours", parsed_retention_hours)
+        object.__setattr__(self, "local_only", True)
+        object.__setattr__(self, "external_export_enabled_by_default", False)
+        object.__setattr__(self, "contains_full_prompt", False)
+        object.__setattr__(self, "contains_full_evidence", False)
+        object.__setattr__(self, "contains_full_response", False)
+        object.__setattr__(self, "contains_secret", False)
+        object.__setattr__(self, "contains_market_payload", False)
+        object.__setattr__(self, "gap_status_visible", True)
+        object.__setattr__(self, "spark_failure_visible", True)
+        object.__setattr__(self, "backup_restore_visible", True)
+        object.__setattr__(self, "security_boundary_visible", True)
+        object.__setattr__(self, "alert_threshold", _required_text_m013(alert_threshold, "seuil sourcé requis"))
+        object.__setattr__(self, "threshold_source", _required_text_m013(threshold_source, "seuil sourcé requis"))
+
+
+@dataclass(frozen=True)
+class LocalMonitoringProfile:
+    profile_version: str
+    signals: tuple[MonitoringSignal, ...]
+    local_only: bool
+    external_export_enabled_by_default: bool
+    retention_hours: int
+    metrics_by_name: Mapping[str, MonitoringSignal]
+    contexts: tuple[str, ...]
+
+    def __init__(
+        self,
+        *,
+        profile_version: str,
+        signals: Sequence[MonitoringSignal],
+        local_only: bool,
+        external_export_enabled_by_default: bool,
+        retention_hours: int,
+    ) -> None:
+        if _required_text_m013(profile_version, "profile_version") != M013_LOCAL_MONITORING_PROFILE_VERSION:
+            raise ValueError("version monitoring local incohérente")
+        parsed_signals = _required_signal_tuple(signals)
+        parsed_retention_hours = _required_positive_int_m013(retention_hours, "rétention courte requise")
+        if parsed_retention_hours > M013_LOCAL_LOG_RETENTION_HOURS:
+            raise ValueError("rétention courte requise")
+        if not _required_bool_m013(local_only, "local_only"):
+            raise ValueError("monitoring local requis")
+        if _required_bool_m013(external_export_enabled_by_default, "external_export_enabled_by_default"):
+            raise ValueError("export externe par défaut interdit")
+
+        metrics_by_name: dict[str, MonitoringSignal] = {}
+        for signal in parsed_signals:
+            if signal.metric_name in metrics_by_name:
+                raise ValueError("métrique dupliquée")
+            metrics_by_name[signal.metric_name] = signal
+
+        object.__setattr__(self, "profile_version", M013_LOCAL_MONITORING_PROFILE_VERSION)
+        object.__setattr__(self, "signals", parsed_signals)
+        object.__setattr__(self, "local_only", True)
+        object.__setattr__(self, "external_export_enabled_by_default", False)
+        object.__setattr__(self, "retention_hours", parsed_retention_hours)
+        object.__setattr__(self, "metrics_by_name", MappingProxyType(metrics_by_name))
+        object.__setattr__(self, "contexts", tuple(sorted({signal.context for signal in parsed_signals})))
+
+    def without_metric(self, metric_name: str) -> "LocalMonitoringProfile":
+        parsed_metric_name = _required_text_m013(metric_name, "metric_name")
+        return LocalMonitoringProfile(
+            profile_version=self.profile_version,
+            signals=tuple(signal for signal in self.signals if signal.metric_name != parsed_metric_name),
+            local_only=self.local_only,
+            external_export_enabled_by_default=self.external_export_enabled_by_default,
+            retention_hours=self.retention_hours,
+        )
+
+
+class MonitoringSignalPolicy:
+    def __init__(self, *, public_endpoint_enabled: bool) -> None:
+        if _required_bool_m013(public_endpoint_enabled, "public_endpoint_enabled"):
+            raise ValueError("endpoint public interdit")
+        self.public_endpoint_enabled = False
+
+    def validate_profile(self, profile: LocalMonitoringProfile) -> None:
+        if not isinstance(profile, LocalMonitoringProfile):
+            raise ValueError("LocalMonitoringProfile requis")
+        if self.public_endpoint_enabled:
+            raise ValueError("endpoint public interdit")
+        if not profile.local_only:
+            raise ValueError("monitoring local requis")
+        if profile.external_export_enabled_by_default:
+            raise ValueError("export externe par défaut interdit")
+        if profile.retention_hours > M013_LOCAL_LOG_RETENTION_HOURS:
+            raise ValueError("rétention courte requise")
+
+        for required_metric in _M013_REQUIRED_METRICS:
+            if required_metric not in profile.metrics_by_name:
+                raise ValueError("métrique absente")
+        for required_context in _M013_CONTEXTS:
+            if required_context not in profile.contexts:
+                raise ValueError("contexte V1 absent")
+        for signal in profile.signals:
+            self.validate_signal(signal)
+
+    def validate_signal(self, signal: MonitoringSignal) -> None:
+        if not isinstance(signal, MonitoringSignal):
+            raise ValueError("MonitoringSignal requis")
+
+
+@dataclass(frozen=True)
+class ResourceProfileMeasurement:
+    measurement_id: str
+    host: str
+    resource_kind: str
+    metric_name: str
+    measured_value: float
+    unit: str
+    benchmark_source: str
+    capacity_decision: str
+    explicit_setting: str
+
+    def __init__(
+        self,
+        *,
+        measurement_id: str,
+        host: str,
+        resource_kind: str,
+        metric_name: str,
+        measured_value: float,
+        unit: str,
+        benchmark_source: str,
+        capacity_decision: str,
+        explicit_setting: str,
+    ) -> None:
+        parsed_resource_kind = _required_resource_kind(resource_kind)
+        parsed_value = _required_positive_number_m013(measured_value, "mesure CPU/GPU/I/O absente")
+        object.__setattr__(self, "measurement_id", _required_text_m013(measurement_id, "measurement_id"))
+        object.__setattr__(self, "host", _required_text_m013(host, "host"))
+        object.__setattr__(self, "resource_kind", parsed_resource_kind)
+        object.__setattr__(self, "metric_name", _required_text_m013(metric_name, "metric_name"))
+        object.__setattr__(self, "measured_value", parsed_value)
+        object.__setattr__(self, "unit", _required_text_m013(unit, "unit"))
+        object.__setattr__(self, "benchmark_source", _required_text_m013(benchmark_source, "benchmark_source"))
+        object.__setattr__(self, "capacity_decision", _required_text_m013(capacity_decision, "capacity_decision"))
+        object.__setattr__(self, "explicit_setting", _required_text_m013(explicit_setting, "explicit_setting"))
+
+
+@dataclass(frozen=True)
+class BenchmarkedResourceSetting:
+    setting_name: str
+    value: int
+    unit: str
+    benchmark_source: str
+    explicit_default: bool
+
+    def __init__(
+        self,
+        *,
+        setting_name: str,
+        value: int,
+        unit: str,
+        benchmark_source: str,
+        explicit_default: bool,
+    ) -> None:
+        if _required_bool_m013(explicit_default, "explicit_default"):
+            raise ValueError("valeur par défaut interdite")
+        object.__setattr__(self, "setting_name", _required_text_m013(setting_name, "setting_name"))
+        object.__setattr__(self, "value", _required_positive_int_m013(value, "réglage mesuré requis"))
+        object.__setattr__(self, "unit", _required_text_m013(unit, "unit"))
+        object.__setattr__(
+            self,
+            "benchmark_source",
+            _required_text_m013(benchmark_source, f"{setting_name} sourcée par benchmark requise"),
+        )
+        object.__setattr__(self, "explicit_default", False)
+
+
+@dataclass(frozen=True)
+class ResourceProfile:
+    profile_version: str
+    measurements: tuple[ResourceProfileMeasurement, ...]
+    vllm_image_digest: str
+    model_revision: str
+    concurrency: BenchmarkedResourceSetting
+    context_length: BenchmarkedResourceSetting
+    docker_local_profiled: bool
+    resource_kinds: tuple[str, ...]
+
+    def __init__(
+        self,
+        *,
+        profile_version: str,
+        measurements: Sequence[ResourceProfileMeasurement],
+        vllm_image_digest: str,
+        model_revision: str,
+        concurrency: BenchmarkedResourceSetting,
+        context_length: BenchmarkedResourceSetting,
+        docker_local_profiled: bool,
+    ) -> None:
+        if _required_text_m013(profile_version, "profile_version") != M013_RESOURCE_PROFILE_VERSION:
+            raise ValueError("version profil ressources incohérente")
+        parsed_measurements = _required_measurement_tuple(measurements)
+        parsed_digest = _required_vllm_digest(vllm_image_digest)
+        parsed_model_revision = _required_text_m013(model_revision, "révision modèle requise")
+        if not isinstance(concurrency, BenchmarkedResourceSetting):
+            raise ValueError("concurrence sourcée par benchmark requise")
+        if not isinstance(context_length, BenchmarkedResourceSetting):
+            raise ValueError("longueur de contexte sourcée par benchmark requise")
+        if not _required_bool_m013(docker_local_profiled, "docker_local_profiled"):
+            raise ValueError("profil CPU/GPU/I/O docker-local requis")
+
+        object.__setattr__(self, "profile_version", M013_RESOURCE_PROFILE_VERSION)
+        object.__setattr__(self, "measurements", parsed_measurements)
+        object.__setattr__(self, "vllm_image_digest", parsed_digest)
+        object.__setattr__(self, "model_revision", parsed_model_revision)
+        object.__setattr__(self, "concurrency", concurrency)
+        object.__setattr__(self, "context_length", context_length)
+        object.__setattr__(self, "docker_local_profiled", True)
+        object.__setattr__(self, "resource_kinds", tuple(sorted({item.resource_kind for item in parsed_measurements})))
+
+    def without_resource(self, resource_kind: str) -> "ResourceProfile":
+        parsed_resource_kind = _required_resource_kind(resource_kind)
+        return self._replace(
+            measurements=tuple(item for item in self.measurements if item.resource_kind != parsed_resource_kind)
+        )
+
+    def with_vllm_image_digest(self, digest: str) -> "ResourceProfile":
+        return self._replace(vllm_image_digest=digest)
+
+    def with_model_revision(self, model_revision: str) -> "ResourceProfile":
+        return self._replace(model_revision=model_revision)
+
+    def with_concurrency_source(self, benchmark_source: str) -> "ResourceProfile":
+        return self._replace(
+            concurrency=BenchmarkedResourceSetting(
+                setting_name="concurrence sourcée par benchmark requise",
+                value=self.concurrency.value,
+                unit=self.concurrency.unit,
+                benchmark_source=benchmark_source,
+                explicit_default=False,
+            )
+        )
+
+    def with_context_length_source(self, benchmark_source: str) -> "ResourceProfile":
+        return self._replace(
+            context_length=BenchmarkedResourceSetting(
+                setting_name="longueur de contexte sourcée par benchmark requise",
+                value=self.context_length.value,
+                unit=self.context_length.unit,
+                benchmark_source=benchmark_source,
+                explicit_default=False,
+            )
+        )
+
+    def with_context_length_default(self, explicit_default: bool) -> "ResourceProfile":
+        return self._replace(
+            context_length=BenchmarkedResourceSetting(
+                setting_name=self.context_length.setting_name,
+                value=self.context_length.value,
+                unit=self.context_length.unit,
+                benchmark_source=self.context_length.benchmark_source,
+                explicit_default=explicit_default,
+            )
+        )
+
+    def _replace(
+        self,
+        *,
+        measurements: Sequence[ResourceProfileMeasurement] | None = None,
+        vllm_image_digest: str | None = None,
+        model_revision: str | None = None,
+        concurrency: BenchmarkedResourceSetting | None = None,
+        context_length: BenchmarkedResourceSetting | None = None,
+    ) -> "ResourceProfile":
+        return ResourceProfile(
+            profile_version=self.profile_version,
+            measurements=self.measurements if measurements is None else measurements,
+            vllm_image_digest=self.vllm_image_digest if vllm_image_digest is None else vllm_image_digest,
+            model_revision=self.model_revision if model_revision is None else model_revision,
+            concurrency=self.concurrency if concurrency is None else concurrency,
+            context_length=self.context_length if context_length is None else context_length,
+            docker_local_profiled=self.docker_local_profiled,
+        )
+
+
+class ResourceProfilePolicy:
+    def validate_profile(self, profile: ResourceProfile) -> None:
+        if not isinstance(profile, ResourceProfile):
+            raise ValueError("ResourceProfile requis")
+        if not profile.docker_local_profiled:
+            raise ValueError("profil CPU/GPU/I/O docker-local requis")
+        for resource_kind in _M013_REQUIRED_RESOURCE_KINDS:
+            if resource_kind not in profile.resource_kinds:
+                raise ValueError("mesure CPU/GPU/I/O absente")
+        _required_vllm_digest(profile.vllm_image_digest)
+        _required_text_m013(profile.model_revision, "révision modèle requise")
+        _required_text_m013(profile.concurrency.benchmark_source, "concurrence sourcée par benchmark requise")
+        _required_text_m013(
+            profile.context_length.benchmark_source,
+            "longueur de contexte sourcée par benchmark requise",
+        )
+        if profile.context_length.explicit_default or profile.concurrency.explicit_default:
+            raise ValueError("valeur par défaut interdite")
+
+
+def build_m013_local_monitoring_profile() -> LocalMonitoringProfile:
+    return LocalMonitoringProfile(
+        profile_version=M013_LOCAL_MONITORING_PROFILE_VERSION,
+        signals=(
+            _m013_signal("MON-M013-001", "platform", "edge-gateway", "v1_health_status", "santé"),
+            _m013_signal("MON-M013-002", "SP", "source-processing", "v1_error_total", "erreurs"),
+            _m013_signal("MON-M013-003", "KA", "knowledge-access", "v1_latency_ms", "latence"),
+            _m013_signal("MON-M013-004", "platform", "job-runtime", "job_queue_depth", "jobs", "job_id"),
+            _m013_signal("MON-M013-005", "platform", "outbox", "outbox_pending_total", "outbox", "event_id"),
+            _m013_signal("MON-M013-006", "RA", "llm-gateway", "llm_gateway_latency_ms", "gateway"),
+            _m013_signal("MON-M013-007", "RA", "llm-gateway", "llm_gateway_output_interrupted_total", "gateway"),
+            _m013_signal("MON-M013-008", "platform", "spark-inference", "spark_inference_availability", "Spark"),
+            _m013_signal("MON-M013-009", "platform", "backup-restore", "backup_restore_result", "sauvegarde", "restore_test_result"),
+            _m013_signal("MON-M013-010", "EV", "v1-acceptance-gate", "v1_gap_status", "écarts", "gap_id"),
+            _m013_signal("MON-M013-011", "platform", "network-boundary", "network_security_violation_total", "sécurité"),
+            _m013_signal("MON-M013-012", "EG", "evidence-governance", "claim_verification_error_total", "erreurs", "claim_id"),
+            _m013_signal("MON-M013-013", "CV", "conversation", "conversation_turn_latency_ms", "latence", "conversation_id"),
+            _m013_signal("MON-M013-014", "SD", "strategy-design", "strategy_snapshot_block_total", "écarts", "strategy_id"),
+            _m013_signal("MON-M013-015", "EX", "experimentation", "experiment_job_latency_ms", "jobs", "experiment_id"),
+        ),
+        local_only=True,
+        external_export_enabled_by_default=False,
+        retention_hours=M013_LOCAL_LOG_RETENTION_HOURS,
+    )
+
+
+def build_m013_resource_profile() -> ResourceProfile:
+    return ResourceProfile(
+        profile_version=M013_RESOURCE_PROFILE_VERSION,
+        measurements=(
+            _m013_measurement(
+                "RES-M013-CPU",
+                "CPU",
+                "docker_local_cpu_utilization_percent",
+                42.0,
+                "percent",
+                "cpu_quota=8",
+            ),
+            _m013_measurement(
+                "RES-M013-GPU",
+                "GPU",
+                "docker_local_gpu_allocation_count",
+                1.0,
+                "count",
+                "gpu_devices=1",
+            ),
+            _m013_measurement(
+                "RES-M013-MEMORY",
+                "MEMORY",
+                "docker_local_memory_working_set_gib",
+                24.0,
+                "gibibytes",
+                "memory_limit=64GiB",
+            ),
+            _m013_measurement(
+                "RES-M013-IO",
+                "IO",
+                "docker_local_io_throughput_mib_s",
+                512.0,
+                "mebibytes_per_second",
+                "io_profile=local_nvme",
+            ),
+            _m013_measurement(
+                "RES-M013-STORAGE",
+                "STORAGE",
+                "docker_local_storage_free_gib",
+                1024.0,
+                "gibibytes",
+                "storage_budget=1TiB",
+            ),
+        ),
+        vllm_image_digest="sha256:6d1f6e9126b8cf23f2ac089a21e2f39c57ef8b5fcb16f312c5e00bb05cda73a9",
+        model_revision="nvidia/Gemma-4-31B-IT-NVFP4@LLMRUN-M012-REAL-PATH-0001",
+        concurrency=BenchmarkedResourceSetting(
+            setting_name="concurrence sourcée par benchmark requise",
+            value=4,
+            unit="requêtes concurrentes",
+            benchmark_source=_M013_BENCHMARK_SOURCE,
+            explicit_default=False,
+        ),
+        context_length=BenchmarkedResourceSetting(
+            setting_name="longueur de contexte sourcée par benchmark requise",
+            value=8192,
+            unit="tokens",
+            benchmark_source=_M013_BENCHMARK_SOURCE,
+            explicit_default=False,
+        ),
+        docker_local_profiled=True,
+    )
+
+
+def _m013_signal(
+    signal_id: str,
+    context: str,
+    component: str,
+    metric_name: str,
+    metric_family: str,
+    correlation_field: str = "trace_id",
+) -> MonitoringSignal:
+    return MonitoringSignal(
+        signal_id=signal_id,
+        context=context,
+        component=component,
+        metric_name=metric_name,
+        metric_family=metric_family,
+        owner=context,
+        correlation_field=correlation_field,
+        retention_hours=M013_LOCAL_LOG_RETENTION_HOURS,
+        local_only=True,
+        external_export_enabled_by_default=False,
+        contains_full_prompt=False,
+        contains_full_evidence=False,
+        contains_full_response=False,
+        contains_secret=False,
+        contains_market_payload=False,
+        gap_status_visible=True,
+        spark_failure_visible=True,
+        backup_restore_visible=True,
+        security_boundary_visible=True,
+        alert_threshold="p95 ou compteur au-dessus du seuil publié par benchmark M-012",
+        threshold_source=_M013_BENCHMARK_SOURCE,
+    )
+
+
+def _m013_measurement(
+    measurement_id: str,
+    resource_kind: str,
+    metric_name: str,
+    measured_value: float,
+    unit: str,
+    explicit_setting: str,
+) -> ResourceProfileMeasurement:
+    return ResourceProfileMeasurement(
+        measurement_id=measurement_id,
+        host="docker-local",
+        resource_kind=resource_kind,
+        metric_name=metric_name,
+        measured_value=measured_value,
+        unit=unit,
+        benchmark_source=_M013_BENCHMARK_SOURCE,
+        capacity_decision="accepté pour V1 locale sous charge benchmarkée",
+        explicit_setting=explicit_setting,
+    )
+
+
 def redact_secret_fields(
     value: Mapping[str, Any],
     *,
@@ -608,15 +1153,112 @@ def _freeze_observable_value(value: Any, field_name: str) -> Any:
     )
 
 
+def _required_text_m013(value: Any, field_name: str) -> str:
+    if not isinstance(value, str):
+        raise ValueError(f"{field_name} non textuel")
+    if value.strip() == "":
+        raise ValueError(field_name)
+    if value != value.strip():
+        raise ValueError(f"{field_name} non normalisé")
+    return value
+
+
+def _required_bool_m013(value: Any, field_name: str) -> bool:
+    if not isinstance(value, bool):
+        raise ValueError(f"{field_name} non booléen")
+    return value
+
+
+def _required_positive_int_m013(value: Any, field_name: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(f"{field_name} non entier")
+    if value <= 0:
+        raise ValueError(field_name)
+    return value
+
+
+def _required_positive_number_m013(value: Any, field_name: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{field_name} non numérique")
+    parsed = float(value)
+    if not math.isfinite(parsed) or parsed <= 0:
+        raise ValueError(field_name)
+    return parsed
+
+
+def _required_m013_context(value: Any) -> str:
+    text = _required_text_m013(value, "contexte V1")
+    if text not in _M013_CONTEXTS:
+        raise ValueError("contexte V1 absent")
+    return text
+
+
+def _required_resource_kind(value: Any) -> str:
+    text = _required_text_m013(value, "resource_kind")
+    if text not in _M013_REQUIRED_RESOURCE_KINDS:
+        raise ValueError("mesure CPU/GPU/I/O absente")
+    return text
+
+
+def _required_signal_tuple(values: Sequence[MonitoringSignal]) -> tuple[MonitoringSignal, ...]:
+    if isinstance(values, str) or not isinstance(values, Sequence):
+        raise ValueError("signaux monitoring invalides")
+    parsed = tuple(values)
+    if len(parsed) == 0:
+        raise ValueError("signaux monitoring absents")
+    for signal in parsed:
+        if not isinstance(signal, MonitoringSignal):
+            raise ValueError("MonitoringSignal requis")
+    return parsed
+
+
+def _required_measurement_tuple(
+    values: Sequence[ResourceProfileMeasurement],
+) -> tuple[ResourceProfileMeasurement, ...]:
+    if isinstance(values, str) or not isinstance(values, Sequence):
+        raise ValueError("mesures ressources invalides")
+    parsed = tuple(values)
+    if len(parsed) == 0:
+        raise ValueError("mesure CPU/GPU/I/O absente")
+    for measurement in parsed:
+        if not isinstance(measurement, ResourceProfileMeasurement):
+            raise ValueError("ResourceProfileMeasurement requise")
+    return parsed
+
+
+def _required_vllm_digest(value: Any) -> str:
+    text = _required_text_m013(value, "image vLLM épinglée requise")
+    if not text.startswith("sha256:"):
+        raise ValueError("image vLLM épinglée requise")
+    digest = text.removeprefix("sha256:")
+    if re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+        raise ValueError("image vLLM épinglée requise")
+    if len(set(digest)) == 1:
+        raise ValueError("image vLLM placeholder interdite")
+    return text
+
+
 __all__ = [
+    "BenchmarkedResourceSetting",
     "GatewayObservation",
     "InMemoryObservabilityCollector",
     "JobObservation",
+    "LocalMonitoringProfile",
+    "M013_LOCAL_LOG_RETENTION_HOURS",
+    "M013_LOCAL_MONITORING_PROFILE_VERSION",
+    "M013_RESOURCE_PROFILE_VERSION",
+    "MonitoringSignal",
+    "MonitoringSignalPolicy",
     "ObservabilityContractError",
     "OutboxObservation",
+    "ResourceProfile",
+    "ResourceProfileMeasurement",
+    "ResourceProfilePolicy",
     "SECRET_MASK",
     "StructuredLogEvent",
     "TechnicalMetricEvent",
+    "build_m013_local_monitoring_profile",
+    "build_m013_resource_profile",
     "redact_secret_fields",
     "sha256_text",
 ]
