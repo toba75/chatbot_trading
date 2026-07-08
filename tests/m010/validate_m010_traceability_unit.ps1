@@ -156,7 +156,7 @@ function Remove-M010TemporaryRoot {
         }
     }
 
-    throw "Nettoyage temporaire M-010 impossible apres 5 tentatives: $Path. Derniere erreur: $lastError"
+    throw "Nettoyage temporaire M-010 impossible après 5 tentatives: $Path. Dernière erreur: $lastError"
 }
 
 function Assert-ValidatorRejects {

@@ -193,7 +193,7 @@ function Assert-M013DrillReport {
 
     foreach ($pattern in $forbiddenDrillPatterns) {
         if ($DrillContent -match [regex]::Escape($pattern)) {
-            throw "Fallback Spark interdit: $pattern"
+            throw "Contenu interdit dans le drill pannes Spark: $pattern"
         }
     }
 

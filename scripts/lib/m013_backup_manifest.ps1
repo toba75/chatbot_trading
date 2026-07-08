@@ -221,7 +221,7 @@ function Read-M013BackupManifest {
         Assert-M013Condition -Condition ($artifactKinds.Contains($artifactKind)) -Message "Catégorie artefact V1 absente"
     }
     foreach ($context in $requiredNegativeContexts) {
-        Assert-M013Condition -Condition ($negativeContexts.Contains($context)) -Message "Résultats négatifs et supersédés conservés"
+        Assert-M013Condition -Condition ($negativeContexts.Contains($context)) -Message "Résultats négatifs et supersédés absents pour le contexte: $context"
     }
     Assert-M013Condition -Condition ($projectionCount -gt 0) -Message "Projection régénérable requise"
 

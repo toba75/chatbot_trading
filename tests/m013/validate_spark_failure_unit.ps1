@@ -331,7 +331,7 @@ try {
 
     Assert-ValidatorFails `
         -Name "fallback-documente" `
-        -ExpectedMessage "Fallback Spark interdit" `
+        -ExpectedMessage "Contenu interdit dans le drill pannes Spark" `
         -Mutate {
             param($projectRoot)
             $path = Join-Path $projectRoot "docs/governance/m013_spark_failure_drill.md"
