@@ -167,6 +167,8 @@ $m013RetentionPurgeAcceptancePath = "tests/m013/validate_retention_purge_accepta
 $m013RetentionPurgeUnitPath = "tests/m013/validate_retention_purge_unit.ps1"
 $m013LocalMonitoringAcceptancePath = "tests/m013/validate_local_monitoring_acceptance.ps1"
 $m013LocalMonitoringUnitPath = "tests/m013/validate_local_monitoring_unit.ps1"
+$m013RunbooksUserDocsAcceptancePath = "tests/m013/validate_runbooks_user_docs_acceptance.ps1"
+$m013RunbooksUserDocsUnitPath = "tests/m013/validate_runbooks_user_docs_unit.ps1"
 
 $validationCommands = @(
     @{ Path = "scripts/validate_m000_precondition_report.ps1"; Arguments = @("-Path", $preconditionReportPath) },
@@ -196,6 +198,7 @@ $validationCommands = @(
     @{ Path = "scripts/validate_m013_backup_restore.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_m013_retention.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_m013_monitoring.ps1"; Arguments = @() },
+    @{ Path = "scripts/validate_m013_runbooks.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_platform_topology.ps1"; Arguments = @("-Path", $platformTopologyPath) },
     @{ Path = "scripts/validate_local_compose.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_network_boundary.ps1"; Arguments = @("-SparkFirewallPath", $sparkFirewallPath) },
@@ -470,6 +473,8 @@ $testCommands = @(
     @{ Path = $m013RetentionPurgeUnitPath; Arguments = @() },
     @{ Path = $m013LocalMonitoringAcceptancePath; Arguments = @() },
     @{ Path = $m013LocalMonitoringUnitPath; Arguments = @() },
+    @{ Path = $m013RunbooksUserDocsAcceptancePath; Arguments = @() },
+    @{ Path = $m013RunbooksUserDocsUnitPath; Arguments = @() },
     @{ Path = "tests/m009/validate_m009_specification_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/m009/validate_m009_specification_unit.ps1"; Arguments = @() },
     @{ Path = "tests/m009/validate_deep_research_planning_acceptance.ps1"; Arguments = @() },
@@ -1154,7 +1159,9 @@ if (
         $m013RetentionPurgeAcceptancePath,
         $m013RetentionPurgeUnitPath,
         $m013LocalMonitoringAcceptancePath,
-        $m013LocalMonitoringUnitPath
+        $m013LocalMonitoringUnitPath,
+        $m013RunbooksUserDocsAcceptancePath,
+        $m013RunbooksUserDocsUnitPath
     )
 }
 

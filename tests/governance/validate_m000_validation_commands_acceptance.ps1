@@ -5,7 +5,7 @@ $testCommandPath = Join-Path $repoRoot "scripts/test.ps1"
 $lintCommandPath = Join-Path $repoRoot "scripts/lint.ps1"
 $temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m000_validation_commands_acceptance_" + [System.Guid]::NewGuid().ToString("N"))
 $eAcute = [char] 0x00E9
-$expectedTestCount = 284
+$expectedTestCount = 286
 if ($env:OST_M003_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     $expectedTestCount = 146
 }
@@ -37,9 +37,9 @@ elseif ($env:OST_M012_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     $expectedTestCount = 256
 }
 elseif ($env:OST_M013_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
-    $expectedTestCount = 273
+    $expectedTestCount = 275
 }
-$expectedTestSummary = "Gate test GREEN: 31 validation(s), $expectedTestCount test(s)."
+$expectedTestSummary = "Gate test GREEN: 32 validation(s), $expectedTestCount test(s)."
 
 function Split-MarkdownRow {
     param(
@@ -130,9 +130,11 @@ function New-TemporaryProject {
     Copy-Item -LiteralPath (Join-Path $repoRoot "docs/adr") -Destination (Join-Path $projectRoot "docs/adr") -Recurse
     Copy-Item -LiteralPath (Join-Path $repoRoot "docs/governance") -Destination (Join-Path $projectRoot "docs/governance") -Recurse
     Copy-Item -LiteralPath (Join-Path $repoRoot "docs/evaluation") -Destination (Join-Path $projectRoot "docs/evaluation") -Recurse
+    Copy-Item -LiteralPath (Join-Path $repoRoot "docs/runbooks") -Destination (Join-Path $projectRoot "docs/runbooks") -Recurse
     Copy-Item -LiteralPath (Join-Path $repoRoot "docs/specs") -Destination (Join-Path $projectRoot "docs/specs") -Recurse
     Copy-Item -LiteralPath (Join-Path $repoRoot "docs/tasks") -Destination (Join-Path $projectRoot "docs/tasks") -Recurse
     Copy-Item -LiteralPath (Join-Path $repoRoot "docs/traceability") -Destination (Join-Path $projectRoot "docs/traceability") -Recurse
+    Copy-Item -LiteralPath (Join-Path $repoRoot "docs/user") -Destination (Join-Path $projectRoot "docs/user") -Recurse
     Copy-Item -LiteralPath (Join-Path $repoRoot "app") -Destination (Join-Path $projectRoot "app") -Recurse
     Copy-Item -LiteralPath (Join-Path $repoRoot "deploy") -Destination (Join-Path $projectRoot "deploy") -Recurse
 
@@ -337,6 +339,7 @@ try {
     Assert-OutputContains -Output $testResult.Output -Expected "Validation GREEN: scripts/validate_m013_backup_restore.ps1" -Message "La gate de test doit exécuter le validateur de sauvegarde restauration M-013."
     Assert-OutputContains -Output $testResult.Output -Expected "Validation GREEN: scripts/validate_m013_retention.ps1" -Message "La gate de test doit exécuter le validateur de rétention purge M-013."
     Assert-OutputContains -Output $testResult.Output -Expected "Validation GREEN: scripts/validate_m013_monitoring.ps1" -Message "La gate de test doit exécuter le validateur de monitoring local M-013."
+    Assert-OutputContains -Output $testResult.Output -Expected "Validation GREEN: scripts/validate_m013_runbooks.ps1" -Message "La gate de test doit exécuter le validateur de runbooks documentation M-013."
     Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m009/validate_m009_specification_acceptance.ps1" -Message "La gate de test doit exécuter le test d'acceptation de spécification M-009."
     Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m009/validate_m009_specification_unit.ps1" -Message "La gate de test doit exécuter le test unitaire de spécification M-009."
     Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m012/validate_m012_specification_acceptance.ps1" -Message "La gate de test doit exécuter le test d'acceptation de spécification M-012."
@@ -365,6 +368,8 @@ try {
     Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m013/validate_retention_purge_unit.ps1" -Message "La gate de test doit exécuter le test unitaire rétention purge M-013."
     Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m013/validate_local_monitoring_acceptance.ps1" -Message "La gate de test doit exécuter le test d'acceptation monitoring local M-013."
     Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m013/validate_local_monitoring_unit.ps1" -Message "La gate de test doit exécuter le test unitaire monitoring local M-013."
+    Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m013/validate_runbooks_user_docs_acceptance.ps1" -Message "La gate de test doit exécuter le test d'acceptation runbooks documentation M-013."
+    Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m013/validate_runbooks_user_docs_unit.ps1" -Message "La gate de test doit exécuter le test unitaire runbooks documentation M-013."
     Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m009/validate_deep_research_planning_acceptance.ps1" -Message "La gate de test doit exécuter le test d'acceptation de planification approfondie M-009."
     Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m009/validate_deep_research_planning_unit.ps1" -Message "La gate de test doit exécuter le test unitaire de planification approfondie M-009."
     Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/m009/validate_multi_query_evidence_collection_acceptance.ps1" -Message "La gate de test doit exécuter le test d'acceptation de collecte multi-requêtes M-009."
@@ -374,7 +379,7 @@ try {
     $lintResult = Invoke-ProjectCommand -ProjectRoot $validProjectRoot -RelativePath "scripts/lint.ps1"
     Assert-ExitCode -Actual $lintResult.ExitCode -Expected 0 -Message "La gate de lint M-000 conforme doit réussir."
     Assert-OutputContains -Output $lintResult.Output -Expected "Gate lint GREEN" -Message "La gate de lint doit annoncer son état GREEN."
-    Assert-OutputContains -Output $lintResult.Output -Expected "Gate lint GREEN: 32 validation(s), 0 test(s)." -Message "La gate de lint doit prouver le nombre exact de validations et tests."
+    Assert-OutputContains -Output $lintResult.Output -Expected "Gate lint GREEN: 33 validation(s), 0 test(s)." -Message "La gate de lint doit prouver le nombre exact de validations et tests."
     Assert-OutputContains -Output $lintResult.Output -Expected "Validation GREEN: scripts/validate_local_compose.ps1" -Message "La gate de lint doit exécuter le validateur Compose local M-002."
     Assert-OutputContains -Output $lintResult.Output -Expected "Validation GREEN: scripts/validate_network_boundary.ps1" -Message "La gate de lint doit exécuter le validateur de frontière réseau M-002."
     Assert-OutputContains -Output $lintResult.Output -Expected "Validation GREEN: scripts/validate_m004_specification.ps1" -Message "La gate de lint doit exécuter le validateur de spécification M-004."
@@ -395,6 +400,7 @@ try {
     Assert-OutputContains -Output $lintResult.Output -Expected "Validation GREEN: scripts/validate_m013_backup_restore.ps1" -Message "La gate de lint doit exécuter le validateur de sauvegarde restauration M-013."
     Assert-OutputContains -Output $lintResult.Output -Expected "Validation GREEN: scripts/validate_m013_retention.ps1" -Message "La gate de lint doit exécuter le validateur de rétention purge M-013."
     Assert-OutputContains -Output $lintResult.Output -Expected "Validation GREEN: scripts/validate_m013_monitoring.ps1" -Message "La gate de lint doit exécuter le validateur de monitoring local M-013."
+    Assert-OutputContains -Output $lintResult.Output -Expected "Validation GREEN: scripts/validate_m013_runbooks.ps1" -Message "La gate de lint doit exécuter le validateur de runbooks documentation M-013."
     Assert-OutputContains -Output $lintResult.Output -Expected "Validation GREEN: scripts/validate_m011_traceability.ps1" -Message "La gate de lint doit exécuter le validateur de traçabilité M-011."
     Assert-OutputContains -Output $lintResult.Output -Expected "Validation GREEN: scripts/validate_m010_traceability.ps1" -Message "La gate de lint doit exécuter le validateur de traçabilité M-010."
     Assert-OutputNotContains -Output $lintResult.Output -Forbidden "Ã" -Message "La sortie de la gate de lint doit rester lisible en français accentué."

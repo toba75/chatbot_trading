@@ -254,7 +254,7 @@ try {
         -Mutate {
             param($projectRoot)
             $path = Join-Path $projectRoot "tests/governance/validate_m000_validation_commands_acceptance.ps1"
-            (Get-Content -Raw -Encoding UTF8 -LiteralPath $path).Replace('$expectedTestCount = 282', '$expectedTestCount = 281') |
+            (Get-Content -Raw -Encoding UTF8 -LiteralPath $path).Replace('$expectedTestCount = 286', '$expectedTestCount = 285') |
                 Set-Content -Encoding UTF8 -LiteralPath $path
         }
 }

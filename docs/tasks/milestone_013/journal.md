@@ -115,3 +115,11 @@
 - Décision livrée: le monitoring V1 reste local, sans export externe par défaut, sans endpoint public, avec métriques de santé, erreurs, latence, jobs, outbox, gateway, Spark, sauvegarde, restauration, écarts et sécurité; les journaux techniques ont une rétention courte et une corrélation explicite.
 - Profil ressources livré: CPU, GPU, mémoire, I/O et stockage `docker-local` sont mesurés; l'image vLLM est épinglée par digest, le modèle Gemma est révisionné, la concurrence et la longueur de contexte sont sourcées par le benchmark M-012.
 - ADR: non requise; T-009 applique ADR-008, ADR-009 et ADR-010 sans introduire de composant d'observabilité structurant ni export externe.
+
+## Exécution T-010
+
+- RED: ajout de `tests/m013/validate_runbooks_user_docs_acceptance.ps1` et `tests/m013/validate_runbooks_user_docs_unit.ps1`; commit RED `65376e1e4`.
+- GREEN: publication de `scripts/validate_m013_runbooks.ps1`, de huit runbooks sous `docs/runbooks/`, du guide `docs/user/v1_guide_utilisateur.md` et de l'index `docs/governance/m013_documentation_index.md`; enrôlement dans `scripts/test.ps1` et `scripts/lint.ps1`; rattachement `REQ-M013-010` dans `docs/traceability/matrix.md`.
+- Décision livrée: les runbooks couvrent démarrage local, arrêt local, sauvegarde, restauration, audit réseau, panne Spark, monitoring, ingestion PDF, conversation, recherche approfondie, stratégie, backtest, statuts publics, limites V1 et commandes vérifiées.
+- Garde-fous conservés: aucune publication de service interne, aucun secret, aucune commande destructive sans précondition, aucun fallback textuel, aucun fallback silencieux et aucune promesse financière.
+- ADR: non requise; T-010 documente les décisions existantes sans nouvelle topologie, nouvelle politique de rétention, nouvelle politique d'observabilité ou nouveau contrat durable.
