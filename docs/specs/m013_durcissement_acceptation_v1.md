@@ -6,7 +6,7 @@
 - Tâche source: `docs/tasks/milestone_013/0002_publier_specification_durcissement_v1.md`.
 - Sources normatives: `docs/specs/plan_implementation_milestones_workstreams.md`, M-013; `docs/specs/specification_unifiee_ddd_technique_chatbot_trading_v4_1.md`, sections 18, 19, 20, 21, 22, 23 et 24; `docs/governance/m012_v1_gap_report.md`.
 - Statut: spécification exécutable publiée pour guider T-003 à T-012.
-- ADR applicables: ADR-007; ADR-008; ADR-009; ADR-010; ADR-013; DDD-ADR-004; DDD-ADR-006; DDD-ADR-010; DDD-ADR-011.
+- ADR applicables: ADR-007; ADR-008; ADR-009; ADR-010; ADR-013; DDD-ADR-004; DDD-ADR-006; DDD-ADR-010; DDD-ADR-011; DDD-ADR-012.
 - ADR: non requise pour T-002; la présente spécification applique les décisions existantes sans imposer de nouvelle politique de rétention, sans rendre mTLS obligatoire et sans remplacer la topologie `docker-local` / `spark-inference`.
 
 ## Scénario BDD
@@ -37,7 +37,7 @@ M-013 consomme les preuves de SP, KA, EG, RA, CV, SD, EX, EV et `platform`. Elle
 | SecurityAuditReport | Rapport d'audit réseau et sécurité Spark. | Prouve absence d'exposition publique, gateway unique et validation TLS. |
 | BackupRestoreDrill | Exercice de sauvegarde chiffrée et restauration. | Produit `restore_test_result` et refuse une restauration non testée. |
 | LocalMonitoringProfile | Profil local de monitoring d'exploitation. | Publie métriques sans prompts, preuves, réponses complètes ni secrets. |
-| RetentionPolicy | Politique de conservation et purge administrative. | Conserve versions négatives et supersédées selon DDD-ADR-010; toute durée nouvelle structurante exige ADR. |
+| RetentionPolicy | Politique de conservation et purge administrative. | Conserve versions négatives et supersédées selon DDD-ADR-010 et fixe les durées V1 selon DDD-ADR-012. |
 | Runbook | Procédure d'exploitation locale. | Décrit une action vérifiable sans fallback silencieux. |
 | V1AcceptanceReport | Rapport final d'acceptation V1. | Référence preuves, commandes et écarts non acceptés avant toute décision. |
 | écart non accepté | Écart V1 bloquant ou différé sans acceptation explicite. | Interdit l'acceptation V1. |
@@ -75,7 +75,7 @@ Aucune valeur de seuil non sourcée n'est créée par T-002. Les seuils et promo
 | SecurityAuditReport | Publier l'audit réseau et sécurité. | Le Spark reste inaccessible hors `llm-gateway`. |
 | BackupRestoreDrill | Prouver sauvegarde chiffrée et restauration. | `restore_test_result` est requis. |
 | LocalMonitoringProfile | Publier le monitoring local. | Aucun payload sensible dans logs ou métriques. |
-| RetentionPolicy | Décrire conservation et purge explicite. | Les versions négatives et supersédées restent conservées selon DDD-ADR-010. |
+| RetentionPolicy | Décrire conservation et purge explicite. | Les versions négatives et supersédées restent conservées selon DDD-ADR-010 et les durées V1 restent explicites selon DDD-ADR-012. |
 | Runbook | Décrire les opérations locales. | Chaque procédure nomme commande, preuve et erreur explicite. |
 | V1AcceptanceReport | Publier le verdict V1. | Tout écart non accepté bloque le verdict. |
 
@@ -87,7 +87,7 @@ Aucune valeur de seuil non sourcée n'est créée par T-002. Les seuils et promo
 | RegressionSuitePolicy | Contrôle les non-régressions logicielles. | Un test scientifique RED n'est pas masqué par un test logiciel GREEN. | ADR-010 |
 | SecurityAuditPolicy | Vérifie la frontière `docker-local` / `spark-inference`. | Aucun port public, navigateur incapable d'appeler le Spark, gateway unique. | ADR-007; ADR-008; ADR-009 |
 | BackupRestorePolicy | Exige sauvegarde chiffrée et restauration testée. | Le rapport contient `restore_test_result` avant acceptation et le manifeste distingue autorité métier et projection régénérable. | ADR-009; ADR-013; DDD-ADR-004; DDD-ADR-010 |
-| RetentionPolicy | Encadre conservation et purge administrative. | Toute durée structurante nouvelle crée une ADR dédiée. | DDD-ADR-010 |
+| RetentionPolicy | Encadre conservation et purge administrative. | Les durées et opérations de purge administrative sont explicites; aucune purge ordinaire ne supprime les preuves défavorables. | DDD-ADR-010; DDD-ADR-012 |
 | MonitoringPolicy | Publie les signaux d'exploitation locaux. | Aucun prompt, preuve, réponse complète ou secret dans les signaux. | ADR-008; ADR-009 |
 | RunbookPolicy | Publie des procédures d'exploitation vérifiables. | Aucun fallback silencieux documenté. | ADR-010 |
 | UserDocumentationPolicy | Publie le comportement utilisateur V1. | Les statuts, citations et limites sont visibles. | ADR-010 |
@@ -126,9 +126,9 @@ Une sauvegarde non restaurée ne suffit pas pour accepter V1.
 
 ## Rétention
 
-La `RetentionPolicy` applique DDD-ADR-010: claims rejetés, réponses supersédées, stratégies invalides, versions remplacées, expériences échouées et résultats défavorables restent conservés. Une purge administrative doit être explicite, auditée et réversible par politique lorsque la donnée doit rester consultable.
+La `RetentionPolicy` applique DDD-ADR-010 et DDD-ADR-012: claims rejetés, réponses supersédées, stratégies invalides, versions remplacées, expériences échouées et résultats défavorables restent conservés. Une purge administrative doit être explicite, justifiée, auditée et compatible avec la lecture pendant la durée publiée.
 
-T-002 ne fixe pas de durée de rétention. Toute durée, purge automatique ou exception durable décidée par T-008 exige ADR si elle change le sens de DDD-ADR-010.
+La V1 conserve les artefacts d'autorité hors conversation pendant 120 mois, les conversations pendant 18 mois et les projections régénérables pendant 3 mois. Aucune purge ordinaire n'est autorisée. Une purge de conversation ne cascade pas vers KA, EG, RA, SD ou EX. Une projection régénérable peut être purgée seulement avec une reconstruction documentée depuis les artefacts d'autorité conservés.
 
 ## Monitoring local
 
@@ -218,7 +218,7 @@ Le verdict final est refusé si un écart bloquant existe, si un écart différ�
 | V1-004 - Audit réseau et sécurité Spark | Le Spark est accessible uniquement depuis llm-gateway et aucune donnée métier durable n'y réside. | Given docker-local et spark-inference sont configurés; When SecurityAuditReport est produit; Then aucun port public, accès navigateur direct ou stockage métier Spark n'est accepté. | T-005 | ADR-007; ADR-008; ADR-009 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_m013_network_security_acceptance.ps1 |
 | V1-005 - Pannes Spark sans fallback | Une panne Spark produit un état explicite sans corruption d'état. | Given une demande nécessitant Gemma; When le Spark est indisponible ou le flux est coupé; Then LLM_UNAVAILABLE ou l'erreur TLS explicite est publiée sans fallback silencieux. | T-006 | ADR-008; ADR-009; DDD-ADR-006 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_spark_failure_acceptance.ps1 |
 | V1-006 - Sauvegarde chiffrée et restauration testée | BackupRestoreDrill produit une preuve de restauration avant acceptation. | Given les données docker-local sont sauvegardées; When la restauration isolée est exécutée; Then restore_test_result prouve la restauration chiffrée et exploitable. | T-007 | ADR-009; ADR-013; DDD-ADR-004; DDD-ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_backup_restore_acceptance.ps1 |
-| V1-007 - Rétention et purge administrative | Les versions négatives et supersédées restent consultables. | Given des artefacts négatifs ou supersédés existent; When la rétention est validée; Then aucune purge implicite ne les supprime. | T-008 | DDD-ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_retention_policy_acceptance.ps1 |
+| V1-007 - Rétention et purge administrative | Les versions négatives et supersédées restent consultables. | Given des artefacts négatifs ou supersédés existent; When la rétention est validée; Then aucune purge implicite ne les supprime. | T-008 | DDD-ADR-010; DDD-ADR-012 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_retention_purge_acceptance.ps1 |
 | V1-008 - Monitoring local d'exploitation | LocalMonitoringProfile publie les signaux sans payload sensible. | Given la plateforme locale est exécutée; When les métriques sont collectées; Then latence, erreurs, ressources et circuit breaker sont visibles sans secrets ni contenus complets. | T-009 | ADR-008; ADR-009; ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_local_monitoring_acceptance.ps1 |
 | V1-009 - Runbooks et documentation utilisateur | Les procédures et la documentation décrivent des actions vérifiables sans fallback. | Given l'utilisateur exploite la V1 locale; When il lit runbooks et documentation; Then chaque action sensible nomme commande, résultat attendu, erreur explicite et preuve. | T-010 | ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_runbooks_user_docs_acceptance.ps1 |
 | V1-010 - Anti-patterns interdits V1 | Chaque anti-pattern interdit est testé ou revu. | Given les anti-patterns section 23 sont publiés; When la revue M-013 est exécutée; Then aucun anti-pattern interdit n'est ignoré. | T-011 | ADR-007; ADR-008; ADR-009; DDD-ADR-006; DDD-ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_forbidden_antipatterns_acceptance.ps1 |

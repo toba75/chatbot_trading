@@ -163,6 +163,8 @@ $m013SparkFailureAcceptancePath = "tests/m013/validate_spark_failure_acceptance.
 $m013SparkFailureUnitPath = "tests/m013/validate_spark_failure_unit.ps1"
 $m013BackupRestoreAcceptancePath = "tests/m013/validate_backup_restore_acceptance.ps1"
 $m013BackupRestoreUnitPath = "tests/m013/validate_backup_restore_unit.ps1"
+$m013RetentionPurgeAcceptancePath = "tests/m013/validate_retention_purge_acceptance.ps1"
+$m013RetentionPurgeUnitPath = "tests/m013/validate_retention_purge_unit.ps1"
 
 $validationCommands = @(
     @{ Path = "scripts/validate_m000_precondition_report.ps1"; Arguments = @("-Path", $preconditionReportPath) },
@@ -190,6 +192,7 @@ $validationCommands = @(
     @{ Path = "scripts/validate_m013_security.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_m013_spark_failures.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_m013_backup_restore.ps1"; Arguments = @() },
+    @{ Path = "scripts/validate_m013_retention.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_platform_topology.ps1"; Arguments = @("-Path", $platformTopologyPath) },
     @{ Path = "scripts/validate_local_compose.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_network_boundary.ps1"; Arguments = @("-SparkFirewallPath", $sparkFirewallPath) },
@@ -460,6 +463,8 @@ $testCommands = @(
     @{ Path = $m013SparkFailureUnitPath; Arguments = @() },
     @{ Path = $m013BackupRestoreAcceptancePath; Arguments = @() },
     @{ Path = $m013BackupRestoreUnitPath; Arguments = @() },
+    @{ Path = $m013RetentionPurgeAcceptancePath; Arguments = @() },
+    @{ Path = $m013RetentionPurgeUnitPath; Arguments = @() },
     @{ Path = "tests/m009/validate_m009_specification_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/m009/validate_m009_specification_unit.ps1"; Arguments = @() },
     @{ Path = "tests/m009/validate_deep_research_planning_acceptance.ps1"; Arguments = @() },
@@ -1140,7 +1145,9 @@ if (
         $m013SparkFailureAcceptancePath,
         $m013SparkFailureUnitPath,
         $m013BackupRestoreAcceptancePath,
-        $m013BackupRestoreUnitPath
+        $m013BackupRestoreUnitPath,
+        $m013RetentionPurgeAcceptancePath,
+        $m013RetentionPurgeUnitPath
     )
 }
 

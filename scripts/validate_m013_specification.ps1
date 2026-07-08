@@ -69,7 +69,8 @@ $requiredAdrIds = @(
     "DDD-ADR-006",
     "DDD-ADR-004",
     "DDD-ADR-010",
-    "DDD-ADR-011"
+    "DDD-ADR-011",
+    "DDD-ADR-012"
 )
 
 $expectedGapStatuses = @{
@@ -103,7 +104,7 @@ $expectedBehaviors = @(
     @{ Name = "V1-004 - Audit réseau et sécurité Spark"; Test = "T-005"; Adr = @("ADR-007", "ADR-008", "ADR-009"); Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_m013_network_security_acceptance.ps1" },
     @{ Name = "V1-005 - Pannes Spark sans fallback"; Test = "T-006"; Adr = @("ADR-008", "ADR-009", "DDD-ADR-006"); Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_spark_failure_acceptance.ps1" },
     @{ Name = "V1-006 - Sauvegarde chiffrée et restauration testée"; Test = "T-007"; Adr = @("ADR-009", "ADR-013", "DDD-ADR-004", "DDD-ADR-010"); Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_backup_restore_acceptance.ps1" },
-    @{ Name = "V1-007 - Rétention et purge administrative"; Test = "T-008"; Adr = @("DDD-ADR-010"); Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_retention_policy_acceptance.ps1" },
+    @{ Name = "V1-007 - Rétention et purge administrative"; Test = "T-008"; Adr = @("DDD-ADR-010", "DDD-ADR-012"); Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_retention_purge_acceptance.ps1" },
     @{ Name = "V1-008 - Monitoring local d'exploitation"; Test = "T-009"; Adr = @("ADR-008", "ADR-009", "ADR-010"); Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_local_monitoring_acceptance.ps1" },
     @{ Name = "V1-009 - Runbooks et documentation utilisateur"; Test = "T-010"; Adr = @("ADR-010"); Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_runbooks_user_docs_acceptance.ps1" },
     @{ Name = "V1-010 - Anti-patterns interdits V1"; Test = "T-011"; Adr = @("ADR-007", "ADR-008", "ADR-009", "DDD-ADR-006", "DDD-ADR-010"); Command = "powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_forbidden_antipatterns_acceptance.ps1" },

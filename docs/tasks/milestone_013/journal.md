@@ -99,3 +99,11 @@
 - Décision livrée: la V1 utilise le manifeste `M013-BackupManifest-1.0`, vérifie les hashes restaurés, garde la clé hors dépôt, refuse les secrets versionnés, conserve les résultats négatifs et supersédés, traite Qdrant comme projection régénérable non autorité et confirme qu'aucune donnée métier n'est restaurée sur Spark.
 - Garde-fous conservés: aucune sauvegarde partielle déclarée complète, aucune restauration destructive silencieuse et aucun `restore_test_result` sans commande de restauration.
 - ADR: ADR-013 créée pour le contrat durable de manifeste de sauvegarde et restauration; T-007 applique aussi ADR-009, DDD-ADR-004 et DDD-ADR-010.
+
+## Exécution T-008
+
+- RED: ajout de `tests/m013/validate_retention_purge_acceptance.ps1`, `tests/m013/validate_retention_purge_unit.ps1` et `docs/adr/DDD-ADR-012-politique-retention-purge-administrative-v1.md`; commit RED `4a38c072c`.
+- GREEN: publication de `app/platform/retention.py`, `docs/governance/m013_retention_policy.md` et `scripts/validate_m013_retention.ps1`; enrôlement dans `scripts/test.ps1` et `scripts/lint.ps1`; alignement de la spécification M-013, des compteurs M-012 et rattachement `REQ-M013-008` dans `docs/traceability/matrix.md`.
+- Décision livrée: la V1 conserve les artefacts d'autorité hors conversation pendant 120 mois, les conversations pendant 18 mois et les projections régénérables pendant 3 mois; toute purge administrative exige justification, audit, opérateur, date, identifiants stables et preuve de compatibilité de lecture.
+- Garde-fous conservés: aucune purge ordinaire, aucun effacement de résultat négatif ou supersédé, aucune cascade CV vers KA, EG, RA, SD ou EX, et aucune purge de projection sans commande de reconstruction depuis les artefacts d'autorité conservés.
+- ADR: DDD-ADR-012 créée pour la politique V1 de rétention et purge administrative; T-008 ne modifie pas le sens de DDD-ADR-010.

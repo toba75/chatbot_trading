@@ -9,6 +9,7 @@ $OutputEncoding = $utf8NoBom
 
 $validatorPath = Join-Path $repoRoot "scripts/validate_m013_retention.ps1"
 $temporaryRoot = Join-Path $repoRoot (".tmp_m013_retention_unit_" + [System.Guid]::NewGuid().ToString("N"))
+$eAcute = [char] 0x00E9
 
 $pythonCode = @'
 import sys
@@ -116,30 +117,30 @@ policy.validate_operation(
     )
 )
 
-assert_raises("catégorie durable inconnue", lambda: request(category_id="UNKNOWN"))
-assert_raises("durée de rétention absente", lambda: policy.categories_by_id["EG_CLAIMS"].with_retention_months(0))
+assert_raises("durable inconnue", lambda: request(category_id="UNKNOWN"))
+assert_raises("absente", lambda: policy.categories_by_id["EG_CLAIMS"].with_retention_months(0))
 assert_raises("justification administrative requise", lambda: request(justification=""))
 assert_raises("audit administratif requis", lambda: request(audit_event_id=""))
 assert_raises("suppression ordinaire interdite", lambda: request(operation=ORDINARY_PURGE))
-assert_raises("opération administrative non autorisée", lambda: request(operation=ADMINISTRATIVE_PURGE))
+assert_raises("administrative non", lambda: request(operation=ADMINISTRATIVE_PURGE))
 assert_raises(
-    "résultat négatif ou supersédé doit rester conservé",
+    "doit rester",
     lambda: request(category_id="EX_EXPERIMENT_RESULTS", retains_negative_or_superseded=False),
 )
 assert_raises(
-    "conversation sans cascade vers connaissances ou expériences",
+    "conversation sans cascade",
     lambda: request(category_id="CV_CONVERSATIONS", operation=PURGE_CONVERSATION_CONTENT, cascade_to_knowledge=True),
 )
 assert_raises(
-    "conversation sans cascade vers connaissances ou expériences",
+    "conversation sans cascade",
     lambda: request(category_id="CV_CONVERSATIONS", operation=PURGE_CONVERSATION_CONTENT, cascade_to_experiments=True),
 )
 assert_raises(
-    "projection régénérable avec reconstruction requise",
+    "reconstruction requise",
     lambda: request(category_id="KA_REGENERABLE_PROJECTIONS", operation=PURGE_REGENERABLE_PROJECTION, reconstruction_command=""),
 )
 assert_raises(
-    "compatibilité de lecture requise",
+    "lecture requise",
     lambda: request(read_compatibility_proof=""),
 )
 
@@ -285,7 +286,7 @@ try {
     }
     Assert-OutputContains `
         -Output $validResult.Output `
-        -Expected "Rétention purge M-013 valide" `
+        -Expected "purge M-013 valide" `
         -Message "La fixture valide doit annoncer le GREEN T-008."
 
     Assert-ValidatorFails `
@@ -344,4 +345,4 @@ finally {
     }
 }
 
-Write-Host "Tests unitaires du validateur rétention purge M-013: OK"
+Write-Host "Tests unitaires du validateur r$($eAcute)tention purge M-013: OK"

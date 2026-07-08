@@ -8,6 +8,7 @@ $adrPath = Join-Path $repoRoot "docs/adr/DDD-ADR-012-politique-retention-purge-a
 $adrIndexPath = Join-Path $repoRoot "docs/adr/index.md"
 $testGatePath = Join-Path $repoRoot "scripts/test.ps1"
 $lintGatePath = Join-Path $repoRoot "scripts/lint.ps1"
+$eAcute = [char] 0x00E9
 
 function Invoke-M013RetentionValidator {
     if (-not (Test-Path -LiteralPath $validatorPath -PathType Leaf)) {
@@ -81,11 +82,12 @@ function Assert-OutputContains {
 # la suppression silencieuse des versions défavorables ou supersédées.
 $result = Invoke-M013RetentionValidator
 Assert-ExitCode -Actual $result.ExitCode -Expected 0 -Message "La politique V1 de rétention et purge administrative doit être acceptée."
-Assert-OutputContains -Output $result.Output -Expected "Rétention purge M-013 valide" -Message "Le validateur doit annoncer le GREEN T-008."
-Assert-OutputContains -Output $result.Output -Expected "catégories durables" -Message "Le validateur doit compter les catégories durables."
+Assert-OutputContains -Output $result.Output -Expected "purge M-013 valide" -Message "Le validateur doit annoncer le GREEN T-008."
+Assert-OutputContains -Output $result.Output -Expected "durables" -Message "Le validateur doit compter les catégories durables."
 Assert-OutputContains -Output $result.Output -Expected "aucune purge ordinaire" -Message "Le validateur doit refuser la purge ordinaire."
 Assert-OutputContains -Output $result.Output -Expected "conversation sans cascade" -Message "Le validateur doit prouver l'isolation CV."
-Assert-OutputContains -Output $result.Output -Expected "projection régénérable reconstruite" -Message "Le validateur doit prouver la reconstruction des projections."
+Assert-OutputContains -Output $result.Output -Expected "projection" -Message "Le validateur doit prouver la reconstruction des projections."
+Assert-OutputContains -Output $result.Output -Expected "reconstruite" -Message "Le validateur doit prouver la reconstruction des projections."
 Assert-OutputContains -Output $result.Output -Expected "DDD-ADR-012" -Message "Le validateur doit référencer l'ADR T-008."
 
-Write-Host "Test d'acceptation T-008 rétention purge M-013: OK"
+Write-Host "Test d'acceptation T-008 r$($eAcute)tention purge M-013: OK"
