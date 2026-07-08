@@ -14,7 +14,7 @@
 Le Compose refuse les valeurs par défaut silencieuses. Les variables non secrètes doivent être exportées explicitement avant validation ou démarrage:
 
 - `OST_EDGE_HTTPS_PORT`
-- `CADDY_ADMIN`
+- `CADDY_ADMIN` (valeur locale utilisée: `localhost:2019`)
 - `UI_API_URL`
 - `DATABASE_URL`
 - `QDRANT_URL`
@@ -47,4 +47,4 @@ docker compose -f .\deploy\local-compose\compose.yaml config
 docker compose -f .\deploy\local-compose\compose.yaml up --build
 ```
 
-L'entrée utilisateur est `edge-gateway` sur `127.0.0.1:${OST_EDGE_HTTPS_PORT}`. Aucun service interne ne publie de port hôte; `llm-gateway` est le seul service rattaché au réseau `spark-egress`.
+L'entrée utilisateur est `edge-gateway` liée à `127.0.0.1:${OST_EDGE_HTTPS_PORT}` et accessible via `https://localhost:${OST_EDGE_HTTPS_PORT}`. Aucun service interne ne publie de port hôte; `llm-gateway` est le seul service rattaché au réseau `spark-egress`.

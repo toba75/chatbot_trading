@@ -1,7 +1,13 @@
-:8443 {
+{
+    skip_install_trust
+}
+
+localhost:8443 {
     tls internal
 
-    respond /health "healthy" 200
+    handle /health {
+        respond "healthy" 200
+    }
 
     handle_path /api/* {
         reverse_proxy orchestrator-api:8080

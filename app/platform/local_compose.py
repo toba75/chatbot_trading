@@ -83,6 +83,7 @@ class ComposeService:
     profiles: tuple[str, ...]
     networks: tuple[str, ...]
     secrets: tuple[str, ...]
+    tmpfs: tuple[str, ...]
     environment: Mapping[str, str]
     healthcheck: Mapping[str, Any]
     read_only: bool
@@ -169,6 +170,7 @@ def validate_local_compose(compose: LocalCompose) -> None:
         _validate_service_image(service)
         _validate_service_ports(service)
         _validate_service_exposure(service)
+        _validate_service_tmpfs(service)
         _validate_service_healthcheck(service)
         _validate_service_command(service)
         _validate_service_networks(service, compose.networks)
@@ -201,6 +203,7 @@ def _parse_service(service_id: str, payload: Mapping[str, Any]) -> ComposeServic
         profiles=_optional_text_list(payload, "profiles", f"service {service_id}"),
         networks=_optional_text_list(payload, "networks", f"service {service_id}"),
         secrets=_optional_text_list(payload, "secrets", f"service {service_id}"),
+        tmpfs=_optional_text_list(payload, "tmpfs", f"service {service_id}"),
         environment=environment,
         healthcheck=healthcheck_payload,
         read_only=_optional_bool(payload, "read_only", f"service {service_id}"),
@@ -278,6 +281,16 @@ def _validate_service_exposure(service: ComposeService) -> None:
 
     if service.id in WORKER_SERVICE_IDS and len(service.expose) > 0:
         raise ValueError(f"Port exposé interdit pour worker: {service.id}")
+
+
+def _validate_service_tmpfs(service: ComposeService) -> None:
+    if service.id == "edge-gateway":
+        if service.tmpfs != ("/tmp",):
+            raise ValueError("tmpfs /tmp requis pour edge-gateway")
+        return
+
+    if len(service.tmpfs) > 0:
+        raise ValueError(f"tmpfs non prÃ©vu pour service: {service.id}")
 
 
 def _validate_service_healthcheck(service: ComposeService) -> None:

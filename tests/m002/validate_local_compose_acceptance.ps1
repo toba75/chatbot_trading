@@ -213,6 +213,8 @@ try {
     $validCaddyfile = Get-Content -Raw -Encoding UTF8 -LiteralPath $caddyfilePath
 
     Assert-OutputContains -Output $validCaddyfile -Expected "localhost:8443" -Message "Le Caddyfile doit nommer localhost pour le TLS interne."
+    Assert-OutputContains -Output $validCaddyfile -Expected "skip_install_trust" -Message "Le Caddyfile ne doit pas tenter d'installer la CA locale dans le conteneur."
+    Assert-OutputContains -Output $validCaddyfile -Expected "handle /health" -Message "La santé edge-gateway doit rester traitée par Caddy."
     if ($validCaddyfile -match "(?m)^:8443\s*\{") {
         throw "Le Caddyfile ne doit pas déclarer le site TLS sans hostname."
     }

@@ -15,21 +15,21 @@
 
 | Élément | Commande | Date UTC | Résultat | Observation |
 |---|---|---|---|---|
-| `branche courante` | `git rev-parse --abbrev-ref HEAD` | `2026-07-08T16:33:42Z` | `GREEN` | Branche M-003 autorisée post-merge: codex/milestone-m013-durcissement-acceptation-v1 |
-| `master local` | `git rev-parse --verify master^{commit}` | `2026-07-08T16:33:42Z` | `GREEN` | Révision locale master: 59781819e7a4d67b2fed2c048f95272505ecd2a8 |
-| `origin/master` | `git rev-parse --verify origin/master^{commit}` | `2026-07-08T16:33:42Z` | `GREEN` | Révision origin/master: 59781819e7a4d67b2fed2c048f95272505ecd2a8 |
-| `master contient origin/master` | `git merge-base --is-ancestor origin/master master` | `2026-07-08T16:33:42Z` | `GREEN` | La référence master contient origin/master. |
-| `branche contient master` | `git merge-base --is-ancestor master HEAD` | `2026-07-08T16:33:42Z` | `GREEN` | La branche courante contient la révision locale master. |
-| `docs/tasks/milestone_000 dans master` | `git ls-tree -r --name-only master -- docs/tasks/milestone_000` | `2026-07-08T16:33:42Z` | `GREEN` | Milestone amont présent dans master: docs/tasks/milestone_000 |
-| `docs/tasks/milestone_001 dans master` | `git ls-tree -r --name-only master -- docs/tasks/milestone_001` | `2026-07-08T16:33:42Z` | `GREEN` | Milestone amont présent dans master: docs/tasks/milestone_001 |
-| `docs/tasks/milestone_002 dans master` | `git ls-tree -r --name-only master -- docs/tasks/milestone_002` | `2026-07-08T16:33:42Z` | `GREEN` | Milestone amont présent dans master: docs/tasks/milestone_002 |
+| `branche courante` | `git rev-parse --abbrev-ref HEAD` | `2026-07-08T16:51:10Z` | `GREEN` | Branche M-003 autorisée post-merge: codex/milestone-m013-durcissement-acceptation-v1 |
+| `master local` | `git rev-parse --verify master^{commit}` | `2026-07-08T16:51:10Z` | `GREEN` | Révision locale master: 59781819e7a4d67b2fed2c048f95272505ecd2a8 |
+| `origin/master` | `git rev-parse --verify origin/master^{commit}` | `2026-07-08T16:51:10Z` | `GREEN` | Révision origin/master: 59781819e7a4d67b2fed2c048f95272505ecd2a8 |
+| `master contient origin/master` | `git merge-base --is-ancestor origin/master master` | `2026-07-08T16:51:10Z` | `GREEN` | La référence master contient origin/master. |
+| `branche contient master` | `git merge-base --is-ancestor master HEAD` | `2026-07-08T16:51:10Z` | `GREEN` | La branche courante contient la révision locale master. |
+| `docs/tasks/milestone_000 dans master` | `git ls-tree -r --name-only master -- docs/tasks/milestone_000` | `2026-07-08T16:51:10Z` | `GREEN` | Milestone amont présent dans master: docs/tasks/milestone_000 |
+| `docs/tasks/milestone_001 dans master` | `git ls-tree -r --name-only master -- docs/tasks/milestone_001` | `2026-07-08T16:51:10Z` | `GREEN` | Milestone amont présent dans master: docs/tasks/milestone_001 |
+| `docs/tasks/milestone_002 dans master` | `git ls-tree -r --name-only master -- docs/tasks/milestone_002` | `2026-07-08T16:51:10Z` | `GREEN` | Milestone amont présent dans master: docs/tasks/milestone_002 |
 
 ## Gates exécutées
 
 | Élément | Commande | Date UTC | Résultat | Observation |
 |---|---|---|---|---|
-| `test` | `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1` | `2026-07-08T16:37:02Z` | `GREEN` | Gate test GREEN. |
-| `lint` | `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1` | `2026-07-08T16:37:20Z` | `GREEN` | Gate lint GREEN. |
+| `test` | `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1` | `2026-07-08T16:54:40Z` | `GREEN` | Gate test GREEN. |
+| `lint` | `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1` | `2026-07-08T16:54:59Z` | `GREEN` | Gate lint GREEN. |
 
 ## Sorties des gates
 
