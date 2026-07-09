@@ -145,3 +145,10 @@
 - RED: la revue locale a ajouté des cas de régression sur rapports V1 fabriqués, registres d'écarts factices, hashes de sauvegarde de remplissage, incohérences contexte/artefact, monitoring mal corrélé, sortie de gate finale incomplète et commandes de régression vides.
 - GREEN: les validateurs M-013 refusent désormais les preuves synthétiques, les contextes incompatibles, les digests non probants, les restaurations destructives, les rapports d'acceptation incomplets et les commandes vides avant exécution réelle; les runbooks de certificats Spark, purge administrative et rapport d'acceptation V1 sont publiés.
 - Validation finale: `scripts/test.ps1` GREEN avec `Gate test GREEN: 34 validation(s), 292 test(s).`; le rapport d'acceptation V1 conserve ce comptage réel.
+
+## Tranche M13-reality - ancrage réel V1
+
+- Source: validation locale du Spark `192.168.1.120:8000`, `docs/specs/m013_reality_closure.md` et écart V1 `LLM` bloquant.
+- T-013 formalise le premier verrou réel: une inférence structurée doit traverser `llm-gateway`, appeler Gemma réel, produire une provenance modèle complète et refuser toute valeur implicite.
+- ADR-015 complète ADR-014: le conteneur Spark actuel ne fournit pas `model_revision` et `runtime_version`, donc le gateway exige `GEMMA_MODEL_REVISION` et `GEMMA_RUNTIME_VERSION` explicitement déclarés.
+- RED attendu avant implémentation: `tests/m013/validate_llm_gateway_real_spark_acceptance.ps1` échoue parce que `GatewayConfiguration` ne sait pas encore porter la provenance déclarée.

@@ -20,6 +20,7 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 | [ADR-012](ADR-012-python-outille-pour-validateurs-plateforme.md) | Python outillé pour les validateurs de plateforme | Acceptée | 2026-06-25 | Aucun | Aucune |
 | [ADR-013](ADR-013-contrat-manifeste-sauvegarde-restauration.md) | Contrat de manifeste de sauvegarde et restauration | Acceptée | 2026-07-08 | Aucun | Aucune |
 | [ADR-014](ADR-014-spark-docker-externe-sans-cle-api.md) | Endpoint Docker Spark externe sans clé API | Acceptée | 2026-07-08 | ADR-007; ADR-008 | Aucune |
+| [ADR-015](ADR-015-provenance-llm-declaree-gateway.md) | Provenance LLM déclarée par le gateway | Acceptée | 2026-07-09 | Aucun | Aucune |
 
 ## ADR DDD
 
@@ -41,7 +42,7 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 ## Prochains numéros disponibles
 
 ```text
-Prochaine ADR technique: ADR-015
+Prochaine ADR technique: ADR-016
 Prochaine DDD-ADR: DDD-ADR-013
 ```
 
