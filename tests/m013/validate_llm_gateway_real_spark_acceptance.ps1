@@ -33,7 +33,9 @@ if ($env:GEMMA_TLS_MODE -ne "disabled") {
 $pythonCode = @'
 from __future__ import annotations
 
+import json
 import sys
+import urllib.request
 
 sys.path.insert(0, sys.argv[1])
 
@@ -58,6 +60,23 @@ auth_mode = sys.argv[4]
 tls_mode = sys.argv[5]
 model_revision = sys.argv[6]
 runtime_version = sys.argv[7]
+
+models_url = f"{base_url.rstrip('/')}/models"
+with urllib.request.urlopen(models_url, timeout=30) as response:
+    models_payload = json.loads(response.read().decode("utf-8"))
+
+model_items = models_payload.get("data")
+if not isinstance(model_items, list):
+    raise AssertionError(f"Catalogue modèles Spark invalide: {models_payload!r}")
+served_model_ids = tuple(
+    item["id"]
+    for item in model_items
+    if isinstance(item, dict) and isinstance(item.get("id"), str) and item["id"].strip() == item["id"]
+)
+if served_model not in served_model_ids:
+    raise AssertionError(
+        f"Modèle GEMMA_MODEL absent du Spark réel: {served_model!r}; modèles exposés: {served_model_ids!r}"
+    )
 
 configuration = GatewayConfiguration(
     base_url=base_url,

@@ -152,3 +152,6 @@
 - T-013 formalise le premier verrou réel: une inférence structurée doit traverser `llm-gateway`, appeler Gemma réel, produire une provenance modèle complète et refuser toute valeur implicite.
 - ADR-015 complète ADR-014: le conteneur Spark actuel ne fournit pas `model_revision` et `runtime_version`, donc le gateway exige `GEMMA_MODEL_REVISION` et `GEMMA_RUNTIME_VERSION` explicitement déclarés.
 - RED attendu avant implémentation: `tests/m013/validate_llm_gateway_real_spark_acceptance.ps1` échoue parce que `GatewayConfiguration` ne sait pas encore porter la provenance déclarée.
+- RED: `65a759338c0b80918b00edd2dfde3c5eedf96a96` couvre la spécification `M013-RealityClosure-1.0`, ADR-015, T-013 et le test live `tests/m013/validate_llm_gateway_real_spark_acceptance.ps1`.
+- GREEN: `2fcad498995903174ea55de68f5dc198444b4ada` rend `GatewayConfiguration.model_revision` et `GatewayConfiguration.runtime_version` obligatoires, privilégie la provenance NIM quand elle est fournie et utilise la provenance déclarée sinon.
+- Validation réelle: `tests/m013/validate_llm_gateway_real_spark_acceptance.ps1` GREEN sur `http://192.168.1.120:8000/v1` avec `GEMMA_MODEL=google/gemma-4-26B-A4B-it`, `GEMMA_MODEL_REVISION=google/gemma-4-26B-A4B-it@533c7a07d8e220c4342168ecf816b21c49e8e9ce207b447349d51a7b2f7e1607` et `GEMMA_RUNTIME_VERSION=nim-1.7.0-variant-api-3.1.0`.
