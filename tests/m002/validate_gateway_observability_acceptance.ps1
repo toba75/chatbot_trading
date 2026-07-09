@@ -72,6 +72,8 @@ def configuration() -> GatewayConfiguration:
     return GatewayConfiguration(
         base_url="https://spark-inference.test:8443/v1",
         served_model="gemma-research-t010",
+        model_revision="gemma-4-declared-revision-t010",
+        runtime_version="vllm-openai-declared-t010",
         auth_mode="api_key_file",
         api_key=SECRET_CANARY,
         tls_mode="ca_bundle",

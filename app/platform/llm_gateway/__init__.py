@@ -266,6 +266,8 @@ def classify_gateway_failure(error: BaseException) -> GatewayFailureClassificati
 class GatewayConfiguration:
     base_url: str
     served_model: str
+    model_revision: str
+    runtime_version: str
     auth_mode: str
     api_key: str | None
     tls_mode: str
@@ -275,6 +277,8 @@ class GatewayConfiguration:
     def __post_init__(self) -> None:
         _require_text(self.base_url, "base_url", "LLM_GATEWAY_BASE_URL_REQUIRED")
         _require_text(self.served_model, "served_model", "LLM_GATEWAY_MODEL_REQUIRED")
+        _require_text(self.model_revision, "model_revision", "LLM_GATEWAY_MODEL_REVISION_REQUIRED")
+        _require_text(self.runtime_version, "runtime_version", "LLM_GATEWAY_RUNTIME_VERSION_REQUIRED")
         _require_text(self.auth_mode, "auth_mode", "LLM_GATEWAY_AUTH_MODE_REQUIRED")
         _require_text(self.tls_mode, "tls_mode", "LLM_GATEWAY_TLS_MODE_REQUIRED")
 
@@ -357,6 +361,8 @@ class GatewayConfiguration:
         return {
             "base_url": self.base_url,
             "served_model": self.served_model,
+            "model_revision": self.model_revision,
+            "runtime_version": self.runtime_version,
             "auth_mode": self.auth_mode,
             "api_key": SECRET_MASK if self.api_key is not None else None,
             "tls_mode": self.tls_mode,
@@ -529,6 +535,7 @@ class OpenAICompatibleLocalLanguageModelGateway:
             structured_output = _extract_structured_output(response.payload, request.output_schema)
             completed_at = _utc_now()
             provenance = _build_provenance(
+                configuration=self._configuration,
                 response=response,
                 request=request,
                 body=body,
@@ -979,6 +986,7 @@ def _extract_structured_output(payload: Mapping[str, Any], output_schema: Mappin
 
 def _build_provenance(
     *,
+    configuration: GatewayConfiguration,
     response: OpenAICompatibleResponse,
     request: InferenceRequest,
     body: Mapping[str, Any],
@@ -987,8 +995,18 @@ def _build_provenance(
     completed_at: str,
 ) -> ModelProvenance:
     model_id = _required_payload_text(response.payload, "model", "LLM_RESPONSE_PROVENANCE_MISSING")
-    model_revision = _required_response_text(response, "model_revision", _MODEL_REVISION_HEADER)
-    runtime_version = _required_response_text(response, "runtime_version", _RUNTIME_VERSION_HEADER)
+    model_revision = _response_or_declared_text(
+        response=response,
+        field_name="model_revision",
+        header_name=_MODEL_REVISION_HEADER,
+        declared_value=configuration.model_revision,
+    )
+    runtime_version = _response_or_declared_text(
+        response=response,
+        field_name="runtime_version",
+        header_name=_RUNTIME_VERSION_HEADER,
+        declared_value=configuration.runtime_version,
+    )
 
     return ModelProvenance(
         model_id=model_id,
@@ -1014,10 +1032,21 @@ def _required_payload_text(payload: Mapping[str, Any], field_name: str, code: st
     return value
 
 
-def _required_response_text(response: OpenAICompatibleResponse, field_name: str, header_name: str) -> str:
-    value = response.payload.get(field_name)
-    if value is None:
-        value = response.headers.get(header_name)
+def _response_or_declared_text(
+    *,
+    response: OpenAICompatibleResponse,
+    field_name: str,
+    header_name: str,
+    declared_value: str,
+) -> str:
+    if field_name in response.payload:
+        return _required_provenance_text(response.payload[field_name], field_name)
+    if header_name in response.headers:
+        return _required_provenance_text(response.headers[header_name], field_name)
+    return declared_value
+
+
+def _required_provenance_text(value: object, field_name: str) -> str:
     if not isinstance(value, str) or value.strip() == "":
         raise LLMGatewayContractError("LLM_RESPONSE_PROVENANCE_MISSING", f"Champ de réponse requis absent: {field_name}")
     if value != value.strip():

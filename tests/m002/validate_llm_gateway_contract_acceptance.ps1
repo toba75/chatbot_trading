@@ -118,6 +118,8 @@ class ControlledOpenAIDouble:
 configuration = GatewayConfiguration(
     base_url="http://spark-inference.test:8000/v1",
     served_model="gemma-research",
+    model_revision="gemma-4-declared-revision-t005",
+    runtime_version="vllm-openai-declared-t005",
     auth_mode="none",
     api_key=None,
     tls_mode="disabled",

@@ -7,6 +7,7 @@ $pythonExecutable = Get-RequiredPythonExecutable
 $pythonCode = @'
 from __future__ import annotations
 
+from dataclasses import MISSING, fields
 import sys
 
 sys.path.insert(0, sys.argv[1])
@@ -45,6 +46,8 @@ def valid_configuration() -> GatewayConfiguration:
     return GatewayConfiguration(
         base_url="http://spark-inference.test:8000/v1",
         served_model="gemma-research",
+        model_revision="gemma-4-declared-revision-unit",
+        runtime_version="vllm-openai-declared-unit",
         auth_mode="none",
         api_key=None,
         tls_mode="disabled",
@@ -93,6 +96,8 @@ assert_raises_code(
     lambda: GatewayConfiguration(
         base_url="ftp://spark-inference.test:8000/v1",
         served_model="gemma-research",
+        model_revision="gemma-4-declared-revision-unit",
+        runtime_version="vllm-openai-declared-unit",
         auth_mode="none",
         api_key=None,
         tls_mode="disabled",
@@ -106,6 +111,8 @@ assert_raises_code(
     lambda: GatewayConfiguration(
         base_url="http://attacker.example:8000/v1",
         served_model="gemma-research",
+        model_revision="gemma-4-declared-revision-unit",
+        runtime_version="vllm-openai-declared-unit",
         auth_mode="none",
         api_key=None,
         tls_mode="disabled",
@@ -119,6 +126,8 @@ assert_raises_code(
     lambda: GatewayConfiguration(
         base_url="http://spark-inference.test:8000/v1",
         served_model="gemma-research",
+        model_revision="gemma-4-declared-revision-unit",
+        runtime_version="vllm-openai-declared-unit",
         auth_mode="",
         api_key=None,
         tls_mode="disabled",
@@ -132,6 +141,8 @@ assert_raises_code(
     lambda: GatewayConfiguration(
         base_url="http://spark-inference.test:8000/v1",
         served_model="gemma-research",
+        model_revision="gemma-4-declared-revision-unit",
+        runtime_version="vllm-openai-declared-unit",
         auth_mode="none",
         api_key="unit-secret-key",
         tls_mode="disabled",
@@ -145,6 +156,8 @@ assert_raises_code(
     lambda: GatewayConfiguration(
         base_url="http://spark-inference.test:8000/v1",
         served_model="gemma-research",
+        model_revision="gemma-4-declared-revision-unit",
+        runtime_version="vllm-openai-declared-unit",
         auth_mode="none",
         api_key=None,
         tls_mode="disabled",
@@ -153,11 +166,82 @@ assert_raises_code(
     ),
 )
 
+assert_raises_code(
+    "LLM_GATEWAY_MODEL_REVISION_REQUIRED",
+    lambda: GatewayConfiguration(
+        base_url="http://spark-inference.test:8000/v1",
+        served_model="gemma-research",
+        model_revision="",
+        runtime_version="vllm-openai-declared-unit",
+        auth_mode="none",
+        api_key=None,
+        tls_mode="disabled",
+        tls_ca_bundle_path=None,
+        timeout_seconds=9,
+    ),
+)
+
+assert_raises_code(
+    "LLM_GATEWAY_MODEL_REVISION_REQUIRED",
+    lambda: GatewayConfiguration(
+        base_url="http://spark-inference.test:8000/v1",
+        served_model="gemma-research",
+        model_revision=" gemma-4-declared-revision-unit",
+        runtime_version="vllm-openai-declared-unit",
+        auth_mode="none",
+        api_key=None,
+        tls_mode="disabled",
+        tls_ca_bundle_path=None,
+        timeout_seconds=9,
+    ),
+)
+
+assert_raises_code(
+    "LLM_GATEWAY_RUNTIME_VERSION_REQUIRED",
+    lambda: GatewayConfiguration(
+        base_url="http://spark-inference.test:8000/v1",
+        served_model="gemma-research",
+        model_revision="gemma-4-declared-revision-unit",
+        runtime_version="",
+        auth_mode="none",
+        api_key=None,
+        tls_mode="disabled",
+        tls_ca_bundle_path=None,
+        timeout_seconds=9,
+    ),
+)
+
+assert_raises_code(
+    "LLM_GATEWAY_RUNTIME_VERSION_REQUIRED",
+    lambda: GatewayConfiguration(
+        base_url="http://spark-inference.test:8000/v1",
+        served_model="gemma-research",
+        model_revision="gemma-4-declared-revision-unit",
+        runtime_version="vllm-openai-declared-unit ",
+        auth_mode="none",
+        api_key=None,
+        tls_mode="disabled",
+        tls_ca_bundle_path=None,
+        timeout_seconds=9,
+    ),
+)
+
+field_by_name = {field.name: field for field in fields(GatewayConfiguration)}
+for required_field_name in ("model_revision", "runtime_version"):
+    field = field_by_name[required_field_name]
+    if field.default is not MISSING or field.default_factory is not MISSING:
+        raise AssertionError(f"Valeur par defaut interdite pour {required_field_name}.")
+
 assert_raises_code("LLM_OUTPUT_SCHEMA_REQUIRED", lambda: valid_request(output_schema={}))
 
 configuration = valid_configuration()
 request = valid_request()
 payload = build_openai_chat_completion_request(configuration=configuration, request=request)
+configuration_logs = configuration.masked_for_logs()
+if configuration_logs["model_revision"] != "gemma-4-declared-revision-unit":
+    raise AssertionError(f"Revision declaree absente des logs: {configuration_logs}")
+if configuration_logs["runtime_version"] != "vllm-openai-declared-unit":
+    raise AssertionError(f"Runtime declare absent des logs: {configuration_logs}")
 
 if payload["model"] != "gemma-research":
     raise AssertionError(f"Modèle servi absent du payload: {payload}")
@@ -195,6 +279,8 @@ if immutable_payload["model"] != "gemma-research":
 api_key_configuration = GatewayConfiguration(
     base_url="https://spark-inference.test:8443/v1",
     served_model="gemma-research",
+    model_revision="gemma-4-declared-revision-unit",
+    runtime_version="vllm-openai-declared-unit",
     auth_mode="api_key_file",
     api_key="unit-secret-key",
     tls_mode="ca_bundle",
@@ -305,6 +391,36 @@ if header_provenance_result.provenance.model_revision != "gemma-4-header-revisio
 if header_provenance_result.provenance.runtime_version != "vllm-openai-header":
     raise AssertionError(f"runtime_version header ignorée: {header_provenance_result.provenance}")
 
+declared_provenance_transport = FixedTransport(
+    {
+        "id": "chatcmpl-unit",
+        "model": "gemma-research",
+        "choices": [{"message": {"content": '{"answer":"ok"}'}}],
+    }
+)
+declared_collector = InMemoryObservabilityCollector()
+declared_provenance_result = OpenAICompatibleLocalLanguageModelGateway(
+    configuration=configuration,
+    transport=declared_provenance_transport,
+    retry_policy=GatewayRetryPolicy(max_retries_before_first_token=0),
+    circuit_breaker=GatewayCircuitBreaker(
+        policy=GatewayCircuitBreakerPolicy(failure_threshold=3, open_seconds=30),
+        clock=ManualClock(),
+    ),
+    failure_metric_recorder=GatewayFailureMetricRecorder(
+        observability_collector=declared_collector,
+    ),
+).infer(request)
+if declared_provenance_result.provenance.model_revision != "gemma-4-declared-revision-unit":
+    raise AssertionError(f"model_revision declaree ignoree: {declared_provenance_result.provenance}")
+if declared_provenance_result.provenance.runtime_version != "vllm-openai-declared-unit":
+    raise AssertionError(f"runtime_version declare ignore: {declared_provenance_result.provenance}")
+declared_log = declared_collector.logs()[0].to_mapping()
+if declared_log["model_revision"] != "gemma-4-declared-revision-unit":
+    raise AssertionError(f"model_revision finale absente de l'observabilite: {declared_log}")
+if declared_log["runtime_version"] != "vllm-openai-declared-unit":
+    raise AssertionError(f"runtime_version finale absente de l'observabilite: {declared_log}")
+
 schema_violation_transport = FixedTransport(
     {
         "id": "chatcmpl-unit",
@@ -330,10 +446,11 @@ assert_gateway_error_code(
     ).infer(request),
 )
 
-missing_revision_transport = FixedTransport(
+invalid_revision_transport = FixedTransport(
     {
         "id": "chatcmpl-unit",
         "model": "gemma-research",
+        "model_revision": " gemma-4-revision-unit",
         "runtime_version": "vllm-openai-unit",
         "choices": [{"message": {"content": '{"answer":"ok"}'}}],
     }
@@ -342,7 +459,7 @@ assert_gateway_error_code(
     "LLM_RESPONSE_PROVENANCE_MISSING",
     lambda: OpenAICompatibleLocalLanguageModelGateway(
         configuration=configuration,
-        transport=missing_revision_transport,
+        transport=invalid_revision_transport,
         retry_policy=GatewayRetryPolicy(max_retries_before_first_token=0),
         circuit_breaker=GatewayCircuitBreaker(
             policy=GatewayCircuitBreakerPolicy(failure_threshold=3, open_seconds=30),
