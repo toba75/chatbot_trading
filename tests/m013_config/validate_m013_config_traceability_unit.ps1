@@ -131,6 +131,11 @@ if (-not (Test-Path -LiteralPath $validatorPath -PathType Leaf)) {
     throw "Validateur de traçabilité M13-config absent: scripts/validate_m013_config_traceability.ps1"
 }
 
+$validatorContent = Get-Content -Raw -Encoding UTF8 -LiteralPath $validatorPath
+if ($validatorContent.Contains("42ef2be63")) {
+    throw "Le validateur M13-config ne doit pas dépendre d'un SHA Git volatile."
+}
+
 New-Item -ItemType Directory -Path $temporaryRoot | Out-Null
 
 try {

@@ -20,6 +20,7 @@ function Invoke-M013NetworkSecurityValidator {
             -ComposePath (Join-Path $ProjectRoot "deploy/local-compose/compose.yaml") `
             -TopologyPath (Join-Path $ProjectRoot "app/platform/topology_registry.json") `
             -SparkFirewallPath (Join-Path $ProjectRoot "deploy/spark-firewall/network-boundary.json") `
+            -ApplicationConfigPath (Join-Path $ProjectRoot "config/application.yaml") `
             -AuditPath (Join-Path $ProjectRoot "docs/governance/m013_security_audit.md") `
             -MatrixPath (Join-Path $ProjectRoot "docs/traceability/matrix.md") `
             -TestGatePath (Join-Path $ProjectRoot "scripts/test.ps1") `
@@ -64,6 +65,7 @@ function New-FixtureProject {
         "deploy/local-compose",
         "deploy/spark-firewall",
         "app/platform",
+        "config",
         "docs/governance",
         "docs/traceability",
         "scripts"
@@ -74,6 +76,7 @@ function New-FixtureProject {
     Copy-Item -LiteralPath (Join-Path $repoRoot "deploy/local-compose/compose.yaml") -Destination (Join-Path $projectRoot "deploy/local-compose/compose.yaml")
     Copy-Item -LiteralPath (Join-Path $repoRoot "deploy/spark-firewall/network-boundary.json") -Destination (Join-Path $projectRoot "deploy/spark-firewall/network-boundary.json")
     Copy-Item -LiteralPath (Join-Path $repoRoot "app/platform/topology_registry.json") -Destination (Join-Path $projectRoot "app/platform/topology_registry.json")
+    Copy-Item -LiteralPath (Join-Path $repoRoot "config/application.example.yaml") -Destination (Join-Path $projectRoot "config/application.yaml")
     Copy-Item -LiteralPath (Join-Path $repoRoot "docs/governance/m013_security_audit.md") -Destination (Join-Path $projectRoot "docs/governance/m013_security_audit.md")
     Copy-Item -LiteralPath (Join-Path $repoRoot "docs/traceability/matrix.md") -Destination (Join-Path $projectRoot "docs/traceability/matrix.md")
     Copy-Item -LiteralPath (Join-Path $repoRoot "scripts/test.ps1") -Destination (Join-Path $projectRoot "scripts/test.ps1")

@@ -92,6 +92,21 @@ validated_configuration = load_application_configuration(
 
 # Parse YAML: les value objects exposent les valeurs de configuration typées.
 assert_equal(validated_configuration.deployment.topology, "two_host_local", "Topologie non chargée.")
+assert_equal(
+    validated_configuration.deployment.hosts.docker_local.bind_host,
+    "127.0.0.1",
+    "Binding hôte utilisateur non chargé.",
+)
+assert_equal(
+    validated_configuration.deployment.hosts.docker_local.container_listen_host,
+    "0.0.0.0",
+    "Adresse d'écoute conteneur non chargée.",
+)
+assert_equal(
+    validated_configuration.deployment.hosts.spark_inference.endpoint_hosts,
+    ("192.168.1.120",),
+    "Hôte Spark réel déclaré non chargé.",
+)
 assert_equal(validated_configuration.services.api.port, 8080, "Port API non chargé comme entier.")
 assert_equal(validated_configuration.services.workers.concurrency, 2, "Concurrence workers non chargée.")
 assert_equal(
@@ -204,6 +219,50 @@ with tempfile.TemporaryDirectory(prefix="ost_m013_config_loader_unit_") as tempo
     assert_raises_code(
         "CONFIG_KEY_MISSING",
         lambda: load_application_configuration(config_path=required_missing_path, environment_snapshot={}),
+    )
+
+    host_non_loopback_path = write_configuration(
+        temporary_directory / "host_non_loopback.yaml",
+        example_text.replace("      bind_host: 127.0.0.1\n", "      bind_host: 192.168.1.20\n", 1),
+    )
+    assert_raises_code(
+        "CONFIG_SCHEMA_INVALID",
+        lambda: load_application_configuration(config_path=host_non_loopback_path, environment_snapshot={}),
+    )
+
+    host_public_path = write_configuration(
+        temporary_directory / "host_public.yaml",
+        example_text.replace("      bind_host: 127.0.0.1\n", "      bind_host: 0.0.0.0\n", 1),
+    )
+    assert_raises_code(
+        "CONFIG_SCHEMA_INVALID",
+        lambda: load_application_configuration(config_path=host_public_path, environment_snapshot={}),
+    )
+
+    spark_non_declare_path = write_configuration(
+        temporary_directory / "spark_non_declare.yaml",
+        example_text.replace(
+            "    spark_endpoint_url: http://192.168.1.120:8000/v1\n",
+            "    spark_endpoint_url: http://192.168.1.121:8000/v1\n",
+            1,
+        ),
+    )
+    assert_raises_code(
+        "CONFIG_SCHEMA_INVALID",
+        lambda: load_application_configuration(config_path=spark_non_declare_path, environment_snapshot={}),
+    )
+
+    spark_path_invalide_path = write_configuration(
+        temporary_directory / "spark_path_invalide.yaml",
+        example_text.replace(
+            "    spark_endpoint_url: http://192.168.1.120:8000/v1\n",
+            "    spark_endpoint_url: http://192.168.1.120:8000/chat\n",
+            1,
+        ),
+    )
+    assert_raises_code(
+        "CONFIG_SCHEMA_INVALID",
+        lambda: load_application_configuration(config_path=spark_path_invalide_path, environment_snapshot={}),
     )
 
     assert_raises_code(

@@ -12,6 +12,7 @@ from __future__ import annotations
 import copy
 import sys
 import tempfile
+from dataclasses import replace
 from pathlib import Path
 
 sys.path.insert(0, sys.argv[1])
@@ -94,6 +95,17 @@ def application_configuration_from(text: str):
     path = Path(temporary_config_root.name) / f"application_{abs(hash(text))}.yaml"
     path.write_text(text, encoding="utf-8")
     return load_application_configuration(config_path=path, environment_snapshot={})
+
+
+def application_configuration_with_spark_endpoint(url: str):
+    configuration = application_configuration_from(valid_application_configuration_text)
+    return replace(
+        configuration,
+        services=replace(
+            configuration.services,
+            llm_gateway=replace(configuration.services.llm_gateway, spark_endpoint_url=url),
+        ),
+    )
 
 
 def assert_boundary_error(expected_fragment: str, *, compose_document=None, firewall_payload=None):
@@ -247,6 +259,34 @@ except ValueError as exc:
         raise AssertionError(f"Erreur port Spark inattendue: {exc}")
 else:
     raise AssertionError("Configuration applicative avec port Spark incohérent acceptée.")
+
+spark_host_mismatch_configuration = application_configuration_with_spark_endpoint("http://192.168.1.121:8000/v1")
+try:
+    validate_network_boundary(
+        compose=compose_from(valid_compose_document),
+        topology=topology,
+        spark_firewall=firewall_from(VALID_FIREWALL_PAYLOAD),
+        application_configuration=spark_host_mismatch_configuration,
+    )
+except ValueError as exc:
+    if "Hôte Spark applicatif" not in str(exc):
+        raise AssertionError(f"Erreur hôte Spark inattendue: {exc}")
+else:
+    raise AssertionError("Configuration applicative avec hôte Spark privé non déclaré acceptée.")
+
+spark_path_mismatch_configuration = application_configuration_with_spark_endpoint("http://192.168.1.120:8000/chat")
+try:
+    validate_network_boundary(
+        compose=compose_from(valid_compose_document),
+        topology=topology,
+        spark_firewall=firewall_from(VALID_FIREWALL_PAYLOAD),
+        application_configuration=spark_path_mismatch_configuration,
+    )
+except ValueError as exc:
+    if "Chemin Spark applicatif" not in str(exc):
+        raise AssertionError(f"Erreur chemin Spark inattendue: {exc}")
+else:
+    raise AssertionError("Configuration applicative avec chemin Spark incohérent acceptée.")
 
 spark_auth_mismatch_configuration = application_configuration_from(
     valid_application_configuration_text.replace("    require_api_key: false\n", "    require_api_key: true\n", 1)

@@ -13,6 +13,7 @@ $documents = @(
             "scripts\validate_m013_config_environment.ps1",
             "scripts\validate_local_compose.ps1",
             "scripts\validate_network_boundary.ps1",
+            "-ApplicationConfigPath .\config\application.yaml",
             "configuration_hash",
             "CONFIG_ENV_INPUT_REJECTED",
             "CONFIG_SECRET_INLINE_REJECTED"
@@ -26,6 +27,7 @@ $documents = @(
             "--config",
             "scripts\validate_local_compose.ps1",
             "scripts\validate_network_boundary.ps1",
+            "-ApplicationConfigPath .\config\application.yaml",
             "hash de configuration"
         )
     },
@@ -35,6 +37,7 @@ $documents = @(
         RequiredMarkers = @(
             "config/application.yaml",
             "services.llm_gateway.spark_endpoint_url",
+            "-ApplicationConfigPath .\config\application.yaml",
             "models.llm.model_revision",
             "configuration_hash",
             "LLM_UNAVAILABLE"
@@ -47,6 +50,7 @@ $documents = @(
             "config/application.yaml",
             "services.llm_gateway.tls_mode",
             "security.secrets.tls_ca_certificate_path",
+            "-ApplicationConfigPath .\config\application.yaml",
             "secret hors Git",
             "LLM_TLS_CERTIFICATE_INVALID"
         )

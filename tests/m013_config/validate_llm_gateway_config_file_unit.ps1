@@ -16,6 +16,7 @@ import tempfile
 
 sys.path.insert(0, sys.argv[1])
 
+import app.platform.local_runtime as local_runtime_module  # noqa: E402
 from app.platform.configuration import (  # noqa: E402
     ApplicationConfigurationError,
     load_application_configuration,
@@ -35,6 +36,8 @@ from app.platform.local_runtime import (  # noqa: E402
     _build_gateway_configuration_from_application_configuration,
     _configured_http_bind_host,
     _configured_http_port,
+    _llm_gateway_readiness_response,
+    _post_local_gateway_inference,
 )
 from app.platform.observability import InMemoryObservabilityCollector  # noqa: E402
 
@@ -144,8 +147,13 @@ assert_equal(
 )
 assert_equal(
     _configured_http_bind_host("llm-gateway", configuration),
-    configuration.deployment.hosts.docker_local.bind_host,
-    "Le bind llm-gateway doit respecter la politique loopback du fichier applicatif.",
+    configuration.deployment.hosts.docker_local.container_listen_host,
+    "Le bind llm-gateway doit utiliser l'écoute conteneur déclarée.",
+)
+assert_equal(
+    _configured_http_bind_host("orchestrator-api", configuration),
+    configuration.services.api.bind_host,
+    "Le bind orchestrator-api doit utiliser l'écoute interne déclarée.",
 )
 
 # Given le fichier applicatif porte tout le contrat llm-gateway.
@@ -219,10 +227,23 @@ with tempfile.TemporaryDirectory(prefix="ost_m013_llm_gateway_installation_") as
         ),
         encoding="utf-8",
     )
-    external_dns_configuration = load_application_configuration(config_path=external_dns_path, environment_snapshot={})
-    assert_raises_gateway(
-        "LLM_GATEWAY_SPARK_ENDPOINT_REQUIRED",
-        lambda: _build_gateway_configuration_from_application_configuration(external_dns_configuration),
+    assert_raises_config(
+        "CONFIG_SCHEMA_INVALID",
+        lambda: load_application_configuration(config_path=external_dns_path, environment_snapshot={}),
+    )
+
+    private_ip_non_declared_path = temporary_directory / "ip_privee_non_declaree.yaml"
+    private_ip_non_declared_path.write_text(
+        example_text.replace(
+            "    spark_endpoint_url: http://192.168.1.120:8000/v1\n",
+            "    spark_endpoint_url: http://192.168.1.121:8000/v1\n",
+            1,
+        ),
+        encoding="utf-8",
+    )
+    assert_raises_config(
+        "CONFIG_SCHEMA_INVALID",
+        lambda: load_application_configuration(config_path=private_ip_non_declared_path, environment_snapshot={}),
     )
 
     require_tls_conflict_path = temporary_directory / "require_tls_conflit.yaml"
@@ -261,6 +282,46 @@ with tempfile.TemporaryDirectory(prefix="ost_m013_llm_gateway_installation_") as
         "LLM_GATEWAY_API_KEY_FILE_UNREADABLE",
         lambda: _build_gateway_configuration_from_application_configuration(missing_api_key_configuration),
     )
+    readiness_status, readiness_body = _llm_gateway_readiness_response(
+        application_configuration=missing_api_key_configuration,
+    )
+    assert_equal(readiness_status, 503, "Le healthcheck gateway doit refuser un secret manquant.")
+    assert_equal(
+        readiness_body["error_code"],
+        "LLM_GATEWAY_API_KEY_FILE_UNREADABLE",
+        "Le healthcheck gateway doit exposer le code de configuration serveur.",
+    )
+
+
+class InvalidJsonResponse:
+    status = 200
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, traceback):
+        return False
+
+    def read(self):
+        return b"not-json"
+
+
+original_urlopen = local_runtime_module.urllib.request.urlopen
+try:
+    local_runtime_module.urllib.request.urlopen = lambda request, timeout: InvalidJsonResponse()
+    invalid_status, invalid_payload, _elapsed = _post_local_gateway_inference(
+        body={"messages": [], "output_schema": {}, "schema_name": "invalid", "schema_version": "1.0"},
+        application_configuration=configuration,
+    )
+finally:
+    local_runtime_module.urllib.request.urlopen = original_urlopen
+
+assert_equal(invalid_status, 502, "Une réponse gateway 200 non JSON doit être traduite en 502.")
+assert_equal(
+    invalid_payload["error_code"],
+    "LLM_GATEWAY_RESPONSE_INVALID",
+    "Une réponse gateway 200 non JSON doit avoir un code stable.",
+)
 
 assert_raises_config(
     "CONFIG_ENV_INPUT_REJECTED",

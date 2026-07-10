@@ -16,6 +16,7 @@ from app.platform.local_compose import parse_local_compose_document, validate_lo
 
 
 APPLICATION_CONFIG_VOLUME = "../../config/application.yaml:/workspace/config/application.yaml:ro"
+APPLICATION_SCHEMA_VOLUME = "../../config/application.schema.json:/workspace/config/application.schema.json:ro"
 APPLICATION_CONFIG_ARGUMENTS = ["--config", "/workspace/config/application.yaml"]
 
 
@@ -36,7 +37,7 @@ BASE_SERVICES = {
         "command": runtime_command("serve-http", "ui", "8081"),
         "expose": ["8081"],
         "networks": ["core"],
-        "volumes": [APPLICATION_CONFIG_VOLUME],
+        "volumes": [APPLICATION_CONFIG_VOLUME, APPLICATION_SCHEMA_VOLUME],
         "read_only": True,
     },
     "orchestrator-api": {
@@ -44,7 +45,7 @@ BASE_SERVICES = {
         "command": runtime_command("serve-http", "orchestrator-api", "8080"),
         "expose": ["8080"],
         "networks": ["core"],
-        "volumes": [APPLICATION_CONFIG_VOLUME],
+        "volumes": [APPLICATION_CONFIG_VOLUME, APPLICATION_SCHEMA_VOLUME],
         "read_only": True,
     },
     "llm-gateway": {
@@ -52,7 +53,7 @@ BASE_SERVICES = {
         "command": runtime_command("serve-http", "llm-gateway", "8090"),
         "expose": ["8090"],
         "networks": ["core", "spark-egress"],
-        "volumes": [APPLICATION_CONFIG_VOLUME],
+        "volumes": [APPLICATION_CONFIG_VOLUME, APPLICATION_SCHEMA_VOLUME],
         "read_only": True,
     },
     "postgres": {
@@ -76,7 +77,7 @@ BASE_SERVICES = {
         "command": runtime_command("serve-http", "granite-docling", "8001"),
         "expose": ["8001"],
         "networks": ["core"],
-        "volumes": ["model-cache:/models", APPLICATION_CONFIG_VOLUME],
+        "volumes": ["model-cache:/models", APPLICATION_CONFIG_VOLUME, APPLICATION_SCHEMA_VOLUME],
         "read_only": True,
     },
     "embedding-service": {
@@ -84,7 +85,7 @@ BASE_SERVICES = {
         "command": runtime_command("serve-http", "embedding-service", "8101"),
         "expose": ["8101"],
         "networks": ["core"],
-        "volumes": ["model-cache:/models", APPLICATION_CONFIG_VOLUME],
+        "volumes": ["model-cache:/models", APPLICATION_CONFIG_VOLUME, APPLICATION_SCHEMA_VOLUME],
         "read_only": True,
     },
     "reranker-service": {
@@ -92,7 +93,7 @@ BASE_SERVICES = {
         "command": runtime_command("serve-http", "reranker-service", "8102"),
         "expose": ["8102"],
         "networks": ["core"],
-        "volumes": ["model-cache:/models", APPLICATION_CONFIG_VOLUME],
+        "volumes": ["model-cache:/models", APPLICATION_CONFIG_VOLUME, APPLICATION_SCHEMA_VOLUME],
         "read_only": True,
     },
     "worker-documents": {
@@ -103,27 +104,28 @@ BASE_SERVICES = {
             "corpus-data:/workspace/corpus",
             "document-artifacts:/workspace/data",
             APPLICATION_CONFIG_VOLUME,
+            APPLICATION_SCHEMA_VOLUME,
         ],
     },
     "worker-research": {
         "image": "ostrading/worker-research:0.0.0-m002",
         "command": runtime_command("run-worker", "worker-research"),
         "networks": ["core"],
-        "volumes": [APPLICATION_CONFIG_VOLUME],
+        "volumes": [APPLICATION_CONFIG_VOLUME, APPLICATION_SCHEMA_VOLUME],
         "read_only": True,
     },
     "worker-backtest": {
         "image": "ostrading/worker-backtest:0.0.0-m002",
         "command": runtime_command("run-worker", "worker-backtest"),
         "networks": ["core"],
-        "volumes": ["experiment-data:/workspace/data/experiments", APPLICATION_CONFIG_VOLUME],
+        "volumes": ["experiment-data:/workspace/data/experiments", APPLICATION_CONFIG_VOLUME, APPLICATION_SCHEMA_VOLUME],
     },
     "backtest-engine": {
         "image": "ostrading/backtest-engine:0.0.0-m002",
         "command": runtime_command("serve-http", "backtest-engine", "8200"),
         "expose": ["8200"],
         "networks": ["core"],
-        "volumes": [APPLICATION_CONFIG_VOLUME],
+        "volumes": [APPLICATION_CONFIG_VOLUME, APPLICATION_SCHEMA_VOLUME],
         "read_only": True,
     },
 }
@@ -228,6 +230,8 @@ if "spark-egress" not in llm_gateway.networks:
     raise AssertionError(f"Egress Spark absent pour llm-gateway: {llm_gateway.networks}")
 if APPLICATION_CONFIG_VOLUME not in llm_gateway.volumes:
     raise AssertionError(f"Montage config absent pour llm-gateway: {llm_gateway.volumes}")
+if APPLICATION_SCHEMA_VOLUME not in llm_gateway.volumes:
+    raise AssertionError(f"Montage schéma absent pour llm-gateway: {llm_gateway.volumes}")
 if llm_gateway.environment:
     raise AssertionError(f"Environment gateway interdit: {llm_gateway.environment}")
 
@@ -293,7 +297,11 @@ assert_raises(
 
 assert_raises(
     "Montage config/application.yaml read-only absent pour service applicatif: llm-gateway",
-    valid_compose({"llm-gateway": {"volumes": ["../../config/application.yaml:/workspace/config/application.yaml"]}}),
+    valid_compose({"llm-gateway": {"volumes": ["../../config/application.yaml:/workspace/config/application.yaml", APPLICATION_SCHEMA_VOLUME]}}),
+)
+assert_raises(
+    "Montage config/application.schema.json read-only absent pour service applicatif: llm-gateway",
+    valid_compose({"llm-gateway": {"volumes": [APPLICATION_CONFIG_VOLUME]}}),
 )
 
 assert_raises(

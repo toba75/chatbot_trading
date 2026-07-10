@@ -6,6 +6,7 @@ $auditPath = Join-Path $repoRoot "docs/governance/m013_security_audit.md"
 $matrixPath = Join-Path $repoRoot "docs/traceability/matrix.md"
 $testGatePath = Join-Path $repoRoot "scripts/test.ps1"
 $lintGatePath = Join-Path $repoRoot "scripts/lint.ps1"
+$applicationConfigPath = Join-Path $repoRoot "config/application.example.yaml"
 
 function Invoke-M013NetworkSecurityValidator {
     $previousErrorActionPreference = $ErrorActionPreference
@@ -15,6 +16,7 @@ function Invoke-M013NetworkSecurityValidator {
             -NoProfile `
             -ExecutionPolicy Bypass `
             -File $validatorPath `
+            -ApplicationConfigPath $applicationConfigPath `
             -AuditPath $auditPath `
             -MatrixPath $matrixPath `
             -TestGatePath $testGatePath `

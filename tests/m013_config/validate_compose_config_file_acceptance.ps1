@@ -238,6 +238,9 @@ try {
         if (-not $serviceBlock.Contains("../../config/application.yaml:/workspace/config/application.yaml:ro")) {
             throw "Montage config/application.yaml read-only absent pour service applicatif: $serviceId"
         }
+        if (-not $serviceBlock.Contains("../../config/application.schema.json:/workspace/config/application.schema.json:ro")) {
+            throw "Montage config/application.schema.json read-only absent pour service applicatif: $serviceId"
+        }
     }
 
     $environmentPath = New-TemporaryCompose -Name "orchestrator-api-application-environment" -Content (
