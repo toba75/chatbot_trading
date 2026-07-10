@@ -1,0 +1,119 @@
+deployment:
+  topology: two_host_local
+  hosts:
+    docker_local:
+      role: application_and_data
+      bind_host: 127.0.0.1
+      public_access: false
+    spark_inference:
+      role: gemma_only
+      dns_name: spark-inference.home.arpa
+      allowed_client_cidrs:
+        - 192.168.1.20/32
+  network:
+    require_tls: true
+    require_api_key: true
+    prefer_mtls: false
+  placement:
+    application: docker_local
+    postgres: docker_local
+    qdrant: docker_local
+    llm_gateway: docker_local
+    gemma_vllm: spark_inference
+
+services:
+  postgres:
+    url: postgresql+psycopg://app@postgres/app
+    port: 5432
+  qdrant:
+    url: http://qdrant:6333
+    port: 6333
+  api:
+    bind_host: 127.0.0.1
+    port: 8080
+  workers:
+    queue_name: default
+    concurrency: 2
+  llm_gateway:
+    url: http://llm-gateway:8090
+    port: 8090
+    spark_endpoint_url: https://spark-inference.home.arpa/v1
+    timeout_seconds: 120
+    circuit_breaker_failure_threshold: 3
+    circuit_breaker_reset_seconds: 60
+
+models:
+  llm:
+    provider: spark_vllm
+    transport: openai_compatible_http
+    reference_model: nvidia/Gemma-4-31B-IT-NVFP4
+    served_model_name: gemma-4-31b-it-nvfp4
+    model_revision: nvidia-gemma-4-31b-it-nvfp4-revision-2026-07
+    runtime: vllm
+    runtime_version: vllm-0.9.2-spark
+    context_length_tokens: 32768
+    max_output_tokens: 2048
+    temperature: 0.0
+
+paths:
+  data_root: data
+  corpus_root: data/corpus
+  canonical_sources_root: data/canonical_sources
+  qdrant_storage_root: data/qdrant
+  postgres_data_root: data/postgres
+  reports_root: docs/reports
+  logs_root: logs
+  experiments_root: data/experiments
+
+security:
+  network_exposure: loopback_only
+  allow_public_bind: false
+  secrets:
+    postgres_password_path: config/secrets/local/postgres_password
+    llm_gateway_api_key_path: config/secrets/local/llm_gateway_api_key
+    tls_ca_certificate_path: config/secrets/local/tls_ca_certificate.pem
+  audit:
+    configuration_hash_required: true
+    log_configuration_changes: true
+
+quality_gates:
+  post_conversion:
+    page_count_match: required
+    provenance_coverage_min: 1.0
+    missing_page_max: 0
+  retrieval:
+    citation_required: true
+    min_evidence_candidates: 3
+  answering:
+    unsupported_claim_policy: refuse
+    abstention_required_on_insufficient_evidence: true
+  llm:
+    real_path_required: true
+    fallback_model_allowed: false
+
+observability:
+  metrics:
+    bind_host: 127.0.0.1
+    port: 9100
+  tracing:
+    enabled: true
+    endpoint_path: /traces
+  logs:
+    level: INFO
+    retention_days: 14
+    include_payloads: false
+
+runtime:
+  profile: docker_local
+  workers:
+    ingestion: 2
+    research: 2
+    experiments: 1
+  timeouts:
+    startup_seconds: 120
+    request_seconds: 300
+    shutdown_seconds: 30
+  resource_limits:
+    cpu_count: 8
+    memory_gb: 32
+    gpu_required: false

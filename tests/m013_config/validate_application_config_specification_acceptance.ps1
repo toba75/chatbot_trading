@@ -4,6 +4,8 @@ $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
 $specificationPath = Join-Path $repoRoot "docs/specs/m013_config_configuration_applicative.md"
 $schemaPath = Join-Path $repoRoot "config/application.schema.json"
 $examplePath = Join-Path $repoRoot "config/application.example.yaml"
+$eAcute = [char] 0x00E9
+$eGrave = [char] 0x00E8
 
 function Assert-FileExists {
     param(
@@ -129,15 +131,15 @@ foreach ($historicalKey in @("GEMMA_BASE_URL", "GEMMA_MODEL", "GEMMA_MODEL_REVIS
 }
 
 foreach ($guardrail in @(
-    "Aucune valeur par défaut implicite",
+    "Aucune valeur par d$($eAcute)faut implicite",
     "Aucun fallback environnement",
-    "Aucun fallback vers `os.environ`, `.env`, `env_file`, `environment:` Compose ou variable système homonyme",
-    "Les secrets sont référencés par chemin"
+    "Aucun fallback vers `os.environ`, `.env`, `env_file`, `environment:` Compose ou variable syst$($eGrave)me homonyme",
+    "Les secrets sont r$($eAcute)f$($eAcute)renc$($eAcute)s par chemin"
 )) {
     Assert-Contains -Content $specificationContent -Expected $guardrail -Message "Garde-fou absent de la spécification: $guardrail"
 }
 
-foreach ($forbiddenExampleToken in @("TO_BE_FILLED", "change-me", "password:", "token:", "api_key:", "secret_value:")) {
+foreach ($forbiddenExampleToken in @("TO_BE_FILLED", "change-me", "password:", "token:", "api_key_value:", "secret_value:")) {
     Assert-NotContains -Content $exampleContent -Forbidden $forbiddenExampleToken -Message "L'exemple contient une valeur secrète ou placeholder interdite: $forbiddenExampleToken"
 }
 

@@ -76,3 +76,45 @@ Décision de workflow:
 - Aucune modification de `app/...` n'est effectuée.
 
 Statut: GREEN.
+
+## T-002 - Spécification de configuration applicative
+
+Date d'exécution: 2026-07-10.
+
+Scénario couvert:
+
+- Given l'exploitant prépare un fichier `config/application.yaml`.
+- When le contrat de configuration est validé.
+- Then chaque valeur nécessaire au démarrage est présente dans le fichier, le schéma refuse les absences et aucun fallback environnement n'est décrit.
+
+ADR consultée:
+
+- ADR-016 - Configuration applicative par fichier unique.
+
+Artefacts publiés:
+
+- `docs/specs/m013_config_configuration_applicative.md`.
+- `config/application.schema.json`.
+- `config/application.example.yaml`.
+- `tests/m013_config/validate_application_config_specification_acceptance.ps1`.
+- `tests/m013_config/validate_application_config_specification_unit.ps1`.
+
+Décision de workflow:
+
+- Le commit RED ajoute uniquement les validateurs d'acceptation et unitaires du contrat.
+- Le commit GREEN publie la spécification, le schéma strict, l'exemple non secret et cette preuve de journal.
+- Aucune modification de `app/...` n'est effectuée.
+
+Preuve RED:
+
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_application_config_specification_acceptance.ps1` - RED attendu; `Spécification de configuration absente: docs/specs/m013_config_configuration_applicative.md`.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_application_config_specification_unit.ps1` - RED attendu; `Schéma de configuration absent: config/application.schema.json`.
+
+Commandes GREEN exécutées:
+
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_application_config_specification_acceptance.ps1` - GREEN; `Test d'acceptation du contrat de configuration applicative: OK`.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_application_config_specification_unit.ps1` - GREEN; `Tests unitaires du contrat de configuration applicative: OK`.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_adr_system.ps1` - GREEN; `Système ADR valide: 28 ADR contrôlées, 20 décisions section 3 matérialisées`.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1` - GREEN; `35 validation(s), 0 test(s)`.
+
+Statut: GREEN après exécution des commandes T-002.

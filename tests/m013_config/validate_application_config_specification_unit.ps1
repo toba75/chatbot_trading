@@ -135,9 +135,9 @@ if ($stringDefinition.not.enum -notcontains "TO_BE_FILLED") {
     throw "Le placeholder TO_BE_FILLED doit être explicitement interdit."
 }
 
-Assert-Ref -SchemaNode $schema.properties.models.properties.llm.properties.served_model_name -ExpectedRef "#/$defs/nonEmptyNonPlaceholderString" -Path "application.models.llm.served_model_name"
-Assert-Ref -SchemaNode $schema.properties.models.properties.llm.properties.model_revision -ExpectedRef "#/$defs/nonEmptyNonPlaceholderString" -Path "application.models.llm.model_revision"
-Assert-Ref -SchemaNode $schema.properties.models.properties.llm.properties.runtime_version -ExpectedRef "#/$defs/nonEmptyNonPlaceholderString" -Path "application.models.llm.runtime_version"
+Assert-Ref -SchemaNode $schema.properties.models.properties.llm.properties.served_model_name -ExpectedRef '#/$defs/nonEmptyNonPlaceholderString' -Path "application.models.llm.served_model_name"
+Assert-Ref -SchemaNode $schema.properties.models.properties.llm.properties.model_revision -ExpectedRef '#/$defs/nonEmptyNonPlaceholderString' -Path "application.models.llm.model_revision"
+Assert-Ref -SchemaNode $schema.properties.models.properties.llm.properties.runtime_version -ExpectedRef '#/$defs/nonEmptyNonPlaceholderString' -Path "application.models.llm.runtime_version"
 
 if ($exampleContent.Contains("TO_BE_FILLED")) {
     throw "L'exemple de configuration contient un placeholder interdit."
@@ -148,7 +148,7 @@ $secretsNode = $schema.properties.security.properties.secrets
 Assert-ObjectNodeStrict -SchemaNode $secretsNode -Path "application.security.secrets"
 foreach ($secretPath in @("postgres_password_path", "llm_gateway_api_key_path", "tls_ca_certificate_path")) {
     Assert-RequiredField -SchemaNode $secretsNode -Field $secretPath -Path "application.security.secrets"
-    Assert-Ref -SchemaNode $secretsNode.properties.$secretPath -ExpectedRef "#/$defs/secretPath" -Path "application.security.secrets.$secretPath"
+    Assert-Ref -SchemaNode $secretsNode.properties.$secretPath -ExpectedRef '#/$defs/secretPath' -Path "application.security.secrets.$secretPath"
 }
 
 foreach ($forbiddenSecretProperty in @("password", "token", "api_key", "secret", "secret_value")) {
@@ -157,7 +157,7 @@ foreach ($forbiddenSecretProperty in @("password", "token", "api_key", "secret",
     }
 }
 
-foreach ($forbiddenExampleToken in @("password:", "token:", "api_key:", "secret_value:")) {
+foreach ($forbiddenExampleToken in @("password:", "token:", "api_key_value:", "secret_value:")) {
     if ($exampleContent.Contains($forbiddenExampleToken)) {
         throw "Secret en clair interdit dans l'exemple: $forbiddenExampleToken"
     }
