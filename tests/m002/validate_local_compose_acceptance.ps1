@@ -138,15 +138,19 @@ function Add-SparkEgressToService {
     return $Content.Remove($networkIndex, $networkBlock.Length).Insert($networkIndex, $mutatedNetworkBlock)
 }
 
-function Remove-GatewayAuthMode {
+function Remove-GatewayEnvironmentVariable {
     param(
         [Parameter(Mandatory = $true)]
-        [string] $Content
+        [string] $Content,
+
+        [Parameter(Mandatory = $true)]
+        [string] $Name
     )
 
-    $updatedContent = [regex]::Replace($Content, '(?m)^\s+GEMMA_AUTH_MODE: "none"\r?\n', "", 1)
+    $pattern = "(?m)^\s+$([regex]::Escape($Name)): .*\r?\n"
+    $updatedContent = [regex]::Replace($Content, $pattern, "", 1)
     if ($updatedContent -eq $Content) {
-        throw "Mode d'authentification Spark fixture absent: GEMMA_AUTH_MODE"
+        throw "Variable Spark fixture absente: $Name"
     }
 
     return $updatedContent
@@ -240,10 +244,26 @@ try {
     Assert-ExitCode -Actual $vllmResult.ExitCode -Expected 1 -Message "Un vLLM principal local doit être refusé."
     Assert-OutputContains -Output $vllmResult.Output -Expected "Service Gemma/vLLM principal interdit dans Compose local: vllm-main" -Message "Le refus vLLM local doit être explicite."
 
-    $missingAuthModePath = New-TemporaryCompose -Name "gateway-without-auth-mode" -Content (Remove-GatewayAuthMode -Content $validCompose)
+    $missingAuthModePath = New-TemporaryCompose -Name "gateway-without-auth-mode" -Content (
+        Remove-GatewayEnvironmentVariable -Content $validCompose -Name "GEMMA_AUTH_MODE"
+    )
     $missingAuthModeResult = Invoke-LocalComposeValidator -ComposePath $missingAuthModePath
     Assert-ExitCode -Actual $missingAuthModeResult.ExitCode -Expected 1 -Message "Le mode d'authentification Spark doit être requis."
     Assert-OutputContains -Output $missingAuthModeResult.Output -Expected "Variable gateway Spark absente: GEMMA_AUTH_MODE" -Message "Le mode d'authentification absent doit être nommé."
+
+    $missingModelRevisionPath = New-TemporaryCompose -Name "gateway-without-model-revision" -Content (
+        Remove-GatewayEnvironmentVariable -Content $validCompose -Name "GEMMA_MODEL_REVISION"
+    )
+    $missingModelRevisionResult = Invoke-LocalComposeValidator -ComposePath $missingModelRevisionPath
+    Assert-ExitCode -Actual $missingModelRevisionResult.ExitCode -Expected 1 -Message "La révision modèle Spark doit être requise."
+    Assert-OutputContains -Output $missingModelRevisionResult.Output -Expected "Variable gateway Spark absente: GEMMA_MODEL_REVISION" -Message "La révision modèle absente doit être nommée."
+
+    $missingRuntimeVersionPath = New-TemporaryCompose -Name "gateway-without-runtime-version" -Content (
+        Remove-GatewayEnvironmentVariable -Content $validCompose -Name "GEMMA_RUNTIME_VERSION"
+    )
+    $missingRuntimeVersionResult = Invoke-LocalComposeValidator -ComposePath $missingRuntimeVersionPath
+    Assert-ExitCode -Actual $missingRuntimeVersionResult.ExitCode -Expected 1 -Message "La version runtime Spark doit être requise."
+    Assert-OutputContains -Output $missingRuntimeVersionResult.Output -Expected "Variable gateway Spark absente: GEMMA_RUNTIME_VERSION" -Message "La version runtime absente doit être nommée."
 
     $workerEgressPath = New-TemporaryCompose -Name "worker-spark-egress" -Content (Add-SparkEgressToService -Content $validCompose -ServiceId "worker-documents")
     $workerEgressResult = Invoke-LocalComposeValidator -ComposePath $workerEgressPath

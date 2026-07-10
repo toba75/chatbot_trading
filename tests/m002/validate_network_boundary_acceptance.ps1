@@ -174,6 +174,24 @@ function Add-SparkEgressToService {
     return $Content.Remove($networkIndex, $networkBlock.Length).Insert($networkIndex, $mutatedNetworkBlock)
 }
 
+function Remove-GatewayEnvironmentVariable {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $Content,
+
+        [Parameter(Mandatory = $true)]
+        [string] $Name
+    )
+
+    $pattern = "(?m)^\s+$([regex]::Escape($Name)): .*\r?\n"
+    $updatedContent = [regex]::Replace($Content, $pattern, "", 1)
+    if ($updatedContent -eq $Content) {
+        throw "Variable Spark fixture absente: $Name"
+    }
+
+    return $updatedContent
+}
+
 function Replace-FirewallText {
     param(
         [Parameter(Mandatory = $true)]
@@ -255,6 +273,26 @@ try {
         -SparkFirewallPath $sparkFirewallPath
     Assert-ExitCode -Actual $workerEgressResult.ExitCode -Expected 1 -Message "Un worker ne doit pas joindre spark-egress."
     Assert-OutputContains -Output $workerEgressResult.Output -Expected "Egress Spark interdit hors llm-gateway: worker-research" -Message "Le service avec egress Spark doit être nommé."
+
+    $missingModelRevisionPath = New-TemporaryFile `
+        -Name "gateway-without-model-revision.yaml" `
+        -Content (Remove-GatewayEnvironmentVariable -Content $validCompose -Name "GEMMA_MODEL_REVISION")
+    $missingModelRevisionResult = Invoke-NetworkBoundaryValidator `
+        -ComposePath $missingModelRevisionPath `
+        -TopologyPath $topologyPath `
+        -SparkFirewallPath $sparkFirewallPath
+    Assert-ExitCode -Actual $missingModelRevisionResult.ExitCode -Expected 1 -Message "La révision modèle Spark doit être requise."
+    Assert-OutputContains -Output $missingModelRevisionResult.Output -Expected "Variable gateway Spark absente: GEMMA_MODEL_REVISION" -Message "La révision modèle absente doit être nommée."
+
+    $missingRuntimeVersionPath = New-TemporaryFile `
+        -Name "gateway-without-runtime-version.yaml" `
+        -Content (Remove-GatewayEnvironmentVariable -Content $validCompose -Name "GEMMA_RUNTIME_VERSION")
+    $missingRuntimeVersionResult = Invoke-NetworkBoundaryValidator `
+        -ComposePath $missingRuntimeVersionPath `
+        -TopologyPath $topologyPath `
+        -SparkFirewallPath $sparkFirewallPath
+    Assert-ExitCode -Actual $missingRuntimeVersionResult.ExitCode -Expected 1 -Message "La version runtime Spark doit être requise."
+    Assert-OutputContains -Output $missingRuntimeVersionResult.Output -Expected "Variable gateway Spark absente: GEMMA_RUNTIME_VERSION" -Message "La version runtime absente doit être nommée."
 
     $extraSparkSourcePath = New-TemporaryFile `
         -Name "spark-extra-source.json" `

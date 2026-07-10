@@ -6,6 +6,7 @@
 - Fournir le secret hors dépôt dans `deploy/local-compose/secrets/`:
   - `postgres_password`
 - Le gateway LLM cible uniquement l'endpoint Docker Spark déclaré par `GEMMA_BASE_URL`.
+- La provenance LLM est déclarée explicitement par `GEMMA_MODEL`, `GEMMA_MODEL_REVISION` et `GEMMA_RUNTIME_VERSION`.
 - Le conteneur Gemma sur la machine Spark n'exige pas de clé API: `GEMMA_AUTH_MODE` vaut `none` dans le Compose local.
 - Le transport Spark actuel n'exige pas de bundle CA: `GEMMA_TLS_MODE` vaut `disabled` dans le Compose local.
 
@@ -21,6 +22,12 @@ Le Compose refuse les valeurs par défaut silencieuses. Les variables non secrè
 - `LLM_GATEWAY_URL`
 - `GEMMA_BASE_URL`
 - `GEMMA_MODEL`
+- `GEMMA_MODEL_REVISION`
+- `GEMMA_RUNTIME_VERSION`
+- `GEMMA_TIMEOUT_SECONDS`
+- `GEMMA_RETRY_BEFORE_FIRST_TOKEN`
+- `GEMMA_CIRCUIT_BREAKER_FAILURE_THRESHOLD`
+- `GEMMA_CIRCUIT_BREAKER_OPEN_SECONDS`
 - `POSTGRES_DB`
 - `POSTGRES_USER`
 - `QDRANT_GRPC_PORT`

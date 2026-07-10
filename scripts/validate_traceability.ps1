@@ -916,6 +916,14 @@ $requiredM013Requirements = @(
         CommandScript = "scripts/validate_m013_acceptance.ps1"
         Code = "app/evaluation/domain/v1_acceptance_report.py; docs/governance/m013_v1_acceptance_report.md; scripts/validate_m013_acceptance.ps1; tests/m013/validate_v1_acceptance_report_unit.ps1; docs/tasks/milestone_013/journal.md"
         Adr = "ADR-010; DDD-ADR-010; DDD-ADR-011"
+    },
+    [ordered] @{
+        Id = "REQ-M013-013"
+        Source = "docs/tasks/milestone_013/0013_ancrer_gateway_llm_chemin_reel.md"
+        Test = "tests/m013/validate_llm_gateway_real_spark_acceptance.ps1"
+        CommandScript = "scripts/validate_m013_reality.ps1"
+        Code = "app/platform/local_runtime.py; app/platform/llm_gateway/__init__.py; scripts/validate_m013_reality.ps1; tests/m013/validate_llm_gateway_real_spark_acceptance.ps1; docs/specs/m013_reality_closure.md; docs/tasks/milestone_013/journal.md"
+        Adr = "ADR-014; ADR-015"
     }
 )
 

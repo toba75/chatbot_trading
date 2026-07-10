@@ -15,6 +15,34 @@ sys.path.insert(0, sys.argv[1])
 from app.platform.local_compose import parse_local_compose_document, validate_local_compose
 
 
+BASE_GATEWAY_ENVIRONMENT = {
+    "GEMMA_BASE_URL": "${GEMMA_BASE_URL?GEMMA_BASE_URL requis}",
+    "GEMMA_MODEL": "${GEMMA_MODEL?GEMMA_MODEL requis}",
+    "GEMMA_MODEL_REVISION": "${GEMMA_MODEL_REVISION?GEMMA_MODEL_REVISION requis}",
+    "GEMMA_RUNTIME_VERSION": "${GEMMA_RUNTIME_VERSION?GEMMA_RUNTIME_VERSION requis}",
+    "GEMMA_AUTH_MODE": "none",
+    "GEMMA_TLS_MODE": "disabled",
+    "GEMMA_TIMEOUT_SECONDS": "${GEMMA_TIMEOUT_SECONDS?GEMMA_TIMEOUT_SECONDS requis}",
+    "GEMMA_RETRY_BEFORE_FIRST_TOKEN": "${GEMMA_RETRY_BEFORE_FIRST_TOKEN?GEMMA_RETRY_BEFORE_FIRST_TOKEN requis}",
+    "GEMMA_CIRCUIT_BREAKER_FAILURE_THRESHOLD": (
+        "${GEMMA_CIRCUIT_BREAKER_FAILURE_THRESHOLD?GEMMA_CIRCUIT_BREAKER_FAILURE_THRESHOLD requis}"
+    ),
+    "GEMMA_CIRCUIT_BREAKER_OPEN_SECONDS": (
+        "${GEMMA_CIRCUIT_BREAKER_OPEN_SECONDS?GEMMA_CIRCUIT_BREAKER_OPEN_SECONDS requis}"
+    ),
+}
+
+
+def gateway_environment(**overrides):
+    environment = dict(BASE_GATEWAY_ENVIRONMENT)
+    for key, value in overrides.items():
+        if value is None:
+            environment.pop(key, None)
+        else:
+            environment[key] = value
+    return environment
+
+
 BASE_SERVICES = {
     "edge-gateway": {
         "image": "caddy@sha256:" + "a" * 64,
@@ -45,12 +73,7 @@ BASE_SERVICES = {
         "command": ["python", "-m", "app.platform.local_runtime", "serve-http", "llm-gateway", "8090"],
         "expose": ["8090"],
         "networks": ["core", "spark-egress"],
-        "environment": {
-            "GEMMA_BASE_URL": "${GEMMA_BASE_URL?GEMMA_BASE_URL requis}",
-            "GEMMA_MODEL": "${GEMMA_MODEL?GEMMA_MODEL requis}",
-            "GEMMA_AUTH_MODE": "none",
-            "GEMMA_TLS_MODE": "disabled",
-        },
+        "environment": gateway_environment(),
     },
     "postgres": {
         "image": "postgres@sha256:" + "b" * 64,
@@ -229,12 +252,7 @@ assert_raises(
 
 assert_raises(
     "Endpoint Spark invalide",
-    valid_compose({"llm-gateway": {"environment": {
-        "GEMMA_BASE_URL": "https://api.openai.com/v1",
-        "GEMMA_MODEL": "${GEMMA_MODEL?GEMMA_MODEL requis}",
-        "GEMMA_AUTH_MODE": "none",
-        "GEMMA_TLS_MODE": "disabled",
-    }}}),
+    valid_compose({"llm-gateway": {"environment": gateway_environment(GEMMA_BASE_URL="https://api.openai.com/v1")}}),
 )
 
 assert_raises(
@@ -249,11 +267,27 @@ assert_raises(
 
 assert_raises(
     "Variable gateway Spark absente: GEMMA_AUTH_MODE",
-    valid_compose({"llm-gateway": {"environment": {
-        "GEMMA_BASE_URL": "${GEMMA_BASE_URL?GEMMA_BASE_URL requis}",
-        "GEMMA_MODEL": "${GEMMA_MODEL?GEMMA_MODEL requis}",
-        "GEMMA_TLS_MODE": "disabled",
-    }}}),
+    valid_compose({"llm-gateway": {"environment": gateway_environment(GEMMA_AUTH_MODE=None)}}),
+)
+
+assert_raises(
+    "Variable gateway Spark absente: GEMMA_MODEL_REVISION",
+    valid_compose({"llm-gateway": {"environment": gateway_environment(GEMMA_MODEL_REVISION=None)}}),
+)
+
+assert_raises(
+    "Variable gateway Spark absente: GEMMA_RUNTIME_VERSION",
+    valid_compose({"llm-gateway": {"environment": gateway_environment(GEMMA_RUNTIME_VERSION=None)}}),
+)
+
+assert_raises(
+    "Entier positif requis pour service llm-gateway: GEMMA_TIMEOUT_SECONDS",
+    valid_compose({"llm-gateway": {"environment": gateway_environment(GEMMA_TIMEOUT_SECONDS="0")}}),
+)
+
+assert_raises(
+    "Entier positif ou nul requis pour service llm-gateway: GEMMA_RETRY_BEFORE_FIRST_TOKEN",
+    valid_compose({"llm-gateway": {"environment": gateway_environment(GEMMA_RETRY_BEFORE_FIRST_TOKEN="-1")}}),
 )
 
 assert_raises(
@@ -263,13 +297,9 @@ assert_raises(
 
 assert_raises(
     "GEMMA_API_KEY_FILE interdit quand GEMMA_AUTH_MODE=none",
-    valid_compose({"llm-gateway": {"environment": {
-        "GEMMA_BASE_URL": "${GEMMA_BASE_URL?GEMMA_BASE_URL requis}",
-        "GEMMA_MODEL": "${GEMMA_MODEL?GEMMA_MODEL requis}",
-        "GEMMA_AUTH_MODE": "none",
-        "GEMMA_API_KEY_FILE": "/run/secrets/gemma_api_key",
-        "GEMMA_TLS_MODE": "disabled",
-    }}}),
+    valid_compose(
+        {"llm-gateway": {"environment": gateway_environment(GEMMA_API_KEY_FILE="/run/secrets/gemma_api_key")}}
+    ),
 )
 
 assert_raises(
@@ -282,12 +312,7 @@ assert_raises(
 
 assert_raises(
     "Mode TLS Spark invalide",
-    valid_compose({"llm-gateway": {"environment": {
-        "GEMMA_BASE_URL": "${GEMMA_BASE_URL?GEMMA_BASE_URL requis}",
-        "GEMMA_MODEL": "${GEMMA_MODEL?GEMMA_MODEL requis}",
-        "GEMMA_AUTH_MODE": "none",
-        "GEMMA_TLS_MODE": "implicit",
-    }}}),
+    valid_compose({"llm-gateway": {"environment": gateway_environment(GEMMA_TLS_MODE="implicit")}}),
 )
 
 print("Tests unitaires Compose local M-002: OK")

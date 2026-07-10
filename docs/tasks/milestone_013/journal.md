@@ -155,3 +155,12 @@
 - RED: `65a759338c0b80918b00edd2dfde3c5eedf96a96` couvre la spécification `M013-RealityClosure-1.0`, ADR-015, T-013 et le test live `tests/m013/validate_llm_gateway_real_spark_acceptance.ps1`.
 - GREEN: `2fcad498995903174ea55de68f5dc198444b4ada` rend `GatewayConfiguration.model_revision` et `GatewayConfiguration.runtime_version` obligatoires, privilégie la provenance NIM quand elle est fournie et utilise la provenance déclarée sinon.
 - Validation réelle: `tests/m013/validate_llm_gateway_real_spark_acceptance.ps1` GREEN sur `http://192.168.1.120:8000/v1` avec `GEMMA_MODEL=google/gemma-4-26B-A4B-it`, `GEMMA_MODEL_REVISION=google/gemma-4-26B-A4B-it@533c7a07d8e220c4342168ecf816b21c49e8e9ce207b447349d51a7b2f7e1607` et `GEMMA_RUNTIME_VERSION=nim-1.7.0-variant-api-3.1.0`.
+
+## Tranche M13-reality - corrections de revue
+
+- Correction: le service local `llm-gateway` expose désormais `POST /v1/infer`, construit le gateway depuis les variables `GEMMA_*` obligatoires et conserve l'instance gateway dans le processus pour préserver l'état du circuit breaker.
+- Correction: `deploy/local-compose/compose.yaml`, `validate_local_compose`, `validate_network_boundary` et les runbooks exigent `GEMMA_MODEL_REVISION`, `GEMMA_RUNTIME_VERSION` et les paramètres runtime sans valeur par défaut.
+- Correction: `tests/m013/validate_llm_gateway_real_spark_acceptance.ps1` lance le service HTTP local, vérifie `/models`, `/metadata` et `/version` sur le Spark réel, puis poste sur `http://127.0.0.1:8090/v1/infer`.
+- Traçabilité: ajout de `REQ-M013-013`, du validateur `scripts/validate_m013_reality.ps1` et de son enrôlement dans `scripts/test.ps1`.
+- Validation ciblée: `scripts/validate_m013_reality.ps1` GREEN sur le Spark réel avec `GEMMA_MODEL=google/gemma-4-26B-A4B-it`, `GEMMA_MODEL_REVISION=google/gemma-4-26B-A4B-it@533c7a07d8e220c4342168ecf816b21c49e8e9ce207b447349d51a7b2f7e1607`, `GEMMA_RUNTIME_VERSION=nim-1.7.0-variant-api-3.1.0`, `GEMMA_TIMEOUT_SECONDS=120`, `GEMMA_RETRY_BEFORE_FIRST_TOKEN=1`, `GEMMA_CIRCUIT_BREAKER_FAILURE_THRESHOLD=2` et `GEMMA_CIRCUIT_BREAKER_OPEN_SECONDS=30`.
+- Validation globale ciblée: `scripts/lint.ps1` GREEN avec `Gate lint GREEN: 35 validation(s), 0 test(s).`

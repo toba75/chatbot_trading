@@ -26,6 +26,7 @@ from app.platform.llm_gateway import (
     OpenAICompatibleResponse,
     build_openai_chat_completion_request,
 )
+from app.platform import local_runtime
 from app.platform.observability import InMemoryObservabilityCollector
 
 
@@ -110,6 +111,48 @@ assert_raises_code(
     "LLM_GATEWAY_SPARK_ENDPOINT_REQUIRED",
     lambda: GatewayConfiguration(
         base_url="http://attacker.example:8000/v1",
+        served_model="gemma-research",
+        model_revision="gemma-4-declared-revision-unit",
+        runtime_version="vllm-openai-declared-unit",
+        auth_mode="none",
+        api_key=None,
+        tls_mode="disabled",
+        tls_ca_bundle_path=None,
+        timeout_seconds=9,
+    ),
+)
+
+GatewayConfiguration(
+    base_url="http://192.168.1.120:8000/v1",
+    served_model="gemma-research",
+    model_revision="gemma-4-declared-revision-unit",
+    runtime_version="vllm-openai-declared-unit",
+    auth_mode="none",
+    api_key=None,
+    tls_mode="disabled",
+    tls_ca_bundle_path=None,
+    timeout_seconds=9,
+)
+
+assert_raises_code(
+    "LLM_GATEWAY_SPARK_ENDPOINT_REQUIRED",
+    lambda: GatewayConfiguration(
+        base_url="http://127.0.0.1:8000/v1",
+        served_model="gemma-research",
+        model_revision="gemma-4-declared-revision-unit",
+        runtime_version="vllm-openai-declared-unit",
+        auth_mode="none",
+        api_key=None,
+        tls_mode="disabled",
+        tls_ca_bundle_path=None,
+        timeout_seconds=9,
+    ),
+)
+
+assert_raises_code(
+    "LLM_GATEWAY_SPARK_ENDPOINT_REQUIRED",
+    lambda: GatewayConfiguration(
+        base_url="http://10.1.2.3:8000/v1",
         served_model="gemma-research",
         model_revision="gemma-4-declared-revision-unit",
         runtime_version="vllm-openai-declared-unit",
@@ -231,6 +274,25 @@ for required_field_name in ("model_revision", "runtime_version"):
     field = field_by_name[required_field_name]
     if field.default is not MISSING or field.default_factory is not MISSING:
         raise AssertionError(f"Valeur par defaut interdite pour {required_field_name}.")
+
+runtime_environment = {
+    "GEMMA_BASE_URL": "http://spark-inference.test:8000/v1",
+    "GEMMA_MODEL": "gemma-research",
+    "GEMMA_MODEL_REVISION": "gemma-4-declared-revision-unit",
+    "GEMMA_RUNTIME_VERSION": "vllm-openai-declared-unit",
+    "GEMMA_AUTH_MODE": "none",
+    "GEMMA_TLS_MODE": "disabled",
+    "GEMMA_TIMEOUT_SECONDS": "9",
+    "GEMMA_RETRY_BEFORE_FIRST_TOKEN": "1",
+    "GEMMA_CIRCUIT_BREAKER_FAILURE_THRESHOLD": "2",
+    "GEMMA_CIRCUIT_BREAKER_OPEN_SECONDS": "30",
+}
+local_runtime._LLM_GATEWAY_INSTANCE = None
+first_runtime_gateway = local_runtime._get_local_language_model_gateway(environment=runtime_environment)
+second_runtime_gateway = local_runtime._get_local_language_model_gateway(environment=runtime_environment)
+if first_runtime_gateway is not second_runtime_gateway:
+    raise AssertionError("Le runtime local doit conserver l'instance gateway LLM et son circuit breaker.")
+local_runtime._LLM_GATEWAY_INSTANCE = None
 
 assert_raises_code("LLM_OUTPUT_SCHEMA_REQUIRED", lambda: valid_request(output_schema={}))
 

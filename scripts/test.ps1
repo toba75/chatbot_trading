@@ -205,6 +205,7 @@ $validationCommands = @(
     @{ Path = "scripts/validate_m013_runbooks.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_m013_antipatterns.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_m013_acceptance.ps1"; Arguments = @() },
+    @{ Path = "scripts/validate_m013_reality.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_platform_topology.ps1"; Arguments = @("-Path", $platformTopologyPath) },
     @{ Path = "scripts/validate_local_compose.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_network_boundary.ps1"; Arguments = @("-SparkFirewallPath", $sparkFirewallPath) },

@@ -38,9 +38,11 @@
 - Invariants et garde-fous: aucune provenance inventée; aucune valeur par défaut; aucun fallback modèle; aucune fuite de prompt complet; aucun changement d'état métier dans le gateway.
 - Dépendances: ADR-014; ADR-015; `app/platform/llm_gateway/__init__.py`; `app/platform/observability/__init__.py`; Spark `192.168.1.120:8000` lancé pour le test live.
 - Commandes de validation:
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_reality.ps1`
   - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_llm_gateway_real_spark_acceptance.ps1`
   - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m002\validate_llm_gateway_contract_acceptance.ps1`
   - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m002\validate_llm_gateway_contract_unit.ps1`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_traceability.ps1`
   - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_adr_system.ps1`
   - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`
 - Commit RED: `test(platform): couvrir gateway llm reel avec provenance declaree ADR-015`

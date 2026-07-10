@@ -22,7 +22,7 @@ from app.platform.observability import GatewayObservation, InMemoryObservability
 GATEWAY_CLIENT_ID = "llm-gateway"
 SECRET_MASK = "<secret-masked>"
 _FORBIDDEN_SAMPLING_KEYS = frozenset({"model", "messages", "response_format"})
-_ALLOWED_SPARK_HOSTS = frozenset({"spark-inference", "spark-inference.test"})
+_ALLOWED_SPARK_HOSTS = frozenset({"spark-inference", "spark-inference.test", "192.168.1.120"})
 _SPARK_API_PATH = "/v1"
 _AUTH_MODE_NONE = "none"
 _AUTH_MODE_API_KEY_FILE = "api_key_file"
@@ -380,10 +380,10 @@ def _is_allowed_spark_host(hostname: str | None) -> bool:
     if hostname in _ALLOWED_SPARK_HOSTS:
         return True
     try:
-        parsed_ip = ipaddress.ip_address(hostname)
+        ipaddress.ip_address(hostname)
     except ValueError:
         return False
-    return parsed_ip.is_private
+    return False
 
 
 @dataclass(frozen=True)

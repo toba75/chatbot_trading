@@ -66,6 +66,18 @@ SPARK_AUTH_MODE_NONE = "none"
 SPARK_AUTH_MODE_API_KEY_FILE = "api_key_file"
 SPARK_TLS_MODE_DISABLED = "disabled"
 SPARK_TLS_MODE_CA_BUNDLE = "ca_bundle"
+REQUIRED_GATEWAY_RUNTIME_ENVIRONMENT_KEYS = (
+    "GEMMA_BASE_URL",
+    "GEMMA_MODEL",
+    "GEMMA_MODEL_REVISION",
+    "GEMMA_RUNTIME_VERSION",
+    "GEMMA_AUTH_MODE",
+    "GEMMA_TLS_MODE",
+    "GEMMA_TIMEOUT_SECONDS",
+    "GEMMA_RETRY_BEFORE_FIRST_TOKEN",
+    "GEMMA_CIRCUIT_BREAKER_FAILURE_THRESHOLD",
+    "GEMMA_CIRCUIT_BREAKER_OPEN_SECONDS",
+)
 
 
 @dataclass(frozen=True)
@@ -427,9 +439,8 @@ def _validate_compose_spark_egress(compose: LocalCompose) -> None:
 
 def _validate_gateway_tls_and_secret_scope(compose: LocalCompose, spark_firewall: SparkFirewallPolicy) -> None:
     gateway = compose.service(LLM_GATEWAY_SERVICE_ID)
-    _require_gateway_environment(gateway, "GEMMA_BASE_URL")
-    _require_gateway_environment(gateway, "GEMMA_AUTH_MODE")
-    _require_gateway_environment(gateway, "GEMMA_TLS_MODE")
+    for key in REQUIRED_GATEWAY_RUNTIME_ENVIRONMENT_KEYS:
+        _require_gateway_environment(gateway, key)
 
     base_url = gateway.environment["GEMMA_BASE_URL"]
     _validate_gateway_base_url(base_url, spark_firewall)

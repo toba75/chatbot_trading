@@ -59,6 +59,27 @@ SPARK_AUTH_MODE_API_KEY_FILE = "api_key_file"
 SPARK_TLS_MODE_DISABLED = "disabled"
 SPARK_TLS_MODE_CA_BUNDLE = "ca_bundle"
 SPARK_ENDPOINT_PATH = "/v1"
+REQUIRED_GATEWAY_ENVIRONMENT_KEYS = (
+    "GEMMA_BASE_URL",
+    "GEMMA_MODEL",
+    "GEMMA_MODEL_REVISION",
+    "GEMMA_RUNTIME_VERSION",
+    "GEMMA_AUTH_MODE",
+    "GEMMA_TLS_MODE",
+    "GEMMA_TIMEOUT_SECONDS",
+    "GEMMA_RETRY_BEFORE_FIRST_TOKEN",
+    "GEMMA_CIRCUIT_BREAKER_FAILURE_THRESHOLD",
+    "GEMMA_CIRCUIT_BREAKER_OPEN_SECONDS",
+)
+GATEWAY_MODE_ENVIRONMENT_KEYS = frozenset(("GEMMA_AUTH_MODE", "GEMMA_TLS_MODE"))
+GATEWAY_POSITIVE_INTEGER_ENVIRONMENT_KEYS = frozenset(
+    (
+        "GEMMA_TIMEOUT_SECONDS",
+        "GEMMA_CIRCUIT_BREAKER_FAILURE_THRESHOLD",
+        "GEMMA_CIRCUIT_BREAKER_OPEN_SECONDS",
+    )
+)
+GATEWAY_NON_NEGATIVE_INTEGER_ENVIRONMENT_KEYS = frozenset(("GEMMA_RETRY_BEFORE_FIRST_TOKEN",))
 EXPECTED_SERVICE_COMMANDS = {
     "ui": ("python", "-m", "app.platform.local_runtime", "serve-http", "ui", "8081"),
     "orchestrator-api": ("python", "-m", "app.platform.local_runtime", "serve-http", "orchestrator-api", "8080"),
@@ -378,8 +399,9 @@ def _validate_service_environment(service: ComposeService) -> None:
         key_upper = key.upper()
         is_secret_file_reference = key_upper.endswith("_FILE") or key_upper.endswith("_BUNDLE")
         contains_secret_marker = any(marker in key_upper for marker in SECRET_ENVIRONMENT_MARKERS)
+        is_public_gateway_runtime_key = service.id == "llm-gateway" and key in REQUIRED_GATEWAY_ENVIRONMENT_KEYS
 
-        if contains_secret_marker and not is_secret_file_reference:
+        if contains_secret_marker and not is_secret_file_reference and not is_public_gateway_runtime_key:
             raise ValueError(f"Secret en clair interdit pour service {service.id}: {key}")
 
         if key_upper.endswith("_FILE") and not value.startswith("/run/secrets/"):
@@ -393,7 +415,17 @@ def _validate_service_environment(service: ComposeService) -> None:
                 _validate_explicit_spark_base_url(value, service.environment.get("GEMMA_TLS_MODE"))
             continue
 
-        if service.id == "llm-gateway" and key in {"GEMMA_AUTH_MODE", "GEMMA_TLS_MODE"}:
+        if service.id == "llm-gateway" and key in GATEWAY_MODE_ENVIRONMENT_KEYS:
+            continue
+
+        if service.id == "llm-gateway" and key in GATEWAY_POSITIVE_INTEGER_ENVIRONMENT_KEYS:
+            if not REQUIRED_ENVIRONMENT_PATTERN.match(value):
+                _validate_gateway_positive_integer(value, key)
+            continue
+
+        if service.id == "llm-gateway" and key in GATEWAY_NON_NEGATIVE_INTEGER_ENVIRONMENT_KEYS:
+            if not REQUIRED_ENVIRONMENT_PATTERN.match(value):
+                _validate_gateway_non_negative_integer(value, key)
             continue
 
         if not REQUIRED_ENVIRONMENT_PATTERN.match(value):
@@ -407,7 +439,7 @@ def _validate_service_environment(service: ComposeService) -> None:
 
 
 def _validate_llm_gateway_spark_environment(service: ComposeService) -> None:
-    for key in ("GEMMA_BASE_URL", "GEMMA_MODEL", "GEMMA_AUTH_MODE", "GEMMA_TLS_MODE"):
+    for key in REQUIRED_GATEWAY_ENVIRONMENT_KEYS:
         if key not in service.environment:
             raise ValueError(f"Variable gateway Spark absente: {key}")
         if service.environment[key].strip() == "":
@@ -437,6 +469,16 @@ def _validate_llm_gateway_spark_environment(service: ComposeService) -> None:
     if not REQUIRED_ENVIRONMENT_PATTERN.match(base_url):
         _validate_explicit_spark_base_url(base_url, tls_mode)
 
+    for key in GATEWAY_POSITIVE_INTEGER_ENVIRONMENT_KEYS:
+        value = service.environment[key]
+        if not REQUIRED_ENVIRONMENT_PATTERN.match(value):
+            _validate_gateway_positive_integer(value, key)
+
+    for key in GATEWAY_NON_NEGATIVE_INTEGER_ENVIRONMENT_KEYS:
+        value = service.environment[key]
+        if not REQUIRED_ENVIRONMENT_PATTERN.match(value):
+            _validate_gateway_non_negative_integer(value, key)
+
 
 def _validate_explicit_spark_base_url(value: str, tls_mode: str | None) -> None:
     parsed = urlparse(value)
@@ -452,6 +494,16 @@ def _validate_explicit_spark_base_url(value: str, tls_mode: str | None) -> None:
         raise ValueError("Mode TLS Spark incohérent pour service llm-gateway: GEMMA_BASE_URL")
     if tls_mode == SPARK_TLS_MODE_CA_BUNDLE and parsed.scheme != "https":
         raise ValueError("Mode TLS Spark incohérent pour service llm-gateway: GEMMA_BASE_URL")
+
+
+def _validate_gateway_positive_integer(value: str, key: str) -> None:
+    if not re.fullmatch(r"[1-9][0-9]*", value):
+        raise ValueError(f"Entier positif requis pour service llm-gateway: {key}")
+
+
+def _validate_gateway_non_negative_integer(value: str, key: str) -> None:
+    if not re.fullmatch(r"(0|[1-9][0-9]*)", value):
+        raise ValueError(f"Entier positif ou nul requis pour service llm-gateway: {key}")
 
 
 def _is_pinned_image(image: str) -> bool:

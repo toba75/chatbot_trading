@@ -152,6 +152,17 @@ def add_gateway_environment_line(document: str, line: str) -> str:
     return document[:marker_index] + f"      {line}\n" + document[marker_index:]
 
 
+def remove_gateway_environment_line(document: str, name: str) -> str:
+    target = f"      {name}:"
+    line_start = document.find(target)
+    if line_start < 0:
+        raise AssertionError(f"Variable gateway absente du fixture: {name}")
+    line_end = document.find("\n", line_start)
+    if line_end < 0:
+        raise AssertionError(f"Fin de ligne gateway absente du fixture: {name}")
+    return document[:line_start] + document[line_end + 1 :]
+
+
 def replace_gateway_base_url(document: str, value: str) -> str:
     current = '      GEMMA_BASE_URL: "${GEMMA_BASE_URL?GEMMA_BASE_URL requis}"'
     replacement = f'      GEMMA_BASE_URL: "{value}"'
@@ -235,6 +246,16 @@ assert_boundary_error("navigateur direct au Spark interdit", firewall_payload=fi
 assert_boundary_error(
     "GEMMA_TLS_VERIFY",
     compose_document=add_gateway_environment_line(valid_compose_document, 'GEMMA_TLS_VERIFY: "false"'),
+)
+
+assert_boundary_error(
+    "Variable gateway Spark absente: GEMMA_MODEL_REVISION",
+    compose_document=remove_gateway_environment_line(valid_compose_document, "GEMMA_MODEL_REVISION"),
+)
+
+assert_boundary_error(
+    "Variable gateway Spark absente: GEMMA_RUNTIME_VERSION",
+    compose_document=remove_gateway_environment_line(valid_compose_document, "GEMMA_RUNTIME_VERSION"),
 )
 
 assert_boundary_error(
