@@ -24,6 +24,7 @@ from app.platform.configuration import (  # noqa: E402
 from app.platform.llm_gateway import (  # noqa: E402
     GatewayCircuitBreaker,
     GatewayCircuitBreakerPolicy,
+    GatewayConfiguration,
     LLMGatewayContractError,
     GatewayFailureMetricRecorder,
     GatewayRetryPolicy,
@@ -194,6 +195,39 @@ assert_equal(
     gateway_configuration.configuration_hash,
     configuration.configuration_hash,
     "Hash de configuration absent du contrat gateway.",
+)
+
+assert_raises_gateway(
+    "LLM_GATEWAY_ALLOWED_SPARK_HOSTS_REQUIRED",
+    lambda: GatewayConfiguration(
+        base_url="http://spark:8000/v1",
+        served_model="google/gemma-4-26B-A4B-it",
+        model_revision="google/gemma-4-26B-A4B-it@declared-revision",
+        runtime_version="nim-1.7.0-variant-api-3.1.0",
+        configuration_hash=configuration.configuration_hash,
+        auth_mode="none",
+        api_key=None,
+        tls_mode="disabled",
+        tls_ca_bundle_path=None,
+        timeout_seconds=120,
+        allowed_spark_hosts="spark-inference.home.arpa",
+    ),
+)
+assert_raises_gateway(
+    "LLM_GATEWAY_ALLOWED_SPARK_HOSTS_REQUIRED",
+    lambda: GatewayConfiguration(
+        base_url="http://spark-inference.home.arpa:8000/v1",
+        served_model="google/gemma-4-26B-A4B-it",
+        model_revision="google/gemma-4-26B-A4B-it@declared-revision",
+        runtime_version="nim-1.7.0-variant-api-3.1.0",
+        configuration_hash=configuration.configuration_hash,
+        auth_mode="none",
+        api_key=None,
+        tls_mode="disabled",
+        tls_ca_bundle_path=None,
+        timeout_seconds=120,
+        allowed_spark_hosts=(" spark-inference.home.arpa",),
+    ),
 )
 
 with tempfile.TemporaryDirectory(prefix="ost_m013_llm_gateway_installation_") as temporary_directory_name:

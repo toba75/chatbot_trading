@@ -212,6 +212,19 @@ with tempfile.TemporaryDirectory(prefix="ost_m013_config_loader_unit_") as tempo
         lambda: load_application_configuration(config_path=blank_path, environment_snapshot={}),
     )
 
+    unnormalized_path = write_configuration(
+        temporary_directory / "valeur_non_normalisee.yaml",
+        example_text.replace(
+            "    url: postgresql+psycopg://app@postgres/app\n",
+            '    url: " postgresql+psycopg://app@postgres/app"\n',
+            1,
+        ),
+    )
+    assert_raises_code(
+        "CONFIG_KEY_EMPTY",
+        lambda: load_application_configuration(config_path=unnormalized_path, environment_snapshot={}),
+    )
+
     required_missing_path = write_configuration(
         temporary_directory / "cle_absente.yaml",
         example_text.replace("      allowed_client_cidrs:\n        - 192.168.1.20/32\n", "", 1),
@@ -237,6 +250,15 @@ with tempfile.TemporaryDirectory(prefix="ost_m013_config_loader_unit_") as tempo
     assert_raises_code(
         "CONFIG_SCHEMA_INVALID",
         lambda: load_application_configuration(config_path=host_public_path, environment_snapshot={}),
+    )
+
+    public_access_conflict_path = write_configuration(
+        temporary_directory / "public_access_conflit.yaml",
+        example_text.replace("      public_access: false\n", "      public_access: true\n", 1),
+    )
+    assert_raises_code(
+        "CONFIG_SCHEMA_INVALID",
+        lambda: load_application_configuration(config_path=public_access_conflict_path, environment_snapshot={}),
     )
 
     spark_non_declare_path = write_configuration(
