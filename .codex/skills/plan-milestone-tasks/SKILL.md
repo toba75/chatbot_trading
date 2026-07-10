@@ -19,6 +19,8 @@ Créer un plan de tâches d'implémentation à partir du métier du portefeuille
    - rafraîchir les références avec `git fetch origin --prune` quand un remote existe;
    - vérifier la référence locale `master`, pas seulement la branche courante ni une branche de milestone;
    - contrôler que les artefacts versionnés attendus du milestone amont sont visibles depuis `master`, par exemple `docs/tasks/milestone_NNN`, le journal, les ADR, les tests et le code concernés quand ils existent;
+   - pour un sous-milestone `docs/tasks/milestone_NNN-slug`, vérifier seulement les milestones strictement antérieurs à `NNN`; ne pas exiger que `docs/tasks/milestone_NNN` soit clôturé dans `master`;
+   - ne jamais considérer `docs/tasks/milestone_NNN-slug` comme une clôture de `docs/tasks/milestone_NNN` pour planifier un milestone aval;
    - si un milestone amont existe seulement dans une branche locale, une branche remote, une PR ou un merge commit qui n'est pas ancêtre de `master`, le considérer absent de `master`.
 6. Refuser d'avancer si un milestone amont requis n'est pas présent dans `master`: ne pas créer de dossier de tâches, ne pas produire de plan de contournement et retourner le blocage exact avec les milestones manquants, les références Git observées et la commande de vérification utile.
 7. Inspecter les tests et le code existants du bounded context concerné pour éviter les tâches redondantes.
@@ -104,7 +106,11 @@ Adapter le nombre de tâches à la taille du milestone. Scinder toute tâche qui
 
 ## Création Des Fichiers De Tâches
 
-Créer un fichier Markdown par tâche dans `docs/tasks/milestone_NNN`, où `NNN` est le numéro du milestone sur trois chiffres.
+Créer un fichier Markdown par tâche dans `docs/tasks/milestone_NNN` ou `docs/tasks/milestone_NNN-slug`, où `NNN` est le numéro du milestone sur trois chiffres et `slug` est un suffixe métier optionnel en minuscules.
+
+Utiliser `docs/tasks/milestone_NNN-slug` quand le milestone demandé porte un nom composite ou correctif qui doit conserver le numéro canonique, par exemple `M13-config` -> `docs/tasks/milestone_013-config`.
+
+Un dossier `milestone_NNN-slug` est un sous-milestone de `milestone_NNN`: il ne requiert pas la clôture du parent `milestone_NNN`, mais il requiert les milestones strictement antérieurs. Il ne débloque pas les milestones aval qui exigent la clôture de `milestone_NNN`.
 
 Nommer chaque fichier de tâche avec le format `NNNN_slug.md`, où:
 
@@ -114,6 +120,7 @@ Nommer chaque fichier de tâche avec le format `NNNN_slug.md`, où:
 Exemple pour le milestone 7:
 
 - dossier: `docs/tasks/milestone_007`;
+- dossier suffixé: `docs/tasks/milestone_013-config`;
 - premier fichier: `docs/tasks/milestone_007/0001_verifier_precondition_green.md`.
 
 Chaque fichier de tâche doit contenir la structure détaillée de la tâche concernée, notamment le but métier, la portée DDD, le scénario BDD, les tests RED/GREEN, l'implémentation attendue, les invariants, les dépendances, les commandes de validation et les commits RED/GREEN.

@@ -47,6 +47,9 @@ Règles permanentes:
 - aucun fallback silencieux;
 - aucune conversion ambiguë;
 - aucune gestion d'erreur générique non justifiée;
+- aucune variable d'environnement acceptée comme entrée de configuration applicative;
+- aucun fallback vers les variables d'environnement, fichiers `.env`, `env_file` ou valeurs `environment:` Compose;
+- un seul fichier de configuration applicative chargé explicitement au démarrage de chaque processus;
 - aucun accès direct au stockage possédé par un autre bounded context;
 - aucune sortie de modèle probabiliste ne change seule un état métier protégé;
 - aucune réponse factuelle publiée sans preuve localisable ou statut d'abstention explicite;
@@ -72,7 +75,7 @@ git ls-tree -r --name-only master -- docs/tasks docs/adr docs/specs
 |---|---|---|---|---|
 | WS-01 | Gouvernance, ADR et traçabilité | Maintenir décisions, conformité spec-code-tests, conventions BDD/TDD et absence de dérive silencieuse | Transverse | Matrice de traçabilité maintenue, ADR à jour, critères V1 suivis |
 | WS-02 | Langage publié et frontières DDD | Établir les contrats intercontextes, les identifiants, les événements et les règles de dépendance | SP, KA, EG, RA, CV, SD, EX | Contrats versionnés, tests de contrats et tests d'architecture en place |
-| WS-03 | Plateforme locale et inférence | Fournir `docker-local`, jobs, outbox, observabilité, sécurité réseau et `llm-gateway` vers le Spark | `platform` | Services locaux non exposés, inférence Spark jointe uniquement via gateway, erreurs explicites |
+| WS-03 | Plateforme locale et inférence | Fournir `docker-local`, configuration applicative stricte, jobs, outbox, observabilité, sécurité réseau et `llm-gateway` vers le Spark | `platform` | Services locaux non exposés, fichier de configuration unique validé, inférence Spark jointe uniquement via gateway, erreurs explicites |
 | WS-04 | Traitement des sources | Enregistrer, diagnostiquer, router, convertir, contrôler et publier les versions canoniques | SP | Original immuable, page manifest complet, version canonique publiée, citation résolvable |
 | WS-05 | Accès aux connaissances | Construire les projections régénérables et retourner des preuves candidates traçables | KA | Projection versionnée, recherche hybride derrière un port, `SourceLocator` résolvable |
 | WS-06 | Gouvernance des preuves | Créer, vérifier, relier et versionner les claims et leurs preuves | EG | Claim sans preuve directe refusé, portée conservée, dépendances comptabilisées |
@@ -100,6 +103,7 @@ git ls-tree -r --name-only master -- docs/tasks docs/adr docs/specs
 | M-011 | Expérience reproductible | Exécuter un backtest déterministe avec entrées figées et résultat conservé | WS-10, WS-09 | M-010 |
 | M-012 | Évaluation pilote et calibration | Mesurer le système sur corpus pilote et justifier les seuils | WS-11, tous | M-011 |
 | M-013 | Durcissement et acceptation V1 | Valider sécurité, exploitation, régression et critères V1 | WS-01, WS-03, WS-11 | M-012 |
+| M13-config | Configuration applicative sans environnement | Remplacer toute entrée de processus par variables d'environnement par un fichier de configuration unique, explicite et validé | WS-01, WS-03, WS-11 | M-012; sous-milestone de M-013 |
 
 ## 6. Milestones détaillés
 
@@ -161,6 +165,8 @@ git ls-tree -r --name-only master -- docs/tasks docs/adr docs/specs
   - Then l'état `LLM_UNAVAILABLE` ou l'erreur TLS explicite est retourné sans changer l'état métier
 - Livrables:
   - configuration locale `docker-local`;
+  - fichier `config/application.yaml` chargé explicitement par chaque processus applicatif;
+  - validateur bloquant les variables d'environnement applicatives et tout fallback de configuration;
   - services PostgreSQL, Qdrant, API, workers, `llm-gateway`, observabilité;
   - aucune présence de Gemma ou vLLM principal dans le Compose local;
   - outbox transactionnelle et consommateurs idempotents;
@@ -461,6 +467,35 @@ git ls-tree -r --name-only master -- docs/tasks docs/adr docs/specs
   - anti-patterns interdits vérifiés par tests ou revue documentée.
 - Sortie attendue: la V1 est acceptable, exploitable et conforme à la spécification.
 
+### M13-config - Configuration applicative sans environnement
+
+- Source: sections 0, 3, 13, 16, 18, 20, 22 et ADR-016.
+- Objectif métier: rendre le lancement local reproductible et auditable sans qu'une variable d'environnement puisse piloter silencieusement l'application.
+- Workstreams actifs: WS-01, WS-03, WS-11.
+- Bounded contexts concernés: `platform`, `llm-gateway`, API, workers et tous les adaptateurs qui consomment une configuration.
+- Dossier de tâches attendu si le jalon est détaillé: `docs/tasks/milestone_013-config`.
+- Règle de gouvernance: `M13-config` est un sous-milestone de `M-013`; sa planification ne requiert pas la clôture de `M-013` dans `master`, seulement les milestones strictement antérieurs.
+- Scénario directeur:
+  - Given un processus applicatif reçoit un chemin `--config` vers `config/application.yaml`
+  - When le processus démarre avec des variables d'environnement homonymes ou avec une clé obligatoire absente du fichier
+  - Then le démarrage échoue avec une erreur de configuration explicite et aucune valeur issue de l'environnement n'est utilisée
+- Livrables:
+  - schéma strict de `config/application.yaml`;
+  - chargeur de configuration unique pour API, workers, `llm-gateway` et scripts de déploiement Spark;
+  - suppression des entrées `environment:`, `env_file`, `.env` et variables système applicatives des chemins de lancement;
+  - mapping documenté des anciennes clés `GEMMA_*`, `DATABASE_URL`, `QDRANT_URL`, `LLM_GATEWAY_URL` et ports vers les sections du fichier;
+  - erreurs publiques de configuration `CONFIG_FILE_REQUIRED`, `CONFIG_SCHEMA_INVALID`, `CONFIG_KEY_MISSING`, `CONFIG_KEY_EMPTY` et `CONFIG_ENV_INPUT_REJECTED`;
+  - runbook de démarrage local par fichier de configuration;
+  - rapport d'audit prouvant l'absence de fallback vers l'environnement.
+- Tests et gates:
+  - démarrage sans `--config` refusé;
+  - fichier absent ou invalide refusé;
+  - clé obligatoire absente ou vide refusée;
+  - variable d'environnement applicative homonyme refusée, même si le fichier est valide;
+  - Compose local sans `environment:` ni `env_file` pour les valeurs applicatives;
+  - recherche statique bloquant `os.environ`, `getenv`, `process.env` ou équivalent dans le code applicatif hors adaptateur de validation qui les refuse explicitement.
+- Sortie attendue: aucun processus applicatif n'accepte de variable d'environnement comme entrée; seules les valeurs présentes dans le fichier de configuration pilotent l'application.
+
 ## 7. Chemin critique
 
 Chemin critique pour obtenir un chatbot documentaire cité:
@@ -473,6 +508,7 @@ Chemin critique pour la V1 complète:
 
 ```text
 M-008 -> M-009 -> M-010 -> M-011 -> M-012 -> M-013
+M-012 -> M13-config
 ```
 
 La plateforme M-002 peut avancer en parallèle des premières spécifications détaillées de M-003 uniquement si M-001 est accepté et présent dans `master`.
@@ -507,6 +543,7 @@ Les points suivants doivent déclencher une vérification ADR avant implémentat
 | Topologie `docker-local` et `spark-inference` | M-002 | Oui |
 | Gemma 4 servi par vLLM sur Spark | M-002 | Oui |
 | Snapshots immuables pour stratégies et expériences | M-010 ou M-011 | Oui |
+| Configuration applicative par fichier unique sans variables d'environnement | M13-config | ADR-016 |
 
 Une ADR acceptée ne doit pas être réécrite pour changer son sens. Toute évolution doit créer une nouvelle ADR remplaçante.
 
@@ -538,10 +575,11 @@ Si un milestone amont requis n'est pas présent dans `master`, la création du d
 | Spark ou vLLM exposé directement | Plateforme M-002 et audit M-013 |
 | Panne Spark masquée | Gateway M-002, tests de processus et absence de fallback silencieux |
 | Critère scientifique ignoré après GREEN logiciel | Évaluation M-012 séparant tests logiciels et métriques scientifiques |
+| Configuration pilotée par variable d'environnement ou valeur système | M13-config, chargeur strict, audit Compose et scan statique |
 
 ## 12. Livrable V1 attendu
 
-À la fin de M-013, l'utilisateur doit pouvoir:
+À la fin de M13-config, l'utilisateur doit pouvoir:
 
 - charger un corpus personnel de PDF;
 - obtenir des versions canoniques contrôlées et traçables;
@@ -554,4 +592,5 @@ Si un milestone amont requis n'est pas présent dans `master`, la création du d
 - exécuter une expérience reproductible par code déterministe;
 - conserver les résultats positifs, négatifs et échoués;
 - auditer les décisions, modèles, versions, données et configurations;
+- démarrer chaque processus applicatif uniquement depuis le fichier `config/application.yaml`;
 - exploiter le système localement sans exposition publique.

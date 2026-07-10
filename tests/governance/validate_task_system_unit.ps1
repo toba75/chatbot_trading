@@ -78,6 +78,8 @@ function New-TemporaryProject {
 # Convention des tâches de milestone
 
 - Un dossier de milestone suit exactement docs/tasks/milestone_NNN.
+- Un dossier de milestone peut suivre docs/tasks/milestone_NNN-slug.
+- Un dossier suffixé est un sous-milestone.
 - Une tâche de milestone suit exactement NNNN_slug.md.
 - La première tâche est 0001_verifier_precondition_green.md.
 - Le slug refuse les accents, espaces et majuscules.
@@ -209,6 +211,14 @@ try {
     }
     Assert-ExitCode -Actual $validResult.ExitCode -Expected 0 -Message "Un dossier de tâches minimal conforme doit être accepté."
 
+    $validSuffixedProjectRoot = New-TemporaryProject -Name "valid-suffixed-milestone"
+    Rename-Item -LiteralPath (Join-Path $validSuffixedProjectRoot "docs/tasks/milestone_000") -NewName "milestone_000-config"
+    $validSuffixedResult = Invoke-Validator -ProjectRoot $validSuffixedProjectRoot
+    if ($validSuffixedResult.ExitCode -ne 0) {
+        throw "Un dossier de milestone avec suffixe doit être accepté. Sortie du validateur: $($validSuffixedResult.Output)"
+    }
+    Assert-ExitCode -Actual $validSuffixedResult.ExitCode -Expected 0 -Message "Un dossier de milestone avec suffixe doit être accepté."
+
     $validCrlfProjectRoot = New-TemporaryProject -Name "valid-crlf-title"
     Set-ProjectTaskLineEndings -ProjectRoot $validCrlfProjectRoot -LineEnding "`r`n"
     $validCrlfResult = Invoke-Validator -ProjectRoot $validCrlfProjectRoot
@@ -262,6 +272,11 @@ try {
     Rename-Item -LiteralPath (Join-Path $invalidMilestoneProjectRoot "docs/tasks/milestone_000") -NewName "milestone_00"
     $invalidMilestoneResult = Invoke-Validator -ProjectRoot $invalidMilestoneProjectRoot
     Assert-ExitCode -Actual $invalidMilestoneResult.ExitCode -Expected 1 -Message "Un numéro de milestone hors format doit être refusé."
+
+    $invalidMilestoneSuffixProjectRoot = New-TemporaryProject -Name "invalid-milestone-suffix"
+    Rename-Item -LiteralPath (Join-Path $invalidMilestoneSuffixProjectRoot "docs/tasks/milestone_000") -NewName "milestone_000-Config"
+    $invalidMilestoneSuffixResult = Invoke-Validator -ProjectRoot $invalidMilestoneSuffixProjectRoot
+    Assert-ExitCode -Actual $invalidMilestoneSuffixResult.ExitCode -Expected 1 -Message "Un suffixe de milestone hors format doit être refusé."
 
     $invalidTaskNumberProjectRoot = New-TemporaryProject -Name "invalid-task-number"
     Rename-Item -LiteralPath (Join-Path $invalidTaskNumberProjectRoot "docs/tasks/milestone_000/0002_controler_tache_suivante.md") -NewName "0003_controler_tache_suivante.md"

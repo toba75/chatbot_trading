@@ -14,6 +14,8 @@ $allowedMilestoneFiles = @("journal.md")
 
 $requiredConventionMarkers = @(
     "docs/tasks/milestone_NNN",
+    "docs/tasks/milestone_NNN-slug",
+    "sous-milestone",
     "NNNN_slug.md",
     "0001_verifier_precondition_green.md",
     "Given",
@@ -106,13 +108,15 @@ function Assert-MilestoneDependenciesInMaster {
 
     for ($requiredMilestone = 0; $requiredMilestone -lt $MilestoneNumber; $requiredMilestone++) {
         $requiredPath = "docs/tasks/milestone_{0:000}" -f $requiredMilestone
-        $output = & git -C $repoRoot ls-tree -r --name-only master -- $requiredPath 2>&1
+        $output = & git -C $repoRoot ls-tree -r --name-only master -- docs/tasks 2>&1
 
         if ($LASTEXITCODE -ne 0) {
             throw "Impossible de vérifier les dépendances amont dans master pour $requiredPath. Sortie git: $($output -join "`n")"
         }
 
-        if (@($output | Where-Object { $_ -like "$requiredPath/*" }).Count -eq 0) {
+        $hasRequiredMilestone = @($output | Where-Object { $_ -like "$requiredPath/*" }).Count -gt 0
+
+        if (-not $hasRequiredMilestone) {
             throw "Milestone amont absent de master pour le dossier aval: $requiredPath"
         }
     }
@@ -166,7 +170,7 @@ function Assert-MilestoneDirectory {
         [System.IO.DirectoryInfo] $MilestoneDirectory
     )
 
-    $match = [regex]::Match($MilestoneDirectory.Name, "^milestone_(?<number>\d{3})$")
+    $match = [regex]::Match($MilestoneDirectory.Name, "^milestone_(?<number>\d{3})(?:-(?<slug>[a-z0-9]+(?:_[a-z0-9]+)*))?$")
     if (-not $match.Success) {
         throw "Dossier de milestone invalide: $($MilestoneDirectory.Name)"
     }
@@ -234,7 +238,7 @@ $milestoneDirectories = New-Object System.Collections.Generic.List[System.IO.Dir
 
 foreach ($child in (Get-ChildItem -LiteralPath $tasksDir | Sort-Object Name)) {
     if ($child.PSIsContainer) {
-        if ($child.Name -notmatch "^milestone_\d{3}$") {
+        if ($child.Name -notmatch "^milestone_\d{3}(?:-[a-z0-9]+(?:_[a-z0-9]+)*)?$") {
             throw "Entrée invalide dans docs/tasks: $($child.Name)"
         }
 

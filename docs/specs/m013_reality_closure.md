@@ -5,7 +5,7 @@
 - Identifiant: `M013-RealityClosure-1.0`
 - Source: écart V1 M-013 `LLM` bloquant et validation locale du Spark `192.168.1.120:8000`.
 - Portée: clôturer les écarts de réalité qui empêchent de considérer le chat, le gateway LLM et les évaluations aval comme exécutés sur la pile réelle.
-- ADR applicables: ADR-014; ADR-015; DDD-ADR-007; DDD-ADR-011.
+- ADR applicables: ADR-014; ADR-015; ADR-016; DDD-ADR-007; DDD-ADR-011.
 
 ## Intention métier
 
@@ -21,7 +21,7 @@ M-013 a durci l'exploitation et publié une non-acceptation V1. `M13-reality` tr
 
 ### R-001 - Gateway réel avec provenance déclarée
 
-Le gateway LLM doit réussir une inférence contre le Spark réel quand `GEMMA_BASE_URL`, `GEMMA_MODEL`, `GEMMA_AUTH_MODE`, `GEMMA_TLS_MODE`, `GEMMA_MODEL_REVISION` et `GEMMA_RUNTIME_VERSION` sont fournis explicitement. Si la réponse NIM ne porte pas de provenance, le gateway utilise les valeurs déclarées; si elles manquent, il échoue explicitement.
+Le gateway LLM doit réussir une inférence contre le Spark réel quand l'endpoint, le modèle servi, les modes d'authentification et TLS, `model_revision` et `runtime_version` sont présents dans `config/application.yaml`. Si la réponse NIM ne porte pas de provenance, le gateway utilise les valeurs déclarées dans ce fichier; si elles manquent ou si elles sont fournies par variable d'environnement, il échoue explicitement.
 
 ### R-002 - Chat produit sans provider factice
 

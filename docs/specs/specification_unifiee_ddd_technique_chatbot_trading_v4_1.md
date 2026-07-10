@@ -49,9 +49,12 @@ Le présent document réunit dans une même spécification :
 | Contrat entre bounded contexts | langage publié et contrat versionné |
 | Détail de conversion, indexation, serving, stockage ou déploiement | réalisation technique correspondante |
 | Valeur de seuil, modèle ou paramètre expérimental | configuration versionnée et rapport de benchmark |
+| Valeur système nécessaire au démarrage ou au pilotage applicatif | fichier de configuration applicative unique, validé au démarrage |
 | Conflit transversal | ADR explicite nouvelle ; aucune résolution silencieuse |
 
 Une commodité technique NE DOIT PAS contourner un invariant métier. À l’inverse, le modèle de domaine NE DOIT PAS incorporer inutilement les API propres à Docling, Qdrant, vLLM, FastAPI ou au moteur de backtest.
+
+Les variables d’environnement NE DOIVENT PAS être acceptées comme entrée de configuration applicative. Un processus applicatif DOIT recevoir le chemin explicite du fichier de configuration à charger, puis lire uniquement les valeurs présentes dans ce fichier. Aucun fallback vers `os.environ`, `process.env`, un fichier `.env`, `env_file`, `environment:` Compose ou une valeur système homonyme n’est autorisé.
 
 ## Conventions normatives
 
@@ -553,6 +556,14 @@ Il NE DOIT PAS conserver :
 - les secrets des autres services.
 
 Toute donnée métier durable demeure la propriété de `docker-local`. Le cache de modèle du Spark est régénérable et n’entre pas dans le périmètre des sauvegardes métier.
+
+### ADR-016 — Configuration applicative par fichier unique
+
+Tout processus applicatif DOIT charger sa configuration depuis un fichier unique déclaré explicitement au lancement. Les clés qui pilotent la base, Qdrant, le gateway LLM, Spark, les modèles, les timeouts, les ports, les chemins métier, les profils de charge, la sécurité et la provenance modèle DOIVENT être présentes dans ce fichier.
+
+Les variables d’environnement NE DOIVENT PAS être acceptées comme entrée de processus pour piloter l’application. La présence d’une variable d’environnement reprenant une clé applicative connue DOIT produire une erreur explicite de configuration au lieu d’être ignorée silencieusement ou utilisée comme fallback.
+
+Les secrets restent des fichiers ou stores secrets référencés par chemin depuis la configuration; leur contenu ne devient pas une variable d’environnement applicative.
 
 ---
 
@@ -4112,6 +4123,24 @@ Le monolithe modulaire DOIT offrir :
 
 Il NE DOIT PAS simuler des appels réseau inutiles entre modules exécutés dans le même processus.
 
+### Configuration applicative de processus
+
+La configuration applicative est portée par un seul fichier `config/application.yaml`, validé par schéma au démarrage de chaque processus applicatif.
+
+Chaque processus applicatif DOIT être lancé avec un argument explicite `--config <chemin>`. Le chemin du fichier de configuration NE DOIT PAS provenir d’une variable d’environnement, d’un `.env`, d’un `env_file` Compose, d’une valeur par défaut de l’image ou d’un chemin implicite.
+
+Le chargeur de configuration DOIT :
+
+- refuser un démarrage sans argument `--config` ;
+- refuser un fichier absent, illisible ou non conforme au schéma ;
+- refuser toute clé obligatoire absente, vide ou placeholder ;
+- refuser toute variable d’environnement connue qui duplique une clé de `config/application.yaml` ;
+- produire une erreur explicite parmi `CONFIG_FILE_REQUIRED`, `CONFIG_FILE_UNREADABLE`, `CONFIG_SCHEMA_INVALID`, `CONFIG_KEY_MISSING`, `CONFIG_KEY_EMPTY` ou `CONFIG_ENV_INPUT_REJECTED`.
+
+Le chargeur de configuration NE DOIT PAS lire `os.environ`, `process.env`, les variables système du shell, les valeurs `environment:` Compose, les fichiers `.env` ou les `env_file` comme source de configuration applicative. Les variables système nécessaires au runtime hôte peuvent exister, mais elles ne pilotent aucun comportement applicatif.
+
+Les secrets NE DOIVENT PAS être placés dans des variables d’environnement. Le fichier de configuration référence des chemins de fichiers secrets, montés en lecture seule hors Git, ou un store secret explicite approuvé par ADR.
+
 ### CQRS local et projections
 
 Une séparation command/query est recommandée lorsque les modèles de lecture diffèrent fortement, notamment pour :
@@ -4244,37 +4273,18 @@ L’adresse ne doit jamais être codée en dur dans le domaine.
 
 Le runtime Gemma est géré séparément du fichier Compose local. La procédure de référence utilise un conteneur vLLM Gemma 4 sur le Spark, conformément au guide NVIDIA.[^spark-vllm]
 
-Exemple indicatif à adapter et à figer par version ou digest :
+Exemple indicatif à adapter et à figer par version ou digest. Le script lit le fichier de configuration explicite, vérifie le schéma, puis rend les arguments Docker effectifs sans accepter de variable d’environnement applicative :
 
 ```bash
 # Exécuté sur le DGX Spark, pas sur docker-local.
-docker run -d \
-  --name gemma-vllm \
-  --restart unless-stopped \
-  --gpus all \
-  --shm-size=16g \
-  --env-file /srv/spark-inference/secrets/vllm.env \
-  --mount type=bind,src=/srv/spark-inference/hf-cache,dst=/root/.cache/huggingface \
-  --mount type=bind,src=/srv/spark-inference/tls,dst=/run/tls,readonly \
-  -p "${SPARK_LAN_IP}:8443:8443" \
-  vllm/vllm-openai:gemma4-cu130 \
-  nvidia/Gemma-4-31B-IT-NVFP4 \
-  --served-model-name gemma-research \
-  --host 0.0.0.0 \
-  --port 8443 \
-  --ssl-keyfile /run/tls/server.key \
-  --ssl-certfile /run/tls/server.crt \
-  --max-model-len 32768 \
-  --max-num-seqs 1 \
-  --enable-auto-tool-choice \
-  --tool-call-parser gemma4 \
-  --reasoning-parser gemma4
+deploy/spark-inference/run-gemma-vllm.sh \
+  --config /srv/trading-research-assistant/config/application.yaml
 ```
 
 Exigences complémentaires :
 
 - l’image doit être épinglée par digest ou version validée ;
-- `VLLM_API_KEY` doit être fourni hors ligne de commande via le fichier secret ;
+- les secrets éventuels doivent être fournis par fichiers référencés dans `config/application.yaml`, jamais par variable d’environnement ;
 - la règle pare-feu doit autoriser `8443/tcp` uniquement depuis `docker-local` ;
 - les journaux du serveur ne doivent pas persister les corps complets des requêtes ;
 - le cache Hugging Face est régénérable et distinct des données métier ;
@@ -4302,6 +4312,8 @@ Le gateway NE DOIT PAS exécuter les règles métier. Il rend une capacité tech
 
 Le fichier Compose local NE DOIT contenir aucun service Gemma ou vLLM principal. Il référence le Spark par configuration externe.
 
+Le fichier Compose local NE DOIT PAS transmettre de configuration applicative via `environment:` ou `env_file`. Chaque service applicatif monte `config/application.yaml` en lecture seule et reçoit son chemin par argument `--config`.
+
 Extrait indicatif :
 
 ```yaml
@@ -4326,11 +4338,9 @@ services:
     build:
       context: ../..
       dockerfile: deploy/local-compose/Dockerfile
-    command: ["uvicorn", "app.api.main:app", "--host", "0.0.0.0", "--port", "8080"]
-    environment:
-      DATABASE_URL: postgresql+psycopg://app@postgres/app
-      QDRANT_URL: http://qdrant:6333
-      LLM_GATEWAY_URL: http://llm-gateway:8090
+    command: ["python", "-m", "app.api.main", "--host", "0.0.0.0", "--port", "8080", "--config", "/workspace/config/application.yaml"]
+    volumes:
+      - ../../config/application.yaml:/workspace/config/application.yaml:ro
     networks: [core]
     depends_on: [postgres, qdrant, llm-gateway]
 
@@ -4338,13 +4348,9 @@ services:
     build:
       context: ../..
       dockerfile: deploy/local-compose/Dockerfile
-    command: ["python", "-m", "app.platform.llm_gateway"]
-    environment:
-      GEMMA_BASE_URL: https://spark-inference.home.arpa:8443/v1
-      GEMMA_MODEL: gemma-research
-      GEMMA_API_KEY_FILE: /run/secrets/gemma_api_key
-      GEMMA_CA_BUNDLE: /run/secrets/spark_ca
-    secrets: [gemma_api_key, spark_ca]
+    command: ["python", "-m", "app.platform.llm_gateway", "--config", "/workspace/config/application.yaml"]
+    volumes:
+      - ../../config/application.yaml:/workspace/config/application.yaml:ro
     networks: [core, spark-egress]
 
   postgres:
@@ -4371,8 +4377,9 @@ services:
     build:
       context: ../..
       dockerfile: deploy/local-compose/Dockerfile
-    command: ["python", "-m", "app.workers.documents"]
+    command: ["python", "-m", "app.workers.documents", "--config", "/workspace/config/application.yaml"]
     volumes:
+      - ../../config/application.yaml:/workspace/config/application.yaml:ro
       - ../../corpus:/workspace/corpus
       - ../../data:/workspace/data
     networks: [core]
@@ -4381,15 +4388,18 @@ services:
     build:
       context: ../..
       dockerfile: deploy/local-compose/Dockerfile
-    command: ["python", "-m", "app.workers.research"]
+    command: ["python", "-m", "app.workers.research", "--config", "/workspace/config/application.yaml"]
+    volumes:
+      - ../../config/application.yaml:/workspace/config/application.yaml:ro
     networks: [core]
 
   worker-backtest:
     build:
       context: ../..
       dockerfile: deploy/local-compose/Dockerfile
-    command: ["python", "-m", "app.workers.backtest"]
+    command: ["python", "-m", "app.workers.backtest", "--config", "/workspace/config/application.yaml"]
     volumes:
+      - ../../config/application.yaml:/workspace/config/application.yaml:ro
       - ../../data/experiments:/workspace/data/experiments
     networks: [core]
 
@@ -4404,11 +4414,6 @@ volumes:
   qdrant-data: {}
   model-cache: {}
 
-secrets:
-  gemma_api_key:
-    file: ./secrets/gemma_api_key
-  spark_ca:
-    file: ./secrets/spark_ca.pem
 ```
 
 Le fichier complet doit ajouter des healthchecks, limites de ressources, utilisateurs non-root, systèmes de fichiers en lecture seule lorsque possible, versions épinglées et politiques de redémarrage.
@@ -4515,14 +4520,8 @@ trading-research-assistant/
 │   ├── experiments/
 │   └── logs/
 ├── config/
-│   ├── mandate.yaml
-│   ├── routing.yaml
-│   ├── docling_profiles.yaml
-│   ├── models.yaml
-│   ├── deployment.yaml
-│   ├── taxonomy.yaml
-│   ├── quality_gates.yaml
-│   └── security.yaml
+│   ├── application.yaml              # fichier unique lu par les processus
+│   └── application.schema.json
 ├── app/
 │   ├── source_processing/
 │   ├── knowledge_access/
@@ -4857,135 +4856,145 @@ Le système doit permettre :
 
 ## Configuration indicative
 
-### `models.yaml`
+La configuration applicative indicative est un seul fichier `config/application.yaml`. Les fragments ci-dessous sont des sections du même fichier, pas des fichiers séparés. Tout processus qui accepte une valeur homonyme depuis l’environnement est non conforme.
+
+### `application.yaml` - section `models`
 
 ```yaml
-llm:
-  provider: spark_vllm
-  transport: openai_compatible_https
-  reference_model: nvidia/Gemma-4-31B-IT-NVFP4
-  candidate_models:
-    - YCWTG/gemma-4-31B-it-NVFP4A16-GPTQ
-    - google/gemma-4-31B-it-qat-w4a16-ct
-  served_model_name: gemma-research
-  base_url: https://spark-inference.home.arpa:8443/v1
-  api_key_file: /run/secrets/gemma_api_key
-  ca_bundle: /run/secrets/spark_ca
-  client_certificate_file: null       # renseigner si mTLS
-  client_key_file: null               # renseigner si mTLS
-  max_model_len_default: 32768
-  max_model_len_deep_research: 65536
-  max_num_seqs: 1
-  reasoning_parser: gemma4
-  tool_call_parser: gemma4
-  connect_timeout_seconds: 3
-  first_token_timeout_seconds: 45
-  total_timeout_seconds: 600
-  max_in_flight_requests: 1
-  retries_before_first_token: 2
-  circuit_breaker:
-    failure_threshold: 3
-    open_seconds: 30
-  silent_fallback: false
+models:
+  llm:
+    provider: spark_vllm
+    transport: openai_compatible_http
+    reference_model: nvidia/Gemma-4-31B-IT-NVFP4
+    candidate_models:
+      - YCWTG/gemma-4-31B-it-NVFP4A16-GPTQ
+      - google/gemma-4-31B-it-qat-w4a16-ct
+    served_model_name: gemma-research
+    base_url: http://spark-inference.home.arpa:8000/v1
+    auth_mode: none
+    tls_mode: disabled
+    model_revision: nvidia-gemma-4-31b-it-nvfp4
+    runtime_version: nim-gemma-openai-compatible
+    max_model_len_interactive_research: 32768
+    max_model_len_deep_research: 65536
+    max_num_seqs: 1
+    reasoning_parser: gemma4
+    tool_call_parser: gemma4
+    connect_timeout_seconds: 3
+    first_token_timeout_seconds: 45
+    total_timeout_seconds: 600
+    max_in_flight_requests: 1
+    retries_before_first_token: 2
+    circuit_breaker:
+      failure_threshold: 3
+      open_seconds: 30
 
-conversion_vlm:
-  model: ibm-granite/granite-docling-258M
-  deployment: docker_local
-  base_url: http://granite-docling:8001
-  acceleration: auto
+  conversion_vlm:
+    model: ibm-granite/granite-docling-258M
+    deployment: docker_local
+    base_url: http://granite-docling:8001
+    acceleration: explicit_cuda
 
-embeddings:
-  deployment: docker_local
-  dense_model: TO_BE_BENCHMARKED
-  sparse_model: Qdrant/bm25
-  multilingual_required: true
+  embeddings:
+    deployment: docker_local
+    dense_model: TO_BE_BENCHMARKED
+    sparse_model: Qdrant/bm25
+    multilingual_required: true
 
-reranker:
-  deployment: docker_local
-  model: TO_BE_BENCHMARKED
-  multilingual_required: true
+  reranker:
+    deployment: docker_local
+    model: TO_BE_BENCHMARKED
+    multilingual_required: true
 ```
 
-Le nom `spark-inference.home.arpa` et les chemins de secrets sont propres à l’environnement et doivent être injectés sans modifier le code du domaine. Aucun endpoint `127.0.0.1:8000` ne doit être supposé par l’application locale.
+Le nom `spark-inference.home.arpa`, l’URL effective, les modes d’authentification et TLS, la provenance modèle et les chemins de secrets éventuels sont propres à l’installation et doivent être renseignés dans `config/application.yaml` sans modifier le code du domaine. Aucun endpoint `127.0.0.1:8000` ne doit être supposé par l’application locale.
 
-### `deployment.yaml`
+### `application.yaml` - section `deployment`
 
 ```yaml
-topology: two_host_local
+deployment:
+  topology: two_host_local
 
-hosts:
-  docker_local:
-    role: application_and_data
-  spark_inference:
-    role: gemma_only
-    dns_name: spark-inference.home.arpa
-    allowed_client_cidrs:
-      - 192.168.1.20/32   # exemple : IP réservée de docker-local
+  hosts:
+    docker_local:
+      role: application_and_data
+    spark_inference:
+      role: gemma_only
+      dns_name: spark-inference.home.arpa
+      allowed_client_cidrs:
+        - 192.168.1.20/32   # exemple : IP réservée de docker-local
 
-network:
-  require_tls: true
-  require_api_key: true
-  prefer_mtls: true
-  direct_browser_to_spark: false
-  spark_callbacks_to_local: false
+  network:
+    require_tls: false
+    require_api_key: false
+    prefer_mtls: false
+    direct_browser_to_spark: false
+    spark_callbacks_to_local: false
 
-placement:
-  gemma_vllm: spark_inference
-  application: docker_local
-  postgres: docker_local
-  qdrant: docker_local
-  docling: docker_local
-  granite_docling: docker_local
-  embeddings: docker_local
-  reranker: docker_local
-  backtests: docker_local
+  services:
+    postgres_url: postgresql+psycopg://app@postgres/app
+    qdrant_url: http://qdrant:6333
+    llm_gateway_url: http://llm-gateway:8090
+
+  placement:
+    gemma_vllm: spark_inference
+    application: docker_local
+    postgres: docker_local
+    qdrant: docker_local
+    docling: docker_local
+    granite_docling: docker_local
+    embeddings: docker_local
+    reranker: docker_local
+    backtests: docker_local
 ```
 
-### `routing.yaml`
+### `application.yaml` - section `routing`
 
 ```yaml
-routes:
-  native_standard:
-    native_text_quality_min: 0.95
-    image_coverage_max: 0.50
+routing:
+  routes:
+    native_standard:
+      native_text_quality_min: 0.95
+      image_coverage_max: 0.50
 
-  scan_granite:
-    image_coverage_min: 0.80
-    skew_abs_max_degrees: 1.0
-    noise_score_max: 0.25
+    scan_granite:
+      image_coverage_min: 0.80
+      skew_abs_max_degrees: 1.0
+      noise_score_max: 0.25
 
-  preprocess_granite:
-    skew_abs_min_degrees: 1.0
-    apply_rotation: true
-    apply_deskew: true
-    destructive_cleanup: false
+    preprocess_granite:
+      skew_abs_min_degrees: 1.0
+      apply_rotation: true
+      apply_deskew: true
+      destructive_cleanup: false
 
-  bad_ocr_to_granite:
-    duplicated_text_score_min: 0.15
-    native_text_quality_max: 0.70
+    bad_ocr_to_granite:
+      duplicated_text_score_min: 0.15
+      native_text_quality_max: 0.70
 
-  benchmark:
-    confidence_threshold: 0.85
+    benchmark:
+      confidence_threshold: 0.85
 ```
 
 Les seuils ci-dessus sont des valeurs initiales de développement, pas des vérités générales. Ils doivent être calibrés sur le corpus pilote.
 
-### `quality_gates.yaml`
+### `application.yaml` - section `quality_gates`
 
 ```yaml
-post_conversion:
-  page_count_match: required
-  valid_json: required
-  provenance_coverage_min: 1.0
-  missing_page_max: 0
-  duplicate_item_id_max: 0
+quality_gates:
+  post_conversion:
+    page_count_match: required
+    valid_json: required
+    provenance_coverage_min: 1.0
+    missing_page_max: 0
+    duplicate_item_id_max: 0
 
-pilot_targets:
-  numeric_token_accuracy_min: 0.995
-  sign_accuracy_on_critical_spans: 1.0
-  table_cell_exact_match_min: 0.98
-  retrieval_recall_at_20_min: 0.90
-  citation_precision_min: 0.95
+  pilot_targets:
+    numeric_token_accuracy_min: 0.995
+    sign_accuracy_on_critical_spans: 1.0
+    table_cell_exact_match_min: 0.98
+    retrieval_recall_at_20_min: 0.90
+    citation_precision_min: 0.95
 ```
 
 Ces cibles doivent être mesurées sur un jeu annoté et peuvent être adaptées selon le type de document.
@@ -5745,9 +5754,11 @@ La migration ne doit pas bloquer la livraison fonctionnelle. Chaque contexte peu
 
 - déployer Gemma 4/vLLM sur le DGX Spark ;
 - épingler l’image et la révision du modèle ;
-- configurer DNS ou IP réservée ;
+- créer `config/application.yaml` comme fichier unique de configuration applicative ;
+- configurer DNS ou IP réservée dans `config/application.yaml` ;
 - établir TLS, clé d’API et règles pare-feu ;
 - créer `llm-gateway` sur `docker-local` ;
+- interdire toute entrée de configuration par variable d’environnement, `.env`, `env_file` ou `environment:` Compose ;
 - tester pannes, timeouts, circuit breaker et absence d’accès direct ;
 - valider qu’aucune donnée métier durable n’est stockée sur le Spark.
 

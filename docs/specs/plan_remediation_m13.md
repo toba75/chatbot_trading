@@ -100,7 +100,7 @@ La remédiation est terminée seulement si:
   - Then chaque PDF existe, possède un hash stable, une strate documentaire et une justification d'inclusion.
 - Tests d'acceptation à écrire: `tests/m013/validate_real_corpus_manifest_acceptance.ps1`.
 - Tests unitaires à écrire: manifest absent, chemin non résolvable, hash manquant, strate absente, doublon binaire, document hors plage 50-100, exclusion non justifiée.
-- Implémentation attendue: créer un format strict de manifeste local, par exemple `docs/evaluation/m013/real_corpus_manifest.schema.json` et un validateur qui lit un chemin explicite fourni par variable d'environnement.
+- Implémentation attendue: créer un format strict de manifeste local, par exemple `docs/evaluation/m013/real_corpus_manifest.schema.json`, et un validateur qui lit le chemin du manifeste depuis `config/application.yaml` sans accepter de variable d'environnement.
 - Invariants et garde-fous: aucun PDF généré; aucun chemin par défaut; aucun corpus minimal de secours; aucun original modifié.
 - Dépendances: exigences M-012 de corpus pilote et strates documentaires.
 - Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_real_corpus_manifest_acceptance.ps1`.
