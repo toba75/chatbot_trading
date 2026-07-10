@@ -268,6 +268,7 @@ class GatewayConfiguration:
     served_model: str
     model_revision: str
     runtime_version: str
+    configuration_hash: str
     auth_mode: str
     api_key: str | None
     tls_mode: str
@@ -279,6 +280,7 @@ class GatewayConfiguration:
         _require_text(self.served_model, "served_model", "LLM_GATEWAY_MODEL_REQUIRED")
         _require_text(self.model_revision, "model_revision", "LLM_GATEWAY_MODEL_REVISION_REQUIRED")
         _require_text(self.runtime_version, "runtime_version", "LLM_GATEWAY_RUNTIME_VERSION_REQUIRED")
+        _require_sha256_hex(self.configuration_hash, "configuration_hash", "LLM_GATEWAY_CONFIGURATION_HASH_REQUIRED")
         _require_text(self.auth_mode, "auth_mode", "LLM_GATEWAY_AUTH_MODE_REQUIRED")
         _require_text(self.tls_mode, "tls_mode", "LLM_GATEWAY_TLS_MODE_REQUIRED")
 
@@ -363,6 +365,7 @@ class GatewayConfiguration:
             "served_model": self.served_model,
             "model_revision": self.model_revision,
             "runtime_version": self.runtime_version,
+            "configuration_hash": self.configuration_hash,
             "auth_mode": self.auth_mode,
             "api_key": SECRET_MASK if self.api_key is not None else None,
             "tls_mode": self.tls_mode,
@@ -887,6 +890,7 @@ def _build_gateway_observation(
         trace_id=request.trace_id,
         request_id=request.request_id,
         idempotency_key=request.idempotency_key,
+        configuration_hash=configuration.configuration_hash,
         phase="spark_inference",
         status=status,
         latency_ms=latency_ms,
@@ -1073,6 +1077,14 @@ def _require_text(value: object, field_name: str, code: str) -> None:
         raise LLMGatewayContractError(code, f"Champ requis absent: {field_name}")
     if value != value.strip():
         raise LLMGatewayContractError(code, f"Champ non normalisé: {field_name}")
+
+
+def _require_sha256_hex(value: object, field_name: str, code: str) -> None:
+    _require_text(value, field_name, code)
+    if not isinstance(value, str):
+        raise LLMGatewayContractError(code, f"Hash SHA-256 invalide: {field_name}")
+    if len(value) != 64 or any(character not in "0123456789abcdef" for character in value):
+        raise LLMGatewayContractError(code, f"Hash SHA-256 invalide: {field_name}")
 
 
 def _require_mapping(value: object, field_name: str, code: str) -> None:

@@ -74,9 +74,17 @@ Cette spécification remplace les entrées de processus historiques par un fichi
 | `QDRANT_URL` | `services.qdrant.url` | Migrée dans le fichier; variable refusée au démarrage. |
 | `LLM_GATEWAY_URL` | `services.llm_gateway.url` | Migrée dans le fichier; variable refusée au démarrage. |
 | `GEMMA_BASE_URL` | `services.llm_gateway.spark_endpoint_url` | Migrée dans le fichier; variable refusée au démarrage. |
+| `GEMMA_AUTH_MODE` | `services.llm_gateway.auth_mode` | Migrée dans le fichier; `none` et `api_key_file` sont les seuls modes acceptés; variable refusée au démarrage. |
+| `GEMMA_TLS_MODE` | `services.llm_gateway.tls_mode` | Migrée dans le fichier; `disabled` et `ca_bundle` sont les seuls modes acceptés; variable refusée au démarrage. |
 | `GEMMA_MODEL` | `models.llm.served_model_name` | Migrée dans le fichier; variable refusée au démarrage. |
 | `GEMMA_MODEL_REVISION` | `models.llm.model_revision` | Migrée dans le fichier; variable refusée au démarrage. |
 | `GEMMA_RUNTIME_VERSION` | `models.llm.runtime_version` | Migrée dans le fichier; variable refusée au démarrage. |
+| `GEMMA_TIMEOUT_SECONDS` | `services.llm_gateway.timeout_seconds` | Migrée dans le fichier; variable refusée au démarrage. |
+| `GEMMA_RETRY_BEFORE_FIRST_TOKEN` | `services.llm_gateway.retry_before_first_token` | Migrée dans le fichier; entier positif ou nul; variable refusée au démarrage. |
+| `GEMMA_CIRCUIT_BREAKER_FAILURE_THRESHOLD` | `services.llm_gateway.circuit_breaker_failure_threshold` | Migrée dans le fichier; variable refusée au démarrage. |
+| `GEMMA_CIRCUIT_BREAKER_OPEN_SECONDS` | `services.llm_gateway.circuit_breaker_reset_seconds` | Migrée dans le fichier; variable refusée au démarrage. |
+| `GEMMA_API_KEY_FILE` | `security.secrets.llm_gateway_api_key_path` | Référencée par chemin seulement quand `auth_mode=api_key_file`; variable refusée au démarrage. |
+| `GEMMA_CA_BUNDLE` | `security.secrets.tls_ca_certificate_path` | Référencé par chemin seulement quand `tls_mode=ca_bundle`; variable refusée au démarrage. |
 | `API_PORT` | `services.api.port` | Migrée dans le fichier; variable refusée au démarrage. |
 | `LLM_GATEWAY_PORT` | `services.llm_gateway.port` | Migrée dans le fichier; variable refusée au démarrage. |
 | `SPARK_ALLOWED_CLIENT_CIDRS` | `deployment.hosts.spark_inference.allowed_client_cidrs` | Migrée dans le fichier; variable refusée au démarrage. |
@@ -86,6 +94,8 @@ Cette spécification remplace les entrées de processus historiques par un fichi
 Les chemins de secrets sont obligatoires dans `security.secrets`. Ils pointent vers des fichiers montés en lecture seule hors Git, par exemple `config/secrets/local/postgres_password`. Le schéma refuse les propriétés génériques `password`, `token`, `api_key`, `secret` ou `secret_value` afin d'empêcher un secret en clair dans l'artefact versionné.
 
 La configuration peut exiger TLS ou une clé d'API, mais l'exigence est déclarée dans `deployment.network` et les chemins de matériaux secrets restent dans `security.secrets`. Aucune valeur système du shell ne complète ces champs.
+
+Pour le Spark Docker actuel gouverné par ADR-014, `services.llm_gateway.auth_mode` vaut `none` et `services.llm_gateway.tls_mode` vaut `disabled`. Dans ce mode, le gateway ne lit pas `security.secrets.llm_gateway_api_key_path`, n'injecte aucun header `Authorization`, ne lit pas `security.secrets.tls_ca_certificate_path` et conserve les pannes Spark sous forme d'erreurs explicites comme `LLM_UNAVAILABLE`.
 
 ## Contrat de traçabilité
 

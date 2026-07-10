@@ -114,7 +114,10 @@ class LLMGatewayServiceConfiguration:
     url: str
     port: int
     spark_endpoint_url: str
+    auth_mode: str
+    tls_mode: str
     timeout_seconds: int
+    retry_before_first_token: int
     circuit_breaker_failure_threshold: int
     circuit_breaker_reset_seconds: int
 
@@ -780,7 +783,10 @@ def _build_application_configuration(
                 url=services["llm_gateway"]["url"],
                 port=services["llm_gateway"]["port"],
                 spark_endpoint_url=services["llm_gateway"]["spark_endpoint_url"],
+                auth_mode=services["llm_gateway"]["auth_mode"],
+                tls_mode=services["llm_gateway"]["tls_mode"],
                 timeout_seconds=services["llm_gateway"]["timeout_seconds"],
+                retry_before_first_token=services["llm_gateway"]["retry_before_first_token"],
                 circuit_breaker_failure_threshold=services["llm_gateway"]["circuit_breaker_failure_threshold"],
                 circuit_breaker_reset_seconds=services["llm_gateway"]["circuit_breaker_reset_seconds"],
             ),

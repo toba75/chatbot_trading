@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
 . (Join-Path $repoRoot "scripts/require_python.ps1")
@@ -66,12 +66,12 @@ assert_equal(
 )
 assert_equal(
     validated_configuration.services.llm_gateway.spark_endpoint_url,
-    "https://spark-inference.home.arpa/v1",
+    "http://192.168.1.120:8000/v1",
     "La configuration validée doit exposer l'endpoint Spark du fichier.",
 )
 assert_equal(
     validated_configuration.models.llm.served_model_name,
-    "gemma-4-31b-it-nvfp4",
+    "google/gemma-4-26B-A4B-it",
     "La configuration validée doit exposer le modèle servi du fichier.",
 )
 assert_true(
@@ -135,7 +135,7 @@ with tempfile.TemporaryDirectory(prefix="ost_m013_config_loader_acceptance_") as
 
     empty_key_path = write_configuration(
         temporary_directory / "cle_vide.yaml",
-        example_text.replace("    runtime_version: vllm-0.9.2-spark\n", '    runtime_version: ""\n', 1),
+        example_text.replace("    runtime_version: nim-1.7.0-variant-api-3.1.0\n", '    runtime_version: ""\n', 1),
     )
     assert_raises_code(
         "CONFIG_KEY_EMPTY",
@@ -148,7 +148,7 @@ with tempfile.TemporaryDirectory(prefix="ost_m013_config_loader_acceptance_") as
     placeholder_path = write_configuration(
         temporary_directory / "placeholder.yaml",
         example_text.replace(
-            "    model_revision: nvidia-gemma-4-31b-it-nvfp4-revision-2026-07\n",
+            "    model_revision: google/gemma-4-26B-A4B-it@declared-revision\n",
             "    model_revision: TO_BE_FILLED\n",
             1,
         ),

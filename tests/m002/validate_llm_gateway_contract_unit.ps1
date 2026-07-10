@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
 . (Join-Path $repoRoot "scripts/require_python.ps1")
@@ -27,6 +27,7 @@ from app.platform.llm_gateway import (
     build_openai_chat_completion_request,
 )
 from app.platform import local_runtime
+from app.platform.configuration import load_application_configuration
 from app.platform.observability import InMemoryObservabilityCollector
 
 
@@ -49,6 +50,7 @@ def valid_configuration() -> GatewayConfiguration:
         served_model="gemma-research",
         model_revision="gemma-4-declared-revision-unit",
         runtime_version="vllm-openai-declared-unit",
+        configuration_hash="c" * 64,
         auth_mode="none",
         api_key=None,
         tls_mode="disabled",
@@ -99,6 +101,7 @@ assert_raises_code(
         served_model="gemma-research",
         model_revision="gemma-4-declared-revision-unit",
         runtime_version="vllm-openai-declared-unit",
+        configuration_hash="c" * 64,
         auth_mode="none",
         api_key=None,
         tls_mode="disabled",
@@ -114,6 +117,7 @@ assert_raises_code(
         served_model="gemma-research",
         model_revision="gemma-4-declared-revision-unit",
         runtime_version="vllm-openai-declared-unit",
+        configuration_hash="c" * 64,
         auth_mode="none",
         api_key=None,
         tls_mode="disabled",
@@ -127,6 +131,7 @@ GatewayConfiguration(
     served_model="gemma-research",
     model_revision="gemma-4-declared-revision-unit",
     runtime_version="vllm-openai-declared-unit",
+    configuration_hash="c" * 64,
     auth_mode="none",
     api_key=None,
     tls_mode="disabled",
@@ -141,6 +146,7 @@ assert_raises_code(
         served_model="gemma-research",
         model_revision="gemma-4-declared-revision-unit",
         runtime_version="vllm-openai-declared-unit",
+        configuration_hash="c" * 64,
         auth_mode="none",
         api_key=None,
         tls_mode="disabled",
@@ -156,6 +162,7 @@ assert_raises_code(
         served_model="gemma-research",
         model_revision="gemma-4-declared-revision-unit",
         runtime_version="vllm-openai-declared-unit",
+        configuration_hash="c" * 64,
         auth_mode="none",
         api_key=None,
         tls_mode="disabled",
@@ -171,6 +178,7 @@ assert_raises_code(
         served_model="gemma-research",
         model_revision="gemma-4-declared-revision-unit",
         runtime_version="vllm-openai-declared-unit",
+        configuration_hash="c" * 64,
         auth_mode="",
         api_key=None,
         tls_mode="disabled",
@@ -186,6 +194,7 @@ assert_raises_code(
         served_model="gemma-research",
         model_revision="gemma-4-declared-revision-unit",
         runtime_version="vllm-openai-declared-unit",
+        configuration_hash="c" * 64,
         auth_mode="none",
         api_key="unit-secret-key",
         tls_mode="disabled",
@@ -201,6 +210,7 @@ assert_raises_code(
         served_model="gemma-research",
         model_revision="gemma-4-declared-revision-unit",
         runtime_version="vllm-openai-declared-unit",
+        configuration_hash="c" * 64,
         auth_mode="none",
         api_key=None,
         tls_mode="disabled",
@@ -216,6 +226,7 @@ assert_raises_code(
         served_model="gemma-research",
         model_revision="",
         runtime_version="vllm-openai-declared-unit",
+        configuration_hash="c" * 64,
         auth_mode="none",
         api_key=None,
         tls_mode="disabled",
@@ -231,6 +242,7 @@ assert_raises_code(
         served_model="gemma-research",
         model_revision=" gemma-4-declared-revision-unit",
         runtime_version="vllm-openai-declared-unit",
+        configuration_hash="c" * 64,
         auth_mode="none",
         api_key=None,
         tls_mode="disabled",
@@ -246,6 +258,7 @@ assert_raises_code(
         served_model="gemma-research",
         model_revision="gemma-4-declared-revision-unit",
         runtime_version="",
+        configuration_hash="c" * 64,
         auth_mode="none",
         api_key=None,
         tls_mode="disabled",
@@ -261,6 +274,7 @@ assert_raises_code(
         served_model="gemma-research",
         model_revision="gemma-4-declared-revision-unit",
         runtime_version="vllm-openai-declared-unit ",
+        configuration_hash="c" * 64,
         auth_mode="none",
         api_key=None,
         tls_mode="disabled",
@@ -270,29 +284,27 @@ assert_raises_code(
 )
 
 field_by_name = {field.name: field for field in fields(GatewayConfiguration)}
-for required_field_name in ("model_revision", "runtime_version"):
+for required_field_name in ("model_revision", "runtime_version", "configuration_hash"):
     field = field_by_name[required_field_name]
     if field.default is not MISSING or field.default_factory is not MISSING:
         raise AssertionError(f"Valeur par defaut interdite pour {required_field_name}.")
 
-runtime_environment = {
-    "GEMMA_BASE_URL": "http://spark-inference.test:8000/v1",
-    "GEMMA_MODEL": "gemma-research",
-    "GEMMA_MODEL_REVISION": "gemma-4-declared-revision-unit",
-    "GEMMA_RUNTIME_VERSION": "vllm-openai-declared-unit",
-    "GEMMA_AUTH_MODE": "none",
-    "GEMMA_TLS_MODE": "disabled",
-    "GEMMA_TIMEOUT_SECONDS": "9",
-    "GEMMA_RETRY_BEFORE_FIRST_TOKEN": "1",
-    "GEMMA_CIRCUIT_BREAKER_FAILURE_THRESHOLD": "2",
-    "GEMMA_CIRCUIT_BREAKER_OPEN_SECONDS": "30",
-}
+runtime_configuration = load_application_configuration(
+    config_path=f"{sys.argv[1]}/config/application.example.yaml",
+    environment_snapshot={},
+)
 local_runtime._LLM_GATEWAY_INSTANCE = None
-first_runtime_gateway = local_runtime._get_local_language_model_gateway(environment=runtime_environment)
-second_runtime_gateway = local_runtime._get_local_language_model_gateway(environment=runtime_environment)
+local_runtime._LLM_GATEWAY_CONFIGURATION_HASH = None
+first_runtime_gateway = local_runtime._get_local_language_model_gateway(
+    application_configuration=runtime_configuration,
+)
+second_runtime_gateway = local_runtime._get_local_language_model_gateway(
+    application_configuration=runtime_configuration,
+)
 if first_runtime_gateway is not second_runtime_gateway:
     raise AssertionError("Le runtime local doit conserver l'instance gateway LLM et son circuit breaker.")
 local_runtime._LLM_GATEWAY_INSTANCE = None
+local_runtime._LLM_GATEWAY_CONFIGURATION_HASH = None
 
 assert_raises_code("LLM_OUTPUT_SCHEMA_REQUIRED", lambda: valid_request(output_schema={}))
 
@@ -343,6 +355,7 @@ api_key_configuration = GatewayConfiguration(
     served_model="gemma-research",
     model_revision="gemma-4-declared-revision-unit",
     runtime_version="vllm-openai-declared-unit",
+    configuration_hash="c" * 64,
     auth_mode="api_key_file",
     api_key="unit-secret-key",
     tls_mode="ca_bundle",

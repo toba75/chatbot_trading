@@ -157,10 +157,13 @@ foreach ($forbiddenSecretProperty in @("password", "token", "api_key", "secret",
     }
 }
 
-foreach ($forbiddenExampleToken in @("password:", "token:", "api_key_value:", "secret_value:")) {
+foreach ($forbiddenExampleToken in @("password:", "api_key_value:", "secret_value:")) {
     if ($exampleContent.Contains($forbiddenExampleToken)) {
         throw "Secret en clair interdit dans l'exemple: $forbiddenExampleToken"
     }
+}
+if ($exampleContent -match '(?m)^\s*token\s*:') {
+    throw "Secret en clair interdit dans l'exemple: token:"
 }
 
 # Clé environnement historique non migrée: le schéma et l'exemple ne publient aucune ancienne entrée.

@@ -231,7 +231,10 @@
             "url",
             "port",
             "spark_endpoint_url",
+            "auth_mode",
+            "tls_mode",
             "timeout_seconds",
+            "retry_before_first_token",
             "circuit_breaker_failure_threshold",
             "circuit_breaker_reset_seconds"
           ],
@@ -245,9 +248,25 @@
             "spark_endpoint_url": {
               "$ref": "#/$defs/nonEmptyNonPlaceholderString"
             },
+            "auth_mode": {
+              "enum": [
+                "none",
+                "api_key_file"
+              ]
+            },
+            "tls_mode": {
+              "enum": [
+                "disabled",
+                "ca_bundle"
+              ]
+            },
             "timeout_seconds": {
               "type": "integer",
               "minimum": 1
+            },
+            "retry_before_first_token": {
+              "type": "integer",
+              "minimum": 0
             },
             "circuit_breaker_failure_threshold": {
               "type": "integer",

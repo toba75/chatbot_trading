@@ -1,3 +1,8 @@
+﻿param(
+    [Parameter(Mandatory = $false)]
+    [string] $ConfigPath
+)
+
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
@@ -7,36 +12,14 @@ $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 [Console]::OutputEncoding = $utf8NoBom
 $OutputEncoding = $utf8NoBom
 
-$requiredVariables = @(
-    "GEMMA_BASE_URL",
-    "GEMMA_MODEL",
-    "GEMMA_AUTH_MODE",
-    "GEMMA_TLS_MODE",
-    "GEMMA_MODEL_REVISION",
-    "GEMMA_RUNTIME_VERSION",
-    "GEMMA_TIMEOUT_SECONDS",
-    "GEMMA_RETRY_BEFORE_FIRST_TOKEN",
-    "GEMMA_CIRCUIT_BREAKER_FAILURE_THRESHOLD",
-    "GEMMA_CIRCUIT_BREAKER_OPEN_SECONDS"
-)
-
-foreach ($name in $requiredVariables) {
-    $value = [Environment]::GetEnvironmentVariable($name)
-    if ([string]::IsNullOrWhiteSpace($value)) {
-        throw "Variable requise absente pour le test produit M13-reality: $name"
-    }
-    if ($value -ne $value.Trim()) {
-        throw "Variable non normalisée pour le test produit M13-reality: $name"
-    }
+$effectiveConfigPath = $ConfigPath
+if ([string]::IsNullOrWhiteSpace($effectiveConfigPath)) {
+    $effectiveConfigPath = Join-Path $repoRoot "config/application.yaml"
 }
-
-if ($env:GEMMA_AUTH_MODE -ne "none") {
-    throw "GEMMA_AUTH_MODE doit valoir none pour le conteneur Spark actuel."
+if (-not (Test-Path -LiteralPath $effectiveConfigPath -PathType Leaf)) {
+    throw "Configuration locale requise pour le test produit M13-reality: $effectiveConfigPath"
 }
-if ($env:GEMMA_TLS_MODE -ne "disabled") {
-    throw "GEMMA_TLS_MODE doit valoir disabled pour le conteneur Spark actuel."
-}
-
+$resolvedConfigPath = (Resolve-Path -LiteralPath $effectiveConfigPath).Path
 $pythonCode = @'
 from __future__ import annotations
 
@@ -49,17 +32,26 @@ import urllib.request
 
 
 repo_root = sys.argv[1]
-served_model = sys.argv[2]
-model_revision = sys.argv[3]
-runtime_version = sys.argv[4]
+config_path = sys.argv[2]
 
 if repo_root not in sys.path:
     sys.path.insert(0, repo_root)
 
+from app.platform.configuration import load_application_configuration  # noqa: E402
 from app.evaluation.domain.llm_real_path_benchmark import (  # noqa: E402
     REQUIRED_LLM_TASKS,
     REQUIRED_LLM_TECHNICAL_METRICS,
 )
+
+
+configuration = load_application_configuration(config_path=config_path, environment_snapshot={})
+served_model = configuration.models.llm.served_model_name
+model_revision = configuration.models.llm.model_revision
+runtime_version = configuration.models.llm.runtime_version
+if configuration.services.llm_gateway.auth_mode != "none":
+    raise AssertionError("auth_mode doit valoir none pour le conteneur Spark actuel.")
+if configuration.services.llm_gateway.tls_mode != "disabled":
+    raise AssertionError("tls_mode doit valoir disabled pour le conteneur Spark actuel.")
 
 
 orchestrator_url = "http://127.0.0.1:8080"
@@ -262,7 +254,7 @@ Set-Content -Encoding UTF8 -LiteralPath $pythonScriptPath -Value $pythonCode
 try {
     $gatewayProcess = Start-Process `
         -FilePath $pythonExecutable `
-        -ArgumentList @("-m", "app.platform.local_runtime", "serve-http", "llm-gateway", "8090") `
+        -ArgumentList @("-m", "app.platform.local_runtime", "serve-http", "llm-gateway", "8090", "--config", $resolvedConfigPath) `
         -WorkingDirectory $repoRoot `
         -RedirectStandardOutput $gatewayStdoutPath `
         -RedirectStandardError $gatewayStderrPath `
@@ -271,7 +263,7 @@ try {
 
     $orchestratorProcess = Start-Process `
         -FilePath $pythonExecutable `
-        -ArgumentList @("-m", "app.platform.local_runtime", "serve-http", "orchestrator-api", "8080") `
+        -ArgumentList @("-m", "app.platform.local_runtime", "serve-http", "orchestrator-api", "8080", "--config", $resolvedConfigPath) `
         -WorkingDirectory $repoRoot `
         -RedirectStandardOutput $orchestratorStdoutPath `
         -RedirectStandardError $orchestratorStderrPath `
@@ -281,9 +273,7 @@ try {
     $env:PYTHONIOENCODING = "utf-8"
     $output = & $pythonExecutable -B $pythonScriptPath `
         $repoRoot `
-        $env:GEMMA_MODEL `
-        $env:GEMMA_MODEL_REVISION `
-        $env:GEMMA_RUNTIME_VERSION 2>&1
+        $resolvedConfigPath 2>&1
     $exitCode = $LASTEXITCODE
 }
 finally {

@@ -195,3 +195,75 @@ Commandes GREEN exécutées:
 - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1` - GREEN; `Gate lint GREEN: 35 validation(s), 0 test(s)`.
 
 Statut: GREEN correctif après validation finale.
+
+## T-004 - Migration du gateway LLM vers la configuration applicative
+
+Date d'exécution: 2026-07-10.
+
+Scénario couvert:
+
+- Given `config/application.yaml` déclare le Spark réel, le modèle servi et la provenance LLM.
+- When le chat produit ou le benchmark LLM exécute une inférence.
+- Then le gateway utilise les valeurs du fichier, rejette les homonymes d'environnement et conserve la provenance complète avec le hash de configuration.
+
+ADR consultées:
+
+- ADR-014 - Endpoint Docker Spark externe sans clé API.
+- ADR-015 - Provenance LLM déclarée par le gateway.
+- ADR-016 - Configuration applicative par fichier unique.
+
+Artefacts livrés:
+
+- `app/platform/local_runtime.py`.
+- `app/platform/llm_gateway/__init__.py`.
+- `app/platform/observability/__init__.py`.
+- `app/platform/configuration/__init__.py`.
+- `config/application.schema.json`.
+- `config/application.example.yaml`.
+- `docs/specs/m013_config_configuration_applicative.md`.
+- `tests/m013_config/validate_llm_gateway_config_file_acceptance.ps1`.
+- `tests/m013_config/validate_llm_gateway_config_file_unit.ps1`.
+- `tests/m013/validate_llm_gateway_real_spark_acceptance.ps1`.
+- `tests/m013/validate_m013_reality_product_acceptance.ps1`.
+- `tests/m013/validate_m013_reality_product_unit.ps1`.
+- `scripts/validate_m013_reality.ps1`.
+
+Décision de workflow:
+
+- Le commit RED ajoute uniquement les tests T-004 du gateway configuré par fichier.
+- L'implémentation GREEN remplace la construction `GatewayConfiguration` depuis `GEMMA_*` par `ApplicationConfiguration`.
+- `auth_mode`, `tls_mode` et `retry_before_first_token` deviennent des clés obligatoires du fichier applicatif.
+- En mode `auth_mode=none` et `tls_mode=disabled`, le gateway n'injecte aucun header `Authorization` et ne lit pas les chemins de secrets Spark.
+- `configuration_hash` est propagé dans `GatewayConfiguration`, les logs et les métriques gateway.
+- Compose, `scripts/test.ps1`, `scripts/lint.ps1` et les runbooks ne sont pas migrés dans cette tâche.
+
+Preuve RED:
+
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_llm_gateway_config_file_unit.ps1` - RED attendu; `_build_gateway_configuration_from_application_configuration` absent.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_llm_gateway_config_file_acceptance.ps1` - RED attendu; le runtime `serve-http` démarre sans `--config`.
+- Commit RED: `65b0853db` (`test(platform): couvrir gateway llm configure par fichier`).
+
+Commandes GREEN exécutées:
+
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_llm_gateway_config_file_acceptance.ps1` - GREEN; `Test d'acceptation T-004 gateway LLM configuré par fichier: OK`.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_llm_gateway_config_file_unit.ps1` - GREEN; `Tests unitaires T-004 gateway LLM configuré par fichier: OK`.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_application_config_loader_acceptance.ps1` - GREEN; `Test d'acceptation du chargeur de configuration applicative: OK`.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_application_config_loader_unit.ps1` - GREEN; `Tests unitaires du chargeur de configuration applicative: OK`.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_application_config_specification_acceptance.ps1` - GREEN; `Test d'acceptation du contrat de configuration applicative: OK`.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_application_config_specification_unit.ps1` - GREEN; `Tests unitaires du contrat de configuration applicative: OK`.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_m013_reality_product_unit.ps1` - GREEN; `Tests unitaires M13-reality produit: OK`.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m002\validate_llm_gateway_contract_acceptance.ps1` - GREEN; `Test d'acceptation contrat gateway LLM M-002: OK`.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m002\validate_llm_gateway_contract_unit.ps1` - GREEN; `Tests unitaires contrat gateway LLM M-002: OK`.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m002\validate_llm_gateway_failures_acceptance.ps1` - GREEN; `Test d'acceptation pannes gateway LLM M-002: OK`.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m002\validate_llm_gateway_failures_unit.ps1` - GREEN; `Tests unitaires pannes gateway LLM M-002: OK`.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m002\validate_gateway_observability_acceptance.ps1` - GREEN; `Test d'acceptation observabilité gateway M-002: OK`.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m002\validate_gateway_observability_unit.ps1` - GREEN; `Tests unitaires observabilité gateway M-002: OK`.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1` - GREEN; `Gate lint GREEN: 35 validation(s), 0 test(s)`.
+
+Validation live Spark:
+
+- Commande tentée: `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_reality.ps1`.
+- Résultat: impossible sans configuration locale réelle; le script échoue explicitement sur `Configuration locale requise pour le test réel M13-reality: C:\Users\maxim\python\chatbot_trading\config\application.yaml`.
+- Aucun test live Spark n'a été converti en fixture et aucune provenance n'a été inventée.
+
+Statut: GREEN hors réseau pour T-004; validation live Spark bloquée par l'absence de `config/application.yaml` local réel.

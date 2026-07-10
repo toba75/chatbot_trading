@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
 $specificationPath = Join-Path $repoRoot "docs/specs/m013_config_configuration_applicative.md"
@@ -139,8 +139,12 @@ foreach ($guardrail in @(
     Assert-Contains -Content $specificationContent -Expected $guardrail -Message "Garde-fou absent de la spécification: $guardrail"
 }
 
-foreach ($forbiddenExampleToken in @("TO_BE_FILLED", "change-me", "password:", "token:", "api_key_value:", "secret_value:")) {
+foreach ($forbiddenExampleToken in @("TO_BE_FILLED", "change-me", "password:", "api_key_value:", "secret_value:")) {
     Assert-NotContains -Content $exampleContent -Forbidden $forbiddenExampleToken -Message "L'exemple contient une valeur secrète ou placeholder interdite: $forbiddenExampleToken"
+}
+
+if ($exampleContent -match '(?m)^\s*token\s*:') {
+    throw "L'exemple contient une valeur secrète ou placeholder interdite: token:"
 }
 
 Write-Host "Test d'acceptation du contrat de configuration applicative: OK"

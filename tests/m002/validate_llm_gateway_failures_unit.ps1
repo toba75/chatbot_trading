@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
 . (Join-Path $repoRoot "scripts/require_python.ps1")
@@ -77,6 +77,7 @@ def valid_configuration() -> GatewayConfiguration:
         served_model="gemma-research",
         model_revision="gemma-4-declared-revision-unit-t006",
         runtime_version="vllm-openai-declared-unit-t006",
+        configuration_hash="c" * 64,
         auth_mode="api_key_file",
         api_key="secret-unit-t006",
         tls_mode="ca_bundle",
