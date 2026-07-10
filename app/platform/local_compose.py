@@ -311,7 +311,7 @@ def _validate_service_tmpfs(service: ComposeService) -> None:
         return
 
     if len(service.tmpfs) > 0:
-        raise ValueError(f"tmpfs non prÃ©vu pour service: {service.id}")
+        raise ValueError(f"tmpfs non prévu pour service: {service.id}")
 
 
 def _validate_service_healthcheck(service: ComposeService) -> None:

@@ -375,16 +375,16 @@ Test requis: tests/m004/validate_page_conversion_unit.ps1
 Tests unitaires T-003 conversion pagewise M-004: OK
 Test GREEN: tests/m004/validate_page_conversion_unit.ps1
 Test requis: tests/m004/validate_text_authority_acceptance.ps1
-Test d'acceptation T-004 autoritÃ© textuelle M-004: OK
+Test d'acceptation T-004 autorité textuelle M-004: OK
 Test GREEN: tests/m004/validate_text_authority_acceptance.ps1
 Test requis: tests/m004/validate_text_authority_unit.ps1
-Tests unitaires T-004 autoritÃ© textuelle M-004: OK
+Tests unitaires T-004 autorité textuelle M-004: OK
 Test GREEN: tests/m004/validate_text_authority_unit.ps1
 Test requis: tests/m004/validate_canonical_quality_acceptance.ps1
-Test d'acceptation T-005 qualitÃ© canonique M-004: OK
+Test d'acceptation T-005 qualité canonique M-004: OK
 Test GREEN: tests/m004/validate_canonical_quality_acceptance.ps1
 Test requis: tests/m004/validate_canonical_quality_unit.ps1
-Tests unitaires T-005 qualitÃ© canonique M-004: OK
+Tests unitaires T-005 qualité canonique M-004: OK
 Test GREEN: tests/m004/validate_canonical_quality_unit.ps1
 Test requis: tests/m004/validate_canonical_publication_acceptance.ps1
 Test d'acceptation T-006 publication canonique immuable M-004: OK
@@ -393,16 +393,16 @@ Test requis: tests/m004/validate_canonical_publication_unit.ps1
 Tests unitaires T-006 publication canonique immuable M-004: OK
 Test GREEN: tests/m004/validate_canonical_publication_unit.ps1
 Test requis: tests/m004/validate_source_locator_resolution_acceptance.ps1
-Test d'acceptation T-007 rÃ©solution SourceLocator M-004: OK
+Test d'acceptation T-007 résolution SourceLocator M-004: OK
 Test GREEN: tests/m004/validate_source_locator_resolution_acceptance.ps1
 Test requis: tests/m004/validate_source_locator_resolution_unit.ps1
-Tests unitaires T-007 rÃ©solution SourceLocator M-004: OK
+Tests unitaires T-007 résolution SourceLocator M-004: OK
 Test GREEN: tests/m004/validate_source_locator_resolution_unit.ps1
 Test requis: tests/m004/validate_canonical_publication_event_acceptance.ps1
-Test d'acceptation T-008 Ã©vÃ©nement CanonicalSourcePublished M-004: OK
+Test d'acceptation T-008 événement CanonicalSourcePublished M-004: OK
 Test GREEN: tests/m004/validate_canonical_publication_event_acceptance.ps1
 Test requis: tests/m004/validate_canonical_publication_event_unit.ps1
-Tests unitaires T-008 Ã©vÃ©nement CanonicalSourcePublished M-004: OK
+Tests unitaires T-008 événement CanonicalSourcePublished M-004: OK
 Test GREEN: tests/m004/validate_canonical_publication_event_unit.ps1
 Test requis: tests/m004/validate_document_conversion_command_acceptance.ps1
 Test d'acceptation T-009 commande de conversion documentaire M-004: OK
@@ -417,10 +417,10 @@ Test requis: tests/m004/validate_m004_traceability_unit.ps1
 Tests unitaires de traçabilité M-004: OK
 Test GREEN: tests/m004/validate_m004_traceability_unit.ps1
 Test requis: tests/m005/validate_m005_specification_acceptance.ps1
-Test d'acceptation de la spÃ©cification M-005: OK
+Test d'acceptation de la spécification M-005: OK
 Test GREEN: tests/m005/validate_m005_specification_acceptance.ps1
 Test requis: tests/m005/validate_m005_specification_unit.ps1
-Tests unitaires du validateur de spÃ©cification M-005: OK
+Tests unitaires du validateur de spécification M-005: OK
 Test GREEN: tests/m005/validate_m005_specification_unit.ps1
 Test requis: tests/m005/validate_knowledge_projection_acceptance.ps1
 Test d'acceptation T-003 projection de connaissance M-005: OK
@@ -432,10 +432,10 @@ Test requis: tests/m005/validate_index_command_acceptance.ps1
 Test d'acceptation T-003 contrat HTTP indexation KA M-005: OK
 Test GREEN: tests/m005/validate_index_command_acceptance.ps1
 Test requis: tests/m005/validate_hierarchical_chunking_acceptance.ps1
-Test d'acceptation T-004 chunking hiÃ©rarchique traÃ§able M-005: OK
+Test d'acceptation T-004 chunking hiérarchique traçable M-005: OK
 Test GREEN: tests/m005/validate_hierarchical_chunking_acceptance.ps1
 Test requis: tests/m005/validate_hierarchical_chunking_unit.ps1
-Tests unitaires T-004 chunking hiÃ©rarchique traÃ§able M-005: OK
+Tests unitaires T-004 chunking hiérarchique traçable M-005: OK
 Test GREEN: tests/m005/validate_hierarchical_chunking_unit.ps1
 Test requis: tests/m005/validate_projection_metadata_filters_acceptance.ps1
 Test d'acceptation T-005 métadonnées filtrables M-005: OK
@@ -450,19 +450,19 @@ Test requis: tests/m005/validate_projection_encoding_unit.ps1
 Tests unitaires T-006 encodage dense sparse M-005: OK
 Test GREEN: tests/m005/validate_projection_encoding_unit.ps1
 Test requis: tests/m005/validate_qdrant_projection_acceptance.ps1
-Test d'acceptation T-007 index Qdrant rÃ©gÃ©nÃ©rable M-005: OK
+Test d'acceptation T-007 index Qdrant régénérable M-005: OK
 Test GREEN: tests/m005/validate_qdrant_projection_acceptance.ps1
 Test requis: tests/m005/validate_qdrant_projection_unit.ps1
-Tests unitaires T-007 index Qdrant rÃ©gÃ©nÃ©rable M-005: OK
+Tests unitaires T-007 index Qdrant régénérable M-005: OK
 Test GREEN: tests/m005/validate_qdrant_projection_unit.ps1
 Test requis: tests/m005/validate_knowledge_projection_events_acceptance.ps1
-Test d'acceptation T-007 Ã©vÃ©nements KnowledgeProjection M-005: OK
+Test d'acceptation T-007 événements KnowledgeProjection M-005: OK
 Test GREEN: tests/m005/validate_knowledge_projection_events_acceptance.ps1
 Test requis: tests/m005/validate_hybrid_search_acceptance.ps1
-Test d'acceptation T-008 recherche hybride traÃ§able M-005: OK
+Test d'acceptation T-008 recherche hybride traçable M-005: OK
 Test GREEN: tests/m005/validate_hybrid_search_acceptance.ps1
 Test requis: tests/m005/validate_hybrid_search_unit.ps1
-Tests unitaires T-008 recherche hybride traÃ§able M-005: OK
+Tests unitaires T-008 recherche hybride traçable M-005: OK
 Test GREEN: tests/m005/validate_hybrid_search_unit.ps1
 Test requis: tests/m005/validate_search_trace_acceptance.ps1
 Test d'acceptation T-008 trace de recherche M-005: OK
@@ -474,13 +474,13 @@ Test requis: tests/m005/validate_search_command_unit.ps1
 Tests unitaires T-009 commande de recherche publique KA M-005: OK
 Test GREEN: tests/m005/validate_search_command_unit.ps1
 Test requis: tests/m005/validate_m005_traceability_acceptance.ps1
-Test d'acceptation T-010 traÃ§abilitÃ© et mÃ©triques M-005: OK
+Test d'acceptation T-010 traçabilité et métriques M-005: OK
 Test GREEN: tests/m005/validate_m005_traceability_acceptance.ps1
 Test requis: tests/m005/validate_m005_traceability_unit.ps1
-Tests unitaires T-010 traÃ§abilitÃ© et mÃ©triques M-005: OK
+Tests unitaires T-010 traçabilité et métriques M-005: OK
 Test GREEN: tests/m005/validate_m005_traceability_unit.ps1
 Test requis: tests/m006/validate_m006_specification_acceptance.ps1
-Test d'acceptation de la spÃ©cification M-006: OK
+Test d'acceptation de la spécification M-006: OK
 Test GREEN: tests/m006/validate_m006_specification_acceptance.ps1
 Test requis: tests/m006/validate_m006_specification_unit.ps1
 Tests unitaires du validateur de spécification M-006: OK
@@ -498,28 +498,28 @@ Test requis: tests/m006/validate_claim_evidence_attachment_unit.ps1
 Tests unitaires T-004 attachement preuve claim M-006: OK
 Test GREEN: tests/m006/validate_claim_evidence_attachment_unit.ps1
 Test requis: tests/m006/validate_claim_verification_acceptance.ps1
-Test d'acceptation T-005 vÃ©rification claim preuve directe M-006: OK
+Test d'acceptation T-005 vérification claim preuve directe M-006: OK
 Test GREEN: tests/m006/validate_claim_verification_acceptance.ps1
 Test requis: tests/m006/validate_claim_verification_unit.ps1
-Tests unitaires T-005 vÃ©rification claim preuve directe M-006: OK
+Tests unitaires T-005 vérification claim preuve directe M-006: OK
 Test GREEN: tests/m006/validate_claim_verification_unit.ps1
 Test requis: tests/m006/validate_dependency_group_acceptance.ps1
-Test d'acceptation T-006 confirmations indÃ©pendantes M-006: OK
+Test d'acceptation T-006 confirmations indépendantes M-006: OK
 Test GREEN: tests/m006/validate_dependency_group_acceptance.ps1
 Test requis: tests/m006/validate_dependency_group_unit.ps1
-Tests unitaires T-006 confirmations indÃ©pendantes M-006: OK
+Tests unitaires T-006 confirmations indépendantes M-006: OK
 Test GREEN: tests/m006/validate_dependency_group_unit.ps1
 Test requis: tests/m006/validate_claim_relation_acceptance.ps1
-Test d'acceptation T-007 relations claims aprÃ¨s comparaison de portÃ©e M-006: OK
+Test d'acceptation T-007 relations claims après comparaison de portée M-006: OK
 Test GREEN: tests/m006/validate_claim_relation_acceptance.ps1
 Test requis: tests/m006/validate_claim_relation_unit.ps1
-Tests unitaires T-007 relations claims aprÃ¨s comparaison de portÃ©e M-006: OK
+Tests unitaires T-007 relations claims après comparaison de portée M-006: OK
 Test GREEN: tests/m006/validate_claim_relation_unit.ps1
 Test requis: tests/m006/validate_claim_retention_acceptance.ps1
-Test d'acceptation T-008 conservation claims rejetÃ©s et supersÃ©dÃ©s M-006: OK
+Test d'acceptation T-008 conservation claims rejetés et supersédés M-006: OK
 Test GREEN: tests/m006/validate_claim_retention_acceptance.ps1
 Test requis: tests/m006/validate_claim_retention_unit.ps1
-Tests unitaires T-008 conservation claims rejetÃ©s et supersÃ©dÃ©s M-006: OK
+Tests unitaires T-008 conservation claims rejetés et supersédés M-006: OK
 Test GREEN: tests/m006/validate_claim_retention_unit.ps1
 Test requis: tests/m006/validate_claim_http_contract_acceptance.ps1
 Test d'acceptation T-009 contrat HTTP claims evidence M-006: OK
@@ -528,10 +528,10 @@ Test requis: tests/m006/validate_claim_http_contract_unit.ps1
 Tests unitaires T-009 contrat HTTP claims evidence M-006: OK
 Test GREEN: tests/m006/validate_claim_http_contract_unit.ps1
 Test requis: tests/m006/validate_m006_traceability_acceptance.ps1
-Test d'acceptation T-010 traÃ§abilitÃ© et mÃ©triques M-006: OK
+Test d'acceptation T-010 traçabilité et métriques M-006: OK
 Test GREEN: tests/m006/validate_m006_traceability_acceptance.ps1
 Test requis: tests/m006/validate_m006_traceability_unit.ps1
-Tests unitaires T-010 traÃ§abilitÃ© et mÃ©triques M-006: OK
+Tests unitaires T-010 traçabilité et métriques M-006: OK
 Test GREEN: tests/m006/validate_m006_traceability_unit.ps1
 Test requis: tests/m007/validate_m007_specification_acceptance.ps1
 Test d'acceptation de la spécification M-007: OK
@@ -546,10 +546,10 @@ Test requis: tests/m007/validate_research_case_mandate_unit.ps1
 Tests unitaires T-003 ResearchCase mandat explicite M-007: OK
 Test GREEN: tests/m007/validate_research_case_mandate_unit.ps1
 Test requis: tests/m007/validate_evidence_set_sealing_acceptance.ps1
-Test d'acceptation T-004 EvidenceSet scellÃ© M-007: OK
+Test d'acceptation T-004 EvidenceSet scellé M-007: OK
 Test GREEN: tests/m007/validate_evidence_set_sealing_acceptance.ps1
 Test requis: tests/m007/validate_evidence_set_sealing_unit.ps1
-Tests unitaires T-004 EvidenceSet scellÃ© M-007: OK
+Tests unitaires T-004 EvidenceSet scellé M-007: OK
 Test GREEN: tests/m007/validate_evidence_set_sealing_unit.ps1
 Test requis: tests/m007/validate_contradiction_gap_acceptance.ps1
 Test d'acceptation T-005 contradictions et lacunes M-007: OK
@@ -558,34 +558,34 @@ Test requis: tests/m007/validate_contradiction_gap_unit.ps1
 Tests unitaires T-005 contradictions et lacunes M-007: OK
 Test GREEN: tests/m007/validate_contradiction_gap_unit.ps1
 Test requis: tests/m007/validate_answer_assertion_extraction_acceptance.ps1
-Test d'acceptation T-006 extraction assertions de rÃ©ponse M-007: OK
+Test d'acceptation T-006 extraction assertions de réponse M-007: OK
 Test GREEN: tests/m007/validate_answer_assertion_extraction_acceptance.ps1
 Test requis: tests/m007/validate_answer_assertion_extraction_unit.ps1
-Tests unitaires T-006 extraction assertions de rÃ©ponse M-007: OK
+Tests unitaires T-006 extraction assertions de réponse M-007: OK
 Test GREEN: tests/m007/validate_answer_assertion_extraction_unit.ps1
 Test requis: tests/m007/validate_answer_support_acceptance.ps1
-Test d'acceptation T-007 support et citations de rÃ©ponse M-007: OK
+Test d'acceptation T-007 support et citations de réponse M-007: OK
 Test GREEN: tests/m007/validate_answer_support_acceptance.ps1
 Test requis: tests/m007/validate_answer_support_unit.ps1
-Tests unitaires T-007 support et citations de rÃ©ponse M-007: OK
+Tests unitaires T-007 support et citations de réponse M-007: OK
 Test GREEN: tests/m007/validate_answer_support_unit.ps1
 Test requis: tests/m007/validate_current_data_abstention_acceptance.ps1
-Test d'acceptation T-008 abstention donnÃ©es actuelles M-007: OK
+Test d'acceptation T-008 abstention données actuelles M-007: OK
 Test GREEN: tests/m007/validate_current_data_abstention_acceptance.ps1
 Test requis: tests/m007/validate_current_data_abstention_unit.ps1
-Tests unitaires T-008 abstention donnÃ©es actuelles M-007: OK
+Tests unitaires T-008 abstention données actuelles M-007: OK
 Test GREEN: tests/m007/validate_current_data_abstention_unit.ps1
 Test requis: tests/m007/validate_answer_http_contract_acceptance.ps1
-Test d'acceptation T-009 contrat HTTP rÃ©ponse documentaire M-007: OK
+Test d'acceptation T-009 contrat HTTP réponse documentaire M-007: OK
 Test GREEN: tests/m007/validate_answer_http_contract_acceptance.ps1
 Test requis: tests/m007/validate_answer_http_contract_unit.ps1
-Tests unitaires T-009 contrat HTTP rÃ©ponse documentaire M-007: OK
+Tests unitaires T-009 contrat HTTP réponse documentaire M-007: OK
 Test GREEN: tests/m007/validate_answer_http_contract_unit.ps1
 Test requis: tests/m007/validate_m007_traceability_acceptance.ps1
-Test d'acceptation T-010 traÃ§abilitÃ© et mÃ©triques M-007: OK
+Test d'acceptation T-010 traçabilité et métriques M-007: OK
 Test GREEN: tests/m007/validate_m007_traceability_acceptance.ps1
 Test requis: tests/m007/validate_m007_traceability_unit.ps1
-Tests unitaires T-010 traÃ§abilitÃ© et mÃ©triques M-007: OK
+Tests unitaires T-010 traçabilité et métriques M-007: OK
 Test GREEN: tests/m007/validate_m007_traceability_unit.ps1
 Test requis: tests/m010/validate_strategy_compatibility_acceptance.ps1
 Test d'acceptation de compatibilité de stratégie M-010: OK
