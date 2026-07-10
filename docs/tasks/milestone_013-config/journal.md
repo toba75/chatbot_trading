@@ -370,3 +370,53 @@ Commandes GREEN exécutées:
 - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1` - T-006 appelée et GREEN, puis arrêt indépendant sur `scripts/validate_m013_reality.ps1` faute de fichier local réel `config/application.yaml`.
 
 Statut: GREEN pour T-006; `scripts/test.ps1` reste non conclusif au-delà de T-006 tant que `config/application.yaml` local réel n'est pas fourni pour M13-reality.
+
+## T-007 - Runbooks de migration de configuration
+
+Date d'exécution: 2026-07-10.
+
+Scénario couvert:
+
+- Given un exploitant local lit les runbooks après M13-config.
+- When il prépare et démarre la pile V1.
+- Then chaque commande utilise `--config`, les anciennes variables sont présentées comme entrées rejetées, et la preuve d'audit cite le fichier chargé.
+
+ADR consultée:
+
+- ADR-016 - Configuration applicative par fichier unique.
+
+Artefacts livrés:
+
+- `docs/runbooks/configuration_applicative.md`.
+- `tests/m013_config/validate_config_runbooks_acceptance.ps1`.
+- `tests/m013_config/validate_config_runbooks_unit.ps1`.
+- `docs/runbooks/exploitation_locale.md`.
+- `docs/runbooks/spark_reseau_incidents.md`.
+- `docs/runbooks/certificats_spark.md`.
+- `deploy/local-compose/README.md`.
+- `scripts/validate_m013_config_environment.py`.
+
+Décision de workflow:
+
+- Le commit RED ajoute uniquement les tests d'acceptation et unitaires des runbooks de migration.
+- L'implémentation GREEN publie le runbook `configuration_applicative`, met à jour les runbooks existants avec `config/application.yaml`, `--config`, les chemins de secrets hors Git et la preuve `configuration_hash`.
+- La gate T-006 reste stricte: elle autorise les anciennes clés dans le nouveau runbook uniquement sur les lignes qui documentent explicitement migration, rejet ou interdiction; toute mention opérationnelle reste rejetée par `CONFIG_ENV_INPUT_REJECTED`.
+- `scripts/test.ps1` et `scripts/lint.ps1` ne sont pas modifiés dans cette tâche; l'enrôlement global reste réservé à T-008.
+
+Preuve RED:
+
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_config_runbooks_acceptance.ps1` - RED attendu; `Document attendu absent: C:\Users\maxim\python\chatbot_trading\docs\runbooks\configuration_applicative.md`.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_config_runbooks_unit.ps1` - RED attendu; `Document requis absent: docs/runbooks/configuration_applicative.md`.
+- Commit RED: `2166e787a` (`test(docs): couvrir runbooks configuration sans environnement`).
+
+Commandes GREEN exécutées:
+
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_config_runbooks_acceptance.ps1` - GREEN; `Test d'acceptation runbooks configuration M13-config: OK`.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_config_runbooks_unit.ps1` - GREEN; `Tests unitaires runbooks configuration M13-config: OK`.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_runbooks.ps1` - GREEN; `Runbooks documentation utilisateur M-013 valides: 11 runbook(s), documentation utilisateur V1, commandes vérifiées, écarts V1 non acceptés visibles, aucun secret, aucun service interne publié, aucune promesse financière.`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_config_environment.ps1` - GREEN; `Gate environnement M13-config GREEN: 258 fichier(s), 63 exception(s) technique(s) contrôlée(s).`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_environment_input_rejection_acceptance.ps1` - GREEN; `Test d'acceptation rejet environnement M13-config: OK`.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_environment_input_rejection_unit.ps1` - GREEN; `Tests unitaires rejet environnement M13-config: OK`.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1` - GREEN; `Gate lint GREEN: 36 validation(s), 0 test(s)`.
+
+Statut: GREEN pour T-007; le runbook documente les anciennes clés uniquement comme migration ou rejet, et aucun enrôlement global `scripts/test.ps1` / `scripts/lint.ps1` n'a été ajouté hors T-008.

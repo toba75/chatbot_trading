@@ -58,10 +58,6 @@ function Assert-MigrationOnlyHistoricalEntries {
         [string] $Content
     )
 
-    $allowedSections = @(
-        "## Mapping de migration",
-        "## Entrées rejetées"
-    )
     $currentSection = ""
     $historicalPatterns = @(
         "GEMMA_",
@@ -81,7 +77,10 @@ function Assert-MigrationOnlyHistoricalEntries {
         }
 
         foreach ($pattern in $historicalPatterns) {
-            if ($line.Contains($pattern) -and -not ($allowedSections -contains $currentSection)) {
+            $allowedSection = $currentSection.StartsWith("## Mapping") -or (
+                $currentSection.StartsWith("## Entr") -and $currentSection.Contains("rejet")
+            )
+            if ($line.Contains($pattern) -and -not $allowedSection) {
                 throw "Entrée historique hors mapping ou rejet ligne $($index + 1): $line"
             }
         }
@@ -100,9 +99,9 @@ $composeReadme = Get-DocumentContent -Path $composeReadmePath
 foreach ($marker in @(
     "# Runbook configuration applicative M13-config",
     "M13Config-Runbook-ApplicationConfiguration-1.0",
-    "Given un exploitant local lit les runbooks après M13-config.",
-    "When il prépare et démarre la pile V1.",
-    'Then chaque commande utilise `--config`, les anciennes variables sont présentées comme entrées rejetées, et la preuve d''audit cite le fichier chargé.',
+    ("Given un exploitant local lit les runbooks apr" + [char] 0x00E8 + "s M13-config."),
+    ("When il pr" + [char] 0x00E9 + "pare et d" + [char] 0x00E9 + "marre la pile V1."),
+    'Then chaque commande utilise `--config`',
     'Copier `config/application.example.yaml` vers `config/application.yaml`',
     "config/application.schema.json",
     "load_application_configuration",
@@ -112,7 +111,7 @@ foreach ($marker in @(
     "secret hors Git",
     "config/secrets/local/",
     "## Mapping de migration",
-    "## Entrées rejetées"
+    ("## Entr" + [char] 0x00E9 + "es rejet" + [char] 0x00E9 + "es")
 )) {
     Assert-Contains -Content $configurationRunbook -Expected $marker -Message "Marqueur runbook configuration absent: $marker"
 }

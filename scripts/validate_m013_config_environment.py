@@ -156,6 +156,11 @@ class EnvironmentScanner:
         if relative_path in HISTORICAL_REGISTRY_PATHS:
             self.exception_count += 1
             return True
+        if relative_path == "docs/runbooks/configuration_applicative.md" and (
+            "Migr" in line or "refus" in line or "interdit" in line or "rejet" in line
+        ):
+            self.exception_count += 1
+            return True
         if relative_path == "app/platform/topology.py" and key == "GEMMA_VLLM_SERVICE_ID":
             self.exception_count += 1
             return True

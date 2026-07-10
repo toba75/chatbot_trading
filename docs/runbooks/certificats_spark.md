@@ -5,8 +5,8 @@
 - Identifiant: `M013-Runbook-SparkCertificates-1.0`
 - Tâche: `docs/tasks/milestone_013/0010_publier_runbooks_documentation_utilisateur.md`
 - Preuve source: `docs/governance/m013_security_audit.md`
-- ADR applicables: ADR-007, ADR-008, ADR-009, ADR-010, ADR-014.
-- ADR: ADR-014; le Spark actuel fonctionne avec `services.llm_gateway.tls_mode=disabled`, et ce runbook décrit le contrôle à appliquer si une terminaison HTTPS avec CA explicite est ajoutée.
+- ADR applicables: ADR-007, ADR-008, ADR-009, ADR-010, ADR-014, ADR-016.
+- ADR: ADR-014 et ADR-016; le Spark actuel fonctionne avec `services.llm_gateway.tls_mode=disabled` dans `config/application.yaml`, et ce runbook décrit le contrôle à appliquer si une terminaison HTTPS avec CA explicite est ajoutée.
 
 ## Scénario BDD
 
@@ -17,6 +17,7 @@
 ## Validation de certificat
 
 - Précondition: une terminaison HTTPS Spark a été décidée explicitement, la rotation certificat est préparée hors dépôt et aucune clé privée ou passphrase n'est écrite dans Git.
+- Point de configuration: le chemin `security.secrets.tls_ca_certificate_path` désigne un certificat public local, et le secret hors Git associé reste monté en lecture seule quand un mode futur l'exige.
 - Commande vérifiée:
 
 ```powershell
@@ -36,7 +37,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_secu
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_network_boundary.ps1
 ```
 
-- Résultat attendu: le gateway conserve la frontière `spark-inference`, le mode TLS déclaré et l'authentification explicite; aucun service interne n'est publié.
+- Résultat attendu: le gateway conserve la frontière `spark-inference`, le mode TLS déclaré dans `config/application.yaml`, le chemin `security.secrets.tls_ca_certificate_path` et l'authentification explicite; aucun service interne n'est publié.
 - Erreur explicite: `LLM_AUTHENTICATION_FAILED` ou `LLM_TLS_CERTIFICATE_INVALID` reste visible tant que la rotation n'est pas validée.
 - Preuve à conserver: sortie du validateur réseau, horodatage local de rotation et absence de secret dans les logs.
 

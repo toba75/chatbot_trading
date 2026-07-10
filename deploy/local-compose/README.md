@@ -10,6 +10,7 @@
 - La provenance LLM est déclarée explicitement dans `models.llm.served_model_name`, `models.llm.model_revision` et `models.llm.runtime_version`.
 - Les processus applicatifs reçoivent tous `--config /workspace/config/application.yaml`.
 - Le fichier `config/application.yaml` est monté en lecture seule dans les services applicatifs.
+- Montage attendu dans chaque service applicatif: `../../config/application.yaml:/workspace/config/application.yaml:ro`.
 
 ## Variables requises
 
