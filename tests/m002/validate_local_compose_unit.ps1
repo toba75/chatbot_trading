@@ -17,6 +17,7 @@ from app.platform.local_compose import parse_local_compose_document, validate_lo
 
 APPLICATION_CONFIG_VOLUME = "../../config/application.yaml:/workspace/config/application.yaml:ro"
 APPLICATION_SCHEMA_VOLUME = "../../config/application.schema.json:/workspace/config/application.schema.json:ro"
+LLM_GATEWAY_LOCAL_SECRETS_VOLUME = "../../config/secrets/local:/workspace/config/secrets/local:ro"
 APPLICATION_CONFIG_ARGUMENTS = ["--config", "/workspace/config/application.yaml"]
 
 
@@ -37,7 +38,7 @@ BASE_SERVICES = {
         "command": runtime_command("serve-http", "ui", "8081"),
         "expose": ["8081"],
         "networks": ["core"],
-        "volumes": [APPLICATION_CONFIG_VOLUME, APPLICATION_SCHEMA_VOLUME],
+        "volumes": [APPLICATION_CONFIG_VOLUME, APPLICATION_SCHEMA_VOLUME, LLM_GATEWAY_LOCAL_SECRETS_VOLUME],
         "read_only": True,
     },
     "orchestrator-api": {
@@ -232,6 +233,8 @@ if APPLICATION_CONFIG_VOLUME not in llm_gateway.volumes:
     raise AssertionError(f"Montage config absent pour llm-gateway: {llm_gateway.volumes}")
 if APPLICATION_SCHEMA_VOLUME not in llm_gateway.volumes:
     raise AssertionError(f"Montage schéma absent pour llm-gateway: {llm_gateway.volumes}")
+if LLM_GATEWAY_LOCAL_SECRETS_VOLUME not in llm_gateway.volumes:
+    raise AssertionError(f"Montage secrets Spark local absent pour llm-gateway: {llm_gateway.volumes}")
 if llm_gateway.environment:
     raise AssertionError(f"Environment gateway interdit: {llm_gateway.environment}")
 
@@ -302,6 +305,10 @@ assert_raises(
 assert_raises(
     "Montage config/application.schema.json read-only absent pour service applicatif: llm-gateway",
     valid_compose({"llm-gateway": {"volumes": [APPLICATION_CONFIG_VOLUME]}}),
+)
+assert_raises(
+    "Montage config/secrets/local read-only absent pour service llm-gateway",
+    valid_compose({"llm-gateway": {"volumes": [APPLICATION_CONFIG_VOLUME, APPLICATION_SCHEMA_VOLUME]}}),
 )
 
 assert_raises(

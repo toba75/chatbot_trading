@@ -241,6 +241,9 @@ try {
         if (-not $serviceBlock.Contains("../../config/application.schema.json:/workspace/config/application.schema.json:ro")) {
             throw "Montage config/application.schema.json read-only absent pour service applicatif: $serviceId"
         }
+        if ($serviceId -eq "llm-gateway" -and -not $serviceBlock.Contains("../../config/secrets/local:/workspace/config/secrets/local:ro")) {
+            throw "Montage config/secrets/local read-only absent pour service llm-gateway"
+        }
     }
 
     $environmentPath = New-TemporaryCompose -Name "orchestrator-api-application-environment" -Content (
