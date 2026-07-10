@@ -267,3 +267,59 @@ Validation live Spark:
 - Aucun test live Spark n'a été converti en fixture et aucune provenance n'a été inventée.
 
 Statut: GREEN hors réseau pour T-004; validation live Spark bloquée par l'absence de `config/application.yaml` local réel.
+
+## T-005 - Migration Compose vers le fichier de configuration
+
+Date d'exécution: 2026-07-10.
+
+Scénario couvert:
+
+- Given le fichier `config/application.yaml` est monté en lecture seule dans les services applicatifs.
+- When la pile locale est validée et démarrée.
+- Then chaque processus reçoit `--config`, aucune valeur applicative n'est transmise par `environment:` ou `env_file`, et la frontière Spark reste contrôlée.
+
+ADR consultées:
+
+- ADR-014 - Endpoint Docker Spark externe sans clé API.
+- ADR-016 - Configuration applicative par fichier unique.
+
+Artefacts livrés:
+
+- `deploy/local-compose/compose.yaml`.
+- `deploy/local-compose/README.md`.
+- `app/platform/local_compose.py`.
+- `app/platform/security/network_boundary.py`.
+- `tests/m013_config/validate_compose_config_file_acceptance.ps1`.
+- `tests/m013_config/validate_compose_config_file_unit.ps1`.
+- `tests/m002/validate_local_compose_acceptance.ps1`.
+- `tests/m002/validate_local_compose_unit.ps1`.
+- `tests/m002/validate_network_boundary_acceptance.ps1`.
+- `tests/m002/validate_network_boundary_unit.ps1`.
+
+Décision de workflow:
+
+- Le commit RED ajoute uniquement les tests T-005 du Compose sans environnement applicatif.
+- L'implémentation GREEN retire les variables applicatives des services `ostrading/*`, ajoute `--config /workspace/config/application.yaml`, monte `../../config/application.yaml:/workspace/config/application.yaml:ro` et interdit `env_file`.
+- Les variables techniques restantes sont explicitement allowlistées: `CADDY_ADMIN` pour Caddy, `POSTGRES_DB`, `POSTGRES_USER` et `POSTGRES_PASSWORD_FILE` pour l'image PostgreSQL.
+- Les contrôles M-002 conservent les refus de ports internes, de service Gemma/vLLM local et de `spark-egress` hors `llm-gateway`.
+- `scripts/test.ps1`, `scripts/lint.ps1`, les runbooks généraux et la matrice de traçabilité ne sont pas modifiés dans cette tâche.
+
+Preuve RED:
+
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_compose_config_file_acceptance.ps1` - RED attendu; `Entrée applicative interdite présente dans le Compose canonique: DATABASE_URL:`.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_compose_config_file_unit.ps1` - RED attendu; `Commande Compose invalide pour service ui`.
+- Commit RED: `288f5fe18` (`test(platform): couvrir compose sans environnement applicatif`).
+
+Commandes GREEN exécutées:
+
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_compose_config_file_acceptance.ps1` - GREEN; `Test d'acceptation Compose M13-config: OK`.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_compose_config_file_unit.ps1` - GREEN; `Tests unitaires Compose M13-config: OK`.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m002\validate_local_compose_acceptance.ps1` - GREEN; `Test d'acceptation Compose local M-002: OK`.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m002\validate_local_compose_unit.ps1` - GREEN; `Tests unitaires Compose local M-002: OK`.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m002\validate_network_boundary_acceptance.ps1` - GREEN; `Test d'acceptation frontière réseau M-002: OK`.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m002\validate_network_boundary_unit.ps1` - GREEN; `Tests unitaires frontière réseau M-002: OK`.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_local_compose.ps1` - GREEN; `Compose local M-002 valide: 13 service(s), 3 réseau(x), 1 secret(s) contrôlé(s).`.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_network_boundary.ps1` - GREEN; `Frontière réseau M-002 valide: 13 service(s) Compose, 1 règle(s) Spark, transport Spark et egress contrôlés.`.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1` - GREEN; `Gate lint GREEN: 35 validation(s), 0 test(s)`.
+
+Statut: GREEN pour T-005; la validation Compose contrôle le montage `config/application.yaml` mais ne requiert pas le fichier local réel, qui reste propre à l'installation.

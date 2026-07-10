@@ -92,6 +92,32 @@ function Get-ComposeLineEnding {
     throw "Fin de ligne fixture Compose absente."
 }
 
+function Find-ServiceInsertionIndex {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $Content,
+
+        [Parameter(Mandatory = $true)]
+        [string] $ServiceId,
+
+        [Parameter(Mandatory = $true)]
+        [string] $Section
+    )
+
+    $serviceMatch = [regex]::Match($Content, "(?m)^  $([regex]::Escape($ServiceId)):\r?\n")
+    if (-not $serviceMatch.Success) {
+        throw "Service fixture absent: $ServiceId"
+    }
+
+    $serviceTail = $Content.Substring($serviceMatch.Index + $serviceMatch.Length)
+    $sectionMatch = [regex]::Match($serviceTail, "(?m)^    $([regex]::Escape($Section)):\r?\n")
+    if (-not $sectionMatch.Success) {
+        throw "Section fixture absente pour service ${ServiceId}: $Section"
+    }
+
+    return $serviceMatch.Index + $serviceMatch.Length + $sectionMatch.Index
+}
+
 function Add-PublishedPortToService {
     param(
         [Parameter(Mandatory = $true)]
@@ -102,14 +128,13 @@ function Add-PublishedPortToService {
     )
 
     $lineEnding = Get-ComposeLineEnding -Content $Content
-    $serviceHeader = "${lineEnding}  ${ServiceId}:${lineEnding}"
-    if (-not $Content.Contains($serviceHeader)) {
+    $serviceMatch = [regex]::Match($Content, "(?m)^  $([regex]::Escape($ServiceId)):\r?\n")
+    if (-not $serviceMatch.Success) {
         throw "Service fixture absent: $ServiceId"
     }
 
-    $publishedPort = "${lineEnding}  ${ServiceId}:${lineEnding}    ports:${lineEnding}      - `"127.0.0.1:9191:9191`"${lineEnding}"
-    $serviceIndex = $Content.IndexOf($serviceHeader)
-    return $Content.Remove($serviceIndex, $serviceHeader.Length).Insert($serviceIndex, $publishedPort)
+    $publishedPort = "${lineEnding}    ports:${lineEnding}      - `"127.0.0.1:9191:9191`"${lineEnding}"
+    return $Content.Insert($serviceMatch.Index + $serviceMatch.Length, $publishedPort)
 }
 
 function Add-SparkEgressToService {
@@ -122,38 +147,47 @@ function Add-SparkEgressToService {
     )
 
     $lineEnding = Get-ComposeLineEnding -Content $Content
-    $serviceHeader = "${lineEnding}  ${ServiceId}:${lineEnding}"
-    $serviceIndex = $Content.IndexOf($serviceHeader)
-    if ($serviceIndex -lt 0) {
-        throw "Service fixture absent: $ServiceId"
-    }
-
-    $networkBlock = "    networks:${lineEnding}      - core${lineEnding}"
-    $networkIndex = $Content.IndexOf($networkBlock, $serviceIndex)
-    if ($networkIndex -lt 0) {
+    $networkIndex = Find-ServiceInsertionIndex -Content $Content -ServiceId $ServiceId -Section "networks"
+    $networkBlockMatch = [regex]::Match($Content.Substring($networkIndex), "(?m)^    networks:\r?\n      - core\r?\n")
+    if (-not $networkBlockMatch.Success) {
         throw "Bloc networks fixture absent pour service: $ServiceId"
     }
 
     $mutatedNetworkBlock = "    networks:${lineEnding}      - core${lineEnding}      - spark-egress${lineEnding}"
-    return $Content.Remove($networkIndex, $networkBlock.Length).Insert($networkIndex, $mutatedNetworkBlock)
+    return $Content.Remove($networkIndex, $networkBlockMatch.Length).Insert($networkIndex, $mutatedNetworkBlock)
 }
 
-function Remove-GatewayEnvironmentVariable {
+function Add-ApplicationEnvironmentVariable {
     param(
         [Parameter(Mandatory = $true)]
         [string] $Content,
 
         [Parameter(Mandatory = $true)]
+        [string] $ServiceId,
+
+        [Parameter(Mandatory = $true)]
         [string] $Name
     )
 
-    $pattern = "(?m)^\s+$([regex]::Escape($Name)): .*\r?\n"
-    $updatedContent = [regex]::Replace($Content, $pattern, "", 1)
-    if ($updatedContent -eq $Content) {
-        throw "Variable Spark fixture absente: $Name"
-    }
+    $lineEnding = Get-ComposeLineEnding -Content $Content
+    $networkIndex = Find-ServiceInsertionIndex -Content $Content -ServiceId $ServiceId -Section "networks"
+    $environmentBlock = "    environment:${lineEnding}      ${Name}: `"http://valeur-applicative.local`"${lineEnding}"
+    return $Content.Insert($networkIndex, $environmentBlock)
+}
 
-    return $updatedContent
+function Add-EnvFileToService {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $Content,
+
+        [Parameter(Mandatory = $true)]
+        [string] $ServiceId
+    )
+
+    $lineEnding = Get-ComposeLineEnding -Content $Content
+    $networkIndex = Find-ServiceInsertionIndex -Content $Content -ServiceId $ServiceId -Section "networks"
+    $envFileBlock = "    env_file:${lineEnding}      - .env${lineEnding}"
+    return $Content.Insert($networkIndex, $envFileBlock)
 }
 
 function Add-VllmPrincipalService {
@@ -244,26 +278,19 @@ try {
     Assert-ExitCode -Actual $vllmResult.ExitCode -Expected 1 -Message "Un vLLM principal local doit être refusé."
     Assert-OutputContains -Output $vllmResult.Output -Expected "Service Gemma/vLLM principal interdit dans Compose local: vllm-main" -Message "Le refus vLLM local doit être explicite."
 
-    $missingAuthModePath = New-TemporaryCompose -Name "gateway-without-auth-mode" -Content (
-        Remove-GatewayEnvironmentVariable -Content $validCompose -Name "GEMMA_AUTH_MODE"
+    $applicationEnvironmentPath = New-TemporaryCompose -Name "gateway-application-environment" -Content (
+        Add-ApplicationEnvironmentVariable -Content $validCompose -ServiceId "llm-gateway" -Name "GEMMA_MODEL_REVISION"
     )
-    $missingAuthModeResult = Invoke-LocalComposeValidator -ComposePath $missingAuthModePath
-    Assert-ExitCode -Actual $missingAuthModeResult.ExitCode -Expected 1 -Message "Le mode d'authentification Spark doit être requis."
-    Assert-OutputContains -Output $missingAuthModeResult.Output -Expected "Variable gateway Spark absente: GEMMA_AUTH_MODE" -Message "Le mode d'authentification absent doit être nommé."
+    $applicationEnvironmentResult = Invoke-LocalComposeValidator -ComposePath $applicationEnvironmentPath
+    Assert-ExitCode -Actual $applicationEnvironmentResult.ExitCode -Expected 1 -Message "Le gateway ne doit pas recevoir de configuration applicative par environment."
+    Assert-OutputContains -Output $applicationEnvironmentResult.Output -Expected "Variable applicative interdite pour service llm-gateway: GEMMA_MODEL_REVISION" -Message "La clé applicative interdite doit être nommée."
 
-    $missingModelRevisionPath = New-TemporaryCompose -Name "gateway-without-model-revision" -Content (
-        Remove-GatewayEnvironmentVariable -Content $validCompose -Name "GEMMA_MODEL_REVISION"
+    $envFilePath = New-TemporaryCompose -Name "worker-env-file" -Content (
+        Add-EnvFileToService -Content $validCompose -ServiceId "worker-research"
     )
-    $missingModelRevisionResult = Invoke-LocalComposeValidator -ComposePath $missingModelRevisionPath
-    Assert-ExitCode -Actual $missingModelRevisionResult.ExitCode -Expected 1 -Message "La révision modèle Spark doit être requise."
-    Assert-OutputContains -Output $missingModelRevisionResult.Output -Expected "Variable gateway Spark absente: GEMMA_MODEL_REVISION" -Message "La révision modèle absente doit être nommée."
-
-    $missingRuntimeVersionPath = New-TemporaryCompose -Name "gateway-without-runtime-version" -Content (
-        Remove-GatewayEnvironmentVariable -Content $validCompose -Name "GEMMA_RUNTIME_VERSION"
-    )
-    $missingRuntimeVersionResult = Invoke-LocalComposeValidator -ComposePath $missingRuntimeVersionPath
-    Assert-ExitCode -Actual $missingRuntimeVersionResult.ExitCode -Expected 1 -Message "La version runtime Spark doit être requise."
-    Assert-OutputContains -Output $missingRuntimeVersionResult.Output -Expected "Variable gateway Spark absente: GEMMA_RUNTIME_VERSION" -Message "La version runtime absente doit être nommée."
+    $envFileResult = Invoke-LocalComposeValidator -ComposePath $envFilePath
+    Assert-ExitCode -Actual $envFileResult.ExitCode -Expected 1 -Message "Un env_file ne doit pas être accepté."
+    Assert-OutputContains -Output $envFileResult.Output -Expected "env_file interdit pour service worker-research" -Message "Le service avec env_file doit être nommé."
 
     $workerEgressPath = New-TemporaryCompose -Name "worker-spark-egress" -Content (Add-SparkEgressToService -Content $validCompose -ServiceId "worker-documents")
     $workerEgressResult = Invoke-LocalComposeValidator -ComposePath $workerEgressPath

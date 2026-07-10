@@ -98,91 +98,72 @@ def assert_boundary_error(expected_fragment: str, *, compose_document=None, fire
         raise AssertionError(f"Erreur attendue absente: {expected_fragment}")
 
 
+def _lines(document: str) -> list[str]:
+    return document.splitlines()
+
+
+def _service_header_index(lines: list[str], service_id: str) -> int:
+    expected = f"  {service_id}:"
+    for index, line in enumerate(lines):
+        if line == expected:
+            return index
+    raise AssertionError(f"Service fixture absent: {service_id}")
+
+
+def _service_end_index(lines: list[str], service_start: int) -> int:
+    for index in range(service_start + 1, len(lines)):
+        line = lines[index]
+        if line.startswith("  ") and not line.startswith("    "):
+            return index
+    return len(lines)
+
+
+def _join(lines: list[str]) -> str:
+    return "\n".join(lines) + "\n"
+
+
 def add_published_port(document: str, service_id: str) -> str:
-    service_header = f"\n  {service_id}:\n"
-    if service_header not in document:
-        raise AssertionError(f"Service fixture absent: {service_id}")
-    return document.replace(
-        service_header,
-        f'\n  {service_id}:\n    ports:\n      - "0.0.0.0:9191:9191"\n',
-        1,
-    )
+    lines = _lines(document)
+    service_start = _service_header_index(lines, service_id)
+    lines[service_start + 1:service_start + 1] = [
+        "    ports:",
+        '      - "0.0.0.0:9191:9191"',
+    ]
+    return _join(lines)
 
 
 def add_profile_published_port(document: str, service_id: str) -> str:
-    service_header = f"\n  {service_id}:\n"
-    if service_header not in document:
-        raise AssertionError(f"Service fixture absent: {service_id}")
-    return document.replace(
-        service_header,
-        f'\n  {service_id}:\n    profiles:\n      - debug\n    ports:\n      - "127.0.0.1:6333:6333"\n',
-        1,
-    )
+    lines = _lines(document)
+    service_start = _service_header_index(lines, service_id)
+    lines[service_start + 1:service_start + 1] = [
+        "    profiles:",
+        "      - debug",
+        "    ports:",
+        '      - "127.0.0.1:6333:6333"',
+    ]
+    return _join(lines)
 
 
 def add_spark_egress(document: str, service_id: str) -> str:
-    service_header = f"\n  {service_id}:\n"
-    service_index = document.find(service_header)
-    if service_index < 0:
-        raise AssertionError(f"Service fixture absent: {service_id}")
-
-    network_block = "    networks:\n      - core\n"
-    network_index = document.find(network_block, service_index)
-    if network_index < 0:
-        raise AssertionError(f"Bloc networks fixture absent: {service_id}")
-
-    return (
-        document[:network_index]
-        + "    networks:\n      - core\n      - spark-egress\n"
-        + document[network_index + len(network_block) :]
-    )
+    lines = _lines(document)
+    service_start = _service_header_index(lines, service_id)
+    service_end = _service_end_index(lines, service_start)
+    for index in range(service_start, service_end):
+        if lines[index] == "      - core":
+            lines.insert(index + 1, "      - spark-egress")
+            return _join(lines)
+    raise AssertionError(f"Réseau core absent du fixture: {service_id}")
 
 
-def add_gateway_environment_line(document: str, line: str) -> str:
-    gateway_header = "\n  llm-gateway:\n"
-    gateway_index = document.find(gateway_header)
-    if gateway_index < 0:
-        raise AssertionError("Service fixture absent: llm-gateway")
-
-    marker = "      GEMMA_BASE_URL:"
-    marker_index = document.find(marker, gateway_index)
-    if marker_index < 0:
-        raise AssertionError("Variable GEMMA_BASE_URL absente du fixture")
-
-    return document[:marker_index] + f"      {line}\n" + document[marker_index:]
-
-
-def remove_gateway_environment_line(document: str, name: str) -> str:
-    target = f"      {name}:"
-    line_start = document.find(target)
-    if line_start < 0:
-        raise AssertionError(f"Variable gateway absente du fixture: {name}")
-    line_end = document.find("\n", line_start)
-    if line_end < 0:
-        raise AssertionError(f"Fin de ligne gateway absente du fixture: {name}")
-    return document[:line_start] + document[line_end + 1 :]
-
-
-def replace_gateway_base_url(document: str, value: str) -> str:
-    current = '      GEMMA_BASE_URL: "${GEMMA_BASE_URL?GEMMA_BASE_URL requis}"'
-    replacement = f'      GEMMA_BASE_URL: "{value}"'
-    if current not in document:
-        raise AssertionError("Variable GEMMA_BASE_URL absente du fixture")
-    return document.replace(current, replacement)
-
-
-def add_ui_environment_line(document: str, line: str) -> str:
-    ui_header = "\n  ui:\n"
-    ui_index = document.find(ui_header)
-    if ui_index < 0:
-        raise AssertionError("Service fixture absent: ui")
-
-    marker = "      UI_API_URL:"
-    marker_index = document.find(marker, ui_index)
-    if marker_index < 0:
-        raise AssertionError("Variable UI_API_URL absente du fixture")
-
-    return document[:marker_index] + f"      {line}\n" + document[marker_index:]
+def add_service_environment_line(document: str, service_id: str, line: str) -> str:
+    lines = _lines(document)
+    service_start = _service_header_index(lines, service_id)
+    service_end = _service_end_index(lines, service_start)
+    for index in range(service_start, service_end):
+        if lines[index] == "    networks:":
+            lines[index:index] = ["    environment:", f"      {line}"]
+            return _join(lines)
+    raise AssertionError(f"Bloc networks absent du fixture: {service_id}")
 
 
 validate_network_boundary(
@@ -223,6 +204,16 @@ assert_boundary_error(
     compose_document=add_spark_egress(valid_compose_document, "worker-research"),
 )
 
+assert_boundary_error(
+    "Variable applicative interdite pour service llm-gateway: GEMMA_TLS_VERIFY",
+    compose_document=add_service_environment_line(valid_compose_document, "llm-gateway", 'GEMMA_TLS_VERIFY: "false"'),
+)
+
+assert_boundary_error(
+    "Variable applicative interdite pour service ui: GEMMA_API_KEY_FILE",
+    compose_document=add_service_environment_line(valid_compose_document, "ui", 'GEMMA_API_KEY_FILE: "/run/secrets/gemma_api_key"'),
+)
+
 firewall_payload = copy.deepcopy(VALID_FIREWALL_PAYLOAD)
 firewall_payload["allowed_ingress"][0]["source_service"] = "worker-research"
 assert_boundary_error("Source Spark non autoris", firewall_payload=firewall_payload)
@@ -243,31 +234,6 @@ firewall_payload = copy.deepcopy(VALID_FIREWALL_PAYLOAD)
 firewall_payload["browser_direct_access_allowed"] = True
 assert_boundary_error("navigateur direct au Spark interdit", firewall_payload=firewall_payload)
 
-assert_boundary_error(
-    "GEMMA_TLS_VERIFY",
-    compose_document=add_gateway_environment_line(valid_compose_document, 'GEMMA_TLS_VERIFY: "false"'),
-)
-
-assert_boundary_error(
-    "Variable gateway Spark absente: GEMMA_MODEL_REVISION",
-    compose_document=remove_gateway_environment_line(valid_compose_document, "GEMMA_MODEL_REVISION"),
-)
-
-assert_boundary_error(
-    "Variable gateway Spark absente: GEMMA_RUNTIME_VERSION",
-    compose_document=remove_gateway_environment_line(valid_compose_document, "GEMMA_RUNTIME_VERSION"),
-)
-
-assert_boundary_error(
-    "Mode TLS Spark",
-    compose_document=replace_gateway_base_url(valid_compose_document, "https://api.openai.com/v1"),
-)
-
-assert_boundary_error(
-    "Secret vLLM interdit",
-    compose_document=add_ui_environment_line(valid_compose_document, 'GEMMA_API_KEY_FILE: "/run/secrets/gemma_api_key"'),
-)
-
 remote_compose_document = valid_compose_document.replace(
     "127.0.0.1:${OST_EDGE_HTTPS_PORT?OST_EDGE_HTTPS_PORT requis}:8443",
     "192.168.10.20:${OST_EDGE_HTTPS_PORT?OST_EDGE_HTTPS_PORT requis}:8443",
@@ -281,26 +247,14 @@ remote_firewall_payload = copy.deepcopy(VALID_FIREWALL_PAYLOAD)
 remote_firewall_payload["remote_user_access"] = {
     "enabled": True,
     "entrypoint_service": "edge-gateway",
-    "allowed_bindings": ["192.168.10.20"],
-}
-validate_network_boundary(
-    compose=compose_from(remote_compose_document),
-    topology=topology,
-    spark_firewall=firewall_from(remote_firewall_payload),
-)
-
-public_remote_firewall_payload = copy.deepcopy(VALID_FIREWALL_PAYLOAD)
-public_remote_firewall_payload["remote_user_access"] = {
-    "enabled": True,
-    "entrypoint_service": "edge-gateway",
     "allowed_bindings": ["0.0.0.0"],
 }
 assert_boundary_error(
     "distant public interdit: 0.0.0.0",
-    firewall_payload=public_remote_firewall_payload,
+    firewall_payload=remote_firewall_payload,
 )
 
-print("Tests unitaires fronti\u00e8re r\u00e9seau M-002: OK")
+print("Tests unitaires frontière réseau M-002: OK")
 '@
 
 $previousErrorActionPreference = $ErrorActionPreference

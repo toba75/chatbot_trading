@@ -104,18 +104,18 @@ function Add-ApplicationEnvironmentVariable {
     )
 
     $lineEnding = Get-ComposeLineEnding -Content $Content
-    $serviceHeader = "${lineEnding}  ${ServiceId}:${lineEnding}"
-    $serviceIndex = $Content.IndexOf($serviceHeader)
-    if ($serviceIndex -lt 0) {
+    $serviceMatch = [regex]::Match($Content, "(?m)^  $([regex]::Escape($ServiceId)):\r?\n")
+    if (-not $serviceMatch.Success) {
         throw "Service fixture absent: $ServiceId"
     }
 
-    $networkBlock = "    networks:${lineEnding}"
-    $networkIndex = $Content.IndexOf($networkBlock, $serviceIndex)
-    if ($networkIndex -lt 0) {
+    $serviceTail = $Content.Substring($serviceMatch.Index + $serviceMatch.Length)
+    $networkMatch = [regex]::Match($serviceTail, "(?m)^    networks:\r?\n")
+    if (-not $networkMatch.Success) {
         throw "Point d'insertion fixture absent pour service: $ServiceId"
     }
 
+    $networkIndex = $serviceMatch.Index + $serviceMatch.Length + $networkMatch.Index
     $environmentBlock = "    environment:${lineEnding}      ${VariableName}: `"http://valeur-applicative.local`"${lineEnding}"
     return $Content.Insert($networkIndex, $environmentBlock)
 }
@@ -130,18 +130,18 @@ function Add-EnvFileToService {
     )
 
     $lineEnding = Get-ComposeLineEnding -Content $Content
-    $serviceHeader = "${lineEnding}  ${ServiceId}:${lineEnding}"
-    $serviceIndex = $Content.IndexOf($serviceHeader)
-    if ($serviceIndex -lt 0) {
+    $serviceMatch = [regex]::Match($Content, "(?m)^  $([regex]::Escape($ServiceId)):\r?\n")
+    if (-not $serviceMatch.Success) {
         throw "Service fixture absent: $ServiceId"
     }
 
-    $networkBlock = "    networks:${lineEnding}"
-    $networkIndex = $Content.IndexOf($networkBlock, $serviceIndex)
-    if ($networkIndex -lt 0) {
+    $serviceTail = $Content.Substring($serviceMatch.Index + $serviceMatch.Length)
+    $networkMatch = [regex]::Match($serviceTail, "(?m)^    networks:\r?\n")
+    if (-not $networkMatch.Success) {
         throw "Point d'insertion fixture absent pour service: $ServiceId"
     }
 
+    $networkIndex = $serviceMatch.Index + $serviceMatch.Length + $networkMatch.Index
     $envFileBlock = "    env_file:${lineEnding}      - .env${lineEnding}"
     return $Content.Insert($networkIndex, $envFileBlock)
 }
@@ -182,6 +182,22 @@ try {
         }
     }
 
+    $composeServiceIds = @(
+        "edge-gateway",
+        "ui",
+        "orchestrator-api",
+        "llm-gateway",
+        "postgres",
+        "qdrant",
+        "granite-docling",
+        "embedding-service",
+        "reranker-service",
+        "worker-documents",
+        "worker-research",
+        "worker-backtest",
+        "backtest-engine"
+    )
+
     foreach ($serviceId in @(
         "ui",
         "orchestrator-api",
@@ -194,13 +210,21 @@ try {
         "worker-backtest",
         "backtest-engine"
     )) {
-        $serviceHeader = "`n  ${serviceId}:`n"
+        $lineEnding = Get-ComposeLineEnding -Content $validCompose
+        $serviceHeader = "${lineEnding}  ${serviceId}:${lineEnding}"
         $serviceIndex = $validCompose.IndexOf($serviceHeader)
         if ($serviceIndex -lt 0) {
             throw "Service applicatif absent du Compose canonique: $serviceId"
         }
 
-        $nextServiceIndex = $validCompose.IndexOf("`n  ", $serviceIndex + $serviceHeader.Length)
+        $nextServiceIndex = $validCompose.Length
+        foreach ($candidateServiceId in $composeServiceIds) {
+            $candidateHeader = "${lineEnding}  ${candidateServiceId}:${lineEnding}"
+            $candidateIndex = $validCompose.IndexOf($candidateHeader, $serviceIndex + $serviceHeader.Length)
+            if ($candidateIndex -ge 0 -and $candidateIndex -lt $nextServiceIndex) {
+                $nextServiceIndex = $candidateIndex
+            }
+        }
         $serviceBlock = if ($nextServiceIndex -lt 0) {
             $validCompose.Substring($serviceIndex)
         }

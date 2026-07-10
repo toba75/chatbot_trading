@@ -304,7 +304,7 @@ assert_raises(
 )
 
 assert_raises(
-    "Variable non allowlistée pour service edge-gateway: UI_API_URL",
+    "Variable applicative interdite pour service edge-gateway: UI_API_URL",
     valid_compose({"edge-gateway": {"environment": {"UI_API_URL": "${UI_API_URL?UI_API_URL requis}"}}}),
 )
 

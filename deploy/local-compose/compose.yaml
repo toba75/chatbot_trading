@@ -44,12 +44,14 @@ services:
       - serve-http
       - ui
       - "8081"
+      - --config
+      - /workspace/config/application.yaml
     expose:
       - "8081"
     networks:
       - core
-    environment:
-      UI_API_URL: "${UI_API_URL?UI_API_URL requis}"
+    volumes:
+      - ../../config/application.yaml:/workspace/config/application.yaml:ro
     healthcheck:
       test:
         - CMD-SHELL
@@ -73,6 +75,8 @@ services:
       - serve-http
       - orchestrator-api
       - "8080"
+      - --config
+      - /workspace/config/application.yaml
     expose:
       - "8080"
     networks:
@@ -84,10 +88,8 @@ services:
         condition: service_healthy
       llm-gateway:
         condition: service_healthy
-    environment:
-      DATABASE_URL: "${DATABASE_URL?DATABASE_URL requis}"
-      QDRANT_URL: "${QDRANT_URL?QDRANT_URL requis}"
-      LLM_GATEWAY_URL: "${LLM_GATEWAY_URL?LLM_GATEWAY_URL requis}"
+    volumes:
+      - ../../config/application.yaml:/workspace/config/application.yaml:ro
     healthcheck:
       test:
         - CMD-SHELL
@@ -111,22 +113,15 @@ services:
       - serve-http
       - llm-gateway
       - "8090"
+      - --config
+      - /workspace/config/application.yaml
     expose:
       - "8090"
     networks:
       - core
       - spark-egress
-    environment:
-      GEMMA_BASE_URL: "${GEMMA_BASE_URL?GEMMA_BASE_URL requis}"
-      GEMMA_MODEL: "${GEMMA_MODEL?GEMMA_MODEL requis}"
-      GEMMA_MODEL_REVISION: "${GEMMA_MODEL_REVISION?GEMMA_MODEL_REVISION requis}"
-      GEMMA_RUNTIME_VERSION: "${GEMMA_RUNTIME_VERSION?GEMMA_RUNTIME_VERSION requis}"
-      GEMMA_AUTH_MODE: "none"
-      GEMMA_TLS_MODE: "disabled"
-      GEMMA_TIMEOUT_SECONDS: "${GEMMA_TIMEOUT_SECONDS?GEMMA_TIMEOUT_SECONDS requis}"
-      GEMMA_RETRY_BEFORE_FIRST_TOKEN: "${GEMMA_RETRY_BEFORE_FIRST_TOKEN?GEMMA_RETRY_BEFORE_FIRST_TOKEN requis}"
-      GEMMA_CIRCUIT_BREAKER_FAILURE_THRESHOLD: "${GEMMA_CIRCUIT_BREAKER_FAILURE_THRESHOLD?GEMMA_CIRCUIT_BREAKER_FAILURE_THRESHOLD requis}"
-      GEMMA_CIRCUIT_BREAKER_OPEN_SECONDS: "${GEMMA_CIRCUIT_BREAKER_OPEN_SECONDS?GEMMA_CIRCUIT_BREAKER_OPEN_SECONDS requis}"
+    volumes:
+      - ../../config/application.yaml:/workspace/config/application.yaml:ro
     healthcheck:
       test:
         - CMD-SHELL
@@ -170,8 +165,6 @@ services:
       - core
     volumes:
       - qdrant-data:/qdrant/storage
-    environment:
-      QDRANT__SERVICE__GRPC_PORT: "${QDRANT_GRPC_PORT?QDRANT_GRPC_PORT requis}"
     healthcheck:
       test:
         - CMD-SHELL
@@ -194,14 +187,15 @@ services:
       - serve-http
       - granite-docling
       - "8001"
+      - --config
+      - /workspace/config/application.yaml
     expose:
       - "8001"
     networks:
       - core
     volumes:
       - model-cache:/models
-    environment:
-      GRANITE_MODEL_PATH: "${GRANITE_MODEL_PATH?GRANITE_MODEL_PATH requis}"
+      - ../../config/application.yaml:/workspace/config/application.yaml:ro
     healthcheck:
       test:
         - CMD-SHELL
@@ -225,14 +219,15 @@ services:
       - serve-http
       - embedding-service
       - "8101"
+      - --config
+      - /workspace/config/application.yaml
     expose:
       - "8101"
     networks:
       - core
     volumes:
       - model-cache:/models
-    environment:
-      EMBEDDING_MODEL_PATH: "${EMBEDDING_MODEL_PATH?EMBEDDING_MODEL_PATH requis}"
+      - ../../config/application.yaml:/workspace/config/application.yaml:ro
     healthcheck:
       test:
         - CMD-SHELL
@@ -256,14 +251,15 @@ services:
       - serve-http
       - reranker-service
       - "8102"
+      - --config
+      - /workspace/config/application.yaml
     expose:
       - "8102"
     networks:
       - core
     volumes:
       - model-cache:/models
-    environment:
-      RERANKER_MODEL_PATH: "${RERANKER_MODEL_PATH?RERANKER_MODEL_PATH requis}"
+      - ../../config/application.yaml:/workspace/config/application.yaml:ro
     healthcheck:
       test:
         - CMD-SHELL
@@ -286,16 +282,14 @@ services:
       - app.platform.local_runtime
       - run-worker
       - worker-documents
+      - --config
+      - /workspace/config/application.yaml
     networks:
       - core
     volumes:
       - corpus-data:/workspace/corpus
       - document-artifacts:/workspace/data
-    environment:
-      DATABASE_URL: "${DATABASE_URL?DATABASE_URL requis}"
-      QDRANT_URL: "${QDRANT_URL?QDRANT_URL requis}"
-      GRANITE_URL: "${GRANITE_URL?GRANITE_URL requis}"
-      EMBEDDING_SERVICE_URL: "${EMBEDDING_SERVICE_URL?EMBEDDING_SERVICE_URL requis}"
+      - ../../config/application.yaml:/workspace/config/application.yaml:ro
     healthcheck:
       test:
         - CMD-SHELL
@@ -317,13 +311,12 @@ services:
       - app.platform.local_runtime
       - run-worker
       - worker-research
+      - --config
+      - /workspace/config/application.yaml
     networks:
       - core
-    environment:
-      DATABASE_URL: "${DATABASE_URL?DATABASE_URL requis}"
-      QDRANT_URL: "${QDRANT_URL?QDRANT_URL requis}"
-      LLM_GATEWAY_URL: "${LLM_GATEWAY_URL?LLM_GATEWAY_URL requis}"
-      RERANKER_SERVICE_URL: "${RERANKER_SERVICE_URL?RERANKER_SERVICE_URL requis}"
+    volumes:
+      - ../../config/application.yaml:/workspace/config/application.yaml:ro
     healthcheck:
       test:
         - CMD-SHELL
@@ -346,13 +339,13 @@ services:
       - app.platform.local_runtime
       - run-worker
       - worker-backtest
+      - --config
+      - /workspace/config/application.yaml
     networks:
       - core
     volumes:
       - experiment-data:/workspace/data/experiments
-    environment:
-      DATABASE_URL: "${DATABASE_URL?DATABASE_URL requis}"
-      BACKTEST_ENGINE_URL: "${BACKTEST_ENGINE_URL?BACKTEST_ENGINE_URL requis}"
+      - ../../config/application.yaml:/workspace/config/application.yaml:ro
     healthcheck:
       test:
         - CMD-SHELL
@@ -375,12 +368,14 @@ services:
       - serve-http
       - backtest-engine
       - "8200"
+      - --config
+      - /workspace/config/application.yaml
     expose:
       - "8200"
     networks:
       - core
-    environment:
-      BACKTEST_WORKDIR: "${BACKTEST_WORKDIR?BACKTEST_WORKDIR requis}"
+    volumes:
+      - ../../config/application.yaml:/workspace/config/application.yaml:ro
     healthcheck:
       test:
         - CMD-SHELL

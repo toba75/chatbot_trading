@@ -15,32 +15,12 @@ sys.path.insert(0, sys.argv[1])
 from app.platform.local_compose import parse_local_compose_document, validate_local_compose
 
 
-BASE_GATEWAY_ENVIRONMENT = {
-    "GEMMA_BASE_URL": "${GEMMA_BASE_URL?GEMMA_BASE_URL requis}",
-    "GEMMA_MODEL": "${GEMMA_MODEL?GEMMA_MODEL requis}",
-    "GEMMA_MODEL_REVISION": "${GEMMA_MODEL_REVISION?GEMMA_MODEL_REVISION requis}",
-    "GEMMA_RUNTIME_VERSION": "${GEMMA_RUNTIME_VERSION?GEMMA_RUNTIME_VERSION requis}",
-    "GEMMA_AUTH_MODE": "none",
-    "GEMMA_TLS_MODE": "disabled",
-    "GEMMA_TIMEOUT_SECONDS": "${GEMMA_TIMEOUT_SECONDS?GEMMA_TIMEOUT_SECONDS requis}",
-    "GEMMA_RETRY_BEFORE_FIRST_TOKEN": "${GEMMA_RETRY_BEFORE_FIRST_TOKEN?GEMMA_RETRY_BEFORE_FIRST_TOKEN requis}",
-    "GEMMA_CIRCUIT_BREAKER_FAILURE_THRESHOLD": (
-        "${GEMMA_CIRCUIT_BREAKER_FAILURE_THRESHOLD?GEMMA_CIRCUIT_BREAKER_FAILURE_THRESHOLD requis}"
-    ),
-    "GEMMA_CIRCUIT_BREAKER_OPEN_SECONDS": (
-        "${GEMMA_CIRCUIT_BREAKER_OPEN_SECONDS?GEMMA_CIRCUIT_BREAKER_OPEN_SECONDS requis}"
-    ),
-}
+APPLICATION_CONFIG_VOLUME = "../../config/application.yaml:/workspace/config/application.yaml:ro"
+APPLICATION_CONFIG_ARGUMENTS = ["--config", "/workspace/config/application.yaml"]
 
 
-def gateway_environment(**overrides):
-    environment = dict(BASE_GATEWAY_ENVIRONMENT)
-    for key, value in overrides.items():
-        if value is None:
-            environment.pop(key, None)
-        else:
-            environment[key] = value
-    return environment
+def runtime_command(*values):
+    return ["python", "-m", "app.platform.local_runtime", *values, *APPLICATION_CONFIG_ARGUMENTS]
 
 
 BASE_SERVICES = {
@@ -49,31 +29,31 @@ BASE_SERVICES = {
         "ports": ["127.0.0.1:${OST_EDGE_HTTPS_PORT?OST_EDGE_HTTPS_PORT requis}:443"],
         "networks": ["edge", "core"],
         "tmpfs": ["/tmp"],
+        "environment": {"CADDY_ADMIN": "${CADDY_ADMIN?CADDY_ADMIN requis}"},
     },
     "ui": {
         "image": "ostrading/ui:0.0.0-m002",
-        "command": ["python", "-m", "app.platform.local_runtime", "serve-http", "ui", "8081"],
+        "command": runtime_command("serve-http", "ui", "8081"),
         "expose": ["8081"],
         "networks": ["core"],
-        "environment": {"UI_API_URL": "${UI_API_URL?UI_API_URL requis}"},
+        "volumes": [APPLICATION_CONFIG_VOLUME],
+        "read_only": True,
     },
     "orchestrator-api": {
         "image": "ostrading/orchestrator-api:0.0.0-m002",
-        "command": ["python", "-m", "app.platform.local_runtime", "serve-http", "orchestrator-api", "8080"],
+        "command": runtime_command("serve-http", "orchestrator-api", "8080"),
         "expose": ["8080"],
         "networks": ["core"],
-        "environment": {
-            "DATABASE_URL": "${DATABASE_URL?DATABASE_URL requis}",
-            "QDRANT_URL": "${QDRANT_URL?QDRANT_URL requis}",
-            "LLM_GATEWAY_URL": "${LLM_GATEWAY_URL?LLM_GATEWAY_URL requis}",
-        },
+        "volumes": [APPLICATION_CONFIG_VOLUME],
+        "read_only": True,
     },
     "llm-gateway": {
         "image": "ostrading/llm-gateway:0.0.0-m002",
-        "command": ["python", "-m", "app.platform.local_runtime", "serve-http", "llm-gateway", "8090"],
+        "command": runtime_command("serve-http", "llm-gateway", "8090"),
         "expose": ["8090"],
         "networks": ["core", "spark-egress"],
-        "environment": gateway_environment(),
+        "volumes": [APPLICATION_CONFIG_VOLUME],
+        "read_only": True,
     },
     "postgres": {
         "image": "postgres@sha256:" + "b" * 64,
@@ -93,42 +73,58 @@ BASE_SERVICES = {
     },
     "granite-docling": {
         "image": "ostrading/granite-docling:0.0.0-m002",
-        "command": ["python", "-m", "app.platform.local_runtime", "serve-http", "granite-docling", "8001"],
+        "command": runtime_command("serve-http", "granite-docling", "8001"),
         "expose": ["8001"],
         "networks": ["core"],
+        "volumes": ["model-cache:/models", APPLICATION_CONFIG_VOLUME],
+        "read_only": True,
     },
     "embedding-service": {
         "image": "ostrading/embedding-service:0.0.0-m002",
-        "command": ["python", "-m", "app.platform.local_runtime", "serve-http", "embedding-service", "8101"],
+        "command": runtime_command("serve-http", "embedding-service", "8101"),
         "expose": ["8101"],
         "networks": ["core"],
+        "volumes": ["model-cache:/models", APPLICATION_CONFIG_VOLUME],
+        "read_only": True,
     },
     "reranker-service": {
         "image": "ostrading/reranker-service:0.0.0-m002",
-        "command": ["python", "-m", "app.platform.local_runtime", "serve-http", "reranker-service", "8102"],
+        "command": runtime_command("serve-http", "reranker-service", "8102"),
         "expose": ["8102"],
         "networks": ["core"],
+        "volumes": ["model-cache:/models", APPLICATION_CONFIG_VOLUME],
+        "read_only": True,
     },
     "worker-documents": {
         "image": "ostrading/worker-documents:0.0.0-m002",
-        "command": ["python", "-m", "app.platform.local_runtime", "run-worker", "worker-documents"],
+        "command": runtime_command("run-worker", "worker-documents"),
         "networks": ["core"],
+        "volumes": [
+            "corpus-data:/workspace/corpus",
+            "document-artifacts:/workspace/data",
+            APPLICATION_CONFIG_VOLUME,
+        ],
     },
     "worker-research": {
         "image": "ostrading/worker-research:0.0.0-m002",
-        "command": ["python", "-m", "app.platform.local_runtime", "run-worker", "worker-research"],
+        "command": runtime_command("run-worker", "worker-research"),
         "networks": ["core"],
+        "volumes": [APPLICATION_CONFIG_VOLUME],
+        "read_only": True,
     },
     "worker-backtest": {
         "image": "ostrading/worker-backtest:0.0.0-m002",
-        "command": ["python", "-m", "app.platform.local_runtime", "run-worker", "worker-backtest"],
+        "command": runtime_command("run-worker", "worker-backtest"),
         "networks": ["core"],
+        "volumes": ["experiment-data:/workspace/data/experiments", APPLICATION_CONFIG_VOLUME],
     },
     "backtest-engine": {
         "image": "ostrading/backtest-engine:0.0.0-m002",
-        "command": ["python", "-m", "app.platform.local_runtime", "serve-http", "backtest-engine", "8200"],
+        "command": runtime_command("serve-http", "backtest-engine", "8200"),
         "expose": ["8200"],
         "networks": ["core"],
+        "volumes": [APPLICATION_CONFIG_VOLUME],
+        "read_only": True,
     },
 }
 
@@ -140,25 +136,24 @@ def service_lines(service_id, definition):
         lines.append("    command:")
         for value in command:
             lines.append(f'      - "{value}"')
-    for section in ("ports", "expose", "networks", "secrets"):
+    for section in ("ports", "expose", "networks", "volumes", "secrets", "env_file"):
         values = definition.get(section, [])
         if values:
             lines.append(f"    {section}:")
             for value in values:
                 lines.append(f'      - "{value}"')
-
     tmpfs = definition.get("tmpfs", [])
     if tmpfs:
         lines.append("    tmpfs:")
         for value in tmpfs:
             lines.append(f'      - "{value}"')
-
     environment = definition.get("environment", {})
     if environment:
         lines.append("    environment:")
         for name, value in environment.items():
             lines.append(f'      {name}: "{value}"')
-
+    if definition.get("read_only"):
+        lines.append("    read_only: true")
     if definition.get("healthcheck", True):
         lines.extend(
             [
@@ -172,7 +167,6 @@ def service_lines(service_id, definition):
                 "      start_period: 10s",
             ]
         )
-
     return lines
 
 
@@ -201,7 +195,6 @@ def valid_compose(service_overrides=None, top_level_secrets=None):
     for secret_name in secret_names:
         suffix = ".pem" if secret_name == "spark_ca" else ""
         lines.extend([f"  {secret_name}:", f"    file: ./secrets/{secret_name}{suffix}"])
-
     return "\n".join(lines) + "\n"
 
 
@@ -230,6 +223,14 @@ if edge_gateway.ports != ("127.0.0.1:${OST_EDGE_HTTPS_PORT?OST_EDGE_HTTPS_PORT r
 if edge_gateway.tmpfs != ("/tmp",):
     raise AssertionError(f"tmpfs edge-gateway incorrect: {edge_gateway.tmpfs}")
 
+llm_gateway = compose.service("llm-gateway")
+if "spark-egress" not in llm_gateway.networks:
+    raise AssertionError(f"Egress Spark absent pour llm-gateway: {llm_gateway.networks}")
+if APPLICATION_CONFIG_VOLUME not in llm_gateway.volumes:
+    raise AssertionError(f"Montage config absent pour llm-gateway: {llm_gateway.volumes}")
+if llm_gateway.environment:
+    raise AssertionError(f"Environment gateway interdit: {llm_gateway.environment}")
+
 assert_raises(
     "tmpfs /tmp requis pour edge-gateway",
     valid_compose({"edge-gateway": {"tmpfs": []}}),
@@ -251,13 +252,20 @@ assert_raises(
 )
 
 assert_raises(
-    "Endpoint Spark invalide",
-    valid_compose({"llm-gateway": {"environment": gateway_environment(GEMMA_BASE_URL="https://api.openai.com/v1")}}),
-)
-
-assert_raises(
     "module_absent",
-    valid_compose({"llm-gateway": {"command": ["python", "-m", "app.platform.module_absent"]}}),
+    valid_compose(
+        {
+            "llm-gateway": {
+                "command": [
+                    "python",
+                    "-m",
+                    "app.platform.module_absent",
+                    "--config",
+                    "/workspace/config/application.yaml",
+                ]
+            }
+        }
+    ),
 )
 
 assert_raises(
@@ -266,28 +274,41 @@ assert_raises(
 )
 
 assert_raises(
-    "Variable gateway Spark absente: GEMMA_AUTH_MODE",
-    valid_compose({"llm-gateway": {"environment": gateway_environment(GEMMA_AUTH_MODE=None)}}),
+    "Argument --config absent pour service applicatif: orchestrator-api",
+    valid_compose(
+        {
+            "orchestrator-api": {
+                "command": [
+                    "python",
+                    "-m",
+                    "app.platform.local_runtime",
+                    "serve-http",
+                    "orchestrator-api",
+                    "8080",
+                ]
+            }
+        }
+    ),
 )
 
 assert_raises(
-    "Variable gateway Spark absente: GEMMA_MODEL_REVISION",
-    valid_compose({"llm-gateway": {"environment": gateway_environment(GEMMA_MODEL_REVISION=None)}}),
+    "Montage config/application.yaml read-only absent pour service applicatif: llm-gateway",
+    valid_compose({"llm-gateway": {"volumes": ["../../config/application.yaml:/workspace/config/application.yaml"]}}),
 )
 
 assert_raises(
-    "Variable gateway Spark absente: GEMMA_RUNTIME_VERSION",
-    valid_compose({"llm-gateway": {"environment": gateway_environment(GEMMA_RUNTIME_VERSION=None)}}),
+    "Variable applicative interdite pour service llm-gateway: GEMMA_MODEL_REVISION",
+    valid_compose({"llm-gateway": {"environment": {"GEMMA_MODEL_REVISION": "revision"}}}),
 )
 
 assert_raises(
-    "Entier positif requis pour service llm-gateway: GEMMA_TIMEOUT_SECONDS",
-    valid_compose({"llm-gateway": {"environment": gateway_environment(GEMMA_TIMEOUT_SECONDS="0")}}),
+    "Variable non allowlistée pour service qdrant: QDRANT__SERVICE__GRPC_PORT",
+    valid_compose({"qdrant": {"environment": {"QDRANT__SERVICE__GRPC_PORT": "${QDRANT_GRPC_PORT?QDRANT_GRPC_PORT requis}"}}}),
 )
 
 assert_raises(
-    "Entier positif ou nul requis pour service llm-gateway: GEMMA_RETRY_BEFORE_FIRST_TOKEN",
-    valid_compose({"llm-gateway": {"environment": gateway_environment(GEMMA_RETRY_BEFORE_FIRST_TOKEN="-1")}}),
+    "env_file interdit pour service worker-research",
+    valid_compose({"worker-research": {"env_file": [".env"]}}),
 )
 
 assert_raises(
@@ -296,23 +317,11 @@ assert_raises(
 )
 
 assert_raises(
-    "GEMMA_API_KEY_FILE interdit quand GEMMA_AUTH_MODE=none",
-    valid_compose(
-        {"llm-gateway": {"environment": gateway_environment(GEMMA_API_KEY_FILE="/run/secrets/gemma_api_key")}}
-    ),
-)
-
-assert_raises(
     "Secret Spark interdit pour llm-gateway: gemma_api_key",
     valid_compose(
         {"llm-gateway": {"secrets": ["gemma_api_key"]}},
         top_level_secrets=["postgres_password", "gemma_api_key"],
     ),
-)
-
-assert_raises(
-    "Mode TLS Spark invalide",
-    valid_compose({"llm-gateway": {"environment": gateway_environment(GEMMA_TLS_MODE="implicit")}}),
 )
 
 print("Tests unitaires Compose local M-002: OK")

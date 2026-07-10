@@ -7,7 +7,6 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
-from urllib.parse import urlparse
 
 
 REQUIRED_SERVICE_IDS = (
@@ -54,12 +53,34 @@ FORBIDDEN_MODEL_SERVICE_PATTERN = re.compile(r"(^|[-_])(gemma|vllm)([-_]|$)")
 REQUIRED_ENVIRONMENT_PATTERN = re.compile(r"^\$\{[A-Z][A-Z0-9_]*\?[^}]+\}$")
 SECRET_ENVIRONMENT_MARKERS = ("PASSWORD", "TOKEN", "SECRET", "API_KEY")
 INTERNAL_IMAGE_PREFIX = "ostrading/"
-SPARK_AUTH_MODE_NONE = "none"
-SPARK_AUTH_MODE_API_KEY_FILE = "api_key_file"
-SPARK_TLS_MODE_DISABLED = "disabled"
-SPARK_TLS_MODE_CA_BUNDLE = "ca_bundle"
-SPARK_ENDPOINT_PATH = "/v1"
-REQUIRED_GATEWAY_ENVIRONMENT_KEYS = (
+APPLICATION_CONFIG_CONTAINER_PATH = "/workspace/config/application.yaml"
+APPLICATION_CONFIG_VOLUME = f"../../config/application.yaml:{APPLICATION_CONFIG_CONTAINER_PATH}:ro"
+APPLICATION_CONFIG_ARGUMENTS = ("--config", APPLICATION_CONFIG_CONTAINER_PATH)
+FORBIDDEN_APPLICATION_ENVIRONMENT_KEYS = frozenset(
+    (
+        "API_PORT",
+        "BACKTEST_ENGINE_URL",
+        "BACKTEST_WORKDIR",
+        "DATABASE_URL",
+        "EMBEDDING_MODEL_PATH",
+        "EMBEDDING_SERVICE_URL",
+        "GRANITE_MODEL_PATH",
+        "GRANITE_URL",
+        "LLM_GATEWAY_PORT",
+        "LLM_GATEWAY_URL",
+        "QDRANT_URL",
+        "RERANKER_MODEL_PATH",
+        "RERANKER_SERVICE_URL",
+        "SPARK_ALLOWED_CLIENT_CIDRS",
+        "UI_API_URL",
+    )
+)
+FORBIDDEN_APPLICATION_ENVIRONMENT_PREFIXES = ("GEMMA_", "VLLM_")
+ALLOWED_TECHNICAL_ENVIRONMENT_BY_SERVICE = {
+    "edge-gateway": frozenset(("CADDY_ADMIN",)),
+    "postgres": frozenset(("POSTGRES_DB", "POSTGRES_USER", "POSTGRES_PASSWORD_FILE")),
+}
+HISTORICAL_GATEWAY_ENVIRONMENT_KEYS = (
     "GEMMA_BASE_URL",
     "GEMMA_MODEL",
     "GEMMA_MODEL_REVISION",
@@ -71,27 +92,25 @@ REQUIRED_GATEWAY_ENVIRONMENT_KEYS = (
     "GEMMA_CIRCUIT_BREAKER_FAILURE_THRESHOLD",
     "GEMMA_CIRCUIT_BREAKER_OPEN_SECONDS",
 )
-GATEWAY_MODE_ENVIRONMENT_KEYS = frozenset(("GEMMA_AUTH_MODE", "GEMMA_TLS_MODE"))
-GATEWAY_POSITIVE_INTEGER_ENVIRONMENT_KEYS = frozenset(
-    (
-        "GEMMA_TIMEOUT_SECONDS",
-        "GEMMA_CIRCUIT_BREAKER_FAILURE_THRESHOLD",
-        "GEMMA_CIRCUIT_BREAKER_OPEN_SECONDS",
-    )
-)
-GATEWAY_NON_NEGATIVE_INTEGER_ENVIRONMENT_KEYS = frozenset(("GEMMA_RETRY_BEFORE_FIRST_TOKEN",))
+
+
+def _runtime_command(*arguments: str) -> tuple[str, ...]:
+    return ("python", "-m", "app.platform.local_runtime", *arguments, *APPLICATION_CONFIG_ARGUMENTS)
+
+
 EXPECTED_SERVICE_COMMANDS = {
-    "ui": ("python", "-m", "app.platform.local_runtime", "serve-http", "ui", "8081"),
-    "orchestrator-api": ("python", "-m", "app.platform.local_runtime", "serve-http", "orchestrator-api", "8080"),
-    "llm-gateway": ("python", "-m", "app.platform.local_runtime", "serve-http", "llm-gateway", "8090"),
-    "granite-docling": ("python", "-m", "app.platform.local_runtime", "serve-http", "granite-docling", "8001"),
-    "embedding-service": ("python", "-m", "app.platform.local_runtime", "serve-http", "embedding-service", "8101"),
-    "reranker-service": ("python", "-m", "app.platform.local_runtime", "serve-http", "reranker-service", "8102"),
-    "worker-documents": ("python", "-m", "app.platform.local_runtime", "run-worker", "worker-documents"),
-    "worker-research": ("python", "-m", "app.platform.local_runtime", "run-worker", "worker-research"),
-    "worker-backtest": ("python", "-m", "app.platform.local_runtime", "run-worker", "worker-backtest"),
-    "backtest-engine": ("python", "-m", "app.platform.local_runtime", "serve-http", "backtest-engine", "8200"),
+    "ui": _runtime_command("serve-http", "ui", "8081"),
+    "orchestrator-api": _runtime_command("serve-http", "orchestrator-api", "8080"),
+    "llm-gateway": _runtime_command("serve-http", "llm-gateway", "8090"),
+    "granite-docling": _runtime_command("serve-http", "granite-docling", "8001"),
+    "embedding-service": _runtime_command("serve-http", "embedding-service", "8101"),
+    "reranker-service": _runtime_command("serve-http", "reranker-service", "8102"),
+    "worker-documents": _runtime_command("run-worker", "worker-documents"),
+    "worker-research": _runtime_command("run-worker", "worker-research"),
+    "worker-backtest": _runtime_command("run-worker", "worker-backtest"),
+    "backtest-engine": _runtime_command("serve-http", "backtest-engine", "8200"),
 }
+APPLICATION_SERVICE_IDS = frozenset(EXPECTED_SERVICE_COMMANDS)
 
 
 @dataclass(frozen=True)
@@ -103,7 +122,9 @@ class ComposeService:
     expose: tuple[str, ...]
     profiles: tuple[str, ...]
     networks: tuple[str, ...]
+    volumes: tuple[str, ...]
     secrets: tuple[str, ...]
+    env_file: tuple[str, ...]
     tmpfs: tuple[str, ...]
     environment: Mapping[str, str]
     healthcheck: Mapping[str, Any]
@@ -193,6 +214,7 @@ def validate_local_compose(compose: LocalCompose) -> None:
         _validate_service_exposure(service)
         _validate_service_tmpfs(service)
         _validate_service_healthcheck(service)
+        _validate_service_application_configuration(service)
         _validate_service_command(service)
         _validate_service_networks(service, compose.networks)
         _validate_service_secrets(service, compose.secrets)
@@ -223,7 +245,9 @@ def _parse_service(service_id: str, payload: Mapping[str, Any]) -> ComposeServic
         expose=_optional_text_list(payload, "expose", f"service {service_id}"),
         profiles=_optional_text_list(payload, "profiles", f"service {service_id}"),
         networks=_optional_text_list(payload, "networks", f"service {service_id}"),
+        volumes=_optional_text_list(payload, "volumes", f"service {service_id}"),
         secrets=_optional_text_list(payload, "secrets", f"service {service_id}"),
+        env_file=_optional_env_file_list(payload, "env_file", f"service {service_id}"),
         tmpfs=_optional_text_list(payload, "tmpfs", f"service {service_id}"),
         environment=environment,
         healthcheck=healthcheck_payload,
@@ -331,6 +355,28 @@ def _validate_service_healthcheck(service: ComposeService) -> None:
         raise ValueError(f"Healthcheck mutant interdit pour service read_only: {service.id}")
 
 
+def _validate_service_application_configuration(service: ComposeService) -> None:
+    if len(service.env_file) > 0:
+        raise ValueError(f"env_file interdit pour service {service.id}")
+
+    if service.id not in APPLICATION_SERVICE_IDS:
+        return
+
+    if "--config" not in service.command:
+        raise ValueError(f"Argument --config absent pour service applicatif: {service.id}")
+
+    config_index = service.command.index("--config")
+    if config_index + 1 >= len(service.command):
+        raise ValueError(f"Chemin --config absent pour service applicatif: {service.id}")
+    if service.command[config_index + 1] != APPLICATION_CONFIG_CONTAINER_PATH:
+        raise ValueError(f"Chemin --config invalide pour service applicatif: {service.id}")
+
+    if APPLICATION_CONFIG_VOLUME not in service.volumes:
+        raise ValueError(
+            f"Montage config/application.yaml read-only absent pour service applicatif: {service.id}"
+        )
+
+
 def _validate_service_command(service: ComposeService) -> None:
     expected_command = EXPECTED_SERVICE_COMMANDS.get(service.id)
     if expected_command is None:
@@ -379,15 +425,9 @@ def _validate_service_secrets(service: ComposeService, secrets: Mapping[str, Map
             raise ValueError(f"Secret référencé absent pour service {service.id}: {secret_id}")
 
     if service.id == "llm-gateway":
-        auth_mode = service.environment.get("GEMMA_AUTH_MODE")
-        tls_mode = service.environment.get("GEMMA_TLS_MODE")
-        if auth_mode == SPARK_AUTH_MODE_API_KEY_FILE and SPARK_API_KEY_SECRET not in service.secrets:
-            raise ValueError(f"Secret Spark absent pour llm-gateway: {SPARK_API_KEY_SECRET}")
-        if auth_mode == SPARK_AUTH_MODE_NONE and SPARK_API_KEY_SECRET in service.secrets:
+        if SPARK_API_KEY_SECRET in service.secrets:
             raise ValueError(f"Secret Spark interdit pour llm-gateway: {SPARK_API_KEY_SECRET}")
-        if tls_mode == SPARK_TLS_MODE_CA_BUNDLE and SPARK_CA_SECRET not in service.secrets:
-            raise ValueError(f"Secret Spark absent pour llm-gateway: {SPARK_CA_SECRET}")
-        if tls_mode == SPARK_TLS_MODE_DISABLED and SPARK_CA_SECRET in service.secrets:
+        if SPARK_CA_SECRET in service.secrets:
             raise ValueError(f"Secret Spark interdit pour llm-gateway: {SPARK_CA_SECRET}")
 
     if service.id == "postgres" and "postgres_password" not in service.secrets:
@@ -396,12 +436,20 @@ def _validate_service_secrets(service: ComposeService, secrets: Mapping[str, Map
 
 def _validate_service_environment(service: ComposeService) -> None:
     for key, value in service.environment.items():
+        if _is_application_environment_key(key):
+            raise ValueError(f"Variable applicative interdite pour service {service.id}: {key}")
+        if service.id in APPLICATION_SERVICE_IDS:
+            raise ValueError(f"Variable applicative interdite pour service {service.id}: {key}")
+
+        allowed_keys = ALLOWED_TECHNICAL_ENVIRONMENT_BY_SERVICE.get(service.id, frozenset())
+        if key not in allowed_keys:
+            raise ValueError(f"Variable non allowlistÃ©e pour service {service.id}: {key}")
+
         key_upper = key.upper()
         is_secret_file_reference = key_upper.endswith("_FILE") or key_upper.endswith("_BUNDLE")
         contains_secret_marker = any(marker in key_upper for marker in SECRET_ENVIRONMENT_MARKERS)
-        is_public_gateway_runtime_key = service.id == "llm-gateway" and key in REQUIRED_GATEWAY_ENVIRONMENT_KEYS
 
-        if contains_secret_marker and not is_secret_file_reference and not is_public_gateway_runtime_key:
+        if contains_secret_marker and not is_secret_file_reference:
             raise ValueError(f"Secret en clair interdit pour service {service.id}: {key}")
 
         if key_upper.endswith("_FILE") and not value.startswith("/run/secrets/"):
@@ -410,100 +458,18 @@ def _validate_service_environment(service: ComposeService) -> None:
         if value.startswith("/run/secrets/"):
             continue
 
-        if service.id == "llm-gateway" and key == "GEMMA_BASE_URL":
-            if not REQUIRED_ENVIRONMENT_PATTERN.match(value):
-                _validate_explicit_spark_base_url(value, service.environment.get("GEMMA_TLS_MODE"))
-            continue
-
-        if service.id == "llm-gateway" and key in GATEWAY_MODE_ENVIRONMENT_KEYS:
-            continue
-
-        if service.id == "llm-gateway" and key in GATEWAY_POSITIVE_INTEGER_ENVIRONMENT_KEYS:
-            if not REQUIRED_ENVIRONMENT_PATTERN.match(value):
-                _validate_gateway_positive_integer(value, key)
-            continue
-
-        if service.id == "llm-gateway" and key in GATEWAY_NON_NEGATIVE_INTEGER_ENVIRONMENT_KEYS:
-            if not REQUIRED_ENVIRONMENT_PATTERN.match(value):
-                _validate_gateway_non_negative_integer(value, key)
-            continue
-
         if not REQUIRED_ENVIRONMENT_PATTERN.match(value):
             raise ValueError(f"Variable non injectée explicitement pour service {service.id}: {key}")
 
         if ":-" in value or "-" in value.split("?", 1)[0]:
             raise ValueError(f"Valeur par défaut interdite pour service {service.id}: {key}")
 
-    if service.id == "llm-gateway":
-        _validate_llm_gateway_spark_environment(service)
-
-
-def _validate_llm_gateway_spark_environment(service: ComposeService) -> None:
-    for key in REQUIRED_GATEWAY_ENVIRONMENT_KEYS:
-        if key not in service.environment:
-            raise ValueError(f"Variable gateway Spark absente: {key}")
-        if service.environment[key].strip() == "":
-            raise ValueError(f"Variable gateway Spark vide: {key}")
-
-    auth_mode = service.environment["GEMMA_AUTH_MODE"]
-    if auth_mode not in {SPARK_AUTH_MODE_NONE, SPARK_AUTH_MODE_API_KEY_FILE}:
-        raise ValueError(f"Mode d'authentification Spark invalide: {auth_mode}")
-
-    tls_mode = service.environment["GEMMA_TLS_MODE"]
-    if tls_mode not in {SPARK_TLS_MODE_DISABLED, SPARK_TLS_MODE_CA_BUNDLE}:
-        raise ValueError(f"Mode TLS Spark invalide: {tls_mode}")
-
-    has_api_key_file = "GEMMA_API_KEY_FILE" in service.environment
-    if auth_mode == SPARK_AUTH_MODE_NONE and has_api_key_file:
-        raise ValueError("GEMMA_API_KEY_FILE interdit quand GEMMA_AUTH_MODE=none")
-    if auth_mode == SPARK_AUTH_MODE_API_KEY_FILE and not has_api_key_file:
-        raise ValueError("GEMMA_API_KEY_FILE requis quand GEMMA_AUTH_MODE=api_key_file")
-
-    has_ca_bundle = "GEMMA_CA_BUNDLE" in service.environment
-    if tls_mode == SPARK_TLS_MODE_DISABLED and has_ca_bundle:
-        raise ValueError("GEMMA_CA_BUNDLE interdit quand GEMMA_TLS_MODE=disabled")
-    if tls_mode == SPARK_TLS_MODE_CA_BUNDLE and not has_ca_bundle:
-        raise ValueError("GEMMA_CA_BUNDLE requis quand GEMMA_TLS_MODE=ca_bundle")
-
-    base_url = service.environment["GEMMA_BASE_URL"]
-    if not REQUIRED_ENVIRONMENT_PATTERN.match(base_url):
-        _validate_explicit_spark_base_url(base_url, tls_mode)
-
-    for key in GATEWAY_POSITIVE_INTEGER_ENVIRONMENT_KEYS:
-        value = service.environment[key]
-        if not REQUIRED_ENVIRONMENT_PATTERN.match(value):
-            _validate_gateway_positive_integer(value, key)
-
-    for key in GATEWAY_NON_NEGATIVE_INTEGER_ENVIRONMENT_KEYS:
-        value = service.environment[key]
-        if not REQUIRED_ENVIRONMENT_PATTERN.match(value):
-            _validate_gateway_non_negative_integer(value, key)
-
-
-def _validate_explicit_spark_base_url(value: str, tls_mode: str | None) -> None:
-    parsed = urlparse(value)
-    if parsed.scheme not in {"http", "https"} or parsed.netloc == "":
-        raise ValueError("Endpoint Spark invalide pour service llm-gateway: GEMMA_BASE_URL")
-    if parsed.username is not None or parsed.password is not None:
-        raise ValueError("Endpoint Spark invalide pour service llm-gateway: GEMMA_BASE_URL")
-    if parsed.path != SPARK_ENDPOINT_PATH:
-        raise ValueError("Endpoint Spark invalide pour service llm-gateway: GEMMA_BASE_URL")
-    if parsed.hostname in {"api.openai.com", "openai.com"}:
-        raise ValueError("Endpoint Spark invalide pour service llm-gateway: GEMMA_BASE_URL")
-    if tls_mode == SPARK_TLS_MODE_DISABLED and parsed.scheme != "http":
-        raise ValueError("Mode TLS Spark incohérent pour service llm-gateway: GEMMA_BASE_URL")
-    if tls_mode == SPARK_TLS_MODE_CA_BUNDLE and parsed.scheme != "https":
-        raise ValueError("Mode TLS Spark incohérent pour service llm-gateway: GEMMA_BASE_URL")
-
-
-def _validate_gateway_positive_integer(value: str, key: str) -> None:
-    if not re.fullmatch(r"[1-9][0-9]*", value):
-        raise ValueError(f"Entier positif requis pour service llm-gateway: {key}")
-
-
-def _validate_gateway_non_negative_integer(value: str, key: str) -> None:
-    if not re.fullmatch(r"(0|[1-9][0-9]*)", value):
-        raise ValueError(f"Entier positif ou nul requis pour service llm-gateway: {key}")
+def _is_application_environment_key(key: str) -> bool:
+    if key in FORBIDDEN_APPLICATION_ENVIRONMENT_KEYS:
+        return True
+    if key in HISTORICAL_GATEWAY_ENVIRONMENT_KEYS:
+        return True
+    return any(key.startswith(prefix) for prefix in FORBIDDEN_APPLICATION_ENVIRONMENT_PREFIXES)
 
 
 def _is_pinned_image(image: str) -> bool:
@@ -733,6 +699,21 @@ def _optional_text_list(payload: Mapping[str, Any], field_name: str, context: st
             raise ValueError(f"Entrée {field_name}[{index}] non normalisée pour {context}.")
         values.append(item)
     return tuple(values)
+
+
+def _optional_env_file_list(payload: Mapping[str, Any], field_name: str, context: str) -> tuple[str, ...]:
+    if field_name not in payload:
+        return ()
+
+    value = payload[field_name]
+    if isinstance(value, str):
+        if value.strip() == "":
+            raise ValueError(f"Champ {field_name} vide pour {context}.")
+        if value != value.strip():
+            raise ValueError(f"Champ {field_name} non normalisÃ© pour {context}.")
+        return (value,)
+
+    return _optional_text_list(payload, field_name, context)
 
 
 def _optional_bool(payload: Mapping[str, Any], field_name: str, context: str) -> bool:
