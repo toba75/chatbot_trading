@@ -6,7 +6,10 @@ param(
     [string] $TopologyPath,
 
     [Parameter(Mandatory = $false)]
-    [string] $SparkFirewallPath
+    [string] $SparkFirewallPath,
+
+    [Parameter(Mandatory = $false)]
+    [string] $ApplicationConfigPath
 )
 
 $ErrorActionPreference = "Stop"
@@ -35,6 +38,10 @@ if (-not $PSBoundParameters.ContainsKey("SparkFirewallPath")) {
     $SparkFirewallPath = Join-Path $repoRoot "deploy/spark-firewall/network-boundary.json"
 }
 
+if (-not $PSBoundParameters.ContainsKey("ApplicationConfigPath")) {
+    $ApplicationConfigPath = Join-Path $repoRoot "config/application.example.yaml"
+}
+
 . $pythonPreflightPath
 $pythonExecutable = Get-RequiredPythonExecutable
 
@@ -49,6 +56,7 @@ $output = & $pythonExecutable `
     --compose-path $ComposePath `
     --topology-path $TopologyPath `
     --spark-firewall-path $SparkFirewallPath `
+    --application-config-path $ApplicationConfigPath `
     2>&1
 
 $exitCode = $LASTEXITCODE

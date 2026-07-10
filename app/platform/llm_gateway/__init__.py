@@ -22,7 +22,7 @@ from app.platform.observability import GatewayObservation, InMemoryObservability
 GATEWAY_CLIENT_ID = "llm-gateway"
 SECRET_MASK = "<secret-masked>"
 _FORBIDDEN_SAMPLING_KEYS = frozenset({"model", "messages", "response_format"})
-_ALLOWED_SPARK_HOSTS = frozenset({"spark-inference", "spark-inference.test", "192.168.1.120"})
+_DEFAULT_SPARK_HOSTS = frozenset({"spark-inference", "spark-inference.test"})
 _SPARK_API_PATH = "/v1"
 _AUTH_MODE_NONE = "none"
 _AUTH_MODE_API_KEY_FILE = "api_key_file"
@@ -274,6 +274,7 @@ class GatewayConfiguration:
     tls_mode: str
     tls_ca_bundle_path: str | None
     timeout_seconds: int
+    allowed_spark_hosts: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         _require_text(self.base_url, "base_url", "LLM_GATEWAY_BASE_URL_REQUIRED")
@@ -335,7 +336,7 @@ class GatewayConfiguration:
                 "LLM_GATEWAY_SPARK_ENDPOINT_REQUIRED",
                 "Le gateway LLM doit cibler le chemin Spark /v1.",
             )
-        if not _is_allowed_spark_host(parsed_base_url.hostname):
+        if not _is_allowed_spark_host(parsed_base_url.hostname, self.allowed_spark_hosts):
             raise LLMGatewayContractError(
                 "LLM_GATEWAY_SPARK_ENDPOINT_REQUIRED",
                 "Le gateway LLM doit cibler explicitement spark-inference ou une adresse privée Spark.",
@@ -371,22 +372,25 @@ class GatewayConfiguration:
             "tls_mode": self.tls_mode,
             "tls_ca_bundle_path": self.tls_ca_bundle_path,
             "timeout_seconds": self.timeout_seconds,
+            "allowed_spark_hosts": self.allowed_spark_hosts,
         }
 
     def __repr__(self) -> str:
         return f"GatewayConfiguration({self.masked_for_logs()!r})"
 
 
-def _is_allowed_spark_host(hostname: str | None) -> bool:
+def _is_allowed_spark_host(hostname: str | None, allowed_spark_hosts: tuple[str, ...]) -> bool:
     if hostname is None:
         return False
-    if hostname in _ALLOWED_SPARK_HOSTS:
+    if hostname in _DEFAULT_SPARK_HOSTS:
+        return True
+    if hostname in allowed_spark_hosts:
         return True
     try:
-        ipaddress.ip_address(hostname)
+        address = ipaddress.ip_address(hostname)
     except ValueError:
         return False
-    return False
+    return address.is_private and not address.is_loopback and not address.is_link_local
 
 
 @dataclass(frozen=True)

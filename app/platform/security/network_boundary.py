@@ -6,7 +6,9 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
+from urllib.parse import urlparse
 
+from app.platform.configuration import ApplicationConfiguration
 from app.platform.local_compose import ComposeService, LocalCompose, validate_local_compose
 from app.platform.topology import PlatformTopology
 
@@ -258,8 +260,12 @@ def validate_network_boundary(
     compose: LocalCompose,
     topology: PlatformTopology,
     spark_firewall: SparkFirewallPolicy,
+    application_configuration: ApplicationConfiguration,
 ) -> None:
+    if not isinstance(application_configuration, ApplicationConfiguration):
+        raise ValueError("Configuration applicative requise pour la frontière réseau.")
     validate_spark_firewall_policy(spark_firewall)
+    _validate_application_spark_policy(application_configuration, spark_firewall)
     _validate_topology_contract(topology)
     _validate_compose_ports(compose, spark_firewall.remote_user_access)
     _validate_compose_spark_egress(compose)
@@ -269,6 +275,36 @@ def validate_network_boundary(
         build_network_flow_matrix(compose=compose, spark_firewall=spark_firewall),
         spark_firewall.spark_endpoint,
     )
+
+
+def _validate_application_spark_policy(
+    application_configuration: ApplicationConfiguration,
+    spark_firewall: SparkFirewallPolicy,
+) -> None:
+    endpoint = spark_firewall.spark_endpoint
+    gateway = application_configuration.services.llm_gateway
+    parsed_endpoint = urlparse(gateway.spark_endpoint_url)
+    try:
+        parsed_port = parsed_endpoint.port
+    except ValueError as exc:
+        raise ValueError("Port Spark applicatif invalide") from exc
+
+    if parsed_port != endpoint.port:
+        raise ValueError(
+            f"Port Spark applicatif incohérent: {parsed_port} attendu {endpoint.port}"
+        )
+    if gateway.auth_mode != endpoint.auth_mode:
+        raise ValueError(
+            f"Mode auth Spark applicatif incohérent: {gateway.auth_mode} attendu {endpoint.auth_mode}"
+        )
+    if gateway.tls_mode != endpoint.tls_mode:
+        raise ValueError(
+            f"Mode TLS Spark applicatif incohérent: {gateway.tls_mode} attendu {endpoint.tls_mode}"
+        )
+    if endpoint.tls_mode == SPARK_TLS_MODE_DISABLED and parsed_endpoint.scheme != "http":
+        raise ValueError("Schéma Spark applicatif incohérent avec TLS disabled")
+    if endpoint.tls_mode == SPARK_TLS_MODE_CA_BUNDLE and parsed_endpoint.scheme != "https":
+        raise ValueError("Schéma Spark applicatif incohérent avec TLS ca_bundle")
 
 
 def build_network_flow_matrix(

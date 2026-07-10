@@ -197,7 +197,7 @@ with tempfile.TemporaryDirectory(prefix="ost_m013_llm_gateway_installation_") as
             "    dns_name: spark-inference.home.arpa\n",
             1,
         ).replace(
-            "    spark_endpoint_url: http://spark-inference:8000/v1\n",
+            "    spark_endpoint_url: http://192.168.1.120:8000/v1\n",
             "    spark_endpoint_url: http://spark-inference.home.arpa:8000/v1\n",
             1,
         ),
@@ -213,7 +213,7 @@ with tempfile.TemporaryDirectory(prefix="ost_m013_llm_gateway_installation_") as
     external_dns_path = temporary_directory / "dns_externe.yaml"
     external_dns_path.write_text(
         example_text.replace(
-            "    spark_endpoint_url: http://spark-inference:8000/v1\n",
+            "    spark_endpoint_url: http://192.168.1.120:8000/v1\n",
             "    spark_endpoint_url: http://spark-public.example.com:8000/v1\n",
             1,
         ),

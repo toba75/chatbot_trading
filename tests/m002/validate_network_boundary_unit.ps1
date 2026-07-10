@@ -243,7 +243,7 @@ try:
         application_configuration=spark_port_mismatch_configuration,
     )
 except ValueError as exc:
-    if "Port Spark applicatif incohérent" not in str(exc):
+    if "Port Spark applicatif" not in str(exc):
         raise AssertionError(f"Erreur port Spark inattendue: {exc}")
 else:
     raise AssertionError("Configuration applicative avec port Spark incohérent acceptée.")
@@ -260,7 +260,7 @@ try:
         application_configuration=spark_auth_mismatch_configuration,
     )
 except ValueError as exc:
-    if "Mode auth Spark applicatif incohérent" not in str(exc):
+    if "Mode auth Spark applicatif" not in str(exc):
         raise AssertionError(f"Erreur auth Spark inattendue: {exc}")
 else:
     raise AssertionError("Configuration applicative avec auth Spark incohérente acceptée.")
@@ -282,7 +282,7 @@ try:
         application_configuration=spark_tls_mismatch_configuration,
     )
 except ValueError as exc:
-    if "Mode TLS Spark applicatif incohérent" not in str(exc):
+    if "Mode TLS Spark applicatif" not in str(exc):
         raise AssertionError(f"Erreur TLS Spark inattendue: {exc}")
 else:
     raise AssertionError("Configuration applicative avec TLS Spark incohérent acceptée.")

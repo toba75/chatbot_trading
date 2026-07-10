@@ -158,7 +158,7 @@ assert_raises_code(
 assert_raises_code(
     "LLM_GATEWAY_SPARK_ENDPOINT_REQUIRED",
     lambda: GatewayConfiguration(
-        base_url="http://10.1.2.3:8000/v1",
+        base_url="http://8.8.8.8:8000/v1",
         served_model="gemma-research",
         model_revision="gemma-4-declared-revision-unit",
         runtime_version="vllm-openai-declared-unit",

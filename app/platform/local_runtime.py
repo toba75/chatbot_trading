@@ -145,11 +145,10 @@ def _load_runtime_application_configuration(config_path: str | None) -> Applicat
 
 
 def _serve_http(*, service_id: str, port: int, application_configuration: ApplicationConfiguration) -> None:
-    expected_port = HTTP_SERVICE_PORTS.get(service_id)
-    if expected_port is None:
-        raise ValueError(f"Service HTTP local inconnu: {service_id}")
+    expected_port = _configured_http_port(service_id, application_configuration)
     if port != expected_port:
         raise ValueError(f"Port HTTP local invalide pour {service_id}: {port}")
+    bind_host = _configured_http_bind_host(service_id, application_configuration)
 
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:
@@ -183,8 +182,35 @@ def _serve_http(*, service_id: str, port: int, application_configuration: Applic
         def log_message(self, format: str, *args: object) -> None:
             return
 
-    server = ThreadingHTTPServer(("0.0.0.0", port), Handler)
+    server = ThreadingHTTPServer((bind_host, port), Handler)
     server.serve_forever()
+
+
+def _configured_http_port(service_id: str, application_configuration: ApplicationConfiguration) -> int:
+    if service_id == "orchestrator-api":
+        return application_configuration.services.api.port
+    if service_id == "llm-gateway":
+        return application_configuration.services.llm_gateway.port
+    expected_port = HTTP_SERVICE_PORTS.get(service_id)
+    if expected_port is None:
+        raise ValueError(f"Service HTTP local inconnu: {service_id}")
+    return expected_port
+
+
+def _configured_http_bind_host(service_id: str, application_configuration: ApplicationConfiguration) -> str:
+    if service_id == "orchestrator-api":
+        bind_host = application_configuration.services.api.bind_host
+    else:
+        _configured_http_port(service_id, application_configuration)
+        bind_host = application_configuration.deployment.hosts.docker_local.bind_host
+
+    public_bindings = {"", "0.0.0.0", "::", "[::]", "*"}
+    loopback_bindings = {"127.0.0.1", "localhost", "::1", "[::1]"}
+    if application_configuration.security.network_exposure == "loopback_only" and bind_host not in loopback_bindings:
+        raise ValueError(f"Binding non loopback interdit pour {service_id}: {bind_host}")
+    if not application_configuration.security.allow_public_bind and bind_host in public_bindings:
+        raise ValueError(f"Binding public interdit pour {service_id}: {bind_host}")
+    return bind_host
 
 
 def _write_json_response(handler: BaseHTTPRequestHandler, *, status_code: int, body: dict[str, Any]) -> None:
@@ -294,7 +320,10 @@ def _product_chat_completions_post_response(
 
     structured_output = _required_gateway_mapping(gateway_body, "structured_output")
     answer = _required_gateway_text(structured_output, "answer")
-    provenance = _required_gateway_mapping(gateway_body, "provenance")
+    provenance = _provenance_with_configuration_hash(
+        _required_gateway_mapping(gateway_body, "provenance"),
+        application_configuration=application_configuration,
+    )
     raw_response_id = _required_gateway_text(gateway_body, "raw_response_id")
     model = _required_matching_model(body, application_configuration=application_configuration)
 
@@ -350,6 +379,7 @@ def _llm_real_path_benchmark_post_response(
                 task_name=task_name,
                 gateway_body=gateway_body,
                 gateway_latency_ms=gateway_latency_ms,
+                application_configuration=application_configuration,
             )
         )
 
@@ -358,6 +388,7 @@ def _llm_real_path_benchmark_post_response(
         "run_id": run_id,
         "execution_mode": "live_spark",
         "model": model,
+        "configuration_hash": application_configuration.configuration_hash,
         "path_segments": list(_M013_REALITY_PATH_SEGMENTS),
         "task_names": list(_M013_REQUIRED_LLM_TASKS),
         "task_results": task_results,
@@ -498,9 +529,13 @@ def _build_live_benchmark_task_result(
     task_name: str,
     gateway_body: dict[str, Any],
     gateway_latency_ms: float,
+    application_configuration: ApplicationConfiguration,
 ) -> dict[str, Any]:
     structured_output = _required_gateway_mapping(gateway_body, "structured_output")
-    provenance = _required_gateway_mapping(gateway_body, "provenance")
+    provenance = _provenance_with_configuration_hash(
+        _required_gateway_mapping(gateway_body, "provenance"),
+        application_configuration=application_configuration,
+    )
     raw_response_id = _required_gateway_text(gateway_body, "raw_response_id")
     answer = _required_gateway_text(structured_output, "answer")
     output_task_name = _required_gateway_text(structured_output, "task_name")
@@ -514,6 +549,22 @@ def _build_live_benchmark_task_result(
         "gateway_latency_ms": _format_metric(gateway_latency_ms),
         "provenance": provenance,
     }
+
+
+def _provenance_with_configuration_hash(
+    provenance: dict[str, Any],
+    *,
+    application_configuration: ApplicationConfiguration,
+) -> dict[str, Any]:
+    enriched = dict(provenance)
+    existing_hash = enriched.get("configuration_hash")
+    if existing_hash is not None and existing_hash != application_configuration.configuration_hash:
+        raise LLMGatewayContractError(
+            "LLM_GATEWAY_RESPONSE_INVALID",
+            "Hash de configuration gateway incohérent.",
+        )
+    enriched["configuration_hash"] = application_configuration.configuration_hash
+    return enriched
 
 
 def _build_live_benchmark_technical_metrics(task_results: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -709,10 +760,21 @@ def _build_gateway_configuration_from_application_configuration(
     api_key = None
     if gateway_service.auth_mode == "api_key_file":
         api_key_path = security.secrets.llm_gateway_api_key_path
-        api_key = Path(api_key_path).read_text(encoding="utf-8").strip()
+        try:
+            api_key = Path(api_key_path).read_text(encoding="utf-8").strip()
+        except OSError as exc:
+            raise LLMGatewayContractError(
+                "LLM_GATEWAY_API_KEY_FILE_UNREADABLE",
+                f"Fichier de clé API Spark illisible: {api_key_path}",
+            ) from exc
     tls_ca_bundle_path = None
     if gateway_service.tls_mode == "ca_bundle":
         tls_ca_bundle_path = security.secrets.tls_ca_certificate_path
+        if not Path(tls_ca_bundle_path).is_file():
+            raise LLMGatewayContractError(
+                "LLM_GATEWAY_TLS_CA_FILE_UNREADABLE",
+                f"Bundle CA Spark illisible: {tls_ca_bundle_path}",
+            )
 
     return GatewayConfiguration(
         base_url=gateway_service.spark_endpoint_url,
@@ -725,6 +787,9 @@ def _build_gateway_configuration_from_application_configuration(
         tls_mode=gateway_service.tls_mode,
         tls_ca_bundle_path=tls_ca_bundle_path,
         timeout_seconds=gateway_service.timeout_seconds,
+        allowed_spark_hosts=(
+            application_configuration.deployment.hosts.spark_inference.dns_name,
+        ),
     )
 
 

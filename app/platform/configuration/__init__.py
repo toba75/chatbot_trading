@@ -295,6 +295,7 @@ def load_application_configuration(
     _reject_inline_secrets(payload)
     _validate_required_keys_and_values(payload, schema, schema, ())
     _validate_schema(payload, schema, path)
+    _validate_cross_field_invariants(payload, path)
     return _build_application_configuration(payload, _configuration_hash(payload))
 
 
@@ -561,6 +562,42 @@ def _validate_schema(payload: Mapping[str, Any], schema: Mapping[str, Any], path
             f"schéma invalide à {_format_path(exc.path_parts)}: {exc}",
             str(path),
         ) from exc
+
+
+def _validate_cross_field_invariants(payload: Mapping[str, Any], path: Path) -> None:
+    deployment_network = payload["deployment"]["network"]
+    gateway_service = payload["services"]["llm_gateway"]
+
+    if deployment_network["prefer_mtls"] and not deployment_network["require_tls"]:
+        raise ApplicationConfigurationError(
+            CONFIG_SCHEMA_INVALID,
+            "prefer_mtls exige require_tls",
+            str(path),
+        )
+    if deployment_network["require_tls"] and gateway_service["tls_mode"] != "ca_bundle":
+        raise ApplicationConfigurationError(
+            CONFIG_SCHEMA_INVALID,
+            "require_tls exige services.llm_gateway.tls_mode=ca_bundle",
+            str(path),
+        )
+    if not deployment_network["require_tls"] and gateway_service["tls_mode"] == "ca_bundle":
+        raise ApplicationConfigurationError(
+            CONFIG_SCHEMA_INVALID,
+            "services.llm_gateway.tls_mode=ca_bundle exige require_tls",
+            str(path),
+        )
+    if deployment_network["require_api_key"] and gateway_service["auth_mode"] != "api_key_file":
+        raise ApplicationConfigurationError(
+            CONFIG_SCHEMA_INVALID,
+            "require_api_key exige services.llm_gateway.auth_mode=api_key_file",
+            str(path),
+        )
+    if not deployment_network["require_api_key"] and gateway_service["auth_mode"] == "api_key_file":
+        raise ApplicationConfigurationError(
+            CONFIG_SCHEMA_INVALID,
+            "services.llm_gateway.auth_mode=api_key_file exige require_api_key",
+            str(path),
+        )
 
 
 class _SchemaValidationError(ValueError):
