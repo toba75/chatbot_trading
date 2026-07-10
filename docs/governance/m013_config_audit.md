@@ -32,7 +32,7 @@ La configuration valide produit `configuration_hash`, qui doit être conservé d
 | REQ-M013-CONFIG-005 | T-005 Compose par fichier | `288f5fe18` `test(platform): couvrir compose sans environnement applicatif` | `55886cdd7` `feat(platform): piloter compose par application yaml` | `deploy/local-compose/compose.yaml`; `app/platform/local_compose.py`; `app/platform/security/network_boundary.py` |
 | REQ-M013-CONFIG-006 | T-006 gate environnement | `c9c4118c0` `test(governance): couvrir rejet environnement applicatif` | `ea544dc2d` `feat(governance): bloquer entrees environnement applicatives` | `scripts/validate_m013_config_environment.ps1`; `scripts/validate_m013_config_environment.py` |
 | REQ-M013-CONFIG-007 | T-007 runbooks migration | `2166e787a` `test(docs): couvrir runbooks configuration sans environnement` | `8db59074f` `docs(runbooks): publier migration application yaml` | `docs/runbooks/configuration_applicative.md`; runbooks exploitation, Spark et certificats |
-| REQ-M013-CONFIG-008 | T-008 traçabilité et gates | `42ef2be63` `test(governance): couvrir tracabilite m13 config` | Commit attendu par cette livraison: `docs(governance): relier m13 config aux gates` | `docs/traceability/matrix.md`; `scripts/validate_m013_config_traceability.ps1`; `docs/governance/m013_config_audit.md`; `scripts/test.ps1`; `scripts/lint.ps1` |
+| REQ-M013-CONFIG-008 | T-008 traçabilité et gates | `42ef2be63` `test(governance): couvrir tracabilite m13 config` | `4f5479445` `docs(governance): relier m13 config aux gates` | `docs/traceability/matrix.md`; `scripts/validate_m013_config_traceability.ps1`; `docs/governance/m013_config_audit.md`; `scripts/test.ps1`; `scripts/lint.ps1` |
 
 ## Validations attendues
 

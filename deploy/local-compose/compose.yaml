@@ -92,7 +92,6 @@ services:
     volumes:
       - ../../config/application.yaml:/workspace/config/application.yaml:ro
       - ../../config/application.schema.json:/workspace/config/application.schema.json:ro
-      - ../../config/secrets/local:/workspace/config/secrets/local:ro
     healthcheck:
       test:
         - CMD-SHELL
