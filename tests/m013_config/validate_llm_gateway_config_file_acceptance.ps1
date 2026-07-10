@@ -45,6 +45,54 @@ finally {
     Remove-Item -LiteralPath $runtimeStderrPath -Force -ErrorAction SilentlyContinue
 }
 
+$pollutedStdoutPath = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m013_config_polluted_" + [System.Guid]::NewGuid().ToString("N") + ".out.log")
+$pollutedStderrPath = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m013_config_polluted_" + [System.Guid]::NewGuid().ToString("N") + ".err.log")
+$previousDatabaseUrl = $env:DATABASE_URL
+$pollutedProcess = $null
+try {
+    $env:DATABASE_URL = "postgresql://pollution/interdite"
+    $pollutedProcess = Start-Process `
+        -FilePath $pythonExecutable `
+        -ArgumentList @("-m", "app.platform.local_runtime", "serve-http", "llm-gateway", "8090", "--config", ".\config\application.example.yaml") `
+        -WorkingDirectory $repoRoot `
+        -RedirectStandardOutput $pollutedStdoutPath `
+        -RedirectStandardError $pollutedStderrPath `
+        -WindowStyle Hidden `
+        -PassThru
+
+    if (-not $pollutedProcess.WaitForExit(3000)) {
+        Stop-Process -Id $pollutedProcess.Id -Force
+        throw "CONFIG_ENV_INPUT_REJECTED attendu: le runtime pollué est resté démarré."
+    }
+
+    $pollutedOutput = @()
+    if (Test-Path -LiteralPath $pollutedStdoutPath) {
+        $pollutedOutput += Get-Content -LiteralPath $pollutedStdoutPath
+    }
+    if (Test-Path -LiteralPath $pollutedStderrPath) {
+        $pollutedOutput += Get-Content -LiteralPath $pollutedStderrPath
+    }
+    if ($pollutedProcess.ExitCode -eq 0) {
+        throw "CONFIG_ENV_INPUT_REJECTED attendu: le runtime pollué a réussi."
+    }
+    if (($pollutedOutput -join "`n") -notmatch "CONFIG_ENV_INPUT_REJECTED") {
+        throw "CONFIG_ENV_INPUT_REJECTED absent de la sortie runtime pollué: $($pollutedOutput -join "`n")"
+    }
+}
+finally {
+    if ($null -ne $pollutedProcess -and -not $pollutedProcess.HasExited) {
+        Stop-Process -Id $pollutedProcess.Id -Force
+    }
+    if ($null -eq $previousDatabaseUrl) {
+        Remove-Item Env:DATABASE_URL -ErrorAction SilentlyContinue
+    }
+    else {
+        $env:DATABASE_URL = $previousDatabaseUrl
+    }
+    Remove-Item -LiteralPath $pollutedStdoutPath -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $pollutedStderrPath -Force -ErrorAction SilentlyContinue
+}
+
 $pythonCode = @'
 from __future__ import annotations
 
@@ -216,6 +264,12 @@ try:
         "Provenance chat incomplète.",
     )
 
+    assert_equal(
+        product["provenance"]["configuration_hash"],
+        configuration.configuration_hash,
+        "Hash de configuration absent de la preuve chat produit.",
+    )
+
     benchmark_status, benchmark_response = _llm_real_path_benchmark_post_response(
         body={
             "model": configuration.models.llm.served_model_name,
@@ -229,8 +283,17 @@ try:
     )
     assert_equal(benchmark_status, 200, "Le benchmark LLM configuré doit réussir.")
     assert_equal(tuple(benchmark_response["task_names"]), REQUIRED_LLM_TASKS, "Tâches benchmark invalides.")
+    assert_equal(
+        benchmark_response["configuration_hash"],
+        configuration.configuration_hash,
+        "Hash de configuration absent du rapport benchmark.",
+    )
     assert_true(
-        all(result["provenance"]["runtime_version"] == configuration.models.llm.runtime_version for result in benchmark_response["task_results"]),
+        all(
+            result["provenance"]["runtime_version"] == configuration.models.llm.runtime_version
+            and result["provenance"]["configuration_hash"] == configuration.configuration_hash
+            for result in benchmark_response["task_results"]
+        ),
         "Runtime déclaré absent des tâches benchmark.",
     )
 finally:

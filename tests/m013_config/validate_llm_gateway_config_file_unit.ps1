@@ -23,6 +23,7 @@ from app.platform.configuration import (  # noqa: E402
 from app.platform.llm_gateway import (  # noqa: E402
     GatewayCircuitBreaker,
     GatewayCircuitBreakerPolicy,
+    LLMGatewayContractError,
     GatewayFailureMetricRecorder,
     GatewayRetryPolicy,
     InferenceMessage,
@@ -32,6 +33,8 @@ from app.platform.llm_gateway import (  # noqa: E402
 )
 from app.platform.local_runtime import (  # noqa: E402
     _build_gateway_configuration_from_application_configuration,
+    _configured_http_bind_host,
+    _configured_http_port,
 )
 from app.platform.observability import InMemoryObservabilityCollector  # noqa: E402
 
@@ -93,6 +96,16 @@ def assert_raises_config(expected_code: str, action) -> None:
     raise AssertionError(f"Erreur CONFIG attendue absente: {expected_code}")
 
 
+def assert_raises_gateway(expected_code: str, action) -> None:
+    try:
+        action()
+    except LLMGatewayContractError as exc:
+        if exc.code != expected_code:
+            raise AssertionError(f"Code gateway inattendu: {exc.code}. Attendu: {expected_code}.") from exc
+        return
+    raise AssertionError(f"Erreur gateway attendue absente: {expected_code}")
+
+
 def valid_request() -> InferenceRequest:
     return InferenceRequest(
         messages=(InferenceMessage(role="user", content='Réponds uniquement {"answer":"OK"}.'),),
@@ -118,6 +131,22 @@ example_path = repo_root / "config" / "application.example.yaml"
 example_text = example_path.read_text(encoding="utf-8-sig").replace("\r\n", "\n")
 
 configuration = load_application_configuration(config_path=example_path, environment_snapshot={})
+
+assert_equal(
+    _configured_http_port("orchestrator-api", configuration),
+    configuration.services.api.port,
+    "Le port orchestrator-api doit provenir du fichier applicatif.",
+)
+assert_equal(
+    _configured_http_port("llm-gateway", configuration),
+    configuration.services.llm_gateway.port,
+    "Le port llm-gateway doit provenir du fichier applicatif.",
+)
+assert_equal(
+    _configured_http_bind_host("llm-gateway", configuration),
+    configuration.deployment.hosts.docker_local.bind_host,
+    "Le bind llm-gateway doit respecter la politique loopback du fichier applicatif.",
+)
 
 # Given le fichier applicatif porte tout le contrat llm-gateway.
 # When local_runtime construit GatewayConfiguration depuis l'objet validé.
@@ -158,6 +187,80 @@ assert_equal(
     configuration.configuration_hash,
     "Hash de configuration absent du contrat gateway.",
 )
+
+with tempfile.TemporaryDirectory(prefix="ost_m013_llm_gateway_installation_") as temporary_directory_name:
+    temporary_directory = Path(temporary_directory_name)
+    declared_dns_path = temporary_directory / "dns_declare.yaml"
+    declared_dns_path.write_text(
+        example_text.replace(
+            "    dns_name: spark-inference\n",
+            "    dns_name: spark-inference.home.arpa\n",
+            1,
+        ).replace(
+            "    spark_endpoint_url: http://spark-inference:8000/v1\n",
+            "    spark_endpoint_url: http://spark-inference.home.arpa:8000/v1\n",
+            1,
+        ),
+        encoding="utf-8",
+    )
+    declared_dns_configuration = load_application_configuration(config_path=declared_dns_path, environment_snapshot={})
+    assert_equal(
+        _build_gateway_configuration_from_application_configuration(declared_dns_configuration).base_url,
+        "http://spark-inference.home.arpa:8000/v1",
+        "Le DNS Spark declare dans application.yaml doit etre accepte sans changement de code.",
+    )
+
+    external_dns_path = temporary_directory / "dns_externe.yaml"
+    external_dns_path.write_text(
+        example_text.replace(
+            "    spark_endpoint_url: http://spark-inference:8000/v1\n",
+            "    spark_endpoint_url: http://spark-public.example.com:8000/v1\n",
+            1,
+        ),
+        encoding="utf-8",
+    )
+    external_dns_configuration = load_application_configuration(config_path=external_dns_path, environment_snapshot={})
+    assert_raises_gateway(
+        "LLM_GATEWAY_SPARK_ENDPOINT_REQUIRED",
+        lambda: _build_gateway_configuration_from_application_configuration(external_dns_configuration),
+    )
+
+    require_tls_conflict_path = temporary_directory / "require_tls_conflit.yaml"
+    require_tls_conflict_path.write_text(
+        example_text.replace("    require_tls: false\n", "    require_tls: true\n", 1),
+        encoding="utf-8",
+    )
+    assert_raises_config(
+        "CONFIG_SCHEMA_INVALID",
+        lambda: load_application_configuration(config_path=require_tls_conflict_path, environment_snapshot={}),
+    )
+
+    require_api_key_conflict_path = temporary_directory / "require_api_key_conflit.yaml"
+    require_api_key_conflict_path.write_text(
+        example_text.replace("    require_api_key: false\n", "    require_api_key: true\n", 1),
+        encoding="utf-8",
+    )
+    assert_raises_config(
+        "CONFIG_SCHEMA_INVALID",
+        lambda: load_application_configuration(config_path=require_api_key_conflict_path, environment_snapshot={}),
+    )
+
+    missing_api_key_path = temporary_directory / "secret_absent.yaml"
+    missing_api_key_path.write_text(
+        example_text.replace("    require_api_key: false\n", "    require_api_key: true\n", 1)
+        .replace("    auth_mode: none\n", "    auth_mode: api_key_file\n", 1)
+        .replace(
+            "    llm_gateway_api_key_path: config/secrets/local/llm_gateway_api_key.txt\n",
+            f"    llm_gateway_api_key_path: {temporary_directory.as_posix()}/secret_absent.txt\n",
+            1,
+        ),
+        encoding="utf-8",
+    )
+    missing_api_key_configuration = load_application_configuration(config_path=missing_api_key_path, environment_snapshot={})
+    assert_raises_gateway(
+        "LLM_GATEWAY_API_KEY_FILE_UNREADABLE",
+        lambda: _build_gateway_configuration_from_application_configuration(missing_api_key_configuration),
+    )
 
 assert_raises_config(
     "CONFIG_ENV_INPUT_REJECTED",

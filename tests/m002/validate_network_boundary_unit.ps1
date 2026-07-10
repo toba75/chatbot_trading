@@ -11,10 +11,12 @@ from __future__ import annotations
 
 import copy
 import sys
+import tempfile
 from pathlib import Path
 
 sys.path.insert(0, sys.argv[1])
 
+from app.platform.configuration import load_application_configuration
 from app.platform.local_compose import parse_local_compose_document
 from app.platform.topology import load_platform_topology
 from app.platform.security.network_boundary import (
@@ -28,7 +30,11 @@ repo_root = Path(sys.argv[1])
 valid_compose_document = (repo_root / "deploy/local-compose/compose.yaml").read_text(
     encoding="utf-8-sig"
 )
+valid_application_configuration_text = (repo_root / "config/application.example.yaml").read_text(
+    encoding="utf-8-sig"
+).replace("\r\n", "\n")
 topology = load_platform_topology(repo_root / "app/platform/topology_registry.json")
+temporary_config_root = tempfile.TemporaryDirectory(prefix="ost_m002_network_boundary_config_")
 
 VALID_FIREWALL_PAYLOAD = {
     "schema_version": "1.0",
@@ -84,12 +90,19 @@ def firewall_from(payload):
     return parse_spark_firewall_policy(copy.deepcopy(payload))
 
 
+def application_configuration_from(text: str):
+    path = Path(temporary_config_root.name) / f"application_{abs(hash(text))}.yaml"
+    path.write_text(text, encoding="utf-8")
+    return load_application_configuration(config_path=path, environment_snapshot={})
+
+
 def assert_boundary_error(expected_fragment: str, *, compose_document=None, firewall_payload=None):
     try:
         validate_network_boundary(
             compose=compose_from(compose_document or valid_compose_document),
             topology=topology,
             spark_firewall=firewall_from(firewall_payload or VALID_FIREWALL_PAYLOAD),
+            application_configuration=application_configuration_from(valid_application_configuration_text),
         )
     except ValueError as exc:
         if expected_fragment not in str(exc):
@@ -170,6 +183,7 @@ validate_network_boundary(
     compose=compose_from(valid_compose_document),
     topology=topology,
     spark_firewall=firewall_from(VALID_FIREWALL_PAYLOAD),
+    application_configuration=application_configuration_from(valid_application_configuration_text),
 )
 
 flows = build_network_flow_matrix(
@@ -213,6 +227,65 @@ assert_boundary_error(
     "Variable applicative interdite pour service ui: GEMMA_API_KEY_FILE",
     compose_document=add_service_environment_line(valid_compose_document, "ui", 'GEMMA_API_KEY_FILE: "/run/secrets/gemma_api_key"'),
 )
+
+spark_port_mismatch_configuration = application_configuration_from(
+    valid_application_configuration_text.replace(
+        "    spark_endpoint_url: http://192.168.1.120:8000/v1\n",
+        "    spark_endpoint_url: http://192.168.1.120:22/v1\n",
+        1,
+    )
+)
+try:
+    validate_network_boundary(
+        compose=compose_from(valid_compose_document),
+        topology=topology,
+        spark_firewall=firewall_from(VALID_FIREWALL_PAYLOAD),
+        application_configuration=spark_port_mismatch_configuration,
+    )
+except ValueError as exc:
+    if "Port Spark applicatif incohérent" not in str(exc):
+        raise AssertionError(f"Erreur port Spark inattendue: {exc}")
+else:
+    raise AssertionError("Configuration applicative avec port Spark incohérent acceptée.")
+
+spark_auth_mismatch_configuration = application_configuration_from(
+    valid_application_configuration_text.replace("    require_api_key: false\n", "    require_api_key: true\n", 1)
+    .replace("    auth_mode: none\n", "    auth_mode: api_key_file\n", 1)
+)
+try:
+    validate_network_boundary(
+        compose=compose_from(valid_compose_document),
+        topology=topology,
+        spark_firewall=firewall_from(VALID_FIREWALL_PAYLOAD),
+        application_configuration=spark_auth_mismatch_configuration,
+    )
+except ValueError as exc:
+    if "Mode auth Spark applicatif incohérent" not in str(exc):
+        raise AssertionError(f"Erreur auth Spark inattendue: {exc}")
+else:
+    raise AssertionError("Configuration applicative avec auth Spark incohérente acceptée.")
+
+spark_tls_mismatch_configuration = application_configuration_from(
+    valid_application_configuration_text.replace("    require_tls: false\n", "    require_tls: true\n", 1)
+    .replace(
+        "    spark_endpoint_url: http://192.168.1.120:8000/v1\n",
+        "    spark_endpoint_url: https://192.168.1.120:8000/v1\n",
+        1,
+    )
+    .replace("    tls_mode: disabled\n", "    tls_mode: ca_bundle\n", 1)
+)
+try:
+    validate_network_boundary(
+        compose=compose_from(valid_compose_document),
+        topology=topology,
+        spark_firewall=firewall_from(VALID_FIREWALL_PAYLOAD),
+        application_configuration=spark_tls_mismatch_configuration,
+    )
+except ValueError as exc:
+    if "Mode TLS Spark applicatif incohérent" not in str(exc):
+        raise AssertionError(f"Erreur TLS Spark inattendue: {exc}")
+else:
+    raise AssertionError("Configuration applicative avec TLS Spark incohérent acceptée.")
 
 firewall_payload = copy.deepcopy(VALID_FIREWALL_PAYLOAD)
 firewall_payload["allowed_ingress"][0]["source_service"] = "worker-research"
