@@ -8,7 +8,10 @@ $ErrorActionPreference = "Stop"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
 
-$defaultAcceptanceTestPath = "tests/m013/validate_llm_gateway_real_spark_acceptance.ps1"
+$defaultAcceptanceTestPaths = @(
+    "tests/m013/validate_llm_gateway_real_spark_acceptance.ps1",
+    "tests/m013/validate_m013_reality_product_acceptance.ps1"
+)
 $requiredTraceabilityPaths = @(
     "docs/tasks/milestone_013/0013_ancrer_gateway_llm_chemin_reel.md",
     "docs/specs/m013_reality_closure.md",
@@ -44,31 +47,36 @@ function Assert-RequiredFile {
     return $resolvedPath
 }
 
-$effectiveAcceptanceTestPath = $AcceptanceTestPath
-if ([string]::IsNullOrWhiteSpace($effectiveAcceptanceTestPath)) {
-    $effectiveAcceptanceTestPath = $defaultAcceptanceTestPath
+$effectiveAcceptanceTestPaths = @()
+if ([string]::IsNullOrWhiteSpace($AcceptanceTestPath)) {
+    $effectiveAcceptanceTestPaths = $defaultAcceptanceTestPaths
+}
+else {
+    $effectiveAcceptanceTestPaths = @($AcceptanceTestPath)
 }
 
-$resolvedAcceptanceTestPath = Assert-RequiredFile -Path $effectiveAcceptanceTestPath
 foreach ($path in $requiredTraceabilityPaths) {
     Assert-RequiredFile -Path $path | Out-Null
 }
 
-$previousErrorActionPreference = $ErrorActionPreference
-$ErrorActionPreference = "Continue"
-try {
-    $output = & powershell `
-        -NoProfile `
-        -ExecutionPolicy Bypass `
-        -File $resolvedAcceptanceTestPath 2>&1
-    $exitCode = $LASTEXITCODE
-}
-finally {
-    $ErrorActionPreference = $previousErrorActionPreference
+foreach ($effectiveAcceptanceTestPath in $effectiveAcceptanceTestPaths) {
+    $resolvedAcceptanceTestPath = Assert-RequiredFile -Path $effectiveAcceptanceTestPath
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $output = & powershell `
+            -NoProfile `
+            -ExecutionPolicy Bypass `
+            -File $resolvedAcceptanceTestPath 2>&1
+        $exitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+
+    if ($exitCode -ne 0) {
+        throw ($output -join "`n")
+    }
 }
 
-if ($exitCode -ne 0) {
-    throw ($output -join "`n")
-}
-
-Write-Host "Validation M13-reality gateway LLM réel valide."
+Write-Host "Validation M13-reality chemin réel chat et LLM valide."
