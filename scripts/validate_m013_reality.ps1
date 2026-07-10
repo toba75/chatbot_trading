@@ -9,6 +9,7 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
 
 $defaultAcceptanceTestPaths = @(
+    "tests/m013/validate_m013_reality_product_unit.ps1",
     "tests/m013/validate_llm_gateway_real_spark_acceptance.ps1",
     "tests/m013/validate_m013_reality_product_acceptance.ps1"
 )

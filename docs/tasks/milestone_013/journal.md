@@ -164,3 +164,12 @@
 - Traçabilité: ajout de `REQ-M013-013`, du validateur `scripts/validate_m013_reality.ps1` et de son enrôlement dans `scripts/test.ps1`.
 - Validation ciblée: `scripts/validate_m013_reality.ps1` GREEN sur le Spark réel avec `GEMMA_MODEL=google/gemma-4-26B-A4B-it`, `GEMMA_MODEL_REVISION=google/gemma-4-26B-A4B-it@533c7a07d8e220c4342168ecf816b21c49e8e9ce207b447349d51a7b2f7e1607`, `GEMMA_RUNTIME_VERSION=nim-1.7.0-variant-api-3.1.0`, `GEMMA_TIMEOUT_SECONDS=120`, `GEMMA_RETRY_BEFORE_FIRST_TOKEN=1`, `GEMMA_CIRCUIT_BREAKER_FAILURE_THRESHOLD=2` et `GEMMA_CIRCUIT_BREAKER_OPEN_SECONDS=30`.
 - Validation globale ciblée: `scripts/lint.ps1` GREEN avec `Gate lint GREEN: 35 validation(s), 0 test(s).`
+
+## Tranche M13-reality - reprise chat produit et évaluations réelles
+
+- Constat de reprise: le premier ancrage M13-reality validait `llm-gateway` seul et ne prouvait pas le contrat public chat ni le recalcul des évaluations LLM.
+- RED: `1896c7910` ajoute `tests/m013/validate_m013_reality_product_acceptance.ps1`; le test échoue sur `POST /v1/chat/completions` avec `ENDPOINT_NOT_FOUND`, preuve que le chat produit réel n'était pas exposé.
+- RED unitaire: `tests/m013/validate_m013_reality_product_unit.ps1` échoue avant implémentation parce que `local_runtime.py` ne sait pas construire les requêtes strictes du chat produit ni les tâches LLM obligatoires.
+- GREEN: `orchestrator-api` expose `POST /v1/chat/completions` et `POST /v1/evaluation/llm-real-path-benchmark`, puis délègue au service HTTP `llm-gateway` local sans provider factice.
+- Validation réelle: `tests/m013/validate_m013_reality_product_acceptance.ps1` GREEN sur `orchestrator-api -> llm-gateway -> Spark` avec le chat produit et les onze tâches `REQUIRED_LLM_TASKS` rejouées contre `GEMMA_MODEL=google/gemma-4-26B-A4B-it`.
+- Validation ciblée: `scripts/validate_m013_reality.ps1` GREEN avec `tests/m013/validate_m013_reality_product_unit.ps1`, `tests/m013/validate_llm_gateway_real_spark_acceptance.ps1` et `tests/m013/validate_m013_reality_product_acceptance.ps1`.

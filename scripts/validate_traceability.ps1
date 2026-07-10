@@ -920,9 +920,9 @@ $requiredM013Requirements = @(
     [ordered] @{
         Id = "REQ-M013-013"
         Source = "docs/tasks/milestone_013/0013_ancrer_gateway_llm_chemin_reel.md"
-        Test = "tests/m013/validate_llm_gateway_real_spark_acceptance.ps1"
+        Test = "tests/m013/validate_llm_gateway_real_spark_acceptance.ps1; tests/m013/validate_m013_reality_product_acceptance.ps1"
         CommandScript = "scripts/validate_m013_reality.ps1"
-        Code = "app/platform/local_runtime.py; app/platform/llm_gateway/__init__.py; scripts/validate_m013_reality.ps1; tests/m013/validate_llm_gateway_real_spark_acceptance.ps1; docs/specs/m013_reality_closure.md; docs/tasks/milestone_013/journal.md"
+        Code = "app/platform/local_runtime.py; app/platform/llm_gateway/__init__.py; scripts/validate_m013_reality.ps1; tests/m013/validate_llm_gateway_real_spark_acceptance.ps1; tests/m013/validate_m013_reality_product_acceptance.ps1; tests/m013/validate_m013_reality_product_unit.ps1; docs/specs/m013_reality_closure.md; docs/tasks/milestone_013/journal.md"
         Adr = "ADR-014; ADR-015"
     }
 )

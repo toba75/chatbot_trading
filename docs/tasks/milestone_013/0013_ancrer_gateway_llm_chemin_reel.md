@@ -4,13 +4,13 @@
 
 - Nom: M-013 - Durcissement et acceptation V1, tranche `M13-reality`.
 - Source: `docs/specs/m013_reality_closure.md`, ADR-014, ADR-015 et écart V1 `LLM` bloquant.
-- Objectif métier: prouver que le gateway applicatif appelle Gemma réel sur Spark avec une provenance exploitable, sans mock, sans secret fictif et sans fallback.
+- Objectif métier: prouver que le chat produit local et les évaluations LLM appellent Gemma réel sur Spark via `orchestrator-api -> llm-gateway`, avec une provenance exploitable, sans mock, sans secret fictif et sans fallback.
 
 ## Contexte DDD
 
 - Domaine: plateforme locale et évaluation V1.
-- Bounded context: `platform.llm_gateway`, consommé par EV, RA et CV.
-- Objectif métier: transformer la disponibilité technique de Gemma en preuve applicative rejouable.
+- Bounded context: `platform.llm_gateway` et endpoint local `orchestrator-api`, consommés par EV, RA et CV.
+- Objectif métier: transformer la disponibilité technique de Gemma en preuve applicative rejouable par le chat produit et le benchmark LLM.
 - Langage ubiquitaire: `llm-gateway`, Spark, NIM, provenance modèle, `GEMMA_MODEL_REVISION`, `GEMMA_RUNTIME_VERSION`, chemin réel, absence de fallback.
 - Invariants critiques: toute inférence réussie porte un modèle, une révision, un runtime, un hash d'entrée et un hash de sortie; l'absence de provenance déclarée bloque le gateway; les pannes Spark restent explicites.
 - Garde-fous: pas de valeur par défaut pour la provenance; pas de clé API en mode `none`; pas d'appel direct à Gemma hors `llm-gateway`; pas de réponse factuelle publiée si le gateway échoue.
@@ -32,13 +32,15 @@
   - Given Gemma est disponible dans un Docker sur la machine Spark et les variables `GEMMA_*` de provenance sont déclarées explicitement.
   - When le gateway LLM exécute une inférence structurée par le chemin `docker-local -> llm-gateway -> Spark`.
   - Then la réponse structurée est validée, la provenance contient le modèle, la révision et le runtime déclarés, et aucune clé API ni fallback n'est utilisé.
-- Tests d'acceptation à écrire: `tests/m013/validate_llm_gateway_real_spark_acceptance.ps1`, qui échoue si une variable requise manque, si le Spark ne répond pas, si la provenance est absente, si le mode `none` injecte une autorisation ou si une sortie non JSON est acceptée.
-- Tests unitaires à écrire: compléter les tests M-002 du gateway pour la provenance déclarée, le refus des champs vides, le refus d'une provenance par défaut et la priorité des champs déclarés quand NIM ne renvoie pas d'en-têtes de provenance.
-- Implémentation attendue: ajouter `model_revision` et `runtime_version` à `GatewayConfiguration`, exiger leur déclaration explicite, utiliser ces valeurs comme provenance déclarée quand la réponse OpenAI compatible ne fournit ni payload ni headers, et les enregistrer dans l'observabilité.
+- Tests d'acceptation à écrire: `tests/m013/validate_llm_gateway_real_spark_acceptance.ps1`, qui échoue si une variable requise manque, si le Spark ne répond pas, si la provenance est absente, si le mode `none` injecte une autorisation ou si une sortie non JSON est acceptée; `tests/m013/validate_m013_reality_product_acceptance.ps1`, qui échoue si le contrat public `/v1/chat/completions` ou le benchmark `/v1/evaluation/llm-real-path-benchmark` ne passe pas par `llm-gateway` et Spark réel.
+- Tests unitaires à écrire: compléter les tests M-002 du gateway pour la provenance déclarée, le refus des champs vides, le refus d'une provenance par défaut et la priorité des champs déclarés quand NIM ne renvoie pas d'en-têtes de provenance; ajouter `tests/m013/validate_m013_reality_product_unit.ps1` pour verrouiller les requêtes strictes du chat et du benchmark.
+- Implémentation attendue: ajouter `model_revision` et `runtime_version` à `GatewayConfiguration`, exiger leur déclaration explicite, utiliser ces valeurs comme provenance déclarée quand la réponse OpenAI compatible ne fournit ni payload ni headers, les enregistrer dans l'observabilité, puis exposer dans `orchestrator-api` un chat produit et un benchmark LLM qui délèguent explicitement au service HTTP `llm-gateway`.
 - Invariants et garde-fous: aucune provenance inventée; aucune valeur par défaut; aucun fallback modèle; aucune fuite de prompt complet; aucun changement d'état métier dans le gateway.
 - Dépendances: ADR-014; ADR-015; `app/platform/llm_gateway/__init__.py`; `app/platform/observability/__init__.py`; Spark `192.168.1.120:8000` lancé pour le test live.
 - Commandes de validation:
   - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_reality.ps1`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_m013_reality_product_acceptance.ps1`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_m013_reality_product_unit.ps1`
   - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_llm_gateway_real_spark_acceptance.ps1`
   - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m002\validate_llm_gateway_contract_acceptance.ps1`
   - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m002\validate_llm_gateway_contract_unit.ps1`
