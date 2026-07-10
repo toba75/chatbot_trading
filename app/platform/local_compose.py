@@ -57,6 +57,7 @@ APPLICATION_CONFIG_CONTAINER_PATH = "/workspace/config/application.yaml"
 APPLICATION_CONFIG_VOLUME = f"../../config/application.yaml:{APPLICATION_CONFIG_CONTAINER_PATH}:ro"
 APPLICATION_SCHEMA_CONTAINER_PATH = "/workspace/config/application.schema.json"
 APPLICATION_SCHEMA_VOLUME = f"../../config/application.schema.json:{APPLICATION_SCHEMA_CONTAINER_PATH}:ro"
+LLM_GATEWAY_LOCAL_SECRETS_VOLUME = "../../config/secrets/local:/workspace/config/secrets/local:ro"
 APPLICATION_CONFIG_ARGUMENTS = ("--config", APPLICATION_CONFIG_CONTAINER_PATH)
 FORBIDDEN_APPLICATION_ENVIRONMENT_KEYS = frozenset(
     (
@@ -381,6 +382,8 @@ def _validate_service_application_configuration(service: ComposeService) -> None
         raise ValueError(
             f"Montage config/application.schema.json read-only absent pour service applicatif: {service.id}"
         )
+    if service.id == "llm-gateway" and LLM_GATEWAY_LOCAL_SECRETS_VOLUME not in service.volumes:
+        raise ValueError("Montage config/secrets/local read-only absent pour service llm-gateway")
 
 
 def _validate_service_command(service: ComposeService) -> None:

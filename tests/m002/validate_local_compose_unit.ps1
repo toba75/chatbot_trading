@@ -38,7 +38,7 @@ BASE_SERVICES = {
         "command": runtime_command("serve-http", "ui", "8081"),
         "expose": ["8081"],
         "networks": ["core"],
-        "volumes": [APPLICATION_CONFIG_VOLUME, APPLICATION_SCHEMA_VOLUME, LLM_GATEWAY_LOCAL_SECRETS_VOLUME],
+        "volumes": [APPLICATION_CONFIG_VOLUME, APPLICATION_SCHEMA_VOLUME],
         "read_only": True,
     },
     "orchestrator-api": {
@@ -54,7 +54,7 @@ BASE_SERVICES = {
         "command": runtime_command("serve-http", "llm-gateway", "8090"),
         "expose": ["8090"],
         "networks": ["core", "spark-egress"],
-        "volumes": [APPLICATION_CONFIG_VOLUME, APPLICATION_SCHEMA_VOLUME],
+        "volumes": [APPLICATION_CONFIG_VOLUME, APPLICATION_SCHEMA_VOLUME, LLM_GATEWAY_LOCAL_SECRETS_VOLUME],
         "read_only": True,
     },
     "postgres": {

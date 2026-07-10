@@ -211,16 +211,24 @@ try {
         "backtest-engine"
     )) {
         $lineEnding = Get-ComposeLineEnding -Content $validCompose
-        $serviceHeader = "${lineEnding}  ${serviceId}:${lineEnding}"
-        $serviceIndex = $validCompose.IndexOf($serviceHeader)
-        if ($serviceIndex -lt 0) {
+        $serviceMatch = [regex]::Match($validCompose, "(?m)^  $([regex]::Escape($serviceId)):\r?\n")
+        if (-not $serviceMatch.Success) {
             throw "Service applicatif absent du Compose canonique: $serviceId"
         }
+        $serviceIndex = $serviceMatch.Index
 
         $nextServiceIndex = $validCompose.Length
         foreach ($candidateServiceId in $composeServiceIds) {
-            $candidateHeader = "${lineEnding}  ${candidateServiceId}:${lineEnding}"
-            $candidateIndex = $validCompose.IndexOf($candidateHeader, $serviceIndex + $serviceHeader.Length)
+            $candidateMatch = [regex]::Match(
+                $validCompose.Substring($serviceIndex + $serviceMatch.Length),
+                "(?m)^  $([regex]::Escape($candidateServiceId)):\r?\n"
+            )
+            $candidateIndex = if ($candidateMatch.Success) {
+                $serviceIndex + $serviceMatch.Length + $candidateMatch.Index
+            }
+            else {
+                -1
+            }
             if ($candidateIndex -ge 0 -and $candidateIndex -lt $nextServiceIndex) {
                 $nextServiceIndex = $candidateIndex
             }

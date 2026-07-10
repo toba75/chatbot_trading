@@ -13,6 +13,8 @@
 - Montage attendu dans chaque service applicatif: `../../config/application.yaml:/workspace/config/application.yaml:ro`.
 - Le schéma `config/application.schema.json` est monté en lecture seule dans les services applicatifs.
 - Montage schéma attendu: `../../config/application.schema.json:/workspace/config/application.schema.json:ro`.
+- Le répertoire `config/secrets/local/` est monté en lecture seule dans `llm-gateway` pour les modes futurs `api_key_file` et `ca_bundle`.
+- Montage secrets gateway attendu: `../../config/secrets/local:/workspace/config/secrets/local:ro`.
 
 ## Variables requises
 
