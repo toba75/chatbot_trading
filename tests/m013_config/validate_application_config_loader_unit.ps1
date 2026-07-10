@@ -7,13 +7,10 @@ $pythonExecutable = Get-RequiredPythonExecutable
 $pythonCode = @'
 from __future__ import annotations
 
-import copy
 import inspect
 from pathlib import Path
 import sys
 import tempfile
-
-import yaml
 
 sys.path.insert(0, sys.argv[1])
 
@@ -27,11 +24,6 @@ from app.platform.configuration import (
 def assert_equal(actual, expected, message):
     if actual != expected:
         raise AssertionError(f"{message} Obtenu: {actual!r}. Attendu: {expected!r}.")
-
-
-def assert_true(condition, message):
-    if not condition:
-        raise AssertionError(message)
 
 
 def assert_raises_code(expected_code, action):
@@ -48,17 +40,39 @@ def assert_raises_code(expected_code, action):
         raise AssertionError(f"Erreur attendue absente: {expected_code}")
 
 
-def write_yaml(path, payload, *, sort_keys=False):
-    path.write_text(
-        yaml.safe_dump(payload, sort_keys=sort_keys, allow_unicode=True),
-        encoding="utf-8",
-    )
+def write_configuration(path, content):
+    path.write_text(content, encoding="utf-8")
     return path
+
+
+def reorder_root_sections(content, ordered_names):
+    blocks = {}
+    current_name = None
+    current_lines = []
+
+    for line in content.strip().splitlines():
+        if line != "" and not line.startswith(" ") and line.endswith(":"):
+            if current_name is not None:
+                blocks[current_name] = "\n".join(current_lines)
+            current_name = line[:-1]
+            current_lines = [line]
+            continue
+        if current_name is not None:
+            current_lines.append(line)
+
+    if current_name is not None:
+        blocks[current_name] = "\n".join(current_lines)
+
+    missing_sections = [name for name in ordered_names if name not in blocks]
+    if len(missing_sections) > 0:
+        raise AssertionError(f"Sections racines absentes du fixture: {missing_sections!r}")
+
+    return "\n\n".join(blocks[name] for name in ordered_names) + "\n"
 
 
 repo_root = Path(sys.argv[1])
 example_path = repo_root / "config" / "application.example.yaml"
-example_payload = yaml.safe_load(example_path.read_text(encoding="utf-8-sig"))
+example_text = example_path.read_text(encoding="utf-8-sig").replace("\r\n", "\n")
 
 signature = inspect.signature(load_application_configuration)
 for parameter_name in ("config_path", "environment_snapshot"):
@@ -67,8 +81,9 @@ for parameter_name in ("config_path", "environment_snapshot"):
         raise AssertionError(f"Valeur par défaut interdite pour {parameter_name}.")
 
 source = inspect.getsource(configuration_module)
-if "os.environ" in source or "getenv(" in source:
-    raise AssertionError("Le chargeur ne doit pas lire directement l'environnement système.")
+for forbidden_fragment in ("os.environ", "getenv("):
+    if forbidden_fragment in source:
+        raise AssertionError(f"Fragment interdit dans le chargeur: {forbidden_fragment}")
 
 validated_configuration = load_application_configuration(
     config_path=example_path,
@@ -89,19 +104,29 @@ assert_equal(validated_configuration.runtime.resource_limits.cpu_count, 8, "Limi
 with tempfile.TemporaryDirectory(prefix="ost_m013_config_loader_unit_") as temporary_directory_name:
     temporary_directory = Path(temporary_directory_name)
 
-    sorted_yaml_path = write_yaml(
-        temporary_directory / "application_sorted.yaml",
-        copy.deepcopy(example_payload),
-        sort_keys=True,
+    reordered_yaml_path = write_configuration(
+        temporary_directory / "application_reordonnee.yaml",
+        reorder_root_sections(
+            example_text,
+            (
+                "runtime",
+                "observability",
+                "quality_gates",
+                "security",
+                "paths",
+                "models",
+                "services",
+                "deployment",
+            ),
+        ),
     )
-    unsorted_yaml_path = write_yaml(
-        temporary_directory / "application_unsorted.yaml",
-        copy.deepcopy(example_payload),
-        sort_keys=False,
+    original_yaml_path = write_configuration(
+        temporary_directory / "application_originale.yaml",
+        example_text,
     )
     assert_equal(
-        load_application_configuration(config_path=sorted_yaml_path, environment_snapshot={}).configuration_hash,
-        load_application_configuration(config_path=unsorted_yaml_path, environment_snapshot={}).configuration_hash,
+        load_application_configuration(config_path=reordered_yaml_path, environment_snapshot={}).configuration_hash,
+        load_application_configuration(config_path=original_yaml_path, environment_snapshot={}).configuration_hash,
         "Le hash doit dépendre du contenu validé et non de l'ordre YAML.",
     )
 
@@ -112,14 +137,22 @@ with tempfile.TemporaryDirectory(prefix="ost_m013_config_loader_unit_") as tempo
         lambda: load_application_configuration(config_path=invalid_yaml_path, environment_snapshot={}),
     )
 
-    for mutation_name, mutate_payload in (
-        ("port_chaine", lambda payload: payload["services"]["api"].__setitem__("port", "8080")),
-        ("concurrence_zero", lambda payload: payload["services"]["workers"].__setitem__("concurrency", 0)),
-        ("exposition_booleen_chaine", lambda payload: payload["security"].__setitem__("allow_public_bind", "false")),
-    ):
-        invalid_type_payload = copy.deepcopy(example_payload)
-        mutate_payload(invalid_type_payload)
-        invalid_type_path = write_yaml(temporary_directory / f"{mutation_name}.yaml", invalid_type_payload)
+    invalid_type_cases = (
+        (
+            "port_chaine",
+            example_text.replace("    port: 8080\n", '    port: "8080"\n', 1),
+        ),
+        (
+            "concurrence_zero",
+            example_text.replace("    concurrency: 2\n", "    concurrency: 0\n", 1),
+        ),
+        (
+            "exposition_booleen_chaine",
+            example_text.replace("  allow_public_bind: false\n", '  allow_public_bind: "false"\n', 1),
+        ),
+    )
+    for mutation_name, mutated_text in invalid_type_cases:
+        invalid_type_path = write_configuration(temporary_directory / f"{mutation_name}.yaml", mutated_text)
         assert_raises_code(
             "CONFIG_SCHEMA_INVALID",
             lambda path=invalid_type_path: load_application_configuration(
@@ -128,41 +161,46 @@ with tempfile.TemporaryDirectory(prefix="ost_m013_config_loader_unit_") as tempo
             ),
         )
 
-    unknown_root_payload = copy.deepcopy(example_payload)
-    unknown_root_payload["environment"] = {"DATABASE_URL": "postgresql://interdit"}
-    unknown_root_path = write_yaml(temporary_directory / "section_inconnue.yaml", unknown_root_payload)
+    unknown_root_path = write_configuration(
+        temporary_directory / "section_inconnue.yaml",
+        example_text + "\nenvironment:\n  DATABASE_URL: postgresql://interdit\n",
+    )
     assert_raises_code(
         "CONFIG_SCHEMA_INVALID",
         lambda: load_application_configuration(config_path=unknown_root_path, environment_snapshot={}),
     )
 
-    unknown_service_payload = copy.deepcopy(example_payload)
-    unknown_service_payload["services"]["redis"] = {"url": "redis://redis:6379"}
-    unknown_service_path = write_yaml(temporary_directory / "service_inconnu.yaml", unknown_service_payload)
+    unknown_service_path = write_configuration(
+        temporary_directory / "service_inconnu.yaml",
+        example_text.replace("services:\n", "services:\n  redis:\n    url: redis://redis:6379\n", 1),
+    )
     assert_raises_code(
         "CONFIG_SCHEMA_INVALID",
         lambda: load_application_configuration(config_path=unknown_service_path, environment_snapshot={}),
     )
 
-    secret_inline_payload = copy.deepcopy(example_payload)
-    secret_inline_payload["security"]["secrets"]["password"] = "secret-en-clair"
-    secret_inline_path = write_yaml(temporary_directory / "secret_inline.yaml", secret_inline_payload)
+    secret_inline_path = write_configuration(
+        temporary_directory / "secret_inline.yaml",
+        example_text.replace("  secrets:\n", "  secrets:\n    password: secret-en-clair\n", 1),
+    )
     assert_raises_code(
         "CONFIG_SECRET_INLINE_REJECTED",
         lambda: load_application_configuration(config_path=secret_inline_path, environment_snapshot={}),
     )
 
-    blank_payload = copy.deepcopy(example_payload)
-    blank_payload["services"]["postgres"]["url"] = "   "
-    blank_path = write_yaml(temporary_directory / "valeur_blanche.yaml", blank_payload)
+    blank_path = write_configuration(
+        temporary_directory / "valeur_blanche.yaml",
+        example_text.replace("    url: postgresql+psycopg://app@postgres/app\n", '    url: "   "\n', 1),
+    )
     assert_raises_code(
         "CONFIG_KEY_EMPTY",
         lambda: load_application_configuration(config_path=blank_path, environment_snapshot={}),
     )
 
-    required_missing_payload = copy.deepcopy(example_payload)
-    del required_missing_payload["deployment"]["hosts"]["spark_inference"]["allowed_client_cidrs"]
-    required_missing_path = write_yaml(temporary_directory / "cle_absente.yaml", required_missing_payload)
+    required_missing_path = write_configuration(
+        temporary_directory / "cle_absente.yaml",
+        example_text.replace("      allowed_client_cidrs:\n        - 192.168.1.20/32\n", "", 1),
+    )
     assert_raises_code(
         "CONFIG_KEY_MISSING",
         lambda: load_application_configuration(config_path=required_missing_path, environment_snapshot={}),

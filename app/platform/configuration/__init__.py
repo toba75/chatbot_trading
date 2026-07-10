@@ -7,10 +7,8 @@ from dataclasses import dataclass
 import hashlib
 import json
 from pathlib import Path
+import re
 from typing import Any
-
-from jsonschema import Draft202012Validator
-import yaml
 
 
 CONFIG_FILE_REQUIRED = "CONFIG_FILE_REQUIRED"
@@ -335,11 +333,11 @@ def _read_configuration_payload(path: Path) -> Mapping[str, Any]:
         ) from exc
 
     try:
-        payload = yaml.safe_load(content)
-    except yaml.YAMLError as exc:
+        payload = _parse_application_yaml(content)
+    except _ConfigurationSyntaxError as exc:
         raise ApplicationConfigurationError(
             CONFIG_SCHEMA_INVALID,
-            "YAML de configuration invalide",
+            f"YAML de configuration invalide: {exc}",
             str(path),
         ) from exc
 
@@ -350,6 +348,98 @@ def _read_configuration_payload(path: Path) -> Mapping[str, Any]:
             str(path),
         )
     return payload
+
+
+class _ConfigurationSyntaxError(ValueError):
+    pass
+
+
+def _parse_application_yaml(content: str) -> Mapping[str, Any]:
+    root: dict[str, Any] = {}
+    lines = content.splitlines()
+    stack: list[tuple[int, Any]] = [(-1, root)]
+
+    for line_index, raw_line in enumerate(lines):
+        if raw_line.strip() == "" or raw_line.lstrip().startswith("#"):
+            continue
+        if "\t" in raw_line:
+            raise _ConfigurationSyntaxError(f"tabulation interdite ligne {line_index + 1}")
+
+        indent = len(raw_line) - len(raw_line.lstrip(" "))
+        if indent % 2 != 0:
+            raise _ConfigurationSyntaxError(f"indentation impaire ligne {line_index + 1}")
+
+        stripped = raw_line.strip()
+        while len(stack) > 1 and indent <= stack[-1][0]:
+            stack.pop()
+
+        parent = stack[-1][1]
+        if stripped.startswith("- "):
+            if not isinstance(parent, list):
+                raise _ConfigurationSyntaxError(f"entrée de liste sans liste parente ligne {line_index + 1}")
+            item_text = stripped[2:].strip()
+            if item_text == "":
+                raise _ConfigurationSyntaxError(f"entrée de liste vide ligne {line_index + 1}")
+            parent.append(_parse_yaml_scalar(item_text))
+            continue
+
+        if ":" not in stripped:
+            raise _ConfigurationSyntaxError(f"séparateur clé-valeur absent ligne {line_index + 1}")
+
+        key_text, value_text = stripped.split(":", 1)
+        key = key_text.strip()
+        if key == "":
+            raise _ConfigurationSyntaxError(f"clé vide ligne {line_index + 1}")
+        if not isinstance(parent, dict):
+            raise _ConfigurationSyntaxError(f"clé sous liste scalaire ligne {line_index + 1}")
+        if key in parent:
+            raise _ConfigurationSyntaxError(f"clé dupliquée ligne {line_index + 1}: {key}")
+
+        stripped_value = value_text.strip()
+        if stripped_value == "":
+            next_line = _next_yaml_content_line(lines, line_index + 1)
+            if next_line is None:
+                raise _ConfigurationSyntaxError(f"valeur imbriquée absente ligne {line_index + 1}")
+            next_indent, next_stripped = next_line
+            if next_indent <= indent:
+                raise _ConfigurationSyntaxError(f"valeur imbriquée absente ligne {line_index + 1}")
+            child: dict[str, Any] | list[Any]
+            if next_stripped.startswith("- "):
+                child = []
+            else:
+                child = {}
+            parent[key] = child
+            stack.append((indent, child))
+            continue
+
+        parent[key] = _parse_yaml_scalar(stripped_value)
+
+    return root
+
+
+def _next_yaml_content_line(lines: list[str], start_index: int) -> tuple[int, str] | None:
+    for raw_line in lines[start_index:]:
+        if raw_line.strip() == "" or raw_line.lstrip().startswith("#"):
+            continue
+        indent = len(raw_line) - len(raw_line.lstrip(" "))
+        return indent, raw_line.strip()
+    return None
+
+
+def _parse_yaml_scalar(value: str) -> str | int | float | bool:
+    if value == "true":
+        return True
+    if value == "false":
+        return False
+    if len(value) >= 2 and value[0] == '"' and value[-1] == '"':
+        return value[1:-1]
+    if re.fullmatch(r"[-+]?[0-9]+", value):
+        return int(value)
+    if re.fullmatch(r"[-+]?[0-9]+\.[0-9]+", value):
+        return float(value)
+    if value.startswith("[") or value.startswith("{"):
+        raise _ConfigurationSyntaxError(f"syntaxe YAML non supportée: {value}")
+    return value
 
 
 def _reject_environment_inputs(
@@ -460,19 +550,138 @@ def _validate_required_keys_and_values(
 
 
 def _validate_schema(payload: Mapping[str, Any], schema: Mapping[str, Any], path: Path) -> None:
-    validator = Draft202012Validator(schema)
-    errors = sorted(
-        validator.iter_errors(payload),
-        key=lambda error: tuple(str(part) for part in error.absolute_path),
-    )
-    if len(errors) > 0:
-        first_error = errors[0]
-        error_path = _format_path(tuple(str(part) for part in first_error.absolute_path))
+    try:
+        _validate_schema_node(payload, schema, schema, ())
+    except _SchemaValidationError as exc:
         raise ApplicationConfigurationError(
             CONFIG_SCHEMA_INVALID,
-            f"schéma invalide à {error_path}: {first_error.message}",
+            f"schéma invalide à {_format_path(exc.path_parts)}: {exc}",
             str(path),
-        )
+        ) from exc
+
+
+class _SchemaValidationError(ValueError):
+    def __init__(self, message: str, path_parts: tuple[str, ...]) -> None:
+        self.path_parts = path_parts
+        super().__init__(message)
+
+
+def _validate_schema_node(
+    value: Any,
+    schema_node: Mapping[str, Any],
+    root_schema: Mapping[str, Any],
+    path_parts: tuple[str, ...],
+) -> None:
+    resolved_node = _resolve_schema_node(schema_node, root_schema)
+
+    expected_type = resolved_node.get("type")
+    if isinstance(expected_type, str):
+        _validate_json_schema_type(value, expected_type, path_parts)
+
+    if "enum" in resolved_node and value not in resolved_node["enum"]:
+        raise _SchemaValidationError("valeur hors enum", path_parts)
+
+    if "const" in resolved_node and value != resolved_node["const"]:
+        raise _SchemaValidationError("valeur const différente", path_parts)
+
+    if isinstance(value, str):
+        min_length = resolved_node.get("minLength")
+        if isinstance(min_length, int) and len(value) < min_length:
+            raise _SchemaValidationError("chaîne trop courte", path_parts)
+
+        pattern = resolved_node.get("pattern")
+        if isinstance(pattern, str) and re.search(pattern, value) is None:
+            raise _SchemaValidationError("motif de chaîne non respecté", path_parts)
+
+    if _is_json_number(value):
+        minimum = resolved_node.get("minimum")
+        if _is_json_number(minimum) and value < minimum:
+            raise _SchemaValidationError("nombre sous le minimum", path_parts)
+
+        maximum = resolved_node.get("maximum")
+        if _is_json_number(maximum) and value > maximum:
+            raise _SchemaValidationError("nombre au-dessus du maximum", path_parts)
+
+    if isinstance(value, Mapping):
+        properties = resolved_node.get("properties")
+        if isinstance(properties, Mapping):
+            for required_key in resolved_node.get("required", ()):
+                if required_key not in value:
+                    raise _SchemaValidationError(
+                        f"clé obligatoire absente: {required_key}",
+                        (*path_parts, str(required_key)),
+                    )
+
+            additional_properties = resolved_node.get("additionalProperties")
+            for key, item in value.items():
+                if key in properties:
+                    child_schema = properties[key]
+                    if not isinstance(child_schema, Mapping):
+                        raise _SchemaValidationError("schéma de propriété non objet", (*path_parts, str(key)))
+                    _validate_schema_node(item, child_schema, root_schema, (*path_parts, str(key)))
+                    continue
+
+                if additional_properties is False:
+                    raise _SchemaValidationError("propriété inconnue interdite", (*path_parts, str(key)))
+
+    if isinstance(value, list):
+        min_items = resolved_node.get("minItems")
+        if isinstance(min_items, int) and len(value) < min_items:
+            raise _SchemaValidationError("liste trop courte", path_parts)
+
+        item_schema = resolved_node.get("items")
+        if isinstance(item_schema, Mapping):
+            for index, item in enumerate(value):
+                _validate_schema_node(item, item_schema, root_schema, (*path_parts, str(index)))
+
+    not_schema = resolved_node.get("not")
+    if isinstance(not_schema, Mapping) and _matches_schema_node(value, not_schema, root_schema, path_parts):
+        raise _SchemaValidationError("condition not violée", path_parts)
+
+
+def _matches_schema_node(
+    value: Any,
+    schema_node: Mapping[str, Any],
+    root_schema: Mapping[str, Any],
+    path_parts: tuple[str, ...],
+) -> bool:
+    try:
+        _validate_schema_node(value, schema_node, root_schema, path_parts)
+    except _SchemaValidationError:
+        return False
+    return True
+
+
+def _validate_json_schema_type(value: Any, expected_type: str, path_parts: tuple[str, ...]) -> None:
+    if expected_type == "object":
+        if not isinstance(value, Mapping):
+            raise _SchemaValidationError("objet attendu", path_parts)
+        return
+    if expected_type == "array":
+        if not isinstance(value, list):
+            raise _SchemaValidationError("liste attendue", path_parts)
+        return
+    if expected_type == "string":
+        if not isinstance(value, str):
+            raise _SchemaValidationError("chaîne attendue", path_parts)
+        return
+    if expected_type == "integer":
+        if not isinstance(value, int) or isinstance(value, bool):
+            raise _SchemaValidationError("entier attendu", path_parts)
+        return
+    if expected_type == "number":
+        if not _is_json_number(value):
+            raise _SchemaValidationError("nombre attendu", path_parts)
+        return
+    if expected_type == "boolean":
+        if not isinstance(value, bool):
+            raise _SchemaValidationError("booléen attendu", path_parts)
+        return
+    raise _SchemaValidationError(f"type de schéma non supporté: {expected_type}", path_parts)
+
+
+def _is_json_number(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
 def _resolve_schema_node(

@@ -164,3 +164,34 @@ Note de validation:
 - Le gate `scripts/lint.ps1` appelle ce même validateur avec ses paramètres canoniques et reste GREEN.
 
 Statut: GREEN pour le chargeur applicatif T-003; risque résiduel limité à l'incohérence de commande documentée ci-dessus.
+
+### Correction T-003 - Suppression des dépendances Python implicites
+
+Date d'exécution: 2026-07-10.
+
+Écart détecté:
+
+- Le chargeur T-003 importait `yaml` et `jsonschema`, et les tests loader importaient `yaml`.
+- Le dépôt ne publie aucun manifeste de dépendances Python (`requirements`, `pyproject`, `poetry.lock`, `uv.lock`), donc ces imports constituaient une dépendance implicite non traçable.
+
+Preuve RED corrective:
+
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_application_config_loader_dependencies_unit.ps1` - RED attendu; `Dépendance Python externe interdite dans T-003: import yaml dans app/platform/configuration/__init__.py`.
+- Commit RED correctif: `44d1201f0` (`test(platform): interdire dependances externes configuration`).
+
+Correction livrée:
+
+- Remplacement de `yaml.safe_load` par un parseur YAML standard library limité au sous-ensemble strict utilisé par `config/application.example.yaml`: mappings indentés, listes scalaires et scalaires `string`, `integer`, `number`, `boolean`.
+- Remplacement de `Draft202012Validator` par un validateur local couvrant les mots-clés utilisés par `config/application.schema.json`: `$ref`, `type`, `required`, `properties`, `additionalProperties`, `enum`, `const`, `minimum`, `maximum`, `minLength`, `pattern`, `items`, `minItems` et `not`.
+- Retrait des imports externes dans les tests loader; les variantes de configuration sont maintenant produites par mutation textuelle contrôlée.
+- Aucun changement `local_runtime`, gateway LLM ou Compose.
+
+Commandes GREEN exécutées:
+
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_application_config_loader_dependencies_unit.ps1` - GREEN; `Tests unitaires dépendances chargeur de configuration applicative: OK`.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_application_config_loader_acceptance.ps1` - GREEN; `Test d'acceptation du chargeur de configuration applicative: OK`.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_application_config_loader_unit.ps1` - GREEN; `Tests unitaires du chargeur de configuration applicative: OK`.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_architecture_boundaries.ps1 -AppRoot .\app -ContextRegistryPath .\app\context_registry.json -SpecificationPath .\docs\specs\m001_frontieres_ddd_contrats_publies.md` - GREEN; `Frontières d'import M-001 valides: 183 fichier(s), 1127 import(s) contrôlé(s)`.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1` - GREEN; `Gate lint GREEN: 35 validation(s), 0 test(s)`.
+
+Statut: GREEN correctif après validation finale.

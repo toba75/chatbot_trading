@@ -7,12 +7,9 @@ $pythonExecutable = Get-RequiredPythonExecutable
 $pythonCode = @'
 from __future__ import annotations
 
-import copy
 from pathlib import Path
 import sys
 import tempfile
-
-import yaml
 
 sys.path.insert(0, sys.argv[1])
 
@@ -46,17 +43,14 @@ def assert_raises_code(expected_code, action):
         raise AssertionError(f"Erreur attendue absente: {expected_code}")
 
 
-def write_yaml(path, payload):
-    path.write_text(
-        yaml.safe_dump(payload, sort_keys=False, allow_unicode=True),
-        encoding="utf-8",
-    )
+def write_configuration(path, content):
+    path.write_text(content, encoding="utf-8")
     return path
 
 
 repo_root = Path(sys.argv[1])
 example_path = repo_root / "config" / "application.example.yaml"
-example_payload = yaml.safe_load(example_path.read_text(encoding="utf-8-sig"))
+example_text = example_path.read_text(encoding="utf-8-sig").replace("\r\n", "\n")
 
 # Given un processus applicatif reçoit --config config/application.yaml.
 # When le fichier est lisible, conforme et qu'aucune variable homonyme n'est présente.
@@ -115,9 +109,10 @@ with tempfile.TemporaryDirectory(prefix="ost_m013_config_loader_acceptance_") as
         ),
     )
 
-    invalid_schema_payload = copy.deepcopy(example_payload)
-    invalid_schema_payload["services"]["api"]["port"] = "8080"
-    invalid_schema_path = write_yaml(temporary_directory / "schema_invalide.yaml", invalid_schema_payload)
+    invalid_schema_path = write_configuration(
+        temporary_directory / "schema_invalide.yaml",
+        example_text.replace("    port: 5432\n", '    port: "5432"\n', 1),
+    )
     assert_raises_code(
         "CONFIG_SCHEMA_INVALID",
         lambda: load_application_configuration(
@@ -126,9 +121,10 @@ with tempfile.TemporaryDirectory(prefix="ost_m013_config_loader_acceptance_") as
         ),
     )
 
-    missing_key_payload = copy.deepcopy(example_payload)
-    del missing_key_payload["services"]["postgres"]["url"]
-    missing_key_path = write_yaml(temporary_directory / "cle_obligatoire_absente.yaml", missing_key_payload)
+    missing_key_path = write_configuration(
+        temporary_directory / "cle_obligatoire_absente.yaml",
+        example_text.replace("    url: postgresql+psycopg://app@postgres/app\n", "", 1),
+    )
     assert_raises_code(
         "CONFIG_KEY_MISSING",
         lambda: load_application_configuration(
@@ -137,9 +133,10 @@ with tempfile.TemporaryDirectory(prefix="ost_m013_config_loader_acceptance_") as
         ),
     )
 
-    empty_key_payload = copy.deepcopy(example_payload)
-    empty_key_payload["models"]["llm"]["runtime_version"] = ""
-    empty_key_path = write_yaml(temporary_directory / "cle_vide.yaml", empty_key_payload)
+    empty_key_path = write_configuration(
+        temporary_directory / "cle_vide.yaml",
+        example_text.replace("    runtime_version: vllm-0.9.2-spark\n", '    runtime_version: ""\n', 1),
+    )
     assert_raises_code(
         "CONFIG_KEY_EMPTY",
         lambda: load_application_configuration(
@@ -148,9 +145,14 @@ with tempfile.TemporaryDirectory(prefix="ost_m013_config_loader_acceptance_") as
         ),
     )
 
-    placeholder_payload = copy.deepcopy(example_payload)
-    placeholder_payload["models"]["llm"]["model_revision"] = "TO_BE_FILLED"
-    placeholder_path = write_yaml(temporary_directory / "placeholder.yaml", placeholder_payload)
+    placeholder_path = write_configuration(
+        temporary_directory / "placeholder.yaml",
+        example_text.replace(
+            "    model_revision: nvidia-gemma-4-31b-it-nvfp4-revision-2026-07\n",
+            "    model_revision: TO_BE_FILLED\n",
+            1,
+        ),
+    )
     assert_raises_code(
         "CONFIG_KEY_EMPTY",
         lambda: load_application_configuration(
