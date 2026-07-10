@@ -518,6 +518,7 @@ function Get-GateCommandPaths {
 }
 
 $excludedPreconditionTestPaths = @()
+$excludedPreconditionValidationPaths = @()
 if ($env:OST_M003_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     Write-Host "Test d'acceptation de précondition M-003 exclu explicitement: exécution imbriquée du validateur de précondition."
     Write-Host "Test d'acceptation de précondition M-004 exclu explicitement: M-003 reste indépendant du milestone aval."
@@ -1180,9 +1181,265 @@ if (
     )
 }
 
+if ($env:OST_M003_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
+    Write-Host "Validations M-004 à M-013 exclues explicitement: M-003 vérifie une gate amont bornée."
+    $excludedPreconditionValidationPaths = @(
+        "scripts/validate_m004_specification.ps1",
+        "scripts/validate_m005_specification.ps1",
+        "scripts/validate_m006_specification.ps1",
+        "scripts/validate_m007_specification.ps1",
+        "scripts/validate_m008_specification.ps1",
+        "scripts/validate_m009_specification.ps1",
+        "scripts/validate_m010_specification.ps1",
+        "scripts/validate_m011_specification.ps1",
+        "scripts/validate_m011_traceability.ps1",
+        "scripts/validate_m012_specification.ps1",
+        "scripts/validate_m012_traceability.ps1",
+        "scripts/validate_m013_specification.ps1",
+        "scripts/validate_m013_v1_gap_decisions.ps1",
+        "scripts/validate_m013_regression.ps1",
+        "scripts/validate_m013_security.ps1",
+        "scripts/validate_m013_spark_failures.ps1",
+        "scripts/validate_m013_backup_restore.ps1",
+        "scripts/validate_m013_retention.ps1",
+        "scripts/validate_m013_monitoring.ps1",
+        "scripts/validate_m013_runbooks.ps1",
+        "scripts/validate_m013_antipatterns.ps1",
+        "scripts/validate_m013_acceptance.ps1",
+        "scripts/validate_m013_reality.ps1"
+    )
+}
+elseif ($env:OST_M004_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
+    Write-Host "Validations M-005 à M-013 exclues explicitement: M-004 vérifie une gate amont bornée."
+    $excludedPreconditionValidationPaths = @(
+        "scripts/validate_m005_specification.ps1",
+        "scripts/validate_m006_specification.ps1",
+        "scripts/validate_m007_specification.ps1",
+        "scripts/validate_m008_specification.ps1",
+        "scripts/validate_m009_specification.ps1",
+        "scripts/validate_m010_specification.ps1",
+        "scripts/validate_m011_specification.ps1",
+        "scripts/validate_m011_traceability.ps1",
+        "scripts/validate_m012_specification.ps1",
+        "scripts/validate_m012_traceability.ps1",
+        "scripts/validate_m013_specification.ps1",
+        "scripts/validate_m013_v1_gap_decisions.ps1",
+        "scripts/validate_m013_regression.ps1",
+        "scripts/validate_m013_security.ps1",
+        "scripts/validate_m013_spark_failures.ps1",
+        "scripts/validate_m013_backup_restore.ps1",
+        "scripts/validate_m013_retention.ps1",
+        "scripts/validate_m013_monitoring.ps1",
+        "scripts/validate_m013_runbooks.ps1",
+        "scripts/validate_m013_antipatterns.ps1",
+        "scripts/validate_m013_acceptance.ps1",
+        "scripts/validate_m013_reality.ps1"
+    )
+}
+elseif ($env:OST_M005_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
+    Write-Host "Validations M-006 à M-013 exclues explicitement: M-005 vérifie une gate amont bornée."
+    $excludedPreconditionValidationPaths = @(
+        "scripts/validate_m006_specification.ps1",
+        "scripts/validate_m007_specification.ps1",
+        "scripts/validate_m008_specification.ps1",
+        "scripts/validate_m009_specification.ps1",
+        "scripts/validate_m010_specification.ps1",
+        "scripts/validate_m011_specification.ps1",
+        "scripts/validate_m011_traceability.ps1",
+        "scripts/validate_m012_specification.ps1",
+        "scripts/validate_m012_traceability.ps1",
+        "scripts/validate_m013_specification.ps1",
+        "scripts/validate_m013_v1_gap_decisions.ps1",
+        "scripts/validate_m013_regression.ps1",
+        "scripts/validate_m013_security.ps1",
+        "scripts/validate_m013_spark_failures.ps1",
+        "scripts/validate_m013_backup_restore.ps1",
+        "scripts/validate_m013_retention.ps1",
+        "scripts/validate_m013_monitoring.ps1",
+        "scripts/validate_m013_runbooks.ps1",
+        "scripts/validate_m013_antipatterns.ps1",
+        "scripts/validate_m013_acceptance.ps1",
+        "scripts/validate_m013_reality.ps1"
+    )
+}
+elseif ($env:OST_M006_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
+    Write-Host "Validations M-007 à M-013 exclues explicitement: M-006 vérifie une gate amont bornée."
+    $excludedPreconditionValidationPaths = @(
+        "scripts/validate_m007_specification.ps1",
+        "scripts/validate_m008_specification.ps1",
+        "scripts/validate_m009_specification.ps1",
+        "scripts/validate_m010_specification.ps1",
+        "scripts/validate_m011_specification.ps1",
+        "scripts/validate_m011_traceability.ps1",
+        "scripts/validate_m012_specification.ps1",
+        "scripts/validate_m012_traceability.ps1",
+        "scripts/validate_m013_specification.ps1",
+        "scripts/validate_m013_v1_gap_decisions.ps1",
+        "scripts/validate_m013_regression.ps1",
+        "scripts/validate_m013_security.ps1",
+        "scripts/validate_m013_spark_failures.ps1",
+        "scripts/validate_m013_backup_restore.ps1",
+        "scripts/validate_m013_retention.ps1",
+        "scripts/validate_m013_monitoring.ps1",
+        "scripts/validate_m013_runbooks.ps1",
+        "scripts/validate_m013_antipatterns.ps1",
+        "scripts/validate_m013_acceptance.ps1",
+        "scripts/validate_m013_reality.ps1"
+    )
+}
+elseif ($env:OST_M007_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
+    Write-Host "Validations M-008 à M-013 exclues explicitement: M-007 vérifie une gate amont bornée."
+    $excludedPreconditionValidationPaths = @(
+        "scripts/validate_m008_specification.ps1",
+        "scripts/validate_m009_specification.ps1",
+        "scripts/validate_m010_specification.ps1",
+        "scripts/validate_m011_specification.ps1",
+        "scripts/validate_m011_traceability.ps1",
+        "scripts/validate_m012_specification.ps1",
+        "scripts/validate_m012_traceability.ps1",
+        "scripts/validate_m013_specification.ps1",
+        "scripts/validate_m013_v1_gap_decisions.ps1",
+        "scripts/validate_m013_regression.ps1",
+        "scripts/validate_m013_security.ps1",
+        "scripts/validate_m013_spark_failures.ps1",
+        "scripts/validate_m013_backup_restore.ps1",
+        "scripts/validate_m013_retention.ps1",
+        "scripts/validate_m013_monitoring.ps1",
+        "scripts/validate_m013_runbooks.ps1",
+        "scripts/validate_m013_antipatterns.ps1",
+        "scripts/validate_m013_acceptance.ps1",
+        "scripts/validate_m013_reality.ps1"
+    )
+}
+elseif ($env:OST_M008_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
+    Write-Host "Validations M-009 à M-013 exclues explicitement: M-008 vérifie une gate amont bornée."
+    $excludedPreconditionValidationPaths = @(
+        "scripts/validate_m009_specification.ps1",
+        "scripts/validate_m010_specification.ps1",
+        "scripts/validate_m011_specification.ps1",
+        "scripts/validate_m011_traceability.ps1",
+        "scripts/validate_m012_specification.ps1",
+        "scripts/validate_m012_traceability.ps1",
+        "scripts/validate_m013_specification.ps1",
+        "scripts/validate_m013_v1_gap_decisions.ps1",
+        "scripts/validate_m013_regression.ps1",
+        "scripts/validate_m013_security.ps1",
+        "scripts/validate_m013_spark_failures.ps1",
+        "scripts/validate_m013_backup_restore.ps1",
+        "scripts/validate_m013_retention.ps1",
+        "scripts/validate_m013_monitoring.ps1",
+        "scripts/validate_m013_runbooks.ps1",
+        "scripts/validate_m013_antipatterns.ps1",
+        "scripts/validate_m013_acceptance.ps1",
+        "scripts/validate_m013_reality.ps1"
+    )
+}
+elseif ($env:OST_M009_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
+    Write-Host "Validations M-010 à M-013 exclues explicitement: M-009 vérifie une gate amont bornée."
+    $excludedPreconditionValidationPaths = @(
+        "scripts/validate_m010_specification.ps1",
+        "scripts/validate_m011_specification.ps1",
+        "scripts/validate_m011_traceability.ps1",
+        "scripts/validate_m012_specification.ps1",
+        "scripts/validate_m012_traceability.ps1",
+        "scripts/validate_m013_specification.ps1",
+        "scripts/validate_m013_v1_gap_decisions.ps1",
+        "scripts/validate_m013_regression.ps1",
+        "scripts/validate_m013_security.ps1",
+        "scripts/validate_m013_spark_failures.ps1",
+        "scripts/validate_m013_backup_restore.ps1",
+        "scripts/validate_m013_retention.ps1",
+        "scripts/validate_m013_monitoring.ps1",
+        "scripts/validate_m013_runbooks.ps1",
+        "scripts/validate_m013_antipatterns.ps1",
+        "scripts/validate_m013_acceptance.ps1",
+        "scripts/validate_m013_reality.ps1"
+    )
+}
+elseif ($env:OST_M010_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
+    Write-Host "Validations M-011 à M-013 exclues explicitement: M-010 vérifie une gate amont bornée."
+    $excludedPreconditionValidationPaths = @(
+        "scripts/validate_m011_specification.ps1",
+        "scripts/validate_m011_traceability.ps1",
+        "scripts/validate_m012_specification.ps1",
+        "scripts/validate_m012_traceability.ps1",
+        "scripts/validate_m013_specification.ps1",
+        "scripts/validate_m013_v1_gap_decisions.ps1",
+        "scripts/validate_m013_regression.ps1",
+        "scripts/validate_m013_security.ps1",
+        "scripts/validate_m013_spark_failures.ps1",
+        "scripts/validate_m013_backup_restore.ps1",
+        "scripts/validate_m013_retention.ps1",
+        "scripts/validate_m013_monitoring.ps1",
+        "scripts/validate_m013_runbooks.ps1",
+        "scripts/validate_m013_antipatterns.ps1",
+        "scripts/validate_m013_acceptance.ps1",
+        "scripts/validate_m013_reality.ps1"
+    )
+}
+elseif ($env:OST_M011_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
+    Write-Host "Validations M-012 à M-013 exclues explicitement: M-011 vérifie une gate amont bornée."
+    $excludedPreconditionValidationPaths = @(
+        "scripts/validate_m012_specification.ps1",
+        "scripts/validate_m012_traceability.ps1",
+        "scripts/validate_m013_specification.ps1",
+        "scripts/validate_m013_v1_gap_decisions.ps1",
+        "scripts/validate_m013_regression.ps1",
+        "scripts/validate_m013_security.ps1",
+        "scripts/validate_m013_spark_failures.ps1",
+        "scripts/validate_m013_backup_restore.ps1",
+        "scripts/validate_m013_retention.ps1",
+        "scripts/validate_m013_monitoring.ps1",
+        "scripts/validate_m013_runbooks.ps1",
+        "scripts/validate_m013_antipatterns.ps1",
+        "scripts/validate_m013_acceptance.ps1",
+        "scripts/validate_m013_reality.ps1"
+    )
+}
+elseif ($env:OST_M012_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
+    Write-Host "Validations M-013 exclues explicitement: M-012 vérifie une gate amont bornée."
+    $excludedPreconditionValidationPaths = @(
+        "scripts/validate_m013_specification.ps1",
+        "scripts/validate_m013_v1_gap_decisions.ps1",
+        "scripts/validate_m013_regression.ps1",
+        "scripts/validate_m013_security.ps1",
+        "scripts/validate_m013_spark_failures.ps1",
+        "scripts/validate_m013_backup_restore.ps1",
+        "scripts/validate_m013_retention.ps1",
+        "scripts/validate_m013_monitoring.ps1",
+        "scripts/validate_m013_runbooks.ps1",
+        "scripts/validate_m013_antipatterns.ps1",
+        "scripts/validate_m013_acceptance.ps1",
+        "scripts/validate_m013_reality.ps1"
+    )
+}
+elseif ($env:OST_M013_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
+    Write-Host "Validations d'implémentation M-013 exclues explicitement: M-013 vérifie sa précondition sans appeler ses gates aval."
+    $excludedPreconditionValidationPaths = @(
+        "scripts/validate_m013_specification.ps1",
+        "scripts/validate_m013_v1_gap_decisions.ps1",
+        "scripts/validate_m013_regression.ps1",
+        "scripts/validate_m013_security.ps1",
+        "scripts/validate_m013_spark_failures.ps1",
+        "scripts/validate_m013_backup_restore.ps1",
+        "scripts/validate_m013_retention.ps1",
+        "scripts/validate_m013_monitoring.ps1",
+        "scripts/validate_m013_runbooks.ps1",
+        "scripts/validate_m013_antipatterns.ps1",
+        "scripts/validate_m013_acceptance.ps1",
+        "scripts/validate_m013_reality.ps1"
+    )
+}
+
 if ($excludedPreconditionTestPaths.Count -gt 0) {
     $testCommands = @(
         $testCommands | Where-Object { $excludedPreconditionTestPaths -notcontains $_.Path }
+    )
+}
+
+if ($excludedPreconditionValidationPaths.Count -gt 0) {
+    $validationCommands = @(
+        $validationCommands | Where-Object { $excludedPreconditionValidationPaths -notcontains $_.Path }
     )
 }
 

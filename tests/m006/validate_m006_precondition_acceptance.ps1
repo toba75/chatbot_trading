@@ -169,8 +169,8 @@ try {
 
     Assert-OutputContains `
         -Output $reportContent `
-        -Expected "Gate test GREEN: 15 validation(s), 148 test(s)." `
-        -Message "La précondition M-006 doit exécuter une gate bornée aux validations amont et M-006."
+        -Expected "Gate test GREEN: 15 validation(s), 160 test(s)." `
+        -Message "La précondition M-006 doit exécuter des validations bornées aux jalons amont et M-006."
 
     Assert-OutputNotContains `
         -Output $reportContent `
