@@ -118,3 +118,49 @@ Commandes GREEN exécutées:
 - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1` - GREEN; `35 validation(s), 0 test(s)`.
 
 Statut: GREEN après exécution des commandes T-002.
+
+## T-003 - Chargement de configuration depuis un fichier unique
+
+Date d'exécution: 2026-07-10.
+
+Scénario couvert:
+
+- Given un processus applicatif reçoit `--config config/application.yaml`.
+- When le fichier est lisible, conforme et qu'aucune variable homonyme n'est présente.
+- Then le chargeur retourne une configuration validée et aucun accès à l'environnement ne pilote l'application.
+
+ADR consultée:
+
+- ADR-016 - Configuration applicative par fichier unique.
+
+Artefacts livrés:
+
+- `app/platform/configuration/__init__.py`.
+- `tests/m013_config/validate_application_config_loader_acceptance.ps1`.
+- `tests/m013_config/validate_application_config_loader_unit.ps1`.
+
+Décision de workflow:
+
+- Le commit RED ajoute uniquement le test d'acceptation du chargeur.
+- L'implémentation GREEN expose `load_application_configuration(config_path, environment_snapshot)`, des value objects gelés, des erreurs publiques `CONFIG_*`, la validation du schéma T-002, le rejet des variables historiques ou homonymes et le hash stable de configuration.
+- Aucun changement de schéma ou d'exemple n'a été nécessaire.
+- Aucun module `local_runtime`, gateway LLM ou Compose n'est migré dans cette tâche.
+
+Preuve RED:
+
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_application_config_loader_acceptance.ps1` - RED attendu; `ImportError: cannot import name 'ApplicationConfigurationError' from 'app.platform.configuration'`.
+- Commit RED: `953ba59a3` (`test(platform): couvrir chargement configuration fichier unique`).
+
+Commandes GREEN exécutées:
+
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_application_config_loader_acceptance.ps1` - GREEN; `Test d'acceptation du chargeur de configuration applicative: OK`.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_application_config_loader_unit.ps1` - GREEN; `Tests unitaires du chargeur de configuration applicative: OK`.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_architecture_boundaries.ps1 -AppRoot .\app -ContextRegistryPath .\app\context_registry.json -SpecificationPath .\docs\specs\m001_frontieres_ddd_contrats_publies.md` - GREEN; `Frontières d'import M-001 valides: 183 fichier(s), 1128 import(s) contrôlé(s)`.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1` - GREEN; `Gate lint GREEN: 35 validation(s), 0 test(s)`.
+
+Note de validation:
+
+- La commande directe `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_architecture_boundaries.ps1` est déjà RED sans modification T-003, car ce validateur exige les paramètres obligatoires `AppRoot`, `ContextRegistryPath` et `SpecificationPath`.
+- Le gate `scripts/lint.ps1` appelle ce même validateur avec ses paramètres canoniques et reste GREEN.
+
+Statut: GREEN pour le chargeur applicatif T-003; risque résiduel limité à l'incohérence de commande documentée ci-dessus.
