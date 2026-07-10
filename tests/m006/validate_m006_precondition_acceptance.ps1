@@ -68,6 +68,23 @@ function Assert-OutputContains {
     }
 }
 
+function Assert-OutputNotContains {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $Output,
+
+        [Parameter(Mandatory = $true)]
+        [string] $Forbidden,
+
+        [Parameter(Mandatory = $true)]
+        [string] $Message
+    )
+
+    if ($Output.Contains($Forbidden)) {
+        throw "$Message Sortie obtenue: $Output"
+    }
+}
+
 if (-not (Test-Path -LiteralPath $validatorPath -PathType Leaf)) {
     throw "Validateur de précondition M-006 absent: scripts/validate_m006_precondition.ps1"
 }
@@ -149,6 +166,16 @@ try {
         -Output $reportContent `
         -Expected "Validation GREEN: scripts/validate_architecture_boundaries.ps1" `
         -Message "Le rapport doit conserver la preuve des frontières d'architecture GREEN."
+
+    Assert-OutputContains `
+        -Output $reportContent `
+        -Expected "Gate test GREEN: 15 validation(s), 148 test(s)." `
+        -Message "La précondition M-006 doit exécuter une gate bornée aux validations amont et M-006."
+
+    Assert-OutputNotContains `
+        -Output $reportContent `
+        -Forbidden "scripts/validate_m013_reality.ps1" `
+        -Message "La précondition M-006 ne doit pas appeler le test réel M13-reality."
 
     Assert-OutputContains `
         -Output $reportContent `
