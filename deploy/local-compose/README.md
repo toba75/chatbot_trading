@@ -20,7 +20,7 @@ Le Compose refuse les valeurs par défaut silencieuses. Les variables techniques
 - `POSTGRES_DB`
 - `POSTGRES_USER`
 
-Aucune valeur applicative OSTrading ne doit être transmise par `environment:` ou `env_file`. Les anciennes entrées `DATABASE_URL`, `QDRANT_URL`, `LLM_GATEWAY_URL`, `GEMMA_*`, `UI_API_URL`, `GRANITE_*`, `EMBEDDING_*`, `RERANKER_*` et `BACKTEST_*` sont à renseigner dans `config/application.yaml` selon le schéma applicatif.
+Aucune valeur applicative OSTrading ne doit être transmise par `environment:` ou `env_file`. Les anciennes entrées applicatives sont à renseigner dans `config/application.yaml` selon le schéma applicatif.
 
 ## Validation statique
 

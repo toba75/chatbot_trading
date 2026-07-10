@@ -323,3 +323,50 @@ Commandes GREEN exécutées:
 - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1` - GREEN; `Gate lint GREEN: 35 validation(s), 0 test(s)`.
 
 Statut: GREEN pour T-005; la validation Compose contrôle le montage `config/application.yaml` mais ne requiert pas le fichier local réel, qui reste propre à l'installation.
+
+## T-006 - Blocage des entrées d'environnement applicatives
+
+Date d'exécution: 2026-07-10.
+
+Scénario couvert:
+
+- Given une modification réintroduit une lecture de variable d'environnement applicative.
+- When la gate M13-config inspecte le code, Compose, les scripts et la documentation d'exploitation.
+- Then la validation échoue avec `CONFIG_ENV_INPUT_REJECTED` et un diagnostic `chemin:ligne` avant tout démarrage.
+
+ADR consultée:
+
+- ADR-016 - Configuration applicative par fichier unique.
+
+Artefacts livrés:
+
+- `tests/m013_config/validate_environment_input_rejection_acceptance.ps1`.
+- `tests/m013_config/validate_environment_input_rejection_unit.ps1`.
+- `scripts/validate_m013_config_environment.ps1`.
+- `scripts/validate_m013_config_environment.py`.
+- `scripts/lint.ps1`.
+- `scripts/test.ps1`.
+- Ajustements minimaux de mentions opérationnelles dans `docs/runbooks/exploitation_locale.md`, `docs/runbooks/spark_reseau_incidents.md`, `docs/runbooks/certificats_spark.md` et `deploy/local-compose/README.md`.
+
+Décision de workflow:
+
+- Le commit RED ajoute uniquement les tests d'acceptation et unitaires qui exigent la gate anti-environnement.
+- L'implémentation GREEN crée une gate statique bornée aux racines `app`, `scripts`, `deploy` et `docs/runbooks`, avec refus de `os.environ`, `getenv`, `process.env`, `.env`, `env_file`, `environment:` applicatif, clés historiques et variables homonymes shell.
+- Les exceptions sont nommées et testées: l'instantané `dict(os.environ)` de `app/platform/local_runtime.py` sert uniquement au rejet explicite, les registres de rejet `platform.configuration`, `local_compose` et `network_boundary` conservent les marqueurs interdits, les validateurs M13 existants peuvent chercher les patterns de secrets `GEMMA_API_KEY`/`VLLM_API_KEY`, et les gardes de récursion PowerShell restent techniques.
+- Les runbooks ne sont pas migrés complètement dans cette tâche; seules les lignes qui prescrivaient encore des variables de shell applicatives ont été remplacées par des références à `config/application.yaml`.
+
+Preuve RED:
+
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_environment_input_rejection_acceptance.ps1` - RED attendu; `Validateur environnement M13-config absent: scripts/validate_m013_config_environment.ps1`.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_environment_input_rejection_unit.ps1` - RED attendu; `Validateur environnement M13-config absent: scripts/validate_m013_config_environment.ps1`.
+- Commit RED: `c9c4118c` (`test(governance): couvrir rejet environnement applicatif`).
+
+Commandes GREEN exécutées:
+
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_environment_input_rejection_acceptance.ps1` - GREEN; `Test d'acceptation rejet environnement M13-config: OK`.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_environment_input_rejection_unit.ps1` - GREEN; `Tests unitaires rejet environnement M13-config: OK`.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_config_environment.ps1` - GREEN; `Gate environnement M13-config GREEN: 257 fichier(s), 46 exception(s) technique(s) contrôlée(s).`.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1` - GREEN; `Gate lint GREEN: 36 validation(s), 0 test(s)`.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1` - T-006 appelée et GREEN, puis arrêt indépendant sur `scripts/validate_m013_reality.ps1` faute de fichier local réel `config/application.yaml`.
+
+Statut: GREEN pour T-006; `scripts/test.ps1` reste non conclusif au-delà de T-006 tant que `config/application.yaml` local réel n'est pas fourni pour M13-reality.

@@ -6,12 +6,12 @@
 - Tâche: `docs/tasks/milestone_013/0010_publier_runbooks_documentation_utilisateur.md`
 - Preuve source: `docs/governance/m013_security_audit.md`
 - ADR applicables: ADR-007, ADR-008, ADR-009, ADR-010, ADR-014.
-- ADR: ADR-014; le Spark actuel fonctionne en `GEMMA_TLS_MODE=disabled`, et ce runbook décrit le contrôle à appliquer si une terminaison HTTPS avec CA explicite est ajoutée.
+- ADR: ADR-014; le Spark actuel fonctionne avec `services.llm_gateway.tls_mode=disabled`, et ce runbook décrit le contrôle à appliquer si une terminaison HTTPS avec CA explicite est ajoutée.
 
 ## Scénario BDD
 
 - Given Spark reste accessible uniquement par `llm-gateway -> spark-inference`.
-- When un certificat TLS est validé, renouvelé ou refusé pour un futur mode `GEMMA_TLS_MODE=ca_bundle`.
+- When un certificat TLS est validé, renouvelé ou refusé pour un futur mode `services.llm_gateway.tls_mode=ca_bundle`.
 - Then l'état public nomme la validation de certificat, la rotation certificat et l'erreur explicite sans publier de clé privée.
 
 ## Validation de certificat
@@ -29,7 +29,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_secu
 
 ## Rotation certificat
 
-- Précondition: le nouveau certificat est installé localement sur le plan Spark avant exposition au gateway et `GEMMA_TLS_MODE=ca_bundle` est déclaré explicitement.
+- Précondition: le nouveau certificat est installé localement sur le plan Spark avant exposition au gateway et `services.llm_gateway.tls_mode=ca_bundle` est déclaré explicitement dans `config/application.yaml`.
 - Commande vérifiée:
 
 ```powershell

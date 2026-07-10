@@ -117,8 +117,11 @@ if ($env:OST_M013_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     Write-Host "Garde de récursion technique."
 }
 '@
+    Write-Fixture -RelativePath "app/platform/security/network_boundary.py" -Content @'
+VLLM_SECRET_MARKERS = ("GEMMA", "VLLM", "OPENAI_API_KEY", "LLM_API_KEY")
+'@
     Write-Fixture -RelativePath "scripts/validate_m013_security.ps1" -Content @'
-$secretPatterns = @("GEMMA_API_KEY\s*=")
+$secretPatterns = @("GEMMA_API_KEY\s*=", "VLLM_API_KEY\s*=")
 '@
     Write-Fixture -RelativePath "docs/specs/m013_config_configuration_applicative.md" -Content @'
 Les clés historiques GEMMA_BASE_URL, DATABASE_URL et QDRANT_URL sont refusées.

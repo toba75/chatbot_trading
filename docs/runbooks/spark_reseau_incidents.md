@@ -25,7 +25,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_secu
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_network_boundary.ps1
 ```
 
-- Résultat attendu: seul `llm-gateway -> spark-inference` est autorisé, `GEMMA_AUTH_MODE=none`, `GEMMA_TLS_MODE=disabled`, `GEMMA_MODEL_REVISION` et `GEMMA_RUNTIME_VERSION` sont explicites, PostgreSQL, Qdrant, workers et Spark ne sont pas publiés.
+- Résultat attendu: seul `llm-gateway -> spark-inference` est autorisé, `services.llm_gateway.auth_mode=none`, `services.llm_gateway.tls_mode=disabled`, `models.llm.model_revision` et `models.llm.runtime_version` sont explicites dans `config/application.yaml`, PostgreSQL, Qdrant, workers et Spark ne sont pas publiés.
 - Erreur explicite: toute exposition interne, tout accès navigateur direct ou tout secret Spark côté interface rend l'audit RED.
 - Preuve à conserver: sortie des validateurs, `docs/governance/m013_security_audit.md` et horodatage de l'audit.
 
