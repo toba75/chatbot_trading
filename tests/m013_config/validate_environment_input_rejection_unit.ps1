@@ -143,6 +143,22 @@ $env:DATABASE_URL = "fixture négative"
     Assert-RedFixture -Name "script shell applicatif" -ExpectedFragment "LLM_GATEWAY_URL"
 
     Reset-FixtureRoot
+    Write-Fixture -RelativePath "scripts/bad_launcher_upper_env.ps1" -Content '$url = $Env:CUSTOM_RUNTIME_FLAG'
+    Assert-RedFixture -Name "script shell applicatif Env majuscule" -ExpectedFragment "CUSTOM_RUNTIME_FLAG"
+
+    Reset-FixtureRoot
+    Write-Fixture -RelativePath "scripts/bad_launcher_braced_env.ps1" -Content '$url = ${env:CUSTOM_RUNTIME_FLAG}'
+    Assert-RedFixture -Name "script shell applicatif env accolade" -ExpectedFragment "CUSTOM_RUNTIME_FLAG"
+
+    Reset-FixtureRoot
+    Write-Fixture -RelativePath "scripts/bad_launcher_provider_env.ps1" -Content 'Get-Item Env:CUSTOM_RUNTIME_FLAG'
+    Assert-RedFixture -Name "script shell applicatif provider Env" -ExpectedFragment "CUSTOM_RUNTIME_FLAG"
+
+    Reset-FixtureRoot
+    Write-Fixture -RelativePath "scripts/bad_launcher_dotnet_env.ps1" -Content '[Environment]::GetEnvironmentVariable("CUSTOM_RUNTIME_FLAG")'
+    Assert-RedFixture -Name "script shell applicatif Environment dotnet" -ExpectedFragment "CUSTOM_RUNTIME_FLAG"
+
+    Reset-FixtureRoot
     Write-Fixture -RelativePath "app/platform/local_runtime.py" -Content @'
 import os
 
