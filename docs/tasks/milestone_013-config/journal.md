@@ -420,3 +420,58 @@ Commandes GREEN exécutées:
 - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1` - GREEN; `Gate lint GREEN: 36 validation(s), 0 test(s)`.
 
 Statut: GREEN pour T-007; le runbook documente les anciennes clés uniquement comme migration ou rejet, et aucun enrôlement global `scripts/test.ps1` / `scripts/lint.ps1` n'a été ajouté hors T-008.
+
+## T-008 - Traçabilité, audit et gates M13-config
+
+Date d'exécution: 2026-07-10.
+
+Scénario couvert:
+
+- Given les tâches M13-config ont migré configuration, gateway, Compose, scans et runbooks.
+- When les gates de traçabilité et de lint sont exécutées.
+- Then chaque exigence ADR-016 est reliée à une preuve et toute régression d'environnement bloque la validation.
+
+ADR consultée:
+
+- ADR-016 - Configuration applicative par fichier unique.
+
+Artefacts livrés:
+
+- `docs/governance/m013_config_audit.md`.
+- `scripts/validate_m013_config_traceability.ps1`.
+- `tests/m013_config/validate_m013_config_traceability_acceptance.ps1`.
+- `tests/m013_config/validate_m013_config_traceability_unit.ps1`.
+- `docs/traceability/matrix.md`.
+- `scripts/test.ps1`.
+- `scripts/lint.ps1`.
+
+Décision de workflow:
+
+- Le commit RED ajoute uniquement les tests d'acceptation et unitaires de traçabilité M13-config.
+- L'implémentation GREEN ajoute les exigences `REQ-M013-CONFIG-001` à `REQ-M013-CONFIG-008`, le rapport d'audit, le validateur dédié et l'enrôlement dans les gates.
+- Aucune ADR nouvelle n'est créée: ADR-016 couvre déjà la décision structurante.
+- Ce sous-milestone ne clôt pas M-013 entier et ne déclare pas la V1 acceptée.
+
+Preuve RED:
+
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_m013_config_traceability_acceptance.ps1` - RED attendu; `Validateur de traçabilité M13-config absent: scripts/validate_m013_config_traceability.ps1`.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_m013_config_traceability_unit.ps1` - RED attendu; `Validateur de traçabilité M13-config absent: scripts/validate_m013_config_traceability.ps1`.
+- Commit RED: `42ef2be63` (`test(governance): couvrir tracabilite m13 config`).
+
+Commandes GREEN exécutées:
+
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_m013_config_traceability_acceptance.ps1` - GREEN; `Test d'acceptation T-008 traçabilité M13-config: OK`.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_m013_config_traceability_unit.ps1` - GREEN; `Tests unitaires T-008 traçabilité M13-config: OK`.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_config_traceability.ps1` - GREEN; `Traçabilité M13-config valide: 8 exigence(s), 8 tâche(s), V1 non acceptée.`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_traceability.ps1` - GREEN; `Matrice de traçabilité valide: 161 exigence(s) contrôlée(s).`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1` - GREEN; `Gate lint GREEN: 37 validation(s), 0 test(s).`
+- `git diff --check` - GREEN; avertissements Git de normalisation LF vers CRLF uniquement, sans erreur whitespace.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1` - GREEN jusqu'à `scripts/validate_m013_config_traceability.ps1`, puis RED indépendant sur `scripts/validate_m013_reality.ps1`: `Configuration locale requise pour le test réel M13-reality: C:\Users\maxim\python\chatbot_trading\config\application.yaml`.
+
+Limites conservées:
+
+- `config/application.yaml` réel requis pour les démarrages locaux et la preuve live.
+- Spark live requis pour valider les chemins réels M13-reality.
+- Les preuves synthétiques et statiques ne remplacent pas l'exécution réelle Spark.
+
+Statut: GREEN pour T-008; la suite complète `scripts/test.ps1` reste bloquée uniquement par l'absence de `config/application.yaml` réel requis par M13-reality.
