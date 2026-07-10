@@ -284,11 +284,26 @@ def _validate_application_spark_policy(
     endpoint = spark_firewall.spark_endpoint
     gateway = application_configuration.services.llm_gateway
     parsed_endpoint = urlparse(gateway.spark_endpoint_url)
+    if parsed_endpoint.username is not None or parsed_endpoint.password is not None:
+        raise ValueError("Identifiants Spark applicatifs interdits")
+    if parsed_endpoint.path != "/v1":
+        raise ValueError(f"Chemin Spark applicatif incohérent: {parsed_endpoint.path}")
     try:
         parsed_port = parsed_endpoint.port
     except ValueError as exc:
         raise ValueError("Port Spark applicatif invalide") from exc
 
+    allowed_hosts = {
+        endpoint.host,
+        "spark-inference",
+        "spark-inference.test",
+        application_configuration.deployment.hosts.spark_inference.dns_name,
+        *application_configuration.deployment.hosts.spark_inference.endpoint_hosts,
+    }
+    if parsed_endpoint.hostname not in allowed_hosts:
+        raise ValueError(
+            f"Hôte Spark applicatif incohérent: {parsed_endpoint.hostname} attendu parmi {sorted(allowed_hosts)}"
+        )
     if parsed_port != endpoint.port:
         raise ValueError(
             f"Port Spark applicatif incohérent: {parsed_port} attendu {endpoint.port}"

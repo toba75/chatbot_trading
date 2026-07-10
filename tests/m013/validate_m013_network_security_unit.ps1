@@ -247,14 +247,14 @@ try {
         }
 
     Assert-ValidatorFails `
-        -Name "auth-mode-absent" `
-        -ExpectedMessage "Variable gateway Spark absente: GEMMA_AUTH_MODE" `
+        -Name "auth-mode-fichier-incoherent" `
+        -ExpectedMessage "auth_mode=api_key_file exige require_api_key" `
         -Mutate {
             param($projectRoot)
-            $composePath = Join-Path $projectRoot "deploy/local-compose/compose.yaml"
-            Set-FixtureText -Path $composePath -Mutate {
+            $applicationConfigPath = Join-Path $projectRoot "config/application.yaml"
+            Set-FixtureText -Path $applicationConfigPath -Mutate {
                 param($content)
-                return [regex]::Replace($content, '(?m)^\s{6}GEMMA_AUTH_MODE: "none"\r?\n', "", 1)
+                return $content.Replace("    auth_mode: none", "    auth_mode: api_key_file")
             }
         }
 

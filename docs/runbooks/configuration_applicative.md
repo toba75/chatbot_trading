@@ -46,7 +46,7 @@ Commande vérifiée:
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_config_environment.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_local_compose.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_network_boundary.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_network_boundary.ps1 -ApplicationConfigPath .\config\application.yaml
 ```
 
 Résultat attendu: la gate environnement reste GREEN, Compose monte le fichier applicatif en lecture seule, et le seul chemin Spark autorisé reste `llm-gateway -> spark-inference`.

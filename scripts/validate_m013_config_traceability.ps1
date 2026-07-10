@@ -130,8 +130,7 @@ $expectedAuditMarkers = @(
     $m013NotClosedMarker,
     $v1NotAcceptedMarker,
     $realConfigMarker,
-    "Spark live requis",
-    "42ef2be63"
+    "Spark live requis"
 )
 
 function Assert-Condition {

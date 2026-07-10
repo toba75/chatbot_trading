@@ -55,6 +55,8 @@ SECRET_ENVIRONMENT_MARKERS = ("PASSWORD", "TOKEN", "SECRET", "API_KEY")
 INTERNAL_IMAGE_PREFIX = "ostrading/"
 APPLICATION_CONFIG_CONTAINER_PATH = "/workspace/config/application.yaml"
 APPLICATION_CONFIG_VOLUME = f"../../config/application.yaml:{APPLICATION_CONFIG_CONTAINER_PATH}:ro"
+APPLICATION_SCHEMA_CONTAINER_PATH = "/workspace/config/application.schema.json"
+APPLICATION_SCHEMA_VOLUME = f"../../config/application.schema.json:{APPLICATION_SCHEMA_CONTAINER_PATH}:ro"
 APPLICATION_CONFIG_ARGUMENTS = ("--config", APPLICATION_CONFIG_CONTAINER_PATH)
 FORBIDDEN_APPLICATION_ENVIRONMENT_KEYS = frozenset(
     (
@@ -374,6 +376,10 @@ def _validate_service_application_configuration(service: ComposeService) -> None
     if APPLICATION_CONFIG_VOLUME not in service.volumes:
         raise ValueError(
             f"Montage config/application.yaml read-only absent pour service applicatif: {service.id}"
+        )
+    if APPLICATION_SCHEMA_VOLUME not in service.volumes:
+        raise ValueError(
+            f"Montage config/application.schema.json read-only absent pour service applicatif: {service.id}"
         )
 
 

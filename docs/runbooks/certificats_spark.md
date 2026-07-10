@@ -21,7 +21,7 @@
 - Commande vérifiée:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_security.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_security.ps1 -ApplicationConfigPath .\config\application.yaml
 ```
 
 - Résultat attendu: `llm-gateway -> spark-inference` reste le seul chemin autorisé; en mode actuel `disabled`, aucun CA n'est exigé; en mode futur `ca_bundle`, tout accès direct Spark depuis navigateur reste interdit.
@@ -34,7 +34,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_secu
 - Commande vérifiée:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_network_boundary.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_network_boundary.ps1 -ApplicationConfigPath .\config\application.yaml
 ```
 
 - Résultat attendu: le gateway conserve la frontière `spark-inference`, le mode TLS déclaré dans `config/application.yaml`, le chemin `security.secrets.tls_ca_certificate_path` et l'authentification explicite; aucun service interne n'est publié.

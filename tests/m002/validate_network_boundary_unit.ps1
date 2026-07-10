@@ -269,7 +269,7 @@ try:
         application_configuration=spark_host_mismatch_configuration,
     )
 except ValueError as exc:
-    if "Hôte Spark applicatif" not in str(exc):
+    if "Spark applicatif incoh" not in str(exc):
         raise AssertionError(f"Erreur hôte Spark inattendue: {exc}")
 else:
     raise AssertionError("Configuration applicative avec hôte Spark privé non déclaré acceptée.")

@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 import re
 from typing import Any
+from urllib.parse import urlparse
 
 
 CONFIG_FILE_REQUIRED = "CONFIG_FILE_REQUIRED"
@@ -51,6 +52,7 @@ class ApplicationConfigurationError(ValueError):
 class DockerLocalHostConfiguration:
     role: str
     bind_host: str
+    container_listen_host: str
     public_access: bool
 
 
@@ -58,6 +60,7 @@ class DockerLocalHostConfiguration:
 class SparkInferenceHostConfiguration:
     role: str
     dns_name: str
+    endpoint_hosts: tuple[str, ...]
     allowed_client_cidrs: tuple[str, ...]
 
 
@@ -565,8 +568,28 @@ def _validate_schema(payload: Mapping[str, Any], schema: Mapping[str, Any], path
 
 
 def _validate_cross_field_invariants(payload: Mapping[str, Any], path: Path) -> None:
+    deployment_hosts = payload["deployment"]["hosts"]
     deployment_network = payload["deployment"]["network"]
     gateway_service = payload["services"]["llm_gateway"]
+    security = payload["security"]
+
+    docker_host = deployment_hosts["docker_local"]
+    host_bind = docker_host["bind_host"]
+    public_bindings = {"", "0.0.0.0", "::", "[::]", "*"}
+    loopback_bindings = {"127.0.0.1", "localhost", "::1", "[::1]"}
+
+    if security["network_exposure"] == "loopback_only" and host_bind not in loopback_bindings:
+        raise ApplicationConfigurationError(
+            CONFIG_SCHEMA_INVALID,
+            "security.network_exposure=loopback_only exige deployment.hosts.docker_local.bind_host loopback",
+            str(path),
+        )
+    if not security["allow_public_bind"] and host_bind in public_bindings:
+        raise ApplicationConfigurationError(
+            CONFIG_SCHEMA_INVALID,
+            "security.allow_public_bind=false interdit deployment.hosts.docker_local.bind_host public",
+            str(path),
+        )
 
     if deployment_network["prefer_mtls"] and not deployment_network["require_tls"]:
         raise ApplicationConfigurationError(
@@ -596,6 +619,60 @@ def _validate_cross_field_invariants(payload: Mapping[str, Any], path: Path) -> 
         raise ApplicationConfigurationError(
             CONFIG_SCHEMA_INVALID,
             "services.llm_gateway.auth_mode=api_key_file exige require_api_key",
+            str(path),
+        )
+
+    _validate_spark_endpoint_invariants(
+        deployment_hosts["spark_inference"],
+        gateway_service["spark_endpoint_url"],
+        path,
+    )
+
+
+def _validate_spark_endpoint_invariants(
+    spark_host: Mapping[str, Any],
+    spark_endpoint_url: str,
+    path: Path,
+) -> None:
+    parsed_endpoint = urlparse(spark_endpoint_url)
+    if parsed_endpoint.scheme not in {"http", "https"} or parsed_endpoint.netloc == "":
+        raise ApplicationConfigurationError(
+            CONFIG_SCHEMA_INVALID,
+            "services.llm_gateway.spark_endpoint_url doit être une URL HTTP explicite",
+            str(path),
+        )
+    if parsed_endpoint.username is not None or parsed_endpoint.password is not None:
+        raise ApplicationConfigurationError(
+            CONFIG_SCHEMA_INVALID,
+            "services.llm_gateway.spark_endpoint_url interdit les identifiants",
+            str(path),
+        )
+    if parsed_endpoint.path != "/v1":
+        raise ApplicationConfigurationError(
+            CONFIG_SCHEMA_INVALID,
+            "services.llm_gateway.spark_endpoint_url doit cibler /v1",
+            str(path),
+        )
+    try:
+        parsed_port = parsed_endpoint.port
+    except ValueError as exc:
+        raise ApplicationConfigurationError(
+            CONFIG_SCHEMA_INVALID,
+            "services.llm_gateway.spark_endpoint_url porte un port invalide",
+            str(path),
+        ) from exc
+    if parsed_port is None:
+        raise ApplicationConfigurationError(
+            CONFIG_SCHEMA_INVALID,
+            "services.llm_gateway.spark_endpoint_url doit déclarer un port",
+            str(path),
+        )
+
+    allowed_hosts = {"spark-inference", "spark-inference.test", spark_host["dns_name"], *spark_host["endpoint_hosts"]}
+    if parsed_endpoint.hostname not in allowed_hosts:
+        raise ApplicationConfigurationError(
+            CONFIG_SCHEMA_INVALID,
+            "services.llm_gateway.spark_endpoint_url doit cibler un hôte Spark déclaré",
             str(path),
         )
 
@@ -778,11 +855,13 @@ def _build_application_configuration(
                 docker_local=DockerLocalHostConfiguration(
                     role=deployment_hosts["docker_local"]["role"],
                     bind_host=deployment_hosts["docker_local"]["bind_host"],
+                    container_listen_host=deployment_hosts["docker_local"]["container_listen_host"],
                     public_access=deployment_hosts["docker_local"]["public_access"],
                 ),
                 spark_inference=SparkInferenceHostConfiguration(
                     role=deployment_hosts["spark_inference"]["role"],
                     dns_name=deployment_hosts["spark_inference"]["dns_name"],
+                    endpoint_hosts=tuple(deployment_hosts["spark_inference"]["endpoint_hosts"]),
                     allowed_client_cidrs=tuple(deployment_hosts["spark_inference"]["allowed_client_cidrs"]),
                 ),
             ),

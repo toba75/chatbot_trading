@@ -52,6 +52,7 @@ services:
       - core
     volumes:
       - ../../config/application.yaml:/workspace/config/application.yaml:ro
+      - ../../config/application.schema.json:/workspace/config/application.schema.json:ro
     healthcheck:
       test:
         - CMD-SHELL
@@ -90,6 +91,7 @@ services:
         condition: service_healthy
     volumes:
       - ../../config/application.yaml:/workspace/config/application.yaml:ro
+      - ../../config/application.schema.json:/workspace/config/application.schema.json:ro
     healthcheck:
       test:
         - CMD-SHELL
@@ -122,6 +124,7 @@ services:
       - spark-egress
     volumes:
       - ../../config/application.yaml:/workspace/config/application.yaml:ro
+      - ../../config/application.schema.json:/workspace/config/application.schema.json:ro
     healthcheck:
       test:
         - CMD-SHELL
@@ -196,6 +199,7 @@ services:
     volumes:
       - model-cache:/models
       - ../../config/application.yaml:/workspace/config/application.yaml:ro
+      - ../../config/application.schema.json:/workspace/config/application.schema.json:ro
     healthcheck:
       test:
         - CMD-SHELL
@@ -228,6 +232,7 @@ services:
     volumes:
       - model-cache:/models
       - ../../config/application.yaml:/workspace/config/application.yaml:ro
+      - ../../config/application.schema.json:/workspace/config/application.schema.json:ro
     healthcheck:
       test:
         - CMD-SHELL
@@ -260,6 +265,7 @@ services:
     volumes:
       - model-cache:/models
       - ../../config/application.yaml:/workspace/config/application.yaml:ro
+      - ../../config/application.schema.json:/workspace/config/application.schema.json:ro
     healthcheck:
       test:
         - CMD-SHELL
@@ -290,6 +296,7 @@ services:
       - corpus-data:/workspace/corpus
       - document-artifacts:/workspace/data
       - ../../config/application.yaml:/workspace/config/application.yaml:ro
+      - ../../config/application.schema.json:/workspace/config/application.schema.json:ro
     healthcheck:
       test:
         - CMD-SHELL
@@ -317,6 +324,7 @@ services:
       - core
     volumes:
       - ../../config/application.yaml:/workspace/config/application.yaml:ro
+      - ../../config/application.schema.json:/workspace/config/application.schema.json:ro
     healthcheck:
       test:
         - CMD-SHELL
@@ -346,6 +354,7 @@ services:
     volumes:
       - experiment-data:/workspace/data/experiments
       - ../../config/application.yaml:/workspace/config/application.yaml:ro
+      - ../../config/application.schema.json:/workspace/config/application.schema.json:ro
     healthcheck:
       test:
         - CMD-SHELL
@@ -376,6 +385,7 @@ services:
       - core
     volumes:
       - ../../config/application.yaml:/workspace/config/application.yaml:ro
+      - ../../config/application.schema.json:/workspace/config/application.schema.json:ro
     healthcheck:
       test:
         - CMD-SHELL

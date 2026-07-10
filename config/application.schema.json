@@ -44,6 +44,7 @@
               "required": [
                 "role",
                 "bind_host",
+                "container_listen_host",
                 "public_access"
               ],
               "properties": {
@@ -53,6 +54,9 @@
                   ]
                 },
                 "bind_host": {
+                  "$ref": "#/$defs/nonEmptyNonPlaceholderString"
+                },
+                "container_listen_host": {
                   "$ref": "#/$defs/nonEmptyNonPlaceholderString"
                 },
                 "public_access": {
@@ -66,6 +70,7 @@
               "required": [
                 "role",
                 "dns_name",
+                "endpoint_hosts",
                 "allowed_client_cidrs"
               ],
               "properties": {
@@ -76,6 +81,13 @@
                 },
                 "dns_name": {
                   "$ref": "#/$defs/nonEmptyNonPlaceholderString"
+                },
+                "endpoint_hosts": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "$ref": "#/$defs/nonEmptyNonPlaceholderString"
+                  }
                 },
                 "allowed_client_cidrs": {
                   "type": "array",

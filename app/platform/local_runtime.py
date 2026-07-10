@@ -156,6 +156,12 @@ def _serve_http(*, service_id: str, port: int, application_configuration: Applic
                 self.send_response(404)
                 self.end_headers()
                 return
+            if service_id == "llm-gateway" and self.path == "/health":
+                status_code, response_body = _llm_gateway_readiness_response(
+                    application_configuration=application_configuration,
+                )
+                _write_json_response(self, status_code=status_code, body=response_body)
+                return
             _write_json_response(
                 self,
                 status_code=200,
@@ -199,18 +205,30 @@ def _configured_http_port(service_id: str, application_configuration: Applicatio
 
 def _configured_http_bind_host(service_id: str, application_configuration: ApplicationConfiguration) -> str:
     if service_id == "orchestrator-api":
-        bind_host = application_configuration.services.api.bind_host
-    else:
-        _configured_http_port(service_id, application_configuration)
-        bind_host = application_configuration.deployment.hosts.docker_local.bind_host
+        return application_configuration.services.api.bind_host
+    _configured_http_port(service_id, application_configuration)
+    return application_configuration.deployment.hosts.docker_local.container_listen_host
 
-    public_bindings = {"", "0.0.0.0", "::", "[::]", "*"}
-    loopback_bindings = {"127.0.0.1", "localhost", "::1", "[::1]"}
-    if application_configuration.security.network_exposure == "loopback_only" and bind_host not in loopback_bindings:
-        raise ValueError(f"Binding non loopback interdit pour {service_id}: {bind_host}")
-    if not application_configuration.security.allow_public_bind and bind_host in public_bindings:
-        raise ValueError(f"Binding public interdit pour {service_id}: {bind_host}")
-    return bind_host
+
+def _llm_gateway_readiness_response(
+    *,
+    application_configuration: ApplicationConfiguration,
+) -> tuple[int, dict[str, Any]]:
+    try:
+        _build_gateway_configuration_from_application_configuration(application_configuration)
+    except LLMGatewayContractError as exc:
+        return 503, {
+            "service": "llm-gateway",
+            "status": "not_ready",
+            "error_code": exc.code,
+            "message": exc.message,
+            "configuration_hash": application_configuration.configuration_hash,
+        }
+    return 200, {
+        "service": "llm-gateway",
+        "status": "ready",
+        "configuration_hash": application_configuration.configuration_hash,
+    }
 
 
 def _write_json_response(handler: BaseHTTPRequestHandler, *, status_code: int, body: dict[str, Any]) -> None:
@@ -496,7 +514,10 @@ def _post_local_gateway_inference(
     timeout_seconds = application_configuration.services.llm_gateway.timeout_seconds
     try:
         with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
-            payload = json.loads(response.read().decode("utf-8"))
+            try:
+                payload = json.loads(response.read().decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                return 502, {"error_code": "LLM_GATEWAY_RESPONSE_INVALID"}, _elapsed_ms_since(started_ns)
             if not isinstance(payload, dict):
                 return 502, {"error_code": "LLM_GATEWAY_RESPONSE_INVALID"}, _elapsed_ms_since(started_ns)
             return response.status, payload, _elapsed_ms_since(started_ns)
@@ -703,6 +724,9 @@ def _llm_gateway_post_response(
 
     try:
         gateway = _get_local_language_model_gateway(application_configuration=application_configuration)
+    except LLMGatewayContractError as exc:
+        return 503, {"error_code": exc.code, "message": exc.message}
+    try:
         result = gateway.infer(_build_inference_request(body))
     except LLMGatewayContractError as exc:
         return 400, {"error_code": exc.code, "message": exc.message}
@@ -789,6 +813,7 @@ def _build_gateway_configuration_from_application_configuration(
         timeout_seconds=gateway_service.timeout_seconds,
         allowed_spark_hosts=(
             application_configuration.deployment.hosts.spark_inference.dns_name,
+            *application_configuration.deployment.hosts.spark_inference.endpoint_hosts,
         ),
     )
 

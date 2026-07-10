@@ -45,7 +45,7 @@ Cette spécification remplace les entrées de processus historiques par un fichi
 
 | Section | Responsabilité | Exemples de clés obligatoires |
 |---|---|---|
-| `deployment` | Décrit la topologie locale et le placement des services | `topology`, `hosts`, `network`, `placement` |
+| `deployment` | Décrit la topologie locale, le binding hôte, l'écoute conteneur, les hôtes Spark autorisés et le placement des services | `topology`, `hosts.docker_local.bind_host`, `hosts.docker_local.container_listen_host`, `hosts.spark_inference.endpoint_hosts`, `network`, `placement` |
 | `services` | Déclare les URLs, ports et paramètres de démarrage des services locaux | `postgres`, `qdrant`, `api`, `workers`, `llm_gateway` |
 | `models.llm` | Déclare le modèle principal, sa provenance et son runtime | `provider`, `transport`, `served_model_name`, `model_revision`, `runtime_version` |
 | `paths` | Déclare les répertoires applicatifs pilotants | `data_root`, `corpus_root`, `canonical_sources_root`, `reports_root`, `logs_root` |

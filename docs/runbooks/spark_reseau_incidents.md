@@ -21,8 +21,8 @@
 - Commande vérifiée:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_security.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_network_boundary.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_security.ps1 -ApplicationConfigPath .\config\application.yaml
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_network_boundary.ps1 -ApplicationConfigPath .\config\application.yaml
 ```
 
 - Résultat attendu: seul `llm-gateway -> spark-inference` est autorisé, `services.llm_gateway.auth_mode=none`, `services.llm_gateway.tls_mode=disabled`, `services.llm_gateway.spark_endpoint_url`, `models.llm.model_revision` et `models.llm.runtime_version` sont explicites dans `config/application.yaml`, PostgreSQL, Qdrant, workers et Spark ne sont pas publiés.

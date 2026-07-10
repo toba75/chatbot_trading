@@ -11,6 +11,8 @@
 - Les processus applicatifs reçoivent tous `--config /workspace/config/application.yaml`.
 - Le fichier `config/application.yaml` est monté en lecture seule dans les services applicatifs.
 - Montage attendu dans chaque service applicatif: `../../config/application.yaml:/workspace/config/application.yaml:ro`.
+- Le schéma `config/application.schema.json` est monté en lecture seule dans les services applicatifs.
+- Montage schéma attendu: `../../config/application.schema.json:/workspace/config/application.schema.json:ro`.
 
 ## Variables requises
 
@@ -27,7 +29,7 @@ Aucune valeur applicative OSTrading ne doit être transmise par `environment:` o
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_local_compose.ps1 -Path .\deploy\local-compose\compose.yaml
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_network_boundary.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_network_boundary.ps1 -ApplicationConfigPath .\config\application.yaml
 docker compose -f .\deploy\local-compose\compose.yaml config
 ```
 

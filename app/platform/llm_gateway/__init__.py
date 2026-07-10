@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import ipaddress
 import json
 import ssl
 import time
@@ -339,7 +338,7 @@ class GatewayConfiguration:
         if not _is_allowed_spark_host(parsed_base_url.hostname, self.allowed_spark_hosts):
             raise LLMGatewayContractError(
                 "LLM_GATEWAY_SPARK_ENDPOINT_REQUIRED",
-                "Le gateway LLM doit cibler explicitement spark-inference ou une adresse privée Spark.",
+                "Le gateway LLM doit cibler explicitement un hôte Spark déclaré.",
             )
         try:
             parsed_port = parsed_base_url.port
@@ -386,11 +385,7 @@ def _is_allowed_spark_host(hostname: str | None, allowed_spark_hosts: tuple[str,
         return True
     if hostname in allowed_spark_hosts:
         return True
-    try:
-        address = ipaddress.ip_address(hostname)
-    except ValueError:
-        return False
-    return address.is_private and not address.is_loopback and not address.is_link_local
+    return False
 
 
 @dataclass(frozen=True)
