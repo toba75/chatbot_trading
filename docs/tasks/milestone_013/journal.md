@@ -173,3 +173,21 @@
 - GREEN: `orchestrator-api` expose `POST /v1/chat/completions` et `POST /v1/evaluation/llm-real-path-benchmark`, puis délègue au service HTTP `llm-gateway` local sans provider factice.
 - Validation réelle: `tests/m013/validate_m013_reality_product_acceptance.ps1` GREEN sur `orchestrator-api -> llm-gateway -> Spark` avec le chat produit et les onze tâches `REQUIRED_LLM_TASKS` rejouées contre `GEMMA_MODEL=google/gemma-4-26B-A4B-it`.
 - Validation ciblée: `scripts/validate_m013_reality.ps1` GREEN avec `tests/m013/validate_m013_reality_product_unit.ps1`, `tests/m013/validate_llm_gateway_real_spark_acceptance.ps1` et `tests/m013/validate_m013_reality_product_acceptance.ps1`.
+
+## Tranche M13-remediation - validation réelle bout-en-bout
+
+- Source: `docs/specs/plan_remediation_m13.md`.
+- Prévol de planification: `git fetch origin --prune` exécuté; `master` et `origin/master` pointent sur `08ecd4f2d56f993899d3bec0f5abe28f57405514`; les dossiers `docs/tasks/milestone_003` à `docs/tasks/milestone_013` sont présents dans `master`.
+- État GREEN avant création des tâches: `scripts/validate_task_system.ps1` GREEN avec `14 milestone(s), 147 tâche(s) contrôlée(s)`; `scripts/lint.ps1` GREEN avec `35 validation(s), 0 test(s)`.
+- Intention: requalifier `M13-reality` comme smoke test LLM live, puis exiger une preuve produit réelle partant de PDF locaux déclarés jusqu'à une réponse conversationnelle citée ouvrable.
+- Limite de cette planification: ajout documentaire de tâches uniquement; aucune implémentation `app/...`, aucun test exécutable et aucun script de gate produit réel ne sont créés dans cette étape.
+- T-014 requalifie `M13-reality` en smoke test LLM live.
+- T-015 rend obligatoire le manifeste de corpus PDF réel local.
+- T-016 publie le jeu annoté réel de questions et preuves attendues.
+- T-017 exécute réellement Source Processing sur les PDF.
+- T-018 construit et interroge une projection KA réelle.
+- T-019 produit une réponse RA réelle fondée sur preuves.
+- T-020 valide le chat produit réel via `/v1/chat/completions`.
+- T-021 vérifie les scénarios stratégie et backtest sans substitution.
+- T-022 publie le rapport d'exécution réelle.
+- T-023 rend l'acceptation V1 dépendante du pipeline réel bout-en-bout.

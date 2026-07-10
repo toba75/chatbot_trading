@@ -13,13 +13,15 @@
 
 - Given un utilisateur exploite la V1 localement avec un PDF original identifié.
 - When il ajoute le PDF, le rend interrogeable, ouvre une conversation et pose une question.
-- Then l'UI affiche les étapes documentaires, la projection recherchable, la réponse, les citations, les lacunes, les contradictions et les pannes explicites sans fallback silencieux.
+- Then l'UI affiche les sorties observables de chaque étape documentaire, la projection recherchable, la réponse, les citations, les lacunes, les contradictions et les pannes explicites sans fallback silencieux.
 
 ## Mission
 
 L'UI minimale doit permettre à un utilisateur non technique d'utiliser le chatbot local sans passer par les commandes PowerShell pour le parcours courant: ajouter un PDF, attendre qu'il devienne interrogeable, poser une question et vérifier les preuves.
 
 L'UI n'est pas un nouveau bounded context métier. Elle est un client local des contrats publics et des read-models nécessaires. Elle ne décide aucune vérité documentaire, ne choisit aucune route documentaire implicite, ne publie aucun brouillon LLM comme réponse, ne remplace aucune projection indisponible et ne masque aucune panne.
+
+L'UI doit permettre à l'utilisateur de juger visuellement les sorties du pipeline avant d'utiliser le document dans une conversation. Cette visualisation n'ajoute pas un statut métier `APPROUVE_PAR_UTILISATEUR`, ne demande pas une validation explicite à chaque étape et ne bloque pas une étape non ambiguë dans l'attente d'un accord humain.
 
 La cible ergonomique est un outil de travail sobre, pas une landing page. Le premier écran est l'espace opérationnel: état local, corpus, conversation et preuves.
 
@@ -31,7 +33,7 @@ Une zone de chargement PDF et une zone de chat ne suffisent pas. Pour que le pip
 |---|---|---|
 | État local | Afficher santé API, files de jobs, `llm-gateway`, Spark, stockage local et erreurs publiques. | Éviter de soumettre une action quand une dépendance bloquante est déjà connue. |
 | Corpus PDF | Ajouter un PDF, renseigner ses métadonnées, suivre diagnostic, routage, conversion et indexation. | Transformer un fichier local en source interrogeable. |
-| Détails documentaires | Montrer pages en revue, quarantaine, version canonique, projection et erreurs. | Ne jamais confondre source chargée et source prête pour RA. |
+| Détails documentaires | Montrer métadonnées retenues, empreinte, manifeste, diagnostics, routes, QA, version canonique, projection et erreurs. | Ne jamais confondre source chargée et source prête pour RA. |
 | Conversation | Créer une conversation, envoyer un message, afficher question résolue, mode, justification, statut et réponse. | Utiliser CV et RA sans exposer l'historique comme preuve. |
 | Preuves et citations | Ouvrir les citations, SourceLocator, page, fragment, statut de support, lacunes et contradictions. | Vérifier la réponse au lieu de faire confiance au texte généré. |
 | Journal d'événements public | Afficher les dernières commandes, statuts publics et identifiants utiles. | Diagnostiquer explicitement une limite sans logs sensibles. |
@@ -93,18 +95,35 @@ Résultat affiché:
 
 Après enregistrement, l'UI propose les étapes dans l'ordre du pipeline:
 
-| Étape | Commande | Condition d'accès | Résultat visible |
+| Étape | Commande | Condition d'accès | Résultat visible immédiat |
 |---|---|---|---|
-| Diagnostic | `POST /v1/documents/{document_id}/diagnose` | Source enregistrée ou doublon accepté. | `diagnostic_status`, progression publique et erreurs. |
-| Revue explicite | Read-model documentaire. | Route incertaine, page bloquée ou quarantaine. | Pages concernées, motif et action autorisée. |
-| Conversion canonique | `POST /v1/documents/{document_id}/convert` | Route explicite et source non quarantainée. | `conversion_status`, `canonical_version_id` si accepté. |
-| Indexation | `POST /v1/documents/{document_id}/index` | Version canonique acceptée. | `projection_id`, `projection_status`, `canonical_version_id`. |
+| Diagnostic | `POST /v1/documents/{document_id}/diagnose` | Source enregistrée ou doublon accepté. | `diagnostic_status`, progression publique, manifeste, diagnostics page par page et erreurs. |
+| Revue explicite | Read-model documentaire. | Route incertaine, page bloquée ou quarantaine. | Pages concernées, motif, route proposée ou absence de route, et action autorisée uniquement si le pipeline l'exige. |
+| Conversion canonique | `POST /v1/documents/{document_id}/convert` | Route explicite et source non quarantainée. | `conversion_status`, QA pré/post-conversion, `TextAuthorityManifest`, `canonical_version_id` et hash canonique si accepté. |
+| Indexation | `POST /v1/documents/{document_id}/index` | Version canonique acceptée. | `projection_id`, profil, nombre de chunks, fraîcheur, `projection_status`, `canonical_version_id`. |
 
 L'UI ne déclenche pas automatiquement la conversion ou l'indexation après une étape ambiguë. En cas de `MANUAL_REVIEW`, `QUARANTINE`, `REJECTED`, `FAILED`, `SOURCE_NOT_ROUTED`, `PAGE_AUTHORITY_MISSING` ou `PROJECTION_PROFILE_INVALID`, elle arrête le flux et affiche l'action explicite requise.
 
 Le profil de projection ne peut pas être implicite. Si plusieurs profils existent, l'utilisateur choisit un profil exposé par la configuration locale. Si aucun profil n'est disponible, l'indexation est bloquée avec une erreur publique.
 
-### 4. Sélectionner les documents interrogeables
+### 4. Visualiser les sorties du pipeline documentaire
+
+L'UI affiche une fiche de sortie pour chaque étape terminée ou bloquée. Cette fiche sert à l'inspection utilisateur: elle ne transforme pas l'utilisateur en validateur métier, ne demande pas d'acceptation ou de refus et ne crée pas d'état supplémentaire dans SP, KA, EG, RA ou CV.
+
+| Étape | Sorties visibles pour jugement utilisateur | Affichage minimal | Interdits |
+|---|---|---|---|
+| Enregistrement PDF | Empreinte stable, métadonnées retenues, statut source, indication d'immuabilité du PDF original. | Fiche `document_id`, titre, origine, date, type, langue, hash, horodatage, `document_status`, doublon éventuel. | Remplacer le titre ou l'origine par défaut depuis le nom de fichier; masquer un PDF illisible. |
+| Diagnostic | Manifeste complet, nombre de pages attendu, nombre de pages diagnostiquées, diagnostic page par page. | Tableau par page: page, type observé, texte natif présent, image présente, OCR existant, rotation, lisibilité, signaux de tableaux ou formules, statut. | Résumer un diagnostic incomplet comme prêt; fusionner des pages absentes; masquer une page non diagnostiquée. |
+| Routage documentaire | Route décidée ou absence de route pour chaque page, justification synthétique, motif de revue ou quarantaine. | Tableau par page: route, justification, politique de routage, statut `ROUTE_EXPLICIT`, `MANUAL_REVIEW` ou `SOURCE_QUARANTINED`. | Demander une approbation systématique de l'utilisateur; choisir une route par défaut; poursuivre silencieusement sur une route incertaine. |
+| Conversion canonique | `TextAuthorityManifest`, QA pré-conversion, QA post-conversion, pages rejetées, version et hash canoniques. | Comparaison bornée original/canonique: page, autorité textuelle retenue, signaux QA, erreurs, `SourceLocator` échantillons, `canonical_version_id`, hash. | Exposer l'artefact complet si non public; fusionner plusieurs autorités textuelles; présenter une page rejetée comme publiée. |
+| Indexation KA | Profil de projection, paramètres publics, nombre de chunks, exemples de chunks, SourceLocator associés, fraîcheur et statut `SEARCHABLE`. | Fiche `projection_id`, `projection_profile_id`, chunking, modèles publics, `chunk_count`, génération, fraîcheur, statut, aperçu borné de quelques chunks avec hashes. | Exposer collection Qdrant, points internes ou scores comme vérité; rendre sélectionnable une projection `STALE`, `FAILED` ou non `SEARCHABLE`. |
+| Contrôle de recherche | Vérifier que la projection répond techniquement à une requête bornée produite par un contexte autorisé ou par un read-model d'inspection. | Requête ou contrôle affiché avec `search_trace_id`, filtres appliqués, résultats candidats, SourceLocator et avertissements. | Appeler KA librement depuis le navigateur; présenter une preuve candidate KA comme claim vérifié ou réponse RA; exposer une recherche libre comme vérité utilisateur finale. |
+| Réponse conversationnelle | Question résolue, mode, justification, statut, réponse publiable, lacunes, contradictions, citations. | Carte de tour avec `conversation_id`, `turn_id`, `resolved_question`, `mode`, `support_status`, `answer_id` si présent. | Afficher l'historique comme preuve; publier un brouillon ou une sortie partielle LLM. |
+| Citations | Ouverture de SourceLocator, page, fragment, version canonique et hash. | Panneau preuve: document, page, item, fragment borné, statut de résolution, lien local. | Remplacer une citation non ouvrable par un extrait voisin; masquer `ANSWER_CITATION_UNRESOLVABLE`. |
+
+Le contrôle de recherche est une visualisation d'inspection KA bornée. Il ne remplace pas RA, ne vérifie pas les claims et ne produit pas de réponse conversationnelle. L'UI ne doit pas appeler directement `POST /v1/search` si le contrat KA le réserve aux contextes RA et EG; dans ce cas, elle lit un read-model de projection affichant des chunks échantillonnés, leurs SourceLocator et les traces de contrôle publiées.
+
+### 5. Sélectionner les documents interrogeables
 
 Un document devient sélectionnable pour la conversation seulement si:
 
@@ -113,9 +132,9 @@ Un document devient sélectionnable pour la conversation seulement si:
 - la projection est `SEARCHABLE`;
 - aucun statut bloquant actif ne concerne la source, la version canonique ou la projection.
 
-Un document chargé mais non indexé reste visible dans le corpus avec son état réel. L'UI ne le présente jamais comme utilisable par le chatbot.
+Un document chargé mais non indexé reste visible dans le corpus avec son état réel et ses sorties inspectables. L'UI ne le présente jamais comme utilisable par le chatbot.
 
-### 5. Ouvrir une conversation
+### 6. Ouvrir une conversation
 
 Le formulaire de conversation demande explicitement:
 
@@ -139,7 +158,7 @@ GET /v1/conversations/{conversation_id}
 GET /v1/conversations/{conversation_id}/turns
 ```
 
-### 6. Poser une question
+### 7. Poser une question
 
 Le champ de message envoie:
 
@@ -171,7 +190,7 @@ Une réponse conversationnelle affiche:
 
 L'historique de conversation n'est jamais affiché comme preuve. Une réutilisation d'assertion historique doit être présentée comme réutilisation vérifiée ou revalidation RA, jamais comme souvenir suffisant.
 
-### 7. Vérifier les preuves
+### 8. Vérifier les preuves
 
 Le panneau de preuves affiche chaque citation avec:
 
@@ -195,8 +214,12 @@ Les commandes publiques existantes ne suffisent pas à rendre une UI exploitable
 |---|---|---|---|
 | Lire l'état local global. | `platform` | santé API, file de jobs, statut `llm-gateway`, statut Spark, dernier code public, horodatage. | prompt complet, secret, preuve complète, réponse complète. |
 | Lister les documents. | SP avec projection de lecture KA. | `document_id`, titre, statut source, statut diagnostic, statut conversion, `canonical_version_id`, statut projection. | `original_storage_ref`, tables SP, collection Qdrant. |
-| Lire un document. | SP. | métadonnées publiques, pages en revue, quarantaine, version canonique, SourceLocator ouvrables. | artefacts internes de conversion non publiés. |
-| Lire une projection. | KA. | `projection_id`, `canonical_version_id`, `projection_status`, profil public, fraîcheur. | `qdrant_collection`, identifiants de points, paramètres internes non publiés. |
+| Lire la sortie d'enregistrement. | SP. | métadonnées retenues, empreinte stable, statut source, doublon éventuel, horodatage. | métadonnées inventées par l'UI, chemin de stockage interne, hash recalculé côté navigateur. |
+| Lire le diagnostic documentaire. | SP. | manifeste complet, nombre de pages, diagnostics page par page, signaux de lisibilité, tableaux, formules, rotation, erreurs. | diagnostic agrégé qui masque une page absente, route implicite, artefacts OCR internes non publiés. |
+| Lire le routage documentaire. | SP. | route par page, justification, version de politique, pages en revue, quarantaine, motif public. | approbation utilisateur obligatoire pour route non ambiguë, route par défaut, détail de stockage interne. |
+| Lire la sortie canonique. | SP. | `TextAuthorityManifest`, QA pré/post-conversion, pages rejetées, `canonical_version_id`, hash canonique, SourceLocator échantillons, aperçu borné original/canonique. | artefact complet non public, fusion silencieuse d'autorités textuelles, correction OCR silencieuse. |
+| Lire une projection. | KA. | `projection_id`, `canonical_version_id`, `projection_status`, profil public, `chunk_count`, fraîcheur, exemples de chunks et SourceLocator. | `qdrant_collection`, identifiants de points, paramètres internes non publiés. |
+| Lire un contrôle de recherche borné. | KA via read-model d'inspection ou contexte autorisé. | requête de contrôle, `search_trace_id`, résultats candidats, filtres appliqués, avertissements, SourceLocator. | appeler KA librement depuis le navigateur, présenter un résultat KA comme claim vérifié, exposer une recherche libre comme réponse finale. |
 | Résoudre une citation. | SP via langage SourceLocator. | page, item, coordonnées si disponibles, hash et aperçu local borné. | substitution de source ou lecture directe d'un stockage interne. |
 | Lire une réponse présentée. | CV/RA. | statut, texte publié, citations, lacunes, contradictions, identifiants publics. | brouillon, prompt, override de support, stockage RA. |
 
@@ -247,14 +270,19 @@ Si ces lectures n'existent pas encore, l'UI doit être considérée non impléme
 | UI-006 - Citations ouvrables | Une réponse supportée exige des citations résolubles. | Given RA retourne une citation; When l'utilisateur l'ouvre; Then l'UI affiche SourceLocator, page et version canonique. |
 | UI-007 - Abstention visible | Une lacune ou donnée actuelle manquante n'est pas reformulée en réponse affirmative. | Given RA retourne `CURRENT_DATA_REQUIRED`; When la réponse est présentée; Then l'UI affiche l'abstention et la raison publique. |
 | UI-008 - Payloads sensibles absents | L'UI ne rend pas publics prompt complet, brouillon, preuve complète, secret ou stockage interne. | Given une erreur publique survient; When le journal UI l'affiche; Then seuls code public, identifiants publics et horodatage sont visibles. |
+| UI-009 - Sortie d'enregistrement inspectable | L'utilisateur voit l'identité documentaire retenue sans validation manuelle requise. | Given un PDF est enregistré; When la fiche document est ouverte; Then l'empreinte, les métadonnées retenues, le statut source et l'immuabilité sont affichés. |
+| UI-010 - Diagnostic page par page inspectable | Le diagnostic ne se réduit pas à un statut global. | Given un diagnostic est terminé; When l'utilisateur ouvre les détails; Then le manifeste, le nombre de pages et les signaux page par page sont affichés. |
+| UI-011 - Routage inspectable sans approbation systématique | Les routes et justifications sont visibles sans créer un workflow d'acceptation utilisateur. | Given le routage est explicite; When l'utilisateur inspecte le document; Then la route par page, la justification et la politique sont affichées sans bouton d'approbation obligatoire. |
+| UI-012 - Conversion canonique inspectable | Les sorties canoniques critiques sont visibles avant usage RA. | Given une conversion est acceptée; When l'utilisateur ouvre la version canonique; Then QA pré/post, `TextAuthorityManifest`, pages rejetées, hash et aperçu borné original/canonique sont affichés. |
+| UI-013 - Projection inspectable | Une projection `SEARCHABLE` expose assez d'éléments pour juger sa construction. | Given l'indexation est terminée; When l'utilisateur ouvre la projection; Then profil, `chunk_count`, fraîcheur, échantillons de chunks et SourceLocator sont affichés. |
+| UI-014 - Contrôle de recherche non factuel | Le contrôle de recherche ne remplace pas RA et ne contourne pas les contextes autorisés. | Given une trace de contrôle KA est disponible; When les résultats s'affichent; Then l'UI les marque comme preuves candidates non vérifiées et conserve `search_trace_id`. |
 
 ## Exclusions
 
 - Pas de chat générique directement branché au LLM.
 - Pas d'appel navigateur direct vers Spark, vLLM, Qdrant, PostgreSQL ou stockage documentaire interne.
-- Pas de recherche libre KA exposée à l'utilisateur final hors flux RA/CV.
+- Pas de recherche libre KA présentée comme réponse finale hors flux RA/CV; seule une inspection de projection bornée peut afficher des preuves candidates explicitement non vérifiées.
 - Pas de correction OCR ou édition documentaire silencieuse dans l'UI minimale.
 - Pas de promesse financière, conseil d'investissement ou donnée de marché inventée.
 - Pas de suppression ou purge administrative depuis l'UI minimale.
 - Pas de publication publique externe; l'interface reste locale.
-
