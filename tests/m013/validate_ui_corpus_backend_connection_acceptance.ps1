@@ -24,6 +24,8 @@ from app.platform.ui_corpus import (  # noqa: E402
     ui_get_pdf_content_response,
     ui_get_response,
 )
+from app.platform.configuration import load_application_configuration  # noqa: E402
+from app.platform.local_runtime import _local_post_response  # noqa: E402
 
 
 def assert_equal(actual: object, expected: object, message: str) -> None:
@@ -39,6 +41,19 @@ def assert_contains(text: str, expected: str, message: str) -> None:
 def assert_not_contains(text: str, forbidden: str, message: str) -> None:
     if forbidden in text:
         raise AssertionError(f"{message} Texte obtenu: {text!r}")
+
+
+def runtime_configuration_for(corpus_root: Path):
+    template_path = Path(repo_root) / "config" / "application.yaml"
+    config_text = template_path.read_text(encoding="utf-8")
+    corpus_root_text = corpus_root.as_posix()
+    config_text = config_text.replace(
+        "  corpus_root: data/corpus",
+        f'  corpus_root: "{corpus_root_text}"',
+    )
+    config_path = corpus_root.parent / "application.yaml"
+    config_path.write_text(config_text, encoding="utf-8")
+    return load_application_configuration(config_path=config_path, environment_snapshot={})
 
 
 with tempfile.TemporaryDirectory() as temporary_root:
@@ -89,6 +104,36 @@ with tempfile.TemporaryDirectory() as temporary_root:
     assert_equal(content_status, 200, "Le contenu PDF doit etre servi depuis le backend local.")
     assert_equal(content_type, "application/pdf", "Le contenu original doit garder son type PDF.")
     assert_equal(response_body, pdf_content, "Le contenu servi doit etre le PDF original.")
+
+    # Given l'utilisateur clique sur Diagnostiquer depuis l'UI locale.
+    # When le formulaire POST /v1/documents/{document_id}/diagnose arrive sur le service ui.
+    # Then le runtime local reconnait la commande documentaire et publie un statut public explicite.
+    runtime_configuration = runtime_configuration_for(corpus_root)
+    diagnosis_status, diagnosis_body = _local_post_response(
+        service_id="ui",
+        path=f"/v1/documents/{expected_document_id}/diagnose",
+        body={},
+        application_configuration=runtime_configuration,
+    )
+    assert_equal(diagnosis_status, 202, "Le clic Diagnostiquer ne doit pas retourner ENDPOINT_NOT_FOUND.")
+    assert_equal(
+        diagnosis_body,
+        {"document_id": expected_document_id, "diagnostic_status": "DIAGNOSTIC_REQUESTED"},
+        "La reponse diagnostic doit rester minimale et publique.",
+    )
+
+    repeated_status, repeated_body = _local_post_response(
+        service_id="ui",
+        path=f"/v1/documents/{expected_document_id}/diagnose",
+        body={},
+        application_configuration=runtime_configuration,
+    )
+    assert_equal(repeated_status, 409, "Un second clic ne doit pas relancer silencieusement le diagnostic.")
+    assert_equal(
+        repeated_body,
+        {"error_code": "DIAGNOSTIC_ALREADY_REQUESTED", "document_id": expected_document_id},
+        "La repetition doit produire une erreur publique stable.",
+    )
 
 print("Test d'acceptation connexion backend UI corpus PDF: OK")
 '@
