@@ -122,8 +122,34 @@ manual_review_document = CorpusPdfDocument(
     projection_status="PROJECTION_NOT_REQUESTED",
     selected=False,
 )
+explicit_route_document = CorpusPdfDocument(
+    document_id="DOC-M013-UI-0004",
+    title="Document routé",
+    source_status="SOURCE_REGISTERED",
+    diagnostic_status="ROUTE_EXPLICIT",
+    conversion_status="CONVERSION_NOT_REQUESTED",
+    canonical_version_id=None,
+    projection_status="PROJECTION_NOT_REQUESTED",
+    selected=False,
+)
+quarantined_diagnostic_document = CorpusPdfDocument(
+    document_id="DOC-M013-UI-0005",
+    title="Document diagnostic quarantainé",
+    source_status="SOURCE_QUARANTINED",
+    diagnostic_status="SOURCE_QUARANTINED",
+    conversion_status="SOURCE_QUARANTINED",
+    canonical_version_id=None,
+    projection_status="PROJECTION_NOT_REQUESTED",
+    selected=False,
+)
 state = CorpusPdfScreenState(
-    documents=(unsafe_document, diagnostic_ready_document, manual_review_document),
+    documents=(
+        unsafe_document,
+        diagnostic_ready_document,
+        manual_review_document,
+        explicit_route_document,
+        quarantined_diagnostic_document,
+    ),
     active_selected_document_ids=("DOC-M013-UI-0001",),
     read_model_status="READ_MODEL_READY",
 )
@@ -134,6 +160,8 @@ assert_contains(html, 'action="/v1/documents/DOC-M013-UI-0002/diagnose"', "Le di
 assert_contains(html, ">Diagnostiquer</button>", "Le bouton de diagnostic doit être libellé explicitement.")
 assert_not_contains(html, 'action="/v1/documents/DOC-M013-UI-0001/diagnose"', "Un diagnostic déjà demandé ne doit pas rendre la commande.")
 assert_not_contains(html, 'action="/v1/documents/DOC-M013-UI-0003/diagnose"', "Une revue manuelle ne doit pas rendre la commande de diagnostic.")
+assert_not_contains(html, 'action="/v1/documents/DOC-M013-UI-0004/diagnose"', "Une route explicite ne doit pas rendre la commande de diagnostic.")
+assert_not_contains(html, 'action="/v1/documents/DOC-M013-UI-0005/diagnose"', "Une source quarantainée ne doit pas rendre la commande de diagnostic.")
 assert_contains(html, 'data-action="retirer_selection_active"', "L'action de retrait doit être non destructive.")
 assert_not_contains(html.lower(), "delete", "Aucun contrôle delete ne doit être rendu.")
 assert_not_contains(html.lower(), "supprimer", "Aucun contrôle supprimer ne doit être rendu.")
