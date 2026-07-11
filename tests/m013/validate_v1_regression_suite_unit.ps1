@@ -108,6 +108,30 @@ function Assert-ValidatorFails {
         -Message "Le cas RED $Name doit nommer la règle violée."
 }
 
+function Remove-TemporaryRoot {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $Path
+    )
+
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return
+    }
+
+    for ($attempt = 1; $attempt -le 5; $attempt++) {
+        try {
+            Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction Stop
+            return
+        }
+        catch {
+            if ($attempt -eq 5) {
+                throw
+            }
+            Start-Sleep -Milliseconds (200 * $attempt)
+        }
+    }
+}
+
 if (-not (Test-Path -LiteralPath $validatorPath -PathType Leaf)) {
     throw "Validateur de régression V1 M-013 absent: scripts/validate_m013_regression.ps1"
 }
@@ -196,9 +220,7 @@ try {
         }
 }
 finally {
-    if (Test-Path -LiteralPath $temporaryRoot) {
-        Remove-Item -LiteralPath $temporaryRoot -Recurse -Force
-    }
+    Remove-TemporaryRoot -Path $temporaryRoot
 }
 
 Write-Host "Tests unitaires T-004 suite de régression V1 M-013: OK"

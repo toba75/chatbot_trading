@@ -149,7 +149,7 @@ try {
         -Expected "Traçabilité M13-config valide" `
         -Message "La fixture valide doit annoncer le GREEN M13-config."
     $validTestGateContent = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $validProjectRoot "scripts/test.ps1")
-    if ($validTestGateContent.Contains("scripts/validate_m013_reality.ps1")) {
+    if ($validTestGateContent.Contains('@{ Path = "scripts/validate_m013_reality.ps1"')) {
         throw "La gate test déterministe ne doit pas lancer M13-reality live sans configuration locale explicite."
     }
 

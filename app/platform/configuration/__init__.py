@@ -549,10 +549,10 @@ def _validate_required_keys_and_values(
         return
 
     if resolved_node.get("type") == "string" and isinstance(value, str):
-        if value.strip() == "" or value == _PLACEHOLDER_VALUE:
+        if value.strip() == "" or value != value.strip() or value == _PLACEHOLDER_VALUE:
             raise ApplicationConfigurationError(
                 CONFIG_KEY_EMPTY,
-                f"clé obligatoire vide ou placeholder: {_format_path(path_parts)}",
+                f"clé obligatoire vide, non normalisée ou placeholder: {_format_path(path_parts)}",
             )
 
 
@@ -588,6 +588,14 @@ def _validate_cross_field_invariants(payload: Mapping[str, Any], path: Path) -> 
         raise ApplicationConfigurationError(
             CONFIG_SCHEMA_INVALID,
             "security.allow_public_bind=false interdit deployment.hosts.docker_local.bind_host public",
+            str(path),
+        )
+    if docker_host["public_access"] and (
+        security["network_exposure"] == "loopback_only" or not security["allow_public_bind"]
+    ):
+        raise ApplicationConfigurationError(
+            CONFIG_SCHEMA_INVALID,
+            "deployment.hosts.docker_local.public_access=true exige une exposition réseau publique explicite",
             str(path),
         )
 

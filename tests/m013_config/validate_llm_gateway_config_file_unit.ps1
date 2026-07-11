@@ -10,6 +10,9 @@ $OutputEncoding = $utf8NoBom
 $pythonCode = @'
 from __future__ import annotations
 
+import contextlib
+import io
+import json
 from pathlib import Path
 import sys
 import tempfile
@@ -38,6 +41,7 @@ from app.platform.local_runtime import (  # noqa: E402
     _configured_http_bind_host,
     _configured_http_port,
     _llm_gateway_readiness_response,
+    _llm_gateway_post_response,
     _post_local_gateway_inference,
 )
 from app.platform.observability import InMemoryObservabilityCollector  # noqa: E402
@@ -128,6 +132,25 @@ def valid_request() -> InferenceRequest:
         prompt_version="1.0",
         sampling_parameters={"max_tokens": 16, "temperature": 0},
     )
+
+
+def valid_request_body() -> dict[str, object]:
+    request = valid_request()
+    return {
+        "messages": [
+            {"role": message.role, "content": message.content}
+            for message in request.messages
+        ],
+        "output_schema": dict(request.output_schema),
+        "schema_name": request.schema_name,
+        "schema_version": request.schema_version,
+        "trace_id": request.trace_id,
+        "request_id": request.request_id,
+        "idempotency_key": request.idempotency_key,
+        "prompt_id": request.prompt_id,
+        "prompt_version": request.prompt_version,
+        "sampling_parameters": dict(request.sampling_parameters),
+    }
 
 
 repo_root = Path(sys.argv[1])
@@ -355,6 +378,57 @@ assert_equal(
     invalid_payload["error_code"],
     "LLM_GATEWAY_RESPONSE_INVALID",
     "Une réponse gateway 200 non JSON doit avoir un code stable.",
+)
+
+runtime_transport = CapturingTransport()
+runtime_stdout = io.StringIO()
+original_transport_factory = local_runtime_module.UrllibOpenAICompatibleTransport
+original_gateway_instance = local_runtime_module._LLM_GATEWAY_INSTANCE
+original_gateway_hash = local_runtime_module._LLM_GATEWAY_CONFIGURATION_HASH
+try:
+    local_runtime_module.UrllibOpenAICompatibleTransport = lambda: runtime_transport
+    local_runtime_module._LLM_GATEWAY_INSTANCE = None
+    local_runtime_module._LLM_GATEWAY_CONFIGURATION_HASH = None
+    with contextlib.redirect_stdout(runtime_stdout):
+        runtime_status, runtime_payload = _llm_gateway_post_response(
+            path="/v1/infer",
+            body=valid_request_body(),
+            application_configuration=configuration,
+        )
+finally:
+    local_runtime_module.UrllibOpenAICompatibleTransport = original_transport_factory
+    local_runtime_module._LLM_GATEWAY_INSTANCE = original_gateway_instance
+    local_runtime_module._LLM_GATEWAY_CONFIGURATION_HASH = original_gateway_hash
+
+assert_equal(runtime_status, 200, "Le chemin HTTP local simulÃ© doit rÃ©ussir.")
+assert_equal(
+    runtime_payload["structured_output"],
+    {"answer": "OK"},
+    "Le chemin HTTP local simulÃ© doit retourner la sortie structurÃ©e.",
+)
+runtime_events = [
+    json.loads(line)
+    for line in runtime_stdout.getvalue().splitlines()
+    if line.strip()
+]
+gateway_events = [
+    event
+    for event in runtime_events
+    if event.get("event_type") == "llm_gateway_observation"
+]
+assert_true(gateway_events, "Le runtime gateway doit exporter une observation stdout JSON.")
+runtime_event = gateway_events[0]
+assert_equal(
+    runtime_event["log"]["configuration_hash"],
+    configuration.configuration_hash,
+    "Le log stdout runtime doit porter le hash de configuration.",
+)
+assert_true(
+    any(
+        metric["tags"].get("configuration_hash") == configuration.configuration_hash
+        for metric in runtime_event["metrics"]
+    ),
+    "Les mÃ©triques stdout runtime doivent porter le hash de configuration.",
 )
 
 assert_raises_config(

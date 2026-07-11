@@ -308,6 +308,7 @@ class GatewayConfiguration:
             )
         if self.tls_mode == _TLS_MODE_CA_BUNDLE:
             _require_text(self.tls_ca_bundle_path, "tls_ca_bundle_path", "LLM_GATEWAY_TLS_CA_REQUIRED")
+        _require_allowed_spark_hosts(self.allowed_spark_hosts)
 
         parsed_base_url = urlparse(self.base_url)
         if parsed_base_url.scheme not in {"http", "https"} or parsed_base_url.netloc == "":
@@ -386,6 +387,20 @@ def _is_allowed_spark_host(hostname: str | None, allowed_spark_hosts: tuple[str,
     if hostname in allowed_spark_hosts:
         return True
     return False
+
+
+def _require_allowed_spark_hosts(allowed_spark_hosts: tuple[str, ...]) -> None:
+    if not isinstance(allowed_spark_hosts, tuple):
+        raise LLMGatewayContractError(
+            "LLM_GATEWAY_ALLOWED_SPARK_HOSTS_REQUIRED",
+            "Les hôtes Spark autorisés doivent être un tuple strict.",
+        )
+    for hostname in allowed_spark_hosts:
+        if not isinstance(hostname, str) or hostname.strip() == "" or hostname != hostname.strip():
+            raise LLMGatewayContractError(
+                "LLM_GATEWAY_ALLOWED_SPARK_HOSTS_REQUIRED",
+                "Chaque hôte Spark autorisé doit être une chaîne normalisée.",
+            )
 
 
 @dataclass(frozen=True)

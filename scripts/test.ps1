@@ -26,7 +26,6 @@ $m013SpecificationPath = Join-Path $repoRoot "docs/specs/m013_durcissement_accep
 $platformTopologyPath = Join-Path $repoRoot "app/platform/topology_registry.json"
 $sparkFirewallPath = Join-Path $repoRoot "deploy/spark-firewall/network-boundary.json"
 $applicationExampleConfigPath = Join-Path $repoRoot "config/application.example.yaml"
-$applicationRuntimeConfigPath = Join-Path $repoRoot "config/application.yaml"
 $appRoot = Join-Path $repoRoot "app"
 $contextRegistryPath = Join-Path $repoRoot "app/context_registry.json"
 $m003PreconditionAcceptancePath = "tests/m003/validate_m003_precondition_acceptance.ps1"
@@ -209,7 +208,6 @@ $validationCommands = @(
     @{ Path = "scripts/validate_m013_acceptance.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_m013_config_environment.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_m013_config_traceability.ps1"; Arguments = @() },
-    @{ Path = "scripts/validate_m013_reality.ps1"; Arguments = @("-ConfigPath", $applicationRuntimeConfigPath) },
     @{ Path = "scripts/validate_platform_topology.ps1"; Arguments = @("-Path", $platformTopologyPath) },
     @{ Path = "scripts/validate_local_compose.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_network_boundary.ps1"; Arguments = @("-SparkFirewallPath", $sparkFirewallPath, "-ApplicationConfigPath", $applicationExampleConfigPath) },

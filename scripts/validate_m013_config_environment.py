@@ -66,7 +66,12 @@ IGNORED_EXACT_PATHS = frozenset(
         "scripts/validate_m013_config_environment.py",
     }
 )
-CODE_ENV_PATTERN = re.compile(r"\$env:([A-Za-z_][A-Za-z0-9_]*)")
+CODE_ENV_PATTERN = re.compile(r"\$(?:env:|Env:)([A-Za-z_][A-Za-z0-9_]*)")
+CODE_BRACED_ENV_PATTERN = re.compile(r"\$\{(?:env:|Env:)([A-Za-z_][A-Za-z0-9_]*)\}")
+CODE_PROVIDER_ENV_PATTERN = re.compile(r"(?<![$\{])\bEnv:([A-Za-z_][A-Za-z0-9_]*)")
+CODE_DOTNET_ENV_PATTERN = re.compile(
+    r"\[Environment\]::GetEnvironmentVariable\(\s*['\"]([A-Za-z_][A-Za-z0-9_]*)['\"]\s*\)"
+)
 OST_RECURSION_GUARD_PATTERN = re.compile(r"^OST_M\d{3}_PRECONDITION_ACCEPTANCE_RUNNING$")
 COMPOSE_ENVIRONMENT_KEY_PATTERN = re.compile(r"^\s{6}([A-Za-z_][A-Za-z0-9_]*)\s*:")
 COMPOSE_ENVIRONMENT_LIST_KEY_PATTERN = re.compile(r"^\s{6}-\s*([A-Za-z_][A-Za-z0-9_]*)=")
@@ -194,14 +199,31 @@ class EnvironmentScanner:
         if "process.env" in line:
             self.add_violation(relative_path, line_number, "lecture process.env interdite comme source applicative")
 
-        for match in CODE_ENV_PATTERN.finditer(line):
-            name = match.group(1)
-            if name not in ALLOWED_SHELL_ENVIRONMENT_KEYS and OST_RECURSION_GUARD_PATTERN.fullmatch(name) is None:
-                self.add_violation(
-                    relative_path,
-                    line_number,
-                    f"lecture $env:{name} interdite comme source applicative",
-                )
+        for pattern, label in (
+            (CODE_BRACED_ENV_PATTERN, "${env:...}"),
+            (CODE_ENV_PATTERN, "$env:..."),
+            (CODE_PROVIDER_ENV_PATTERN, "Env:"),
+            (CODE_DOTNET_ENV_PATTERN, "[Environment]::GetEnvironmentVariable"),
+        ):
+            for match in pattern.finditer(line):
+                name = match.group(1)
+                self.add_shell_environment_violation(relative_path, line_number, name, label)
+
+    def add_shell_environment_violation(
+        self,
+        relative_path: str,
+        line_number: int,
+        name: str,
+        syntax_label: str,
+    ) -> None:
+        if name in ALLOWED_SHELL_ENVIRONMENT_KEYS or OST_RECURSION_GUARD_PATTERN.fullmatch(name) is not None:
+            self.exception_count += 1
+            return
+        self.add_violation(
+            relative_path,
+            line_number,
+            f"lecture {syntax_label} {name} interdite comme source applicative",
+        )
 
     def scan_forbidden_key_line(self, relative_path: str, line_number: int, line: str) -> None:
         key = self.forbidden_key_from_text(line)

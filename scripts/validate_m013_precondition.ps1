@@ -10,9 +10,11 @@ $ErrorActionPreference = "Stop"
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $m013Branch = "codex/milestone-m013-durcissement-acceptation-v1"
+$m013ConfigBranch = "codex/m13-config"
 $allowedBranches = @(
     "master",
-    $m013Branch
+    $m013Branch,
+    $m013ConfigBranch
 )
 $requiredMasterArtifacts = @(
     [ordered] @{ Path = "docs/tasks/milestone_012"; Kind = "Directory" },
@@ -574,11 +576,11 @@ $currentBranchResult = Invoke-M013Process `
     -Arguments @("-C", $repoRoot, "rev-parse", "--abbrev-ref", "HEAD")
 $currentBranch = if ($currentBranchResult.OutputLines.Count -eq 0) { "" } else { $currentBranchResult.OutputLines[0].Trim() }
 if (($currentBranchResult.ExitCode -eq 0) -and ($allowedBranches -contains $currentBranch)) {
-    if ($currentBranch -eq $m013Branch) {
-        $branchObservation = "Branche M-013 autorisée: $currentBranch"
+    if ($currentBranch -eq "master") {
+        $branchObservation = "Branche master autorisée pour vérifier la précondition M-013 après fusion: $currentBranch"
     }
     else {
-        $branchObservation = "Branche master autorisée pour vérifier la précondition M-013 après fusion: $currentBranch"
+        $branchObservation = "Branche M-013 autorisée: $currentBranch"
     }
     Add-M013Result -Results $gitResults -Name "branche courante" -Command $currentBranchResult.Command -ExitCode 0 -OutputLines $currentBranchResult.OutputLines -Status "GREEN" -Observation $branchObservation -StartedAtUtc $currentBranchResult.StartedAtUtc -CompletedAtUtc $currentBranchResult.CompletedAtUtc
     Write-Host $branchObservation

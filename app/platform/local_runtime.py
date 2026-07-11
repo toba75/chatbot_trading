@@ -37,7 +37,7 @@ from app.platform.llm_gateway import (
     SystemGatewayClock,
     UrllibOpenAICompatibleTransport,
 )
-from app.platform.observability import InMemoryObservabilityCollector
+from app.platform.observability import GatewayObservation, InMemoryObservabilityCollector
 
 
 HTTP_SERVICE_PORTS = {
@@ -95,6 +95,21 @@ _M013_REQUIRED_LLM_TECHNICAL_METRICS = (
     "llm_structured_output_stability_rate",
     "llm_spark_restart_recovery_rate",
 )
+
+
+class _StdoutGatewayObservabilityCollector(InMemoryObservabilityCollector):
+    """Collecteur runtime qui publie les observations gateway en JSON lines."""
+
+    def record_gateway_observation(self, observation: GatewayObservation) -> None:
+        previous_metric_count = len(self.metrics())
+        super().record_gateway_observation(observation)
+        emitted_metrics = self.metrics()[previous_metric_count:]
+        payload = {
+            "event_type": "llm_gateway_observation",
+            "log": self.logs()[-1].to_mapping(),
+            "metrics": [metric.to_mapping() for metric in emitted_metrics],
+        }
+        print(json.dumps(payload, ensure_ascii=False, sort_keys=True), flush=True)
 
 
 def main() -> int:
@@ -427,8 +442,8 @@ def _build_product_chat_inference_body(
         {
             "role": "system",
             "content": (
-                "Tu es le chat produit OSTrading local. Reponds uniquement avec un JSON conforme au schema. "
-                "Le champ answer contient la reponse publiable a l'utilisateur."
+                "Tu es le chat produit OSTrading local. Réponds uniquement avec un JSON conforme au schéma. "
+                "Le champ answer contient la réponse publiable à l'utilisateur."
             ),
         }
     ]
@@ -465,9 +480,9 @@ def _build_live_benchmark_task_inference_body(
 ) -> dict[str, Any]:
     _required_matching_model(body, application_configuration=application_configuration)
     if task_name not in _M013_REQUIRED_LLM_TASKS:
-        raise LLMGatewayContractError("LOCAL_RUNTIME_LLM_TASK_UNKNOWN", f"Tache LLM inconnue: {task_name}")
+        raise LLMGatewayContractError("LOCAL_RUNTIME_LLM_TASK_UNKNOWN", f"Tâche LLM inconnue: {task_name}")
     if isinstance(task_index, bool) or not isinstance(task_index, int) or task_index < 1:
-        raise LLMGatewayContractError("HTTP_REQUEST_INVALID", "Index de tache LLM invalide.")
+        raise LLMGatewayContractError("HTTP_REQUEST_INVALID", "Index de tâche LLM invalide.")
 
     base_trace_id = _required_body_text(body, "trace_id")
     base_request_id = _required_body_text(body, "request_id")
@@ -478,8 +493,8 @@ def _build_live_benchmark_task_inference_body(
             {
                 "role": "system",
                 "content": (
-                    "Tu executes une evaluation LLM M13-reality sur le chemin reel. "
-                    "Reponds uniquement avec le JSON demande."
+                    "Tu exécutes une évaluation LLM M13-reality sur le chemin réel. "
+                    "Réponds uniquement avec le JSON demandé."
                 ),
             },
             {
@@ -632,21 +647,21 @@ def _unavailable_metric(name: str, reason: str) -> dict[str, Any]:
 
 def _benchmark_prompt_for_task(*, task_name: str, marker: str) -> str:
     prompts = {
-        "json_valide": "Controle la production JSON stricte.",
+        "json_valide": "Contrôle la production JSON stricte.",
         "extraction_atomique": "Extrait le fait atomique: le chiffre d'affaires vaut 42 millions EUR.",
-        "conservation_negations": "Preserve la negation: la societe n'a pas de dette nette.",
-        "exactitude_nombres": "Preserve les nombres: marge 12,5 pour cent et 3 incidents.",
-        "conditions_application": "Preserve la condition: acheter seulement si marge superieure a 20 pour cent.",
-        "limites": "Preserve la limite: conclusion limitee aux donnees 2024.",
-        "entailment": "Verifie l'entailment: si A implique B et A est vrai, B est vrai.",
-        "contradiction": "Detecte la contradiction: marge superieure a 20 pour cent et marge inferieure a 10 pour cent.",
-        "synthese_fr_en": "Synthese en francais: revenue grew but cash flow decreased.",
+        "conservation_negations": "Préserve la négation: la société n'a pas de dette nette.",
+        "exactitude_nombres": "Préserve les nombres: marge 12,5 pour cent et 3 incidents.",
+        "conditions_application": "Préserve la condition: acheter seulement si marge supérieure à 20 pour cent.",
+        "limites": "Préserve la limite: conclusion limitée aux données 2024.",
+        "entailment": "Vérifie l'entailment: si A implique B et A est vrai, B est vrai.",
+        "contradiction": "Détecte la contradiction: marge supérieure à 20 pour cent et marge inférieure à 10 pour cent.",
+        "synthese_fr_en": "Synthèse en français: revenue grew but cash flow decreased.",
         "tool_calling": "Choisis l'outil lookup_document pour le document DOC-M013.",
-        "citations": "Associe la reponse a la citation source SRC-M013-1.",
+        "citations": "Associe la réponse à la citation source SRC-M013-1.",
     }
     prompt = prompts.get(task_name)
     if prompt is None:
-        raise LLMGatewayContractError("LOCAL_RUNTIME_LLM_TASK_UNKNOWN", f"Tache LLM inconnue: {task_name}")
+        raise LLMGatewayContractError("LOCAL_RUNTIME_LLM_TASK_UNKNOWN", f"Tâche LLM inconnue: {task_name}")
     return (
         f"{prompt} Retourne exactement un objet JSON avec task_name=\"{task_name}\", "
         f"evaluation_marker=\"{marker}\" et answer non vide."
@@ -655,7 +670,7 @@ def _benchmark_prompt_for_task(*, task_name: str, marker: str) -> str:
 
 def _benchmark_marker_for_task(task_name: str) -> str:
     if task_name not in _M013_REQUIRED_LLM_TASKS:
-        raise LLMGatewayContractError("LOCAL_RUNTIME_LLM_TASK_UNKNOWN", f"Tache LLM inconnue: {task_name}")
+        raise LLMGatewayContractError("LOCAL_RUNTIME_LLM_TASK_UNKNOWN", f"Tâche LLM inconnue: {task_name}")
     return f"M013-REALITY-{task_name}"
 
 
@@ -824,7 +839,7 @@ def _build_local_language_model_gateway(
 ) -> OpenAICompatibleLocalLanguageModelGateway:
     gateway_service = application_configuration.services.llm_gateway
     configuration = _build_gateway_configuration_from_application_configuration(application_configuration)
-    collector = InMemoryObservabilityCollector()
+    collector = _StdoutGatewayObservabilityCollector()
     return OpenAICompatibleLocalLanguageModelGateway(
         configuration=configuration,
         transport=UrllibOpenAICompatibleTransport(),

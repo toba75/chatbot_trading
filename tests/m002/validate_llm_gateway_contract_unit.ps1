@@ -137,6 +137,7 @@ GatewayConfiguration(
     tls_mode="disabled",
     tls_ca_bundle_path=None,
     timeout_seconds=9,
+    allowed_spark_hosts=("192.168.1.120",),
 )
 
 assert_raises_code(
