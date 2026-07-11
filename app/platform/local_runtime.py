@@ -40,11 +40,11 @@ from app.platform.llm_gateway import (
 from app.platform.observability import GatewayObservation, InMemoryObservabilityCollector
 from app.platform.ui_corpus import (
     CorpusPdfScreenState,
-    apply_diagnostic_requests_to_corpus_state,
-    build_corpus_pdf_state_from_corpus_root,
-    ui_get_pdf_content_response,
+    ORCHESTRATOR_API_CONTRACT_NOT_WIRED,
+    UI_FUNCTION_NOT_OPERATIONAL,
+    build_unconnected_corpus_pdf_state,
     ui_get_response,
-    ui_request_diagnostic_response,
+    ui_unavailable_pdf_content_response,
 )
 
 
@@ -59,12 +59,12 @@ HTTP_SERVICE_PORTS = {
 }
 WORKER_SERVICE_IDS = frozenset(("worker-documents", "worker-research", "worker-backtest"))
 _M005_INDEX_PATH_PATTERN = re.compile(r"^/v1/documents/([^/]+)/index$")
-_UI_DOCUMENT_DIAGNOSE_PATH_PATTERN = re.compile(r"^/v1/documents/[^/]+/diagnose$")
+_UI_DOCUMENT_COMMAND_PATH_PATTERN = re.compile(
+    r"^/v1/documents(?:/[^/]+/(?:diagnose|convert|index))?$"
+)
 _LLM_GATEWAY_LOCK = threading.Lock()
 _LLM_GATEWAY_INSTANCE: OpenAICompatibleLocalLanguageModelGateway | None = None
 _LLM_GATEWAY_CONFIGURATION_HASH: str | None = None
-_UI_DIAGNOSTIC_REQUESTS_LOCK = threading.Lock()
-_UI_DIAGNOSTIC_REQUESTED_DOCUMENT_IDS: set[str] = set()
 _M013_REALITY_PATH_SEGMENTS = ("docker-local", "orchestrator-api", "llm-gateway", "vllm-spark")
 _M013_PRODUCT_CHAT_SCHEMA = {
     "type": "object",
@@ -179,11 +179,9 @@ def _serve_http(*, service_id: str, port: int, application_configuration: Applic
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:
             if service_id == "ui" and self.path != "/health":
-                corpus_root = _runtime_path(application_configuration.paths.corpus_root)
                 if self.path.endswith("/pdf/content"):
-                    status_code, content_type, response_body = ui_get_pdf_content_response(
+                    status_code, content_type, response_body = ui_unavailable_pdf_content_response(
                         path=self.path,
-                        corpus_root=corpus_root,
                     )
                     _write_binary_response(
                         self,
@@ -222,6 +220,15 @@ def _serve_http(*, service_id: str, port: int, application_configuration: Applic
             )
 
         def do_POST(self) -> None:
+            if service_id == "ui":
+                status_code, response_body = _local_post_response(
+                    service_id=service_id,
+                    path=self.path,
+                    body={},
+                    application_configuration=application_configuration,
+                )
+                _write_json_response(self, status_code=status_code, body=response_body)
+                return
             body_result = _read_json_body(self)
             if body_result[0] != 200:
                 _write_json_response(
@@ -367,14 +374,8 @@ def _build_ui_corpus_state(
     *,
     application_configuration: ApplicationConfiguration,
 ) -> CorpusPdfScreenState:
-    corpus_root = _runtime_path(application_configuration.paths.corpus_root)
-    base_state = build_corpus_pdf_state_from_corpus_root(corpus_root=corpus_root)
-    with _UI_DIAGNOSTIC_REQUESTS_LOCK:
-        requested_document_ids = tuple(_UI_DIAGNOSTIC_REQUESTED_DOCUMENT_IDS)
-    return apply_diagnostic_requests_to_corpus_state(
-        state=base_state,
-        diagnostic_requested_document_ids=requested_document_ids,
-    )
+    _required_application_configuration(application_configuration)
+    return build_unconnected_corpus_pdf_state()
 
 
 def _ui_post_response(
@@ -383,18 +384,15 @@ def _ui_post_response(
     body: dict[str, Any],
     application_configuration: ApplicationConfiguration | None,
 ) -> tuple[int, dict[str, Any]]:
-    if _UI_DOCUMENT_DIAGNOSE_PATH_PATTERN.fullmatch(path) is None:
+    if _UI_DOCUMENT_COMMAND_PATH_PATTERN.fullmatch(path) is None:
         return 404, {"error_code": "ENDPOINT_NOT_FOUND", "path": path}
-    if body != {}:
-        return 400, {"error_code": "HTTP_REQUEST_INVALID", "field": "body"}
-    state = _build_ui_corpus_state(
-        application_configuration=_required_application_configuration(application_configuration),
-    )
-    status_code, response_body = ui_request_diagnostic_response(path=path, state=state)
-    if status_code == 202:
-        with _UI_DIAGNOSTIC_REQUESTS_LOCK:
-            _UI_DIAGNOSTIC_REQUESTED_DOCUMENT_IDS.add(response_body["document_id"])
-    return status_code, response_body
+    if application_configuration is not None:
+        _required_application_configuration(application_configuration)
+    return 503, {
+        "error_code": UI_FUNCTION_NOT_OPERATIONAL,
+        "reason": ORCHESTRATOR_API_CONTRACT_NOT_WIRED,
+        "endpoint": path,
+    }
 
 
 def _local_post_response(

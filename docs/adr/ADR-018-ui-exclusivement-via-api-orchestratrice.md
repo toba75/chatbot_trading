@@ -72,4 +72,4 @@ L'API `orchestrator-api` est la frontière HTTP publique du système local. Les 
 
 ## Notes
 
-Cette ADR enregistre la règle d'architecture. Elle ne déclare pas l'implémentation UI actuelle conforme. Le raccordement de l'UI aux commandes et read-models réels de `orchestrator-api` reste un travail d'implémentation distinct.
+Le premier écran UI applique désormais cette décision en restant explicitement non opérationnel tant que les contrats documentaires ne sont pas câblés dans `orchestrator-api`. Il ne lit plus le corpus, ne sert plus directement les PDF et ne conserve plus de statut diagnostic local. Le raccordement aux commandes et read-models réels de `orchestrator-api` reste un travail d'implémentation distinct avant de réactiver ces fonctions.
