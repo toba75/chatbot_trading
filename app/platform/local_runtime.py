@@ -220,6 +220,14 @@ def _serve_http(*, service_id: str, port: int, application_configuration: Applic
     server.serve_forever()
 
 
+def serve_http_service(*, service_id: str, port: int, config_path: str) -> None:
+    _serve_http(
+        service_id=service_id,
+        port=port,
+        application_configuration=_load_runtime_application_configuration(config_path),
+    )
+
+
 def _configured_http_port(service_id: str, application_configuration: ApplicationConfiguration) -> int:
     if service_id == "orchestrator-api":
         return application_configuration.services.api.port
