@@ -60,14 +60,21 @@ $requiredGates = @(
     "ADR",
     $traceabilityGate,
     "Tests",
-    "Lint"
+    "Lint",
+    "Frontière UI/API"
 )
 
 $requiredMarkers = @(
     "docs/traceability/matrix.md",
     "docs/adr/",
     "scripts/test.ps1",
-    "scripts/lint.ps1"
+    "scripts/lint.ps1",
+    "ADR-018",
+    "orchestrator-api",
+    "mock",
+    "stub",
+    "fake",
+    "fallback"
 )
 
 function Assert-Condition {
