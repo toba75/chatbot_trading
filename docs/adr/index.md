@@ -22,7 +22,7 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 | [ADR-014](ADR-014-spark-docker-externe-sans-cle-api.md) | Endpoint Docker Spark externe sans clé API | Acceptée | 2026-07-08 | ADR-007; ADR-008 | Aucune |
 | [ADR-015](ADR-015-provenance-llm-declaree-gateway.md) | Provenance LLM déclarée par le gateway | Acceptée | 2026-07-09 | Aucun | Aucune |
 | [ADR-016](ADR-016-configuration-applicative-fichier-unique.md) | Configuration applicative par fichier unique | Acceptée | 2026-07-10 | Aucun | Aucune |
-| [ADR-017](ADR-017-pdf-sources-suivis-par-git-lfs.md) | PDF sources suivis par Git LFS | Proposée | 2026-07-11 | Aucun | Aucune |
+| [ADR-017](ADR-017-pdf-sources-suivis-par-git-lfs.md) | PDF sources suivis par Git LFS | Acceptée | 2026-07-11 | Aucun | Aucune |
 
 ## ADR DDD
 
