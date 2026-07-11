@@ -54,7 +54,7 @@ Chaque gate poss$($eGrave)de une preuve explicite, datable dans Git et reli$($eA
 
 ## $adrHeading
 
-Toute d$($eAcute)cision structurante est document$($eAcute)e dans docs/adr/ ou l'absence d'ADR est justifi$($eAcute)e.
+Toute d$($eAcute)cision structurante est document$($eAcute)e dans docs/adr/ ou l'absence d'ADR est justifi$($eAcute)e. ADR-018 impose la fronti$($eGrave)re UI via orchestrator-api sans mock, stub, fake ni fallback.
 
 ## $traceabilityHeading
 
