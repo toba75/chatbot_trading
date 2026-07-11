@@ -20,7 +20,9 @@ if repo_root not in sys.path:
     sys.path.insert(0, repo_root)
 
 from app.platform.ui_corpus import (  # noqa: E402
+    apply_diagnostic_requests_to_corpus_state,
     build_corpus_pdf_state_from_corpus_root,
+    ui_request_diagnostic_response,
     ui_get_pdf_content_response,
 )
 
@@ -83,6 +85,49 @@ with tempfile.TemporaryDirectory() as temporary_root:
     assert_equal(unknown_status, 404, "Un document inconnu doit rester introuvable.")
     assert_equal(content_type, "text/plain; charset=utf-8", "Une erreur de contenu PDF doit rester textuelle.")
     assert_equal(body, b"PDF introuvable", "Le corps d'erreur ne doit pas divulguer de chemin.")
+
+    diagnosis_status, diagnosis_body = ui_request_diagnostic_response(
+        path=f"/v1/documents/{state.documents[0].document_id}/diagnose",
+        state=state,
+    )
+    assert_equal(diagnosis_status, 202, "Une source non diagnostiquee doit accepter la demande.")
+    assert_equal(
+        diagnosis_body,
+        {"document_id": state.documents[0].document_id, "diagnostic_status": "DIAGNOSTIC_REQUESTED"},
+        "La reponse diagnostic doit rester publique et minimale.",
+    )
+
+    requested_state = apply_diagnostic_requests_to_corpus_state(
+        state=state,
+        diagnostic_requested_document_ids=(state.documents[0].document_id,),
+    )
+    assert_equal(
+        requested_state.documents[0].diagnostic_status,
+        "DIAGNOSTIC_REQUESTED",
+        "Une demande acceptee doit etre visible dans le read-model UI.",
+    )
+
+    repeated_status, repeated_body = ui_request_diagnostic_response(
+        path=f"/v1/documents/{state.documents[0].document_id}/diagnose",
+        state=requested_state,
+    )
+    assert_equal(repeated_status, 409, "Une demande deja acceptee ne doit pas etre relancee.")
+    assert_equal(
+        repeated_body,
+        {"error_code": "DIAGNOSTIC_ALREADY_REQUESTED", "document_id": state.documents[0].document_id},
+        "La repetition doit etre explicite.",
+    )
+
+    missing_status, missing_body = ui_request_diagnostic_response(
+        path="/v1/documents/DOC-FFFFFFFFFFFFFFFF/diagnose",
+        state=state,
+    )
+    assert_equal(missing_status, 404, "Un diagnostic sur document absent doit retourner 404.")
+    assert_equal(
+        missing_body,
+        {"error_code": "SOURCE_NOT_FOUND", "document_id": "DOC-FFFFFFFFFFFFFFFF"},
+        "Le document absent doit etre nomme sans chemin local.",
+    )
 
 print("Tests unitaires connexion backend UI corpus PDF: OK")
 '@

@@ -68,6 +68,9 @@ READ_MODEL_STATUSES = frozenset(
 )
 _PDF_VIEWER_PATH_PATTERN = re.compile(r"^/ui/documents/(?P<document_id>[^/]+)/pdf$")
 _PDF_CONTENT_PATH_PATTERN = re.compile(r"^/ui/documents/(?P<document_id>[^/]+)/pdf/content$")
+_DOCUMENT_DIAGNOSE_PATH_PATTERN = re.compile(
+    r"^/v1/documents/(?P<document_id>[^/]+)/diagnose$"
+)
 _DESTRUCTIVE_FIELD_NAMES = frozenset(
     {
         "delete",
@@ -266,6 +269,34 @@ def remove_from_active_selection(
     return tuple(value for value in parsed_selection if value != parsed_document_id)
 
 
+def apply_diagnostic_requests_to_corpus_state(
+    *,
+    state: CorpusPdfScreenState,
+    diagnostic_requested_document_ids: Sequence[str],
+) -> CorpusPdfScreenState:
+    parsed_state = _ensure_screen_state(state)
+    requested_ids = frozenset(
+        _ensure_document_id(document_id)
+        for document_id in diagnostic_requested_document_ids
+    )
+    documents = tuple(
+        _document_with_diagnostic_requested(document)
+        if document.document_id in requested_ids
+        else document
+        for document in parsed_state.documents
+    )
+    active_selection = tuple(
+        document_id
+        for document_id in parsed_state.active_selected_document_ids
+        if document_id not in requested_ids
+    )
+    return CorpusPdfScreenState(
+        documents=documents,
+        active_selected_document_ids=active_selection,
+        read_model_status=parsed_state.read_model_status,
+    )
+
+
 def ensure_no_destructive_ui_fields(payload: Mapping[str, Any]) -> None:
     """Refuse les champs de suppression et les champs de stockage interne."""
 
@@ -421,6 +452,32 @@ def ui_get_pdf_content_response(
     return 404, "text/plain; charset=utf-8", "PDF introuvable".encode("utf-8")
 
 
+def ui_request_diagnostic_response(
+    *,
+    path: str,
+    state: CorpusPdfScreenState,
+) -> tuple[int, dict[str, str]]:
+    parsed_path = _ensure_path(path)
+    parsed_state = _ensure_screen_state(state)
+    match = _DOCUMENT_DIAGNOSE_PATH_PATTERN.fullmatch(parsed_path)
+    if match is None:
+        return 404, {"error_code": "ENDPOINT_NOT_FOUND", "path": parsed_path}
+    document_id = _ensure_document_id(match.group("document_id"))
+    for document in parsed_state.documents:
+        if document.document_id != document_id:
+            continue
+        if document.diagnostic_status != "DIAGNOSTIC_NOT_REQUESTED":
+            return 409, {
+                "error_code": "DIAGNOSTIC_ALREADY_REQUESTED",
+                "document_id": document_id,
+            }
+        return 202, {
+            "document_id": document_id,
+            "diagnostic_status": "DIAGNOSTIC_REQUESTED",
+        }
+    return 404, {"error_code": "SOURCE_NOT_FOUND", "document_id": document_id}
+
+
 def _render_document_row(document: CorpusPdfDocument) -> str:
     selected_text = "Sélection active" if document.selected else "Hors sélection active"
     selectable = "true" if document.selectable_for_conversation else "false"
@@ -471,6 +528,22 @@ def _render_diagnostic_cell(document: CorpusPdfDocument) -> str:
             '<button type="submit">Diagnostiquer</button>',
             "</form>",
         )
+    )
+
+
+def _document_with_diagnostic_requested(document: CorpusPdfDocument) -> CorpusPdfDocument:
+    parsed_document = _ensure_document(document)
+    if parsed_document.diagnostic_status != "DIAGNOSTIC_NOT_REQUESTED":
+        return parsed_document
+    return CorpusPdfDocument(
+        document_id=parsed_document.document_id,
+        title=parsed_document.title,
+        source_status=parsed_document.source_status,
+        diagnostic_status="DIAGNOSTIC_REQUESTED",
+        conversion_status=parsed_document.conversion_status,
+        canonical_version_id=parsed_document.canonical_version_id,
+        projection_status=parsed_document.projection_status,
+        selected=False,
     )
 
 
@@ -617,6 +690,7 @@ def _escape(value: str) -> str:
 
 
 __all__ = [
+    "apply_diagnostic_requests_to_corpus_state",
     "CorpusPdfDocument",
     "CorpusPdfScreenState",
     "build_registration_payload",
@@ -628,4 +702,5 @@ __all__ = [
     "render_pdf_viewer",
     "ui_get_pdf_content_response",
     "ui_get_response",
+    "ui_request_diagnostic_response",
 ]

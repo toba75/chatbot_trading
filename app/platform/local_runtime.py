@@ -39,9 +39,12 @@ from app.platform.llm_gateway import (
 )
 from app.platform.observability import GatewayObservation, InMemoryObservabilityCollector
 from app.platform.ui_corpus import (
+    CorpusPdfScreenState,
+    apply_diagnostic_requests_to_corpus_state,
     build_corpus_pdf_state_from_corpus_root,
     ui_get_pdf_content_response,
     ui_get_response,
+    ui_request_diagnostic_response,
 )
 
 
@@ -56,9 +59,12 @@ HTTP_SERVICE_PORTS = {
 }
 WORKER_SERVICE_IDS = frozenset(("worker-documents", "worker-research", "worker-backtest"))
 _M005_INDEX_PATH_PATTERN = re.compile(r"^/v1/documents/([^/]+)/index$")
+_UI_DOCUMENT_DIAGNOSE_PATH_PATTERN = re.compile(r"^/v1/documents/[^/]+/diagnose$")
 _LLM_GATEWAY_LOCK = threading.Lock()
 _LLM_GATEWAY_INSTANCE: OpenAICompatibleLocalLanguageModelGateway | None = None
 _LLM_GATEWAY_CONFIGURATION_HASH: str | None = None
+_UI_DIAGNOSTIC_REQUESTS_LOCK = threading.Lock()
+_UI_DIAGNOSTIC_REQUESTED_DOCUMENT_IDS: set[str] = set()
 _M013_REALITY_PATH_SEGMENTS = ("docker-local", "orchestrator-api", "llm-gateway", "vllm-spark")
 _M013_PRODUCT_CHAT_SCHEMA = {
     "type": "object",
@@ -188,7 +194,9 @@ def _serve_http(*, service_id: str, port: int, application_configuration: Applic
                     return
                 status_code, content_type, response_body = ui_get_response(
                     path=self.path,
-                    state=build_corpus_pdf_state_from_corpus_root(corpus_root=corpus_root),
+                    state=_build_ui_corpus_state(
+                        application_configuration=application_configuration,
+                    ),
                 )
                 _write_text_response(
                     self,
@@ -355,6 +363,40 @@ def _read_json_body(handler: BaseHTTPRequestHandler) -> tuple[int, dict[str, Any
     return 200, parsed_body
 
 
+def _build_ui_corpus_state(
+    *,
+    application_configuration: ApplicationConfiguration,
+) -> CorpusPdfScreenState:
+    corpus_root = _runtime_path(application_configuration.paths.corpus_root)
+    base_state = build_corpus_pdf_state_from_corpus_root(corpus_root=corpus_root)
+    with _UI_DIAGNOSTIC_REQUESTS_LOCK:
+        requested_document_ids = tuple(_UI_DIAGNOSTIC_REQUESTED_DOCUMENT_IDS)
+    return apply_diagnostic_requests_to_corpus_state(
+        state=base_state,
+        diagnostic_requested_document_ids=requested_document_ids,
+    )
+
+
+def _ui_post_response(
+    *,
+    path: str,
+    body: dict[str, Any],
+    application_configuration: ApplicationConfiguration | None,
+) -> tuple[int, dict[str, Any]]:
+    if _UI_DOCUMENT_DIAGNOSE_PATH_PATTERN.fullmatch(path) is None:
+        return 404, {"error_code": "ENDPOINT_NOT_FOUND", "path": path}
+    if body != {}:
+        return 400, {"error_code": "HTTP_REQUEST_INVALID", "field": "body"}
+    state = _build_ui_corpus_state(
+        application_configuration=_required_application_configuration(application_configuration),
+    )
+    status_code, response_body = ui_request_diagnostic_response(path=path, state=state)
+    if status_code == 202:
+        with _UI_DIAGNOSTIC_REQUESTS_LOCK:
+            _UI_DIAGNOSTIC_REQUESTED_DOCUMENT_IDS.add(response_body["document_id"])
+    return status_code, response_body
+
+
 def _local_post_response(
     *,
     service_id: str,
@@ -362,6 +404,12 @@ def _local_post_response(
     body: dict[str, Any],
     application_configuration: ApplicationConfiguration | None = None,
 ) -> tuple[int, dict[str, Any]]:
+    if service_id == "ui":
+        return _ui_post_response(
+            path=path,
+            body=body,
+            application_configuration=application_configuration,
+        )
     if service_id == "llm-gateway":
         return _llm_gateway_post_response(
             path=path,
