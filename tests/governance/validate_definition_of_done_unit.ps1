@@ -46,6 +46,7 @@ Cette d$($eAcute)finition s'applique $($aGrave) chaque t$($aCircumflex)che de mi
 | $traceabilityGate | Ligne de matrice specs-tests-code-ADR mise $($aGrave) jour. | Refuser la cl$($oCircumflex)ture si la matrice est incoh$($eAcute)rente. |
 | Tests | Commandes de tests cibl$($eAcute)es puis pertinentes ex$($eAcute)cut$($eAcute)es. | Refuser la cl$($oCircumflex)ture si un test $($eAcute)choue ou est ignor$($eAcute). |
 | Lint | Commandes de lint ou validation statique ex$($eAcute)cut$($eAcute)es. | Refuser la cl$($oCircumflex)ture si un lint configur$($eAcute) $($eAcute)choue ou manque sans blocage trac$($eAcute). |
+| Fronti$($eGrave)re UI/API | Preuve que toute capacit$($eAcute) UI passe par orchestrator-api. | Refuser la cl$($oCircumflex)ture si l'UI mocke, stube, fake ou remplace un contrat absent par un fallback. |
 
 ## $proofHeading
 
@@ -178,10 +179,10 @@ try {
     $emptySectionResult = Invoke-Validator -ProjectRoot $emptySectionProjectRoot
     Assert-ExitCode -Actual $emptySectionResult.ExitCode -Expected 1 -Message "Une section obligatoire vide doit être refusée."
 
-    $missingGateDocument = [regex]::Replace($validDocument, "(?m)^\| TDD \|.+\|\r?\n?", "")
+    $missingGateDocument = [regex]::Replace($validDocument, "(?m)^\| Fronti$($eGrave)re UI/API \|.+\|\r?\n?", "")
     $missingGateProjectRoot = New-TemporaryProject -Name "missing-gate" -Document $missingGateDocument
     $missingGateResult = Invoke-Validator -ProjectRoot $missingGateProjectRoot
-    Assert-ExitCode -Actual $missingGateResult.ExitCode -Expected 1 -Message "Une gate obligatoire absente doit être refusée."
+    Assert-ExitCode -Actual $missingGateResult.ExitCode -Expected 1 -Message "Une clôture sans frontière UI/API doit être refusée."
 
     $lintGateRow = "| Lint | Commandes de lint ou validation statique ex$($eAcute)cut$($eAcute)es. | Refuser la cl$($oCircumflex)ture si un lint configur$($eAcute) $($eAcute)choue ou manque sans blocage trac$($eAcute). |"
     $unknownGateDocument = $validDocument.Replace($lintGateRow, "$lintGateRow`r`n| Revue manuelle | Validation hors gate automatique. | Refuser selon pr$($eAcute)f$($eAcute)rence. |")
