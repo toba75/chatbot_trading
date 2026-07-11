@@ -341,19 +341,33 @@ def render_pdf_viewer(document: CorpusPdfDocument) -> str:
     """Rend un visualiseur public en lecture seule pour un PDF original."""
 
     parsed_document = _ensure_document(document)
+    escaped_document_id = _escape(parsed_document.document_id)
     return "\n".join(
         (
             "<!doctype html>",
             '<html lang="fr">',
             "<head>",
             '  <meta charset="utf-8">',
-            f"  <title>PDF original {_escape(parsed_document.document_id)}</title>",
+            f"  <title>PDF original {escaped_document_id}</title>",
+            "  <style>",
+            "    html, body { height: 100%; margin: 0; color: #1f2933; font-family: Arial, sans-serif; }",
+            "    body.pdf-viewer-page { min-height: 100vh; display: flex; flex-direction: column; background: #f7f9fb; }",
+            "    .pdf-viewer-header { padding: 16px 24px; border-bottom: 1px solid #ccd3dc; background: #ffffff; }",
+            "    .pdf-viewer-header h1 { margin: 0 0 8px; font-size: 24px; line-height: 1.25; word-break: break-word; }",
+            "    .pdf-viewer-header p { margin: 4px 0; font-size: 14px; }",
+            "    .pdf-viewer-main { flex: 1; min-height: 0; padding: 12px; }",
+            "    .pdf-viewer-frame { display: block; width: 100%; height: calc(100vh - 132px); min-height: 640px; border: 0; background: #ffffff; }",
+            "  </style>",
             "</head>",
-            "<body>",
-            f"  <h1>PDF original {_escape(parsed_document.title)}</h1>",
-            f"  <p>Identifiant public: <code>{_escape(parsed_document.document_id)}</code></p>",
-            '  <p>Visualisation locale contrôlée en lecture seule.</p>',
-            f'  <iframe title="PDF original" src="/ui/documents/{_escape(parsed_document.document_id)}/pdf/content"></iframe>',
+            '<body class="pdf-viewer-page">',
+            '  <header class="pdf-viewer-header">',
+            f"    <h1>PDF original {_escape(parsed_document.title)}</h1>",
+            f"    <p>Identifiant public: <code>{escaped_document_id}</code></p>",
+            "    <p>Visualisation locale contrôlée en lecture seule.</p>",
+            "  </header>",
+            '  <main class="pdf-viewer-main">',
+            f'    <iframe class="pdf-viewer-frame" title="PDF original" type="application/pdf" src="/ui/documents/{escaped_document_id}/pdf/content"></iframe>',
+            "  </main>",
             "</body>",
             "</html>",
         )
