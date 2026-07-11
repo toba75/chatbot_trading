@@ -220,6 +220,7 @@ $testCommands = @(
     @{ Path = "tests/governance/validate_m000_precondition_report_unit.ps1"; Arguments = @() },
     @{ Path = "tests/governance/validate_adr_system_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/governance/validate_adr_system_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/governance/validate_git_lfs_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/governance/validate_task_system_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/governance/validate_task_system_unit.ps1"; Arguments = @() },
     @{ Path = "tests/governance/validate_traceability_acceptance.ps1"; Arguments = @() },
