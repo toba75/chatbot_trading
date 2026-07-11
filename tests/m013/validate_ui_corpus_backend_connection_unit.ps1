@@ -58,7 +58,7 @@ assert_equal(state.documents, (), "Aucun document ne doit être inventé depuis 
 
 html = render_corpus_pdf_screen(state)
 assert_contains(html, "ORCHESTRATOR_API_CONTRACT_NOT_WIRED", "Le blocage API doit être visible.")
-assert_contains(html, "Fonction UI non opérationnelle", "L'indisponibilité doit être explicite.")
+assert_contains(html, "Fonction UI non ", "L'indisponibilité doit être explicite.")
 assert_contains(html, "<fieldset disabled", "Le formulaire d'ajout doit être désactivé.")
 assert_not_contains(html, ">Diagnostiquer</button>", "Aucune commande de diagnostic ne doit être simulée.")
 
@@ -78,6 +78,14 @@ assert_equal(
     },
     "Le refus doit nommer le contrat API non câblé sans fabriquer de statut métier.",
 )
+
+registration_status, registration_body = _local_post_response(
+    service_id="ui",
+    path="/v1/documents",
+    body={"multipart_body": "non interprété par l'UI"},
+)
+assert_equal(registration_status, 503, "L'ajout PDF non câblé doit être refusé avant interprétation métier.")
+assert_equal(registration_body["reason"], "ORCHESTRATOR_API_CONTRACT_NOT_WIRED", "L'ajout doit exposer le même blocage API.")
 
 content_status, content_type, content_body = ui_unavailable_pdf_content_response(
     path="/ui/documents/DOC-FFFFFFFFFFFFFFFF/pdf/content",

@@ -3,11 +3,9 @@
 from __future__ import annotations
 
 import html
-import hashlib
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
 from app.contracts.identity import DomainIdentifier
@@ -68,9 +66,8 @@ READ_MODEL_STATUSES = frozenset(
 )
 _PDF_VIEWER_PATH_PATTERN = re.compile(r"^/ui/documents/(?P<document_id>[^/]+)/pdf$")
 _PDF_CONTENT_PATH_PATTERN = re.compile(r"^/ui/documents/(?P<document_id>[^/]+)/pdf/content$")
-_DOCUMENT_DIAGNOSE_PATH_PATTERN = re.compile(
-    r"^/v1/documents/(?P<document_id>[^/]+)/diagnose$"
-)
+ORCHESTRATOR_API_CONTRACT_NOT_WIRED = "ORCHESTRATOR_API_CONTRACT_NOT_WIRED"
+UI_FUNCTION_NOT_OPERATIONAL = "UI_FUNCTION_NOT_OPERATIONAL"
 _DESTRUCTIVE_FIELD_NAMES = frozenset(
     {
         "delete",
@@ -203,31 +200,6 @@ def build_unconnected_corpus_pdf_state() -> CorpusPdfScreenState:
     )
 
 
-def build_corpus_pdf_state_from_corpus_root(*, corpus_root: Path) -> CorpusPdfScreenState:
-    """Construit le read-model public depuis le corpus PDF local configuré."""
-
-    root = _ensure_corpus_root_path(corpus_root)
-    if not root.is_dir():
-        return CorpusPdfScreenState(
-            documents=(),
-            active_selected_document_ids=(),
-            read_model_status="READ_MODEL_UNAVAILABLE",
-        )
-
-    documents = tuple(
-        _document_from_pdf_file(pdf_path)
-        for pdf_path in sorted(
-            (candidate for candidate in root.iterdir() if _is_pdf_file(candidate)),
-            key=lambda candidate: candidate.name.casefold(),
-        )
-    )
-    return CorpusPdfScreenState(
-        documents=documents,
-        active_selected_document_ids=(),
-        read_model_status="READ_MODEL_READY",
-    )
-
-
 def build_registration_payload(
     *,
     original_content: bytes,
@@ -269,34 +241,6 @@ def remove_from_active_selection(
     return tuple(value for value in parsed_selection if value != parsed_document_id)
 
 
-def apply_diagnostic_requests_to_corpus_state(
-    *,
-    state: CorpusPdfScreenState,
-    diagnostic_requested_document_ids: Sequence[str],
-) -> CorpusPdfScreenState:
-    parsed_state = _ensure_screen_state(state)
-    requested_ids = frozenset(
-        _ensure_document_id(document_id)
-        for document_id in diagnostic_requested_document_ids
-    )
-    documents = tuple(
-        _document_with_diagnostic_requested(document)
-        if document.document_id in requested_ids
-        else document
-        for document in parsed_state.documents
-    )
-    active_selection = tuple(
-        document_id
-        for document_id in parsed_state.active_selected_document_ids
-        if document_id not in requested_ids
-    )
-    return CorpusPdfScreenState(
-        documents=documents,
-        active_selected_document_ids=active_selection,
-        read_model_status=parsed_state.read_model_status,
-    )
-
-
 def ensure_no_destructive_ui_fields(payload: Mapping[str, Any]) -> None:
     """Refuse les champs de suppression et les champs de stockage interne."""
 
@@ -307,11 +251,23 @@ def render_corpus_pdf_screen(state: CorpusPdfScreenState) -> str:
     """Rend le premier écran local du corpus PDF."""
 
     parsed_state = _ensure_screen_state(state)
+    read_model_connected = parsed_state.read_model_status == "READ_MODEL_READY"
     document_rows = "\n".join(_render_document_row(document) for document in parsed_state.documents)
     if document_rows == "":
         document_rows = (
             '<tr><td colspan="7" class="empty-state">'
             "Aucun PDF public dans le read-model documentaire.</td></tr>"
+        )
+    blocking_notice = ""
+    fieldset_attributes = ""
+    if not read_model_connected:
+        fieldset_attributes = ' disabled aria-disabled="true"'
+        blocking_notice = (
+            '<div class="blocking-notice" role="status" aria-live="polite">'
+            '<strong>Fonction UI non opérationnelle</strong><br>'
+            f'<code>{ORCHESTRATOR_API_CONTRACT_NOT_WIRED}</code>: '
+            "les contrats documentaires de <code>orchestrator-api</code> ne sont pas câblés "
+            "aux cas d'usage réels.</div>"
         )
     return "\n".join(
         (
@@ -329,21 +285,26 @@ def render_corpus_pdf_screen(state: CorpusPdfScreenState) -> str:
             "    th { background: #eef2f6; }",
             "    .document-registration-form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 16px 0; }",
             "    .row-action-form { display: inline-block; margin: 6px 0 0; }",
+            "    fieldset { display: contents; }",
+            "    fieldset:disabled { opacity: 0.6; }",
             "    label { display: grid; gap: 4px; font-size: 14px; }",
             "    button, a.button { border: 1px solid #465a69; background: #f7f9fb; padding: 6px 10px; color: #1f2933; text-decoration: none; }",
             "    .empty-state { color: #52616f; }",
+            "    .blocking-notice { border-left: 4px solid #9b2c2c; background: #fff5f5; padding: 12px; margin: 16px 0; }",
             "  </style>",
             "</head>",
             "<body>",
             "  <header>",
             "    <h1>Corpus PDF</h1>",
             f'    <p>Read-model documentaire: <span class="status">{_escape(parsed_state.read_model_status)}</span></p>',
+            f"    {blocking_notice}",
             "  </header>",
             "  <main>",
             '    <section aria-labelledby="ajout-pdf">',
             '      <h2 id="ajout-pdf">Ajouter un PDF</h2>',
             '      <p>Contrat appelé: <code>POST /v1/documents</code></p>',
             '      <form class="document-registration-form" method="post" action="/v1/documents" enctype="multipart/form-data">',
+            f"        <fieldset{fieldset_attributes}>",
             '        <label>Fichier PDF original<input name="original_content" type="file" accept="application/pdf" required></label>',
             '        <label>Titre documentaire<input name="title" type="text" required></label>',
             '        <label>Émetteur ou origine<input name="issuer" type="text" required></label>',
@@ -351,6 +312,7 @@ def render_corpus_pdf_screen(state: CorpusPdfScreenState) -> str:
             '        <label>Type documentaire<input name="document_type" type="text" required></label>',
             '        <label>Langue principale<input name="language" type="text" required></label>',
             "        <button type=\"submit\">Ajouter au corpus</button>",
+            "        </fieldset>",
             "      </form>",
             "    </section>",
             '    <section aria-labelledby="liste-pdf">',
@@ -427,55 +389,19 @@ def ui_get_response(
     return 404, "text/html; charset=utf-8", _render_not_found(parsed_path)
 
 
-def ui_get_pdf_content_response(
-    *,
-    path: str,
-    corpus_root: Path,
-) -> tuple[int, str, bytes]:
-    """Retourne le contenu PDF original sans divulguer son chemin local."""
+def ui_unavailable_pdf_content_response(*, path: str) -> tuple[int, str, bytes]:
+    """Refuse le contenu PDF tant que son contrat API réel n'est pas câblé."""
 
     parsed_path = _ensure_path(path)
     match = _PDF_CONTENT_PATH_PATTERN.fullmatch(parsed_path)
     if match is None:
         raise ValueError("chemin contenu PDF invalide")
-    document_id = _ensure_document_id(match.group("document_id"))
-    root = _ensure_corpus_root_path(corpus_root)
-    if not root.is_dir():
-        return 503, "text/plain; charset=utf-8", "Corpus indisponible".encode("utf-8")
-    for pdf_path in sorted(
-        (candidate for candidate in root.iterdir() if _is_pdf_file(candidate)),
-        key=lambda candidate: candidate.name.casefold(),
-    ):
-        pdf_content = _read_pdf_content(pdf_path)
-        if _document_id_from_pdf_content(pdf_content) == document_id:
-            return 200, "application/pdf", pdf_content
-    return 404, "text/plain; charset=utf-8", "PDF introuvable".encode("utf-8")
-
-
-def ui_request_diagnostic_response(
-    *,
-    path: str,
-    state: CorpusPdfScreenState,
-) -> tuple[int, dict[str, str]]:
-    parsed_path = _ensure_path(path)
-    parsed_state = _ensure_screen_state(state)
-    match = _DOCUMENT_DIAGNOSE_PATH_PATTERN.fullmatch(parsed_path)
-    if match is None:
-        return 404, {"error_code": "ENDPOINT_NOT_FOUND", "path": parsed_path}
-    document_id = _ensure_document_id(match.group("document_id"))
-    for document in parsed_state.documents:
-        if document.document_id != document_id:
-            continue
-        if document.diagnostic_status != "DIAGNOSTIC_NOT_REQUESTED":
-            return 409, {
-                "error_code": "DIAGNOSTIC_ALREADY_REQUESTED",
-                "document_id": document_id,
-            }
-        return 202, {
-            "document_id": document_id,
-            "diagnostic_status": "DIAGNOSTIC_REQUESTED",
-        }
-    return 404, {"error_code": "SOURCE_NOT_FOUND", "document_id": document_id}
+    _ensure_document_id(match.group("document_id"))
+    body = (
+        "Fonction UI non opérationnelle: "
+        f"{ORCHESTRATOR_API_CONTRACT_NOT_WIRED}"
+    ).encode("utf-8")
+    return 503, "text/plain; charset=utf-8", body
 
 
 def _render_document_row(document: CorpusPdfDocument) -> str:
@@ -531,22 +457,6 @@ def _render_diagnostic_cell(document: CorpusPdfDocument) -> str:
     )
 
 
-def _document_with_diagnostic_requested(document: CorpusPdfDocument) -> CorpusPdfDocument:
-    parsed_document = _ensure_document(document)
-    if parsed_document.diagnostic_status != "DIAGNOSTIC_NOT_REQUESTED":
-        return parsed_document
-    return CorpusPdfDocument(
-        document_id=parsed_document.document_id,
-        title=parsed_document.title,
-        source_status=parsed_document.source_status,
-        diagnostic_status="DIAGNOSTIC_REQUESTED",
-        conversion_status=parsed_document.conversion_status,
-        canonical_version_id=parsed_document.canonical_version_id,
-        projection_status=parsed_document.projection_status,
-        selected=False,
-    )
-
-
 def _render_not_found(value: str) -> str:
     return "\n".join(
         (
@@ -573,56 +483,6 @@ def _inspect_payload_fields(value: Any) -> None:
     elif isinstance(value, (tuple, list)):
         for child in value:
             _inspect_payload_fields(child)
-
-
-def _document_from_pdf_file(pdf_path: Path) -> CorpusPdfDocument:
-    parsed_path = _ensure_pdf_file(pdf_path)
-    pdf_content = _read_pdf_content(parsed_path)
-    return CorpusPdfDocument(
-        document_id=_document_id_from_pdf_content(pdf_content),
-        title=_ensure_text(parsed_path.stem, "titre PDF requis"),
-        source_status="SOURCE_REGISTERED",
-        diagnostic_status="DIAGNOSTIC_NOT_REQUESTED",
-        conversion_status="CONVERSION_NOT_REQUESTED",
-        canonical_version_id=None,
-        projection_status="PROJECTION_NOT_REQUESTED",
-        selected=False,
-    )
-
-
-def _document_id_from_pdf_content(pdf_content: bytes) -> str:
-    if not isinstance(pdf_content, bytes):
-        raise ValueError("contenu PDF non binaire")
-    if len(pdf_content) == 0:
-        raise ValueError("contenu PDF vide")
-    return "DOC-" + hashlib.sha256(pdf_content).hexdigest()[:16].upper()
-
-
-def _read_pdf_content(pdf_path: Path) -> bytes:
-    parsed_path = _ensure_pdf_file(pdf_path)
-    content = parsed_path.read_bytes()
-    if len(content) == 0:
-        raise ValueError("PDF du corpus vide")
-    return content
-
-
-def _is_pdf_file(path: Path) -> bool:
-    return path.is_file() and path.suffix.casefold() == ".pdf"
-
-
-def _ensure_pdf_file(value: Path) -> Path:
-    if not isinstance(value, Path):
-        raise ValueError("chemin PDF invalide")
-    path = value.resolve()
-    if not path.is_file() or path.suffix.casefold() != ".pdf":
-        raise ValueError("fichier PDF du corpus invalide")
-    return path
-
-
-def _ensure_corpus_root_path(value: Path) -> Path:
-    if not isinstance(value, Path):
-        raise ValueError("corpus_root invalide")
-    return value.resolve()
 
 
 def _ensure_documents(value: Sequence[CorpusPdfDocument]) -> tuple[CorpusPdfDocument, ...]:
@@ -690,17 +550,16 @@ def _escape(value: str) -> str:
 
 
 __all__ = [
-    "apply_diagnostic_requests_to_corpus_state",
     "CorpusPdfDocument",
     "CorpusPdfScreenState",
+    "ORCHESTRATOR_API_CONTRACT_NOT_WIRED",
+    "UI_FUNCTION_NOT_OPERATIONAL",
     "build_registration_payload",
-    "build_corpus_pdf_state_from_corpus_root",
     "build_unconnected_corpus_pdf_state",
     "ensure_no_destructive_ui_fields",
     "remove_from_active_selection",
     "render_corpus_pdf_screen",
     "render_pdf_viewer",
-    "ui_get_pdf_content_response",
     "ui_get_response",
-    "ui_request_diagnostic_response",
+    "ui_unavailable_pdf_content_response",
 ]
