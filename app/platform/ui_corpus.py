@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import html
+import hashlib
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from app.contracts.identity import DomainIdentifier
@@ -65,6 +67,7 @@ READ_MODEL_STATUSES = frozenset(
     }
 )
 _PDF_VIEWER_PATH_PATTERN = re.compile(r"^/ui/documents/(?P<document_id>[^/]+)/pdf$")
+_PDF_CONTENT_PATH_PATTERN = re.compile(r"^/ui/documents/(?P<document_id>[^/]+)/pdf/content$")
 _DESTRUCTIVE_FIELD_NAMES = frozenset(
     {
         "delete",
@@ -194,6 +197,31 @@ def build_unconnected_corpus_pdf_state() -> CorpusPdfScreenState:
         documents=(),
         active_selected_document_ids=(),
         read_model_status="READ_MODEL_NOT_CONNECTED",
+    )
+
+
+def build_corpus_pdf_state_from_corpus_root(*, corpus_root: Path) -> CorpusPdfScreenState:
+    """Construit le read-model public depuis le corpus PDF local configuré."""
+
+    root = _ensure_corpus_root_path(corpus_root)
+    if not root.is_dir():
+        return CorpusPdfScreenState(
+            documents=(),
+            active_selected_document_ids=(),
+            read_model_status="READ_MODEL_UNAVAILABLE",
+        )
+
+    documents = tuple(
+        _document_from_pdf_file(pdf_path)
+        for pdf_path in sorted(
+            (candidate for candidate in root.iterdir() if _is_pdf_file(candidate)),
+            key=lambda candidate: candidate.name.casefold(),
+        )
+    )
+    return CorpusPdfScreenState(
+        documents=documents,
+        active_selected_document_ids=(),
+        read_model_status="READ_MODEL_READY",
     )
 
 
@@ -353,6 +381,31 @@ def ui_get_response(
     return 404, "text/html; charset=utf-8", _render_not_found(parsed_path)
 
 
+def ui_get_pdf_content_response(
+    *,
+    path: str,
+    corpus_root: Path,
+) -> tuple[int, str, bytes]:
+    """Retourne le contenu PDF original sans divulguer son chemin local."""
+
+    parsed_path = _ensure_path(path)
+    match = _PDF_CONTENT_PATH_PATTERN.fullmatch(parsed_path)
+    if match is None:
+        raise ValueError("chemin contenu PDF invalide")
+    document_id = _ensure_document_id(match.group("document_id"))
+    root = _ensure_corpus_root_path(corpus_root)
+    if not root.is_dir():
+        return 503, "text/plain; charset=utf-8", "Corpus indisponible".encode("utf-8")
+    for pdf_path in sorted(
+        (candidate for candidate in root.iterdir() if _is_pdf_file(candidate)),
+        key=lambda candidate: candidate.name.casefold(),
+    ):
+        pdf_content = _read_pdf_content(pdf_path)
+        if _document_id_from_pdf_content(pdf_content) == document_id:
+            return 200, "application/pdf", pdf_content
+    return 404, "text/plain; charset=utf-8", "PDF introuvable".encode("utf-8")
+
+
 def _render_document_row(document: CorpusPdfDocument) -> str:
     selected_text = "Sélection active" if document.selected else "Hors sélection active"
     selectable = "true" if document.selectable_for_conversation else "false"
@@ -414,6 +467,56 @@ def _inspect_payload_fields(value: Any) -> None:
     elif isinstance(value, (tuple, list)):
         for child in value:
             _inspect_payload_fields(child)
+
+
+def _document_from_pdf_file(pdf_path: Path) -> CorpusPdfDocument:
+    parsed_path = _ensure_pdf_file(pdf_path)
+    pdf_content = _read_pdf_content(parsed_path)
+    return CorpusPdfDocument(
+        document_id=_document_id_from_pdf_content(pdf_content),
+        title=_ensure_text(parsed_path.stem, "titre PDF requis"),
+        source_status="SOURCE_REGISTERED",
+        diagnostic_status="DIAGNOSTIC_NOT_REQUESTED",
+        conversion_status="CONVERSION_NOT_REQUESTED",
+        canonical_version_id=None,
+        projection_status="PROJECTION_NOT_REQUESTED",
+        selected=False,
+    )
+
+
+def _document_id_from_pdf_content(pdf_content: bytes) -> str:
+    if not isinstance(pdf_content, bytes):
+        raise ValueError("contenu PDF non binaire")
+    if len(pdf_content) == 0:
+        raise ValueError("contenu PDF vide")
+    return "DOC-" + hashlib.sha256(pdf_content).hexdigest()[:16].upper()
+
+
+def _read_pdf_content(pdf_path: Path) -> bytes:
+    parsed_path = _ensure_pdf_file(pdf_path)
+    content = parsed_path.read_bytes()
+    if len(content) == 0:
+        raise ValueError("PDF du corpus vide")
+    return content
+
+
+def _is_pdf_file(path: Path) -> bool:
+    return path.is_file() and path.suffix.casefold() == ".pdf"
+
+
+def _ensure_pdf_file(value: Path) -> Path:
+    if not isinstance(value, Path):
+        raise ValueError("chemin PDF invalide")
+    path = value.resolve()
+    if not path.is_file() or path.suffix.casefold() != ".pdf":
+        raise ValueError("fichier PDF du corpus invalide")
+    return path
+
+
+def _ensure_corpus_root_path(value: Path) -> Path:
+    if not isinstance(value, Path):
+        raise ValueError("corpus_root invalide")
+    return value.resolve()
 
 
 def _ensure_documents(value: Sequence[CorpusPdfDocument]) -> tuple[CorpusPdfDocument, ...]:
@@ -484,10 +587,12 @@ __all__ = [
     "CorpusPdfDocument",
     "CorpusPdfScreenState",
     "build_registration_payload",
+    "build_corpus_pdf_state_from_corpus_root",
     "build_unconnected_corpus_pdf_state",
     "ensure_no_destructive_ui_fields",
     "remove_from_active_selection",
     "render_corpus_pdf_screen",
     "render_pdf_viewer",
+    "ui_get_pdf_content_response",
     "ui_get_response",
 ]

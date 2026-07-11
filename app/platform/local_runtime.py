@@ -38,7 +38,11 @@ from app.platform.llm_gateway import (
     UrllibOpenAICompatibleTransport,
 )
 from app.platform.observability import GatewayObservation, InMemoryObservabilityCollector
-from app.platform.ui_corpus import build_unconnected_corpus_pdf_state, ui_get_response
+from app.platform.ui_corpus import (
+    build_corpus_pdf_state_from_corpus_root,
+    ui_get_pdf_content_response,
+    ui_get_response,
+)
 
 
 HTTP_SERVICE_PORTS = {
@@ -169,9 +173,22 @@ def _serve_http(*, service_id: str, port: int, application_configuration: Applic
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:
             if service_id == "ui" and self.path != "/health":
+                corpus_root = _runtime_path(application_configuration.paths.corpus_root)
+                if self.path.endswith("/pdf/content"):
+                    status_code, content_type, response_body = ui_get_pdf_content_response(
+                        path=self.path,
+                        corpus_root=corpus_root,
+                    )
+                    _write_binary_response(
+                        self,
+                        status_code=status_code,
+                        content_type=content_type,
+                        body=response_body,
+                    )
+                    return
                 status_code, content_type, response_body = ui_get_response(
                     path=self.path,
-                    state=build_unconnected_corpus_pdf_state(),
+                    state=build_corpus_pdf_state_from_corpus_root(corpus_root=corpus_root),
                 )
                 _write_text_response(
                     self,
@@ -293,6 +310,27 @@ def _write_text_response(
     handler.send_header("Content-Length", str(len(payload)))
     handler.end_headers()
     handler.wfile.write(payload)
+
+
+def _write_binary_response(
+    handler: BaseHTTPRequestHandler,
+    *,
+    status_code: int,
+    content_type: str,
+    body: bytes,
+) -> None:
+    handler.send_response(status_code)
+    handler.send_header("Content-Type", content_type)
+    handler.send_header("Content-Length", str(len(body)))
+    handler.end_headers()
+    handler.wfile.write(body)
+
+
+def _runtime_path(path_text: str) -> Path:
+    path = Path(path_text)
+    if path.is_absolute():
+        return path
+    return Path.cwd() / path
 
 
 def _read_json_body(handler: BaseHTTPRequestHandler) -> tuple[int, dict[str, Any]]:
