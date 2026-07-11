@@ -195,6 +195,20 @@ try {
     $missingUiApiBoundaryResult = Invoke-Validator -ProjectRoot $missingUiApiBoundaryProjectRoot
     Assert-ExitCode -Actual $missingUiApiBoundaryResult.ExitCode -Expected 1 -Message "Une clôture sans gate Frontière UI/API doit être refusée."
 
+    # Given une tâche UI candidate à la clôture et un endpoint API déclaré.
+    # When la gouvernance ne couvre pas le cas où cet endpoint n'est pas câblé au cas d'usage réel.
+    # Then la clôture est refusée comme pour un contrat absent, sans comportement de substitution.
+    $uncabledUiApiProjectRoot = New-TemporaryProject -Name "uncabled-ui-api"
+    $uncabledDefinitionPath = Join-Path $uncabledUiApiProjectRoot "docs/governance/definition_of_done.md"
+    $uncabledDefinition = Get-Content -Raw -Encoding UTF8 -LiteralPath $uncabledDefinitionPath
+    $uncabledDefinition = $uncabledDefinition.Replace(
+        "absent ou non câblé au cas d'usage réel",
+        "absent"
+    )
+    Set-Content -Encoding UTF8 -LiteralPath $uncabledDefinitionPath -Value $uncabledDefinition
+    $uncabledUiApiResult = Invoke-Validator -ProjectRoot $uncabledUiApiProjectRoot
+    Assert-ExitCode -Actual $uncabledUiApiResult.ExitCode -Expected 1 -Message "Une clôture qui ignore un contrat API non câblé doit être refusée."
+
     $emptyAdrProofProjectRoot = New-TemporaryProject -Name "empty-adr-proof"
     Set-GateCell `
         -Path (Join-Path $emptyAdrProofProjectRoot "docs/governance/definition_of_done.md") `

@@ -17,7 +17,7 @@ L'API `orchestrator-api` est la frontière HTTP publique du système local. Les 
 
 - Given une action ou une lecture de l'UI nécessite une capacité applicative.
 - When l'utilisateur déclenche cette capacité depuis l'UI.
-- Then l'UI passe exclusivement par un contrat public de `orchestrator-api` et, si ce contrat est absent ou indisponible, affiche un blocage explicite sans mock, stub, fake, réponse synthétique ni fallback.
+- Then l'UI passe exclusivement par un contrat public de `orchestrator-api` câblé au cas d'usage réel et, si ce contrat est absent, non câblé ou indisponible, affiche un blocage explicite sans mock, stub, fake, réponse synthétique ni fallback.
 
 ## Décision
 
@@ -25,7 +25,7 @@ L'API `orchestrator-api` est la frontière HTTP publique du système local. Les 
 - L'UI **NE DOIT PAS** appeler directement un handler applicatif, un repository, un stockage, un système de fichiers métier, une file de jobs, un worker, Spark, Qdrant ni un service interne de bounded context.
 - L'UI **NE DOIT PAS** implémenter, reproduire, simuler ou mémoriser une capacité métier absente de `orchestrator-api` au moyen d'un mock, stub, fake, état en mémoire, réponse statique ou donnée synthétique dans son chemin d'exécution.
 - Les mocks, stubs et fakes **PEUVENT** être utilisés uniquement dans des tests automatisés isolés; ils **NE DOIVENT PAS** constituer une preuve de chemin applicatif réel ni être activables dans le runtime UI.
-- Lorsqu'un contrat requis est absent, indisponible ou retourne une erreur publique, l'UI **DOIT** présenter cette indisponibilité explicitement et l'action concernée **DOIT** rester non opérationnelle. Aucun accès direct ni comportement alternatif ne peut remplacer le contrat manquant.
+- Si le contrat API requis est absent ou n'est pas câblé au cas d'usage réel, la fonction UI correspondante **DOIT** rester explicitement non opérationnelle. Il en va de même lorsque le contrat est indisponible ou retourne une erreur publique. Aucun accès direct ni comportement alternatif ne peut remplacer le contrat manquant ou non câblé.
 - `orchestrator-api` **DOIT** déléguer aux adaptateurs et services applicatifs propriétaires. Elle **NE DOIT PAS** centraliser les règles métier des bounded contexts dans son routeur HTTP.
 
 ## Options considérées
@@ -46,7 +46,7 @@ L'API `orchestrator-api` est la frontière HTTP publique du système local. Les 
 
 ### Négatives ou coûts
 
-- Une fonction UI reste bloquée tant que son contrat de commande et son read-model ne sont pas exposés par `orchestrator-api`.
+- Une fonction UI reste bloquée tant que son contrat de commande et son read-model ne sont pas exposés par `orchestrator-api` et câblés aux cas d'usage réels.
 - L'API doit fournir les lectures bornées nécessaires à l'UI, même lorsque les commandes métier existent déjà.
 - Le runtime UI actuel doit être corrigé lorsqu'il lit le corpus directement ou conserve un état documentaire local.
 
@@ -60,7 +60,7 @@ L'API `orchestrator-api` est la frontière HTTP publique du système local. Les 
 
 - Modules concernés: `app/platform/ui_corpus.py`, client API de l'UI, composition de `orchestrator-api`, adaptateurs HTTP et read-models des bounded contexts.
 - Configuration concernée: URL publique locale de `orchestrator-api`; aucun backend UI alternatif.
-- Tests attendus: tests de gouvernance de la Definition of Done, tests d'acceptation prouvant le chemin UI vers `orchestrator-api`, tests d'erreur quand un contrat est absent.
+- Tests attendus: tests de gouvernance de la Definition of Done, tests d'acceptation prouvant le chemin UI vers `orchestrator-api`, tests d'erreur quand un contrat est absent ou non câblé.
 - Milestones concernées: UI locale et toute évolution future d'une surface utilisateur.
 
 ## Liens de traçabilité

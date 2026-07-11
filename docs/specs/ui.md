@@ -29,7 +29,7 @@ La cible ergonomique est un outil de travail sobre, pas une landing page. Le pre
 
 Toute commande, lecture ou récupération de contenu métier initiée par l'UI passe exclusivement par un contrat public de `orchestrator-api`. L'UI reste un adaptateur de présentation et ne devient ni une façade métier concurrente, ni un client direct des composants internes.
 
-Si une capacité nécessaire n'existe pas dans `orchestrator-api`, la fonction UI correspondante est non opérationnelle et l'indisponibilité est affichée explicitement. L'UI ne doit ni mocker, ni stuber, ni faker, ni simuler cette capacité; elle ne doit pas produire une réponse synthétique, conserver un état métier substitutif ou déclencher un fallback vers un fichier, un repository, une file de jobs, un worker ou un service interne.
+Si le contrat API requis est absent ou n'est pas câblé au cas d'usage réel, la fonction UI correspondante reste explicitement non opérationnelle. Il en va de même si le contrat est indisponible. L'UI ne doit ni mocker, ni stuber, ni faker, ni simuler cette capacité; elle ne doit pas produire une réponse synthétique, conserver un état métier substitutif ou déclencher un fallback vers un fichier, un repository, une file de jobs, un worker ou un service interne.
 
 Les doubles de test restent autorisés uniquement dans des tests automatisés isolés. Ils ne constituent jamais une preuve que le chemin UI réel est raccordé à l'application.
 
@@ -37,7 +37,7 @@ Scénario BDD de frontière:
 
 - Given une action de l'UI dépend d'une capacité applicative.
 - When l'utilisateur déclenche cette action.
-- Then l'UI appelle le contrat public correspondant de `orchestrator-api` et présente sa réponse réelle; si le contrat est absent ou indisponible, elle affiche un blocage explicite sans comportement de substitution.
+- Then l'UI appelle le contrat public correspondant de `orchestrator-api` câblé au cas d'usage réel et présente sa réponse réelle; si le contrat est absent, non câblé ou indisponible, elle affiche un blocage explicite sans comportement de substitution.
 
 ## Principe de surface minimale
 
@@ -290,7 +290,7 @@ Si ces lectures n'existent pas encore, l'UI doit être considérée non impléme
 | UI-012 - Conversion canonique inspectable | Les sorties canoniques critiques sont visibles avant usage RA. | Given une conversion est acceptée; When l'utilisateur ouvre la version canonique; Then QA pré/post, `TextAuthorityManifest`, pages rejetées, hash et aperçu borné original/canonique sont affichés. |
 | UI-013 - Projection inspectable | Une projection `SEARCHABLE` expose assez d'éléments pour juger sa construction. | Given l'indexation est terminée; When l'utilisateur ouvre la projection; Then profil, `chunk_count`, fraîcheur, échantillons de chunks et SourceLocator sont affichés. |
 | UI-014 - Contrôle de recherche non factuel | Le contrôle de recherche ne remplace pas RA et ne contourne pas les contextes autorisés. | Given une trace de contrôle KA est disponible; When les résultats s'affichent; Then l'UI les marque comme preuves candidates non vérifiées et conserve `search_trace_id`. |
-| UI-015 - Frontière API orchestratrice obligatoire | Toute capacité UI passe par `orchestrator-api`; une capacité absente reste explicitement indisponible sans mock, stub, fake ni fallback. | Given une action UI dépend d'un contrat applicatif; When ce contrat est absent ou indisponible; Then l'UI affiche le blocage et n'exécute aucun comportement de substitution. |
+| UI-015 - Frontière API orchestratrice obligatoire | Toute capacité UI passe par un contrat `orchestrator-api` câblé au cas d'usage réel; un contrat absent, non câblé ou indisponible laisse la fonction UI explicitement non opérationnelle sans mock, stub, fake ni fallback. | Given une action UI dépend d'un contrat applicatif; When ce contrat est absent, non câblé ou indisponible; Then l'UI affiche le blocage et n'exécute aucun comportement de substitution. |
 
 ## Exclusions
 

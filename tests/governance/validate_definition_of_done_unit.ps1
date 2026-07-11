@@ -46,7 +46,7 @@ Cette d$($eAcute)finition s'applique $($aGrave) chaque t$($aCircumflex)che de mi
 | $traceabilityGate | Ligne de matrice specs-tests-code-ADR mise $($aGrave) jour. | Refuser la cl$($oCircumflex)ture si la matrice est incoh$($eAcute)rente. |
 | Tests | Commandes de tests cibl$($eAcute)es puis pertinentes ex$($eAcute)cut$($eAcute)es. | Refuser la cl$($oCircumflex)ture si un test $($eAcute)choue ou est ignor$($eAcute). |
 | Lint | Commandes de lint ou validation statique ex$($eAcute)cut$($eAcute)es. | Refuser la cl$($oCircumflex)ture si un lint configur$($eAcute) $($eAcute)choue ou manque sans blocage trac$($eAcute). |
-| Fronti$($eGrave)re UI/API | Preuve que toute capacit$($eAcute) UI passe par orchestrator-api. | Refuser la cl$($oCircumflex)ture si l'UI mocke, stube, fake ou remplace un contrat absent par un fallback. |
+| Fronti$($eGrave)re UI/API | Preuve que toute capacit$($eAcute) UI passe par orchestrator-api. | Refuser la cl$($oCircumflex)ture si le contrat est absent ou non c$($aCircumflex)bl$($eAcute) au cas d'usage r$($eAcute)el, ou si l'UI le remplace par un mock, stub, fake ou fallback. |
 
 ## $proofHeading
 
