@@ -102,14 +102,38 @@ unsafe_document = CorpusPdfDocument(
     projection_status="SEARCHABLE",
     selected=True,
 )
+diagnostic_ready_document = CorpusPdfDocument(
+    document_id="DOC-M013-UI-0002",
+    title="Document à diagnostiquer",
+    source_status="SOURCE_REGISTERED",
+    diagnostic_status="DIAGNOSTIC_NOT_REQUESTED",
+    conversion_status="CONVERSION_NOT_REQUESTED",
+    canonical_version_id=None,
+    projection_status="PROJECTION_NOT_REQUESTED",
+    selected=False,
+)
+manual_review_document = CorpusPdfDocument(
+    document_id="DOC-M013-UI-0003",
+    title="Document en revue",
+    source_status="SOURCE_REGISTERED",
+    diagnostic_status="MANUAL_REVIEW",
+    conversion_status="SOURCE_NOT_ROUTED",
+    canonical_version_id=None,
+    projection_status="PROJECTION_NOT_REQUESTED",
+    selected=False,
+)
 state = CorpusPdfScreenState(
-    documents=(unsafe_document,),
+    documents=(unsafe_document, diagnostic_ready_document, manual_review_document),
     active_selected_document_ids=("DOC-M013-UI-0001",),
     read_model_status="READ_MODEL_READY",
 )
 html = render_corpus_pdf_screen(state)
 assert_contains(html, "&lt;script&gt;", "Le titre documentaire doit être échappé.")
 assert_not_contains(html, "<script>alert", "Le HTML ne doit pas injecter le titre brut.")
+assert_contains(html, 'action="/v1/documents/DOC-M013-UI-0002/diagnose"', "Le diagnostic non demandé doit rendre la commande publique.")
+assert_contains(html, ">Diagnostiquer</button>", "Le bouton de diagnostic doit être libellé explicitement.")
+assert_not_contains(html, 'action="/v1/documents/DOC-M013-UI-0001/diagnose"', "Un diagnostic déjà demandé ne doit pas rendre la commande.")
+assert_not_contains(html, 'action="/v1/documents/DOC-M013-UI-0003/diagnose"', "Une revue manuelle ne doit pas rendre la commande de diagnostic.")
 assert_contains(html, 'data-action="retirer_selection_active"', "L'action de retrait doit être non destructive.")
 assert_not_contains(html.lower(), "delete", "Aucun contrôle delete ne doit être rendu.")
 assert_not_contains(html.lower(), "supprimer", "Aucun contrôle supprimer ne doit être rendu.")
