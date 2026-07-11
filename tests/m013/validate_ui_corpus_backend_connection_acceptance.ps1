@@ -10,7 +10,6 @@ $OutputEncoding = $utf8NoBom
 $pythonCode = @'
 from __future__ import annotations
 
-from hashlib import sha256
 from pathlib import Path
 import sys
 import tempfile
@@ -19,13 +18,15 @@ repo_root = sys.argv[1]
 if repo_root not in sys.path:
     sys.path.insert(0, repo_root)
 
-from app.platform.ui_corpus import (  # noqa: E402
-    build_corpus_pdf_state_from_corpus_root,
-    ui_get_pdf_content_response,
-    ui_get_response,
-)
 from app.platform.configuration import load_application_configuration  # noqa: E402
-from app.platform.local_runtime import _local_post_response  # noqa: E402
+from app.platform.local_runtime import (  # noqa: E402
+    _build_ui_corpus_state,
+    _local_post_response,
+)
+from app.platform.ui_corpus import (  # noqa: E402
+    ui_get_response,
+    ui_unavailable_pdf_content_response,
+)
 
 
 def assert_equal(actual: object, expected: object, message: str) -> None:
@@ -46,10 +47,9 @@ def assert_not_contains(text: str, forbidden: str, message: str) -> None:
 def runtime_configuration_for(corpus_root: Path):
     template_path = Path(repo_root) / "config" / "application.yaml"
     config_text = template_path.read_text(encoding="utf-8")
-    corpus_root_text = corpus_root.as_posix()
     config_text = config_text.replace(
         "  corpus_root: data/corpus",
-        f'  corpus_root: "{corpus_root_text}"',
+        f'  corpus_root: "{corpus_root.as_posix()}"',
     )
     config_path = corpus_root.parent / "application.yaml"
     config_path.write_text(config_text, encoding="utf-8")
@@ -59,83 +59,61 @@ def runtime_configuration_for(corpus_root: Path):
 with tempfile.TemporaryDirectory() as temporary_root:
     corpus_root = Path(temporary_root) / "corpus"
     corpus_root.mkdir()
-    pdf_content = b"%PDF-1.7\nbackend fixture\n%%EOF\n"
-    pdf_path = corpus_root / "Alpha Strategy.pdf"
-    pdf_path.write_bytes(pdf_content)
-    (corpus_root / "notes.txt").write_text("hors corpus", encoding="utf-8")
+    (corpus_root / "Ne doit pas être lu.pdf").write_bytes(b"%PDF-1.7\ninterdit\n%%EOF\n")
+    configuration = runtime_configuration_for(corpus_root)
 
-    expected_document_id = "DOC-" + sha256(pdf_content).hexdigest()[:16].upper()
+    # Given un PDF existe dans le stockage configuré mais GET /v1/documents n'est pas câblé.
+    # When le runtime UI construit son écran.
+    # Then il n'accède pas au corpus et laisse la fonction explicitement non opérationnelle.
+    state = _build_ui_corpus_state(application_configuration=configuration)
+    assert_equal(state.read_model_status, "READ_MODEL_NOT_CONNECTED", "Le runtime doit refléter le contrat API absent.")
+    assert_equal(state.documents, (), "Le PDF local ne doit pas contourner l'API orchestratrice.")
 
-    # Given le backend local possede un corpus PDF configure.
-    # When l'UI construit son read-model depuis ce corpus.
-    # Then le premier ecran affiche le PDF reel sans exposer le chemin de stockage.
-    state = build_corpus_pdf_state_from_corpus_root(corpus_root=corpus_root)
-    assert_equal(state.read_model_status, "READ_MODEL_READY", "Le read-model corpus doit etre branche.")
-    assert_equal(len(state.documents), 1, "Seuls les fichiers PDF du corpus doivent etre affiches.")
-    assert_equal(state.documents[0].document_id, expected_document_id, "Le document_id doit venir du contenu PDF.")
-    assert_equal(state.documents[0].projection_status, "PROJECTION_NOT_REQUESTED", "Un PDF brut ne doit pas devenir SEARCHABLE.")
-    assert_equal(state.documents[0].selected, False, "Un PDF non indexe ne doit pas etre selectionne.")
+    screen_status, screen_type, screen_body = ui_get_response(path="/ui/corpus-pdf", state=state)
+    assert_equal(screen_status, 200, "L'écran bloqué doit rester consultable.")
+    assert_equal(screen_type, "text/html; charset=utf-8", "L'écran doit rester HTML.")
+    assert_contains(screen_body, "ORCHESTRATOR_API_CONTRACT_NOT_WIRED", "Le défaut de câblage doit être public.")
+    assert_not_contains(screen_body, "Ne doit pas être lu", "Le stockage direct ne doit pas fuiter dans l'UI.")
 
-    status_code, content_type, body = ui_get_response(path="/", state=state)
-    assert_equal(status_code, 200, "L'ecran corpus doit etre servi.")
-    assert_equal(content_type, "text/html; charset=utf-8", "L'ecran corpus doit rester HTML.")
-    assert_contains(body, "Alpha Strategy", "Le PDF du corpus doit apparaitre dans l'UI.")
-    assert_contains(body, expected_document_id, "L'identite publique doit etre visible.")
-    assert_contains(body, "SOURCE_REGISTERED", "Le statut source issu du corpus doit etre visible.")
-    assert_contains(body, "PROJECTION_NOT_REQUESTED", "Le statut projection non interrogeable doit etre visible.")
-    assert_contains(body, 'data-selectable="false"', "Le PDF brut ne doit pas etre selectionnable.")
-    assert_not_contains(body, str(corpus_root), "Le chemin interne du corpus ne doit pas fuiter.")
-    assert_not_contains(body, "original_storage_ref", "La reference de stockage SP ne doit pas fuiter.")
-    assert_not_contains(body.lower(), "qdrant", "Le stockage KA ne doit pas fuiter.")
-
-    viewer_status, viewer_content_type, viewer_body = ui_get_response(
-        path=f"/ui/documents/{expected_document_id}/pdf",
-        state=state,
-    )
-    assert_equal(viewer_status, 200, "Le visualiseur public doit etre servi.")
-    assert_equal(viewer_content_type, "text/html; charset=utf-8", "Le visualiseur doit etre HTML.")
-    assert_contains(viewer_body, f"/ui/documents/{expected_document_id}/pdf/content", "Le visualiseur doit pointer vers le contenu controle.")
-    assert_not_contains(viewer_body, str(corpus_root), "Le visualiseur ne doit pas divulguer le chemin local.")
-
-    content_status, content_type, response_body = ui_get_pdf_content_response(
-        path=f"/ui/documents/{expected_document_id}/pdf/content",
-        corpus_root=corpus_root,
-    )
-    assert_equal(content_status, 200, "Le contenu PDF doit etre servi depuis le backend local.")
-    assert_equal(content_type, "application/pdf", "Le contenu original doit garder son type PDF.")
-    assert_equal(response_body, pdf_content, "Le contenu servi doit etre le PDF original.")
-
-    # Given l'utilisateur clique sur Diagnostiquer depuis l'UI locale.
-    # When le formulaire POST /v1/documents/{document_id}/diagnose arrive sur le service ui.
-    # Then le runtime local reconnait la commande documentaire et publie un statut public explicite.
-    runtime_configuration = runtime_configuration_for(corpus_root)
-    diagnosis_status, diagnosis_body = _local_post_response(
-        service_id="ui",
-        path=f"/v1/documents/{expected_document_id}/diagnose",
+    diagnosis_path = "/v1/documents/DOC-FFFFFFFFFFFFFFFF/diagnose"
+    api_status, api_body = _local_post_response(
+        service_id="orchestrator-api",
+        path=diagnosis_path,
         body={},
-        application_configuration=runtime_configuration,
+        application_configuration=configuration,
     )
-    assert_equal(diagnosis_status, 202, "Le clic Diagnostiquer ne doit pas retourner ENDPOINT_NOT_FOUND.")
-    assert_equal(
-        diagnosis_body,
-        {"document_id": expected_document_id, "diagnostic_status": "DIAGNOSTIC_REQUESTED"},
-        "La reponse diagnostic doit rester minimale et publique.",
-    )
+    assert_equal(api_status, 404, "Le contrat documentaire est réellement absent de l'API actuelle.")
+    assert_equal(api_body["error_code"], "ENDPOINT_NOT_FOUND", "L'API doit prouver l'absence du contrat.")
 
-    repeated_status, repeated_body = _local_post_response(
+    ui_status, ui_body = _local_post_response(
         service_id="ui",
-        path=f"/v1/documents/{expected_document_id}/diagnose",
+        path=diagnosis_path,
         body={},
-        application_configuration=runtime_configuration,
+        application_configuration=configuration,
     )
-    assert_equal(repeated_status, 409, "Un second clic ne doit pas relancer silencieusement le diagnostic.")
-    assert_equal(
-        repeated_body,
-        {"error_code": "DIAGNOSTIC_ALREADY_REQUESTED", "document_id": expected_document_id},
-        "La repetition doit produire une erreur publique stable.",
-    )
+    assert_equal(ui_status, 503, "L'UI ne doit pas simuler le diagnostic absent.")
+    assert_equal(ui_body["error_code"], "UI_FUNCTION_NOT_OPERATIONAL", "Le blocage UI doit être stable.")
+    assert_equal(ui_body["reason"], "ORCHESTRATOR_API_CONTRACT_NOT_WIRED", "Le défaut de câblage doit être nommé.")
+    assert_not_contains(str(ui_body), "DIAGNOSTIC_REQUESTED", "Aucun état diagnostic ne doit être fabriqué.")
 
-print("Test d'acceptation connexion backend UI corpus PDF: OK")
+    content_status, _, content_body = ui_unavailable_pdf_content_response(
+        path="/ui/documents/DOC-FFFFFFFFFFFFFFFF/pdf/content",
+    )
+    assert_equal(content_status, 503, "Le PDF ne doit pas être servi depuis le stockage UI.")
+    assert_not_contains(content_body.decode("utf-8"), str(corpus_root), "Le chemin local ne doit pas être exposé.")
+
+runtime_source = (Path(repo_root) / "app" / "platform" / "local_runtime.py").read_text(encoding="utf-8")
+ui_source = (Path(repo_root) / "app" / "platform" / "ui_corpus.py").read_text(encoding="utf-8")
+for forbidden in (
+    "_UI_DIAGNOSTIC_REQUESTED_DOCUMENT_IDS",
+    "ui_request_diagnostic_response",
+    "apply_diagnostic_requests_to_corpus_state",
+):
+    assert_not_contains(runtime_source, forbidden, "Le runtime UI ne doit conserver aucun état métier substitutif.")
+for forbidden in (".iterdir()", ".read_bytes()", "hashlib.sha256"):
+    assert_not_contains(ui_source, forbidden, "L'adaptateur UI ne doit pas lire ni identifier directement les PDF.")
+
+print("Test d'acceptation frontière UI vers API orchestratrice: OK")
 '@
 
 $pythonScriptPath = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m013_ui_backend_acceptance_" + [System.Guid]::NewGuid().ToString("N") + ".py")
@@ -153,7 +131,7 @@ try {
     }
 
     if ($exitCode -ne 0) {
-        throw "Test d'acceptation connexion backend UI corpus PDF invalide. Sortie: $($output -join "`n")"
+        throw "Test d'acceptation frontière UI vers API orchestratrice invalide. Sortie: $($output -join "`n")"
     }
     Write-Host ($output -join "`n")
 }
