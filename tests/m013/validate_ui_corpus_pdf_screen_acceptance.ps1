@@ -60,8 +60,18 @@ blocked_document = CorpusPdfDocument(
     projection_status="PROJECTION_NOT_FOUND",
     selected=False,
 )
+diagnostic_ready_document = CorpusPdfDocument(
+    document_id="DOC-M013-UI-0003",
+    title="Document à diagnostiquer",
+    source_status="SOURCE_REGISTERED",
+    diagnostic_status="DIAGNOSTIC_NOT_REQUESTED",
+    conversion_status="CONVERSION_NOT_REQUESTED",
+    canonical_version_id=None,
+    projection_status="PROJECTION_NOT_REQUESTED",
+    selected=False,
+)
 state = CorpusPdfScreenState(
-    documents=(searchable_document, blocked_document),
+    documents=(searchable_document, blocked_document, diagnostic_ready_document),
     active_selected_document_ids=("DOC-M013-UI-0001",),
     read_model_status="READ_MODEL_READY",
 )
@@ -76,9 +86,14 @@ assert_equal(content_type, "text/html; charset=utf-8", "Le premier écran doit �
 assert_contains(body, "Corpus PDF", "Le titre de l'écran corpus doit être visible.")
 assert_contains(body, "Rapport annuel 2024", "Le PDF interrogeable doit être listé.")
 assert_contains(body, "Document en quarantaine", "Le PDF bloqué doit rester visible.")
+assert_contains(body, "Document à diagnostiquer", "Le PDF prêt au diagnostic doit rester visible.")
 assert_contains(body, "SOURCE_QUARANTINED", "Le statut bloquant ne doit pas être masqué.")
 assert_contains(body, "SEARCHABLE", "Le statut de projection interrogeable doit être visible.")
 assert_contains(body, "POST /v1/documents", "L'ajout doit passer par le contrat public SP.")
+assert_contains(body, 'action="/v1/documents/DOC-M013-UI-0003/diagnose"', "Le diagnostic disponible doit appeler le contrat public SP.")
+assert_contains(body, ">Diagnostiquer</button>", "Le bouton de diagnostic doit être visible quand l'état le permet.")
+assert_not_contains(body, 'action="/v1/documents/DOC-M013-UI-0001/diagnose"', "Un diagnostic déjà demandé ne doit pas réafficher le bouton.")
+assert_not_contains(body, 'action="/v1/documents/DOC-M013-UI-0002/diagnose"', "Un diagnostic en revue manuelle ne doit pas afficher le bouton.")
 assert_contains(body, "Retirer de la sélection active", "L'action non destructive doit remplacer la suppression.")
 assert_contains(body, "/ui/documents/DOC-M013-UI-0001/pdf", "Le visualiseur PDF doit être ouvrable.")
 assert_contains(body, 'data-selectable="false"', "Un document non SEARCHABLE ne doit pas être sélectionnable.")
