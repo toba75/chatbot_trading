@@ -185,6 +185,16 @@ try {
     $missingLintResult = Invoke-Validator -ProjectRoot $missingLintProjectRoot
     Assert-ExitCode -Actual $missingLintResult.ExitCode -Expected 1 -Message "Une clôture sans gate Lint doit être refusée."
 
+    # Given une tâche UI candidate à la clôture.
+    # When la preuve de passage exclusif par orchestrator-api est absente.
+    # Then la clôture est refusée sans mock, stub, fake ni fallback de substitution.
+    $missingUiApiBoundaryProjectRoot = New-TemporaryProject -Name "missing-ui-api-boundary"
+    Remove-GateRow `
+        -Path (Join-Path $missingUiApiBoundaryProjectRoot "docs/governance/definition_of_done.md") `
+        -Gate "Frontière UI/API"
+    $missingUiApiBoundaryResult = Invoke-Validator -ProjectRoot $missingUiApiBoundaryProjectRoot
+    Assert-ExitCode -Actual $missingUiApiBoundaryResult.ExitCode -Expected 1 -Message "Une clôture sans gate Frontière UI/API doit être refusée."
+
     $emptyAdrProofProjectRoot = New-TemporaryProject -Name "empty-adr-proof"
     Set-GateCell `
         -Path (Join-Path $emptyAdrProofProjectRoot "docs/governance/definition_of_done.md") `

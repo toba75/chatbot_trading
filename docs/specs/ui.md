@@ -5,8 +5,8 @@
 - Objet: spécification produit transverse pour l'interface locale minimale du chatbot.
 - Portée: ingestion d'un PDF local, préparation documentaire, indexation, conversation et ouverture des preuves.
 - Sources normatives: `docs/specs/m003_source_enregistree_diagnostiquee_routee.md`, `docs/specs/m004_version_canonique_publiee.md`, `docs/specs/m005_projection_connaissance_recherchable.md`, `docs/specs/m007_reponse_documentaire_verifiee.md`, `docs/specs/m008_conversation_produit.md`, `docs/specs/m013_durcissement_acceptation_v1.md`, `docs/user/v1_guide_utilisateur.md`, `docs/runbooks/ingestion_pdf.md` et `docs/runbooks/conversation_v1.md`.
-- ADR consultées: ADR-001, ADR-002, ADR-003, ADR-004, ADR-005, ADR-006, ADR-008, ADR-009, ADR-010, DDD-ADR-003, DDD-ADR-004, DDD-ADR-005, DDD-ADR-007 et DDD-ADR-008.
-- ADR: non requise, car cette spécification applique les contrats existants sans créer de nouvelle topologie, sans stockage métier UI et sans accès direct au Spark, à Qdrant, à SP, KA, EG ou RA internes.
+- ADR consultées: ADR-001, ADR-002, ADR-003, ADR-004, ADR-005, ADR-006, ADR-008, ADR-009, ADR-010, ADR-018, DDD-ADR-003, DDD-ADR-004, DDD-ADR-005, DDD-ADR-007 et DDD-ADR-008.
+- ADR applicable: ADR-018 impose que l'UI utilise exclusivement les contrats publics de `orchestrator-api`, sans accès métier direct, simulation de capacité absente ni fallback.
 - Nature du changement: conception documentaire. Ce fichier ne livre aucune implémentation `app/...`.
 
 ## Scénario BDD principal
@@ -24,6 +24,20 @@ L'UI n'est pas un nouveau bounded context métier. Elle est un client local des 
 L'UI doit permettre à l'utilisateur de juger visuellement les sorties du pipeline avant d'utiliser le document dans une conversation. Cette visualisation n'ajoute pas un statut métier `APPROUVE_PAR_UTILISATEUR`, ne demande pas une validation explicite à chaque étape et ne bloque pas une étape non ambiguë dans l'attente d'un accord humain.
 
 La cible ergonomique est un outil de travail sobre, pas une landing page. Le premier écran est l'espace opérationnel: état local, corpus, conversation et preuves.
+
+## Frontière UI/API orchestratrice obligatoire
+
+Toute commande, lecture ou récupération de contenu métier initiée par l'UI passe exclusivement par un contrat public de `orchestrator-api`. L'UI reste un adaptateur de présentation et ne devient ni une façade métier concurrente, ni un client direct des composants internes.
+
+Si une capacité nécessaire n'existe pas dans `orchestrator-api`, la fonction UI correspondante est non opérationnelle et l'indisponibilité est affichée explicitement. L'UI ne doit ni mocker, ni stuber, ni faker, ni simuler cette capacité; elle ne doit pas produire une réponse synthétique, conserver un état métier substitutif ou déclencher un fallback vers un fichier, un repository, une file de jobs, un worker ou un service interne.
+
+Les doubles de test restent autorisés uniquement dans des tests automatisés isolés. Ils ne constituent jamais une preuve que le chemin UI réel est raccordé à l'application.
+
+Scénario BDD de frontière:
+
+- Given une action de l'UI dépend d'une capacité applicative.
+- When l'utilisateur déclenche cette action.
+- Then l'UI appelle le contrat public correspondant de `orchestrator-api` et présente sa réponse réelle; si le contrat est absent ou indisponible, elle affiche un blocage explicite sans comportement de substitution.
 
 ## Principe de surface minimale
 
@@ -276,6 +290,7 @@ Si ces lectures n'existent pas encore, l'UI doit être considérée non impléme
 | UI-012 - Conversion canonique inspectable | Les sorties canoniques critiques sont visibles avant usage RA. | Given une conversion est acceptée; When l'utilisateur ouvre la version canonique; Then QA pré/post, `TextAuthorityManifest`, pages rejetées, hash et aperçu borné original/canonique sont affichés. |
 | UI-013 - Projection inspectable | Une projection `SEARCHABLE` expose assez d'éléments pour juger sa construction. | Given l'indexation est terminée; When l'utilisateur ouvre la projection; Then profil, `chunk_count`, fraîcheur, échantillons de chunks et SourceLocator sont affichés. |
 | UI-014 - Contrôle de recherche non factuel | Le contrôle de recherche ne remplace pas RA et ne contourne pas les contextes autorisés. | Given une trace de contrôle KA est disponible; When les résultats s'affichent; Then l'UI les marque comme preuves candidates non vérifiées et conserve `search_trace_id`. |
+| UI-015 - Frontière API orchestratrice obligatoire | Toute capacité UI passe par `orchestrator-api`; une capacité absente reste explicitement indisponible sans mock, stub, fake ni fallback. | Given une action UI dépend d'un contrat applicatif; When ce contrat est absent ou indisponible; Then l'UI affiche le blocage et n'exécute aucun comportement de substitution. |
 
 ## Exclusions
 
