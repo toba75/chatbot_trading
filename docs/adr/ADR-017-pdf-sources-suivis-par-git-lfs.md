@@ -1,6 +1,6 @@
 # ADR-017 - PDF sources suivis par Git LFS
 
-**Statut :** Proposée
+**Statut :** Acceptée
 **Date :** 2026-07-11
 **Décideurs :** Propriétaire du projet
 **Remplace :** Aucun
