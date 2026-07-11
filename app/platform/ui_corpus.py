@@ -296,7 +296,8 @@ def render_corpus_pdf_screen(state: CorpusPdfScreenState) -> str:
             "    table { border-collapse: collapse; width: 100%; margin-top: 16px; }",
             "    th, td { border: 1px solid #ccd3dc; padding: 8px; text-align: left; }",
             "    th { background: #eef2f6; }",
-            "    form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 16px 0; }",
+            "    .document-registration-form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 16px 0; }",
+            "    .row-action-form { display: inline-block; margin: 6px 0 0; }",
             "    label { display: grid; gap: 4px; font-size: 14px; }",
             "    button, a.button { border: 1px solid #465a69; background: #f7f9fb; padding: 6px 10px; color: #1f2933; text-decoration: none; }",
             "    .empty-state { color: #52616f; }",
@@ -311,7 +312,7 @@ def render_corpus_pdf_screen(state: CorpusPdfScreenState) -> str:
             '    <section aria-labelledby="ajout-pdf">',
             '      <h2 id="ajout-pdf">Ajouter un PDF</h2>',
             '      <p>Contrat appelé: <code>POST /v1/documents</code></p>',
-            '      <form method="post" action="/v1/documents" enctype="multipart/form-data">',
+            '      <form class="document-registration-form" method="post" action="/v1/documents" enctype="multipart/form-data">',
             '        <label>Fichier PDF original<input name="original_content" type="file" accept="application/pdf" required></label>',
             '        <label>Titre documentaire<input name="title" type="text" required></label>',
             '        <label>Émetteur ou origine<input name="issuer" type="text" required></label>',
@@ -439,7 +440,7 @@ def _render_document_row(document: CorpusPdfDocument) -> str:
             "</span></td><td>",
             _escape(document.source_status),
             "</td><td>",
-            _escape(document.diagnostic_status),
+            _render_diagnostic_cell(document),
             "</td><td>",
             _escape(document.conversion_status),
             "</td><td>",
@@ -451,6 +452,24 @@ def _render_document_row(document: CorpusPdfDocument) -> str:
             '">Retirer de la sélection active</button></td><td><a class="button" href="/ui/documents/',
             _escape(document.document_id),
             '/pdf">Ouvrir le PDF</a></td></tr>',
+        )
+    )
+
+
+def _render_diagnostic_cell(document: CorpusPdfDocument) -> str:
+    parsed_document = _ensure_document(document)
+    diagnostic_status = _escape(parsed_document.diagnostic_status)
+    if parsed_document.diagnostic_status != "DIAGNOSTIC_NOT_REQUESTED":
+        return diagnostic_status
+    escaped_document_id = _escape(parsed_document.document_id)
+    return "".join(
+        (
+            diagnostic_status,
+            '<form class="row-action-form" method="post" action="/v1/documents/',
+            escaped_document_id,
+            '/diagnose">',
+            '<button type="submit">Diagnostiquer</button>',
+            "</form>",
         )
     )
 
