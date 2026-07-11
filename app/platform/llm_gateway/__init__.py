@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import ipaddress
 import json
 import ssl
 import time
@@ -22,7 +21,7 @@ from app.platform.observability import GatewayObservation, InMemoryObservability
 GATEWAY_CLIENT_ID = "llm-gateway"
 SECRET_MASK = "<secret-masked>"
 _FORBIDDEN_SAMPLING_KEYS = frozenset({"model", "messages", "response_format"})
-_ALLOWED_SPARK_HOSTS = frozenset({"spark-inference", "spark-inference.test", "192.168.1.120"})
+_DEFAULT_SPARK_HOSTS = frozenset({"spark-inference", "spark-inference.test"})
 _SPARK_API_PATH = "/v1"
 _AUTH_MODE_NONE = "none"
 _AUTH_MODE_API_KEY_FILE = "api_key_file"
@@ -268,17 +267,20 @@ class GatewayConfiguration:
     served_model: str
     model_revision: str
     runtime_version: str
+    configuration_hash: str
     auth_mode: str
     api_key: str | None
     tls_mode: str
     tls_ca_bundle_path: str | None
     timeout_seconds: int
+    allowed_spark_hosts: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         _require_text(self.base_url, "base_url", "LLM_GATEWAY_BASE_URL_REQUIRED")
         _require_text(self.served_model, "served_model", "LLM_GATEWAY_MODEL_REQUIRED")
         _require_text(self.model_revision, "model_revision", "LLM_GATEWAY_MODEL_REVISION_REQUIRED")
         _require_text(self.runtime_version, "runtime_version", "LLM_GATEWAY_RUNTIME_VERSION_REQUIRED")
+        _require_sha256_hex(self.configuration_hash, "configuration_hash", "LLM_GATEWAY_CONFIGURATION_HASH_REQUIRED")
         _require_text(self.auth_mode, "auth_mode", "LLM_GATEWAY_AUTH_MODE_REQUIRED")
         _require_text(self.tls_mode, "tls_mode", "LLM_GATEWAY_TLS_MODE_REQUIRED")
 
@@ -306,6 +308,7 @@ class GatewayConfiguration:
             )
         if self.tls_mode == _TLS_MODE_CA_BUNDLE:
             _require_text(self.tls_ca_bundle_path, "tls_ca_bundle_path", "LLM_GATEWAY_TLS_CA_REQUIRED")
+        _require_allowed_spark_hosts(self.allowed_spark_hosts)
 
         parsed_base_url = urlparse(self.base_url)
         if parsed_base_url.scheme not in {"http", "https"} or parsed_base_url.netloc == "":
@@ -333,10 +336,10 @@ class GatewayConfiguration:
                 "LLM_GATEWAY_SPARK_ENDPOINT_REQUIRED",
                 "Le gateway LLM doit cibler le chemin Spark /v1.",
             )
-        if not _is_allowed_spark_host(parsed_base_url.hostname):
+        if not _is_allowed_spark_host(parsed_base_url.hostname, self.allowed_spark_hosts):
             raise LLMGatewayContractError(
                 "LLM_GATEWAY_SPARK_ENDPOINT_REQUIRED",
-                "Le gateway LLM doit cibler explicitement spark-inference ou une adresse privée Spark.",
+                "Le gateway LLM doit cibler explicitement un hôte Spark déclaré.",
             )
         try:
             parsed_port = parsed_base_url.port
@@ -363,27 +366,41 @@ class GatewayConfiguration:
             "served_model": self.served_model,
             "model_revision": self.model_revision,
             "runtime_version": self.runtime_version,
+            "configuration_hash": self.configuration_hash,
             "auth_mode": self.auth_mode,
             "api_key": SECRET_MASK if self.api_key is not None else None,
             "tls_mode": self.tls_mode,
             "tls_ca_bundle_path": self.tls_ca_bundle_path,
             "timeout_seconds": self.timeout_seconds,
+            "allowed_spark_hosts": self.allowed_spark_hosts,
         }
 
     def __repr__(self) -> str:
         return f"GatewayConfiguration({self.masked_for_logs()!r})"
 
 
-def _is_allowed_spark_host(hostname: str | None) -> bool:
+def _is_allowed_spark_host(hostname: str | None, allowed_spark_hosts: tuple[str, ...]) -> bool:
     if hostname is None:
         return False
-    if hostname in _ALLOWED_SPARK_HOSTS:
+    if hostname in _DEFAULT_SPARK_HOSTS:
         return True
-    try:
-        ipaddress.ip_address(hostname)
-    except ValueError:
-        return False
+    if hostname in allowed_spark_hosts:
+        return True
     return False
+
+
+def _require_allowed_spark_hosts(allowed_spark_hosts: tuple[str, ...]) -> None:
+    if not isinstance(allowed_spark_hosts, tuple):
+        raise LLMGatewayContractError(
+            "LLM_GATEWAY_ALLOWED_SPARK_HOSTS_REQUIRED",
+            "Les hôtes Spark autorisés doivent être un tuple strict.",
+        )
+    for hostname in allowed_spark_hosts:
+        if not isinstance(hostname, str) or hostname.strip() == "" or hostname != hostname.strip():
+            raise LLMGatewayContractError(
+                "LLM_GATEWAY_ALLOWED_SPARK_HOSTS_REQUIRED",
+                "Chaque hôte Spark autorisé doit être une chaîne normalisée.",
+            )
 
 
 @dataclass(frozen=True)
@@ -887,6 +904,7 @@ def _build_gateway_observation(
         trace_id=request.trace_id,
         request_id=request.request_id,
         idempotency_key=request.idempotency_key,
+        configuration_hash=configuration.configuration_hash,
         phase="spark_inference",
         status=status,
         latency_ms=latency_ms,
@@ -1073,6 +1091,14 @@ def _require_text(value: object, field_name: str, code: str) -> None:
         raise LLMGatewayContractError(code, f"Champ requis absent: {field_name}")
     if value != value.strip():
         raise LLMGatewayContractError(code, f"Champ non normalisé: {field_name}")
+
+
+def _require_sha256_hex(value: object, field_name: str, code: str) -> None:
+    _require_text(value, field_name, code)
+    if not isinstance(value, str):
+        raise LLMGatewayContractError(code, f"Hash SHA-256 invalide: {field_name}")
+    if len(value) != 64 or any(character not in "0123456789abcdef" for character in value):
+        raise LLMGatewayContractError(code, f"Hash SHA-256 invalide: {field_name}")
 
 
 def _require_mapping(value: object, field_name: str, code: str) -> None:

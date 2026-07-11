@@ -1,0 +1,736 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ost.local/schema/application.schema.json",
+  "title": "Configuration applicative OSTrading",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "deployment",
+    "services",
+    "models",
+    "paths",
+    "security",
+    "quality_gates",
+    "observability",
+    "runtime"
+  ],
+  "properties": {
+    "deployment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "topology",
+        "hosts",
+        "network",
+        "placement"
+      ],
+      "properties": {
+        "topology": {
+          "enum": [
+            "two_host_local"
+          ]
+        },
+        "hosts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "docker_local",
+            "spark_inference"
+          ],
+          "properties": {
+            "docker_local": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "role",
+                "bind_host",
+                "container_listen_host",
+                "public_access"
+              ],
+              "properties": {
+                "role": {
+                  "enum": [
+                    "application_and_data"
+                  ]
+                },
+                "bind_host": {
+                  "$ref": "#/$defs/nonEmptyNonPlaceholderString"
+                },
+                "container_listen_host": {
+                  "$ref": "#/$defs/nonEmptyNonPlaceholderString"
+                },
+                "public_access": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "spark_inference": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "role",
+                "dns_name",
+                "endpoint_hosts",
+                "allowed_client_cidrs"
+              ],
+              "properties": {
+                "role": {
+                  "enum": [
+                    "gemma_only"
+                  ]
+                },
+                "dns_name": {
+                  "$ref": "#/$defs/nonEmptyNonPlaceholderString"
+                },
+                "endpoint_hosts": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "$ref": "#/$defs/nonEmptyNonPlaceholderString"
+                  }
+                },
+                "allowed_client_cidrs": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "$ref": "#/$defs/nonEmptyNonPlaceholderString"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "network": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "require_tls",
+            "require_api_key",
+            "prefer_mtls"
+          ],
+          "properties": {
+            "require_tls": {
+              "type": "boolean"
+            },
+            "require_api_key": {
+              "type": "boolean"
+            },
+            "prefer_mtls": {
+              "type": "boolean"
+            }
+          }
+        },
+        "placement": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "application",
+            "postgres",
+            "qdrant",
+            "llm_gateway",
+            "gemma_vllm"
+          ],
+          "properties": {
+            "application": {
+              "enum": [
+                "docker_local"
+              ]
+            },
+            "postgres": {
+              "enum": [
+                "docker_local"
+              ]
+            },
+            "qdrant": {
+              "enum": [
+                "docker_local"
+              ]
+            },
+            "llm_gateway": {
+              "enum": [
+                "docker_local"
+              ]
+            },
+            "gemma_vllm": {
+              "enum": [
+                "spark_inference"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "services": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "postgres",
+        "qdrant",
+        "api",
+        "workers",
+        "llm_gateway"
+      ],
+      "properties": {
+        "postgres": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "url",
+            "port"
+          ],
+          "properties": {
+            "url": {
+              "$ref": "#/$defs/nonEmptyNonPlaceholderString"
+            },
+            "port": {
+              "$ref": "#/$defs/tcpPort"
+            }
+          }
+        },
+        "qdrant": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "url",
+            "port"
+          ],
+          "properties": {
+            "url": {
+              "$ref": "#/$defs/nonEmptyNonPlaceholderString"
+            },
+            "port": {
+              "$ref": "#/$defs/tcpPort"
+            }
+          }
+        },
+        "api": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "bind_host",
+            "port"
+          ],
+          "properties": {
+            "bind_host": {
+              "$ref": "#/$defs/nonEmptyNonPlaceholderString"
+            },
+            "port": {
+              "$ref": "#/$defs/tcpPort"
+            }
+          }
+        },
+        "workers": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "queue_name",
+            "concurrency"
+          ],
+          "properties": {
+            "queue_name": {
+              "$ref": "#/$defs/nonEmptyNonPlaceholderString"
+            },
+            "concurrency": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "llm_gateway": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "url",
+            "port",
+            "spark_endpoint_url",
+            "auth_mode",
+            "tls_mode",
+            "timeout_seconds",
+            "retry_before_first_token",
+            "circuit_breaker_failure_threshold",
+            "circuit_breaker_reset_seconds"
+          ],
+          "properties": {
+            "url": {
+              "$ref": "#/$defs/nonEmptyNonPlaceholderString"
+            },
+            "port": {
+              "$ref": "#/$defs/tcpPort"
+            },
+            "spark_endpoint_url": {
+              "$ref": "#/$defs/nonEmptyNonPlaceholderString"
+            },
+            "auth_mode": {
+              "enum": [
+                "none",
+                "api_key_file"
+              ]
+            },
+            "tls_mode": {
+              "enum": [
+                "disabled",
+                "ca_bundle"
+              ]
+            },
+            "timeout_seconds": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "retry_before_first_token": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "circuit_breaker_failure_threshold": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "circuit_breaker_reset_seconds": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        }
+      }
+    },
+    "models": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "llm"
+      ],
+      "properties": {
+        "llm": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "provider",
+            "transport",
+            "reference_model",
+            "served_model_name",
+            "model_revision",
+            "runtime",
+            "runtime_version",
+            "context_length_tokens",
+            "max_output_tokens",
+            "temperature"
+          ],
+          "properties": {
+            "provider": {
+              "enum": [
+                "spark_vllm"
+              ]
+            },
+            "transport": {
+              "enum": [
+                "openai_compatible_http"
+              ]
+            },
+            "reference_model": {
+              "$ref": "#/$defs/nonEmptyNonPlaceholderString"
+            },
+            "served_model_name": {
+              "$ref": "#/$defs/nonEmptyNonPlaceholderString"
+            },
+            "model_revision": {
+              "$ref": "#/$defs/nonEmptyNonPlaceholderString"
+            },
+            "runtime": {
+              "enum": [
+                "vllm"
+              ]
+            },
+            "runtime_version": {
+              "$ref": "#/$defs/nonEmptyNonPlaceholderString"
+            },
+            "context_length_tokens": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_output_tokens": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "temperature": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        }
+      }
+    },
+    "paths": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "data_root",
+        "corpus_root",
+        "canonical_sources_root",
+        "qdrant_storage_root",
+        "postgres_data_root",
+        "reports_root",
+        "logs_root",
+        "experiments_root"
+      ],
+      "properties": {
+        "data_root": {
+          "$ref": "#/$defs/nonEmptyNonPlaceholderString"
+        },
+        "corpus_root": {
+          "$ref": "#/$defs/nonEmptyNonPlaceholderString"
+        },
+        "canonical_sources_root": {
+          "$ref": "#/$defs/nonEmptyNonPlaceholderString"
+        },
+        "qdrant_storage_root": {
+          "$ref": "#/$defs/nonEmptyNonPlaceholderString"
+        },
+        "postgres_data_root": {
+          "$ref": "#/$defs/nonEmptyNonPlaceholderString"
+        },
+        "reports_root": {
+          "$ref": "#/$defs/nonEmptyNonPlaceholderString"
+        },
+        "logs_root": {
+          "$ref": "#/$defs/nonEmptyNonPlaceholderString"
+        },
+        "experiments_root": {
+          "$ref": "#/$defs/nonEmptyNonPlaceholderString"
+        }
+      }
+    },
+    "security": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "network_exposure",
+        "allow_public_bind",
+        "secrets",
+        "audit"
+      ],
+      "properties": {
+        "network_exposure": {
+          "enum": [
+            "loopback_only",
+            "private_lan_explicit"
+          ]
+        },
+        "allow_public_bind": {
+          "type": "boolean"
+        },
+        "secrets": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "postgres_password_path",
+            "llm_gateway_api_key_path",
+            "tls_ca_certificate_path"
+          ],
+          "properties": {
+            "postgres_password_path": {
+              "$ref": "#/$defs/secretPath"
+            },
+            "llm_gateway_api_key_path": {
+              "$ref": "#/$defs/secretPath"
+            },
+            "tls_ca_certificate_path": {
+              "$ref": "#/$defs/secretPath"
+            }
+          }
+        },
+        "audit": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "configuration_hash_required",
+            "log_configuration_changes"
+          ],
+          "properties": {
+            "configuration_hash_required": {
+              "type": "boolean",
+              "const": true
+            },
+            "log_configuration_changes": {
+              "type": "boolean",
+              "const": true
+            }
+          }
+        }
+      }
+    },
+    "quality_gates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "post_conversion",
+        "retrieval",
+        "answering",
+        "llm"
+      ],
+      "properties": {
+        "post_conversion": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "page_count_match",
+            "provenance_coverage_min",
+            "missing_page_max"
+          ],
+          "properties": {
+            "page_count_match": {
+              "enum": [
+                "required"
+              ]
+            },
+            "provenance_coverage_min": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "missing_page_max": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "retrieval": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "citation_required",
+            "min_evidence_candidates"
+          ],
+          "properties": {
+            "citation_required": {
+              "type": "boolean",
+              "const": true
+            },
+            "min_evidence_candidates": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "answering": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "unsupported_claim_policy",
+            "abstention_required_on_insufficient_evidence"
+          ],
+          "properties": {
+            "unsupported_claim_policy": {
+              "enum": [
+                "refuse"
+              ]
+            },
+            "abstention_required_on_insufficient_evidence": {
+              "type": "boolean",
+              "const": true
+            }
+          }
+        },
+        "llm": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "real_path_required",
+            "fallback_model_allowed"
+          ],
+          "properties": {
+            "real_path_required": {
+              "type": "boolean",
+              "const": true
+            },
+            "fallback_model_allowed": {
+              "type": "boolean",
+              "const": false
+            }
+          }
+        }
+      }
+    },
+    "observability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "metrics",
+        "tracing",
+        "logs"
+      ],
+      "properties": {
+        "metrics": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "bind_host",
+            "port"
+          ],
+          "properties": {
+            "bind_host": {
+              "$ref": "#/$defs/nonEmptyNonPlaceholderString"
+            },
+            "port": {
+              "$ref": "#/$defs/tcpPort"
+            }
+          }
+        },
+        "tracing": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled",
+            "endpoint_path"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "endpoint_path": {
+              "$ref": "#/$defs/nonEmptyNonPlaceholderString"
+            }
+          }
+        },
+        "logs": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "level",
+            "retention_days",
+            "include_payloads"
+          ],
+          "properties": {
+            "level": {
+              "enum": [
+                "DEBUG",
+                "INFO",
+                "WARNING",
+                "ERROR"
+              ]
+            },
+            "retention_days": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "include_payloads": {
+              "type": "boolean",
+              "const": false
+            }
+          }
+        }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "workers",
+        "timeouts",
+        "resource_limits"
+      ],
+      "properties": {
+        "profile": {
+          "enum": [
+            "docker_local"
+          ]
+        },
+        "workers": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "ingestion",
+            "research",
+            "experiments"
+          ],
+          "properties": {
+            "ingestion": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "research": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "experiments": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "timeouts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "startup_seconds",
+            "request_seconds",
+            "shutdown_seconds"
+          ],
+          "properties": {
+            "startup_seconds": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "request_seconds": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "shutdown_seconds": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "resource_limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "cpu_count",
+            "memory_gb",
+            "gpu_required"
+          ],
+          "properties": {
+            "cpu_count": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "memory_gb": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "gpu_required": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "nonEmptyNonPlaceholderString": {
+      "type": "string",
+      "minLength": 1,
+      "not": {
+        "enum": [
+          "",
+          "TO_BE_FILLED"
+        ]
+      }
+    },
+    "secretPath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(config/secrets/|/).+",
+      "not": {
+        "enum": [
+          "",
+          "TO_BE_FILLED"
+        ]
+      }
+    },
+    "tcpPort": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65535
+    }
+  }
+}

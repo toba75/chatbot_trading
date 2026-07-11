@@ -1,39 +1,22 @@
+﻿param(
+    [Parameter(Mandatory = $false)]
+    [string] $ConfigPath
+)
+
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
 . (Join-Path $repoRoot "scripts/require_python.ps1")
 $pythonExecutable = Get-RequiredPythonExecutable
 
-$requiredVariables = @(
-    "GEMMA_BASE_URL",
-    "GEMMA_MODEL",
-    "GEMMA_AUTH_MODE",
-    "GEMMA_TLS_MODE",
-    "GEMMA_MODEL_REVISION",
-    "GEMMA_RUNTIME_VERSION",
-    "GEMMA_TIMEOUT_SECONDS",
-    "GEMMA_RETRY_BEFORE_FIRST_TOKEN",
-    "GEMMA_CIRCUIT_BREAKER_FAILURE_THRESHOLD",
-    "GEMMA_CIRCUIT_BREAKER_OPEN_SECONDS"
-)
-
-foreach ($name in $requiredVariables) {
-    $value = [Environment]::GetEnvironmentVariable($name)
-    if ([string]::IsNullOrWhiteSpace($value)) {
-        throw "Variable requise absente pour le test réel M13-reality: $name"
-    }
-    if ($value -ne $value.Trim()) {
-        throw "Variable non normalisée pour le test réel M13-reality: $name"
-    }
+$effectiveConfigPath = $ConfigPath
+if ([string]::IsNullOrWhiteSpace($effectiveConfigPath)) {
+    $effectiveConfigPath = Join-Path $repoRoot "config/application.yaml"
 }
-
-if ($env:GEMMA_AUTH_MODE -ne "none") {
-    throw "GEMMA_AUTH_MODE doit valoir none pour le conteneur Spark actuel."
+if (-not (Test-Path -LiteralPath $effectiveConfigPath -PathType Leaf)) {
+    throw "Configuration locale requise pour le test réel M13-reality: $effectiveConfigPath"
 }
-if ($env:GEMMA_TLS_MODE -ne "disabled") {
-    throw "GEMMA_TLS_MODE doit valoir disabled pour le conteneur Spark actuel."
-}
-
+$resolvedConfigPath = (Resolve-Path -LiteralPath $effectiveConfigPath).Path
 $pythonCode = @'
 from __future__ import annotations
 
@@ -44,10 +27,23 @@ import urllib.error
 import urllib.request
 
 
-base_url = sys.argv[2].rstrip("/")
-served_model = sys.argv[3]
-model_revision = sys.argv[4]
-runtime_version = sys.argv[5]
+repo_root = sys.argv[1]
+config_path = sys.argv[2]
+if repo_root not in sys.path:
+    sys.path.insert(0, repo_root)
+
+from app.platform.configuration import load_application_configuration  # noqa: E402
+
+
+configuration = load_application_configuration(config_path=config_path, environment_snapshot={})
+base_url = configuration.services.llm_gateway.spark_endpoint_url.rstrip("/")
+served_model = configuration.models.llm.served_model_name
+model_revision = configuration.models.llm.model_revision
+runtime_version = configuration.models.llm.runtime_version
+if configuration.services.llm_gateway.auth_mode != "none":
+    raise AssertionError("auth_mode doit valoir none pour le conteneur Spark actuel.")
+if configuration.services.llm_gateway.tls_mode != "disabled":
+    raise AssertionError("tls_mode doit valoir disabled pour le conteneur Spark actuel.")
 gateway_url = "http://127.0.0.1:8090"
 
 
@@ -178,7 +174,7 @@ Set-Content -Encoding UTF8 -LiteralPath $pythonScriptPath -Value $pythonCode
 try {
     $runtimeProcess = Start-Process `
         -FilePath $pythonExecutable `
-        -ArgumentList @("-m", "app.platform.local_runtime", "serve-http", "llm-gateway", "8090") `
+        -ArgumentList @("-m", "app.platform.local_runtime", "serve-http", "llm-gateway", "8090", "--config", $resolvedConfigPath) `
         -WorkingDirectory $repoRoot `
         -RedirectStandardOutput $runtimeStdoutPath `
         -RedirectStandardError $runtimeStderrPath `
@@ -188,10 +184,7 @@ try {
     $env:PYTHONIOENCODING = "utf-8"
     $output = & $pythonExecutable -B $pythonScriptPath `
         $repoRoot `
-        $env:GEMMA_BASE_URL `
-        $env:GEMMA_MODEL `
-        $env:GEMMA_MODEL_REVISION `
-        $env:GEMMA_RUNTIME_VERSION 2>&1
+        $resolvedConfigPath 2>&1
 }
 finally {
     $ErrorActionPreference = $previousErrorActionPreference

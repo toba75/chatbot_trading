@@ -1,6 +1,9 @@
 param(
     [Parameter(Mandatory = $false)]
-    [string] $AcceptanceTestPath
+    [string] $AcceptanceTestPath,
+
+    [Parameter(Mandatory = $false)]
+    [string] $ConfigPath
 )
 
 $ErrorActionPreference = "Stop"
@@ -65,10 +68,18 @@ foreach ($effectiveAcceptanceTestPath in $effectiveAcceptanceTestPaths) {
     $previousErrorActionPreference = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
     try {
+        $arguments = @(
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            $resolvedAcceptanceTestPath
+        )
+        if (-not [string]::IsNullOrWhiteSpace($ConfigPath)) {
+            $arguments += @("-ConfigPath", $ConfigPath)
+        }
         $output = & powershell `
-            -NoProfile `
-            -ExecutionPolicy Bypass `
-            -File $resolvedAcceptanceTestPath 2>&1
+            @arguments 2>&1
         $exitCode = $LASTEXITCODE
     }
     finally {

@@ -25,6 +25,7 @@ $m012SpecificationPath = Join-Path $repoRoot "docs/specs/m012_evaluation_pilote_
 $m013SpecificationPath = Join-Path $repoRoot "docs/specs/m013_durcissement_acceptation_v1.md"
 $platformTopologyPath = Join-Path $repoRoot "app/platform/topology_registry.json"
 $sparkFirewallPath = Join-Path $repoRoot "deploy/spark-firewall/network-boundary.json"
+$applicationExampleConfigPath = Join-Path $repoRoot "config/application.example.yaml"
 $appRoot = Join-Path $repoRoot "app"
 $contextRegistryPath = Join-Path $repoRoot "app/context_registry.json"
 $m003PreconditionAcceptancePath = "tests/m003/validate_m003_precondition_acceptance.ps1"
@@ -197,7 +198,7 @@ $validationCommands = @(
     @{ Path = "scripts/validate_m013_specification.ps1"; Arguments = @("-Path", $m013SpecificationPath) },
     @{ Path = "scripts/validate_m013_v1_gap_decisions.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_m013_regression.ps1"; Arguments = @() },
-    @{ Path = "scripts/validate_m013_security.ps1"; Arguments = @() },
+    @{ Path = "scripts/validate_m013_security.ps1"; Arguments = @("-ApplicationConfigPath", $applicationExampleConfigPath) },
     @{ Path = "scripts/validate_m013_spark_failures.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_m013_backup_restore.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_m013_retention.ps1"; Arguments = @() },
@@ -205,10 +206,11 @@ $validationCommands = @(
     @{ Path = "scripts/validate_m013_runbooks.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_m013_antipatterns.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_m013_acceptance.ps1"; Arguments = @() },
-    @{ Path = "scripts/validate_m013_reality.ps1"; Arguments = @() },
+    @{ Path = "scripts/validate_m013_config_environment.ps1"; Arguments = @() },
+    @{ Path = "scripts/validate_m013_config_traceability.ps1"; Arguments = @() },
     @{ Path = "scripts/validate_platform_topology.ps1"; Arguments = @("-Path", $platformTopologyPath) },
     @{ Path = "scripts/validate_local_compose.ps1"; Arguments = @() },
-    @{ Path = "scripts/validate_network_boundary.ps1"; Arguments = @("-SparkFirewallPath", $sparkFirewallPath) },
+    @{ Path = "scripts/validate_network_boundary.ps1"; Arguments = @("-SparkFirewallPath", $sparkFirewallPath, "-ApplicationConfigPath", $applicationExampleConfigPath) },
     @{ Path = "scripts/validate_architecture_boundaries.ps1"; Arguments = @("-AppRoot", $appRoot, "-ContextRegistryPath", $contextRegistryPath, "-SpecificationPath", $m001SpecificationPath) }
 )
 
@@ -486,6 +488,21 @@ $testCommands = @(
     @{ Path = $m013AntipatternsUnitPath; Arguments = @() },
     @{ Path = $m013AcceptanceReportAcceptancePath; Arguments = @() },
     @{ Path = $m013AcceptanceReportUnitPath; Arguments = @() },
+    @{ Path = "tests/m013_config/validate_application_config_specification_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m013_config/validate_application_config_specification_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m013_config/validate_application_config_loader_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m013_config/validate_application_config_loader_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m013_config/validate_application_config_loader_dependencies_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m013_config/validate_llm_gateway_config_file_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m013_config/validate_llm_gateway_config_file_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m013_config/validate_compose_config_file_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m013_config/validate_compose_config_file_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m013_config/validate_environment_input_rejection_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m013_config/validate_environment_input_rejection_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m013_config/validate_config_runbooks_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m013_config/validate_config_runbooks_unit.ps1"; Arguments = @() },
+    @{ Path = "tests/m013_config/validate_m013_config_traceability_acceptance.ps1"; Arguments = @() },
+    @{ Path = "tests/m013_config/validate_m013_config_traceability_unit.ps1"; Arguments = @() },
     @{ Path = "tests/m009/validate_m009_specification_acceptance.ps1"; Arguments = @() },
     @{ Path = "tests/m009/validate_m009_specification_unit.ps1"; Arguments = @() },
     @{ Path = "tests/m009/validate_deep_research_planning_acceptance.ps1"; Arguments = @() },

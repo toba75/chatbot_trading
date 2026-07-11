@@ -9,6 +9,9 @@
     [string] $SparkFirewallPath,
 
     [Parameter(Mandatory = $false)]
+    [string] $ApplicationConfigPath,
+
+    [Parameter(Mandatory = $false)]
     [string] $AuditPath,
 
     [Parameter(Mandatory = $false)]
@@ -29,6 +32,7 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $defaultComposePath = "deploy/local-compose/compose.yaml"
 $defaultTopologyPath = "app/platform/topology_registry.json"
 $defaultSparkFirewallPath = "deploy/spark-firewall/network-boundary.json"
+$defaultApplicationConfigPath = "config/application.example.yaml"
 $defaultAuditPath = "docs/governance/m013_security_audit.md"
 $defaultMatrixPath = "docs/traceability/matrix.md"
 $defaultTestGatePath = "scripts/test.ps1"
@@ -357,6 +361,7 @@ function Assert-M013Traceability {
 $resolvedComposePath = Resolve-M013RequiredPath -Path $ComposePath -DefaultRelativePath $defaultComposePath -Label "compose local"
 $resolvedTopologyPath = Resolve-M013RequiredPath -Path $TopologyPath -DefaultRelativePath $defaultTopologyPath -Label "topologie plateforme"
 $resolvedSparkFirewallPath = Resolve-M013RequiredPath -Path $SparkFirewallPath -DefaultRelativePath $defaultSparkFirewallPath -Label "pare-feu Spark"
+$resolvedApplicationConfigPath = Resolve-M013RequiredPath -Path $ApplicationConfigPath -DefaultRelativePath $defaultApplicationConfigPath -Label "configuration applicative"
 $resolvedAuditPath = Resolve-M013RequiredPath -Path $AuditPath -DefaultRelativePath $defaultAuditPath -Label "audit sécurité M-013"
 $resolvedMatrixPath = Resolve-M013RequiredPath -Path $MatrixPath -DefaultRelativePath $defaultMatrixPath -Label "matrice"
 $resolvedTestGatePath = Resolve-M013RequiredPath -Path $TestGatePath -DefaultRelativePath $defaultTestGatePath -Label "gate test"
@@ -372,7 +377,9 @@ Invoke-M013ChildValidator `
         "-TopologyPath",
         $resolvedTopologyPath,
         "-SparkFirewallPath",
-        $resolvedSparkFirewallPath
+        $resolvedSparkFirewallPath,
+        "-ApplicationConfigPath",
+        $resolvedApplicationConfigPath
     )
 
 $composeContent = (Get-Content -Raw -Encoding UTF8 -LiteralPath $resolvedComposePath).TrimStart([char] 0xFEFF)

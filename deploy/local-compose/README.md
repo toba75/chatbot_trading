@@ -3,48 +3,35 @@
 ## Préconditions
 
 - Exécuter les commandes depuis la racine du dépôt.
+- Créer le fichier local `config/application.yaml` à partir de `config/application.example.yaml` et renseigner les valeurs propres à l'installation.
 - Fournir le secret hors dépôt dans `deploy/local-compose/secrets/`:
   - `postgres_password`
-- Le gateway LLM cible uniquement l'endpoint Docker Spark déclaré par `GEMMA_BASE_URL`.
-- La provenance LLM est déclarée explicitement par `GEMMA_MODEL`, `GEMMA_MODEL_REVISION` et `GEMMA_RUNTIME_VERSION`.
-- Le conteneur Gemma sur la machine Spark n'exige pas de clé API: `GEMMA_AUTH_MODE` vaut `none` dans le Compose local.
-- Le transport Spark actuel n'exige pas de bundle CA: `GEMMA_TLS_MODE` vaut `disabled` dans le Compose local.
+- Le gateway LLM cible uniquement l'endpoint Docker Spark déclaré dans `services.llm_gateway.spark_endpoint_url`.
+- La provenance LLM est déclarée explicitement dans `models.llm.served_model_name`, `models.llm.model_revision` et `models.llm.runtime_version`.
+- Les processus applicatifs reçoivent tous `--config /workspace/config/application.yaml`.
+- Le fichier `config/application.yaml` est monté en lecture seule dans les services applicatifs.
+- Montage attendu dans chaque service applicatif: `../../config/application.yaml:/workspace/config/application.yaml:ro`.
+- Le schéma `config/application.schema.json` est monté en lecture seule dans les services applicatifs.
+- Montage schéma attendu: `../../config/application.schema.json:/workspace/config/application.schema.json:ro`.
+- Le répertoire `config/secrets/local/` est monté en lecture seule dans `llm-gateway` pour les modes futurs `api_key_file` et `ca_bundle`.
+- Montage secrets gateway attendu: `../../config/secrets/local:/workspace/config/secrets/local:ro`.
 
 ## Variables requises
 
-Le Compose refuse les valeurs par défaut silencieuses. Les variables non secrètes doivent être exportées explicitement avant validation ou démarrage:
+Le Compose refuse les valeurs par défaut silencieuses. Les variables techniques restantes doivent être exportées explicitement avant validation ou démarrage:
 
 - `OST_EDGE_HTTPS_PORT`
 - `CADDY_ADMIN` (valeur locale utilisée: `localhost:2019`)
-- `UI_API_URL`
-- `DATABASE_URL`
-- `QDRANT_URL`
-- `LLM_GATEWAY_URL`
-- `GEMMA_BASE_URL`
-- `GEMMA_MODEL`
-- `GEMMA_MODEL_REVISION`
-- `GEMMA_RUNTIME_VERSION`
-- `GEMMA_TIMEOUT_SECONDS`
-- `GEMMA_RETRY_BEFORE_FIRST_TOKEN`
-- `GEMMA_CIRCUIT_BREAKER_FAILURE_THRESHOLD`
-- `GEMMA_CIRCUIT_BREAKER_OPEN_SECONDS`
 - `POSTGRES_DB`
 - `POSTGRES_USER`
-- `QDRANT_GRPC_PORT`
-- `GRANITE_MODEL_PATH`
-- `EMBEDDING_MODEL_PATH`
-- `RERANKER_MODEL_PATH`
-- `GRANITE_URL`
-- `EMBEDDING_SERVICE_URL`
-- `RERANKER_SERVICE_URL`
-- `BACKTEST_ENGINE_URL`
-- `BACKTEST_WORKDIR`
+
+Aucune valeur applicative OSTrading ne doit être transmise par `environment:` ou `env_file`. Les anciennes entrées applicatives sont à renseigner dans `config/application.yaml` selon le schéma applicatif.
 
 ## Validation statique
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_local_compose.ps1 -Path .\deploy\local-compose\compose.yaml
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_network_boundary.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_network_boundary.ps1 -ApplicationConfigPath .\config\application.yaml
 docker compose -f .\deploy\local-compose\compose.yaml config
 ```
 

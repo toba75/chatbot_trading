@@ -8,7 +8,8 @@ from pathlib import Path
 from typing import Any, Mapping
 from urllib.parse import urlparse
 
-from app.platform.local_compose import ComposeService, LocalCompose
+from app.platform.configuration import ApplicationConfiguration
+from app.platform.local_compose import ComposeService, LocalCompose, validate_local_compose
 from app.platform.topology import PlatformTopology
 
 
@@ -19,7 +20,6 @@ SPARK_SERVICE_ID = "gemma-vllm"
 SPARK_EGRESS_NETWORK_ID = "spark-egress"
 EDGE_GATEWAY_SERVICE_ID = "edge-gateway"
 SPARK_PROTOCOL = "tcp"
-EXPECTED_SPARK_BASE_PATH = "/v1"
 
 REQUIRED_ADR_IDS = ("ADR-007", "ADR-008", "ADR-009", "ADR-014")
 PRIVATE_STORAGE_SERVICE_IDS = frozenset(
@@ -47,38 +47,11 @@ EXPECTED_DENIED_INITIATORS = frozenset(
 )
 PUBLIC_BINDINGS = frozenset(("", "0.0.0.0", "::", "[::]", "*"))
 LOCAL_USER_BINDING = "127.0.0.1"
-TLS_VERIFY_KEYS = frozenset(("GEMMA_TLS_VERIFY", "VLLM_TLS_VERIFY", "TLS_VERIFY", "SSL_VERIFY"))
-TLS_DISABLE_KEYS = frozenset(
-    (
-        "GEMMA_DISABLE_TLS",
-        "GEMMA_TLS_DISABLED",
-        "GEMMA_INSECURE_SKIP_VERIFY",
-        "GEMMA_SKIP_TLS_VERIFY",
-        "VLLM_DISABLE_TLS",
-        "VLLM_INSECURE_SKIP_VERIFY",
-    )
-)
-FALSE_VALUES = frozenset(("false", "0", "no", "off", "disabled"))
-TRUE_VALUES = frozenset(("true", "1", "yes", "on", "enabled"))
 VLLM_SECRET_MARKERS = ("GEMMA", "VLLM", "OPENAI_API_KEY", "LLM_API_KEY")
 BROWSER_REACHABLE_SERVICE_IDS = frozenset(("ui", "edge-gateway"))
 SPARK_AUTH_MODE_NONE = "none"
-SPARK_AUTH_MODE_API_KEY_FILE = "api_key_file"
 SPARK_TLS_MODE_DISABLED = "disabled"
 SPARK_TLS_MODE_CA_BUNDLE = "ca_bundle"
-REQUIRED_GATEWAY_RUNTIME_ENVIRONMENT_KEYS = (
-    "GEMMA_BASE_URL",
-    "GEMMA_MODEL",
-    "GEMMA_MODEL_REVISION",
-    "GEMMA_RUNTIME_VERSION",
-    "GEMMA_AUTH_MODE",
-    "GEMMA_TLS_MODE",
-    "GEMMA_TIMEOUT_SECONDS",
-    "GEMMA_RETRY_BEFORE_FIRST_TOKEN",
-    "GEMMA_CIRCUIT_BREAKER_FAILURE_THRESHOLD",
-    "GEMMA_CIRCUIT_BREAKER_OPEN_SECONDS",
-)
-
 
 @dataclass(frozen=True)
 class SparkEndpoint:
@@ -287,16 +260,66 @@ def validate_network_boundary(
     compose: LocalCompose,
     topology: PlatformTopology,
     spark_firewall: SparkFirewallPolicy,
+    application_configuration: ApplicationConfiguration,
 ) -> None:
+    if not isinstance(application_configuration, ApplicationConfiguration):
+        raise ValueError("Configuration applicative requise pour la frontière réseau.")
     validate_spark_firewall_policy(spark_firewall)
+    _validate_application_spark_policy(application_configuration, spark_firewall)
     _validate_topology_contract(topology)
     _validate_compose_ports(compose, spark_firewall.remote_user_access)
     _validate_compose_spark_egress(compose)
-    _validate_gateway_tls_and_secret_scope(compose, spark_firewall)
+    validate_local_compose(compose)
+    _validate_vllm_secret_scope(compose)
     _validate_flow_matrix(
         build_network_flow_matrix(compose=compose, spark_firewall=spark_firewall),
         spark_firewall.spark_endpoint,
     )
+
+
+def _validate_application_spark_policy(
+    application_configuration: ApplicationConfiguration,
+    spark_firewall: SparkFirewallPolicy,
+) -> None:
+    endpoint = spark_firewall.spark_endpoint
+    gateway = application_configuration.services.llm_gateway
+    parsed_endpoint = urlparse(gateway.spark_endpoint_url)
+    if parsed_endpoint.username is not None or parsed_endpoint.password is not None:
+        raise ValueError("Identifiants Spark applicatifs interdits")
+    if parsed_endpoint.path != "/v1":
+        raise ValueError(f"Chemin Spark applicatif incohérent: {parsed_endpoint.path}")
+    try:
+        parsed_port = parsed_endpoint.port
+    except ValueError as exc:
+        raise ValueError("Port Spark applicatif invalide") from exc
+
+    allowed_hosts = {
+        endpoint.host,
+        "spark-inference",
+        "spark-inference.test",
+        application_configuration.deployment.hosts.spark_inference.dns_name,
+        *application_configuration.deployment.hosts.spark_inference.endpoint_hosts,
+    }
+    if parsed_endpoint.hostname not in allowed_hosts:
+        raise ValueError(
+            f"Hôte Spark applicatif incohérent: {parsed_endpoint.hostname} attendu parmi {sorted(allowed_hosts)}"
+        )
+    if parsed_port != endpoint.port:
+        raise ValueError(
+            f"Port Spark applicatif incohérent: {parsed_port} attendu {endpoint.port}"
+        )
+    if gateway.auth_mode != endpoint.auth_mode:
+        raise ValueError(
+            f"Mode auth Spark applicatif incohérent: {gateway.auth_mode} attendu {endpoint.auth_mode}"
+        )
+    if gateway.tls_mode != endpoint.tls_mode:
+        raise ValueError(
+            f"Mode TLS Spark applicatif incohérent: {gateway.tls_mode} attendu {endpoint.tls_mode}"
+        )
+    if endpoint.tls_mode == SPARK_TLS_MODE_DISABLED and parsed_endpoint.scheme != "http":
+        raise ValueError("Schéma Spark applicatif incohérent avec TLS disabled")
+    if endpoint.tls_mode == SPARK_TLS_MODE_CA_BUNDLE and parsed_endpoint.scheme != "https":
+        raise ValueError("Schéma Spark applicatif incohérent avec TLS ca_bundle")
 
 
 def build_network_flow_matrix(
@@ -437,71 +460,18 @@ def _validate_compose_spark_egress(compose: LocalCompose) -> None:
             raise ValueError(f"Egress Spark interdit hors llm-gateway: {service.id}")
 
 
-def _validate_gateway_tls_and_secret_scope(compose: LocalCompose, spark_firewall: SparkFirewallPolicy) -> None:
-    gateway = compose.service(LLM_GATEWAY_SERVICE_ID)
-    for key in REQUIRED_GATEWAY_RUNTIME_ENVIRONMENT_KEYS:
-        _require_gateway_environment(gateway, key)
-
-    base_url = gateway.environment["GEMMA_BASE_URL"]
-    _validate_gateway_base_url(base_url, spark_firewall)
-    auth_mode = gateway.environment["GEMMA_AUTH_MODE"]
-    tls_mode = gateway.environment["GEMMA_TLS_MODE"]
-    if auth_mode != spark_firewall.spark_endpoint.auth_mode:
-        raise ValueError(f"Mode d'authentification Spark invalide pour llm-gateway: {auth_mode}")
-    if tls_mode != spark_firewall.spark_endpoint.tls_mode:
-        raise ValueError(f"Mode TLS Spark incohérent pour llm-gateway: {tls_mode}")
-    if auth_mode == SPARK_AUTH_MODE_NONE and "GEMMA_API_KEY_FILE" in gateway.environment:
-        raise ValueError("GEMMA_API_KEY_FILE interdit quand GEMMA_AUTH_MODE=none")
-    if auth_mode == SPARK_AUTH_MODE_API_KEY_FILE and "GEMMA_API_KEY_FILE" not in gateway.environment:
-        raise ValueError("GEMMA_API_KEY_FILE requis quand GEMMA_AUTH_MODE=api_key_file")
-    if tls_mode == SPARK_TLS_MODE_DISABLED and "GEMMA_CA_BUNDLE" in gateway.environment:
-        raise ValueError("GEMMA_CA_BUNDLE interdit quand GEMMA_TLS_MODE=disabled")
-    if tls_mode == SPARK_TLS_MODE_CA_BUNDLE and "GEMMA_CA_BUNDLE" not in gateway.environment:
-        raise ValueError("GEMMA_CA_BUNDLE requis quand GEMMA_TLS_MODE=ca_bundle")
-
-    for key, value in gateway.environment.items():
-        key_upper = key.upper()
-        value_normalized = value.strip().lower()
-        if key_upper in TLS_VERIFY_KEYS and value_normalized in FALSE_VALUES:
-            raise ValueError(f"TLS Spark désactivé pour llm-gateway: {key}")
-        if key_upper in TLS_DISABLE_KEYS and value_normalized in TRUE_VALUES:
-            raise ValueError(f"TLS Spark désactivé pour llm-gateway: {key}")
-
+def _validate_vllm_secret_scope(compose: LocalCompose) -> None:
     for service in compose.services:
         if service.id not in BROWSER_REACHABLE_SERVICE_IDS:
             continue
         for key in service.environment:
             key_upper = key.upper()
             if any(marker in key_upper for marker in VLLM_SECRET_MARKERS):
-                raise ValueError(f"Secret vLLM interdit pour accès navigateur: {service.id}")
+                raise ValueError(f"Secret vLLM interdit pour accÃ¨s navigateur: {service.id}")
         for secret_id in service.secrets:
             secret_upper = secret_id.upper()
             if any(marker in secret_upper for marker in VLLM_SECRET_MARKERS):
-                raise ValueError(f"Secret vLLM interdit pour accès navigateur: {service.id}")
-
-
-def _validate_gateway_base_url(base_url: str, spark_firewall: SparkFirewallPolicy) -> None:
-    if _is_required_environment_reference(base_url):
-        return
-
-    parsed_base_url = urlparse(base_url)
-    expected_scheme = "http"
-    if spark_firewall.spark_endpoint.tls_mode == SPARK_TLS_MODE_CA_BUNDLE:
-        expected_scheme = "https"
-    if parsed_base_url.scheme != expected_scheme:
-        raise ValueError("Mode TLS Spark incohérent pour llm-gateway: GEMMA_BASE_URL")
-    if parsed_base_url.hostname != spark_firewall.spark_endpoint.host:
-        raise ValueError("Endpoint Spark invalide pour llm-gateway: GEMMA_BASE_URL")
-    if parsed_base_url.port != spark_firewall.spark_endpoint.port:
-        raise ValueError("Endpoint Spark invalide pour llm-gateway: GEMMA_BASE_URL")
-    if parsed_base_url.path != EXPECTED_SPARK_BASE_PATH:
-        raise ValueError("Endpoint Spark invalide pour llm-gateway: GEMMA_BASE_URL")
-    if parsed_base_url.username is not None or parsed_base_url.password is not None:
-        raise ValueError("Endpoint Spark invalide pour llm-gateway: GEMMA_BASE_URL")
-
-
-def _is_required_environment_reference(value: str) -> bool:
-    return value.startswith("${") and "?" in value and value.endswith("}")
+                raise ValueError(f"Secret vLLM interdit pour accÃ¨s navigateur: {service.id}")
 
 
 def _validate_flow_matrix(flows: tuple[NetworkFlow, ...], spark_endpoint: SparkEndpoint) -> None:
@@ -530,13 +500,6 @@ def _validate_remote_user_access_policy(policy: RemoteUserAccessPolicy) -> None:
             raise ValueError(f"Accès utilisateur distant public interdit: {binding}")
         if binding == LOCAL_USER_BINDING:
             raise ValueError(f"Accès utilisateur distant local déclaré comme distant: {binding}")
-
-
-def _require_gateway_environment(service: ComposeService, key: str) -> None:
-    if key not in service.environment:
-        raise ValueError(f"Variable gateway Spark absente: {key}")
-    if service.environment[key].strip() == "":
-        raise ValueError(f"Variable gateway Spark vide: {key}")
 
 
 def _parse_published_port(raw_port: str) -> PublishedPort:

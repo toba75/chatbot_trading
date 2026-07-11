@@ -51,6 +51,7 @@ class GatewayObservation:
     trace_id: str
     request_id: str
     idempotency_key: str
+    configuration_hash: str
     phase: str
     status: str
     latency_ms: float
@@ -70,6 +71,7 @@ class GatewayObservation:
         _ensure_text(self.trace_id, "trace_id", "OBS_TRACE_ID_REQUIRED")
         _ensure_text(self.request_id, "request_id", "OBS_REQUEST_ID_REQUIRED")
         _ensure_text(self.idempotency_key, "idempotency_key", "OBS_IDEMPOTENCY_KEY_REQUIRED")
+        _ensure_hash(self.configuration_hash, "configuration_hash", "OBS_CONFIGURATION_HASH_INVALID")
         _ensure_text(self.phase, "phase", "OBS_PHASE_REQUIRED")
         _ensure_text(self.status, "status", "OBS_STATUS_REQUIRED")
         _ensure_non_negative_number(self.latency_ms, "latency_ms", "OBS_LATENCY_INVALID")
@@ -248,6 +250,7 @@ class InMemoryObservabilityCollector:
         details = {
             "request_id": observation.request_id,
             "idempotency_key": observation.idempotency_key,
+            "configuration_hash": observation.configuration_hash,
             "served_model": observation.served_model,
             "model_revision": observation.model_revision,
             "runtime_version": observation.runtime_version,
@@ -272,6 +275,7 @@ class InMemoryObservabilityCollector:
         )
 
         base_tags = {
+            "configuration_hash": observation.configuration_hash,
             "served_model": observation.served_model,
             "status": observation.status,
         }

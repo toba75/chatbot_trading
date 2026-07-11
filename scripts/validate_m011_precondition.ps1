@@ -10,7 +10,8 @@ $defaultReportPath = "docs/governance/m011_precondition_green.md"
 $m011Branch = "codex/milestone-m011-experience-reproductible"
 $m012Branch = "codex/milestone-m012-evaluation-pilote-calibration"
 $m013Branch = "codex/milestone-m013-durcissement-acceptation-v1"
-$allowedBranches = @("master", $m011Branch, $m012Branch, $m013Branch)
+$m013ConfigBranch = "codex/m13-config"
+$allowedBranches = @("master", $m011Branch, $m012Branch, $m013Branch, $m013ConfigBranch)
 $requiredMasterArtifacts = @(
     "docs/tasks/milestone_010",
     "docs/specs/m010_strategie_candidate_attribuee.md",

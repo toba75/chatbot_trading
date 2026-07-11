@@ -6,8 +6,8 @@
 - Rapports sources: `docs/governance/m013_security_audit.md` et `docs/governance/m013_spark_failure_drill.md`
 - Politique réseau: `M013-SecurityAuditReport-1.0`
 - Drill incident: `M013-SPARK-FAILURE-DRILL-0001`
-- ADR applicables: ADR-007, ADR-008, ADR-009, ADR-014, DDD-ADR-006
-- ADR: ADR-014; ce runbook applique la frontière réseau, l'endpoint Docker Spark externe sans clé API et les statuts de panne existants.
+- ADR applicables: ADR-007, ADR-008, ADR-009, ADR-014, ADR-016, DDD-ADR-006
+- ADR: ADR-014 et ADR-016; ce runbook applique la frontière réseau, l'endpoint Docker Spark externe sans clé API, la configuration par `config/application.yaml` et les statuts de panne existants.
 
 ## Scénario BDD
 
@@ -21,13 +21,13 @@
 - Commande vérifiée:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_security.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_network_boundary.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_security.ps1 -ApplicationConfigPath .\config\application.yaml
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_network_boundary.ps1 -ApplicationConfigPath .\config\application.yaml
 ```
 
-- Résultat attendu: seul `llm-gateway -> spark-inference` est autorisé, `GEMMA_AUTH_MODE=none`, `GEMMA_TLS_MODE=disabled`, `GEMMA_MODEL_REVISION` et `GEMMA_RUNTIME_VERSION` sont explicites, PostgreSQL, Qdrant, workers et Spark ne sont pas publiés.
+- Résultat attendu: seul `llm-gateway -> spark-inference` est autorisé, `services.llm_gateway.auth_mode=none`, `services.llm_gateway.tls_mode=disabled`, `services.llm_gateway.spark_endpoint_url`, `models.llm.model_revision` et `models.llm.runtime_version` sont explicites dans `config/application.yaml`, PostgreSQL, Qdrant, workers et Spark ne sont pas publiés.
 - Erreur explicite: toute exposition interne, tout accès navigateur direct ou tout secret Spark côté interface rend l'audit RED.
-- Preuve à conserver: sortie des validateurs, `docs/governance/m013_security_audit.md` et horodatage de l'audit.
+- Preuve à conserver: sortie des validateurs, `docs/governance/m013_security_audit.md`, `configuration_hash` du fichier chargé et horodatage de l'audit.
 
 ## Incidents Spark
 

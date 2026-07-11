@@ -8,6 +8,7 @@ from pathlib import Path
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPOSITORY_ROOT))
 
+from app.platform.configuration import load_application_configuration  # noqa: E402
 from app.platform.local_compose import load_local_compose  # noqa: E402
 from app.platform.security.network_boundary import (  # noqa: E402
     load_spark_firewall_policy,
@@ -21,6 +22,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--compose-path", required=True)
     parser.add_argument("--topology-path", required=True)
     parser.add_argument("--spark-firewall-path", required=True)
+    parser.add_argument("--application-config-path", required=True)
     return parser.parse_args()
 
 
@@ -37,18 +39,25 @@ def main() -> int:
         compose_path = Path(args.compose_path).resolve()
         topology_path = Path(args.topology_path).resolve()
         spark_firewall_path = Path(args.spark_firewall_path).resolve()
+        application_config_path = Path(args.application_config_path).resolve()
 
         require_path_under_repository(compose_path, "compose local")
         require_path_under_repository(topology_path, "topologie M-002")
         require_path_under_repository(spark_firewall_path, "pare-feu Spark")
+        require_path_under_repository(application_config_path, "configuration applicative")
 
         compose = load_local_compose(compose_path)
         topology = load_platform_topology(topology_path)
         spark_firewall = load_spark_firewall_policy(spark_firewall_path)
+        application_configuration = load_application_configuration(
+            config_path=application_config_path,
+            environment_snapshot={},
+        )
         validate_network_boundary(
             compose=compose,
             topology=topology,
             spark_firewall=spark_firewall,
+            application_configuration=application_configuration,
         )
     except (OSError, ValueError) as exc:
         print(f"Frontière réseau M-002 invalide: {exc}", file=sys.stderr)

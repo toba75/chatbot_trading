@@ -18,15 +18,17 @@ if repo_root not in sys.path:
 
 from app.evaluation.domain.llm_real_path_benchmark import REQUIRED_LLM_TASKS  # noqa: E402
 from app.platform.llm_gateway import LLMGatewayContractError  # noqa: E402
+from app.platform.configuration import load_application_configuration  # noqa: E402
 from app.platform.local_runtime import (  # noqa: E402
     _build_live_benchmark_task_inference_body,
     _build_product_chat_inference_body,
 )
 
 
-environment = {
-    "GEMMA_MODEL": "google/gemma-4-26B-A4B-it",
-}
+application_configuration = load_application_configuration(
+    config_path=f"{repo_root}/config/application.example.yaml",
+    environment_snapshot={},
+)
 
 
 def assert_equal(actual: object, expected: object, message: str) -> None:
@@ -45,7 +47,7 @@ def assert_raises(error_code: str, action) -> None:
 
 
 chat_body = {
-    "model": "google/gemma-4-26B-A4B-it",
+    "model": application_configuration.models.llm.served_model_name,
     "conversation_id": "CONV-M013-UNIT-0001",
     "trace_id": "TRACE-M013-UNIT-CHAT-0001",
     "request_id": "REQ-M013-UNIT-CHAT-0001",
@@ -54,7 +56,10 @@ chat_body = {
     "sampling_parameters": {"max_tokens": 96, "temperature": 0},
 }
 
-inference_body = _build_product_chat_inference_body(chat_body, environment=environment)
+inference_body = _build_product_chat_inference_body(
+    chat_body,
+    application_configuration=application_configuration,
+)
 assert_equal(inference_body["schema_name"], "m13_reality_product_chat", "Schéma chat produit invalide.")
 assert_equal(inference_body["schema_version"], "1.0", "Version schéma chat produit invalide.")
 assert_equal(inference_body["trace_id"], "TRACE-M013-UNIT-CHAT-0001", "Trace chat non propagée.")
@@ -67,11 +72,14 @@ assert_equal(inference_body["messages"][1]["role"], "user", "Message utilisateur
 
 assert_raises(
     "LOCAL_RUNTIME_MODEL_MISMATCH",
-    lambda: _build_product_chat_inference_body({**chat_body, "model": "autre-modele"}, environment=environment),
+    lambda: _build_product_chat_inference_body(
+        {**chat_body, "model": "autre-modele"},
+        application_configuration=application_configuration,
+    ),
 )
 
 benchmark_body = {
-    "model": "google/gemma-4-26B-A4B-it",
+    "model": application_configuration.models.llm.served_model_name,
     "run_id": "LLMRUN-M013-UNIT-0001",
     "trace_id": "TRACE-M013-UNIT-BENCHMARK-0001",
     "request_id": "REQ-M013-UNIT-BENCHMARK-0001",
@@ -84,7 +92,7 @@ for index, task_name in enumerate(REQUIRED_LLM_TASKS, start=1):
         benchmark_body,
         task_name=task_name,
         task_index=index,
-        environment=environment,
+        application_configuration=application_configuration,
     )
     assert_equal(task_body["schema_name"], "m13_reality_llm_benchmark_task", "Schéma tâche invalide.")
     assert_equal(task_body["schema_version"], "1.0", "Version schéma tâche invalide.")
@@ -116,7 +124,7 @@ assert_raises(
         benchmark_body,
         task_name="tache_inconnue",
         task_index=99,
-        environment=environment,
+        application_configuration=application_configuration,
     ),
 )
 

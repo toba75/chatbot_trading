@@ -108,6 +108,32 @@ function Get-ComposeLineEnding {
     throw "Fin de ligne fixture Compose absente."
 }
 
+function Find-ServiceInsertionIndex {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $Content,
+
+        [Parameter(Mandatory = $true)]
+        [string] $ServiceId,
+
+        [Parameter(Mandatory = $true)]
+        [string] $Section
+    )
+
+    $serviceMatch = [regex]::Match($Content, "(?m)^  $([regex]::Escape($ServiceId)):\r?\n")
+    if (-not $serviceMatch.Success) {
+        throw "Service fixture absent: $ServiceId"
+    }
+
+    $serviceTail = $Content.Substring($serviceMatch.Index + $serviceMatch.Length)
+    $sectionMatch = [regex]::Match($serviceTail, "(?m)^    $([regex]::Escape($Section)):\r?\n")
+    if (-not $sectionMatch.Success) {
+        throw "Section fixture absente pour service ${ServiceId}: $Section"
+    }
+
+    return $serviceMatch.Index + $serviceMatch.Length + $sectionMatch.Index
+}
+
 function Add-PublishedPortToService {
     param(
         [Parameter(Mandatory = $true)]
@@ -118,14 +144,13 @@ function Add-PublishedPortToService {
     )
 
     $lineEnding = Get-ComposeLineEnding -Content $Content
-    $serviceHeader = "${lineEnding}  ${ServiceId}:${lineEnding}"
-    if (-not $Content.Contains($serviceHeader)) {
+    $serviceMatch = [regex]::Match($Content, "(?m)^  $([regex]::Escape($ServiceId)):\r?\n")
+    if (-not $serviceMatch.Success) {
         throw "Service fixture absent: $ServiceId"
     }
 
-    $publishedPort = "${lineEnding}  ${ServiceId}:${lineEnding}    ports:${lineEnding}      - `"0.0.0.0:9191:9191`"${lineEnding}"
-    $serviceIndex = $Content.IndexOf($serviceHeader)
-    return $Content.Remove($serviceIndex, $serviceHeader.Length).Insert($serviceIndex, $publishedPort)
+    $publishedPort = "${lineEnding}    ports:${lineEnding}      - `"0.0.0.0:9191:9191`"${lineEnding}"
+    return $Content.Insert($serviceMatch.Index + $serviceMatch.Length, $publishedPort)
 }
 
 function Add-ProfilePublishedPortToService {
@@ -138,14 +163,13 @@ function Add-ProfilePublishedPortToService {
     )
 
     $lineEnding = Get-ComposeLineEnding -Content $Content
-    $serviceHeader = "${lineEnding}  ${ServiceId}:${lineEnding}"
-    if (-not $Content.Contains($serviceHeader)) {
+    $serviceMatch = [regex]::Match($Content, "(?m)^  $([regex]::Escape($ServiceId)):\r?\n")
+    if (-not $serviceMatch.Success) {
         throw "Service fixture absent: $ServiceId"
     }
 
-    $publishedPort = "${lineEnding}  ${ServiceId}:${lineEnding}    profiles:${lineEnding}      - debug${lineEnding}    ports:${lineEnding}      - `"127.0.0.1:6333:6333`"${lineEnding}"
-    $serviceIndex = $Content.IndexOf($serviceHeader)
-    return $Content.Remove($serviceIndex, $serviceHeader.Length).Insert($serviceIndex, $publishedPort)
+    $publishedPort = "${lineEnding}    profiles:${lineEnding}      - debug${lineEnding}    ports:${lineEnding}      - `"127.0.0.1:6333:6333`"${lineEnding}"
+    return $Content.Insert($serviceMatch.Index + $serviceMatch.Length, $publishedPort)
 }
 
 function Add-SparkEgressToService {
@@ -158,38 +182,32 @@ function Add-SparkEgressToService {
     )
 
     $lineEnding = Get-ComposeLineEnding -Content $Content
-    $serviceHeader = "${lineEnding}  ${ServiceId}:${lineEnding}"
-    $serviceIndex = $Content.IndexOf($serviceHeader)
-    if ($serviceIndex -lt 0) {
-        throw "Service fixture absent: $ServiceId"
-    }
-
-    $networkBlock = "    networks:${lineEnding}      - core${lineEnding}"
-    $networkIndex = $Content.IndexOf($networkBlock, $serviceIndex)
-    if ($networkIndex -lt 0) {
+    $networkIndex = Find-ServiceInsertionIndex -Content $Content -ServiceId $ServiceId -Section "networks"
+    $networkBlockMatch = [regex]::Match($Content.Substring($networkIndex), "(?m)^    networks:\r?\n      - core\r?\n")
+    if (-not $networkBlockMatch.Success) {
         throw "Bloc networks fixture absent pour service: $ServiceId"
     }
 
     $mutatedNetworkBlock = "    networks:${lineEnding}      - core${lineEnding}      - spark-egress${lineEnding}"
-    return $Content.Remove($networkIndex, $networkBlock.Length).Insert($networkIndex, $mutatedNetworkBlock)
+    return $Content.Remove($networkIndex, $networkBlockMatch.Length).Insert($networkIndex, $mutatedNetworkBlock)
 }
 
-function Remove-GatewayEnvironmentVariable {
+function Add-ApplicationEnvironmentVariable {
     param(
         [Parameter(Mandatory = $true)]
         [string] $Content,
 
         [Parameter(Mandatory = $true)]
+        [string] $ServiceId,
+
+        [Parameter(Mandatory = $true)]
         [string] $Name
     )
 
-    $pattern = "(?m)^\s+$([regex]::Escape($Name)): .*\r?\n"
-    $updatedContent = [regex]::Replace($Content, $pattern, "", 1)
-    if ($updatedContent -eq $Content) {
-        throw "Variable Spark fixture absente: $Name"
-    }
-
-    return $updatedContent
+    $lineEnding = Get-ComposeLineEnding -Content $Content
+    $networkIndex = Find-ServiceInsertionIndex -Content $Content -ServiceId $ServiceId -Section "networks"
+    $environmentBlock = "    environment:${lineEnding}      ${Name}: `"false`"${lineEnding}"
+    return $Content.Insert($networkIndex, $environmentBlock)
 }
 
 function Replace-FirewallText {
@@ -274,25 +292,15 @@ try {
     Assert-ExitCode -Actual $workerEgressResult.ExitCode -Expected 1 -Message "Un worker ne doit pas joindre spark-egress."
     Assert-OutputContains -Output $workerEgressResult.Output -Expected "Egress Spark interdit hors llm-gateway: worker-research" -Message "Le service avec egress Spark doit être nommé."
 
-    $missingModelRevisionPath = New-TemporaryFile `
-        -Name "gateway-without-model-revision.yaml" `
-        -Content (Remove-GatewayEnvironmentVariable -Content $validCompose -Name "GEMMA_MODEL_REVISION")
-    $missingModelRevisionResult = Invoke-NetworkBoundaryValidator `
-        -ComposePath $missingModelRevisionPath `
+    $gatewayEnvironmentPath = New-TemporaryFile `
+        -Name "gateway-application-environment.yaml" `
+        -Content (Add-ApplicationEnvironmentVariable -Content $validCompose -ServiceId "llm-gateway" -Name "GEMMA_TLS_VERIFY")
+    $gatewayEnvironmentResult = Invoke-NetworkBoundaryValidator `
+        -ComposePath $gatewayEnvironmentPath `
         -TopologyPath $topologyPath `
         -SparkFirewallPath $sparkFirewallPath
-    Assert-ExitCode -Actual $missingModelRevisionResult.ExitCode -Expected 1 -Message "La révision modèle Spark doit être requise."
-    Assert-OutputContains -Output $missingModelRevisionResult.Output -Expected "Variable gateway Spark absente: GEMMA_MODEL_REVISION" -Message "La révision modèle absente doit être nommée."
-
-    $missingRuntimeVersionPath = New-TemporaryFile `
-        -Name "gateway-without-runtime-version.yaml" `
-        -Content (Remove-GatewayEnvironmentVariable -Content $validCompose -Name "GEMMA_RUNTIME_VERSION")
-    $missingRuntimeVersionResult = Invoke-NetworkBoundaryValidator `
-        -ComposePath $missingRuntimeVersionPath `
-        -TopologyPath $topologyPath `
-        -SparkFirewallPath $sparkFirewallPath
-    Assert-ExitCode -Actual $missingRuntimeVersionResult.ExitCode -Expected 1 -Message "La version runtime Spark doit être requise."
-    Assert-OutputContains -Output $missingRuntimeVersionResult.Output -Expected "Variable gateway Spark absente: GEMMA_RUNTIME_VERSION" -Message "La version runtime absente doit être nommée."
+    Assert-ExitCode -Actual $gatewayEnvironmentResult.ExitCode -Expected 1 -Message "Le gateway ne doit pas recevoir de configuration Spark par environment."
+    Assert-OutputContains -Output $gatewayEnvironmentResult.Output -Expected "Variable applicative interdite pour service llm-gateway: GEMMA_TLS_VERIFY" -Message "La variable Spark interdite doit être nommée."
 
     $extraSparkSourcePath = New-TemporaryFile `
         -Name "spark-extra-source.json" `

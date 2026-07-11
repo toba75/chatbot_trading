@@ -20,6 +20,7 @@ function Invoke-M013NetworkSecurityValidator {
             -ComposePath (Join-Path $ProjectRoot "deploy/local-compose/compose.yaml") `
             -TopologyPath (Join-Path $ProjectRoot "app/platform/topology_registry.json") `
             -SparkFirewallPath (Join-Path $ProjectRoot "deploy/spark-firewall/network-boundary.json") `
+            -ApplicationConfigPath (Join-Path $ProjectRoot "config/application.yaml") `
             -AuditPath (Join-Path $ProjectRoot "docs/governance/m013_security_audit.md") `
             -MatrixPath (Join-Path $ProjectRoot "docs/traceability/matrix.md") `
             -TestGatePath (Join-Path $ProjectRoot "scripts/test.ps1") `
@@ -64,6 +65,7 @@ function New-FixtureProject {
         "deploy/local-compose",
         "deploy/spark-firewall",
         "app/platform",
+        "config",
         "docs/governance",
         "docs/traceability",
         "scripts"
@@ -74,6 +76,7 @@ function New-FixtureProject {
     Copy-Item -LiteralPath (Join-Path $repoRoot "deploy/local-compose/compose.yaml") -Destination (Join-Path $projectRoot "deploy/local-compose/compose.yaml")
     Copy-Item -LiteralPath (Join-Path $repoRoot "deploy/spark-firewall/network-boundary.json") -Destination (Join-Path $projectRoot "deploy/spark-firewall/network-boundary.json")
     Copy-Item -LiteralPath (Join-Path $repoRoot "app/platform/topology_registry.json") -Destination (Join-Path $projectRoot "app/platform/topology_registry.json")
+    Copy-Item -LiteralPath (Join-Path $repoRoot "config/application.example.yaml") -Destination (Join-Path $projectRoot "config/application.yaml")
     Copy-Item -LiteralPath (Join-Path $repoRoot "docs/governance/m013_security_audit.md") -Destination (Join-Path $projectRoot "docs/governance/m013_security_audit.md")
     Copy-Item -LiteralPath (Join-Path $repoRoot "docs/traceability/matrix.md") -Destination (Join-Path $projectRoot "docs/traceability/matrix.md")
     Copy-Item -LiteralPath (Join-Path $repoRoot "scripts/test.ps1") -Destination (Join-Path $projectRoot "scripts/test.ps1")
@@ -129,6 +132,30 @@ function Assert-ValidatorFails {
         throw "Le cas RED $Name doit échouer."
     }
     Assert-OutputContains -Output $result.Output -Expected $ExpectedMessage -Message "Le cas RED $Name doit nommer la règle violée."
+}
+
+function Remove-TemporaryRoot {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $Path
+    )
+
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return
+    }
+
+    for ($attempt = 1; $attempt -le 5; $attempt++) {
+        try {
+            Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction Stop
+            return
+        }
+        catch {
+            if ($attempt -eq 5) {
+                throw
+            }
+            Start-Sleep -Milliseconds (200 * $attempt)
+        }
+    }
 }
 
 if (-not (Test-Path -LiteralPath $validatorPath -PathType Leaf)) {
@@ -244,14 +271,14 @@ try {
         }
 
     Assert-ValidatorFails `
-        -Name "auth-mode-absent" `
-        -ExpectedMessage "Variable gateway Spark absente: GEMMA_AUTH_MODE" `
+        -Name "auth-mode-fichier-incoherent" `
+        -ExpectedMessage "auth_mode=api_key_file exige require_api_key" `
         -Mutate {
             param($projectRoot)
-            $composePath = Join-Path $projectRoot "deploy/local-compose/compose.yaml"
-            Set-FixtureText -Path $composePath -Mutate {
+            $applicationConfigPath = Join-Path $projectRoot "config/application.yaml"
+            Set-FixtureText -Path $applicationConfigPath -Mutate {
                 param($content)
-                return [regex]::Replace($content, '(?m)^\s{6}GEMMA_AUTH_MODE: "none"\r?\n', "", 1)
+                return $content.Replace("    auth_mode: none", "    auth_mode: api_key_file")
             }
         }
 
@@ -338,9 +365,7 @@ try {
         }
 }
 finally {
-    if (Test-Path -LiteralPath $temporaryRoot) {
-        Remove-Item -LiteralPath $temporaryRoot -Recurse -Force
-    }
+    Remove-TemporaryRoot -Path $temporaryRoot
 }
 
 Write-Host "Tests unitaires sécurité réseau M-013: OK"
