@@ -25,7 +25,7 @@ Elle ne remplace pas les définitions de terminé propres aux bounded contexts d
 | Traçabilité | Ligne de `docs/traceability/matrix.md` reliant exigence, test, commande, code et ADR. | Refuser la clôture si l'exigence touchée n'est pas reliée à une preuve vérifiable. |
 | Tests | Tests ciblés, validateurs pertinents et suite disponible exécutés avec résultat GREEN. | Refuser la clôture si une validation échouée est ignorée ou si un test requis est absent sans blocage documenté. |
 | Lint | `scripts/lint.ps1` ou validation statique configurée exécutée quand elle existe, sinon absence tracée jusqu'à T-006. | Refuser la clôture si un lint configuré échoue ou si son absence est masquée. |
-| Frontière UI/API | Pour toute tâche UI, preuve automatisée que chaque commande, lecture et contenu métier passe exclusivement par un contrat public de `orchestrator-api`, conformément à ADR-018. | Refuser la clôture si l'UI appelle directement un composant interne ou remplace un contrat absent par un mock, stub, fake, état local, réponse synthétique ou fallback. |
+| Frontière UI/API | Pour toute tâche UI, preuve automatisée que chaque commande, lecture et contenu métier passe exclusivement par un contrat public de `orchestrator-api` câblé au cas d'usage réel, conformément à ADR-018. | Refuser la clôture si le contrat est absent ou non câblé au cas d'usage réel, si l'UI appelle directement un composant interne ou si elle remplace le contrat par un mock, stub, fake, état local, réponse synthétique ou fallback. |
 
 ## Critères de preuve
 
@@ -41,9 +41,9 @@ Pour toute tâche qui crée ou modifie une surface UI, la preuve d'achèvement *
 
 L'UI **NE DOIT PAS** accéder directement aux handlers applicatifs, repositories, stockages, fichiers métier, files de jobs, workers, Spark, Qdrant ou services internes des bounded contexts. Elle **NE DOIT PAS** implémenter ou mémoriser une capacité métier absente de l'API au moyen d'un mock, stub, fake, état en mémoire, réponse statique, donnée synthétique ou fallback dans son chemin d'exécution.
 
-Les doubles de test sont autorisés uniquement dans des tests automatisés isolés. Une preuve d'acceptation du chemin réel **DOIT** exercer `UI -> orchestrator-api -> adaptateur applicatif` et vérifier l'erreur publique lorsque le contrat requis est absent ou indisponible.
+Les doubles de test sont autorisés uniquement dans des tests automatisés isolés. Une preuve d'acceptation du chemin réel **DOIT** exercer `UI -> orchestrator-api -> adaptateur applicatif -> cas d'usage réel` et vérifier le blocage public lorsque le contrat requis est absent, non câblé ou indisponible.
 
-Si `orchestrator-api` n'expose pas une capacité nécessaire, la tâche UI reste inachevée ou explicitement bloquée. Une interface qui simule cette capacité **NE DOIT PAS** être déclarée opérationnelle.
+Si le contrat API requis est absent ou non câblé au cas d'usage réel, la fonction UI correspondante reste explicitement non opérationnelle et la tâche UI reste inachevée ou explicitement bloquée. Une interface qui simule cette capacité **NE DOIT PAS** être déclarée opérationnelle.
 
 ## ADR et décisions structurantes
 

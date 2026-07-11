@@ -71,6 +71,7 @@ $requiredMarkers = @(
     "scripts/lint.ps1",
     "ADR-018",
     "orchestrator-api",
+    "absent ou non câblé au cas d'usage réel",
     "mock",
     "stub",
     "fake",
