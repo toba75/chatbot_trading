@@ -1,10 +1,10 @@
 # ADR-022 - Outbox SP et leases de jobs PostgreSQL
 
-**Statut :** Acceptée
+**Statut :** Remplacée
 **Date :** 2026-07-12
 **Décideurs :** Équipe OSTrading
 **Remplace :** Aucun
-**Remplacée par :** Aucune
+**Remplacée par :** ADR-024
 **Source :** Findings de revue M13-FastAPI, T-005 à T-007
 
 ## Contexte
@@ -69,5 +69,7 @@ Les lectures d'une tentative étaient également composées par plusieurs requê
 ## Notes
 
 Cette ADR applique DDD-ADR-008 sans la remplacer : la transaction forte reste locale à SP, puis la synchronisation vers `platform` est éventuellement cohérente et idempotente.
+
+Le 2026-07-13, ADR-024 remplace cette décision : la transaction unique du relais et la clé étrangère interschéma sont supprimées au profit de trois transactions locales, avec redélivrance idempotente après crash.
 
 Mise en conformité du 2026-07-13 : `worker-documents` renouvelle désormais la lease pendant tout le diagnostic, sérialise le renouvellement avec la transition terminale, classe les erreurs transitoires et permanentes, borne l'inspection pypdf par taille, pages, temps, texte et objets, puis publie l'échec terminal dans l'état SP. Les preuves sont `validate_worker_data_resilience_acceptance.ps1` et `validate_document_worker_live.ps1`; commits RED `7b7912f09` et GREEN `9d17bc129`. Cette note réalise les obligations existantes sans changer la décision.

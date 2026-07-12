@@ -169,6 +169,18 @@
 - Limite explicite : M13-FastAPI raccorde la frontière ASGI, mais ne livre pas le runtime de conversion M004. Le worker réel s'arrête après le diagnostic; aucun adaptateur Docling/OCRmyPDF réel, aucune publication PostgreSQL `CanonicalSourcePublished` et aucun consommateur KA durable ne sont présents. `/v1/documents/{document_id}/index` reste donc explicitement indisponible et l'UI ne simule aucune projection. Le `PostgresKnowledgeProjectionRepository` est validé comme producteur durable, sans inventer de `CanonicalSourceRef` depuis un diagnostic.
 - Validation : gate M13-FastAPI Static `31/31` GREEN et lint ciblé GREEN. La preuve live documentaire complète reste réservée au runtime M004 qui produit effectivement `page_count`, `SourceLocator` et `canonical_artifact_sha256` après fusion, QA et stockage de l'artefact canonique.
 
+## Correctif de revue - Frontière transactionnelle du relais outbox
+
+- Date : 2026-07-13.
+- Scénario BDD : Given un message SP réclamé avec une lease; When la plateforme committe le job puis que le relais tombe avant l'ACK SP; Then la lease expirée permet une redélivrance, le même `job_id` est retrouvé sans doublon et tout contenu divergent échoue explicitement.
+- Décision : ADR-024 remplace ADR-022. Claim SP, consommation plateforme et ACK SP utilisent trois transactions locales; aucune transaction ni clé étrangère ne traverse les propriétaires définis par DDD-ADR-008.
+- Migration : `007_job_outbox_context_boundary.sql` supprime la clé étrangère interschéma, ajoute la lease de relais et l'identité SHA-256 de consommation plateforme; l'upgrade 006 vers 007 et sa réexécution sont GREEN.
+- Commit RED : `9afe600cf`, `test(worker): couvrir frontière transactionnelle outbox ADR-024`.
+- Commit GREEN : `db9ad998b`, `feat(worker): séparer relais SP et plateforme ADR-024`.
+- Preuves : unité crash/redélivrance, deux relais PostgreSQL concurrents, crash après commit avant ACK, conflit divergent `JOB_RELAY_MESSAGE_CONFLICT`, absence de clé étrangère interschéma, diagnostics réels et `trace_id` préservé.
+- Validations : gate M13-FastAPI Static `31/31` GREEN; frontière d'imports `215` fichiers et `1419` imports GREEN; tests live outbox, migration et worker GREEN.
+- Hors périmètre : aucune modification du pipeline `CanonicalSourcePublished`, de Docling ou des diagnostics PDF réels.
+
 ## Correctif de revue - Preuve UI sur le serveur réel
 
 - Date : 2026-07-13.

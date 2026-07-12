@@ -70,7 +70,7 @@ foreach ($marker in @(
     "ADR-019",
     "ADR-020",
     "ADR-021",
-    "ADR-022"
+    "ADR-024"
 )) {
     Assert-Contains $traceability $marker "Traçabilité T-011 incomplète."
 }
