@@ -1,6 +1,9 @@
 ALTER TABLE source_processing.job_outbox
     DROP CONSTRAINT IF EXISTS job_outbox_platform_job_id_fkey;
 
+ALTER TABLE source_processing.document_conversion_requests
+    DROP CONSTRAINT IF EXISTS document_conversion_requests_job_id_fkey;
+
 ALTER TABLE source_processing.job_outbox
     ADD COLUMN IF NOT EXISTS relay_owner text,
     ADD COLUMN IF NOT EXISTS relay_lease_expires_at timestamptz;
