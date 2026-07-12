@@ -102,5 +102,13 @@
 - Erreurs: `TRACE_ID_INVALID` en 400, timeout en 504, exception en 500, toutes avec `error_code`, `X-Trace-ID` et log JSON sans payload ni secret.
 - Déploiement: image `ostrading/orchestrator-api:0.1.0-m013-fastapi-schema-003`, commandes hôte/edge séparées et rollback compatible ledger sans suppression de volume.
 - Contrat historique: aucun alias public `GET /` n'est confirmé par les tests de `master`; aucune rupture d'alias public n'est introduite.
-- Validations: gate M13-FastAPI 8 preuves GREEN, lint 38 validations GREEN, système ADR GREEN, Compose statique et `docker compose config` GREEN, preuves live PostgreSQL et PDF/Uvicorn GREEN.
+- Validations: gate M13-FastAPI 10 preuves GREEN, lint 38 validations GREEN, système ADR GREEN, Compose statique et `docker compose config` GREEN, preuves live PostgreSQL, PDF/Uvicorn et worker concurrent GREEN.
 - Modification utilisateur protégée: `tests/m013/validate_m013_reality_product_acceptance.ps1`, hors staging et hors commits.
+## Correctif de revue T-005 à T-007 - worker et cohérence des données
+
+- Scénario BDD : Given une demande de diagnostic acceptée et persistée par SP; When deux processus workers concurrents relaient et réclament les jobs PostgreSQL, et qu'un propriétaire s'arrête avant résultat; Then chaque job suit `pending -> running -> succeeded|failed`, une lease expirée permet la reprise, les sorties page par page sont persistées une fois, le `trace_id` reste corrélé hors payload et un writer obsolète est refusé.
+- Décision : ADR-022 applique DDD-ADR-008 par outbox SP atomique puis relais `platform`, claims `FOR UPDATE SKIP LOCKED`, leases et version optimiste; ADR-021 gouverne la migration ascendante `003_document_worker_runtime.sql`.
+- Commit RED : `d9f73943f`, `test(worker): couvrir outbox leases et reprise ADR-022`.
+- Commit GREEN : `d1daf1f34`, `feat(worker): executer diagnostics durables ADR-022`.
+- Preuves : API Uvicorn réelle vers PostgreSQL Docker puis deux seconds processus workers; trois jobs réussis; crash/reprise; `trace_id` absent du payload; conflit `PROCESSING_RUN_VERSION_CONFLICT`; interleaving `REPEATABLE READ`; upgrade schema 003 exécuté deux fois avec ledger idempotent.
+- Validations : T-005 persistance, T-006 commandes, T-007 read-models, architecture, gate M13-FastAPI et lint GREEN (38 validations).
