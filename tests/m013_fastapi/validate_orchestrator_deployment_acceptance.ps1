@@ -32,12 +32,14 @@ Assert-Contains $compose "      - api" "Compose ne lance pas le point d'entrée 
 Assert-Contains $compose "      - --config" "Compose ne transmet pas la configuration unique."
 Assert-Contains $compose "      - /workspace/config/application.yaml" "Chemin de configuration Compose invalide."
 Assert-Contains $compose 'http://127.0.0.1:8080/ready' "Healthcheck readiness HTTP absent."
-Assert-Contains $compose 'ostrading/orchestrator-api:0.1.0-m013-fastapi-schema-005' "Tag image/schéma M13-FastAPI absent."
+Assert-Contains $compose 'schema-${OSTRADING_POSTGRES_SCHEMA_VERSION?OSTRADING_POSTGRES_SCHEMA_VERSION requis}-${OSTRADING_IMAGE_REVISION?OSTRADING_IMAGE_REVISION requis}' "Tag image/schéma/commit M13-FastAPI absent."
 Assert-Contains $caddyfile 'max_size 54MB' "Limite agrégée Caddy absente."
 Assert-Contains $dockerfile "COPY uv.lock ./uv.lock" "Le verrou uv n'est pas copié dans l'image."
 Assert-Contains $dockerfile "AS builder" "Étape builder Docker absente."
 Assert-Contains $dockerfile "AS runtime" "Étape runtime Docker absente."
-Assert-Contains $dockerfile 'org.ostrading.postgres-schema-version="005"' "Version de schéma absente de l'image."
+Assert-Contains $dockerfile 'org.ostrading.postgres-schema-version="${OSTRADING_POSTGRES_SCHEMA_VERSION}"' "Version de schéma dynamique absente de l'image."
+Assert-Contains $dockerfile 'org.opencontainers.image.revision="${OSTRADING_IMAGE_REVISION}"' "Révision immuable absente de l'image."
+Assert-Contains $dockerfile 'ghcr.io/astral-sh/uv@sha256:' "Bootstrap uv non verrouillé par digest."
 Assert-Contains $dockerfile "COPY --chown=ostrading:ostrading deploy/postgres/migrations ./deploy/postgres/migrations" "Migrations non embarquées dans l'image."
 $runtimeBlock = $dockerfile.Substring($dockerfile.IndexOf("AS runtime"))
 if ($runtimeBlock.Contains("pip install") -or $runtimeBlock.Contains(" uv sync")) {
@@ -65,7 +67,7 @@ if (-not (Test-Path -LiteralPath $auditPath -PathType Leaf)) {
 }
 $runbook = Get-Content -Raw -Encoding UTF8 $runbookPath
 $audit = Get-Content -Raw -Encoding UTF8 $auditPath
-foreach ($marker in @("uv run api --config", "api --config /workspace/config/application.yaml", "exec -T orchestrator-api", "python -m app.platform.postgres_migrations", "/health", "/ready", "/openapi.json", "rollback", "ADR-019", "ADR-020", "ADR-021")) {
+foreach ($marker in @("api --config /workspace/config/application.yaml", "exec -T orchestrator-api", "python -m app.platform.postgres_migrations", "/health", "/ready", "/openapi.json", "rollback", "ADR-019", "ADR-020", "ADR-021", "-Mode Live", "IMAGE_REVISION_MUTABLE_REJECTED")) {
     Assert-Contains $runbook $marker "Runbook API incomplet."
 }
 foreach ($marker in @("M13-FastAPI", "configuration_hash", "trace_id", "PostgreSQL", "PDF", "fallback")) {

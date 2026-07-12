@@ -58,14 +58,16 @@ foreach ($marker in @(
     Assert-Contains $runbook $marker "Procédure Compose reproductible ou garde-fou réseau absent."
 }
 Assert-NotContains $runbook 'uv run api --config' "La recette hôte non reproductible reste documentée."
-Assert-Contains $runbook 'POST /v1/documents` répond en `201 application/json`' "Contrat OpenAPI de création imprécis."
-Assert-Contains $runbook 'GET /v1/documents/{document_id}/original` répond en `200 application/pdf` uniquement' "Contrat OpenAPI PDF 200 imprécis."
+Assert-Contains $runbook 'POST /v1/documents' "Contrat OpenAPI de création absent."
+Assert-Contains $runbook '201 application/json' "Média OpenAPI de création imprécis."
+Assert-Contains $runbook 'GET /v1/documents/{document_id}/original' "Contrat OpenAPI de restitution absent."
+Assert-Contains $runbook '200 application/pdf' "Média OpenAPI PDF 200 imprécis."
 
 foreach ($marker in @(
-    '## État courant',
+    "## $([char]0x00C9)tat courant",
     '## Preuves historiques',
-    'schéma courant dérivé des migrations',
-    'image locale identifiée par le commit Git complet',
+    'deploy/postgres/migrations/*.sql',
+    'org.opencontainers.image.revision',
     'validate_m013_fastapi.ps1 -Mode Live',
     'scripts/test.ps1',
     'non concluant'

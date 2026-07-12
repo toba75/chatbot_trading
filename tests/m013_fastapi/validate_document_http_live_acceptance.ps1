@@ -10,14 +10,9 @@ $null = & docker info --format '{{.ServerVersion}}' 2>&1
 if ($LASTEXITCODE -ne 0) {
     throw "DOCKER_ENGINE_REQUIRED"
 }
-$uv = Get-Command uv -ErrorAction Stop
 $apiPython = Join-Path $repoRoot ".venv\Scripts\python.exe"
 if (-not (Test-Path -LiteralPath $apiPython -PathType Leaf)) {
     throw "UV_PROJECT_PYTHON_REQUIRED"
-}
-& $uv.Source run --project $repoRoot --no-sync api --help *> $null
-if ($LASTEXITCODE -ne 0) {
-    throw "UV_RUN_API_COMMAND_INVALID"
 }
 
 function Get-FreeTcpPort {

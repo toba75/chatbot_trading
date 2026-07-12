@@ -65,10 +65,13 @@ services:
     read_only: true
 
   orchestrator-api:
-    image: ostrading/orchestrator-api:0.1.0-m013-fastapi-schema-005
+    image: ostrading/orchestrator-api:0.1.0-m013-fastapi-schema-${OSTRADING_POSTGRES_SCHEMA_VERSION?OSTRADING_POSTGRES_SCHEMA_VERSION requis}-${OSTRADING_IMAGE_REVISION?OSTRADING_IMAGE_REVISION requis}
     build:
       context: ../..
       dockerfile: deploy/local-compose/Dockerfile
+      args:
+        OSTRADING_IMAGE_REVISION: "${OSTRADING_IMAGE_REVISION?OSTRADING_IMAGE_REVISION requis}"
+        OSTRADING_POSTGRES_SCHEMA_VERSION: "${OSTRADING_POSTGRES_SCHEMA_VERSION?OSTRADING_POSTGRES_SCHEMA_VERSION requis}"
     command:
       - api
       - --config

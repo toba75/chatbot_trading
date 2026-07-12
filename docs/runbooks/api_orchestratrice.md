@@ -1,35 +1,39 @@
 # Runbook de l'API orchestratrice M13-FastAPI
 
-## Statut
+## Statut et périmètre
 
 - Tâche: `docs/tasks/milestone_013-fastapi/0011_deployer_auditer_api_orchestratrice.md`.
 - ADR applicables: ADR-019 pour le runtime, ADR-020 pour la frontière binaire bornée et ADR-021 pour les migrations PostgreSQL; ADR-018 reste inchangée.
 - Runtime public unique: FastAPI servi par Uvicorn sous l'identité `orchestrator-api`.
-- Configuration unique: fichier explicite conforme à M13-config; aucune variable applicative, valeur par défaut ou solution de repli.
+- Chemin d'exploitation supporté: Compose depuis un commit Git complet, avec la dernière migration livrée par ce commit.
+- Configuration unique: fichier conforme à M13-config; aucune variable applicative, valeur par défaut ou solution de repli.
 
 ## Scénario BDD
 
-- Given l'application ASGI, PostgreSQL et les contrats documentaires sont prêts.
-- When l'exploitant démarre `orchestrator-api` puis enregistre un PDF.
-- Then `/health`, `/ready`, `/openapi.json` et les lectures publiques sont servis par Uvicorn, avec un `trace_id` et le `configuration_hash` dans les logs techniques.
+- Given un clone propre placé sur un commit Git précis et les secrets locaux requis.
+- When l'exploitant dérive explicitement la révision et le schéma, valide Compose puis construit la stack.
+- Then `/health`, `/ready`, `/openapi.json` et les lectures publiques sont servis par l'image identifiée par ce commit, avec un `trace_id` et le `configuration_hash` dans les logs techniques.
 
-## Démarrage local borné
+## Préconditions strictes
 
-Depuis la racine du dépôt, avec le fichier et le secret PostgreSQL effectivement présents:
+La recette hôte n'est pas un chemin d'exploitation: PostgreSQL est adressé par son nom DNS interne `postgres`, qui n'est volontairement pas joignable depuis l'hôte. Il est interdit de lancer directement l'entrée `api` hors de Compose. La commande historique `python -m app.platform.local_runtime serve-http orchestrator-api 8080` reste interdite et retourne `ORCHESTRATOR_LEGACY_RUNTIME_FORBIDDEN`.
+
+Depuis la racine du dépôt, l'exploitant doit fixer les variables techniques et prouver l'identité du commit et du schéma:
 
 ```powershell
-uv run api --config .\config\application.yaml
+$env:OST_EDGE_HTTPS_PORT = "8443"
+$env:CADDY_ADMIN = "localhost:2019"
+$env:POSTGRES_DB = "ostrading"
+$env:POSTGRES_USER = "ostrading"
+$env:OSTRADING_IMAGE_REVISION = git rev-parse HEAD
+if ($env:OSTRADING_IMAGE_REVISION -notmatch '^[0-9a-f]{40}$') { throw "IMAGE_REVISION_MUTABLE_REJECTED" }
+$latestMigration = Get-ChildItem .\deploy\postgres\migrations\*.sql | Sort-Object Name | Select-Object -Last 1
+if ($latestMigration.BaseName -notmatch '^(?<version>[0-9]{3})_') { throw "POSTGRES_SCHEMA_VERSION_UNREADABLE" }
+$env:OSTRADING_POSTGRES_SCHEMA_VERSION = $Matches.version
+docker compose -f .\deploy\local-compose\compose.yaml config
 ```
 
-Le processus s'arrête explicitement si `--config`, PostgreSQL, le secret PostgreSQL ou une migration obligatoire manque. Il ne démarre aucun ancien routeur et n'essaie aucun backend alternatif.
-
-La commande historique `python -m app.platform.local_runtime serve-http orchestrator-api 8080` est interdite et retourne `ORCHESTRATOR_LEGACY_RUNTIME_FORBIDDEN`. Elle ne constitue ni une santé valide ni une procédure de rollback.
-
-## Contrat OpenAPI public
-
-`GET /openapi.json` décrit le corps `multipart/form-data` de `POST /v1/documents`, dont le fichier `application/pdf`, les métadonnées obligatoires et les réponses typées `200`, `201`, `400`, `409`, `422` et `500`. Le diagnostic documente `202` et ses erreurs publiques; la restitution originale documente `application/pdf` en `200`. Les schémas publics ne contiennent aucune référence de stockage, de secret, de job interne ni d'identifiant Qdrant.
-
-Les erreurs publiques sont des DTO typés autour de `error_code`; les champs complémentaires restent bornés au contrat documenté. Une réponse `5xx` n'active aucun runtime alternatif.
+Le secret `deploy/local-compose/secrets/postgres_password` doit exister. L'identifiant d'image est alors `ostrading/orchestrator-api:0.1.0-m013-fastapi-schema-<version>-<commit-complet>`; `latest`, une branche, un hash abrégé ou une version de schéma saisie manuellement sont refusés.
 
 ## Démarrage Compose
 
@@ -37,9 +41,15 @@ Les erreurs publiques sont des DTO typés autour de `error_code`; les champs com
 docker compose -f .\deploy\local-compose\compose.yaml up --build
 ```
 
-Les quatre variables techniques `OST_EDGE_HTTPS_PORT`, `CADDY_ADMIN`, `POSTGRES_DB` et `POSTGRES_USER` doivent avoir été exportées explicitement selon `deploy/local-compose/README.md`; aucune variable applicative n'est admise.
+Compose transmet la révision et le schéma comme arguments de build, exécute directement `api --config /workspace/config/application.yaml` depuis la `.venv` construite avec `uv.lock`, et ne publie pas le port 8080. Le builder copie `uv` depuis une image épinglée par digest; le runtime n'embarque pas `uv` et ne résout aucune dépendance.
 
-Le service `orchestrator-api` exécute directement l'entrée verrouillée `api --config /workspace/config/application.yaml` depuis la `.venv` copiée par le builder. L'image runtime n'installe pas `uv` et ne résout aucune dépendance. Le service conserve le port interne 8080 et attend PostgreSQL. L'UI et `llm-gateway` gardent leur runtime propre; ils ne sont pas migrés vers FastAPI.
+Seul `edge-gateway` publie un port, exclusivement sur `127.0.0.1`. Toute tentative de remplacer cette adresse par `0.0.0.0`, une adresse LAN ou une interface publique est un échec d'exploitation nommé `REFUS_BIND_PUBLIC`; elle exige une décision de sécurité distincte, jamais une modification opportuniste du runbook.
+
+## Contrat OpenAPI public
+
+`POST /v1/documents` répond en `201 application/json` avec le DTO documentaire public. `GET /v1/documents/{document_id}/original` répond en `200 application/pdf` uniquement. Le diagnostic documente `202 application/json`; les erreurs publiques utilisent les statuts `400`, `404`, `409`, `422` ou `500` et un DTO typé autour de `error_code`.
+
+`GET /openapi.json` décrit le multipart PDF et les métadonnées obligatoires. Les schémas publics ne contiennent aucune référence de stockage, secret, job interne ni identifiant Qdrant. Une réponse `5xx` n'active aucun runtime alternatif.
 
 ## Gates statique et live
 
@@ -48,68 +58,64 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_fast
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_fastapi.ps1 -Mode Live
 ```
 
-Le mode `Static` est celui de `scripts/lint.ps1` et n'exige ni Docker ni `.venv`. Le mode `Live`, utilisé par `scripts/test.ps1`, exécute d'abord toutes les preuves statiques puis PostgreSQL, Uvicorn, PDF et workers réels. L'absence de mode est une erreur; il n'existe aucun choix implicite.
-
-L'image et le schéma sont couplés explicitement par `ostrading/orchestrator-api:0.1.0-m013-fastapi-schema-005` et le label `org.ostrading.postgres-schema-version=005`. Le runner prend un verrou advisory transactionnel, vérifie le ledger `platform.schema_migrations`, applique les versions absentes et refuse toute dérive de SHA-256 avant que `/ready` puisse répondre 200. Les timeouts `startup_seconds`, `request_seconds` et `shutdown_seconds` pilotent respectivement connexion/migrations, requêtes/keep-alive et arrêt Uvicorn; le healthcheck Compose reprend 120 s, 300 s et 30 s sans valeur alternative.
+Les deux modes exécutent d'abord `uv sync --frozen --no-dev --no-install-project`, puis imposent `.venv\Scripts\python.exe` à toutes les preuves. Les dépendances proviennent exclusivement de `uv.lock`; le code testé reste celui du checkout, sans réinstaller les points d'entrée pendant qu'un service local peut les utiliser. Un clone propre ne dépend donc ni du Python global ni d'une `.venv` préexistante. Le mode `Static` n'exige pas Docker; le mode `Live` ajoute PostgreSQL, Uvicorn, PDF et workers réels. L'absence de mode est une erreur explicite.
 
 ## Migration d'un volume existant
 
-Le démarrage normal applique la migration avant readiness. Pour une opération séparée et reproductible, depuis l'hôte et avec PostgreSQL déjà démarré:
+Le démarrage normal applique toutes les migrations livrées avant readiness. Pour séparer l'opération:
 
 ```powershell
 docker compose -f .\deploy\local-compose\compose.yaml up -d postgres
 docker compose -f .\deploy\local-compose\compose.yaml run --rm --no-deps orchestrator-api python -m app.platform.postgres_migrations --config /workspace/config/application.yaml
 ```
 
-La sortie attendue pour cette image est `POSTGRES_SCHEMA_READY:005`. Relancer exactement la même commande est idempotent. Une erreur `POSTGRES_MIGRATION_DRIFT`, `POSTGRES_SCHEMA_VERSION_UNSUPPORTED` ou un timeout interdit le démarrage; aucun script n'est ignoré et aucun ledger n'est corrigé automatiquement.
-
-## Limites binaires et spool temporaire
-
-- Caddy refuse les corps `/api/*` supérieurs à 54 Mo avant le proxy.
-- L'ASGI applique la même limite agrégée, y compris sans `Content-Length` ou en transfert chunked, avant le parseur multipart.
-- Le PDF métier reste limité à 50 Mio. Le titre est limité à 512 caractères, chaque auteur à 256 caractères, la liste à 16 auteurs, l'édition à 64 caractères et l'année à l'intervalle 1 à 9999.
-- `orchestrator-api` conserve `read_only: true` et dispose uniquement de `/tmp:size=128m,mode=1777` pour couvrir simultanément le spool ASGI et le spool multipart. Une saturation ou un dépassement reste une erreur visible; aucun stockage alternatif n'est utilisé.
-- La restitution d'un original vérifie son SHA-256 avant le statut 200, puis émet des chunks d'au plus 64 Kio. Le descripteur est fermé à la fin, sur interruption ou par la tâche de fermeture de la réponse.
+La sortie attendue est `POSTGRES_SCHEMA_READY:<OSTRADING_POSTGRES_SCHEMA_VERSION>`. La relance est idempotente. `POSTGRES_MIGRATION_DRIFT`, `POSTGRES_SCHEMA_VERSION_UNSUPPORTED` ou un timeout interdisent le démarrage; aucun ledger n'est corrigé automatiquement.
 
 ## Contrôles opératoires
-
-Depuis l'hôte, seul `edge-gateway` est publié. `handle_path /api/*` retire le préfixe avant le proxy:
 
 ```powershell
 $edgeAuthority = docker compose -f .\deploy\local-compose\compose.yaml port edge-gateway 8443
 curl.exe --fail --insecure "https://$edgeAuthority/api/ready"
 curl.exe --fail --insecure "https://$edgeAuthority/api/openapi.json"
-```
-
-Pour contrôler directement le service sur le réseau Compose sans supposer un port hôte inexistant:
-
-```powershell
 docker compose -f .\deploy\local-compose\compose.yaml exec -T orchestrator-api python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=300).read().decode())"
 docker compose -f .\deploy\local-compose\compose.yaml exec -T orchestrator-api python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8080/ready', timeout=300).read().decode())"
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_fastapi.ps1
 ```
 
-- `/health` prouve que le processus répond.
-- `/ready` doit répondre 200 et nommer PostgreSQL `ready`; un 503 interdit l'exploitation.
-- `/openapi.json` est la seule description OpenAPI exposée; `/docs` et `/redoc` sont désactivés.
-- Chaque réponse porte `X-Trace-ID`; le log JSON correspondant contient seulement méthode, chemin, statut, durée, `trace_id` et `configuration_hash`, jamais le PDF ni les métadonnées bibliographiques.
+Le `/ready` doit nommer PostgreSQL `ready`. Chaque réponse porte `X-Trace-ID`; le log JSON contient méthode, chemin, statut, durée, `trace_id` et `configuration_hash`, jamais le PDF ni les métadonnées bibliographiques.
 
-## Arrêt et rollback
+## Limites binaires
 
-L'arrêt Compose conserve les volumes:
+- Caddy et l'ASGI refusent les corps `/api/*` supérieurs à 54 Mo, y compris sans `Content-Length`.
+- Le PDF métier reste limité à 50 Mio et les métadonnées à leurs bornes documentées.
+- Le service reste `read_only: true`; `/tmp` est explicitement borné.
+- La restitution vérifie le SHA-256 avant le statut 200 et émet des chunks d'au plus 64 Kio.
+
+## Arrêt et rollback immuable
+
+L'arrêt conserve les volumes:
 
 ```powershell
 docker compose -f .\deploy\local-compose\compose.yaml down
 ```
 
-Le rollback applicatif consiste à arrêter l'image courante, puis à redéployer un tag immuable qui déclare explicitement `schema-005` et le même ledger compatible:
+Le rollback redéploie un commit complet compatible avec le ledger. Il ne réutilise jamais le tag de l'image courante:
 
 ```powershell
-docker compose -f .\deploy\local-compose\compose.yaml down
-git switch --detach <commit-green-compatible-schema-005>
+git switch --detach <commit-complet-compatible>
+$env:OSTRADING_IMAGE_REVISION = git rev-parse HEAD
+if ($env:OSTRADING_IMAGE_REVISION -notmatch '^[0-9a-f]{40}$') { throw "IMAGE_REVISION_MUTABLE_REJECTED" }
+$latestMigration = Get-ChildItem .\deploy\postgres\migrations\*.sql | Sort-Object Name | Select-Object -Last 1
+if ($latestMigration.BaseName -notmatch '^(?<version>[0-9]{3})_') { throw "POSTGRES_SCHEMA_VERSION_UNREADABLE" }
+$env:OSTRADING_POSTGRES_SCHEMA_VERSION = $Matches.version
+docker compose -f .\deploy\local-compose\compose.yaml config
 docker compose -f .\deploy\local-compose\compose.yaml up --build
+$image = "ostrading/orchestrator-api:0.1.0-m013-fastapi-schema-$env:OSTRADING_POSTGRES_SCHEMA_VERSION-$env:OSTRADING_IMAGE_REVISION"
+$inspection = (docker image inspect $image | ConvertFrom-Json)[0]
+if ($inspection.Config.Labels.'org.opencontainers.image.revision' -ne $env:OSTRADING_IMAGE_REVISION) { throw "IMAGE_REVISION_MISMATCH" }
+if ($inspection.Config.Labels.'org.ostrading.postgres-schema-version' -ne $env:OSTRADING_POSTGRES_SCHEMA_VERSION) { throw "IMAGE_SCHEMA_MISMATCH" }
+$inspection.Id
 ```
 
-Avant l'opération, l'exploitant doit vérifier le tag Compose et `SELECT version, filename, sha256 FROM platform.schema_migrations ORDER BY version`. Une image exigeant une version inférieure à celle du ledger est refusée; le rollback ne supprime jamais le volume et n'exécute aucune migration descendante. Une incompatibilité nécessite une migration corrective ascendante explicitement versionnée. Il est interdit de réactiver `app.platform.local_runtime serve-http orchestrator-api`, de servir deux runtimes sur le port 8080 ou de supprimer les volumes. Aucun fallback vers l'ancien routeur n'est autorisé.
+La révision et le schéma inspectés doivent correspondre exactement aux variables, et l'identifiant local de l'image est consigné dans la preuve de rollback. Une image exigeant une version inférieure au ledger est refusée. Le rollback ne supprime jamais le volume et n'exécute aucune migration descendante; une incompatibilité nécessite une migration corrective ascendante versionnée.
 
-Le rollback du présent durcissement doit restaurer ensemble `pyproject.toml`, `uv.lock`, l'image multi-stage, les limites Caddy/ASGI et le `tmpfs`. Il est interdit de retirer seulement une limite ou de réintroduire `Path.read_bytes()` sur la restitution publique.
+Aucun fallback vers l'ancien routeur, aucun second runtime sur 8080 et aucun bind public implicite ne sont autorisés.
