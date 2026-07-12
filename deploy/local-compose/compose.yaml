@@ -287,6 +287,13 @@ services:
     build:
       context: ../..
       dockerfile: deploy/local-compose/Dockerfile
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+    pids_limit: 256
     command:
       - python
       - -m
@@ -318,7 +325,7 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
-    restart: "no"
+    restart: unless-stopped
 
   worker-research:
     image: ostrading/worker-research:0.0.0-m002

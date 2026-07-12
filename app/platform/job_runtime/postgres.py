@@ -366,6 +366,55 @@ class PostgresJobQueue:
             failure_reason=_ensure_text(failure_reason, "failure_reason"),
         )
 
+    def retry_or_fail(
+        self,
+        *,
+        job_id: str,
+        owner_id: str,
+        error_code: str,
+        max_attempts: int,
+    ) -> JobRecord:
+        """Relâche un échec transitoire ou le rend terminal au budget épuisé."""
+
+        parsed_job_id = _ensure_text(job_id, "job_id")
+        parsed_owner = _ensure_text(owner_id, "owner_id")
+        parsed_error_code = _ensure_text(error_code, "error_code")
+        parsed_max_attempts = _ensure_positive_integer(max_attempts, "max_attempts")
+        with self._connection_factory.connect() as connection:
+            with connection.transaction(), connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE platform.technical_jobs
+                       SET status = CASE
+                               WHEN execution_attempts < %s THEN 'pending'
+                               ELSE 'failed'
+                           END,
+                           result = NULL,
+                           failure_reason = CASE
+                               WHEN execution_attempts < %s THEN NULL
+                               ELSE %s
+                           END,
+                           lease_owner = NULL,
+                           lease_expires_at = NULL
+                     WHERE job_id = %s AND status = 'running'
+                       AND lease_owner = %s AND lease_expires_at > CURRENT_TIMESTAMP
+                    RETURNING sequence, job_id, job_name, priority, input_hash,
+                              configuration_hash, code_version, model_version,
+                              payload, status, result, failure_reason
+                    """,
+                    (
+                        parsed_max_attempts,
+                        parsed_max_attempts,
+                        parsed_error_code,
+                        parsed_job_id,
+                        parsed_owner,
+                    ),
+                )
+                row = cursor.fetchone()
+        if row is None:
+            raise JobLeaseConflictError()
+        return _job_from_row(row)
+
     def _transition_lease(
         self,
         *,

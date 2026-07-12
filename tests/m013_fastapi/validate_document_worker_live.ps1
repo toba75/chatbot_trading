@@ -39,13 +39,21 @@ try {
         --publish "127.0.0.1:${postgresPort}:5432" $image
     if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($id)) { throw "POSTGRES_DOCKER_START_FAILED" }
     $ready = $false
+    $consecutiveReady = 0
     for ($attempt = 0; $attempt -lt 120; $attempt++) {
         & docker exec $container pg_isready -U app -d app *> $null
-        if ($LASTEXITCODE -eq 0) { $ready = $true; break }
+        if ($LASTEXITCODE -eq 0) {
+            $consecutiveReady++
+            if ($consecutiveReady -ge 3) { $ready = $true; break }
+        } else {
+            $consecutiveReady = 0
+        }
         Start-Sleep -Milliseconds 500
     }
     if (-not $ready) { throw "POSTGRES_DOCKER_NOT_READY" }
 
+    $previousPythonPath = $env:PYTHONPATH
+    $env:PYTHONPATH = $repoRoot
     $apiProcess = Start-Process -FilePath $python `
         -ArgumentList @("-B", "-m", "app.platform.orchestrator_command", "--config", $configPath) `
         -WorkingDirectory $temporaryRoot -RedirectStandardOutput $stdoutPath `
@@ -136,7 +144,7 @@ def register_and_diagnose(index):
     return document_id, trace_id
 
 
-documents = [register_and_diagnose(index) for index in range(1, 4)]
+documents = [register_and_diagnose(index) for index in range(1, 5)]
 os.chdir(runtime_root)
 configuration = load_application_configuration(config_path, environment_snapshot={})
 connection_factory = PsycopgConnectionFactory(
@@ -167,18 +175,43 @@ recovery = subprocess.run(
 )
 assert recovery.returncode == 0, (recovery.stdout, recovery.stderr)
 
-for document_id, _ in documents:
+# Le quatrième original devient illisible après sa soumission : l'échec permanent
+# doit terminer le job et devenir visible dans le read-model public.
+failed_document_id, _ = documents[3]
+failed_source = adapters.source_document_repository.find_by_document_id(
+    DocumentId.from_value(failed_document_id)
+)
+failed_path = adapters.original_source_store.resolve_internal_path(
+    failed_source.original_storage_ref
+)
+failed_path.unlink()
+failure = subprocess.run(
+    [python, "-B", "-m", "app.source_processing.adapters.worker_runtime", "--config", str(config_path), "--max-jobs", "1", "--worker-id", "LIVE-FAILURE", "--lease-seconds", "5", "--poll-seconds", "0.1"],
+    cwd=runtime_root, env=worker_environment, capture_output=True, text=True, timeout=30,
+)
+assert failure.returncode == 0, (failure.stdout, failure.stderr)
+
+for document_id, _ in documents[:3]:
     status, diagnostic = request(f"/v1/documents/{document_id}/diagnostic", headers={"X-Trace-Id": "TRACE-M13-WORKER-READ"})
     assert status == 200
     assert diagnostic["diagnostic_status"] == "DIAGNOSED", diagnostic
     assert diagnostic["diagnosed_page_count"] == diagnostic["source_page_count"] == 1
 
+status, failed_diagnostic = request(
+    f"/v1/documents/{failed_document_id}/diagnostic",
+    headers={"X-Trace-Id": "TRACE-M13-WORKER-FAILED"},
+)
+assert status == 200
+assert failed_diagnostic["diagnostic_status"] == "FAILED", failed_diagnostic
+assert failed_diagnostic["diagnosed_page_count"] == 0
+
 with adapters.job_queue._connection_factory.connect() as connection:
     with connection.cursor() as cursor:
         cursor.execute("SELECT status, trace_id, payload ? 'trace_id', lease_owner, lease_expires_at FROM platform.technical_jobs ORDER BY sequence", ())
         rows = cursor.fetchall()
-        assert len(rows) == 3
-        assert all(row[0] == "succeeded" for row in rows), rows
+        assert len(rows) == 4
+        assert [row[0] for row in rows].count("succeeded") == 3, rows
+        assert [row[0] for row in rows].count("failed") == 1, rows
         assert {row[1] for row in rows} == {trace_id for _, trace_id in documents}
         assert all(row[2] is False for row in rows)
         assert all(row[3] is None and row[4] is None for row in rows)
@@ -213,7 +246,7 @@ with factory.connect() as reader, factory.connect() as writer:
             cursor.execute("SELECT aggregate_version FROM source_processing.document_processing_runs WHERE document_id = %s", (document_id.value,))
             assert cursor.fetchone()[0] == before
 
-print(json.dumps({"jobs": 3, "workers": 2, "crash_recovery": True, "optimistic_conflict": True, "snapshot": "repeatable-read"}, sort_keys=True))
+print(json.dumps({"jobs": 4, "workers": 2, "crash_recovery": True, "public_failure": True, "optimistic_conflict": True, "snapshot": "repeatable-read"}, sort_keys=True))
 '@ | & $python -B -
     if ($LASTEXITCODE -ne 0) { throw "DOCUMENT_WORKER_LIVE_SCENARIO_FAILED" }
 }
@@ -221,6 +254,7 @@ finally {
     foreach ($name in @("M13_WORKER_LIVE_ORIGIN", "M13_WORKER_LIVE_CONFIG", "M13_WORKER_LIVE_ROOT", "M13_WORKER_LIVE_PYTHON", "M13_WORKER_LIVE_REPO")) {
         Remove-Item "Env:$name" -ErrorAction SilentlyContinue
     }
+    $env:PYTHONPATH = $previousPythonPath
     if ($null -ne $apiProcess -and -not $apiProcess.HasExited) {
         Stop-Process -Id $apiProcess.Id -Force
         $apiProcess.WaitForExit()

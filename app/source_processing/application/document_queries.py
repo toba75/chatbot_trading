@@ -23,36 +23,6 @@ from app.source_processing.domain.document_processing_run import (
 from app.source_processing.domain.source_document import DocumentId, SourceDocument
 
 
-class SourceDocumentReadRepository(Protocol):
-    """Port de lecture des sources enregistrées appartenant à SP."""
-
-    def list_documents(self) -> tuple[SourceDocument, ...]:
-        """Retourne les sources persistées sans exposer leur stockage."""
-
-    def find_by_document_id(self, document_id: DocumentId) -> SourceDocument | None:
-        """Retourne une source à partir de son identité publique."""
-
-
-class ProcessingRunReadRepository(Protocol):
-    """Port de lecture des diagnostics et routes appartenant à SP."""
-
-    def find_by_document_id(
-        self,
-        document_id: DocumentId,
-    ) -> DocumentProcessingRun | None:
-        """Retourne la tentative persistée du document."""
-
-
-class DocumentConversionReadRepository(Protocol):
-    """Port de lecture des conversions canoniques appartenant à SP."""
-
-    def find_conversion_by_document_id(
-        self,
-        document_id: DocumentId,
-    ) -> DocumentConversionState | None:
-        """Retourne l'état persistant de conversion du document."""
-
-
 @dataclass(frozen=True, slots=True)
 class DocumentStateSnapshot:
     """Snapshot cohérent du parent SP et de ses sorties persistées."""
@@ -60,6 +30,17 @@ class DocumentStateSnapshot:
     source_document: SourceDocument
     processing_run: DocumentProcessingRun | None
     conversion: DocumentConversionState | None
+
+    def __post_init__(self) -> None:
+        source = _ensure_source_document(self.source_document)
+        if self.processing_run is not None:
+            processing_run = _ensure_processing_run(self.processing_run)
+            if processing_run.document_id != source.document_id:
+                raise ValueError("processing_run hors document parent")
+        if self.conversion is not None:
+            conversion = _ensure_conversion_state(self.conversion)
+            if conversion.document_id != source.document_id:
+                raise ValueError("conversion hors document parent")
 
 
 class DocumentSnapshotRepository(Protocol):
@@ -380,7 +361,6 @@ __all__ = [
     "ConversionNotRequestedError",
     "DiagnosticNotRequestedError",
     "DiagnosticPageView",
-    "DocumentConversionReadRepository",
     "DocumentConversionView",
     "DocumentCorpusItem",
     "DocumentCorpusView",
@@ -391,7 +371,5 @@ __all__ = [
     "PageDiagnosticView",
     "PageManifestEntryView",
     "PageRouteView",
-    "ProcessingRunReadRepository",
-    "SourceDocumentReadRepository",
     "SourceNotFoundError",
 ]

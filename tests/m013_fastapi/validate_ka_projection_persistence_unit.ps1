@@ -138,6 +138,7 @@ projection_row = (
     profile.index_schema,
     projection.build_fingerprint.value,
     "BUILDING",
+    projection.aggregate_version,
     3,
     datetime(2026, 7, 12, 10, tzinfo=timezone.utc),
 )

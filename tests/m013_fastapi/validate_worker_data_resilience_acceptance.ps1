@@ -38,10 +38,10 @@ from app.source_processing.domain.document_processing_run import (
 )
 from app.source_processing.domain.source_document import (
     DocumentId,
+    BibliographicMetadata,
     OriginalStorageRef,
     SourceDocument,
     SourceFingerprint,
-    SourceMetadata,
 )
 
 
@@ -50,7 +50,7 @@ class FakeStore:
         self.path = path
 
     def storage_ref(self, value):
-        return OriginalStorageRef.from_value(value)
+        return value
 
     def resolve_internal_path(self, storage_ref):
         return self.path
@@ -72,11 +72,15 @@ class LostQueue(RenewingQueue):
 
 
 def source_and_run():
-    source = SourceDocument.register(
-        document_id=DocumentId.from_value("DOC-M013-WORKER-FAIL"),
-        fingerprint=SourceFingerprint.from_value("a" * 64),
-        original_storage_ref=OriginalStorageRef.from_value("originals/a.pdf"),
-        metadata=SourceMetadata(
+    fingerprint = SourceFingerprint.from_content(b"worker-failure")
+    document_id = DocumentId.from_fingerprint(fingerprint)
+    source = SourceDocument.register_original(
+        document_id=document_id,
+        fingerprint=fingerprint,
+        original_storage_ref=OriginalStorageRef.from_value(
+            f"artifact:source_processing.original_sources/{document_id.value}/{fingerprint.value}.pdf"
+        ),
+        metadata=BibliographicMetadata(
             title="Worker failure",
             authors=("OSTrading",),
             publication_year=2026,
@@ -188,10 +192,13 @@ assert PublicDiagnosticStatus.from_value(failed.status.value).value == "FAILED"
 projection = KnowledgeProjection.request(
     canonical_ref=CanonicalSourceRef(
         schema_version="1.0",
+        canonical_source_id="CSRC-M013-KA-VERSION",
         document_id="DOC-M013-KA-VERSION",
         canonical_version_id="CVER-M013-KA-VERSION",
+        source_sha256="a" * 64,
         canonical_artifact_sha256="b" * 64,
         page_count=1,
+        accepted_at="2026-07-13T00:00:00Z",
         quality_policy_version="qa-v1",
     ),
     projection_profile=ProjectionProfile(

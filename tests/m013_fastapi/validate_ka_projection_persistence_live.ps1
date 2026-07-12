@@ -14,9 +14,15 @@ function Get-FreeTcpPort {
 }
 
 function Wait-Postgres([string] $containerName) {
+    $consecutiveReady = 0
     for ($attempt = 0; $attempt -lt 120; $attempt++) {
         & docker exec $containerName pg_isready -U app -d app *> $null
-        if ($LASTEXITCODE -eq 0) { return }
+        if ($LASTEXITCODE -eq 0) {
+            $consecutiveReady++
+            if ($consecutiveReady -ge 3) { return }
+        } else {
+            $consecutiveReady = 0
+        }
         Start-Sleep -Milliseconds 500
     }
     throw "POSTGRES_DOCKER_NOT_READY"

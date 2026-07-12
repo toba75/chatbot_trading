@@ -23,6 +23,13 @@ from app.knowledge_access.domain.time import ensure_utc_instant
 from app.platform.postgres import PostgresConnectionFactory
 
 
+class KnowledgeProjectionVersionConflictError(RuntimeError):
+    """Un writer KA obsolète ne peut pas écraser une transition plus récente."""
+
+    def __init__(self) -> None:
+        super().__init__("KA_PROJECTION_VERSION_CONFLICT")
+
+
 class PostgresKnowledgeProjectionRepository:
     """Produit le read-model durable depuis chaque transition d'agrégat KA."""
 
@@ -57,13 +64,13 @@ class PostgresKnowledgeProjectionRepository:
                         projection_id, document_id, canonical_version_id,
                         projection_profile_id, chunking_profile, embedding_model,
                         sparse_profile, index_schema, build_fingerprint, status,
-                        chunk_count, state_observed_at
+                        chunk_count, state_observed_at, aggregate_version
                     )
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 0, CURRENT_TIMESTAMP)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 0, CURRENT_TIMESTAMP, %s)
                     ON CONFLICT (build_fingerprint) DO NOTHING
                     RETURNING projection_id
                     """,
-                    _projection_parameters(parsed_projection, profile),
+                    (*_projection_parameters(parsed_projection, profile), parsed_projection.aggregate_version),
                 )
                 inserted = cursor.fetchone()
         if inserted is not None:
@@ -122,22 +129,24 @@ class PostgresKnowledgeProjectionRepository:
                     """
                     UPDATE knowledge_access.knowledge_projections
                        SET status = %s,
-                           state_observed_at = CURRENT_TIMESTAMP
+                           state_observed_at = CURRENT_TIMESTAMP,
+                           aggregate_version = %s
                      WHERE projection_id = %s
                        AND build_fingerprint = %s
+                       AND aggregate_version = %s
                     RETURNING projection_id
                     """,
                     (
                         parsed_projection.status.value,
+                        parsed_projection.aggregate_version,
                         parsed_projection.projection_id,
                         parsed_projection.build_fingerprint.value,
+                        parsed_projection.aggregate_version - 1,
                     ),
                 )
                 updated = cursor.fetchone()
         if updated is None:
-            raise ValueError(
-                f"projection inconnue ou empreinte incohérente: {parsed_projection.projection_id}"
-            )
+            raise KnowledgeProjectionVersionConflictError()
         return parsed_projection
 
     def save_projection_outputs(
@@ -165,18 +174,34 @@ class PostgresKnowledgeProjectionRepository:
             with connection.transaction(), connection.cursor() as cursor:
                 cursor.execute(
                     """
+                    SELECT aggregate_version
+                      FROM knowledge_access.knowledge_projections
+                     WHERE projection_id = %s
+                     FOR UPDATE
+                    """,
+                    (projection.projection_id,),
+                )
+                existing_version_row = cursor.fetchone()
+                if existing_version_row is not None and existing_version_row[0] not in (
+                    projection.aggregate_version - 1,
+                    projection.aggregate_version,
+                ):
+                    raise KnowledgeProjectionVersionConflictError()
+                cursor.execute(
+                    """
                     INSERT INTO knowledge_access.knowledge_projections (
                         projection_id, document_id, canonical_version_id,
                         projection_profile_id, chunking_profile, embedding_model,
                         sparse_profile, index_schema, build_fingerprint, status,
-                        chunk_count, state_observed_at
+                        chunk_count, state_observed_at, aggregate_version
                     )
 
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT (projection_id) DO UPDATE SET
                         status = EXCLUDED.status,
                         chunk_count = EXCLUDED.chunk_count,
-                        state_observed_at = EXCLUDED.state_observed_at
+                        state_observed_at = EXCLUDED.state_observed_at,
+                        aggregate_version = EXCLUDED.aggregate_version
                     """,
                     (
                         projection.projection_id,
@@ -191,6 +216,7 @@ class PostgresKnowledgeProjectionRepository:
                         projection.status.value,
                         chunk_count,
                         observed_at,
+                        projection.aggregate_version,
                     ),
                 )
                 cursor.execute(
@@ -242,7 +268,8 @@ class PostgresKnowledgeProjectionRepository:
                     f"""
                     SELECT projection_id, document_id, canonical_version_id,
                            projection_profile_id, chunking_profile, embedding_model,
-                           sparse_profile, index_schema, build_fingerprint, status
+                           sparse_profile, index_schema, build_fingerprint, status,
+                           aggregate_version
                       FROM knowledge_access.knowledge_projections
                      WHERE {predicate}
                     """,
@@ -281,7 +308,7 @@ class PostgresProjectionReadRepository:
                     SELECT projection_id, document_id, canonical_version_id,
                            projection_profile_id, chunking_profile, embedding_model,
                            sparse_profile, index_schema, build_fingerprint, status,
-                           chunk_count, state_observed_at
+                           aggregate_version, chunk_count, state_observed_at
                       FROM knowledge_access.knowledge_projections
                      WHERE document_id = %s
                      ORDER BY state_observed_at DESC, projection_id DESC
@@ -311,7 +338,7 @@ def _projection_record_from_rows(
     row: Any,
     sample_rows: Sequence[Any],
 ) -> ProjectionReadRecord:
-    observed_at = row[11]
+    observed_at = row[12]
     if not callable(getattr(observed_at, "isoformat", None)):
         raise ValueError("state_observed_at PostgreSQL invalide")
     observed_at_text = observed_at.isoformat().replace("+00:00", "Z")
@@ -319,7 +346,7 @@ def _projection_record_from_rows(
 
     return ProjectionReadRecord(
         projection=projection,
-        chunk_count=row[10],
+        chunk_count=row[11],
         chunk_samples=tuple(
             _chunk_from_row(sample_row, projection=projection)
             for sample_row in sample_rows
@@ -342,6 +369,7 @@ def _projection_from_row(row: Any) -> KnowledgeProjection:
         ),
         build_fingerprint=BuildFingerprint(row[8]),
         status=ProjectionStatus.from_value(row[9]),
+        aggregate_version=row[10],
     )
 
 
@@ -446,6 +474,7 @@ def _ensure_build_fingerprint(value: BuildFingerprint) -> BuildFingerprint:
 
 
 __all__ = [
+    "KnowledgeProjectionVersionConflictError",
     "PostgresKnowledgeProjectionRepository",
     "PostgresProjectionReadRepository",
 ]

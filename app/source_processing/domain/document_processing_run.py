@@ -23,6 +23,7 @@ class DocumentProcessingRunStatus(str, Enum):
     MANUAL_REVIEW = "MANUAL_REVIEW"
     QUARANTINED = "QUARANTINED"
     REJECTED = "REJECTED"
+    FAILED = "FAILED"
 
 
 class PageManifestEntryState(str, Enum):
@@ -812,6 +813,20 @@ class ProcessingRunRejected:
 
 
 @dataclass(frozen=True)
+class ProcessingRunFailed:
+    """Événement terminal quand le diagnostic technique échoue explicitement."""
+
+    processing_run_id: ProcessingRunId
+    document_id: DocumentId
+    error_code: str
+
+    def __post_init__(self) -> None:
+        _ensure_processing_run_id(self.processing_run_id)
+        _ensure_document_id(self.document_id)
+        object.__setattr__(self, "error_code", _ensure_failure_error_code(self.error_code))
+
+
+@dataclass(frozen=True)
 class DocumentProcessingRun:
     """Agrégat SP qui porte une tentative de traitement d'un SourceDocument."""
 
@@ -830,9 +845,11 @@ class DocumentProcessingRun:
         | PageRouteDecided
         | ManualReviewRequested
         | ProcessingRunQuarantined
-        | ProcessingRunRejected,
+        | ProcessingRunRejected
+        | ProcessingRunFailed,
         ...,
     ]
+    failure_error_code: str | None = None
 
     @classmethod
     def start(
@@ -867,7 +884,7 @@ class DocumentProcessingRun:
     def blocking_reason(self) -> str | None:
         """Justification bloquante conservée pour les états non publiables."""
 
-        return self.manual_review_reason
+        return self.failure_error_code or self.manual_review_reason
 
     def record_page_diagnostics(
         self,
@@ -1030,6 +1047,34 @@ class DocumentProcessingRun:
             events=self.events + (rejected_event,),
         )
 
+    def fail(self, error_code: str) -> "DocumentProcessingRun":
+        """Rend terminal et public un diagnostic impossible à terminer."""
+
+        if self.status not in (
+            DocumentProcessingRunStatus.MANIFEST_CREATED,
+            DocumentProcessingRunStatus.DIAGNOSED,
+            DocumentProcessingRunStatus.MANUAL_REVIEW,
+        ):
+            raise ValueError("transition d'échec interdite")
+        failed_event = ProcessingRunFailed(
+            processing_run_id=self.processing_run_id,
+            document_id=self.document_id,
+            error_code=error_code,
+        )
+        return DocumentProcessingRun(
+            processing_run_id=self.processing_run_id,
+            document_id=self.document_id,
+            page_manifest=self.page_manifest,
+            page_decisions=self.page_decisions,
+            route_plan=None,
+            manual_review_reason=None,
+            blocking_policy_version=None,
+            status=DocumentProcessingRunStatus.FAILED,
+            aggregate_version=self.aggregate_version + 1,
+            events=self.events + (failed_event,),
+            failure_error_code=failed_event.error_code,
+        )
+
     def ensure_documentary_publication_allowed(self) -> None:
         if self.status is DocumentProcessingRunStatus.ROUTE_PLANNED:
             return
@@ -1053,6 +1098,7 @@ class DocumentProcessingRun:
         blocking_policy_version = _ensure_routing_policy_version_or_none(
             self.blocking_policy_version
         )
+        failure_error_code = _ensure_failure_error_code_or_none(self.failure_error_code)
         if not isinstance(self.status, DocumentProcessingRunStatus):
             raise ValueError("document_processing_run_status invalide")
         if (
@@ -1075,6 +1121,7 @@ class DocumentProcessingRun:
                     ManualReviewRequested,
                     ProcessingRunQuarantined,
                     ProcessingRunRejected,
+                    ProcessingRunFailed,
                 ),
             ):
                 raise ValueError("event DocumentProcessingRun invalide")
@@ -1130,6 +1177,16 @@ class DocumentProcessingRun:
                 raise ValueError("plan de route interdit sur tentative bloquée")
             _ensure_manual_review_reason(manual_review_reason)
             _ensure_routing_policy_version(blocking_policy_version)
+        if self.status is DocumentProcessingRunStatus.FAILED:
+            if route_plan is not None or manual_review_reason is not None:
+                raise ValueError("route interdite sur tentative en échec")
+            if blocking_policy_version is not None:
+                raise ValueError("politique de routage interdite sur échec technique")
+            _ensure_failure_error_code(failure_error_code)
+            if not isinstance(self.events[-1], ProcessingRunFailed):
+                raise ValueError("event d'échec absent")
+        elif failure_error_code is not None:
+            raise ValueError("failure_error_code interdit hors échec")
         object.__setattr__(self, "page_decisions", page_decisions)
         object.__setattr__(self, "route_plan", route_plan)
         object.__setattr__(self, "manual_review_reason", manual_review_reason)
@@ -1138,6 +1195,7 @@ class DocumentProcessingRun:
             "blocking_policy_version",
             blocking_policy_version,
         )
+        object.__setattr__(self, "failure_error_code", failure_error_code)
 
 
 def _ensure_processing_run_id_value(value: Any) -> str:
@@ -1218,6 +1276,20 @@ def _ensure_manual_review_reason_or_none(value: Any) -> str | None:
     if value is None:
         return None
     return _ensure_manual_review_reason(value)
+
+
+def _ensure_failure_error_code(value: Any) -> str:
+    if not isinstance(value, str) or value.strip() == "" or value != value.strip():
+        raise ValueError("failure_error_code invalide")
+    if value.upper() != value or not value.replace("_", "").isalnum():
+        raise ValueError("failure_error_code invalide")
+    return value
+
+
+def _ensure_failure_error_code_or_none(value: Any) -> str | None:
+    if value is None:
+        return None
+    return _ensure_failure_error_code(value)
 
 
 def _ensure_route_confidence_score(value: Any) -> float:

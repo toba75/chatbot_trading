@@ -161,6 +161,7 @@ class KnowledgeProjection:
     projection_profile: ProjectionProfile
     build_fingerprint: BuildFingerprint
     status: ProjectionStatus
+    aggregate_version: int = 0
 
     @classmethod
     def request(
@@ -195,6 +196,12 @@ class KnowledgeProjection:
         _ensure_projection_profile(self.projection_profile)
         _ensure_build_fingerprint(self.build_fingerprint)
         object.__setattr__(self, "status", ProjectionStatus.from_value(self.status))
+        if (
+            isinstance(self.aggregate_version, bool)
+            or not isinstance(self.aggregate_version, int)
+            or self.aggregate_version < 0
+        ):
+            raise ValueError("aggregate_version KA invalide")
 
     def start_build(self) -> "KnowledgeProjection":
         return self._transition(
@@ -268,7 +275,11 @@ class KnowledgeProjection:
             raise ValueError(
                 f"transition interdite vers {next_status.value} depuis {self.status.value}"
             )
-        return replace(self, status=next_status)
+        return replace(
+            self,
+            status=next_status,
+            aggregate_version=self.aggregate_version + 1,
+        )
 
 
 def _projection_id_for(build_fingerprint: BuildFingerprint) -> str:

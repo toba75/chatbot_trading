@@ -48,6 +48,7 @@ from app.source_processing.domain.document_processing_run import (
     PagePreprocessingAction,
     PageRoute,
     PageRouteName,
+    ProcessingRunFailed,
     ProcessingRunId,
     RouteDecisionMode,
     RoutePlan,
@@ -234,24 +235,6 @@ class PostgresDocumentPersistence:
             raise ValueError("document_id invalide")
         return self._find_source("document_id = %s", (document_id.value,))
 
-    def list_documents(self) -> tuple[SourceDocument, ...]:
-        """Retourne les sources persistées dans l'ordre de leur identité publique."""
-
-        with self._connection_factory.connect() as connection:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT document_id, fingerprint, original_storage_ref, title,
-                           authors, publication_year, edition, status,
-                           quarantine_reason
-                      FROM source_processing.source_documents
-                     ORDER BY document_id
-                    """,
-                    (),
-                )
-                rows = cursor.fetchall()
-        return tuple(_source_from_row(row) for row in rows)
-
     def list_document_snapshots(
         self,
         *,
@@ -291,7 +274,8 @@ class PostgresDocumentPersistence:
                     cursor.execute(
                         """
                         SELECT processing_run_id, document_id, source_page_count, status,
-                               manual_review_reason, blocking_policy_version, aggregate_version
+                               manual_review_reason, blocking_policy_version, aggregate_version,
+                               failure_error_code
                           FROM source_processing.document_processing_runs
                          WHERE document_id = ANY(%s)
                          ORDER BY document_id
@@ -596,7 +580,8 @@ class PostgresDocumentPersistence:
             status = EXCLUDED.status,
             manual_review_reason = EXCLUDED.manual_review_reason,
             blocking_policy_version = EXCLUDED.blocking_policy_version,
-            aggregate_version = EXCLUDED.aggregate_version
+            aggregate_version = EXCLUDED.aggregate_version,
+            failure_error_code = EXCLUDED.failure_error_code
             WHERE source_processing.document_processing_runs.aggregate_version
                 = EXCLUDED.aggregate_version - 1"""
         with connection.cursor() as cursor:
@@ -604,9 +589,10 @@ class PostgresDocumentPersistence:
                 f"""
                 INSERT INTO source_processing.document_processing_runs (
                     processing_run_id, document_id, source_page_count, status,
-                    manual_review_reason, blocking_policy_version, aggregate_version
+                    manual_review_reason, blocking_policy_version, aggregate_version,
+                    failure_error_code
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (processing_run_id) {conflict_clause}
                 RETURNING processing_run_id
                 """,
@@ -620,6 +606,7 @@ class PostgresDocumentPersistence:
                     if processing_run.blocking_policy_version is None
                     else processing_run.blocking_policy_version.value,
                     processing_run.aggregate_version,
+                    processing_run.failure_error_code,
                 ),
             )
             if cursor.fetchone() is None:
@@ -767,7 +754,8 @@ class PostgresDocumentPersistence:
             cursor.execute(
                 """
                 SELECT processing_run_id, document_id, source_page_count, status,
-                       manual_review_reason, blocking_policy_version, aggregate_version
+                       manual_review_reason, blocking_policy_version, aggregate_version,
+                       failure_error_code
                   FROM source_processing.document_processing_runs
                  WHERE document_id = %s
                  ORDER BY created_at DESC
@@ -778,94 +766,8 @@ class PostgresDocumentPersistence:
             row = cursor.fetchone()
             if row is None:
                 return None
-            processing_run_id = row[0]
-            cursor.execute(
-                """
-                SELECT page_number, state
-                  FROM source_processing.page_manifest_entries
-                 WHERE processing_run_id = %s
-                 ORDER BY page_number
-                """,
-                (processing_run_id,),
-            )
-            manifest_rows = cursor.fetchall()
-            cursor.execute(
-                """
-                SELECT page_number, page_state, native_text_state, image_state,
-                       existing_ocr_state, layout_complexity, corruption_state,
-                       mixed_content_detected, has_table, has_formula,
-                       diagnostic_version, justification
-                  FROM source_processing.page_decisions
-                 WHERE processing_run_id = %s
-                 ORDER BY page_number
-                """,
-                (processing_run_id,),
-            )
-            decision_rows = cursor.fetchall()
-            cursor.execute(
-                """
-                SELECT routing_policy_version, dominant_route_name, confidence_score
-                  FROM source_processing.route_plans
-                 WHERE processing_run_id = %s
-                """,
-                (processing_run_id,),
-            )
-            plan_row = cursor.fetchone()
-            cursor.execute(
-                """
-                SELECT page_number, route_name, decision_mode, confidence_score,
-                       preprocessing_action, routing_policy_version, justification,
-                       is_exception
-                  FROM source_processing.page_routes
-                 WHERE processing_run_id = %s
-                 ORDER BY page_number
-                """,
-                (processing_run_id,),
-            )
-            route_rows = cursor.fetchall()
-
-        run_id = ProcessingRunId.from_value(row[0])
-        parsed_document_id = DocumentId.from_value(row[1])
-        manifest = PageManifest.from_entries(
-            source_page_count=row[2],
-            entries=tuple(
-                PageManifestEntry(
-                    page_number=PageNumber.from_value(item[0]),
-                    state=PageManifestEntryState(item[1]),
-                )
-                for item in manifest_rows
-            ),
-        )
-        decisions = tuple(_decision_from_row(item) for item in decision_rows)
-        routes = tuple(_route_from_row(item) for item in route_rows)
-        route_plan = None
-        if plan_row is not None:
-            route_plan = RoutePlan(
-                routing_policy_version=RoutingPolicyVersion.from_value(plan_row[0]),
-                page_routes=routes,
-                dominant_route_name=PageRouteName(plan_row[1]),
-                page_exceptions=tuple(route for route, item in zip(routes, route_rows) if item[7]),
-                confidence_score=plan_row[2],
-            )
-        started = DocumentProcessingStarted(
-            processing_run_id=run_id,
-            document_id=parsed_document_id,
-            source_page_count=row[2],
-        )
-        return DocumentProcessingRun(
-            processing_run_id=run_id,
-            document_id=parsed_document_id,
-            page_manifest=manifest,
-            page_decisions=decisions,
-            route_plan=route_plan,
-            manual_review_reason=row[4],
-            blocking_policy_version=None
-            if row[5] is None
-            else RoutingPolicyVersion.from_value(row[5]),
-            status=DocumentProcessingRunStatus(row[3]),
-            aggregate_version=row[6],
-            events=(started,),
-        )
+            grouped = _load_processing_run_children(cursor, [row[0]])
+        return _processing_run_from_grouped_rows(row, grouped)
 
 
 def _load_processing_run_children(
@@ -984,7 +886,19 @@ def _processing_run_from_grouped_rows(
                 document_id=document_id,
                 source_page_count=row[2],
             ),
+        )
+        + (
+            (
+                ProcessingRunFailed(
+                    processing_run_id=run_id,
+                    document_id=document_id,
+                    error_code=row[7],
+                ),
+            )
+            if DocumentProcessingRunStatus(row[3]) is DocumentProcessingRunStatus.FAILED
+            else ()
         ),
+        failure_error_code=row[7],
     )
 
 

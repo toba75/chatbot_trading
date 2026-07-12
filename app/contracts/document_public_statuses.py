@@ -32,6 +32,7 @@ class PublicDiagnosticStatus(_StrictPublicStatus):
     MANUAL_REVIEW = "MANUAL_REVIEW"
     QUARANTINED = "QUARANTINED"
     REJECTED = "REJECTED"
+    FAILED = "FAILED"
 
 
 class PublicConversionStatus(_StrictPublicStatus):
