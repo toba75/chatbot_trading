@@ -90,10 +90,11 @@ with factory.connect() as connection:
             (4, "004_knowledge_projection_chunk_samples.sql"),
             (5, "005_source_processing_read_performance.sql"),
             (6, "006_worker_resilience_and_ka_version.sql"),
+            (7, "007_job_outbox_context_boundary.sql"),
         ]
         cursor.execute("SELECT to_regclass('knowledge_access.knowledge_projections')", ())
         assert cursor.fetchone() == ("knowledge_access.knowledge_projections",)
-print("upgrade-volume-pre-M13=schema-006; ledger=idempotent; lock=advisory")
+print("upgrade-volume-pre-M13=schema-007; ledger=idempotent; lock=advisory")
 '@ | & $python -B -
     if ($LASTEXITCODE -ne 0) { throw "POSTGRES_MIGRATION_UPGRADE_FAILED" }
 }

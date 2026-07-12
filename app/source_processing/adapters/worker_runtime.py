@@ -177,7 +177,11 @@ def _run_worker(
     processed = 0
     while max_jobs is None or processed < max_jobs:
         try:
-            persistence.job_queue.relay_pending_outbox(limit=16)
+            persistence.job_outbox_relay.relay_pending(
+                limit=16,
+                owner_id=f"{owner_id}-OUTBOX",
+                lease_seconds=lease_seconds,
+            )
             claimed = persistence.job_queue.claim_next(
                 owner_id=owner_id,
                 lease_seconds=lease_seconds,

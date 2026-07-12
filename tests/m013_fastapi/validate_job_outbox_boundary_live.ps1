@@ -24,7 +24,8 @@ $migrations006 = Join-Path $temporaryRoot "migrations-006"
 $image = "postgres@sha256:7e5df973a74872482e320dcbdeb055e178d6f42de0558b083892c50cda833c96"
 New-Item -ItemType Directory -Path $migrations006 -Force | Out-Null
 [System.IO.File]::WriteAllText($secret, "m13-relay-password", [System.Text.UTF8Encoding]::new($false))
-Get-ChildItem (Join-Path $repoRoot "deploy\postgres\migrations") -Filter "00[1-6]_*.sql" |
+Get-ChildItem (Join-Path $repoRoot "deploy\postgres\migrations") -Filter "*.sql" |
+    Where-Object { $_.Name -match '^00[1-6]_' } |
     Copy-Item -Destination $migrations006
 
 try {

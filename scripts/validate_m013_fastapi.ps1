@@ -58,6 +58,7 @@ $staticTests = @(
     "tests/m013_fastapi/validate_orchestrator_deployment_acceptance.ps1",
     "tests/m013_fastapi/validate_orchestrator_deployment_unit.ps1",
     "tests/m013_fastapi/validate_document_worker_runtime_acceptance.ps1",
+    "tests/m013_fastapi/validate_job_outbox_boundary_acceptance.ps1",
     "tests/m013_fastapi/validate_worker_data_resilience_acceptance.ps1",
     "tests/m013_fastapi/validate_ka_projection_persistence_unit.ps1",
     "tests/m013_fastapi/validate_m013_fastapi_traceability_unit.ps1",
@@ -69,6 +70,7 @@ $liveTests = @(
     "tests/m013_fastapi/validate_postgres_migration_upgrade_live.ps1",
     "tests/m013_fastapi/validate_document_http_live_acceptance.ps1",
     "tests/m013_fastapi/validate_document_worker_live.ps1",
+    "tests/m013_fastapi/validate_job_outbox_boundary_live.ps1",
     "tests/m013_fastapi/validate_ka_projection_persistence_live.ps1",
     "tests/m013_fastapi/validate_ui_orchestrator_document_flow_acceptance.ps1"
 )

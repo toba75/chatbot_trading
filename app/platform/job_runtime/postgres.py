@@ -17,6 +17,7 @@ from app.platform.job_runtime import (
     JobStatus,
     JobSubmissionDecision,
 )
+from app.platform.job_runtime.relay import RelayedJobMessage
 from app.platform.postgres import PostgresConnection, PostgresConnectionFactory
 from app.platform.request_context import current_trace_id
 
@@ -26,6 +27,13 @@ class JobLeaseConflictError(RuntimeError):
 
     def __init__(self) -> None:
         super().__init__("JOB_LEASE_LOST")
+
+
+class JobRelayMessageConflictError(RuntimeError):
+    """Le même message de relais désigne un contenu technique différent."""
+
+    def __init__(self) -> None:
+        super().__init__("JOB_RELAY_MESSAGE_CONFLICT")
 
 
 @dataclass(frozen=True, slots=True)
@@ -196,89 +204,106 @@ class PostgresJobQueue:
                 row = cursor.fetchone()
         return None if row is None else _job_from_row(row)
 
-    def relay_pending_outbox(self, *, limit: int) -> int:
-        """Relaie dans l'ordre les messages SP sans transaction inter-propriétaires."""
+    def consume_relay_message(self, message: RelayedJobMessage) -> str:
+        """Consomme un message dans une transaction exclusivement ``platform``."""
 
-        if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1:
-            raise ValueError("relay limit invalide")
-        relayed = 0
-        for _ in range(limit):
-            with self._connection_factory.connect() as connection:
-                with connection.transaction():
-                    with connection.cursor() as cursor:
-                        cursor.execute(
-                            """
-                            SELECT sequence, outbox_id, job_name, priority, input_hash,
-                                   configuration_hash, code_version, model_version,
-                                   payload, trace_id
-                              FROM source_processing.job_outbox
-                             WHERE status = 'pending'
-                             ORDER BY sequence
-                             FOR UPDATE SKIP LOCKED
-                             LIMIT 1
-                            """,
-                            (),
-                        )
-                        message = cursor.fetchone()
-                        if message is None:
-                            return relayed
-                        cursor.execute(
-                            """
-                            INSERT INTO platform.technical_jobs (
-                                job_name, priority, input_hash, configuration_hash,
-                                code_version, model_version, payload, trace_id, status,
-                                recalculation_number
-                            )
-                            VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, %s, 'pending', 0)
-                            ON CONFLICT (
-                                job_name, input_hash, configuration_hash,
-                                code_version, model_version, recalculation_number
-                            ) DO NOTHING
-                            RETURNING job_id
-                            """,
-                            (
-                                message[2],
-                                message[3],
-                                message[4],
-                                message[5],
-                                message[6],
-                                message[7],
-                                json.dumps(dict(message[8]), separators=(",", ":"), sort_keys=True),
-                                message[9],
-                            ),
-                        )
-                        inserted = cursor.fetchone()
-                        if inserted is None:
-                            cursor.execute(
-                                """
-                                SELECT job_id
-                                  FROM platform.technical_jobs
-                                 WHERE job_name = %s
-                                   AND input_hash = %s
-                                   AND configuration_hash = %s
-                                   AND code_version = %s
-                                   AND model_version = %s
-                                   AND recalculation_number = 0
-                                """,
-                                (message[2], message[4], message[5], message[6], message[7]),
-                            )
-                            inserted = cursor.fetchone()
-                        if inserted is None:
-                            raise RuntimeError("JOB_OUTBOX_RELAY_FAILED")
-                        cursor.execute(
-                            """
-                            UPDATE source_processing.job_outbox
-                               SET status = 'relayed', platform_job_id = %s,
-                                   relayed_at = CURRENT_TIMESTAMP,
-                                   relay_attempts = relay_attempts + 1
-                             WHERE sequence = %s AND status = 'pending'
-                            """,
-                            (inserted[0], message[0]),
-                        )
-                        if cursor.rowcount != 1:
-                            raise RuntimeError("JOB_OUTBOX_RELAY_CONFLICT")
-            relayed += 1
-        return relayed
+        if not isinstance(message, RelayedJobMessage):
+            raise ValueError("message relais invalide")
+        request = message.as_job_request()
+        self._catalog.require_known_job(request.job_name)
+        serialized_payload = json.dumps(
+            dict(request.payload),
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+        with self._connection_factory.connect() as connection:
+            with connection.transaction(), connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                    (message.message_id,),
+                )
+                cursor.execute(
+                    """
+                    SELECT job_id, source_message_hash
+                      FROM platform.technical_jobs
+                     WHERE source_message_id = %s
+                    """,
+                    (message.message_id,),
+                )
+                consumed = cursor.fetchone()
+                if consumed is not None:
+                    if consumed[1] != message.content_hash:
+                        raise JobRelayMessageConflictError()
+                    return consumed[0]
+
+                cursor.execute(
+                    """
+                    SELECT job_id, priority, payload, trace_id,
+                           source_message_id, source_message_hash
+                      FROM platform.technical_jobs
+                     WHERE job_name = %s
+                       AND input_hash = %s
+                       AND configuration_hash = %s
+                       AND code_version = %s
+                       AND model_version = %s
+                       AND recalculation_number = 0
+                     FOR UPDATE
+                    """,
+                    request.idempotence_key.identity_tuple(),
+                )
+                existing = cursor.fetchone()
+                if existing is not None:
+                    if (
+                        existing[1] != request.priority.value
+                        or dict(existing[2]) != dict(request.payload)
+                        or existing[3] != message.trace_id
+                        or existing[4] is not None
+                        or existing[5] is not None
+                    ):
+                        raise JobRelayMessageConflictError()
+                    cursor.execute(
+                        """
+                        UPDATE platform.technical_jobs
+                           SET source_message_id = %s, source_message_hash = %s
+                         WHERE job_id = %s AND source_message_id IS NULL
+                        """,
+                        (message.message_id, message.content_hash, existing[0]),
+                    )
+                    if cursor.rowcount != 1:
+                        raise JobRelayMessageConflictError()
+                    return existing[0]
+
+                cursor.execute(
+                    """
+                    INSERT INTO platform.technical_jobs (
+                        job_name, priority, input_hash, configuration_hash,
+                        code_version, model_version, payload, trace_id, status,
+                        recalculation_number, source_message_id, source_message_hash
+                    )
+                    VALUES (
+                        %s, %s, %s, %s, %s, %s, %s::jsonb, %s, 'pending', 0,
+                        %s, %s
+                    )
+                    RETURNING job_id
+                    """,
+                    (
+                        request.job_name,
+                        request.priority.value,
+                        request.idempotence_key.input_hash,
+                        request.idempotence_key.configuration_hash,
+                        request.idempotence_key.code_version,
+                        request.idempotence_key.model_version,
+                        serialized_payload,
+                        message.trace_id,
+                        message.message_id,
+                        message.content_hash,
+                    ),
+                )
+                inserted = cursor.fetchone()
+        if inserted is None:
+            raise RuntimeError("JOB_RELAY_PERSISTENCE_FAILED")
+        return inserted[0]
 
     def claim_next(
         self,
@@ -548,4 +573,9 @@ def _job_from_row(row: Any) -> JobRecord:
     )
 
 
-__all__ = ["ClaimedJob", "JobLeaseConflictError", "PostgresJobQueue"]
+__all__ = [
+    "ClaimedJob",
+    "JobLeaseConflictError",
+    "JobRelayMessageConflictError",
+    "PostgresJobQueue",
+]

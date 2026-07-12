@@ -9,19 +9,21 @@ $scenario = @'
 from datetime import timedelta
 
 from app.platform.job_runtime.postgres import PostgresJobQueue
+from app.platform.job_runtime.relay import JobOutboxRelay
 from app.source_processing.application.document_worker import DocumentDiagnosticWorker
 from app.source_processing.adapters.postgres_document_persistence import (
     ProcessingRunVersionConflictError,
 )
 
 for method_name in (
-    "relay_pending_outbox",
+    "consume_relay_message",
     "claim_next",
     "renew_lease",
     "mark_succeeded",
     "mark_failed",
 ):
     assert callable(getattr(PostgresJobQueue, method_name, None)), method_name
+assert callable(getattr(JobOutboxRelay, "relay_pending", None))
 
 assert callable(getattr(DocumentDiagnosticWorker, "execute", None))
 assert issubclass(ProcessingRunVersionConflictError, RuntimeError)
@@ -66,7 +68,7 @@ $runtime = Get-Content -Raw -Encoding UTF8 (Join-Path $repoRoot "app\source_proc
 if ($runtime.Contains("threading.Event().wait()")) {
     throw "worker-documents attend encore sans consommer la file."
 }
-foreach ($marker in @("DocumentDiagnosticWorker", "claim_next", "relay_pending_outbox")) {
+foreach ($marker in @("DocumentDiagnosticWorker", "claim_next", "job_outbox_relay.relay_pending")) {
     if (-not $runtime.Contains($marker)) { throw "Raccordement worker absent: $marker" }
 }
 

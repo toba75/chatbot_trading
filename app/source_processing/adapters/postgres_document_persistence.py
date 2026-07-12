@@ -12,6 +12,7 @@ from uuid import uuid4
 
 from app.platform.job_runtime import JOB_RUNTIME_CATALOG, JobRequest
 from app.platform.job_runtime.postgres import PostgresJobQueue
+from app.platform.job_runtime.relay import JobOutboxRelay
 from app.platform.configuration import ApplicationConfiguration
 from app.platform.postgres import (
     PostgresConnection,
@@ -28,6 +29,7 @@ from app.source_processing.application.original_queries import (
     OriginalHashMismatchError,
     VerifiedOriginalBinary,
 )
+from app.source_processing.adapters.postgres_job_outbox import PostgresJobOutbox
 from app.source_processing.domain.document_processing_run import (
     DiagnosticVersion,
     DocumentProcessingRun,
@@ -954,6 +956,7 @@ class DocumentPersistenceAdapters:
     processing_run_repository: PostgresProcessingRunRepository
     document_conversion_repository: PostgresDocumentConversionRepository
     job_queue: PostgresJobQueue
+    job_outbox_relay: JobOutboxRelay
 
 
 def build_document_persistence(
@@ -968,6 +971,10 @@ def build_document_persistence(
     if not callable(getattr(connection_factory, "connect", None)):
         raise ValueError("connection_factory invalide")
     persistence = PostgresDocumentPersistence(connection_factory=connection_factory)
+    job_queue = PostgresJobQueue(
+        connection_factory=connection_factory,
+        catalog=JOB_RUNTIME_CATALOG,
+    )
     return DocumentPersistenceAdapters(
         original_source_store=CorpusOriginalSourceStore(
             corpus_root=Path(application_configuration.paths.corpus_root)
@@ -975,9 +982,10 @@ def build_document_persistence(
         source_document_repository=persistence,
         processing_run_repository=PostgresProcessingRunRepository(persistence),
         document_conversion_repository=PostgresDocumentConversionRepository(persistence),
-        job_queue=PostgresJobQueue(
-            connection_factory=connection_factory,
-            catalog=JOB_RUNTIME_CATALOG,
+        job_queue=job_queue,
+        job_outbox_relay=JobOutboxRelay(
+            outbox=PostgresJobOutbox(connection_factory=connection_factory),
+            consumer=job_queue,
         ),
     )
 
