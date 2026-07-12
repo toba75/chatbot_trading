@@ -37,6 +37,7 @@ $staticTests = @(
     "tests/m013_fastapi/validate_orchestrator_deployment_acceptance.ps1",
     "tests/m013_fastapi/validate_orchestrator_deployment_unit.ps1",
     "tests/m013_fastapi/validate_document_worker_runtime_acceptance.ps1",
+    "tests/m013_fastapi/validate_worker_data_resilience_acceptance.ps1",
     "tests/m013_fastapi/validate_ka_projection_persistence_unit.ps1",
     "tests/m013_fastapi/validate_m013_fastapi_traceability_unit.ps1",
     "tests/m013_fastapi/validate_review_governance_performance_acceptance.ps1"
