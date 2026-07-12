@@ -8,6 +8,8 @@ $tests = @(
     "tests/m013_fastapi/validate_postgres_migration_upgrade_live.ps1",
     "tests/m013_fastapi/validate_orchestrator_deployment_acceptance.ps1",
     "tests/m013_fastapi/validate_document_http_live_acceptance.ps1",
+    "tests/m013_fastapi/validate_document_worker_runtime_acceptance.ps1",
+    "tests/m013_fastapi/validate_document_worker_live.ps1",
     "tests/m013_fastapi/validate_orchestrator_deployment_unit.ps1",
     "tests/m013_fastapi/validate_m013_fastapi_traceability_unit.ps1"
 )
@@ -25,4 +27,4 @@ foreach ($test in $tests) {
     Write-Host "Validation GREEN: $test"
 }
 
-Write-Host "Gate M13-FastAPI GREEN: 8 preuve(s), migrations, timeouts, limites HTTP, streaming, Docker/PostgreSQL/PDF/Uvicorn inclus."
+Write-Host "Gate M13-FastAPI GREEN: 10 preuve(s), migrations, timeouts, limites HTTP, streaming, worker concurrent et Docker/PostgreSQL/PDF/Uvicorn inclus."
