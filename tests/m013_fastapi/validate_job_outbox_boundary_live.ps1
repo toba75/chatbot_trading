@@ -174,7 +174,6 @@ with base_factory.connect() as connection:
               JOIN pg_namespace rn ON rn.oid = rt.relnamespace
              WHERE c.contype = 'f'
                AND n.nspname = 'source_processing'
-               AND t.relname = 'job_outbox'
                AND rn.nspname = 'platform'
             """,
             (),

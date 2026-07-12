@@ -84,6 +84,7 @@ if (-not (Test-Path -LiteralPath $migrationPath -PathType Leaf)) {
 $migration = Get-Content -Raw -Encoding UTF8 $migrationPath
 foreach ($marker in @(
     "DROP CONSTRAINT IF EXISTS job_outbox_platform_job_id_fkey",
+    "DROP CONSTRAINT IF EXISTS document_conversion_requests_job_id_fkey",
     "relay_owner",
     "relay_lease_expires_at",
     "source_message_id",
