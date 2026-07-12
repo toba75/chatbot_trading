@@ -18,7 +18,7 @@ FastAPI et Uvicorn sont des adaptateurs techniques. Ils ne possèdent aucun aggr
 | Serveur HTTP | Processus Uvicorn servant exclusivement l'application ASGI de `orchestrator-api`. |
 | Contrat public | Route, payload, statut et erreur observables par un client autorisé, notamment l'UI. |
 | Composition root | Point unique qui construit les dépendances concrètes et les injecte aux adaptateurs HTTP. |
-| Adaptateur HTTP autorisé | Module sous `app/platform` ou sous `app/<bounded_context>/adapters/http`. |
+| Adaptateur HTTP autorisé | Module sous `app/platform`, sous `app/<bounded_context>/adapters/http`, ou module nommé dans l'allowlist HTTP explicite de la gate d'architecture. |
 | Propriétaire métier | Bounded context qui définit la commande, le handler, les invariants, les erreurs et le read-model délégués par HTTP. |
 
 ## Scénario BDD de décision
@@ -39,6 +39,9 @@ FastAPI et Uvicorn sont des adaptateurs techniques. Ils ne possèdent aucun aggr
 
 - `app/platform/**`: application ASGI, composition root, démarrage Uvicorn et traduction transverse du transport.
 - `app/<bounded_context>/adapters/http/**` ou `app/<bounded_context>/adapters/http.py`: adaptateurs HTTP autorisés qui traduisent un contrat public vers un port applicatif propriétaire.
+- `app/source_processing/adapters/query_http.py` et `app/source_processing/adapters/original_http.py`: adaptateurs HTTP SP explicitement autorisés pour les read-models documentaires et la restitution contrôlée de l'original.
+
+L'allowlist des modules nommés est exacte. Elle n'autorise ni tout le répertoire `adapters/`, ni un même nom de fichier dans un autre bounded context.
 
 ### Responsabilités interdites
 
