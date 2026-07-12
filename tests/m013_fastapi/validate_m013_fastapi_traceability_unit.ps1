@@ -26,6 +26,7 @@ foreach ($testPath in @(
     "tests/m013_fastapi/validate_postgres_migration_upgrade_live.ps1",
     "tests/m013_fastapi/validate_orchestrator_deployment_acceptance.ps1",
     "tests/m013_fastapi/validate_document_http_live_acceptance.ps1",
+    "tests/m013_fastapi/validate_ka_projection_persistence_live.ps1",
     "tests/m013_fastapi/validate_orchestrator_deployment_unit.ps1",
     "tests/m013_fastapi/validate_m013_fastapi_traceability_unit.ps1"
 )) {
@@ -34,11 +35,15 @@ foreach ($testPath in @(
 Assert-Contains $testGate "scripts/validate_m013_fastapi.ps1" "Gate M13-FastAPI absente de scripts/test.ps1."
 Assert-Contains $lintGate "scripts/validate_m013_fastapi.ps1" "Gate M13-FastAPI absente de scripts/lint.ps1."
 foreach ($marker in @(
+    "REQ-M013-FASTAPI-009",
+    "REQ-M013-FASTAPI-010",
     "REQ-M013-FASTAPI-011",
     "docs/tasks/milestone_013-fastapi/0011_deployer_auditer_api_orchestratrice.md",
     "scripts/validate_m013_fastapi.ps1",
     "ADR-019",
-    "ADR-020"
+    "ADR-020",
+    "ADR-021",
+    "ADR-022"
 )) {
     Assert-Contains $traceability $marker "Traçabilité T-011 incomplète."
 }

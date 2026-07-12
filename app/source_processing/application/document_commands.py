@@ -49,12 +49,15 @@ class SourceDocumentLookupRepository(SourceDocumentRepository, Protocol):
 class ProcessingRunLookupRepository(ProcessingRunRepository, Protocol):
     """Dépôt de tentatives avec lecture par document."""
 
-    def find_by_document_id(self, document_id: DocumentId) -> object | None:
+    def find_by_document_id(
+        self,
+        document_id: DocumentId,
+    ) -> DocumentProcessingRun | None:
         """Retourne une tentative déjà demandée pour ce document."""
 
     def submit_processing_run(
         self,
-        processing_run: object,
+        processing_run: DocumentProcessingRun,
         job_queue: "DiagnosisJobQueue",
         job_request: JobRequest,
     ) -> JobSubmissionDecision:

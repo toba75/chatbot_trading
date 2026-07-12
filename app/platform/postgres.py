@@ -7,10 +7,30 @@ from pathlib import Path
 from typing import Any, Protocol
 
 
+class PostgresCursor(Protocol):
+    def execute(self, query: str, parameters: object = ()) -> object: ...
+    def fetchone(self) -> Any: ...
+    def fetchall(self) -> list[Any]: ...
+    def __enter__(self) -> "PostgresCursor": ...
+    def __exit__(self, exc_type: object, exc: object, traceback: object) -> bool: ...
+
+
+class PostgresTransaction(Protocol):
+    def __enter__(self) -> object: ...
+    def __exit__(self, exc_type: object, exc: object, traceback: object) -> bool: ...
+
+
+class PostgresConnection(Protocol):
+    def cursor(self) -> PostgresCursor: ...
+    def transaction(self) -> PostgresTransaction: ...
+    def __enter__(self) -> "PostgresConnection": ...
+    def __exit__(self, exc_type: object, exc: object, traceback: object) -> bool: ...
+
+
 class PostgresConnectionFactory(Protocol):
     """Port technique ouvrant une connexion transactionnelle PostgreSQL."""
 
-    def connect(self) -> Any:
+    def connect(self) -> PostgresConnection:
         """Ouvre une nouvelle connexion; aucun partage de connexion entre processus."""
 
 
@@ -33,7 +53,7 @@ class PsycopgConnectionFactory:
         ):
             raise ValueError("postgres_connect_timeout_seconds invalide")
 
-    def connect(self) -> Any:
+    def connect(self) -> PostgresConnection:
         try:
             import psycopg
         except ImportError as exc:
@@ -67,4 +87,10 @@ def _read_password(path: Path) -> str:
     return password
 
 
-__all__ = ["PostgresConnectionFactory", "PsycopgConnectionFactory"]
+__all__ = [
+    "PostgresConnection",
+    "PostgresConnectionFactory",
+    "PostgresCursor",
+    "PostgresTransaction",
+    "PsycopgConnectionFactory",
+]

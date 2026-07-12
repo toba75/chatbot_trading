@@ -54,6 +54,7 @@ class Connection:
     def __enter__(self): return self
     def __exit__(self, *args): return False
     def cursor(self): return self._cursor
+    def transaction(self): return self
 
 
 class Factory:
@@ -103,9 +104,13 @@ def chunk(number):
 
 
 writer_cursor = Cursor(None, [])
-writer = PostgresKnowledgeProjectionRepository(connection_factory=Factory([writer_cursor]))
+writer = PostgresKnowledgeProjectionRepository(
+    connection_factory=Factory([writer_cursor]),
+    sample_storage_limit=3,
+)
 writer.save_transition(
     projection=projection,
+    chunk_count=3,
     chunks=(chunk(1), chunk(2), chunk(3)),
     state_observed_at="2026-07-12T10:00:00Z",
 )
@@ -142,6 +147,10 @@ sample_rows = [
             }
             for locator in sample.source_locators
         ],
+        sample.chunk_id,
+        sample.parent_chunk_id,
+        sample.profile_id,
+        sample.profile_version,
     )
     for sample in (chunk(1), chunk(2))
 ]

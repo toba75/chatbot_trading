@@ -112,3 +112,14 @@
 - Commit GREEN : `d1daf1f34`, `feat(worker): executer diagnostics durables ADR-022`.
 - Preuves : API Uvicorn réelle vers PostgreSQL Docker puis deux seconds processus workers; trois jobs réussis; crash/reprise; `trace_id` absent du payload; conflit `PROCESSING_RUN_VERSION_CONFLICT`; interleaving `REPEATABLE READ`; upgrade schema 003 exécuté deux fois avec ledger idempotent.
 - Validations : T-005 persistance, T-006 commandes, T-007 read-models, architecture, gate M13-FastAPI et lint GREEN (38 validations).
+
+## Correctif de revue T-009/T-010 - contrats produit KA, SP et UI
+
+- Date : 2026-07-12.
+- Scénario : Given des transitions `KnowledgeProjection` et des DTO documentaires servis par l'application FastAPI réelle; When PostgreSQL redémarre et que l'utilisateur charge, diagnostique ou inspecte un PDF; Then KA relit les états et `SourceLocator` bornés, l'UI applique les statuts SP exacts, refuse les diagnostics incohérents et présente une navigation HTML accessible sans fallback.
+- ADR : ADR-018, ADR-021 et ADR-022 consultées et appliquées; aucune nouvelle ADR requise. La migration ascendante `004_knowledge_projection_chunk_samples.sql` suit ADR-021.
+- Commit RED : `d5f682fdf`, `test(produit): couvrir contrats KA SP UI stricts`.
+- Migration : schéma PostgreSQL `004`, table `knowledge_access.knowledge_projection_chunk_samples`, image `schema-004` et lecture `REPEATABLE READ READ ONLY` avec `sample_limit` SQL.
+- Preuves live : PostgreSQL Docker réel redémarré avec `BUILDING`, `SEARCHABLE`, `STALE`, `FAILED`; Uvicorn/FastAPI réels avec upload multipart, diagnostic, conversion, projection et original par le client UI.
+- UI : origine hôte `127.0.0.1` issue de la configuration, origine Compose `orchestrator-api`, succès POST en `303`, erreurs françaises `role=alert`, inspections sémantiques et retrait du bouton de sélection non raccordé.
+- Modification utilisateur protégée : `tests/m013/validate_m013_reality_product_acceptance.ps1`, hors staging et hors commits.

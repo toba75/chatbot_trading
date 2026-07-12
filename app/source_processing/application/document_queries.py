@@ -5,6 +5,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Protocol
 
+from app.contracts.document_public_statuses import (
+    PublicConversionStatus,
+    PublicDiagnosticStatus,
+    PublicSourceStatus,
+)
+
 from app.source_processing.application.document_commands import (
     DocumentConversionState,
     SourceNotFoundError,
@@ -238,16 +244,18 @@ class DocumentQueryService:
         return DocumentCorpusItem(
             document_id=document_id.value,
             title=source_document.metadata.title,
-            document_status=source_document.status.value,
+            document_status=PublicSourceStatus.from_value(source_document.status.value).value,
             diagnostic_status=(
-                "DIAGNOSTIC_NOT_REQUESTED"
+                PublicDiagnosticStatus.DIAGNOSTIC_NOT_REQUESTED.value
                 if parsed_processing_run is None
-                else parsed_processing_run.status.value
+                else PublicDiagnosticStatus.from_value(parsed_processing_run.status.value).value
             ),
             conversion_status=(
-                "CONVERSION_NOT_REQUESTED"
+                PublicConversionStatus.CONVERSION_NOT_REQUESTED.value
                 if parsed_conversion is None
-                else parsed_conversion.conversion_status.value
+                else PublicConversionStatus.from_value(
+                    parsed_conversion.conversion_status.value
+                ).value
             ),
             canonical_version_id=(
                 None

@@ -15,6 +15,7 @@ from app.platform.ui_corpus import (
     CONVERSION_STATUSES,
     DIAGNOSTIC_STATUSES,
     PROJECTION_STATUSES,
+    SOURCE_STATUSES,
     CorpusPdfDocument,
     CorpusPdfScreenState,
 )
@@ -228,14 +229,18 @@ class UiDocumentApiClient:
         )
 
     def read_diagnostic(self, document_id: str) -> UiDocumentJsonResponse:
+        parsed_document_id = _ensure_document_id(document_id)
         response = self._json_request(
             method="GET",
-            path=f"/v1/documents/{_ensure_document_id(document_id)}/diagnostic",
+            path=f"/v1/documents/{parsed_document_id}/diagnostic",
             body=None,
             content_type=None,
         )
         if response.status_code == 200:
-            _validate_diagnostic_payload(response.payload)
+            _validate_diagnostic_payload(
+                response.payload,
+                expected_document_id=parsed_document_id,
+            )
         return response
 
     def read_conversion(self, document_id: str) -> UiDocumentJsonResponse:
@@ -262,6 +267,7 @@ class UiDocumentApiClient:
                 raise ValueError("conversion retournée pour un autre document")
             if response.payload["conversion_status"] not in CONVERSION_STATUSES:
                 raise ValueError("statut conversion public invalide")
+            _validate_conversion_nullability(response.payload)
         return response
 
     def read_projection(self, document_id: str) -> UiDocumentJsonResponse:
@@ -357,6 +363,22 @@ def _parse_corpus_document(value: Any) -> dict[str, Any]:
         )
     )
     _require_exact_fields(value, expected, "document corpus")
+    _ensure_document_id(value["document_id"])
+    _ensure_text(value["title"], "titre documentaire public invalide")
+    if value["document_status"] not in SOURCE_STATUSES:
+        raise ValueError("statut source public invalide")
+    if value["diagnostic_status"] not in DIAGNOSTIC_STATUSES:
+        raise ValueError("statut diagnostic public invalide")
+    if value["conversion_status"] not in CONVERSION_STATUSES:
+        raise ValueError("statut conversion public invalide")
+    canonical_version_id = value["canonical_version_id"]
+    if canonical_version_id is not None:
+        _ensure_text(canonical_version_id, "canonical_version_id public invalide")
+    if value["conversion_status"] == "CANONICAL_ACCEPTED":
+        if canonical_version_id is None:
+            raise ValueError("canonical_version_id requis pour conversion acceptée")
+    elif canonical_version_id is not None:
+        raise ValueError("canonical_version_id interdit avant conversion acceptée")
     return dict(value)
 
 
@@ -386,7 +408,11 @@ def _parse_projection_status(payload: Mapping[str, Any], *, expected_document_id
     return status
 
 
-def _validate_diagnostic_payload(payload: Mapping[str, Any]) -> None:
+def _validate_diagnostic_payload(
+    payload: Mapping[str, Any],
+    *,
+    expected_document_id: str,
+) -> None:
     _require_exact_fields(
         payload,
         frozenset(
@@ -402,6 +428,8 @@ def _validate_diagnostic_payload(payload: Mapping[str, Any]) -> None:
         ),
         "diagnostic",
     )
+    if payload["document_id"] != expected_document_id:
+        raise ValueError("diagnostic retourné pour un autre document")
     if payload["diagnostic_status"] not in DIAGNOSTIC_STATUSES:
         raise ValueError("statut diagnostic public invalide")
     source_page_count = payload["source_page_count"]
@@ -409,10 +437,95 @@ def _validate_diagnostic_payload(payload: Mapping[str, Any]) -> None:
     for count in (source_page_count, diagnosed_page_count):
         if isinstance(count, bool) or not isinstance(count, int) or count < 0:
             raise ValueError("comptage diagnostic public invalide")
-    if diagnosed_page_count > source_page_count:
+    if source_page_count < 1 or diagnosed_page_count > source_page_count:
         raise ValueError("comptage diagnostic public incohérent")
-    if not isinstance(payload["manifest"], list) or not isinstance(payload["pages"], list):
+    manifest = payload["manifest"]
+    pages = payload["pages"]
+    if not isinstance(manifest, list) or not isinstance(pages, list):
         raise ValueError("détails diagnostic publics invalides")
+    expected_page_numbers = list(range(1, source_page_count + 1))
+    manifest_numbers = []
+    manifest_statuses: dict[int, str] = {}
+    for entry in manifest:
+        if not isinstance(entry, Mapping):
+            raise ValueError("entrée manifeste publique invalide")
+        _require_exact_fields(
+            entry,
+            frozenset(("page_number", "manifest_status")),
+            "manifeste",
+        )
+        page_number = _positive_page_number(entry["page_number"])
+        manifest_status = _ensure_text(
+            entry["manifest_status"],
+            "manifest_status public invalide",
+        )
+        manifest_numbers.append(page_number)
+        manifest_statuses[page_number] = manifest_status
+    if manifest_numbers != expected_page_numbers:
+        raise ValueError("manifeste diagnostic incomplet, dupliqué ou désordonné")
+
+    page_numbers = []
+    diagnosed_pages = 0
+    for page in pages:
+        if not isinstance(page, Mapping):
+            raise ValueError("page diagnostic publique invalide")
+        _require_exact_fields(
+            page,
+            frozenset(
+                (
+                    "page_number",
+                    "manifest_status",
+                    "diagnostic",
+                    "route",
+                )
+            ),
+            "pages diagnostic",
+        )
+        page_number = _positive_page_number(page["page_number"])
+        page_numbers.append(page_number)
+        if page["manifest_status"] != manifest_statuses.get(page_number):
+            raise ValueError("statut de page incohérent avec le manifeste")
+        diagnostic = page["diagnostic"]
+        route = page["route"]
+        if diagnostic is not None:
+            if not isinstance(diagnostic, Mapping):
+                raise ValueError("diagnostic de page public invalide")
+            diagnosed_pages += 1
+        if route is not None and not isinstance(route, Mapping):
+            raise ValueError("route de page publique invalide")
+    if page_numbers != expected_page_numbers:
+        raise ValueError("pages diagnostic incomplètes, dupliquées ou désordonnées")
+    if diagnosed_pages != diagnosed_page_count:
+        raise ValueError("comptage diagnostic public incohérent")
+
+    manual_review_reason = payload["manual_review_reason"]
+    if payload["diagnostic_status"] == "MANUAL_REVIEW":
+        _ensure_text(manual_review_reason, "motif de revue manuelle requis")
+    elif manual_review_reason is not None:
+        raise ValueError("motif de revue manuelle interdit pour ce statut")
+
+
+def _validate_conversion_nullability(payload: Mapping[str, Any]) -> None:
+    status = payload["conversion_status"]
+    rejection = payload["qa_rejection_error_code"]
+    canonical_version_id = payload["canonical_version_id"]
+    if status == "QA_REJECTED":
+        _ensure_text(rejection, "qa_rejection_error_code requis")
+        if canonical_version_id is not None:
+            raise ValueError("canonical_version_id interdit pour QA_REJECTED")
+        return
+    if rejection is not None:
+        raise ValueError("qa_rejection_error_code interdit pour ce statut")
+    if status == "CANONICAL_ACCEPTED":
+        _ensure_text(canonical_version_id, "canonical_version_id requis")
+    elif canonical_version_id is not None:
+        raise ValueError("canonical_version_id interdit avant acceptation")
+
+
+def _positive_page_number(value: Any) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise ValueError("numéro de page public invalide")
+    return value
 
 
 def _validate_registration_response(response: UiDocumentJsonResponse) -> None:

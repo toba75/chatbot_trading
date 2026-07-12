@@ -158,6 +158,7 @@ def main() -> int:
                 service_id=args.service_id,
                 port=args.port,
                 application_configuration=_load_runtime_application_configuration(args.config),
+                ui_execution_context=("compose" if args.service_id == "ui" else None),
             )
         if args.command == "run-worker":
             _run_worker(
@@ -187,7 +188,13 @@ def _load_runtime_application_configuration(config_path: str | None) -> Applicat
     )
 
 
-def _serve_http(*, service_id: str, port: int, application_configuration: ApplicationConfiguration) -> None:
+def _serve_http(
+    *,
+    service_id: str,
+    port: int,
+    application_configuration: ApplicationConfiguration,
+    ui_execution_context: str | None,
+) -> None:
     expected_port = _configured_http_port(service_id, application_configuration)
     if port != expected_port:
         raise ValueError(f"Port HTTP local invalide pour {service_id}: {port}")
@@ -198,6 +205,7 @@ def _serve_http(*, service_id: str, port: int, application_configuration: Applic
             if service_id == "ui" and self.path != "/health":
                 api_client = _build_ui_document_api_client(
                     application_configuration=application_configuration,
+                    execution_context=_require_ui_execution_context(ui_execution_context),
                 )
                 pdf_match = _UI_PDF_CONTENT_PATH_PATTERN.fullmatch(self.path)
                 if pdf_match is not None:
@@ -210,12 +218,23 @@ def _serve_http(*, service_id: str, port: int, application_configuration: Applic
                             body={"error_code": ORCHESTRATOR_API_UNAVAILABLE},
                         )
                         return
-                    _write_binary_response(
-                        self,
-                        status_code=response.status_code,
-                        content_type=response.content_type,
-                        body=response.body,
-                    )
+                    if response.status_code == 200:
+                        _write_binary_response(
+                            self,
+                            status_code=response.status_code,
+                            content_type=response.content_type,
+                            body=response.body,
+                        )
+                    else:
+                        _write_text_response(
+                            self,
+                            status_code=response.status_code,
+                            content_type="text/html; charset=utf-8",
+                            body=render_document_inspection(
+                                title="PDF original",
+                                response=_json_response_for_ui_error(response),
+                            ),
+                        )
                     return
                 inspection_match = _UI_DOCUMENT_INSPECTION_PATH_PATTERN.fullmatch(self.path)
                 if inspection_match is not None:
@@ -292,6 +311,9 @@ def _serve_http(*, service_id: str, port: int, application_configuration: Applic
                 try:
                     response = _build_ui_document_api_client(
                         application_configuration=application_configuration,
+                        execution_context=_require_ui_execution_context(
+                            ui_execution_context
+                        ),
                     ).forward_document_command(
                         path=self.path,
                         body=raw_body,
@@ -302,11 +324,18 @@ def _serve_http(*, service_id: str, port: int, application_configuration: Applic
                         status_code=503,
                         payload={"error_code": ORCHESTRATOR_API_UNAVAILABLE},
                     )
-                _write_json_response(
-                    self,
-                    status_code=response.status_code,
-                    body=dict(response.payload),
-                )
+                if response.status_code < 400:
+                    _write_redirect_response(self, location="/ui/corpus-pdf")
+                else:
+                    _write_text_response(
+                        self,
+                        status_code=response.status_code,
+                        content_type="text/html; charset=utf-8",
+                        body=render_document_inspection(
+                            title="Erreur documentaire",
+                            response=response,
+                        ),
+                    )
                 return
             body_result = _read_json_body(self)
             if body_result[0] != 200:
@@ -336,6 +365,7 @@ def serve_http_service(*, service_id: str, port: int, config_path: str) -> None:
         service_id=service_id,
         port=port,
         application_configuration=_load_runtime_application_configuration(config_path),
+        ui_execution_context=("host" if service_id == "ui" else None),
     )
 
 
@@ -420,6 +450,35 @@ def _write_binary_response(
     handler.wfile.write(body)
 
 
+def _write_redirect_response(
+    handler: BaseHTTPRequestHandler,
+    *,
+    location: str,
+) -> None:
+    if not isinstance(location, str) or not location.startswith("/"):
+        raise ValueError("location de redirection UI invalide")
+    handler.send_response(303)
+    handler.send_header("Location", location)
+    handler.send_header("Content-Length", "0")
+    handler.end_headers()
+
+
+def _json_response_for_ui_error(response: Any) -> UiDocumentJsonResponse:
+    status_code = getattr(response, "status_code", None)
+    body = getattr(response, "body", None)
+    if isinstance(status_code, bool) or not isinstance(status_code, int):
+        raise ValueError("statut erreur PDF invalide")
+    if not isinstance(body, bytes):
+        raise ValueError("corps erreur PDF invalide")
+    try:
+        payload = json.loads(body.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError("erreur PDF publique non JSON") from exc
+    if not isinstance(payload, dict):
+        raise ValueError("erreur PDF publique non objet")
+    return UiDocumentJsonResponse(status_code=status_code, payload=payload)
+
+
 def _runtime_path(path_text: str) -> Path:
     path = Path(path_text)
     if path.is_absolute():
@@ -482,14 +541,45 @@ def _build_ui_corpus_state(
 def _build_ui_document_api_client(
     *,
     application_configuration: ApplicationConfiguration,
+    execution_context: str,
 ) -> UiDocumentApiClient:
     configuration = _required_application_configuration(application_configuration)
     return UiDocumentApiClient(
         transport=UrllibUiDocumentApiTransport(
-            orchestrator_origin=f"http://orchestrator-api:{configuration.services.api.port}",
+            orchestrator_origin=build_ui_orchestrator_origin(
+                configuration,
+                execution_context=execution_context,
+            ),
             timeout_seconds=configuration.runtime.timeouts.request_seconds,
         )
     )
+
+
+def build_ui_orchestrator_origin(
+    application_configuration: ApplicationConfiguration,
+    *,
+    execution_context: str,
+) -> str:
+    """Résout explicitement l'origine UI selon le runtime hôte ou Compose."""
+
+    configuration = _required_application_configuration(application_configuration)
+    if execution_context == "host":
+        host = configuration.deployment.hosts.docker_local.bind_host
+    elif execution_context == "compose":
+        host = "orchestrator-api"
+    else:
+        raise ValueError("contexte d'exécution UI invalide")
+    if not isinstance(host, str) or host.strip() == "" or host != host.strip():
+        raise ValueError("hôte orchestrateur UI invalide")
+    if host == "0.0.0.0":
+        raise ValueError("hôte orchestrateur UI non adressable")
+    return f"http://{host}:{configuration.services.api.port}"
+
+
+def _require_ui_execution_context(value: str | None) -> str:
+    if value not in ("host", "compose"):
+        raise ValueError("contexte d'exécution UI requis")
+    return value
 
 
 def _read_ui_document_step(

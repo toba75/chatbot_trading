@@ -13,7 +13,11 @@ from uuid import uuid4
 from app.platform.job_runtime import JOB_RUNTIME_CATALOG, JobRequest
 from app.platform.job_runtime.postgres import PostgresJobQueue
 from app.platform.configuration import ApplicationConfiguration
-from app.platform.postgres import PostgresConnectionFactory, PsycopgConnectionFactory
+from app.platform.postgres import (
+    PostgresConnection,
+    PostgresConnectionFactory,
+    PsycopgConnectionFactory,
+)
 from app.platform.request_context import current_trace_id
 from app.source_processing.application.document_commands import (
     DocumentConversionState,
@@ -357,7 +361,7 @@ class PostgresDocumentPersistence:
     def submit_processing_run(
         self,
         processing_run: DocumentProcessingRun,
-        job_queue: Any,
+        job_queue: PostgresJobQueue,
         job_request: JobRequest,
     ) -> OutboxSubmissionDecision:
         if not isinstance(processing_run, DocumentProcessingRun):
@@ -387,7 +391,7 @@ class PostgresDocumentPersistence:
     def submit_conversion_request(
         self,
         conversion_state: DocumentConversionState,
-        job_queue: Any,
+        job_queue: PostgresJobQueue,
         job_request: JobRequest,
     ) -> OutboxSubmissionDecision:
         if not isinstance(conversion_state, DocumentConversionState):
@@ -428,7 +432,7 @@ class PostgresDocumentPersistence:
     def _enqueue_job_outbox(
         self,
         *,
-        connection: Any,
+        connection: PostgresConnection,
         job_request: JobRequest,
         trace_id: str,
     ) -> OutboxSubmissionDecision:
@@ -486,7 +490,7 @@ class PostgresDocumentPersistence:
 
     def _find_source_in_connection(
         self,
-        connection: Any,
+        connection: PostgresConnection,
         predicate: str,
         parameters: tuple[Any, ...],
     ) -> SourceDocument | None:
@@ -508,7 +512,7 @@ class PostgresDocumentPersistence:
 
     def _load_conversion(
         self,
-        connection: Any,
+        connection: PostgresConnection,
         document_id: DocumentId,
     ) -> DocumentConversionState | None:
         with connection.cursor() as cursor:
@@ -533,7 +537,7 @@ class PostgresDocumentPersistence:
 
     def _save_processing_run(
         self,
-        connection: Any,
+        connection: PostgresConnection,
         processing_run: DocumentProcessingRun,
         *,
         insert_only: bool = False,
@@ -662,7 +666,7 @@ class PostgresDocumentPersistence:
 
     def _load_processing_run(
         self,
-        connection: Any,
+        connection: PostgresConnection,
         document_id: DocumentId,
     ) -> DocumentProcessingRun | None:
         with connection.cursor() as cursor:
@@ -787,7 +791,7 @@ class PostgresProcessingRunRepository:
     def submit_processing_run(
         self,
         processing_run: DocumentProcessingRun,
-        job_queue: Any,
+        job_queue: PostgresJobQueue,
         job_request: JobRequest,
     ) -> OutboxSubmissionDecision:
         return self._persistence.submit_processing_run(processing_run, job_queue, job_request)
@@ -807,7 +811,7 @@ class PostgresDocumentConversionRepository:
     def submit_conversion_request(
         self,
         conversion_state: DocumentConversionState,
-        job_queue: Any,
+        job_queue: PostgresJobQueue,
         job_request: JobRequest,
     ) -> OutboxSubmissionDecision:
         return self._persistence.submit_conversion_request(conversion_state, job_queue, job_request)

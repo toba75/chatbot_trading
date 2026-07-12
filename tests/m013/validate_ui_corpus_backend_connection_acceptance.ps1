@@ -50,7 +50,7 @@ class RecordingTransport:
                 200,
                 "application/json",
                 b'{"documents":[{"document_id":"DOC-M013-UI-API01","title":"Depuis API",'
-                b'"document_status":"SOURCE_REGISTERED","diagnostic_status":"DIAGNOSTIC_NOT_REQUESTED",'
+                b'"document_status":"REGISTERED","diagnostic_status":"DIAGNOSTIC_NOT_REQUESTED",'
                 b'"conversion_status":"CONVERSION_NOT_REQUESTED","canonical_version_id":null}]}',
             ),
             UiDocumentApiResponse(

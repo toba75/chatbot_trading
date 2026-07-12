@@ -33,7 +33,7 @@ Les quatre variables techniques `OST_EDGE_HTTPS_PORT`, `CADDY_ADMIN`, `POSTGRES_
 
 Le service `orchestrator-api` exécute directement l'entrée verrouillée `api --config /workspace/config/application.yaml` depuis la `.venv` copiée par le builder. L'image runtime n'installe pas `uv` et ne résout aucune dépendance. Le service conserve le port interne 8080 et attend PostgreSQL. L'UI et `llm-gateway` gardent leur runtime propre; ils ne sont pas migrés vers FastAPI.
 
-L'image et le schéma sont couplés explicitement par `ostrading/orchestrator-api:0.1.0-m013-fastapi-schema-003` et le label `org.ostrading.postgres-schema-version=003`. Le runner prend un verrou advisory transactionnel, vérifie le ledger `platform.schema_migrations`, applique les versions absentes et refuse toute dérive de SHA-256 avant que `/ready` puisse répondre 200. Les timeouts `startup_seconds`, `request_seconds` et `shutdown_seconds` pilotent respectivement connexion/migrations, requêtes/keep-alive et arrêt Uvicorn; le healthcheck Compose reprend 120 s, 300 s et 30 s sans valeur alternative.
+L'image et le schéma sont couplés explicitement par `ostrading/orchestrator-api:0.1.0-m013-fastapi-schema-004` et le label `org.ostrading.postgres-schema-version=004`. Le runner prend un verrou advisory transactionnel, vérifie le ledger `platform.schema_migrations`, applique les versions absentes et refuse toute dérive de SHA-256 avant que `/ready` puisse répondre 200. Les timeouts `startup_seconds`, `request_seconds` et `shutdown_seconds` pilotent respectivement connexion/migrations, requêtes/keep-alive et arrêt Uvicorn; le healthcheck Compose reprend 120 s, 300 s et 30 s sans valeur alternative.
 
 ## Migration d'un volume existant
 
@@ -44,7 +44,7 @@ docker compose -f .\deploy\local-compose\compose.yaml up -d postgres
 docker compose -f .\deploy\local-compose\compose.yaml run --rm --no-deps orchestrator-api python -m app.platform.postgres_migrations --config /workspace/config/application.yaml
 ```
 
-La sortie attendue pour cette image est `POSTGRES_SCHEMA_READY:003`. Relancer exactement la même commande est idempotent. Une erreur `POSTGRES_MIGRATION_DRIFT`, `POSTGRES_SCHEMA_VERSION_UNSUPPORTED` ou un timeout interdit le démarrage; aucun script n'est ignoré et aucun ledger n'est corrigé automatiquement.
+La sortie attendue pour cette image est `POSTGRES_SCHEMA_READY:004`. Relancer exactement la même commande est idempotent. Une erreur `POSTGRES_MIGRATION_DRIFT`, `POSTGRES_SCHEMA_VERSION_UNSUPPORTED` ou un timeout interdit le démarrage; aucun script n'est ignoré et aucun ledger n'est corrigé automatiquement.
 
 ## Limites binaires et spool temporaire
 
@@ -85,11 +85,11 @@ L'arrêt Compose conserve les volumes:
 docker compose -f .\deploy\local-compose\compose.yaml down
 ```
 
-Le rollback applicatif consiste à arrêter l'image courante, puis à redéployer un tag immuable qui déclare explicitement `schema-003` et le même ledger compatible:
+Le rollback applicatif consiste à arrêter l'image courante, puis à redéployer un tag immuable qui déclare explicitement `schema-004` et le même ledger compatible:
 
 ```powershell
 docker compose -f .\deploy\local-compose\compose.yaml down
-git switch --detach <commit-green-compatible-schema-003>
+git switch --detach <commit-green-compatible-schema-004>
 docker compose -f .\deploy\local-compose\compose.yaml up --build
 ```
 

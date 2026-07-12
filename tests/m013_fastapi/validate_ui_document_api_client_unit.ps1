@@ -66,7 +66,7 @@ transport = RecordingTransport(
         json_response(
             200,
             '{"documents":[{"document_id":"DOC-M013-FASTAPI-UI01","title":"Rapport",'
-            '"document_status":"SOURCE_REGISTERED","diagnostic_status":"DIAGNOSTIC_NOT_REQUESTED",'
+            '"document_status":"REGISTERED","diagnostic_status":"DIAGNOSTIC_NOT_REQUESTED",'
             '"conversion_status":"CONVERSION_NOT_REQUESTED","canonical_version_id":null}]}',
         ),
         json_response(
@@ -116,7 +116,7 @@ internal_transport = RecordingTransport(
         json_response(
             200,
             '{"documents":[{"document_id":"DOC-M013-FASTAPI-UI01","title":"Rapport",'
-            '"document_status":"SOURCE_REGISTERED","diagnostic_status":"DIAGNOSTIC_NOT_REQUESTED",'
+            '"document_status":"REGISTERED","diagnostic_status":"DIAGNOSTIC_NOT_REQUESTED",'
             '"conversion_status":"CONVERSION_NOT_REQUESTED","canonical_version_id":null,'
             '"original_storage_ref":"/var/lib/private.pdf"}]}',
         )
@@ -135,7 +135,7 @@ unknown_status_transport = RecordingTransport(
         json_response(
             200,
             '{"documents":[{"document_id":"DOC-M013-FASTAPI-UI01","title":"Rapport",'
-            '"document_status":"SOURCE_REGISTERED","diagnostic_status":"DIAGNOSTIC_INVENTED",'
+            '"document_status":"REGISTERED","diagnostic_status":"DIAGNOSTIC_INVENTED",'
             '"conversion_status":"CONVERSION_NOT_REQUESTED","canonical_version_id":null}]}',
         )
     ]

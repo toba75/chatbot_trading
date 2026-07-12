@@ -41,7 +41,7 @@ def assert_not_contains(text: str, forbidden: str, message: str) -> None:
 document = CorpusPdfDocument(
     document_id="DOC-M013-VIEWER-0001",
     title="_OceanofPDF.com_Markets_and_Momentum_-_James_F_Dalton",
-    source_status="SOURCE_REGISTERED",
+    source_status="REGISTERED",
     diagnostic_status="DIAGNOSTIC_NOT_REQUESTED",
     conversion_status="CONVERSION_NOT_REQUESTED",
     canonical_version_id=None,

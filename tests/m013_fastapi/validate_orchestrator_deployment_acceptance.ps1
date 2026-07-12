@@ -32,12 +32,12 @@ Assert-Contains $compose "      - api" "Compose ne lance pas le point d'entrée 
 Assert-Contains $compose "      - --config" "Compose ne transmet pas la configuration unique."
 Assert-Contains $compose "      - /workspace/config/application.yaml" "Chemin de configuration Compose invalide."
 Assert-Contains $compose 'http://127.0.0.1:8080/ready' "Healthcheck readiness HTTP absent."
-Assert-Contains $compose 'ostrading/orchestrator-api:0.1.0-m013-fastapi-schema-003' "Tag image/schéma M13-FastAPI absent."
+Assert-Contains $compose 'ostrading/orchestrator-api:0.1.0-m013-fastapi-schema-004' "Tag image/schéma M13-FastAPI absent."
 Assert-Contains $caddyfile 'max_size 54MB' "Limite agrégée Caddy absente."
 Assert-Contains $dockerfile "COPY uv.lock ./uv.lock" "Le verrou uv n'est pas copié dans l'image."
 Assert-Contains $dockerfile "AS builder" "Étape builder Docker absente."
 Assert-Contains $dockerfile "AS runtime" "Étape runtime Docker absente."
-Assert-Contains $dockerfile 'org.ostrading.postgres-schema-version="003"' "Version de schéma absente de l'image."
+Assert-Contains $dockerfile 'org.ostrading.postgres-schema-version="004"' "Version de schéma absente de l'image."
 Assert-Contains $dockerfile "COPY --chown=ostrading:ostrading deploy/postgres/migrations ./deploy/postgres/migrations" "Migrations non embarquées dans l'image."
 $runtimeBlock = $dockerfile.Substring($dockerfile.IndexOf("AS runtime"))
 if ($runtimeBlock.Contains("pip install") -or $runtimeBlock.Contains(" uv sync")) {

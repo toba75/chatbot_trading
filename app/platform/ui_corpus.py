@@ -3,60 +3,25 @@
 from __future__ import annotations
 
 import html
-import json
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
 from app.contracts.identity import DomainIdentifier
+from app.contracts.document_public_statuses import (
+    PublicConversionStatus,
+    PublicDiagnosticStatus,
+    PublicProjectionStatus,
+    PublicSourceStatus,
+)
 
 
-SOURCE_STATUSES = frozenset(
-    {
-        "SOURCE_REGISTERED",
-        "DUPLICATE_SOURCE",
-        "SOURCE_QUARANTINED",
-        "SOURCE_UNREADABLE",
-    }
-)
-DIAGNOSTIC_STATUSES = frozenset(
-    {
-        "DIAGNOSTIC_NOT_REQUESTED",
-        "DIAGNOSTIC_REQUESTED",
-        "ROUTE_EXPLICIT",
-        "MANUAL_REVIEW",
-        "SOURCE_QUARANTINED",
-    }
-)
-CONVERSION_STATUSES = frozenset(
-    {
-        "CONVERSION_NOT_REQUESTED",
-        "CONVERSION_REQUESTED",
-        "CANONICAL_ACCEPTED",
-        "SOURCE_NOT_ROUTED",
-        "SOURCE_QUARANTINED",
-        "SOURCE_NOT_CANONICAL",
-        "PAGE_AUTHORITY_MISSING",
-        "REJECTED",
-    }
-)
+SOURCE_STATUSES = frozenset(status.value for status in PublicSourceStatus)
+DIAGNOSTIC_STATUSES = frozenset(status.value for status in PublicDiagnosticStatus)
+CONVERSION_STATUSES = frozenset(status.value for status in PublicConversionStatus)
 PROJECTION_STATUSES = frozenset(
-    {
-        "PROJECTION_NOT_REQUESTED",
-        "INDEXATION_REQUESTED",
-        "REQUESTED",
-        "BUILDING",
-        "BUILT",
-        "INDEXING",
-        "SEARCHABLE",
-        "STALE",
-        "FAILED",
-        "RETIRED",
-        "PROJECTION_NOT_FOUND",
-        "PROJECTION_STALE",
-        "SEARCH_INDEX_UNAVAILABLE",
-    }
+    status.value for status in PublicProjectionStatus
 )
 READ_MODEL_STATUSES = frozenset(
     {
@@ -390,10 +355,55 @@ def render_document_inspection(*, title: str, response: Any) -> str:
     if not isinstance(payload, Mapping):
         raise ValueError("payload inspection invalide")
     ensure_no_destructive_ui_fields(payload)
-    serialized = html.escape(
-        json.dumps(dict(payload), ensure_ascii=False, sort_keys=True, indent=2),
-        quote=True,
-    )
+    if status_code >= 400:
+        error_code = _escape(str(payload.get("error_code")))
+        content = "".join(
+            (
+                '<section role="alert" aria-labelledby="erreur-documentaire">',
+                '<h2 id="erreur-documentaire">Action impossible</h2>',
+                f"<p>Le service a répondu avec le code <code>{error_code}</code>.</p>",
+                "<p>Vérifiez que l’API orchestratrice et le worker documentaire sont prêts, puis réessayez.</p>",
+                '<p><a href="/ui/corpus-pdf">Réessayer depuis le corpus</a></p>',
+                "</section>",
+            )
+        )
+    elif parsed_title.casefold() == "diagnostic":
+        pages = payload.get("pages")
+        if not isinstance(pages, list):
+            raise ValueError("pages diagnostic requises pour le rendu")
+        page_items = "".join(
+            "".join(
+                (
+                    f'<li><h3>Page {_escape(str(page.get("page_number")))}</h3>',
+                    f'<p>Manifeste : <code>{_escape(str(page.get("manifest_status")))}</code></p>',
+                    f'<p>Diagnostic : <code>{_escape(_inspection_state(page.get("diagnostic")))}</code></p>',
+                    f'<p>Route : <code>{_escape(_inspection_state(page.get("route")))}</code></p></li>',
+                )
+            )
+            for page in pages
+            if isinstance(page, Mapping)
+        )
+        content = "".join(
+            (
+                '<section aria-labelledby="resume-diagnostic">',
+                '<h2 id="resume-diagnostic">Résumé du diagnostic</h2>',
+                f'<p>Statut : <code>{_escape(str(payload.get("diagnostic_status")))}</code></p>',
+                f'<p>Pages diagnostiquées : {_escape(str(payload.get("diagnosed_page_count")))} / {_escape(str(payload.get("source_page_count")))}</p>',
+                f"<ol>{page_items}</ol></section>",
+            )
+        )
+    else:
+        visible_items = "".join(
+            f"<dt>{_escape(str(key))}</dt><dd><code>{_escape(_inspection_state(value))}</code></dd>"
+            for key, value in payload.items()
+        )
+        content = "".join(
+            (
+                f'<section aria-labelledby="resume-{_escape(parsed_title.casefold())}">',
+                f'<h2 id="resume-{_escape(parsed_title.casefold())}">Données publiques</h2>',
+                f"<dl>{visible_items}</dl></section>",
+            )
+        )
     return "\n".join(
         (
             "<!doctype html>",
@@ -402,7 +412,7 @@ def render_document_inspection(*, title: str, response: Any) -> str:
             "<body>",
             f"<h1>{_escape(parsed_title)}</h1>",
             f"<p>Statut HTTP public: <code>{status_code}</code></p>",
-            f"<pre>{serialized}</pre>",
+            content,
             '<p><a href="/ui/corpus-pdf">Retour au corpus</a></p>',
             "</body>",
             "</html>",
@@ -463,9 +473,7 @@ def _render_document_row(document: CorpusPdfDocument) -> str:
             '/projection">Inspecter</a>',
             "</td><td>",
             _escape(selected_text),
-            '<br><button type="button" data-action="retirer_selection_active" data-document-id="',
-            _escape(document.document_id),
-            '">Retirer de la sélection active</button></td><td><a class="button" href="/ui/documents/',
+            '</td><td><a class="button" href="/ui/documents/',
             _escape(document.document_id),
             '/pdf">Ouvrir le PDF</a></td></tr>',
         )
@@ -605,6 +613,17 @@ def _ensure_path(value: Any) -> str:
 
 def _escape(value: str) -> str:
     return html.escape(value, quote=True)
+
+
+def _inspection_state(value: Any) -> str:
+    if value is None:
+        return "Non disponible"
+    if isinstance(value, Mapping):
+        status = value.get("route_name") or value.get("page_state")
+        return "Disponible" if status is None else str(status)
+    if isinstance(value, list):
+        return f"{len(value)} élément(s)"
+    return str(value)
 
 
 __all__ = [

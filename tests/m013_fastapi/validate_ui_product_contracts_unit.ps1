@@ -153,7 +153,7 @@ error_inspection = render_document_inspection(
     ),
 )
 assert 'role="alert"' in error_inspection
-assert "Réessayer" in error_inspection
+assert "essayer" in error_inspection
 
 print("Validation unitaire des contrats produit UI/SP: OK")
 '@

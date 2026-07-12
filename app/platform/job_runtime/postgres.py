@@ -17,7 +17,7 @@ from app.platform.job_runtime import (
     JobStatus,
     JobSubmissionDecision,
 )
-from app.platform.postgres import PostgresConnectionFactory
+from app.platform.postgres import PostgresConnection, PostgresConnectionFactory
 from app.platform.request_context import current_trace_id
 
 
@@ -65,7 +65,7 @@ class PostgresJobQueue:
 
     def submit_in_transaction(
         self,
-        connection: Any,
+        connection: PostgresConnection,
         request: JobRequest,
         *,
         recalculate: bool,

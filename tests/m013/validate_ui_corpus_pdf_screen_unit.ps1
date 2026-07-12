@@ -57,8 +57,8 @@ assert_raises(
     lambda: CorpusPdfDocument(
         document_id="BAD-0001",
         title="Rapport",
-        source_status="SOURCE_REGISTERED",
-        diagnostic_status="DIAGNOSTIC_REQUESTED",
+        source_status="REGISTERED",
+        diagnostic_status="ROUTE_PLANNED",
         conversion_status="CANONICAL_ACCEPTED",
         canonical_version_id="CANON-0001",
         projection_status="SEARCHABLE",
@@ -71,7 +71,7 @@ assert_raises(
         document_id="DOC-M013-UI-0001",
         title="Rapport",
         source_status="DELETE_REQUESTED",
-        diagnostic_status="DIAGNOSTIC_REQUESTED",
+        diagnostic_status="ROUTE_PLANNED",
         conversion_status="CANONICAL_ACCEPTED",
         canonical_version_id="CANON-0001",
         projection_status="SEARCHABLE",
@@ -83,8 +83,8 @@ assert_raises(
     lambda: CorpusPdfDocument(
         document_id="DOC-M013-UI-0001",
         title="",
-        source_status="SOURCE_REGISTERED",
-        diagnostic_status="DIAGNOSTIC_REQUESTED",
+        source_status="REGISTERED",
+        diagnostic_status="ROUTE_PLANNED",
         conversion_status="CANONICAL_ACCEPTED",
         canonical_version_id="CANON-0001",
         projection_status="SEARCHABLE",
@@ -95,8 +95,8 @@ assert_raises(
 unsafe_document = CorpusPdfDocument(
     document_id="DOC-M013-UI-0001",
     title="<script>alert('x')</script>",
-    source_status="SOURCE_REGISTERED",
-    diagnostic_status="DIAGNOSTIC_REQUESTED",
+    source_status="REGISTERED",
+    diagnostic_status="ROUTE_PLANNED",
     conversion_status="CANONICAL_ACCEPTED",
     canonical_version_id="CANON-M013-UI-0001",
     projection_status="SEARCHABLE",
@@ -105,7 +105,7 @@ unsafe_document = CorpusPdfDocument(
 diagnostic_ready_document = CorpusPdfDocument(
     document_id="DOC-M013-UI-0002",
     title="Document à diagnostiquer",
-    source_status="SOURCE_REGISTERED",
+    source_status="REGISTERED",
     diagnostic_status="DIAGNOSTIC_NOT_REQUESTED",
     conversion_status="CONVERSION_NOT_REQUESTED",
     canonical_version_id=None,
@@ -115,9 +115,9 @@ diagnostic_ready_document = CorpusPdfDocument(
 manual_review_document = CorpusPdfDocument(
     document_id="DOC-M013-UI-0003",
     title="Document en revue",
-    source_status="SOURCE_REGISTERED",
+    source_status="REGISTERED",
     diagnostic_status="MANUAL_REVIEW",
-    conversion_status="SOURCE_NOT_ROUTED",
+    conversion_status="CONVERSION_NOT_REQUESTED",
     canonical_version_id=None,
     projection_status="PROJECTION_NOT_REQUESTED",
     selected=False,
@@ -125,8 +125,8 @@ manual_review_document = CorpusPdfDocument(
 explicit_route_document = CorpusPdfDocument(
     document_id="DOC-M013-UI-0004",
     title="Document routé",
-    source_status="SOURCE_REGISTERED",
-    diagnostic_status="ROUTE_EXPLICIT",
+    source_status="REGISTERED",
+    diagnostic_status="ROUTE_PLANNED",
     conversion_status="CONVERSION_NOT_REQUESTED",
     canonical_version_id=None,
     projection_status="PROJECTION_NOT_REQUESTED",
@@ -135,9 +135,9 @@ explicit_route_document = CorpusPdfDocument(
 quarantined_diagnostic_document = CorpusPdfDocument(
     document_id="DOC-M013-UI-0005",
     title="Document diagnostic quarantainé",
-    source_status="SOURCE_QUARANTINED",
-    diagnostic_status="SOURCE_QUARANTINED",
-    conversion_status="SOURCE_QUARANTINED",
+    source_status="QUARANTINED",
+    diagnostic_status="QUARANTINED",
+    conversion_status="CONVERSION_NOT_REQUESTED",
     canonical_version_id=None,
     projection_status="PROJECTION_NOT_REQUESTED",
     selected=False,
@@ -162,7 +162,7 @@ assert_not_contains(html, 'action="/v1/documents/DOC-M013-UI-0001/diagnose"', "U
 assert_not_contains(html, 'action="/v1/documents/DOC-M013-UI-0003/diagnose"', "Une revue manuelle ne doit pas rendre la commande de diagnostic.")
 assert_not_contains(html, 'action="/v1/documents/DOC-M013-UI-0004/diagnose"', "Une route explicite ne doit pas rendre la commande de diagnostic.")
 assert_not_contains(html, 'action="/v1/documents/DOC-M013-UI-0005/diagnose"', "Une source quarantainée ne doit pas rendre la commande de diagnostic.")
-assert_contains(html, 'data-action="retirer_selection_active"', "L'action de retrait doit être non destructive.")
+assert_not_contains(html, 'data-action="retirer_selection_active"', "Le bouton sans commande publique doit être retiré.")
 assert_not_contains(html.lower(), "delete", "Aucun contrôle delete ne doit être rendu.")
 assert_not_contains(html.lower(), "supprimer", "Aucun contrôle supprimer ne doit être rendu.")
 assert_not_contains(html.lower(), "purge", "Aucun contrôle purge ne doit être rendu.")

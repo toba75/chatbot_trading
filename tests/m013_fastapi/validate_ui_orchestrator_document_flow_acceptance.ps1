@@ -1,165 +1,255 @@
 $ErrorActionPreference = "Stop"
 
-$repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "../..")).Path
 . (Join-Path $repoRoot "scripts/require_python.ps1")
 $pythonExecutable = Get-RequiredPythonExecutable
-$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
-[Console]::OutputEncoding = $utf8NoBom
-$OutputEncoding = $utf8NoBom
 
 $pythonCode = @'
 from __future__ import annotations
 
-import json
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from threading import Thread
+import hashlib
+from pathlib import Path
+import socket
 import sys
+from threading import Thread
+import time
 
-repo_root = sys.argv[1]
-if repo_root not in sys.path:
-    sys.path.insert(0, repo_root)
+import uvicorn
 
-from app.platform.ui_corpus import render_corpus_pdf_screen, render_document_inspection  # noqa: E402
-from app.platform.ui_document_api import UiDocumentApiClient, UrllibUiDocumentApiTransport  # noqa: E402
+sys.path.insert(0, sys.argv[1])
+
+from app.knowledge_access.adapters.http import build_projection_query_router
+from app.knowledge_access.application.projection_queries import ProjectionNotRequestedView
+from app.platform.configuration import load_application_configuration
+from app.platform.orchestrator_asgi import create_orchestrator_app
+from app.platform.orchestrator_composition import DependencyReadiness, OrchestratorCompositionRoot
+from app.platform.ui_corpus import render_document_inspection
+from app.platform.ui_document_api import UiDocumentApiClient, UrllibUiDocumentApiTransport
+from app.source_processing.adapters.document_http import SourceProcessingHttpAdapter
+from app.source_processing.adapters.http import build_document_command_router
+from app.source_processing.adapters.original_http import build_original_pdf_router
+from app.source_processing.adapters.query_http import build_document_query_router
+from app.source_processing.application.document_commands import (
+    DocumentDiagnosisAcceptance,
+    RegisterDocumentAcceptance,
+)
+from app.source_processing.application.document_queries import (
+    DiagnosticPageView,
+    DocumentConversionView,
+    DocumentCorpusItem,
+    DocumentCorpusView,
+    DocumentDiagnosticView,
+    PageManifestEntryView,
+)
+from app.source_processing.application.original_queries import OriginalPdfContent
+from app.source_processing.domain.source_document import DocumentId, SourceFingerprint
+from fastapi import APIRouter
 
 
-DOCUMENT_ID = "DOC-M013-FASTAPI-UI01"
 PDF = b"%PDF-1.7\n1 0 obj<<>>endobj\n%%EOF\n"
-requests: list[tuple[str, str]] = []
 
 
-class OrchestratorHandler(BaseHTTPRequestHandler):
-    def do_GET(self) -> None:
-        requests.append(("GET", self.path))
-        if self.path == "/v1/documents":
-            self._json(200, {"documents": [{
-                "document_id": DOCUMENT_ID,
-                "title": "Rapport API",
-                "document_status": "SOURCE_REGISTERED",
-                "diagnostic_status": "DIAGNOSTIC_NOT_REQUESTED",
-                "conversion_status": "CONVERSION_NOT_REQUESTED",
-                "canonical_version_id": None,
-            }]})
-            return
-        if self.path == f"/v1/documents/{DOCUMENT_ID}/projection":
-            self._json(200, {"document_id": DOCUMENT_ID, "projection_status": "PROJECTION_NOT_REQUESTED"})
-            return
-        if self.path == f"/v1/documents/{DOCUMENT_ID}/diagnostic":
-            self._json(409, {"error_code": "DIAGNOSTIC_NOT_REQUESTED", "document_id": DOCUMENT_ID})
-            return
-        if self.path == f"/v1/documents/{DOCUMENT_ID}/original":
-            self.send_response(200)
-            self.send_header("Content-Type", "application/pdf")
-            self.send_header("Content-Length", str(len(PDF)))
-            self.end_headers()
-            self.wfile.write(PDF)
-            return
-        self._json(404, {"error_code": "ENDPOINT_NOT_FOUND", "path": self.path})
-
-    def do_POST(self) -> None:
-        requests.append(("POST", self.path))
-        if self.path == f"/v1/documents/{DOCUMENT_ID}/diagnose":
-            self._json(202, {"document_id": DOCUMENT_ID, "diagnostic_status": "DIAGNOSTIC_REQUESTED"})
-            return
-        if self.path == "/v1/documents/DOC-M013-FASTAPI-FAIL/diagnose":
-            self._json(503, {"error_code": "DOCUMENT_COMMAND_UNAVAILABLE", "document_id": "DOC-M013-FASTAPI-FAIL"})
-            return
-        self._json(404, {"error_code": "ENDPOINT_NOT_FOUND", "path": self.path})
-
-    def _json(self, status_code: int, payload: dict[str, object]) -> None:
-        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-        self.send_response(status_code)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
-
-    def log_message(self, format: str, *args: object) -> None:
-        return
+def multipart(boundary):
+    fields = (
+        ("title", "Rapport API réelle"),
+        ("authors", "Auteur"),
+        ("publication_year", "2026"),
+        ("edition", "1"),
+    )
+    chunks = [
+        f"--{boundary}\r\n".encode(),
+        b'Content-Disposition: form-data; name="original_content"; filename="rapport.pdf"\r\n',
+        b"Content-Type: application/pdf\r\n\r\n",
+        PDF,
+        b"\r\n",
+    ]
+    for name, value in fields:
+        chunks.extend((
+            f"--{boundary}\r\n".encode(),
+            f'Content-Disposition: form-data; name="{name}"\r\n\r\n'.encode(),
+            value.encode("utf-8"),
+            b"\r\n",
+        ))
+    chunks.append(f"--{boundary}--\r\n".encode())
+    return b"".join(chunks)
 
 
-server = ThreadingHTTPServer(("127.0.0.1", 0), OrchestratorHandler)
-thread = Thread(target=server.serve_forever, daemon=True)
+class ProductPorts:
+    def __init__(self):
+        self.document_id = None
+        self.title = None
+        self.diagnosed = False
+
+    def register_source_document(self, *, original_content, bibliographic_metadata):
+        assert original_content == PDF
+        fingerprint = SourceFingerprint.from_content(original_content)
+        self.document_id = DocumentId.from_fingerprint(fingerprint)
+        self.title = bibliographic_metadata["title"]
+        return RegisterDocumentAcceptance(self.document_id, "REGISTERED", False)
+
+    def start_document_processing(self, *, document_id):
+        assert self.document_id is not None and document_id == self.document_id.value
+        self.diagnosed = True
+        return DocumentDiagnosisAcceptance(self.document_id, "DIAGNOSTIC_REQUESTED")
+
+    def list_documents(self):
+        assert self.document_id is not None and self.title is not None
+        return DocumentCorpusView(documents=(DocumentCorpusItem(
+            document_id=self.document_id.value,
+            title=self.title,
+            document_status="REGISTERED",
+            diagnostic_status="MANIFEST_CREATED" if self.diagnosed else "DIAGNOSTIC_NOT_REQUESTED",
+            conversion_status="QA_REJECTED",
+            canonical_version_id=None,
+        ),))
+
+    def read_diagnostic(self, document_id):
+        assert self.document_id is not None and document_id == self.document_id.value
+        return DocumentDiagnosticView(
+            document_id=document_id,
+            diagnostic_status="MANIFEST_CREATED",
+            source_page_count=1,
+            diagnosed_page_count=0,
+            manual_review_reason=None,
+            manifest=(PageManifestEntryView(page_number=1, manifest_status="PRESENT"),),
+            pages=(DiagnosticPageView(
+                page_number=1,
+                manifest_status="PRESENT",
+                diagnostic=None,
+                route=None,
+            ),),
+        )
+
+    def read_conversion(self, document_id):
+        assert self.document_id is not None and document_id == self.document_id.value
+        return DocumentConversionView(
+            document_id=document_id,
+            conversion_status="QA_REJECTED",
+            qa_rejection_error_code="PAGE_AUTHORITY_MISSING",
+            canonical_version_id=None,
+        )
+
+    def read_projection(self, document_id):
+        assert self.document_id is not None and document_id == self.document_id.value
+        return ProjectionNotRequestedView(
+            document_id=document_id,
+            projection_status="PROJECTION_NOT_REQUESTED",
+        )
+
+    def read_original(self, document_id):
+        assert self.document_id is not None and document_id == self.document_id.value
+        chunks = iter((PDF,))
+        return OriginalPdfContent(
+            document_id=document_id,
+            source_sha256=hashlib.sha256(PDF).hexdigest(),
+            content_length=len(PDF),
+            content_chunks=chunks,
+            close=lambda: None,
+        )
+
+
+class ReadyDependency:
+    async def open(self): return None
+    async def close(self): return None
+    def readiness(self): return DependencyReadiness(name="ui-real-fastapi", status="ready")
+
+
+configuration = load_application_configuration(
+    Path(sys.argv[1]) / "config" / "application.example.yaml",
+    {},
+)
+ports = ProductPorts()
+router = APIRouter()
+router.include_router(build_document_command_router(
+    document_http_adapter=SourceProcessingHttpAdapter(ports),
+    max_pdf_bytes=1024 * 1024,
+))
+router.include_router(build_document_query_router(document_queries=ports))
+router.include_router(build_projection_query_router(projection_queries=ports))
+router.include_router(build_original_pdf_router(original_pdf_queries=ports))
+
+
+def root_factory(validated_configuration):
+    return OrchestratorCompositionRoot(
+        configuration=validated_configuration,
+        dependencies=(ReadyDependency(),),
+        document_command_router=router,
+    )
+
+
+application = create_orchestrator_app(
+    configuration=configuration,
+    composition_root_factory=root_factory,
+)
+with socket.socket() as probe:
+    probe.bind(("127.0.0.1", 0))
+    port = probe.getsockname()[1]
+server = uvicorn.Server(uvicorn.Config(
+    application,
+    host="127.0.0.1",
+    port=port,
+    log_level="critical",
+    lifespan="on",
+))
+thread = Thread(target=server.run, daemon=True)
 thread.start()
+deadline = time.monotonic() + 10
+while not server.started and time.monotonic() < deadline:
+    time.sleep(0.01)
+if not server.started:
+    raise AssertionError("Uvicorn réel non démarré")
+
 try:
-    transport = UrllibUiDocumentApiTransport(
-        orchestrator_origin=f"http://127.0.0.1:{server.server_port}",
+    client = UiDocumentApiClient(transport=UrllibUiDocumentApiTransport(
+        orchestrator_origin=f"http://127.0.0.1:{port}",
         timeout_seconds=5,
+    ))
+    boundary = "ost-ui-real-fastapi"
+    registration = client.forward_document_command(
+        path="/v1/documents",
+        body=multipart(boundary),
+        content_type=f"multipart/form-data; boundary={boundary}",
     )
-    client = UiDocumentApiClient(transport=transport)
-
-    # Given l'API documentaire répond réellement en HTTP.
-    # When l'UI ouvre le corpus, diagnostique, inspecte une étape et ouvre le PDF.
-    # Then elle affiche exclusivement les réponses publiques de ces contrats.
+    assert registration.status_code == 201
+    document_id = registration.payload["document_id"]
+    diagnosis = client.forward_document_command(
+        path=f"/v1/documents/{document_id}/diagnose",
+        body=b"",
+        content_type="application/octet-stream",
+    )
+    assert diagnosis.status_code == 202
     state = client.build_corpus_state(active_selected_document_ids=())
-    body = render_corpus_pdf_screen(state)
-    if "Rapport API" not in body or ">Diagnostiquer</button>" not in body:
-        raise AssertionError(f"Le corpus HTTP réel n'est pas rendu: {body}")
-
-    command = client.forward_document_command(
-        path=f"/v1/documents/{DOCUMENT_ID}/diagnose",
-        body=b"",
-        content_type="application/octet-stream",
-    )
-    if command.status_code != 202 or command.payload["diagnostic_status"] != "DIAGNOSTIC_REQUESTED":
-        raise AssertionError(f"Commande diagnostic non relayée: {command}")
-
-    diagnostic = client.read_diagnostic(DOCUMENT_ID)
-    inspection = render_document_inspection(title="Diagnostic", response=diagnostic)
-    if "DIAGNOSTIC_NOT_REQUESTED" not in inspection or "original_storage_ref" in inspection:
-        raise AssertionError(f"Erreur publique diagnostic invalide: {inspection}")
-
-    pdf = client.read_original_pdf(DOCUMENT_ID)
-    if pdf.status_code != 200 or pdf.content_type != "application/pdf" or pdf.body != PDF:
-        raise AssertionError("Le visualiseur ne lit pas le PDF via le contrat original public.")
-
-    unavailable = client.forward_document_command(
-        path="/v1/documents/DOC-M013-FASTAPI-FAIL/diagnose",
-        body=b"",
-        content_type="application/octet-stream",
-    )
-    if unavailable.status_code != 503 or unavailable.payload != {
-        "error_code": "DOCUMENT_COMMAND_UNAVAILABLE",
-        "document_id": "DOC-M013-FASTAPI-FAIL",
-    }:
-        raise AssertionError(f"L'erreur publique a été masquée ou remplacée: {unavailable}")
-
-    expected_requests = {
-        ("GET", "/v1/documents"),
-        ("GET", f"/v1/documents/{DOCUMENT_ID}/projection"),
-        ("GET", f"/v1/documents/{DOCUMENT_ID}/diagnostic"),
-        ("GET", f"/v1/documents/{DOCUMENT_ID}/original"),
-        ("POST", f"/v1/documents/{DOCUMENT_ID}/diagnose"),
-        ("POST", "/v1/documents/DOC-M013-FASTAPI-FAIL/diagnose"),
-    }
-    if set(requests) != expected_requests:
-        raise AssertionError(f"Trajet HTTP UI/API incomplet: {requests}")
+    assert state.documents[0].source_status == "REGISTERED"
+    assert state.documents[0].diagnostic_status == "MANIFEST_CREATED"
+    diagnostic = client.read_diagnostic(document_id)
+    assert "Page 1" in render_document_inspection(title="Diagnostic", response=diagnostic)
+    conversion = client.read_conversion(document_id)
+    assert conversion.payload["conversion_status"] == "QA_REJECTED"
+    projection = client.read_projection(document_id)
+    assert projection.payload["projection_status"] == "PROJECTION_NOT_REQUESTED"
+    original = client.read_original_pdf(document_id)
+    assert original.body == PDF
 finally:
-    server.shutdown()
-    server.server_close()
-    thread.join(timeout=5)
+    server.should_exit = True
+    thread.join(timeout=10)
+    if thread.is_alive():
+        raise AssertionError("Uvicorn réel non arrêté")
 
-print("Test d'acceptation parcours documentaire UI/orchestrateur: OK")
+print("Test d'acceptation UI vers application FastAPI réelle: OK")
 '@
 
-$pythonScriptPath = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m013_fastapi_ui_flow_acceptance_" + [System.Guid]::NewGuid().ToString("N") + ".py")
+$pythonScriptPath = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m013_ui_real_fastapi_" + [guid]::NewGuid().ToString("N") + ".py")
 Set-Content -Encoding UTF8 -LiteralPath $pythonScriptPath -Value $pythonCode
+$previousErrorActionPreference = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
 try {
-    $previousErrorActionPreference = $ErrorActionPreference
-    $ErrorActionPreference = "Continue"
-    try {
-        $env:PYTHONIOENCODING = "utf-8"
-        $output = & $pythonExecutable -B $pythonScriptPath $repoRoot 2>&1
-        $exitCode = $LASTEXITCODE
-    }
-    finally {
-        $ErrorActionPreference = $previousErrorActionPreference
-    }
-    if ($exitCode -ne 0) {
-        throw "Test d'acceptation parcours documentaire UI/orchestrateur invalide. Sortie: $($output -join "`n")"
-    }
-    Write-Host ($output -join "`n")
+    $env:PYTHONIOENCODING = "utf-8"
+    $output = & $pythonExecutable -B $pythonScriptPath $repoRoot 2>&1
+    $exitCode = $LASTEXITCODE
 }
 finally {
+    $ErrorActionPreference = $previousErrorActionPreference
     Remove-Item -LiteralPath $pythonScriptPath -Force
 }
+if ($exitCode -ne 0) { throw ($output -join "`n") }
+Write-Host ($output -join "`n")
