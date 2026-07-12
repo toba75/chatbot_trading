@@ -119,6 +119,7 @@
 - Scénario : Given des transitions `KnowledgeProjection` et des DTO documentaires servis par l'application FastAPI réelle; When PostgreSQL redémarre et que l'utilisateur charge, diagnostique ou inspecte un PDF; Then KA relit les états et `SourceLocator` bornés, l'UI applique les statuts SP exacts, refuse les diagnostics incohérents et présente une navigation HTML accessible sans fallback.
 - ADR : ADR-018, ADR-021 et ADR-022 consultées et appliquées; aucune nouvelle ADR requise. La migration ascendante `004_knowledge_projection_chunk_samples.sql` suit ADR-021.
 - Commit RED : `d5f682fdf`, `test(produit): couvrir contrats KA SP UI stricts`.
+- Commit GREEN : `3521770cc`, `feat(produit): durcir contrats KA SP UI ADR-018 ADR-021 ADR-022`.
 - Migration : schéma PostgreSQL `004`, table `knowledge_access.knowledge_projection_chunk_samples`, image `schema-004` et lecture `REPEATABLE READ READ ONLY` avec `sample_limit` SQL.
 - Preuves live : PostgreSQL Docker réel redémarré avec `BUILDING`, `SEARCHABLE`, `STALE`, `FAILED`; Uvicorn/FastAPI réels avec upload multipart, diagnostic, conversion, projection et original par le client UI.
 - UI : origine hôte `127.0.0.1` issue de la configuration, origine Compose `orchestrator-api`, succès POST en `303`, erreurs françaises `role=alert`, inspections sémantiques et retrait du bouton de sélection non raccordé.
