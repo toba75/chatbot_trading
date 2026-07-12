@@ -174,6 +174,16 @@ try {
 
     Assert-OutputNotContains `
         -Output $reportContent `
+        -Forbidden "tests/governance/validate_git_lfs_acceptance.ps1" `
+        -Message "La précondition M-006 ne doit pas exécuter la gouvernance Git LFS aval."
+
+    Assert-OutputNotContains `
+        -Output $reportContent `
+        -Forbidden "tests/governance/validate_gitignore_acceptance.ps1" `
+        -Message "La précondition M-006 ne doit pas exécuter la gouvernance gitignore aval."
+
+    Assert-OutputNotContains `
+        -Output $reportContent `
         -Forbidden "scripts/validate_m013_reality.ps1" `
         -Message "La précondition M-006 ne doit pas appeler le test réel M13-reality."
 
