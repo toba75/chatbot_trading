@@ -68,7 +68,7 @@ async def get(application, path):
     await application(
         {
             "type": "http",
-            "asgi": {"version": "3.0", "spec_version": "2.3"},
+            "asgi": {"version": "3.0", "spec_version": "2.4"},
             "http_version": "1.1",
             "method": "GET",
             "scheme": "http",

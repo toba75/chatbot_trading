@@ -8,11 +8,14 @@ $pythonCode = @'
 from __future__ import annotations
 
 import asyncio
+import json
 from pathlib import Path
 import sys
 from tempfile import TemporaryDirectory
 
 sys.path.insert(0, sys.argv[1])
+
+from fastapi import FastAPI
 
 from app.source_processing.adapters.original_http import build_original_pdf_router
 from app.source_processing.adapters.postgres_document_persistence import CorpusOriginalSourceStore
@@ -65,7 +68,7 @@ async def invoke_router(router, path):
     await router(
         {
             "type": "http",
-            "asgi": {"version": "3.0", "spec_version": "2.3"},
+            "asgi": {"version": "3.0", "spec_version": "2.4"},
             "http_version": "1.1",
             "method": "GET",
             "scheme": "http",
@@ -125,14 +128,15 @@ with TemporaryDirectory() as temporary_directory:
 
     not_found = assert_raises(
         SourceNotFoundError,
-        "source absente: DOC-FFFFFFFFFFFFFFFF",
+        "source documentaire inconnue: DOC-FFFFFFFFFFFFFFFF",
         lambda: service.read_original("DOC-FFFFFFFFFFFFFFFF"),
     )
     assert not_found.document_id == "DOC-FFFFFFFFFFFFFFFF"
 
-    router = build_original_pdf_router(original_pdf_queries=service)
+    application = FastAPI()
+    application.include_router(build_original_pdf_router(original_pdf_queries=service))
     start, headers, body_messages = asyncio.run(
-        invoke_router(router, f"/v1/documents/{document_id.value}/original")
+        invoke_router(application, f"/v1/documents/{document_id.value}/original")
     )
     assert start["status"] == 200
     assert headers["content-type"] == "application/pdf"
@@ -166,6 +170,17 @@ with TemporaryDirectory() as temporary_directory:
         "ORIGINAL_HASH_MISMATCH",
         lambda: service.read_original(document_id.value),
     )
+    mismatch_start, _, mismatch_messages = asyncio.run(
+        invoke_router(application, f"/v1/documents/{document_id.value}/original")
+    )
+    mismatch_body = b"".join(
+        message.get("body", b"") for message in mismatch_messages
+    )
+    assert mismatch_start["status"] == 409
+    assert json.loads(mismatch_body.decode("utf-8")) == {
+        "error_code": "ORIGINAL_HASH_MISMATCH",
+        "document_id": document_id.value,
+    }
 
 print("Tests unitaires du streaming PDF original contrôlé: OK")
 '@

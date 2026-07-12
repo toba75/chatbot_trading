@@ -17,6 +17,7 @@ from app.source_processing.application.document_commands import (
     DocumentConversionState,
     DocumentConversionStatus,
 )
+from app.source_processing.application.original_queries import OriginalHashMismatchError
 from app.source_processing.domain.document_processing_run import (
     DiagnosticVersion,
     DocumentProcessingRun,
@@ -76,7 +77,7 @@ class CorpusOriginalSourceStore:
         if not isinstance(original_content, bytes) or len(original_content) == 0:
             raise ValueError("original_content invalide")
         if hashlib.sha256(original_content).hexdigest() != fingerprint.value:
-            raise ValueError("ORIGINAL_HASH_MISMATCH")
+            raise OriginalHashMismatchError()
 
         relative_path = Path(document_id.value) / f"{fingerprint.value}.pdf"
         target = self._corpus_root / relative_path
@@ -123,7 +124,7 @@ class CorpusOriginalSourceStore:
         except OSError as exc:
             raise RuntimeError("ORIGINAL_UNREADABLE") from exc
         if hashlib.sha256(content).hexdigest() != source_document.fingerprint.value:
-            raise ValueError("ORIGINAL_HASH_MISMATCH")
+            raise OriginalHashMismatchError()
         return content
 
 
@@ -654,7 +655,7 @@ def _verify_file_hash(path: Path, expected_hash: str) -> None:
     except OSError as exc:
         raise RuntimeError("ORIGINAL_UNREADABLE") from exc
     if actual != expected_hash:
-        raise ValueError("ORIGINAL_HASH_MISMATCH")
+        raise OriginalHashMismatchError()
 
 
 def _source_parameters(source: SourceDocument) -> tuple[Any, ...]:
