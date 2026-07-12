@@ -104,6 +104,7 @@ git ls-tree -r --name-only master -- docs/tasks docs/adr docs/specs
 | M-012 | Évaluation pilote et calibration | Mesurer le système sur corpus pilote et justifier les seuils | WS-11, tous | M-011 |
 | M-013 | Durcissement et acceptation V1 | Valider sécurité, exploitation, régression et critères V1 | WS-01, WS-03, WS-11 | M-012 |
 | M13-config | Configuration applicative sans environnement | Remplacer toute entrée de processus par variables d'environnement par un fichier de configuration unique, explicite et validé | WS-01, WS-03, WS-11 | M-012; sous-milestone de M-013 |
+| M13-FastAPI | API orchestratrice ASGI raccordée | Remplacer le routeur HTTP artisanal par une frontière ASGI structurée et raccorder les contrats documentaires aux cas d'usage réels | WS-01, WS-03, WS-04, WS-05, WS-08, WS-11 | M-012; sous-milestone de M-013 |
 
 ## 6. Milestones détaillés
 
@@ -496,6 +497,39 @@ git ls-tree -r --name-only master -- docs/tasks docs/adr docs/specs
   - recherche statique bloquant `os.environ`, `getenv`, `process.env` ou équivalent dans le code applicatif hors adaptateur de validation qui les refuse explicitement.
 - Sortie attendue: aucun processus applicatif n'accepte de variable d'environnement comme entrée; seules les valeurs présentes dans le fichier de configuration pilotent l'application.
 
+### M13-FastAPI - API orchestratrice ASGI raccordée
+
+- Source: ADR-018, spécifications M-003 à M-005, `docs/specs/ui.md` et demande utilisateur du 2026-07-12.
+- Objectif métier: fournir une frontière HTTP publique explicite, testable et maintenable qui préserve les contrats existants et délègue les commandes et lectures documentaires aux bounded contexts propriétaires.
+- Workstreams actifs: WS-01, WS-03, WS-04, WS-05, WS-08, WS-11.
+- Bounded contexts concernés: `platform` pour la composition HTTP, SP pour les sources, diagnostics et conversions, KA pour les projections, et UI comme client exclusif de l'API orchestratrice.
+- Dossier de tâches attendu si le jalon est détaillé: `docs/tasks/milestone_013-fastapi`.
+- Règle de gouvernance: `M13-FastAPI` est un sous-milestone de `M-013`; sa planification ne requiert pas la clôture de `M-013` dans `master`, seulement les milestones strictement antérieurs.
+- Scénario directeur:
+  - Given un client appelle un contrat public existant ou documentaire de l'API orchestratrice
+  - When la requête est servie par l'application ASGI locale
+  - Then le contrat HTTP délègue au cas d'usage propriétaire, conserve les erreurs publiques et ne déclenche aucun mock, stub, fake ni fallback
+- Livrables:
+  - ADR décidant `FastAPI + Uvicorn` pour `orchestrator-api` sans imposer ce framework aux bounded contexts;
+  - application ASGI construite par une factory et composition root explicite au démarrage;
+  - migration sans régression des routes existantes de santé, conversation, évaluation, recherche et indexation;
+  - routeur documentaire pour l'enregistrement PDF et le lancement du diagnostic;
+  - read-models publics SP pour le corpus, le diagnostic et la conversion;
+  - read-model public KA pour la projection;
+  - récupération contrôlée du PDF original sans exposition de référence de stockage;
+  - UI consommant exclusivement les contrats de l'API orchestratrice;
+  - lancement Uvicorn, healthchecks Compose, OpenAPI borné, observabilité et gates de non-régression.
+- Tests et gates:
+  - parité exacte des statuts, corps et codes d'erreur des routes publiques préexistantes;
+  - upload PDF `multipart/form-data` strict, sans métadonnée inventée ni lecture complète non bornée implicite;
+  - preuve `HTTP -> routeur -> cas d'usage -> port -> adaptateur réel` pour les commandes documentaires;
+  - lectures diagnostic, conversion et projection sans reconstruction depuis les logs ou les stockages techniques;
+  - PDF original restitué bit à bit avec `application/pdf`, sans `original_storage_ref` public;
+  - UI incapable d'appeler directement un repository, un chemin métier, Qdrant, PostgreSQL, un worker ou Spark;
+  - dépendance indisponible rendue par une erreur publique explicite, sans backend alternatif;
+  - test HTTP réel et test OpenAPI sur l'application ASGI.
+- Sortie attendue: `orchestrator-api` est une façade HTTP ASGI mince et opérationnelle; l'UI observe et déclenche le pipeline documentaire uniquement par ses contrats publics raccordés.
+
 ## 7. Chemin critique
 
 Chemin critique pour obtenir un chatbot documentaire cité:
@@ -509,6 +543,7 @@ Chemin critique pour la V1 complète:
 ```text
 M-008 -> M-009 -> M-010 -> M-011 -> M-012 -> M-013
 M-012 -> M13-config
+M-012 -> M13-FastAPI
 ```
 
 La plateforme M-002 peut avancer en parallèle des premières spécifications détaillées de M-003 uniquement si M-001 est accepté et présent dans `master`.
@@ -544,6 +579,7 @@ Les points suivants doivent déclencher une vérification ADR avant implémentat
 | Gemma 4 servi par vLLM sur Spark | M-002 | Oui |
 | Snapshots immuables pour stratégies et expériences | M-010 ou M-011 | Oui |
 | Configuration applicative par fichier unique sans variables d'environnement | M13-config | ADR-016 |
+| Framework ASGI et serveur HTTP de l'API orchestratrice | M13-FastAPI | ADR-019 à créer |
 
 Une ADR acceptée ne doit pas être réécrite pour changer son sens. Toute évolution doit créer une nouvelle ADR remplaçante.
 
