@@ -168,3 +168,16 @@
 - UI : la limite agrégée est contrôlée avant lecture du corps par le proxy UI, les erreurs conservent leur statut HTTP, le champ public fautif est affiché et les preuves imbriquées restent inspectables en fenêtre étroite.
 - Limite explicite : M13-FastAPI raccorde la frontière ASGI, mais ne livre pas le runtime de conversion M004. Le worker réel s'arrête après le diagnostic; aucun adaptateur Docling/OCRmyPDF réel, aucune publication PostgreSQL `CanonicalSourcePublished` et aucun consommateur KA durable ne sont présents. `/v1/documents/{document_id}/index` reste donc explicitement indisponible et l'UI ne simule aucune projection. Le `PostgresKnowledgeProjectionRepository` est validé comme producteur durable, sans inventer de `CanonicalSourceRef` depuis un diagnostic.
 - Validation : gate M13-FastAPI Static `31/31` GREEN et lint ciblé GREEN. La preuve live documentaire complète reste réservée au runtime M004 qui produit effectivement `page_count`, `SourceLocator` et `canonical_artifact_sha256` après fusion, QA et stockage de l'artefact canonique.
+
+## Correctif de revue - Preuve UI sur le serveur réel
+
+- Date : 2026-07-13.
+- Scénario BDD : Given PostgreSQL Docker, les migrations du commit, la factory FastAPI de production et le worker documentaire; When un navigateur charge un PDF par le vrai `ThreadingHTTPServer` de `local_runtime`; Then l'UI suit `POST-Redirect-GET`, restitue le corpus et l'original, affiche les diagnostics page par page, conserve les statuts HTTP d'erreur et bloque conversion/indexation sans fallback.
+- ADR : ADR-018, ADR-019, ADR-020, ADR-021 et ADR-022 consultées et appliquées; aucune nouvelle décision structurante n'est introduite.
+- Commit RED : `3d554eebd`, `test(ui): prouver le serveur réel via FastAPI et PostgreSQL`.
+- Commit GREEN : `e663c95d5`, `fix(ui): exécuter le parcours réel sur serveur local`.
+- Runtime : PostgreSQL, Uvicorn/FastAPI et l'UI utilisent trois ports libres; aucune injection de `ProductPorts`, aucun repository direct, aucun fake de projection et aucun fallback ne participent à la preuve.
+- Parcours prouvé : upload multipart d'un PDF `pypdf`, redirection `303`, corpus responsive et accessible, commande de diagnostic, worker PostgreSQL réel, inspection des signaux et routes, récupération binaire identique de l'original.
+- Blocages explicites : conversion absente en `409 CONVERSION_NOT_REQUESTED`; commande d'indexation hors parcours UI en `404 UI_DOCUMENT_COMMAND_FORBIDDEN`; champ obligatoire absent en `400 HTTP_REQUEST_INVALID`; document inconnu en `404`, toujours rendu en page HTML `role=alert` avec retour au corpus.
+- Performance UI : une lecture de corpus produit un seul appel paginé `GET /v1/documents`; aucun appel `1+N` vers `/projection` n'est émis.
+- Catalogue : la preuve dépendante de Docker quitte `-Mode Static` et rejoint exclusivement `-Mode Live`; la gate Static reste autonome.
