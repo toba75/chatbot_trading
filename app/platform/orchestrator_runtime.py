@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from importlib.metadata import version
 from pathlib import Path
+import asyncio
 from typing import Any
 
 from fastapi import APIRouter
@@ -20,6 +21,10 @@ from app.platform.orchestrator_composition import (
     OrchestratorCompositionRoot,
 )
 from app.platform.postgres import PsycopgConnectionFactory
+from app.platform.postgres_migrations import (
+    POSTGRES_MIGRATIONS_PATH,
+    PostgresMigrationRunner,
+)
 from app.source_processing.adapters.document_http import SourceProcessingHttpAdapter
 from app.source_processing.adapters.http import build_document_command_router
 from app.source_processing.adapters.original_http import build_original_pdf_router
@@ -44,17 +49,15 @@ class PostgresOrchestratorDependency:
     """Readiness stricte qui bloque le démarrage si PostgreSQL manque."""
 
     connection_factory: PsycopgConnectionFactory
+    migration_runner: PostgresMigrationRunner
     _opened: bool = field(init=False, default=False)
 
     async def open(self) -> None:
         if self._opened:
             raise RuntimeError("dépendance PostgreSQL déjà ouverte")
-        with self.connection_factory.connect() as connection:
-            with connection.cursor() as cursor:
-                cursor.execute("SELECT 1", ())
-                row = cursor.fetchone()
-        if row != (1,):
-            raise RuntimeError("POSTGRES_READINESS_INVALID")
+        await asyncio.to_thread(self.migration_runner.run)
+        if not await asyncio.to_thread(self.migration_runner.is_required_schema_ready):
+            raise RuntimeError("POSTGRES_SCHEMA_VERSION_REQUIRED")
         self._opened = True
 
     async def close(self) -> None:
@@ -63,9 +66,20 @@ class PostgresOrchestratorDependency:
         self._opened = False
 
     def readiness(self) -> DependencyReadiness:
+        if not self._opened:
+            status = "unavailable"
+        else:
+            try:
+                status = (
+                    "ready"
+                    if self.migration_runner.is_required_schema_ready()
+                    else "unavailable"
+                )
+            except Exception:
+                status = "unavailable"
         return DependencyReadiness(
             name="postgres",
-            status="ready" if self._opened else "unavailable",
+            status=status,
         )
 
 
@@ -80,6 +94,12 @@ def build_orchestrator_composition_root(
     connection_factory = PsycopgConnectionFactory(
         connection_url=configuration.services.postgres.url,
         password_path=Path(configuration.security.secrets.postgres_password_path),
+        connect_timeout_seconds=configuration.runtime.timeouts.startup_seconds,
+    )
+    migration_runner = PostgresMigrationRunner(
+        connection_factory=connection_factory,
+        migrations_path=POSTGRES_MIGRATIONS_PATH,
+        operation_timeout_seconds=configuration.runtime.timeouts.startup_seconds,
     )
     persistence = build_document_persistence(configuration)
     document_commands = DocumentCommandService(
@@ -125,13 +145,19 @@ def build_orchestrator_composition_root(
 
     return OrchestratorCompositionRoot(
         configuration=configuration,
-        dependencies=(PostgresOrchestratorDependency(connection_factory),),
+        dependencies=(
+            PostgresOrchestratorDependency(
+                connection_factory=connection_factory,
+                migration_runner=migration_runner,
+            ),
+        ),
         document_command_router=document_router,
     )
 
 
 __all__ = [
     "MAX_PDF_BYTES",
+    "POSTGRES_MIGRATIONS_PATH",
     "PostgresOrchestratorDependency",
     "build_orchestrator_composition_root",
 ]

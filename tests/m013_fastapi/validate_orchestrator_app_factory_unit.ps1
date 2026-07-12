@@ -131,8 +131,13 @@ async def scenario(repo_root):
     assert_equal(len(uvicorn_calls), 1, "Uvicorn doit être invoqué une seule fois.")
     assert_equal(
         uvicorn_calls[0][1],
-        {"host": configuration.services.api.bind_host, "port": configuration.services.api.port},
-        "Uvicorn doit recevoir exclusivement le bind et le port de la configuration validée.",
+        {
+            "host": configuration.services.api.bind_host,
+            "port": configuration.services.api.port,
+            "timeout_keep_alive": configuration.runtime.timeouts.request_seconds,
+            "timeout_graceful_shutdown": configuration.runtime.timeouts.shutdown_seconds,
+        },
+        "Uvicorn doit recevoir le bind, le port et les budgets de la configuration validée.",
     )
     assert_equal(root_factory_count, 1, "Le serveur ne doit pas créer la composition avant le lifespan Uvicorn.")
 

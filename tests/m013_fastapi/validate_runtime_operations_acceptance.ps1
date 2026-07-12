@@ -16,6 +16,7 @@ from io import BytesIO, StringIO
 import json
 from pathlib import Path
 import sys
+from tempfile import TemporaryDirectory
 import types
 import urllib.error
 
@@ -146,16 +147,27 @@ async def main(repo_root):
     previous_psycopg = sys.modules.get("psycopg")
     sys.modules["psycopg"] = fake_psycopg
     try:
-        PsycopgConnectionFactory(
-            connection_url="postgresql://app@postgres/app",
-            password_path=repo_root / "tests/fixtures/postgres_password",
-            connect_timeout_seconds=configuration.runtime.timeouts.startup_seconds,
-        )
+        with TemporaryDirectory() as temporary_directory:
+            password_path = Path(temporary_directory) / "postgres_password"
+            password_path.write_text("test-password", encoding="utf-8")
+            PsycopgConnectionFactory(
+                connection_url="postgresql://app@postgres/app",
+                password_path=password_path,
+                connect_timeout_seconds=configuration.runtime.timeouts.startup_seconds,
+            ).connect()
     finally:
         if previous_psycopg is None:
             del sys.modules["psycopg"]
         else:
             sys.modules["psycopg"] = previous_psycopg
+    assert_equal(
+        connect_calls,
+        [(
+            "postgresql://app@postgres/app",
+            {"password": "test-password", "connect_timeout": configuration.runtime.timeouts.startup_seconds},
+        )],
+        "Psycopg doit recevoir le connect_timeout validé.",
+    )
 
     runtime_root = build_orchestrator_composition_root(configuration)
     postgres_dependency = runtime_root.dependencies[0]
@@ -227,6 +239,10 @@ async def main(repo_root):
             assert_equal(invalid[0], 400, "Une trace invalide doit produire 400.")
             assert_equal(invalid[2], {"error_code": "TRACE_ID_INVALID"}, "Erreur trace publique invalide.")
             assert invalid[1]["x-trace-id"].startswith("TRACE-")
+            not_found = await asgi_request(app, "/route-absente", headers=((b"x-trace-id", b"TRACE-404"),))
+            assert_equal(not_found[0], 404, "Une route absente doit conserver 404.")
+            assert_equal(not_found[2], {"error_code": "HTTP_ROUTE_NOT_FOUND"}, "Erreur 404 publique invalide.")
+            assert_equal(not_found[1]["x-trace-id"], "TRACE-404", "Trace de l'erreur 404 absente.")
             failed = await asgi_request(app, "/boom", headers=((b"x-trace-id", b"TRACE-FAIL"),))
             assert_equal(failed[0], 500, "Une exception infrastructure doit produire 500.")
             assert_equal(failed[2], {"error_code": "ORCHESTRATOR_INTERNAL_ERROR"}, "Erreur infrastructure publique invalide.")
@@ -237,7 +253,7 @@ async def main(repo_root):
     log_text = logs.getvalue()
     assert "SECRET_PAYLOAD_MUST_NOT_LEAK" not in log_text
     records = [json.loads(line) for line in log_text.splitlines()]
-    assert_equal([record["status_code"] for record in records], [400, 500, 504], "Un log JSON est requis pour chaque erreur.")
+    assert_equal([record["status_code"] for record in records], [400, 404, 500, 504], "Un log JSON est requis pour chaque erreur.")
 
     # Un timeout pendant HTTPError.read() est une indisponibilité explicite.
     class TimedOutHttpError(urllib.error.HTTPError):
@@ -268,4 +284,3 @@ print("Test d'acceptation runtime/opérations M13-FastAPI: OK")
 
 $scenario | & $python -B - $repoRoot
 if ($LASTEXITCODE -ne 0) { throw "Test d'acceptation runtime/opérations M13-FastAPI RED." }
-

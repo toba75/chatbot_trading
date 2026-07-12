@@ -150,10 +150,16 @@ class UrllibUiDocumentApiTransport:
                     body=response.read(),
                 )
         except urllib.error.HTTPError as exc:
+            try:
+                error_body = exc.read()
+            except (urllib.error.URLError, TimeoutError, OSError) as read_exc:
+                raise UiDocumentApiUnavailableError(
+                    ORCHESTRATOR_API_UNAVAILABLE
+                ) from read_exc
             return UiDocumentApiResponse(
                 status_code=exc.code,
                 content_type=exc.headers.get_content_type(),
-                body=exc.read(),
+                body=error_body,
             )
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
             raise UiDocumentApiUnavailableError(ORCHESTRATOR_API_UNAVAILABLE) from exc

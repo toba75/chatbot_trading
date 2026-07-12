@@ -4,7 +4,7 @@
 
 - Tâche: T-011, déployer et auditer l'API orchestratrice.
 - Date: 2026-07-12.
-- Décision: ADR-019, FastAPI et Uvicorn uniquement pour `orchestrator-api`.
+- Décisions: ADR-019, FastAPI et Uvicorn uniquement pour `orchestrator-api`; ADR-021, migrations versionnées sous ledger et verrou avant readiness.
 - Configuration: M13-config, fichier unique et `configuration_hash` obligatoire.
 
 ## Scénario audité
@@ -18,7 +18,9 @@
 | Contrôle | Preuve attendue | Verdict |
 |---|---|---|
 | Runtime public unique | Compose exécute `uv run --no-sync api`; aucune commande `local_runtime` pour `orchestrator-api` | Couvert par la gate |
-| PostgreSQL réel | Conteneur PostgreSQL épinglé, migrations SQL exécutées, readiness `SELECT 1` | Couvert par la gate live |
+| PostgreSQL réel | Conteneur PostgreSQL épinglé, upgrade d'un volume pré-M13, ledger SHA-256 et readiness dynamique du schéma 002 | Couvert par la gate live |
+| Budgets M13-config | connexion/startup 120 s, requête/healthcheck 300 s, arrêt Uvicorn/Compose 30 s | Couvert par tests runtime et Compose |
+| Erreurs infrastructure | JSON public `error_code`, `X-Trace-ID` et log JSON sans secret, y compris exception, timeout et trace invalide | Couvert par test runtime |
 | PDF réel | PDF valide produit avec `pypdf`, transmis multipart, hash identique à la restitution | Couvert par la gate live |
 | Traçabilité | `X-Trace-ID`, log `trace_id`, `configuration_hash`, statut et durée sans payload | Couvert par la gate live |
 | OpenAPI borné | `/openapi.json` sans référence de stockage, job, secret ni identifiant Qdrant | Couvert par la gate live |
@@ -58,6 +60,14 @@ La preuve live utilise Docker Engine, PostgreSQL, Uvicorn et HTTP réels. Aucun 
 - Gate lint: GREEN, 38 validations.
 - Gate de traçabilité: GREEN, 163 exigences.
 - Gate globale `scripts/test.ps1`: tentative bornée à 10 minutes, expirée sans sortie ni code de sortie applicatif; résultat non concluant et jamais présenté comme GREEN.
+
+## Correctif de revue runtime et opérations
+
+- Décision applicable : ADR-021.
+- Scénarios : upgrade d'un volume pré-M13 vers le schéma 002; revalidation dynamique après démarrage; timeouts configurés; rollback des ressources partielles; réponses infrastructure traçables; timeout de lecture UI traduit sans fallback.
+- Version livrée : image `ostrading/orchestrator-api:0.1.0-m013-fastapi-schema-002`, migrations `001` et `002`, ledger `platform.schema_migrations`.
+- Le contrat historique `GET /` n'existe pas dans les tests publics de `master`; aucune rupture d'alias n'est introduite ni documentée comme API publique.
+- Rollback : uniquement vers une image explicitement compatible avec le ledger 002, sans suppression de volume ni migration descendante implicite.
 
 ## Correctif de revue sécurité HTTP
 

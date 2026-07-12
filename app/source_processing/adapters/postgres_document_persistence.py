@@ -677,6 +677,7 @@ def build_document_persistence(
         password_path=Path(
             application_configuration.security.secrets.postgres_password_path
         ),
+        connect_timeout_seconds=application_configuration.runtime.timeouts.startup_seconds,
     )
     persistence = PostgresDocumentPersistence(connection_factory=connection_factory)
     return DocumentPersistenceAdapters(

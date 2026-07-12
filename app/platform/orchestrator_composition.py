@@ -48,16 +48,41 @@ class OrchestratorCompositionRoot:
     async def open(self) -> None:
         if self._opened:
             raise RuntimeError("composition root orchestratrice déjà ouverte")
-        for dependency in self.dependencies:
-            await dependency.open()
+        opened_dependencies: list[OrchestratorDependency] = []
+        try:
+            for dependency in self.dependencies:
+                await dependency.open()
+                opened_dependencies.append(dependency)
+        except Exception as primary_error:
+            for dependency in reversed(opened_dependencies):
+                try:
+                    await dependency.close()
+                except Exception as rollback_error:
+                    primary_error.add_note(
+                        "ROLLBACK_CLOSE_ERROR:"
+                        f"{type(rollback_error).__name__}:{rollback_error}"
+                    )
+            raise
         self._opened = True
 
     async def close(self) -> None:
         if not self._opened:
             raise RuntimeError("composition root orchestratrice non ouverte")
+        primary_error: Exception | None = None
         for dependency in reversed(self.dependencies):
-            await dependency.close()
+            try:
+                await dependency.close()
+            except Exception as close_error:
+                if primary_error is None:
+                    primary_error = close_error
+                else:
+                    primary_error.add_note(
+                        "ADDITIONAL_CLOSE_ERROR:"
+                        f"{type(close_error).__name__}:{close_error}"
+                    )
         self._opened = False
+        if primary_error is not None:
+            raise primary_error
 
     def readiness_snapshot(self) -> tuple[DependencyReadiness, ...]:
         if not self._opened:

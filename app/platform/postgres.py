@@ -20,11 +20,18 @@ class PsycopgConnectionFactory:
 
     connection_url: str
     password_path: Path
+    connect_timeout_seconds: int
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "connection_url", _normalize_connection_url(self.connection_url))
         if not isinstance(self.password_path, Path):
             raise ValueError("postgres_password_path invalide")
+        if (
+            isinstance(self.connect_timeout_seconds, bool)
+            or not isinstance(self.connect_timeout_seconds, int)
+            or self.connect_timeout_seconds < 1
+        ):
+            raise ValueError("postgres_connect_timeout_seconds invalide")
 
     def connect(self) -> Any:
         try:
@@ -33,7 +40,11 @@ class PsycopgConnectionFactory:
             raise RuntimeError("PSYCOPG_DEPENDENCY_MISSING") from exc
 
         password = _read_password(self.password_path)
-        return psycopg.connect(self.connection_url, password=password)
+        return psycopg.connect(
+            self.connection_url,
+            password=password,
+            connect_timeout=self.connect_timeout_seconds,
+        )
 
 
 def _normalize_connection_url(value: str) -> str:

@@ -65,7 +65,7 @@ services:
     read_only: true
 
   orchestrator-api:
-    image: ostrading/orchestrator-api:0.0.0-m002
+    image: ostrading/orchestrator-api:0.1.0-m013-fastapi-schema-002
     build:
       context: ../..
       dockerfile: deploy/local-compose/Dockerfile
@@ -94,11 +94,12 @@ services:
     healthcheck:
       test:
         - CMD-SHELL
-        - "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/ready', timeout=2).read()\""
+        - "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/ready', timeout=300).read()\""
       interval: 30s
-      timeout: 5s
+      timeout: 300s
       retries: 3
-      start_period: 10s
+      start_period: 120s
+    stop_grace_period: 30s
     restart: "no"
     read_only: true
 

@@ -3,16 +3,20 @@ from __future__ import annotations
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from dataclasses import asdict
+import asyncio
 import json
+import re
 from tempfile import SpooledTemporaryFile
 import time
 from typing import Any
 from uuid import uuid4
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 import uvicorn
 from starlette.concurrency import run_in_threadpool
+from starlette.exceptions import HTTPException as StarletteHttpException
 
 from app.platform.configuration import ApplicationConfiguration
 from app.platform.orchestrator_composition import OrchestratorCompositionRoot
@@ -140,7 +144,11 @@ def create_orchestrator_app(
         if not isinstance(composition_root, OrchestratorCompositionRoot):
             raise TypeError("composition_root_factory doit construire OrchestratorCompositionRoot")
 
-        await composition_root.open()
+        try:
+            async with asyncio.timeout(configuration.runtime.timeouts.startup_seconds):
+                await composition_root.open()
+        except TimeoutError as exc:
+            raise TimeoutError("ORCHESTRATOR_STARTUP_TIMEOUT") from exc
         application.state.composition_root = composition_root
         application.include_router(composition_root.document_command_router)
         try:
@@ -162,28 +170,72 @@ def create_orchestrator_app(
         replay_chunk_bytes=REQUEST_BODY_REPLAY_CHUNK_BYTES,
     )
 
+    @application.exception_handler(RequestValidationError)
+    async def validation_error_handler(
+        request: Request,
+        exception: RequestValidationError,
+    ) -> JSONResponse:
+        del request, exception
+        return JSONResponse(
+            status_code=422,
+            content={"error_code": "HTTP_REQUEST_INVALID"},
+        )
+
+    @application.exception_handler(StarletteHttpException)
+    async def http_error_handler(
+        request: Request,
+        exception: StarletteHttpException,
+    ) -> JSONResponse:
+        del request
+        error_codes = {
+            404: "HTTP_ROUTE_NOT_FOUND",
+            405: "HTTP_METHOD_NOT_ALLOWED",
+        }
+        return JSONResponse(
+            status_code=exception.status_code,
+            content={
+                "error_code": error_codes.get(exception.status_code, "HTTP_ERROR")
+            },
+        )
+
     @application.middleware("http")
-    async def trace_request(request: Request, call_next: Callable) -> JSONResponse:
-        trace_id = _request_trace_id(request)
+    async def trace_request(request: Request, call_next: Callable) -> Response:
+        try:
+            trace_id = _request_trace_id(request)
+        except ValueError:
+            trace_id = _new_trace_id()
+            response = JSONResponse(
+                status_code=400,
+                content={"error_code": "TRACE_ID_INVALID"},
+            )
+            _complete_traced_response(
+                response=response,
+                trace_id=trace_id,
+                configuration=configuration,
+                request=request,
+                started_ns=time.perf_counter_ns(),
+            )
+            return response
         started_ns = time.perf_counter_ns()
-        response = await call_next(request)
-        duration_ms = (time.perf_counter_ns() - started_ns) / 1_000_000
-        response.headers["X-Trace-ID"] = trace_id
-        print(
-            json.dumps(
-                {
-                    "configuration_hash": configuration.configuration_hash,
-                    "duration_ms": round(duration_ms, 3),
-                    "event_type": "orchestrator_http_request",
-                    "method": request.method,
-                    "path": request.url.path,
-                    "status_code": response.status_code,
-                    "trace_id": trace_id,
-                },
-                ensure_ascii=False,
-                sort_keys=True,
-            ),
-            flush=True,
+        try:
+            async with asyncio.timeout(configuration.runtime.timeouts.request_seconds):
+                response = await call_next(request)
+        except TimeoutError:
+            response = JSONResponse(
+                status_code=504,
+                content={"error_code": "ORCHESTRATOR_REQUEST_TIMEOUT"},
+            )
+        except Exception:
+            response = JSONResponse(
+                status_code=500,
+                content={"error_code": "ORCHESTRATOR_INTERNAL_ERROR"},
+            )
+        _complete_traced_response(
+            response=response,
+            trace_id=trace_id,
+            configuration=configuration,
+            request=request,
+            started_ns=started_ns,
         )
         return response
     application.include_router(build_health_router())
@@ -195,7 +247,7 @@ def create_orchestrator_app(
     @application.get("/ready")
     async def ready() -> JSONResponse:
         composition_root = application.state.composition_root
-        dependencies = composition_root.readiness_snapshot()
+        dependencies = await run_in_threadpool(composition_root.readiness_snapshot)
         is_ready = all(dependency.status == "ready" for dependency in dependencies)
         return JSONResponse(
             status_code=200 if is_ready else 503,
@@ -212,10 +264,46 @@ def create_orchestrator_app(
 def _request_trace_id(request: Request) -> str:
     provided = request.headers.get("X-Trace-ID")
     if provided is None:
-        return f"TRACE-{uuid4().hex.upper()}"
-    if provided == "" or provided != provided.strip() or len(provided) > 128:
+        return _new_trace_id()
+    if (
+        provided == ""
+        or provided != provided.strip()
+        or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}", provided) is None
+    ):
         raise ValueError("TRACE_ID_INVALID")
     return provided
+
+
+def _new_trace_id() -> str:
+    return f"TRACE-{uuid4().hex.upper()}"
+
+
+def _complete_traced_response(
+    *,
+    response: Response,
+    trace_id: str,
+    configuration: ApplicationConfiguration,
+    request: Request,
+    started_ns: int,
+) -> None:
+    duration_ms = (time.perf_counter_ns() - started_ns) / 1_000_000
+    response.headers["X-Trace-ID"] = trace_id
+    print(
+        json.dumps(
+            {
+                "configuration_hash": configuration.configuration_hash,
+                "duration_ms": round(duration_ms, 3),
+                "event_type": "orchestrator_http_request",
+                "method": request.method,
+                "path": request.url.path,
+                "status_code": response.status_code,
+                "trace_id": trace_id,
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        ),
+        flush=True,
+    )
 
 
 def _content_length(scope: Any) -> int | None:
@@ -295,6 +383,8 @@ def serve_orchestrator_app(
         application,
         host=configuration.services.api.bind_host,
         port=configuration.services.api.port,
+        timeout_keep_alive=configuration.runtime.timeouts.request_seconds,
+        timeout_graceful_shutdown=configuration.runtime.timeouts.shutdown_seconds,
     )
 
 

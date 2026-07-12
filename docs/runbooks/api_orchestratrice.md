@@ -3,7 +3,7 @@
 ## Statut
 
 - Tâche: `docs/tasks/milestone_013-fastapi/0011_deployer_auditer_api_orchestratrice.md`.
-- ADR applicables: ADR-019 pour le runtime et ADR-020 pour la frontière binaire bornée; ADR-018 reste inchangée.
+- ADR applicables: ADR-019 pour le runtime, ADR-020 pour la frontière binaire bornée et ADR-021 pour les migrations PostgreSQL; ADR-018 reste inchangée.
 - Runtime public unique: FastAPI servi par Uvicorn sous l'identité `orchestrator-api`.
 - Configuration unique: fichier explicite conforme à M13-config; aucune variable applicative, valeur par défaut ou solution de repli.
 
@@ -33,6 +33,19 @@ Les quatre variables techniques `OST_EDGE_HTTPS_PORT`, `CADDY_ADMIN`, `POSTGRES_
 
 Le service `orchestrator-api` exécute directement l'entrée verrouillée `api --config /workspace/config/application.yaml` depuis la `.venv` copiée par le builder. L'image runtime n'installe pas `uv` et ne résout aucune dépendance. Le service conserve le port interne 8080 et attend PostgreSQL. L'UI et `llm-gateway` gardent leur runtime propre; ils ne sont pas migrés vers FastAPI.
 
+L'image et le schéma sont couplés explicitement par `ostrading/orchestrator-api:0.1.0-m013-fastapi-schema-002` et le label `org.ostrading.postgres-schema-version=002`. Le runner prend un verrou advisory transactionnel, vérifie le ledger `platform.schema_migrations`, applique les versions absentes et refuse toute dérive de SHA-256 avant que `/ready` puisse répondre 200. Les timeouts `startup_seconds`, `request_seconds` et `shutdown_seconds` pilotent respectivement connexion/migrations, requêtes/keep-alive et arrêt Uvicorn; le healthcheck Compose reprend 120 s, 300 s et 30 s sans valeur alternative.
+
+## Migration d'un volume existant
+
+Le démarrage normal applique la migration avant readiness. Pour une opération séparée et reproductible, depuis l'hôte et avec PostgreSQL déjà démarré:
+
+```powershell
+docker compose -f .\deploy\local-compose\compose.yaml up -d postgres
+docker compose -f .\deploy\local-compose\compose.yaml run --rm --no-deps orchestrator-api python -m app.platform.postgres_migrations --config /workspace/config/application.yaml
+```
+
+La sortie attendue pour cette image est `POSTGRES_SCHEMA_READY:002`. Relancer exactement la même commande est idempotent. Une erreur `POSTGRES_MIGRATION_DRIFT`, `POSTGRES_SCHEMA_VERSION_UNSUPPORTED` ou un timeout interdit le démarrage; aucun script n'est ignoré et aucun ledger n'est corrigé automatiquement.
+
 ## Limites binaires et spool temporaire
 
 - Caddy refuse les corps `/api/*` supérieurs à 54 Mo avant le proxy.
@@ -43,10 +56,19 @@ Le service `orchestrator-api` exécute directement l'entrée verrouillée `api -
 
 ## Contrôles opératoires
 
+Depuis l'hôte, seul `edge-gateway` est publié. `handle_path /api/*` retire le préfixe avant le proxy:
+
 ```powershell
-Invoke-RestMethod http://127.0.0.1:8080/health
-Invoke-RestMethod http://127.0.0.1:8080/ready
-Invoke-RestMethod http://127.0.0.1:8080/openapi.json
+$edgeAuthority = docker compose -f .\deploy\local-compose\compose.yaml port edge-gateway 8443
+curl.exe --fail --insecure "https://$edgeAuthority/api/ready"
+curl.exe --fail --insecure "https://$edgeAuthority/api/openapi.json"
+```
+
+Pour contrôler directement le service sur le réseau Compose sans supposer un port hôte inexistant:
+
+```powershell
+docker compose -f .\deploy\local-compose\compose.yaml exec -T orchestrator-api python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=300).read().decode())"
+docker compose -f .\deploy\local-compose\compose.yaml exec -T orchestrator-api python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8080/ready', timeout=300).read().decode())"
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_fastapi.ps1
 ```
 
@@ -63,6 +85,14 @@ L'arrêt Compose conserve les volumes:
 docker compose -f .\deploy\local-compose\compose.yaml down
 ```
 
-Le rollback applicatif consiste à redéployer le commit GREEN M13-FastAPI précédent avec son `uv.lock`, son image et son schéma PostgreSQL compatibles. Il est interdit de réactiver `app.platform.local_runtime serve-http orchestrator-api`, de servir deux runtimes sur le port 8080 ou de supprimer les volumes. Une migration corrective doit être explicite et gouvernée; aucun fallback vers l'ancien routeur n'est autorisé.
+Le rollback applicatif consiste à arrêter l'image courante, puis à redéployer un tag immuable qui déclare explicitement `schema-002` et le même ledger compatible:
+
+```powershell
+docker compose -f .\deploy\local-compose\compose.yaml down
+git switch --detach <commit-green-compatible-schema-002>
+docker compose -f .\deploy\local-compose\compose.yaml up --build
+```
+
+Avant l'opération, l'exploitant doit vérifier le tag Compose et `SELECT version, filename, sha256 FROM platform.schema_migrations ORDER BY version`. Une image exigeant une version inférieure à celle du ledger est refusée; le rollback ne supprime jamais le volume et n'exécute aucune migration descendante. Une incompatibilité nécessite une migration corrective ascendante explicitement versionnée. Il est interdit de réactiver `app.platform.local_runtime serve-http orchestrator-api`, de servir deux runtimes sur le port 8080 ou de supprimer les volumes. Aucun fallback vers l'ancien routeur n'est autorisé.
 
 Le rollback du présent durcissement doit restaurer ensemble `pyproject.toml`, `uv.lock`, l'image multi-stage, les limites Caddy/ASGI et le `tmpfs`. Il est interdit de retirer seulement une limite ou de réintroduire `Path.read_bytes()` sur la restitution publique.

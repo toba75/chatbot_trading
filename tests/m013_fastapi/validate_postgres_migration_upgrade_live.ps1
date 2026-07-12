@@ -1,8 +1,10 @@
 $ErrorActionPreference = "Stop"
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "../..")).Path
-. (Join-Path $repoRoot "scripts/require_python.ps1")
-$python = Get-RequiredPythonExecutable
+$python = Join-Path $repoRoot ".venv\Scripts\python.exe"
+if (-not (Test-Path -LiteralPath $python -PathType Leaf)) { throw "UV_PROJECT_PYTHON_REQUIRED" }
+$env:PYTHONPATH = $repoRoot
+$env:PYTHONIOENCODING = "utf-8"
 $null = & docker info --format '{{.ServerVersion}}' 2>&1
 if ($LASTEXITCODE -ne 0) { throw "DOCKER_ENGINE_REQUIRED" }
 
@@ -51,6 +53,7 @@ try {
     $env:M13_MIGRATION_PATH = Join-Path $repoRoot "deploy/postgres/migrations"
     @'
 import os
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import psycopg
 
@@ -67,7 +70,8 @@ runner = PostgresMigrationRunner(
     migrations_path=Path(os.environ["M13_MIGRATION_PATH"]),
     operation_timeout_seconds=30,
 )
-runner.run()
+with ThreadPoolExecutor(max_workers=2) as executor:
+    list(executor.map(lambda _: runner.run(), range(2)))
 runner.run()
 assert runner.is_required_schema_ready()
 with factory.connect() as connection:

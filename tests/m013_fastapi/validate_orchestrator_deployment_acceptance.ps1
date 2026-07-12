@@ -32,10 +32,13 @@ Assert-Contains $compose "      - api" "Compose ne lance pas le point d'entrée 
 Assert-Contains $compose "      - --config" "Compose ne transmet pas la configuration unique."
 Assert-Contains $compose "      - /workspace/config/application.yaml" "Chemin de configuration Compose invalide."
 Assert-Contains $compose 'http://127.0.0.1:8080/ready' "Healthcheck readiness HTTP absent."
+Assert-Contains $compose 'ostrading/orchestrator-api:0.1.0-m013-fastapi-schema-002' "Tag image/schéma M13-FastAPI absent."
 Assert-Contains $caddyfile 'max_size 54MB' "Limite agrégée Caddy absente."
 Assert-Contains $dockerfile "COPY uv.lock ./uv.lock" "Le verrou uv n'est pas copié dans l'image."
 Assert-Contains $dockerfile "AS builder" "Étape builder Docker absente."
 Assert-Contains $dockerfile "AS runtime" "Étape runtime Docker absente."
+Assert-Contains $dockerfile 'org.ostrading.postgres-schema-version="002"' "Version de schéma absente de l'image."
+Assert-Contains $dockerfile "COPY --chown=ostrading:ostrading deploy/postgres/migrations ./deploy/postgres/migrations" "Migrations non embarquées dans l'image."
 $runtimeBlock = $dockerfile.Substring($dockerfile.IndexOf("AS runtime"))
 if ($runtimeBlock.Contains("pip install") -or $runtimeBlock.Contains(" uv sync")) {
     throw "Le runtime Docker ne doit ni installer uv ni résoudre les dépendances."
@@ -47,6 +50,9 @@ $orchestratorBlock = [regex]::Match(
 if ([string]::IsNullOrWhiteSpace($orchestratorBlock)) {
     throw "Bloc Compose orchestrator-api illisible."
 }
+Assert-Contains $orchestratorBlock "      timeout: 300s" "Timeout healthcheck non aligné avec request_seconds."
+Assert-Contains $orchestratorBlock "      start_period: 120s" "Budget startup healthcheck non aligné."
+Assert-Contains $orchestratorBlock "    stop_grace_period: 30s" "Budget shutdown Compose non aligné."
 Assert-Contains $orchestratorBlock '/tmp:size=128m,mode=1777' "tmpfs borné du double spool multipart absent."
 if ($orchestratorBlock.Contains("app.platform.local_runtime")) {
     throw "L'ancien runtime local reste actif pour orchestrator-api."
@@ -59,7 +65,7 @@ if (-not (Test-Path -LiteralPath $auditPath -PathType Leaf)) {
 }
 $runbook = Get-Content -Raw -Encoding UTF8 $runbookPath
 $audit = Get-Content -Raw -Encoding UTF8 $auditPath
-foreach ($marker in @("uv run api --config", "api --config /workspace/config/application.yaml", "/health", "/ready", "/openapi.json", "rollback", "ADR-019", "ADR-020")) {
+foreach ($marker in @("uv run api --config", "api --config /workspace/config/application.yaml", "exec -T orchestrator-api", "python -m app.platform.postgres_migrations", "/health", "/ready", "/openapi.json", "rollback", "ADR-019", "ADR-020", "ADR-021")) {
     Assert-Contains $runbook $marker "Runbook API incomplet."
 }
 foreach ($marker in @("M13-FastAPI", "configuration_hash", "trace_id", "PostgreSQL", "PDF", "fallback")) {
