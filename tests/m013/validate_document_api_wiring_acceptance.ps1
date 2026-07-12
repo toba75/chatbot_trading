@@ -1,21 +1,31 @@
 $ErrorActionPreference = "Stop"
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "../..")).Path
-$temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("ostrading-document-api-" + [guid]::NewGuid().ToString("N"))
-New-Item -ItemType Directory -Path $temporaryRoot | Out-Null
+. (Join-Path $repoRoot "scripts/require_python.ps1")
+$pythonExecutable = Get-RequiredPythonExecutable
 
-try {
-    $env:OST_REPO_ROOT = $repoRoot
-    $env:OST_DOCUMENT_API_TEMP_ROOT = $temporaryRoot
+$pythonCode = @'
+from __future__ import annotations
 
-    @'
-import os
-import sys
+import asyncio
+import json
 from pathlib import Path
+import sys
+from tempfile import TemporaryDirectory
 
-sys.path.insert(0, os.environ["OST_REPO_ROOT"])
+sys.path.insert(0, sys.argv[1])
 
-from app.platform.document_api import build_local_document_api
+from app.platform.configuration import load_application_configuration
+from app.platform.job_runtime import JobRecord, JobStatus, JobSubmissionDecision
+from app.platform.orchestrator_asgi import create_orchestrator_app
+from app.platform.orchestrator_composition import (
+    DependencyReadiness,
+    OrchestratorCompositionRoot,
+)
+from app.source_processing.adapters.document_http import SourceProcessingHttpAdapter
+from app.source_processing.adapters.pdf_document_inspector import CorpusPdfDocumentInspector
+from app.source_processing.adapters.postgres_document_persistence import CorpusOriginalSourceStore
+from app.source_processing.application.document_commands import DocumentCommandService
 
 
 def assert_equal(actual, expected, message):
@@ -46,80 +56,253 @@ def one_page_pdf():
     return bytes(payload)
 
 
-storage_root = Path(os.environ["OST_DOCUMENT_API_TEMP_ROOT"])
-api = build_local_document_api(
-    corpus_root=storage_root / "corpus",
-    projection_root=storage_root / "projections",
-    configuration_hash="a" * 64,
-    code_version="acceptance-test",
-    model_version="document-diagnostic-v1",
-)
-pdf_content = one_page_pdf()
+def multipart_body(*, boundary, pdf_content):
+    parts = []
 
-# Given l'API orchestratrice dispose d'un stockage documentaire local vide.
-# When un PDF est enregistre par le contrat public POST /v1/documents.
-registered = api.handle_post(
-    path="/v1/documents",
-    body={
-        "original_content": pdf_content,
-        "bibliographic_metadata": {
-            "title": "Document de validation",
-            "authors": ["Equipe OSTrading"],
-            "publication_year": 2026,
-            "edition": "1",
+    def field(name, value):
+        parts.extend(
+            (
+                f"--{boundary}\r\n".encode("ascii"),
+                f'Content-Disposition: form-data; name="{name}"\r\n\r\n'.encode("ascii"),
+                str(value).encode("utf-8"),
+                b"\r\n",
+            )
+        )
+
+    parts.extend(
+        (
+            f"--{boundary}\r\n".encode("ascii"),
+            b'Content-Disposition: form-data; name="original_content"; filename="nom-ignore.pdf"\r\n',
+            b"Content-Type: application/pdf\r\n\r\n",
+            pdf_content,
+            b"\r\n",
+        )
+    )
+    field("title", "Document de validation")
+    field("authors", "Équipe OSTrading")
+    field("publication_year", "2026")
+    field("edition", "1")
+    parts.append(f"--{boundary}--\r\n".encode("ascii"))
+    return b"".join(parts)
+
+
+async def asgi_post(application, path, body, content_type):
+    sent_messages = []
+    delivered = False
+
+    async def receive():
+        nonlocal delivered
+        if delivered:
+            return {"type": "http.disconnect"}
+        delivered = True
+        return {"type": "http.request", "body": body, "more_body": False}
+
+    async def send(message):
+        sent_messages.append(message)
+
+    await application(
+        {
+            "type": "http",
+            "asgi": {"version": "3.0", "spec_version": "2.3"},
+            "http_version": "1.1",
+            "method": "POST",
+            "scheme": "http",
+            "path": path,
+            "raw_path": path.encode("ascii"),
+            "query_string": b"",
+            "root_path": "",
+            "headers": [
+                (b"content-type", content_type.encode("ascii")),
+                (b"content-length", str(len(body)).encode("ascii")),
+            ],
+            "client": ("asgi-test", 50000),
+            "server": ("orchestrator-api", 8080),
+            "state": {},
         },
-    },
-)
+        receive,
+        send,
+    )
+    start = next(message for message in sent_messages if message["type"] == "http.response.start")
+    raw_response = b"".join(
+        message.get("body", b"")
+        for message in sent_messages
+        if message["type"] == "http.response.body"
+    )
+    return start["status"], json.loads(raw_response.decode("utf-8"))
 
-# Then la commande atteint le cas d'usage SP reel et le document est lisible dans le corpus public.
-assert_equal(registered.status_code, 201, "L'enregistrement doit creer la source.")
-document_id = registered.json_body["document_id"]
-listed = api.handle_get(path="/v1/documents")
-assert_equal(listed.status_code, 200, "Le corpus public doit etre lisible.")
-assert_equal(len(listed.json_body["documents"]), 1, "Le corpus doit contenir le PDF enregistre.")
-assert_equal(listed.json_body["documents"][0]["document_id"], document_id, "Le DocumentId doit rester stable.")
-assert_equal(listed.json_body["documents"][0]["diagnostic_status"], "DIAGNOSTIC_NOT_REQUESTED", "Le diagnostic initial doit etre explicite.")
 
-# When le diagnostic est demande par POST /v1/documents/{id}/diagnose.
-diagnosis_requested = api.handle_post(
-    path=f"/v1/documents/{document_id}/diagnose",
-    body={},
-)
+class SharedPersistence:
+    def __init__(self):
+        self.sources = {}
+        self.runs = {}
+        self.jobs = {}
 
-# Then la commande atteint le cas d'usage SP et sa sortie detaillee devient lisible.
-assert_equal(diagnosis_requested.status_code, 202, "Le diagnostic doit etre accepte.")
-diagnosis = api.handle_get(path=f"/v1/documents/{document_id}/diagnostic")
-assert_equal(diagnosis.status_code, 200, "Le diagnostic public doit etre lisible.")
-assert_equal(diagnosis.json_body["diagnostic_status"], "DIAGNOSTIC_REQUESTED", "La demande de diagnostic doit etre visible.")
-assert_equal(diagnosis.json_body["source_page_count"], 1, "Le manifeste doit exposer le nombre de pages.")
-assert_equal(diagnosis.json_body["pages"], [{"page_number": 1, "manifest_state": "PRESENT", "diagnostic": None}], "Chaque page doit rester inspectable.")
+    def find_by_fingerprint(self, fingerprint):
+        return next((source for source in self.sources.values() if source.fingerprint == fingerprint), None)
 
-# Then les sorties absentes de conversion et projection restent lisibles sans etat invente.
-conversion = api.handle_get(path=f"/v1/documents/{document_id}/conversion")
-projection = api.handle_get(path=f"/v1/documents/{document_id}/projection")
-assert_equal(conversion.status_code, 200, "La lecture de conversion doit etre operationnelle.")
-assert_equal(conversion.json_body, {"document_id": document_id, "conversion_status": "CONVERSION_NOT_REQUESTED", "canonical_version_id": None, "rejection_error_code": None}, "La conversion absente doit etre explicite.")
-assert_equal(projection.status_code, 200, "La lecture de projection doit etre operationnelle.")
-assert_equal(projection.json_body, {"document_id": document_id, "projection_status": "PROJECTION_NOT_REQUESTED", "projection_id": None, "canonical_version_id": None, "profile": None, "chunk_count": None}, "La projection absente doit etre explicite.")
+    def find_by_work_key(self, work_key):
+        return next((source for source in self.sources.values() if source.metadata.work_key == work_key), None)
 
-# Then le PDF original est recupere par un contrat controle sans reference de stockage interne.
-original = api.handle_get(path=f"/v1/documents/{document_id}/original")
-assert_equal(original.status_code, 200, "Le PDF original doit etre recuperable.")
-assert_equal(original.content_type, "application/pdf", "Le type MIME doit rester PDF.")
-assert_equal(original.binary_body, pdf_content, "L'original doit etre restitue bit a bit.")
-for payload in (listed.json_body, diagnosis.json_body, conversion.json_body, projection.json_body):
-    if "original_storage_ref" in repr(payload):
-        raise AssertionError("Une reference de stockage interne ne doit jamais etre exposee.")
+    def find_by_document_id(self, document_id):
+        return self.sources.get(document_id.value)
 
-print("Test d'acceptation raccordement contrats documentaires orchestrator-api: OK")
-'@ | & (Join-Path $repoRoot ".venv/Scripts/python.exe") -
+    def save_if_absent(self, source_document):
+        existing = self.sources.get(source_document.document_id.value)
+        if existing is not None:
+            return existing
+        self.sources[source_document.document_id.value] = source_document
+        return None
 
-    if ($LASTEXITCODE -ne 0) {
-        throw "Le test d'acceptation du raccordement documentaire a echoue."
-    }
+    def save(self, processing_run):
+        self.runs[processing_run.document_id.value] = processing_run
+
+    def find_processing_run(self, document_id):
+        return self.runs.get(document_id.value)
+
+    def submit_processing_run(self, processing_run, job_queue, job_request):
+        submission = job_queue.submit(job_request, recalculate=False)
+        if submission.created:
+            self.runs[processing_run.document_id.value] = processing_run
+        return submission
+
+
+class ProcessingRuns:
+    def __init__(self, persistence):
+        self.persistence = persistence
+
+    def save(self, processing_run):
+        self.persistence.save(processing_run)
+
+    def find_by_document_id(self, document_id):
+        return self.persistence.find_processing_run(document_id)
+
+    def submit_processing_run(self, processing_run, job_queue, job_request):
+        return self.persistence.submit_processing_run(processing_run, job_queue, job_request)
+
+
+class PersistentJobQueue:
+    def __init__(self, persistence):
+        self.persistence = persistence
+
+    def submit(self, request, *, recalculate):
+        key = request.idempotence_key.identity_tuple()
+        existing = self.persistence.jobs.get(key)
+        if existing is not None:
+            return JobSubmissionDecision(job=existing, created=False, recalculation_refused=False)
+        job = JobRecord(
+            sequence=len(self.persistence.jobs) + 1,
+            job_id=f"JOB-M002-{len(self.persistence.jobs) + 1:06d}",
+            request=request,
+            status=JobStatus.PENDING,
+            result=None,
+            failure_reason=None,
+        )
+        self.persistence.jobs[key] = job
+        return JobSubmissionDecision(job=job, created=True, recalculation_refused=False)
+
+
+class ReadyDependency:
+    async def open(self):
+        return None
+
+    async def close(self):
+        return None
+
+    def readiness(self):
+        return DependencyReadiness(name="document-store", status="ready")
+
+
+async def scenario(repo_root):
+    configuration = load_application_configuration(
+        config_path=repo_root / "config" / "application.example.yaml",
+        environment_snapshot={},
+    )
+    pdf_content = one_page_pdf()
+    with TemporaryDirectory() as temporary_directory:
+        persistence = SharedPersistence()
+        original_store = CorpusOriginalSourceStore(
+            corpus_root=Path(temporary_directory) / "corpus"
+        )
+        commands = DocumentCommandService(
+            original_source_store=original_store,
+            source_document_repository=persistence,
+            document_inspector=CorpusPdfDocumentInspector(original_source_store=original_store),
+            processing_run_repository=ProcessingRuns(persistence),
+            job_queue=PersistentJobQueue(persistence),
+            diagnosis_configuration_hash="a" * 64,
+            code_version="acceptance-test",
+            model_version="document-diagnostic-v1",
+        )
+        adapter = SourceProcessingHttpAdapter(document_commands=commands)
+
+        def root_factory(validated_configuration):
+            return OrchestratorCompositionRoot(
+                configuration=validated_configuration,
+                dependencies=(ReadyDependency(),),
+                document_http_adapter=adapter,
+                document_upload_max_bytes=1024 * 1024,
+            )
+
+        application = create_orchestrator_app(
+            configuration=configuration,
+            composition_root_factory=root_factory,
+        )
+        boundary = "ost-m013-fastapi-wiring"
+        body = multipart_body(boundary=boundary, pdf_content=pdf_content)
+
+        async with application.router.lifespan_context(application):
+            registered_status, registered = await asgi_post(
+                application,
+                "/v1/documents",
+                body,
+                f"multipart/form-data; boundary={boundary}",
+            )
+            assert_equal(registered_status, 201, "L'enregistrement ASGI doit créer la source.")
+            assert_equal(set(registered), {"document_id", "document_status"}, "La réponse ne doit exposer aucun champ interne.")
+            document_id = registered["document_id"]
+            source = next(iter(persistence.sources.values()))
+            assert_equal(source.document_id.value, document_id, "Le DocumentId public doit rester celui de SP.")
+            assert_equal(original_store.read_original(source), pdf_content, "L'original doit être conservé bit à bit.")
+            assert_equal(source.metadata.title, "Document de validation", "Le nom de fichier ne doit pas devenir métadonnée.")
+
+            diagnosed_status, diagnosed = await asgi_post(
+                application,
+                f"/v1/documents/{document_id}/diagnose",
+                b"",
+                "application/octet-stream",
+            )
+            assert_equal(diagnosed_status, 202, "Le diagnostic doit être accepté.")
+            assert_equal(
+                diagnosed,
+                {"document_id": document_id, "diagnostic_status": "DIAGNOSTIC_REQUESTED"},
+                "Le contrat public ne doit exposer ni run ni référence interne.",
+            )
+            assert_equal(len(persistence.runs), 1, "La tentative DIAGNOSE doit être persistée.")
+            assert_equal(len(persistence.jobs), 1, "Le job DIAGNOSE doit être persisté.")
+            job = next(iter(persistence.jobs.values()))
+            assert_equal(job.request.job_name, "DIAGNOSE", "Aucun diagnostic simulé ne doit remplacer le job.")
+
+
+asyncio.run(scenario(Path(sys.argv[1])))
+print("Test d'acceptation raccordement commandes documentaires ASGI: OK")
+'@
+
+$pythonScriptPath = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m013_document_wiring_" + [System.Guid]::NewGuid().ToString("N") + ".py")
+Set-Content -Encoding UTF8 -LiteralPath $pythonScriptPath -Value $pythonCode
+$previousErrorActionPreference = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+try {
+    $env:PYTHONIOENCODING = "utf-8"
+    $output = & $pythonExecutable -B $pythonScriptPath $repoRoot 2>&1
+    $exitCode = $LASTEXITCODE
 }
 finally {
-    Remove-Item Env:OST_REPO_ROOT -ErrorAction SilentlyContinue
-    Remove-Item Env:OST_DOCUMENT_API_TEMP_ROOT -ErrorAction SilentlyContinue
-    Remove-Item -LiteralPath $temporaryRoot -Recurse -Force -ErrorAction SilentlyContinue
+    $ErrorActionPreference = $previousErrorActionPreference
+    Remove-Item -LiteralPath $pythonScriptPath -Force
 }
+
+if ($exitCode -ne 0) {
+    throw ($output -join "`n")
+}
+
+Write-Host "Test d'acceptation raccordement commandes documentaires ASGI: OK"
