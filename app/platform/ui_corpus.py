@@ -268,6 +268,8 @@ def render_corpus_pdf_screen(state: CorpusPdfScreenState) -> str:
             "    button, a.button { border: 1px solid #465a69; background: #f7f9fb; padding: 6px 10px; color: #1f2933; text-decoration: none; }",
             "    .empty-state { color: #52616f; }",
             "    .blocking-notice { border-left: 4px solid #9b2c2c; background: #fff5f5; padding: 12px; margin: 16px 0; }",
+            "    .table-scroll { width: 100%; overflow-x: auto; }",
+            "    @media (max-width: 720px) { body { margin: 12px; } .document-registration-form { grid-template-columns: 1fr; } table { min-width: 820px; } }",
             "  </style>",
             "</head>",
             "<body>",
@@ -293,12 +295,12 @@ def render_corpus_pdf_screen(state: CorpusPdfScreenState) -> str:
             "    </section>",
             '    <section aria-labelledby="liste-pdf">',
             '      <h2 id="liste-pdf">PDF du corpus</h2>',
-            "      <table>",
+            '      <div class="table-scroll"><table>',
             "        <thead>",
             "          <tr><th>Document</th><th>Source</th><th>Diagnostic</th><th>Conversion</th><th>Projection</th><th>Sélection</th><th>PDF</th></tr>",
             "        </thead>",
             f"        <tbody>{document_rows}</tbody>",
-            "      </table>",
+            "      </table></div>",
             "    </section>",
             "  </main>",
             "</body>",
@@ -357,11 +359,18 @@ def render_document_inspection(*, title: str, response: Any) -> str:
     ensure_no_destructive_ui_fields(payload)
     if status_code >= 400:
         error_code = _escape(str(payload.get("error_code")))
+        field = payload.get("field")
+        field_help = (
+            ""
+            if field is None
+            else f"<p>Champ à corriger : <code>{_escape(str(field))}</code>.</p>"
+        )
         content = "".join(
             (
                 '<section role="alert" aria-labelledby="erreur-documentaire">',
                 '<h2 id="erreur-documentaire">Action impossible</h2>',
                 f"<p>Le service a répondu avec le code <code>{error_code}</code>.</p>",
+                field_help,
                 "<p>Vérifiez que l’API orchestratrice et le worker documentaire sont prêts, puis réessayez.</p>",
                 '<p><a href="/ui/corpus-pdf">Réessayer depuis le corpus</a></p>',
                 "</section>",
@@ -376,8 +385,8 @@ def render_document_inspection(*, title: str, response: Any) -> str:
                 (
                     f'<li><h3>Page {_escape(str(page.get("page_number")))}</h3>',
                     f'<p>Manifeste : <code>{_escape(str(page.get("manifest_status")))}</code></p>',
-                    f'<p>Diagnostic : <code>{_escape(_inspection_state(page.get("diagnostic")))}</code></p>',
-                    f'<p>Route : <code>{_escape(_inspection_state(page.get("route")))}</code></p></li>',
+                    f'<section aria-label="Signaux page">{_render_mapping_details(page.get("diagnostic"))}</section>',
+                    f'<section aria-label="Justification de route">{_render_mapping_details(page.get("route"))}</section></li>',
                 )
             )
             for page in pages
@@ -393,15 +402,12 @@ def render_document_inspection(*, title: str, response: Any) -> str:
             )
         )
     else:
-        visible_items = "".join(
-            f"<dt>{_escape(str(key))}</dt><dd><code>{_escape(_inspection_state(value))}</code></dd>"
-            for key, value in payload.items()
-        )
+        visible_items = _render_mapping_details(payload)
         content = "".join(
             (
                 f'<section aria-labelledby="resume-{_escape(parsed_title.casefold())}">',
                 f'<h2 id="resume-{_escape(parsed_title.casefold())}">Données publiques</h2>',
-                f"<dl>{visible_items}</dl></section>",
+                f"{visible_items}</section>",
             )
         )
     return "\n".join(
@@ -624,6 +630,23 @@ def _inspection_state(value: Any) -> str:
     if isinstance(value, list):
         return f"{len(value)} élément(s)"
     return str(value)
+
+
+def _render_mapping_details(value: Any) -> str:
+    """Affiche chaque preuve publique validée sans masquer les structures imbriquées."""
+
+    if value is None:
+        return "<p>Non disponible</p>"
+    if isinstance(value, Mapping):
+        items = "".join(
+            f"<dt>{_escape(str(key))}</dt><dd>{_render_mapping_details(child)}</dd>"
+            for key, child in value.items()
+        )
+        return f"<dl>{items}</dl>"
+    if isinstance(value, list):
+        items = "".join(f"<li>{_render_mapping_details(child)}</li>" for child in value)
+        return f"<ol>{items}</ol>"
+    return f"<code>{_escape(str(value))}</code>"
 
 
 __all__ = [

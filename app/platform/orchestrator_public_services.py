@@ -5,8 +5,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Protocol
 
+from app.platform.application.public_contract_use_cases import (
+    ConversationUseCase,
+    EvaluationUseCase,
+    IndexingUseCase,
+    SearchUseCase,
+)
 from app.platform.configuration import ApplicationConfiguration
-from app.platform import local_runtime
 
 
 PublicResponse = tuple[int, dict[str, Any]]
@@ -25,10 +30,7 @@ class ConversationService:
     configuration: ApplicationConfiguration
 
     def handle(self, body: dict[str, Any]) -> PublicResponse:
-        return local_runtime.product_chat_completions_post_response(
-            body=body,
-            application_configuration=self.configuration,
-        )
+        return ConversationUseCase(self.configuration).handle(body)
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,24 +38,19 @@ class EvaluationService:
     configuration: ApplicationConfiguration
 
     def handle(self, body: dict[str, Any]) -> PublicResponse:
-        return local_runtime.llm_real_path_benchmark_post_response(
-            body=body,
-            application_configuration=self.configuration,
-        )
+        return EvaluationUseCase(self.configuration).handle(body)
 
 
 @dataclass(frozen=True, slots=True)
 class SearchService:
     def handle(self, body: dict[str, Any]) -> PublicResponse:
-        del body
-        return local_runtime.search_post_response()
+        return SearchUseCase().handle(body)
 
 
 @dataclass(frozen=True, slots=True)
 class IndexingService:
     def handle(self, document_id: str, body: dict[str, Any]) -> PublicResponse:
-        del body
-        return local_runtime.index_post_response(document_id=document_id)
+        return IndexingUseCase().handle(document_id, body)
 
 
 @dataclass(frozen=True, slots=True)

@@ -165,7 +165,7 @@ registered = json.loads(body)
 document_id = registered["document_id"]
 assert set(registered) == {"document_id", "document_status"}
 
-status, _, body = request("/v1/documents", headers={"X-Trace-Id": "TRACE-M13-PDF-LIST"})
+status, _, body = request("/v1/documents?limit=100", headers={"X-Trace-Id": "TRACE-M13-PDF-LIST"})
 assert status == 200
 corpus = json.loads(body)
 assert any(item["document_id"] == document_id for item in corpus["documents"])

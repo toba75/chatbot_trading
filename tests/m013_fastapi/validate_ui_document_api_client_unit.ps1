@@ -67,11 +67,8 @@ transport = RecordingTransport(
             200,
             '{"documents":[{"document_id":"DOC-M013-FASTAPI-UI01","title":"Rapport",'
             '"document_status":"REGISTERED","diagnostic_status":"DIAGNOSTIC_NOT_REQUESTED",'
-            '"conversion_status":"CONVERSION_NOT_REQUESTED","canonical_version_id":null}]}',
-        ),
-        json_response(
-            200,
-            '{"document_id":"DOC-M013-FASTAPI-UI01","projection_status":"PROJECTION_NOT_REQUESTED"}',
+            '"conversion_status":"CONVERSION_NOT_REQUESTED","canonical_version_id":null,'
+            '"projection_status":"PROJECTION_NOT_REQUESTED"}],"next_cursor":null}',
         ),
         json_response(
             409,
@@ -98,8 +95,7 @@ assert_equal(command.status_code, 202, "La commande doit conserver le statut HTT
 assert_equal(
     [request[1] for request in transport.requests],
     [
-        "/v1/documents",
-        "/v1/documents/DOC-M013-FASTAPI-UI01/projection",
+        "/v1/documents?limit=100",
         "/v1/documents/DOC-M013-FASTAPI-UI01/diagnostic",
         "/v1/documents/DOC-M013-FASTAPI-UI01/diagnose",
     ],
@@ -118,7 +114,8 @@ internal_transport = RecordingTransport(
             '{"documents":[{"document_id":"DOC-M013-FASTAPI-UI01","title":"Rapport",'
             '"document_status":"REGISTERED","diagnostic_status":"DIAGNOSTIC_NOT_REQUESTED",'
             '"conversion_status":"CONVERSION_NOT_REQUESTED","canonical_version_id":null,'
-            '"original_storage_ref":"/var/lib/private.pdf"}]}',
+            '"projection_status":"PROJECTION_NOT_REQUESTED",'
+            '"original_storage_ref":"/var/lib/private.pdf"}],"next_cursor":null}',
         )
     ]
 )
@@ -136,7 +133,8 @@ unknown_status_transport = RecordingTransport(
             200,
             '{"documents":[{"document_id":"DOC-M013-FASTAPI-UI01","title":"Rapport",'
             '"document_status":"REGISTERED","diagnostic_status":"DIAGNOSTIC_INVENTED",'
-            '"conversion_status":"CONVERSION_NOT_REQUESTED","canonical_version_id":null}]}',
+            '"conversion_status":"CONVERSION_NOT_REQUESTED","canonical_version_id":null,'
+            '"projection_status":"PROJECTION_NOT_REQUESTED"}],"next_cursor":null}',
         )
     ]
 )

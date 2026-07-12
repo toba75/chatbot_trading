@@ -38,6 +38,7 @@ from app.platform.llm_gateway import (
     UrllibOpenAICompatibleTransport,
 )
 from app.platform.observability import GatewayObservation, InMemoryObservabilityCollector
+from app.platform.orchestrator_asgi import MAX_REQUEST_BODY_BYTES
 from app.platform.ui_corpus import (
     CorpusPdfScreenState,
     build_unavailable_corpus_pdf_state,
@@ -258,7 +259,7 @@ def _serve_http(
                         )
                     _write_text_response(
                         self,
-                        status_code=200,
+                        status_code=response.status_code,
                         content_type="text/html; charset=utf-8",
                         body=render_document_inspection(
                             title=step.capitalize(),
@@ -520,8 +521,11 @@ def _read_raw_body(
     if raw_length is None or not raw_length.isdecimal():
         return 400, {"error_code": "HTTP_REQUEST_INVALID", "field": "content_length"}
     content_length = int(raw_length)
-    if content_length < 0:
-        return 400, {"error_code": "HTTP_REQUEST_INVALID", "field": "content_length"}
+    if content_length > MAX_REQUEST_BODY_BYTES:
+        return 413, {
+            "error_code": "HTTP_REQUEST_TOO_LARGE",
+            "max_body_bytes": MAX_REQUEST_BODY_BYTES,
+        }
     return 200, handler.rfile.read(content_length)
 
 

@@ -5,6 +5,7 @@ from typing import Any
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
+from starlette.concurrency import run_in_threadpool
 
 from app.platform.llm_gateway import LLMGatewayContractError
 from app.platform.orchestrator_public_services import (
@@ -34,7 +35,7 @@ def build_conversation_router(handler: JsonCommandHandler) -> APIRouter:
         if isinstance(body_result, JSONResponse):
             return body_result
         try:
-            response = parsed_handler.handle(body_result)
+            response = await run_in_threadpool(parsed_handler.handle, body_result)
         except LLMGatewayContractError as exc:
             response = 400, {"error_code": exc.code, "message": exc.message}
         return _json_response(response)
@@ -52,7 +53,7 @@ def build_evaluation_router(handler: JsonCommandHandler) -> APIRouter:
         if isinstance(body_result, JSONResponse):
             return body_result
         try:
-            response = parsed_handler.handle(body_result)
+            response = await run_in_threadpool(parsed_handler.handle, body_result)
         except LLMGatewayContractError as exc:
             response = 400, {"error_code": exc.code, "message": exc.message}
         return _json_response(response)
@@ -69,7 +70,7 @@ def build_search_router(handler: JsonCommandHandler) -> APIRouter:
         body_result = await _read_json_object(request)
         if isinstance(body_result, JSONResponse):
             return body_result
-        return _json_response(parsed_handler.handle(body_result))
+        return _json_response(await run_in_threadpool(parsed_handler.handle, body_result))
 
     return router
 
@@ -83,7 +84,9 @@ def build_indexing_router(handler: IndexCommandHandler) -> APIRouter:
         body_result = await _read_json_object(request)
         if isinstance(body_result, JSONResponse):
             return body_result
-        return _json_response(parsed_handler.handle(document_id, body_result))
+        return _json_response(
+            await run_in_threadpool(parsed_handler.handle, document_id, body_result)
+        )
 
     return router
 

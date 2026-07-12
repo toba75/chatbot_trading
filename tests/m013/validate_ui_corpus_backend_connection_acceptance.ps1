@@ -51,12 +51,8 @@ class RecordingTransport:
                 "application/json",
                 b'{"documents":[{"document_id":"DOC-M013-UI-API01","title":"Depuis API",'
                 b'"document_status":"REGISTERED","diagnostic_status":"DIAGNOSTIC_NOT_REQUESTED",'
-                b'"conversion_status":"CONVERSION_NOT_REQUESTED","canonical_version_id":null}]}',
-            ),
-            UiDocumentApiResponse(
-                200,
-                "application/json",
-                b'{"document_id":"DOC-M013-UI-API01","projection_status":"PROJECTION_NOT_REQUESTED"}',
+                b'"conversion_status":"CONVERSION_NOT_REQUESTED","canonical_version_id":null,'
+                b'"projection_status":"PROJECTION_NOT_REQUESTED"}],"next_cursor":null}',
             ),
         ]
 
@@ -96,7 +92,7 @@ with tempfile.TemporaryDirectory() as temporary_root:
     assert_equal(state.documents[0].title, "Depuis API", "Le document doit venir de l'orchestrateur.")
     assert_equal(
         transport.paths,
-        ["/v1/documents", "/v1/documents/DOC-M013-UI-API01/projection"],
+        ["/v1/documents?limit=100"],
         "Le trajet doit rester borné aux contrats documentaires publics.",
     )
 

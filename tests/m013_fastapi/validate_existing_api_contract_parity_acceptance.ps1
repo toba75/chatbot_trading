@@ -17,7 +17,7 @@ from fastapi import APIRouter
 sys.path.insert(0, sys.argv[1])
 
 from app.platform.configuration import load_application_configuration
-import app.platform.local_runtime as legacy_runtime
+import app.platform.application.public_contract_use_cases as public_use_cases
 from app.platform.orchestrator_asgi import create_orchestrator_app
 from app.platform.orchestrator_composition import DependencyReadiness, OrchestratorCompositionRoot
 from app.platform.orchestrator_contract_routers import build_public_contract_router
@@ -107,7 +107,7 @@ def benchmark_body(configuration):
     }
 
 
-def fake_gateway_response(*, body, application_configuration):
+def fake_gateway_response(body, application_configuration):
     if body["schema_name"] == "m13_reality_product_chat":
         structured_output = {"answer": "Réponse stable"}
         raw_response_id = "RAW-CHAT-PARITY"
@@ -145,21 +145,15 @@ async def scenario(repo_root):
         composition_root_factory=root_factory,
     )
 
-    original_gateway = legacy_runtime._post_local_gateway_inference
-    original_time = legacy_runtime.time.time
-    legacy_runtime._post_local_gateway_inference = fake_gateway_response
-    legacy_runtime.time.time = lambda: 1_720_000_000
+    original_gateway = public_use_cases._infer
+    original_time = public_use_cases.time.time
+    public_use_cases._infer = fake_gateway_response
+    public_use_cases.time.time = lambda: 1_720_000_000
     try:
-        direct_chat = legacy_runtime._product_chat_completions_post_response(
-            body=chat_body(configuration),
-            application_configuration=configuration,
-        )
-        direct_benchmark = legacy_runtime._llm_real_path_benchmark_post_response(
-            body=benchmark_body(configuration),
-            application_configuration=configuration,
-        )
-        direct_search = legacy_runtime._search_post_response()
-        direct_index = legacy_runtime._index_post_response(document_id="DOC-M013-FASTAPI-PARITY")
+        direct_chat = public_use_cases.ConversationUseCase(configuration).handle(chat_body(configuration))
+        direct_benchmark = public_use_cases.EvaluationUseCase(configuration).handle(benchmark_body(configuration))
+        direct_search = public_use_cases.SearchUseCase().handle({})
+        direct_index = public_use_cases.IndexingUseCase().handle("DOC-M013-FASTAPI-PARITY", {})
 
         async with application.router.lifespan_context(application):
             assert_equal(
@@ -206,8 +200,8 @@ async def scenario(repo_root):
                 "L'identifiant d'indexation invalide doit conserver son contrat public.",
             )
     finally:
-        legacy_runtime._post_local_gateway_inference = original_gateway
-        legacy_runtime.time.time = original_time
+        public_use_cases._infer = original_gateway
+        public_use_cases.time.time = original_time
 
 
 asyncio.run(scenario(Path(sys.argv[1])))

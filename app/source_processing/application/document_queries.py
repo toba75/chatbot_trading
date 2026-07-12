@@ -88,10 +88,11 @@ class DocumentCorpusItem:
 
 
 @dataclass(frozen=True, slots=True)
-class DocumentCorpusView:
-    """Liste immuable des documents visibles par un client public."""
+class DocumentCorpusPageView:
+    """Page SP bornée; le curseur est l'identifiant du dernier élément rendu."""
 
     documents: tuple[DocumentCorpusItem, ...]
+    next_cursor: str | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -178,21 +179,35 @@ class DocumentQueryService:
             raise ValueError("document_snapshot_repository sans lecture")
         self._document_snapshot_repository = document_snapshot_repository
 
-    def list_documents(self) -> DocumentCorpusView:
+    def list_documents(
+        self,
+        *,
+        limit: int,
+        cursor: str | None,
+    ) -> DocumentCorpusPageView:
+        if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1 or limit > 100:
+            raise ValueError("limit corpus invalide")
+        if cursor is not None:
+            DocumentId.from_value(cursor)
         snapshots = tuple(
             self._document_snapshot_repository.list_document_snapshots(
-                limit=100,
-                after_document_id=None,
+                limit=limit + 1,
+                after_document_id=cursor,
             )
         )
+        has_next_page = len(snapshots) > limit
+        visible_snapshots = snapshots[:limit]
         items = tuple(
             self._corpus_item(snapshot)
             for snapshot in sorted(
-                snapshots,
+                visible_snapshots,
                 key=lambda candidate: candidate.source_document.document_id.value,
             )
         )
-        return DocumentCorpusView(documents=items)
+        return DocumentCorpusPageView(
+            documents=items,
+            next_cursor=items[-1].document_id if has_next_page else None,
+        )
 
     def read_diagnostic(self, document_id: str) -> DocumentDiagnosticView:
         parsed_document_id = DocumentId.from_value(document_id)
@@ -363,7 +378,7 @@ __all__ = [
     "DiagnosticPageView",
     "DocumentConversionView",
     "DocumentCorpusItem",
-    "DocumentCorpusView",
+    "DocumentCorpusPageView",
     "DocumentDiagnosticView",
     "DocumentQueryService",
     "DocumentSnapshotRepository",

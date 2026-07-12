@@ -25,6 +25,10 @@ from app.platform.orchestrator_asgi import create_orchestrator_app
 from app.platform.orchestrator_composition import DependencyReadiness, OrchestratorCompositionRoot
 from app.platform.ui_corpus import render_document_inspection
 from app.platform.ui_document_api import UiDocumentApiClient, UrllibUiDocumentApiTransport
+from app.platform.orchestrator_runtime import (
+    OrchestratorDocumentCorpusItem,
+    OrchestratorDocumentCorpusPage,
+)
 from app.source_processing.adapters.document_http import SourceProcessingHttpAdapter
 from app.source_processing.adapters.http import build_document_command_router
 from app.source_processing.adapters.original_http import build_original_pdf_router
@@ -36,8 +40,6 @@ from app.source_processing.application.document_commands import (
 from app.source_processing.application.document_queries import (
     DiagnosticPageView,
     DocumentConversionView,
-    DocumentCorpusItem,
-    DocumentCorpusView,
     DocumentDiagnosticView,
     PageManifestEntryView,
 )
@@ -92,16 +94,18 @@ class ProductPorts:
         self.diagnosed = True
         return DocumentDiagnosisAcceptance(self.document_id, "DIAGNOSTIC_REQUESTED")
 
-    def list_documents(self):
+    def list_documents(self, *, limit, cursor):
+        assert limit == 100 and cursor is None
         assert self.document_id is not None and self.title is not None
-        return DocumentCorpusView(documents=(DocumentCorpusItem(
+        return OrchestratorDocumentCorpusPage(documents=(OrchestratorDocumentCorpusItem(
             document_id=self.document_id.value,
             title=self.title,
             document_status="REGISTERED",
             diagnostic_status="MANIFEST_CREATED" if self.diagnosed else "DIAGNOSTIC_NOT_REQUESTED",
             conversion_status="QA_REJECTED",
             canonical_version_id=None,
-        ),))
+            projection_status="SEARCHABLE",
+        ),), next_cursor=None)
 
     def read_diagnostic(self, document_id):
         assert self.document_id is not None and document_id == self.document_id.value

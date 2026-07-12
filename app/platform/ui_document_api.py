@@ -11,6 +11,15 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 from urllib.parse import urlsplit
 
+from pydantic import ValidationError
+
+from app.platform.orchestrator_api_models import (
+    DocumentCorpusResponse,
+    DocumentDiagnosticResponse,
+    ProjectionResponse,
+)
+from app.platform.orchestrator_asgi import MAX_REQUEST_BODY_BYTES
+
 from app.platform.ui_corpus import (
     CONVERSION_STATUSES,
     DIAGNOSTIC_STATUSES,
@@ -22,6 +31,7 @@ from app.platform.ui_corpus import (
 
 
 ORCHESTRATOR_API_UNAVAILABLE = "ORCHESTRATOR_API_UNAVAILABLE"
+UI_DOCUMENT_PAGE_SIZE = 100
 _DOCUMENT_ID_PATTERN = r"[^/]+"
 _DIAGNOSE_PATH_PATTERN = re.compile(
     rf"^/v1/documents/(?P<document_id>{_DOCUMENT_ID_PATTERN})/diagnose$"
@@ -179,49 +189,46 @@ class UiDocumentApiClient:
         *,
         active_selected_document_ids: Sequence[str],
     ) -> CorpusPdfScreenState:
-        response = self._json_request(
-            method="GET",
-            path="/v1/documents",
-            body=None,
-            content_type=None,
-        )
-        _require_success(response, expected_statuses=frozenset((200,)))
-        _require_exact_fields(response.payload, frozenset(("documents",)), "corpus")
-        raw_documents = response.payload["documents"]
-        if not isinstance(raw_documents, list):
-            raise ValueError("documents publics invalides")
         selected_ids = tuple(active_selected_document_ids)
         documents: list[CorpusPdfDocument] = []
-        for raw_document in raw_documents:
-            document = _parse_corpus_document(raw_document)
-            parsed_document = CorpusPdfDocument(
-                document_id=document["document_id"],
-                title=document["title"],
-                source_status=document["document_status"],
-                diagnostic_status=document["diagnostic_status"],
-                conversion_status=document["conversion_status"],
-                canonical_version_id=document["canonical_version_id"],
-                projection_status="PROJECTION_NOT_REQUESTED",
-                selected=document["document_id"] in selected_ids,
+        cursor: str | None = None
+        seen_cursors: set[str] = set()
+        while True:
+            path = f"/v1/documents?limit={UI_DOCUMENT_PAGE_SIZE}"
+            if cursor is not None:
+                path = f"{path}&cursor={cursor}"
+            response = self._json_request(
+                method="GET",
+                path=path,
+                body=None,
+                content_type=None,
             )
-            projection = self.read_projection(document["document_id"])
-            _require_success(projection, expected_statuses=frozenset((200,)))
-            projection_status = _parse_projection_status(
-                projection.payload,
-                expected_document_id=document["document_id"],
-            )
-            documents.append(
-                CorpusPdfDocument(
-                    document_id=document["document_id"],
-                    title=parsed_document.title,
-                    source_status=parsed_document.source_status,
-                    diagnostic_status=parsed_document.diagnostic_status,
-                    conversion_status=parsed_document.conversion_status,
-                    canonical_version_id=parsed_document.canonical_version_id,
-                    projection_status=projection_status,
-                    selected=parsed_document.selected,
+            _require_success(response, expected_statuses=frozenset((200,)))
+            try:
+                page = DocumentCorpusResponse.model_validate(response.payload)
+            except ValidationError as exc:
+                raise ValueError("page de corpus publique incompatible") from exc
+            for public_document in page.documents:
+                document = _parse_corpus_document(public_document.model_dump())
+                documents.append(
+                    CorpusPdfDocument(
+                        document_id=document["document_id"],
+                        title=document["title"],
+                        source_status=document["document_status"],
+                        diagnostic_status=document["diagnostic_status"],
+                        conversion_status=document["conversion_status"],
+                        canonical_version_id=document["canonical_version_id"],
+                        projection_status=document["projection_status"],
+                        selected=document["document_id"] in selected_ids,
+                    )
                 )
-            )
+            cursor = page.next_cursor
+            if cursor is None:
+                break
+            _ensure_document_id(cursor)
+            if cursor in seen_cursors:
+                raise ValueError("curseur de corpus public cyclique")
+            seen_cursors.add(cursor)
         return CorpusPdfScreenState(
             documents=tuple(documents),
             active_selected_document_ids=selected_ids,
@@ -237,6 +244,10 @@ class UiDocumentApiClient:
             content_type=None,
         )
         if response.status_code == 200:
+            try:
+                DocumentDiagnosticResponse.model_validate(response.payload)
+            except ValidationError as exc:
+                raise ValueError("diagnostic public incompatible") from exc
             _validate_diagnostic_payload(
                 response.payload,
                 expected_document_id=parsed_document_id,
@@ -278,6 +289,10 @@ class UiDocumentApiClient:
             content_type=None,
         )
         if response.status_code == 200:
+            try:
+                ProjectionResponse.model_validate(response.payload)
+            except ValidationError as exc:
+                raise ValueError("projection publique incompatible") from exc
             _parse_projection_status(
                 response.payload,
                 expected_document_id=document_id,
@@ -313,6 +328,8 @@ class UiDocumentApiClient:
         parsed_path = _ensure_document_command_path(path)
         if not isinstance(body, bytes):
             raise ValueError("body commande UI invalide")
+        if len(body) > MAX_REQUEST_BODY_BYTES:
+            raise ValueError("HTTP_REQUEST_TOO_LARGE")
         parsed_content_type = _ensure_text(content_type, "content_type commande UI invalide")
         response = self._json_request(
             method="POST",
@@ -360,6 +377,7 @@ def _parse_corpus_document(value: Any) -> dict[str, Any]:
             "diagnostic_status",
             "conversion_status",
             "canonical_version_id",
+            "projection_status",
         )
     )
     _require_exact_fields(value, expected, "document corpus")
@@ -379,6 +397,8 @@ def _parse_corpus_document(value: Any) -> dict[str, Any]:
             raise ValueError("canonical_version_id requis pour conversion acceptée")
     elif canonical_version_id is not None:
         raise ValueError("canonical_version_id interdit avant conversion acceptée")
+    if value["projection_status"] not in PROJECTION_STATUSES:
+        raise ValueError("projection_status public invalide")
     return dict(value)
 
 
@@ -616,8 +636,16 @@ def _ensure_origin(value: str) -> str:
 
 def _ensure_public_relative_path(value: str) -> str:
     path = _ensure_text(value, "chemin public UI requis")
-    if not _PUBLIC_DOCUMENT_PATH_PATTERN.fullmatch(path) or "://" in path or "?" in path:
+    parsed = urlsplit(path)
+    if parsed.scheme != "" or parsed.netloc != "" or parsed.fragment != "":
         raise ValueError("chemin documentaire public invalide")
+    if not _PUBLIC_DOCUMENT_PATH_PATTERN.fullmatch(parsed.path) or "://" in path:
+        raise ValueError("chemin documentaire public invalide")
+    if parsed.query != "" and re.fullmatch(
+        r"limit=[1-9][0-9]{0,2}(?:&cursor=DOC-[A-Za-z0-9-]+)?",
+        parsed.query,
+    ) is None:
+        raise ValueError("pagination documentaire publique invalide")
     return path
 
 
@@ -649,6 +677,7 @@ def _ensure_text(value: Any, message: str) -> str:
 
 __all__ = [
     "ORCHESTRATOR_API_UNAVAILABLE",
+    "UI_DOCUMENT_PAGE_SIZE",
     "UiDocumentApiClient",
     "UiDocumentApiPublicError",
     "UiDocumentApiResponse",

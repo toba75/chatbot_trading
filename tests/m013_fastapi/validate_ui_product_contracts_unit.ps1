@@ -67,6 +67,7 @@ assert {status.value for status in PublicDiagnosticStatus} == {
     "MANUAL_REVIEW",
     "QUARANTINED",
     "REJECTED",
+    "FAILED",
 }
 assert {status.value for status in PublicConversionStatus} == {
     "CONVERSION_NOT_REQUESTED",
@@ -87,8 +88,25 @@ valid_diagnostic = {
         {"page_number": 2, "manifest_status": "PRESENT"},
     ],
     "pages": [
-        {"page_number": 1, "manifest_status": "PRESENT", "diagnostic": {}, "route": {}},
-        {"page_number": 2, "manifest_status": "PRESENT", "diagnostic": {}, "route": {}},
+        {
+            "page_number": number,
+            "manifest_status": "PRESENT",
+            "diagnostic": {
+                "page_state": "NATIVE_OK", "native_text_state": "RELIABLE",
+                "image_state": "NONE", "existing_ocr_state": "NONE",
+                "layout_complexity": "SIMPLE", "corruption_state": "NONE",
+                "mixed_content_detected": False, "has_table": False,
+                "has_formula": False, "diagnostic_version": "diag-v1",
+                "justification": f"Signaux réels page {number}.",
+            },
+            "route": {
+                "route_name": "NATIVE_STANDARD", "decision_mode": "AUTO",
+                "confidence_score": 0.99, "preprocessing_action": "NONE",
+                "routing_policy_version": "routing-v1",
+                "justification": f"Route réelle page {number}.",
+            },
+        }
+        for number in (1, 2)
     ],
 }
 client = UiDocumentApiClient(transport=QueueTransport([response(valid_diagnostic)]))

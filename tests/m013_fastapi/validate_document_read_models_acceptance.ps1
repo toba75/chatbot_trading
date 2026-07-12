@@ -85,7 +85,7 @@ class SnapshotRepository:
         self.conversions = conversions
 
     def list_document_snapshots(self, *, limit, after_document_id):
-        assert limit == 100
+        assert limit == 101
         assert after_document_id is None
         return tuple(self.find_document_snapshot(document.document_id) for document in self.sources.list_documents())
 
@@ -183,7 +183,7 @@ def routed_run(document, suffix):
     )
 
 
-async def get(application, path):
+async def get(application, path, query=""):
     sent = []
     delivered = False
 
@@ -206,7 +206,7 @@ async def get(application, path):
             "scheme": "http",
             "path": path,
             "raw_path": path.encode("ascii"),
-            "query_string": b"",
+            "query_string": query.encode("ascii"),
             "root_path": "",
             "headers": [],
             "client": ("asgi-test", 50000),
@@ -303,9 +303,10 @@ async def scenario(repo_root):
         composition_root_factory=root_factory,
     )
     async with application.router.lifespan_context(application):
-        corpus_status, corpus = await get(application, "/v1/documents")
+        corpus_status, corpus = await get(application, "/v1/documents", "limit=100")
         assert corpus_status == 200
         assert len(corpus["documents"]) == 5
+        assert corpus["next_cursor"] is None
         source_item = next(
             item for item in corpus["documents"] if item["document_id"] == source_only.document_id.value
         )

@@ -6,7 +6,6 @@ from dataclasses import asdict
 import asyncio
 import json
 import re
-from tempfile import SpooledTemporaryFile
 import time
 from typing import Any
 from uuid import uuid4
@@ -30,6 +29,32 @@ CompositionRootFactory = Callable[[ApplicationConfiguration], OrchestratorCompos
 MAX_REQUEST_BODY_BYTES = 54_000_000
 REQUEST_BODY_MEMORY_SPOOL_BYTES = 1024 * 1024
 REQUEST_BODY_REPLAY_CHUNK_BYTES = 64 * 1024
+
+
+class RequestBodyTooLargeError(ValueError):
+    """Le flux reçu dépasse la frontière agrégée avant son parsing."""
+
+
+class BoundedReceive:
+    """Décore ``receive`` sans recopier ni spouler le corps HTTP."""
+
+    def __init__(self, receive: Callable, *, max_body_bytes: int) -> None:
+        if not callable(receive):
+            raise ValueError("receive ASGI invalide")
+        self._receive = receive
+        self._max_body_bytes = _ensure_positive_integer(max_body_bytes, "max_body_bytes")
+        self._consumed = 0
+
+    async def __call__(self) -> dict[str, Any]:
+        message = await self._receive()
+        if message.get("type") == "http.request":
+            body = message.get("body", b"")
+            if not isinstance(body, bytes):
+                raise ValueError("chunk HTTP non binaire")
+            self._consumed += len(body)
+            if self._consumed > self._max_body_bytes:
+                raise RequestBodyTooLargeError("HTTP_REQUEST_TOO_LARGE")
+        return message
 
 
 class BoundedRequestBodyMiddleware:
@@ -65,73 +90,30 @@ class BoundedRequestBodyMiddleware:
             return
 
         content_length = _content_length(scope)
-        if content_length is None:
-            await self._buffer_and_forward(scope, receive, send)
-            return
-        if content_length < 0:
+        if content_length is not None and content_length < 0:
             await _send_invalid_content_length(send)
             return
-        if content_length > self._max_body_bytes:
+        if content_length is not None and content_length > self._max_body_bytes:
             await _send_body_too_large(send, self._max_body_bytes)
             return
-        await self._buffer_and_forward(scope, receive, send)
+        response_started = False
 
-    async def _buffer_and_forward(
-        self,
-        scope: Any,
-        receive: Callable,
-        send: Callable,
-    ) -> None:
-        original_content_length = _content_length(scope)
-        spool = SpooledTemporaryFile(max_size=self._memory_spool_bytes, mode="w+b")
-        consumed = 0
+        async def tracked_send(message: dict[str, Any]) -> None:
+            nonlocal response_started
+            if message.get("type") == "http.response.start":
+                response_started = True
+            await send(message)
+
         try:
-            while True:
-                message = await receive()
-                if message["type"] == "http.disconnect":
-                    return
-                if message["type"] != "http.request":
-                    raise ValueError("message ASGI de requête invalide")
-                body = message.get("body", b"")
-                if not isinstance(body, bytes):
-                    raise ValueError("chunk HTTP non binaire")
-                consumed += len(body)
-                if consumed > self._max_body_bytes:
-                    await _send_body_too_large(send, self._max_body_bytes)
-                    return
-                if body:
-                    await run_in_threadpool(spool.write, body)
-                if not message.get("more_body", False):
-                    break
-
-            await run_in_threadpool(spool.seek, 0)
-
-            async def replay_receive() -> dict[str, Any]:
-                chunk = await run_in_threadpool(
-                    spool.read,
-                    self._replay_chunk_bytes,
-                )
-                return {
-                    "type": "http.request",
-                    "body": chunk,
-                    "more_body": len(chunk) > 0 and spool.tell() < consumed,
-                }
-
-            forwarded_scope = dict(scope)
-            forwarded_headers = [
-                (name, value)
-                for name, value in scope.get("headers", ())
-                if name.lower() != b"content-length"
-            ]
-            if original_content_length is not None:
-                forwarded_headers.append(
-                    (b"content-length", str(consumed).encode("ascii"))
-                )
-            forwarded_scope["headers"] = forwarded_headers
-            await self._application(forwarded_scope, replay_receive, send)
-        finally:
-            await run_in_threadpool(spool.close)
-
+            await self._application(
+                scope,
+                BoundedReceive(receive, max_body_bytes=self._max_body_bytes),
+                tracked_send,
+            )
+        except RequestBodyTooLargeError:
+            if response_started:
+                raise
+            await _send_body_too_large(send, self._max_body_bytes)
 
 def create_orchestrator_app(
     *,

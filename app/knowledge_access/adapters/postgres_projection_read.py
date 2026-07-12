@@ -287,6 +287,36 @@ class PostgresProjectionReadRepository:
             raise ValueError("connection_factory invalide")
         self._connection_factory = connection_factory
 
+    def current_projection_statuses_for_document_ids(
+        self,
+        document_ids: Sequence[str],
+    ) -> Mapping[str, str]:
+        """Lit en une requête le dernier statut KA de chaque document demandé."""
+
+        if isinstance(document_ids, (str, bytes)) or not isinstance(document_ids, Sequence):
+            raise ValueError("document_ids KA invalides")
+        parsed_ids = tuple(document_ids)
+        if len(parsed_ids) > 100 or len(set(parsed_ids)) != len(parsed_ids):
+            raise ValueError("document_ids KA invalides")
+        for document_id in parsed_ids:
+            if not isinstance(document_id, str) or not document_id.startswith("DOC-"):
+                raise ValueError("document_id KA invalide")
+        if len(parsed_ids) == 0:
+            return {}
+        with self._connection_factory.connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT DISTINCT ON (document_id) document_id, status
+                      FROM knowledge_access.knowledge_projections
+                     WHERE document_id = ANY(%s)
+                     ORDER BY document_id, state_observed_at DESC, projection_id DESC
+                    """,
+                    (list(parsed_ids),),
+                )
+                rows = cursor.fetchall()
+        return {str(document_id): str(status) for document_id, status in rows}
+
     def current_projection_for_document_id(
         self,
         document_id: str,

@@ -5,14 +5,14 @@ from __future__ import annotations
 from dataclasses import asdict
 from typing import Any, Protocol
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
+from starlette.concurrency import run_in_threadpool
 
 from app.source_processing.application.document_queries import (
     ConversionNotRequestedError,
     DiagnosticNotRequestedError,
     DocumentConversionView,
-    DocumentCorpusView,
     DocumentDiagnosticView,
     SourceNotFoundError,
 )
@@ -30,8 +30,13 @@ from app.platform.orchestrator_api_models import (
 class DocumentQueryPort(Protocol):
     """Port applicatif strict consommé par le routeur de lecture."""
 
-    def list_documents(self) -> DocumentCorpusView:
-        """Retourne le corpus public."""
+    def list_documents(
+        self,
+        *,
+        limit: int,
+        cursor: str | None,
+    ) -> Any:
+        """Retourne une page bornée du corpus public."""
 
     def read_diagnostic(self, document_id: str) -> DocumentDiagnosticView:
         """Retourne le diagnostic public d'un document."""
@@ -51,10 +56,17 @@ def build_document_query_router(*, document_queries: DocumentQueryPort) -> APIRo
         response_model=DocumentCorpusResponse,
         responses=PUBLIC_ERROR_RESPONSES,
     )
-    async def list_documents() -> JSONResponse:
-        view = parsed_queries.list_documents()
-        if not isinstance(view, DocumentCorpusView):
-            raise TypeError("read-model de corpus invalide")
+    async def list_documents(
+        limit: int = Query(..., ge=1, le=100),
+        cursor: str | None = Query(None, min_length=1, max_length=128),
+    ) -> JSONResponse:
+        view = await run_in_threadpool(
+            parsed_queries.list_documents,
+            limit=limit,
+            cursor=cursor,
+        )
+        if not hasattr(view, "documents") or not hasattr(view, "next_cursor"):
+            raise TypeError("read-model de page corpus invalide")
         return JSONResponse(status_code=200, content=asdict(view))
 
     @router.get(
@@ -66,7 +78,7 @@ def build_document_query_router(*, document_queries: DocumentQueryPort) -> APIRo
         if not _is_valid_document_id(document_id):
             return _invalid_document_id_response()
         try:
-            view = parsed_queries.read_diagnostic(document_id)
+            view = await run_in_threadpool(parsed_queries.read_diagnostic, document_id)
         except SourceNotFoundError as exc:
             return _source_not_found_response(exc)
         except DiagnosticNotRequestedError as exc:
@@ -84,7 +96,7 @@ def build_document_query_router(*, document_queries: DocumentQueryPort) -> APIRo
         if not _is_valid_document_id(document_id):
             return _invalid_document_id_response()
         try:
-            view = parsed_queries.read_conversion(document_id)
+            view = await run_in_threadpool(parsed_queries.read_conversion, document_id)
         except SourceNotFoundError as exc:
             return _source_not_found_response(exc)
         except ConversionNotRequestedError as exc:

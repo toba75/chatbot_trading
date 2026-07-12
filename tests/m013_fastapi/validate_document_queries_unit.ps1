@@ -85,7 +85,7 @@ class SnapshotRepository:
         self.conversions = conversions
 
     def list_document_snapshots(self, *, limit, after_document_id):
-        assert limit == 100
+        assert limit == 3
         assert after_document_id is None
         return tuple(self.find_document_snapshot(document.document_id) for document in self.sources.list_documents())
 
@@ -197,7 +197,7 @@ service = DocumentQueryService(
 )
 
 # La projection du corpus vient uniquement des absences ou états réels des repositories.
-corpus = service.list_documents()
+corpus = service.list_documents(limit=2, cursor=None)
 assert tuple(item.document_id for item in corpus.documents) == tuple(
     sorted((document.document_id.value, source_only.document_id.value))
 )
@@ -207,6 +207,7 @@ source_only_item = next(
 assert source_only_item.diagnostic_status == "DIAGNOSTIC_NOT_REQUESTED"
 assert source_only_item.conversion_status == "CONVERSION_NOT_REQUESTED"
 assert source_only_item.canonical_version_id is None
+assert corpus.next_cursor is None
 
 # Les pages restent dans l'ordre du manifeste et les DTO sont immuables.
 diagnostic = service.read_diagnostic(document.document_id.value)

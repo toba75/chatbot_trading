@@ -7,8 +7,8 @@ from typing import Any, Protocol
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
+from starlette.concurrency import run_in_threadpool
 
-from app.contracts.identity import DomainIdentifier
 from app.platform.orchestrator_api_models import (
     ProjectionResponse,
     PUBLIC_ERROR_RESPONSES,
@@ -46,7 +46,7 @@ def build_projection_query_router(
     async def read_projection(document_id: str) -> JSONResponse:
         if not _is_valid_document_id(document_id):
             return _invalid_document_id_response()
-        view = parsed_queries.read_projection(document_id)
+        view = await run_in_threadpool(parsed_queries.read_projection, document_id)
         if not isinstance(view, (ProjectionNotRequestedView, KnowledgeProjectionView)):
             raise TypeError("read-model de projection invalide")
         return JSONResponse(status_code=200, content=asdict(view))
