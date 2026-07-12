@@ -7,7 +7,29 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from app.source_processing.adapters.postgres_document_persistence import CorpusOriginalSourceStore
+from app.platform.configuration import load_application_configuration
+from app.platform.job_runtime import (
+    JobIdempotenceKey,
+    JobPriority,
+    JobRecord,
+    JobRequest,
+    JobStatus,
+    JobSubmissionDecision,
+)
+from app.platform.job_runtime.postgres import PostgresJobQueue
+from app.source_processing.adapters.postgres_document_persistence import (
+    CorpusOriginalSourceStore,
+    PostgresDocumentPersistence,
+    build_document_persistence,
+)
+from app.source_processing.domain.document_processing_run import (
+    DocumentProcessingRun,
+    PageManifest,
+    PageManifestEntry,
+    PageManifestEntryState,
+    PageNumber,
+    ProcessingRunId,
+)
 from app.source_processing.domain.source_document import (
     BibliographicMetadata,
     DocumentId,
@@ -58,6 +80,116 @@ with TemporaryDirectory() as temporary_directory:
     assert source.original_storage_ref.value.startswith("artifact:source_processing.original_sources/")
     assert str(Path(temporary_directory)) not in source.original_storage_ref.value
 
+
+# La construction runtime ne lit que la configuration M13-config et ne propose aucun backend mémoire.
+configuration = load_application_configuration(
+    Path("config/application.yaml"),
+    environment_snapshot={},
+)
+adapters = build_document_persistence(configuration)
+assert isinstance(adapters.source_document_repository, PostgresDocumentPersistence)
+assert isinstance(adapters.job_queue, PostgresJobQueue)
+
+
+class TransactionState:
+    def __init__(self):
+        self.committed = False
+        self.rolled_back = False
+
+
+class Transaction:
+    def __init__(self, state):
+        self.state = state
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, traceback):
+        if exc_type is None:
+            self.state.committed = True
+        else:
+            self.state.rolled_back = True
+        return False
+
+
+class Connection:
+    def __init__(self, state):
+        self.state = state
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, traceback):
+        return False
+
+    def transaction(self):
+        return Transaction(self.state)
+
+
+class ConnectionFactory:
+    def __init__(self, state):
+        self.state = state
+
+    def connect(self):
+        return Connection(self.state)
+
+
+class FailingPersistence(PostgresDocumentPersistence):
+    def _save_processing_run(self, connection, processing_run, *, insert_only=False):
+        raise RuntimeError("PROCESSING_RUN_PERSISTENCE_FAILED")
+
+
+class TransactionalQueue:
+    def submit_in_transaction(self, connection, request, *, recalculate):
+        job = JobRecord(
+            sequence=1,
+            job_id="JOB-M002-000001",
+            request=request,
+            status=JobStatus.PENDING,
+            result=None,
+            failure_reason=None,
+        )
+        return JobSubmissionDecision(job=job, created=True, recalculation_refused=False)
+
+
+manifest = PageManifest.from_entries(
+    source_page_count=1,
+    entries=(PageManifestEntry(PageNumber.from_value(1), PageManifestEntryState.PRESENT),),
+)
+processing_run = DocumentProcessingRun.start(
+    ProcessingRunId.from_value(f"RUN-DIAGNOSE-{document_id.value}"),
+    source,
+    manifest,
+)
+request = JobRequest(
+    job_name="DIAGNOSE",
+    priority=JobPriority.P1,
+    idempotence_key=JobIdempotenceKey(
+        job_name="DIAGNOSE",
+        input_hash=fingerprint.value,
+        configuration_hash="b" * 64,
+        code_version="unit",
+        model_version="none",
+    ),
+    payload={"document_id": document_id.value},
+)
+transaction_state = TransactionState()
+failing_persistence = FailingPersistence(
+    connection_factory=ConnectionFactory(transaction_state)
+)
+try:
+    failing_persistence.submit_processing_run(
+        processing_run,
+        TransactionalQueue(),
+        request,
+    )
+except RuntimeError as exc:
+    assert str(exc) == "PROCESSING_RUN_PERSISTENCE_FAILED"
+else:
+    raise AssertionError("Échec de persistance attendu absent")
+assert transaction_state.rolled_back is True
+assert transaction_state.committed is False
+
 print("Tests unitaires du stockage original durable: OK")
 '@
 
@@ -66,9 +198,10 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 $adapter = Get-Content -Raw (Join-Path $repoRoot "app\source_processing\adapters\postgres_document_persistence.py")
 $jobRuntime = Get-Content -Raw (Join-Path $repoRoot "app\platform\job_runtime\postgres.py")
+$postgresConnection = Get-Content -Raw (Join-Path $repoRoot "app\platform\postgres.py")
 
-foreach ($forbidden in @("sqlite3", "json.dump", "json.load")) {
-    if ($adapter.Contains($forbidden) -or $jobRuntime.Contains($forbidden)) {
+foreach ($forbidden in @("sqlite3", "json.dump(", "json.load(")) {
+    if ($adapter.Contains($forbidden) -or $jobRuntime.Contains($forbidden) -or $postgresConnection.Contains($forbidden)) {
         throw "Backend métier interdit détecté: $forbidden"
     }
 }
@@ -76,7 +209,7 @@ if ($adapter.Contains("InMemoryJobQueue") -or $jobRuntime.Contains("InMemoryJobQ
     throw "Fallback InMemoryJobQueue interdit dans le runtime durable."
 }
 foreach ($marker in @("submit_in_transaction", "ON CONFLICT", "FOR UPDATE", "PsycopgConnectionFactory")) {
-    if (-not ($adapter.Contains($marker) -or $jobRuntime.Contains($marker))) {
+    if (-not ($adapter.Contains($marker) -or $jobRuntime.Contains($marker) -or $postgresConnection.Contains($marker))) {
         throw "Garantie PostgreSQL absente: $marker"
     }
 }

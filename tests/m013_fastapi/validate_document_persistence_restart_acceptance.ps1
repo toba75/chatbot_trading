@@ -151,7 +151,7 @@ metadata = BibliographicMetadata(
 )
 manifest = PageManifest.from_entries(
     source_page_count=1,
-    entries=(PageManifestEntry(PageNumber.from_value(1), PageManifestEntryState.READABLE),),
+    entries=(PageManifestEntry(PageNumber.from_value(1), PageManifestEntryState.PRESENT),),
 )
 
 with TemporaryDirectory() as temporary_directory:
@@ -225,7 +225,7 @@ foreach ($marker in @(
 }
 
 $compose = Get-Content -Raw (Join-Path $repoRoot "deploy\local-compose\compose.yaml")
-if (($compose.Split("corpus-data:/workspace/corpus").Count - 1) -lt 2) {
+if (($compose.Split("corpus-data:/workspace/data/corpus").Count - 1) -lt 2) {
     throw "Le corpus partagé doit être monté dans orchestrator-api et worker-documents."
 }
 if (-not $compose.Contains("../postgres/migrations:/docker-entrypoint-initdb.d:ro")) {

@@ -1,4 +1,4 @@
-"""File locale de jobs techniques priorises et idempotents M-002."""
+"""Contrats et file mémoire de test; le runtime durable vit dans ``postgres``."""
 
 from __future__ import annotations
 
@@ -483,7 +483,6 @@ def _freeze_payload_value(value: Any, field_name: str) -> Any:
 
 
 JOB_RUNTIME_CATALOG = JobCatalog.from_job_names(_LOCAL_JOB_NAMES)
-
 
 __all__ = [
     "InMemoryJobQueue",

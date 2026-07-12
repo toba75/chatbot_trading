@@ -90,8 +90,10 @@ services:
       llm-gateway:
         condition: service_healthy
     volumes:
+      - corpus-data:/workspace/data/corpus
       - ../../config/application.yaml:/workspace/config/application.yaml:ro
       - ../../config/application.schema.json:/workspace/config/application.schema.json:ro
+      - ./secrets/postgres_password:/workspace/config/secrets/local/postgres_password:ro
     healthcheck:
       test:
         - CMD-SHELL
@@ -145,6 +147,7 @@ services:
       - core
     volumes:
       - postgres-data:/var/lib/postgresql/data
+      - ../postgres/migrations:/docker-entrypoint-initdb.d:ro
     environment:
       POSTGRES_DB: "${POSTGRES_DB?POSTGRES_DB requis}"
       POSTGRES_USER: "${POSTGRES_USER?POSTGRES_USER requis}"
@@ -293,15 +296,19 @@ services:
       - /workspace/config/application.yaml
     networks:
       - core
+    depends_on:
+      postgres:
+        condition: service_healthy
     volumes:
-      - corpus-data:/workspace/corpus
+      - corpus-data:/workspace/data/corpus
       - document-artifacts:/workspace/data
       - ../../config/application.yaml:/workspace/config/application.yaml:ro
       - ../../config/application.schema.json:/workspace/config/application.schema.json:ro
+      - ./secrets/postgres_password:/workspace/config/secrets/local/postgres_password:ro
     healthcheck:
       test:
         - CMD-SHELL
-        - "test -d /workspace/corpus"
+        - "test -d /workspace/data/corpus"
       interval: 30s
       timeout: 5s
       retries: 3
