@@ -140,3 +140,18 @@
 - Validations : gate statique `28/28` GREEN; gate live `32/32` GREEN; lint `38` validations GREEN; traçabilité `173` exigences GREEN; M13-reality GREEN sur PostgreSQL/migrations, `uv run api`, llm-gateway et Spark/vLLM réels; les `23` validations M-005 sont GREEN.
 - Suite globale : tentative bornée de `scripts/test.ps1` à 10 minutes, expirée sans sortie ni verdict applicatif; résultat non concluant, jamais présenté comme GREEN.
 - Préservation utilisateur : le hunk `wait_health` du fichier `tests/m013/validate_m013_reality_product_acceptance.ps1` est resté hors index et hors commits; seuls les hunks de migration vers FastAPI/PostgreSQL ont été commités.
+
+## Correctif de revue - Opérations reproductibles et documentation courante
+
+- Date : 2026-07-13.
+- Scénario BDD : Given un clone propre, un commit Git complet et les migrations de ce commit; When l'exploitant matérialise l'environnement verrouillé puis construit la stack Compose; Then la gate utilise un seul interpréteur issu de `uv.lock`, l'image expose la révision et le schéma courants, le bind reste local et aucune recette hôte ou image mutable ne sert de rollback.
+- ADR : ADR-021 consultée et appliquée; aucune nouvelle décision structurante n'est introduite.
+- Commit RED : `f9aec200a`, `test(opérations): couvrir exécution reproductible M13-FastAPI`.
+- Commit GREEN : `6e8b532d9`, `feat(opérations): verrouiller exécution M13-FastAPI ADR-021`.
+- Gate : `uv sync --frozen --no-dev --no-install-project` matérialise les dépendances, puis `.venv\Scripts\python.exe` devient l'unique Python visible des preuves M13-FastAPI.
+- Image : Python et uv sont épinglés par digest; le tag et les labels associent la dernière migration livrée au hash Git complet, sans registre externe ni tag `latest`.
+- Exploitation : le chemin supporté est Compose; seul Caddy publie `127.0.0.1`; la commande hôte ambiguë et le rollback par tag réutilisable sont retirés.
+- OpenAPI : `POST /v1/documents` est documenté en `201 application/json`; l'original est documenté en `200 application/pdf` uniquement.
+- Preuves GREEN : acceptation des opérations reproductibles, acceptation du déploiement, `uv lock --check`, `docker compose config`, build multi-stage et inspection des labels image/schéma.
+- Gate statique globale : son bootstrap verrouillé est prouvé; son verdict final est différé pendant les correctifs de revue concurrents dont les tests RED sont déjà présents dans le worktree partagé.
+- Suite globale : aucune nouvelle conclusion n'est déclarée pour `scripts/test.ps1`; la tentative précédente reste non concluante après dix minutes.
