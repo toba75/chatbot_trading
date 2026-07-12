@@ -32,3 +32,16 @@
 - Aucun résultat GREEN futur n'est déclaré.
 - Aucun repository en mémoire, mock, stub ou fallback n'est admis comme runtime ou preuve de parcours réel.
 - Une dépendance non câblée conserve une erreur explicite jusqu'à son raccordement effectif.
+
+## T-001 - Précondition GREEN
+
+- Date: 2026-07-12.
+- Statut: IMPLÉMENTÉE par gates bornées; la gate globale reste sans verdict.
+- Base reconstruite: `master` et `origin/master` au commit `35fb5a4f8`.
+- Commit RED: `c79f93b2c`, `test(platform): couvrir precondition m13 fastapi`.
+- Implémentation: récupération strictement bornée des allowlists M-003 à M-013 pour `codex/m13-fastapi` et publication de `docs/governance/m013_fastapi_precondition.md`.
+- Preuves GREEN: contrats M-003, M-004, M-005, frontière UI/API, frontières d'import et validateurs T-001.
+- RED attendu conservé: `tests/m013/validate_document_api_wiring_acceptance.ps1`, source `8ec5231e4`, réécrit localement en `be62f3e7a`, réservé à T-006 et non enrôlé.
+- Limite: `scripts/test.ps1` a dépassé une heure sur `master` sans code de sortie; aucun GREEN global n'est déclaré.
+- Modification utilisateur protégée: `tests/m013/validate_m013_reality_product_acceptance.ps1`, hors staging et hors commits T-001.
+- ADR: ADR-018 consultée et inchangée; aucune nouvelle ADR requise pour cette récupération locale de gate.

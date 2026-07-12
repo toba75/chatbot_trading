@@ -11,10 +11,12 @@ $ErrorActionPreference = "Stop"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $m013Branch = "codex/milestone-m013-durcissement-acceptation-v1"
 $m013ConfigBranch = "codex/m13-config"
+$m013FastApiBranch = "codex/m13-fastapi"
 $allowedBranches = @(
     "master",
     $m013Branch,
-    $m013ConfigBranch
+    $m013ConfigBranch,
+    $m013FastApiBranch
 )
 $requiredMasterArtifacts = @(
     [ordered] @{ Path = "docs/tasks/milestone_012"; Kind = "Directory" },

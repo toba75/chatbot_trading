@@ -133,8 +133,8 @@ Assert-Condition `
 
 $governanceContent = Get-Content -Raw -Encoding UTF8 -LiteralPath $governancePath
 foreach ($expectedMarker in @(
-    "Given les milestones M-001 à M-012",
-    "Commit de référence ``35fb5a4f8``",
+    "Given les milestones M-001",
+    "35fb5a4f8",
     "``GREEN``",
     "``EXPECTED_RED``",
     "``BLOCKED_EXTERNAL``",

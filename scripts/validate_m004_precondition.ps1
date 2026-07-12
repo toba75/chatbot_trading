@@ -18,7 +18,8 @@ $allowedBranches = @(
     "codex/milestone-m011-experience-reproductible",
     "codex/milestone-m012-evaluation-pilote-calibration",
     "codex/milestone-m013-durcissement-acceptation-v1",
-    "codex/m13-config"
+    "codex/m13-config",
+    "codex/m13-fastapi"
 )
 $requiredMilestonePaths = @(
     "docs/tasks/milestone_000",

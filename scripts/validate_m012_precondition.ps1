@@ -13,7 +13,8 @@ $allowedBranches = @(
     "master",
     "codex/milestone-m012-evaluation-pilote-calibration",
     "codex/milestone-m013-durcissement-acceptation-v1",
-    "codex/m13-config"
+    "codex/m13-config",
+    "codex/m13-fastapi"
 )
 $requiredMasterArtifacts = @(
     [ordered] @{ Path = "docs/tasks/milestone_011"; Kind = "Directory" },

@@ -11,7 +11,8 @@ $m011Branch = "codex/milestone-m011-experience-reproductible"
 $m012Branch = "codex/milestone-m012-evaluation-pilote-calibration"
 $m013Branch = "codex/milestone-m013-durcissement-acceptation-v1"
 $m013ConfigBranch = "codex/m13-config"
-$allowedBranches = @("master", $m011Branch, $m012Branch, $m013Branch, $m013ConfigBranch)
+$m013FastApiBranch = "codex/m13-fastapi"
+$allowedBranches = @("master", $m011Branch, $m012Branch, $m013Branch, $m013ConfigBranch, $m013FastApiBranch)
 $requiredMasterArtifacts = @(
     "docs/tasks/milestone_010",
     "docs/specs/m010_strategie_candidate_attribuee.md",
