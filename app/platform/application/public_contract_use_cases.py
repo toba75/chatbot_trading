@@ -160,6 +160,30 @@ class IndexingUseCase:
         return 503, {"document_id": parsed, "error_code": "SERVICE_NOT_CONFIGURED", "endpoint": "POST /v1/documents/{document_id}/index"}
 
 
+def product_chat_completions_post_response(
+    *,
+    body: dict[str, Any],
+    application_configuration: ApplicationConfiguration,
+) -> PublicResponse:
+    return ConversationUseCase(application_configuration).handle(body)
+
+
+def llm_real_path_benchmark_post_response(
+    *,
+    body: dict[str, Any],
+    application_configuration: ApplicationConfiguration,
+) -> PublicResponse:
+    return EvaluationUseCase(application_configuration).handle(body)
+
+
+def search_post_response() -> PublicResponse:
+    return SearchUseCase().handle({})
+
+
+def index_post_response(*, document_id: str) -> PublicResponse:
+    return IndexingUseCase().handle(document_id, {})
+
+
 def _infer(body: dict[str, Any], configuration: ApplicationConfiguration) -> tuple[int, dict[str, Any], float]:
     request = urllib.request.Request(_gateway_endpoint(configuration), data=_json(body).encode(), headers={"Content-Type": "application/json; charset=utf-8"}, method="POST")
     started = time.perf_counter_ns()
@@ -266,4 +290,13 @@ def _unavailable(name: str) -> dict[str, Any]:
     return {"name": name, "value": None, "numerator": None, "denominator": None, "measured": False, "unavailable_reason": "metrique_non_exposee_par_llm_gateway_v1"}
 
 
-__all__ = ["ConversationUseCase", "EvaluationUseCase", "IndexingUseCase", "SearchUseCase"]
+__all__ = [
+    "ConversationUseCase",
+    "EvaluationUseCase",
+    "IndexingUseCase",
+    "SearchUseCase",
+    "index_post_response",
+    "llm_real_path_benchmark_post_response",
+    "product_chat_completions_post_response",
+    "search_post_response",
+]

@@ -38,6 +38,12 @@ from app.platform.llm_gateway import (
     UrllibOpenAICompatibleTransport,
 )
 from app.platform.observability import GatewayObservation, InMemoryObservabilityCollector
+from app.platform.application.public_contract_use_cases import (
+    index_post_response as _public_index_post_response,
+    llm_real_path_benchmark_post_response as _public_llm_real_path_benchmark_post_response,
+    product_chat_completions_post_response as _public_product_chat_completions_post_response,
+    search_post_response as _public_search_post_response,
+)
 from app.platform.orchestrator_asgi import MAX_REQUEST_BODY_BYTES
 from app.platform.ui_corpus import (
     CorpusPdfScreenState,
@@ -624,14 +630,14 @@ def _local_post_response(
     return 404, {"error_code": "ENDPOINT_NOT_FOUND", "path": path}
 
 
-def search_post_response() -> tuple[int, dict[str, Any]]:
+def _legacy_search_post_response() -> tuple[int, dict[str, Any]]:
     return 503, {
         "error_code": "SERVICE_NOT_CONFIGURED",
         "endpoint": "POST /v1/search",
     }
 
 
-def index_post_response(*, document_id: str) -> tuple[int, dict[str, Any]]:
+def _legacy_index_post_response(*, document_id: str) -> tuple[int, dict[str, Any]]:
     try:
         validated_document_id = str(DomainIdentifier.parse_with_prefix(document_id, "DOC"))
     except ValueError:
@@ -651,7 +657,7 @@ def _required_application_configuration(
     return application_configuration
 
 
-def product_chat_completions_post_response(
+def _legacy_product_chat_completions_post_response(
     *,
     body: dict[str, Any],
     application_configuration: ApplicationConfiguration,
@@ -694,7 +700,7 @@ def product_chat_completions_post_response(
     }
 
 
-def llm_real_path_benchmark_post_response(
+def _legacy_llm_real_path_benchmark_post_response(
     *,
     body: dict[str, Any],
     application_configuration: ApplicationConfiguration,
@@ -1247,7 +1253,7 @@ if __name__ == "__main__":
 
 # Compatibilité de tests M13-config antérieurs. Les routeurs ASGI n'utilisent plus
 # ces noms privés; la composition injecte les services publics ci-dessus.
-_search_post_response = search_post_response
-_index_post_response = index_post_response
-_product_chat_completions_post_response = product_chat_completions_post_response
-_llm_real_path_benchmark_post_response = llm_real_path_benchmark_post_response
+_search_post_response = _public_search_post_response
+_index_post_response = _public_index_post_response
+_product_chat_completions_post_response = _public_product_chat_completions_post_response
+_llm_real_path_benchmark_post_response = _public_llm_real_path_benchmark_post_response

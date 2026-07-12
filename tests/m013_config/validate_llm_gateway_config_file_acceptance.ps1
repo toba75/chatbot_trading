@@ -104,7 +104,6 @@ import tempfile
 sys.path.insert(0, sys.argv[1])
 
 from app.evaluation.domain.llm_real_path_benchmark import REQUIRED_LLM_TASKS  # noqa: E402
-from app.platform import local_runtime  # noqa: E402
 from app.platform.configuration import (  # noqa: E402
     ApplicationConfigurationError,
     load_application_configuration,
@@ -123,8 +122,11 @@ from app.platform.llm_gateway import (  # noqa: E402
 from app.platform.local_runtime import (  # noqa: E402
     _benchmark_marker_for_task,
     _build_gateway_configuration_from_application_configuration,
-    _llm_real_path_benchmark_post_response,
-    _product_chat_completions_post_response,
+)
+import app.platform.application.public_contract_use_cases as public_use_cases  # noqa: E402
+from app.platform.application.public_contract_use_cases import (  # noqa: E402
+    llm_real_path_benchmark_post_response as _llm_real_path_benchmark_post_response,
+    product_chat_completions_post_response as _product_chat_completions_post_response,
 )
 from app.platform.observability import InMemoryObservabilityCollector  # noqa: E402
 
@@ -198,7 +200,7 @@ configuration = load_application_configuration(config_path=example_path, environ
 recorded_inference_bodies: list[dict[str, object]] = []
 
 
-def fake_gateway_post(*, body, application_configuration):
+def fake_gateway_post(body, application_configuration):
     assert_equal(
         application_configuration.configuration_hash,
         configuration.configuration_hash,
@@ -240,8 +242,8 @@ def fake_gateway_post(*, body, application_configuration):
     )
 
 
-original_gateway_post = local_runtime._post_local_gateway_inference
-local_runtime._post_local_gateway_inference = fake_gateway_post
+original_gateway_post = public_use_cases._infer
+public_use_cases._infer = fake_gateway_post
 try:
     chat_status, chat_response = _product_chat_completions_post_response(
         body={
@@ -297,7 +299,7 @@ try:
         "Runtime déclaré absent des tâches benchmark.",
     )
 finally:
-    local_runtime._post_local_gateway_inference = original_gateway_post
+    public_use_cases._infer = original_gateway_post
 
 assert_true(len(recorded_inference_bodies) == 1 + len(REQUIRED_LLM_TASKS), "Nombre d'inférences configurées invalide.")
 
