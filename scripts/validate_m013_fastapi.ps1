@@ -52,7 +52,6 @@ $staticTests = @(
     "tests/m013_fastapi/validate_original_pdf_stream_unit.ps1",
     "tests/m013_fastapi/validate_projection_read_model_acceptance.ps1",
     "tests/m013_fastapi/validate_projection_queries_unit.ps1",
-    "tests/m013_fastapi/validate_ui_orchestrator_document_flow_acceptance.ps1",
     "tests/m013_fastapi/validate_ui_document_api_client_unit.ps1",
     "tests/m013_fastapi/validate_ui_product_contracts_unit.ps1",
     "tests/m013_fastapi/validate_runtime_operations_acceptance.ps1",
@@ -70,7 +69,8 @@ $liveTests = @(
     "tests/m013_fastapi/validate_postgres_migration_upgrade_live.ps1",
     "tests/m013_fastapi/validate_document_http_live_acceptance.ps1",
     "tests/m013_fastapi/validate_document_worker_live.ps1",
-    "tests/m013_fastapi/validate_ka_projection_persistence_live.ps1"
+    "tests/m013_fastapi/validate_ka_projection_persistence_live.ps1",
+    "tests/m013_fastapi/validate_ui_orchestrator_document_flow_acceptance.ps1"
 )
 
 $declaredTests = @($staticTests + $liveTests | Sort-Object -Unique)
