@@ -94,6 +94,25 @@ invalid_year = metadata_payload("1re édition")
 invalid_year["publication_year"] = 0
 assert_raises("publication_year invalide", lambda: BibliographicMetadata.from_payload(invalid_year))
 
+oversized_title = metadata_payload("1re édition")
+oversized_title["title"] = "T" * 513
+assert_raises("title trop long", lambda: BibliographicMetadata.from_payload(oversized_title))
+
+too_many_authors = metadata_payload("1re édition")
+too_many_authors["authors"] = [f"Auteur {index}" for index in range(17)]
+assert_raises("authors trop nombreux", lambda: BibliographicMetadata.from_payload(too_many_authors))
+
+oversized_author = metadata_payload("1re édition")
+oversized_author["authors"] = ["A" * 257]
+assert_raises("author trop long", lambda: BibliographicMetadata.from_payload(oversized_author))
+
+oversized_edition = metadata_payload("E" * 65)
+assert_raises("edition trop longue", lambda: BibliographicMetadata.from_payload(oversized_edition))
+
+future_unbounded_year = metadata_payload("1re édition")
+future_unbounded_year["publication_year"] = 10000
+assert_raises("publication_year invalide", lambda: BibliographicMetadata.from_payload(future_unbounded_year))
+
 # SourceDocument.registerOriginal crée l'agrégat enregistré sans modifier l'original.
 storage_ref = OriginalStorageRef.from_value(f"artifact:source_processing.original_sources/{document_id.value}/{fingerprint.value}.pdf")
 source_document = SourceDocument.register_original(
