@@ -97,6 +97,15 @@ public_services = (repo_root / "app/platform/orchestrator_public_services.py").r
 assert "from app.platform import local_runtime" not in public_services
 assert "local_runtime." not in public_services
 assert (repo_root / "app/platform/application/public_contract_use_cases.py").is_file()
+local_runtime = (repo_root / "app/platform/local_runtime.py").read_text(encoding="utf-8")
+for dead_definition in (
+    "def product_chat_completions_post_response(",
+    "def llm_real_path_benchmark_post_response(",
+    "def search_post_response(",
+    "def index_post_response(",
+):
+    assert dead_definition not in local_runtime
+assert "app.platform.application.public_contract_use_cases" in local_runtime
 
 asgi_source = (repo_root / "app/platform/orchestrator_asgi.py").read_text(encoding="utf-8")
 assert "SpooledTemporaryFile" not in asgi_source
