@@ -24,6 +24,11 @@
 | OpenAPI borné | `/openapi.json` sans référence de stockage, job, secret ni identifiant Qdrant | Couvert par la gate live |
 | Configuration obligatoire | `--config` requis; secret et dépendance manquants arrêtent le démarrage | Couvert par tests et runtime |
 | Aucun fallback | aucune route de secours, aucun backend alternatif, aucune réactivation de l'ancien serveur | Couvert par tests statiques |
+| Corps HTTP agrégé | Caddy et ASGI refusent au-delà de 54 Mo, même sans `Content-Length` | Couvert par tests routeur et déploiement |
+| Spool multipart | Racine en lecture seule et `tmpfs /tmp` limité à 128 Mio pour les deux spools bornés | Couvert par Compose et preuve live > 1 Mio |
+| Original PDF | SHA-256 vérifié avant 200, chunks de 64 Kio maximum et fermeture garantie | Couvert par tests unitaires et concurrence bornée |
+| Dépendances | `pypdf==6.14.2`, `python-multipart==0.0.32`, verrou cohérent | Couvert par gate et `uv lock --check` |
+| Image runtime | Résolution dans le builder, aucune installation de `uv` dans le runtime | Couvert par gate de déploiement et build Compose |
 
 ## Commandes d'audit
 
@@ -49,7 +54,15 @@ La preuve live utilise Docker Engine, PostgreSQL, Uvicorn et HTTP réels. Aucun 
 - Docker Engine: serveur `29.1.5` disponible.
 - Image Compose: `ostrading/orchestrator-api:0.0.0-m002` construite avec `uv sync --frozen --no-dev`; manifeste local `sha256:51de59597a927e0cb59030a630ae3af81fd2a599ef0835697f1791fdb076ae84`.
 - Preuve HTTP: document `DOC-BC6CFA26B1753E74`, PDF SHA-256 `bc6cfa26b1753e740c2749f8a854828770965f5862134ec304cb11a25e98d02a`, PostgreSQL Docker et transport `uvicorn-http`.
-- Gate M13-FastAPI: quatre preuves GREEN, dont la preuve live sans double.
+- Gate M13-FastAPI initiale: quatre preuves GREEN, dont la preuve live sans double.
 - Gate lint: GREEN, 38 validations.
 - Gate de traçabilité: GREEN, 163 exigences.
 - Gate globale `scripts/test.ps1`: tentative bornée à 10 minutes, expirée sans sortie ni code de sortie applicatif; résultat non concluant et jamais présenté comme GREEN.
+
+## Correctif de revue sécurité HTTP
+
+- Décision applicable : ADR-020, complément d'ADR-019 pour les corps binaires bornés.
+- Preuves RED : commit `ae943a04c` pour la frontière HTTP, le streaming et le déploiement; commit `d4b64cf26` pour les invariants du value object bibliographique.
+- Audit de dépendances : `pip-audit` n'est pas disponible dans l'environnement local; aucune installation opportuniste ni fallback de scanner n'a été exécuté. Les versions exactes et `uv.lock` sont vérifiés par la gate.
+- La preuve live génère un PDF `pypdf` supérieur à 1 Mio, l'enregistre par HTTP multipart réel puis compare le SHA-256 de la restitution streamée.
+- La gate M13-FastAPI durcie exécute six preuves, dont les limites du routeur et le streaming original avant la preuve live.

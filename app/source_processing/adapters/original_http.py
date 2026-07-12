@@ -6,6 +6,7 @@ from typing import Any, Protocol
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse, StreamingResponse
+from starlette.background import BackgroundTask
 from starlette.responses import Response
 
 from app.source_processing.application.document_commands import SourceNotFoundError
@@ -30,7 +31,7 @@ def build_original_pdf_router(*, original_pdf_queries: OriginalPdfQueryPort) -> 
     router = APIRouter()
 
     @router.get("/v1/documents/{document_id}/original")
-    async def read_original(document_id: str) -> Response:
+    def read_original(document_id: str) -> Response:
         if not _is_valid_document_id(document_id):
             return _invalid_document_id_response()
         try:
@@ -42,7 +43,7 @@ def build_original_pdf_router(*, original_pdf_queries: OriginalPdfQueryPort) -> 
         if not isinstance(original, OriginalPdfContent):
             raise TypeError("contenu PDF original invalide")
         return StreamingResponse(
-            content=iter((original.content,)),
+            content=original.content_chunks,
             media_type="application/pdf",
             headers={
                 "Content-Length": str(original.content_length),
@@ -51,6 +52,7 @@ def build_original_pdf_router(*, original_pdf_queries: OriginalPdfQueryPort) -> 
                 ),
                 "ETag": f'"{original.source_sha256}"',
             },
+            background=BackgroundTask(original.close),
         )
 
     return router

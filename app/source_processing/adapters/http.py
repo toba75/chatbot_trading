@@ -9,6 +9,7 @@ from fastapi import APIRouter, Request, UploadFile
 from fastapi.responses import JSONResponse
 from starlette.datastructures import FormData, UploadFile as StarletteUploadFile
 from starlette.exceptions import HTTPException as StarletteHttpException
+from starlette.concurrency import run_in_threadpool
 
 from app.source_processing.adapters.document_http import HttpRequest, HttpResponse
 
@@ -18,6 +19,13 @@ class DocumentHttpAdapter(Protocol):
 
     def handle(self, request: HttpRequest) -> HttpResponse:
         """Traite une commande documentaire sans connaître FastAPI."""
+
+
+MAX_TITLE_CHARACTERS = 512
+MAX_AUTHOR_CHARACTERS = 256
+MAX_AUTHORS = 16
+MAX_EDITION_CHARACTERS = 64
+MAX_PUBLICATION_YEAR = 9999
 
 
 def build_document_command_router(
@@ -38,8 +46,8 @@ def build_document_command_router(
         try:
             async with request.form(
                 max_files=1,
-                max_fields=5,
-                max_part_size=parsed_max_pdf_bytes,
+                max_fields=MAX_AUTHORS + 4,
+                max_part_size=MAX_TITLE_CHARACTERS + 1,
             ) as form:
                 return await _register_document(
                     form=form,
@@ -50,7 +58,7 @@ def build_document_command_router(
             return _invalid_request("body")
 
     @router.post("/v1/documents/{document_id}/diagnose")
-    async def diagnose_document(document_id: str, request: Request) -> JSONResponse:
+    def diagnose_document(document_id: str, request: Request) -> JSONResponse:
         if _request_has_body(request):
             return _invalid_request("body")
         response = parsed_adapter.handle(
@@ -95,7 +103,8 @@ async def _register_document(
     if len(original_content) == 0 or len(original_content) > max_pdf_bytes:
         return _invalid_request("original_content")
 
-    response = document_http_adapter.handle(
+    response = await run_in_threadpool(
+        document_http_adapter.handle,
         HttpRequest(
             method="POST",
             path="/v1/documents",
@@ -103,26 +112,34 @@ async def _register_document(
                 "original_content": original_content,
                 "bibliographic_metadata": metadata_or_error,
             },
-        )
+        ),
     )
     return _json_response(response)
 
 
 def _bibliographic_metadata(form: FormData) -> Mapping[str, Any] | JSONResponse:
     title = _single_text_field(form, "title")
-    if title is None:
+    if title is None or len(title) > MAX_TITLE_CHARACTERS:
         return _invalid_request("title")
     authors = _repeated_text_field(form, "authors")
-    if authors is None:
+    if (
+        authors is None
+        or len(authors) > MAX_AUTHORS
+        or any(len(author) > MAX_AUTHOR_CHARACTERS for author in authors)
+    ):
         return _invalid_request("authors")
     publication_year_text = _single_text_field(form, "publication_year")
-    if publication_year_text is None or not publication_year_text.isdecimal():
+    if (
+        publication_year_text is None
+        or len(publication_year_text) > 4
+        or not publication_year_text.isdecimal()
+    ):
         return _invalid_request("publication_year")
     publication_year = int(publication_year_text)
-    if publication_year < 1:
+    if publication_year < 1 or publication_year > MAX_PUBLICATION_YEAR:
         return _invalid_request("publication_year")
     edition = _single_text_field(form, "edition")
-    if edition is None:
+    if edition is None or len(edition) > MAX_EDITION_CHARACTERS:
         return _invalid_request("edition")
     return {
         "title": title,

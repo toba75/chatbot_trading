@@ -32,7 +32,7 @@ Assert-Contains $compose "      - api" "Compose ne lance pas le point d'entrée 
 Assert-Contains $compose "      - --config" "Compose ne transmet pas la configuration unique."
 Assert-Contains $compose "      - /workspace/config/application.yaml" "Chemin de configuration Compose invalide."
 Assert-Contains $compose 'http://127.0.0.1:8080/ready' "Healthcheck readiness HTTP absent."
-Assert-Contains $caddyfile 'max_size 52MB' "Limite agrégée Caddy absente."
+Assert-Contains $caddyfile 'max_size 54MB' "Limite agrégée Caddy absente."
 Assert-Contains $dockerfile "COPY uv.lock ./uv.lock" "Le verrou uv n'est pas copié dans l'image."
 Assert-Contains $dockerfile "AS builder" "Étape builder Docker absente."
 Assert-Contains $dockerfile "AS runtime" "Étape runtime Docker absente."
@@ -47,7 +47,7 @@ $orchestratorBlock = [regex]::Match(
 if ([string]::IsNullOrWhiteSpace($orchestratorBlock)) {
     throw "Bloc Compose orchestrator-api illisible."
 }
-Assert-Contains $orchestratorBlock '/tmp:size=64m,mode=1777' "tmpfs borné du spool multipart absent."
+Assert-Contains $orchestratorBlock '/tmp:size=128m,mode=1777' "tmpfs borné du double spool multipart absent."
 if ($orchestratorBlock.Contains("app.platform.local_runtime")) {
     throw "L'ancien runtime local reste actif pour orchestrator-api."
 }
@@ -59,7 +59,7 @@ if (-not (Test-Path -LiteralPath $auditPath -PathType Leaf)) {
 }
 $runbook = Get-Content -Raw -Encoding UTF8 $runbookPath
 $audit = Get-Content -Raw -Encoding UTF8 $auditPath
-foreach ($marker in @("uv run api --config", "/health", "/ready", "/openapi.json", "rollback", "ADR-019")) {
+foreach ($marker in @("uv run api --config", "api --config /workspace/config/application.yaml", "/health", "/ready", "/openapi.json", "rollback", "ADR-019", "ADR-020")) {
     Assert-Contains $runbook $marker "Runbook API incomplet."
 }
 foreach ($marker in @("M13-FastAPI", "configuration_hash", "trace_id", "PostgreSQL", "PDF", "fallback")) {

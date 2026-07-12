@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import hashlib
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from typing import Any, Protocol
 
@@ -24,8 +24,13 @@ class SourceDocumentOriginalRepository(Protocol):
 class OriginalSourceReader(Protocol):
     """Port binaire qui lit la référence interne portée par le SourceDocument."""
 
-    def read_original(self, source_document: SourceDocument) -> bytes:
-        """Retourne les octets immuables après contrôle du stockage."""
+    def open_verified_original(
+        self,
+        source_document: SourceDocument,
+        *,
+        chunk_size: int,
+    ) -> "VerifiedOriginalBinary":
+        """Ouvre un original vérifié et un itérateur binaire borné."""
 
 
 class OriginalHashMismatchError(ValueError):
@@ -35,17 +40,39 @@ class OriginalHashMismatchError(ValueError):
         super().__init__("ORIGINAL_HASH_MISMATCH")
 
 
+ORIGINAL_STREAM_CHUNK_BYTES = 64 * 1024
+
+
+@dataclass(frozen=True, slots=True)
+class VerifiedOriginalBinary:
+    """Descripteur binaire vérifié dont la fermeture est explicite."""
+
+    content_length: int
+    content_chunks: Iterator[bytes]
+    close: Callable[[], None]
+
+    def __post_init__(self) -> None:
+        if (
+            isinstance(self.content_length, bool)
+            or not isinstance(self.content_length, int)
+            or self.content_length < 1
+        ):
+            raise ValueError("content_length original invalide")
+        if not callable(getattr(self.content_chunks, "__next__", None)):
+            raise ValueError("content_chunks original invalide")
+        if not callable(self.close):
+            raise ValueError("fermeture original invalide")
+
+
 @dataclass(frozen=True, slots=True)
 class OriginalPdfContent:
-    """Contenu PDF vérifié prêt à franchir la frontière HTTP publique."""
+    """Flux PDF vérifié prêt à franchir la frontière HTTP publique."""
 
     document_id: str
     source_sha256: str
-    content: bytes
-
-    @property
-    def content_length(self) -> int:
-        return len(self.content)
+    content_length: int
+    content_chunks: Iterator[bytes]
+    close: Callable[[], None]
 
     @property
     def public_filename(self) -> str:
@@ -54,10 +81,16 @@ class OriginalPdfContent:
     def __post_init__(self) -> None:
         DocumentId.from_value(self.document_id)
         SourceFingerprint.from_value(self.source_sha256)
-        if not isinstance(self.content, bytes) or len(self.content) == 0:
-            raise ValueError("contenu PDF original invalide")
-        if hashlib.sha256(self.content).hexdigest() != self.source_sha256:
-            raise OriginalHashMismatchError()
+        if (
+            isinstance(self.content_length, bool)
+            or not isinstance(self.content_length, int)
+            or self.content_length < 1
+        ):
+            raise ValueError("content_length PDF original invalide")
+        if not callable(getattr(self.content_chunks, "__next__", None)):
+            raise ValueError("chunks PDF original invalides")
+        if not callable(self.close):
+            raise ValueError("fermeture PDF original invalide")
 
 
 class OriginalPdfQueryService:
@@ -71,8 +104,8 @@ class OriginalPdfQueryService:
     ) -> None:
         if not callable(getattr(source_document_repository, "find_by_document_id", None)):
             raise ValueError("source_document_repository sans lecture par document_id")
-        if not callable(getattr(original_source_reader, "read_original", None)):
-            raise ValueError("original_source_reader sans lecture originale")
+        if not callable(getattr(original_source_reader, "open_verified_original", None)):
+            raise ValueError("original_source_reader sans ouverture vérifiée")
         self._source_document_repository = source_document_repository
         self._original_source_reader = original_source_reader
 
@@ -84,13 +117,18 @@ class OriginalPdfQueryService:
         if source_document is None:
             raise SourceNotFoundError(parsed_document_id.value)
         parsed_source_document = _ensure_source_document(source_document)
-        content = self._original_source_reader.read_original(parsed_source_document)
-        if not isinstance(content, bytes) or len(content) == 0:
-            raise ValueError("contenu PDF original invalide")
+        binary = self._original_source_reader.open_verified_original(
+            parsed_source_document,
+            chunk_size=ORIGINAL_STREAM_CHUNK_BYTES,
+        )
+        if not isinstance(binary, VerifiedOriginalBinary):
+            raise ValueError("flux PDF original invalide")
         return OriginalPdfContent(
             document_id=parsed_source_document.document_id.value,
             source_sha256=parsed_source_document.fingerprint.value,
-            content=content,
+            content_length=binary.content_length,
+            content_chunks=binary.content_chunks,
+            close=binary.close,
         )
 
 
@@ -105,5 +143,7 @@ __all__ = [
     "OriginalPdfContent",
     "OriginalPdfQueryService",
     "OriginalSourceReader",
+    "ORIGINAL_STREAM_CHUNK_BYTES",
     "SourceDocumentOriginalRepository",
+    "VerifiedOriginalBinary",
 ]

@@ -103,7 +103,7 @@ def _runtime_command(*arguments: str) -> tuple[str, ...]:
 
 EXPECTED_SERVICE_COMMANDS = {
     "ui": _runtime_command("serve-http", "ui", "8081"),
-    "orchestrator-api": ("uv", "run", "--no-sync", "api", *APPLICATION_CONFIG_ARGUMENTS),
+    "orchestrator-api": ("api", *APPLICATION_CONFIG_ARGUMENTS),
     "llm-gateway": _runtime_command("serve-http", "llm-gateway", "8090"),
     "granite-docling": _runtime_command("serve-http", "granite-docling", "8001"),
     "embedding-service": _runtime_command("serve-http", "embedding-service", "8101"),
@@ -337,6 +337,15 @@ def _validate_service_tmpfs(service: ComposeService) -> None:
             raise ValueError("tmpfs /tmp requis pour edge-gateway")
         return
 
+    if service.id == "orchestrator-api":
+        if service.tmpfs != ("/tmp:size=128m,mode=1777",):
+            raise ValueError(
+                "ORCHESTRATOR_TMPFS_BOUNDED_REQUIRED: "
+                "tmpfs /tmp borné requis pour orchestrator-api: "
+                f"{service.tmpfs}"
+            )
+        return
+
     if len(service.tmpfs) > 0:
         raise ValueError(f"tmpfs non prévu pour service: {service.id}")
 
@@ -394,14 +403,14 @@ def _validate_service_command(service: ComposeService) -> None:
         return
 
     if service.command != expected_command:
-        if service.id == "orchestrator-api" and service.command[:4] == ("uv", "run", "--no-sync", "api"):
+        if service.id == "orchestrator-api" and service.command[0:1] == ("api",):
             raise ValueError("Commande Compose Uvicorn orchestrator-api invalide")
         if len(service.command) >= 3 and service.command[0] == "python" and service.command[1] == "-m":
             module_name = service.command[2]
             if importlib.util.find_spec(module_name) is None:
                 raise ValueError(f"Commande Compose non exécutable pour service {service.id}: {module_name}")
         raise ValueError(f"Commande Compose invalide pour service {service.id}")
-    if service.id == "orchestrator-api" and service.command[:4] == ("uv", "run", "--no-sync", "api"):
+    if service.id == "orchestrator-api" and service.command[0:1] == ("api",):
         return
     if len(service.command) >= 3 and service.command[0] == "python" and service.command[1] == "-m":
         module_name = service.command[2]

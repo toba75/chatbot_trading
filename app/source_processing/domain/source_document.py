@@ -17,6 +17,11 @@ _ORIGINAL_STORAGE_REF_PATTERN = re.compile(
     r"^artifact:source_processing\.original_sources/DOC-[A-Z0-9-]+/[0-9a-f]{64}\.pdf$"
 )
 _ORIGINAL_STORAGE_PREFIX = "artifact:source_processing.original_sources/"
+MAX_BIBLIOGRAPHIC_TITLE_CHARACTERS = 512
+MAX_BIBLIOGRAPHIC_AUTHOR_CHARACTERS = 256
+MAX_BIBLIOGRAPHIC_AUTHORS = 16
+MAX_BIBLIOGRAPHIC_EDITION_CHARACTERS = 64
+MAX_BIBLIOGRAPHIC_PUBLICATION_YEAR = 9999
 
 
 class SourceDocumentStatus(str, Enum):
@@ -111,10 +116,20 @@ class BibliographicMetadata:
         return (self.title.casefold(), normalized_authors)
 
     def __post_init__(self) -> None:
-        _ensure_text(self.title, "title")
-        _ensure_authors_value(self.authors)
-        _ensure_publication_year_value(self.publication_year)
-        _ensure_text(self.edition, "edition")
+        title = _ensure_text(self.title, "title")
+        if len(title) > MAX_BIBLIOGRAPHIC_TITLE_CHARACTERS:
+            raise ValueError("title trop long")
+        authors = _ensure_authors_value(self.authors)
+        if len(authors) > MAX_BIBLIOGRAPHIC_AUTHORS:
+            raise ValueError("authors trop nombreux")
+        if any(len(author) > MAX_BIBLIOGRAPHIC_AUTHOR_CHARACTERS for author in authors):
+            raise ValueError("author trop long")
+        publication_year = _ensure_publication_year_value(self.publication_year)
+        if publication_year > MAX_BIBLIOGRAPHIC_PUBLICATION_YEAR:
+            raise ValueError("publication_year invalide")
+        edition = _ensure_text(self.edition, "edition")
+        if len(edition) > MAX_BIBLIOGRAPHIC_EDITION_CHARACTERS:
+            raise ValueError("edition trop longue")
 
 
 @dataclass(frozen=True)

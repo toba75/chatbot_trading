@@ -66,11 +66,15 @@ async def post(
 ):
     sent = []
     offset = 0
+    delivered_empty = False
 
     async def receive():
-        nonlocal offset
+        nonlocal delivered_empty, offset
         if receive_calls is not None:
             receive_calls.append(offset)
+        if len(body) == 0 and not delivered_empty:
+            delivered_empty = True
+            return {"type": "http.request", "body": b"", "more_body": False}
         if offset >= len(body):
             return {"type": "http.disconnect"}
         chunk_size = receive_chunk_bytes or len(body)
@@ -137,7 +141,7 @@ async def scenario():
     application = FastAPI()
     application.add_middleware(
         BoundedRequestBodyMiddleware,
-        max_body_bytes=1024,
+        max_body_bytes=4096,
         memory_spool_bytes=128,
         replay_chunk_bytes=64,
     )
@@ -279,7 +283,7 @@ async def scenario():
             f"La limite métier de {field_name} doit être appliquée.",
         )
 
-    aggregate_oversized_pdf = b"%PDF-1.7\n" + b"x" * 1400 + b"\n%%EOF\n"
+    aggregate_oversized_pdf = b"%PDF-1.7\n" + b"x" * 5000 + b"\n%%EOF\n"
     aggregate_oversized = multipart(
         boundary=boundary,
         content=aggregate_oversized_pdf,
@@ -294,7 +298,7 @@ async def scenario():
             multipart_type,
             receive_calls=content_length_receive_calls,
         ),
-        (413, {"error_code": "HTTP_REQUEST_TOO_LARGE", "max_body_bytes": 1024}),
+        (413, {"error_code": "HTTP_REQUEST_TOO_LARGE", "max_body_bytes": 4096}),
         "Un Content-Length excessif doit être refusé par la frontière ASGI.",
     )
     assert_equal(
@@ -311,7 +315,7 @@ async def scenario():
             include_content_length=False,
             receive_chunk_bytes=128,
         ),
-        (413, {"error_code": "HTTP_REQUEST_TOO_LARGE", "max_body_bytes": 1024}),
+        (413, {"error_code": "HTTP_REQUEST_TOO_LARGE", "max_body_bytes": 4096}),
         "Un transfert chunked excessif doit être borné avant le parsing multipart.",
     )
 

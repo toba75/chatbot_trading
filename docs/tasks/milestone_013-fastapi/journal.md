@@ -75,3 +75,16 @@
 - Image Compose: construction GREEN de `ostrading/orchestrator-api:0.0.0-m002` avec le verrou `uv.lock`.
 - Gates GREEN: quatre preuves T-011, traçabilité 163 exigences, lint 38 validations et vingt validations de non-régression T-003 à T-010.
 - Gate globale: `scripts/test.ps1` non concluante après la borne explicite de 10 minutes, sans sortie; aucun verdict GREEN global déclaré.
+
+## Correctif de revue - Frontière HTTP binaire bornée
+
+- Date: 2026-07-12.
+- Source: findings sécurité, dépendances, configuration et performance sur T-006, T-008 et T-011.
+- Scénario: Given un upload multipart ou un original PDF; When les octets franchissent Caddy, l'ASGI et SP; Then consommation, spool, métadonnées et chunks restent bornés, le hash est vérifié et aucune opération synchrone lourde ne bloque directement l'event-loop.
+- ADR: ADR-020 créée pour compléter ADR-019 sans modifier la propriété métier de SP.
+- Commits RED: `ae943a04c`, `test(api): couvrir frontiere binaire bornee ADR-020`; `d4b64cf26`, `test(sp): borner metadonnees bibliographiques ADR-020`.
+- Implémentation: limite Caddy/ASGI de 54 Mo, PDF métier 50 Mio, métadonnées courtes, `tmpfs /tmp` 128 Mio pour le double spool borné, streaming par chunks 64 Kio, threadpool FastAPI et image builder/runtime.
+- Dépendances: `pypdf==6.14.2` et `python-multipart==0.0.32`, verrou régénéré par `uv lock`.
+- Preuve réelle: PDF `pypdf` supérieur à 1 Mio transmis à PostgreSQL/Uvicorn réels puis restitué avec hash identique.
+- Audit dépendances: `pip-audit` indisponible localement; aucun scanner alternatif silencieux.
+- Commit GREEN: `feat(api): borner frontiere http et streaming original ADR-020` (hash à renseigner après création).

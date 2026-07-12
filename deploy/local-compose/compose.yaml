@@ -70,9 +70,6 @@ services:
       context: ../..
       dockerfile: deploy/local-compose/Dockerfile
     command:
-      - uv
-      - run
-      - --no-sync
       - api
       - --config
       - /workspace/config/application.yaml
@@ -92,6 +89,8 @@ services:
       - ../../config/application.yaml:/workspace/config/application.yaml:ro
       - ../../config/application.schema.json:/workspace/config/application.schema.json:ro
       - ./secrets/postgres_password:/workspace/config/secrets/local/postgres_password:ro
+    tmpfs:
+      - /tmp:size=128m,mode=1777
     healthcheck:
       test:
         - CMD-SHELL

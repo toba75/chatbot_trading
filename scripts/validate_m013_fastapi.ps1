@@ -2,6 +2,8 @@ $ErrorActionPreference = "Stop"
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $tests = @(
+    "tests/m013_fastapi/validate_document_command_router_unit.ps1",
+    "tests/m013_fastapi/validate_original_pdf_stream_unit.ps1",
     "tests/m013_fastapi/validate_orchestrator_deployment_acceptance.ps1",
     "tests/m013_fastapi/validate_document_http_live_acceptance.ps1",
     "tests/m013_fastapi/validate_orchestrator_deployment_unit.ps1",
@@ -21,4 +23,4 @@ foreach ($test in $tests) {
     Write-Host "Validation GREEN: $test"
 }
 
-Write-Host "Gate M13-FastAPI GREEN: 4 preuve(s), Docker/PostgreSQL/PDF/Uvicorn inclus."
+Write-Host "Gate M13-FastAPI GREEN: 6 preuve(s), limites HTTP, streaming, Docker/PostgreSQL/PDF/Uvicorn inclus."

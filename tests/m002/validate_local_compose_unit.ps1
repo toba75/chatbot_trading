@@ -43,10 +43,11 @@ BASE_SERVICES = {
     },
     "orchestrator-api": {
         "image": "ostrading/orchestrator-api:0.0.0-m002",
-        "command": ["uv", "run", "--no-sync", "api", *APPLICATION_CONFIG_ARGUMENTS],
+        "command": ["api", *APPLICATION_CONFIG_ARGUMENTS],
         "expose": ["8080"],
         "networks": ["core"],
         "volumes": [APPLICATION_CONFIG_VOLUME, APPLICATION_SCHEMA_VOLUME],
+        "tmpfs": ["/tmp:size=128m,mode=1777"],
         "read_only": True,
     },
     "llm-gateway": {
@@ -226,6 +227,10 @@ if edge_gateway.ports != ("127.0.0.1:${OST_EDGE_HTTPS_PORT?OST_EDGE_HTTPS_PORT r
 if edge_gateway.tmpfs != ("/tmp",):
     raise AssertionError(f"tmpfs edge-gateway incorrect: {edge_gateway.tmpfs}")
 
+orchestrator_api = compose.service("orchestrator-api")
+if orchestrator_api.tmpfs != ("/tmp:size=128m,mode=1777",):
+    raise AssertionError(f"tmpfs orchestrator-api incorrect: {orchestrator_api.tmpfs}")
+
 llm_gateway = compose.service("llm-gateway")
 if "spark-egress" not in llm_gateway.networks:
     raise AssertionError(f"Egress Spark absent pour llm-gateway: {llm_gateway.networks}")
@@ -241,6 +246,11 @@ if llm_gateway.environment:
 assert_raises(
     "tmpfs /tmp requis pour edge-gateway",
     valid_compose({"edge-gateway": {"tmpfs": []}}),
+)
+
+assert_raises(
+    "ORCHESTRATOR_TMPFS_BOUNDED_REQUIRED",
+    valid_compose({"orchestrator-api": {"tmpfs": []}}),
 )
 
 assert_raises(

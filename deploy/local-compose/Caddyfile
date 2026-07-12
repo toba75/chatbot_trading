@@ -10,6 +10,9 @@ localhost:8443 {
     }
 
     handle_path /api/* {
+        request_body {
+            max_size 54MB
+        }
         reverse_proxy orchestrator-api:8080
     }
 

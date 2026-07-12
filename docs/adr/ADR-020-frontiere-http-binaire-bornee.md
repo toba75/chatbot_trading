@@ -21,9 +21,9 @@ La stack locale conserve un système de fichiers racine en lecture seule. Le spo
 
 ## Décision
 
-- Caddy **DOIT** refuser tout corps `/api/*` supérieur à 52 Mo avant le proxy vers `orchestrator-api`.
+- Caddy **DOIT** refuser tout corps `/api/*` supérieur à 54 Mo avant le proxy vers `orchestrator-api`.
 - L'application ASGI **DOIT** appliquer la même limite agrégée, avec ou sans `Content-Length`, avant de déléguer au parseur multipart.
-- Le buffer ASGI **DOIT** utiliser un spool mémoire court puis `/tmp`; le service Compose **DOIT** monter `/tmp` en `tmpfs` de 64 Mio avec `read_only: true` conservé.
+- Le buffer ASGI **DOIT** utiliser un spool mémoire court puis `/tmp`; le service Compose **DOIT** monter `/tmp` en `tmpfs` de 128 Mio avec `read_only: true` conservé afin de couvrir simultanément le spool agrégé et celui du parseur multipart.
 - La route documentaire **DOIT** conserver une limite PDF métier de 50 Mio et refuser explicitement les titres de plus de 512 caractères, plus de 16 auteurs, un auteur de plus de 256 caractères, une édition de plus de 64 caractères ou une année hors de l'intervalle 1 à 9999.
 - La restitution d'un original **DOIT** vérifier son hash par chunks bornés avant de publier un statut 200, puis émettre le même fichier en chunks d'au plus 64 Kio avec fermeture garantie.
 - Les opérations synchrones de fichier, PostgreSQL et inspection PDF appelées depuis des routes asynchrones **DOIVENT** être exécutées dans le threadpool borné du runtime ASGI ou par une route synchrone.
@@ -52,7 +52,7 @@ La stack locale conserve un système de fichiers racine en lecture seule. Le spo
 
 - Un upload autorisé est lu une première fois par le middleware agrégé avant le parsing multipart.
 - La vérification avant réponse puis la restitution lisent deux fois l'original afin de conserver le statut d'erreur 409 avant les en-têtes 200.
-- Le `tmpfs` réserve une enveloppe maximale explicite par conteneur.
+- Le `tmpfs` réserve une enveloppe maximale explicite de 128 Mio par conteneur pour le double spool borné.
 
 ### Risques et contrôles
 
@@ -72,7 +72,7 @@ La stack locale conserve un système de fichiers racine en lecture seule. Le spo
 - Spécification : `docs/specs/m013_fastapi_api_orchestratrice.md`.
 - Plan d'implémentation : `docs/tasks/milestone_013-fastapi/0006_enregistrer_pdf_lancer_diagnostic.md`; `0008_recuperer_pdf_original_controle.md`; `0011_deployer_auditer_api_orchestratrice.md`.
 - Tests d'acceptation : `tests/m013_fastapi/validate_document_commands_http_acceptance.ps1`; `validate_original_pdf_retrieval_acceptance.ps1`; `validate_document_http_live_acceptance.ps1`.
-- Commits : RED à renseigner après création; GREEN à renseigner après implémentation.
+- Commits : RED `ae943a04c` et `d4b64cf26`; GREEN `feat(api): borner frontiere http et streaming original ADR-020` (hash à renseigner après création).
 
 ## Notes
 

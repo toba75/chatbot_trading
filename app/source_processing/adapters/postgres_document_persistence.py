@@ -17,7 +17,10 @@ from app.source_processing.application.document_commands import (
     DocumentConversionState,
     DocumentConversionStatus,
 )
-from app.source_processing.application.original_queries import OriginalHashMismatchError
+from app.source_processing.application.original_queries import (
+    OriginalHashMismatchError,
+    VerifiedOriginalBinary,
+)
 from app.source_processing.domain.document_processing_run import (
     DiagnosticVersion,
     DocumentProcessingRun,
@@ -115,17 +118,58 @@ class CorpusOriginalSourceStore:
             raise ValueError("ORIGINAL_STORAGE_REF_OUTSIDE_CORPUS")
         return resolved
 
-    def read_original(self, source_document: SourceDocument) -> bytes:
+    def open_verified_original(
+        self,
+        source_document: SourceDocument,
+        *,
+        chunk_size: int,
+    ) -> VerifiedOriginalBinary:
         if not isinstance(source_document, SourceDocument):
             raise ValueError("source_document invalide")
+        if isinstance(chunk_size, bool) or not isinstance(chunk_size, int) or chunk_size < 1:
+            raise ValueError("chunk_size invalide")
         path = self.resolve_internal_path(source_document.original_storage_ref)
         try:
-            content = path.read_bytes()
+            stream = path.open("rb")
         except OSError as exc:
             raise RuntimeError("ORIGINAL_UNREADABLE") from exc
-        if hashlib.sha256(content).hexdigest() != source_document.fingerprint.value:
-            raise OriginalHashMismatchError()
-        return content
+        try:
+            digest = hashlib.sha256()
+            content_length = 0
+            while chunk := stream.read(chunk_size):
+                digest.update(chunk)
+                content_length += len(chunk)
+            if content_length == 0:
+                raise RuntimeError("ORIGINAL_UNREADABLE")
+            if digest.hexdigest() != source_document.fingerprint.value:
+                raise OriginalHashMismatchError()
+            stream.seek(0)
+        except BaseException:
+            stream.close()
+            raise
+
+        def content_chunks():
+            try:
+                while chunk := stream.read(chunk_size):
+                    yield chunk
+            finally:
+                stream.close()
+
+        chunks = content_chunks()
+        return VerifiedOriginalBinary(
+            content_length=content_length,
+            content_chunks=chunks,
+            close=chunks.close,
+        )
+
+    def read_original(self, source_document: SourceDocument) -> bytes:
+        """Compatibilité interne : matérialise explicitement le flux vérifié."""
+
+        binary = self.open_verified_original(source_document, chunk_size=64 * 1024)
+        try:
+            return b"".join(binary.content_chunks)
+        finally:
+            binary.close()
 
 
 class PostgresDocumentPersistence:
@@ -651,7 +695,11 @@ def build_document_persistence(
 
 def _verify_file_hash(path: Path, expected_hash: str) -> None:
     try:
-        actual = hashlib.sha256(path.read_bytes()).hexdigest()
+        digest = hashlib.sha256()
+        with path.open("rb") as stream:
+            while chunk := stream.read(64 * 1024):
+                digest.update(chunk)
+        actual = digest.hexdigest()
     except OSError as exc:
         raise RuntimeError("ORIGINAL_UNREADABLE") from exc
     if actual != expected_hash:

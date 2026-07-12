@@ -20,6 +20,8 @@ $traceability = Get-Content -Raw -Encoding UTF8 (Join-Path $repoRoot "docs\trace
 $journal = Get-Content -Raw -Encoding UTF8 (Join-Path $repoRoot "docs\tasks\milestone_013-fastapi\journal.md")
 
 foreach ($testPath in @(
+    "tests/m013_fastapi/validate_document_command_router_unit.ps1",
+    "tests/m013_fastapi/validate_original_pdf_stream_unit.ps1",
     "tests/m013_fastapi/validate_orchestrator_deployment_acceptance.ps1",
     "tests/m013_fastapi/validate_document_http_live_acceptance.ps1",
     "tests/m013_fastapi/validate_orchestrator_deployment_unit.ps1",
@@ -33,11 +35,12 @@ foreach ($marker in @(
     "REQ-M013-FASTAPI-011",
     "docs/tasks/milestone_013-fastapi/0011_deployer_auditer_api_orchestratrice.md",
     "scripts/validate_m013_fastapi.ps1",
-    "ADR-019"
+    "ADR-019",
+    "ADR-020"
 )) {
     Assert-Contains $traceability $marker "Traçabilité T-011 incomplète."
 }
-foreach ($marker in @("## T-011", "Commit RED", "Commit GREEN", "ADR-019")) {
+foreach ($marker in @("## T-011", "Commit RED", "Commit GREEN", "ADR-019", "ADR-020")) {
     Assert-Contains $journal $marker "Journal T-011 incomplet."
 }
 
