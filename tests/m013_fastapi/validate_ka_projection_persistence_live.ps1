@@ -75,7 +75,7 @@ states = {
 }
 for name, value in states.items():
     chunks = () if name in ("BUILDING", "FAILED") else tuple(sample(value, number) for number in range(1, 4))
-    writer.save_transition(projection=value, chunk_count=len(chunks), chunks=chunks, state_observed_at="2026-07-12T12:00:00Z")
+    writer.save_projection_outputs(projection=value, chunk_count=len(chunks), chunks=chunks, state_observed_at="2026-07-12T12:00:00Z")
 '@ | & $python -B -
     if ($LASTEXITCODE -ne 0) { throw "KA_POSTGRES_WRITE_FAILED" }
 
