@@ -70,12 +70,10 @@ services:
       context: ../..
       dockerfile: deploy/local-compose/Dockerfile
     command:
-      - python
-      - -m
-      - app.platform.local_runtime
-      - serve-http
-      - orchestrator-api
-      - "8080"
+      - uv
+      - run
+      - --no-sync
+      - api
       - --config
       - /workspace/config/application.yaml
     expose:
@@ -97,7 +95,7 @@ services:
     healthcheck:
       test:
         - CMD-SHELL
-        - "python -c \"import socket; socket.create_connection(('127.0.0.1', 8080), 2).close()\""
+        - "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/ready', timeout=2).read()\""
       interval: 30s
       timeout: 5s
       retries: 3

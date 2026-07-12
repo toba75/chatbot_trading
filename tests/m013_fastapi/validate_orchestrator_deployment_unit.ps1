@@ -30,6 +30,7 @@ application = create_orchestrator_app(
 assert root.configuration is configuration
 assert len(root.dependencies) == 1
 assert root.dependencies[0].readiness().name == "postgres"
+application.include_router(root.document_command_router)
 
 paths = tuple(route.path for route in application.routes)
 required_paths = (

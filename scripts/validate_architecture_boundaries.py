@@ -36,6 +36,23 @@ RESEARCH_OUTCOME_CONSUMERS = frozenset({"RA", "SD"})
 STRATEGY_SNAPSHOT_CONSUMERS = frozenset({"SD", "EX"})
 EXPERIMENT_RESULT_CONSUMERS = frozenset({"EX", "RA", "CV"})
 QDRANT_DIRECT_ACCESS_FORBIDDEN_CONSUMERS = frozenset({"EG", "RA"})
+ORCHESTRATOR_COMPOSITION_MODULE = "app.platform.orchestrator_runtime"
+ORCHESTRATOR_COMPOSITION_ALLOWED_IMPORTS = frozenset(
+    {
+        "app.knowledge_access.adapters.http",
+        "app.knowledge_access.adapters.postgres_projection_read",
+        "app.knowledge_access.application.projection_queries",
+        "app.source_processing.adapters.document_http",
+        "app.source_processing.adapters.http",
+        "app.source_processing.adapters.original_http",
+        "app.source_processing.adapters.pdf_document_inspector",
+        "app.source_processing.adapters.postgres_document_persistence",
+        "app.source_processing.adapters.query_http",
+        "app.source_processing.application.document_commands",
+        "app.source_processing.application.document_queries",
+        "app.source_processing.application.original_queries",
+    }
+)
 CONTRACT_MODULE_ALLOWED_CONSUMERS: dict[str, frozenset[str]] = {
     "app.contracts.identity": ALL_CONTEXT_CODES,
     "app.contracts.source_references": SOURCE_REFERENCE_CONSUMERS,
@@ -609,6 +626,11 @@ def contract_import_violations(
 
     if source.context_code == SPECIAL_SOURCE_PLATFORM:
         if target.kind == "bounded_context":
+            if (
+                source.module_name == ORCHESTRATOR_COMPOSITION_MODULE
+                and target.name in ORCHESTRATOR_COMPOSITION_ALLOWED_IMPORTS
+            ):
+                return violations
             violations.append(
                 "Import de contexte metier interdit dans platform: "
                 f"module {source.module_name}, import {target.name}, ligne {location}."

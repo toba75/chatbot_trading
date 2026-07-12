@@ -3,8 +3,11 @@ from __future__ import annotations
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from dataclasses import asdict
+import json
+import time
+from uuid import uuid4
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 import uvicorn
 
@@ -44,7 +47,38 @@ def create_orchestrator_app(
         finally:
             await composition_root.close()
 
-    application = FastAPI(lifespan=lifespan)
+    application = FastAPI(
+        lifespan=lifespan,
+        title="OSTrading orchestrator-api",
+        version="0.1.0",
+        docs_url=None,
+        redoc_url=None,
+    )
+
+    @application.middleware("http")
+    async def trace_request(request: Request, call_next: Callable) -> JSONResponse:
+        trace_id = _request_trace_id(request)
+        started_ns = time.perf_counter_ns()
+        response = await call_next(request)
+        duration_ms = (time.perf_counter_ns() - started_ns) / 1_000_000
+        response.headers["X-Trace-ID"] = trace_id
+        print(
+            json.dumps(
+                {
+                    "configuration_hash": configuration.configuration_hash,
+                    "duration_ms": round(duration_ms, 3),
+                    "event_type": "orchestrator_http_request",
+                    "method": request.method,
+                    "path": request.url.path,
+                    "status_code": response.status_code,
+                    "trace_id": trace_id,
+                },
+                ensure_ascii=False,
+                sort_keys=True,
+            ),
+            flush=True,
+        )
+        return response
     application.include_router(build_health_router())
     application.include_router(build_conversation_router(configuration))
     application.include_router(build_evaluation_router(configuration))
@@ -66,6 +100,15 @@ def create_orchestrator_app(
         )
 
     return application
+
+
+def _request_trace_id(request: Request) -> str:
+    provided = request.headers.get("X-Trace-ID")
+    if provided is None:
+        return f"TRACE-{uuid4().hex.upper()}"
+    if provided == "" or provided != provided.strip() or len(provided) > 128:
+        raise ValueError("TRACE_ID_INVALID")
+    return provided
 
 
 def serve_orchestrator_app(

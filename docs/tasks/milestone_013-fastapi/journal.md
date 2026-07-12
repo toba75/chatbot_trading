@@ -58,3 +58,20 @@
 - Commit RED: `7a3c3c231`, `test(architecture): couvrir frontiere asgi orchestratrice`.
 - Commit GREEN: `docs(architecture): decider fastapi uvicorn ADR-019`.
 - Gates: spécification, politique d'import FastAPI/Uvicorn, système ADR et validateur M13-FastAPI.
+
+## T-011 - Déploiement et audit de l'API orchestratrice
+
+- Date: 2026-07-12.
+- Statut: implémentation et validation T-011.
+- Scénario: Given l'application ASGI et les contrats documentaires GREEN; When PostgreSQL Docker et la stack Uvicorn exécutent le parcours d'un PDF réel; Then un seul `orchestrator-api` sert les contrats, trace chaque appel et bloque toute régression par la gate M13-FastAPI.
+- Commit RED: `b2a00b28a`, `test(platform): couvrir deploiement audit m13 fastapi`.
+- Commit GREEN: `feat(platform): deployer api orchestratrice fastapi`.
+- Runtime: commande `uv run api --config`, service Compose Uvicorn au port interne 8080, readiness PostgreSQL bloquante et aucun ancien routeur actif.
+- Preuve live: Docker/PostgreSQL, migrations réelles, PDF valide, HTTP multipart, lectures publiques, hash original, OpenAPI borné et traces corrélées.
+- Gate: `scripts/validate_m013_fastapi.ps1`, enrôlée dans `scripts/test.ps1` et `scripts/lint.ps1`.
+- ADR: ADR-019 consultée et appliquée; ADR-018 inchangée; aucune nouvelle ADR requise.
+- Hors périmètre préservé: UI et `llm-gateway` ne sont pas migrés vers FastAPI.
+- Résultat live: `DOC-BC6CFA26B1753E74`, PDF SHA-256 `bc6cfa26b1753e740c2749f8a854828770965f5862134ec304cb11a25e98d02a`, PostgreSQL Docker et Uvicorn HTTP.
+- Image Compose: construction GREEN de `ostrading/orchestrator-api:0.0.0-m002` avec le verrou `uv.lock`.
+- Gates GREEN: quatre preuves T-011, traçabilité 163 exigences, lint 38 validations et vingt validations de non-régression T-003 à T-010.
+- Gate globale: `scripts/test.ps1` non concluante après la borne explicite de 10 minutes, sans sortie; aucun verdict GREEN global déclaré.

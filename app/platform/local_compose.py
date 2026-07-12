@@ -103,7 +103,7 @@ def _runtime_command(*arguments: str) -> tuple[str, ...]:
 
 EXPECTED_SERVICE_COMMANDS = {
     "ui": _runtime_command("serve-http", "ui", "8081"),
-    "orchestrator-api": _runtime_command("serve-http", "orchestrator-api", "8080"),
+    "orchestrator-api": ("uv", "run", "--no-sync", "api", *APPLICATION_CONFIG_ARGUMENTS),
     "llm-gateway": _runtime_command("serve-http", "llm-gateway", "8090"),
     "granite-docling": _runtime_command("serve-http", "granite-docling", "8001"),
     "embedding-service": _runtime_command("serve-http", "embedding-service", "8101"),
@@ -394,11 +394,15 @@ def _validate_service_command(service: ComposeService) -> None:
         return
 
     if service.command != expected_command:
+        if service.id == "orchestrator-api" and service.command[:4] == ("uv", "run", "--no-sync", "api"):
+            raise ValueError("Commande Compose Uvicorn orchestrator-api invalide")
         if len(service.command) >= 3 and service.command[0] == "python" and service.command[1] == "-m":
             module_name = service.command[2]
             if importlib.util.find_spec(module_name) is None:
                 raise ValueError(f"Commande Compose non exécutable pour service {service.id}: {module_name}")
         raise ValueError(f"Commande Compose invalide pour service {service.id}")
+    if service.id == "orchestrator-api" and service.command[:4] == ("uv", "run", "--no-sync", "api"):
+        return
     if len(service.command) >= 3 and service.command[0] == "python" and service.command[1] == "-m":
         module_name = service.command[2]
         if importlib.util.find_spec(module_name) is None:

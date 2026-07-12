@@ -57,7 +57,7 @@ BASE_SERVICES = {
     },
     "orchestrator-api": {
         "image": "ostrading/orchestrator-api:0.0.0-m002",
-        "command": runtime_command("serve-http", "orchestrator-api", "8080"),
+        "command": ["uv", "run", "--no-sync", "api", *APPLICATION_CONFIG_ARGUMENTS],
         "expose": ["8080"],
         "networks": ["core"],
         "volumes": [APPLICATION_CONFIG_VOLUME, APPLICATION_SCHEMA_VOLUME],

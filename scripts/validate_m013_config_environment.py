@@ -184,7 +184,10 @@ class EnvironmentScanner:
 
     def scan_code_environment_api(self, relative_path: str, line_number: int, line: str) -> None:
         if "os.environ" in line:
-            if relative_path == "app/platform/local_runtime.py" and re.search(
+            if relative_path in {
+                "app/platform/local_runtime.py",
+                "app/platform/orchestrator_command.py",
+            } and re.search(
                 r"environment_snapshot\s*=\s*dict\(os\.environ\)", line
             ):
                 self.exception_count += 1

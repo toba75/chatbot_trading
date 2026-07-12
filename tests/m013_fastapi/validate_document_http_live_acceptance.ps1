@@ -11,6 +11,14 @@ if ($LASTEXITCODE -ne 0) {
     throw "DOCKER_ENGINE_REQUIRED"
 }
 $uv = Get-Command uv -ErrorAction Stop
+$apiPython = Join-Path $repoRoot ".venv\Scripts\python.exe"
+if (-not (Test-Path -LiteralPath $apiPython -PathType Leaf)) {
+    throw "UV_PROJECT_PYTHON_REQUIRED"
+}
+& $uv.Source run --project $repoRoot --no-sync api --help *> $null
+if ($LASTEXITCODE -ne 0) {
+    throw "UV_RUN_API_COMMAND_INVALID"
+}
 
 function Get-FreeTcpPort {
     $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
@@ -25,21 +33,19 @@ $postgresPort = Get-FreeTcpPort
 $apiPort = Get-FreeTcpPort
 $temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) "ostrading-m13-fastapi-$suffix"
 $configPath = Join-Path $temporaryRoot "application.yaml"
-$secretPath = Join-Path $temporaryRoot "postgres_password"
-$corpusRoot = Join-Path $temporaryRoot "corpus"
+$secretPath = Join-Path $temporaryRoot "config\secrets\local\postgres_password"
+$corpusRoot = Join-Path $temporaryRoot "data\corpus"
 $stdoutPath = Join-Path $temporaryRoot "api.stdout.log"
 $stderrPath = Join-Path $temporaryRoot "api.stderr.log"
 $apiProcess = $null
 
-New-Item -ItemType Directory -Path $temporaryRoot, $corpusRoot -Force | Out-Null
+New-Item -ItemType Directory -Path $temporaryRoot, $corpusRoot, (Split-Path -Parent $secretPath) -Force | Out-Null
 [System.IO.File]::WriteAllText($secretPath, "m13-fastapi-live-password", [System.Text.UTF8Encoding]::new($false))
 
 $config = Get-Content -Raw -Encoding UTF8 (Join-Path $repoRoot "config\application.example.yaml")
 $config = $config.Replace("postgresql+psycopg://app@postgres/app", "postgresql+psycopg://app@127.0.0.1:$postgresPort/app")
 $config = $config.Replace("  api:`r`n    bind_host: 0.0.0.0`r`n    port: 8080", "  api:`r`n    bind_host: 127.0.0.1`r`n    port: $apiPort")
 $config = $config.Replace("  api:`n    bind_host: 0.0.0.0`n    port: 8080", "  api:`n    bind_host: 127.0.0.1`n    port: $apiPort")
-$config = $config.Replace("  corpus_root: data/corpus", "  corpus_root: $($corpusRoot.Replace('\', '/'))")
-$config = $config.Replace("    postgres_password_path: config/secrets/local/postgres_password", "    postgres_password_path: $($secretPath.Replace('\', '/'))")
 [System.IO.File]::WriteAllText($configPath, $config, [System.Text.UTF8Encoding]::new($false))
 
 try {
@@ -55,20 +61,30 @@ try {
     }
 
     $ready = $false
-    for ($attempt = 0; $attempt -lt 60; $attempt++) {
+    $consecutiveReady = 0
+    for ($attempt = 0; $attempt -lt 120; $attempt++) {
         & docker exec $containerName pg_isready -U app -d app *> $null
-        if ($LASTEXITCODE -eq 0) { $ready = $true; break }
+        if ($LASTEXITCODE -eq 0) {
+            $consecutiveReady += 1
+            if ($consecutiveReady -eq 3) { $ready = $true; break }
+        } else {
+            $consecutiveReady = 0
+        }
         Start-Sleep -Milliseconds 500
     }
     if (-not $ready) { throw "POSTGRES_DOCKER_NOT_READY" }
 
-    Get-Content -Raw -Encoding UTF8 (Join-Path $repoRoot "deploy\postgres\migrations\001_document_persistence.sql") |
-        & docker exec -i $containerName psql -v ON_ERROR_STOP=1 -U app -d app *> $null
-    if ($LASTEXITCODE -ne 0) { throw "POSTGRES_MIGRATION_FAILED" }
+    Get-ChildItem (Join-Path $repoRoot "deploy\postgres\migrations") -Filter "*.sql" -File |
+        Sort-Object Name |
+        ForEach-Object {
+            Get-Content -Raw -Encoding UTF8 $_.FullName |
+                & docker exec -i $containerName psql -v ON_ERROR_STOP=1 -U app -d app *> $null
+            if ($LASTEXITCODE -ne 0) { throw "POSTGRES_MIGRATION_FAILED $($_.Name)" }
+        }
 
-    $apiProcess = Start-Process -FilePath $uv.Source `
-        -ArgumentList @("run", "api", "--config", $configPath) `
-        -WorkingDirectory $repoRoot `
+    $apiProcess = Start-Process -FilePath $apiPython `
+        -ArgumentList @("-B", "-m", "app.platform.orchestrator_command", "--config", $configPath) `
+        -WorkingDirectory $temporaryRoot `
         -RedirectStandardOutput $stdoutPath `
         -RedirectStandardError $stderrPath `
         -WindowStyle Hidden `
@@ -119,7 +135,8 @@ def request(path, *, method="GET", data=None, headers=None):
 for path in ("/health", "/ready", "/openapi.json"):
     status, headers, body = request(path, headers={"X-Trace-Id": f"TRACE-M13-{path[1:].replace('/', '-') }"})
     assert status == 200, (path, status, body)
-    assert headers["X-Trace-Id"].startswith("TRACE-M13-")
+    normalized_headers = {name.lower(): value for name, value in headers.items()}
+    assert normalized_headers["x-trace-id"].startswith("TRACE-M13-")
 
 openapi = json.loads(request("/openapi.json")[2])
 for internal in ("original_storage_ref", "processing_run_id", "job_id", "qdrant_collection", "postgres_password_path"):
@@ -174,8 +191,38 @@ assert json.loads(body) == {"document_id": document_id, "projection_status": "PR
 
 print(json.dumps({"document_id": document_id, "pdf_sha256": hashlib.sha256(pdf_bytes).hexdigest(), "postgres": "docker", "transport": "uvicorn-http"}, sort_keys=True))
 '@
-    $scenario | & $uv.Source run python -B -
+    $scenario | & $apiPython -B -
     if ($LASTEXITCODE -ne 0) { throw "DOCUMENT_HTTP_LIVE_SCENARIO_FAILED" }
+
+    Start-Sleep -Milliseconds 200
+    $requestLogs = @(
+        Get-Content -Encoding UTF8 $stdoutPath |
+            ForEach-Object {
+                try { $_ | ConvertFrom-Json }
+                catch { $null }
+            } |
+            Where-Object { $_.event_type -eq "orchestrator_http_request" }
+    )
+    if ($requestLogs.Count -lt 10) {
+        throw "ORCHESTRATOR_TRACE_LOGS_MISSING"
+    }
+    foreach ($requestLog in $requestLogs) {
+        if ([string]::IsNullOrWhiteSpace($requestLog.trace_id)) {
+            throw "ORCHESTRATOR_TRACE_ID_MISSING"
+        }
+        if ($requestLog.configuration_hash -notmatch '^[a-f0-9]{64}$') {
+            throw "ORCHESTRATOR_CONFIGURATION_HASH_MISSING"
+        }
+        if ($requestLog.status_code -lt 200 -or $requestLog.status_code -gt 599) {
+            throw "ORCHESTRATOR_TRACE_STATUS_INVALID"
+        }
+    }
+    $rawLogs = Get-Content -Raw -Encoding UTF8 $stdoutPath
+    foreach ($sensitiveMarker in @("Preuve réelle M13-FastAPI", "OSTrading", "bc6cfa26")) {
+        if ($rawLogs.Contains($sensitiveMarker)) {
+            throw "ORCHESTRATOR_SENSITIVE_PAYLOAD_LOGGED"
+        }
+    }
 }
 finally {
     Remove-Item Env:M13_FASTAPI_LIVE_ORIGIN -ErrorAction SilentlyContinue

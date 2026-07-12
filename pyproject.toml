@@ -15,6 +15,7 @@ dependencies = [
 ]
 
 [project.scripts]
+api = "app.platform.orchestrator_command:main"
 ui = "app.platform.ui_command:main"
 
 [tool.setuptools.packages.find]

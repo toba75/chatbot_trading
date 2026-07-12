@@ -924,6 +924,14 @@ $requiredM013Requirements = @(
         CommandScript = "scripts/validate_m013_reality.ps1"
         Code = "app/platform/local_runtime.py; app/platform/llm_gateway/__init__.py; scripts/validate_m013_reality.ps1; tests/m013/validate_llm_gateway_real_spark_acceptance.ps1; tests/m013/validate_m013_reality_product_acceptance.ps1; tests/m013/validate_m013_reality_product_unit.ps1; docs/specs/m013_reality_closure.md; docs/tasks/milestone_013/journal.md"
         Adr = "ADR-014; ADR-015"
+    },
+    [ordered] @{
+        Id = "REQ-M013-FASTAPI-011"
+        Source = "docs/tasks/milestone_013-fastapi/0011_deployer_auditer_api_orchestratrice.md"
+        Test = "tests/m013_fastapi/validate_orchestrator_deployment_acceptance.ps1; tests/m013_fastapi/validate_document_http_live_acceptance.ps1; tests/m013_fastapi/validate_orchestrator_deployment_unit.ps1; tests/m013_fastapi/validate_m013_fastapi_traceability_unit.ps1"
+        CommandScript = "scripts/validate_m013_fastapi.ps1"
+        Code = "app/platform/orchestrator_command.py; app/platform/orchestrator_runtime.py; app/platform/orchestrator_asgi.py; deploy/local-compose/compose.yaml; deploy/postgres/migrations/002_knowledge_projection_read_models.sql; scripts/validate_m013_fastapi.ps1; docs/runbooks/api_orchestratrice.md; docs/governance/m013_fastapi_audit.md; docs/tasks/milestone_013-fastapi/journal.md"
+        Adr = "ADR-018; ADR-019"
     }
 )
 

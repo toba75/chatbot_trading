@@ -300,8 +300,8 @@ function Assert-GateEnrollment {
     }
 
     Assert-Condition `
-        -Condition ($LintGateContent.Contains("-ExpectedValidationCount 37")) `
-        -Message "Compteur lint M13-config invalide: 37 validations attendues"
+        -Condition ($LintGateContent.Contains("-ExpectedValidationCount 38")) `
+        -Message "Compteur lint M13-config invalide: 38 validations attendues"
 }
 
 function Assert-AuditReport {

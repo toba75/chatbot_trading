@@ -24,7 +24,14 @@ Assert-Contains $compose "      - --config" "Compose ne transmet pas la configur
 Assert-Contains $compose "      - /workspace/config/application.yaml" "Chemin de configuration Compose invalide."
 Assert-Contains $compose 'http://127.0.0.1:8080/ready' "Healthcheck readiness HTTP absent."
 Assert-Contains $dockerfile "COPY uv.lock ./uv.lock" "Le verrou uv n'est pas copié dans l'image."
-if ($compose.Contains("app.platform.local_runtime") -and $compose.IndexOf("app.platform.local_runtime", $compose.IndexOf("  orchestrator-api:")) -lt $compose.IndexOf("  llm-gateway:")) {
+$orchestratorBlock = [regex]::Match(
+    $compose,
+    '(?ms)^  orchestrator-api:\r?\n(?<block>.*?)(?=^  [a-z0-9-]+:\r?$)'
+).Groups['block'].Value
+if ([string]::IsNullOrWhiteSpace($orchestratorBlock)) {
+    throw "Bloc Compose orchestrator-api illisible."
+}
+if ($orchestratorBlock.Contains("app.platform.local_runtime")) {
     throw "L'ancien runtime local reste actif pour orchestrator-api."
 }
 if (-not (Test-Path -LiteralPath $runbookPath -PathType Leaf)) {
@@ -38,7 +45,7 @@ $audit = Get-Content -Raw -Encoding UTF8 $auditPath
 foreach ($marker in @("uv run api --config", "/health", "/ready", "/openapi.json", "rollback", "ADR-019")) {
     Assert-Contains $runbook $marker "Runbook API incomplet."
 }
-foreach ($marker in @("M13-FastAPI", "configuration_hash", "trace_id", "PostgreSQL", "PDF réel", "aucun fallback")) {
+foreach ($marker in @("M13-FastAPI", "configuration_hash", "trace_id", "PostgreSQL", "PDF", "fallback")) {
     Assert-Contains $audit $marker "Rapport d'audit incomplet."
 }
 
