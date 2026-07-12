@@ -65,7 +65,7 @@ services:
     read_only: true
 
   orchestrator-api:
-    image: ostrading/orchestrator-api:0.1.0-m013-fastapi-schema-002
+    image: ostrading/orchestrator-api:0.1.0-m013-fastapi-schema-003
     build:
       context: ../..
       dockerfile: deploy/local-compose/Dockerfile
@@ -287,9 +287,13 @@ services:
     command:
       - python
       - -m
-      - app.platform.local_runtime
-      - run-worker
-      - worker-documents
+      - app.source_processing.adapters.worker_runtime
+      - --worker-id
+      - worker-documents-1
+      - --lease-seconds
+      - "120"
+      - --poll-seconds
+      - "0.5"
       - --config
       - /workspace/config/application.yaml
     networks:

@@ -3,20 +3,23 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from app.platform.job_runtime import JOB_RUNTIME_CATALOG, JobRequest, JobSubmissionDecision
+from app.platform.job_runtime import JOB_RUNTIME_CATALOG, JobRequest
 from app.platform.job_runtime.postgres import PostgresJobQueue
 from app.platform.configuration import ApplicationConfiguration
 from app.platform.postgres import PostgresConnectionFactory, PsycopgConnectionFactory
+from app.platform.request_context import current_trace_id
 from app.source_processing.application.document_commands import (
     DocumentConversionState,
     DocumentConversionStatus,
 )
+from app.source_processing.application.document_queries import DocumentStateSnapshot
 from app.source_processing.application.original_queries import (
     OriginalHashMismatchError,
     VerifiedOriginalBinary,
@@ -57,6 +60,27 @@ from app.source_processing.domain.source_document import (
 
 
 _ARTIFACT_PREFIX = "artifact:source_processing.original_sources/"
+
+
+class ProcessingRunVersionConflictError(RuntimeError):
+    """Conflit explicite entre deux writers du même agrégat SP."""
+
+    def __init__(self) -> None:
+        super().__init__("PROCESSING_RUN_VERSION_CONFLICT")
+
+
+@dataclass(frozen=True, slots=True)
+class OutboxSubmissionDecision:
+    """Résultat local SP avant relais éventuellement cohérent vers platform."""
+
+    outbox_id: str
+    created: bool
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.outbox_id, str) or not self.outbox_id.startswith("OUTBOX-SP-"):
+            raise ValueError("outbox_id invalide")
+        if not isinstance(self.created, bool):
+            raise ValueError("created non booléen")
 
 
 class CorpusOriginalSourceStore:
@@ -224,6 +248,60 @@ class PostgresDocumentPersistence:
                 rows = cursor.fetchall()
         return tuple(_source_from_row(row) for row in rows)
 
+    def list_document_snapshots(self) -> tuple[DocumentStateSnapshot, ...]:
+        with self._connection_factory.connect() as connection:
+            with connection.transaction():
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY",
+                        (),
+                    )
+                    cursor.execute(
+                        """
+                        SELECT document_id, fingerprint, original_storage_ref, title,
+                               authors, publication_year, edition, status,
+                               quarantine_reason
+                          FROM source_processing.source_documents
+                         ORDER BY document_id
+                        """,
+                        (),
+                    )
+                    sources = tuple(_source_from_row(row) for row in cursor.fetchall())
+                return tuple(
+                    DocumentStateSnapshot(
+                        source_document=source,
+                        processing_run=self._load_processing_run(connection, source.document_id),
+                        conversion=self._load_conversion(connection, source.document_id),
+                    )
+                    for source in sources
+                )
+
+    def find_document_snapshot(
+        self,
+        document_id: DocumentId,
+    ) -> DocumentStateSnapshot | None:
+        if not isinstance(document_id, DocumentId):
+            raise ValueError("document_id invalide")
+        with self._connection_factory.connect() as connection:
+            with connection.transaction():
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY",
+                        (),
+                    )
+                source = self._find_source_in_connection(
+                    connection,
+                    "document_id = %s",
+                    (document_id.value,),
+                )
+                if source is None:
+                    return None
+                return DocumentStateSnapshot(
+                    source_document=source,
+                    processing_run=self._load_processing_run(connection, document_id),
+                    conversion=self._load_conversion(connection, document_id),
+                )
+
     def save_if_absent(self, source_document: SourceDocument) -> SourceDocument | None:
         if not isinstance(source_document, SourceDocument):
             raise ValueError("source_document invalide")
@@ -268,25 +346,30 @@ class PostgresDocumentPersistence:
         if not isinstance(document_id, DocumentId):
             raise ValueError("document_id invalide")
         with self._connection_factory.connect() as connection:
-            return self._load_processing_run(connection, document_id)
+            with connection.transaction():
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY",
+                        (),
+                    )
+                return self._load_processing_run(connection, document_id)
 
     def submit_processing_run(
         self,
         processing_run: DocumentProcessingRun,
         job_queue: Any,
         job_request: JobRequest,
-    ) -> JobSubmissionDecision:
+    ) -> OutboxSubmissionDecision:
         if not isinstance(processing_run, DocumentProcessingRun):
             raise ValueError("processing_run invalide")
-        submit_in_transaction = getattr(job_queue, "submit_in_transaction", None)
-        if not callable(submit_in_transaction):
+        if not isinstance(job_queue, PostgresJobQueue):
             raise ValueError("PERSISTENT_JOB_QUEUE_REQUIRED")
         with self._connection_factory.connect() as connection:
             with connection.transaction():
-                submission = submit_in_transaction(
-                    connection,
-                    job_request,
-                    recalculate=False,
+                submission = self._enqueue_job_outbox(
+                    connection=connection,
+                    job_request=job_request,
+                    trace_id=current_trace_id(),
                 )
                 if submission.created:
                     self._save_processing_run(connection, processing_run, insert_only=True)
@@ -299,43 +382,24 @@ class PostgresDocumentPersistence:
         if not isinstance(document_id, DocumentId):
             raise ValueError("document_id invalide")
         with self._connection_factory.connect() as connection:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT document_id, conversion_status, canonical_version_id,
-                           rejection_error_code
-                      FROM source_processing.document_conversion_requests
-                     WHERE document_id = %s
-                    """,
-                    (document_id.value,),
-                )
-                row = cursor.fetchone()
-        if row is None:
-            return None
-        return DocumentConversionState(
-            document_id=DocumentId.from_value(row[0]),
-            conversion_status=DocumentConversionStatus.from_value(row[1]),
-            canonical_version_id=row[2],
-            rejection_error_code=row[3],
-        )
+            return self._load_conversion(connection, document_id)
 
     def submit_conversion_request(
         self,
         conversion_state: DocumentConversionState,
         job_queue: Any,
         job_request: JobRequest,
-    ) -> JobSubmissionDecision:
+    ) -> OutboxSubmissionDecision:
         if not isinstance(conversion_state, DocumentConversionState):
             raise ValueError("conversion_state invalide")
-        submit_in_transaction = getattr(job_queue, "submit_in_transaction", None)
-        if not callable(submit_in_transaction):
+        if not isinstance(job_queue, PostgresJobQueue):
             raise ValueError("PERSISTENT_JOB_QUEUE_REQUIRED")
         with self._connection_factory.connect() as connection:
             with connection.transaction():
-                submission = submit_in_transaction(
-                    connection,
-                    job_request,
-                    recalculate=False,
+                submission = self._enqueue_job_outbox(
+                    connection=connection,
+                    job_request=job_request,
+                    trace_id=current_trace_id(),
                 )
                 if submission.created:
                     with connection.cursor() as cursor:
@@ -343,9 +407,9 @@ class PostgresDocumentPersistence:
                             """
                             INSERT INTO source_processing.document_conversion_requests (
                                 document_id, conversion_status, canonical_version_id,
-                                rejection_error_code, job_id
+                                rejection_error_code, submission_id, job_id
                             )
-                            VALUES (%s, %s, %s, %s, %s)
+                            VALUES (%s, %s, %s, %s, %s, NULL)
                             ON CONFLICT (document_id) DO NOTHING
                             RETURNING document_id
                             """,
@@ -354,30 +418,118 @@ class PostgresDocumentPersistence:
                                 conversion_state.conversion_status.value,
                                 conversion_state.canonical_version_id,
                                 conversion_state.rejection_error_code,
-                                submission.job.job_id,
+                                submission.outbox_id,
                             ),
                         )
                         if cursor.fetchone() is None:
                             raise RuntimeError("CONVERSION_PERSISTENCE_CONFLICT")
                 return submission
 
+    def _enqueue_job_outbox(
+        self,
+        *,
+        connection: Any,
+        job_request: JobRequest,
+        trace_id: str,
+    ) -> OutboxSubmissionDecision:
+        if not isinstance(job_request, JobRequest):
+            raise ValueError("job_request invalide")
+        identity = job_request.idempotence_key.identity_tuple()
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                ("sp-outbox|" + "|".join(identity),),
+            )
+            cursor.execute(
+                """
+                SELECT outbox_id
+                  FROM source_processing.job_outbox
+                 WHERE job_name = %s
+                   AND input_hash = %s
+                   AND configuration_hash = %s
+                   AND code_version = %s
+                   AND model_version = %s
+                 FOR UPDATE
+                """,
+                identity,
+            )
+            existing = cursor.fetchone()
+            if existing is not None:
+                return OutboxSubmissionDecision(outbox_id=existing[0], created=False)
+            cursor.execute(
+                """
+                INSERT INTO source_processing.job_outbox (
+                    job_name, priority, input_hash, configuration_hash,
+                    code_version, model_version, payload, trace_id, status
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, %s, 'pending')
+                RETURNING outbox_id
+                """,
+                (
+                    job_request.job_name,
+                    job_request.priority.value,
+                    *identity[1:],
+                    json.dumps(
+                        dict(job_request.payload), separators=(",", ":"), sort_keys=True
+                    ),
+                    trace_id,
+                ),
+            )
+            inserted = cursor.fetchone()
+        if inserted is None:
+            raise RuntimeError("JOB_OUTBOX_PERSISTENCE_FAILED")
+        return OutboxSubmissionDecision(outbox_id=inserted[0], created=True)
+
     def _find_source(self, predicate: str, parameters: tuple[Any, ...]) -> SourceDocument | None:
         with self._connection_factory.connect() as connection:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    f"""
-                    SELECT document_id, fingerprint, original_storage_ref, title,
-                           authors, publication_year, edition, status,
-                           quarantine_reason
-                      FROM source_processing.source_documents
-                     WHERE {predicate}
-                     ORDER BY document_id
-                     LIMIT 1
-                    """,
-                    parameters,
-                )
-                row = cursor.fetchone()
+            return self._find_source_in_connection(connection, predicate, parameters)
+
+    def _find_source_in_connection(
+        self,
+        connection: Any,
+        predicate: str,
+        parameters: tuple[Any, ...],
+    ) -> SourceDocument | None:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"""
+                SELECT document_id, fingerprint, original_storage_ref, title,
+                       authors, publication_year, edition, status,
+                       quarantine_reason
+                  FROM source_processing.source_documents
+                 WHERE {predicate}
+                 ORDER BY document_id
+                 LIMIT 1
+                """,
+                parameters,
+            )
+            row = cursor.fetchone()
         return None if row is None else _source_from_row(row)
+
+    def _load_conversion(
+        self,
+        connection: Any,
+        document_id: DocumentId,
+    ) -> DocumentConversionState | None:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT document_id, conversion_status, canonical_version_id,
+                       rejection_error_code
+                  FROM source_processing.document_conversion_requests
+                 WHERE document_id = %s
+                """,
+                (document_id.value,),
+            )
+            row = cursor.fetchone()
+        if row is None:
+            return None
+        return DocumentConversionState(
+            document_id=DocumentId.from_value(row[0]),
+            conversion_status=DocumentConversionStatus.from_value(row[1]),
+            canonical_version_id=row[2],
+            rejection_error_code=row[3],
+        )
 
     def _save_processing_run(
         self,
@@ -390,15 +542,18 @@ class PostgresDocumentPersistence:
             source_page_count = EXCLUDED.source_page_count,
             status = EXCLUDED.status,
             manual_review_reason = EXCLUDED.manual_review_reason,
-            blocking_policy_version = EXCLUDED.blocking_policy_version"""
+            blocking_policy_version = EXCLUDED.blocking_policy_version,
+            aggregate_version = EXCLUDED.aggregate_version
+            WHERE source_processing.document_processing_runs.aggregate_version
+                = EXCLUDED.aggregate_version - 1"""
         with connection.cursor() as cursor:
             cursor.execute(
                 f"""
                 INSERT INTO source_processing.document_processing_runs (
                     processing_run_id, document_id, source_page_count, status,
-                    manual_review_reason, blocking_policy_version
+                    manual_review_reason, blocking_policy_version, aggregate_version
                 )
-                VALUES (%s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (processing_run_id) {conflict_clause}
                 RETURNING processing_run_id
                 """,
@@ -411,10 +566,13 @@ class PostgresDocumentPersistence:
                     None
                     if processing_run.blocking_policy_version is None
                     else processing_run.blocking_policy_version.value,
+                    processing_run.aggregate_version,
                 ),
             )
             if cursor.fetchone() is None:
-                raise RuntimeError("PROCESSING_RUN_PERSISTENCE_CONFLICT")
+                if insert_only:
+                    raise RuntimeError("PROCESSING_RUN_PERSISTENCE_CONFLICT")
+                raise ProcessingRunVersionConflictError()
             for table in ("page_routes", "route_plans", "page_decisions", "page_manifest_entries"):
                 cursor.execute(
                     f"DELETE FROM source_processing.{table} WHERE processing_run_id = %s",
@@ -511,7 +669,7 @@ class PostgresDocumentPersistence:
             cursor.execute(
                 """
                 SELECT processing_run_id, document_id, source_page_count, status,
-                       manual_review_reason, blocking_policy_version
+                       manual_review_reason, blocking_policy_version, aggregate_version
                   FROM source_processing.document_processing_runs
                  WHERE document_id = %s
                  ORDER BY created_at DESC
@@ -607,6 +765,7 @@ class PostgresDocumentPersistence:
             if row[5] is None
             else RoutingPolicyVersion.from_value(row[5]),
             status=DocumentProcessingRunStatus(row[3]),
+            aggregate_version=row[6],
             events=(started,),
         )
 
@@ -630,7 +789,7 @@ class PostgresProcessingRunRepository:
         processing_run: DocumentProcessingRun,
         job_queue: Any,
         job_request: JobRequest,
-    ) -> JobSubmissionDecision:
+    ) -> OutboxSubmissionDecision:
         return self._persistence.submit_processing_run(processing_run, job_queue, job_request)
 
 
@@ -650,7 +809,7 @@ class PostgresDocumentConversionRepository:
         conversion_state: DocumentConversionState,
         job_queue: Any,
         job_request: JobRequest,
-    ) -> JobSubmissionDecision:
+    ) -> OutboxSubmissionDecision:
         return self._persistence.submit_conversion_request(conversion_state, job_queue, job_request)
 
 
@@ -780,5 +939,7 @@ __all__ = [
     "PostgresDocumentConversionRepository",
     "PostgresDocumentPersistence",
     "PostgresProcessingRunRepository",
+    "ProcessingRunVersionConflictError",
+    "OutboxSubmissionDecision",
     "build_document_persistence",
 ]

@@ -20,6 +20,7 @@ from starlette.exceptions import HTTPException as StarletteHttpException
 
 from app.platform.configuration import ApplicationConfiguration
 from app.platform.orchestrator_composition import OrchestratorCompositionRoot
+from app.platform.request_context import bind_trace_id, reset_trace_id
 from app.platform.orchestrator_contract_routers import (
     build_conversation_router,
     build_evaluation_router,
@@ -217,19 +218,23 @@ def create_orchestrator_app(
             )
             return response
         started_ns = time.perf_counter_ns()
+        trace_token = bind_trace_id(trace_id)
         try:
-            async with asyncio.timeout(configuration.runtime.timeouts.request_seconds):
-                response = await call_next(request)
-        except TimeoutError:
-            response = JSONResponse(
-                status_code=504,
-                content={"error_code": "ORCHESTRATOR_REQUEST_TIMEOUT"},
-            )
-        except Exception:
-            response = JSONResponse(
-                status_code=500,
-                content={"error_code": "ORCHESTRATOR_INTERNAL_ERROR"},
-            )
+            try:
+                async with asyncio.timeout(configuration.runtime.timeouts.request_seconds):
+                    response = await call_next(request)
+            except TimeoutError:
+                response = JSONResponse(
+                    status_code=504,
+                    content={"error_code": "ORCHESTRATOR_REQUEST_TIMEOUT"},
+                )
+            except Exception:
+                response = JSONResponse(
+                    status_code=500,
+                    content={"error_code": "ORCHESTRATOR_INTERNAL_ERROR"},
+                )
+        finally:
+            reset_trace_id(trace_token)
         _complete_traced_response(
             response=response,
             trace_id=trace_id,

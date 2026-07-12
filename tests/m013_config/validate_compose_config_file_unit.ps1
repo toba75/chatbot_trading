@@ -38,6 +38,10 @@ def runtime_command(*values: str) -> list[str]:
     return ["python", "-m", "app.platform.local_runtime", *values, *APPLICATION_CONFIG_ARGUMENTS]
 
 
+def document_worker_command() -> list[str]:
+    return ["python", "-m", "app.source_processing.adapters.worker_runtime", "--worker-id", "worker-documents-1", "--lease-seconds", "120", "--poll-seconds", "0.5", *APPLICATION_CONFIG_ARGUMENTS]
+
+
 BASE_SERVICES = {
     "edge-gateway": {
         "image": "caddy@sha256:" + "a" * 64,
@@ -116,7 +120,7 @@ BASE_SERVICES = {
     },
     "worker-documents": {
         "image": "ostrading/worker-documents:0.0.0-m002",
-        "command": runtime_command("run-worker", "worker-documents"),
+        "command": document_worker_command(),
         "networks": ["core"],
         "volumes": [
             "corpus-data:/workspace/corpus",

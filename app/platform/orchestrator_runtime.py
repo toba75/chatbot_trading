@@ -115,9 +115,7 @@ def build_orchestrator_composition_root(
         model_version=f"pypdf-{version('pypdf')}",
     )
     document_queries = DocumentQueryService(
-        source_document_repository=persistence.source_document_repository,
-        processing_run_repository=persistence.processing_run_repository,
-        document_conversion_repository=persistence.document_conversion_repository,
+        document_snapshot_repository=persistence.source_document_repository,
     )
     original_queries = OriginalPdfQueryService(
         source_document_repository=persistence.source_document_repository,

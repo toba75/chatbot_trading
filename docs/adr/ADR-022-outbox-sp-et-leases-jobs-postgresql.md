@@ -64,7 +64,7 @@ Les lectures d'une tentative étaient également composées par plusieurs requê
 - Spécification : `docs/specs/m013_fastapi_api_orchestratrice.md`; DDD-ADR-008.
 - Plan d'implémentation : `docs/tasks/milestone_013-fastapi/0005_partager_etat_documentaire_durable.md` à `0007_lire_diagnostic_conversion.md`.
 - Tests d'acceptation : `tests/m013_fastapi/validate_document_worker_runtime_acceptance.ps1`; `tests/m013_fastapi/validate_document_worker_live.ps1`.
-- Commits : RED à renseigner; GREEN à renseigner.
+- Commits : RED `d9f73943f`; GREEN à renseigner après validation finale.
 
 ## Notes
 

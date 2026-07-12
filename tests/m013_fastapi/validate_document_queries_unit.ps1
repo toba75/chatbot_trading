@@ -20,6 +20,7 @@ from app.source_processing.application.document_queries import (
     ConversionNotRequestedError,
     DiagnosticNotRequestedError,
     DocumentQueryService,
+    DocumentStateSnapshot,
     SourceNotFoundError,
 )
 from app.source_processing.domain.document_processing_run import (
@@ -75,6 +76,26 @@ class ConversionRepository:
 
     def find_conversion_by_document_id(self, document_id):
         return self.conversions.get(document_id.value)
+
+
+class SnapshotRepository:
+    def __init__(self, sources, runs, conversions):
+        self.sources = sources
+        self.runs = runs
+        self.conversions = conversions
+
+    def list_document_snapshots(self):
+        return tuple(self.find_document_snapshot(document.document_id) for document in self.sources.list_documents())
+
+    def find_document_snapshot(self, document_id):
+        source = self.sources.find_by_document_id(document_id)
+        if source is None:
+            return None
+        return DocumentStateSnapshot(
+            source_document=source,
+            processing_run=self.runs.find_by_document_id(document_id),
+            conversion=self.conversions.find_conversion_by_document_id(document_id),
+        )
 
 
 def source(label):
@@ -166,9 +187,11 @@ conversion = DocumentConversionState(
     rejection_error_code=None,
 )
 service = DocumentQueryService(
-    source_document_repository=SourceRepository((document, source_only)),
-    processing_run_repository=ProcessingRepository((processing,)),
-    document_conversion_repository=ConversionRepository((conversion,)),
+    document_snapshot_repository=SnapshotRepository(
+        SourceRepository((document, source_only)),
+        ProcessingRepository((processing,)),
+        ConversionRepository((conversion,)),
+    ),
 )
 
 # La projection du corpus vient uniquement des absences ou états réels des repositories.

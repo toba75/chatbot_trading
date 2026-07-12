@@ -9,6 +9,7 @@ from tempfile import TemporaryDirectory
 
 from app.platform.configuration import load_application_configuration
 from app.platform.job_runtime import (
+    JOB_RUNTIME_CATALOG,
     JobIdempotenceKey,
     JobPriority,
     JobRecord,
@@ -17,8 +18,10 @@ from app.platform.job_runtime import (
     JobSubmissionDecision,
 )
 from app.platform.job_runtime.postgres import PostgresJobQueue
+from app.platform.request_context import bind_trace_id, reset_trace_id
 from app.source_processing.adapters.postgres_document_persistence import (
     CorpusOriginalSourceStore,
+    OutboxSubmissionDecision,
     PostgresDocumentPersistence,
     build_document_persistence,
 )
@@ -135,6 +138,10 @@ class ConnectionFactory:
 
 
 class FailingPersistence(PostgresDocumentPersistence):
+    def _enqueue_job_outbox(self, *, connection, job_request, trace_id):
+        assert trace_id == "TRACE-M13-PERSISTENCE-UNIT"
+        return OutboxSubmissionDecision(outbox_id="OUTBOX-SP-0000000001", created=True)
+
     def _save_processing_run(self, connection, processing_run, *, insert_only=False):
         raise RuntimeError("PROCESSING_RUN_PERSISTENCE_FAILED")
 
@@ -177,16 +184,20 @@ transaction_state = TransactionState()
 failing_persistence = FailingPersistence(
     connection_factory=ConnectionFactory(transaction_state)
 )
+queue = PostgresJobQueue(
+    connection_factory=ConnectionFactory(transaction_state),
+    catalog=JOB_RUNTIME_CATALOG,
+)
+trace_token = bind_trace_id("TRACE-M13-PERSISTENCE-UNIT")
 try:
-    failing_persistence.submit_processing_run(
-        processing_run,
-        TransactionalQueue(),
-        request,
-    )
-except RuntimeError as exc:
-    assert str(exc) == "PROCESSING_RUN_PERSISTENCE_FAILED"
-else:
-    raise AssertionError("Échec de persistance attendu absent")
+    try:
+        failing_persistence.submit_processing_run(processing_run, queue, request)
+    except RuntimeError as exc:
+        assert str(exc) == "PROCESSING_RUN_PERSISTENCE_FAILED"
+    else:
+        raise AssertionError("Échec de persistance attendu absent")
+finally:
+    reset_trace_id(trace_token)
 assert transaction_state.rolled_back is True
 assert transaction_state.committed is False
 

@@ -62,7 +62,7 @@ foreach ($marker in @("job_outbox", "PROCESSING_RUN_VERSION_CONFLICT", "REPEATAB
     if (-not $persistence.Contains($marker)) { throw "Garantie SP absente: $marker" }
 }
 
-$runtime = Get-Content -Raw -Encoding UTF8 (Join-Path $repoRoot "app\platform\local_runtime.py")
+$runtime = Get-Content -Raw -Encoding UTF8 (Join-Path $repoRoot "app\source_processing\adapters\worker_runtime.py")
 if ($runtime.Contains("threading.Event().wait()")) {
     throw "worker-documents attend encore sans consommer la file."
 }

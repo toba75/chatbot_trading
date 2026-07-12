@@ -30,9 +30,15 @@ function Start-Postgres {
         --env POSTGRES_DB=app --env POSTGRES_USER=app --env POSTGRES_PASSWORD=m13-migration-password `
         --publish "127.0.0.1:${port}:5432" --volume "${volume}:/var/lib/postgresql/data" $image
     if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($id)) { throw "POSTGRES_DOCKER_START_FAILED" }
+    $consecutiveReady = 0
     for ($attempt = 0; $attempt -lt 120; $attempt++) {
         & docker exec $container pg_isready -U app -d app *> $null
-        if ($LASTEXITCODE -eq 0) { return }
+        if ($LASTEXITCODE -eq 0) {
+            $consecutiveReady += 1
+            if ($consecutiveReady -eq 3) { return }
+        } else {
+            $consecutiveReady = 0
+        }
         Start-Sleep -Milliseconds 500
     }
     throw "POSTGRES_DOCKER_NOT_READY"
@@ -80,10 +86,11 @@ with factory.connect() as connection:
         assert cursor.fetchall() == [
             (1, "001_document_persistence.sql"),
             (2, "002_knowledge_projection_read_models.sql"),
+            (3, "003_document_worker_runtime.sql"),
         ]
         cursor.execute("SELECT to_regclass('knowledge_access.knowledge_projections')", ())
         assert cursor.fetchone() == ("knowledge_access.knowledge_projections",)
-print("upgrade-volume-pre-M13=schema-002; ledger=idempotent; lock=advisory")
+print("upgrade-volume-pre-M13=schema-003; ledger=idempotent; lock=advisory")
 '@ | & $python -B -
     if ($LASTEXITCODE -ne 0) { throw "POSTGRES_MIGRATION_UPGRADE_FAILED" }
 }

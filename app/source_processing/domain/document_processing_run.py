@@ -823,6 +823,7 @@ class DocumentProcessingRun:
     manual_review_reason: str | None
     blocking_policy_version: RoutingPolicyVersion | None
     status: DocumentProcessingRunStatus
+    aggregate_version: int
     events: tuple[
         DocumentProcessingStarted
         | PageDiagnosticRecorded
@@ -858,6 +859,7 @@ class DocumentProcessingRun:
             manual_review_reason=None,
             blocking_policy_version=None,
             status=DocumentProcessingRunStatus.MANIFEST_CREATED,
+            aggregate_version=0,
             events=(started_event,),
         )
 
@@ -898,6 +900,7 @@ class DocumentProcessingRun:
             manual_review_reason=None,
             blocking_policy_version=None,
             status=DocumentProcessingRunStatus.DIAGNOSED,
+            aggregate_version=self.aggregate_version + 1,
             events=self.events + diagnostic_events,
         )
 
@@ -932,6 +935,7 @@ class DocumentProcessingRun:
                 manual_review_reason=manual_review_event.reason,
                 blocking_policy_version=manual_review_event.routing_policy_version,
                 status=DocumentProcessingRunStatus.MANUAL_REVIEW,
+                aggregate_version=self.aggregate_version + 1,
                 events=self.events + (manual_review_event,),
             )
 
@@ -956,6 +960,7 @@ class DocumentProcessingRun:
             manual_review_reason=None,
             blocking_policy_version=None,
             status=DocumentProcessingRunStatus.ROUTE_PLANNED,
+            aggregate_version=self.aggregate_version + 1,
             events=self.events + route_events,
         )
 
@@ -990,6 +995,7 @@ class DocumentProcessingRun:
             manual_review_reason=quarantined_event.reason,
             blocking_policy_version=quarantined_event.routing_policy_version,
             status=DocumentProcessingRunStatus.QUARANTINED,
+            aggregate_version=self.aggregate_version + 1,
             events=self.events + (quarantined_event,),
         )
 
@@ -1020,6 +1026,7 @@ class DocumentProcessingRun:
             manual_review_reason=rejected_event.reason,
             blocking_policy_version=rejected_event.routing_policy_version,
             status=DocumentProcessingRunStatus.REJECTED,
+            aggregate_version=self.aggregate_version + 1,
             events=self.events + (rejected_event,),
         )
 
@@ -1048,6 +1055,12 @@ class DocumentProcessingRun:
         )
         if not isinstance(self.status, DocumentProcessingRunStatus):
             raise ValueError("document_processing_run_status invalide")
+        if (
+            isinstance(self.aggregate_version, bool)
+            or not isinstance(self.aggregate_version, int)
+            or self.aggregate_version < 0
+        ):
+            raise ValueError("aggregate_version invalide")
         if not isinstance(self.events, tuple):
             raise ValueError("events DocumentProcessingRun non tuple")
         if len(self.events) == 0:

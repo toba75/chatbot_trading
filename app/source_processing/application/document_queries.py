@@ -47,6 +47,26 @@ class DocumentConversionReadRepository(Protocol):
         """Retourne l'état persistant de conversion du document."""
 
 
+@dataclass(frozen=True, slots=True)
+class DocumentStateSnapshot:
+    """Snapshot cohérent du parent SP et de ses sorties persistées."""
+
+    source_document: SourceDocument
+    processing_run: DocumentProcessingRun | None
+    conversion: DocumentConversionState | None
+
+
+class DocumentSnapshotRepository(Protocol):
+    def list_document_snapshots(self) -> tuple[DocumentStateSnapshot, ...]:
+        """Retourne tous les états sous un même snapshot transactionnel."""
+
+    def find_document_snapshot(
+        self,
+        document_id: DocumentId,
+    ) -> DocumentStateSnapshot | None:
+        """Retourne le parent et ses enfants depuis un même snapshot."""
+
+
 class DiagnosticNotRequestedError(ValueError):
     """Erreur publique produite quand aucune tentative persistée n'existe."""
 
@@ -158,56 +178,39 @@ class DocumentQueryService:
     def __init__(
         self,
         *,
-        source_document_repository: SourceDocumentReadRepository,
-        processing_run_repository: ProcessingRunReadRepository,
-        document_conversion_repository: DocumentConversionReadRepository,
+        document_snapshot_repository: DocumentSnapshotRepository,
     ) -> None:
-        if not callable(getattr(source_document_repository, "list_documents", None)):
-            raise ValueError("source_document_repository sans liste documentaire")
-        if not callable(getattr(source_document_repository, "find_by_document_id", None)):
-            raise ValueError("source_document_repository sans lecture par document_id")
-        if not callable(getattr(processing_run_repository, "find_by_document_id", None)):
-            raise ValueError("processing_run_repository sans lecture par document_id")
-        if not callable(
-            getattr(document_conversion_repository, "find_conversion_by_document_id", None)
-        ):
-            raise ValueError("document_conversion_repository sans lecture par document_id")
-        self._source_document_repository = source_document_repository
-        self._processing_run_repository = processing_run_repository
-        self._document_conversion_repository = document_conversion_repository
+        if not callable(getattr(document_snapshot_repository, "list_document_snapshots", None)):
+            raise ValueError("document_snapshot_repository sans liste")
+        if not callable(getattr(document_snapshot_repository, "find_document_snapshot", None)):
+            raise ValueError("document_snapshot_repository sans lecture")
+        self._document_snapshot_repository = document_snapshot_repository
 
     def list_documents(self) -> DocumentCorpusView:
-        documents = tuple(self._source_document_repository.list_documents())
-        parsed_documents = tuple(_ensure_source_document(document) for document in documents)
+        snapshots = tuple(self._document_snapshot_repository.list_document_snapshots())
         items = tuple(
-            self._corpus_item(document)
-            for document in sorted(
-                parsed_documents,
-                key=lambda candidate: candidate.document_id.value,
+            self._corpus_item(snapshot)
+            for snapshot in sorted(
+                snapshots,
+                key=lambda candidate: candidate.source_document.document_id.value,
             )
         )
         return DocumentCorpusView(documents=items)
 
     def read_diagnostic(self, document_id: str) -> DocumentDiagnosticView:
         parsed_document_id = DocumentId.from_value(document_id)
-        self._require_source(parsed_document_id)
-        processing_run = self._processing_run_repository.find_by_document_id(
-            parsed_document_id
-        )
-        if processing_run is None:
+        snapshot = self._require_snapshot(parsed_document_id)
+        if snapshot.processing_run is None:
             raise DiagnosticNotRequestedError(parsed_document_id.value)
-        parsed_processing_run = _ensure_processing_run(processing_run)
+        parsed_processing_run = _ensure_processing_run(snapshot.processing_run)
         return _diagnostic_view(parsed_processing_run)
 
     def read_conversion(self, document_id: str) -> DocumentConversionView:
         parsed_document_id = DocumentId.from_value(document_id)
-        self._require_source(parsed_document_id)
-        conversion = self._document_conversion_repository.find_conversion_by_document_id(
-            parsed_document_id
-        )
-        if conversion is None:
+        snapshot = self._require_snapshot(parsed_document_id)
+        if snapshot.conversion is None:
             raise ConversionNotRequestedError(parsed_document_id.value)
-        parsed_conversion = _ensure_conversion_state(conversion)
+        parsed_conversion = _ensure_conversion_state(snapshot.conversion)
         return DocumentConversionView(
             document_id=parsed_conversion.document_id.value,
             conversion_status=parsed_conversion.conversion_status.value,
@@ -215,18 +218,17 @@ class DocumentQueryService:
             canonical_version_id=parsed_conversion.canonical_version_id,
         )
 
-    def _require_source(self, document_id: DocumentId) -> SourceDocument:
-        source = self._source_document_repository.find_by_document_id(document_id)
-        if source is None:
+    def _require_snapshot(self, document_id: DocumentId) -> DocumentStateSnapshot:
+        snapshot = self._document_snapshot_repository.find_document_snapshot(document_id)
+        if snapshot is None:
             raise SourceNotFoundError(document_id.value)
-        return _ensure_source_document(source)
+        return snapshot
 
-    def _corpus_item(self, source_document: SourceDocument) -> DocumentCorpusItem:
+    def _corpus_item(self, snapshot: DocumentStateSnapshot) -> DocumentCorpusItem:
+        source_document = _ensure_source_document(snapshot.source_document)
         document_id = source_document.document_id
-        processing_run = self._processing_run_repository.find_by_document_id(document_id)
-        conversion = self._document_conversion_repository.find_conversion_by_document_id(
-            document_id
-        )
+        processing_run = snapshot.processing_run
+        conversion = snapshot.conversion
         parsed_processing_run = (
             None if processing_run is None else _ensure_processing_run(processing_run)
         )
@@ -366,6 +368,8 @@ __all__ = [
     "DocumentCorpusView",
     "DocumentDiagnosticView",
     "DocumentQueryService",
+    "DocumentSnapshotRepository",
+    "DocumentStateSnapshot",
     "PageDiagnosticView",
     "PageManifestEntryView",
     "PageRouteView",

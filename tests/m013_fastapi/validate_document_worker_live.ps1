@@ -96,6 +96,9 @@ origin = os.environ["M13_WORKER_LIVE_ORIGIN"]
 config_path = Path(os.environ["M13_WORKER_LIVE_CONFIG"])
 python = os.environ["M13_WORKER_LIVE_PYTHON"]
 repo = os.environ["M13_WORKER_LIVE_REPO"]
+runtime_root = os.environ["M13_WORKER_LIVE_ROOT"]
+worker_environment = dict(os.environ)
+worker_environment["PYTHONPATH"] = repo
 
 
 def request(path, *, method="GET", data=None, headers=None):
@@ -133,16 +136,17 @@ def register_and_diagnose(index):
 
 
 documents = [register_and_diagnose(index) for index in range(1, 4)]
+os.chdir(runtime_root)
 configuration = load_application_configuration(config_path, environment_snapshot={})
 adapters = build_document_persistence(configuration)
 assert isinstance(adapters.job_queue, PostgresJobQueue)
 
 # Deux processus réclament deux jobs concurrents; SKIP LOCKED interdit un double claim actif.
 commands = [
-    [python, "-B", "-m", "app.platform.local_runtime", "run-worker", "worker-documents", "--config", str(config_path), "--max-jobs", "1", "--worker-id", owner, "--lease-seconds", "5"]
+    [python, "-B", "-m", "app.source_processing.adapters.worker_runtime", "--config", str(config_path), "--max-jobs", "1", "--worker-id", owner, "--lease-seconds", "5", "--poll-seconds", "0.1"]
     for owner in ("LIVE-WORKER-A", "LIVE-WORKER-B")
 ]
-processes = [subprocess.Popen(command, cwd=repo, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True) for command in commands]
+processes = [subprocess.Popen(command, cwd=runtime_root, env=worker_environment, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True) for command in commands]
 for process in processes:
     stdout, stderr = process.communicate(timeout=30)
     assert process.returncode == 0, (stdout, stderr)
@@ -152,8 +156,8 @@ claimed = adapters.job_queue.claim_next(owner_id="LIVE-CRASHED", lease_seconds=1
 assert claimed is not None
 time.sleep(1.2)
 recovery = subprocess.run(
-    [python, "-B", "-m", "app.platform.local_runtime", "run-worker", "worker-documents", "--config", str(config_path), "--max-jobs", "1", "--worker-id", "LIVE-RECOVERY", "--lease-seconds", "5"],
-    cwd=repo, capture_output=True, text=True, timeout=30,
+    [python, "-B", "-m", "app.source_processing.adapters.worker_runtime", "--config", str(config_path), "--max-jobs", "1", "--worker-id", "LIVE-RECOVERY", "--lease-seconds", "5", "--poll-seconds", "0.1"],
+    cwd=runtime_root, env=worker_environment, capture_output=True, text=True, timeout=30,
 )
 assert recovery.returncode == 0, (recovery.stdout, recovery.stderr)
 

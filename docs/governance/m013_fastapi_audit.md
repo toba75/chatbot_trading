@@ -18,7 +18,7 @@
 | Contrôle | Preuve attendue | Verdict |
 |---|---|---|
 | Runtime public unique | Compose exécute `uv run --no-sync api`; aucune commande `local_runtime` pour `orchestrator-api` | Couvert par la gate |
-| PostgreSQL réel | Conteneur PostgreSQL épinglé, upgrade d'un volume pré-M13, ledger SHA-256 et readiness dynamique du schéma 002 | Couvert par la gate live |
+| PostgreSQL réel | Conteneur PostgreSQL épinglé, upgrade d'un volume pré-M13, ledger SHA-256 et readiness dynamique du schéma 003 | Couvert par la gate live |
 | Budgets M13-config | connexion/startup 120 s, requête/healthcheck 300 s, arrêt Uvicorn/Compose 30 s | Couvert par tests runtime et Compose |
 | Erreurs infrastructure | JSON public `error_code`, `X-Trace-ID` et log JSON sans secret, y compris exception, timeout et trace invalide | Couvert par test runtime |
 | PDF réel | PDF valide produit avec `pypdf`, transmis multipart, hash identique à la restitution | Couvert par la gate live |
@@ -65,10 +65,10 @@ La preuve live utilise Docker Engine, PostgreSQL, Uvicorn et HTTP réels. Aucun 
 
 - Décision applicable : ADR-021.
 - Commits : RED `3c4159a86`, `test(runtime): couvrir migrations et budgets ADR-021`; GREEN `439b4336f`, `feat(runtime): fiabiliser demarrage et migrations ADR-021`.
-- Scénarios : upgrade d'un volume pré-M13 vers le schéma 002; revalidation dynamique après démarrage; timeouts configurés; rollback des ressources partielles; réponses infrastructure traçables; timeout de lecture UI traduit sans fallback.
-- Version livrée : image `ostrading/orchestrator-api:0.1.0-m013-fastapi-schema-002`, migrations `001` et `002`, ledger `platform.schema_migrations`.
+- Scénarios : upgrade d'un volume pré-M13 vers le schéma 003; revalidation dynamique après démarrage; timeouts configurés; rollback des ressources partielles; réponses infrastructure traçables; timeout de lecture UI traduit sans fallback.
+- Version livrée : image `ostrading/orchestrator-api:0.1.0-m013-fastapi-schema-003`, migrations `001`, `002` et `003`, ledger `platform.schema_migrations`.
 - Le contrat historique `GET /` n'existe pas dans les tests publics de `master`; aucune rupture d'alias n'est introduite ni documentée comme API publique.
-- Rollback : uniquement vers une image explicitement compatible avec le ledger 002, sans suppression de volume ni migration descendante implicite.
+- Rollback : uniquement vers une image explicitement compatible avec le ledger 003, sans suppression de volume ni migration descendante implicite.
 
 ## Correctif de revue sécurité HTTP
 

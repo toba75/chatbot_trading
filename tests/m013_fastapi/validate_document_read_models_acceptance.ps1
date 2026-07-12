@@ -22,7 +22,7 @@ from app.source_processing.application.document_commands import (
     DocumentConversionState,
     DocumentConversionStatus,
 )
-from app.source_processing.application.document_queries import DocumentQueryService
+from app.source_processing.application.document_queries import DocumentQueryService, DocumentStateSnapshot
 from app.source_processing.domain.document_processing_run import (
     DiagnosticVersion,
     DocumentProcessingRun,
@@ -76,6 +76,26 @@ class ConversionRepository:
 
     def find_conversion_by_document_id(self, document_id):
         return self.conversions.get(document_id.value)
+
+
+class SnapshotRepository:
+    def __init__(self, sources, runs, conversions):
+        self.sources = sources
+        self.runs = runs
+        self.conversions = conversions
+
+    def list_document_snapshots(self):
+        return tuple(self.find_document_snapshot(document.document_id) for document in self.sources.list_documents())
+
+    def find_document_snapshot(self, document_id):
+        source = self.sources.find_by_document_id(document_id)
+        if source is None:
+            return None
+        return DocumentStateSnapshot(
+            source_document=source,
+            processing_run=self.runs.find_by_document_id(document_id),
+            conversion=self.conversions.find_conversion_by_document_id(document_id),
+        )
 
 
 class ReadyDependency:
@@ -235,18 +255,17 @@ async def scenario(repo_root):
     rejected_processing = routed_run(rejected, "REJECTED")
 
     query_service = DocumentQueryService(
-        source_document_repository=SourceRepository(
-            (source_only, requested, routed, accepted, rejected)
-        ),
-        processing_run_repository=ProcessingRepository(
+        document_snapshot_repository=SnapshotRepository(
+            SourceRepository((source_only, requested, routed, accepted, rejected)),
+            ProcessingRepository(
             (
                 requested_processing,
                 routed_processing,
                 accepted_processing,
                 rejected_processing,
             )
-        ),
-        document_conversion_repository=ConversionRepository(
+            ),
+            ConversionRepository(
             (
                 DocumentConversionState(
                     document_id=accepted.document_id,
@@ -261,6 +280,7 @@ async def scenario(repo_root):
                     rejection_error_code="PAGE_AUTHORITY_MISSING",
                 ),
             )
+            ),
         ),
     )
     configuration = load_application_configuration(
