@@ -28,6 +28,7 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 | [ADR-020](ADR-020-frontiere-http-binaire-bornee.md) | Frontière HTTP binaire bornée | Acceptée | 2026-07-12 | Aucun | Aucune |
 | [ADR-021](ADR-021-migrations-postgresql-au-demarrage.md) | Migrations PostgreSQL versionnées avant readiness | Acceptée | 2026-07-12 | Aucun | Aucune |
 | [ADR-022](ADR-022-outbox-sp-et-leases-jobs-postgresql.md) | Outbox SP et leases de jobs PostgreSQL | Acceptée | 2026-07-12 | Aucun | Aucune |
+| [ADR-023](ADR-023-version-optimiste-agregats-postgresql.md) | Version optimiste des agrégats PostgreSQL | Acceptée | 2026-07-13 | Aucun | Aucune |
 
 ## ADR DDD
 
@@ -49,7 +50,7 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 ## Prochains numéros disponibles
 
 ```text
-Prochaine ADR technique: ADR-023
+Prochaine ADR technique: ADR-024
 Prochaine DDD-ADR: DDD-ADR-013
 ```
 

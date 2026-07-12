@@ -69,3 +69,5 @@ Les lectures d'une tentative étaient également composées par plusieurs requê
 ## Notes
 
 Cette ADR applique DDD-ADR-008 sans la remplacer : la transaction forte reste locale à SP, puis la synchronisation vers `platform` est éventuellement cohérente et idempotente.
+
+Mise en conformité du 2026-07-13 : `worker-documents` renouvelle désormais la lease pendant tout le diagnostic, sérialise le renouvellement avec la transition terminale, classe les erreurs transitoires et permanentes, borne l'inspection pypdf par taille, pages, temps, texte et objets, puis publie l'échec terminal dans l'état SP. Les preuves sont `validate_worker_data_resilience_acceptance.ps1` et `validate_document_worker_live.ps1`; commits RED `7b7912f09` et GREEN `9d17bc129`. Cette note réalise les obligations existantes sans changer la décision.
