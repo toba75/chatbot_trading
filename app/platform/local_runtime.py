@@ -1131,21 +1131,10 @@ def _run_worker(
 ) -> None:
     _required_application_configuration(application_configuration)
     _require_worker_service(service_id)
-    if service_id != "worker-documents":
-        raise RuntimeError(f"WORKER_EXECUTION_NOT_IMPLEMENTED:{service_id}")
-    if not isinstance(owner_id, str) or owner_id.strip() == "" or owner_id != owner_id.strip():
-        raise ValueError("owner_id worker invalide")
-    if isinstance(lease_seconds, bool) or not isinstance(lease_seconds, int) or lease_seconds < 1:
-        raise ValueError("lease_seconds worker invalide")
-    if isinstance(poll_seconds, bool) or not isinstance(poll_seconds, (int, float)) or poll_seconds <= 0:
-        raise ValueError("poll_seconds worker invalide")
-    if max_jobs is not None and (
-        isinstance(max_jobs, bool) or not isinstance(max_jobs, int) or max_jobs < 1
-    ):
-        raise ValueError("max_jobs worker invalide")
-
+    if service_id == "worker-documents":
+        raise RuntimeError("DOCUMENT_WORKER_COMMAND_REQUIRED")
     del owner_id, lease_seconds, poll_seconds, max_jobs
-    raise RuntimeError("DOCUMENT_WORKER_COMMAND_REQUIRED")
+    threading.Event().wait()
 
 
 def _require_worker_service(service_id: str) -> None:
