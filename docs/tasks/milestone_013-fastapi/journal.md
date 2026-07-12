@@ -177,6 +177,7 @@
 - Migration : `007_job_outbox_context_boundary.sql` supprime la clé étrangère interschéma, ajoute la lease de relais et l'identité SHA-256 de consommation plateforme; l'upgrade 006 vers 007 et sa réexécution sont GREEN.
 - Commit RED : `9afe600cf`, `test(worker): couvrir frontière transactionnelle outbox ADR-024`.
 - Commit GREEN : `db9ad998b`, `feat(worker): séparer relais SP et plateforme ADR-024`.
+- Garde globale : RED `618b77a46`, GREEN `669265460`; la migration supprime aussi la clé étrangère historique de `document_conversion_requests` vers `platform.technical_jobs`.
 - Preuves : unité crash/redélivrance, deux relais PostgreSQL concurrents, crash après commit avant ACK, conflit divergent `JOB_RELAY_MESSAGE_CONFLICT`, absence de clé étrangère interschéma, diagnostics réels et `trace_id` préservé.
 - Validations : gate M13-FastAPI Static `31/31` GREEN; frontière d'imports `215` fichiers et `1419` imports GREEN; tests live outbox, migration et worker GREEN.
 - Hors périmètre : aucune modification du pipeline `CanonicalSourcePublished`, de Docling ou des diagnostics PDF réels.

@@ -68,7 +68,7 @@ Un crash après la création du job et avant l'acquittement SP doit être tolér
 - Spécifications : `docs/specs/m013_fastapi_api_orchestratrice.md`; DDD-ADR-008; ADR-021; ADR-023.
 - Plan d'implémentation : `docs/tasks/milestone_013-fastapi/0005_partager_etat_documentaire_durable.md` à `0007_lire_diagnostic_conversion.md`; correctif de revue itération 2.
 - Tests d'acceptation : `tests/m013_fastapi/validate_job_outbox_boundary_acceptance.ps1`; `tests/m013_fastapi/validate_job_outbox_boundary_live.ps1`; `tests/m013_fastapi/validate_document_worker_live.ps1`; `tests/m013_fastapi/validate_postgres_migration_upgrade_live.ps1`.
-- Commits : RED `9afe600cf`; GREEN `db9ad998b`.
+- Commits : RED `9afe600cf`; GREEN `db9ad998b`; RED de garde globale `618b77a46`; GREEN `669265460`.
 
 ## Notes
 
