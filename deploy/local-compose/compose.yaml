@@ -293,7 +293,7 @@ services:
         limits:
           cpus: "2.0"
           memory: 2G
-    pids_limit: 256
+          pids: 256
     command:
       - python
       - -m
