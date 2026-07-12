@@ -123,9 +123,11 @@ pdf_path = root / "preuve-reelle.pdf"
 writer = PdfWriter()
 writer.add_blank_page(width=595, height=842)
 writer.add_metadata({"/Title": "Preuve live M13-FastAPI", "/Author": "OSTrading"})
+writer.add_attachment("preuve-plus-un-mio.bin", b"x" * (1024 * 1024 + 4096))
 with pdf_path.open("wb") as stream:
     writer.write(stream)
 pdf_bytes = pdf_path.read_bytes()
+assert len(pdf_bytes) > 1024 * 1024, len(pdf_bytes)
 
 def request(path, *, method="GET", data=None, headers=None):
     req = urllib.request.Request(origin + path, method=method, data=data, headers=headers or {})

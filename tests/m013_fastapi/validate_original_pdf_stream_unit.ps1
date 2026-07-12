@@ -94,7 +94,16 @@ async def invoke_router(router, path):
     return start, headers, body_messages
 
 
-pdf = b"%PDF-1.7\nstream-controle\n%%EOF\n"
+async def invoke_concurrently(router, path):
+    return await asyncio.gather(
+        invoke_router(router, path),
+        invoke_router(router, path),
+        invoke_router(router, path),
+    )
+
+
+pdf = b"%PDF-1.7\n" + (b"stream-controle\n" * 70000) + b"%%EOF\n"
+assert len(pdf) > 1024 * 1024
 fingerprint = SourceFingerprint.from_content(pdf)
 document_id = DocumentId.from_fingerprint(fingerprint)
 
@@ -120,11 +129,14 @@ with TemporaryDirectory() as temporary_directory:
     )
 
     original = service.read_original(document_id.value)
-    assert original.content == pdf
     assert original.source_sha256 == fingerprint.value
     assert original.content_length == len(pdf)
     assert original.public_filename == f"{document_id.value}.pdf"
     assert repository.requested_ids == [document_id]
+    chunks = tuple(original.content_chunks)
+    assert b"".join(chunks) == pdf
+    assert len(chunks) > 1
+    assert max(map(len, chunks)) <= 64 * 1024
 
     not_found = assert_raises(
         SourceNotFoundError,
@@ -144,10 +156,23 @@ with TemporaryDirectory() as temporary_directory:
     assert headers["content-disposition"] == f'inline; filename="{document_id.value}.pdf"'
     assert headers["etag"] == f'"{fingerprint.value}"'
     assert b"".join(message.get("body", b"") for message in body_messages) == pdf
+    streamed_messages = [message for message in body_messages if message.get("body", b"")]
+    assert len(streamed_messages) > 1
+    assert max(len(message["body"]) for message in streamed_messages) <= 64 * 1024
     assert any(message.get("more_body") is True for message in body_messages)
     assert body_messages[-1].get("more_body") is False
     assert temporary_directory not in str(headers)
     assert source_document.metadata.title not in str(headers)
+
+    concurrent = asyncio.run(
+        invoke_concurrently(
+            application,
+            f"/v1/documents/{document_id.value}/original",
+        )
+    )
+    for concurrent_start, _, concurrent_messages in concurrent:
+        assert concurrent_start["status"] == 200
+        assert b"".join(message.get("body", b"") for message in concurrent_messages) == pdf
 
     # Même si un objet typé est corrompu hors du domaine, l'adaptateur refuse toute sortie du corpus.
     forged_ref = OriginalStorageRef.from_value(storage_ref)
@@ -181,6 +206,12 @@ with TemporaryDirectory() as temporary_directory:
         "error_code": "ORIGINAL_HASH_MISMATCH",
         "document_id": document_id.value,
     }
+
+    persistence_source = (
+        Path(sys.argv[1])
+        / "app/source_processing/adapters/postgres_document_persistence.py"
+    ).read_text(encoding="utf-8")
+    assert "read_bytes()" not in persistence_source
 
 print("Tests unitaires du streaming PDF original contrôlé: OK")
 '@

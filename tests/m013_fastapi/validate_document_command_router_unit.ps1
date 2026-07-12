@@ -15,6 +15,7 @@ import sys
 sys.path.insert(0, sys.argv[1])
 
 from fastapi import FastAPI
+from app.platform.orchestrator_asgi import BoundedRequestBodyMiddleware
 from app.source_processing.adapters.http import build_document_command_router
 from app.source_processing.adapters.document_http import SourceProcessingHttpAdapter
 from app.source_processing.application.document_commands import (
@@ -53,20 +54,40 @@ def multipart(*, boundary, content, fields, content_type="application/pdf"):
     return b"".join(chunks)
 
 
-async def post(application, path, body, content_type):
+async def post(
+    application,
+    path,
+    body,
+    content_type,
+    *,
+    include_content_length=True,
+    receive_chunk_bytes=None,
+    receive_calls=None,
+):
     sent = []
-    delivered = False
+    offset = 0
 
     async def receive():
-        nonlocal delivered
-        if delivered:
+        nonlocal offset
+        if receive_calls is not None:
+            receive_calls.append(offset)
+        if offset >= len(body):
             return {"type": "http.disconnect"}
-        delivered = True
-        return {"type": "http.request", "body": body, "more_body": False}
+        chunk_size = receive_chunk_bytes or len(body)
+        chunk = body[offset : offset + chunk_size]
+        offset += len(chunk)
+        return {
+            "type": "http.request",
+            "body": chunk,
+            "more_body": offset < len(body),
+        }
 
     async def send(message):
         sent.append(message)
 
+    headers = [(b"content-type", content_type.encode("ascii"))]
+    if include_content_length:
+        headers.append((b"content-length", str(len(body)).encode("ascii")))
     await application(
         {
             "type": "http",
@@ -78,10 +99,7 @@ async def post(application, path, body, content_type):
             "raw_path": path.encode("ascii"),
             "query_string": b"",
             "root_path": "",
-            "headers": [
-                (b"content-type", content_type.encode("ascii")),
-                (b"content-length", str(len(body)).encode("ascii")),
-            ],
+            "headers": headers,
             "client": ("asgi-test", 50000),
             "server": ("orchestrator-api", 8080),
             "state": {},
@@ -117,6 +135,12 @@ async def scenario():
     commands = RouterCommands()
     adapter = SourceProcessingHttpAdapter(commands)
     application = FastAPI()
+    application.add_middleware(
+        BoundedRequestBodyMiddleware,
+        max_body_bytes=1024,
+        memory_spool_bytes=128,
+        replay_chunk_bytes=64,
+    )
     application.include_router(
         build_document_command_router(
             document_http_adapter=adapter,
@@ -188,6 +212,107 @@ async def scenario():
         await post(application, "/v1/documents", invalid_year, multipart_type),
         (400, {"error_code": "HTTP_REQUEST_INVALID", "field": "publication_year"}),
         "L'année bibliographique doit être un entier explicite.",
+    )
+
+    oversized_metadata = (
+        ("title", "T" * 513),
+        ("authors", "Auteur"),
+        ("publication_year", "2026"),
+        ("edition", "1"),
+    )
+    assert_equal(
+        await post(
+            application,
+            "/v1/documents",
+            multipart(boundary=boundary, content=valid_pdf, fields=oversized_metadata),
+            multipart_type,
+        ),
+        (400, {"error_code": "HTTP_REQUEST_INVALID", "field": "title"}),
+        "Un titre de plus de 512 caractères doit être refusé.",
+    )
+    for field_name, fields_override in (
+        (
+            "authors",
+            (
+                ("title", "Titre"),
+                ("authors", "A" * 257),
+                ("publication_year", "2026"),
+                ("edition", "1"),
+            ),
+        ),
+        (
+            "authors",
+            (
+                ("title", "Titre"),
+                *(("authors", f"Auteur {index}") for index in range(17)),
+                ("publication_year", "2026"),
+                ("edition", "1"),
+            ),
+        ),
+        (
+            "publication_year",
+            (
+                ("title", "Titre"),
+                ("authors", "Auteur"),
+                ("publication_year", "10000"),
+                ("edition", "1"),
+            ),
+        ),
+        (
+            "edition",
+            (
+                ("title", "Titre"),
+                ("authors", "Auteur"),
+                ("publication_year", "2026"),
+                ("edition", "E" * 65),
+            ),
+        ),
+    ):
+        assert_equal(
+            await post(
+                application,
+                "/v1/documents",
+                multipart(boundary=boundary, content=valid_pdf, fields=fields_override),
+                multipart_type,
+            ),
+            (400, {"error_code": "HTTP_REQUEST_INVALID", "field": field_name}),
+            f"La limite métier de {field_name} doit être appliquée.",
+        )
+
+    aggregate_oversized_pdf = b"%PDF-1.7\n" + b"x" * 1400 + b"\n%%EOF\n"
+    aggregate_oversized = multipart(
+        boundary=boundary,
+        content=aggregate_oversized_pdf,
+        fields=fields,
+    )
+    content_length_receive_calls = []
+    assert_equal(
+        await post(
+            application,
+            "/v1/documents",
+            aggregate_oversized,
+            multipart_type,
+            receive_calls=content_length_receive_calls,
+        ),
+        (413, {"error_code": "HTTP_REQUEST_TOO_LARGE", "max_body_bytes": 1024}),
+        "Un Content-Length excessif doit être refusé par la frontière ASGI.",
+    )
+    assert_equal(
+        content_length_receive_calls,
+        [],
+        "Un Content-Length excessif doit être refusé avant toute consommation.",
+    )
+    assert_equal(
+        await post(
+            application,
+            "/v1/documents",
+            aggregate_oversized,
+            multipart_type,
+            include_content_length=False,
+            receive_chunk_bytes=128,
+        ),
+        (413, {"error_code": "HTTP_REQUEST_TOO_LARGE", "max_body_bytes": 1024}),
+        "Un transfert chunked excessif doit être borné avant le parsing multipart.",
     )
 
     corrupt = multipart(
