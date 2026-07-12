@@ -6,7 +6,10 @@ build-backend = "setuptools.build_meta"
 name = "chatbot-trading"
 version = "0.1.0"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "fastapi==0.135.1",
+    "uvicorn==0.41.0",
+]
 
 [project.scripts]
 ui = "app.platform.ui_command:main"

@@ -14,8 +14,9 @@ import sys
 
 sys.path.insert(0, sys.argv[1])
 
+import app.platform.orchestrator_asgi as orchestrator_asgi_module
 from app.platform.configuration import load_application_configuration
-from app.platform.orchestrator_asgi import create_orchestrator_app
+from app.platform.orchestrator_asgi import create_orchestrator_app, serve_orchestrator_app
 from app.platform.orchestrator_composition import (
     DependencyReadiness,
     OrchestratorCompositionRoot,
@@ -60,6 +61,15 @@ async def scenario(repo_root):
         config_path=repo_root / "config" / "application.example.yaml",
         environment_snapshot={},
     )
+    pyproject_content = (repo_root / "pyproject.toml").read_text(encoding="utf-8")
+    uv_lock_content = (repo_root / "uv.lock").read_text(encoding="utf-8")
+    for dependency_pin in ("fastapi==0.135.1", "uvicorn==0.41.0"):
+        if dependency_pin not in pyproject_content:
+            raise AssertionError(f"Dépendance exacte absente de pyproject.toml: {dependency_pin}")
+    for locked_package in ('name = "fastapi"\nversion = "0.135.1"', 'name = "uvicorn"\nversion = "0.41.0"'):
+        if locked_package not in uv_lock_content:
+            raise AssertionError(f"Dépendance absente ou non verrouillée dans uv.lock: {locked_package!r}")
+
     events = []
     first = OrderedDependency("postgres", events)
     second = OrderedDependency("qdrant", events)
@@ -100,6 +110,24 @@ async def scenario(repo_root):
         ["open:postgres", "open:qdrant", "close:qdrant", "close:postgres"],
         "Le lifespan doit ouvrir dans l'ordre déclaré et fermer dans l'ordre inverse.",
     )
+
+    uvicorn_calls = []
+    original_uvicorn_run = orchestrator_asgi_module.uvicorn.run
+    orchestrator_asgi_module.uvicorn.run = lambda application, **kwargs: uvicorn_calls.append((application, kwargs))
+    try:
+        serve_orchestrator_app(
+            configuration=configuration,
+            composition_root_factory=root_factory,
+        )
+    finally:
+        orchestrator_asgi_module.uvicorn.run = original_uvicorn_run
+    assert_equal(len(uvicorn_calls), 1, "Uvicorn doit être invoqué une seule fois.")
+    assert_equal(
+        uvicorn_calls[0][1],
+        {"host": configuration.services.api.bind_host, "port": configuration.services.api.port},
+        "Uvicorn doit recevoir exclusivement le bind et le port de la configuration validée.",
+    )
+    assert_equal(root_factory_count, 1, "Le serveur ne doit pas créer la composition avant le lifespan Uvicorn.")
 
     try:
         DependencyReadiness(name="postgres", status="unknown")
