@@ -87,4 +87,4 @@
 - Dépendances: `pypdf==6.14.2` et `python-multipart==0.0.32`, verrou régénéré par `uv lock`.
 - Preuve réelle: PDF `pypdf` supérieur à 1 Mio transmis à PostgreSQL/Uvicorn réels puis restitué avec hash identique.
 - Audit dépendances: `pip-audit` indisponible localement; aucun scanner alternatif silencieux.
-- Commit GREEN: `feat(api): borner frontiere http et streaming original ADR-020` (hash à renseigner après création).
+- Commit GREEN: `89acbdd70`, `feat(api): borner frontiere http et streaming original ADR-020`.

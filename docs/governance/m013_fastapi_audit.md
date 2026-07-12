@@ -66,3 +66,6 @@ La preuve live utilise Docker Engine, PostgreSQL, Uvicorn et HTTP réels. Aucun 
 - Audit de dépendances : `pip-audit` n'est pas disponible dans l'environnement local; aucune installation opportuniste ni fallback de scanner n'a été exécuté. Les versions exactes et `uv.lock` sont vérifiés par la gate.
 - La preuve live génère un PDF `pypdf` supérieur à 1 Mio, l'enregistre par HTTP multipart réel puis compare le SHA-256 de la restitution streamée.
 - La gate M13-FastAPI durcie exécute six preuves, dont les limites du routeur et le streaming original avant la preuve live.
+- Commit GREEN : `89acbdd70`, `feat(api): borner frontiere http et streaming original ADR-020`.
+- Image multi-stage reconstruite : manifeste local `sha256:cc413e65961544241f11682021b886e76e0f2b5b5ec8967f9c806958b14cc450`; runtime non privilégié sans exécutable `uv`.
+- Preuve live finale : `DOC-ACCDE60BF0517081`, SHA-256 `accde60bf05170810a4e22bb71f72c1b944d7135aa6672eb8bf1aaedbcdb5692`.

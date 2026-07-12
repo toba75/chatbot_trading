@@ -72,7 +72,7 @@ La stack locale conserve un système de fichiers racine en lecture seule. Le spo
 - Spécification : `docs/specs/m013_fastapi_api_orchestratrice.md`.
 - Plan d'implémentation : `docs/tasks/milestone_013-fastapi/0006_enregistrer_pdf_lancer_diagnostic.md`; `0008_recuperer_pdf_original_controle.md`; `0011_deployer_auditer_api_orchestratrice.md`.
 - Tests d'acceptation : `tests/m013_fastapi/validate_document_commands_http_acceptance.ps1`; `validate_original_pdf_retrieval_acceptance.ps1`; `validate_document_http_live_acceptance.ps1`.
-- Commits : RED `ae943a04c` et `d4b64cf26`; GREEN `feat(api): borner frontiere http et streaming original ADR-020` (hash à renseigner après création).
+- Commits : RED `ae943a04c` et `d4b64cf26`; GREEN `89acbdd70`, `feat(api): borner frontiere http et streaming original ADR-020`.
 
 ## Notes
 
