@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import hashlib
+import inspect
 from pathlib import Path
 import sys
 
@@ -108,7 +109,17 @@ writer = PostgresKnowledgeProjectionRepository(
     connection_factory=Factory([writer_cursor]),
     sample_storage_limit=3,
 )
-writer.save_transition(
+for method_name in (
+    "save_if_absent",
+    "require_absent_build_fingerprint",
+    "projection_for_build_fingerprint",
+    "projection_for_id",
+    "save_transition",
+    "save_projection_outputs",
+):
+    assert callable(getattr(writer, method_name, None)), f"Port KA absent: {method_name}"
+assert tuple(inspect.signature(writer.save_transition).parameters) == ("projection",)
+writer.save_projection_outputs(
     projection=projection,
     chunk_count=3,
     chunks=(chunk(1), chunk(2), chunk(3)),
