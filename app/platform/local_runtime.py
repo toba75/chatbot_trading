@@ -54,6 +54,7 @@ from app.platform.ui_corpus import (
 from app.platform.ui_document_api import (
     ORCHESTRATOR_API_UNAVAILABLE,
     UiDocumentApiClient,
+    UiDocumentCommandForbiddenError,
     UiDocumentApiPublicError,
     UiDocumentApiUnavailableError,
     UiDocumentJsonResponse,
@@ -207,8 +208,10 @@ def _serve_http(
 ) -> None:
     if service_id == "orchestrator-api":
         raise ValueError("ORCHESTRATOR_LEGACY_RUNTIME_FORBIDDEN")
+    if isinstance(port, bool) or not isinstance(port, int) or not 1 <= port <= 65_535:
+        raise ValueError(f"Port HTTP local invalide pour {service_id}: {port}")
     expected_port = _configured_http_port(service_id, application_configuration)
-    if port != expected_port:
+    if service_id != "ui" and port != expected_port:
         raise ValueError(f"Port HTTP local invalide pour {service_id}: {port}")
     bind_host = _configured_http_bind_host(service_id, application_configuration)
 
@@ -335,6 +338,11 @@ def _serve_http(
                     response = UiDocumentJsonResponse(
                         status_code=503,
                         payload={"error_code": ORCHESTRATOR_API_UNAVAILABLE},
+                    )
+                except UiDocumentCommandForbiddenError:
+                    response = UiDocumentJsonResponse(
+                        status_code=404,
+                        payload={"error_code": "UI_DOCUMENT_COMMAND_FORBIDDEN"},
                     )
                 if response.status_code < 400:
                     _write_redirect_response(self, location="/ui/corpus-pdf")

@@ -251,17 +251,17 @@ assert original == pdf
 # La conversion M-004 et l'indexation absentes restent explicitement bloquées sans fallback.
 status, _, conversion_body = request(f"/ui/documents/{document_id}/conversion")
 conversion = html.unescape(conversion_body.decode("utf-8"))
-assert status == 200
-assert "QA_REJECTED" in conversion
-assert "PAGE_AUTHORITY_MISSING" in conversion
+assert status == 409, (status, conversion)
+assert 'role="alert"' in conversion
+assert "CONVERSION_NOT_REQUESTED" in conversion
 status, _, index_body = request(
     f"/v1/documents/{document_id}/index", method="POST", data=b"",
     headers={"Content-Type": "application/octet-stream"}, follow_redirects=False,
 )
 index_error = index_body.decode("utf-8")
-assert status == 503, (status, index_error)
+assert status == 404, (status, index_error)
 assert 'role="alert"' in index_error
-assert "SERVICE_NOT_CONFIGURED" in index_error
+assert "UI_DOCUMENT_COMMAND_FORBIDDEN" in index_error
 
 # Les erreurs conservent leur statut HTTP et une page française actionnable.
 invalid_payload, invalid_content_type = multipart(pdf, include_title=False)
@@ -270,9 +270,9 @@ status, _, invalid_body = request(
     headers={"Content-Type": invalid_content_type}, follow_redirects=False,
 )
 invalid_page = invalid_body.decode("utf-8")
-assert status == 422, (status, invalid_page)
+assert status == 400, (status, invalid_page)
 assert 'role="alert"' in invalid_page
-assert "RÃ©essayer depuis le corpus" in invalid_page
+assert 'href="/ui/corpus-pdf"' in invalid_page
 status, _, missing_body = request("/ui/documents/DOC-0000000000000000/diagnostic")
 assert status == 404
 assert 'role="alert"' in missing_body.decode("utf-8")

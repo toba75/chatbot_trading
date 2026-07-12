@@ -95,6 +95,10 @@ class UiDocumentApiUnavailableError(ConnectionError):
     """Indique explicitement que l'API orchestratrice ne répond pas."""
 
 
+class UiDocumentCommandForbiddenError(ValueError):
+    """Refuse une commande hors du parcours documentaire UI."""
+
+
 class UiDocumentApiPublicError(RuntimeError):
     """Porte une erreur HTTP publique retournée par l'orchestrateur."""
 
@@ -653,7 +657,7 @@ def _ensure_document_command_path(value: str) -> str:
     path = _ensure_public_relative_path(value)
     if path == "/v1/documents" or _DIAGNOSE_PATH_PATTERN.fullmatch(path) is not None:
         return path
-    raise ValueError("commande documentaire UI interdite")
+    raise UiDocumentCommandForbiddenError("commande documentaire UI interdite")
 
 
 def _ensure_document_id(value: str) -> str:
@@ -679,6 +683,7 @@ __all__ = [
     "ORCHESTRATOR_API_UNAVAILABLE",
     "UI_DOCUMENT_PAGE_SIZE",
     "UiDocumentApiClient",
+    "UiDocumentCommandForbiddenError",
     "UiDocumentApiPublicError",
     "UiDocumentApiResponse",
     "UiDocumentApiUnavailableError",
