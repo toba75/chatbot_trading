@@ -142,8 +142,6 @@ async def scenario():
     application.add_middleware(
         BoundedRequestBodyMiddleware,
         max_body_bytes=4096,
-        memory_spool_bytes=128,
-        replay_chunk_bytes=64,
     )
     application.include_router(
         build_document_command_router(

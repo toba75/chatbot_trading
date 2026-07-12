@@ -27,8 +27,6 @@ from app.platform.orchestrator_contract_routers import (
 
 CompositionRootFactory = Callable[[ApplicationConfiguration], OrchestratorCompositionRoot]
 MAX_REQUEST_BODY_BYTES = 54_000_000
-REQUEST_BODY_MEMORY_SPOOL_BYTES = 1024 * 1024
-REQUEST_BODY_REPLAY_CHUNK_BYTES = 64 * 1024
 
 
 class RequestBodyTooLargeError(ValueError):
@@ -65,8 +63,6 @@ class BoundedRequestBodyMiddleware:
         application: Any,
         *,
         max_body_bytes: int,
-        memory_spool_bytes: int,
-        replay_chunk_bytes: int,
     ) -> None:
         if not callable(application):
             raise ValueError("application ASGI invalide")
@@ -74,14 +70,6 @@ class BoundedRequestBodyMiddleware:
         self._max_body_bytes = _ensure_positive_integer(
             max_body_bytes,
             "max_body_bytes",
-        )
-        self._memory_spool_bytes = _ensure_positive_integer(
-            memory_spool_bytes,
-            "memory_spool_bytes",
-        )
-        self._replay_chunk_bytes = _ensure_positive_integer(
-            replay_chunk_bytes,
-            "replay_chunk_bytes",
         )
 
     async def __call__(self, scope: Any, receive: Callable, send: Callable) -> None:
@@ -151,8 +139,6 @@ def create_orchestrator_app(
     application.add_middleware(
         BoundedRequestBodyMiddleware,
         max_body_bytes=MAX_REQUEST_BODY_BYTES,
-        memory_spool_bytes=REQUEST_BODY_MEMORY_SPOOL_BYTES,
-        replay_chunk_bytes=REQUEST_BODY_REPLAY_CHUNK_BYTES,
     )
 
     @application.exception_handler(RequestValidationError)
@@ -282,6 +268,7 @@ def _complete_traced_response(
                 "method": request.method,
                 "path": request.url.path,
                 "status_code": response.status_code,
+                "error_code": _response_error_code(response),
                 "trace_id": trace_id,
                 "success_count": 1 if response.status_code < 400 else 0,
                 "error_count": 1 if response.status_code >= 400 else 0,
@@ -300,6 +287,22 @@ def _request_volume_bytes(request: Request) -> int:
     if raw is None or not raw.isdecimal():
         return 0
     return int(raw)
+
+
+def _response_error_code(response: Response) -> str | None:
+    if response.status_code < 400:
+        return None
+    body = getattr(response, "body", None)
+    if isinstance(body, bytes):
+        try:
+            payload = json.loads(body.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            payload = None
+        if isinstance(payload, dict):
+            error_code = payload.get("error_code")
+            if isinstance(error_code, str) and re.fullmatch(r"[A-Z][A-Z0-9_]{2,127}", error_code):
+                return error_code
+    return "HTTP_RESPONSE_ERROR"
 
 
 def _content_length(scope: Any) -> int | None:
