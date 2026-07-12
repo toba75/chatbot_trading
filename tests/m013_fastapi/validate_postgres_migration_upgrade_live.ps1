@@ -1,0 +1,95 @@
+$ErrorActionPreference = "Stop"
+
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "../..")).Path
+. (Join-Path $repoRoot "scripts/require_python.ps1")
+$python = Get-RequiredPythonExecutable
+$null = & docker info --format '{{.ServerVersion}}' 2>&1
+if ($LASTEXITCODE -ne 0) { throw "DOCKER_ENGINE_REQUIRED" }
+
+function Get-FreeTcpPort {
+    $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+    $listener.Start()
+    try { return ([System.Net.IPEndPoint] $listener.LocalEndpoint).Port }
+    finally { $listener.Stop() }
+}
+
+$suffix = [Guid]::NewGuid().ToString("N").Substring(0, 12)
+$container = "ostrading-m13-migration-$suffix"
+$volume = "ostrading-m13-prevolume-$suffix"
+$port = Get-FreeTcpPort
+$temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) $container
+$secret = Join-Path $temporaryRoot "postgres_password"
+$image = "postgres@sha256:7e5df973a74872482e320dcbdeb055e178d6f42de0558b083892c50cda833c96"
+New-Item -ItemType Directory -Path $temporaryRoot -Force | Out-Null
+[System.IO.File]::WriteAllText($secret, "m13-migration-password", [System.Text.UTF8Encoding]::new($false))
+
+function Start-Postgres {
+    $id = & docker run --detach --name $container `
+        --env POSTGRES_DB=app --env POSTGRES_USER=app --env POSTGRES_PASSWORD=m13-migration-password `
+        --publish "127.0.0.1:${port}:5432" --volume "${volume}:/var/lib/postgresql/data" $image
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($id)) { throw "POSTGRES_DOCKER_START_FAILED" }
+    for ($attempt = 0; $attempt -lt 120; $attempt++) {
+        & docker exec $container pg_isready -U app -d app *> $null
+        if ($LASTEXITCODE -eq 0) { return }
+        Start-Sleep -Milliseconds 500
+    }
+    throw "POSTGRES_DOCKER_NOT_READY"
+}
+
+try {
+    # Given un volume pré-M13 ne contient que la première migration et aucun ledger.
+    Start-Postgres
+    Get-Content -Raw -Encoding UTF8 (Join-Path $repoRoot "deploy/postgres/migrations/001_document_persistence.sql") |
+        & docker exec -i $container psql -v ON_ERROR_STOP=1 -U app -d app *> $null
+    if ($LASTEXITCODE -ne 0) { throw "PRE_M13_SCHEMA_CREATION_FAILED" }
+    & docker rm --force $container *> $null
+
+    # When le même volume redémarre avec le runner M13-FastAPI.
+    Start-Postgres
+    $env:M13_MIGRATION_URL = "postgresql://app@127.0.0.1:$port/app"
+    $env:M13_MIGRATION_SECRET = $secret
+    $env:M13_MIGRATION_PATH = Join-Path $repoRoot "deploy/postgres/migrations"
+    @'
+import os
+from pathlib import Path
+import psycopg
+
+from app.platform.postgres import PsycopgConnectionFactory
+from app.platform.postgres_migrations import PostgresMigrationRunner
+
+factory = PsycopgConnectionFactory(
+    connection_url=os.environ["M13_MIGRATION_URL"],
+    password_path=Path(os.environ["M13_MIGRATION_SECRET"]),
+    connect_timeout_seconds=5,
+)
+runner = PostgresMigrationRunner(
+    connection_factory=factory,
+    migrations_path=Path(os.environ["M13_MIGRATION_PATH"]),
+    operation_timeout_seconds=30,
+)
+runner.run()
+runner.run()
+assert runner.is_required_schema_ready()
+with factory.connect() as connection:
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT version, filename FROM platform.schema_migrations ORDER BY version", ())
+        assert cursor.fetchall() == [
+            (1, "001_document_persistence.sql"),
+            (2, "002_knowledge_projection_read_models.sql"),
+        ]
+        cursor.execute("SELECT to_regclass('knowledge_access.knowledge_projections')", ())
+        assert cursor.fetchone() == ("knowledge_access.knowledge_projections",)
+print("upgrade-volume-pre-M13=schema-002; ledger=idempotent; lock=advisory")
+'@ | & $python -B -
+    if ($LASTEXITCODE -ne 0) { throw "POSTGRES_MIGRATION_UPGRADE_FAILED" }
+}
+finally {
+    Remove-Item Env:M13_MIGRATION_URL -ErrorAction SilentlyContinue
+    Remove-Item Env:M13_MIGRATION_SECRET -ErrorAction SilentlyContinue
+    Remove-Item Env:M13_MIGRATION_PATH -ErrorAction SilentlyContinue
+    & docker rm --force $container *> $null
+    & docker volume rm $volume *> $null
+    Remove-Item -LiteralPath $temporaryRoot -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+Write-Host "Test live upgrade PostgreSQL sur volume pré-M13: OK"

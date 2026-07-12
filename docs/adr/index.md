@@ -26,6 +26,7 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 | [ADR-018](ADR-018-ui-exclusivement-via-api-orchestratrice.md) | UI exclusivement via l'API orchestratrice | Acceptée | 2026-07-11 | Aucun | Aucune |
 | [ADR-019](ADR-019-api-orchestratrice-fastapi-uvicorn.md) | API orchestratrice FastAPI et Uvicorn | Acceptée | 2026-07-12 | Aucun | Aucune |
 | [ADR-020](ADR-020-frontiere-http-binaire-bornee.md) | Frontière HTTP binaire bornée | Acceptée | 2026-07-12 | Aucun | Aucune |
+| [ADR-021](ADR-021-migrations-postgresql-au-demarrage.md) | Migrations PostgreSQL versionnées avant readiness | Acceptée | 2026-07-12 | Aucun | Aucune |
 
 ## ADR DDD
 
@@ -47,7 +48,7 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 ## Prochains numéros disponibles
 
 ```text
-Prochaine ADR technique: ADR-021
+Prochaine ADR technique: ADR-022
 Prochaine DDD-ADR: DDD-ADR-013
 ```
 
