@@ -120,6 +120,7 @@
 - ADR : ADR-018, ADR-021 et ADR-022 consultées et appliquées; aucune nouvelle ADR requise. La migration ascendante `004_knowledge_projection_chunk_samples.sql` suit ADR-021.
 - Commit RED : `d5f682fdf`, `test(produit): couvrir contrats KA SP UI stricts`.
 - Commit GREEN : `3521770cc`, `feat(produit): durcir contrats KA SP UI ADR-018 ADR-021 ADR-022`.
+- Conformité du producteur KA : RED `f3bf36660`, GREEN `27bef8d48`; le repository PostgreSQL implémente désormais `save_if_absent`, contrôle d'empreinte, lectures par empreinte/identité et `save_transition`, tandis que `save_projection_outputs` persiste les échantillons bornés.
 - Migration : schéma PostgreSQL `004`, table `knowledge_access.knowledge_projection_chunk_samples`, image `schema-004` et lecture `REPEATABLE READ READ ONLY` avec `sample_limit` SQL.
 - Preuves live : PostgreSQL Docker réel redémarré avec `BUILDING`, `SEARCHABLE`, `STALE`, `FAILED`; Uvicorn/FastAPI réels avec upload multipart, diagnostic, conversion, projection et original par le client UI.
 - UI : origine hôte `127.0.0.1` issue de la configuration, origine Compose `orchestrator-api`, succès POST en `303`, erreurs françaises `role=alert`, inspections sémantiques et retrait du bouton de sélection non raccordé.
