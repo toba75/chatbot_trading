@@ -306,6 +306,7 @@ async def scenario(repo_root):
         assert requested_status == 200
         assert requested_payload["diagnostic_status"] == "MANIFEST_CREATED"
         assert requested_payload["diagnosed_page_count"] == 0
+        assert [entry["page_number"] for entry in requested_payload["manifest"]] == [1, 2]
         assert [page["page_number"] for page in requested_payload["pages"]] == [1, 2]
         assert all(page["diagnostic"] is None for page in requested_payload["pages"])
 

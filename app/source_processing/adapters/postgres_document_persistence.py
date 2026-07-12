@@ -161,6 +161,24 @@ class PostgresDocumentPersistence:
             raise ValueError("document_id invalide")
         return self._find_source("document_id = %s", (document_id.value,))
 
+    def list_documents(self) -> tuple[SourceDocument, ...]:
+        """Retourne les sources persistées dans l'ordre de leur identité publique."""
+
+        with self._connection_factory.connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT document_id, fingerprint, original_storage_ref, title,
+                           authors, publication_year, edition, status,
+                           quarantine_reason
+                      FROM source_processing.source_documents
+                     ORDER BY document_id
+                    """,
+                    (),
+                )
+                rows = cursor.fetchall()
+        return tuple(_source_from_row(row) for row in rows)
+
     def save_if_absent(self, source_document: SourceDocument) -> SourceDocument | None:
         if not isinstance(source_document, SourceDocument):
             raise ValueError("source_document invalide")

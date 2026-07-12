@@ -133,7 +133,7 @@ def routed_run(document):
         page_manifest=manifest,
     )
     diagnosed = started.record_page_diagnostics(
-        tuple(page_decision(number) for number in reversed(page_numbers))
+        tuple(page_decision(number) for number in page_numbers)
     )
     return diagnosed.decide_route_plan(
         PageRoutingConfiguration(
@@ -185,6 +185,7 @@ assert source_only_item.canonical_version_id is None
 
 # Les pages restent dans l'ordre du manifeste et les DTO sont immuables.
 diagnostic = service.read_diagnostic(document.document_id.value)
+assert tuple(entry.page_number for entry in diagnostic.manifest) == (1, 2, 3)
 assert tuple(page.page_number for page in diagnostic.pages) == (1, 2, 3)
 assert diagnostic.diagnosed_page_count == 3
 assert diagnostic.pages[2].diagnostic.has_formula is True
