@@ -33,6 +33,8 @@ $corpusRoot = Join-Path $temporaryRoot "data\corpus"
 $stdoutPath = Join-Path $temporaryRoot "api.stdout.log"
 $stderrPath = Join-Path $temporaryRoot "api.stderr.log"
 $apiProcess = $null
+$previousPythonPath = $env:PYTHONPATH
+$env:PYTHONPATH = $repoRoot
 
 New-Item -ItemType Directory -Path $temporaryRoot, $corpusRoot, (Split-Path -Parent $secretPath) -Force | Out-Null
 [System.IO.File]::WriteAllText($secretPath, "m13-fastapi-live-password", [System.Text.UTF8Encoding]::new($false))
@@ -72,9 +74,17 @@ try {
     Get-ChildItem (Join-Path $repoRoot "deploy\postgres\migrations") -Filter "*.sql" -File |
         Sort-Object Name |
         ForEach-Object {
-            Get-Content -Raw -Encoding UTF8 $_.FullName |
-                & docker exec -i $containerName psql -v ON_ERROR_STOP=1 -U app -d app *> $null
-            if ($LASTEXITCODE -ne 0) { throw "POSTGRES_MIGRATION_FAILED $($_.Name)" }
+            $previousErrorActionPreference = $ErrorActionPreference
+            $ErrorActionPreference = "Continue"
+            try {
+                Get-Content -Raw -Encoding UTF8 $_.FullName |
+                    & docker exec -i $containerName psql -v ON_ERROR_STOP=1 -U app -d app *> $null
+                $migrationExitCode = $LASTEXITCODE
+            }
+            finally {
+                $ErrorActionPreference = $previousErrorActionPreference
+            }
+            if ($migrationExitCode -ne 0) { throw "POSTGRES_MIGRATION_FAILED $($_.Name)" }
         }
 
     $apiProcess = Start-Process -FilePath $apiPython `
@@ -222,6 +232,7 @@ print(json.dumps({"document_id": document_id, "pdf_sha256": hashlib.sha256(pdf_b
     }
 }
 finally {
+    $env:PYTHONPATH = $previousPythonPath
     Remove-Item Env:M13_FASTAPI_LIVE_ORIGIN -ErrorAction SilentlyContinue
     Remove-Item Env:M13_FASTAPI_LIVE_ROOT -ErrorAction SilentlyContinue
     if ($null -ne $apiProcess -and -not $apiProcess.HasExited) {
