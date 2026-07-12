@@ -57,6 +57,13 @@ La preuve live utilise Docker Engine, PostgreSQL, Uvicorn et HTTP réels. Aucun 
 
 ## Résultats observés
 
+- Correctif de revue final : gate statique `28/28` GREEN et gate live `32/32` GREEN, avec contrôle d'exhaustivité du catalogue.
+- OpenAPI : multipart PDF, DTO publics, `application/pdf`, statuts `201`, `202`, `4xx` et `5xx` validés sémantiquement.
+- M13-reality : GREEN avec PostgreSQL Docker et migrations réelles, `uv run --no-sync api`, llm-gateway et Spark/vLLM réels.
+- Compatibilité : les 23 validations M-005, la parité API, l'architecture, la traçabilité à 173 exigences et le lint à 38 validations sont GREEN.
+- Gate globale : tentative bornée à 10 minutes, expirée sans sortie ni verdict applicatif; résultat non concluant.
+- Commits : RED `4a448c2c7`; GREEN `f9a7ff3c1`; commit documentaire de clôture séparé afin de conserver les hashes de preuve.
+
 - Docker Engine: serveur `29.1.5` disponible.
 - Image Compose: `ostrading/orchestrator-api:0.0.0-m002` construite avec `uv sync --frozen --no-dev`; manifeste local `sha256:51de59597a927e0cb59030a630ae3af81fd2a599ef0835697f1791fdb076ae84`.
 - Preuve HTTP: document `DOC-BC6CFA26B1753E74`, PDF SHA-256 `bc6cfa26b1753e740c2749f8a854828770965f5862134ec304cb11a25e98d02a`, PostgreSQL Docker et transport `uvicorn-http`.

@@ -136,3 +136,7 @@
 - Observabilité : corrélation HTTP vers outbox puis worker; compteurs succès/erreur, durée et volume sans payload, selon la configuration de tracing.
 - Dérogation historique : les sujets de commits antérieurs sans accents ne sont pas réécrits afin de préserver la traçabilité des hashes. Tous les nouveaux sujets utilisent désormais l'accentuation française.
 - Commit RED : `4a448c2c7`, `test(platform): couvrir gouvernance et performance M13-FastAPI`.
+- Commit GREEN : `f9a7ff3c1`, `feat(platform): durcir API orchestratrice et gates M13-FastAPI`.
+- Validations : gate statique `28/28` GREEN; gate live `32/32` GREEN; lint `38` validations GREEN; traçabilité `173` exigences GREEN; M13-reality GREEN sur PostgreSQL/migrations, `uv run api`, llm-gateway et Spark/vLLM réels; les `23` validations M-005 sont GREEN.
+- Suite globale : tentative bornée de `scripts/test.ps1` à 10 minutes, expirée sans sortie ni verdict applicatif; résultat non concluant, jamais présenté comme GREEN.
+- Préservation utilisateur : le hunk `wait_health` du fichier `tests/m013/validate_m013_reality_product_acceptance.ps1` est resté hors index et hors commits; seuls les hunks de migration vers FastAPI/PostgreSQL ont été commités.
