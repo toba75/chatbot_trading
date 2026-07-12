@@ -83,7 +83,7 @@
 - Scénario: Given un upload multipart ou un original PDF; When les octets franchissent Caddy, l'ASGI et SP; Then consommation, spool, métadonnées et chunks restent bornés, le hash est vérifié et aucune opération synchrone lourde ne bloque directement l'event-loop.
 - ADR: ADR-020 créée pour compléter ADR-019 sans modifier la propriété métier de SP.
 - Commits RED: `ae943a04c`, `test(api): couvrir frontiere binaire bornee ADR-020`; `d4b64cf26`, `test(sp): borner metadonnees bibliographiques ADR-020`.
-- Implémentation: limite Caddy/ASGI de 54 Mo, PDF métier 50 Mio, métadonnées courtes, `tmpfs /tmp` 128 Mio pour le double spool borné, streaming par chunks 64 Kio, threadpool FastAPI et image builder/runtime.
+- Implémentation: limite Caddy/ASGI de 54 Mo, PDF métier 50 Mio, métadonnées courtes, comptage ASGI sans double spool avant le parseur multipart, `tmpfs /tmp` 128 Mio, streaming par chunks 64 Kio, threadpool FastAPI et image builder/runtime.
 - Dépendances: `pypdf==6.14.2` et `python-multipart==0.0.32`, verrou régénéré par `uv lock`.
 - Preuve réelle: PDF `pypdf` supérieur à 1 Mio transmis à PostgreSQL/Uvicorn réels puis restitué avec hash identique.
 - Audit dépendances: `pip-audit` indisponible localement; aucun scanner alternatif silencieux.
@@ -155,3 +155,16 @@
 - Preuves GREEN : acceptation des opérations reproductibles, acceptation du déploiement, `uv lock --check`, `docker compose config`, build multi-stage et inspection des labels image/schéma.
 - Gate statique globale : son bootstrap verrouillé est prouvé; son verdict final est différé pendant les correctifs de revue concurrents dont les tests RED sont déjà présents dans le worktree partagé.
 - Suite globale : aucune nouvelle conclusion n'est déclarée pour `scripts/test.ps1`; la tentative précédente reste non concluante après dix minutes.
+
+## Correctif de revue - API, KA et UI paginées
+
+- Date : 2026-07-13.
+- Scénario BDD : Given plus de cent documents et des lectures synchrones PostgreSQL; When l'UI consulte le corpus ou une preuve documentaire; Then elle suit un curseur public borné, reçoit le statut KA par lot sans fan-out `1+N`, et l'event-loop déporte chaque cas d'usage synchrone vers le threadpool.
+- ADR : ADR-018, ADR-019 et ADR-020 consultées et appliquées; aucune nouvelle décision structurante n'est introduite.
+- Commit RED : `510d85ac6`, `test(api-ui): couvrir pagination et contrats stricts`.
+- Commit GREEN : `c1aadb5f7`, `feat(api-ui): paginer et typer les contrats publics`.
+- Extraction applicative : RED `e6cef6a3d`, GREEN `9c5dcda90`; conversation, évaluation, recherche et indexation sont composées hors du runtime HTTP historique.
+- Contrats : manifeste, signaux page, route, profil, fraîcheur, chunks et `SourceLocator` sont des modèles OpenAPI imbriqués stricts; l'absence de projection et la projection complète forment une union explicite.
+- UI : la limite agrégée est contrôlée avant lecture du corps par le proxy UI, les erreurs conservent leur statut HTTP, le champ public fautif est affiché et les preuves imbriquées restent inspectables en fenêtre étroite.
+- Limite explicite : M13-FastAPI raccorde la frontière ASGI, mais ne livre pas le runtime de conversion M004. Le worker réel s'arrête après le diagnostic; aucun adaptateur Docling/OCRmyPDF réel, aucune publication PostgreSQL `CanonicalSourcePublished` et aucun consommateur KA durable ne sont présents. `/v1/documents/{document_id}/index` reste donc explicitement indisponible et l'UI ne simule aucune projection. Le `PostgresKnowledgeProjectionRepository` est validé comme producteur durable, sans inventer de `CanonicalSourceRef` depuis un diagnostic.
+- Validation : gate M13-FastAPI Static `31/31` GREEN et lint ciblé GREEN. La preuve live documentaire complète reste réservée au runtime M004 qui produit effectivement `page_count`, `SourceLocator` et `canonical_artifact_sha256` après fusion, QA et stockage de l'artefact canonique.

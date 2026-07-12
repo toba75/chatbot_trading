@@ -33,6 +33,8 @@ La commande réelle de l'image est `api --config /workspace/config/application.y
 | Bind réseau | seul Caddy publie `127.0.0.1`; aucun port FastAPI hôte | Couvert par Compose |
 | OpenAPI | création en `201 application/json`; original en `200 application/pdf` uniquement | Couvert sémantiquement |
 | Corps HTTP et original | limites Caddy/ASGI, hash avant 200, streaming borné | Couvert par tests et preuve live |
+| Pagination corpus | curseur public obligatoire, page de 1 à 100, statut KA lu en lot | Couvert par gate statique |
+| Modèles publics | structures imbriquées strictes et union d'absence/projection | Couvert par OpenAPI et tests UI |
 | Traçabilité | `X-Trace-ID`, `trace_id`, `configuration_hash`, statut et durée sans payload | Couvert par preuve live |
 | Aucun fallback | dépendance ou migration absente arrête le démarrage | Couvert par tests statiques |
 
@@ -51,6 +53,8 @@ La preuve live utilise Docker Engine, PostgreSQL, Uvicorn, PDF et workers réels
 ## Limites actuelles
 
 - L'UI reste cliente HTTP de `orchestrator-api`; elle n'est pas migrée vers FastAPI.
+- Le runtime M004 de conversion canonique n'est pas livré par ce sous-milestone : aucun adaptateur Docling/OCRmyPDF réel ni publication durable `CanonicalSourcePublished` ne permet encore à `/index` de recevoir un `CanonicalSourceRef` complet. L'indexation et la sélection conversationnelle restent bloquées explicitement; aucune projection n'est fabriquée depuis l'état `DIAGNOSED`.
+- Une publication future ne pourra émettre `CanonicalSourcePublished` qu'après fusion Docling, adjudication d'autorité textuelle, QA, stockage de l'artefact et calcul de `canonical_artifact_sha256`; le relais KA devra appliquer DDD-ADR-008 par inbox idempotente sans transaction forte intercontextes.
 - `llm-gateway` reste le seul adaptateur réseau vers Spark.
 - Qdrant n'est pas une source de vérité de projection.
 - Les migrations restent ascendantes; aucun rollback de schéma destructif n'est automatisé.
@@ -66,4 +70,5 @@ Les éléments ci-dessous sont conservés pour la traçabilité des décisions; 
 - Worker ADR-022: RED `d9f73943f`, GREEN `d1daf1f34`; outbox, claims, leases et reprise après crash.
 - Contrats produit KA/SP/UI: RED `d5f682fdf` et `f3bf36660`, GREEN `3521770cc` et `27bef8d48`.
 - Gouvernance/performance: RED `4a448c2c7`, GREEN `f9a7ff3c1`; gate exhaustive Static/Live, OpenAPI typé et lectures bornées.
+- API/KA/UI paginées : RED `510d85ac6`, GREEN `c1aadb5f7`; extraction applicative RED `e6cef6a3d`, GREEN `9c5dcda90`; gate Static `31/31` GREEN.
 - La tentative historique de `scripts/test.ps1` est restée non concluante après dix minutes, sans verdict applicatif.
