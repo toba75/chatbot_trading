@@ -928,10 +928,10 @@ $requiredM013Requirements = @(
     [ordered] @{
         Id = "REQ-M013-FASTAPI-011"
         Source = "docs/tasks/milestone_013-fastapi/0011_deployer_auditer_api_orchestratrice.md"
-        Test = "tests/m013_fastapi/validate_document_command_router_unit.ps1; tests/m013_fastapi/validate_original_pdf_stream_unit.ps1; tests/m013_fastapi/validate_orchestrator_deployment_acceptance.ps1; tests/m013_fastapi/validate_document_http_live_acceptance.ps1; tests/m013_fastapi/validate_orchestrator_deployment_unit.ps1; tests/m013_fastapi/validate_m013_fastapi_traceability_unit.ps1"
+        Test = "tests/m013_fastapi/validate_document_command_router_unit.ps1; tests/m013_fastapi/validate_original_pdf_stream_unit.ps1; tests/m013_fastapi/validate_runtime_operations_acceptance.ps1; tests/m013_fastapi/validate_postgres_migration_upgrade_live.ps1; tests/m013_fastapi/validate_orchestrator_deployment_acceptance.ps1; tests/m013_fastapi/validate_document_http_live_acceptance.ps1; tests/m013_fastapi/validate_orchestrator_deployment_unit.ps1; tests/m013_fastapi/validate_m013_fastapi_traceability_unit.ps1"
         CommandScript = "scripts/validate_m013_fastapi.ps1"
-        Code = "app/platform/orchestrator_command.py; app/platform/orchestrator_runtime.py; app/platform/orchestrator_asgi.py; app/source_processing/adapters/http.py; app/source_processing/adapters/original_http.py; app/source_processing/adapters/postgres_document_persistence.py; deploy/local-compose/Caddyfile; deploy/local-compose/compose.yaml; deploy/local-compose/Dockerfile; deploy/postgres/migrations/002_knowledge_projection_read_models.sql; scripts/validate_m013_fastapi.ps1; docs/runbooks/api_orchestratrice.md; docs/governance/m013_fastapi_audit.md; docs/tasks/milestone_013-fastapi/journal.md"
-        Adr = "ADR-018; ADR-019; ADR-020"
+        Code = "app/platform/orchestrator_command.py; app/platform/orchestrator_runtime.py; app/platform/orchestrator_asgi.py; app/platform/postgres_migrations.py; app/source_processing/adapters/http.py; app/source_processing/adapters/original_http.py; app/source_processing/adapters/postgres_document_persistence.py; deploy/local-compose/Caddyfile; deploy/local-compose/compose.yaml; deploy/local-compose/Dockerfile; deploy/postgres/migrations/002_knowledge_projection_read_models.sql; scripts/validate_m013_fastapi.ps1; docs/runbooks/api_orchestratrice.md; docs/governance/m013_fastapi_audit.md; docs/tasks/milestone_013-fastapi/journal.md"
+        Adr = "ADR-018; ADR-019; ADR-020; ADR-021"
     }
 )
 

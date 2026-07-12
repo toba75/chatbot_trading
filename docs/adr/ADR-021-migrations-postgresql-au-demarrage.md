@@ -63,7 +63,7 @@ Le démarrage doit aussi rester borné par la configuration M13-config, sériali
 - Spécification : `docs/specs/m013_fastapi_api_orchestratrice.md`.
 - Plan d'implémentation : `docs/tasks/milestone_013-fastapi/0011_deployer_auditer_api_orchestratrice.md`.
 - Tests d'acceptation : `tests/m013_fastapi/validate_runtime_operations_acceptance.ps1`; `tests/m013_fastapi/validate_postgres_migration_upgrade_live.ps1`.
-- Commits : commit RED et commit GREEN du correctif runtime/opérations ADR-021.
+- Commits : RED `3c4159a86`; GREEN `439b4336f`.
 
 ## Notes
 

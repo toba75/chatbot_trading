@@ -88,3 +88,19 @@
 - Preuve réelle: PDF `pypdf` supérieur à 1 Mio transmis à PostgreSQL/Uvicorn réels puis restitué avec hash identique.
 - Audit dépendances: `pip-audit` indisponible localement; aucun scanner alternatif silencieux.
 - Commit GREEN: `89acbdd70`, `feat(api): borner frontiere http et streaming original ADR-020`.
+
+## Correctif de revue - Runtime et opérations
+
+- Date: 2026-07-12.
+- Source: findings migrations, timeouts, erreurs publiques, cycle de vie des ressources, client UI et runbook sur T-011.
+- Scénario: Given un volume PostgreSQL pré-M13 et la configuration M13-config; When `orchestrator-api` démarre, traite une requête puis s'arrête; Then le schéma 002 est migré sous ledger/verrou avant readiness, les budgets sont propagés, toute erreur infrastructure reste JSON et traçable, et toutes les ressources sont fermées sans masquer l'erreur primaire.
+- ADR: ADR-021 créée pour gouverner le runner transactionnel, le ledger SHA-256, la readiness dynamique et le rollback strictement ascendant.
+- Commit RED: `3c4159a86`, `test(runtime): couvrir migrations et budgets ADR-021`.
+- Commit GREEN: `439b4336f`, `feat(runtime): fiabiliser demarrage et migrations ADR-021`.
+- Preuve PostgreSQL: upgrade concurrent et idempotent d'un volume pré-M13 vers `001` et `002`, avec `platform.schema_migrations` et verrou advisory.
+- Budgets: `startup_seconds` pilote connexion et démarrage/migrations, `request_seconds` borne requête et healthcheck, `shutdown_seconds` pilote Uvicorn et Compose.
+- Erreurs: `TRACE_ID_INVALID` en 400, timeout en 504, exception en 500, toutes avec `error_code`, `X-Trace-ID` et log JSON sans payload ni secret.
+- Déploiement: image `ostrading/orchestrator-api:0.1.0-m013-fastapi-schema-002`, commandes hôte/edge séparées et rollback compatible ledger sans suppression de volume.
+- Contrat historique: aucun alias public `GET /` n'est confirmé par les tests de `master`; aucune rupture d'alias public n'est introduite.
+- Validations: gate M13-FastAPI 8 preuves GREEN, lint 38 validations GREEN, système ADR GREEN, Compose statique et `docker compose config` GREEN, preuves live PostgreSQL et PDF/Uvicorn GREEN.
+- Modification utilisateur protégée: `tests/m013/validate_m013_reality_product_acceptance.ps1`, hors staging et hors commits.

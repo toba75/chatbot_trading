@@ -22,6 +22,8 @@ $journal = Get-Content -Raw -Encoding UTF8 (Join-Path $repoRoot "docs\tasks\mile
 foreach ($testPath in @(
     "tests/m013_fastapi/validate_document_command_router_unit.ps1",
     "tests/m013_fastapi/validate_original_pdf_stream_unit.ps1",
+    "tests/m013_fastapi/validate_runtime_operations_acceptance.ps1",
+    "tests/m013_fastapi/validate_postgres_migration_upgrade_live.ps1",
     "tests/m013_fastapi/validate_orchestrator_deployment_acceptance.ps1",
     "tests/m013_fastapi/validate_document_http_live_acceptance.ps1",
     "tests/m013_fastapi/validate_orchestrator_deployment_unit.ps1",

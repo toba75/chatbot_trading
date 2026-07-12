@@ -64,6 +64,7 @@ La preuve live utilise Docker Engine, PostgreSQL, Uvicorn et HTTP réels. Aucun 
 ## Correctif de revue runtime et opérations
 
 - Décision applicable : ADR-021.
+- Commits : RED `3c4159a86`, `test(runtime): couvrir migrations et budgets ADR-021`; GREEN `439b4336f`, `feat(runtime): fiabiliser demarrage et migrations ADR-021`.
 - Scénarios : upgrade d'un volume pré-M13 vers le schéma 002; revalidation dynamique après démarrage; timeouts configurés; rollback des ressources partielles; réponses infrastructure traçables; timeout de lecture UI traduit sans fallback.
 - Version livrée : image `ostrading/orchestrator-api:0.1.0-m013-fastapi-schema-002`, migrations `001` et `002`, ledger `platform.schema_migrations`.
 - Le contrat historique `GET /` n'existe pas dans les tests publics de `master`; aucune rupture d'alias n'est introduite ni documentée comme API publique.
