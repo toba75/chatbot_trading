@@ -110,18 +110,16 @@ assert_not_contains(body.lower(), "purge", "Le premier écran ne doit pas propos
 payload = build_registration_payload(
     original_content=b"%PDF-1.7\nfixture minimale",
     title="Rapport annuel 2024",
-    issuer="OSTrading",
-    document_date="2024-12-31",
-    document_type="rapport_annuel",
-    language="fr",
+    authors=("Auteur A", "Auteur B"),
+    publication_year=2024,
+    edition="1",
 )
 assert_contains(str(payload.keys()), "original_content", "Le contenu original doit être transmis.")
 metadata = payload["bibliographic_metadata"]
 assert_equal(metadata["title"], "Rapport annuel 2024", "Le titre doit venir du formulaire.")
-assert_equal(metadata["issuer"], "OSTrading", "L'émetteur doit venir du formulaire.")
-assert_equal(metadata["document_date"], "2024-12-31", "La date documentaire doit venir du formulaire.")
-assert_equal(metadata["document_type"], "rapport_annuel", "Le type documentaire doit venir du formulaire.")
-assert_equal(metadata["language"], "fr", "La langue doit venir du formulaire.")
+assert_equal(metadata["authors"], ("Auteur A", "Auteur B"), "Les auteurs doivent venir du formulaire.")
+assert_equal(metadata["publication_year"], 2024, "L'année doit venir du formulaire.")
+assert_equal(metadata["edition"], "1", "L'édition doit venir du formulaire.")
 
 # Given un PDF est sélectionné pour une conversation.
 # When l'utilisateur le retire depuis le premier écran.

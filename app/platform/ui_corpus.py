@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+import json
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -60,14 +61,10 @@ PROJECTION_STATUSES = frozenset(
 READ_MODEL_STATUSES = frozenset(
     {
         "READ_MODEL_READY",
-        "READ_MODEL_NOT_CONNECTED",
         "READ_MODEL_UNAVAILABLE",
     }
 )
 _PDF_VIEWER_PATH_PATTERN = re.compile(r"^/ui/documents/(?P<document_id>[^/]+)/pdf$")
-_PDF_CONTENT_PATH_PATTERN = re.compile(r"^/ui/documents/(?P<document_id>[^/]+)/pdf/content$")
-ORCHESTRATOR_API_CONTRACT_NOT_WIRED = "ORCHESTRATOR_API_CONTRACT_NOT_WIRED"
-UI_FUNCTION_NOT_OPERATIONAL = "UI_FUNCTION_NOT_OPERATIONAL"
 _DESTRUCTIVE_FIELD_NAMES = frozenset(
     {
         "delete",
@@ -166,6 +163,7 @@ class CorpusPdfScreenState:
     documents: Sequence[CorpusPdfDocument]
     active_selected_document_ids: Sequence[str]
     read_model_status: str
+    public_error: Mapping[str, Any] | None = None
 
     def __post_init__(self) -> None:
         documents = _ensure_documents(self.documents)
@@ -188,15 +186,29 @@ class CorpusPdfScreenState:
                 "statut read-model UI invalide",
             ),
         )
+        if self.read_model_status == "READ_MODEL_READY":
+            if self.public_error is not None:
+                raise ValueError("erreur publique interdite pour un read-model prêt")
+            return
+        if not isinstance(self.public_error, Mapping):
+            raise ValueError("erreur publique requise pour un read-model indisponible")
+        error_payload = dict(self.public_error)
+        ensure_no_destructive_ui_fields(error_payload)
+        _ensure_text(error_payload.get("error_code"), "error_code public requis")
+        object.__setattr__(self, "public_error", error_payload)
 
 
-def build_unconnected_corpus_pdf_state() -> CorpusPdfScreenState:
-    """Construit un état explicite quand le read-model documentaire n'est pas branché."""
+def build_unavailable_corpus_pdf_state(
+    *,
+    public_error: Mapping[str, Any],
+) -> CorpusPdfScreenState:
+    """Construit le blocage UI à partir d'une erreur réellement observée."""
 
     return CorpusPdfScreenState(
         documents=(),
         active_selected_document_ids=(),
-        read_model_status="READ_MODEL_NOT_CONNECTED",
+        read_model_status="READ_MODEL_UNAVAILABLE",
+        public_error=public_error,
     )
 
 
@@ -204,10 +216,9 @@ def build_registration_payload(
     *,
     original_content: bytes,
     title: str,
-    issuer: str,
-    document_date: str,
-    document_type: str,
-    language: str,
+    authors: Sequence[str],
+    publication_year: int,
+    edition: str,
 ) -> Mapping[str, Any]:
     """Construit le payload strict de `POST /v1/documents`."""
 
@@ -217,10 +228,9 @@ def build_registration_payload(
         "original_content": original_content,
         "bibliographic_metadata": {
             "title": _ensure_text(title, "title requis"),
-            "issuer": _ensure_text(issuer, "issuer requis"),
-            "document_date": _ensure_text(document_date, "document_date requis"),
-            "document_type": _ensure_text(document_type, "document_type requis"),
-            "language": _ensure_text(language, "language requis"),
+            "authors": _ensure_authors(authors),
+            "publication_year": _ensure_publication_year(publication_year),
+            "edition": _ensure_text(edition, "edition requise"),
         },
     }
     ensure_no_destructive_ui_fields(payload)
@@ -262,12 +272,14 @@ def render_corpus_pdf_screen(state: CorpusPdfScreenState) -> str:
     fieldset_attributes = ""
     if not read_model_connected:
         fieldset_attributes = ' disabled aria-disabled="true"'
+        public_error = html.escape(
+            str(dict(parsed_state.public_error)),
+            quote=True,
+        )
         blocking_notice = (
             '<div class="blocking-notice" role="status" aria-live="polite">'
             '<strong>Fonction UI non opérationnelle</strong><br>'
-            f'<code>{ORCHESTRATOR_API_CONTRACT_NOT_WIRED}</code>: '
-            "les contrats documentaires de <code>orchestrator-api</code> ne sont pas câblés "
-            "aux cas d'usage réels.</div>"
+            f'<code>{public_error}</code></div>'
         )
     return "\n".join(
         (
@@ -307,10 +319,9 @@ def render_corpus_pdf_screen(state: CorpusPdfScreenState) -> str:
             f"        <fieldset{fieldset_attributes}>",
             '        <label>Fichier PDF original<input name="original_content" type="file" accept="application/pdf" required></label>',
             '        <label>Titre documentaire<input name="title" type="text" required></label>',
-            '        <label>Émetteur ou origine<input name="issuer" type="text" required></label>',
-            '        <label>Date documentaire<input name="document_date" type="text" required></label>',
-            '        <label>Type documentaire<input name="document_type" type="text" required></label>',
-            '        <label>Langue principale<input name="language" type="text" required></label>',
+            '        <label>Auteur<input name="authors" type="text" required></label>',
+            '        <label>Année de publication<input name="publication_year" type="number" min="1" required></label>',
+            '        <label>Édition<input name="edition" type="text" required></label>',
             "        <button type=\"submit\">Ajouter au corpus</button>",
             "        </fieldset>",
             "      </form>",
@@ -368,6 +379,37 @@ def render_pdf_viewer(document: CorpusPdfDocument) -> str:
     )
 
 
+def render_document_inspection(*, title: str, response: Any) -> str:
+    """Rend une sortie ou erreur publique déjà validée par le client UI."""
+
+    parsed_title = _ensure_text(title, "titre inspection requis")
+    status_code = getattr(response, "status_code", None)
+    payload = getattr(response, "payload", None)
+    if isinstance(status_code, bool) or not isinstance(status_code, int):
+        raise ValueError("status_code inspection invalide")
+    if not isinstance(payload, Mapping):
+        raise ValueError("payload inspection invalide")
+    ensure_no_destructive_ui_fields(payload)
+    serialized = html.escape(
+        json.dumps(dict(payload), ensure_ascii=False, sort_keys=True, indent=2),
+        quote=True,
+    )
+    return "\n".join(
+        (
+            "<!doctype html>",
+            '<html lang="fr">',
+            '<head><meta charset="utf-8"><title>Inspection documentaire</title></head>',
+            "<body>",
+            f"<h1>{_escape(parsed_title)}</h1>",
+            f"<p>Statut HTTP public: <code>{status_code}</code></p>",
+            f"<pre>{serialized}</pre>",
+            '<p><a href="/ui/corpus-pdf">Retour au corpus</a></p>',
+            "</body>",
+            "</html>",
+        )
+    )
+
+
 def ui_get_response(
     *,
     path: str,
@@ -387,21 +429,6 @@ def ui_get_response(
                 return 200, "text/html; charset=utf-8", render_pdf_viewer(document)
         return 404, "text/html; charset=utf-8", _render_not_found(document_id)
     return 404, "text/html; charset=utf-8", _render_not_found(parsed_path)
-
-
-def ui_unavailable_pdf_content_response(*, path: str) -> tuple[int, str, bytes]:
-    """Refuse le contenu PDF tant que son contrat API réel n'est pas câblé."""
-
-    parsed_path = _ensure_path(path)
-    match = _PDF_CONTENT_PATH_PATTERN.fullmatch(parsed_path)
-    if match is None:
-        raise ValueError("chemin contenu PDF invalide")
-    _ensure_document_id(match.group("document_id"))
-    body = (
-        "Fonction UI non opérationnelle: "
-        f"{ORCHESTRATOR_API_CONTRACT_NOT_WIRED}"
-    ).encode("utf-8")
-    return 503, "text/plain; charset=utf-8", body
 
 
 def _render_document_row(document: CorpusPdfDocument) -> str:
@@ -426,8 +453,14 @@ def _render_document_row(document: CorpusPdfDocument) -> str:
             _render_diagnostic_cell(document),
             "</td><td>",
             _escape(document.conversion_status),
+            '<br><a href="/ui/documents/',
+            _escape(document.document_id),
+            '/conversion">Inspecter</a>',
             "</td><td>",
             _escape(document.projection_status),
+            '<br><a href="/ui/documents/',
+            _escape(document.document_id),
+            '/projection">Inspecter</a>',
             "</td><td>",
             _escape(selected_text),
             '<br><button type="button" data-action="retirer_selection_active" data-document-id="',
@@ -443,7 +476,14 @@ def _render_diagnostic_cell(document: CorpusPdfDocument) -> str:
     parsed_document = _ensure_document(document)
     diagnostic_status = _escape(parsed_document.diagnostic_status)
     if parsed_document.diagnostic_status != "DIAGNOSTIC_NOT_REQUESTED":
-        return diagnostic_status
+        return "".join(
+            (
+                diagnostic_status,
+                '<br><a href="/ui/documents/',
+                _escape(parsed_document.document_id),
+                '/diagnostic">Inspecter</a>',
+            )
+        )
     escaped_document_id = _escape(parsed_document.document_id)
     return "".join(
         (
@@ -453,6 +493,9 @@ def _render_diagnostic_cell(document: CorpusPdfDocument) -> str:
             '/diagnose">',
             '<button type="submit">Diagnostiquer</button>',
             "</form>",
+            '<br><a href="/ui/documents/',
+            escaped_document_id,
+            '/diagnostic">Inspecter</a>',
         )
     )
 
@@ -495,6 +538,21 @@ def _ensure_documents(value: Sequence[CorpusPdfDocument]) -> tuple[CorpusPdfDocu
     if len(set(document_ids)) != len(document_ids):
         raise ValueError("document UI dupliqué")
     return documents
+
+
+def _ensure_authors(value: Sequence[str]) -> tuple[str, ...]:
+    if isinstance(value, (str, bytes)) or not isinstance(value, Sequence):
+        raise ValueError("authors requis")
+    authors = tuple(_ensure_text(author, "author requis") for author in value)
+    if len(authors) == 0:
+        raise ValueError("authors requis")
+    return authors
+
+
+def _ensure_publication_year(value: Any) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise ValueError("publication_year invalide")
+    return value
 
 
 def _ensure_document(value: CorpusPdfDocument) -> CorpusPdfDocument:
@@ -552,14 +610,12 @@ def _escape(value: str) -> str:
 __all__ = [
     "CorpusPdfDocument",
     "CorpusPdfScreenState",
-    "ORCHESTRATOR_API_CONTRACT_NOT_WIRED",
-    "UI_FUNCTION_NOT_OPERATIONAL",
     "build_registration_payload",
-    "build_unconnected_corpus_pdf_state",
+    "build_unavailable_corpus_pdf_state",
     "ensure_no_destructive_ui_fields",
     "remove_from_active_selection",
     "render_corpus_pdf_screen",
+    "render_document_inspection",
     "render_pdf_viewer",
     "ui_get_response",
-    "ui_unavailable_pdf_content_response",
 ]

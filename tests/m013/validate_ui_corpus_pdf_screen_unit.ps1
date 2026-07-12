@@ -175,21 +175,19 @@ assert_not_contains(viewer, "original_storage_ref", "Le visualiseur ne doit pas 
 payload = build_registration_payload(
     original_content=b"%PDF-1.7\n",
     title="Rapport",
-    issuer="Emetteur",
-    document_date="DATE_NON_RENSEIGNEE",
-    document_type="rapport",
-    language="fr",
+    authors=("Auteur",),
+    publication_year=2026,
+    edition="1",
 )
-assert_equal(payload["bibliographic_metadata"]["document_date"], "DATE_NON_RENSEIGNEE", "La date explicite non renseignée doit être conservée.")
+assert_equal(payload["bibliographic_metadata"]["publication_year"], 2026, "L'année explicite doit être conservée.")
 assert_raises(
     "original_content requis",
     lambda: build_registration_payload(
         original_content=b"",
         title="Rapport",
-        issuer="Emetteur",
-        document_date="2024-01-01",
-        document_type="rapport",
-        language="fr",
+        authors=("Auteur",),
+        publication_year=2026,
+        edition="1",
     ),
 )
 assert_raises(
@@ -197,10 +195,9 @@ assert_raises(
     lambda: build_registration_payload(
         original_content=b"%PDF-1.7\n",
         title="",
-        issuer="Emetteur",
-        document_date="2024-01-01",
-        document_type="rapport",
-        language="fr",
+        authors=("Auteur",),
+        publication_year=2026,
+        edition="1",
     ),
 )
 assert_raises(

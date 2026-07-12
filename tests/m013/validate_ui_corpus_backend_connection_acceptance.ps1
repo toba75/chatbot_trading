@@ -19,13 +19,11 @@ if repo_root not in sys.path:
     sys.path.insert(0, repo_root)
 
 from app.platform.configuration import load_application_configuration  # noqa: E402
-from app.platform.local_runtime import (  # noqa: E402
-    _build_ui_corpus_state,
-    _local_post_response,
-)
-from app.platform.ui_corpus import (  # noqa: E402
-    ui_get_response,
-    ui_unavailable_pdf_content_response,
+from app.platform.local_runtime import _build_ui_corpus_state  # noqa: E402
+from app.platform.ui_corpus import ui_get_response  # noqa: E402
+from app.platform.ui_document_api import (  # noqa: E402
+    UiDocumentApiClient,
+    UiDocumentApiResponse,
 )
 
 
@@ -42,6 +40,29 @@ def assert_contains(text: str, expected: str, message: str) -> None:
 def assert_not_contains(text: str, forbidden: str, message: str) -> None:
     if forbidden in text:
         raise AssertionError(f"{message} Texte obtenu: {text!r}")
+
+
+class RecordingTransport:
+    def __init__(self) -> None:
+        self.paths: list[str] = []
+        self.responses = [
+            UiDocumentApiResponse(
+                200,
+                "application/json",
+                b'{"documents":[{"document_id":"DOC-M013-UI-API01","title":"Depuis API",'
+                b'"document_status":"SOURCE_REGISTERED","diagnostic_status":"DIAGNOSTIC_NOT_REQUESTED",'
+                b'"conversion_status":"CONVERSION_NOT_REQUESTED","canonical_version_id":null}]}',
+            ),
+            UiDocumentApiResponse(
+                200,
+                "application/json",
+                b'{"document_id":"DOC-M013-UI-API01","projection_status":"PROJECTION_NOT_REQUESTED"}',
+            ),
+        ]
+
+    def request(self, *, method: str, path: str, body: bytes | None, content_type: str | None) -> UiDocumentApiResponse:
+        self.paths.append(path)
+        return self.responses.pop(0)
 
 
 def runtime_configuration_for(corpus_root: Path):
@@ -61,55 +82,40 @@ with tempfile.TemporaryDirectory() as temporary_root:
     corpus_root.mkdir()
     (corpus_root / "Ne doit pas être lu.pdf").write_bytes(b"%PDF-1.7\ninterdit\n%%EOF\n")
     configuration = runtime_configuration_for(corpus_root)
+    transport = RecordingTransport()
+    client = UiDocumentApiClient(transport=transport)
 
-    # Given un PDF existe dans le stockage configuré mais GET /v1/documents n'est pas câblé.
-    # When le runtime UI construit son écran.
-    # Then il n'accède pas au corpus et laisse la fonction explicitement non opérationnelle.
-    state = _build_ui_corpus_state(application_configuration=configuration)
-    assert_equal(state.read_model_status, "READ_MODEL_NOT_CONNECTED", "Le runtime doit refléter le contrat API absent.")
-    assert_equal(state.documents, (), "Le PDF local ne doit pas contourner l'API orchestratrice.")
+    # Given un fichier existe dans corpus_root et l'API expose un autre document.
+    # When le runtime UI construit le corpus.
+    # Then seul le read-model HTTP public est rendu, sans lecture de fichier ni fallback.
+    state = _build_ui_corpus_state(
+        application_configuration=configuration,
+        api_client=client,
+    )
+    assert_equal(state.read_model_status, "READ_MODEL_READY", "Le runtime doit refléter le contrat API prêt.")
+    assert_equal(state.documents[0].title, "Depuis API", "Le document doit venir de l'orchestrateur.")
+    assert_equal(
+        transport.paths,
+        ["/v1/documents", "/v1/documents/DOC-M013-UI-API01/projection"],
+        "Le trajet doit rester borné aux contrats documentaires publics.",
+    )
 
     screen_status, screen_type, screen_body = ui_get_response(path="/ui/corpus-pdf", state=state)
-    assert_equal(screen_status, 200, "L'écran bloqué doit rester consultable.")
+    assert_equal(screen_status, 200, "L'écran raccordé doit être consultable.")
     assert_equal(screen_type, "text/html; charset=utf-8", "L'écran doit rester HTML.")
-    assert_contains(screen_body, "ORCHESTRATOR_API_CONTRACT_NOT_WIRED", "Le défaut de câblage doit être public.")
+    assert_contains(screen_body, "Depuis API", "Le read-model API doit être visible.")
+    assert_contains(screen_body, ">Diagnostiquer</button>", "La commande doit être active pour DIAGNOSTIC_NOT_REQUESTED.")
     assert_not_contains(screen_body, "Ne doit pas être lu", "Le stockage direct ne doit pas fuiter dans l'UI.")
-
-    diagnosis_path = "/v1/documents/DOC-FFFFFFFFFFFFFFFF/diagnose"
-    api_status, api_body = _local_post_response(
-        service_id="orchestrator-api",
-        path=diagnosis_path,
-        body={},
-        application_configuration=configuration,
-    )
-    assert_equal(api_status, 404, "Le contrat documentaire est réellement absent de l'API actuelle.")
-    assert_equal(api_body["error_code"], "ENDPOINT_NOT_FOUND", "L'API doit prouver l'absence du contrat.")
-
-    ui_status, ui_body = _local_post_response(
-        service_id="ui",
-        path=diagnosis_path,
-        body={},
-        application_configuration=configuration,
-    )
-    assert_equal(ui_status, 503, "L'UI ne doit pas simuler le diagnostic absent.")
-    assert_equal(ui_body["error_code"], "UI_FUNCTION_NOT_OPERATIONAL", "Le blocage UI doit être stable.")
-    assert_equal(ui_body["reason"], "ORCHESTRATOR_API_CONTRACT_NOT_WIRED", "Le défaut de câblage doit être nommé.")
-    assert_not_contains(str(ui_body), "DIAGNOSTIC_REQUESTED", "Aucun état diagnostic ne doit être fabriqué.")
-
-    content_status, _, content_body = ui_unavailable_pdf_content_response(
-        path="/ui/documents/DOC-FFFFFFFFFFFFFFFF/pdf/content",
-    )
-    assert_equal(content_status, 503, "Le PDF ne doit pas être servi depuis le stockage UI.")
-    assert_not_contains(content_body.decode("utf-8"), str(corpus_root), "Le chemin local ne doit pas être exposé.")
 
 runtime_source = (Path(repo_root) / "app" / "platform" / "local_runtime.py").read_text(encoding="utf-8")
 ui_source = (Path(repo_root) / "app" / "platform" / "ui_corpus.py").read_text(encoding="utf-8")
 for forbidden in (
+    "build_unconnected_corpus_pdf_state",
+    "ORCHESTRATOR_API_CONTRACT_NOT_WIRED",
+    "UI_FUNCTION_NOT_OPERATIONAL",
     "_UI_DIAGNOSTIC_REQUESTED_DOCUMENT_IDS",
-    "ui_request_diagnostic_response",
-    "apply_diagnostic_requests_to_corpus_state",
 ):
-    assert_not_contains(runtime_source, forbidden, "Le runtime UI ne doit conserver aucun état métier substitutif.")
+    assert_not_contains(runtime_source + ui_source, forbidden, "L'ancien chemin UI non raccordé doit être retiré.")
 for forbidden in (".iterdir()", ".read_bytes()", "hashlib.sha256"):
     assert_not_contains(ui_source, forbidden, "L'adaptateur UI ne doit pas lire ni identifier directement les PDF.")
 
@@ -129,7 +135,6 @@ try {
     finally {
         $ErrorActionPreference = $previousErrorActionPreference
     }
-
     if ($exitCode -ne 0) {
         throw "Test d'acceptation frontière UI vers API orchestratrice invalide. Sortie: $($output -join "`n")"
     }

@@ -40,11 +40,17 @@ from app.platform.llm_gateway import (
 from app.platform.observability import GatewayObservation, InMemoryObservabilityCollector
 from app.platform.ui_corpus import (
     CorpusPdfScreenState,
-    ORCHESTRATOR_API_CONTRACT_NOT_WIRED,
-    UI_FUNCTION_NOT_OPERATIONAL,
-    build_unconnected_corpus_pdf_state,
+    build_unavailable_corpus_pdf_state,
+    render_document_inspection,
     ui_get_response,
-    ui_unavailable_pdf_content_response,
+)
+from app.platform.ui_document_api import (
+    ORCHESTRATOR_API_UNAVAILABLE,
+    UiDocumentApiClient,
+    UiDocumentApiPublicError,
+    UiDocumentApiUnavailableError,
+    UiDocumentJsonResponse,
+    UrllibUiDocumentApiTransport,
 )
 
 
@@ -58,8 +64,11 @@ HTTP_SERVICE_PORTS = {
     "backtest-engine": 8200,
 }
 WORKER_SERVICE_IDS = frozenset(("worker-documents", "worker-research", "worker-backtest"))
-_UI_DOCUMENT_COMMAND_PATH_PATTERN = re.compile(
-    r"^/v1/documents(?:/[^/]+/(?:diagnose|convert|index))?$"
+_UI_DOCUMENT_INSPECTION_PATH_PATTERN = re.compile(
+    r"^/ui/documents/(?P<document_id>[^/]+)/(?P<step>diagnostic|conversion|projection)$"
+)
+_UI_PDF_CONTENT_PATH_PATTERN = re.compile(
+    r"^/ui/documents/(?P<document_id>[^/]+)/pdf/content$"
 )
 _LLM_GATEWAY_LOCK = threading.Lock()
 _LLM_GATEWAY_INSTANCE: OpenAICompatibleLocalLanguageModelGateway | None = None
@@ -178,21 +187,57 @@ def _serve_http(*, service_id: str, port: int, application_configuration: Applic
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:
             if service_id == "ui" and self.path != "/health":
-                if self.path.endswith("/pdf/content"):
-                    status_code, content_type, response_body = ui_unavailable_pdf_content_response(
-                        path=self.path,
-                    )
+                api_client = _build_ui_document_api_client(
+                    application_configuration=application_configuration,
+                )
+                pdf_match = _UI_PDF_CONTENT_PATH_PATTERN.fullmatch(self.path)
+                if pdf_match is not None:
+                    try:
+                        response = api_client.read_original_pdf(pdf_match.group("document_id"))
+                    except UiDocumentApiUnavailableError:
+                        _write_json_response(
+                            self,
+                            status_code=503,
+                            body={"error_code": ORCHESTRATOR_API_UNAVAILABLE},
+                        )
+                        return
                     _write_binary_response(
                         self,
-                        status_code=status_code,
-                        content_type=content_type,
-                        body=response_body,
+                        status_code=response.status_code,
+                        content_type=response.content_type,
+                        body=response.body,
+                    )
+                    return
+                inspection_match = _UI_DOCUMENT_INSPECTION_PATH_PATTERN.fullmatch(self.path)
+                if inspection_match is not None:
+                    document_id = inspection_match.group("document_id")
+                    step = inspection_match.group("step")
+                    try:
+                        response = _read_ui_document_step(
+                            api_client=api_client,
+                            document_id=document_id,
+                            step=step,
+                        )
+                    except UiDocumentApiUnavailableError:
+                        response = UiDocumentJsonResponse(
+                            status_code=503,
+                            payload={"error_code": ORCHESTRATOR_API_UNAVAILABLE},
+                        )
+                    _write_text_response(
+                        self,
+                        status_code=200,
+                        content_type="text/html; charset=utf-8",
+                        body=render_document_inspection(
+                            title=step.capitalize(),
+                            response=response,
+                        ),
                     )
                     return
                 status_code, content_type, response_body = ui_get_response(
                     path=self.path,
                     state=_build_ui_corpus_state(
                         application_configuration=application_configuration,
+                        api_client=api_client,
                     ),
                 )
                 _write_text_response(
@@ -220,13 +265,39 @@ def _serve_http(*, service_id: str, port: int, application_configuration: Applic
 
         def do_POST(self) -> None:
             if service_id == "ui":
-                status_code, response_body = _local_post_response(
-                    service_id=service_id,
-                    path=self.path,
-                    body={},
-                    application_configuration=application_configuration,
+                body_result = _read_raw_body(self)
+                if body_result[0] != 200:
+                    _write_json_response(self, status_code=body_result[0], body=body_result[1])
+                    return
+                raw_body = body_result[1]
+                if not isinstance(raw_body, bytes):
+                    raise TypeError("body UI brut invalide")
+                content_type = self.headers.get("Content-Type")
+                if content_type is None:
+                    _write_json_response(
+                        self,
+                        status_code=400,
+                        body={"error_code": "HTTP_REQUEST_INVALID", "field": "content_type"},
+                    )
+                    return
+                try:
+                    response = _build_ui_document_api_client(
+                        application_configuration=application_configuration,
+                    ).forward_document_command(
+                        path=self.path,
+                        body=raw_body,
+                        content_type=content_type,
+                    )
+                except UiDocumentApiUnavailableError:
+                    response = UiDocumentJsonResponse(
+                        status_code=503,
+                        payload={"error_code": ORCHESTRATOR_API_UNAVAILABLE},
+                    )
+                _write_json_response(
+                    self,
+                    status_code=response.status_code,
+                    body=dict(response.payload),
                 )
-                _write_json_response(self, status_code=status_code, body=response_body)
                 return
             body_result = _read_json_body(self)
             if body_result[0] != 200:
@@ -369,29 +440,62 @@ def _read_json_body(handler: BaseHTTPRequestHandler) -> tuple[int, dict[str, Any
     return 200, parsed_body
 
 
+def _read_raw_body(
+    handler: BaseHTTPRequestHandler,
+) -> tuple[int, bytes | dict[str, Any]]:
+    raw_length = handler.headers.get("Content-Length")
+    if raw_length is None or not raw_length.isdecimal():
+        return 400, {"error_code": "HTTP_REQUEST_INVALID", "field": "content_length"}
+    content_length = int(raw_length)
+    if content_length < 0:
+        return 400, {"error_code": "HTTP_REQUEST_INVALID", "field": "content_length"}
+    return 200, handler.rfile.read(content_length)
+
+
 def _build_ui_corpus_state(
     *,
     application_configuration: ApplicationConfiguration,
+    api_client: UiDocumentApiClient,
 ) -> CorpusPdfScreenState:
     _required_application_configuration(application_configuration)
-    return build_unconnected_corpus_pdf_state()
+    if not isinstance(api_client, UiDocumentApiClient):
+        raise TypeError("client API documentaire UI requis")
+    try:
+        return api_client.build_corpus_state(active_selected_document_ids=())
+    except UiDocumentApiPublicError as exc:
+        return build_unavailable_corpus_pdf_state(public_error=exc.response.payload)
+    except UiDocumentApiUnavailableError:
+        return build_unavailable_corpus_pdf_state(
+            public_error={"error_code": ORCHESTRATOR_API_UNAVAILABLE},
+        )
 
 
-def _ui_post_response(
+def _build_ui_document_api_client(
     *,
-    path: str,
-    body: dict[str, Any],
-    application_configuration: ApplicationConfiguration | None,
-) -> tuple[int, dict[str, Any]]:
-    if _UI_DOCUMENT_COMMAND_PATH_PATTERN.fullmatch(path) is None:
-        return 404, {"error_code": "ENDPOINT_NOT_FOUND", "path": path}
-    if application_configuration is not None:
-        _required_application_configuration(application_configuration)
-    return 503, {
-        "error_code": UI_FUNCTION_NOT_OPERATIONAL,
-        "reason": ORCHESTRATOR_API_CONTRACT_NOT_WIRED,
-        "endpoint": path,
-    }
+    application_configuration: ApplicationConfiguration,
+) -> UiDocumentApiClient:
+    configuration = _required_application_configuration(application_configuration)
+    return UiDocumentApiClient(
+        transport=UrllibUiDocumentApiTransport(
+            orchestrator_origin=f"http://orchestrator-api:{configuration.services.api.port}",
+            timeout_seconds=configuration.runtime.timeouts.request_seconds,
+        )
+    )
+
+
+def _read_ui_document_step(
+    *,
+    api_client: UiDocumentApiClient,
+    document_id: str,
+    step: str,
+) -> UiDocumentJsonResponse:
+    if step == "diagnostic":
+        return api_client.read_diagnostic(document_id)
+    if step == "conversion":
+        return api_client.read_conversion(document_id)
+    if step == "projection":
+        return api_client.read_projection(document_id)
+    raise ValueError("étape documentaire UI inconnue")
 
 
 def _local_post_response(
@@ -401,12 +505,6 @@ def _local_post_response(
     body: dict[str, Any],
     application_configuration: ApplicationConfiguration | None = None,
 ) -> tuple[int, dict[str, Any]]:
-    if service_id == "ui":
-        return _ui_post_response(
-            path=path,
-            body=body,
-            application_configuration=application_configuration,
-        )
     if service_id == "llm-gateway":
         return _llm_gateway_post_response(
             path=path,
