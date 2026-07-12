@@ -368,15 +368,15 @@ local_search_status, local_search_body = _local_post_response(
     path="/v1/search",
     body=valid_body(),
 )
-assert_equal(local_search_status, 503, "Le runtime local doit reconnaître POST /v1/search sans fallback.")
-assert_equal(local_search_body["error_code"], "SERVICE_NOT_CONFIGURED", "Le runtime local doit refuser explicitement tant que KA n'est pas câblé.")
+assert_equal(local_search_status, 404, "Le routeur artisanal ne doit plus servir POST /v1/search après sa migration ASGI.")
+assert_equal(local_search_body["error_code"], "ENDPOINT_NOT_FOUND", "La route migrée ne doit conserver aucun fallback artisanal.")
 local_index_status, local_index_body = _local_post_response(
     service_id="orchestrator-api",
     path="/v1/documents/DOC-M005-T009-UNIT/index",
     body=valid_body(),
 )
-assert_equal(local_index_status, 503, "Le runtime local doit reconnaître POST /v1/documents/{document_id}/index.")
-assert_equal(local_index_body["endpoint"], "POST /v1/documents/{document_id}/index", "L'endpoint local doit être nommé.")
+assert_equal(local_index_status, 404, "Le routeur artisanal ne doit plus servir POST /v1/documents/{document_id}/index.")
+assert_equal(local_index_body["error_code"], "ENDPOINT_NOT_FOUND", "L'indexation migrée ne doit conserver aucun fallback artisanal.")
 local_ui_status, local_ui_body = _local_post_response(
     service_id="ui",
     path="/v1/search",

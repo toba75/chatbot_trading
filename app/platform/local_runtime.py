@@ -58,7 +58,6 @@ HTTP_SERVICE_PORTS = {
     "backtest-engine": 8200,
 }
 WORKER_SERVICE_IDS = frozenset(("worker-documents", "worker-research", "worker-backtest"))
-_M005_INDEX_PATH_PATTERN = re.compile(r"^/v1/documents/([^/]+)/index$")
 _UI_DOCUMENT_COMMAND_PATH_PATTERN = re.compile(
     r"^/v1/documents(?:/[^/]+/(?:diagnose|convert|index))?$"
 )
@@ -416,39 +415,26 @@ def _local_post_response(
         )
     if service_id != "orchestrator-api":
         return 404, {"error_code": "ENDPOINT_NOT_FOUND", "path": path}
-    if path == "/v1/chat/completions":
-        try:
-            return _product_chat_completions_post_response(
-                body=body,
-                application_configuration=_required_application_configuration(application_configuration),
-            )
-        except LLMGatewayContractError as exc:
-            return 400, {"error_code": exc.code, "message": exc.message}
-    if path == "/v1/evaluation/llm-real-path-benchmark":
-        try:
-            return _llm_real_path_benchmark_post_response(
-                body=body,
-                application_configuration=_required_application_configuration(application_configuration),
-            )
-        except LLMGatewayContractError as exc:
-            return 400, {"error_code": exc.code, "message": exc.message}
-    if path == "/v1/search":
-        return 503, {
-            "error_code": "SERVICE_NOT_CONFIGURED",
-            "endpoint": "POST /v1/search",
-        }
-    index_match = _M005_INDEX_PATH_PATTERN.fullmatch(path)
-    if index_match is not None:
-        try:
-            document_id = str(DomainIdentifier.parse_with_prefix(index_match.group(1), "DOC"))
-        except ValueError:
-            return 400, {"error_code": "HTTP_REQUEST_INVALID", "field": "document_id"}
-        return 503, {
-            "document_id": document_id,
-            "error_code": "SERVICE_NOT_CONFIGURED",
-            "endpoint": "POST /v1/documents/{document_id}/index",
-        }
     return 404, {"error_code": "ENDPOINT_NOT_FOUND", "path": path}
+
+
+def _search_post_response() -> tuple[int, dict[str, Any]]:
+    return 503, {
+        "error_code": "SERVICE_NOT_CONFIGURED",
+        "endpoint": "POST /v1/search",
+    }
+
+
+def _index_post_response(*, document_id: str) -> tuple[int, dict[str, Any]]:
+    try:
+        validated_document_id = str(DomainIdentifier.parse_with_prefix(document_id, "DOC"))
+    except ValueError:
+        return 400, {"error_code": "HTTP_REQUEST_INVALID", "field": "document_id"}
+    return 503, {
+        "document_id": validated_document_id,
+        "error_code": "SERVICE_NOT_CONFIGURED",
+        "endpoint": "POST /v1/documents/{document_id}/index",
+    }
 
 
 def _required_application_configuration(

@@ -10,6 +10,13 @@ import uvicorn
 
 from app.platform.configuration import ApplicationConfiguration
 from app.platform.orchestrator_composition import OrchestratorCompositionRoot
+from app.platform.orchestrator_contract_routers import (
+    build_conversation_router,
+    build_evaluation_router,
+    build_health_router,
+    build_indexing_router,
+    build_search_router,
+)
 
 
 CompositionRootFactory = Callable[[ApplicationConfiguration], OrchestratorCompositionRoot]
@@ -37,10 +44,11 @@ def create_orchestrator_app(
             await composition_root.close()
 
     application = FastAPI(lifespan=lifespan)
-
-    @application.get("/health")
-    async def health() -> dict[str, str]:
-        return {"service": "orchestrator-api", "status": "healthy"}
+    application.include_router(build_health_router())
+    application.include_router(build_conversation_router(configuration))
+    application.include_router(build_evaluation_router(configuration))
+    application.include_router(build_search_router())
+    application.include_router(build_indexing_router())
 
     @application.get("/ready")
     async def ready() -> JSONResponse:
