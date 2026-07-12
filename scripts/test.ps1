@@ -766,7 +766,10 @@ elseif ($env:OST_M006_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
     Write-Host "Tests de précondition M-008 exclus explicitement: M-006 reste indépendant du milestone aval."
     Write-Host "Tests de précondition M-009 exclus explicitement: M-006 reste indépendant du milestone aval."
     Write-Host "Tests de précondition M-010 exclus explicitement: M-006 reste indépendant du milestone aval."
+    Write-Host "Tests de gouvernance M13-UI exclus explicitement: M-006 reste indépendant du milestone aval."
     $excludedPreconditionTestPaths = @(
+        "tests/governance/validate_git_lfs_acceptance.ps1",
+        "tests/governance/validate_gitignore_acceptance.ps1",
         $m003PreconditionAcceptancePath,
         $m004PreconditionAcceptancePath,
         $m005PreconditionAcceptancePath,
