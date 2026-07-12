@@ -12,6 +12,8 @@ import inspect
 from pathlib import Path
 import sys
 
+from fastapi import APIRouter
+
 sys.path.insert(0, sys.argv[1])
 
 import app.platform.orchestrator_asgi as orchestrator_asgi_module
@@ -54,7 +56,11 @@ class OrderedDependency:
 async def scenario(repo_root):
     for parameter_name in ("configuration", "composition_root_factory"):
         assert_required_parameter(create_orchestrator_app, parameter_name)
-    for parameter_name in ("configuration", "dependencies"):
+    for parameter_name in (
+        "configuration",
+        "dependencies",
+        "document_command_router",
+    ):
         assert_required_parameter(OrchestratorCompositionRoot, parameter_name)
 
     configuration = load_application_configuration(
@@ -82,6 +88,7 @@ async def scenario(repo_root):
         return OrchestratorCompositionRoot(
             configuration=validated_configuration,
             dependencies=(first, second),
+            document_command_router=APIRouter(),
         )
 
     application = create_orchestrator_app(

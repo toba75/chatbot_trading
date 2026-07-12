@@ -38,6 +38,7 @@ def create_orchestrator_app(
 
         await composition_root.open()
         application.state.composition_root = composition_root
+        application.include_router(composition_root.document_command_router)
         try:
             yield
         finally:

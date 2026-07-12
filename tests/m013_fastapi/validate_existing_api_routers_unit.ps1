@@ -121,6 +121,7 @@ async def scenario(repo_root):
         return OrchestratorCompositionRoot(
             configuration=validated_configuration,
             dependencies=(ReadyDependency(),),
+            document_command_router=APIRouter(),
         )
 
     application = create_orchestrator_app(

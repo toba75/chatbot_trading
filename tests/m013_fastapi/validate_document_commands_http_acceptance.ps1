@@ -18,6 +18,7 @@ from app.platform.configuration import load_application_configuration
 from app.platform.orchestrator_asgi import create_orchestrator_app
 from app.platform.orchestrator_composition import DependencyReadiness, OrchestratorCompositionRoot
 from app.source_processing.adapters.document_http import SourceProcessingHttpAdapter
+from app.source_processing.adapters.http import build_document_command_router
 from app.source_processing.application.document_commands import (
     DiagnosisAlreadyRequestedError,
     DocumentDiagnosisAcceptance,
@@ -140,8 +141,10 @@ async def scenario(repo_root):
         return OrchestratorCompositionRoot(
             configuration=validated_configuration,
             dependencies=(ReadyDependency(),),
-            document_http_adapter=adapter,
-            document_upload_max_bytes=1024 * 1024,
+            document_command_router=build_document_command_router(
+                document_http_adapter=adapter,
+                max_pdf_bytes=1024 * 1024,
+            ),
         )
 
     application = create_orchestrator_app(configuration=configuration, composition_root_factory=root_factory)
@@ -202,7 +205,7 @@ async def scenario(repo_root):
             (409, {"error_code": "DIAGNOSTIC_ALREADY_REQUESTED", "document_id": document_id}),
             "La répétition doit produire l'erreur publique idempotente.",
         )
-        absent = "DOC-" + "f" * 64
+        absent = "DOC-" + "F" * 16
         assert_equal(
             await post(application, f"/v1/documents/{absent}/diagnose", b"", "application/octet-stream"),
             (404, {"error_code": "SOURCE_NOT_FOUND", "document_id": absent}),

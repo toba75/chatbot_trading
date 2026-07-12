@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal, Protocol
 
+from fastapi import APIRouter
+
 from app.platform.configuration import ApplicationConfiguration
 
 
@@ -32,6 +34,7 @@ class OrchestratorDependency(Protocol):
 class OrchestratorCompositionRoot:
     configuration: ApplicationConfiguration
     dependencies: tuple[OrchestratorDependency, ...]
+    document_command_router: APIRouter
     _opened: bool = field(init=False, default=False)
 
     def __post_init__(self) -> None:
@@ -39,6 +42,8 @@ class OrchestratorCompositionRoot:
             raise TypeError("configuration applicative validée obligatoire")
         if len(self.dependencies) == 0:
             raise ValueError("au moins une dépendance orchestratrice obligatoire")
+        if not isinstance(self.document_command_router, APIRouter):
+            raise ValueError("document_command_router invalide")
 
     async def open(self) -> None:
         if self._opened:

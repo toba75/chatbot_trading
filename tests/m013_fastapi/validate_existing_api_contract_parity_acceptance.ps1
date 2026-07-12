@@ -12,6 +12,8 @@ import json
 from pathlib import Path
 import sys
 
+from fastapi import APIRouter
+
 sys.path.insert(0, sys.argv[1])
 
 from app.platform.configuration import load_application_configuration
@@ -132,6 +134,7 @@ async def scenario(repo_root):
         return OrchestratorCompositionRoot(
             configuration=validated_configuration,
             dependencies=(ReadyDependency(),),
+            document_command_router=APIRouter(),
         )
 
     application = create_orchestrator_app(

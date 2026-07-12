@@ -15,7 +15,7 @@ import sys
 sys.path.insert(0, sys.argv[1])
 
 from fastapi import FastAPI
-from app.source_processing.adapters.document_command_router import build_document_command_router
+from app.source_processing.adapters.http import build_document_command_router
 from app.source_processing.adapters.document_http import SourceProcessingHttpAdapter
 from app.source_processing.application.document_commands import (
     DiagnosisAlreadyRequestedError,
@@ -106,9 +106,9 @@ class RouterCommands:
         return RegisterDocumentAcceptance(document_id, "REGISTERED", False)
 
     def start_document_processing(self, *, document_id):
-        if document_id == "DOC-" + "a" * 64:
+        if document_id == "DOC-" + "A" * 16:
             raise SourceNotFoundError(document_id)
-        if document_id == "DOC-" + "b" * 64:
+        if document_id == "DOC-" + "B" * 16:
             raise DiagnosisAlreadyRequestedError(document_id)
         return DocumentDiagnosisAcceptance(DocumentId.from_value(document_id), "DIAGNOSTIC_REQUESTED")
 
@@ -206,13 +206,13 @@ async def scenario():
         (400, {"error_code": "HTTP_REQUEST_INVALID", "field": "document_id"}),
         "Un DocumentId invalide doit rester une erreur M-003.",
     )
-    absent = "DOC-" + "a" * 64
+    absent = "DOC-" + "A" * 16
     assert_equal(
         await post(application, f"/v1/documents/{absent}/diagnose", b"", "application/octet-stream"),
         (404, {"error_code": "SOURCE_NOT_FOUND", "document_id": absent}),
         "SOURCE_NOT_FOUND doit rester 404.",
     )
-    repeated = "DOC-" + "b" * 64
+    repeated = "DOC-" + "B" * 16
     assert_equal(
         await post(application, f"/v1/documents/{repeated}/diagnose", b"", "application/octet-stream"),
         (409, {"error_code": "DIAGNOSTIC_ALREADY_REQUESTED", "document_id": repeated}),
@@ -245,7 +245,7 @@ if ($exitCode -ne 0) {
     throw ($output -join "`n")
 }
 
-$routerSource = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $repoRoot "app/source_processing/adapters/document_command_router.py")
+$routerSource = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $repoRoot "app/source_processing/adapters/http.py")
 foreach ($forbidden in @("logger.debug(original_content", "logger.info(original_content", "except Exception", "Depends(")) {
     if ($routerSource.Contains($forbidden)) {
         throw "Garde-fou routeur violé: $forbidden"

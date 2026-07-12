@@ -23,6 +23,7 @@ from app.platform.orchestrator_composition import (
     OrchestratorCompositionRoot,
 )
 from app.source_processing.adapters.document_http import SourceProcessingHttpAdapter
+from app.source_processing.adapters.http import build_document_command_router
 from app.source_processing.adapters.pdf_document_inspector import CorpusPdfDocumentInspector
 from app.source_processing.adapters.postgres_document_persistence import CorpusOriginalSourceStore
 from app.source_processing.application.document_commands import DocumentCommandService
@@ -239,8 +240,10 @@ async def scenario(repo_root):
             return OrchestratorCompositionRoot(
                 configuration=validated_configuration,
                 dependencies=(ReadyDependency(),),
-                document_http_adapter=adapter,
-                document_upload_max_bytes=1024 * 1024,
+                document_command_router=build_document_command_router(
+                    document_http_adapter=adapter,
+                    max_pdf_bytes=1024 * 1024,
+                ),
             )
 
         application = create_orchestrator_app(
