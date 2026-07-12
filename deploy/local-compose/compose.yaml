@@ -65,7 +65,7 @@ services:
     read_only: true
 
   orchestrator-api:
-    image: ostrading/orchestrator-api:0.1.0-m013-fastapi-schema-004
+    image: ostrading/orchestrator-api:0.1.0-m013-fastapi-schema-005
     build:
       context: ../..
       dockerfile: deploy/local-compose/Dockerfile

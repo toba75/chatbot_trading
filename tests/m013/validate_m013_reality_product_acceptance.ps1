@@ -20,6 +20,35 @@ if (-not (Test-Path -LiteralPath $effectiveConfigPath -PathType Leaf)) {
     throw "Configuration locale requise pour le test produit M13-reality: $effectiveConfigPath"
 }
 $resolvedConfigPath = (Resolve-Path -LiteralPath $effectiveConfigPath).Path
+$uvCommand = Get-Command uv -ErrorAction SilentlyContinue
+if ($null -eq $uvCommand) {
+    throw "UV_RUNTIME_REQUIRED"
+}
+$uvExecutable = $uvCommand.Source
+$postgresContainer = "ost-m013-reality-postgres-" + [System.Guid]::NewGuid().ToString("N")
+$runtimeConfigPath = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m013_reality_config_" + [System.Guid]::NewGuid().ToString("N") + ".yaml")
+$tcpListener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+$tcpListener.Start()
+$postgresPort = ([System.Net.IPEndPoint]$tcpListener.LocalEndpoint).Port
+$tcpListener.Stop()
+$postgresPasswordPath = Join-Path $repoRoot "deploy/local-compose/secrets/postgres_password"
+if (-not (Test-Path -LiteralPath $postgresPasswordPath -PathType Leaf)) {
+    throw "POSTGRES_SECRET_REQUIRED"
+}
+$postgresPassword = (Get-Content -Raw -Encoding UTF8 -LiteralPath $postgresPasswordPath).TrimEnd("`r", "`n")
+$runtimeSecretRelativePath = "config/secrets/local/m013_reality_postgres_password"
+$runtimeSecretPath = Join-Path $repoRoot $runtimeSecretRelativePath
+[System.IO.File]::WriteAllText($runtimeSecretPath, $postgresPassword, $utf8NoBom)
+$runtimeConfig = Get-Content -Raw -Encoding UTF8 -LiteralPath $resolvedConfigPath
+$runtimeConfig = $runtimeConfig.Replace(
+    "postgresql+psycopg://app@postgres/app",
+    "postgresql+psycopg://app@127.0.0.1:$postgresPort/app"
+)
+$runtimeConfig = $runtimeConfig.Replace(
+    "config/secrets/local/postgres_password",
+    $runtimeSecretRelativePath
+)
+[System.IO.File]::WriteAllText($runtimeConfigPath, $runtimeConfig, $utf8NoBom)
 $pythonCode = @'
 from __future__ import annotations
 
@@ -252,9 +281,29 @@ $orchestratorStdoutPath = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m013
 $orchestratorStderrPath = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m013_reality_orchestrator_" + [System.Guid]::NewGuid().ToString("N") + ".err.log")
 Set-Content -Encoding UTF8 -LiteralPath $pythonScriptPath -Value $pythonCode
 try {
+    $postgresImage = "postgres@sha256:7e5df973a74872482e320dcbdeb055e178d6f42de0558b083892c50cda833c96"
+    $postgresId = & docker run --detach --name $postgresContainer `
+        --env POSTGRES_DB=app --env POSTGRES_USER=app --env "POSTGRES_PASSWORD=$postgresPassword" `
+        --publish "127.0.0.1:${postgresPort}:5432" $postgresImage 2>&1
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($postgresId)) {
+        throw "POSTGRES_DOCKER_START_FAILED: $postgresId"
+    }
+    $postgresReady = $false
+    foreach ($attempt in 1..120) {
+        & docker exec $postgresContainer pg_isready -U app -d app *> $null
+        if ($LASTEXITCODE -eq 0) {
+            $postgresReady = $true
+            break
+        }
+        Start-Sleep -Milliseconds 250
+    }
+    if (-not $postgresReady) {
+        throw "POSTGRES_DOCKER_NOT_READY"
+    }
+
     $gatewayProcess = Start-Process `
         -FilePath $pythonExecutable `
-        -ArgumentList @("-m", "app.platform.local_runtime", "serve-http", "llm-gateway", "8090", "--config", $resolvedConfigPath) `
+        -ArgumentList @("-m", "app.platform.local_runtime", "serve-http", "llm-gateway", "8090", "--config", $runtimeConfigPath) `
         -WorkingDirectory $repoRoot `
         -RedirectStandardOutput $gatewayStdoutPath `
         -RedirectStandardError $gatewayStderrPath `
@@ -262,8 +311,8 @@ try {
         -PassThru
 
     $orchestratorProcess = Start-Process `
-        -FilePath $pythonExecutable `
-        -ArgumentList @("-m", "app.platform.local_runtime", "serve-http", "orchestrator-api", "8080", "--config", $resolvedConfigPath) `
+        -FilePath $uvExecutable `
+        -ArgumentList @("run", "--no-sync", "api", "--config", $runtimeConfigPath) `
         -WorkingDirectory $repoRoot `
         -RedirectStandardOutput $orchestratorStdoutPath `
         -RedirectStandardError $orchestratorStderrPath `
@@ -273,7 +322,7 @@ try {
     $env:PYTHONIOENCODING = "utf-8"
     $output = & $pythonExecutable -B $pythonScriptPath `
         $repoRoot `
-        $resolvedConfigPath 2>&1
+        $runtimeConfigPath 2>&1
     $exitCode = $LASTEXITCODE
 }
 finally {
@@ -284,6 +333,9 @@ finally {
     if ($null -ne $orchestratorProcess -and -not $orchestratorProcess.HasExited) {
         Stop-Process -Id $orchestratorProcess.Id -Force
     }
+    & docker rm --force $postgresContainer *> $null
+    Remove-Item -LiteralPath $runtimeConfigPath -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $runtimeSecretPath -Force -ErrorAction SilentlyContinue
     Remove-Item -LiteralPath $pythonScriptPath -Force -ErrorAction SilentlyContinue
 }
 

@@ -22,8 +22,10 @@ from app.platform.orchestrator_contract_routers import (
     build_evaluation_router,
     build_health_router,
     build_indexing_router,
+    build_public_contract_router,
     build_search_router,
 )
+from app.platform.orchestrator_public_services import build_public_contract_services
 import app.platform.local_runtime as local_runtime
 from app.platform.orchestrator_asgi import create_orchestrator_app
 from app.platform.orchestrator_composition import DependencyReadiness, OrchestratorCompositionRoot
@@ -88,12 +90,13 @@ async def scenario(repo_root):
         config_path=repo_root / "config" / "application.example.yaml",
         environment_snapshot={},
     )
+    services = build_public_contract_services(configuration)
     router_factories = (
         (build_health_router, ()),
-        (build_conversation_router, (configuration,)),
-        (build_evaluation_router, (configuration,)),
-        (build_search_router, ()),
-        (build_indexing_router, ()),
+        (build_conversation_router, (services.conversation,)),
+        (build_evaluation_router, (services.evaluation,)),
+        (build_search_router, (services.search,)),
+        (build_indexing_router, (services.indexing,)),
     )
     for factory, arguments in router_factories:
         router = factory(*arguments)
@@ -121,7 +124,7 @@ async def scenario(repo_root):
         return OrchestratorCompositionRoot(
             configuration=validated_configuration,
             dependencies=(ReadyDependency(),),
-            document_command_router=APIRouter(),
+            document_command_router=build_public_contract_router(services),
         )
 
     application = create_orchestrator_app(

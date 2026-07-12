@@ -22,11 +22,7 @@ from app.platform.configuration import ApplicationConfiguration
 from app.platform.orchestrator_composition import OrchestratorCompositionRoot
 from app.platform.request_context import bind_trace_id, reset_trace_id
 from app.platform.orchestrator_contract_routers import (
-    build_conversation_router,
-    build_evaluation_router,
     build_health_router,
-    build_indexing_router,
-    build_search_router,
 )
 
 
@@ -86,6 +82,7 @@ class BoundedRequestBodyMiddleware:
         receive: Callable,
         send: Callable,
     ) -> None:
+        original_content_length = _content_length(scope)
         spool = SpooledTemporaryFile(max_size=self._memory_spool_bytes, mode="w+b")
         consumed = 0
         try:
@@ -121,11 +118,16 @@ class BoundedRequestBodyMiddleware:
                 }
 
             forwarded_scope = dict(scope)
-            forwarded_scope["headers"] = [
+            forwarded_headers = [
                 (name, value)
                 for name, value in scope.get("headers", ())
                 if name.lower() != b"content-length"
-            ] + [(b"content-length", str(consumed).encode("ascii"))]
+            ]
+            if original_content_length is not None:
+                forwarded_headers.append(
+                    (b"content-length", str(consumed).encode("ascii"))
+                )
+            forwarded_scope["headers"] = forwarded_headers
             await self._application(forwarded_scope, replay_receive, send)
         finally:
             await run_in_threadpool(spool.close)
@@ -244,10 +246,6 @@ def create_orchestrator_app(
         )
         return response
     application.include_router(build_health_router())
-    application.include_router(build_conversation_router(configuration))
-    application.include_router(build_evaluation_router(configuration))
-    application.include_router(build_search_router())
-    application.include_router(build_indexing_router())
 
     @application.get("/ready")
     async def ready() -> JSONResponse:
@@ -303,12 +301,23 @@ def _complete_traced_response(
                 "path": request.url.path,
                 "status_code": response.status_code,
                 "trace_id": trace_id,
+                "success_count": 1 if response.status_code < 400 else 0,
+                "error_count": 1 if response.status_code >= 400 else 0,
+                "request_volume_bytes": _request_volume_bytes(request),
+                "tracing_enabled": configuration.observability.tracing.enabled,
             },
             ensure_ascii=False,
             sort_keys=True,
         ),
         flush=True,
     )
+
+
+def _request_volume_bytes(request: Request) -> int:
+    raw = request.headers.get("content-length")
+    if raw is None or not raw.isdecimal():
+        return 0
+    return int(raw)
 
 
 def _content_length(scope: Any) -> int | None:

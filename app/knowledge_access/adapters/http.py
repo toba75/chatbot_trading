@@ -9,6 +9,12 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
 from app.contracts.identity import DomainIdentifier
+from app.platform.orchestrator_api_models import (
+    ProjectionResponse,
+    PUBLIC_ERROR_RESPONSES,
+    parse_public_document_id,
+    public_error,
+)
 from app.knowledge_access.application.projection_queries import (
     KnowledgeProjectionView,
     ProjectionNotRequestedView,
@@ -32,7 +38,11 @@ def build_projection_query_router(
     parsed_queries = _ensure_projection_queries(projection_queries)
     router = APIRouter()
 
-    @router.get("/v1/documents/{document_id}/projection")
+    @router.get(
+        "/v1/documents/{document_id}/projection",
+        response_model=ProjectionResponse,
+        responses=PUBLIC_ERROR_RESPONSES,
+    )
     async def read_projection(document_id: str) -> JSONResponse:
         if not _is_valid_document_id(document_id):
             return _invalid_document_id_response()
@@ -47,13 +57,13 @@ def build_projection_query_router(
 def _invalid_document_id_response() -> JSONResponse:
     return JSONResponse(
         status_code=400,
-        content={"error_code": "HTTP_REQUEST_INVALID", "field": "document_id"},
+        content=public_error("HTTP_REQUEST_INVALID", field="document_id"),
     )
 
 
 def _is_valid_document_id(value: str) -> bool:
     try:
-        DomainIdentifier.parse_with_prefix(value, "DOC")
+        parse_public_document_id(value)
     except ValueError:
         return False
     return True

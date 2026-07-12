@@ -63,7 +63,12 @@ class DocumentStateSnapshot:
 
 
 class DocumentSnapshotRepository(Protocol):
-    def list_document_snapshots(self) -> tuple[DocumentStateSnapshot, ...]:
+    def list_document_snapshots(
+        self,
+        *,
+        limit: int,
+        after_document_id: str | None,
+    ) -> tuple[DocumentStateSnapshot, ...]:
         """Retourne tous les états sous un même snapshot transactionnel."""
 
     def find_document_snapshot(
@@ -193,7 +198,12 @@ class DocumentQueryService:
         self._document_snapshot_repository = document_snapshot_repository
 
     def list_documents(self) -> DocumentCorpusView:
-        snapshots = tuple(self._document_snapshot_repository.list_document_snapshots())
+        snapshots = tuple(
+            self._document_snapshot_repository.list_document_snapshots(
+                limit=100,
+                after_document_id=None,
+            )
+        )
         items = tuple(
             self._corpus_item(snapshot)
             for snapshot in sorted(

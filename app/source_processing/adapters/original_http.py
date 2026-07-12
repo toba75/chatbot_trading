@@ -15,6 +15,11 @@ from app.source_processing.application.original_queries import (
     OriginalPdfContent,
 )
 from app.source_processing.domain.source_document import DocumentId
+from app.platform.orchestrator_api_models import (
+    PUBLIC_ERROR_RESPONSES,
+    parse_public_document_id,
+    public_error,
+)
 
 
 class OriginalPdfQueryPort(Protocol):
@@ -30,7 +35,20 @@ def build_original_pdf_router(*, original_pdf_queries: OriginalPdfQueryPort) -> 
     parsed_queries = _ensure_original_pdf_queries(original_pdf_queries)
     router = APIRouter()
 
-    @router.get("/v1/documents/{document_id}/original")
+    @router.get(
+        "/v1/documents/{document_id}/original",
+        responses={
+            200: {
+                "description": "PDF original vérifié bit à bit.",
+                "content": {
+                    "application/pdf": {
+                        "schema": {"type": "string", "format": "binary"}
+                    }
+                },
+            },
+            **PUBLIC_ERROR_RESPONSES,
+        },
+    )
     def read_original(document_id: str) -> Response:
         if not _is_valid_document_id(document_id):
             return _invalid_document_id_response()
@@ -61,30 +79,27 @@ def build_original_pdf_router(*, original_pdf_queries: OriginalPdfQueryPort) -> 
 def _source_not_found_response(error: SourceNotFoundError) -> JSONResponse:
     return JSONResponse(
         status_code=404,
-        content={"error_code": "SOURCE_NOT_FOUND", "document_id": error.document_id},
+        content=public_error("SOURCE_NOT_FOUND", document_id=error.document_id),
     )
 
 
 def _hash_mismatch_response(document_id: str) -> JSONResponse:
     return JSONResponse(
         status_code=409,
-        content={
-            "error_code": "ORIGINAL_HASH_MISMATCH",
-            "document_id": document_id,
-        },
+        content=public_error("ORIGINAL_HASH_MISMATCH", document_id=document_id),
     )
 
 
 def _invalid_document_id_response() -> JSONResponse:
     return JSONResponse(
         status_code=400,
-        content={"error_code": "HTTP_REQUEST_INVALID", "field": "document_id"},
+        content=public_error("HTTP_REQUEST_INVALID", field="document_id"),
     )
 
 
 def _is_valid_document_id(value: str) -> bool:
     try:
-        DocumentId.from_value(value)
+        DocumentId.from_value(parse_public_document_id(value))
     except ValueError:
         return False
     return True

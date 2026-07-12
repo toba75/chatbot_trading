@@ -16,7 +16,7 @@ from app.platform.configuration import ApplicationConfiguration
 from app.platform.postgres import (
     PostgresConnection,
     PostgresConnectionFactory,
-    PsycopgConnectionFactory,
+    PostgresCursor,
 )
 from app.platform.request_context import current_trace_id
 from app.source_processing.application.document_commands import (
@@ -252,7 +252,17 @@ class PostgresDocumentPersistence:
                 rows = cursor.fetchall()
         return tuple(_source_from_row(row) for row in rows)
 
-    def list_document_snapshots(self) -> tuple[DocumentStateSnapshot, ...]:
+    def list_document_snapshots(
+        self,
+        *,
+        limit: int,
+        after_document_id: str | None,
+    ) -> tuple[DocumentStateSnapshot, ...]:
+        if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1 or limit > 1000:
+            raise ValueError("limit corpus invalide")
+        parsed_after = None
+        if after_document_id is not None:
+            parsed_after = DocumentId.from_value(after_document_id).value
         with self._connection_factory.connect() as connection:
             with connection.transaction():
                 with connection.cursor() as cursor:
@@ -260,25 +270,64 @@ class PostgresDocumentPersistence:
                         "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY",
                         (),
                     )
+                    predicate = "" if parsed_after is None else "WHERE document_id > %s"
+                    parameters: tuple[Any, ...] = () if parsed_after is None else (parsed_after,)
                     cursor.execute(
-                        """
+                        f"""
                         SELECT document_id, fingerprint, original_storage_ref, title,
                                authors, publication_year, edition, status,
                                quarantine_reason
                           FROM source_processing.source_documents
+                          {predicate}
                          ORDER BY document_id
+                         LIMIT %s
                         """,
-                        (),
+                        (*parameters, limit),
                     )
                     sources = tuple(_source_from_row(row) for row in cursor.fetchall())
-                return tuple(
-                    DocumentStateSnapshot(
-                        source_document=source,
-                        processing_run=self._load_processing_run(connection, source.document_id),
-                        conversion=self._load_conversion(connection, source.document_id),
+                    if len(sources) == 0:
+                        return ()
+                    document_ids = [source.document_id.value for source in sources]
+                    cursor.execute(
+                        """
+                        SELECT processing_run_id, document_id, source_page_count, status,
+                               manual_review_reason, blocking_policy_version, aggregate_version
+                          FROM source_processing.document_processing_runs
+                         WHERE document_id = ANY(%s)
+                         ORDER BY document_id
+                        """,
+                        (document_ids,),
                     )
-                    for source in sources
-                )
+                    run_rows = tuple(cursor.fetchall())
+                    run_ids = [row[0] for row in run_rows]
+                    grouped = _load_processing_run_children(cursor, run_ids)
+                    cursor.execute(
+                        """
+                        SELECT document_id, conversion_status, canonical_version_id,
+                               rejection_error_code
+                          FROM source_processing.document_conversion_requests
+                         WHERE document_id = ANY(%s)
+                        """,
+                        (document_ids,),
+                    )
+                    conversions = {
+                        row[0]: DocumentConversionState(
+                            document_id=DocumentId.from_value(row[0]),
+                            conversion_status=DocumentConversionStatus.from_value(row[1]),
+                            canonical_version_id=row[2],
+                            rejection_error_code=row[3],
+                        )
+                        for row in cursor.fetchall()
+                    }
+        runs = {row[1]: _processing_run_from_grouped_rows(row, grouped) for row in run_rows}
+        return tuple(
+            DocumentStateSnapshot(
+                source_document=source,
+                processing_run=runs.get(source.document_id.value),
+                conversion=conversions.get(source.document_id.value),
+            )
+            for source in sources
+        )
 
     def find_document_snapshot(
         self,
@@ -582,47 +631,75 @@ class PostgresDocumentPersistence:
                     f"DELETE FROM source_processing.{table} WHERE processing_run_id = %s",
                     (processing_run.processing_run_id.value,),
                 )
-            for entry in processing_run.page_manifest.entries:
-                cursor.execute(
-                    """
-                    INSERT INTO source_processing.page_manifest_entries
-                        (processing_run_id, page_number, state)
-                    VALUES (%s, %s, %s)
-                    """,
-                    (
-                        processing_run.processing_run_id.value,
-                        entry.page_number.value,
-                        entry.state.value,
+            cursor.execute(
+                """
+                INSERT INTO source_processing.page_manifest_entries
+                    (processing_run_id, page_number, state)
+                SELECT %s, batch.page_number, batch.state
+                  FROM jsonb_to_recordset(%s::jsonb)
+                       AS batch(page_number integer, state text)
+                """,
+                (
+                    processing_run.processing_run_id.value,
+                    json.dumps(
+                        [
+                            {
+                                "page_number": entry.page_number.value,
+                                "state": entry.state.value,
+                            }
+                            for entry in processing_run.page_manifest.entries
+                        ],
+                        separators=(",", ":"),
                     ),
+                ),
+            )
+            cursor.execute(
+                """
+                INSERT INTO source_processing.page_decisions (
+                    processing_run_id, page_number, page_state,
+                    native_text_state, image_state, existing_ocr_state,
+                    layout_complexity, corruption_state, mixed_content_detected,
+                    has_table, has_formula, diagnostic_version, justification
                 )
-            for decision in processing_run.page_decisions:
-                signals = decision.signals
-                cursor.execute(
-                    """
-                    INSERT INTO source_processing.page_decisions (
-                        processing_run_id, page_number, page_state,
-                        native_text_state, image_state, existing_ocr_state,
-                        layout_complexity, corruption_state, mixed_content_detected,
-                        has_table, has_formula, diagnostic_version, justification
-                    )
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    """,
-                    (
-                        processing_run.processing_run_id.value,
-                        decision.page_number.value,
-                        decision.page_state.value,
-                        signals.native_text_state.value,
-                        signals.image_state.value,
-                        signals.existing_ocr_state.value,
-                        signals.layout_complexity.value,
-                        signals.corruption_state.value,
-                        signals.mixed_content_detected,
-                        signals.has_table,
-                        signals.has_formula,
-                        decision.diagnostic_version.value,
-                        decision.justification,
+                SELECT %s, batch.page_number, batch.page_state,
+                       batch.native_text_state, batch.image_state,
+                       batch.existing_ocr_state, batch.layout_complexity,
+                       batch.corruption_state, batch.mixed_content_detected,
+                       batch.has_table, batch.has_formula,
+                       batch.diagnostic_version, batch.justification
+                  FROM jsonb_to_recordset(%s::jsonb) AS batch(
+                    page_number integer, page_state text, native_text_state text,
+                    image_state text, existing_ocr_state text, layout_complexity text,
+                    corruption_state text, mixed_content_detected boolean,
+                    has_table boolean, has_formula boolean,
+                    diagnostic_version text, justification text
+                  )
+                """,
+                (
+                    processing_run.processing_run_id.value,
+                    json.dumps(
+                        [
+                            {
+                                "page_number": decision.page_number.value,
+                                "page_state": decision.page_state.value,
+                                "native_text_state": decision.signals.native_text_state.value,
+                                "image_state": decision.signals.image_state.value,
+                                "existing_ocr_state": decision.signals.existing_ocr_state.value,
+                                "layout_complexity": decision.signals.layout_complexity.value,
+                                "corruption_state": decision.signals.corruption_state.value,
+                                "mixed_content_detected": decision.signals.mixed_content_detected,
+                                "has_table": decision.signals.has_table,
+                                "has_formula": decision.signals.has_formula,
+                                "diagnostic_version": decision.diagnostic_version.value,
+                                "justification": decision.justification,
+                            }
+                            for decision in processing_run.page_decisions
+                        ],
+                        ensure_ascii=False,
+                        separators=(",", ":"),
                     ),
-                )
+                ),
+            )
             if processing_run.route_plan is not None:
                 route_plan = processing_run.route_plan
                 cursor.execute(
@@ -641,28 +718,45 @@ class PostgresDocumentPersistence:
                     ),
                 )
                 exception_pages = {route.page_number.value for route in route_plan.page_exceptions}
-                for route in route_plan.page_routes:
-                    cursor.execute(
-                        """
-                        INSERT INTO source_processing.page_routes (
-                            processing_run_id, page_number, route_name,
-                            decision_mode, confidence_score, preprocessing_action,
-                            routing_policy_version, justification, is_exception
-                        )
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                        """,
-                        (
-                            processing_run.processing_run_id.value,
-                            route.page_number.value,
-                            route.route_name.value,
-                            route.decision_mode.value,
-                            route.confidence_score,
-                            route.preprocessing_action.value,
-                            route.routing_policy_version.value,
-                            route.justification,
-                            route.page_number.value in exception_pages,
-                        ),
+                cursor.execute(
+                    """
+                    INSERT INTO source_processing.page_routes (
+                        processing_run_id, page_number, route_name,
+                        decision_mode, confidence_score, preprocessing_action,
+                        routing_policy_version, justification, is_exception
                     )
+                    SELECT %s, batch.page_number, batch.route_name,
+                           batch.decision_mode, batch.confidence_score,
+                           batch.preprocessing_action, batch.routing_policy_version,
+                           batch.justification, batch.is_exception
+                      FROM jsonb_to_recordset(%s::jsonb) AS batch(
+                        page_number integer, route_name text, decision_mode text,
+                        confidence_score double precision, preprocessing_action text,
+                        routing_policy_version text, justification text,
+                        is_exception boolean
+                      )
+                    """,
+                    (
+                        processing_run.processing_run_id.value,
+                        json.dumps(
+                            [
+                                {
+                                    "page_number": route.page_number.value,
+                                    "route_name": route.route_name.value,
+                                    "decision_mode": route.decision_mode.value,
+                                    "confidence_score": route.confidence_score,
+                                    "preprocessing_action": route.preprocessing_action.value,
+                                    "routing_policy_version": route.routing_policy_version.value,
+                                    "justification": route.justification,
+                                    "is_exception": route.page_number.value in exception_pages,
+                                }
+                                for route in route_plan.page_routes
+                            ],
+                            ensure_ascii=False,
+                            separators=(",", ":"),
+                        ),
+                    ),
+                )
 
     def _load_processing_run(
         self,
@@ -774,6 +868,126 @@ class PostgresDocumentPersistence:
         )
 
 
+def _load_processing_run_children(
+    cursor: PostgresCursor,
+    processing_run_ids: list[str],
+) -> dict[str, dict[str, Any]]:
+    grouped: dict[str, dict[str, Any]] = {
+        "manifest": {},
+        "decisions": {},
+        "plans": {},
+        "routes": {},
+    }
+    cursor.execute(
+        """
+        SELECT processing_run_id, page_number, state
+          FROM source_processing.page_manifest_entries
+         WHERE processing_run_id = ANY(%s)
+         ORDER BY processing_run_id, page_number
+        """,
+        (processing_run_ids,),
+    )
+    _group_rows(grouped["manifest"], cursor.fetchall())
+    cursor.execute(
+        """
+        SELECT processing_run_id, page_number, page_state, native_text_state,
+               image_state, existing_ocr_state, layout_complexity, corruption_state,
+               mixed_content_detected, has_table, has_formula, diagnostic_version,
+               justification
+          FROM source_processing.page_decisions
+         WHERE processing_run_id = ANY(%s)
+         ORDER BY processing_run_id, page_number
+        """,
+        (processing_run_ids,),
+    )
+    _group_rows(grouped["decisions"], cursor.fetchall())
+    cursor.execute(
+        """
+        SELECT processing_run_id, routing_policy_version, dominant_route_name,
+               confidence_score
+          FROM source_processing.route_plans
+         WHERE processing_run_id = ANY(%s)
+        """,
+        (processing_run_ids,),
+    )
+    for row in cursor.fetchall():
+        grouped["plans"][row[0]] = row[1:]
+    cursor.execute(
+        """
+        SELECT processing_run_id, page_number, route_name, decision_mode,
+               confidence_score, preprocessing_action, routing_policy_version,
+               justification, is_exception
+          FROM source_processing.page_routes
+         WHERE processing_run_id = ANY(%s)
+         ORDER BY processing_run_id, page_number
+        """,
+        (processing_run_ids,),
+    )
+    _group_rows(grouped["routes"], cursor.fetchall())
+    return grouped
+
+
+def _group_rows(target: dict[str, Any], rows: list[Any]) -> None:
+    for row in rows:
+        target.setdefault(row[0], []).append(row[1:])
+
+
+def _processing_run_from_grouped_rows(
+    row: Any,
+    grouped: dict[str, dict[str, Any]],
+) -> DocumentProcessingRun:
+    processing_run_id = row[0]
+    manifest_rows = grouped["manifest"].get(processing_run_id, ())
+    decision_rows = grouped["decisions"].get(processing_run_id, ())
+    plan_row = grouped["plans"].get(processing_run_id)
+    route_rows = grouped["routes"].get(processing_run_id, ())
+    run_id = ProcessingRunId.from_value(processing_run_id)
+    document_id = DocumentId.from_value(row[1])
+    manifest = PageManifest.from_entries(
+        source_page_count=row[2],
+        entries=tuple(
+            PageManifestEntry(
+                page_number=PageNumber.from_value(item[0]),
+                state=PageManifestEntryState(item[1]),
+            )
+            for item in manifest_rows
+        ),
+    )
+    decisions = tuple(_decision_from_row(item) for item in decision_rows)
+    routes = tuple(_route_from_row(item) for item in route_rows)
+    route_plan = None
+    if plan_row is not None:
+        route_plan = RoutePlan(
+            routing_policy_version=RoutingPolicyVersion.from_value(plan_row[0]),
+            page_routes=routes,
+            dominant_route_name=PageRouteName(plan_row[1]),
+            page_exceptions=tuple(
+                route for route, route_row in zip(routes, route_rows) if route_row[7]
+            ),
+            confidence_score=plan_row[2],
+        )
+    return DocumentProcessingRun(
+        processing_run_id=run_id,
+        document_id=document_id,
+        page_manifest=manifest,
+        page_decisions=decisions,
+        route_plan=route_plan,
+        manual_review_reason=row[4],
+        blocking_policy_version=None
+        if row[5] is None
+        else RoutingPolicyVersion.from_value(row[5]),
+        status=DocumentProcessingRunStatus(row[3]),
+        aggregate_version=row[6],
+        events=(
+            DocumentProcessingStarted(
+                processing_run_id=run_id,
+                document_id=document_id,
+                source_page_count=row[2],
+            ),
+        ),
+    )
+
+
 class PostgresProcessingRunRepository:
     """Vue du port ``ProcessingRunRepository`` sur la façade durable."""
 
@@ -830,18 +1044,15 @@ class DocumentPersistenceAdapters:
 
 def build_document_persistence(
     application_configuration: ApplicationConfiguration,
+    *,
+    connection_factory: PostgresConnectionFactory,
 ) -> DocumentPersistenceAdapters:
     """Construit le stockage partagé uniquement depuis M13-config."""
 
     if not isinstance(application_configuration, ApplicationConfiguration):
         raise ValueError("application_configuration invalide")
-    connection_factory = PsycopgConnectionFactory(
-        connection_url=application_configuration.services.postgres.url,
-        password_path=Path(
-            application_configuration.security.secrets.postgres_password_path
-        ),
-        connect_timeout_seconds=application_configuration.runtime.timeouts.startup_seconds,
-    )
+    if not callable(getattr(connection_factory, "connect", None)):
+        raise ValueError("connection_factory invalide")
     persistence = PostgresDocumentPersistence(connection_factory=connection_factory)
     return DocumentPersistenceAdapters(
         original_source_store=CorpusOriginalSourceStore(

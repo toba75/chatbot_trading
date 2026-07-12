@@ -926,11 +926,91 @@ $requiredM013Requirements = @(
         Adr = "ADR-014; ADR-015"
     },
     [ordered] @{
+        Id = "REQ-M013-FASTAPI-001"
+        Source = "docs/tasks/milestone_013-fastapi/0001_verifier_precondition_green.md"
+        Test = "tests/m013_fastapi/validate_precondition_acceptance.ps1; tests/m013_fastapi/validate_precondition_unit.ps1"
+        CommandScript = "tests/m013_fastapi/validate_precondition_acceptance.ps1"
+        Code = "docs/governance/m013_fastapi_precondition.md; docs/tasks/milestone_013-fastapi/journal.md"
+        Adr = "ADR-018"
+    },
+    [ordered] @{
+        Id = "REQ-M013-FASTAPI-002"
+        Source = "docs/tasks/milestone_013-fastapi/0002_decider_frontiere_http_publique.md"
+        Test = "tests/m013_fastapi/validate_fastapi_specification_acceptance.ps1; tests/m013_fastapi/validate_fastapi_architecture_policy_unit.ps1"
+        CommandScript = "scripts/validate_m013_fastapi_specification.ps1"
+        Code = "docs/specs/m013_fastapi_api_orchestratrice.md; docs/adr/ADR-019-api-orchestratrice-fastapi-uvicorn.md; scripts/validate_m013_fastapi_specification.ps1"
+        Adr = "ADR-018; ADR-019; DDD-ADR-001"
+    },
+    [ordered] @{
+        Id = "REQ-M013-FASTAPI-003"
+        Source = "docs/tasks/milestone_013-fastapi/0003_servir_sante_api_application_construite.md"
+        Test = "tests/m013_fastapi/validate_orchestrator_asgi_health_acceptance.ps1; tests/m013_fastapi/validate_orchestrator_app_factory_unit.ps1"
+        CommandScript = "tests/m013_fastapi/validate_orchestrator_asgi_health_acceptance.ps1"
+        Code = "app/platform/orchestrator_asgi.py; app/platform/orchestrator_composition.py; app/platform/orchestrator_runtime.py"
+        Adr = "ADR-019; ADR-021"
+    },
+    [ordered] @{
+        Id = "REQ-M013-FASTAPI-004"
+        Source = "docs/tasks/milestone_013-fastapi/0004_preserver_contrats_api_existants.md"
+        Test = "tests/m013_fastapi/validate_existing_api_contract_parity_acceptance.ps1; tests/m013_fastapi/validate_existing_api_routers_unit.ps1"
+        CommandScript = "tests/m013_fastapi/validate_existing_api_contract_parity_acceptance.ps1"
+        Code = "app/platform/orchestrator_contract_routers.py; app/platform/orchestrator_public_services.py; app/platform/orchestrator_asgi.py"
+        Adr = "ADR-019"
+    },
+    [ordered] @{
+        Id = "REQ-M013-FASTAPI-005"
+        Source = "docs/tasks/milestone_013-fastapi/0005_partager_etat_documentaire_durable.md"
+        Test = "tests/m013_fastapi/validate_document_persistence_restart_acceptance.ps1; tests/m013_fastapi/validate_document_persistence_unit.ps1"
+        CommandScript = "tests/m013_fastapi/validate_document_persistence_restart_acceptance.ps1"
+        Code = "app/source_processing/adapters/postgres_document_persistence.py; deploy/postgres/migrations/001_document_persistence.sql; deploy/postgres/migrations/005_source_processing_read_performance.sql"
+        Adr = "ADR-021; ADR-022"
+    },
+    [ordered] @{
+        Id = "REQ-M013-FASTAPI-006"
+        Source = "docs/tasks/milestone_013-fastapi/0006_enregistrer_pdf_lancer_diagnostic.md"
+        Test = "tests/m013_fastapi/validate_document_commands_http_acceptance.ps1; tests/m013_fastapi/validate_document_command_router_unit.ps1; tests/m013/validate_document_api_wiring_acceptance.ps1"
+        CommandScript = "tests/m013_fastapi/validate_document_commands_http_acceptance.ps1"
+        Code = "app/source_processing/adapters/http.py; app/source_processing/adapters/document_http.py; app/source_processing/application/document_commands.py"
+        Adr = "ADR-018; ADR-019; ADR-020; ADR-022"
+    },
+    [ordered] @{
+        Id = "REQ-M013-FASTAPI-007"
+        Source = "docs/tasks/milestone_013-fastapi/0007_lire_diagnostic_conversion.md"
+        Test = "tests/m013_fastapi/validate_document_read_models_acceptance.ps1; tests/m013_fastapi/validate_document_queries_unit.ps1"
+        CommandScript = "tests/m013_fastapi/validate_document_read_models_acceptance.ps1"
+        Code = "app/source_processing/application/document_queries.py; app/source_processing/adapters/query_http.py; app/source_processing/adapters/postgres_document_persistence.py"
+        Adr = "ADR-018; ADR-021; ADR-022"
+    },
+    [ordered] @{
+        Id = "REQ-M013-FASTAPI-008"
+        Source = "docs/tasks/milestone_013-fastapi/0008_recuperer_pdf_original_controle.md"
+        Test = "tests/m013_fastapi/validate_original_pdf_retrieval_acceptance.ps1; tests/m013_fastapi/validate_original_pdf_stream_unit.ps1"
+        CommandScript = "tests/m013_fastapi/validate_original_pdf_retrieval_acceptance.ps1"
+        Code = "app/source_processing/application/original_queries.py; app/source_processing/adapters/original_http.py; app/source_processing/adapters/postgres_document_persistence.py"
+        Adr = "ADR-018; ADR-020; ADR-021"
+    },
+    [ordered] @{
+        Id = "REQ-M013-FASTAPI-009"
+        Source = "docs/tasks/milestone_013-fastapi/0009_lire_projection_connaissance.md"
+        Test = "tests/m013_fastapi/validate_ka_projection_persistence_unit.ps1; tests/m013_fastapi/validate_ka_projection_persistence_live.ps1"
+        CommandScript = "tests/m013_fastapi/validate_ka_projection_persistence_live.ps1"
+        Code = "app/knowledge_access/adapters/postgres_projection_read.py; deploy/postgres/migrations/004_knowledge_projection_chunk_samples.sql; docs/tasks/milestone_013-fastapi/journal.md"
+        Adr = "ADR-021; ADR-022; DDD-ADR-004"
+    },
+    [ordered] @{
+        Id = "REQ-M013-FASTAPI-010"
+        Source = "docs/tasks/milestone_013-fastapi/0010_brancher_ui_api_orchestratrice.md"
+        Test = "tests/m013_fastapi/validate_ui_product_contracts_unit.ps1; tests/m013_fastapi/validate_ui_orchestrator_document_flow_acceptance.ps1"
+        CommandScript = "tests/m013_fastapi/validate_ui_orchestrator_document_flow_acceptance.ps1"
+        Code = "app/contracts/document_public_statuses.py; app/platform/ui_document_api.py; app/platform/ui_corpus.py; app/platform/local_runtime.py; docs/specs/ui.md; docs/tasks/milestone_013-fastapi/journal.md"
+        Adr = "ADR-018; ADR-021"
+    },
+    [ordered] @{
         Id = "REQ-M013-FASTAPI-011"
         Source = "docs/tasks/milestone_013-fastapi/0011_deployer_auditer_api_orchestratrice.md"
-        Test = "tests/m013_fastapi/validate_document_command_router_unit.ps1; tests/m013_fastapi/validate_original_pdf_stream_unit.ps1; tests/m013_fastapi/validate_runtime_operations_acceptance.ps1; tests/m013_fastapi/validate_postgres_migration_upgrade_live.ps1; tests/m013_fastapi/validate_orchestrator_deployment_acceptance.ps1; tests/m013_fastapi/validate_document_http_live_acceptance.ps1; tests/m013_fastapi/validate_orchestrator_deployment_unit.ps1; tests/m013_fastapi/validate_m013_fastapi_traceability_unit.ps1"
+        Test = "tests/m013_fastapi/validate_review_governance_performance_acceptance.ps1; tests/m013_fastapi/validate_orchestrator_deployment_acceptance.ps1; tests/m013_fastapi/validate_postgres_migration_upgrade_live.ps1; tests/m013_fastapi/validate_document_http_live_acceptance.ps1; tests/m013_fastapi/validate_document_worker_live.ps1; tests/m013_fastapi/validate_ka_projection_persistence_live.ps1; tests/m013_fastapi/validate_m013_fastapi_traceability_unit.ps1"
         CommandScript = "scripts/validate_m013_fastapi.ps1"
-        Code = "app/platform/orchestrator_command.py; app/platform/orchestrator_runtime.py; app/platform/orchestrator_asgi.py; app/platform/postgres_migrations.py; app/source_processing/adapters/http.py; app/source_processing/adapters/original_http.py; app/source_processing/adapters/postgres_document_persistence.py; deploy/local-compose/Caddyfile; deploy/local-compose/compose.yaml; deploy/local-compose/Dockerfile; deploy/postgres/migrations/002_knowledge_projection_read_models.sql; scripts/validate_m013_fastapi.ps1; docs/runbooks/api_orchestratrice.md; docs/governance/m013_fastapi_audit.md; docs/tasks/milestone_013-fastapi/journal.md"
+        Code = "app/platform/orchestrator_command.py; app/platform/orchestrator_runtime.py; app/platform/orchestrator_asgi.py; app/platform/orchestrator_contract_routers.py; app/platform/orchestrator_public_services.py; app/platform/orchestrator_api_models.py; app/platform/postgres_migrations.py; app/source_processing/adapters/http.py; app/source_processing/adapters/original_http.py; app/source_processing/adapters/postgres_document_persistence.py; app/source_processing/adapters/worker_runtime.py; deploy/local-compose/Caddyfile; deploy/local-compose/compose.yaml; deploy/local-compose/Dockerfile; deploy/postgres/migrations/005_source_processing_read_performance.sql; scripts/validate_m013_fastapi.ps1; docs/runbooks/api_orchestratrice.md; docs/governance/m013_fastapi_audit.md; docs/tasks/milestone_013-fastapi/journal.md"
         Adr = "ADR-018; ADR-019; ADR-020; ADR-021"
     }
 )
@@ -1104,7 +1184,7 @@ function Assert-CommandCell {
         [string] $RequirementId
     )
 
-    $commandPattern = "^powershell\s+-NoProfile\s+-ExecutionPolicy\s+Bypass\s+-File\s+(?<script>\.?[\\/][^\s;|&]+)(?:\s+-Path\s+(?<pathArg>\.?[\\/][^\s;|&]+))?\s*$"
+    $commandPattern = "^powershell\s+-NoProfile\s+-ExecutionPolicy\s+Bypass\s+-File\s+(?<script>\.?[\\/][^\s;|&]+)(?:\s+-Path\s+(?<pathArg>\.?[\\/][^\s;|&]+))?(?:\s+-Mode\s+(?:Static|Live))?\s*$"
 
     if ($Status -eq "Couvert") {
         Assert-Condition `

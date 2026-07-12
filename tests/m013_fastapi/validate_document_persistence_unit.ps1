@@ -8,6 +8,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from app.platform.configuration import load_application_configuration
+from app.platform.postgres import PsycopgConnectionFactory
 from app.platform.job_runtime import (
     JOB_RUNTIME_CATALOG,
     JobIdempotenceKey,
@@ -89,7 +90,15 @@ configuration = load_application_configuration(
     Path("config/application.yaml"),
     environment_snapshot={},
 )
-adapters = build_document_persistence(configuration)
+connection_factory = PsycopgConnectionFactory(
+    connection_url=configuration.services.postgres.url,
+    password_path=Path(configuration.security.secrets.postgres_password_path),
+    connect_timeout_seconds=configuration.runtime.timeouts.startup_seconds,
+)
+adapters = build_document_persistence(
+    configuration,
+    connection_factory=connection_factory,
+)
 assert isinstance(adapters.source_document_repository, PostgresDocumentPersistence)
 assert isinstance(adapters.job_queue, PostgresJobQueue)
 

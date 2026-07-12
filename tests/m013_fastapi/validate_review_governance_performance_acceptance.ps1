@@ -57,21 +57,9 @@ import sys
 sys.path.insert(0, sys.argv[1])
 
 from app.platform.configuration import load_application_configuration
-from app.platform.orchestrator_asgi import create_orchestrator_app
-from app.platform.orchestrator_composition import DependencyReadiness, OrchestratorCompositionRoot
+from fastapi import FastAPI
 from app.platform.orchestrator_runtime import build_orchestrator_composition_root
 from app.source_processing.adapters.postgres_document_persistence import PostgresDocumentPersistence
-
-
-class ReadyDependency:
-    async def open(self):
-        return None
-
-    async def close(self):
-        return None
-
-    def readiness(self):
-        return DependencyReadiness(name="review", status="ready")
 
 
 async def scenario(repo_root: Path) -> None:
@@ -80,17 +68,9 @@ async def scenario(repo_root: Path) -> None:
         environment_snapshot={},
     )
 
-    def root_factory(validated_configuration):
-        return OrchestratorCompositionRoot(
-            configuration=validated_configuration,
-            dependencies=(ReadyDependency(),),
-            document_command_router=__import__("fastapi").APIRouter(),
-        )
-
-    application = create_orchestrator_app(
-        configuration=configuration,
-        composition_root_factory=root_factory,
-    )
+    root = build_orchestrator_composition_root(configuration)
+    application = FastAPI()
+    application.include_router(root.document_command_router)
     schema = application.openapi()
     registration = schema["paths"]["/v1/documents"]["post"]
     multipart = registration["requestBody"]["content"]["multipart/form-data"]["schema"]

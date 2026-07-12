@@ -17,6 +17,14 @@ from app.source_processing.application.document_queries import (
     SourceNotFoundError,
 )
 from app.source_processing.domain.source_document import DocumentId
+from app.platform.orchestrator_api_models import (
+    DocumentConversionResponse,
+    DocumentCorpusResponse,
+    DocumentDiagnosticResponse,
+    PUBLIC_ERROR_RESPONSES,
+    parse_public_document_id,
+    public_error,
+)
 
 
 class DocumentQueryPort(Protocol):
@@ -38,14 +46,22 @@ def build_document_query_router(*, document_queries: DocumentQueryPort) -> APIRo
     parsed_queries = _ensure_document_queries(document_queries)
     router = APIRouter()
 
-    @router.get("/v1/documents")
+    @router.get(
+        "/v1/documents",
+        response_model=DocumentCorpusResponse,
+        responses=PUBLIC_ERROR_RESPONSES,
+    )
     async def list_documents() -> JSONResponse:
         view = parsed_queries.list_documents()
         if not isinstance(view, DocumentCorpusView):
             raise TypeError("read-model de corpus invalide")
         return JSONResponse(status_code=200, content=asdict(view))
 
-    @router.get("/v1/documents/{document_id}/diagnostic")
+    @router.get(
+        "/v1/documents/{document_id}/diagnostic",
+        response_model=DocumentDiagnosticResponse,
+        responses=PUBLIC_ERROR_RESPONSES,
+    )
     async def read_diagnostic(document_id: str) -> JSONResponse:
         if not _is_valid_document_id(document_id):
             return _invalid_document_id_response()
@@ -59,7 +75,11 @@ def build_document_query_router(*, document_queries: DocumentQueryPort) -> APIRo
             raise TypeError("read-model de diagnostic invalide")
         return JSONResponse(status_code=200, content=asdict(view))
 
-    @router.get("/v1/documents/{document_id}/conversion")
+    @router.get(
+        "/v1/documents/{document_id}/conversion",
+        response_model=DocumentConversionResponse,
+        responses=PUBLIC_ERROR_RESPONSES,
+    )
     async def read_conversion(document_id: str) -> JSONResponse:
         if not _is_valid_document_id(document_id):
             return _invalid_document_id_response()
@@ -79,7 +99,7 @@ def build_document_query_router(*, document_queries: DocumentQueryPort) -> APIRo
 def _source_not_found_response(error: SourceNotFoundError) -> JSONResponse:
     return JSONResponse(
         status_code=404,
-        content={"error_code": "SOURCE_NOT_FOUND", "document_id": error.document_id},
+        content=public_error("SOURCE_NOT_FOUND", document_id=error.document_id),
     )
 
 
@@ -88,10 +108,7 @@ def _diagnostic_not_requested_response(
 ) -> JSONResponse:
     return JSONResponse(
         status_code=409,
-        content={
-            "error_code": "DIAGNOSTIC_NOT_REQUESTED",
-            "document_id": error.document_id,
-        },
+        content=public_error("DIAGNOSTIC_NOT_REQUESTED", document_id=error.document_id),
     )
 
 
@@ -100,23 +117,20 @@ def _conversion_not_requested_response(
 ) -> JSONResponse:
     return JSONResponse(
         status_code=409,
-        content={
-            "error_code": "CONVERSION_NOT_REQUESTED",
-            "document_id": error.document_id,
-        },
+        content=public_error("CONVERSION_NOT_REQUESTED", document_id=error.document_id),
     )
 
 
 def _invalid_document_id_response() -> JSONResponse:
     return JSONResponse(
         status_code=400,
-        content={"error_code": "HTTP_REQUEST_INVALID", "field": "document_id"},
+        content=public_error("HTTP_REQUEST_INVALID", field="document_id"),
     )
 
 
 def _is_valid_document_id(value: str) -> bool:
     try:
-        DocumentId.from_value(value)
+        DocumentId.from_value(parse_public_document_id(value))
     except ValueError:
         return False
     return True

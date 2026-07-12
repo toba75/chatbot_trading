@@ -20,6 +20,8 @@ from app.platform.orchestrator_composition import (
     DependencyReadiness,
     OrchestratorCompositionRoot,
 )
+from app.platform.orchestrator_contract_routers import build_public_contract_router
+from app.platform.orchestrator_public_services import build_public_contract_services
 from app.platform.postgres import PsycopgConnectionFactory
 from app.platform.postgres_migrations import (
     POSTGRES_MIGRATIONS_PATH,
@@ -101,7 +103,10 @@ def build_orchestrator_composition_root(
         migrations_path=POSTGRES_MIGRATIONS_PATH,
         operation_timeout_seconds=configuration.runtime.timeouts.startup_seconds,
     )
-    persistence = build_document_persistence(configuration)
+    persistence = build_document_persistence(
+        configuration,
+        connection_factory=connection_factory,
+    )
     document_commands = DocumentCommandService(
         original_source_store=persistence.original_source_store,
         source_document_repository=persistence.source_document_repository,
@@ -131,6 +136,9 @@ def build_orchestrator_composition_root(
     )
 
     document_router = APIRouter()
+    document_router.include_router(
+        build_public_contract_router(build_public_contract_services(configuration))
+    )
     document_router.include_router(
         build_document_command_router(
             document_http_adapter=SourceProcessingHttpAdapter(document_commands),

@@ -125,3 +125,14 @@
 - Preuves live : PostgreSQL Docker réel redémarré avec `BUILDING`, `SEARCHABLE`, `STALE`, `FAILED`; Uvicorn/FastAPI réels avec upload multipart, diagnostic, conversion, projection et original par le client UI.
 - UI : origine hôte `127.0.0.1` issue de la configuration, origine Compose `orchestrator-api`, succès POST en `303`, erreurs françaises `role=alert`, inspections sémantiques et retrait du bouton de sélection non raccordé.
 - Modification utilisateur protégée : `tests/m013/validate_m013_reality_product_acceptance.ps1`, hors staging et hors commits.
+
+## Correctif de revue gouvernance, OpenAPI, runtime et performance
+
+- Exigences consolidées : `REQ-M013-FASTAPI-001`, `REQ-M013-FASTAPI-002`, `REQ-M013-FASTAPI-003`, `REQ-M013-FASTAPI-004`, `REQ-M013-FASTAPI-005`, `REQ-M013-FASTAPI-006`, `REQ-M013-FASTAPI-007`, `REQ-M013-FASTAPI-008`, `REQ-M013-FASTAPI-009`, `REQ-M013-FASTAPI-010`, `REQ-M013-FASTAPI-011`.
+- Scénario BDD : Given les contrats M13-FastAPI, les preuves statiques et les preuves live; When la gate, OpenAPI, le runtime, PostgreSQL et le worker sont audités; Then toutes les tâches sont traçables, le lint reste indépendant de Docker, la gate live est explicite, les contrats sont typés et les volumes restent bornés sans donnée sensible.
+- Gate : `-Mode Static` exécute les preuves sans Docker; `-Mode Live` exécute le catalogue exhaustif, y compris PostgreSQL, Uvicorn, PDF et workers réels. Une invocation sans mode échoue avec `M013_FASTAPI_LIVE_MODE_REQUIRED`.
+- Runtime : `local_runtime serve-http orchestrator-api` est rejeté par `ORCHESTRATOR_LEGACY_RUNTIME_FORBIDDEN`; les routes conversation, benchmark, recherche et indexation reçoivent des services publics injectés par la composition.
+- PostgreSQL : schéma `005`, pagination par `DocumentId`, snapshot `REPEATABLE READ READ ONLY`, lectures groupées à nombre constant de requêtes, insertions page par lots JSONB et index éditorial composite.
+- Observabilité : corrélation HTTP vers outbox puis worker; compteurs succès/erreur, durée et volume sans payload, selon la configuration de tracing.
+- Dérogation historique : les sujets de commits antérieurs sans accents ne sont pas réécrits afin de préserver la traçabilité des hashes. Tous les nouveaux sujets utilisent désormais l'accentuation française.
+- Commit RED : `4a448c2c7`, `test(platform): couvrir gouvernance et performance M13-FastAPI`.

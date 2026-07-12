@@ -12,6 +12,13 @@ from starlette.exceptions import HTTPException as StarletteHttpException
 from starlette.concurrency import run_in_threadpool
 
 from app.source_processing.adapters.document_http import HttpRequest, HttpResponse
+from app.platform.orchestrator_api_models import (
+    DiagnosticAcceptedResponse,
+    DocumentDuplicateResponse,
+    DocumentRegisteredResponse,
+    DOCUMENT_MULTIPART_OPENAPI,
+    PUBLIC_ERROR_RESPONSES,
+)
 
 
 class DocumentHttpAdapter(Protocol):
@@ -39,7 +46,16 @@ def build_document_command_router(
     parsed_max_pdf_bytes = _ensure_max_pdf_bytes(max_pdf_bytes)
     router = APIRouter()
 
-    @router.post("/v1/documents")
+    @router.post(
+        "/v1/documents",
+        response_model=DocumentRegisteredResponse,
+        status_code=201,
+        responses={
+            200: {"model": DocumentDuplicateResponse, "description": "Binaire déjà enregistré."},
+            **PUBLIC_ERROR_RESPONSES,
+        },
+        openapi_extra=DOCUMENT_MULTIPART_OPENAPI,
+    )
     async def register_document(request: Request) -> JSONResponse:
         if not _is_multipart_request(request):
             return _invalid_request("body")
@@ -57,7 +73,12 @@ def build_document_command_router(
         except StarletteHttpException:
             return _invalid_request("body")
 
-    @router.post("/v1/documents/{document_id}/diagnose")
+    @router.post(
+        "/v1/documents/{document_id}/diagnose",
+        response_model=DiagnosticAcceptedResponse,
+        status_code=202,
+        responses=PUBLIC_ERROR_RESPONSES,
+    )
     def diagnose_document(document_id: str, request: Request) -> JSONResponse:
         if _request_has_body(request):
             return _invalid_request("body")

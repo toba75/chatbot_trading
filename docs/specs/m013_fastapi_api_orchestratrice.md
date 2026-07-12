@@ -95,6 +95,10 @@ T-002 ne modifie pas les dépendances. Lors de l'implémentation de l'applicatio
 - L'application ASGI et la composition root ne portent aucune logique métier.
 - Les dépendances seront déclarées et verrouillées ensemble lors de l'implémentation.
 - La migration est progressive, observable et sans fallback.
+- L'OpenAPI public décrit sémantiquement le multipart PDF, les DTO de réponse, `application/pdf`, les statuts `201`, `202`, `4xx`, `5xx` et les erreurs publiques typées.
+- Les routeurs conversation, benchmark, recherche et indexation reçoivent des services publics injectés par la composition root; ils n'appellent aucune fonction privée de `local_runtime`.
+- La lecture du corpus SP est paginée par `DocumentId`, groupée sous `REPEATABLE READ READ ONLY` et bornée à un nombre constant de requêtes SQL.
+- La gate statique et la preuve live sont sélectionnées par un mode explicite; une invocation sans mode échoue sans fallback.
 
 ## Gates T-002
 

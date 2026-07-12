@@ -152,6 +152,9 @@ def main() -> int:
     check_parser.add_argument("service_id")
 
     args = parser.parse_args()
+    if args.command == "serve-http" and args.service_id == "orchestrator-api":
+        print("ORCHESTRATOR_LEGACY_RUNTIME_FORBIDDEN: utiliser uv run api.", file=sys.stderr)
+        return 2
     try:
         if args.command == "serve-http":
             _serve_http(
@@ -195,6 +198,8 @@ def _serve_http(
     application_configuration: ApplicationConfiguration,
     ui_execution_context: str | None,
 ) -> None:
+    if service_id == "orchestrator-api":
+        raise ValueError("ORCHESTRATOR_LEGACY_RUNTIME_FORBIDDEN")
     expected_port = _configured_http_port(service_id, application_configuration)
     if port != expected_port:
         raise ValueError(f"Port HTTP local invalide pour {service_id}: {port}")
@@ -615,14 +620,14 @@ def _local_post_response(
     return 404, {"error_code": "ENDPOINT_NOT_FOUND", "path": path}
 
 
-def _search_post_response() -> tuple[int, dict[str, Any]]:
+def search_post_response() -> tuple[int, dict[str, Any]]:
     return 503, {
         "error_code": "SERVICE_NOT_CONFIGURED",
         "endpoint": "POST /v1/search",
     }
 
 
-def _index_post_response(*, document_id: str) -> tuple[int, dict[str, Any]]:
+def index_post_response(*, document_id: str) -> tuple[int, dict[str, Any]]:
     try:
         validated_document_id = str(DomainIdentifier.parse_with_prefix(document_id, "DOC"))
     except ValueError:
@@ -642,7 +647,7 @@ def _required_application_configuration(
     return application_configuration
 
 
-def _product_chat_completions_post_response(
+def product_chat_completions_post_response(
     *,
     body: dict[str, Any],
     application_configuration: ApplicationConfiguration,
@@ -685,7 +690,7 @@ def _product_chat_completions_post_response(
     }
 
 
-def _llm_real_path_benchmark_post_response(
+def llm_real_path_benchmark_post_response(
     *,
     body: dict[str, Any],
     application_configuration: ApplicationConfiguration,
@@ -1234,3 +1239,11 @@ def _require_worker_service(service_id: str) -> None:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+# Compatibilité de tests M13-config antérieurs. Les routeurs ASGI n'utilisent plus
+# ces noms privés; la composition injecte les services publics ci-dessus.
+_search_post_response = search_post_response
+_index_post_response = index_post_response
+_product_chat_completions_post_response = product_chat_completions_post_response
+_llm_real_path_benchmark_post_response = llm_real_path_benchmark_post_response

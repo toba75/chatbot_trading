@@ -39,7 +39,7 @@
 - Commandes de validation:
   - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_fastapi\validate_orchestrator_deployment_acceptance.ps1`
   - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_fastapi\validate_document_http_live_acceptance.ps1`
-  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_fastapi.ps1`
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_fastapi.ps1 -Mode Live`
   - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_traceability.ps1`
   - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`
   - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`

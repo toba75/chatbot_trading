@@ -85,6 +85,7 @@ from pypdf import PdfWriter
 
 from app.platform.configuration import load_application_configuration
 from app.platform.job_runtime.postgres import PostgresJobQueue
+from app.platform.postgres import PsycopgConnectionFactory
 from app.source_processing.adapters.postgres_document_persistence import (
     ProcessingRunVersionConflictError,
     build_document_persistence,
@@ -138,7 +139,12 @@ def register_and_diagnose(index):
 documents = [register_and_diagnose(index) for index in range(1, 4)]
 os.chdir(runtime_root)
 configuration = load_application_configuration(config_path, environment_snapshot={})
-adapters = build_document_persistence(configuration)
+connection_factory = PsycopgConnectionFactory(
+    connection_url=configuration.services.postgres.url,
+    password_path=Path(configuration.security.secrets.postgres_password_path),
+    connect_timeout_seconds=configuration.runtime.timeouts.startup_seconds,
+)
+adapters = build_document_persistence(configuration, connection_factory=connection_factory)
 assert isinstance(adapters.job_queue, PostgresJobQueue)
 
 # Deux processus réclament deux jobs concurrents; SKIP LOCKED interdit un double claim actif.

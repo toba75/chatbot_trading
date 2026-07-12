@@ -39,7 +39,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_fastapi\validat
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_fastapi\validate_document_http_live_acceptance.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_fastapi\validate_orchestrator_deployment_unit.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_fastapi\validate_m013_fastapi_traceability_unit.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_fastapi.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_fastapi.ps1 -Mode Live
 ```
 
 La preuve live utilise Docker Engine, PostgreSQL, Uvicorn et HTTP réels. Aucun mock, stub, fake, serveur de test ASGI ni fallback n'est admis dans cette preuve. Les tests unitaires isolés ne remplacent pas cette preuve live.
@@ -50,6 +50,10 @@ La preuve live utilise Docker Engine, PostgreSQL, Uvicorn et HTTP réels. Aucun 
 - `llm-gateway` reste le seul adaptateur réseau vers Spark et n'est pas migré.
 - Qdrant ne devient pas une source de vérité de projection; l'état public KA est lu depuis PostgreSQL.
 - Le rollback suit `docs/runbooks/api_orchestratrice.md` et ne réactive jamais deux runtimes concurrents.
+- La page corpus publique est actuellement bornée à 100 documents par lecture; l'exposition d'un curseur UI complet reste une évolution produit distincte. Le port PostgreSQL accepte un curseur `after_document_id` explicite et n'effectue aucune lecture non bornée.
+- Les métriques M13-FastAPI sont émises dans les événements JSON locaux configurés; aucun exporteur externe ni stockage longue durée n'est introduit.
+- Les handlers conversation et benchmark réutilisent encore les fonctions publiques de calcul du module runtime pendant la migration progressive; les routeurs ne dépendent plus de noms privés. L'extraction complète du moteur LLM hors du module runtime reste un risque de maintenabilité suivi, sans fallback fonctionnel.
+- La migration `005` ajoute des index en ligne lors du démarrage; sur un corpus beaucoup plus volumineux que le profil local V1, la durée de verrou doit être mesurée avant production multi-utilisateur.
 
 ## Résultats observés
 

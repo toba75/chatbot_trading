@@ -153,3 +153,23 @@ try {
 finally {
     Remove-Item -LiteralPath $pythonScriptPath -Force
 }
+
+$acceptance = Get-Content -Raw -Encoding UTF8 (Join-Path $repoRoot "tests/m013/validate_m013_reality_product_acceptance.ps1")
+$legacyRuntime = Get-Content -Raw -Encoding UTF8 (Join-Path $repoRoot "app/platform/local_runtime.py")
+foreach ($marker in @(
+    '$uvExecutable',
+    '"run", "--no-sync", "api"',
+    'POSTGRES_DOCKER_START_FAILED',
+    'POSTGRES_DOCKER_NOT_READY',
+    '$runtimeConfigPath'
+)) {
+    if (-not $acceptance.Contains($marker)) {
+        throw "Preuve M13-reality FastAPI/PostgreSQL incomplète: $marker"
+    }
+}
+if ($acceptance.Contains('"serve-http", "orchestrator-api"')) {
+    throw "La preuve M13-reality ne doit plus démarrer le runtime orchestrateur legacy."
+}
+if (-not $legacyRuntime.Contains("ORCHESTRATOR_LEGACY_RUNTIME_FORBIDDEN")) {
+    throw "Le runtime legacy doit refuser explicitement orchestrator-api."
+}

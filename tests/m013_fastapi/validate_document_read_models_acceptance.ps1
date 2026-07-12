@@ -84,7 +84,9 @@ class SnapshotRepository:
         self.runs = runs
         self.conversions = conversions
 
-    def list_document_snapshots(self):
+    def list_document_snapshots(self, *, limit, after_document_id):
+        assert limit == 100
+        assert after_document_id is None
         return tuple(self.find_document_snapshot(document.document_id) for document in self.sources.list_documents())
 
     def find_document_snapshot(self, document_id):

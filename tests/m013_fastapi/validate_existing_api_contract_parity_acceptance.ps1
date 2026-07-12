@@ -20,6 +20,8 @@ from app.platform.configuration import load_application_configuration
 import app.platform.local_runtime as legacy_runtime
 from app.platform.orchestrator_asgi import create_orchestrator_app
 from app.platform.orchestrator_composition import DependencyReadiness, OrchestratorCompositionRoot
+from app.platform.orchestrator_contract_routers import build_public_contract_router
+from app.platform.orchestrator_public_services import build_public_contract_services
 
 
 def assert_equal(actual, expected, message):
@@ -129,12 +131,13 @@ async def scenario(repo_root):
         config_path=repo_root / "config" / "application.example.yaml",
         environment_snapshot={},
     )
+    services = build_public_contract_services(configuration)
 
     def root_factory(validated_configuration):
         return OrchestratorCompositionRoot(
             configuration=validated_configuration,
             dependencies=(ReadyDependency(),),
-            document_command_router=APIRouter(),
+            document_command_router=build_public_contract_router(services),
         )
 
     application = create_orchestrator_app(

@@ -23,6 +23,14 @@ uv run api --config .\config\application.yaml
 
 Le processus s'arrête explicitement si `--config`, PostgreSQL, le secret PostgreSQL ou une migration obligatoire manque. Il ne démarre aucun ancien routeur et n'essaie aucun backend alternatif.
 
+La commande historique `python -m app.platform.local_runtime serve-http orchestrator-api 8080` est interdite et retourne `ORCHESTRATOR_LEGACY_RUNTIME_FORBIDDEN`. Elle ne constitue ni une santé valide ni une procédure de rollback.
+
+## Contrat OpenAPI public
+
+`GET /openapi.json` décrit le corps `multipart/form-data` de `POST /v1/documents`, dont le fichier `application/pdf`, les métadonnées obligatoires et les réponses typées `200`, `201`, `400`, `409`, `422` et `500`. Le diagnostic documente `202` et ses erreurs publiques; la restitution originale documente `application/pdf` en `200`. Les schémas publics ne contiennent aucune référence de stockage, de secret, de job interne ni d'identifiant Qdrant.
+
+Les erreurs publiques sont des DTO typés autour de `error_code`; les champs complémentaires restent bornés au contrat documenté. Une réponse `5xx` n'active aucun runtime alternatif.
+
 ## Démarrage Compose
 
 ```powershell
@@ -33,7 +41,16 @@ Les quatre variables techniques `OST_EDGE_HTTPS_PORT`, `CADDY_ADMIN`, `POSTGRES_
 
 Le service `orchestrator-api` exécute directement l'entrée verrouillée `api --config /workspace/config/application.yaml` depuis la `.venv` copiée par le builder. L'image runtime n'installe pas `uv` et ne résout aucune dépendance. Le service conserve le port interne 8080 et attend PostgreSQL. L'UI et `llm-gateway` gardent leur runtime propre; ils ne sont pas migrés vers FastAPI.
 
-L'image et le schéma sont couplés explicitement par `ostrading/orchestrator-api:0.1.0-m013-fastapi-schema-004` et le label `org.ostrading.postgres-schema-version=004`. Le runner prend un verrou advisory transactionnel, vérifie le ledger `platform.schema_migrations`, applique les versions absentes et refuse toute dérive de SHA-256 avant que `/ready` puisse répondre 200. Les timeouts `startup_seconds`, `request_seconds` et `shutdown_seconds` pilotent respectivement connexion/migrations, requêtes/keep-alive et arrêt Uvicorn; le healthcheck Compose reprend 120 s, 300 s et 30 s sans valeur alternative.
+## Gates statique et live
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_fastapi.ps1 -Mode Static
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_fastapi.ps1 -Mode Live
+```
+
+Le mode `Static` est celui de `scripts/lint.ps1` et n'exige ni Docker ni `.venv`. Le mode `Live`, utilisé par `scripts/test.ps1`, exécute d'abord toutes les preuves statiques puis PostgreSQL, Uvicorn, PDF et workers réels. L'absence de mode est une erreur; il n'existe aucun choix implicite.
+
+L'image et le schéma sont couplés explicitement par `ostrading/orchestrator-api:0.1.0-m013-fastapi-schema-005` et le label `org.ostrading.postgres-schema-version=005`. Le runner prend un verrou advisory transactionnel, vérifie le ledger `platform.schema_migrations`, applique les versions absentes et refuse toute dérive de SHA-256 avant que `/ready` puisse répondre 200. Les timeouts `startup_seconds`, `request_seconds` et `shutdown_seconds` pilotent respectivement connexion/migrations, requêtes/keep-alive et arrêt Uvicorn; le healthcheck Compose reprend 120 s, 300 s et 30 s sans valeur alternative.
 
 ## Migration d'un volume existant
 
@@ -44,7 +61,7 @@ docker compose -f .\deploy\local-compose\compose.yaml up -d postgres
 docker compose -f .\deploy\local-compose\compose.yaml run --rm --no-deps orchestrator-api python -m app.platform.postgres_migrations --config /workspace/config/application.yaml
 ```
 
-La sortie attendue pour cette image est `POSTGRES_SCHEMA_READY:004`. Relancer exactement la même commande est idempotent. Une erreur `POSTGRES_MIGRATION_DRIFT`, `POSTGRES_SCHEMA_VERSION_UNSUPPORTED` ou un timeout interdit le démarrage; aucun script n'est ignoré et aucun ledger n'est corrigé automatiquement.
+La sortie attendue pour cette image est `POSTGRES_SCHEMA_READY:005`. Relancer exactement la même commande est idempotent. Une erreur `POSTGRES_MIGRATION_DRIFT`, `POSTGRES_SCHEMA_VERSION_UNSUPPORTED` ou un timeout interdit le démarrage; aucun script n'est ignoré et aucun ledger n'est corrigé automatiquement.
 
 ## Limites binaires et spool temporaire
 
@@ -85,11 +102,11 @@ L'arrêt Compose conserve les volumes:
 docker compose -f .\deploy\local-compose\compose.yaml down
 ```
 
-Le rollback applicatif consiste à arrêter l'image courante, puis à redéployer un tag immuable qui déclare explicitement `schema-004` et le même ledger compatible:
+Le rollback applicatif consiste à arrêter l'image courante, puis à redéployer un tag immuable qui déclare explicitement `schema-005` et le même ledger compatible:
 
 ```powershell
 docker compose -f .\deploy\local-compose\compose.yaml down
-git switch --detach <commit-green-compatible-schema-004>
+git switch --detach <commit-green-compatible-schema-005>
 docker compose -f .\deploy\local-compose\compose.yaml up --build
 ```
 
