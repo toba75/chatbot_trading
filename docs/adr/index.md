@@ -24,6 +24,7 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 | [ADR-016](ADR-016-configuration-applicative-fichier-unique.md) | Configuration applicative par fichier unique | Acceptée | 2026-07-10 | Aucun | Aucune |
 | [ADR-017](ADR-017-pdf-sources-suivis-par-git-lfs.md) | PDF sources suivis par Git LFS | Acceptée | 2026-07-11 | Aucun | Aucune |
 | [ADR-018](ADR-018-ui-exclusivement-via-api-orchestratrice.md) | UI exclusivement via l'API orchestratrice | Acceptée | 2026-07-11 | Aucun | Aucune |
+| [ADR-019](ADR-019-api-orchestratrice-fastapi-uvicorn.md) | API orchestratrice FastAPI et Uvicorn | Acceptée | 2026-07-12 | Aucun | Aucune |
 
 ## ADR DDD
 
@@ -45,7 +46,7 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 ## Prochains numéros disponibles
 
 ```text
-Prochaine ADR technique: ADR-019
+Prochaine ADR technique: ADR-020
 Prochaine DDD-ADR: DDD-ADR-013
 ```
 

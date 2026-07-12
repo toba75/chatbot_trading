@@ -45,3 +45,16 @@
 - Limite: `scripts/test.ps1` a dépassé une heure sur `master` sans code de sortie; aucun GREEN global n'est déclaré.
 - Modification utilisateur protégée: `tests/m013/validate_m013_reality_product_acceptance.ps1`, hors staging et hors commits T-001.
 - ADR: ADR-018 consultée et inchangée; aucune nouvelle ADR requise pour cette récupération locale de gate.
+
+## T-002 - Frontière HTTP publique
+
+- Date: 2026-07-12.
+- Statut: IMPLÉMENTÉE par décision d'architecture et spécification exécutable; aucune dépendance ni application ASGI ajoutée dans cette tâche.
+- Scénario: Given le routeur conditionnel partagé; When la frontière HTTP est publiée; Then FastAPI, Uvicorn, la composition root, les responsabilités interdites et la migration progressive sont vérifiables.
+- Décision: ADR-019 retient FastAPI pour l'application ASGI et Uvicorn pour son serveur, uniquement dans `platform` et les adaptateurs HTTP autorisés.
+- Propriété métier: SP, KA, RA et CV conservent commandes, invariants, erreurs et read-models; le transport délègue sans logique métier.
+- Migration: contrat par contrat, preuve de parité avant bascule, aucun fallback silencieux et aucune migration big bang des autres services.
+- ADR-018: inchangée; elle continue d'imposer le passage exclusif de l'UI par `orchestrator-api`.
+- Commit RED: `7a3c3c231`, `test(architecture): couvrir frontiere asgi orchestratrice`.
+- Commit GREEN: `docs(architecture): decider fastapi uvicorn ADR-019`.
+- Gates: spécification, politique d'import FastAPI/Uvicorn, système ADR et validateur M13-FastAPI.
