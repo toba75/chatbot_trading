@@ -18,13 +18,17 @@ from app.source_processing.application.record_page_diagnostics import PageDiagno
 from app.source_processing.domain.document_processing_run import (
     DocumentProcessingRun,
     DocumentProcessingRunStatus,
+    DiagnosticVersion,
+    PageDiagnosticPolicy,
     PageDiagnosticSignals,
     PageManifest,
     PageManifestEntry,
     PageManifestEntryState,
     PageNumber,
+    PageDecisionState,
     PageRouteName,
     PageRoutingConfiguration,
+    PageRoutingPolicy,
     ProcessingRunId,
     RoutingPolicyVersion,
 )
@@ -142,7 +146,7 @@ def _claimed_diagnosis_job(source: SourceDocument, run: DocumentProcessingRun) -
         },
     )
     return ClaimedJob(
-        job=JobRecord(1, "JOB-M004-T005-DIAGNOSE", request, JobStatus.RUNNING, None, None),
+        job=JobRecord(1, "JOB-M002-000005", request, JobStatus.RUNNING, None, None),
         trace_id="TRACE-M004-T005-ROUTE",
         lease_owner="worker-test",
         lease_expires_at=datetime.now(UTC),
@@ -177,3 +181,81 @@ def test_diagnostic_worker_publishes_route_plan_after_inspection() -> None:
     assert repository.run.route_plan is not None
     assert repository.run.route_plan.page_routes[0].route_name is PageRouteName.SCAN_GRANITE
     assert repository.transitions == [(DocumentProcessingRunStatus.DIAGNOSED, repository.run)]
+
+
+def test_ocr_priority_keeps_degraded_scans_and_bad_ocr_routes_reachable() -> None:
+    # Given des signaux réels se recouvrent : une couche OCR mauvaise sur un scan
+    # physiquement dégradé est aussi techniquement une page mixte.
+    # When PageDiagnosticPolicy les classe.
+    # Then PREPROCESS_GRANITE garde la priorité sur ce mélange dégradé, tandis
+    #      BAD_OCR_TO_GRANITE et MIXED_PAGEWISE restent atteignables dans leurs cas propres.
+    configuration = PageRoutingConfiguration(
+        routing_policy_version=RoutingPolicyVersion.from_value("routing-v1"),
+        auto_confidence_min=0.90,
+        benchmark_confidence_min=0.85,
+    )
+    diagnostic_policy = PageDiagnosticPolicy()
+    routing_policy = PageRoutingPolicy()
+
+    degraded = diagnostic_policy.classify(
+        page_number=PageNumber.from_value(1),
+        signals=PageDiagnosticSignals(
+            native_text_state="SUSPECT",
+            image_state="SCAN_DEGRADED",
+            existing_ocr_state="BAD",
+            layout_complexity="SIMPLE",
+            corruption_state="NONE",
+            mixed_content_detected=True,
+            has_table=False,
+            has_formula=False,
+        ),
+        diagnostic_version=DiagnosticVersion.from_value("diag-adr033-v1"),
+        justification="Scan réel avec OCR dégradé et image présente.",
+    )
+    assert degraded.page_state is PageDecisionState.SCAN_DEGRADED
+    assert (
+        routing_policy.decide_page_route(degraded, configuration).route_name
+        is PageRouteName.PREPROCESS_GRANITE
+    )
+
+    bad_ocr = diagnostic_policy.classify(
+        page_number=PageNumber.from_value(2),
+        signals=PageDiagnosticSignals(
+            native_text_state="SUSPECT",
+            image_state="SCAN_CLEAN",
+            existing_ocr_state="BAD",
+            layout_complexity="SIMPLE",
+            corruption_state="NONE",
+            mixed_content_detected=False,
+            has_table=False,
+            has_formula=False,
+        ),
+        diagnostic_version=DiagnosticVersion.from_value("diag-adr033-v1"),
+        justification="OCR mauvais sans dégradation physique du scan.",
+    )
+    assert bad_ocr.page_state is PageDecisionState.OCR_BAD
+    assert (
+        routing_policy.decide_page_route(bad_ocr, configuration).route_name
+        is PageRouteName.BAD_OCR_TO_GRANITE
+    )
+
+    legitimate_mixed = diagnostic_policy.classify(
+        page_number=PageNumber.from_value(3),
+        signals=PageDiagnosticSignals(
+            native_text_state="RELIABLE",
+            image_state="SCAN_CLEAN",
+            existing_ocr_state="VALID",
+            layout_complexity="SIMPLE",
+            corruption_state="NONE",
+            mixed_content_detected=True,
+            has_table=False,
+            has_formula=False,
+        ),
+        diagnostic_version=DiagnosticVersion.from_value("diag-adr033-v1"),
+        justification="Texte et image sains sur une page mixte légitime.",
+    )
+    assert legitimate_mixed.page_state is PageDecisionState.MIXED_CONTENT
+    assert (
+        routing_policy.decide_page_route(legitimate_mixed, configuration).route_name
+        is PageRouteName.MIXED_PAGEWISE
+    )
