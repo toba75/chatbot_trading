@@ -31,9 +31,13 @@ def test_historical_references_are_closed_and_immutable() -> None:
         _assert_reconciliation_preserves_the_closed_catalogue(
             Path(temporary_directory)
         )
+    with TemporaryDirectory() as temporary_directory:
+        _assert_local_runtime_assets_are_not_historical_sources(
+            Path(temporary_directory)
+        )
 
 
-def test_local_runtime_assets_are_not_historical_sources(tmp_path: Path) -> None:
+def _assert_local_runtime_assets_are_not_historical_sources(tmp_path: Path) -> None:
     repository_root = tmp_path / "repository"
     allowlist_path = (
         repository_root
