@@ -71,8 +71,15 @@ try {
         [System.IO.FileShare]::None
     )
 
-    $output = @(& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $sandbox "scripts\validate_m013_fastapi.ps1") -Mode Static 2>&1)
-    $exitCode = $LASTEXITCODE
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $output = @(& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $sandbox "scripts\validate_m013_fastapi.ps1") -Mode Static 2>&1)
+        $exitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
     $lockedSentinel.Dispose()
     $lockedSentinel = $null
     if ($exitCode -eq 0) {
@@ -90,6 +97,46 @@ try {
     $temporaryPath = $temporaryMatch.Groups["path"].Value.Trim()
     if (Test-Path -LiteralPath $temporaryPath) {
         throw "L'environnement uv temporaire subsiste après une preuve RED: $temporaryPath"
+    }
+
+    Add-Content -LiteralPath (Join-Path $sandbox "uv.lock") -Encoding UTF8 -Value "`n[[table_toml_invalide"
+    $lockedSentinel = [System.IO.File]::Open(
+        $sentinelPath,
+        [System.IO.FileMode]::Open,
+        [System.IO.FileAccess]::Read,
+        [System.IO.FileShare]::None
+    )
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $bootstrapOutput = @(& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $sandbox "scripts\validate_m013_fastapi.ps1") -Mode Static 2>&1)
+        $bootstrapExitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+    $lockedSentinel.Dispose()
+    $lockedSentinel = $null
+    if ($bootstrapExitCode -eq 0) {
+        throw "Le bootstrap synthétique invalide devait rester RED avant les preuves."
+    }
+    $renderedBootstrapOutput = $bootstrapOutput | Out-String
+    if ($renderedBootstrapOutput.Contains("Validation Static requise:")) {
+        throw "Le bootstrap uv invalide ne doit exécuter aucune preuve PowerShell."
+    }
+    $bootstrapTemporaryMatch = [regex]::Match(
+        $renderedBootstrapOutput,
+        'M013_FASTAPI_TEMP_ENVIRONMENT:\s*(?<path>[^\r\n]+)'
+    )
+    if (-not $bootstrapTemporaryMatch.Success) {
+        throw "La gate n'a pas exposé le temp créé avant le RED de bootstrap."
+    }
+    $bootstrapTemporaryPath = $bootstrapTemporaryMatch.Groups["path"].Value.Trim()
+    if (Test-Path -LiteralPath $bootstrapTemporaryPath) {
+        throw "L'environnement uv temporaire subsiste après un RED avant la boucle: $bootstrapTemporaryPath"
+    }
+    if ((Get-FileHash -Algorithm SHA256 -LiteralPath $sentinelPath).Hash -ne $sentinelHashBefore) {
+        throw "La .venv occupée a été modifiée pendant le RED de bootstrap."
     }
 }
 finally {
@@ -111,6 +158,22 @@ from app.source_processing.adapters.postgres_document_persistence import (
     _ManifestEntryRow,
     _ProcessingRunRow,
 )
+
+assert _JobRow._fields == (
+    "sequence", "job_id", "job_name", "priority", "input_hash",
+    "configuration_hash", "code_version", "model_version", "payload",
+    "status", "result", "failure_reason",
+)
+assert _ClaimedJobRow._fields == _JobRow._fields + (
+    "trace_id", "lease_owner", "lease_expires_at", "claim_generation",
+    "claim_token", "execution_attempts",
+)
+assert _ProcessingRunRow._fields == (
+    "processing_run_id", "document_id", "source_page_count", "status",
+    "manual_review_reason", "blocking_policy_version", "aggregate_version",
+    "failure_error_code",
+)
+assert _ManifestEntryRow._fields == ("page_number", "state")
 
 
 def require_shape_error(factory, row):

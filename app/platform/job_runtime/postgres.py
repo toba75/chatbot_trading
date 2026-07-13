@@ -1,10 +1,10 @@
-"""File PostgreSQL durable des jobs techniques M-002."""
+"""File PostgreSQL durable avec relais idempotent et claims clôturés."""
 
 from __future__ import annotations
 
 import json
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, NamedTuple
 
 from app.platform.job_runtime import (
     JobCatalog,
@@ -19,6 +19,93 @@ from app.contracts.technical_jobs import ClaimedJob
 from app.platform.job_runtime.relay import RelayedJobMessage
 from app.platform.postgres import PostgresConnection, PostgresConnectionFactory
 from app.platform.request_context import current_trace_id
+
+
+class _JobRow(NamedTuple):
+    sequence: int
+    job_id: str
+    job_name: str
+    priority: str
+    input_hash: str
+    configuration_hash: str
+    code_version: str
+    model_version: str
+    payload: Any
+    status: str
+    result: Any
+    failure_reason: str | None
+
+    @classmethod
+    def from_database(cls, row: Any) -> _JobRow:
+        return cls(*_database_row_values(row, len(cls._fields), "JOB"))
+
+
+class _ClaimedJobRow(NamedTuple):
+    sequence: int
+    job_id: str
+    job_name: str
+    priority: str
+    input_hash: str
+    configuration_hash: str
+    code_version: str
+    model_version: str
+    payload: Any
+    status: str
+    result: Any
+    failure_reason: str | None
+    trace_id: str
+    lease_owner: str
+    lease_expires_at: Any
+    claim_generation: int
+    claim_token: Any
+    execution_attempts: int
+
+    @classmethod
+    def from_database(cls, row: Any) -> _ClaimedJobRow:
+        return cls(*_database_row_values(row, len(cls._fields), "CLAIMED_JOB"))
+
+    def job_row(self) -> _JobRow:
+        return _JobRow(*self[: len(_JobRow._fields)])
+
+
+class _ConsumedRelayRow(NamedTuple):
+    job_id: str
+    source_message_hash: str
+
+    @classmethod
+    def from_database(cls, row: Any) -> _ConsumedRelayRow:
+        return cls(*_database_row_values(row, len(cls._fields), "CONSUMED_RELAY"))
+
+
+class _ExistingRelayRow(NamedTuple):
+    job_id: str
+    priority: str
+    payload: Any
+    trace_id: str
+    source_message_id: str | None
+    source_message_hash: str | None
+
+    @classmethod
+    def from_database(cls, row: Any) -> _ExistingRelayRow:
+        return cls(*_database_row_values(row, len(cls._fields), "EXISTING_RELAY"))
+
+
+class _InsertedJobRow(NamedTuple):
+    job_id: str
+
+    @classmethod
+    def from_database(cls, row: Any) -> _InsertedJobRow:
+        return cls(*_database_row_values(row, len(cls._fields), "INSERTED_JOB"))
+
+
+_JOB_COLUMNS_SQL = ", ".join(_JobRow._fields)
+_CLAIMED_JOB_COLUMNS_SQL = ", ".join(_ClaimedJobRow._fields)
+_QUALIFIED_CLAIMED_JOB_COLUMNS_SQL = ", ".join(
+    f"job.{column}" for column in _ClaimedJobRow._fields
+)
+_CONSUMED_RELAY_COLUMNS_SQL = ", ".join(_ConsumedRelayRow._fields)
+_EXISTING_RELAY_COLUMNS_SQL = ", ".join(_ExistingRelayRow._fields)
+_INSERTED_JOB_COLUMNS_SQL = ", ".join(_InsertedJobRow._fields)
 
 
 class JobLeaseConflictError(RuntimeError):
@@ -80,10 +167,8 @@ class PostgresJobQueue:
                 (lock_key,),
             )
             cursor.execute(
-                """
-                SELECT sequence, job_id, job_name, priority, input_hash,
-                       configuration_hash, code_version, model_version,
-                       payload, status, result, failure_reason
+                f"""
+                SELECT {_JOB_COLUMNS_SQL}
                   FROM platform.technical_jobs
                  WHERE job_name = %s
                    AND input_hash = %s
@@ -111,7 +196,7 @@ class PostgresJobQueue:
                     )
 
             cursor.execute(
-                """
+                f"""
                 INSERT INTO platform.technical_jobs (
                     job_name, priority, input_hash, configuration_hash,
                     code_version, model_version, payload, trace_id, status,
@@ -129,9 +214,7 @@ class PostgresJobQueue:
                            AND model_version = %s
                     ), 0)
                 )
-                RETURNING sequence, job_id, job_name, priority, input_hash,
-                          configuration_hash, code_version, model_version,
-                          payload, status, result, failure_reason
+                RETURNING {_JOB_COLUMNS_SQL}
                 """,
                 (
                     parsed_request.job_name,
@@ -155,10 +238,8 @@ class PostgresJobQueue:
         with self._connection_factory.connect() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(
-                    """
-                    SELECT sequence, job_id, job_name, priority, input_hash,
-                           configuration_hash, code_version, model_version,
-                           payload, status, result, failure_reason
+                    f"""
+                    SELECT {_JOB_COLUMNS_SQL}
                       FROM platform.technical_jobs
                      WHERE job_id = %s
                     """,
@@ -175,10 +256,8 @@ class PostgresJobQueue:
         with self._connection_factory.connect() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(
-                    """
-                    SELECT sequence, job_id, job_name, priority, input_hash,
-                           configuration_hash, code_version, model_version,
-                           payload, status, result, failure_reason
+                    f"""
+                    SELECT {_JOB_COLUMNS_SQL}
                       FROM platform.technical_jobs
                      WHERE job_name = %s
                        AND input_hash = %s
@@ -213,8 +292,8 @@ class PostgresJobQueue:
                     (message.message_id,),
                 )
                 cursor.execute(
-                    """
-                    SELECT job_id, source_message_hash
+                    f"""
+                    SELECT {_CONSUMED_RELAY_COLUMNS_SQL}
                       FROM platform.technical_jobs
                      WHERE source_message_id = %s
                     """,
@@ -222,14 +301,14 @@ class PostgresJobQueue:
                 )
                 consumed = cursor.fetchone()
                 if consumed is not None:
-                    if consumed[1] != message.content_hash:
+                    consumed_row = _ConsumedRelayRow.from_database(consumed)
+                    if consumed_row.source_message_hash != message.content_hash:
                         raise JobRelayMessageConflictError()
-                    return consumed[0]
+                    return consumed_row.job_id
 
                 cursor.execute(
-                    """
-                    SELECT job_id, priority, payload, trace_id,
-                           source_message_id, source_message_hash
+                    f"""
+                    SELECT {_EXISTING_RELAY_COLUMNS_SQL}
                       FROM platform.technical_jobs
                      WHERE job_name = %s
                        AND input_hash = %s
@@ -243,12 +322,13 @@ class PostgresJobQueue:
                 )
                 existing = cursor.fetchone()
                 if existing is not None:
+                    existing_row = _ExistingRelayRow.from_database(existing)
                     if (
-                        existing[1] != request.priority.value
-                        or dict(existing[2]) != dict(request.payload)
-                        or existing[3] != message.trace_id
-                        or existing[4] is not None
-                        or existing[5] is not None
+                        existing_row.priority != request.priority.value
+                        or dict(existing_row.payload) != dict(request.payload)
+                        or existing_row.trace_id != message.trace_id
+                        or existing_row.source_message_id is not None
+                        or existing_row.source_message_hash is not None
                     ):
                         raise JobRelayMessageConflictError()
                     cursor.execute(
@@ -257,14 +337,14 @@ class PostgresJobQueue:
                            SET source_message_id = %s, source_message_hash = %s
                          WHERE job_id = %s AND source_message_id IS NULL
                         """,
-                        (message.message_id, message.content_hash, existing[0]),
+                        (message.message_id, message.content_hash, existing_row.job_id),
                     )
                     if cursor.rowcount != 1:
                         raise JobRelayMessageConflictError()
-                    return existing[0]
+                    return existing_row.job_id
 
                 cursor.execute(
-                    """
+                    f"""
                     INSERT INTO platform.technical_jobs (
                         job_name, priority, input_hash, configuration_hash,
                         code_version, model_version, payload, trace_id, status,
@@ -274,7 +354,7 @@ class PostgresJobQueue:
                         %s, %s, %s, %s, %s, %s, %s::jsonb, %s, 'pending', 0,
                         %s, %s
                     )
-                    RETURNING job_id
+                    RETURNING {_INSERTED_JOB_COLUMNS_SQL}
                     """,
                     (
                         request.job_name,
@@ -292,7 +372,7 @@ class PostgresJobQueue:
                 inserted = cursor.fetchone()
         if inserted is None:
             raise RuntimeError("JOB_RELAY_PERSISTENCE_FAILED")
-        return inserted[0]
+        return _InsertedJobRow.from_database(inserted).job_id
 
     def claim_next(
         self,
@@ -308,7 +388,7 @@ class PostgresJobQueue:
             with connection.transaction():
                 with connection.cursor() as cursor:
                     cursor.execute(
-                        """
+                        f"""
                         WITH candidate AS (
                             SELECT sequence
                               FROM platform.technical_jobs
@@ -329,26 +409,22 @@ class PostgresJobQueue:
                                claim_token = gen_random_uuid()
                           FROM candidate
                          WHERE job.sequence = candidate.sequence
-                        RETURNING job.sequence, job.job_id, job.job_name, job.priority,
-                                  job.input_hash, job.configuration_hash, job.code_version,
-                                  job.model_version, job.payload, job.status, job.result,
-                                  job.failure_reason, job.trace_id, job.lease_owner,
-                                  job.lease_expires_at, job.claim_generation,
-                                  job.claim_token, job.execution_attempts
+                        RETURNING {_QUALIFIED_CLAIMED_JOB_COLUMNS_SQL}
                         """,
                         (list(parsed_names), parsed_owner, parsed_lease),
                     )
                     row = cursor.fetchone()
         if row is None:
             return None
+        claimed_row = _ClaimedJobRow.from_database(row)
         return ClaimedJob(
-            job=_job_from_row(row),
-            trace_id=row[12],
-            lease_owner=row[13],
-            lease_expires_at=row[14],
-            claim_generation=row[15],
-            claim_token=str(row[16]),
-            execution_attempts=row[17],
+            job=_job_from_row(claimed_row.job_row()),
+            trace_id=claimed_row.trace_id,
+            lease_owner=claimed_row.lease_owner,
+            lease_expires_at=claimed_row.lease_expires_at,
+            claim_generation=claimed_row.claim_generation,
+            claim_token=str(claimed_row.claim_token),
+            execution_attempts=claimed_row.execution_attempts,
         )
 
     def renew_lease(
@@ -426,7 +502,7 @@ class PostgresJobQueue:
         with self._connection_factory.connect() as connection:
             with connection.transaction(), connection.cursor() as cursor:
                 cursor.execute(
-                    """
+                    f"""
                     UPDATE platform.technical_jobs
                        SET status = 'pending', result = NULL, failure_reason = NULL,
                            lease_owner = NULL, lease_expires_at = NULL,
@@ -435,9 +511,7 @@ class PostgresJobQueue:
                        AND lease_owner = %s AND lease_expires_at > CURRENT_TIMESTAMP
                        AND claim_generation = %s AND claim_token = %s::uuid
                        AND execution_attempts < %s
-                    RETURNING sequence, job_id, job_name, priority, input_hash,
-                              configuration_hash, code_version, model_version,
-                              payload, status, result, failure_reason
+                    RETURNING {_JOB_COLUMNS_SQL}
                     """,
                     (
                         parsed_job_id,
@@ -470,25 +544,28 @@ class PostgresJobQueue:
             with connection.transaction():
                 with connection.cursor() as cursor:
                     cursor.execute(
-                        """
+                        f"""
                         UPDATE platform.technical_jobs
                            SET lease_expires_at = CURRENT_TIMESTAMP + (%s * INTERVAL '1 second')
                          WHERE job_id = %s AND status = 'running'
                            AND lease_owner = %s AND lease_expires_at > CURRENT_TIMESTAMP
                            AND claim_generation = %s AND claim_token = %s::uuid
-                        RETURNING sequence, job_id, job_name, priority, input_hash,
-                                  configuration_hash, code_version, model_version,
-                                  payload, status, result, failure_reason, trace_id,
-                                  lease_owner, lease_expires_at, claim_generation,
-                                  claim_token, execution_attempts
+                        RETURNING {_CLAIMED_JOB_COLUMNS_SQL}
                         """,
                         (parsed_lease, parsed_job_id, parsed_owner, parsed_generation, parsed_token),
                     )
                     row = cursor.fetchone()
         if row is None:
             raise JobLeaseConflictError()
+        claimed_row = _ClaimedJobRow.from_database(row)
         return ClaimedJob(
-            _job_from_row(row), row[12], row[13], row[14], row[15], str(row[16]), row[17]
+            job=_job_from_row(claimed_row.job_row()),
+            trace_id=claimed_row.trace_id,
+            lease_owner=claimed_row.lease_owner,
+            lease_expires_at=claimed_row.lease_expires_at,
+            claim_generation=claimed_row.claim_generation,
+            claim_token=str(claimed_row.claim_token),
+            execution_attempts=claimed_row.execution_attempts,
         )
 
     def _finish(
@@ -510,7 +587,7 @@ class PostgresJobQueue:
             with connection.transaction():
                 with connection.cursor() as cursor:
                     cursor.execute(
-                        """
+                        f"""
                         UPDATE platform.technical_jobs
                            SET status = %s, result = %s::jsonb, failure_reason = %s,
                                lease_owner = NULL, lease_expires_at = NULL,
@@ -518,9 +595,7 @@ class PostgresJobQueue:
                          WHERE job_id = %s AND status = 'running'
                            AND lease_owner = %s AND lease_expires_at > CURRENT_TIMESTAMP
                            AND claim_generation = %s AND claim_token = %s::uuid
-                        RETURNING sequence, job_id, job_name, priority, input_hash,
-                                  configuration_hash, code_version, model_version,
-                                  payload, status, result, failure_reason
+                        RETURNING {_JOB_COLUMNS_SQL}
                         """,
                         (
                             status, result, failure_reason, parsed_job_id, parsed_owner,
@@ -575,30 +650,40 @@ def _mapping(value: Any, field_name: str) -> Mapping[str, Any] | None:
     return decoded
 
 
+def _database_row_values(row: Any, expected_length: int, row_name: str) -> tuple[Any, ...]:
+    if not isinstance(row, (tuple, list)) or len(row) != expected_length:
+        actual_length = len(row) if isinstance(row, (tuple, list)) else "non-sequence"
+        raise RuntimeError(
+            f"SQL_ROW_SHAPE_INVALID:{row_name}:expected={expected_length}:actual={actual_length}"
+        )
+    return tuple(row)
+
+
 def _job_from_row(row: Any) -> JobRecord:
-    payload = _mapping(row[8], "payload")
+    parsed_row = row if isinstance(row, _JobRow) else _JobRow.from_database(row)
+    payload = _mapping(parsed_row.payload, "payload")
     if payload is None:
         raise RuntimeError("payload PostgreSQL absent")
-    status = JobStatus(row[9])
-    result = _mapping(row[10], "result")
+    status = JobStatus(parsed_row.status)
+    result = _mapping(parsed_row.result, "result")
     return JobRecord(
-        sequence=row[0],
-        job_id=row[1],
+        sequence=parsed_row.sequence,
+        job_id=parsed_row.job_id,
         request=JobRequest(
-            job_name=row[2],
-            priority=JobPriority(row[3]),
+            job_name=parsed_row.job_name,
+            priority=JobPriority(parsed_row.priority),
             idempotence_key=JobIdempotenceKey(
-                job_name=row[2],
-                input_hash=row[4],
-                configuration_hash=row[5],
-                code_version=row[6],
-                model_version=row[7],
+                job_name=parsed_row.job_name,
+                input_hash=parsed_row.input_hash,
+                configuration_hash=parsed_row.configuration_hash,
+                code_version=parsed_row.code_version,
+                model_version=parsed_row.model_version,
             ),
             payload=payload,
         ),
         status=status,
         result=result,
-        failure_reason=row[11],
+        failure_reason=parsed_row.failure_reason,
     )
 
 

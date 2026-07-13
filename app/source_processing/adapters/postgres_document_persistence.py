@@ -7,7 +7,7 @@ import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 from uuid import uuid4
 
 from app.contracts.technical_jobs import JobRequest
@@ -64,6 +64,146 @@ from app.source_processing.domain.source_document import (
 
 
 _ARTIFACT_PREFIX = "artifact:source_processing.original_sources/"
+
+
+class _ProcessingRunRow(NamedTuple):
+    processing_run_id: str
+    document_id: str
+    source_page_count: int
+    status: str
+    manual_review_reason: str | None
+    blocking_policy_version: str | None
+    aggregate_version: int
+    failure_error_code: str | None
+
+    @classmethod
+    def from_database(cls, row: Any) -> _ProcessingRunRow:
+        return cls(*_database_row_values(row, len(cls._fields), "PROCESSING_RUN"))
+
+
+class _ManifestEntryRow(NamedTuple):
+    page_number: int
+    state: str
+
+    @classmethod
+    def from_grouped(cls, row: Any) -> _ManifestEntryRow:
+        return cls(*_database_row_values(row, len(cls._fields), "MANIFEST_ENTRY"))
+
+
+class _ManifestEntryDatabaseRow(NamedTuple):
+    processing_run_id: str
+    page_number: int
+    state: str
+
+    @classmethod
+    def from_database(cls, row: Any) -> _ManifestEntryDatabaseRow:
+        return cls(*_database_row_values(row, len(cls._fields), "MANIFEST_ENTRY_DATABASE"))
+
+    def grouped(self) -> _ManifestEntryRow:
+        return _ManifestEntryRow(self.page_number, self.state)
+
+
+class _DecisionRow(NamedTuple):
+    page_number: int
+    page_state: str
+    native_text_state: str
+    image_state: str
+    existing_ocr_state: str
+    layout_complexity: str
+    corruption_state: str
+    mixed_content_detected: bool
+    has_table: bool
+    has_formula: bool
+    diagnostic_version: str
+    justification: str
+
+
+class _DecisionDatabaseRow(NamedTuple):
+    processing_run_id: str
+    page_number: int
+    page_state: str
+    native_text_state: str
+    image_state: str
+    existing_ocr_state: str
+    layout_complexity: str
+    corruption_state: str
+    mixed_content_detected: bool
+    has_table: bool
+    has_formula: bool
+    diagnostic_version: str
+    justification: str
+
+    @classmethod
+    def from_database(cls, row: Any) -> _DecisionDatabaseRow:
+        return cls(*_database_row_values(row, len(cls._fields), "DECISION_DATABASE"))
+
+    def grouped(self) -> _DecisionRow:
+        return _DecisionRow(*self[1:])
+
+
+class _RoutePlanRow(NamedTuple):
+    routing_policy_version: str
+    dominant_route_name: str
+    confidence_score: float
+
+
+class _RoutePlanDatabaseRow(NamedTuple):
+    processing_run_id: str
+    routing_policy_version: str
+    dominant_route_name: str
+    confidence_score: float
+
+    @classmethod
+    def from_database(cls, row: Any) -> _RoutePlanDatabaseRow:
+        return cls(*_database_row_values(row, len(cls._fields), "ROUTE_PLAN_DATABASE"))
+
+    def grouped(self) -> _RoutePlanRow:
+        return _RoutePlanRow(*self[1:])
+
+
+class _RouteRow(NamedTuple):
+    page_number: int
+    route_name: str
+    decision_mode: str
+    confidence_score: float
+    preprocessing_action: str
+    routing_policy_version: str
+    justification: str
+    is_exception: bool
+
+
+class _RouteDatabaseRow(NamedTuple):
+    processing_run_id: str
+    page_number: int
+    route_name: str
+    decision_mode: str
+    confidence_score: float
+    preprocessing_action: str
+    routing_policy_version: str
+    justification: str
+    is_exception: bool
+
+    @classmethod
+    def from_database(cls, row: Any) -> _RouteDatabaseRow:
+        return cls(*_database_row_values(row, len(cls._fields), "ROUTE_DATABASE"))
+
+    def grouped(self) -> _RouteRow:
+        return _RouteRow(*self[1:])
+
+
+@dataclass(slots=True)
+class _GroupedProcessingRunRows:
+    manifest: dict[str, list[_ManifestEntryRow]]
+    decisions: dict[str, list[_DecisionRow]]
+    plans: dict[str, _RoutePlanRow]
+    routes: dict[str, list[_RouteRow]]
+
+
+_PROCESSING_RUN_COLUMNS_SQL = ", ".join(_ProcessingRunRow._fields)
+_MANIFEST_ENTRY_COLUMNS_SQL = ", ".join(_ManifestEntryDatabaseRow._fields)
+_DECISION_COLUMNS_SQL = ", ".join(_DecisionDatabaseRow._fields)
+_ROUTE_PLAN_COLUMNS_SQL = ", ".join(_RoutePlanDatabaseRow._fields)
+_ROUTE_COLUMNS_SQL = ", ".join(_RouteDatabaseRow._fields)
 
 
 class ProcessingRunVersionConflictError(RuntimeError):
@@ -476,18 +616,18 @@ class PostgresDocumentPersistence:
                         return ()
                     document_ids = [source.document_id.value for source in sources]
                     cursor.execute(
-                        """
-                        SELECT processing_run_id, document_id, source_page_count, status,
-                               manual_review_reason, blocking_policy_version, aggregate_version,
-                               failure_error_code
+                        f"""
+                        SELECT {_PROCESSING_RUN_COLUMNS_SQL}
                           FROM source_processing.document_processing_runs
                          WHERE document_id = ANY(%s)
                          ORDER BY document_id
                         """,
                         (document_ids,),
                     )
-                    run_rows = tuple(cursor.fetchall())
-                    run_ids = [row[0] for row in run_rows]
+                    run_rows = tuple(
+                        _ProcessingRunRow.from_database(row) for row in cursor.fetchall()
+                    )
+                    run_ids = [row.processing_run_id for row in run_rows]
                     grouped = _load_processing_run_children(cursor, run_ids)
                     cursor.execute(
                         """
@@ -507,7 +647,10 @@ class PostgresDocumentPersistence:
                         )
                         for row in cursor.fetchall()
                     }
-        runs = {row[1]: _processing_run_from_grouped_rows(row, grouped) for row in run_rows}
+        runs = {
+            row.document_id: _processing_run_from_grouped_rows(row, grouped)
+            for row in run_rows
+        }
         return tuple(
             DocumentStateSnapshot(
                 source_document=source,
@@ -996,10 +1139,8 @@ class PostgresDocumentPersistence:
     ) -> DocumentProcessingRun | None:
         with connection.cursor() as cursor:
             cursor.execute(
-                """
-                SELECT processing_run_id, document_id, source_page_count, status,
-                       manual_review_reason, blocking_policy_version, aggregate_version,
-                       failure_error_code
+                f"""
+                SELECT {_PROCESSING_RUN_COLUMNS_SQL}
                   FROM source_processing.document_processing_runs
                  WHERE document_id = %s
                  ORDER BY created_at DESC
@@ -1007,94 +1148,87 @@ class PostgresDocumentPersistence:
                 """,
                 (document_id.value,),
             )
-            row = cursor.fetchone()
-            if row is None:
+            database_row = cursor.fetchone()
+            if database_row is None:
                 return None
-            grouped = _load_processing_run_children(cursor, [row[0]])
+            row = _ProcessingRunRow.from_database(database_row)
+            grouped = _load_processing_run_children(cursor, [row.processing_run_id])
         return _processing_run_from_grouped_rows(row, grouped)
 
 
 def _load_processing_run_children(
     cursor: PostgresCursor,
     processing_run_ids: list[str],
-) -> dict[str, dict[str, Any]]:
-    grouped: dict[str, dict[str, Any]] = {
-        "manifest": {},
-        "decisions": {},
-        "plans": {},
-        "routes": {},
-    }
+) -> _GroupedProcessingRunRows:
+    grouped = _GroupedProcessingRunRows(manifest={}, decisions={}, plans={}, routes={})
     cursor.execute(
-        """
-        SELECT processing_run_id, page_number, state
+        f"""
+        SELECT {_MANIFEST_ENTRY_COLUMNS_SQL}
           FROM source_processing.page_manifest_entries
          WHERE processing_run_id = ANY(%s)
          ORDER BY processing_run_id, page_number
         """,
         (processing_run_ids,),
     )
-    _group_rows(grouped["manifest"], cursor.fetchall())
+    for database_row in cursor.fetchall():
+        row = _ManifestEntryDatabaseRow.from_database(database_row)
+        grouped.manifest.setdefault(row.processing_run_id, []).append(row.grouped())
     cursor.execute(
-        """
-        SELECT processing_run_id, page_number, page_state, native_text_state,
-               image_state, existing_ocr_state, layout_complexity, corruption_state,
-               mixed_content_detected, has_table, has_formula, diagnostic_version,
-               justification
+        f"""
+        SELECT {_DECISION_COLUMNS_SQL}
           FROM source_processing.page_decisions
          WHERE processing_run_id = ANY(%s)
          ORDER BY processing_run_id, page_number
         """,
         (processing_run_ids,),
     )
-    _group_rows(grouped["decisions"], cursor.fetchall())
+    for database_row in cursor.fetchall():
+        row = _DecisionDatabaseRow.from_database(database_row)
+        grouped.decisions.setdefault(row.processing_run_id, []).append(row.grouped())
     cursor.execute(
-        """
-        SELECT processing_run_id, routing_policy_version, dominant_route_name,
-               confidence_score
+        f"""
+        SELECT {_ROUTE_PLAN_COLUMNS_SQL}
           FROM source_processing.route_plans
          WHERE processing_run_id = ANY(%s)
         """,
         (processing_run_ids,),
     )
-    for row in cursor.fetchall():
-        grouped["plans"][row[0]] = row[1:]
+    for database_row in cursor.fetchall():
+        row = _RoutePlanDatabaseRow.from_database(database_row)
+        grouped.plans[row.processing_run_id] = row.grouped()
     cursor.execute(
-        """
-        SELECT processing_run_id, page_number, route_name, decision_mode,
-               confidence_score, preprocessing_action, routing_policy_version,
-               justification, is_exception
+        f"""
+        SELECT {_ROUTE_COLUMNS_SQL}
           FROM source_processing.page_routes
          WHERE processing_run_id = ANY(%s)
          ORDER BY processing_run_id, page_number
         """,
         (processing_run_ids,),
     )
-    _group_rows(grouped["routes"], cursor.fetchall())
+    for database_row in cursor.fetchall():
+        row = _RouteDatabaseRow.from_database(database_row)
+        grouped.routes.setdefault(row.processing_run_id, []).append(row.grouped())
     return grouped
-
-
-def _group_rows(target: dict[str, Any], rows: list[Any]) -> None:
-    for row in rows:
-        target.setdefault(row[0], []).append(row[1:])
 
 
 def _processing_run_from_grouped_rows(
     row: Any,
-    grouped: dict[str, dict[str, Any]],
+    grouped: _GroupedProcessingRunRows,
 ) -> DocumentProcessingRun:
-    processing_run_id = row[0]
-    manifest_rows = grouped["manifest"].get(processing_run_id, ())
-    decision_rows = grouped["decisions"].get(processing_run_id, ())
-    plan_row = grouped["plans"].get(processing_run_id)
-    route_rows = grouped["routes"].get(processing_run_id, ())
+    parsed_row = row if isinstance(row, _ProcessingRunRow) else _ProcessingRunRow.from_database(row)
+    processing_run_id = parsed_row.processing_run_id
+    manifest_rows = grouped.manifest.get(processing_run_id, ())
+    decision_rows = grouped.decisions.get(processing_run_id, ())
+    plan_row = grouped.plans.get(processing_run_id)
+    route_rows = grouped.routes.get(processing_run_id, ())
     run_id = ProcessingRunId.from_value(processing_run_id)
-    document_id = DocumentId.from_value(row[1])
+    document_id = DocumentId.from_value(parsed_row.document_id)
     manifest = PageManifest.from_entries(
-        source_page_count=row[2],
+        source_page_count=parsed_row.source_page_count,
         entries=tuple(
             PageManifestEntry(
-                page_number=PageNumber.from_value(item[0]),
-                state=PageManifestEntryState(item[1]),
+                page_number=PageNumber.from_value(item.page_number),
+                state=PageManifestEntryState(item.state),
             )
             for item in manifest_rows
         ),
@@ -1104,13 +1238,15 @@ def _processing_run_from_grouped_rows(
     route_plan = None
     if plan_row is not None:
         route_plan = RoutePlan(
-            routing_policy_version=RoutingPolicyVersion.from_value(plan_row[0]),
-            page_routes=routes,
-            dominant_route_name=PageRouteName(plan_row[1]),
-            page_exceptions=tuple(
-                route for route, route_row in zip(routes, route_rows) if route_row[7]
+            routing_policy_version=RoutingPolicyVersion.from_value(
+                plan_row.routing_policy_version
             ),
-            confidence_score=plan_row[2],
+            page_routes=routes,
+            dominant_route_name=PageRouteName(plan_row.dominant_route_name),
+            page_exceptions=tuple(
+                route for route, route_row in zip(routes, route_rows) if route_row.is_exception
+            ),
+            confidence_score=plan_row.confidence_score,
         )
     return DocumentProcessingRun(
         processing_run_id=run_id,
@@ -1118,17 +1254,17 @@ def _processing_run_from_grouped_rows(
         page_manifest=manifest,
         page_decisions=decisions,
         route_plan=route_plan,
-        manual_review_reason=row[4],
+        manual_review_reason=parsed_row.manual_review_reason,
         blocking_policy_version=None
-        if row[5] is None
-        else RoutingPolicyVersion.from_value(row[5]),
-        status=DocumentProcessingRunStatus(row[3]),
-        aggregate_version=row[6],
+        if parsed_row.blocking_policy_version is None
+        else RoutingPolicyVersion.from_value(parsed_row.blocking_policy_version),
+        status=DocumentProcessingRunStatus(parsed_row.status),
+        aggregate_version=parsed_row.aggregate_version,
         events=(
             DocumentProcessingStarted(
                 processing_run_id=run_id,
                 document_id=document_id,
-                source_page_count=row[2],
+                source_page_count=parsed_row.source_page_count,
             ),
         )
         + (
@@ -1136,13 +1272,14 @@ def _processing_run_from_grouped_rows(
                 ProcessingRunFailed(
                     processing_run_id=run_id,
                     document_id=document_id,
-                    error_code=row[7],
+                    error_code=parsed_row.failure_error_code,
                 ),
             )
-            if DocumentProcessingRunStatus(row[3]) is DocumentProcessingRunStatus.FAILED
+            if DocumentProcessingRunStatus(parsed_row.status)
+            is DocumentProcessingRunStatus.FAILED
             else ()
         ),
-        failure_error_code=row[7],
+        failure_error_code=parsed_row.failure_error_code,
     )
 
 
@@ -1272,35 +1409,44 @@ def _source_from_row(row: Any) -> SourceDocument:
     return source
 
 
-def _decision_from_row(row: Any) -> PageDecision:
+def _decision_from_row(row: _DecisionRow) -> PageDecision:
     return PageDecision(
-        page_number=PageNumber.from_value(row[0]),
-        page_state=PageDecisionState(row[1]),
+        page_number=PageNumber.from_value(row.page_number),
+        page_state=PageDecisionState(row.page_state),
         signals=PageDiagnosticSignals(
-            native_text_state=NativeTextSignal(row[2]),
-            image_state=PageImageSignal(row[3]),
-            existing_ocr_state=ExistingOcrSignal(row[4]),
-            layout_complexity=LayoutComplexitySignal(row[5]),
-            corruption_state=PageCorruptionSignal(row[6]),
-            mixed_content_detected=row[7],
-            has_table=row[8],
-            has_formula=row[9],
+            native_text_state=NativeTextSignal(row.native_text_state),
+            image_state=PageImageSignal(row.image_state),
+            existing_ocr_state=ExistingOcrSignal(row.existing_ocr_state),
+            layout_complexity=LayoutComplexitySignal(row.layout_complexity),
+            corruption_state=PageCorruptionSignal(row.corruption_state),
+            mixed_content_detected=row.mixed_content_detected,
+            has_table=row.has_table,
+            has_formula=row.has_formula,
         ),
-        diagnostic_version=DiagnosticVersion.from_value(row[10]),
-        justification=row[11],
+        diagnostic_version=DiagnosticVersion.from_value(row.diagnostic_version),
+        justification=row.justification,
     )
 
 
-def _route_from_row(row: Any) -> PageRoute:
+def _route_from_row(row: _RouteRow) -> PageRoute:
     return PageRoute(
-        page_number=PageNumber.from_value(row[0]),
-        route_name=PageRouteName(row[1]),
-        decision_mode=RouteDecisionMode(row[2]),
-        confidence_score=row[3],
-        preprocessing_action=PagePreprocessingAction(row[4]),
-        routing_policy_version=RoutingPolicyVersion.from_value(row[5]),
-        justification=row[6],
+        page_number=PageNumber.from_value(row.page_number),
+        route_name=PageRouteName(row.route_name),
+        decision_mode=RouteDecisionMode(row.decision_mode),
+        confidence_score=row.confidence_score,
+        preprocessing_action=PagePreprocessingAction(row.preprocessing_action),
+        routing_policy_version=RoutingPolicyVersion.from_value(row.routing_policy_version),
+        justification=row.justification,
     )
+
+
+def _database_row_values(row: Any, expected_length: int, row_name: str) -> tuple[Any, ...]:
+    if not isinstance(row, (tuple, list)) or len(row) != expected_length:
+        actual_length = len(row) if isinstance(row, (tuple, list)) else "non-sequence"
+        raise RuntimeError(
+            f"SQL_ROW_SHAPE_INVALID:{row_name}:expected={expected_length}:actual={actual_length}"
+        )
+    return tuple(row)
 
 
 __all__ = [

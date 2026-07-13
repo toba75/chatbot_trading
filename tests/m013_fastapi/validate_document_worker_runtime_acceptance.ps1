@@ -2,8 +2,8 @@ $ErrorActionPreference = "Stop"
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $env:PYTHONPATH = $repoRoot
-$python = Join-Path $repoRoot ".venv\Scripts\python.exe"
-if (-not (Test-Path -LiteralPath $python -PathType Leaf)) { throw "UV_PROJECT_PYTHON_REQUIRED" }
+. (Join-Path $PSScriptRoot "resolve_m013_fastapi_python.ps1")
+$python = Resolve-M013FastApiPython -RepoRoot $repoRoot
 
 $scenario = @'
 from datetime import timedelta

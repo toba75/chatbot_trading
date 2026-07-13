@@ -10,10 +10,8 @@ $null = & docker info --format '{{.ServerVersion}}' 2>&1
 if ($LASTEXITCODE -ne 0) {
     throw "DOCKER_ENGINE_REQUIRED"
 }
-$apiPython = Join-Path $repoRoot ".venv\Scripts\python.exe"
-if (-not (Test-Path -LiteralPath $apiPython -PathType Leaf)) {
-    throw "UV_PROJECT_PYTHON_REQUIRED"
-}
+. (Join-Path $PSScriptRoot "resolve_m013_fastapi_python.ps1")
+$apiPython = Resolve-M013FastApiPython -RepoRoot $repoRoot
 
 function Get-FreeTcpPort {
     $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)

@@ -17,21 +17,21 @@ if ($null -eq $uvCommand) {
     throw "M013_FASTAPI_UV_REQUIRED: uv est requis pour matérialiser l'interpréteur verrouillé."
 }
 
-& $uvCommand.Source sync --frozen --no-dev --no-install-project
-if ($LASTEXITCODE -ne 0) {
-    throw "M013_FASTAPI_UV_SYNC_FAILED: uv sync --frozen --no-dev --no-install-project a échoué."
+$lockHeader = Get-Content -Encoding UTF8 (Join-Path $repoRoot "uv.lock") -TotalCount 5 | Out-String
+$pythonVersionMatch = [regex]::Match($lockHeader, 'requires-python\s*=\s*"==(?<version>\d+\.\d+\.\d+)"')
+if (-not $pythonVersionMatch.Success) {
+    throw "M013_FASTAPI_LOCKED_PYTHON_VERSION_REQUIRED: uv.lock doit verrouiller une version Python exacte."
 }
-
-$lockedPythonDirectory = Join-Path $repoRoot ".venv\Scripts"
-$lockedPython = Join-Path $lockedPythonDirectory "python.exe"
-if (-not (Test-Path -LiteralPath $lockedPython -PathType Leaf)) {
-    throw "M013_FASTAPI_LOCKED_PYTHON_REQUIRED: .venv\Scripts\python.exe absent après uv sync --frozen --no-dev --no-install-project."
-}
-$env:PATH = "$lockedPythonDirectory;$env:PATH"
-$resolvedPython = @(Get-Command python -CommandType Application -ErrorAction Stop)[0].Source
-if ((Resolve-Path -LiteralPath $resolvedPython).Path -ne (Resolve-Path -LiteralPath $lockedPython).Path) {
-    throw "M013_FASTAPI_LOCKED_PYTHON_REQUIRED: la gate n'utilise pas l'interpréteur de uv.lock."
-}
+$lockedPythonVersion = $pythonVersionMatch.Groups["version"].Value
+$temporaryEnvironment = Join-Path (
+    [System.IO.Path]::GetTempPath()
+) ("m013-fastapi-gate-" + [guid]::NewGuid().ToString("N"))
+$previousPath = $env:PATH
+$previousVirtualEnvironment = [System.Environment]::GetEnvironmentVariable("VIRTUAL_ENV", "Process")
+$previousUvProjectEnvironment = [System.Environment]::GetEnvironmentVariable("UV_PROJECT_ENVIRONMENT", "Process")
+$previousM013Python = [System.Environment]::GetEnvironmentVariable("M013_FASTAPI_PYTHON", "Process")
+$locationPushed = $false
+Write-Host "M013_FASTAPI_TEMP_ENVIRONMENT: $temporaryEnvironment"
 
 $staticTests = @(
     "tests/m013_fastapi/validate_precondition_acceptance.ps1",
@@ -96,14 +96,61 @@ if ($missing.Count -ne 0 -or $unknown.Count -ne 0) {
 }
 
 $tests = if ($Mode -eq "Static") { $staticTests } else { @($staticTests + $liveTests) }
-foreach ($test in $tests) {
-    $testPath = Join-Path $repoRoot $test
-    Write-Host "Validation $Mode requise: $test"
-    & powershell -NoProfile -ExecutionPolicy Bypass -File $testPath
+try {
+    Push-Location $repoRoot
+    $locationPushed = $true
+    & $uvCommand.Source venv --no-project --python $lockedPythonVersion $temporaryEnvironment
     if ($LASTEXITCODE -ne 0) {
-        throw "Validation M13-FastAPI $Mode RED: $test"
+        throw "M013_FASTAPI_UV_VENV_FAILED: uv n'a pas créé l'environnement Python $lockedPythonVersion isolé."
     }
-    Write-Host "Validation GREEN: $test"
+    $lockedPythonDirectory = Join-Path $temporaryEnvironment "Scripts"
+    $lockedPython = Join-Path $lockedPythonDirectory "python.exe"
+    if (-not (Test-Path -LiteralPath $lockedPython -PathType Leaf)) {
+        throw "M013_FASTAPI_LOCKED_PYTHON_REQUIRED: python.exe absent de l'environnement uv isolé."
+    }
+    $env:VIRTUAL_ENV = $temporaryEnvironment
+    $env:UV_PROJECT_ENVIRONMENT = $temporaryEnvironment
+    $env:M013_FASTAPI_PYTHON = $lockedPython
+    $env:PATH = "$lockedPythonDirectory;$previousPath"
+    & $uvCommand.Source sync --frozen --no-dev --active --no-install-project --python $lockedPython
+    if ($LASTEXITCODE -ne 0) {
+        throw "M013_FASTAPI_UV_SYNC_FAILED: uv sync --frozen --no-dev --active --no-install-project a échoué dans l'environnement isolé."
+    }
+    $resolvedVersion = (& $lockedPython -c "import platform; print(platform.python_version())").Trim()
+    if ($LASTEXITCODE -ne 0 -or $resolvedVersion -ne $lockedPythonVersion) {
+        throw "M013_FASTAPI_LOCKED_PYTHON_REQUIRED: version attendue=$lockedPythonVersion; obtenue=$resolvedVersion."
+    }
+
+    foreach ($test in $tests) {
+        $testPath = Join-Path $repoRoot $test
+        Write-Host "Validation $Mode requise: $test"
+        & powershell -NoProfile -ExecutionPolicy Bypass -File $testPath
+        if ($LASTEXITCODE -ne 0) {
+            throw "Validation M13-FastAPI $Mode RED: $test"
+        }
+        Write-Host "Validation GREEN: $test"
+    }
+}
+finally {
+    if ($locationPushed) {
+        Pop-Location
+    }
+    $env:PATH = $previousPath
+    foreach ($variable in @(
+        @{ Name = "VIRTUAL_ENV"; Value = $previousVirtualEnvironment },
+        @{ Name = "UV_PROJECT_ENVIRONMENT"; Value = $previousUvProjectEnvironment },
+        @{ Name = "M013_FASTAPI_PYTHON"; Value = $previousM013Python }
+    )) {
+        if ($null -eq $variable.Value) {
+            Remove-Item -Path "Env:$($variable.Name)" -ErrorAction SilentlyContinue
+        }
+        else {
+            Set-Item -Path "Env:$($variable.Name)" -Value $variable.Value
+        }
+    }
+    if (Test-Path -LiteralPath $temporaryEnvironment) {
+        Remove-Item -LiteralPath $temporaryEnvironment -Recurse -Force
+    }
 }
 
 Write-Host "Gate M13-FastAPI $Mode GREEN: $($tests.Count) preuve(s), catalogue exhaustif contrôlé."

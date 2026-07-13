@@ -28,11 +28,14 @@ $audit = Get-Content -Raw -Encoding UTF8 (Join-Path $repoRoot "docs\governance\m
 foreach ($marker in @(
     'M013_FASTAPI_UV_REQUIRED',
     'uv sync --frozen --no-dev',
-    '.venv\Scripts',
+    'UV_PROJECT_ENVIRONMENT',
+    'M013_FASTAPI_PYTHON',
+    'M013_FASTAPI_TEMP_ENVIRONMENT',
     'M013_FASTAPI_LOCKED_PYTHON_REQUIRED'
 )) {
     Assert-Contains $gate $marker "Bootstrap verrouillé de la gate absent."
 }
+Assert-NotContains $gate 'Join-Path $repoRoot ".venv\Scripts"' "La gate reproductible ne doit pas écrire la .venv partagée."
 
 Assert-Contains $dockerfile 'ghcr.io/astral-sh/uv@sha256:' "Image uv non épinglée par digest."
 Assert-Contains $dockerfile 'python:3.12.8-slim-bookworm@sha256:' "Image Python non épinglée par digest."
