@@ -18,6 +18,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from pypdf import PdfWriter
+from psycopg import IntegrityError, OperationalError
 
 from app.contracts.source_references import CanonicalSourceRef, SourceLocator
 from app.contracts.technical_jobs import (
@@ -45,6 +46,10 @@ from app.source_processing.adapters.pdf_inspection_process import (
 )
 from app.source_processing.adapters.pypdf_diagnostic_inspector import PdfDiagnosticInspector
 from app.source_processing.application.document_worker import DiagnosticInspector
+from app.source_processing.adapters.worker_runtime import (
+    _classify_processing_error,
+    _settle_processing_failure,
+)
 
 
 repo = Path(__import__("os").environ["M013_REVIEW3_REPO"])
@@ -107,6 +112,94 @@ for invalid in (
         pass
     else:
         raise AssertionError(f"ClaimedJob incohérent accepté: {invalid}")
+
+
+# Given une panne PostgreSQL classée et un budget de trois tentatives,
+# When chaque frontière SP -> platform est rejouée après crash,
+# Then la plateforme ne devient jamais terminale avant l'état SP durable.
+class ImmediateHeartbeat:
+    def finalize(self, transition): return transition()
+
+
+class FailureWorker:
+    def __init__(self, events): self.events = events
+    def mark_failed(self, claimed, error_code): self.events.append(("sp", error_code))
+
+
+class FailureQueue:
+    def __init__(self, events, *, crash_after_sp=False):
+        self.events = events
+        self.crash_after_sp = crash_after_sp
+        self.retry_calls = 0
+
+    def schedule_retry(self, **kwargs):
+        self.retry_calls += 1
+        self.events.append(("platform-retry", kwargs["max_attempts"]))
+        return type("Pending", (), {"status": JobStatus.PENDING})()
+
+    def mark_failed(self, **kwargs):
+        self.events.append(("platform-failed", kwargs["failure_reason"]))
+        if self.crash_after_sp:
+            self.crash_after_sp = False
+            raise OperationalError("crash après publication SP")
+        return type("Failed", (), {"status": JobStatus.FAILED})()
+
+
+def claim_for_attempt(attempt):
+    return ClaimedJob(
+        job=claim.job,
+        trace_id=claim.trace_id,
+        lease_owner=claim.lease_owner,
+        lease_expires_at=claim.lease_expires_at,
+        claim_generation=attempt,
+        claim_token=f"00000000-0000-4000-8000-{attempt:012d}",
+        execution_attempts=attempt,
+    )
+
+
+for attempt in (1, 2):
+    events = []
+    status = _settle_processing_failure(
+        claimed=claim_for_attempt(attempt),
+        error_code="POSTGRES_TRANSIENT_FAILURE",
+        retryable=True,
+        max_attempts=3,
+        worker=FailureWorker(events),
+        job_queue=FailureQueue(events),
+        heartbeat=ImmediateHeartbeat(),
+    )
+    assert status == "retry_scheduled" and events == [("platform-retry", 3)]
+
+events = []
+queue = FailureQueue(events, crash_after_sp=True)
+try:
+    _settle_processing_failure(
+        claimed=claim_for_attempt(3),
+        error_code="POSTGRES_TRANSIENT_FAILURE",
+        retryable=True,
+        max_attempts=3,
+        worker=FailureWorker(events),
+        job_queue=queue,
+        heartbeat=ImmediateHeartbeat(),
+    )
+except OperationalError:
+    pass
+else:
+    raise AssertionError("crash après publication SP non propagé")
+assert events == [("sp", "POSTGRES_TRANSIENT_FAILURE"), ("platform-failed", "POSTGRES_TRANSIENT_FAILURE")]
+events.clear()
+assert _settle_processing_failure(
+    claimed=claim_for_attempt(3),
+    error_code="POSTGRES_TRANSIENT_FAILURE",
+    retryable=True,
+    max_attempts=3,
+    worker=FailureWorker(events),
+    job_queue=queue,
+    heartbeat=ImmediateHeartbeat(),
+) == "failed"
+assert events[0][0] == "sp" and events[1][0] == "platform-failed"
+assert _classify_processing_error(OperationalError("transitoire")) == ("POSTGRES_TRANSIENT_FAILURE", True)
+assert _classify_processing_error(IntegrityError("intégrité")) == ("POSTGRES_INTEGRITY_FAILURE", False)
 
 
 # Given un inspecteur enfant bloqué,
