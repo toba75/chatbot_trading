@@ -220,27 +220,17 @@ class QualityGatesConfiguration:
 
 
 @dataclass(frozen=True)
-class MetricsConfiguration:
-    bind_host: str
-    port: int
-
-
-@dataclass(frozen=True)
 class TracingConfiguration:
     enabled: bool
-    endpoint_path: str
 
 
 @dataclass(frozen=True)
 class LogsConfiguration:
-    level: str
-    retention_days: int
     include_payloads: bool
 
 
 @dataclass(frozen=True)
 class ObservabilityConfiguration:
-    metrics: MetricsConfiguration
     tracing: TracingConfiguration
     logs: LogsConfiguration
 
@@ -974,17 +964,10 @@ def _build_application_configuration(
             ),
         ),
         observability=ObservabilityConfiguration(
-            metrics=MetricsConfiguration(
-                bind_host=observability["metrics"]["bind_host"],
-                port=observability["metrics"]["port"],
-            ),
             tracing=TracingConfiguration(
                 enabled=observability["tracing"]["enabled"],
-                endpoint_path=observability["tracing"]["endpoint_path"],
             ),
             logs=LogsConfiguration(
-                level=observability["logs"]["level"],
-                retention_days=observability["logs"]["retention_days"],
                 include_payloads=observability["logs"]["include_payloads"],
             ),
         ),

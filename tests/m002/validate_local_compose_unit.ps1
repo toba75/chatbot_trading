@@ -15,7 +15,7 @@ sys.path.insert(0, sys.argv[1])
 from app.platform.local_compose import parse_local_compose_document, validate_local_compose
 
 
-APPLICATION_CONFIG_VOLUME = "../../config/application.yaml:/workspace/config/application.yaml:ro"
+APPLICATION_CONFIG_VOLUME = "./application.compose.yaml:/workspace/config/application.yaml:ro"
 APPLICATION_SCHEMA_VOLUME = "../../config/application.schema.json:/workspace/config/application.schema.json:ro"
 LLM_GATEWAY_LOCAL_SECRETS_VOLUME = "../../config/secrets/local:/workspace/config/secrets/local:ro"
 APPLICATION_CONFIG_ARGUMENTS = ["--config", "/workspace/config/application.yaml"]
@@ -26,7 +26,7 @@ def runtime_command(*values):
 
 
 def document_worker_command():
-    return ["python", "-m", "app.source_processing.adapters.worker_runtime", "--worker-id", "worker-documents-1", "--lease-seconds", "120", "--poll-seconds", "0.5", *APPLICATION_CONFIG_ARGUMENTS]
+    return ["--worker-id", "worker-documents", "--lease-seconds", "120", "--poll-seconds", "0.5", *APPLICATION_CONFIG_ARGUMENTS]
 
 
 BASE_SERVICES = {
@@ -47,7 +47,7 @@ BASE_SERVICES = {
     },
     "orchestrator-api": {
         "image": "ostrading/orchestrator-api:0.0.0-m002",
-        "command": ["api", *APPLICATION_CONFIG_ARGUMENTS],
+        "command": [*APPLICATION_CONFIG_ARGUMENTS],
         "expose": ["8080"],
         "networks": ["core"],
         "volumes": [APPLICATION_CONFIG_VOLUME, APPLICATION_SCHEMA_VOLUME],

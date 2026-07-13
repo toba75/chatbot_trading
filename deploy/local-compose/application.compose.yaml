@@ -26,7 +26,7 @@ deployment:
 
 services:
   postgres:
-    url: postgresql+psycopg://app@postgres/app
+    url: postgresql+psycopg://ostrading@postgres/ostrading
     port: 5432
   qdrant:
     url: http://qdrant:6333
@@ -62,22 +62,22 @@ models:
     temperature: 0.0
 
 paths:
-  data_root: data
-  corpus_root: data/corpus
-  canonical_sources_root: data/canonical_sources
-  qdrant_storage_root: data/qdrant
-  postgres_data_root: data/postgres
-  reports_root: docs/reports
-  logs_root: logs
-  experiments_root: data/experiments
+  data_root: /workspace/data
+  corpus_root: /workspace/data/corpus
+  canonical_sources_root: /workspace/data/canonical_sources
+  qdrant_storage_root: /workspace/data/qdrant
+  postgres_data_root: /workspace/data/postgres
+  reports_root: /workspace/docs/reports
+  logs_root: /workspace/logs
+  experiments_root: /workspace/data/experiments
 
 security:
   network_exposure: loopback_only
   allow_public_bind: false
   secrets:
-    postgres_password_path: config/secrets/local/postgres_password
-    llm_gateway_api_key_path: config/secrets/local/llm_gateway_api_key
-    tls_ca_certificate_path: config/secrets/local/tls_ca_certificate.pem
+    postgres_password_path: /run/secrets/postgres_password
+    llm_gateway_api_key_path: /run/secrets/llm_gateway_api_key
+    tls_ca_certificate_path: /run/secrets/tls_ca_certificate.pem
   audit:
     configuration_hash_required: true
     log_configuration_changes: true

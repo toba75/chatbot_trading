@@ -54,7 +54,7 @@ REQUIRED_ENVIRONMENT_PATTERN = re.compile(r"^\$\{[A-Z][A-Z0-9_]*\?[^}]+\}$")
 SECRET_ENVIRONMENT_MARKERS = ("PASSWORD", "TOKEN", "SECRET", "API_KEY")
 INTERNAL_IMAGE_PREFIX = "ostrading/"
 APPLICATION_CONFIG_CONTAINER_PATH = "/workspace/config/application.yaml"
-APPLICATION_CONFIG_VOLUME = f"../../config/application.yaml:{APPLICATION_CONFIG_CONTAINER_PATH}:ro"
+APPLICATION_CONFIG_VOLUME = f"./application.compose.yaml:{APPLICATION_CONFIG_CONTAINER_PATH}:ro"
 APPLICATION_SCHEMA_CONTAINER_PATH = "/workspace/config/application.schema.json"
 APPLICATION_SCHEMA_VOLUME = f"../../config/application.schema.json:{APPLICATION_SCHEMA_CONTAINER_PATH}:ro"
 LLM_GATEWAY_LOCAL_SECRETS_VOLUME = "../../config/secrets/local:/workspace/config/secrets/local:ro"
@@ -103,17 +103,14 @@ def _runtime_command(*arguments: str) -> tuple[str, ...]:
 
 EXPECTED_SERVICE_COMMANDS = {
     "ui": _runtime_command("serve-http", "ui", "8081"),
-    "orchestrator-api": ("api", *APPLICATION_CONFIG_ARGUMENTS),
+    "orchestrator-api": APPLICATION_CONFIG_ARGUMENTS,
     "llm-gateway": _runtime_command("serve-http", "llm-gateway", "8090"),
     "granite-docling": _runtime_command("serve-http", "granite-docling", "8001"),
     "embedding-service": _runtime_command("serve-http", "embedding-service", "8101"),
     "reranker-service": _runtime_command("serve-http", "reranker-service", "8102"),
     "worker-documents": (
-        "python",
-        "-m",
-        "app.source_processing.adapters.worker_runtime",
         "--worker-id",
-        "worker-documents-1",
+        "worker-documents",
         "--lease-seconds",
         "120",
         "--poll-seconds",
@@ -357,6 +354,11 @@ def _validate_service_tmpfs(service: ComposeService) -> None:
             )
         return
 
+    if service.id == "worker-documents":
+        if service.tmpfs not in ((), ("/tmp:size=128m,mode=1777",)):
+            raise ValueError("tmpfs /tmp worker-documents invalide")
+        return
+
     if len(service.tmpfs) > 0:
         raise ValueError(f"tmpfs non prévu pour service: {service.id}")
 
@@ -421,7 +423,7 @@ def _validate_service_command(service: ComposeService) -> None:
             if importlib.util.find_spec(module_name) is None:
                 raise ValueError(f"Commande Compose non exécutable pour service {service.id}: {module_name}")
         raise ValueError(f"Commande Compose invalide pour service {service.id}")
-    if service.id == "orchestrator-api" and service.command[0:1] == ("api",):
+    if service.id in {"orchestrator-api", "worker-documents"}:
         return
     if len(service.command) >= 3 and service.command[0] == "python" and service.command[1] == "-m":
         module_name = service.command[2]
@@ -491,6 +493,9 @@ def _validate_service_environment(service: ComposeService) -> None:
         if value.startswith("/run/secrets/"):
             continue
 
+        if service.id == "postgres" and key in {"POSTGRES_DB", "POSTGRES_USER"} and value == "ostrading":
+            continue
+
         if not REQUIRED_ENVIRONMENT_PATTERN.match(value):
             raise ValueError(f"Variable non injectée explicitement pour service {service.id}: {key}")
 
@@ -507,7 +512,15 @@ def _is_application_environment_key(key: str) -> bool:
 
 def _is_pinned_image(image: str) -> bool:
     if "${" in image:
-        return False
+        return bool(
+            re.fullmatch(
+                r"ostrading/(?:orchestrator-api|worker-documents):"
+                r"0\.1\.0-m013-fastapi-schema-"
+                r"\$\{OSTRADING_POSTGRES_SCHEMA_VERSION\?[^}]+\}-"
+                r"\$\{OSTRADING_IMAGE_REVISION\?[^}]+\}",
+                image,
+            )
+        )
 
     if "@sha256:" in image:
         digest = image.rsplit("@sha256:", 1)[1]

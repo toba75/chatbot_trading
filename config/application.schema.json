@@ -553,40 +553,19 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "metrics",
         "tracing",
         "logs"
       ],
       "properties": {
-        "metrics": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "bind_host",
-            "port"
-          ],
-          "properties": {
-            "bind_host": {
-              "$ref": "#/$defs/nonEmptyNonPlaceholderString"
-            },
-            "port": {
-              "$ref": "#/$defs/tcpPort"
-            }
-          }
-        },
         "tracing": {
           "type": "object",
           "additionalProperties": false,
           "required": [
-            "enabled",
-            "endpoint_path"
+            "enabled"
           ],
           "properties": {
             "enabled": {
               "type": "boolean"
-            },
-            "endpoint_path": {
-              "$ref": "#/$defs/nonEmptyNonPlaceholderString"
             }
           }
         },
@@ -594,23 +573,9 @@
           "type": "object",
           "additionalProperties": false,
           "required": [
-            "level",
-            "retention_days",
             "include_payloads"
           ],
           "properties": {
-            "level": {
-              "enum": [
-                "DEBUG",
-                "INFO",
-                "WARNING",
-                "ERROR"
-              ]
-            },
-            "retention_days": {
-              "type": "integer",
-              "minimum": 1
-            },
             "include_payloads": {
               "type": "boolean",
               "const": false

@@ -26,7 +26,10 @@ ENV PATH="/workspace/.venv/bin:${PATH}"
 
 WORKDIR /workspace
 
-RUN groupadd --system ostrading && useradd --system --gid ostrading --home-dir /workspace ostrading
+RUN groupadd --system ostrading \
+    && useradd --system --gid ostrading --home-dir /workspace ostrading \
+    && mkdir -p /workspace/data/corpus /workspace/data/experiments \
+    && chown -R ostrading:ostrading /workspace/data
 
 COPY --from=builder --chown=ostrading:ostrading /workspace/.venv /workspace/.venv
 COPY --chown=ostrading:ostrading app ./app
@@ -37,3 +40,13 @@ LABEL org.opencontainers.image.revision="${OSTRADING_IMAGE_REVISION}"
 LABEL org.ostrading.postgres-schema-version="${OSTRADING_POSTGRES_SCHEMA_VERSION}"
 
 USER ostrading
+
+FROM runtime AS orchestrator-api
+
+ENTRYPOINT ["api"]
+
+FROM runtime AS worker-documents
+
+ENTRYPOINT ["python", "-m", "app.source_processing.adapters.worker_runtime"]
+
+FROM runtime AS generic-service

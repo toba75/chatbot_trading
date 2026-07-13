@@ -28,7 +28,7 @@ if ($uvLock.Contains('pypdf", specifier = "==6.10.2"') -or $uvLock.Contains('pyt
     throw "Une version vulnérable reste verrouillée."
 }
 Assert-Contains $compose "  orchestrator-api:" "Service Compose orchestrator-api absent."
-Assert-Contains $compose "      - api" "Compose ne lance pas le point d'entrée Uvicorn dédié."
+Assert-Contains $compose "      target: orchestrator-api" "Compose ne construit pas la cible Uvicorn dédiée."
 Assert-Contains $compose "      - --config" "Compose ne transmet pas la configuration unique."
 Assert-Contains $compose "      - /workspace/config/application.yaml" "Chemin de configuration Compose invalide."
 Assert-Contains $compose 'http://127.0.0.1:8080/ready' "Healthcheck readiness HTTP absent."
@@ -39,6 +39,7 @@ Assert-Contains $dockerfile "AS builder" "Étape builder Docker absente."
 Assert-Contains $dockerfile "AS runtime" "Étape runtime Docker absente."
 Assert-Contains $dockerfile 'org.ostrading.postgres-schema-version="${OSTRADING_POSTGRES_SCHEMA_VERSION}"' "Version de schéma dynamique absente de l'image."
 Assert-Contains $dockerfile 'org.opencontainers.image.revision="${OSTRADING_IMAGE_REVISION}"' "Révision immuable absente de l'image."
+Assert-Contains $dockerfile 'ENTRYPOINT ["api"]' "Entrypoint Uvicorn dédié absent."
 Assert-Contains $dockerfile 'ghcr.io/astral-sh/uv@sha256:' "Bootstrap uv non verrouillé par digest."
 Assert-Contains $dockerfile "COPY --chown=ostrading:ostrading deploy/postgres/migrations ./deploy/postgres/migrations" "Migrations non embarquées dans l'image."
 $runtimeBlock = $dockerfile.Substring($dockerfile.IndexOf("AS runtime"))

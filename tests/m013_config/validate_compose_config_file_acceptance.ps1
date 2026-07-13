@@ -243,7 +243,7 @@ try {
         if (-not $serviceBlock.Contains("- --config") -or -not $serviceBlock.Contains("- /workspace/config/application.yaml")) {
             throw "Argument --config absent pour service applicatif: $serviceId"
         }
-        if (-not $serviceBlock.Contains("../../config/application.yaml:/workspace/config/application.yaml:ro")) {
+        if (-not $serviceBlock.Contains("./application.compose.yaml:/workspace/config/application.yaml:ro")) {
             throw "Montage config/application.yaml read-only absent pour service applicatif: $serviceId"
         }
         if (-not $serviceBlock.Contains("../../config/application.schema.json:/workspace/config/application.schema.json:ro")) {

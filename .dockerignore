@@ -1,0 +1,22 @@
+# Le contexte Docker est la racine du dépôt. Tout est refusé avant allowlist.
+.git
+.git/**
+.venv
+.venv/**
+data
+data/**
+**/secrets
+**/secrets/**
+**/.tmp*
+**/__pycache__
+**/*.pyc
+**
+
+!pyproject.toml
+!uv.lock
+!app/
+!app/**
+!deploy/
+!deploy/postgres/
+!deploy/postgres/migrations/
+!deploy/postgres/migrations/**

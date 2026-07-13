@@ -51,7 +51,7 @@ services:
     networks:
       - core
     volumes:
-      - ../../config/application.yaml:/workspace/config/application.yaml:ro
+      - ./application.compose.yaml:/workspace/config/application.yaml:ro
       - ../../config/application.schema.json:/workspace/config/application.schema.json:ro
     healthcheck:
       test:
@@ -69,11 +69,11 @@ services:
     build:
       context: ../..
       dockerfile: deploy/local-compose/Dockerfile
+      target: orchestrator-api
       args:
         OSTRADING_IMAGE_REVISION: "${OSTRADING_IMAGE_REVISION?OSTRADING_IMAGE_REVISION requis}"
         OSTRADING_POSTGRES_SCHEMA_VERSION: "${OSTRADING_POSTGRES_SCHEMA_VERSION?OSTRADING_POSTGRES_SCHEMA_VERSION requis}"
     command:
-      - api
       - --config
       - /workspace/config/application.yaml
     expose:
@@ -89,9 +89,10 @@ services:
         condition: service_healthy
     volumes:
       - corpus-data:/workspace/data/corpus
-      - ../../config/application.yaml:/workspace/config/application.yaml:ro
+      - ./application.compose.yaml:/workspace/config/application.yaml:ro
       - ../../config/application.schema.json:/workspace/config/application.schema.json:ro
-      - ./secrets/postgres_password:/workspace/config/secrets/local/postgres_password:ro
+    secrets:
+      - postgres_password
     tmpfs:
       - /tmp:size=128m,mode=1777
     healthcheck:
@@ -126,7 +127,7 @@ services:
       - core
       - spark-egress
     volumes:
-      - ../../config/application.yaml:/workspace/config/application.yaml:ro
+      - ./application.compose.yaml:/workspace/config/application.yaml:ro
       - ../../config/application.schema.json:/workspace/config/application.schema.json:ro
       - ../../config/secrets/local:/workspace/config/secrets/local:ro
     healthcheck:
@@ -150,15 +151,15 @@ services:
       - postgres-data:/var/lib/postgresql/data
       - ../postgres/migrations:/docker-entrypoint-initdb.d:ro
     environment:
-      POSTGRES_DB: "${POSTGRES_DB?POSTGRES_DB requis}"
-      POSTGRES_USER: "${POSTGRES_USER?POSTGRES_USER requis}"
+      POSTGRES_DB: "ostrading"
+      POSTGRES_USER: "ostrading"
       POSTGRES_PASSWORD_FILE: "/run/secrets/postgres_password"
     secrets:
       - postgres_password
     healthcheck:
       test:
         - CMD-SHELL
-        - "pg_isready -U ${POSTGRES_USER?POSTGRES_USER requis} -d ${POSTGRES_DB?POSTGRES_DB requis}"
+        - "pg_isready -U ostrading -d ostrading"
       interval: 30s
       timeout: 5s
       retries: 5
@@ -203,7 +204,7 @@ services:
       - core
     volumes:
       - model-cache:/models
-      - ../../config/application.yaml:/workspace/config/application.yaml:ro
+      - ./application.compose.yaml:/workspace/config/application.yaml:ro
       - ../../config/application.schema.json:/workspace/config/application.schema.json:ro
     healthcheck:
       test:
@@ -236,7 +237,7 @@ services:
       - core
     volumes:
       - model-cache:/models
-      - ../../config/application.yaml:/workspace/config/application.yaml:ro
+      - ./application.compose.yaml:/workspace/config/application.yaml:ro
       - ../../config/application.schema.json:/workspace/config/application.schema.json:ro
     healthcheck:
       test:
@@ -269,7 +270,7 @@ services:
       - core
     volumes:
       - model-cache:/models
-      - ../../config/application.yaml:/workspace/config/application.yaml:ro
+      - ./application.compose.yaml:/workspace/config/application.yaml:ro
       - ../../config/application.schema.json:/workspace/config/application.schema.json:ro
     healthcheck:
       test:
@@ -283,10 +284,14 @@ services:
     read_only: true
 
   worker-documents:
-    image: ostrading/worker-documents:0.0.0-m002
+    image: ostrading/worker-documents:0.1.0-m013-fastapi-schema-${OSTRADING_POSTGRES_SCHEMA_VERSION?OSTRADING_POSTGRES_SCHEMA_VERSION requis}-${OSTRADING_IMAGE_REVISION?OSTRADING_IMAGE_REVISION requis}
     build:
       context: ../..
       dockerfile: deploy/local-compose/Dockerfile
+      target: worker-documents
+      args:
+        OSTRADING_IMAGE_REVISION: "${OSTRADING_IMAGE_REVISION?OSTRADING_IMAGE_REVISION requis}"
+        OSTRADING_POSTGRES_SCHEMA_VERSION: "${OSTRADING_POSTGRES_SCHEMA_VERSION?OSTRADING_POSTGRES_SCHEMA_VERSION requis}"
     deploy:
       replicas: 2
       resources:
@@ -295,11 +300,8 @@ services:
           memory: 2G
           pids: 256
     command:
-      - python
-      - -m
-      - app.source_processing.adapters.worker_runtime
       - --worker-id
-      - worker-documents-1
+      - worker-documents
       - --lease-seconds
       - "120"
       - --poll-seconds
@@ -314,9 +316,12 @@ services:
     volumes:
       - corpus-data:/workspace/data/corpus
       - document-artifacts:/workspace/data
-      - ../../config/application.yaml:/workspace/config/application.yaml:ro
+      - ./application.compose.yaml:/workspace/config/application.yaml:ro
       - ../../config/application.schema.json:/workspace/config/application.schema.json:ro
-      - ./secrets/postgres_password:/workspace/config/secrets/local/postgres_password:ro
+    secrets:
+      - postgres_password
+    tmpfs:
+      - /tmp:size=128m,mode=1777
     healthcheck:
       test:
         - CMD-SHELL
@@ -326,6 +331,7 @@ services:
       retries: 3
       start_period: 10s
     restart: unless-stopped
+    read_only: true
 
   worker-research:
     image: ostrading/worker-research:0.0.0-m002
@@ -343,7 +349,7 @@ services:
     networks:
       - core
     volumes:
-      - ../../config/application.yaml:/workspace/config/application.yaml:ro
+      - ./application.compose.yaml:/workspace/config/application.yaml:ro
       - ../../config/application.schema.json:/workspace/config/application.schema.json:ro
     healthcheck:
       test:
@@ -373,7 +379,7 @@ services:
       - core
     volumes:
       - experiment-data:/workspace/data/experiments
-      - ../../config/application.yaml:/workspace/config/application.yaml:ro
+      - ./application.compose.yaml:/workspace/config/application.yaml:ro
       - ../../config/application.schema.json:/workspace/config/application.schema.json:ro
     healthcheck:
       test:
@@ -404,7 +410,7 @@ services:
     networks:
       - core
     volumes:
-      - ../../config/application.yaml:/workspace/config/application.yaml:ro
+      - ./application.compose.yaml:/workspace/config/application.yaml:ro
       - ../../config/application.schema.json:/workspace/config/application.schema.json:ro
     healthcheck:
       test:
