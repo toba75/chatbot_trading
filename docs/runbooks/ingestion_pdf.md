@@ -5,7 +5,7 @@
 - Identifiant : `M013-Runbook-PdfIngestion-1.1`.
 - Contextes : UI locale, SP et plateforme.
 - Sources : `docs/specs/m003_source_enregistree_diagnostiquee_routee.md`, `docs/specs/m013_fastapi_api_orchestratrice.md` et `docs/specs/ui.md`.
-- ADR applicables : ADR-018, ADR-020, ADR-021, ADR-025 et ADR-028.
+- ADR applicables : ADR-018, ADR-020, ADR-021, ADR-025, ADR-028 et ADR-030.
 - Limite : la conversion canonique M-004 et l'indexation KA ne sont pas livrées par M13-FastAPI.
 
 ## Scénario BDD
@@ -16,16 +16,15 @@
 
 ## Préconditions
 
-1. Créer `deploy/local-compose/secrets/postgres_password` selon le runbook d'exploitation.
-2. Créer `deploy/local-compose/secrets/local_api_token` avec au moins 32 octets aléatoires. Ne jamais versionner, afficher ou copier cette valeur dans une commande, un rapport ou un navigateur.
-3. Définir `OSTRADING_IMAGE_REVISION` sur le commit complet et `OSTRADING_POSTGRES_SCHEMA_VERSION` sur `009`.
-4. Démarrer la stack Compose supportée puis attendre `/api/ready`.
+1. Exécuter `uv run ui` depuis la racine du dépôt. Cette commande vérifie Docker, prépare PostgreSQL local, l'API orchestratrice réelle et les secrets locaux absents hors Git.
+2. Attendre l'ouverture de l'UI sur `http://127.0.0.1:8081/ui/corpus-pdf`.
+3. Si un port requis, Docker ou l'API est indisponible, corriger l'erreur publique affichée ; aucun service ou secret de substitution n'est utilisé.
 
-L'UI et l'API montent le même secret en lecture seule. Le navigateur ne reçoit jamais le token : le serveur UI l'ajoute uniquement à l'appel backend.
+L'UI et l'API utilisent le même secret local. Le navigateur ne reçoit jamais le token : le serveur UI l'ajoute uniquement à l'appel backend.
 
 ## Ajouter un PDF
 
-1. Ouvrir `/ui/corpus-pdf` depuis l'origine locale publiée par Caddy.
+1. Ouvrir `http://127.0.0.1:8081/ui/corpus-pdf`.
 2. Choisir un fichier `application/pdf` de 50 Mio maximum.
 3. Saisir explicitement le titre, un ou plusieurs auteurs, l'année de publication et l'édition. Le nom du fichier n'est jamais une métadonnée.
 4. Envoyer le formulaire. Une réponse nominale produit une redirection `303` vers le corpus avec `document_id` et le marqueur de doublon.

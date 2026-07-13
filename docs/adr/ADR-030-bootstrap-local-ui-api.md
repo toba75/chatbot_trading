@@ -1,6 +1,6 @@
 # ADR-030 - Bootstrap local de l’UI via l’API réelle
 
-**Statut :** Proposée
+**Statut :** Acceptée
 **Date :** 2026-07-13
 **Décideurs :** Propriétaire du projet
 **Remplace :** Aucun
@@ -17,6 +17,7 @@ ADR-018 interdit à l’UI de contourner l’API et ADR-028 impose un secret loc
 
 - `uv run ui` **DOIT** démarrer un runtime local de développement comprenant PostgreSQL et `orchestrator-api` réels avant de servir l’UI sur le port publié.
 - Le runtime **DOIT** construire une configuration hôte temporaire qui pointe l’API vers PostgreSQL local ; l’UI continue d’appeler exclusivement `orchestrator-api` conformément à ADR-018.
+- Le runtime **DOIT** limiter l’UI, l’API et le `llm-gateway` démarrés sur l’hôte à `127.0.0.1` ; aucun service interne ne devient accessible sur le réseau local.
 - Le bootstrap **DOIT** provisionner explicitement les secrets locaux absents avec une entropie suffisante et annoncer leur création sans afficher leur valeur.
 - Le runtime **DOIT** refuser explicitement un port occupé, un conteneur PostgreSQL non géré, un secret illisible ou une dépendance Docker indisponible ; il **NE DOIT PAS** réutiliser silencieusement une dépendance inconnue.
 - Le runtime **DOIT** conserver les données documentaires locales et nettoyer les processus ainsi que la configuration temporaire à l’arrêt. Il **NE DOIT PAS** se présenter comme le déploiement Compose d’exploitation d’ADR-026.
@@ -61,7 +62,7 @@ ADR-018 interdit à l’UI de contourner l’API et ADR-028 impose un secret loc
 - Spécification : `docs/specs/ui.md`.
 - Plan d’implémentation : demande utilisateur du 2026-07-13.
 - Tests d’acceptation : `gate_tests/ported/tests/m013/validate_uv_run_ui_local_stack_acceptance.py`.
-- Commits : RED et GREEN à compléter lors de l’implémentation.
+- Commits : RED `8c37fd451` et `43f29a633` ; GREEN lié à l’acceptation de cette ADR.
 
 ## Notes
 
