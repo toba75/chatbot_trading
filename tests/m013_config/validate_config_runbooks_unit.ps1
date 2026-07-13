@@ -60,8 +60,9 @@ $documents = @(
         Path = "deploy/local-compose/README.md"
         RequiredMarkers = @(
             "config/application.yaml",
+            "deploy/local-compose/application.compose.yaml",
             "--config /workspace/config/application.yaml",
-            "../../config/application.yaml:/workspace/config/application.yaml:ro",
+            "./application.compose.yaml:/workspace/config/application.yaml:ro",
             "deploy/local-compose/secrets/",
             "docker compose -f .\deploy\local-compose\compose.yaml up --build"
         )

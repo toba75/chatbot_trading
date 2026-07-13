@@ -68,7 +68,7 @@ Les images API et worker doivent être reliées au même commit complet et au m�
 - Spécification: `docs/specs/m013_fastapi_api_orchestratrice.md`; `docs/specs/m013_config_configuration_applicative.md`.
 - Plan d'implémentation: `docs/tasks/milestone_013-fastapi/0011_deployer_auditer_api_orchestratrice.md`.
 - Tests d'acceptation: `tests/m013_fastapi/validate_review3_deployment_acceptance.ps1`; `tests/m013_fastapi/validate_review3_deployment_live.ps1`.
-- Commits: RED à compléter; GREEN à compléter.
+- Commits: RED `c64311691`; corrections du harness live encore RED `3df97b3b2`, `6b9a94c48`, `fd72ab75d`, `03d301088` et `d38a2142c`; GREEN fonctionnel `f49ffded1`.
 
 ## Notes
 

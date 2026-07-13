@@ -209,3 +209,21 @@
 - Preuves GREEN ciblées : architecture `215` fichiers; sûreté unitaire; lint ciblé; compilation; PostgreSQL live `schema=008`, lease renouvelée, réattribution fenced, identités de réplicas distinctes, trois tentatives transitoires, erreur d'intégrité permanente, ancien ACK fenced et replay KA strict.
 - Upgrade réel : volume au schéma 007 migré vers 008, ledger idempotent et verrou advisory GREEN.
 - Hors staging : les adaptations mécaniques des tests historiques restent séparées; le hunk utilisateur `tests/m013/validate_m013_reality_product_acceptance.ps1` reste hors index et hors commits.
+
+## Correctif de revue 3 - Déploiement Compose reproductible ADR-026
+
+- Date : 2026-07-13.
+- Scénario BDD : Given un clone propre et un commit Git complet; When la gate exporte ce commit, construit les images finales et démarre la stack Compose; Then PostgreSQL, Qdrant, le gateway LLM, l'API, deux workers, l'UI et Caddy exécutent les artefacts étiquetés par ce commit et le schéma 008, sans fichier non suivi ni fallback.
+- Décisions : ADR-023 gouverne les versions optimistes; ADR-024 sépare claim SP, consommation plateforme et ACK SP; ADR-025 impose fencing, replay strict et inspection PDF isolée; ADR-026 complète ADR-021/ADR-025 avec l'archive Git, les images API/worker immuables, la readiness PostgreSQL + LLM, les deux replicas et la prévalidation du rollback.
+- Commit RED : `c64311691`, `test(déploiement): couvrir stack Compose reproductible ADR-026`.
+- Corrections du harness encore RED : `3df97b3b2`, `6b9a94c48`, `fd72ab75d`, `03d301088` et `d38a2142c`. Ces commits ne changent que la mécanique de la preuve live avant le GREEN fonctionnel.
+- Commit GREEN : `f49ffded1`, `feat(déploiement): livrer stack Compose reproductible ADR-026`.
+- Dépendances : Python `3.12.8`, setuptools `80.10.2`, Pydantic `2.13.4` et Starlette `1.3.1` sont directs, exacts et cohérents avec `uv.lock`.
+- Configuration : l'identité PostgreSQL `ostrading` correspond à l'URL montée; les conteneurs utilisent le DNS `llm-gateway`; les clés d'observabilité sans consommateur ont été retirées du schéma strict.
+- Preuve Compose réelle : archive du commit `cdbd5bbff6a9c443e0a6238d44abd9f20e4f2b28`, images API/worker inspectées, utilisateur non-root, entrypoints explicites, deux workers, readiness PostgreSQL + LLM, OpenAPI, multipart et migration 008 GREEN.
+- Preuve T-005 réelle : après upload et diagnostic d'un PDF, PostgreSQL a été redémarré et l'API recréée dans un nouveau processus; le diagnostic `DIAGNOSED` et le SHA-256 de l'original ont été relus sans doublure. `validate_document_persistence_restart_acceptance.ps1` reste une preuve de contrat isolée; `validate_review3_deployment_live.ps1` porte désormais la preuve réelle.
+- Upgrade réel : volume au schéma 007 migré vers 008, ledger idempotent et verrou advisory GREEN.
+- Limite M004 : le diagnostic PDF est réel, mais aucune conversion canonique Docling/OCRmyPDF, publication `CanonicalSourcePublished` ou projection KA issue d'un `CanonicalSourceRef` complet n'est revendiquée.
+- Validations GREEN : déploiement revue 3 statique et live, opérations reproductibles, déploiement orchestrateur, configuration M13-config, Compose local, migration PostgreSQL live, `uv lock --check` et système ADR.
+- Écart historique explicite : certains lots antérieurs ont adapté ou ajouté des tests dans leur commit GREEN. Les hashes sont conservés et cet écart à la séparation RED/GREEN stricte est documenté sans réécriture. Pour ADR-026, le contrat a été commité RED, le harness a été stabilisé dans des commits exclusivement tests, puis l'implémentation a été commitée GREEN sans assouplir le contrat.
+- Préservation utilisateur : le hunk `tests/m013/validate_m013_reality_product_acceptance.ps1` reste hors staging et hors commits.

@@ -63,7 +63,7 @@ Commande vérifiée:
 docker compose -f .\deploy\local-compose\compose.yaml up --build
 ```
 
-Résultat attendu: Compose applique déjà `--config /workspace/config/application.yaml` à chaque processus applicatif et monte `../../config/application.yaml:/workspace/config/application.yaml:ro`.
+Résultat attendu: Compose applique déjà `--config /workspace/config/application.yaml` à chaque processus applicatif et monte la variante conteneur versionnée `./application.compose.yaml:/workspace/config/application.yaml:ro`. Cette variante respecte le même schéma strict et utilise les DNS Compose; elle ne remplace pas le fichier local préparé pour les processus exécutés hors conteneur.
 
 Erreur explicite: si `config/application.yaml` est absent, illisible, incomplet ou contredit par une entrée de processus, le démarrage échoue avant l'accès à PostgreSQL, Qdrant ou Spark.
 

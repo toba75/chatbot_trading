@@ -5,8 +5,8 @@
 - Statut: publié pour T-002.
 - Milestone: `M13-config - Configuration applicative sans environnement`.
 - Bounded context: `platform.configuration`.
-- ADR applicable: ADR-016 - Configuration applicative par fichier unique.
-- Artefacts normatifs: `config/application.schema.json` et `config/application.example.yaml`.
+- ADR applicables: ADR-016 - Configuration applicative par fichier unique; ADR-026 - Déploiement Compose reproductible depuis un commit complet.
+- Artefacts normatifs: `config/application.schema.json`, `config/application.example.yaml` et `deploy/local-compose/application.compose.yaml` pour le réseau conteneur versionné.
 
 ## Scénario BDD
 
@@ -51,7 +51,7 @@ Cette spécification remplace les entrées de processus historiques par un fichi
 | `paths` | Déclare les répertoires applicatifs pilotants | `data_root`, `corpus_root`, `canonical_sources_root`, `reports_root`, `logs_root` |
 | `security` | Déclare exposition réseau, chemins de secrets et audit de configuration | `network_exposure`, `allow_public_bind`, `secrets`, `audit` |
 | `quality_gates` | Déclare les seuils et politiques de validation applicatives | `post_conversion`, `retrieval`, `answering`, `llm` |
-| `observability` | Déclare métriques, traces et logs sans payload sensible | `metrics`, `tracing`, `logs` |
+| `observability` | Déclare uniquement les contrôles effectivement consommés par les runtimes | `tracing.enabled`, `logs.include_payloads` |
 | `runtime` | Déclare profil local, workers, timeouts et ressources | `profile`, `workers`, `timeouts`, `resource_limits` |
 
 ## Erreurs publiques de configuration
@@ -101,6 +101,10 @@ Pour le Spark Docker actuel gouverné par ADR-014, `services.llm_gateway.auth_mo
 
 Chaque chargement valide produit une configuration hashée. Les rapports d'évaluation, de démarrage et d'exploitation référencent ce hash avec les versions de code, modèle et runtime. Un hash manquant est une non-conformité de traçabilité pour M13-config.
 
+ADR-026 retire du schéma les clés d'observabilité sans consommateur applicatif réel : `metrics`, chemin de traces, niveau et rétention applicative. Comme `additionalProperties` vaut `false`, leur présence produit `CONFIG_SCHEMA_INVALID`. La rotation des logs relève de la configuration explicite du moteur de conteneurs et ne constitue pas une clé applicative implicite.
+
+Dans Compose, `deploy/local-compose/application.compose.yaml` est une variante versionnée du même contrat strict : elle utilise les DNS `postgres`, `qdrant`, `llm-gateway` et `orchestrator-api`, ainsi que les chemins de secrets montés dans les conteneurs. Elle ne constitue ni un second schéma ni un fallback vers l'environnement.
+
 ## Commandes de validation
 
 - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_application_config_specification_acceptance.ps1`
@@ -108,9 +112,11 @@ Chaque chargement valide produit une configuration hashée. Les rapports d'éval
 - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_adr_system.ps1`
 - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`
 
-## Exclusions T-002
+## Exclusions historiques T-002
 
 - Aucun chargeur applicatif n'est implémenté dans cette tâche.
 - Aucun fichier `app/...` n'est modifié.
 - Aucun changement Compose ou runbook opératoire n'est livré ici.
 - Aucun fallback temporaire n'est introduit pour faciliter la migration.
+
+Ces exclusions décrivent la publication initiale T-002. Les tâches aval ont depuis livré le chargeur, Compose et les runbooks sans modifier l'interdiction de fallback.

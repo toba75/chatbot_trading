@@ -2,73 +2,81 @@
 
 ## Périmètre
 
-- Tâche: T-011, déployer et auditer l'API orchestratrice.
-- Date de consolidation: 2026-07-13.
-- Décisions: ADR-018, ADR-019, ADR-020, ADR-021 et ADR-022.
-- Configuration: M13-config, fichier unique et `configuration_hash` obligatoire.
+- Tâche : T-011, déployer et auditer l'API orchestratrice.
+- Date de consolidation : 2026-07-13.
+- Décisions courantes : ADR-018, ADR-019, ADR-020, ADR-021, ADR-023, ADR-024, ADR-025 et ADR-026.
+- Configuration : fichier M13-config unique, `configuration_hash` obligatoire et variante conteneur versionnée `deploy/local-compose/application.compose.yaml`.
 
 ## État courant
 
-L'état courant ne fige pas un numéro devenu faux dès qu'une migration ascendante est ajoutée. Le schéma courant dérivé des migrations est le préfixe numérique maximal de `deploy/postgres/migrations/*.sql`; la gate live vérifie ce même ensemble via le ledger `platform.schema_migrations`.
+Le schéma courant est le préfixe numérique maximal de `deploy/postgres/migrations/*.sql`. La gate live vérifie le même ensemble via le ledger `platform.schema_migrations`; elle prouve actuellement la migration 008 et sa réexécution idempotente.
 
-L'image locale identifiée par le commit Git complet utilise le tag `ostrading/orchestrator-api:0.1.0-m013-fastapi-schema-<schéma>-<commit-complet>`. Compose transmet les deux valeurs comme arguments de build et l'image les expose dans `org.ostrading.postgres-schema-version` et `org.opencontainers.image.revision`. Une branche, `latest`, un hash abrégé ou un tag historique ne constitue pas une preuve de rollback.
+Les images API et worker utilisent respectivement `ostrading/orchestrator-api:0.1.0-m013-fastapi-schema-<schéma>-<commit-complet>` et `ostrading/worker-documents:0.1.0-m013-fastapi-schema-<schéma>-<commit-complet>`. Elles exposent `org.ostrading.postgres-schema-version` et `org.opencontainers.image.revision`, s'exécutent sous `ostrading` et possèdent un entrypoint explicite. Une branche, `latest`, un hash abrégé ou le tag worker historique ne constitue pas une preuve de rollback.
 
-La commande réelle de l'image est `api --config /workspace/config/application.yaml`. Le seul chemin d'exploitation supporté est `docker compose -f .\deploy\local-compose\compose.yaml up --build`; le DNS `postgres` est interne à Compose et aucun lancement hôte n'est documenté comme équivalent.
+La stack d'exploitation est construite depuis une archive Git, jamais depuis le worktree. L'API exécute `api --config /workspace/config/application.yaml`; les deux replicas worker exécutent le module documentaire dédié avec le fencing d'ADR-025. Seul Caddy publie `127.0.0.1`.
 
 ## Scénario audité
 
-- Given un commit Git complet, les migrations de ce commit et la configuration M13-config.
-- When Compose construit l'image verrouillée puis PostgreSQL, Uvicorn et les workers exécutent le parcours PDF.
-- Then un seul `orchestrator-api` sert les contrats, le schéma est migré avant readiness et chaque appel reste traçable sans fallback.
+- Given un clone propre, un commit Git complet, ses migrations et le secret PostgreSQL hors Git.
+- When la gate exporte le commit, construit les images finales et démarre la stack Compose.
+- Then PostgreSQL, Qdrant, `llm-gateway`, Uvicorn, deux workers, UI et Caddy réalisent le parcours PDF, puis la donnée survit au redémarrage réel de PostgreSQL et de l'API.
 
 ## Contrôles courants
 
 | Contrôle | Preuve actuelle | Verdict |
 |---|---|---|
-| Interpréteur de gate | `uv sync --frozen --no-dev --no-install-project`, puis PATH imposé sur `.venv\Scripts` | Couvert par la gate statique |
-| Image builder | Python et uv épinglés par digest; `uv.lock` appliqué avec `--frozen` | Couvert par test de déploiement |
-| Identité image/schéma | commit Git complet et dernière migration transmis au tag et aux labels | Couvert par test d'opérations |
-| Runtime public unique | commande `api`; ancien `local_runtime` refusé pour orchestrator-api | Couvert par gates statique et live |
-| PostgreSQL réel | ledger SHA-256, verrou advisory et readiness dynamique | Couvert par gate live |
-| Bind réseau | seul Caddy publie `127.0.0.1`; aucun port FastAPI hôte | Couvert par Compose |
-| OpenAPI | création en `201 application/json`; original en `200 application/pdf` uniquement | Couvert sémantiquement |
-| Corps HTTP et original | limites Caddy/ASGI, hash avant 200, streaming borné | Couvert par tests et preuve live |
-| Pagination corpus | curseur public obligatoire, page de 1 à 100, statut KA lu en lot | Couvert par gate statique |
-| Modèles publics | structures imbriquées strictes et union d'absence/projection | Couvert par OpenAPI et tests UI |
-| Traçabilité | `X-Trace-ID`, `trace_id`, `configuration_hash`, statut et durée sans payload | Couvert par preuve live |
-| Aucun fallback | dépendance ou migration absente arrête le démarrage | Couvert par tests statiques |
+| Interpréteur et dépendances | Python `3.12.8`, setuptools, Pydantic et Starlette directs et exacts, `uv lock --check` | Couvert |
+| Contexte de build | Archive Git complète et `.dockerignore` racine borné | Couvert par ADR-026 et test statique |
+| Identité PostgreSQL | rôle/base `ostrading`, URL conteneur et secret cohérents | Couvert par Compose réel |
+| Identité images | commit complet et schéma 008 dans tags et labels API/worker | Inspectée avant démarrage |
+| Runtime public unique | entrypoint `api`; ancien `local_runtime` refusé | Couvert |
+| Readiness | ledger PostgreSQL requis et `/health` de `llm-gateway` | Couvert par preuve Compose |
+| Workers | deux replicas, identités distinctes et claims fenced | Couvert par ADR-025/ADR-026 |
+| Persistance T-005 | PDF traité, PostgreSQL redémarré, API recréée, diagnostic et SHA-256 relus | Couvert par preuve Compose réelle |
+| OpenAPI et binaire | multipart, `201`, PDF `200`, bornes Caddy/ASGI et hash avant streaming | Couvert |
+| Bind réseau | seul Caddy publie `127.0.0.1` | Couvert |
+| Traçabilité | `X-Trace-ID`, `trace_id`, `configuration_hash`, statut et durée sans payload | Couvert |
+| Aucun fallback | dépendance, migration, image ou configuration invalide arrête l'opération | Couvert |
 
 ## Commandes d'audit actuelles
 
 ```powershell
 uv lock --check
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_fastapi\validate_reproducible_operations_acceptance.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_fastapi\validate_orchestrator_deployment_acceptance.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_fastapi\validate_review3_deployment_acceptance.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_fastapi\validate_review3_deployment_live.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_fastapi\validate_postgres_migration_upgrade_live.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_fastapi.ps1 -Mode Static
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_fastapi.ps1 -Mode Live
 ```
 
-La preuve live utilise Docker Engine, PostgreSQL, Uvicorn, PDF et workers réels. Un test unitaire isolé ne la remplace pas.
+La preuve live exporte le commit, construit la stack finale et emploie Docker Engine, PostgreSQL, Uvicorn, Caddy, le gateway LLM, PDF et workers réels. Un test unitaire isolé ne la remplace pas.
 
 ## Limites actuelles
 
-- L'UI reste cliente HTTP de `orchestrator-api`; elle n'est pas migrée vers FastAPI.
-- Le runtime M004 de conversion canonique n'est pas livré par ce sous-milestone : aucun adaptateur Docling/OCRmyPDF réel ni publication durable `CanonicalSourcePublished` ne permet encore à `/index` de recevoir un `CanonicalSourceRef` complet. L'indexation et la sélection conversationnelle restent bloquées explicitement; aucune projection n'est fabriquée depuis l'état `DIAGNOSED`.
-- Une publication future ne pourra émettre `CanonicalSourcePublished` qu'après fusion Docling, adjudication d'autorité textuelle, QA, stockage de l'artefact et calcul de `canonical_artifact_sha256`; le relais KA devra appliquer DDD-ADR-008 par inbox idempotente sans transaction forte intercontextes.
-- `llm-gateway` reste le seul adaptateur réseau vers Spark.
-- Qdrant n'est pas une source de vérité de projection.
-- Les migrations restent ascendantes; aucun rollback de schéma destructif n'est automatisé.
-- `scripts/test.ps1` a dépassé la borne d'observation de dix minutes lors de la revue. Cette exécution est non concluante et n'est jamais présentée comme GREEN.
+- L'UI reste cliente HTTP de `orchestrator-api`; elle n'est pas réécrite en FastAPI.
+- Le runtime M004 de conversion canonique n'est pas livré par ce sous-milestone. Aucun adaptateur Docling/OCRmyPDF réel ni publication durable `CanonicalSourcePublished` ne permet encore à `/index` de recevoir un `CanonicalSourceRef` complet. L'indexation et la sélection conversationnelle restent bloquées explicitement ; aucune projection n'est fabriquée depuis `DIAGNOSED`.
+- Une publication future devra attendre fusion Docling, adjudication d'autorité textuelle, QA, stockage et calcul de `canonical_artifact_sha256`, puis respecter DDD-ADR-008 par inbox idempotente. Cette description est une contrainte future, pas une preuve M004 livrée.
+- `llm-gateway` reste le seul adaptateur réseau vers Spark. Qdrant n'est pas une source de vérité.
+- Les migrations restent ascendantes ; aucun rollback de schéma destructif n'est automatisé.
+- `scripts/test.ps1` a dépassé dix minutes lors d'une revue antérieure. Cette exécution reste non concluante et n'est jamais présentée comme GREEN.
 
 ## Preuves historiques
 
-Les éléments ci-dessous sont conservés pour la traçabilité des décisions; ils ne décrivent pas la commande, l'image ou le schéma courants.
+Ces éléments conservent l'historique sans décrire l'image, le schéma ou la commande courants :
 
-- T-011 initial: RED `b2a00b28a`, GREEN `c07453414`; première preuve HTTP Docker/PostgreSQL/Uvicorn.
-- Frontière HTTP ADR-020: RED `ae943a04c` et `d4b64cf26`, GREEN `89acbdd70`; PDF supérieur à 1 Mio, limites agrégées et streaming vérifié.
-- Runtime ADR-021: RED `3c4159a86`, GREEN `439b4336f`; introduction du ledger, du verrou et de la readiness dynamique sur le schéma alors courant.
-- Worker ADR-022: RED `d9f73943f`, GREEN `d1daf1f34`; outbox, claims, leases et reprise après crash.
-- Contrats produit KA/SP/UI: RED `d5f682fdf` et `f3bf36660`, GREEN `3521770cc` et `27bef8d48`.
-- Gouvernance/performance: RED `4a448c2c7`, GREEN `f9a7ff3c1`; gate exhaustive Static/Live, OpenAPI typé et lectures bornées.
-- API/KA/UI paginées : RED `510d85ac6`, GREEN `c1aadb5f7`; extraction applicative RED `e6cef6a3d`, GREEN `9c5dcda90`; gate Static `31/31` GREEN.
-- La tentative historique de `scripts/test.ps1` est restée non concluante après dix minutes, sans verdict applicatif.
+- T-011 initial : RED `b2a00b28a`, GREEN `c07453414`; première preuve HTTP Docker/PostgreSQL/Uvicorn.
+- Frontière HTTP ADR-020 : RED `ae943a04c` et `d4b64cf26`, GREEN `89acbdd70`.
+- Runtime ADR-021 : RED `3c4159a86`, GREEN `439b4336f`; ledger, verrou et readiness PostgreSQL.
+- Worker ADR-022 : RED `d9f73943f`, GREEN `d1daf1f34`; cette architecture a ensuite été remplacée pour le relais par ADR-024.
+- Version optimiste ADR-023 : RED `7b7912f09`, GREEN `9d17bc129`, documentation `7a2946c70`.
+- Frontière transactionnelle ADR-024 : RED `9afe600cf` puis garde `618b77a46`, GREEN `db9ad998b` puis `669265460`, documentation `59ef15b6f` et `44118989d`.
+- Fencing et isolation PDF ADR-025 : RED `31ca4dc5c` et `c46b15e36`, GREEN `3cd3c98f6`, compatibilité `f7e6d1c89`, documentation `9ac974b8c`.
+- Déploiement Compose ADR-026 : RED `c64311691` ; corrections du seul harness live `3df97b3b2`, `6b9a94c48`, `fd72ab75d`, `03d301088` et `d38a2142c` ; GREEN fonctionnel `f49ffded1`.
+- Contrats produit KA/SP/UI : RED `d5f682fdf` et `f3bf36660`, GREEN `3521770cc` et `27bef8d48`.
+- Gouvernance/performance : RED `4a448c2c7`, GREEN `f9a7ff3c1` ; API/KA/UI paginées : RED `510d85ac6`, GREEN `c1aadb5f7`.
+
+## Écarts historiques BDD/TDD explicités
+
+Le workflow normatif reste : état GREEN initial, test RED commit distinct, implémentation GREEN commit distinct. Des lots antérieurs ont toutefois ajouté ou adapté des tests dans leur commit GREEN, notamment lors des consolidations produit et gouvernance. Les hashes ne sont pas réécrits : cet écart historique est documenté comme non-conformité de séparation des phases, sans prétendre qu'il respectait le TDD strict.
+
+Pour ADR-026, le contrat d'acceptation a été commité RED avant l'implémentation. Les cinq commits suivants ont corrigé uniquement le harness live encore RED avant le GREEN fonctionnel ; aucun contrat n'a été assoupli dans `f49ffded1`. Le hunk utilisateur de `tests/m013/validate_m013_reality_product_acceptance.ps1` est resté hors staging et hors commits.

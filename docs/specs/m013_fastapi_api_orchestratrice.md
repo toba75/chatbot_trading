@@ -6,7 +6,7 @@
 - Domaine: plateforme locale.
 - Bounded context de composition: `platform`.
 - Frontière publique: `orchestrator-api`.
-- Hors portée T-002: ajout des dépendances, application exécutable, migration des routes et raccordement des read-models.
+- Hors portée historique T-002: ajout des dépendances, application exécutable, migration des routes et raccordement des read-models; ces éléments ont depuis été livrés par les tâches aval M13-FastAPI.
 
 FastAPI et Uvicorn sont des adaptateurs techniques. Ils ne possèdent aucun aggregate, aucune règle métier et aucun état durable d'un bounded context.
 
@@ -74,7 +74,7 @@ Une route non encore migrée reste explicitement sur le runtime actuel. Une rout
 
 ## Dépendances et verrouillage
 
-T-002 ne modifie pas les dépendances. Lors de l'implémentation de l'application ASGI, FastAPI et Uvicorn doivent être déclarés explicitement dans `pyproject.toml` et verrouillés dans `uv.lock`. Une installation implicite, une version flottante ou une dépendance disponible seulement dans l'environnement local est interdite.
+Le runtime exige Python `3.12.8` exactement. FastAPI, Uvicorn, Pydantic, Starlette et setuptools sont déclarés directement avec des versions exactes dans `pyproject.toml` et verrouillés dans `uv.lock`. `uv lock --check` vérifie leur cohérence. Une installation implicite, une version flottante ou une dépendance disponible seulement dans l'environnement local est interdite.
 
 ## Erreurs et absence de fallback
 
@@ -99,6 +99,8 @@ T-002 ne modifie pas les dépendances. Lors de l'implémentation de l'applicatio
 - Les routeurs conversation, benchmark, recherche et indexation reçoivent des services publics injectés par la composition root; ils n'appellent aucune fonction privée de `local_runtime`.
 - La lecture du corpus SP est paginée par `DocumentId`, groupée sous `REPEATABLE READ READ ONLY` et bornée à un nombre constant de requêtes SQL.
 - La gate statique et la preuve live sont sélectionnées par un mode explicite; une invocation sans mode échoue sans fallback.
+- La readiness vérifie distinctement le ledger PostgreSQL et `/health` de `llm-gateway`; l'indisponibilité d'une dépendance est visible sans exposer son URL ni ses secrets.
+- ADR-026 impose une construction depuis une archive Git, des images API/worker identifiées par commit et schéma, deux replicas worker et une preuve Compose finale incluant UI et Caddy.
 
 ## Gates T-002
 
@@ -111,7 +113,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_fast
 
 ## Traçabilité
 
-- ADR: ADR-019; ADR-018 inchangée; DDD-ADR-001.
+- ADR: ADR-018; ADR-019; ADR-020; ADR-021; ADR-023; ADR-024; ADR-025; ADR-026; DDD-ADR-001.
 - Tâche: `docs/tasks/milestone_013-fastapi/0002_decider_frontiere_http_publique.md`.
 - Tests: `tests/m013_fastapi/validate_fastapi_specification_acceptance.ps1`; `tests/m013_fastapi/validate_fastapi_architecture_policy_unit.ps1`.
 - Commit RED: `7a3c3c231`, `test(architecture): couvrir frontiere asgi orchestratrice`.

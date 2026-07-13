@@ -960,10 +960,10 @@ $requiredM013Requirements = @(
     [ordered] @{
         Id = "REQ-M013-FASTAPI-005"
         Source = "docs/tasks/milestone_013-fastapi/0005_partager_etat_documentaire_durable.md"
-        Test = "tests/m013_fastapi/validate_document_persistence_restart_acceptance.ps1; tests/m013_fastapi/validate_document_persistence_unit.ps1"
-        CommandScript = "tests/m013_fastapi/validate_document_persistence_restart_acceptance.ps1"
-        Code = "app/source_processing/adapters/postgres_document_persistence.py; deploy/postgres/migrations/001_document_persistence.sql; deploy/postgres/migrations/005_source_processing_read_performance.sql"
-        Adr = "ADR-021; ADR-024"
+        Test = "tests/m013_fastapi/validate_document_persistence_restart_acceptance.ps1; tests/m013_fastapi/validate_document_persistence_unit.ps1; tests/m013_fastapi/validate_review3_deployment_live.ps1"
+        CommandScript = "tests/m013_fastapi/validate_review3_deployment_live.ps1"
+        Code = "app/source_processing/adapters/postgres_document_persistence.py; app/platform/orchestrator_runtime.py; deploy/postgres/migrations/001_document_persistence.sql; deploy/postgres/migrations/005_source_processing_read_performance.sql; deploy/postgres/migrations/008_claim_fencing_and_projection_replay.sql; deploy/local-compose/application.compose.yaml; deploy/local-compose/compose.yaml"
+        Adr = "ADR-021; ADR-023; ADR-024; ADR-025; ADR-026"
     },
     [ordered] @{
         Id = "REQ-M013-FASTAPI-006"
@@ -1008,10 +1008,10 @@ $requiredM013Requirements = @(
     [ordered] @{
         Id = "REQ-M013-FASTAPI-011"
         Source = "docs/tasks/milestone_013-fastapi/0011_deployer_auditer_api_orchestratrice.md"
-        Test = "tests/m013_fastapi/validate_review_governance_performance_acceptance.ps1; tests/m013_fastapi/validate_reproducible_operations_acceptance.ps1; tests/m013_fastapi/validate_orchestrator_deployment_acceptance.ps1; tests/m013_fastapi/validate_postgres_migration_upgrade_live.ps1; tests/m013_fastapi/validate_document_http_live_acceptance.ps1; tests/m013_fastapi/validate_document_worker_live.ps1; tests/m013_fastapi/validate_job_outbox_boundary_acceptance.ps1; tests/m013_fastapi/validate_job_outbox_boundary_live.ps1; tests/m013_fastapi/validate_ka_projection_persistence_live.ps1; tests/m013_fastapi/validate_m013_fastapi_traceability_unit.ps1"
+        Test = "tests/m013_fastapi/validate_review_governance_performance_acceptance.ps1; tests/m013_fastapi/validate_reproducible_operations_acceptance.ps1; tests/m013_fastapi/validate_orchestrator_deployment_acceptance.ps1; tests/m013_fastapi/validate_review3_deployment_acceptance.ps1; tests/m013_fastapi/validate_review3_deployment_live.ps1; tests/m013_fastapi/validate_postgres_migration_upgrade_live.ps1; tests/m013_fastapi/validate_document_http_live_acceptance.ps1; tests/m013_fastapi/validate_document_worker_live.ps1; tests/m013_fastapi/validate_job_outbox_boundary_acceptance.ps1; tests/m013_fastapi/validate_job_outbox_boundary_live.ps1; tests/m013_fastapi/validate_ka_projection_persistence_live.ps1; tests/m013_fastapi/validate_review3_safety_acceptance.ps1; tests/m013_fastapi/validate_review3_safety_live.ps1; tests/m013_fastapi/validate_m013_fastapi_traceability_unit.ps1"
         CommandScript = "scripts/validate_m013_fastapi.ps1"
-        Code = "app/platform/orchestrator_command.py; app/platform/orchestrator_runtime.py; app/platform/orchestrator_asgi.py; app/platform/orchestrator_contract_routers.py; app/platform/orchestrator_public_services.py; app/platform/orchestrator_api_models.py; app/platform/postgres_migrations.py; app/platform/job_runtime/relay.py; app/platform/job_runtime/postgres.py; app/source_processing/adapters/http.py; app/source_processing/adapters/original_http.py; app/source_processing/adapters/postgres_document_persistence.py; app/source_processing/adapters/postgres_job_outbox.py; app/source_processing/adapters/worker_runtime.py; deploy/postgres/migrations/007_job_outbox_context_boundary.sql; deploy/local-compose/Caddyfile; deploy/local-compose/compose.yaml; deploy/local-compose/Dockerfile; scripts/validate_m013_fastapi.ps1; docs/runbooks/api_orchestratrice.md; docs/governance/m013_fastapi_audit.md; docs/tasks/milestone_013-fastapi/journal.md"
-        Adr = "ADR-018; ADR-019; ADR-020; ADR-021; ADR-024"
+        Code = ".dockerignore; pyproject.toml; uv.lock; app/platform/orchestrator_command.py; app/platform/orchestrator_runtime.py; app/platform/orchestrator_asgi.py; app/platform/orchestrator_contract_routers.py; app/platform/orchestrator_public_services.py; app/platform/orchestrator_api_models.py; app/platform/postgres_migrations.py; app/platform/job_runtime/relay.py; app/platform/job_runtime/postgres.py; app/source_processing/adapters/http.py; app/source_processing/adapters/original_http.py; app/source_processing/adapters/postgres_document_persistence.py; app/source_processing/adapters/postgres_job_outbox.py; app/source_processing/adapters/worker_runtime.py; app/source_processing/adapters/pdf_inspection_process.py; app/knowledge_access/adapters/postgres_projection_read.py; deploy/postgres/migrations/007_job_outbox_context_boundary.sql; deploy/postgres/migrations/008_claim_fencing_and_projection_replay.sql; deploy/local-compose/application.compose.yaml; deploy/local-compose/Caddyfile; deploy/local-compose/compose.yaml; deploy/local-compose/Dockerfile; scripts/validate_m013_fastapi.ps1; docs/runbooks/api_orchestratrice.md; docs/governance/m013_fastapi_audit.md; docs/tasks/milestone_013-fastapi/journal.md"
+        Adr = "ADR-018; ADR-019; ADR-020; ADR-021; ADR-023; ADR-024; ADR-025; ADR-026"
     }
 )
 
