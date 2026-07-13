@@ -89,7 +89,7 @@ with TemporaryDirectory() as temporary_directory:
 
 # La construction runtime ne lit que la configuration M13-config et ne propose aucun backend mémoire.
 configuration = load_application_configuration(
-    Path("config/application.yaml"),
+    Path("config/application.example.yaml"),
     environment_snapshot={},
 )
 connection_factory = PsycopgConnectionFactory(

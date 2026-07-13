@@ -62,7 +62,7 @@ class RecordingTransport:
 
 
 def runtime_configuration_for(corpus_root: Path):
-    template_path = Path(repo_root) / "config" / "application.yaml"
+    template_path = Path(repo_root) / "config" / "application.example.yaml"
     config_text = template_path.read_text(encoding="utf-8")
     config_text = config_text.replace(
         "  corpus_root: data/corpus",

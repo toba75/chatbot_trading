@@ -140,7 +140,7 @@ unknown_status_transport = RecordingTransport(
 )
 assert_raises(
     ValueError,
-    "statut diagnostic public invalide",
+    "page de corpus publique incompatible",
     lambda: UiDocumentApiClient(transport=unknown_status_transport).build_corpus_state(
         active_selected_document_ids=()
     ),
