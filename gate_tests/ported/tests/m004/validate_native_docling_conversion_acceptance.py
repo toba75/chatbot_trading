@@ -23,6 +23,7 @@ from app.source_processing.adapters.docling_native_conversion import (
     IsolatedNativeDoclingConverter,
 )
 from app.source_processing.application.document_commands import (
+    DocumentConversionExecutionPhase,
     DocumentConversionState,
     DocumentConversionStatus,
 )
@@ -75,6 +76,10 @@ class _ConversionRepository:
             conversion_status=DocumentConversionStatus.CONVERSION_REQUESTED,
             canonical_version_id=None,
             rejection_error_code=None,
+            execution_phase=DocumentConversionExecutionPhase.QUEUED,
+            completed_units=0,
+            total_units=1,
+            failure_error_code=None,
         )
         self.publication = None
 
@@ -88,6 +93,23 @@ class _ConversionRepository:
             conversion_status=DocumentConversionStatus.CANONICAL_ACCEPTED,
             canonical_version_id=publication.canonical_version_id,
             rejection_error_code=None,
+            execution_phase=DocumentConversionExecutionPhase.SUCCEEDED,
+            completed_units=1,
+            total_units=1,
+            failure_error_code=None,
+        )
+
+    def begin_native_conversion(self, *, document_id: DocumentId) -> None:
+        assert document_id == self.state.document_id
+        self.state = DocumentConversionState(
+            document_id=document_id,
+            conversion_status=DocumentConversionStatus.CONVERSION_REQUESTED,
+            canonical_version_id=None,
+            rejection_error_code=None,
+            execution_phase=DocumentConversionExecutionPhase.RUNNING,
+            completed_units=0,
+            total_units=1,
+            failure_error_code=None,
         )
 
     def reject_native_conversion(self, *, document_id: DocumentId, error_code: str) -> None:
@@ -96,6 +118,10 @@ class _ConversionRepository:
             conversion_status=DocumentConversionStatus.QA_REJECTED,
             canonical_version_id=None,
             rejection_error_code=error_code,
+            execution_phase=DocumentConversionExecutionPhase.FAILED,
+            completed_units=0,
+            total_units=1,
+            failure_error_code=error_code,
         )
 
 

@@ -15,6 +15,7 @@ from starlette.concurrency import run_in_threadpool
 
 from app.source_processing.adapters.document_http import HttpRequest, HttpResponse
 from app.platform.orchestrator_api_models import (
+    ConversionAcceptedResponse,
     DiagnosticAcceptedResponse,
     DocumentDuplicateResponse,
     DocumentRegisteredResponse,
@@ -38,6 +39,13 @@ class DocumentHttpAdapter(Protocol):
     ) -> HttpResponse: ...
 
 
+class DocumentConversionHttpAdapter(Protocol):
+    """Port HTTP M-004 sans streaming d'original."""
+
+    def handle(self, request: HttpRequest) -> HttpResponse:
+        """Traite uniquement POST /v1/documents/{id}/convert."""
+
+
 MAX_TITLE_CHARACTERS = 512
 MAX_AUTHOR_CHARACTERS = 256
 MAX_AUTHORS = 16
@@ -48,11 +56,15 @@ MAX_PUBLICATION_YEAR = 9999
 def build_document_command_router(
     *,
     document_http_adapter: DocumentHttpAdapter,
+    document_conversion_http_adapter: DocumentConversionHttpAdapter,
     max_pdf_bytes: int,
 ) -> APIRouter:
     """Construit les deux commandes documentaires et injecte leur adaptateur SP."""
 
     parsed_adapter = _ensure_document_http_adapter(document_http_adapter)
+    parsed_conversion_adapter = _ensure_document_conversion_http_adapter(
+        document_conversion_http_adapter
+    )
     parsed_max_pdf_bytes = _ensure_max_pdf_bytes(max_pdf_bytes)
     router = APIRouter()
 
@@ -96,6 +108,24 @@ def build_document_command_router(
             HttpRequest(
                 method="POST",
                 path=f"/v1/documents/{document_id}/diagnose",
+                body={},
+            )
+        )
+        return _json_response(response)
+
+    @router.post(
+        "/v1/documents/{document_id}/convert",
+        response_model=ConversionAcceptedResponse,
+        status_code=202,
+        responses=PUBLIC_ERROR_RESPONSES,
+    )
+    def convert_document(document_id: str, request: Request) -> JSONResponse:
+        if _request_has_body(request):
+            return _invalid_request("body")
+        response = parsed_conversion_adapter.handle(
+            HttpRequest(
+                method="POST",
+                path=f"/v1/documents/{document_id}/convert",
                 body={},
             )
         )
@@ -247,10 +277,20 @@ def _ensure_document_http_adapter(value: Any) -> DocumentHttpAdapter:
     return value
 
 
+def _ensure_document_conversion_http_adapter(value: Any) -> DocumentConversionHttpAdapter:
+    if not callable(getattr(value, "handle", None)):
+        raise ValueError("document_conversion_http_adapter invalide")
+    return value
+
+
 def _ensure_max_pdf_bytes(value: Any) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or value < 1:
         raise ValueError("max_pdf_bytes invalide")
     return value
 
 
-__all__ = ["DocumentHttpAdapter", "build_document_command_router"]
+__all__ = [
+    "DocumentConversionHttpAdapter",
+    "DocumentHttpAdapter",
+    "build_document_command_router",
+]

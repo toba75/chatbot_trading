@@ -17,6 +17,7 @@ from app.source_processing.adapters.docling_native_conversion import (
     NativeDoclingConversionResponse,
 )
 from app.source_processing.application.document_commands import (
+    DocumentConversionExecutionPhase,
     DocumentConversionState,
     DocumentConversionStatus,
 )
@@ -75,6 +76,9 @@ class NativeConversionRepository(Protocol):
     def complete_native_conversion(self, publication: NativeCanonicalPublication) -> None:
         """Persiste en une transaction la référence, le hash et l'acceptation canonique."""
 
+    def begin_native_conversion(self, *, document_id: DocumentId) -> None:
+        """Persiste RUNNING avant tout appel au processus Docling isolé."""
+
     def reject_native_conversion(self, *, document_id: DocumentId, error_code: str) -> None:
         """Rend une indisponibilité terminale persistante, sans changement de route."""
 
@@ -96,6 +100,7 @@ class NativeDocumentConversionWorker:
             (source_document_repository, "find_by_document_id"),
             (processing_run_repository, "find_by_document_id"),
             (conversion_repository, "find_conversion_by_document_id"),
+            (conversion_repository, "begin_native_conversion"),
             (conversion_repository, "complete_native_conversion"),
             (conversion_repository, "reject_native_conversion"),
             (original_source_store, "resolve_internal_path"),
@@ -148,6 +153,12 @@ class NativeDocumentConversionWorker:
             }
         if conversion.conversion_status is not DocumentConversionStatus.CONVERSION_REQUESTED:
             raise WorkerProcessingError("CONVERSION_NOT_EXECUTABLE", retryable=False)
+        if conversion.execution_phase not in {
+            DocumentConversionExecutionPhase.QUEUED,
+            DocumentConversionExecutionPhase.RUNNING,
+        }:
+            raise WorkerProcessingError("CONVERSION_NOT_EXECUTABLE", retryable=False)
+        self._conversion_repository.begin_native_conversion(document_id=document_id)
 
         canonical_version_id = _canonical_version_id(source_sha256)
         source_path = self._original_source_store.resolve_internal_path(source_document.original_storage_ref)

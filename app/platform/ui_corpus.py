@@ -66,6 +66,7 @@ class CorpusPdfDocument:
     conversion_status: str
     canonical_version_id: str | None
     projection_status: str
+    conversion_action_available: bool
     selected: bool
     manual_review_reason: str | None = None
     failure_error_code: str | None = None
@@ -115,6 +116,13 @@ class CorpusPdfDocument:
                 "statut projection public invalide",
             ),
         )
+        if not isinstance(self.conversion_action_available, bool):
+            raise ValueError("disponibilité conversion invalide")
+        if self.conversion_action_available and (
+            self.diagnostic_status != "ROUTE_PLANNED"
+            or self.conversion_status != "CONVERSION_NOT_REQUESTED"
+        ):
+            raise ValueError("disponibilité conversion incohérente")
         if not isinstance(self.selected, bool):
             raise ValueError("selection document invalide")
         if self.diagnostic_status == "MANUAL_REVIEW":
@@ -437,7 +445,10 @@ def render_document_inspection(
             )
         )
     elif parsed_title.casefold() == "diagnostic":
-        progress_html, refresh_html = _render_action_progress(action_progress)
+        progress_html, refresh_html = _render_action_progress(
+            action_progress,
+            expected_action_name="DIAGNOSE",
+        )
         pages = payload.get("pages")
         if not isinstance(pages, list):
             raise ValueError("pages diagnostic requises pour le rendu")
@@ -463,6 +474,34 @@ def render_document_inspection(
                 f"<ol>{page_items}</ol></section>",
             )
         )
+    elif parsed_title.casefold() == "conversion":
+        progress_html, refresh_html = _render_action_progress(
+            action_progress,
+            expected_action_name="CONVERT_DOCUMENT",
+        )
+        canonical_version_id = payload.get("canonical_version_id")
+        canonical_html = (
+            "<p>Version canonique : aucune.</p>"
+            if canonical_version_id is None
+            else f'<p>Version canonique : <code>{_escape(str(canonical_version_id))}</code></p>'
+        )
+        rejection_error_code = payload.get("qa_rejection_error_code")
+        rejection_html = (
+            ""
+            if rejection_error_code is None
+            else f'<p>Erreur terminale : <code>{_escape(str(rejection_error_code))}</code></p>'
+        )
+        content = "".join(
+            (
+                '<section aria-labelledby="resume-conversion">',
+                '<h2 id="resume-conversion">Résumé de la conversion</h2>',
+                progress_html,
+                f'<p>Statut : <code>{_escape(str(payload.get("conversion_status")))}</code></p>',
+                canonical_html,
+                rejection_html,
+                "</section>",
+            )
+        )
     else:
         visible_items = _render_mapping_details(payload)
         content = "".join(
@@ -477,7 +516,9 @@ def render_document_inspection(
             "<!doctype html>",
             '<html lang="fr">',
             '<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">',
-            refresh_html if parsed_title.casefold() == "diagnostic" and status_code < 400 else "",
+            refresh_html
+            if parsed_title.casefold() in {"diagnostic", "conversion"} and status_code < 400
+            else "",
             '<title>Inspection documentaire</title></head>',
             "<body>",
             f"<h1>{_escape(parsed_title)}</h1>",
@@ -490,7 +531,11 @@ def render_document_inspection(
     )
 
 
-def _render_action_progress(value: Any) -> tuple[str, str]:
+def _render_action_progress(
+    value: Any,
+    *,
+    expected_action_name: str,
+) -> tuple[str, str]:
     if value is None:
         raise ValueError("progression d'action requise")
     payload = getattr(value, "payload", value)
@@ -506,7 +551,7 @@ def _render_action_progress(value: Any) -> tuple[str, str]:
         completed_units = getattr(payload, "completed_units", None)
         total_units = getattr(payload, "total_units", None)
         failure_error_code = getattr(payload, "failure_error_code", None)
-    if action_name != "DIAGNOSE":
+    if action_name != expected_action_name:
         raise ValueError("action de progression invalide")
     if phase not in {"NOT_REQUESTED", "QUEUED", "RUNNING", "SUCCEEDED", "FAILED"}:
         raise ValueError("phase de progression invalide")
@@ -587,10 +632,7 @@ def _render_document_row(document: CorpusPdfDocument) -> str:
             "</td><td>",
             _render_diagnostic_cell(document),
             "</td><td>",
-            _escape(document.conversion_status),
-            '<br><a href="/ui/documents/',
-            _escape(document.document_id),
-            '/conversion">Inspecter</a>',
+            _render_conversion_cell(document),
             "</td><td>",
             _escape(document.projection_status),
             '<br><a href="/ui/documents/',
@@ -632,6 +674,33 @@ def _render_diagnostic_cell(document: CorpusPdfDocument) -> str:
             '<br><a href="/ui/documents/',
             escaped_document_id,
             '/diagnostic">Inspecter</a>',
+        )
+    )
+
+
+def _render_conversion_cell(document: CorpusPdfDocument) -> str:
+    parsed_document = _ensure_document(document)
+    escaped_document_id = _escape(parsed_document.document_id)
+    action_html = (
+        ""
+        if not parsed_document.conversion_action_available
+        else "".join(
+            (
+                '<form class="row-action-form" method="post" action="/v1/documents/',
+                escaped_document_id,
+                '/convert">',
+                '<button type="submit">Convertir</button>',
+                "</form>",
+            )
+        )
+    )
+    return "".join(
+        (
+            _escape(parsed_document.conversion_status),
+            action_html,
+            '<br><a href="/ui/documents/',
+            escaped_document_id,
+            '/conversion">Inspecter</a>',
         )
     )
 

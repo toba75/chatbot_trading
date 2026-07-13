@@ -200,8 +200,26 @@ class DiagnosticAcceptedResponse(PublicApiModel):
     diagnostic_status: PublicDiagnosticStatus
 
 
+class ConversionAcceptedResponse(PublicApiModel):
+    document_id: str
+    conversion_status: PublicConversionStatus
+    canonical_version_id: str | None = None
+
+    @model_validator(mode="after")
+    def validate_conversion_acceptance(self) -> "ConversionAcceptedResponse":
+        if self.conversion_status not in {
+            PublicConversionStatus.CONVERSION_REQUESTED,
+            PublicConversionStatus.CANONICAL_ACCEPTED,
+        }:
+            raise ValueError("statut de commande conversion invalide")
+        accepted = self.conversion_status is PublicConversionStatus.CANONICAL_ACCEPTED
+        if accepted != (self.canonical_version_id is not None):
+            raise ValueError("version canonique incohérente avec l'acceptation")
+        return self
+
+
 class DocumentActionProgressResponse(PublicApiModel):
-    action_name: Literal["DIAGNOSE"]
+    action_name: Literal["DIAGNOSE", "CONVERT_DOCUMENT"]
     phase: PublicActionPhase
     completed_units: int = Field(ge=0)
     total_units: int | None = Field(default=None, ge=1)
@@ -242,6 +260,7 @@ class DocumentCorpusItemResponse(PublicApiModel):
     projection_status: PublicProjectionStatus
     manual_review_reason: str | None = None
     failure_error_code: str | None = None
+    conversion_action_available: bool
 
     @model_validator(mode="after")
     def validate_canonical_version(self) -> "DocumentCorpusItemResponse":
@@ -465,6 +484,7 @@ __all__ = [
     "ChatChoiceResponse",
     "ChatCompletionRequest",
     "ChatCompletionResponse",
+    "ConversionAcceptedResponse",
     "ChatMessageRequest",
     "ChatProductProvenanceResponse",
     "ChatProductResponse",

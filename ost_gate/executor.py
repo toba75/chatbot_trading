@@ -59,6 +59,12 @@ def _run_batch(
         expected = {str(node.path): node.identifier for node in nodes}
         timeouts = {node.identifier: node.timeout_seconds for node in nodes}
         environment = os.environ.copy()
+        existing_pythonpath = environment.get("PYTHONPATH")
+        environment["PYTHONPATH"] = (
+            str(plan.repository_root)
+            if existing_pythonpath is None or existing_pythonpath == ""
+            else f"{plan.repository_root}{os.pathsep}{existing_pythonpath}"
+        )
         environment["OST_GATE_EXPECTED_NODES"] = json.dumps(expected)
         environment["OST_GATE_TIMEOUTS"] = json.dumps(timeouts)
         environment["OST_GATE_PYTEST_REPORT"] = str(result_path)

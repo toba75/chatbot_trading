@@ -79,6 +79,8 @@ _UI_DOCUMENT_INSPECTION_PATH_PATTERN = re.compile(
 _UI_PDF_CONTENT_PATH_PATTERN = re.compile(
     r"^/ui/documents/(?P<document_id>[^/]+)/pdf/content$"
 )
+_DIAGNOSE_PATH_PATTERN = re.compile(r"^/v1/documents/(?P<document_id>[^/]+)/diagnose$")
+_CONVERT_PATH_PATTERN = re.compile(r"^/v1/documents/(?P<document_id>[^/]+)/convert$")
 _LLM_GATEWAY_LOCK = threading.Lock()
 _LLM_GATEWAY_INSTANCE: OpenAICompatibleLocalLanguageModelGateway | None = None
 _LLM_GATEWAY_CONFIGURATION_HASH: str | None = None
@@ -275,8 +277,14 @@ def _serve_http(
                             step=step,
                         )
                         action_progress = (
-                            api_client.read_document_action_progress(document_id)
-                            if step == "diagnostic" and response.status_code < 400
+                            api_client.read_document_action_progress(
+                                document_id,
+                                "DIAGNOSE"
+                                if step == "diagnostic"
+                                else "CONVERT_DOCUMENT",
+                            )
+                            if step in {"diagnostic", "conversion"}
+                            and response.status_code < 400
                             else None
                         )
                     except UiDocumentApiUnavailableError:
@@ -386,6 +394,12 @@ def _serve_http(
                     _write_redirect_response(
                         self,
                         location=f"/ui/documents/{document_id}/diagnostic",
+                    )
+                elif response.status_code < 400 and _CONVERT_PATH_PATTERN.fullmatch(self.path):
+                    document_id = str(response.payload.get("document_id", ""))
+                    _write_redirect_response(
+                        self,
+                        location=f"/ui/documents/{document_id}/conversion",
                     )
                 elif response.status_code < 400:
                     query = urlencode(

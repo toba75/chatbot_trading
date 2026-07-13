@@ -37,7 +37,10 @@ from app.platform.postgres_migrations import (
     POSTGRES_MIGRATIONS_PATH,
     PostgresMigrationRunner,
 )
-from app.source_processing.adapters.document_http import SourceProcessingHttpAdapter
+from app.source_processing.adapters.document_http import (
+    SourceProcessingConversionHttpAdapter,
+    SourceProcessingHttpAdapter,
+)
 from app.source_processing.adapters.http import build_document_command_router
 from app.source_processing.adapters.original_http import build_original_pdf_router
 from app.source_processing.adapters.pdf_document_inspector import (
@@ -47,7 +50,10 @@ from app.source_processing.adapters.postgres_document_persistence import (
     build_document_persistence,
 )
 from app.source_processing.adapters.query_http import build_document_query_router
-from app.source_processing.application.document_commands import DocumentCommandService
+from app.source_processing.application.document_commands import (
+    DocumentCommandService,
+    DocumentConversionCommandService,
+)
 from app.source_processing.application.document_queries import (
     DocumentCorpusItem,
     DocumentCorpusPageView,
@@ -68,7 +74,11 @@ PROJECTION_SOURCE_LOCATOR_LIMIT = 3
 class SourceProcessingCorpusPagePort(Protocol):
     def list_documents(self, *, limit: int, cursor: str | None) -> DocumentCorpusPageView: ...
     def read_diagnostic(self, document_id: str) -> DocumentDiagnosticView: ...
-    def read_document_action_progress(self, document_id: str) -> DocumentActionProgressView: ...
+    def read_document_action_progress(
+        self,
+        document_id: str,
+        action_name: str,
+    ) -> DocumentActionProgressView: ...
     def read_conversion(self, document_id: str) -> DocumentConversionView: ...
 
 
@@ -86,6 +96,7 @@ class OrchestratorDocumentCorpusItem:
     document_status: str
     diagnostic_status: str
     conversion_status: str
+    conversion_action_available: bool
     canonical_version_id: str | None
     projection_status: str
     manual_review_reason: str | None
@@ -142,8 +153,15 @@ class OrchestratorDocumentCatalogService:
     def read_diagnostic(self, document_id: str) -> DocumentDiagnosticView:
         return self._source_processing_pages.read_diagnostic(document_id)
 
-    def read_document_action_progress(self, document_id: str) -> DocumentActionProgressView:
-        return self._source_processing_pages.read_document_action_progress(document_id)
+    def read_document_action_progress(
+        self,
+        document_id: str,
+        action_name: str,
+    ) -> DocumentActionProgressView:
+        return self._source_processing_pages.read_document_action_progress(
+            document_id,
+            action_name,
+        )
 
     def read_conversion(self, document_id: str) -> DocumentConversionView:
         return self._source_processing_pages.read_conversion(document_id)
@@ -167,6 +185,7 @@ def _enrich_corpus_item(
         document_status=item.document_status,
         diagnostic_status=item.diagnostic_status,
         conversion_status=item.conversion_status,
+        conversion_action_available=item.conversion_action_available,
         canonical_version_id=item.canonical_version_id,
         projection_status=status,
         manual_review_reason=item.manual_review_reason,
@@ -247,6 +266,14 @@ def build_orchestrator_composition_root(
         code_version=version("chatbot-trading"),
         model_version=f"pypdf-{version('pypdf')}",
     )
+    document_conversion_commands = DocumentConversionCommandService(
+        source_document_repository=persistence.source_document_repository,
+        processing_run_repository=persistence.processing_run_repository,
+        document_conversion_repository=persistence.document_conversion_repository,
+        conversion_configuration_hash=configuration.configuration_hash,
+        code_version=version("chatbot-trading"),
+        model_version=f"docling-{version('docling')}",
+    )
     document_queries = DocumentQueryService(
         document_snapshot_repository=persistence.source_document_repository,
         document_corpus_status_repository=persistence.source_document_repository,
@@ -284,6 +311,9 @@ def build_orchestrator_composition_root(
     document_router.include_router(
         build_document_command_router(
             document_http_adapter=SourceProcessingHttpAdapter(document_commands),
+            document_conversion_http_adapter=SourceProcessingConversionHttpAdapter(
+                document_conversion_commands
+            ),
             max_pdf_bytes=MAX_PDF_BYTES,
         )
     )

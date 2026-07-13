@@ -49,7 +49,11 @@ class DocumentQueryPort(Protocol):
     def read_diagnostic(self, document_id: str) -> DocumentDiagnosticView:
         """Retourne le diagnostic public d'un document."""
 
-    def read_document_action_progress(self, document_id: str) -> DocumentActionProgressView:
+    def read_document_action_progress(
+        self,
+        document_id: str,
+        action_name: str,
+    ) -> DocumentActionProgressView:
         """Retourne la progression publique de l'action documentaire."""
 
     def read_conversion(self, document_id: str) -> DocumentConversionView:
@@ -85,13 +89,34 @@ def build_document_query_router(*, document_queries: DocumentQueryPort) -> APIRo
         response_model=DocumentActionProgressResponse,
         responses=PUBLIC_ERROR_RESPONSES,
     )
-    async def read_document_action_progress(document_id: str) -> JSONResponse:
+    async def read_diagnostic_action_progress(document_id: str) -> JSONResponse:
         if not _is_valid_document_id(document_id):
             return _invalid_document_id_response()
         try:
             view = await run_in_threadpool(
                 parsed_queries.read_document_action_progress,
                 document_id,
+                "DIAGNOSE",
+            )
+        except SourceNotFoundError as exc:
+            return _source_not_found_response(exc)
+        if not isinstance(view, DocumentActionProgressView):
+            raise TypeError("read-model de progression invalide")
+        return JSONResponse(status_code=200, content=asdict(view))
+
+    @router.get(
+        "/v1/documents/{document_id}/conversion/progress",
+        response_model=DocumentActionProgressResponse,
+        responses=PUBLIC_ERROR_RESPONSES,
+    )
+    async def read_conversion_action_progress(document_id: str) -> JSONResponse:
+        if not _is_valid_document_id(document_id):
+            return _invalid_document_id_response()
+        try:
+            view = await run_in_threadpool(
+                parsed_queries.read_document_action_progress,
+                document_id,
+                "CONVERT_DOCUMENT",
             )
         except SourceNotFoundError as exc:
             return _source_not_found_response(exc)

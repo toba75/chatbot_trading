@@ -16,6 +16,7 @@ from urllib.parse import urlsplit
 from pydantic import ValidationError
 
 from app.platform.orchestrator_api_models import (
+    ConversionAcceptedResponse,
     DocumentActionProgressResponse,
     DocumentCorpusResponse,
     DocumentDiagnosticResponse,
@@ -40,8 +41,11 @@ _DOCUMENT_ID_PATTERN = r"[^/]+"
 _DIAGNOSE_PATH_PATTERN = re.compile(
     rf"^/v1/documents/(?P<document_id>{_DOCUMENT_ID_PATTERN})/diagnose$"
 )
+_CONVERT_PATH_PATTERN = re.compile(
+    rf"^/v1/documents/(?P<document_id>{_DOCUMENT_ID_PATTERN})/convert$"
+)
 _PUBLIC_DOCUMENT_PATH_PATTERN = re.compile(
-    r"^/v1/documents(?:/[^/]+(?:/(?:diagnose|diagnostic/progress|diagnostic|conversion|projection|original))?)?$"
+    r"^/v1/documents(?:/[^/]+(?:/(?:diagnose|convert|diagnostic/progress|diagnostic|conversion/progress|conversion|projection|original))?)?$"
 )
 _INTERNAL_FIELD_NAMES = frozenset(
     {
@@ -346,6 +350,7 @@ class UiDocumentApiClient:
                     conversion_status=document["conversion_status"],
                     canonical_version_id=document["canonical_version_id"],
                     projection_status=document["projection_status"],
+                    conversion_action_available=document["conversion_action_available"],
                     selected=document["document_id"] in selected_ids,
                     manual_review_reason=document["manual_review_reason"],
                     failure_error_code=document["failure_error_code"],
@@ -383,11 +388,21 @@ class UiDocumentApiClient:
             )
         return response
 
-    def read_document_action_progress(self, document_id: str) -> UiDocumentJsonResponse:
+    def read_document_action_progress(
+        self,
+        document_id: str,
+        action_name: str,
+    ) -> UiDocumentJsonResponse:
         parsed_document_id = _ensure_document_id(document_id)
+        if action_name == "DIAGNOSE":
+            progress_path = f"/v1/documents/{parsed_document_id}/diagnostic/progress"
+        elif action_name == "CONVERT_DOCUMENT":
+            progress_path = f"/v1/documents/{parsed_document_id}/conversion/progress"
+        else:
+            raise ValueError("action de progression UI inconnue")
         response = self._json_request(
             method="GET",
-            path=f"/v1/documents/{parsed_document_id}/diagnostic/progress",
+            path=progress_path,
             body=None,
             content_type=None,
         )
@@ -396,10 +411,13 @@ class UiDocumentApiClient:
                 validated = DocumentActionProgressResponse.model_validate(response.payload)
             except ValidationError as exc:
                 raise ValueError("progression publique incompatible") from exc
-            return UiDocumentJsonResponse(
+            parsed = UiDocumentJsonResponse(
                 status_code=response.status_code,
                 payload=validated.model_dump(mode="json"),
             )
+            if parsed.payload["action_name"] != action_name:
+                raise ValueError("action de progression publique incohérente")
+            return parsed
         return response
 
     def read_conversion(self, document_id: str) -> UiDocumentJsonResponse:
@@ -506,8 +524,10 @@ class UiDocumentApiClient:
         if response.status_code < 400:
             if parsed_path == "/v1/documents":
                 _validate_registration_response(response)
-            else:
+            elif _DIAGNOSE_PATH_PATTERN.fullmatch(parsed_path) is not None:
                 _validate_diagnosis_response(response)
+            else:
+                _validate_conversion_command_response(response)
         return response
 
     def forward_document_command_stream(
@@ -533,8 +553,10 @@ class UiDocumentApiClient:
         if parsed.status_code < 400:
             if parsed_path == "/v1/documents":
                 _validate_registration_response(parsed)
-            else:
+            elif _DIAGNOSE_PATH_PATTERN.fullmatch(parsed_path) is not None:
                 _validate_diagnosis_response(parsed)
+            else:
+                _validate_conversion_command_response(parsed)
         else:
             _validate_public_error(parsed)
         return parsed
@@ -575,6 +597,7 @@ def _parse_corpus_document(value: Any) -> dict[str, Any]:
             "projection_status",
             "manual_review_reason",
             "failure_error_code",
+            "conversion_action_available",
         )
     )
     _require_exact_fields(value, expected, "document corpus")
@@ -596,6 +619,8 @@ def _parse_corpus_document(value: Any) -> dict[str, Any]:
         raise ValueError("canonical_version_id interdit avant conversion acceptée")
     if value["projection_status"] not in PROJECTION_STATUSES:
         raise ValueError("projection_status public invalide")
+    if not isinstance(value["conversion_action_available"], bool):
+        raise ValueError("disponibilité conversion publique invalide")
     manual_review_reason = value["manual_review_reason"]
     failure_error_code = value["failure_error_code"]
     if value["diagnostic_status"] == "MANUAL_REVIEW":
@@ -784,6 +809,15 @@ def _validate_diagnosis_response(response: UiDocumentJsonResponse) -> None:
         raise ValueError("diagnostic_status de commande invalide")
 
 
+def _validate_conversion_command_response(response: UiDocumentJsonResponse) -> None:
+    if response.status_code != 202:
+        raise ValueError("statut conversion public invalide")
+    try:
+        ConversionAcceptedResponse.model_validate(response.payload)
+    except ValidationError as exc:
+        raise ValueError("commande conversion publique incompatible") from exc
+
+
 def _require_success(
     response: UiDocumentJsonResponse,
     *,
@@ -877,7 +911,11 @@ def _ensure_public_relative_path(value: str) -> str:
 
 def _ensure_document_command_path(value: str) -> str:
     path = _ensure_public_relative_path(value)
-    if path == "/v1/documents" or _DIAGNOSE_PATH_PATTERN.fullmatch(path) is not None:
+    if (
+        path == "/v1/documents"
+        or _DIAGNOSE_PATH_PATTERN.fullmatch(path) is not None
+        or _CONVERT_PATH_PATTERN.fullmatch(path) is not None
+    ):
         return path
     raise UiDocumentCommandForbiddenError("commande documentaire UI interdite")
 

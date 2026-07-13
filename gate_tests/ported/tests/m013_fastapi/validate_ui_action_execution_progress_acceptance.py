@@ -32,8 +32,9 @@ def test_validate_ui_action_execution_progress_acceptance() -> None:
         def read_conversion(self, document_id: str):
             raise AssertionError("La conversion ne doit pas être appelée")
 
-        def read_document_action_progress(self, document_id: str):
+        def read_document_action_progress(self, document_id: str, action_name: str):
             assert document_id == "DOC-M013-UI-PROGRESS"
+            assert action_name == "DIAGNOSE"
             return DocumentActionProgressView(
                 action_name="DIAGNOSE",
                 phase=PublicActionPhase.RUNNING,

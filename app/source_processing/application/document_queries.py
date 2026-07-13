@@ -13,6 +13,7 @@ from app.contracts.document_public_statuses import (
 )
 
 from app.source_processing.application.document_commands import (
+    DocumentConversionExecutionPhase,
     DocumentConversionState,
     SourceNotFoundError,
 )
@@ -99,6 +100,7 @@ class DocumentCorpusItem:
     canonical_version_id: str | None
     manual_review_reason: str | None
     failure_error_code: str | None
+    conversion_action_available: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -181,7 +183,7 @@ class DocumentActionProgressView:
     failure_error_code: str | None
 
     def __post_init__(self) -> None:
-        if self.action_name != "DIAGNOSE":
+        if self.action_name not in {"DIAGNOSE", "CONVERT_DOCUMENT"}:
             raise ValueError("action publique inconnue")
         object.__setattr__(self, "phase", PublicActionPhase.from_value(self.phase))
         if isinstance(self.completed_units, bool) or not isinstance(self.completed_units, int):
@@ -213,6 +215,13 @@ class DocumentActionProgressView:
         processing_run: DocumentProcessingRun | None,
     ) -> "DocumentActionProgressView":
         return _document_action_progress(processing_run)
+
+    @classmethod
+    def from_conversion(
+        cls,
+        conversion: DocumentConversionState | None,
+    ) -> "DocumentActionProgressView":
+        return _conversion_action_progress(conversion)
 
 
 @dataclass(frozen=True, slots=True)
@@ -275,7 +284,7 @@ class DocumentQueryService:
         required = (
             "document_id", "title", "document_status", "diagnostic_status",
             "conversion_status", "canonical_version_id", "manual_review_reason",
-            "failure_error_code",
+            "failure_error_code", "conversion_action_available",
         )
         if any(not hasattr(row, field) for field in required):
             raise TypeError("projection légère de corpus invalide")
@@ -288,6 +297,10 @@ class DocumentQueryService:
             canonical_version_id=row.canonical_version_id,
             manual_review_reason=row.manual_review_reason,
             failure_error_code=row.failure_error_code,
+            conversion_action_available=_ensure_bool(
+                row.conversion_action_available,
+                "conversion_action_available",
+            ),
         )
 
     def read_diagnostic(self, document_id: str) -> DocumentDiagnosticView:
@@ -298,10 +311,18 @@ class DocumentQueryService:
         parsed_processing_run = _ensure_processing_run(snapshot.processing_run)
         return _diagnostic_view(parsed_processing_run)
 
-    def read_document_action_progress(self, document_id: str) -> DocumentActionProgressView:
+    def read_document_action_progress(
+        self,
+        document_id: str,
+        action_name: str,
+    ) -> DocumentActionProgressView:
         parsed_document_id = DocumentId.from_value(document_id)
         snapshot = self._require_snapshot(parsed_document_id)
-        return DocumentActionProgressView.from_processing_run(snapshot.processing_run)
+        if action_name == "DIAGNOSE":
+            return DocumentActionProgressView.from_processing_run(snapshot.processing_run)
+        if action_name == "CONVERT_DOCUMENT":
+            return DocumentActionProgressView.from_conversion(snapshot.conversion)
+        raise ValueError("action publique inconnue")
 
     def read_conversion(self, document_id: str) -> DocumentConversionView:
         parsed_document_id = DocumentId.from_value(document_id)
@@ -359,6 +380,10 @@ class DocumentQueryService:
             ),
             failure_error_code=(
                 None if parsed_processing_run is None else parsed_processing_run.failure_error_code
+            ),
+            conversion_action_available=_conversion_action_available(
+                processing_run=parsed_processing_run,
+                conversion=parsed_conversion,
             ),
         )
 
@@ -440,6 +465,51 @@ def _document_action_progress(
     )
 
 
+def _conversion_action_progress(
+    conversion: DocumentConversionState | None,
+) -> DocumentActionProgressView:
+    if conversion is None:
+        return DocumentActionProgressView(
+            action_name="CONVERT_DOCUMENT",
+            phase=PublicActionPhase.NOT_REQUESTED,
+            completed_units=0,
+            total_units=None,
+            failure_error_code=None,
+        )
+    parsed_conversion = _ensure_conversion_state(conversion)
+    phase_by_execution_phase = {
+        DocumentConversionExecutionPhase.QUEUED: PublicActionPhase.QUEUED,
+        DocumentConversionExecutionPhase.RUNNING: PublicActionPhase.RUNNING,
+        DocumentConversionExecutionPhase.SUCCEEDED: PublicActionPhase.SUCCEEDED,
+        DocumentConversionExecutionPhase.FAILED: PublicActionPhase.FAILED,
+    }
+    return DocumentActionProgressView(
+        action_name="CONVERT_DOCUMENT",
+        phase=phase_by_execution_phase[parsed_conversion.execution_phase],
+        completed_units=parsed_conversion.completed_units,
+        total_units=parsed_conversion.total_units,
+        failure_error_code=parsed_conversion.failure_error_code,
+    )
+
+
+def _conversion_action_available(
+    *,
+    processing_run: DocumentProcessingRun | None,
+    conversion: DocumentConversionState | None,
+) -> bool:
+    if conversion is not None or processing_run is None:
+        return False
+    if processing_run.status is not DocumentProcessingRunStatus.ROUTE_PLANNED:
+        return False
+    if processing_run.route_plan is None:
+        return False
+    routes = processing_run.route_plan.page_routes
+    return (
+        len(routes) == processing_run.page_manifest.source_page_count
+        and all(route.route_name.value == "NATIVE_STANDARD" for route in routes)
+    )
+
+
 def _page_diagnostic_view(decision: PageDecision | None) -> PageDiagnosticView | None:
     if decision is None:
         return None
@@ -492,6 +562,12 @@ def _ensure_conversion_state(value: Any) -> DocumentConversionState:
 
 def _ensure_text(value: Any, field_name: str) -> str:
     if not isinstance(value, str) or value.strip() == "" or value != value.strip():
+        raise ValueError(f"{field_name} invalide")
+    return value
+
+
+def _ensure_bool(value: Any, field_name: str) -> bool:
+    if not isinstance(value, bool):
         raise ValueError(f"{field_name} invalide")
     return value
 

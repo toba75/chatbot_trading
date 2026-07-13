@@ -114,7 +114,7 @@ def test_validate_ui_product_contracts_unit() -> None:
         ])
     )
     try:
-        invalid_progress_client.read_document_action_progress(document_id)
+        invalid_progress_client.read_document_action_progress(document_id, "DIAGNOSE")
     except ValueError as exc:
         assert "progression publique incompatible" in str(exc)
     else:

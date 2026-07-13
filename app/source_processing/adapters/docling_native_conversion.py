@@ -215,6 +215,10 @@ class IsolatedNativeDoclingConverter:
         self._asset_manifest_path = asset_manifest_path
         self._assets_root = assets_root
         self._timeout_seconds = float(timeout_seconds)
+        DoclingAssetManifest.load(
+            manifest_path=self._asset_manifest_path,
+            assets_root=self._assets_root,
+        )
 
     def convert(self, request: NativeDoclingConversionRequest) -> NativeDoclingConversionResponse:
         if not isinstance(request, NativeDoclingConversionRequest):
@@ -264,6 +268,12 @@ class CanonicalArtifactFileStore:
         if not isinstance(root, Path):
             raise ValueError("racine artefacts canoniques invalide")
         self._root = root.resolve()
+        try:
+            self._root.mkdir(parents=True, exist_ok=True)
+        except OSError as error:
+            raise CanonicalArtifactStoreError("CANONICAL_ARTIFACT_STORE_UNAVAILABLE") from error
+        if not self._root.is_dir():
+            raise CanonicalArtifactStoreError("CANONICAL_ARTIFACT_STORE_UNAVAILABLE")
 
     def store_docling_json(self, request: StoreCanonicalArtifactRequest) -> StoredCanonicalArtifact:
         if not isinstance(request, StoreCanonicalArtifactRequest):

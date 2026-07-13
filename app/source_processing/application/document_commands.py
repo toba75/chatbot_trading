@@ -166,6 +166,29 @@ class DocumentConversionStatus(str, Enum):
         raise ValueError("conversion_status invalide")
 
 
+class DocumentConversionExecutionPhase(str, Enum):
+    """Phase durable de l'action CONVERT_DOCUMENT, distincte du statut métier."""
+
+    QUEUED = "QUEUED"
+    RUNNING = "RUNNING"
+    SUCCEEDED = "SUCCEEDED"
+    FAILED = "FAILED"
+
+    @classmethod
+    def from_value(
+        cls,
+        value: "DocumentConversionExecutionPhase | str",
+    ) -> "DocumentConversionExecutionPhase":
+        if isinstance(value, cls):
+            return value
+        if not isinstance(value, str):
+            raise ValueError("conversion_execution_phase invalide")
+        for phase in cls:
+            if phase.value == value:
+                return phase
+        raise ValueError("conversion_execution_phase invalide")
+
+
 @dataclass(frozen=True)
 class DocumentConversionState:
     """État applicatif strict d'une demande de conversion documentaire."""
@@ -174,6 +197,10 @@ class DocumentConversionState:
     conversion_status: DocumentConversionStatus
     canonical_version_id: str | None
     rejection_error_code: str | None
+    execution_phase: DocumentConversionExecutionPhase
+    completed_units: int
+    total_units: int
+    failure_error_code: str | None
 
     def __post_init__(self) -> None:
         _ensure_document_id(self.document_id)
@@ -196,6 +223,35 @@ class DocumentConversionState:
             _ensure_rejection_error_code_for_status(
                 status=self.conversion_status,
                 rejection_error_code=self.rejection_error_code,
+            ),
+        )
+        object.__setattr__(
+            self,
+            "execution_phase",
+            DocumentConversionExecutionPhase.from_value(self.execution_phase),
+        )
+        object.__setattr__(
+            self,
+            "completed_units",
+            _ensure_non_negative_int(self.completed_units, "completed_units"),
+        )
+        object.__setattr__(
+            self,
+            "total_units",
+            _ensure_positive_int(self.total_units, "total_units"),
+        )
+        if self.completed_units > self.total_units:
+            raise ValueError("progression de conversion incohérente")
+        object.__setattr__(
+            self,
+            "failure_error_code",
+            _ensure_conversion_failure_error_code(
+                status=self.conversion_status,
+                phase=self.execution_phase,
+                rejection_error_code=self.rejection_error_code,
+                failure_error_code=self.failure_error_code,
+                completed_units=self.completed_units,
+                total_units=self.total_units,
             ),
         )
 
@@ -591,6 +647,10 @@ class DocumentConversionCommandService:
             conversion_status=DocumentConversionStatus.CONVERSION_REQUESTED,
             canonical_version_id=None,
             rejection_error_code=None,
+            execution_phase=DocumentConversionExecutionPhase.QUEUED,
+            completed_units=0,
+            total_units=len(route_plan.page_routes),
+            failure_error_code=None,
         )
         job_request = JobRequest(
             job_name="CONVERT_DOCUMENT",
@@ -724,9 +784,72 @@ def _ensure_rejection_error_code_for_status(
 
 def _ensure_quality_rejection_error_code(value: Any) -> str:
     text = _ensure_text(value, "rejection_error_code")
-    if text not in {"SOURCE_NOT_CANONICAL", "PAGE_AUTHORITY_MISSING"}:
+    if text not in {
+        "SOURCE_NOT_CANONICAL",
+        "PAGE_AUTHORITY_MISSING",
+        "DOCLING_STANDARD_UNAVAILABLE",
+        "CONVERSION_ASSET_MANIFEST_INVALID",
+        "CANONICAL_ARTIFACT_STORE_UNAVAILABLE",
+        "SOURCE_FINGERPRINT_MISMATCH",
+        "PROCESSING_RUN_NOT_FOUND",
+        "PROCESSING_RUN_ID_MISMATCH",
+        "SOURCE_NOT_ROUTED",
+        "NATIVE_STANDARD_ROUTE_REQUIRED",
+        "CONVERSION_REQUEST_NOT_FOUND",
+        "CONVERSION_NOT_EXECUTABLE",
+        "DOCLING_PAGE_MANIFEST_MISMATCH",
+        "DOCLING_PROVENANCE_MISSING",
+        "WORKER_UNEXPECTED_ERROR",
+    }:
         raise ValueError("rejection_error_code invalide")
     return text
+
+
+def _ensure_non_negative_int(value: Any, field_name: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ValueError(f"{field_name} invalide")
+    return value
+
+
+def _ensure_positive_int(value: Any, field_name: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise ValueError(f"{field_name} invalide")
+    return value
+
+
+def _ensure_conversion_failure_error_code(
+    *,
+    status: DocumentConversionStatus,
+    phase: DocumentConversionExecutionPhase,
+    rejection_error_code: str | None,
+    failure_error_code: Any,
+    completed_units: int,
+    total_units: int,
+) -> str | None:
+    if status is DocumentConversionStatus.CONVERSION_REQUESTED:
+        if phase not in {
+            DocumentConversionExecutionPhase.QUEUED,
+            DocumentConversionExecutionPhase.RUNNING,
+        }:
+            raise ValueError("phase de conversion demandée invalide")
+        if completed_units != 0 or failure_error_code is not None:
+            raise ValueError("progression de conversion demandée invalide")
+        return None
+    if status is DocumentConversionStatus.CANONICAL_ACCEPTED:
+        if (
+            phase is not DocumentConversionExecutionPhase.SUCCEEDED
+            or completed_units != total_units
+            or failure_error_code is not None
+        ):
+            raise ValueError("progression de conversion acceptée invalide")
+        return None
+    if (
+        phase is not DocumentConversionExecutionPhase.FAILED
+        or not isinstance(failure_error_code, str)
+        or failure_error_code != rejection_error_code
+    ):
+        raise ValueError("progression de conversion rejetée invalide")
+    return _ensure_quality_rejection_error_code(failure_error_code)
 
 
 def _conversion_audit_trace_id(document_id: DocumentId) -> str:
@@ -751,6 +874,7 @@ __all__ = [
     "DocumentCommandService",
     "DocumentConversionAcceptance",
     "DocumentConversionCommandService",
+    "DocumentConversionExecutionPhase",
     "DocumentConversionRepository",
     "DocumentConversionState",
     "DocumentConversionStatus",

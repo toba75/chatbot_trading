@@ -19,6 +19,7 @@ from app.platform.postgres import (
 )
 from app.platform.request_context import current_trace_id
 from app.source_processing.application.document_commands import (
+    DocumentConversionExecutionPhase,
     DocumentConversionState,
     DocumentConversionStatus,
 )
@@ -236,6 +237,7 @@ class DocumentCorpusStatusRow:
     canonical_version_id: str | None
     manual_review_reason: str | None
     failure_error_code: str | None
+    conversion_action_available: bool
 
 
 class PostgresCorpusQuotaRepository:
@@ -635,7 +637,8 @@ class PostgresDocumentPersistence:
                     cursor.execute(
                         """
                         SELECT document_id, conversion_status, canonical_version_id,
-                               rejection_error_code
+                               rejection_error_code, execution_phase, completed_units,
+                               total_units, failure_error_code
                           FROM source_processing.document_conversion_requests
                          WHERE document_id = ANY(%s)
                         """,
@@ -647,6 +650,10 @@ class PostgresDocumentPersistence:
                             conversion_status=DocumentConversionStatus.from_value(row[1]),
                             canonical_version_id=row[2],
                             rejection_error_code=row[3],
+                            execution_phase=DocumentConversionExecutionPhase.from_value(row[4]),
+                            completed_units=row[5],
+                            total_units=row[6],
+                            failure_error_code=row[7],
                         )
                         for row in cursor.fetchall()
                     }
@@ -694,7 +701,19 @@ class PostgresDocumentPersistence:
                                COALESCE(conversion.conversion_status, 'CONVERSION_NOT_REQUESTED'),
                                conversion.canonical_version_id,
                                run.manual_review_reason,
-                               run.failure_error_code
+                               run.failure_error_code,
+                               (
+                                   conversion.document_id IS NULL
+                                   AND run.status = 'ROUTE_PLANNED'
+                                   AND (SELECT COUNT(*) FROM source_processing.page_routes AS route
+                                        WHERE route.processing_run_id = run.processing_run_id)
+                                       = run.source_page_count
+                                   AND NOT EXISTS (
+                                       SELECT 1 FROM source_processing.page_routes AS route
+                                        WHERE route.processing_run_id = run.processing_run_id
+                                          AND route.route_name <> 'NATIVE_STANDARD'
+                                   )
+                               ) AS conversion_action_available
                           FROM source_processing.source_documents AS source
                           LEFT JOIN source_processing.document_processing_runs AS run
                             ON run.document_id = source.document_id
@@ -834,9 +853,10 @@ class PostgresDocumentPersistence:
                             """
                             INSERT INTO source_processing.document_conversion_requests (
                                 document_id, conversion_status, canonical_version_id,
-                                rejection_error_code, submission_id, job_id
+                                rejection_error_code, execution_phase, completed_units,
+                                total_units, failure_error_code, submission_id, job_id
                             )
-                            VALUES (%s, %s, %s, %s, %s, NULL)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NULL)
                             ON CONFLICT (document_id) DO NOTHING
                             RETURNING document_id
                             """,
@@ -845,6 +865,10 @@ class PostgresDocumentPersistence:
                                 conversion_state.conversion_status.value,
                                 conversion_state.canonical_version_id,
                                 conversion_state.rejection_error_code,
+                                conversion_state.execution_phase.value,
+                                conversion_state.completed_units,
+                                conversion_state.total_units,
+                                conversion_state.failure_error_code,
                                 submission.outbox_id,
                             ),
                         )
@@ -881,8 +905,11 @@ class PostgresDocumentPersistence:
                     """
                     UPDATE source_processing.document_conversion_requests
                        SET conversion_status = 'CANONICAL_ACCEPTED',
+                           execution_phase = 'SUCCEEDED',
+                           completed_units = total_units,
                            canonical_version_id = %s,
                            rejection_error_code = NULL,
+                           failure_error_code = NULL,
                            canonical_artifact_ref = %s,
                            canonical_artifact_sha256 = %s,
                            route_name = %s,
@@ -903,6 +930,35 @@ class PostgresDocumentPersistence:
                 if cursor.rowcount != 1:
                     raise RuntimeError("CONVERSION_PERSISTENCE_CONFLICT")
 
+    def begin_native_conversion(self, *, document_id: DocumentId) -> None:
+        if not isinstance(document_id, DocumentId):
+            raise ValueError("document_id invalide")
+        with self._connection_factory.connect() as connection:
+            with connection.transaction(), connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE source_processing.document_conversion_requests
+                       SET execution_phase = 'RUNNING'
+                     WHERE document_id = %s
+                       AND conversion_status = 'CONVERSION_REQUESTED'
+                       AND execution_phase = 'QUEUED'
+                    """,
+                    (document_id.value,),
+                )
+                if cursor.rowcount == 1:
+                    return
+                cursor.execute(
+                    """
+                    SELECT execution_phase
+                      FROM source_processing.document_conversion_requests
+                     WHERE document_id = %s
+                    """,
+                    (document_id.value,),
+                )
+                row = cursor.fetchone()
+                if row is None or row[0] != "RUNNING":
+                    raise RuntimeError("CONVERSION_PERSISTENCE_CONFLICT")
+
     def reject_native_conversion(self, *, document_id: DocumentId, error_code: str) -> None:
         if not isinstance(document_id, DocumentId):
             raise ValueError("document_id invalide")
@@ -914,12 +970,14 @@ class PostgresDocumentPersistence:
                     """
                     UPDATE source_processing.document_conversion_requests
                        SET conversion_status = 'QA_REJECTED',
+                           execution_phase = 'FAILED',
                            rejection_error_code = %s,
+                           failure_error_code = %s,
                            canonical_version_id = NULL
                      WHERE document_id = %s
                        AND conversion_status = 'CONVERSION_REQUESTED'
                     """,
-                    (error_code, document_id.value),
+                    (error_code, error_code, document_id.value),
                 )
                 if cursor.rowcount != 1:
                     raise RuntimeError("CONVERSION_PERSISTENCE_CONFLICT")
@@ -1014,7 +1072,8 @@ class PostgresDocumentPersistence:
             cursor.execute(
                 """
                 SELECT document_id, conversion_status, canonical_version_id,
-                       rejection_error_code
+                       rejection_error_code, execution_phase, completed_units,
+                       total_units, failure_error_code
                   FROM source_processing.document_conversion_requests
                  WHERE document_id = %s
                 """,
@@ -1028,6 +1087,10 @@ class PostgresDocumentPersistence:
             conversion_status=DocumentConversionStatus.from_value(row[1]),
             canonical_version_id=row[2],
             rejection_error_code=row[3],
+            execution_phase=DocumentConversionExecutionPhase.from_value(row[4]),
+            completed_units=row[5],
+            total_units=row[6],
+            failure_error_code=row[7],
         )
 
     def _save_processing_run(
@@ -1400,6 +1463,9 @@ class PostgresDocumentConversionRepository:
 
     def complete_native_conversion(self, publication: NativeCanonicalPublication) -> None:
         self._persistence.complete_native_conversion(publication)
+
+    def begin_native_conversion(self, *, document_id: DocumentId) -> None:
+        self._persistence.begin_native_conversion(document_id=document_id)
 
     def reject_native_conversion(self, *, document_id: DocumentId, error_code: str) -> None:
         self._persistence.reject_native_conversion(document_id=document_id, error_code=error_code)

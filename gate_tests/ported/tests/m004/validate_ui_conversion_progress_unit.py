@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from app.contracts.document_public_statuses import PublicActionPhase
-from app.platform.orchestrator_api_models import DocumentActionProgressResponse
+from app.platform.orchestrator_api_models import (
+    ConversionAcceptedResponse,
+    DocumentActionProgressResponse,
+)
 from app.platform.ui_corpus import (
     CorpusPdfDocument,
     CorpusPdfScreenState,
@@ -20,6 +23,25 @@ from app.source_processing.application.document_queries import DocumentActionPro
 class _Transport:
     def __init__(self) -> None:
         self.requests: list[tuple[str, str]] = []
+        self.responses = [
+            UiDocumentApiResponse(
+                status_code=202,
+                content_type="application/json",
+                body=(
+                    b'{"document_id":"DOC-1111111111111111",'
+                    b'"conversion_status":"CONVERSION_REQUESTED",'
+                    b'"canonical_version_id":null}'
+                ),
+            ),
+            UiDocumentApiResponse(
+                status_code=200,
+                content_type="application/json",
+                body=(
+                    b'{"action_name":"CONVERT_DOCUMENT","phase":"RUNNING",'
+                    b'"completed_units":0,"total_units":2,"failure_error_code":null}'
+                ),
+            ),
+        ]
 
     def request(
         self,
@@ -30,17 +52,10 @@ class _Transport:
         content_type: str | None,
     ) -> UiDocumentApiResponse:
         self.requests.append((method, path))
-        return UiDocumentApiResponse(
-            status_code=200,
-            content_type="application/json",
-            body=(
-                b'{"action_name":"CONVERT_DOCUMENT","phase":"RUNNING",'
-                b'"completed_units":0,"total_units":2,"failure_error_code":null}'
-            ),
-        )
+        return self.responses.pop(0)
 
 
-def test_le_contrat_pydantic_accepte_la_progression_de_conversion() -> None:
+def _verifier_contrat_pydantic_de_progression() -> None:
     # Given une conversion native acceptée mais dont le worker travaille réellement.
     # When l'API publie sa progression persistée.
     # Then le DTO public admet CONVERT_DOCUMENT et ses unités sans statut synthétique.
@@ -56,9 +71,21 @@ def test_le_contrat_pydantic_accepte_la_progression_de_conversion() -> None:
 
     assert progress.action_name == "CONVERT_DOCUMENT"
     assert progress.phase is PublicActionPhase.RUNNING
+    try:
+        ConversionAcceptedResponse.model_validate(
+            {
+                "document_id": "DOC-1111111111111111",
+                "conversion_status": "CONVERSION_NOT_REQUESTED",
+                "canonical_version_id": None,
+            }
+        )
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("Une commande conversion sans demande doit être refusée.")
 
 
-def test_le_bouton_convertir_est_limite_a_la_route_native_disponible() -> None:
+def _verifier_bouton_conversion_natif_disponible() -> None:
     # Given deux documents routés, dont seul le premier possède la capacité
     # publique de conversion native entièrement disponible.
     # When l'UI rend le corpus à partir du read-model public.
@@ -106,7 +133,7 @@ def test_le_bouton_convertir_est_limite_a_la_route_native_disponible() -> None:
     assert 'action="/v1/documents/DOC-2222222222222222/convert"' not in html
 
 
-def test_la_conversion_en_cours_est_inspectable_et_se_rafraichit() -> None:
+def _verifier_inspection_conversion_en_cours() -> None:
     # Given une progression CONVERT_DOCUMENT réellement persistée par le worker.
     # When l'utilisateur ouvre l'inspection de conversion.
     # Then l'UI rend phase, unités persistées et rafraîchit tant qu'elle est non terminale.
@@ -141,7 +168,7 @@ def test_la_conversion_en_cours_est_inspectable_et_se_rafraichit() -> None:
     assert 'http-equiv="refresh"' in html
 
 
-def test_le_client_ui_appelle_les_routes_publiques_de_conversion() -> None:
+def _verifier_client_ui_conversion_publique() -> None:
     # Given le client UI du seul contrat orchestrateur.
     # When il transmet Convertir puis lit la progression de conversion.
     # Then il n'utilise que POST /convert et GET /conversion/progress relatifs.
@@ -158,9 +185,18 @@ def test_le_client_ui_appelle_les_routes_publiques_de_conversion() -> None:
         "CONVERT_DOCUMENT",
     )
 
-    assert command.status_code == 200
+    assert command.status_code == 202
     assert progress.payload["action_name"] == "CONVERT_DOCUMENT"
     assert transport.requests == [
         ("POST", "/v1/documents/DOC-1111111111111111/convert"),
         ("GET", "/v1/documents/DOC-1111111111111111/conversion/progress"),
     ]
+
+
+def test_la_conversion_ui_est_reelle_et_observable() -> None:
+    """Couvre le contrat, l'Ã©ligibilitÃ©, le rendu et les routes publiques."""
+
+    _verifier_contrat_pydantic_de_progression()
+    _verifier_bouton_conversion_natif_disponible()
+    _verifier_inspection_conversion_en_cours()
+    _verifier_client_ui_conversion_publique()

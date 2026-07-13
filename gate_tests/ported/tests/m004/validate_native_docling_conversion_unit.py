@@ -75,7 +75,9 @@ def _manifest_refuses_missing_or_divergent_assets(tmp_path: Path) -> None:
 
 def _artifact_store_is_hashed_and_immutable(tmp_path: Path) -> None:
     runtime = _runtime_module()
-    store = runtime.CanonicalArtifactFileStore(root=tmp_path / "canonical")
+    canonical_root = tmp_path / "canonical"
+    store = runtime.CanonicalArtifactFileStore(root=canonical_root)
+    assert canonical_root.is_dir()
     request = _store_request(content=b'{"schema_version":"1.0","producer":"Docling"}')
 
     stored = store.store_docling_json(request)
