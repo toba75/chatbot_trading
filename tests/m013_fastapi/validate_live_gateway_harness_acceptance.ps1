@@ -13,7 +13,7 @@ foreach ($marker in @(
     'Stop-M013FastApiLiveGateway',
     'M013_FASTAPI_LLM_GATEWAY_REUSED',
     'M013_FASTAPI_LLM_GATEWAY_STARTED',
-    'M013_FASTAPI_LLM_GATEWAY_URL'
+    'M013_FASTAPI_GATEWAY_ENDPOINT'
 )) {
     if (-not $gateSource.Contains($marker)) {
         throw "Cycle de vie llm-gateway absent de la gate Live: $marker"
@@ -26,28 +26,28 @@ foreach ($marker in @(
 $python = Resolve-M013FastApiPython -RepoRoot $repoRoot
 
 $previousGatewayUrl = [System.Environment]::GetEnvironmentVariable(
-    "M013_FASTAPI_LLM_GATEWAY_URL",
+    "M013_FASTAPI_GATEWAY_ENDPOINT",
     "Process"
 )
-$env:M013_FASTAPI_LLM_GATEWAY_URL = "http://127.0.0.1:8090"
+$env:M013_FASTAPI_GATEWAY_ENDPOINT = "http://127.0.0.1:8090"
 if ((Resolve-M013FastApiLiveGatewayUrl) -ne "http://127.0.0.1:8090") {
     throw "La résolution explicite de l'URL gateway Live a dérivé."
 }
-$env:M013_FASTAPI_LLM_GATEWAY_URL = "http://service-inattendu:8090"
+$env:M013_FASTAPI_GATEWAY_ENDPOINT = "http://service-inattendu:8090"
 try {
     Resolve-M013FastApiLiveGatewayUrl | Out-Null
     throw "Une URL gateway non loopback aurait dû être refusée."
 }
 catch {
-    if (-not $_.Exception.Message.Contains("M013_FASTAPI_LLM_GATEWAY_URL_INVALID")) {
+        if (-not $_.Exception.Message.Contains("M013_FASTAPI_GATEWAY_ENDPOINT_INVALID")) {
         throw
     }
 }
 if ($null -eq $previousGatewayUrl) {
-    Remove-Item Env:M013_FASTAPI_LLM_GATEWAY_URL
+    Remove-Item Env:M013_FASTAPI_GATEWAY_ENDPOINT
 }
 else {
-    $env:M013_FASTAPI_LLM_GATEWAY_URL = $previousGatewayUrl
+    $env:M013_FASTAPI_GATEWAY_ENDPOINT = $previousGatewayUrl
 }
 
 function Get-FreeTcpPort {
@@ -168,7 +168,7 @@ try {
         throw "Le service inattendu aurait dû être refusé."
     }
     catch {
-        if (-not $_.Exception.Message.Contains("M013_FASTAPI_LLM_GATEWAY_PORT_OCCUPIED_UNEXPECTED")) {
+        if (-not $_.Exception.Message.Contains("M013_FASTAPI_GATEWAY_LISTENER_OCCUPIED_UNEXPECTED")) {
             throw
         }
     }

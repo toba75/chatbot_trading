@@ -123,6 +123,14 @@ VLLM_SECRET_MARKERS = ("GEMMA", "VLLM", "OPENAI_API_KEY", "LLM_API_KEY")
     Write-Fixture -RelativePath "scripts/validate_m013_security.ps1" -Content @'
 $secretPatterns = @("GEMMA_API_KEY\s*=", "VLLM_API_KEY\s*=")
 '@
+    Write-Fixture -RelativePath "scripts/validate_m013_fastapi.ps1" -Content @'
+$previousPath = $env:PATH
+$env:VIRTUAL_ENV = "gate-isolee"
+$env:UV_PROJECT_ENVIRONMENT = "gate-isolee"
+$env:M013_FASTAPI_PYTHON = "python-verrouille"
+$env:M013_FASTAPI_GATEWAY_ENDPOINT = "http://127.0.0.1:8090"
+$env:PATH = "gate-isolee;$previousPath"
+'@
     Write-Fixture -RelativePath "docs/specs/m013_config_configuration_applicative.md" -Content @'
 Les clés historiques GEMMA_BASE_URL, DATABASE_URL et QDRANT_URL sont refusées.
 '@
@@ -141,6 +149,17 @@ $env:DATABASE_URL = "fixture négative"
     Reset-FixtureRoot
     Write-Fixture -RelativePath "scripts/bad_launcher.ps1" -Content '$url = $env:LLM_GATEWAY_URL'
     Assert-RedFixture -Name "script shell applicatif" -ExpectedFragment "LLM_GATEWAY_URL"
+
+    Reset-FixtureRoot
+    Write-Fixture -RelativePath "scripts/bad_gate_copy.ps1" -Content '$python = $env:M013_FASTAPI_PYTHON; $path = $env:PATH'
+    Assert-RedFixture -Name "allowlist technique interdite dans un autre script" -ExpectedFragment "M013_FASTAPI_PYTHON"
+
+    Reset-FixtureRoot
+    Write-Fixture -RelativePath "app/platform/bad_gate_copy.py" -Content @'
+import os
+python = os.environ["M013_FASTAPI_PYTHON"]
+'@
+    Assert-RedFixture -Name "allowlist technique interdite dans app" -ExpectedFragment "app/platform/bad_gate_copy.py:2"
 
     Reset-FixtureRoot
     Write-Fixture -RelativePath "scripts/bad_launcher_upper_env.ps1" -Content '$url = $Env:CUSTOM_RUNTIME_FLAG'

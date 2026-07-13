@@ -50,8 +50,11 @@ Assert-Contains $compose 'OSTRADING_IMAGE_REVISION: "${OSTRADING_IMAGE_REVISION?
 Assert-Contains $compose 'OSTRADING_POSTGRES_SCHEMA_VERSION: "${OSTRADING_POSTGRES_SCHEMA_VERSION?OSTRADING_POSTGRES_SCHEMA_VERSION requis}"' "Build arg de schéma absent."
 
 foreach ($marker in @(
-    '$env:OSTRADING_IMAGE_REVISION = git rev-parse HEAD',
-    '$env:OSTRADING_POSTGRES_SCHEMA_VERSION',
+    '$sourceCommit = (git rev-parse HEAD).Trim()',
+    '$schemaVersion = $Matches.version',
+    '[System.Environment]::SetEnvironmentVariable',
+    '[System.IO.Path]::GetTempPath()',
+    'finally',
     'docker compose -f .\deploy\local-compose\compose.yaml config',
     'docker compose -f .\deploy\local-compose\compose.yaml up --build',
     'validate_m013_fastapi.ps1 -Mode Live',
@@ -59,6 +62,15 @@ foreach ($marker in @(
     'REFUS_BIND_PUBLIC'
 )) {
     Assert-Contains $runbook $marker "Procédure Compose reproductible ou garde-fou réseau absent."
+}
+foreach ($forbiddenEnvironmentInput in @(
+    '$env:OST_EDGE_HTTPS_PORT',
+    '$env:CADDY_ADMIN',
+    '$env:OSTRADING_IMAGE_REVISION',
+    '$env:OSTRADING_POSTGRES_SCHEMA_VERSION',
+    '$env:TEMP'
+)) {
+    Assert-NotContains $runbook $forbiddenEnvironmentInput "Le runbook ne doit pas publier d'entrée environnement opérationnelle."
 }
 Assert-NotContains $runbook 'uv run api --config' "La recette hôte non reproductible reste documentée."
 Assert-Contains $runbook 'POST /v1/documents' "Contrat OpenAPI de création absent."
