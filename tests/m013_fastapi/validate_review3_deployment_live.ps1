@@ -21,7 +21,7 @@ $project = "ostm13$suffix"
 $edgePort = Get-FreeTcpPort
 $composePath = Join-Path $exportRoot "deploy/local-compose/compose.yaml"
 $secretPath = Join-Path $exportRoot "deploy/local-compose/secrets/postgres_password"
-$pythonCommand = Get-Command python -CommandType Application -ErrorAction SilentlyContinue
+$pythonCommand = @(Get-Command python -CommandType Application -ErrorAction SilentlyContinue)[0]
 if ($null -eq $pythonCommand) { throw "PYTHON_TEST_DRIVER_REQUIRED" }
 $python = $pythonCommand.Source
 
