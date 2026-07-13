@@ -88,7 +88,7 @@ function Start-M013FastApiLiveGateway {
                 Port = $Port
             }
         }
-        throw "M013_FASTAPI_LLM_GATEWAY_PORT_OCCUPIED_UNEXPECTED:$Port"
+        throw "M013_FASTAPI_GATEWAY_LISTENER_OCCUPIED_UNEXPECTED:$Port"
     }
 
     $stdoutPath = Join-Path $TemporaryRoot "llm-gateway.stdout.log"

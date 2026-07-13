@@ -25,21 +25,48 @@ Les outils requis sont Git, Docker Engine avec Compose v2, PowerShell et `tar.ex
 Exécuter depuis la racine du dépôt :
 
 ```powershell
-$env:OST_EDGE_HTTPS_PORT = "8443"
-$env:CADDY_ADMIN = "localhost:2019"
-$env:OSTRADING_IMAGE_REVISION = git rev-parse HEAD
-if ($LASTEXITCODE -ne 0 -or $env:OSTRADING_IMAGE_REVISION -notmatch '^[0-9a-f]{40}$') { throw "IMAGE_REVISION_MUTABLE_REJECTED" }
+$edgePort = "8443"
+$caddyAdmin = "localhost:2019"
+$sourceCommit = (git rev-parse HEAD).Trim()
+if ($LASTEXITCODE -ne 0 -or $sourceCommit -notmatch '^[0-9a-f]{40}$') { throw "IMAGE_REVISION_MUTABLE_REJECTED" }
 
-$migrationNames = @(git ls-tree -r --name-only $env:OSTRADING_IMAGE_REVISION -- deploy/postgres/migrations)
+$migrationNames = @(git ls-tree -r --name-only $sourceCommit -- deploy/postgres/migrations)
 if ($LASTEXITCODE -ne 0 -or $migrationNames.Count -eq 0) { throw "POSTGRES_SCHEMA_VERSION_UNREADABLE" }
 $latestMigration = $migrationNames | Sort-Object | Select-Object -Last 1
 if ([IO.Path]::GetFileNameWithoutExtension($latestMigration) -notmatch '^(?<version>[0-9]{3})_') { throw "POSTGRES_SCHEMA_VERSION_UNREADABLE" }
-$env:OSTRADING_POSTGRES_SCHEMA_VERSION = $Matches.version
+$schemaVersion = $Matches.version
 
-$exportRoot = Join-Path $env:TEMP "ostrading-$env:OSTRADING_IMAGE_REVISION"
+function Invoke-ComposeWithTechnicalInterpolation {
+    param(
+        [Parameter(Mandatory = $true)][scriptblock] $Operation,
+        [Parameter(Mandatory = $true)][string] $Revision,
+        [Parameter(Mandatory = $true)][string] $PostgresSchemaVersion
+    )
+    $technicalValues = [ordered] @{
+        OST_EDGE_HTTPS_PORT = $edgePort
+        CADDY_ADMIN = $caddyAdmin
+        OSTRADING_IMAGE_REVISION = $Revision
+        OSTRADING_POSTGRES_SCHEMA_VERSION = $PostgresSchemaVersion
+    }
+    $previousValues = @{}
+    foreach ($entry in $technicalValues.GetEnumerator()) {
+        $previousValues[$entry.Key] = [System.Environment]::GetEnvironmentVariable($entry.Key, "Process") # Fichier .env interdit; lecture technique bornée.
+        [System.Environment]::SetEnvironmentVariable($entry.Key, $entry.Value, "Process") # Fichier .env interdit; interpolation technique bornée.
+    }
+    try {
+        & $Operation
+    }
+    finally {
+        foreach ($entry in $technicalValues.GetEnumerator()) {
+            [System.Environment]::SetEnvironmentVariable($entry.Key, $previousValues[$entry.Key], "Process") # Fichier .env interdit; restauration obligatoire.
+        }
+    }
+}
+
+$exportRoot = Join-Path ([System.IO.Path]::GetTempPath()) "ostrading-$sourceCommit"
 $archive = "$exportRoot.tar"
 if (Test-Path -LiteralPath $exportRoot) { throw "GIT_EXPORT_ALREADY_EXISTS" }
-git archive --format=tar --output=$archive $env:OSTRADING_IMAGE_REVISION
+git archive --format=tar --output=$archive $sourceCommit
 if ($LASTEXITCODE -ne 0) { throw "GIT_EXPORT_FAILED" }
 New-Item -ItemType Directory -Path $exportRoot | Out-Null
 tar.exe -xf $archive -C $exportRoot
@@ -47,8 +74,10 @@ if ($LASTEXITCODE -ne 0) { throw "GIT_EXPORT_EXTRACTION_FAILED" }
 New-Item -ItemType Directory -Force -Path "$exportRoot\deploy\local-compose\secrets" | Out-Null
 Copy-Item -LiteralPath <chemin-secret-postgres-hors-git> -Destination "$exportRoot\deploy\local-compose\secrets\postgres_password"
 Set-Location $exportRoot
-docker compose -f .\deploy\local-compose\compose.yaml config
-if ($LASTEXITCODE -ne 0) { throw "COMPOSE_CONFIGURATION_INVALID" }
+Invoke-ComposeWithTechnicalInterpolation -Revision $sourceCommit -PostgresSchemaVersion $schemaVersion -Operation {
+    docker compose -f .\deploy\local-compose\compose.yaml config
+    if ($LASTEXITCODE -ne 0) { throw "COMPOSE_CONFIGURATION_INVALID" }
+}
 ```
 
 Le contexte Docker est l'archive du commit, jamais le worktree. Le `.dockerignore` racine exclut Git, environnements Python, données, secrets et temporaires. Le fichier de configuration Compose monte `./application.compose.yaml:/workspace/config/application.yaml:ro` et utilise `/run/secrets/postgres_password`.
@@ -56,25 +85,29 @@ Le contexte Docker est l'archive du commit, jamais le worktree. Le `.dockerignor
 ## Construction et inspection avant démarrage
 
 ```powershell
-docker compose -f .\deploy\local-compose\compose.yaml build orchestrator-api worker-documents llm-gateway ui
-if ($LASTEXITCODE -ne 0) { throw "COMPOSE_BUILD_FAILED" }
+Invoke-ComposeWithTechnicalInterpolation -Revision $sourceCommit -PostgresSchemaVersion $schemaVersion -Operation {
+    docker compose -f .\deploy\local-compose\compose.yaml build orchestrator-api worker-documents llm-gateway ui
+    if ($LASTEXITCODE -ne 0) { throw "COMPOSE_BUILD_FAILED" }
+}
 
-$apiImage = "ostrading/orchestrator-api:0.1.0-m013-fastapi-schema-$env:OSTRADING_POSTGRES_SCHEMA_VERSION-$env:OSTRADING_IMAGE_REVISION"
-$workerImage = "ostrading/worker-documents:0.1.0-m013-fastapi-schema-$env:OSTRADING_POSTGRES_SCHEMA_VERSION-$env:OSTRADING_IMAGE_REVISION"
+$apiImage = "ostrading/orchestrator-api:0.1.0-m013-fastapi-schema-$schemaVersion-$sourceCommit"
+$workerImage = "ostrading/worker-documents:0.1.0-m013-fastapi-schema-$schemaVersion-$sourceCommit"
 foreach ($candidate in @(
     @{ Image = $apiImage; Entrypoint = 'api' },
     @{ Image = $workerImage; Entrypoint = 'python' }
 )) {
     $inspection = (docker image inspect $candidate.Image | ConvertFrom-Json)[0]
-    if ($inspection.Config.Labels.'org.opencontainers.image.revision' -ne $env:OSTRADING_IMAGE_REVISION) { throw "IMAGE_REVISION_MISMATCH" }
-    if ($inspection.Config.Labels.'org.ostrading.postgres-schema-version' -ne $env:OSTRADING_POSTGRES_SCHEMA_VERSION) { throw "IMAGE_SCHEMA_MISMATCH" }
+    if ($inspection.Config.Labels.'org.opencontainers.image.revision' -ne $sourceCommit) { throw "IMAGE_REVISION_MISMATCH" }
+    if ($inspection.Config.Labels.'org.ostrading.postgres-schema-version' -ne $schemaVersion) { throw "IMAGE_SCHEMA_MISMATCH" }
     if ($inspection.Config.User -ne 'ostrading') { throw "IMAGE_NON_ROOT_USER_MISMATCH" }
     if ($inspection.Config.Entrypoint[0] -ne $candidate.Entrypoint) { throw "IMAGE_ENTRYPOINT_MISMATCH" }
     $inspection.Id
 }
 
-docker compose -f .\deploy\local-compose\compose.yaml up -d --no-build
-if ($LASTEXITCODE -ne 0) { throw "COMPOSE_START_FAILED" }
+Invoke-ComposeWithTechnicalInterpolation -Revision $sourceCommit -PostgresSchemaVersion $schemaVersion -Operation {
+    docker compose -f .\deploy\local-compose\compose.yaml up -d --no-build
+    if ($LASTEXITCODE -ne 0) { throw "COMPOSE_START_FAILED" }
+}
 ```
 
 L'API exécute `api --config /workspace/config/application.yaml`. Le worker exécute son module dédié, avec un tag immuable contenant schéma et commit. Compose matérialise `services.worker-documents.deploy.replicas: 2` ; ADR-025 impose une identité d'instance et un fencing distincts par replica.
@@ -84,12 +117,14 @@ Le raccourci historique `docker compose -f .\deploy\local-compose\compose.yaml u
 ## Contrôles opératoires
 
 ```powershell
-$edgeAuthority = docker compose -f .\deploy\local-compose\compose.yaml port edge-gateway 8443
-curl.exe --fail --insecure "https://$edgeAuthority/api/health"
-curl.exe --fail --insecure "https://$edgeAuthority/api/ready"
-curl.exe --fail --insecure "https://$edgeAuthority/api/openapi.json"
-docker compose -f .\deploy\local-compose\compose.yaml exec -T orchestrator-api python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=300).read().decode())"
-docker compose -f .\deploy\local-compose\compose.yaml exec -T orchestrator-api python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8080/ready', timeout=300).read().decode())"
+Invoke-ComposeWithTechnicalInterpolation -Revision $sourceCommit -PostgresSchemaVersion $schemaVersion -Operation {
+    $edgeAuthority = docker compose -f .\deploy\local-compose\compose.yaml port edge-gateway 8443
+    curl.exe --fail --insecure "https://$edgeAuthority/api/health"
+    curl.exe --fail --insecure "https://$edgeAuthority/api/ready"
+    curl.exe --fail --insecure "https://$edgeAuthority/api/openapi.json"
+    docker compose -f .\deploy\local-compose\compose.yaml exec -T orchestrator-api python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=300).read().decode())"
+    docker compose -f .\deploy\local-compose\compose.yaml exec -T orchestrator-api python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8080/ready', timeout=300).read().decode())"
+}
 ```
 
 `/ready` doit nommer `postgres` et `llm-gateway` avec le statut `ready`. Une dépendance indisponible rend l'API non prête avec un code technique sûr, sans URL ni secret. Chaque réponse porte `X-Trace-ID`; les logs incluent méthode, chemin, statut, durée, `trace_id` et `configuration_hash`, jamais le PDF ni les métadonnées.
@@ -118,8 +153,10 @@ Les deux modes matérialisent l'environnement verrouillé par `uv sync --frozen 
 ## Migration ascendante d'un volume existant
 
 ```powershell
-docker compose -f .\deploy\local-compose\compose.yaml up -d postgres
-docker compose -f .\deploy\local-compose\compose.yaml run --rm --no-deps orchestrator-api python -m app.platform.postgres_migrations --config /workspace/config/application.yaml
+Invoke-ComposeWithTechnicalInterpolation -Revision $sourceCommit -PostgresSchemaVersion $schemaVersion -Operation {
+    docker compose -f .\deploy\local-compose\compose.yaml up -d postgres
+    docker compose -f .\deploy\local-compose\compose.yaml run --rm --no-deps orchestrator-api python -m app.platform.postgres_migrations --config /workspace/config/application.yaml
+}
 ```
 
 La sortie attendue est `POSTGRES_SCHEMA_READY:<OSTRADING_POSTGRES_SCHEMA_VERSION>`. La relance est idempotente. `POSTGRES_MIGRATION_DRIFT`, `POSTGRES_SCHEMA_VERSION_UNSUPPORTED` ou un timeout interdisent le démarrage ; aucun ledger n'est corrigé automatiquement.
@@ -129,7 +166,9 @@ La sortie attendue est `POSTGRES_SCHEMA_READY:<OSTRADING_POSTGRES_SCHEMA_VERSION
 L'arrêt conserve les volumes :
 
 ```powershell
-docker compose -f .\deploy\local-compose\compose.yaml down
+Invoke-ComposeWithTechnicalInterpolation -Revision $sourceCommit -PostgresSchemaVersion $schemaVersion -Operation {
+    docker compose -f .\deploy\local-compose\compose.yaml down
+}
 ```
 
 Le rollback prévalide le ledger **avant** export, build et remplacement :
@@ -138,7 +177,9 @@ Le rollback prévalide le ledger **avant** export, build et remplacement :
 $target = git rev-parse <commit-complet-compatible>
 if ($LASTEXITCODE -ne 0 -or $target -notmatch '^[0-9a-f]{40}$') { throw "IMAGE_REVISION_MUTABLE_REJECTED" }
 
-$ledgerRaw = docker compose -f .\deploy\local-compose\compose.yaml exec -T postgres psql -At -U ostrading -d ostrading -c "SELECT COALESCE(MAX(version), 0) FROM platform.schema_migrations;"
+$ledgerRaw = Invoke-ComposeWithTechnicalInterpolation -Revision $sourceCommit -PostgresSchemaVersion $schemaVersion -Operation {
+    docker compose -f .\deploy\local-compose\compose.yaml exec -T postgres psql -At -U ostrading -d ostrading -c "SELECT COALESCE(MAX(version), 0) FROM platform.schema_migrations;"
+}
 if ($LASTEXITCODE -ne 0 -or $ledgerRaw -notmatch '^\s*(?<ledger>[0-9]+)\s*$') { throw "POSTGRES_LEDGER_UNREADABLE" }
 $ledgerVersion = [int]$Matches.ledger
 
@@ -148,6 +189,8 @@ $targetLatest = $targetMigrations | Sort-Object | Select-Object -Last 1
 if ([IO.Path]::GetFileNameWithoutExtension($targetLatest) -notmatch '^(?<version>[0-9]{3})_') { throw "POSTGRES_SCHEMA_VERSION_UNREADABLE" }
 $targetSchemaVersion = [int]$Matches.version
 if ($targetSchemaVersion -lt $ledgerVersion) { throw "POSTGRES_SCHEMA_VERSION_UNSUPPORTED" }
+$sourceCommit = $target
+$schemaVersion = '{0:D3}' -f $targetSchemaVersion
 ```
 
 Après cette prévalidation, reprendre la procédure « Export immuable et préparation » avec `$target`, puis « Construction et inspection avant démarrage ». Les labels et entrypoints API **et** worker sont inspectés avant `up -d --no-build`. Une cible plus ancienne que le ledger est refusée avant toute construction et avant tout remplacement. Le rollback ne supprime jamais le volume et n'exécute aucune migration descendante ; une incompatibilité exige une migration corrective ascendante versionnée.

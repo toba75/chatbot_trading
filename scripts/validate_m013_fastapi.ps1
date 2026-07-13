@@ -30,7 +30,7 @@ $previousPath = $env:PATH
 $previousVirtualEnvironment = [System.Environment]::GetEnvironmentVariable("VIRTUAL_ENV", "Process")
 $previousUvProjectEnvironment = [System.Environment]::GetEnvironmentVariable("UV_PROJECT_ENVIRONMENT", "Process")
 $previousM013Python = [System.Environment]::GetEnvironmentVariable("M013_FASTAPI_PYTHON", "Process")
-$previousM013GatewayUrl = [System.Environment]::GetEnvironmentVariable("M013_FASTAPI_LLM_GATEWAY_URL", "Process")
+$previousM013GatewayEndpoint = [System.Environment]::GetEnvironmentVariable("M013_FASTAPI_GATEWAY_ENDPOINT", "Process")
 $locationPushed = $false
 $liveGateway = $null
 Write-Host "M013_FASTAPI_TEMP_ENVIRONMENT: $temporaryEnvironment"
@@ -137,7 +137,7 @@ try {
         else {
             Write-Host "M013_FASTAPI_LLM_GATEWAY_REUSED: port=8090; ownership=external"
         }
-        $env:M013_FASTAPI_LLM_GATEWAY_URL = "http://127.0.0.1:8090"
+        $env:M013_FASTAPI_GATEWAY_ENDPOINT = "http://127.0.0.1:8090"
     }
 
     foreach ($test in $tests) {
@@ -165,7 +165,7 @@ finally {
             @{ Name = "VIRTUAL_ENV"; Value = $previousVirtualEnvironment },
             @{ Name = "UV_PROJECT_ENVIRONMENT"; Value = $previousUvProjectEnvironment },
             @{ Name = "M013_FASTAPI_PYTHON"; Value = $previousM013Python },
-            @{ Name = "M013_FASTAPI_LLM_GATEWAY_URL"; Value = $previousM013GatewayUrl }
+            @{ Name = "M013_FASTAPI_GATEWAY_ENDPOINT"; Value = $previousM013GatewayEndpoint }
         )) {
             if ($null -eq $variable.Value) {
                 Remove-Item -Path "Env:$($variable.Name)" -ErrorAction SilentlyContinue

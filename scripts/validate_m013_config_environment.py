@@ -40,6 +40,17 @@ FORBIDDEN_EXACT_KEYS = frozenset(
 )
 FORBIDDEN_PREFIXES = ("GEMMA_",)
 ALLOWED_SHELL_ENVIRONMENT_KEYS = frozenset({"PYTHONIOENCODING"})
+ALLOWED_SHELL_ENVIRONMENT_BY_PATH = {
+    "scripts/validate_m013_fastapi.ps1": frozenset(
+        {
+            "PATH",
+            "VIRTUAL_ENV",
+            "UV_PROJECT_ENVIRONMENT",
+            "M013_FASTAPI_PYTHON",
+            "M013_FASTAPI_GATEWAY_ENDPOINT",
+        }
+    ),
+}
 ALLOWED_COMPOSE_ENVIRONMENT_BY_SERVICE = {
     "edge-gateway": frozenset({"CADDY_ADMIN"}),
     "postgres": frozenset({"POSTGRES_DB", "POSTGRES_USER", "POSTGRES_PASSWORD_FILE"}),
@@ -219,7 +230,12 @@ class EnvironmentScanner:
         name: str,
         syntax_label: str,
     ) -> None:
-        if name in ALLOWED_SHELL_ENVIRONMENT_KEYS or OST_RECURSION_GUARD_PATTERN.fullmatch(name) is not None:
+        allowed_for_path = ALLOWED_SHELL_ENVIRONMENT_BY_PATH.get(relative_path, frozenset())
+        if (
+            name in ALLOWED_SHELL_ENVIRONMENT_KEYS
+            or name in allowed_for_path
+            or OST_RECURSION_GUARD_PATTERN.fullmatch(name) is not None
+        ):
             self.exception_count += 1
             return
         self.add_violation(

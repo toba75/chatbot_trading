@@ -1,12 +1,12 @@
 function Resolve-M013FastApiLiveGatewayUrl {
-    if ([string]::IsNullOrWhiteSpace($env:M013_FASTAPI_LLM_GATEWAY_URL)) {
-        throw "M013_FASTAPI_LLM_GATEWAY_URL_REQUIRED: exécuter cette preuve via la gate Live."
+    if ([string]::IsNullOrWhiteSpace($env:M013_FASTAPI_GATEWAY_ENDPOINT)) {
+        throw "M013_FASTAPI_GATEWAY_ENDPOINT_REQUIRED: exécuter cette preuve via la gate Live."
     }
     try {
-        $uri = [System.Uri]::new($env:M013_FASTAPI_LLM_GATEWAY_URL)
+        $uri = [System.Uri]::new($env:M013_FASTAPI_GATEWAY_ENDPOINT)
     }
     catch [System.UriFormatException] {
-        throw "M013_FASTAPI_LLM_GATEWAY_URL_INVALID"
+        throw "M013_FASTAPI_GATEWAY_ENDPOINT_INVALID"
     }
     if (
         -not $uri.IsAbsoluteUri -or
@@ -17,7 +17,7 @@ function Resolve-M013FastApiLiveGatewayUrl {
         -not [string]::IsNullOrEmpty($uri.Query) -or
         -not [string]::IsNullOrEmpty($uri.Fragment)
     ) {
-        throw "M013_FASTAPI_LLM_GATEWAY_URL_INVALID"
+        throw "M013_FASTAPI_GATEWAY_ENDPOINT_INVALID"
     }
     return $uri.GetLeftPart([System.UriPartial]::Authority)
 }
