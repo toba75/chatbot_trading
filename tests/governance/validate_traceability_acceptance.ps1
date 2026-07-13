@@ -102,6 +102,17 @@ function New-TemporaryProject {
     Copy-Item -LiteralPath (Join-Path $repoRoot "app") -Destination (Join-Path $projectRoot "app") -Recurse
     Copy-Item -LiteralPath (Join-Path $repoRoot "config") -Destination (Join-Path $projectRoot "config") -Recurse
     Copy-Item -LiteralPath (Join-Path $repoRoot "deploy") -Destination (Join-Path $projectRoot "deploy") -Recurse
+    foreach ($artifact in @(".dockerignore", "pyproject.toml", "uv.lock")) {
+        $sourcePath = Join-Path $repoRoot $artifact
+        if (-not (Test-Path -LiteralPath $sourcePath -PathType Leaf)) {
+            throw "Artefact racine requis absent du dépôt source: $artifact"
+        }
+        $destinationPath = Join-Path $projectRoot $artifact
+        Copy-Item -LiteralPath $sourcePath -Destination $destinationPath
+        if (-not (Test-Path -LiteralPath $destinationPath -PathType Leaf)) {
+            throw "Copie de l'artefact racine requise absente: $artifact"
+        }
+    }
 
     return $projectRoot
 }
