@@ -8,7 +8,13 @@ import subprocess
 import pytest
 
 from ost_gate.historical_references import HistoricalReferenceError
+from ost_gate.historical_references import reconcile_historical_allowlist
 from ost_gate.historical_references import validate_historical_references
+
+
+_CLOSED_HISTORICAL_CATALOGUE_SHA256 = (
+    "50a8dce26ffe13a4bf1b18793671bb9631d3cf18644e48ec5c7a8955b42a52a6"
+)
 
 
 def test_historical_references_are_closed_and_immutable() -> None:
@@ -63,6 +69,78 @@ def test_historical_allowlist_uses_index_content_across_crlf_and_rejects_semanti
         match="GATE_HISTORICAL_ALLOWLIST_HASH_MISMATCH:docs/adr/legacy.md",
     ):
         validate_historical_references(repository_root)
+
+
+def test_reconciliation_preserves_the_closed_catalogue(tmp_path: Path) -> None:
+    repository_root = tmp_path / "repository"
+    source_path = repository_root / "docs" / "adr" / "legacy.md"
+    allowlist_path = (
+        repository_root
+        / "docs"
+        / "governance"
+        / "historical_reference_allowlist.json"
+    )
+    indexed_content = b"# Decision historique\n\nPowerShell reste une preuve historique.\n"
+
+    source_path.parent.mkdir(parents=True)
+    allowlist_path.parent.mkdir(parents=True)
+    source_path.write_bytes(indexed_content)
+    allowlist_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "allowed_paths": [
+                    {
+                        "path": "docs/adr/legacy.md",
+                        "reason": "preuve historique",
+                        "sha256": "0" * 64,
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    _run_git(repository_root, "init", "--quiet")
+    _run_git(repository_root, "config", "core.autocrlf", "false")
+    _run_git(repository_root, "add", "docs")
+
+    before = _catalogue(repository_root)
+    reconciled_count = reconcile_historical_allowlist(repository_root)
+
+    assert reconciled_count == 1
+    assert _catalogue(repository_root) == before
+    validate_historical_references(repository_root)
+
+
+def test_historical_allowlist_catalogue_is_closed() -> None:
+    repository_root = Path(__file__).resolve().parents[2]
+
+    catalogue = _catalogue(repository_root)
+    serialised_catalogue = json.dumps(
+        catalogue,
+        ensure_ascii=True,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+
+    assert (
+        hashlib.sha256(serialised_catalogue).hexdigest()
+        == _CLOSED_HISTORICAL_CATALOGUE_SHA256
+    )
+
+
+def _catalogue(repository_root: Path) -> list[dict[str, str]]:
+    allowlist_path = (
+        repository_root
+        / "docs"
+        / "governance"
+        / "historical_reference_allowlist.json"
+    )
+    document = json.loads(allowlist_path.read_text(encoding="utf-8"))
+    return [
+        {"path": record["path"], "reason": record["reason"]}
+        for record in document["allowed_paths"]
+    ]
 
 
 def _run_git(repository_root: Path, *arguments: str) -> None:
