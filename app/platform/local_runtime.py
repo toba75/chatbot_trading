@@ -8,9 +8,11 @@ import os
 import re
 import sys
 import threading
+import socket
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qs, urlencode, urlsplit
 
 from app.platform.configuration import (
     ApplicationConfiguration,
@@ -54,6 +56,8 @@ from app.platform.ui_document_api import (
     UiDocumentCommandForbiddenError,
     UiDocumentApiPublicError,
     UiDocumentApiUnavailableError,
+    UiDocumentApiResponse,
+    UiDocumentApiStreamResponse,
     UiDocumentJsonResponse,
     UrllibUiDocumentApiTransport,
 )
@@ -78,6 +82,50 @@ _UI_PDF_CONTENT_PATH_PATTERN = re.compile(
 _LLM_GATEWAY_LOCK = threading.Lock()
 _LLM_GATEWAY_INSTANCE: OpenAICompatibleLocalLanguageModelGateway | None = None
 _LLM_GATEWAY_CONFIGURATION_HASH: str | None = None
+UI_MAX_CONCURRENT_TRANSFERS = 4
+UI_SOCKET_TIMEOUT_SECONDS = 30
+
+
+class BoundedThreadingHTTPServer(ThreadingHTTPServer):
+    """Serveur UI dont la capacité et la durée de lecture sont bornées."""
+
+    daemon_threads = True
+
+    def __init__(self, server_address: tuple[str, int], handler_class: type[BaseHTTPRequestHandler]) -> None:
+        super().__init__(server_address, handler_class)
+        self.socket_timeout_seconds = UI_SOCKET_TIMEOUT_SECONDS
+        self._capacity = threading.BoundedSemaphore(UI_MAX_CONCURRENT_TRANSFERS)
+
+    def process_request(self, request: socket.socket, client_address: tuple[str, int]) -> None:
+        if not self._capacity.acquire(blocking=False):
+            body = (
+                "<!doctype html><html lang=\"fr\"><head><meta charset=\"utf-8\">"
+                "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
+                "<title>Service occupé</title></head><body><h1>Service occupé</h1>"
+                "<p>UI_TRANSFER_CAPACITY_EXHAUSTED</p></body></html>"
+            ).encode("utf-8")
+            request.sendall(
+                b"HTTP/1.1 503 Service Unavailable\r\nContent-Type: text/html; charset=utf-8\r\n"
+                + f"Content-Length: {len(body)}\r\nConnection: close\r\n\r\n".encode("ascii")
+                + body
+            )
+            request.shutdown(socket.SHUT_WR)
+            request.settimeout(0.25)
+            try:
+                while request.recv(4096):
+                    pass
+            except (TimeoutError, OSError):
+                pass
+            finally:
+                self.close_request(request)
+            return
+        super().process_request(request, client_address)
+
+    def process_request_thread(self, request: socket.socket, client_address: tuple[str, int]) -> None:
+        try:
+            super().process_request_thread(request, client_address)
+        finally:
+            self._capacity.release()
 
 
 class _StdoutGatewayObservabilityCollector(InMemoryObservabilityCollector):
@@ -172,16 +220,22 @@ def _serve_http(
     bind_host = _configured_http_bind_host(service_id, application_configuration)
 
     class Handler(BaseHTTPRequestHandler):
+        def setup(self) -> None:
+            super().setup()
+            self.connection.settimeout(self.server.socket_timeout_seconds)
+
         def do_GET(self) -> None:
-            if service_id == "ui" and self.path != "/health":
+            parsed_url = urlsplit(self.path)
+            request_path = parsed_url.path
+            if service_id == "ui" and request_path != "/health":
                 api_client = _build_ui_document_api_client(
                     application_configuration=application_configuration,
                     execution_context=_require_ui_execution_context(ui_execution_context),
                 )
-                pdf_match = _UI_PDF_CONTENT_PATH_PATTERN.fullmatch(self.path)
+                pdf_match = _UI_PDF_CONTENT_PATH_PATTERN.fullmatch(request_path)
                 if pdf_match is not None:
                     try:
-                        response = api_client.read_original_pdf(pdf_match.group("document_id"))
+                        response = api_client.read_original_pdf_stream(pdf_match.group("document_id"))
                     except UiDocumentApiUnavailableError:
                         _write_json_response(
                             self,
@@ -189,12 +243,14 @@ def _serve_http(
                             body={"error_code": ORCHESTRATOR_API_UNAVAILABLE},
                         )
                         return
-                    if response.status_code == 200:
-                        _write_binary_response(
+                    if isinstance(response, UiDocumentApiStreamResponse):
+                        _write_stream_response(
                             self,
                             status_code=response.status_code,
                             content_type=response.content_type,
-                            body=response.body,
+                            content_length=response.content_length,
+                            content_chunks=response.content_chunks,
+                            close=response.close,
                         )
                     else:
                         _write_text_response(
@@ -207,7 +263,7 @@ def _serve_http(
                             ),
                         )
                     return
-                inspection_match = _UI_DOCUMENT_INSPECTION_PATH_PATTERN.fullmatch(self.path)
+                inspection_match = _UI_DOCUMENT_INSPECTION_PATH_PATTERN.fullmatch(request_path)
                 if inspection_match is not None:
                     document_id = inspection_match.group("document_id")
                     step = inspection_match.group("step")
@@ -233,10 +289,12 @@ def _serve_http(
                     )
                     return
                 status_code, content_type, response_body = ui_get_response(
-                    path=self.path,
+                    path=request_path,
                     state=_build_ui_corpus_state(
                         application_configuration=application_configuration,
                         api_client=api_client,
+                        cursor=_ui_cursor(parsed_url.query),
+                        registration_notice=_ui_registration_notice(parsed_url.query),
                     ),
                 )
                 _write_text_response(
@@ -246,11 +304,11 @@ def _serve_http(
                     body=response_body,
                 )
                 return
-            if self.path not in {"/", "/health"}:
+            if request_path not in {"/", "/health"}:
                 self.send_response(404)
                 self.end_headers()
                 return
-            if service_id == "llm-gateway" and self.path == "/health":
+            if service_id == "llm-gateway" and request_path == "/health":
                 status_code, response_body = _llm_gateway_readiness_response(
                     application_configuration=application_configuration,
                 )
@@ -264,32 +322,46 @@ def _serve_http(
 
         def do_POST(self) -> None:
             if service_id == "ui":
-                body_result = _read_raw_body(self)
-                if body_result[0] != 200:
-                    _write_json_response(self, status_code=body_result[0], body=body_result[1])
-                    return
-                raw_body = body_result[1]
-                if not isinstance(raw_body, bytes):
-                    raise TypeError("body UI brut invalide")
-                content_type = self.headers.get("Content-Type")
-                if content_type is None:
-                    _write_json_response(
+                origin_refusal = _validate_same_origin_request(self)
+                if origin_refusal is not None:
+                    _write_text_response(
                         self,
-                        status_code=400,
-                        body={"error_code": "HTTP_REQUEST_INVALID", "field": "content_type"},
+                        status_code=403,
+                        content_type="text/html; charset=utf-8",
+                        body=_accessible_ui_error_page("UI_ORIGIN_FORBIDDEN"),
                     )
                     return
+                content_length = _request_content_length(self)
+                if content_length is None:
+                    _write_text_response(self, status_code=400, content_type="text/html; charset=utf-8", body=_accessible_ui_error_page("HTTP_REQUEST_INVALID"))
+                    return
+                if content_length > MAX_REQUEST_BODY_BYTES:
+                    _write_text_response(self, status_code=413, content_type="text/html; charset=utf-8", body=_accessible_ui_error_page("HTTP_REQUEST_TOO_LARGE"))
+                    return
+                content_type = self.headers.get("Content-Type")
+                if content_type is None:
+                    _write_text_response(self, status_code=400, content_type="text/html; charset=utf-8", body=_accessible_ui_error_page("HTTP_REQUEST_INVALID"))
+                    return
                 try:
-                    response = _build_ui_document_api_client(
+                    client = _build_ui_document_api_client(
                         application_configuration=application_configuration,
                         execution_context=_require_ui_execution_context(
                             ui_execution_context
                         ),
-                    ).forward_document_command(
-                        path=self.path,
-                        body=raw_body,
-                        content_type=content_type,
                     )
+                    if content_length == 0:
+                        response = client.forward_document_command(
+                            path=self.path,
+                            body=b"",
+                            content_type=content_type,
+                        )
+                    else:
+                        response = client.forward_document_command_stream(
+                            path=self.path,
+                            source=self.rfile,
+                            content_length=content_length,
+                            content_type=content_type,
+                        )
                 except UiDocumentApiUnavailableError:
                     response = UiDocumentJsonResponse(
                         status_code=503,
@@ -301,7 +373,13 @@ def _serve_http(
                         payload={"error_code": "UI_DOCUMENT_COMMAND_FORBIDDEN"},
                     )
                 if response.status_code < 400:
-                    _write_redirect_response(self, location="/ui/corpus-pdf")
+                    query = urlencode(
+                        {
+                            "document_id": str(response.payload.get("document_id", "")),
+                            "duplicate": str(bool(response.payload.get("duplicate", False))).lower(),
+                        }
+                    )
+                    _write_redirect_response(self, location=f"/ui/corpus-pdf?{query}")
                 else:
                     _write_text_response(
                         self,
@@ -332,7 +410,7 @@ def _serve_http(
         def log_message(self, format: str, *args: object) -> None:
             return
 
-    server = ThreadingHTTPServer((bind_host, port), Handler)
+    server = BoundedThreadingHTTPServer((bind_host, port), Handler)
     server.serve_forever()
 
 
@@ -426,6 +504,27 @@ def _write_binary_response(
     handler.wfile.write(body)
 
 
+def _write_stream_response(
+    handler: BaseHTTPRequestHandler,
+    *,
+    status_code: int,
+    content_type: str,
+    content_length: int,
+    content_chunks: Any,
+    close: Any,
+) -> None:
+    handler.send_response(status_code)
+    handler.send_header("Content-Type", content_type)
+    handler.send_header("Content-Length", str(content_length))
+    handler.end_headers()
+    try:
+        for chunk in content_chunks:
+            handler.wfile.write(chunk)
+            handler.wfile.flush()
+    finally:
+        close()
+
+
 def _write_redirect_response(
     handler: BaseHTTPRequestHandler,
     *,
@@ -484,31 +583,79 @@ def _read_json_body(handler: BaseHTTPRequestHandler) -> tuple[int, dict[str, Any
     return 200, parsed_body
 
 
-def _read_raw_body(
-    handler: BaseHTTPRequestHandler,
-) -> tuple[int, bytes | dict[str, Any]]:
+def _request_content_length(handler: BaseHTTPRequestHandler) -> int | None:
     raw_length = handler.headers.get("Content-Length")
     if raw_length is None or not raw_length.isdecimal():
-        return 400, {"error_code": "HTTP_REQUEST_INVALID", "field": "content_length"}
-    content_length = int(raw_length)
-    if content_length > MAX_REQUEST_BODY_BYTES:
-        return 413, {
-            "error_code": "HTTP_REQUEST_TOO_LARGE",
-            "max_body_bytes": MAX_REQUEST_BODY_BYTES,
-        }
-    return 200, handler.rfile.read(content_length)
+        return None
+    return int(raw_length)
+
+
+def _validate_same_origin_request(handler: BaseHTTPRequestHandler) -> str | None:
+    origin = handler.headers.get("Origin")
+    host = handler.headers.get("Host")
+    if origin is None or host is None:
+        return "UI_ORIGIN_FORBIDDEN"
+    parsed = urlsplit(origin)
+    if parsed.scheme not in ("http", "https") or parsed.netloc != host:
+        return "UI_ORIGIN_FORBIDDEN"
+    fetch_site = handler.headers.get("Sec-Fetch-Site")
+    if fetch_site is not None and fetch_site != "same-origin":
+        return "UI_ORIGIN_FORBIDDEN"
+    return None
+
+
+def _accessible_ui_error_page(error_code: str) -> str:
+    return (
+        '<!doctype html><html lang="fr"><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">'
+        '<title>Erreur de transfert</title></head><body><main role="alert">'
+        f'<h1>Action impossible</h1><p><code>{error_code}</code></p>'
+        '<p><a href="/ui/corpus-pdf">Retour au corpus</a></p></main></body></html>'
+    )
+
+
+def _ui_cursor(query: str) -> str | None:
+    if query == "":
+        return None
+    values = parse_qs(query, strict_parsing=True)
+    unexpected = set(values) - {"cursor", "document_id", "duplicate"}
+    if unexpected:
+        raise ValueError("pagination UI invalide")
+    cursors = values.get("cursor", [])
+    if len(cursors) > 1:
+        raise ValueError("pagination UI invalide")
+    return None if len(cursors) == 0 else cursors[0]
+
+
+def _ui_registration_notice(query: str) -> dict[str, Any] | None:
+    if query == "":
+        return None
+    values = parse_qs(query, strict_parsing=True)
+    identifiers = values.get("document_id", [])
+    duplicates = values.get("duplicate", [])
+    if len(identifiers) == 0 and len(duplicates) == 0:
+        return None
+    if len(identifiers) != 1 or len(duplicates) != 1 or duplicates[0] not in ("true", "false"):
+        raise ValueError("confirmation d'enregistrement UI invalide")
+    return {"document_id": identifiers[0], "duplicate": duplicates[0] == "true"}
 
 
 def _build_ui_corpus_state(
     *,
     application_configuration: ApplicationConfiguration,
     api_client: UiDocumentApiClient,
+    cursor: str | None = None,
+    registration_notice: dict[str, Any] | None = None,
 ) -> CorpusPdfScreenState:
     _required_application_configuration(application_configuration)
     if not isinstance(api_client, UiDocumentApiClient):
         raise TypeError("client API documentaire UI requis")
     try:
-        return api_client.build_corpus_state(active_selected_document_ids=())
+        return api_client.build_corpus_state(
+            active_selected_document_ids=(),
+            cursor=cursor,
+            registration_notice=registration_notice,
+        )
     except UiDocumentApiPublicError as exc:
         return build_unavailable_corpus_pdf_state(public_error=exc.response.payload)
     except UiDocumentApiUnavailableError:
@@ -529,7 +676,8 @@ def _build_ui_document_api_client(
                 configuration,
                 execution_context=execution_context,
             ),
-            timeout_seconds=configuration.runtime.timeouts.request_seconds,
+            timeout_seconds=min(configuration.runtime.timeouts.request_seconds, UI_SOCKET_TIMEOUT_SECONDS),
+            token_path=configuration.security.secrets.local_api_token_path,
         )
     )
 

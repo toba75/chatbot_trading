@@ -207,6 +207,8 @@ class DocumentCorpusItemResponse(PublicApiModel):
     conversion_status: PublicConversionStatus
     canonical_version_id: str | None
     projection_status: PublicProjectionStatus
+    manual_review_reason: str | None = None
+    failure_error_code: str | None = None
 
     @model_validator(mode="after")
     def validate_canonical_version(self) -> "DocumentCorpusItemResponse":
@@ -262,6 +264,7 @@ class DocumentDiagnosticResponse(PublicApiModel):
     source_page_count: int = Field(ge=1)
     diagnosed_page_count: int = Field(ge=0)
     manual_review_reason: str | None
+    failure_error_code: str | None = None
     manifest: list[PageManifestEntryResponse]
     pages: list[DiagnosticPageResponse]
 
@@ -362,6 +365,8 @@ class ProjectionResponse(RootModel[ProjectionResponseUnion]):
 
 
 PUBLIC_ERROR_RESPONSES = {
+    401: {"model": PublicErrorResponse, "description": "Autorisation locale requise."},
+    403: {"model": PublicErrorResponse, "description": "Autorisation locale refusée."},
     400: {"model": PublicErrorResponse, "description": "Requête publique invalide."},
     404: {"model": PublicErrorResponse, "description": "Ressource publique absente."},
     409: {"model": PublicErrorResponse, "description": "Conflit d'état métier."},
@@ -369,6 +374,7 @@ PUBLIC_ERROR_RESPONSES = {
     422: {"model": PublicErrorResponse, "description": "Source ou payload refusé."},
     500: {"model": PublicErrorResponse, "description": "Erreur interne traçable."},
     503: {"model": PublicErrorResponse, "description": "Dépendance obligatoire indisponible."},
+    507: {"model": PublicErrorResponse, "description": "Quota durable du corpus atteint."},
 }
 
 

@@ -8,9 +8,11 @@ $pythonCode = @'
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
 import json
 from pathlib import Path
 import sys
+from tempfile import TemporaryDirectory
 
 sys.path.insert(0, sys.argv[1])
 
@@ -55,7 +57,7 @@ def multipart(*, boundary, content, fields, content_type="application/pdf"):
     return b"".join(chunks)
 
 
-async def post(application, path, body, content_type):
+async def post(application, path, body, content_type, token):
     sent = []
     delivered = False
 
@@ -83,6 +85,7 @@ async def post(application, path, body, content_type):
             "headers": [
                 (b"content-type", content_type.encode("ascii")),
                 (b"content-length", str(len(body)).encode("ascii")),
+                (b"authorization", f"Bearer {token}".encode("ascii")),
             ],
             "client": ("asgi-test", 50000),
             "server": ("orchestrator-api", 8080),
@@ -111,6 +114,12 @@ class ContractCommands:
         self.registered[fingerprint.value] = (document_id, dict(bibliographic_metadata))
         return RegisterDocumentAcceptance(document_id, "REGISTERED", False)
 
+    def register_source_document_path(self, *, original_path, bibliographic_metadata):
+        return self.register_source_document(
+            original_content=original_path.read_bytes(),
+            bibliographic_metadata=bibliographic_metadata,
+        )
+
     def start_document_processing(self, *, document_id):
         known_ids = {entry[0].value for entry in self.registered.values()}
         if document_id not in known_ids:
@@ -134,6 +143,20 @@ class ReadyDependency:
 
 async def scenario(repo_root):
     configuration = load_application_configuration(repo_root / "config" / "application.example.yaml", {})
+    token = "m013-fastapi-acceptance-token-00000001"
+    token_directory = TemporaryDirectory(prefix="ost-m013-auth-")
+    token_path = Path(token_directory.name) / "local_api_token"
+    token_path.write_text(token, encoding="ascii")
+    configuration = replace(
+        configuration,
+        security=replace(
+            configuration.security,
+            secrets=replace(
+                configuration.security.secrets,
+                local_api_token_path=str(token_path),
+            ),
+        ),
+    )
     commands = ContractCommands()
     adapter = SourceProcessingHttpAdapter(commands)
 
@@ -161,7 +184,7 @@ async def scenario(repo_root):
     content_type = f"multipart/form-data; boundary={boundary}"
 
     async with application.router.lifespan_context(application):
-        created = await post(application, "/v1/documents", body, content_type)
+        created = await post(application, "/v1/documents", body, content_type, token)
         assert_equal(created[0], 201, "Le multipart valide doit créer la source.")
         document_id = created[1]["document_id"]
         assert_equal(set(created[1]), {"document_id", "document_status"}, "Aucun identifiant interne ne doit sortir.")
@@ -169,7 +192,7 @@ async def scenario(repo_root):
         assert_equal(metadata["title"], "Rapport annuel explicite", "Le titre doit venir du formulaire explicite.")
         assert_equal(metadata["authors"], ("Auteur A", "Auteur B"), "Les auteurs explicites doivent être conservés.")
 
-        duplicate = await post(application, "/v1/documents", body, content_type)
+        duplicate = await post(application, "/v1/documents", body, content_type, token)
         assert_equal(
             duplicate,
             (200, {"document_id": document_id, "document_status": "DUPLICATE_SOURCE", "duplicate": True}),
@@ -182,7 +205,7 @@ async def scenario(repo_root):
             fields=fields,
         )
         assert_equal(
-            await post(application, "/v1/documents", corrupt_body, content_type),
+            await post(application, "/v1/documents", corrupt_body, content_type, token),
             (422, {"error_code": "SOURCE_UNREADABLE", "reason": "PDF_CORRUPTED"}),
             "Une source illisible doit conserver l'erreur M-003.",
         )
@@ -190,27 +213,28 @@ async def scenario(repo_root):
         missing_fields = tuple(field for field in fields if field[0] != "title")
         missing_body = multipart(boundary=boundary, content=pdf, fields=missing_fields)
         assert_equal(
-            await post(application, "/v1/documents", missing_body, content_type),
+            await post(application, "/v1/documents", missing_body, content_type, token),
             (400, {"error_code": "HTTP_REQUEST_INVALID", "field": "title"}),
             "Une métadonnée obligatoire absente doit être refusée avant SP.",
         )
 
         assert_equal(
-            await post(application, f"/v1/documents/{document_id}/diagnose", b"", "application/octet-stream"),
+            await post(application, f"/v1/documents/{document_id}/diagnose", b"", "application/octet-stream", token),
             (202, {"document_id": document_id, "diagnostic_status": "DIAGNOSTIC_REQUESTED"}),
             "La demande DIAGNOSE doit être acceptée une seule fois.",
         )
         assert_equal(
-            await post(application, f"/v1/documents/{document_id}/diagnose", b"", "application/octet-stream"),
+            await post(application, f"/v1/documents/{document_id}/diagnose", b"", "application/octet-stream", token),
             (409, {"error_code": "DIAGNOSTIC_ALREADY_REQUESTED", "document_id": document_id}),
             "La répétition doit produire l'erreur publique idempotente.",
         )
         absent = "DOC-" + "F" * 16
         assert_equal(
-            await post(application, f"/v1/documents/{absent}/diagnose", b"", "application/octet-stream"),
+            await post(application, f"/v1/documents/{absent}/diagnose", b"", "application/octet-stream", token),
             (404, {"error_code": "SOURCE_NOT_FOUND", "document_id": absent}),
             "Une source absente doit rester 404.",
         )
+    token_directory.cleanup()
 
 
 asyncio.run(scenario(Path(sys.argv[1])))

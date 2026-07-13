@@ -163,6 +163,7 @@ class PathsConfiguration:
     reports_root: str
     logs_root: str
     experiments_root: str
+    corpus_quota_bytes: int
 
 
 @dataclass(frozen=True)
@@ -170,6 +171,7 @@ class SecretPathsConfiguration:
     postgres_password_path: str
     llm_gateway_api_key_path: str
     tls_ca_certificate_path: str
+    local_api_token_path: str
 
 
 @dataclass(frozen=True)
@@ -928,6 +930,7 @@ def _build_application_configuration(
             reports_root=paths["reports_root"],
             logs_root=paths["logs_root"],
             experiments_root=paths["experiments_root"],
+            corpus_quota_bytes=paths["corpus_quota_bytes"],
         ),
         security=SecurityConfiguration(
             network_exposure=security["network_exposure"],
@@ -936,6 +939,7 @@ def _build_application_configuration(
                 postgres_password_path=secrets["postgres_password_path"],
                 llm_gateway_api_key_path=secrets["llm_gateway_api_key_path"],
                 tls_ca_certificate_path=secrets["tls_ca_certificate_path"],
+                local_api_token_path=secrets["local_api_token_path"],
             ),
             audit=SecurityAuditConfiguration(
                 configuration_hash_required=audit["configuration_hash_required"],

@@ -1,8 +1,8 @@
 $ErrorActionPreference = "Stop"
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\.." )).Path
-$python = Join-Path $repoRoot ".venv\Scripts\python.exe"
-if (-not (Test-Path -LiteralPath $python -PathType Leaf)) { throw "UV_PROJECT_PYTHON_REQUIRED" }
+. (Join-Path $repoRoot "scripts/require_python.ps1")
+$python = Get-RequiredPythonExecutable
 $null = & docker info --format '{{.ServerVersion}}' 2>&1
 if ($LASTEXITCODE -ne 0) { throw "DOCKER_ENGINE_REQUIRED" }
 
@@ -78,7 +78,7 @@ runner = PostgresMigrationRunner(
     operation_timeout_seconds=30,
 )
 runner.run()
-assert runner.required_schema_version == 8
+assert runner.required_schema_version == 9
 
 
 def wait_until(predicate, *, timeout=4.0):
@@ -298,9 +298,9 @@ else:
 with factory.connect() as connection:
     with connection.cursor() as cursor:
         cursor.execute("SELECT version FROM platform.schema_migrations ORDER BY version", ())
-        assert cursor.fetchall() == [(number,) for number in range(1, 9)]
+        assert cursor.fetchall() == [(number,) for number in range(1, 10)]
 
-print("schema=008; lease=renewed; reclaim=fenced; replicas=unique; retries=3; integrity=permanent; outbox=fenced; ka=replay-strict")
+print("schema=009; lease=renewed; reclaim=fenced; replicas=unique; retries=3; integrity=permanent; outbox=fenced; ka=replay-strict")
 '@ | & $python -B -
     if ($LASTEXITCODE -ne 0) { throw "M013_REVIEW3_SAFETY_LIVE_RED" }
 }

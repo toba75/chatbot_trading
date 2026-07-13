@@ -369,7 +369,8 @@
         "postgres_data_root",
         "reports_root",
         "logs_root",
-        "experiments_root"
+        "experiments_root",
+        "corpus_quota_bytes"
       ],
       "properties": {
         "data_root": {
@@ -395,6 +396,10 @@
         },
         "experiments_root": {
           "$ref": "#/$defs/nonEmptyNonPlaceholderString"
+        },
+        "corpus_quota_bytes": {
+          "type": "integer",
+          "minimum": 52428800
         }
       }
     },
@@ -423,7 +428,8 @@
           "required": [
             "postgres_password_path",
             "llm_gateway_api_key_path",
-            "tls_ca_certificate_path"
+            "tls_ca_certificate_path",
+            "local_api_token_path"
           ],
           "properties": {
             "postgres_password_path": {
@@ -433,6 +439,9 @@
               "$ref": "#/$defs/secretPath"
             },
             "tls_ca_certificate_path": {
+              "$ref": "#/$defs/secretPath"
+            },
+            "local_api_token_path": {
               "$ref": "#/$defs/secretPath"
             }
           }

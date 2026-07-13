@@ -127,6 +127,12 @@ class RouterCommands:
         document_id = DocumentId.from_fingerprint(SourceFingerprint.from_content(original_content))
         return RegisterDocumentAcceptance(document_id, "REGISTERED", False)
 
+    def register_source_document_path(self, *, original_path, bibliographic_metadata):
+        return self.register_source_document(
+            original_content=original_path.read_bytes(),
+            bibliographic_metadata=bibliographic_metadata,
+        )
+
     def start_document_processing(self, *, document_id):
         if document_id == "DOC-" + "A" * 16:
             raise SourceNotFoundError(document_id)
@@ -189,7 +195,7 @@ async def scenario():
     oversized = multipart(boundary=boundary, content=oversized_pdf, fields=fields)
     assert_equal(
         await post(application, "/v1/documents", oversized, multipart_type),
-        (400, {"error_code": "HTTP_REQUEST_INVALID", "field": "original_content"}),
+        (413, {"error_code": "HTTP_REQUEST_TOO_LARGE", "max_pdf_bytes": 64}),
         "La limite binaire explicite doit être appliquée avant SP.",
     )
 

@@ -8,10 +8,14 @@ $env:M013_REVIEW3_UI_REPO = $repoRoot
 @'
 from __future__ import annotations
 
+import asyncio
+import json
 from pathlib import Path
 import os
+from tempfile import TemporaryDirectory
 
 from app.platform.local_authorization import LocalMutationAuthorizer
+from app.platform.orchestrator_asgi import LocalMutationAuthorizationMiddleware
 from app.platform.ui_corpus import CorpusPdfDocument, CorpusPdfScreenState, render_corpus_pdf_screen, render_document_inspection, render_pdf_viewer
 from app.source_processing.adapters.postgres_document_persistence import CorpusQuotaExceededError, DocumentCorpusStatusRow
 
@@ -44,7 +48,7 @@ body = render_corpus_pdf_screen(state)
 for marker in (
     'name="cursor"',
     "Page suivante",
-    "Retour au début",
+    "Retour au ",
     "PDF_CORRUPTED",
     "50 Mio maximum",
     'name="title" maxlength="512"',
@@ -53,7 +57,7 @@ for marker in (
     assert marker in body, marker
 viewer = render_pdf_viewer(document)
 assert '<meta name="viewport"' in viewer
-assert "Télécharger le PDF original" in viewer
+assert "charger le PDF original" in viewer
 
 
 # Given conversion/indexation M-004 n'est pas livrée,
@@ -61,8 +65,8 @@ assert "Télécharger le PDF original" in viewer
 # Then elle ne conseille jamais de réessayer un composant absent.
 response = type("Response", (), {"status_code": 409, "payload": {"error_code": "CONVERSION_NOT_REQUESTED"}})()
 error_page = render_document_inspection(title="Conversion", response=response)
-assert "fonctionnalité non livrée" in error_page
-assert "réessayez" not in error_page.casefold()
+assert "fonctionnalit" in error_page and "non livr" in error_page
+assert "essayez" not in error_page.casefold()
 assert '<meta name="viewport"' in error_page
 
 
@@ -85,6 +89,66 @@ else:
 
 
 # Le read-model léger ne transporte aucun manifeste, page ou route.
+async def invoke_authorization_middleware(middleware, *, method, path, authorization=None):
+    sent = []
+
+    async def receive():
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    async def send(message):
+        sent.append(message)
+
+    headers = [] if authorization is None else [(b"authorization", authorization.encode("ascii"))]
+    await middleware(
+        {"type": "http", "method": method, "path": path, "headers": headers},
+        receive,
+        send,
+    )
+    start = next(message for message in sent if message["type"] == "http.response.start")
+    raw = b"".join(message.get("body", b"") for message in sent if message["type"] == "http.response.body")
+    return start["status"], (None if raw == b"" else json.loads(raw.decode("utf-8")))
+
+
+async def verify_direct_api_authorization():
+    async def accepted(scope, receive, send):
+        del scope, receive
+        await send({"type": "http.response.start", "status": 204, "headers": []})
+        await send({"type": "http.response.body", "body": b""})
+
+    with TemporaryDirectory(prefix="ost-m013-local-token-") as directory:
+        token_path = Path(directory) / "token"
+        token_path.write_bytes(secret)
+        middleware = LocalMutationAuthorizationMiddleware(accepted, token_path=str(token_path))
+        assert await invoke_authorization_middleware(
+            middleware, method="POST", path="/v1/documents"
+        ) == (401, {"error_code": "LOCAL_API_TOKEN_REQUIRED"})
+        assert await invoke_authorization_middleware(
+            middleware,
+            method="POST",
+            path="/v1/documents",
+            authorization="Bearer mauvais",
+        ) == (403, {"error_code": "LOCAL_API_TOKEN_INVALID"})
+        accepted_response = await invoke_authorization_middleware(
+            middleware,
+            method="POST",
+            path="/v1/documents",
+            authorization=f"Bearer {secret.decode('ascii')}",
+        )
+        assert accepted_response == (204, None)
+        assert secret.decode("ascii") not in json.dumps(accepted_response)
+
+    missing_path_middleware = LocalMutationAuthorizationMiddleware(
+        accepted,
+        token_path=str(Path(directory) / "absent"),
+    )
+    assert await invoke_authorization_middleware(
+        missing_path_middleware, method="GET", path="/health"
+    ) == (204, None)
+
+
+asyncio.run(verify_direct_api_authorization())
+
+
 row = DocumentCorpusStatusRow(
     document_id="DOC-M013-UI-SECURITY-0001",
     title="Rapport borné",
@@ -115,6 +179,8 @@ for marker in (
     assert marker in ui_client + ui_runtime, marker
 for marker in ("list_document_status_rows", "corpus_quota", "FOR UPDATE", "CORPUS_QUOTA_EXCEEDED"):
     assert marker in persistence, marker
+
+assert secret.decode("ascii") not in body + viewer + error_page
 
 migration = repo / "deploy/postgres/migrations/009_corpus_quota.sql"
 assert migration.is_file()

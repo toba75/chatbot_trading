@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from app.source_processing.adapters.pdf_inspection_process import (
     IsolatedPdfInspector,
     PdfInspectionProcessError,
@@ -33,6 +35,12 @@ class CorpusPdfDocumentInspector:
     def inspect_content(self, original_content: bytes) -> None:
         try:
             self._inspector.inspect_content(original_content)
+        except PdfInspectionProcessError as exc:
+            raise ValueError(exc.error_code) from exc
+
+    def inspect_path(self, original_path: Path) -> None:
+        try:
+            self._inspector.inspect_path(original_path)
         except PdfInspectionProcessError as exc:
             raise ValueError(exc.error_code) from exc
 

@@ -171,7 +171,16 @@ error_inspection = render_document_inspection(
     ),
 )
 assert 'role="alert"' in error_inspection
-assert "essayer" in error_inspection
+assert "disponibilit" in error_inspection
+m004_missing_inspection = render_document_inspection(
+    title="Conversion",
+    response=UiDocumentJsonResponse(
+        status_code=409,
+        payload={"error_code": "CONVERSION_NOT_REQUESTED"},
+    ),
+)
+assert "fonctionnalit" in m004_missing_inspection and "non livr" in m004_missing_inspection
+assert "essayer" not in m004_missing_inspection
 
 print("Validation unitaire des contrats produit UI/SP: OK")
 '@

@@ -21,6 +21,8 @@ $project = "ostm13$suffix"
 $edgePort = Get-FreeTcpPort
 $composePath = Join-Path $exportRoot "deploy/local-compose/compose.yaml"
 $secretPath = Join-Path $exportRoot "deploy/local-compose/secrets/postgres_password"
+$localTokenPath = Join-Path $exportRoot "deploy/local-compose/secrets/local_api_token"
+$localToken = "m013-compose-live-local-token-00000001"
 $pythonCommand = @(Get-Command python -CommandType Application -ErrorAction SilentlyContinue)[0]
 if ($null -eq $pythonCommand) { throw "PYTHON_TEST_DRIVER_REQUIRED" }
 $python = $pythonCommand.Source
@@ -41,8 +43,9 @@ try {
 
     New-Item -ItemType Directory -Path (Split-Path -Parent $secretPath) -Force | Out-Null
     [System.IO.File]::WriteAllText($secretPath, "m013-compose-live-password", [System.Text.UTF8Encoding]::new($false))
+    [System.IO.File]::WriteAllText($localTokenPath, $localToken, [System.Text.UTF8Encoding]::new($false))
     $env:OSTRADING_IMAGE_REVISION = $head
-    $env:OSTRADING_POSTGRES_SCHEMA_VERSION = "008"
+    $env:OSTRADING_POSTGRES_SCHEMA_VERSION = "009"
     $env:OST_EDGE_HTTPS_PORT = [string] $edgePort
     $env:CADDY_ADMIN = "localhost:2019"
 
@@ -51,13 +54,13 @@ try {
     & docker compose --project-name $project -f $composePath build orchestrator-api worker-documents llm-gateway ui
     if ($LASTEXITCODE -ne 0) { throw "COMPOSE_FINAL_BUILD_FAILED" }
 
-    $apiImage = "ostrading/orchestrator-api:0.1.0-m013-fastapi-schema-008-$head"
-    $workerImage = "ostrading/worker-documents:0.1.0-m013-fastapi-schema-008-$head"
+    $apiImage = "ostrading/orchestrator-api:0.1.0-m013-fastapi-schema-009-$head"
+    $workerImage = "ostrading/worker-documents:0.1.0-m013-fastapi-schema-009-$head"
     foreach ($image in @($apiImage, $workerImage)) {
         $inspection = (& docker image inspect $image | ConvertFrom-Json)[0]
         if ($inspection.Config.User -ne "ostrading") { throw "IMAGE_NON_ROOT_REQUIRED:$image" }
         if ($inspection.Config.Labels.'org.opencontainers.image.revision' -ne $head) { throw "IMAGE_REVISION_MISMATCH:$image" }
-        if ($inspection.Config.Labels.'org.ostrading.postgres-schema-version' -ne "008") { throw "IMAGE_SCHEMA_MISMATCH:$image" }
+        if ($inspection.Config.Labels.'org.ostrading.postgres-schema-version' -ne "009") { throw "IMAGE_SCHEMA_MISMATCH:$image" }
     }
     $apiInspection = (& docker image inspect $apiImage | ConvertFrom-Json)[0]
     if (($apiInspection.Config.Entrypoint -join ' ') -ne 'api') { throw "API_ENTRYPOINT_MISMATCH" }
@@ -89,6 +92,7 @@ try {
     $env:M013_COMPOSE_ORIGIN = "https://localhost:$edgePort/api"
     $env:M013_COMPOSE_PROJECT = $project
     $env:M013_COMPOSE_FILE = $composePath
+    $env:M013_COMPOSE_TOKEN = $localToken
     $resultPath = Join-Path $temporaryRoot "document-result.json"
     $env:M013_COMPOSE_RESULT = $resultPath
     @'
@@ -104,6 +108,7 @@ from pathlib import Path
 from pypdf import PdfWriter
 
 origin = os.environ["M013_COMPOSE_ORIGIN"]
+local_token = os.environ["M013_COMPOSE_TOKEN"]
 context = ssl._create_unverified_context()
 
 def request(path, *, method="GET", data=None, headers=None):
@@ -122,6 +127,7 @@ assert {item["name"] for item in ready["dependencies"]} == {"postgres", "llm-gat
 openapi = json.loads(request("/openapi.json")[2])
 assert "/v1/documents" in openapi["paths"]
 assert "multipart/form-data" in openapi["paths"]["/v1/documents"]["post"]["requestBody"]["content"]
+assert local_token not in json.dumps(openapi)
 
 pdf_path = Path(os.environ["TEMP"]) / f"m013-compose-{uuid.uuid4().hex}.pdf"
 writer = PdfWriter()
@@ -149,11 +155,19 @@ status, _, body = request(
     "/v1/documents",
     method="POST",
     data=b"".join(parts),
-    headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+    headers={
+        "Content-Type": f"multipart/form-data; boundary={boundary}",
+        "Authorization": f"Bearer {local_token}",
+    },
 )
 assert status == 201, (status, body)
 document_id = json.loads(body)["document_id"]
-status, _, body = request(f"/v1/documents/{document_id}/diagnose", method="POST", data=b"")
+status, _, body = request(
+    f"/v1/documents/{document_id}/diagnose",
+    method="POST",
+    data=b"",
+    headers={"Authorization": f"Bearer {local_token}"},
+)
 assert status == 202, (status, body)
 
 completed = None
@@ -206,12 +220,15 @@ print(json.dumps(result, sort_keys=True))
     if ($reloadedSha256 -ne $documentResult.pdf_sha256) { throw "T005_POSTGRES_RESTART_ORIGINAL_DIVERGENCE" }
 
     $ledgerVersion = (& docker compose --project-name $project -f $composePath exec -T postgres psql -At -U ostrading -d ostrading -c "SELECT max(version) FROM platform.schema_migrations").Trim()
-    if ($LASTEXITCODE -ne 0 -or $ledgerVersion -ne "8") { throw "POSTGRES_LEDGER_SCHEMA_008_REQUIRED:$ledgerVersion" }
+    if ($LASTEXITCODE -ne 0 -or $ledgerVersion -ne "9") { throw "POSTGRES_LEDGER_SCHEMA_009_REQUIRED:$ledgerVersion" }
+    $runtimeLogs = (& docker compose --project-name $project -f $composePath logs --no-color)
+    if (($runtimeLogs -join "`n").Contains($localToken)) { throw "LOCAL_API_TOKEN_LOGGED" }
 }
 finally {
     Remove-Item Env:M013_COMPOSE_ORIGIN -ErrorAction SilentlyContinue
     Remove-Item Env:M013_COMPOSE_PROJECT -ErrorAction SilentlyContinue
     Remove-Item Env:M013_COMPOSE_FILE -ErrorAction SilentlyContinue
+    Remove-Item Env:M013_COMPOSE_TOKEN -ErrorAction SilentlyContinue
     Remove-Item Env:M013_COMPOSE_RESULT -ErrorAction SilentlyContinue
     $cleanupErrorActionPreference = $ErrorActionPreference
     $ErrorActionPreference = "Continue"

@@ -11,6 +11,7 @@ import asyncio
 import json
 from pathlib import Path
 import sys
+from types import SimpleNamespace
 
 sys.path.insert(0, sys.argv[1])
 
@@ -98,6 +99,19 @@ class SnapshotRepository:
             processing_run=self.runs.find_by_document_id(document_id),
             conversion=self.conversions.find_conversion_by_document_id(document_id),
         )
+
+    def list_document_status_rows(self, *, limit, after_document_id):
+        snapshots = self.list_document_snapshots(limit=limit, after_document_id=after_document_id)
+        return tuple(SimpleNamespace(
+            document_id=snapshot.source_document.document_id.value,
+            title=snapshot.source_document.metadata.title,
+            document_status=snapshot.source_document.status.value,
+            diagnostic_status="DIAGNOSTIC_NOT_REQUESTED" if snapshot.processing_run is None else snapshot.processing_run.status.value,
+            conversion_status="CONVERSION_NOT_REQUESTED" if snapshot.conversion is None else snapshot.conversion.conversion_status.value,
+            canonical_version_id=None if snapshot.conversion is None else snapshot.conversion.canonical_version_id,
+            manual_review_reason=None if snapshot.processing_run is None else snapshot.processing_run.manual_review_reason,
+            failure_error_code=None if snapshot.processing_run is None else snapshot.processing_run.failure_error_code,
+        ) for snapshot in snapshots)
 
 
 class ReadyDependency:
@@ -256,8 +270,7 @@ async def scenario(repo_root):
     accepted_processing = routed_run(accepted, "ACCEPTED")
     rejected_processing = routed_run(rejected, "REJECTED")
 
-    query_service = DocumentQueryService(
-        document_snapshot_repository=SnapshotRepository(
+    snapshot_repository = SnapshotRepository(
             SourceRepository((source_only, requested, routed, accepted, rejected)),
             ProcessingRepository(
             (
@@ -283,7 +296,10 @@ async def scenario(repo_root):
                 ),
             )
             ),
-        ),
+        )
+    query_service = DocumentQueryService(
+        document_snapshot_repository=snapshot_repository,
+        document_corpus_status_repository=snapshot_repository,
     )
     configuration = load_application_configuration(
         repo_root / "config" / "application.example.yaml", {}

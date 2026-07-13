@@ -1,8 +1,8 @@
 $ErrorActionPreference = "Stop"
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
-$python = Join-Path $repoRoot ".venv\Scripts\python.exe"
-if (-not (Test-Path -LiteralPath $python -PathType Leaf)) { throw "UV_PROJECT_PYTHON_REQUIRED" }
+. (Join-Path $repoRoot "scripts/require_python.ps1")
+$python = Get-RequiredPythonExecutable
 $null = & docker info --format '{{.ServerVersion}}' 2>&1
 if ($LASTEXITCODE -ne 0) { throw "DOCKER_ENGINE_REQUIRED" }
 
@@ -17,25 +17,34 @@ $suffix = [Guid]::NewGuid().ToString("N").Substring(0, 12)
 $container = "ostrading-m13-ui-$suffix"
 $allocatedPorts = [System.Collections.Generic.HashSet[int]]::new()
 do { $postgresPort = Get-FreeTcpPort } until ($allocatedPorts.Add($postgresPort))
+do { $gatewayPort = Get-FreeTcpPort } until ($allocatedPorts.Add($gatewayPort))
 do { $apiPort = Get-FreeTcpPort } until ($allocatedPorts.Add($apiPort))
 do { $uiPort = Get-FreeTcpPort } until ($allocatedPorts.Add($uiPort))
 $temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) $container
 $configPath = Join-Path $temporaryRoot "config\application.yaml"
 $secretPath = Join-Path $temporaryRoot "config\secrets\local\postgres_password"
+$localTokenPath = Join-Path $temporaryRoot "config\secrets\local\local_api_token"
+$localToken = "m013-ui-live-$([Guid]::NewGuid().ToString('N'))"
 $apiStdoutPath = Join-Path $temporaryRoot "api.stdout.log"
 $apiStderrPath = Join-Path $temporaryRoot "api.stderr.log"
+$gatewayStdoutPath = Join-Path $temporaryRoot "gateway.stdout.log"
+$gatewayStderrPath = Join-Path $temporaryRoot "gateway.stderr.log"
 $uiStdoutPath = Join-Path $temporaryRoot "ui.stdout.log"
 $uiStderrPath = Join-Path $temporaryRoot "ui.stderr.log"
 $uiLauncherPath = Join-Path $temporaryRoot "serve_ui.py"
 $apiProcess = $null
+$gatewayProcess = $null
 $uiProcess = $null
 $previousPythonPath = $env:PYTHONPATH
 $env:PYTHONPATH = $repoRoot
 
 New-Item -ItemType Directory -Path $temporaryRoot, (Split-Path -Parent $configPath), (Split-Path -Parent $secretPath), (Join-Path $temporaryRoot "data\corpus") -Force | Out-Null
 [System.IO.File]::WriteAllText($secretPath, "m13-ui-live-password", [System.Text.UTF8Encoding]::new($false))
+[System.IO.File]::WriteAllText($localTokenPath, $localToken, [System.Text.UTF8Encoding]::new($false))
 $config = Get-Content -Raw -Encoding UTF8 (Join-Path $repoRoot "config\application.example.yaml")
 $config = $config.Replace("postgresql+psycopg://app@postgres/app", "postgresql+psycopg://app@127.0.0.1:$postgresPort/app")
+$config = $config.Replace("url: http://llm-gateway:8090", "url: http://127.0.0.1:$gatewayPort")
+$config = $config.Replace("    port: 8090", "    port: $gatewayPort")
 $config = $config.Replace("  api:`r`n    bind_host: 0.0.0.0`r`n    port: 8080", "  api:`r`n    bind_host: 127.0.0.1`r`n    port: $apiPort")
 $config = $config.Replace("  api:`n    bind_host: 0.0.0.0`n    port: 8080", "  api:`n    bind_host: 127.0.0.1`n    port: $apiPort")
 [System.IO.File]::WriteAllText($configPath, $config, [System.Text.UTF8Encoding]::new($false))
@@ -68,6 +77,24 @@ try {
         Start-Sleep -Milliseconds 500
     }
     if (-not $ready) { throw "POSTGRES_DOCKER_NOT_READY" }
+
+    $gatewayProcess = Start-Process -FilePath $python `
+        -ArgumentList @("-B", "-m", "app.platform.local_runtime", "serve-http", "llm-gateway", "$gatewayPort", "--config", $configPath) `
+        -WorkingDirectory $temporaryRoot -RedirectStandardOutput $gatewayStdoutPath `
+        -RedirectStandardError $gatewayStderrPath -WindowStyle Hidden -PassThru
+    $gatewayReady = $false
+    for ($attempt = 0; $attempt -lt 120; $attempt++) {
+        if ($gatewayProcess.HasExited) { break }
+        try {
+            $response = Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:$gatewayPort/health" -TimeoutSec 2
+            if ($response.StatusCode -eq 200) { $gatewayReady = $true; break }
+        } catch {}
+        Start-Sleep -Milliseconds 250
+    }
+    if (-not $gatewayReady) {
+        $stderr = if (Test-Path $gatewayStderrPath) { Get-Content -Raw -Encoding UTF8 $gatewayStderrPath } else { "" }
+        throw "LLM_GATEWAY_NOT_READY $stderr"
+    }
 
     $apiProcess = Start-Process -FilePath $python `
         -ArgumentList @("-B", "-m", "app.platform.orchestrator_command", "--config", $configPath) `
@@ -109,7 +136,10 @@ try {
     }
 
     $env:M13_UI_LIVE_ORIGIN = $uiOrigin
+    $env:M13_UI_LIVE_API_ORIGIN = $apiOrigin
+    $env:M13_UI_LIVE_TOKEN = $localToken
     $env:M13_UI_LIVE_API_LOG = $apiStdoutPath
+    $env:M13_UI_LIVE_UI_LOG = $uiStdoutPath
     $env:M13_UI_LIVE_CONFIG = $configPath
     $env:M13_UI_LIVE_PYTHON = $python
     $env:M13_UI_LIVE_ROOT = $temporaryRoot
@@ -118,22 +148,29 @@ try {
 from __future__ import annotations
 
 import html
+import http.client
 import io
 import json
 import os
 from pathlib import Path
 import re
+import socket
 import subprocess
 import time
 import urllib.error
 import urllib.request
 import uuid
+from urllib.parse import urlsplit
 
 from pypdf import PdfWriter
+from app.platform.orchestrator_asgi import MAX_REQUEST_BODY_BYTES
 
 
 origin = os.environ["M13_UI_LIVE_ORIGIN"]
+api_origin = os.environ["M13_UI_LIVE_API_ORIGIN"]
+local_token = os.environ["M13_UI_LIVE_TOKEN"]
 api_log = Path(os.environ["M13_UI_LIVE_API_LOG"])
+ui_log = Path(os.environ["M13_UI_LIVE_UI_LOG"])
 config_path = os.environ["M13_UI_LIVE_CONFIG"]
 python = os.environ["M13_UI_LIVE_PYTHON"]
 runtime_root = os.environ["M13_UI_LIVE_ROOT"]
@@ -145,14 +182,65 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
-def request(path, *, method="GET", data=None, headers=None, follow_redirects=True):
-    req = urllib.request.Request(origin + path, method=method, data=data, headers=headers or {})
+def http_request(base_origin, path, *, method="GET", data=None, headers=None, follow_redirects=True):
+    req = urllib.request.Request(base_origin + path, method=method, data=data, headers=headers or {})
     opener = urllib.request.build_opener() if follow_redirects else urllib.request.build_opener(NoRedirect)
     try:
         with opener.open(req, timeout=20) as response:
             return response.status, dict(response.headers), response.read()
     except urllib.error.HTTPError as exc:
         return exc.code, dict(exc.headers), exc.read()
+
+
+def request(path, *, method="GET", data=None, headers=None, follow_redirects=True, same_origin=True):
+    request_headers = dict(headers or {})
+    if method == "POST" and same_origin:
+        request_headers["Origin"] = origin
+        request_headers["Sec-Fetch-Site"] = "same-origin"
+    return http_request(
+        origin,
+        path,
+        method=method,
+        data=data,
+        headers=request_headers,
+        follow_redirects=follow_redirects,
+    )
+
+
+def api_request(path, *, method="GET", data=None, headers=None):
+    return http_request(api_origin, path, method=method, data=data, headers=headers)
+
+
+def oversized_ui_request():
+    parsed = urlsplit(origin)
+    connection = http.client.HTTPConnection(parsed.hostname, parsed.port, timeout=5)
+    try:
+        connection.putrequest("POST", "/v1/documents")
+        connection.putheader("Content-Type", "application/octet-stream")
+        connection.putheader("Content-Length", str(MAX_REQUEST_BODY_BYTES + 1))
+        connection.putheader("Origin", origin)
+        connection.putheader("Sec-Fetch-Site", "same-origin")
+        connection.endheaders()
+        response = connection.getresponse()
+        return response.status, response.read()
+    finally:
+        connection.close()
+
+
+def open_slow_upload():
+    parsed = urlsplit(origin)
+    connection = socket.create_connection((parsed.hostname, parsed.port), timeout=5)
+    headers = (
+        "POST /v1/documents HTTP/1.1\r\n"
+        f"Host: {parsed.netloc}\r\n"
+        f"Origin: {origin}\r\n"
+        "Sec-Fetch-Site: same-origin\r\n"
+        "Content-Type: application/octet-stream\r\n"
+        "Content-Length: 1024\r\n"
+        "Connection: close\r\n\r\n"
+    ).encode("ascii")
+    connection.sendall(headers + b"x")
+    return connection
 
 
 def multipart(pdf_bytes, *, include_title=True):
@@ -193,6 +281,19 @@ writer.add_metadata({"/Title": "Preuve UI réelle", "/Author": "OSTrading"})
 writer.write(stream)
 pdf = stream.getvalue()
 
+# Les lectures API restent publiques; les mutations directes exigent le secret backend.
+assert api_request("/health")[0] == 200
+api_openapi = api_request("/openapi.json")
+assert api_openapi[0] == 200
+assert local_token not in api_openapi[2].decode("utf-8")
+assert api_request("/v1/documents", method="POST", data=b"")[0] == 401
+assert api_request(
+    "/v1/documents",
+    method="POST",
+    data=b"",
+    headers={"Authorization": "Bearer mauvais"},
+)[0] == 403
+
 # Then un navigateur charge un PDF réel via l'UI, observe POST-Redirect-GET et ne reçoit aucun JSON brut.
 payload, content_type = multipart(pdf)
 status, headers, body = request(
@@ -200,15 +301,20 @@ status, headers, body = request(
     headers={"Content-Type": content_type}, follow_redirects=False,
 )
 assert status == 303, (status, body)
-assert headers.get("Location") == "/ui/corpus-pdf"
+location = headers.get("Location")
+assert location is not None and location.startswith("/ui/corpus-pdf?"), location
 assert body == b""
 
-status, _, corpus_body = request(headers["Location"])
+status, _, corpus_body = request(location)
 assert status == 200
 corpus = corpus_body.decode("utf-8")
 document_match = re.search(r'data-document-id="(DOC-[A-F0-9]+)"', corpus)
 assert document_match is not None, corpus
 document_id = document_match.group(1)
+assert f"document_id={document_id}" in location
+assert "duplicate=false" in location
+assert document_id in corpus and "enregistr" in corpus.casefold()
+assert local_token not in corpus
 for marker in ('<html lang="fr">', '@media (max-width: 720px)', 'aria-labelledby="ajout-pdf"', 'class="table-scroll"'):
     assert marker in corpus, marker
 assert 'data-selectable="false"' in corpus
@@ -278,6 +384,58 @@ assert status == 404
 assert 'role="alert"' in missing_body.decode("utf-8")
 
 # Une lecture de corpus produit un unique appel paginé; aucun fan-out projection 1+N n'est toléré.
+# Les mutations navigateur sans origine fiable sont refusées avant tout transfert.
+csrf_status, _, csrf_body = request(
+    "/v1/documents",
+    method="POST",
+    data=b"",
+    headers={"Content-Type": "application/octet-stream"},
+    follow_redirects=False,
+    same_origin=False,
+)
+assert csrf_status == 403
+assert "UI_ORIGIN_FORBIDDEN" in csrf_body.decode("utf-8")
+bad_origin_status, _, _ = request(
+    "/v1/documents",
+    method="POST",
+    data=b"",
+    headers={"Content-Type": "application/octet-stream", "Origin": "http://example.invalid"},
+    follow_redirects=False,
+    same_origin=False,
+)
+assert bad_origin_status == 403
+
+# La limite 50 Mio est refusée sans lire le corps et reste accessible en français.
+oversized_status, oversized_body = oversized_ui_request()
+oversized_page = oversized_body.decode("utf-8")
+assert oversized_status == 413
+assert "HTTP_REQUEST_TOO_LARGE" in oversized_page and 'role="alert"' in oversized_page
+
+# Quatre transferts lents occupent la capacité bornée; le suivant reçoit 503.
+slow_connections = [open_slow_upload() for _ in range(4)]
+try:
+    capacity_status = None
+    capacity_body = b""
+    deadline = time.monotonic() + 3
+    while time.monotonic() < deadline:
+        capacity_status, _, capacity_body = request("/health")
+        if capacity_status == 503:
+            break
+        time.sleep(0.05)
+    assert capacity_status == 503, capacity_status
+    assert "UI_TRANSFER_CAPACITY_EXHAUSTED" in capacity_body.decode("utf-8")
+finally:
+    for connection in slow_connections:
+        connection.close()
+
+deadline = time.monotonic() + 3
+while time.monotonic() < deadline:
+    if request("/health")[0] == 200:
+        break
+    time.sleep(0.05)
+else:
+    raise AssertionError("capacité UI non libérée")
+
 before = len(api_request_paths())
 status, _, _ = request("/ui/corpus-pdf")
 assert status == 200
@@ -286,6 +444,10 @@ while len(api_request_paths()) <= before and time.monotonic() < deadline:
     time.sleep(0.05)
 delta = api_request_paths()[before:]
 assert delta == ["/v1/documents"], delta
+
+for runtime_log in (api_log, ui_log):
+    if runtime_log.is_file():
+        assert local_token not in runtime_log.read_text(encoding="utf-8")
 
 print(json.dumps({
     "api_factory": "production",
@@ -299,11 +461,11 @@ print(json.dumps({
     if ($LASTEXITCODE -ne 0) { throw "UI_REAL_SERVER_LIVE_SCENARIO_FAILED" }
 }
 finally {
-    foreach ($name in @("M13_UI_LIVE_ORIGIN", "M13_UI_LIVE_API_LOG", "M13_UI_LIVE_CONFIG", "M13_UI_LIVE_PYTHON", "M13_UI_LIVE_ROOT", "M13_UI_LIVE_REPO")) {
+    foreach ($name in @("M13_UI_LIVE_ORIGIN", "M13_UI_LIVE_API_ORIGIN", "M13_UI_LIVE_TOKEN", "M13_UI_LIVE_API_LOG", "M13_UI_LIVE_UI_LOG", "M13_UI_LIVE_CONFIG", "M13_UI_LIVE_PYTHON", "M13_UI_LIVE_ROOT", "M13_UI_LIVE_REPO")) {
         Remove-Item "Env:$name" -ErrorAction SilentlyContinue
     }
     $env:PYTHONPATH = $previousPythonPath
-    foreach ($process in @($uiProcess, $apiProcess)) {
+    foreach ($process in @($uiProcess, $apiProcess, $gatewayProcess)) {
         if ($null -ne $process -and -not $process.HasExited) {
             Stop-Process -Id $process.Id -Force
             $process.WaitForExit()

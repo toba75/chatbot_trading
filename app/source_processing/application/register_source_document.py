@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+import hashlib
+from pathlib import Path
 from typing import Any, Protocol
 
 from app.source_processing.domain.source_document import (
@@ -25,6 +27,14 @@ class OriginalSourceStore(Protocol):
         original_content: bytes,
     ) -> str:
         """Stocke l'original bit-à-bit si absent et retourne sa référence immuable."""
+
+
+    def put_original_path_if_absent(
+        self,
+        document_id: DocumentId,
+        fingerprint: SourceFingerprint,
+        source_path: Path,
+    ) -> str: ...
 
 
 class SourceDocumentRepository(Protocol):
@@ -186,6 +196,54 @@ class RegisterSourceDocumentHandler:
         )
 
 
+    def handle_path(
+        self,
+        *,
+        original_path: Path,
+        bibliographic_metadata: Mapping[str, Any],
+    ) -> RegisterSourceDocumentResult:
+        if not isinstance(original_path, Path) or not original_path.is_file():
+            raise ValueError("original_path invalide")
+        metadata = BibliographicMetadata.from_payload(bibliographic_metadata)
+        review_reason = _review_reason_for_unreadable_pdf_path(original_path)
+        if review_reason is not None:
+            return RegisterSourceDocumentResult("REVIEW_REQUIRED", None, None, review_reason)
+        digest = hashlib.sha256()
+        with original_path.open("rb") as stream:
+            while chunk := stream.read(64 * 1024):
+                digest.update(chunk)
+        fingerprint = SourceFingerprint.from_value(digest.hexdigest())
+        binary_duplicate = self._source_document_repository.find_by_fingerprint(fingerprint)
+        if binary_duplicate is not None:
+            return RegisterSourceDocumentResult(
+                "BINARY_DUPLICATE", None, binary_duplicate.document_id, None
+            )
+        work_duplicate = self._source_document_repository.find_by_work_key(metadata.work_key)
+        document_id = DocumentId.from_fingerprint(fingerprint)
+        storage_ref = OriginalStorageRef.from_value(
+            self._original_source_store.put_original_path_if_absent(
+                document_id=document_id,
+                fingerprint=fingerprint,
+                source_path=original_path,
+            )
+        )
+        source_document = SourceDocument.register_original(
+            document_id=document_id,
+            fingerprint=fingerprint,
+            original_storage_ref=storage_ref,
+            metadata=metadata,
+        )
+        concurrent_duplicate = self._source_document_repository.save_if_absent(source_document)
+        if concurrent_duplicate is not None:
+            if concurrent_duplicate.fingerprint != fingerprint:
+                raise ValueError("document_id concurrent incohérent")
+            return RegisterSourceDocumentResult(
+                "BINARY_DUPLICATE", None, concurrent_duplicate.document_id, None
+            )
+        decision = "DISTINCT_EDITION_REGISTERED" if work_duplicate is not None else "REGISTERED"
+        return RegisterSourceDocumentResult(decision, source_document, None, None)
+
+
 def _review_reason_for_unreadable_pdf(original_content: bytes) -> str | None:
     if not isinstance(original_content, bytes):
         raise ValueError("original_content non binaire")
@@ -194,6 +252,25 @@ def _review_reason_for_unreadable_pdf(original_content: bytes) -> str | None:
     if b"%%EOF" not in original_content[-2048:]:
         return "PDF_CORRUPTED"
     if b"/Encrypt" in original_content:
+        return "PDF_ENCRYPTED"
+    return None
+
+
+def _review_reason_for_unreadable_pdf_path(path: Path) -> str | None:
+    content_length = path.stat().st_size
+    if content_length < 1:
+        return "PDF_CORRUPTED"
+    encrypted = False
+    with path.open("rb") as stream:
+        prefix = stream.read(5)
+        while chunk := stream.read(64 * 1024):
+            if b"/Encrypt" in chunk:
+                encrypted = True
+        stream.seek(max(0, content_length - 2048))
+        suffix = stream.read(2048)
+    if prefix != b"%PDF-" or b"%%EOF" not in suffix:
+        return "PDF_CORRUPTED"
+    if encrypted:
         return "PDF_ENCRYPTED"
     return None
 

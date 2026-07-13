@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from pathlib import Path
+import tempfile
 from typing import Any, Protocol
 
 from fastapi import APIRouter, Request, UploadFile
@@ -26,6 +28,14 @@ class DocumentHttpAdapter(Protocol):
 
     def handle(self, request: HttpRequest) -> HttpResponse:
         """Traite une commande documentaire sans connaître FastAPI."""
+
+
+    def handle_staged_registration(
+        self,
+        *,
+        original_path: Path,
+        bibliographic_metadata: Mapping[str, Any],
+    ) -> HttpResponse: ...
 
 
 MAX_TITLE_CHARACTERS = 512
@@ -120,22 +130,30 @@ async def _register_document(
     if isinstance(metadata_or_error, JSONResponse):
         return metadata_or_error
 
-    original_content = await upload.read(max_pdf_bytes + 1)
-    if len(original_content) == 0 or len(original_content) > max_pdf_bytes:
-        return _invalid_request("original_content")
-
-    response = await run_in_threadpool(
-        document_http_adapter.handle,
-        HttpRequest(
-            method="POST",
-            path="/v1/documents",
-            body={
-                "original_content": original_content,
-                "bibliographic_metadata": metadata_or_error,
-            },
-        ),
-    )
-    return _json_response(response)
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as staged:
+        staged_path = Path(staged.name)
+        staged_size = 0
+        while chunk := await upload.read(64 * 1024):
+            staged_size += len(chunk)
+            if staged_size > max_pdf_bytes:
+                staged.close()
+                staged_path.unlink(missing_ok=True)
+                return JSONResponse(
+                    status_code=413,
+                    content={"error_code": "HTTP_REQUEST_TOO_LARGE", "max_pdf_bytes": max_pdf_bytes},
+                )
+            staged.write(chunk)
+    try:
+        if staged_size == 0:
+            return _invalid_request("original_content")
+        response = await run_in_threadpool(
+            document_http_adapter.handle_staged_registration,
+            original_path=staged_path,
+            bibliographic_metadata=metadata_or_error,
+        )
+        return _json_response(response)
+    finally:
+        staged_path.unlink(missing_ok=True)
 
 
 def _bibliographic_metadata(form: FormData) -> Mapping[str, Any] | JSONResponse:
@@ -224,6 +242,8 @@ def _invalid_request(field_name: str) -> JSONResponse:
 def _ensure_document_http_adapter(value: Any) -> DocumentHttpAdapter:
     if not callable(getattr(value, "handle", None)):
         raise ValueError("document_http_adapter invalide")
+    if not callable(getattr(value, "handle_staged_registration", None)):
+        raise ValueError("document_http_adapter sans streaming")
     return value
 
 

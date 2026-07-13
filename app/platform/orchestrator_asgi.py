@@ -20,6 +20,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.exceptions import HTTPException as StarletteHttpException
 
 from app.platform.configuration import ApplicationConfiguration
+from app.platform.local_authorization import LocalMutationAuthorizer
 from app.platform.orchestrator_composition import OrchestratorCompositionRoot
 from app.platform.request_context import bind_trace_id, reset_trace_id
 from app.platform.orchestrator_contract_routers import (
@@ -118,6 +119,53 @@ class BoundedRequestBodyMiddleware:
             if response_started:
                 raise
             await _send_body_too_large(send, self._max_body_bytes)
+
+
+class LocalMutationAuthorizationMiddleware:
+    """Exige le secret backend sur les mutations documentaires persistantes."""
+
+    def __init__(self, application: Any, *, token_path: str) -> None:
+        if not callable(application):
+            raise ValueError("application ASGI invalide")
+        if not isinstance(token_path, str) or token_path.strip() == "":
+            raise ValueError("LOCAL_API_TOKEN_PATH_INVALID")
+        self._application = application
+        self._token_path = Path(token_path)
+
+    async def __call__(self, scope: Any, receive: Callable, send: Callable) -> None:
+        if scope.get("type") != "http":
+            await self._application(scope, receive, send)
+            return
+        method = scope.get("method")
+        path = scope.get("path")
+        if method != "POST" or not (
+            path == "/v1/documents"
+            or (isinstance(path, str) and path.startswith("/v1/documents/") and path.endswith("/diagnose"))
+        ):
+            await self._application(scope, receive, send)
+            return
+        authorizer = LocalMutationAuthorizer.from_file(self._token_path)
+        authorization = None
+        for name, value in scope.get("headers", ()):
+            if name.lower() == b"authorization":
+                try:
+                    authorization = value.decode("ascii")
+                except UnicodeDecodeError:
+                    authorization = ""
+                break
+        refusal = authorizer.authorize(
+            method=method,
+            path=path,
+            authorization_header=authorization,
+        )
+        if refusal is not None:
+            await _send_json_response(
+                send,
+                status_code=refusal[0],
+                content={"error_code": refusal[1]},
+            )
+            return
+        await self._application(scope, receive, send)
 
 
 class StreamingFailureObservationMiddleware:
@@ -233,6 +281,10 @@ def create_orchestrator_app(
     application.add_middleware(
         BoundedRequestBodyMiddleware,
         max_body_bytes=MAX_REQUEST_BODY_BYTES,
+    )
+    application.add_middleware(
+        LocalMutationAuthorizationMiddleware,
+        token_path=configuration.security.secrets.local_api_token_path,
     )
     application.state.composition_root = composition_root
     application.include_router(composition_root.document_command_router)
@@ -669,6 +721,7 @@ def serve_orchestrator_app(
 
 __all__ = [
     "BoundedRequestBodyMiddleware",
+    "LocalMutationAuthorizationMiddleware",
     "CompositionRootFactory",
     "MAX_REQUEST_BODY_BYTES",
     "create_orchestrator_app",

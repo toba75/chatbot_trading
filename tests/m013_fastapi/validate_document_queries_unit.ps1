@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import FrozenInstanceError
 import sys
+from types import SimpleNamespace
 
 sys.path.insert(0, sys.argv[1])
 
@@ -99,6 +100,24 @@ class SnapshotRepository:
             conversion=self.conversions.find_conversion_by_document_id(document_id),
         )
 
+    def list_document_status_rows(self, *, limit, after_document_id):
+        snapshots = self.list_document_snapshots(limit=limit, after_document_id=after_document_id)
+        rows = []
+        for snapshot in snapshots:
+            run = snapshot.processing_run
+            conversion = snapshot.conversion
+            rows.append(SimpleNamespace(
+                document_id=snapshot.source_document.document_id.value,
+                title=snapshot.source_document.metadata.title,
+                document_status=snapshot.source_document.status.value,
+                diagnostic_status="DIAGNOSTIC_NOT_REQUESTED" if run is None else run.status.value,
+                conversion_status="CONVERSION_NOT_REQUESTED" if conversion is None else conversion.conversion_status.value,
+                canonical_version_id=None if conversion is None else conversion.canonical_version_id,
+                manual_review_reason=None if run is None else run.manual_review_reason,
+                failure_error_code=None if run is None else run.failure_error_code,
+            ))
+        return tuple(rows)
+
 
 def source(label):
     content = f"%PDF-1.7\nunit-{label}\n%%EOF\n".encode("utf-8")
@@ -188,12 +207,14 @@ conversion = DocumentConversionState(
     canonical_version_id="CVER-M013-T007-UNIT",
     rejection_error_code=None,
 )
-service = DocumentQueryService(
-    document_snapshot_repository=SnapshotRepository(
+snapshot_repository = SnapshotRepository(
         SourceRepository((document, source_only)),
         ProcessingRepository((processing,)),
         ConversionRepository((conversion,)),
-    ),
+    )
+service = DocumentQueryService(
+    document_snapshot_repository=snapshot_repository,
+    document_corpus_status_repository=snapshot_repository,
 )
 
 # La projection du corpus vient uniquement des absences ou états réels des repositories.

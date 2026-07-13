@@ -86,6 +86,8 @@ class OrchestratorDocumentCorpusItem:
     conversion_status: str
     canonical_version_id: str | None
     projection_status: str
+    manual_review_reason: str | None
+    failure_error_code: str | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -162,6 +164,8 @@ def _enrich_corpus_item(
         conversion_status=item.conversion_status,
         canonical_version_id=item.canonical_version_id,
         projection_status=status,
+        manual_review_reason=item.manual_review_reason,
+        failure_error_code=item.failure_error_code,
     )
 
 
@@ -240,6 +244,7 @@ def build_orchestrator_composition_root(
     )
     document_queries = DocumentQueryService(
         document_snapshot_repository=persistence.source_document_repository,
+        document_corpus_status_repository=persistence.source_document_repository,
     )
     original_queries = OriginalPdfQueryService(
         source_document_repository=persistence.source_document_repository,

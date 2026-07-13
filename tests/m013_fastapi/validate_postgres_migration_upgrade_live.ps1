@@ -1,8 +1,8 @@
 $ErrorActionPreference = "Stop"
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "../..")).Path
-$python = Join-Path $repoRoot ".venv\Scripts\python.exe"
-if (-not (Test-Path -LiteralPath $python -PathType Leaf)) { throw "UV_PROJECT_PYTHON_REQUIRED" }
+. (Join-Path $repoRoot "scripts/require_python.ps1")
+$python = Get-RequiredPythonExecutable
 $env:PYTHONPATH = $repoRoot
 $env:PYTHONIOENCODING = "utf-8"
 $null = & docker info --format '{{.ServerVersion}}' 2>&1
@@ -108,10 +108,11 @@ with factory.connect() as connection:
             (6, "006_worker_resilience_and_ka_version.sql"),
             (7, "007_job_outbox_context_boundary.sql"),
             (8, "008_claim_fencing_and_projection_replay.sql"),
+            (9, "009_corpus_quota.sql"),
         ]
         cursor.execute("SELECT to_regclass('knowledge_access.knowledge_projections')", ())
         assert cursor.fetchone() == ("knowledge_access.knowledge_projections",)
-print("upgrade-volume-007=schema-008; ledger=idempotent; lock=advisory")
+print("upgrade-volume-007=schema-009; ledger=idempotent; lock=advisory")
 '@ | & $python -B -
     if ($LASTEXITCODE -ne 0) { throw "POSTGRES_MIGRATION_UPGRADE_FAILED" }
 }

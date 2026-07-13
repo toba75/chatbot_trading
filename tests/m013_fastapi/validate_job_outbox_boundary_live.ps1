@@ -1,8 +1,8 @@
 $ErrorActionPreference = "Stop"
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "../..")).Path
-$python = Join-Path $repoRoot ".venv\Scripts\python.exe"
-if (-not (Test-Path -LiteralPath $python -PathType Leaf)) { throw "UV_PROJECT_PYTHON_REQUIRED" }
+. (Join-Path $repoRoot "scripts/require_python.ps1")
+$python = Get-RequiredPythonExecutable
 $env:PYTHONPATH = $repoRoot
 $env:PYTHONIOENCODING = "utf-8"
 $null = & docker info --format '{{.ServerVersion}}' 2>&1
@@ -81,7 +81,7 @@ runner007 = PostgresMigrationRunner(
 )
 runner007.run()
 runner007.run()
-assert runner007.required_schema_version == 8
+assert runner007.required_schema_version == 9
 assert runner007.is_required_schema_ready()
 
 
@@ -180,13 +180,13 @@ with base_factory.connect() as connection:
         )
         assert cursor.fetchone() == (0,)
         cursor.execute("SELECT version FROM platform.schema_migrations ORDER BY version", ())
-        assert cursor.fetchall() == [(1,), (2,), (3,), (4,), (5,), (6,), (7,), (8,)]
+        assert cursor.fetchall() == [(1,), (2,), (3,), (4,), (5,), (6,), (7,), (8,), (9,)]
 
 # Claim SP, commit platform et ACK SP ouvrent chacun leur transaction locale.
 assert tracking.connection_count >= 8, tracking.connection_count
 print(
     "relay-live=concurrent-claim; crash-redelivery=idempotent; "
-    "cross-schema-fk=absent; schema=008; transactions=separate"
+    "cross-schema-fk=absent; schema=009; transactions=separate"
 )
 '@ | & $python -B -
     if ($LASTEXITCODE -ne 0) { throw "JOB_OUTBOX_BOUNDARY_LIVE_FAILED" }

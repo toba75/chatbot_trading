@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import json
+import http.client
 import re
 import urllib.error
 import urllib.request
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Protocol
+from pathlib import Path
+from typing import Any, BinaryIO, Callable, Protocol
 from urllib.parse import urlsplit
 
 from pydantic import ValidationError
@@ -19,6 +21,7 @@ from app.platform.orchestrator_api_models import (
     ProjectionResponse,
 )
 from app.platform.orchestrator_asgi import MAX_REQUEST_BODY_BYTES
+from app.platform.local_authorization import LocalMutationAuthorizer
 
 from app.platform.ui_corpus import (
     CONVERSION_STATUSES,
@@ -68,6 +71,26 @@ class UiDocumentApiResponse:
         _ensure_text(self.content_type, "content_type requis")
         if not isinstance(self.body, bytes):
             raise ValueError("body HTTP binaire requis")
+
+
+@dataclass(frozen=True, slots=True)
+class UiDocumentApiStreamResponse:
+    """Réponse binaire dont le corps suit la backpressure du lecteur."""
+
+    status_code: int
+    content_type: str
+    content_length: int
+    content_chunks: Iterator[bytes]
+    close: Callable[[], None]
+
+    def __post_init__(self) -> None:
+        if isinstance(self.status_code, bool) or not isinstance(self.status_code, int):
+            raise ValueError("status_code stream invalide")
+        _ensure_text(self.content_type, "content_type stream requis")
+        if isinstance(self.content_length, bool) or not isinstance(self.content_length, int) or self.content_length < 1:
+            raise ValueError("content_length stream invalide")
+        if not callable(self.close):
+            raise ValueError("fermeture stream requise")
 
 
 @dataclass(frozen=True, slots=True)
@@ -122,11 +145,27 @@ class UiDocumentApiTransport(Protocol):
     ) -> UiDocumentApiResponse:
         """Exécute une requête HTTP vers l'unique origine orchestratrice."""
 
+    def request_stream(
+        self,
+        *,
+        method: str,
+        path: str,
+        source: BinaryIO,
+        content_length: int,
+        content_type: str,
+    ) -> UiDocumentApiResponse: ...
+
+    def read_stream(
+        self,
+        *,
+        path: str,
+    ) -> UiDocumentApiStreamResponse | UiDocumentApiResponse: ...
+
 
 class UrllibUiDocumentApiTransport:
     """Transport réseau runtime sans backend alternatif ni cache."""
 
-    def __init__(self, *, orchestrator_origin: str, timeout_seconds: int) -> None:
+    def __init__(self, *, orchestrator_origin: str, timeout_seconds: int, token_path: str) -> None:
         self._orchestrator_origin = _ensure_origin(orchestrator_origin)
         if (
             isinstance(timeout_seconds, bool)
@@ -135,6 +174,7 @@ class UrllibUiDocumentApiTransport:
         ):
             raise ValueError("timeout_seconds UI invalide")
         self._timeout_seconds = timeout_seconds
+        self._token_path = Path(_ensure_text(token_path, "token_path UI requis"))
 
     def request(
         self,
@@ -151,6 +191,8 @@ class UrllibUiDocumentApiTransport:
         if content_type is not None:
             _ensure_text(content_type, "content_type UI invalide")
         headers = {} if content_type is None else {"Content-Type": content_type}
+        if parsed_method == "POST":
+            headers["Authorization"] = LocalMutationAuthorizer.from_file(self._token_path).authorization_header()
         request = urllib.request.Request(
             url=f"{self._orchestrator_origin}{parsed_path}",
             data=body,
@@ -162,11 +204,11 @@ class UrllibUiDocumentApiTransport:
                 return UiDocumentApiResponse(
                     status_code=response.status,
                     content_type=response.headers.get_content_type(),
-                    body=response.read(),
+                    body=_read_bounded_response(response),
                 )
         except urllib.error.HTTPError as exc:
             try:
-                error_body = exc.read()
+                error_body = _read_bounded_response(exc)
             except (urllib.error.URLError, TimeoutError, OSError) as read_exc:
                 raise UiDocumentApiUnavailableError(
                     ORCHESTRATOR_API_UNAVAILABLE
@@ -178,6 +220,88 @@ class UrllibUiDocumentApiTransport:
             )
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
             raise UiDocumentApiUnavailableError(ORCHESTRATOR_API_UNAVAILABLE) from exc
+
+    def request_stream(
+        self,
+        *,
+        method: str,
+        path: str,
+        source: BinaryIO,
+        content_length: int,
+        content_type: str,
+    ) -> UiDocumentApiResponse:
+        parsed_method = _ensure_method(method)
+        parsed_path = _ensure_public_relative_path(path)
+        if not callable(getattr(source, "read", None)):
+            raise ValueError("source stream UI invalide")
+        if isinstance(content_length, bool) or not isinstance(content_length, int) or content_length < 1:
+            raise ValueError("content_length UI invalide")
+        origin = urlsplit(self._orchestrator_origin)
+        connection_type = http.client.HTTPSConnection if origin.scheme == "https" else http.client.HTTPConnection
+        connection = connection_type(origin.hostname, origin.port, timeout=self._timeout_seconds)
+        try:
+            connection.putrequest(parsed_method, parsed_path)
+            connection.putheader("Content-Type", content_type)
+            connection.putheader("Content-Length", str(content_length))
+            connection.putheader(
+                "Authorization",
+                LocalMutationAuthorizer.from_file(self._token_path).authorization_header(),
+            )
+            connection.endheaders()
+            remaining = content_length
+            while remaining:
+                chunk = source.read(min(64 * 1024, remaining))
+                if not isinstance(chunk, bytes) or len(chunk) == 0:
+                    raise UiDocumentApiUnavailableError("UI_REQUEST_STREAM_INTERRUPTED")
+                connection.send(chunk)
+                remaining -= len(chunk)
+            response = connection.getresponse()
+            return UiDocumentApiResponse(
+                status_code=response.status,
+                content_type=response.getheader("Content-Type", "application/octet-stream").split(";", 1)[0],
+                body=_read_bounded_response(response),
+            )
+        except (OSError, TimeoutError, http.client.HTTPException) as exc:
+            raise UiDocumentApiUnavailableError(ORCHESTRATOR_API_UNAVAILABLE) from exc
+        finally:
+            connection.close()
+
+    def read_stream(self, *, path: str) -> UiDocumentApiStreamResponse | UiDocumentApiResponse:
+        parsed_path = _ensure_public_relative_path(path)
+        try:
+            response = urllib.request.urlopen(
+                f"{self._orchestrator_origin}{parsed_path}",
+                timeout=self._timeout_seconds,
+            )
+        except urllib.error.HTTPError as exc:
+            try:
+                return UiDocumentApiResponse(
+                    status_code=exc.code,
+                    content_type=exc.headers.get_content_type(),
+                    body=_read_bounded_response(exc),
+                )
+            finally:
+                exc.close()
+        content_length_text = response.headers.get("Content-Length")
+        if content_length_text is None or not content_length_text.isdecimal() or int(content_length_text) < 1:
+            response.close()
+            raise ValueError("content_length PDF public invalide")
+
+        def chunks() -> Iterator[bytes]:
+            try:
+                while chunk := response.read(64 * 1024):
+                    yield chunk
+            finally:
+                response.close()
+
+        iterator = chunks()
+        return UiDocumentApiStreamResponse(
+            status_code=response.status,
+            content_type=response.headers.get_content_type(),
+            content_length=int(content_length_text),
+            content_chunks=iterator,
+            close=iterator.close,
+        )
 
 
 class UiDocumentApiClient:
@@ -192,51 +316,45 @@ class UiDocumentApiClient:
         self,
         *,
         active_selected_document_ids: Sequence[str],
+        cursor: str | None = None,
+        registration_notice: Mapping[str, Any] | None = None,
     ) -> CorpusPdfScreenState:
         selected_ids = tuple(active_selected_document_ids)
         documents: list[CorpusPdfDocument] = []
-        cursor: str | None = None
-        seen_cursors: set[str] = set()
-        while True:
-            path = f"/v1/documents?limit={UI_DOCUMENT_PAGE_SIZE}"
-            if cursor is not None:
-                path = f"{path}&cursor={cursor}"
-            response = self._json_request(
-                method="GET",
-                path=path,
-                body=None,
-                content_type=None,
-            )
-            _require_success(response, expected_statuses=frozenset((200,)))
-            try:
-                page = DocumentCorpusResponse.model_validate(response.payload)
-            except ValidationError as exc:
-                raise ValueError("page de corpus publique incompatible") from exc
-            for public_document in page.documents:
-                document = _parse_corpus_document(public_document.model_dump())
-                documents.append(
-                    CorpusPdfDocument(
-                        document_id=document["document_id"],
-                        title=document["title"],
-                        source_status=document["document_status"],
-                        diagnostic_status=document["diagnostic_status"],
-                        conversion_status=document["conversion_status"],
-                        canonical_version_id=document["canonical_version_id"],
-                        projection_status=document["projection_status"],
-                        selected=document["document_id"] in selected_ids,
-                    )
-                )
-            cursor = page.next_cursor
-            if cursor is None:
-                break
+        if cursor is not None:
             _ensure_document_id(cursor)
-            if cursor in seen_cursors:
-                raise ValueError("curseur de corpus public cyclique")
-            seen_cursors.add(cursor)
+        path = f"/v1/documents?limit={UI_DOCUMENT_PAGE_SIZE}"
+        if cursor is not None:
+            path = f"{path}&cursor={cursor}"
+        response = self._json_request(method="GET", path=path, body=None, content_type=None)
+        _require_success(response, expected_statuses=frozenset((200,)))
+        try:
+            page = DocumentCorpusResponse.model_validate(response.payload)
+        except ValidationError as exc:
+            raise ValueError("page de corpus publique incompatible") from exc
+        for public_document in page.documents:
+            document = _parse_corpus_document(public_document.model_dump())
+            documents.append(
+                CorpusPdfDocument(
+                    document_id=document["document_id"],
+                    title=document["title"],
+                    source_status=document["document_status"],
+                    diagnostic_status=document["diagnostic_status"],
+                    conversion_status=document["conversion_status"],
+                    canonical_version_id=document["canonical_version_id"],
+                    projection_status=document["projection_status"],
+                    selected=document["document_id"] in selected_ids,
+                    manual_review_reason=document["manual_review_reason"],
+                    failure_error_code=document["failure_error_code"],
+                )
+            )
         return CorpusPdfScreenState(
             documents=tuple(documents),
             active_selected_document_ids=selected_ids,
             read_model_status="READ_MODEL_READY",
+            current_cursor=cursor,
+            next_cursor=page.next_cursor,
+            registration_notice=registration_notice,
         )
 
     def read_diagnostic(self, document_id: str) -> UiDocumentJsonResponse:
@@ -249,9 +367,13 @@ class UiDocumentApiClient:
         )
         if response.status_code == 200:
             try:
-                DocumentDiagnosticResponse.model_validate(response.payload)
+                validated = DocumentDiagnosticResponse.model_validate(response.payload)
             except ValidationError as exc:
                 raise ValueError("diagnostic public incompatible") from exc
+            response = UiDocumentJsonResponse(
+                status_code=response.status_code,
+                payload=validated.model_dump(mode="json"),
+            )
             _validate_diagnostic_payload(
                 response.payload,
                 expected_document_id=parsed_document_id,
@@ -322,6 +444,24 @@ class UiDocumentApiClient:
         _validate_public_error(parsed_error)
         return response
 
+    def read_original_pdf_stream(
+        self,
+        document_id: str,
+    ) -> UiDocumentApiStreamResponse | UiDocumentApiResponse:
+        reader = getattr(self._transport, "read_stream", None)
+        if not callable(reader):
+            raise TypeError("transport UI sans lecture streaming")
+        response = reader(path=f"/v1/documents/{_ensure_document_id(document_id)}/original")
+        if isinstance(response, UiDocumentApiStreamResponse):
+            if response.status_code != 200 or response.content_type != "application/pdf":
+                response.close()
+                raise ValueError("stream PDF public invalide")
+            return response
+        if not isinstance(response, UiDocumentApiResponse):
+            raise TypeError("réponse stream UI invalide")
+        _validate_public_error(_decode_json_response(response))
+        return response
+
     def forward_document_command(
         self,
         *,
@@ -347,6 +487,35 @@ class UiDocumentApiClient:
             else:
                 _validate_diagnosis_response(response)
         return response
+
+    def forward_document_command_stream(
+        self,
+        *,
+        path: str,
+        source: BinaryIO,
+        content_length: int,
+        content_type: str,
+    ) -> UiDocumentJsonResponse:
+        parsed_path = _ensure_document_command_path(path)
+        sender = getattr(self._transport, "request_stream", None)
+        if not callable(sender):
+            raise TypeError("transport UI sans écriture streaming")
+        response = sender(
+            method="POST",
+            path=parsed_path,
+            source=source,
+            content_length=content_length,
+            content_type=_ensure_text(content_type, "content_type commande UI invalide"),
+        )
+        parsed = _decode_json_response(response)
+        if parsed.status_code < 400:
+            if parsed_path == "/v1/documents":
+                _validate_registration_response(parsed)
+            else:
+                _validate_diagnosis_response(parsed)
+        else:
+            _validate_public_error(parsed)
+        return parsed
 
     def _json_request(
         self,
@@ -382,6 +551,8 @@ def _parse_corpus_document(value: Any) -> dict[str, Any]:
             "conversion_status",
             "canonical_version_id",
             "projection_status",
+            "manual_review_reason",
+            "failure_error_code",
         )
     )
     _require_exact_fields(value, expected, "document corpus")
@@ -403,6 +574,16 @@ def _parse_corpus_document(value: Any) -> dict[str, Any]:
         raise ValueError("canonical_version_id interdit avant conversion acceptée")
     if value["projection_status"] not in PROJECTION_STATUSES:
         raise ValueError("projection_status public invalide")
+    manual_review_reason = value["manual_review_reason"]
+    failure_error_code = value["failure_error_code"]
+    if value["diagnostic_status"] == "MANUAL_REVIEW":
+        _ensure_text(manual_review_reason, "motif de revue manuelle requis")
+    elif manual_review_reason is not None:
+        _ensure_text(manual_review_reason, "motif de revue manuelle invalide")
+    if value["diagnostic_status"] == "FAILED":
+        _ensure_text(failure_error_code, "code d'échec requis")
+    elif failure_error_code is not None:
+        raise ValueError("code d'échec interdit hors FAILED")
     return dict(value)
 
 
@@ -446,6 +627,7 @@ def _validate_diagnostic_payload(
                 "source_page_count",
                 "diagnosed_page_count",
                 "manual_review_reason",
+                "failure_error_code",
                 "manifest",
                 "pages",
             )
@@ -527,6 +709,11 @@ def _validate_diagnostic_payload(
         _ensure_text(manual_review_reason, "motif de revue manuelle requis")
     elif manual_review_reason is not None:
         raise ValueError("motif de revue manuelle interdit pour ce statut")
+    failure_error_code = payload["failure_error_code"]
+    if payload["diagnostic_status"] == "FAILED":
+        _ensure_text(failure_error_code, "code d'échec diagnostic requis")
+    elif failure_error_code is not None:
+        raise ValueError("code d'échec diagnostic interdit")
 
 
 def _validate_conversion_nullability(payload: Mapping[str, Any]) -> None:
@@ -594,6 +781,19 @@ def _decode_json_response(response: UiDocumentApiResponse) -> UiDocumentJsonResp
     if not isinstance(payload, dict):
         raise ValueError("payload JSON public non objet")
     return UiDocumentJsonResponse(status_code=response.status_code, payload=payload)
+
+
+def _read_bounded_response(response: Any) -> bytes:
+    chunks: list[bytes] = []
+    total = 0
+    while chunk := response.read(64 * 1024):
+        if not isinstance(chunk, bytes):
+            raise ValueError("réponse backend non binaire")
+        total += len(chunk)
+        if total > 1024 * 1024:
+            raise ValueError("réponse JSON backend trop volumineuse")
+        chunks.append(chunk)
+    return b"".join(chunks)
 
 
 def _validate_public_error(response: UiDocumentJsonResponse) -> None:
@@ -686,6 +886,7 @@ __all__ = [
     "UiDocumentCommandForbiddenError",
     "UiDocumentApiPublicError",
     "UiDocumentApiResponse",
+    "UiDocumentApiStreamResponse",
     "UiDocumentApiUnavailableError",
     "UiDocumentJsonResponse",
     "UrllibUiDocumentApiTransport",

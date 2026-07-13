@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
 from typing import Any, Protocol
 
 from app.contracts.identity import DomainIdentifier
@@ -311,6 +312,38 @@ class DocumentCommandService:
             processing_run_repository=processing_run_repository,
         )
         self._document_inspector = document_inspector
+
+    def register_source_document_path(
+        self,
+        *,
+        original_path: Path,
+        bibliographic_metadata: Mapping[str, Any],
+    ) -> RegisterDocumentAcceptance:
+        inspect_path = getattr(self._document_inspector, "inspect_path", None)
+        if not callable(inspect_path):
+            raise ValueError("document_inspector sans inspection de chemin")
+        try:
+            inspect_path(original_path)
+        except ValueError as exc:
+            raise SourceUnreadableError(reason=str(exc)) from exc
+        result = self._register_handler.handle_path(
+            original_path=original_path,
+            bibliographic_metadata=bibliographic_metadata,
+        )
+        if result.decision == "REVIEW_REQUIRED":
+            raise SourceUnreadableError(reason=_ensure_text(result.review_reason, "reason"))
+        if result.decision == "BINARY_DUPLICATE":
+            return RegisterDocumentAcceptance(
+                document_id=_ensure_document_id(result.duplicate_document_id),
+                document_status="DUPLICATE_SOURCE",
+                duplicate=True,
+            )
+        source_document = _ensure_source_document(result.source_document)
+        return RegisterDocumentAcceptance(
+            document_id=source_document.document_id,
+            document_status=source_document.status.value,
+            duplicate=False,
+        )
 
     def register_source_document(
         self,

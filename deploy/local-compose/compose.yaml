@@ -53,6 +53,8 @@ services:
     volumes:
       - ./application.compose.yaml:/workspace/config/application.yaml:ro
       - ../../config/application.schema.json:/workspace/config/application.schema.json:ro
+    secrets:
+      - local_api_token
     healthcheck:
       test:
         - CMD-SHELL
@@ -93,6 +95,7 @@ services:
       - ../../config/application.schema.json:/workspace/config/application.schema.json:ro
     secrets:
       - postgres_password
+      - local_api_token
     tmpfs:
       - /tmp:size=128m,mode=1777
     healthcheck:
@@ -442,3 +445,5 @@ volumes:
 secrets:
   postgres_password:
     file: ./secrets/postgres_password
+  local_api_token:
+    file: ./secrets/local_api_token

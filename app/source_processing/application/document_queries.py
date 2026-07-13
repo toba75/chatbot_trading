@@ -59,6 +59,16 @@ class DocumentSnapshotRepository(Protocol):
         """Retourne le parent et ses enfants depuis un même snapshot."""
 
 
+class DocumentCorpusStatusRepository(Protocol):
+    def list_document_status_rows(
+        self,
+        *,
+        limit: int,
+        after_document_id: str | None,
+    ) -> tuple[Any, ...]:
+        """Retourne uniquement les statuts nécessaires à une page de corpus."""
+
+
 class DiagnosticNotRequestedError(ValueError):
     """Erreur publique produite quand aucune tentative persistée n'existe."""
 
@@ -85,6 +95,8 @@ class DocumentCorpusItem:
     diagnostic_status: str
     conversion_status: str
     canonical_version_id: str | None
+    manual_review_reason: str | None
+    failure_error_code: str | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -151,6 +163,7 @@ class DocumentDiagnosticView:
     source_page_count: int
     diagnosed_page_count: int
     manual_review_reason: str | None
+    failure_error_code: str | None
     manifest: tuple[PageManifestEntryView, ...]
     pages: tuple[DiagnosticPageView, ...]
 
@@ -172,12 +185,14 @@ class DocumentQueryService:
         self,
         *,
         document_snapshot_repository: DocumentSnapshotRepository,
+        document_corpus_status_repository: DocumentCorpusStatusRepository,
     ) -> None:
-        if not callable(getattr(document_snapshot_repository, "list_document_snapshots", None)):
-            raise ValueError("document_snapshot_repository sans liste")
         if not callable(getattr(document_snapshot_repository, "find_document_snapshot", None)):
             raise ValueError("document_snapshot_repository sans lecture")
+        if not callable(getattr(document_corpus_status_repository, "list_document_status_rows", None)):
+            raise ValueError("document_corpus_status_repository sans projection légère")
         self._document_snapshot_repository = document_snapshot_repository
+        self._document_corpus_status_repository = document_corpus_status_repository
 
     def list_documents(
         self,
@@ -189,24 +204,43 @@ class DocumentQueryService:
             raise ValueError("limit corpus invalide")
         if cursor is not None:
             DocumentId.from_value(cursor)
-        snapshots = tuple(
-            self._document_snapshot_repository.list_document_snapshots(
+        rows = tuple(
+            self._document_corpus_status_repository.list_document_status_rows(
                 limit=limit + 1,
                 after_document_id=cursor,
             )
         )
-        has_next_page = len(snapshots) > limit
-        visible_snapshots = snapshots[:limit]
+        has_next_page = len(rows) > limit
+        visible_rows = rows[:limit]
         items = tuple(
-            self._corpus_item(snapshot)
-            for snapshot in sorted(
-                visible_snapshots,
-                key=lambda candidate: candidate.source_document.document_id.value,
+            self._corpus_item_from_status_row(row)
+            for row in sorted(
+                visible_rows,
+                key=lambda candidate: candidate.document_id,
             )
         )
         return DocumentCorpusPageView(
             documents=items,
             next_cursor=items[-1].document_id if has_next_page else None,
+        )
+
+    def _corpus_item_from_status_row(self, row: Any) -> DocumentCorpusItem:
+        required = (
+            "document_id", "title", "document_status", "diagnostic_status",
+            "conversion_status", "canonical_version_id", "manual_review_reason",
+            "failure_error_code",
+        )
+        if any(not hasattr(row, field) for field in required):
+            raise TypeError("projection légère de corpus invalide")
+        return DocumentCorpusItem(
+            document_id=DocumentId.from_value(row.document_id).value,
+            title=_ensure_text(row.title, "title"),
+            document_status=PublicSourceStatus.from_value(row.document_status).value,
+            diagnostic_status=PublicDiagnosticStatus.from_value(row.diagnostic_status).value,
+            conversion_status=PublicConversionStatus.from_value(row.conversion_status).value,
+            canonical_version_id=row.canonical_version_id,
+            manual_review_reason=row.manual_review_reason,
+            failure_error_code=row.failure_error_code,
         )
 
     def read_diagnostic(self, document_id: str) -> DocumentDiagnosticView:
@@ -268,6 +302,12 @@ class DocumentQueryService:
                 if parsed_conversion is None
                 else parsed_conversion.canonical_version_id
             ),
+            manual_review_reason=(
+                None if parsed_processing_run is None else parsed_processing_run.manual_review_reason
+            ),
+            failure_error_code=(
+                None if parsed_processing_run is None else parsed_processing_run.failure_error_code
+            ),
         )
 
 
@@ -311,6 +351,7 @@ def _diagnostic_view(processing_run: DocumentProcessingRun) -> DocumentDiagnosti
         source_page_count=processing_run.page_manifest.source_page_count,
         diagnosed_page_count=len(processing_run.page_decisions),
         manual_review_reason=processing_run.manual_review_reason,
+        failure_error_code=processing_run.failure_error_code,
         manifest=manifest,
         pages=pages,
     )
@@ -382,6 +423,7 @@ __all__ = [
     "DocumentDiagnosticView",
     "DocumentQueryService",
     "DocumentSnapshotRepository",
+    "DocumentCorpusStatusRepository",
     "DocumentStateSnapshot",
     "PageDiagnosticView",
     "PageManifestEntryView",

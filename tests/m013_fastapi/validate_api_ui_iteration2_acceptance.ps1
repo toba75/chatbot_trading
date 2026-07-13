@@ -71,10 +71,10 @@ transport = RecordingTransport(
 state = UiDocumentApiClient(transport=transport).build_corpus_state(
     active_selected_document_ids=()
 )
-assert len(state.documents) == UI_DOCUMENT_PAGE_SIZE + 1
+assert len(state.documents) == UI_DOCUMENT_PAGE_SIZE
+assert state.next_cursor == first[-1]["document_id"]
 assert transport.paths == [
     f"/v1/documents?limit={UI_DOCUMENT_PAGE_SIZE}",
-    f"/v1/documents?limit={UI_DOCUMENT_PAGE_SIZE}&cursor={first[-1]['document_id']}",
 ]
 assert not any(path.endswith("/projection") for path in transport.paths)
 

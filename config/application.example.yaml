@@ -70,6 +70,7 @@ paths:
   reports_root: docs/reports
   logs_root: logs
   experiments_root: data/experiments
+  corpus_quota_bytes: 5368709120
 
 security:
   network_exposure: loopback_only
@@ -78,6 +79,7 @@ security:
     postgres_password_path: config/secrets/local/postgres_password
     llm_gateway_api_key_path: config/secrets/local/llm_gateway_api_key
     tls_ca_certificate_path: config/secrets/local/tls_ca_certificate.pem
+    local_api_token_path: config/secrets/local/local_api_token
   audit:
     configuration_hash_required: true
     log_configuration_changes: true

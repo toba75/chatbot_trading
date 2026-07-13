@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Protocol
 
 from app.source_processing.application.document_commands import (
@@ -19,6 +20,7 @@ from app.source_processing.application.document_commands import (
     SourceUnreadableError,
 )
 from app.source_processing.domain.source_document import DocumentId
+from app.source_processing.adapters.postgres_document_persistence import CorpusQuotaExceededError
 
 
 class DocumentCommandPort(Protocol):
@@ -38,6 +40,13 @@ class DocumentCommandPort(Protocol):
         document_id: str,
     ) -> DocumentDiagnosisAcceptance:
         """Demande le diagnostic documentaire via SP."""
+
+    def register_source_document_path(
+        self,
+        *,
+        original_path: Path,
+        bibliographic_metadata: Mapping[str, Any],
+    ) -> RegisterDocumentAcceptance: ...
 
 
 class DocumentConversionCommandPort(Protocol):
@@ -117,24 +126,33 @@ class SourceProcessingHttpAdapter:
                 status_code=422,
                 body={"error_code": "SOURCE_UNREADABLE", "reason": exc.reason},
             )
+        except CorpusQuotaExceededError as exc:
+            return HttpResponse(status_code=507, body={"error_code": exc.error_code})
 
-        if acceptance.duplicate:
-            return HttpResponse(
-                status_code=200,
-                body={
-                    "document_id": acceptance.document_id.value,
-                    "document_status": acceptance.document_status,
-                    "duplicate": True,
-                },
+        return _registration_http_response(acceptance)
+
+    def handle_staged_registration(
+        self,
+        *,
+        original_path: Path,
+        bibliographic_metadata: Mapping[str, Any],
+    ) -> HttpResponse:
+        register_path = getattr(self._document_commands, "register_source_document_path", None)
+        if not callable(register_path):
+            raise RuntimeError("DOCUMENT_STREAMING_COMMAND_REQUIRED")
+        try:
+            acceptance = register_path(
+                original_path=original_path,
+                bibliographic_metadata=bibliographic_metadata,
             )
-
-        return HttpResponse(
-            status_code=201,
-            body={
-                "document_id": acceptance.document_id.value,
-                "document_status": acceptance.document_status,
-            },
-        )
+        except SourceUnreadableError as exc:
+            return HttpResponse(
+                status_code=422,
+                body={"error_code": "SOURCE_UNREADABLE", "reason": exc.reason},
+            )
+        except CorpusQuotaExceededError as exc:
+            return HttpResponse(status_code=507, body={"error_code": exc.error_code})
+        return _registration_http_response(acceptance)
 
     def _handle_start_diagnosis(self, document_id: str) -> HttpResponse:
         try:
@@ -172,6 +190,25 @@ class SourceProcessingHttpAdapter:
                 "diagnostic_status": acceptance.diagnostic_status,
             },
         )
+
+
+def _registration_http_response(acceptance: RegisterDocumentAcceptance) -> HttpResponse:
+    if acceptance.duplicate:
+        return HttpResponse(
+            status_code=200,
+            body={
+                "document_id": acceptance.document_id.value,
+                "document_status": acceptance.document_status,
+                "duplicate": True,
+            },
+        )
+    return HttpResponse(
+        status_code=201,
+        body={
+            "document_id": acceptance.document_id.value,
+            "document_status": acceptance.document_status,
+        },
+    )
 
 
 class SourceProcessingConversionHttpAdapter:

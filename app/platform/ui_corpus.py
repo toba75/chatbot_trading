@@ -67,6 +67,8 @@ class CorpusPdfDocument:
     canonical_version_id: str | None
     projection_status: str
     selected: bool
+    manual_review_reason: str | None = None
+    failure_error_code: str | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "document_id", _ensure_document_id(self.document_id))
@@ -115,6 +117,14 @@ class CorpusPdfDocument:
         )
         if not isinstance(self.selected, bool):
             raise ValueError("selection document invalide")
+        if self.diagnostic_status == "MANUAL_REVIEW":
+            object.__setattr__(self, "manual_review_reason", _ensure_text(self.manual_review_reason, "motif de revue manuelle requis"))
+        elif self.manual_review_reason is not None:
+            object.__setattr__(self, "manual_review_reason", _ensure_text(self.manual_review_reason, "motif de revue manuelle invalide"))
+        if self.diagnostic_status == "FAILED":
+            object.__setattr__(self, "failure_error_code", _ensure_text(self.failure_error_code, "code d'échec requis"))
+        elif self.failure_error_code is not None:
+            raise ValueError("code d'échec interdit hors FAILED")
 
     @property
     def selectable_for_conversation(self) -> bool:
@@ -129,6 +139,9 @@ class CorpusPdfScreenState:
     active_selected_document_ids: Sequence[str]
     read_model_status: str
     public_error: Mapping[str, Any] | None = None
+    current_cursor: str | None = None
+    next_cursor: str | None = None
+    registration_notice: Mapping[str, Any] | None = None
 
     def __post_init__(self) -> None:
         documents = _ensure_documents(self.documents)
@@ -142,6 +155,18 @@ class CorpusPdfScreenState:
                 raise ValueError("selection active sans document public")
         object.__setattr__(self, "documents", documents)
         object.__setattr__(self, "active_selected_document_ids", active_selection)
+        if self.current_cursor is not None:
+            object.__setattr__(self, "current_cursor", _ensure_document_id(self.current_cursor))
+        if self.next_cursor is not None:
+            object.__setattr__(self, "next_cursor", _ensure_document_id(self.next_cursor))
+        if self.registration_notice is not None:
+            notice = dict(self.registration_notice)
+            if set(notice) != {"document_id", "duplicate"}:
+                raise ValueError("confirmation d'enregistrement invalide")
+            notice["document_id"] = _ensure_document_id(notice["document_id"])
+            if not isinstance(notice["duplicate"], bool):
+                raise ValueError("confirmation duplicate invalide")
+            object.__setattr__(self, "registration_notice", notice)
         object.__setattr__(
             self,
             "read_model_status",
@@ -246,12 +271,28 @@ def render_corpus_pdf_screen(state: CorpusPdfScreenState) -> str:
             '<strong>Fonction UI non opérationnelle</strong><br>'
             f'<code>{public_error}</code></div>'
         )
+    pagination = '<nav aria-label="Pagination du corpus"><a href="/ui/corpus-pdf">Retour au début</a>'
+    if parsed_state.next_cursor is not None:
+        pagination += (
+            '<form method="get" action="/ui/corpus-pdf">'
+            f'<input type="hidden" name="cursor" value="{_escape(parsed_state.next_cursor)}">'
+            '<button type="submit">Page suivante</button></form>'
+        )
+    pagination += "</nav>"
+    registration_confirmation = ""
+    if parsed_state.registration_notice is not None:
+        duplicate_label = "doublon existant" if parsed_state.registration_notice["duplicate"] else "nouveau document"
+        registration_confirmation = (
+            '<div role="status" aria-live="polite"><strong>Enregistrement confirmé</strong> : '
+            f'<code>{_escape(parsed_state.registration_notice["document_id"])}</code> ({duplicate_label}).</div>'
+        )
     return "\n".join(
         (
             "<!doctype html>",
             '<html lang="fr">',
             "<head>",
             '  <meta charset="utf-8">',
+            '  <meta name="viewport" content="width=device-width, initial-scale=1">',
             "  <title>Corpus PDF</title>",
             "  <style>",
             "    body { font-family: Arial, sans-serif; margin: 24px; color: #1f2933; }",
@@ -277,18 +318,19 @@ def render_corpus_pdf_screen(state: CorpusPdfScreenState) -> str:
             "    <h1>Corpus PDF</h1>",
             f'    <p>Read-model documentaire: <span class="status">{_escape(parsed_state.read_model_status)}</span></p>',
             f"    {blocking_notice}",
+            f"    {registration_confirmation}",
             "  </header>",
             "  <main>",
             '    <section aria-labelledby="ajout-pdf">',
             '      <h2 id="ajout-pdf">Ajouter un PDF</h2>',
-            '      <p>Contrat appelé: <code>POST /v1/documents</code></p>',
+            '      <p>Contrat appelé: <code>POST /v1/documents</code>. PDF de 50 Mio maximum.</p>',
             '      <form class="document-registration-form" method="post" action="/v1/documents" enctype="multipart/form-data">',
             f"        <fieldset{fieldset_attributes}>",
             '        <label>Fichier PDF original<input name="original_content" type="file" accept="application/pdf" required></label>',
-            '        <label>Titre documentaire<input name="title" type="text" required></label>',
-            '        <label>Auteur<input name="authors" type="text" required></label>',
+            '        <label>Titre documentaire<input name="title" maxlength="512" type="text" required></label>',
+            '        <label>Auteur<input name="authors" maxlength="256" type="text" required></label>',
             '        <label>Année de publication<input name="publication_year" type="number" min="1" required></label>',
-            '        <label>Édition<input name="edition" type="text" required></label>',
+            '        <label>Édition<input name="edition" maxlength="64" type="text" required></label>',
             "        <button type=\"submit\">Ajouter au corpus</button>",
             "        </fieldset>",
             "      </form>",
@@ -301,6 +343,7 @@ def render_corpus_pdf_screen(state: CorpusPdfScreenState) -> str:
             "        </thead>",
             f"        <tbody>{document_rows}</tbody>",
             "      </table></div>",
+            f"      {pagination}",
             "    </section>",
             "  </main>",
             "</body>",
@@ -320,6 +363,7 @@ def render_pdf_viewer(document: CorpusPdfDocument) -> str:
             '<html lang="fr">',
             "<head>",
             '  <meta charset="utf-8">',
+            '  <meta name="viewport" content="width=device-width, initial-scale=1">',
             f"  <title>PDF original {escaped_document_id}</title>",
             "  <style>",
             "    html, body { height: 100%; margin: 0; color: #1f2933; font-family: Arial, sans-serif; }",
@@ -339,6 +383,7 @@ def render_pdf_viewer(document: CorpusPdfDocument) -> str:
             "  </header>",
             '  <main class="pdf-viewer-main">',
             f'    <iframe class="pdf-viewer-frame" title="PDF original" type="application/pdf" src="/ui/documents/{escaped_document_id}/pdf/content"></iframe>',
+            f'    <p><a href="/ui/documents/{escaped_document_id}/pdf/content">Télécharger le PDF original</a></p>',
             "  </main>",
             "</body>",
             "</html>",
@@ -365,14 +410,24 @@ def render_document_inspection(*, title: str, response: Any) -> str:
             if field is None
             else f"<p>Champ à corriger : <code>{_escape(str(field))}</code>.</p>"
         )
+        feature_not_delivered = payload.get("error_code") in {
+            "CONVERSION_NOT_REQUESTED",
+            "PROJECTION_NOT_REQUESTED",
+            "SERVICE_NOT_CONFIGURED",
+        }
+        guidance = (
+            "<p>fonctionnalité non livrée</p>"
+            if feature_not_delivered
+            else "<p>Vérifiez les champs indiqués ou la disponibilité du service.</p>"
+        )
         content = "".join(
             (
                 '<section role="alert" aria-labelledby="erreur-documentaire">',
                 '<h2 id="erreur-documentaire">Action impossible</h2>',
                 f"<p>Le service a répondu avec le code <code>{error_code}</code>.</p>",
                 field_help,
-                "<p>Vérifiez que l’API orchestratrice et le worker documentaire sont prêts, puis réessayez.</p>",
-                '<p><a href="/ui/corpus-pdf">Réessayer depuis le corpus</a></p>',
+                guidance,
+                '<p><a href="/ui/corpus-pdf">Retour au corpus</a></p>',
                 "</section>",
             )
         )
@@ -414,7 +469,7 @@ def render_document_inspection(*, title: str, response: Any) -> str:
         (
             "<!doctype html>",
             '<html lang="fr">',
-            '<head><meta charset="utf-8"><title>Inspection documentaire</title></head>',
+            '<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Inspection documentaire</title></head>',
             "<body>",
             f"<h1>{_escape(parsed_title)}</h1>",
             f"<p>Statut HTTP public: <code>{status_code}</code></p>",
@@ -490,9 +545,12 @@ def _render_diagnostic_cell(document: CorpusPdfDocument) -> str:
     parsed_document = _ensure_document(document)
     diagnostic_status = _escape(parsed_document.diagnostic_status)
     if parsed_document.diagnostic_status != "DIAGNOSTIC_NOT_REQUESTED":
+        reason = parsed_document.manual_review_reason or parsed_document.failure_error_code
+        reason_html = "" if reason is None else f"<br><strong>Motif :</strong> {_escape(reason)}"
         return "".join(
             (
                 diagnostic_status,
+                reason_html,
                 '<br><a href="/ui/documents/',
                 _escape(parsed_document.document_id),
                 '/diagnostic">Inspecter</a>',
@@ -519,7 +577,7 @@ def _render_not_found(value: str) -> str:
         (
             "<!doctype html>",
             '<html lang="fr">',
-            "<head><meta charset=\"utf-8\"><title>Ressource UI absente</title></head>",
+            "<head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>Ressource UI absente</title></head>",
             "<body>",
             f"<h1>Ressource UI absente</h1><p>{_escape(value)}</p>",
             "</body>",

@@ -73,6 +73,117 @@ class ProcessingRunVersionConflictError(RuntimeError):
         super().__init__("PROCESSING_RUN_VERSION_CONFLICT")
 
 
+class CorpusQuotaExceededError(RuntimeError):
+    """Refus stable avant toute écriture dépassant le quota agrégé."""
+
+    def __init__(self) -> None:
+        self.error_code = "CORPUS_QUOTA_EXCEEDED"
+        super().__init__(self.error_code)
+
+
+@dataclass(frozen=True, slots=True)
+class DocumentCorpusStatusRow:
+    """Projection SQL légère de la liste, sans enfant documentaire."""
+
+    document_id: str
+    title: str
+    document_status: str
+    diagnostic_status: str
+    conversion_status: str
+    canonical_version_id: str | None
+    manual_review_reason: str | None
+    failure_error_code: str | None
+
+
+class PostgresCorpusQuotaRepository:
+    """Compteur agrégé sérialisé par verrou de ligne PostgreSQL."""
+
+    def __init__(self, *, connection_factory: PostgresConnectionFactory) -> None:
+        if not callable(getattr(connection_factory, "connect", None)):
+            raise ValueError("connection_factory quota invalide")
+        self._connection_factory = connection_factory
+
+    def reserve(self, *, fingerprint: str, content_length: int, quota_bytes: int) -> bool:
+        SourceFingerprint.from_value(fingerprint)
+        if isinstance(content_length, bool) or not isinstance(content_length, int) or content_length < 1:
+            raise ValueError("content_length quota invalide")
+        if isinstance(quota_bytes, bool) or not isinstance(quota_bytes, int) or quota_bytes < 1:
+            raise ValueError("quota_bytes invalide")
+        with self._connection_factory.connect() as connection:
+            with connection.transaction():
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        "SELECT total_bytes FROM source_processing.corpus_quota WHERE singleton = true FOR UPDATE",
+                        (),
+                    )
+                    usage_row = cursor.fetchone()
+                    if usage_row is None:
+                        raise RuntimeError("CORPUS_QUOTA_STATE_MISSING")
+                    cursor.execute(
+                        "SELECT content_length FROM source_processing.corpus_original_reservations WHERE fingerprint = %s",
+                        (fingerprint,),
+                    )
+                    existing = cursor.fetchone()
+                    if existing is not None:
+                        if existing[0] != content_length:
+                            raise RuntimeError("CORPUS_QUOTA_RESERVATION_CONFLICT")
+                        return False
+                    if usage_row[0] + content_length > quota_bytes:
+                        raise CorpusQuotaExceededError()
+                    cursor.execute(
+                        "INSERT INTO source_processing.corpus_original_reservations (fingerprint, content_length) VALUES (%s, %s)",
+                        (fingerprint, content_length),
+                    )
+                    cursor.execute(
+                        "UPDATE source_processing.corpus_quota SET total_bytes = total_bytes + %s WHERE singleton = true",
+                        (content_length,),
+                    )
+        return True
+
+    def release(self, *, fingerprint: str, content_length: int) -> None:
+        with self._connection_factory.connect() as connection:
+            with connection.transaction():
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        "SELECT total_bytes FROM source_processing.corpus_quota WHERE singleton = true FOR UPDATE",
+                        (),
+                    )
+                    if cursor.fetchone() is None:
+                        raise RuntimeError("CORPUS_QUOTA_STATE_MISSING")
+                    cursor.execute(
+                        "DELETE FROM source_processing.corpus_original_reservations WHERE fingerprint = %s AND content_length = %s RETURNING content_length",
+                        (fingerprint, content_length),
+                    )
+                    removed = cursor.fetchone()
+                    if removed is not None:
+                        cursor.execute(
+                            "UPDATE source_processing.corpus_quota SET total_bytes = total_bytes - %s WHERE singleton = true",
+                            (content_length,),
+                        )
+
+    def current_usage_bytes(self) -> int:
+        with self._connection_factory.connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT total_bytes FROM source_processing.corpus_quota WHERE singleton = true",
+                    (),
+                )
+                row = cursor.fetchone()
+        if row is None:
+            raise RuntimeError("CORPUS_QUOTA_STATE_MISSING")
+        return row[0]
+
+    def reset_for_acceptance_test(self) -> None:
+        with self._connection_factory.connect() as connection:
+            with connection.transaction():
+                with connection.cursor() as cursor:
+                    cursor.execute("DELETE FROM source_processing.corpus_original_reservations", ())
+                    cursor.execute(
+                        "UPDATE source_processing.corpus_quota SET total_bytes = 0 WHERE singleton = true",
+                        (),
+                    )
+
+
 @dataclass(frozen=True, slots=True)
 class OutboxSubmissionDecision:
     """Résultat local SP avant relais éventuellement cohérent vers platform."""
@@ -123,6 +234,38 @@ class CorpusOriginalSourceStore:
                 stream.write(original_content)
                 stream.flush()
                 os.fsync(stream.fileno())
+            try:
+                os.link(temporary, target)
+            except FileExistsError:
+                pass
+            _verify_file_hash(target, fingerprint.value)
+        finally:
+            if temporary.exists():
+                temporary.unlink()
+        return f"{_ARTIFACT_PREFIX}{relative_path.as_posix()}"
+
+    def put_original_path_if_absent(
+        self,
+        document_id: DocumentId,
+        fingerprint: SourceFingerprint,
+        source_path: Path,
+    ) -> str:
+        if not isinstance(source_path, Path) or not source_path.is_file():
+            raise ValueError("source_path invalide")
+        _verify_file_hash(source_path, fingerprint.value)
+        relative_path = Path(document_id.value) / f"{fingerprint.value}.pdf"
+        target = self._corpus_root / relative_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if target.exists():
+            _verify_file_hash(target, fingerprint.value)
+            return f"{_ARTIFACT_PREFIX}{relative_path.as_posix()}"
+        temporary = target.parent / f".{target.name}.{uuid4().hex}.tmp"
+        try:
+            with source_path.open("rb") as source, temporary.open("xb") as destination:
+                while chunk := source.read(64 * 1024):
+                    destination.write(chunk)
+                destination.flush()
+                os.fsync(destination.fileno())
             try:
                 os.link(temporary, target)
             except FileExistsError:
@@ -198,6 +341,68 @@ class CorpusOriginalSourceStore:
             return b"".join(binary.content_chunks)
         finally:
             binary.close()
+
+
+class QuotaEnforcedOriginalSourceStore(CorpusOriginalSourceStore):
+    """Stockage corpus dont chaque nouvel original réserve son volume durable."""
+
+    def __init__(
+        self,
+        *,
+        corpus_root: Path,
+        quota_repository: PostgresCorpusQuotaRepository,
+        quota_bytes: int,
+    ) -> None:
+        super().__init__(corpus_root=corpus_root)
+        if not isinstance(quota_repository, PostgresCorpusQuotaRepository):
+            raise ValueError("quota_repository invalide")
+        if isinstance(quota_bytes, bool) or not isinstance(quota_bytes, int) or quota_bytes < 1:
+            raise ValueError("quota_bytes invalide")
+        self._quota_repository = quota_repository
+        self._quota_bytes = quota_bytes
+
+    def put_original_if_absent(
+        self,
+        document_id: DocumentId,
+        fingerprint: SourceFingerprint,
+        original_content: bytes,
+    ) -> str:
+        reserved = self._quota_repository.reserve(
+            fingerprint=fingerprint.value,
+            content_length=len(original_content),
+            quota_bytes=self._quota_bytes,
+        )
+        try:
+            return super().put_original_if_absent(document_id, fingerprint, original_content)
+        except BaseException:
+            if reserved:
+                self._quota_repository.release(
+                    fingerprint=fingerprint.value,
+                    content_length=len(original_content),
+                )
+            raise
+
+    def put_original_path_if_absent(
+        self,
+        document_id: DocumentId,
+        fingerprint: SourceFingerprint,
+        source_path: Path,
+    ) -> str:
+        content_length = source_path.stat().st_size
+        reserved = self._quota_repository.reserve(
+            fingerprint=fingerprint.value,
+            content_length=content_length,
+            quota_bytes=self._quota_bytes,
+        )
+        try:
+            return super().put_original_path_if_absent(document_id, fingerprint, source_path)
+        except BaseException:
+            if reserved:
+                self._quota_repository.release(
+                    fingerprint=fingerprint.value,
+                    content_length=content_length,
+                )
+            raise
 
 
 class PostgresDocumentPersistence:
@@ -311,6 +516,52 @@ class PostgresDocumentPersistence:
             )
             for source in sources
         )
+
+    def list_document_status_rows(
+        self,
+        *,
+        limit: int,
+        after_document_id: str | None,
+    ) -> tuple[DocumentCorpusStatusRow, ...]:
+        """Lit une page de statuts en une requête sans hydrater les enfants SP."""
+
+        if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1 or limit > 101:
+            raise ValueError("limit corpus invalide")
+        parsed_after = None
+        if after_document_id is not None:
+            parsed_after = DocumentId.from_value(after_document_id).value
+        predicate = "" if parsed_after is None else "WHERE source.document_id > %s"
+        parameters: tuple[Any, ...] = () if parsed_after is None else (parsed_after,)
+        with self._connection_factory.connect() as connection:
+            with connection.transaction():
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY",
+                        (),
+                    )
+                    cursor.execute(
+                        f"""
+                        SELECT source.document_id,
+                               source.title,
+                               source.status,
+                               COALESCE(run.status, 'DIAGNOSTIC_NOT_REQUESTED'),
+                               COALESCE(conversion.conversion_status, 'CONVERSION_NOT_REQUESTED'),
+                               conversion.canonical_version_id,
+                               run.manual_review_reason,
+                               run.failure_error_code
+                          FROM source_processing.source_documents AS source
+                          LEFT JOIN source_processing.document_processing_runs AS run
+                            ON run.document_id = source.document_id
+                          LEFT JOIN source_processing.document_conversion_requests AS conversion
+                            ON conversion.document_id = source.document_id
+                          {predicate}
+                         ORDER BY source.document_id
+                         LIMIT %s
+                        """,
+                        (*parameters, limit),
+                    )
+                    rows = tuple(cursor.fetchall())
+        return tuple(DocumentCorpusStatusRow(*row) for row in rows)
 
     def find_document_snapshot(
         self,
@@ -940,7 +1191,7 @@ class PostgresDocumentConversionRepository:
 class DocumentPersistenceAdapters:
     """Adaptateurs durables injectables dans l'API et ``worker-documents``."""
 
-    original_source_store: CorpusOriginalSourceStore
+    original_source_store: QuotaEnforcedOriginalSourceStore
     source_document_repository: PostgresDocumentPersistence
     processing_run_repository: PostgresProcessingRunRepository
     document_conversion_repository: PostgresDocumentConversionRepository
@@ -959,8 +1210,12 @@ def build_document_persistence(
         raise ValueError("connection_factory invalide")
     persistence = PostgresDocumentPersistence(connection_factory=connection_factory)
     return DocumentPersistenceAdapters(
-        original_source_store=CorpusOriginalSourceStore(
-            corpus_root=Path(application_configuration.paths.corpus_root)
+        original_source_store=QuotaEnforcedOriginalSourceStore(
+            corpus_root=Path(application_configuration.paths.corpus_root),
+            quota_repository=PostgresCorpusQuotaRepository(
+                connection_factory=connection_factory
+            ),
+            quota_bytes=application_configuration.paths.corpus_quota_bytes,
         ),
         source_document_repository=persistence,
         processing_run_repository=PostgresProcessingRunRepository(persistence),
@@ -1049,7 +1304,11 @@ def _route_from_row(row: Any) -> PageRoute:
 
 
 __all__ = [
+    "CorpusQuotaExceededError",
     "CorpusOriginalSourceStore",
+    "DocumentCorpusStatusRow",
+    "PostgresCorpusQuotaRepository",
+    "QuotaEnforcedOriginalSourceStore",
     "DocumentPersistenceAdapters",
     "PostgresDocumentConversionRepository",
     "PostgresDocumentPersistence",

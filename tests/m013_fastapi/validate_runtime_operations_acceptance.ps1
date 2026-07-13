@@ -275,7 +275,8 @@ async def main(repo_root):
 
     # Un timeout pendant HTTPError.read() est une indisponibilité explicite.
     class TimedOutHttpError(urllib.error.HTTPError):
-        def read(self):
+        def read(self, size=-1):
+            del size
             raise TimeoutError("read timed out with secret")
 
     previous_urlopen = asgi_module.uvicorn.run  # sentinelle locale pour éviter tout fallback implicite
@@ -285,7 +286,7 @@ async def main(repo_root):
         TimedOutHttpError(request.full_url, 503, "Unavailable", {}, BytesIO())
     )
     try:
-        transport = UrllibUiDocumentApiTransport(orchestrator_origin="http://orchestrator-api:8080", timeout_seconds=1)
+        transport = UrllibUiDocumentApiTransport(orchestrator_origin="http://orchestrator-api:8080", timeout_seconds=1, token_path="config/secrets/local/local_api_token")
         try:
             transport.request(method="GET", path="/v1/documents", body=None, content_type=None)
         except UiDocumentApiUnavailableError as exc:
