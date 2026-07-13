@@ -272,6 +272,20 @@ assert_raises(
         justification="Justification explicite.",
     ),
 )
+assert_classification(
+    signals(
+        native_text_state="ABSENT",
+        image_state="NONE",
+        existing_ocr_state="NONE",
+        layout_complexity="SIMPLE",
+        corruption_state="NONE",
+        mixed_content_detected=False,
+        has_table=False,
+        has_formula=False,
+    ),
+    PageDecisionState.EMPTY,
+    "Une page sans texte ni image doit produire EMPTY.",
+)
 assert_raises(
     "signaux diagnostiques insuffisants",
     lambda: decision_for(
@@ -279,7 +293,7 @@ assert_raises(
         signals(
             native_text_state="ABSENT",
             image_state="NONE",
-            existing_ocr_state="NONE",
+            existing_ocr_state="VALID",
             layout_complexity="SIMPLE",
             corruption_state="NONE",
             mixed_content_detected=False,
