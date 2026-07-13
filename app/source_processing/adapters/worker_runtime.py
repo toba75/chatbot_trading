@@ -10,31 +10,28 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from psycopg import Error as PsycopgError
+from psycopg import Error as PsycopgError, IntegrityError, OperationalError
+from uuid import uuid4
 
 from app.platform.configuration import ApplicationConfiguration, load_application_configuration
 from app.platform.job_runtime import JobStatus
+from app.platform.job_runtime.composition import build_postgres_job_runtime
 from app.platform.job_runtime.postgres import JobLeaseConflictError
 from app.platform.postgres import PsycopgConnectionFactory
 from app.platform.postgres_migrations import build_configured_postgres_migration_runner
 from app.platform.request_context import bind_trace_id, reset_trace_id
 from app.source_processing.adapters.postgres_document_persistence import build_document_persistence
+from app.source_processing.adapters.postgres_job_outbox import PostgresJobOutbox
 from app.source_processing.adapters.pypdf_diagnostic_inspector import (
     PdfDiagnosticInspector,
-    PdfInspectionBudget,
 )
+from app.source_processing.adapters.pdf_inspection_process import build_m13_isolated_pdf_inspector
 from app.source_processing.application.document_worker import (
     DocumentDiagnosticWorker,
     WorkerProcessingError,
 )
 
 
-MAX_PDF_BYTES = 50 * 1024 * 1024
-MAX_PDF_PAGES = 1_000
-MAX_PDF_INSPECTION_SECONDS = 90.0
-MAX_PAGE_TEXT_CHARACTERS = 250_000
-MAX_TOTAL_TEXT_CHARACTERS = 5_000_000
-MAX_PAGE_XOBJECTS = 256
 MAX_TRANSIENT_ATTEMPTS = 3
 
 
@@ -47,6 +44,8 @@ class JobLeaseHeartbeat:
         job_queue: Any,
         job_id: str,
         owner_id: str,
+        claim_generation: int,
+        claim_token: str,
         lease_seconds: int,
         heartbeat_seconds: float,
     ) -> None:
@@ -68,6 +67,12 @@ class JobLeaseHeartbeat:
         self._job_queue = job_queue
         self._job_id = job_id
         self._owner_id = owner_id
+        if isinstance(claim_generation, bool) or not isinstance(claim_generation, int) or claim_generation < 1:
+            raise ValueError("claim_generation heartbeat invalide")
+        if not isinstance(claim_token, str) or claim_token.strip() == "":
+            raise ValueError("claim_token heartbeat invalide")
+        self._claim_generation = claim_generation
+        self._claim_token = claim_token
         self._lease_seconds = lease_seconds
         self._heartbeat_seconds = float(heartbeat_seconds)
         self._stop = threading.Event()
@@ -113,6 +118,8 @@ class JobLeaseHeartbeat:
                     self._job_queue.renew_lease(
                         job_id=self._job_id,
                         owner_id=self._owner_id,
+                        claim_generation=self._claim_generation,
+                        claim_token=self._claim_token,
                         lease_seconds=self._lease_seconds,
                     )
                 except Exception as exc:
@@ -148,6 +155,7 @@ def _run_worker(
         isinstance(max_jobs, bool) or not isinstance(max_jobs, int) or max_jobs < 1
     ):
         raise ValueError("max_jobs worker invalide")
+    instance_owner_id = f"{owner_id}:{uuid4()}"
 
     build_configured_postgres_migration_runner(application_configuration).run()
     connection_factory = PsycopgConnectionFactory(
@@ -159,36 +167,33 @@ def _run_worker(
         application_configuration,
         connection_factory=connection_factory,
     )
+    job_runtime = build_postgres_job_runtime(
+        connection_factory=connection_factory,
+        outbox=PostgresJobOutbox(connection_factory=connection_factory),
+    )
     worker = DocumentDiagnosticWorker(
         source_document_repository=persistence.source_document_repository,
         processing_run_repository=persistence.processing_run_repository,
         diagnostic_inspector=PdfDiagnosticInspector(
             original_source_store=persistence.original_source_store,
-            budget=PdfInspectionBudget(
-                max_pdf_bytes=MAX_PDF_BYTES,
-                max_pages=MAX_PDF_PAGES,
-                max_elapsed_seconds=MAX_PDF_INSPECTION_SECONDS,
-                max_text_characters_per_page=MAX_PAGE_TEXT_CHARACTERS,
-                max_total_text_characters=MAX_TOTAL_TEXT_CHARACTERS,
-                max_xobjects_per_page=MAX_PAGE_XOBJECTS,
-            ),
+            inspector=build_m13_isolated_pdf_inspector(),
         ),
     )
     processed = 0
     while max_jobs is None or processed < max_jobs:
         try:
-            persistence.job_outbox_relay.relay_pending(
+            job_runtime.outbox_relay.relay_pending(
                 limit=16,
-                owner_id=f"{owner_id}-OUTBOX",
+                owner_id=f"{instance_owner_id}-OUTBOX",
                 lease_seconds=lease_seconds,
             )
-            claimed = persistence.job_queue.claim_next(
-                owner_id=owner_id,
+            claimed = job_runtime.queue.claim_next(
+                owner_id=instance_owner_id,
                 lease_seconds=lease_seconds,
                 job_names=("DIAGNOSE",),
             )
-        except PsycopgError:
-            _log_runtime_error(owner_id=owner_id, error_code="POSTGRES_TRANSIENT_FAILURE")
+        except OperationalError:
+            _log_runtime_error(owner_id=instance_owner_id, error_code="POSTGRES_TRANSIENT_FAILURE")
             time.sleep(poll_seconds)
             continue
         if claimed is None:
@@ -200,9 +205,11 @@ def _run_worker(
         started_ns = time.perf_counter_ns()
         trace_token = bind_trace_id(claimed.trace_id)
         heartbeat = JobLeaseHeartbeat(
-            job_queue=persistence.job_queue,
+            job_queue=job_runtime.queue,
             job_id=claimed.job.job_id,
-            owner_id=owner_id,
+            owner_id=instance_owner_id,
+            claim_generation=claimed.claim_generation,
+            claim_token=claimed.claim_token,
             lease_seconds=lease_seconds,
             heartbeat_seconds=max(0.05, lease_seconds / 3),
         )
@@ -214,36 +221,22 @@ def _run_worker(
                 result = worker.execute(claimed)
             except Exception as exc:
                 error_code, retryable = _classify_processing_error(exc)
-                if retryable:
-                    job = heartbeat.finalize(
-                        lambda: persistence.job_queue.retry_or_fail(
-                            job_id=claimed.job.job_id,
-                            owner_id=owner_id,
-                            error_code=error_code,
-                            max_attempts=MAX_TRANSIENT_ATTEMPTS,
-                        )
-                    )
-                    if job.status is JobStatus.FAILED:
-                        worker.mark_failed(claimed, error_code)
-                        status = "failed"
-                    else:
-                        status = "retry_scheduled"
-                else:
-                    def fail_permanently() -> Any:
-                        worker.mark_failed(claimed, error_code)
-                        return persistence.job_queue.mark_failed(
-                            job_id=claimed.job.job_id,
-                            owner_id=owner_id,
-                            failure_reason=error_code,
-                        )
-
-                    heartbeat.finalize(fail_permanently)
-                    status = "failed"
+                status = _settle_processing_failure(
+                    claimed=claimed,
+                    error_code=error_code,
+                    retryable=retryable,
+                    max_attempts=MAX_TRANSIENT_ATTEMPTS,
+                    worker=worker,
+                    job_queue=job_runtime.queue,
+                    heartbeat=heartbeat,
+                )
             else:
                 heartbeat.finalize(
-                    lambda: persistence.job_queue.mark_succeeded(
+                    lambda: job_runtime.queue.mark_succeeded(
                         job_id=claimed.job.job_id,
-                        owner_id=owner_id,
+                        owner_id=instance_owner_id,
+                        claim_generation=claimed.claim_generation,
+                        claim_token=claimed.claim_token,
                         result=result,
                     )
                 )
@@ -259,7 +252,7 @@ def _run_worker(
         _log_job_result(
             application_configuration=application_configuration,
             claimed=claimed,
-            owner_id=owner_id,
+            owner_id=instance_owner_id,
             status=status,
             error_code=error_code,
             duration_ms=duration_ms,
@@ -270,9 +263,55 @@ def _run_worker(
 def _classify_processing_error(error: Exception) -> tuple[str, bool]:
     if isinstance(error, WorkerProcessingError):
         return error.error_code, error.retryable
-    if isinstance(error, PsycopgError):
+    if isinstance(error, OperationalError):
         return "POSTGRES_TRANSIENT_FAILURE", True
+    if isinstance(error, IntegrityError):
+        return "POSTGRES_INTEGRITY_FAILURE", False
+    if isinstance(error, PsycopgError):
+        return "POSTGRES_PERMANENT_FAILURE", False
     return "WORKER_UNEXPECTED_ERROR", False
+
+
+def _settle_processing_failure(
+    *,
+    claimed: Any,
+    error_code: str,
+    retryable: bool,
+    max_attempts: int,
+    worker: Any,
+    job_queue: Any,
+    heartbeat: Any,
+) -> str:
+    """Publie SP avant tout échec terminal platform, puis permet la réconciliation."""
+
+    if retryable and claimed.execution_attempts < max_attempts:
+        job = heartbeat.finalize(
+            lambda: job_queue.schedule_retry(
+                job_id=claimed.job.job_id,
+                owner_id=claimed.lease_owner,
+                claim_generation=claimed.claim_generation,
+                claim_token=claimed.claim_token,
+                max_attempts=max_attempts,
+            )
+        )
+        if job.status is not JobStatus.PENDING:
+            raise RuntimeError("JOB_RETRY_STATE_INVALID")
+        return "retry_scheduled"
+
+    def fail_after_sp_publication() -> Any:
+        worker.mark_failed(claimed, error_code)
+        return job_queue.mark_failed(
+            job_id=claimed.job.job_id,
+            owner_id=claimed.lease_owner,
+            claim_generation=claimed.claim_generation,
+            claim_token=claimed.claim_token,
+            failure_reason=error_code,
+        )
+
+    job = heartbeat.finalize(fail_after_sp_publication)
+    if job.status is not JobStatus.FAILED:
+        raise RuntimeError("JOB_TERMINAL_STATE_INVALID")
+    return "failed"
 
 
 def _log_runtime_error(*, owner_id: str, error_code: str) -> None:
@@ -343,4 +382,10 @@ if __name__ == "__main__":
     raise SystemExit(main())
 
 
-__all__ = ["JobLeaseHeartbeat", "_run_worker", "main"]
+__all__ = [
+    "JobLeaseHeartbeat",
+    "_classify_processing_error",
+    "_run_worker",
+    "_settle_processing_failure",
+    "main",
+]

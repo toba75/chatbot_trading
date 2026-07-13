@@ -8,7 +8,7 @@ from enum import Enum
 from typing import Any, Protocol
 
 from app.contracts.identity import DomainIdentifier
-from app.platform.job_runtime import (
+from app.contracts.technical_jobs import (
     JobIdempotenceKey,
     JobPriority,
     JobRequest,
@@ -58,7 +58,6 @@ class ProcessingRunLookupRepository(ProcessingRunRepository, Protocol):
     def submit_processing_run(
         self,
         processing_run: DocumentProcessingRun,
-        job_queue: "DiagnosisJobQueue",
         job_request: JobRequest,
     ) -> JobSubmissionDecision:
         """Persiste la tentative et soumet le job DIAGNOSE en une opération atomique."""
@@ -76,22 +75,9 @@ class DocumentConversionRepository(Protocol):
     def submit_conversion_request(
         self,
         conversion_state: "DocumentConversionState",
-        job_queue: "DiagnosisJobQueue",
         job_request: JobRequest,
     ) -> JobSubmissionDecision:
         """Persiste la demande de conversion et soumet le job CONVERT_DOCUMENT."""
-
-
-class DiagnosisJobQueue(Protocol):
-    """Port de soumission idempotente au runtime de jobs M-002."""
-
-    def submit(
-        self,
-        request: JobRequest,
-        *,
-        recalculate: bool,
-    ) -> JobSubmissionDecision:
-        """Soumet une demande technique DIAGNOSE."""
 
 
 class DocumentCommandError(ValueError):
@@ -296,22 +282,20 @@ class DocumentCommandService:
         source_document_repository: SourceDocumentLookupRepository,
         document_inspector: DocumentInspector,
         processing_run_repository: ProcessingRunLookupRepository,
-        job_queue: DiagnosisJobQueue,
         diagnosis_configuration_hash: str,
         code_version: str,
         model_version: str,
     ) -> None:
         if not callable(getattr(source_document_repository, "find_by_document_id", None)):
             raise ValueError("source_document_repository sans lecture par document_id")
+        if not callable(getattr(document_inspector, "inspect_content", None)):
+            raise ValueError("document_inspector sans validation d'enregistrement")
         if not callable(getattr(processing_run_repository, "find_by_document_id", None)):
             raise ValueError("processing_run_repository sans lecture par document_id")
         if not callable(getattr(processing_run_repository, "submit_processing_run", None)):
             raise ValueError("processing_run_repository sans soumission atomique")
-        if not callable(getattr(job_queue, "submit", None)):
-            raise ValueError("job_queue invalide")
         self._source_document_repository = source_document_repository
         self._processing_run_repository = processing_run_repository
-        self._job_queue = job_queue
         self._diagnosis_configuration_hash = _ensure_sha256(
             diagnosis_configuration_hash,
             "diagnosis_configuration_hash",
@@ -326,6 +310,7 @@ class DocumentCommandService:
             document_inspector=document_inspector,
             processing_run_repository=processing_run_repository,
         )
+        self._document_inspector = document_inspector
 
     def register_source_document(
         self,
@@ -333,6 +318,10 @@ class DocumentCommandService:
         original_content: bytes,
         bibliographic_metadata: Mapping[str, Any],
     ) -> RegisterDocumentAcceptance:
+        try:
+            self._document_inspector.inspect_content(original_content)
+        except ValueError as exc:
+            raise SourceUnreadableError(reason=str(exc)) from exc
         result = self._register_handler.handle(
             RegisterSourceDocumentCommand(
                 original_content=original_content,
@@ -406,7 +395,6 @@ class DocumentCommandService:
         )
         submission = self._processing_run_repository.submit_processing_run(
             processing_run=processing_run,
-            job_queue=self._job_queue,
             job_request=job_request,
         )
         if not submission.created:
@@ -426,7 +414,6 @@ class DocumentConversionCommandService:
         source_document_repository: SourceDocumentLookupRepository,
         processing_run_repository: ProcessingRunLookupRepository,
         document_conversion_repository: DocumentConversionRepository,
-        job_queue: DiagnosisJobQueue,
         conversion_configuration_hash: str,
         code_version: str,
         model_version: str,
@@ -439,12 +426,9 @@ class DocumentConversionCommandService:
             raise ValueError("document_conversion_repository sans lecture de conversion")
         if not callable(getattr(document_conversion_repository, "submit_conversion_request", None)):
             raise ValueError("document_conversion_repository sans soumission de conversion")
-        if not callable(getattr(job_queue, "submit", None)):
-            raise ValueError("job_queue invalide")
         self._source_document_repository = source_document_repository
         self._processing_run_repository = processing_run_repository
         self._document_conversion_repository = document_conversion_repository
-        self._job_queue = job_queue
         self._conversion_configuration_hash = _ensure_sha256(
             conversion_configuration_hash,
             "conversion_configuration_hash",
@@ -595,7 +579,6 @@ class DocumentConversionCommandService:
         )
         submission = self._document_conversion_repository.submit_conversion_request(
             conversion_state=conversion_state,
-            job_queue=self._job_queue,
             job_request=job_request,
         )
         if not submission.created:
@@ -731,7 +714,6 @@ __all__ = [
     "CanonicalQualityRejectedError",
     "ConversionAlreadyRequestedError",
     "DiagnosisAlreadyRequestedError",
-    "DiagnosisJobQueue",
     "DocumentCommandError",
     "DocumentCommandService",
     "DocumentConversionAcceptance",

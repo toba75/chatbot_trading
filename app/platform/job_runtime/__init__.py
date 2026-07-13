@@ -6,9 +6,17 @@ import math
 import re
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from enum import Enum
 from types import MappingProxyType
 from typing import Any
+
+from app.contracts.technical_jobs import (
+    JobIdempotenceKey,
+    JobPriority,
+    JobRecord,
+    JobRequest,
+    JobStatus,
+    JobSubmissionDecision,
+)
 
 
 _HASH_PATTERN = re.compile(r"^[a-f0-9]{64}$")
@@ -32,40 +40,6 @@ _LOCAL_JOB_NAMES = (
     "BACKTEST",
     "VERIFY_RESPONSE",
 )
-
-
-class JobPriority(str, Enum):
-    """Priorite technique explicite d'un job local."""
-
-    P0 = "P0"
-    P1 = "P1"
-    P2 = "P2"
-    P3 = "P3"
-    P4 = "P4"
-    P5 = "P5"
-
-    @property
-    def rank(self) -> int:
-        return _PRIORITY_RANKS[self]
-
-
-class JobStatus(str, Enum):
-    """Statut explicite d'un job local."""
-
-    PENDING = "pending"
-    RUNNING = "running"
-    SUCCEEDED = "succeeded"
-    FAILED = "failed"
-
-
-_PRIORITY_RANKS = {
-    JobPriority.P0: 0,
-    JobPriority.P1: 1,
-    JobPriority.P2: 2,
-    JobPriority.P3: 3,
-    JobPriority.P4: 4,
-    JobPriority.P5: 5,
-}
 
 
 @dataclass(frozen=True)
@@ -99,104 +73,6 @@ class JobCatalog:
         if parsed_name not in self.job_names:
             raise ValueError(f"job inconnu: {parsed_name}")
         return parsed_name
-
-
-@dataclass(frozen=True)
-class JobIdempotenceKey:
-    """Cle complete empechant le recalcul implicite d'un job reussi."""
-
-    job_name: str
-    input_hash: str
-    configuration_hash: str
-    code_version: str
-    model_version: str
-
-    def __post_init__(self) -> None:
-        _ensure_text(self.job_name, "job_name")
-        _ensure_hash(self.input_hash, "input_hash")
-        _ensure_hash(self.configuration_hash, "configuration_hash")
-        _ensure_text(self.code_version, "code_version")
-        _ensure_text(self.model_version, "model_version")
-
-    def identity_tuple(self) -> tuple[str, str, str, str, str]:
-        return (
-            self.job_name,
-            self.input_hash,
-            self.configuration_hash,
-            self.code_version,
-            self.model_version,
-        )
-
-
-@dataclass(frozen=True)
-class JobRequest:
-    """Demande technique d'execution d'un job."""
-
-    job_name: str
-    priority: JobPriority
-    idempotence_key: JobIdempotenceKey
-    payload: Mapping[str, Any]
-
-    def __post_init__(self) -> None:
-        job_name = _ensure_text(self.job_name, "job_name")
-        if not isinstance(self.priority, JobPriority):
-            raise ValueError("priority invalide")
-        if not isinstance(self.idempotence_key, JobIdempotenceKey):
-            raise ValueError("idempotence_key invalide")
-        if self.idempotence_key.job_name != job_name:
-            raise ValueError("idempotence_key incoherente avec job_name")
-        object.__setattr__(self, "payload", _freeze_mapping(self.payload, "payload"))
-
-
-@dataclass(frozen=True)
-class JobRecord:
-    """Etat observable d'un job technique local."""
-
-    sequence: int
-    job_id: str
-    request: JobRequest
-    status: JobStatus
-    result: Mapping[str, Any] | None
-    failure_reason: str | None
-
-    def __post_init__(self) -> None:
-        _ensure_positive_integer(self.sequence, "sequence")
-        _ensure_job_id(self.job_id)
-        if not isinstance(self.request, JobRequest):
-            raise ValueError("request invalide")
-        if not isinstance(self.status, JobStatus):
-            raise ValueError("status invalide")
-
-        if self.status is JobStatus.SUCCEEDED:
-            if self.result is None:
-                raise ValueError("result absent")
-            object.__setattr__(self, "result", _freeze_mapping(self.result, "result"))
-        elif self.result is not None:
-            raise ValueError("result interdit sans statut succeeded")
-
-        if self.status is JobStatus.FAILED:
-            _ensure_text(self.failure_reason, "failure_reason")
-        elif self.failure_reason is not None:
-            raise ValueError("failure_reason interdit sans statut failed")
-
-
-@dataclass(frozen=True)
-class JobSubmissionDecision:
-    """Decision observable apres soumission d'un job."""
-
-    job: JobRecord
-    created: bool
-    recalculation_refused: bool
-
-    def __post_init__(self) -> None:
-        if not isinstance(self.job, JobRecord):
-            raise ValueError("job invalide")
-        if not isinstance(self.created, bool):
-            raise ValueError("created non booleen")
-        if not isinstance(self.recalculation_refused, bool):
-            raise ValueError("recalculation_refused non booleen")
-        if self.created and self.recalculation_refused:
-            raise ValueError("decision de soumission incoherente")
 
 
 class InMemoryJobQueue:

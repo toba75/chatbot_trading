@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from hashlib import sha256
 from collections.abc import Mapping, Sequence
 from typing import Any
 
@@ -28,6 +29,13 @@ class KnowledgeProjectionVersionConflictError(RuntimeError):
 
     def __init__(self) -> None:
         super().__init__("KA_PROJECTION_VERSION_CONFLICT")
+
+
+class KnowledgeProjectionReplayConflictError(RuntimeError):
+    """Une version KA rejouée ne peut désigner des sorties divergentes."""
+
+    def __init__(self) -> None:
+        super().__init__("KA_PROJECTION_REPLAY_DIVERGENCE")
 
 
 class PostgresKnowledgeProjectionRepository:
@@ -169,12 +177,22 @@ class PostgresKnowledgeProjectionRepository:
         if len(samples) > self._sample_storage_limit:
             raise ValueError("échantillons KA au-delà de la limite de stockage")
         observed_at = ensure_utc_instant(state_observed_at, "state_observed_at")
+        if projection.status is ProjectionStatus.SEARCHABLE and (
+            chunk_count < 1 or len(samples) < 1
+        ):
+            raise ValueError("KA_SEARCHABLE_OUTPUTS_INCOMPLETE")
+        outputs_fingerprint = _outputs_fingerprint(
+            projection=projection,
+            chunk_count=chunk_count,
+            samples=samples,
+            state_observed_at=observed_at,
+        )
         profile = projection.projection_profile
         with self._connection_factory.connect() as connection:
             with connection.transaction(), connection.cursor() as cursor:
                 cursor.execute(
                     """
-                    SELECT aggregate_version
+                    SELECT aggregate_version, outputs_fingerprint
                       FROM knowledge_access.knowledge_projections
                      WHERE projection_id = %s
                      FOR UPDATE
@@ -182,26 +200,30 @@ class PostgresKnowledgeProjectionRepository:
                     (projection.projection_id,),
                 )
                 existing_version_row = cursor.fetchone()
-                if existing_version_row is not None and existing_version_row[0] not in (
-                    projection.aggregate_version - 1,
-                    projection.aggregate_version,
-                ):
-                    raise KnowledgeProjectionVersionConflictError()
+                if existing_version_row is not None:
+                    if existing_version_row[0] == projection.aggregate_version:
+                        if existing_version_row[1] == outputs_fingerprint:
+                            return
+                        raise KnowledgeProjectionReplayConflictError()
+                    if existing_version_row[0] != projection.aggregate_version - 1:
+                        raise KnowledgeProjectionVersionConflictError()
                 cursor.execute(
                     """
                     INSERT INTO knowledge_access.knowledge_projections (
                         projection_id, document_id, canonical_version_id,
                         projection_profile_id, chunking_profile, embedding_model,
                         sparse_profile, index_schema, build_fingerprint, status,
-                        chunk_count, state_observed_at, aggregate_version
+                        chunk_count, state_observed_at, aggregate_version,
+                        outputs_fingerprint
                     )
 
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT (projection_id) DO UPDATE SET
                         status = EXCLUDED.status,
                         chunk_count = EXCLUDED.chunk_count,
                         state_observed_at = EXCLUDED.state_observed_at,
-                        aggregate_version = EXCLUDED.aggregate_version
+                        aggregate_version = EXCLUDED.aggregate_version,
+                        outputs_fingerprint = EXCLUDED.outputs_fingerprint
                     """,
                     (
                         projection.projection_id,
@@ -217,6 +239,7 @@ class PostgresKnowledgeProjectionRepository:
                         chunk_count,
                         observed_at,
                         projection.aggregate_version,
+                        outputs_fingerprint,
                     ),
                 )
                 cursor.execute(
@@ -491,6 +514,39 @@ def _ensure_chunks(
     return chunks
 
 
+def _outputs_fingerprint(
+    *,
+    projection: KnowledgeProjection,
+    chunk_count: int,
+    samples: tuple[KnowledgeChunk, ...],
+    state_observed_at: str,
+) -> str:
+    payload = {
+        "aggregate_version": projection.aggregate_version,
+        "build_fingerprint": projection.build_fingerprint.value,
+        "chunk_count": chunk_count,
+        "profile": projection.projection_profile.to_fingerprint_payload(),
+        "projection_id": projection.projection_id,
+        "samples": [
+            {
+                "chunk_id": sample.chunk_id,
+                "chunk_level": sample.chunk_level,
+                "content_hash": sample.content_hash,
+                "parent_chunk_id": sample.parent_chunk_id,
+                "profile_id": sample.profile_id,
+                "profile_version": sample.profile_version,
+                "source_locators": [locator.to_payload() for locator in sample.source_locators],
+                "text": sample.text,
+            }
+            for sample in samples
+        ],
+        "state_observed_at": state_observed_at,
+        "status": projection.status.value,
+    }
+    serialized = json.dumps(payload, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+    return sha256(serialized.encode("utf-8")).hexdigest()
+
+
 def _ensure_projection(value: KnowledgeProjection) -> KnowledgeProjection:
     if not isinstance(value, KnowledgeProjection):
         raise ValueError("KnowledgeProjection invalide")
@@ -504,6 +560,7 @@ def _ensure_build_fingerprint(value: BuildFingerprint) -> BuildFingerprint:
 
 
 __all__ = [
+    "KnowledgeProjectionReplayConflictError",
     "KnowledgeProjectionVersionConflictError",
     "PostgresKnowledgeProjectionRepository",
     "PostgresProjectionReadRepository",

@@ -10,9 +10,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from app.platform.job_runtime import JOB_RUNTIME_CATALOG, JobRequest
-from app.platform.job_runtime.postgres import PostgresJobQueue
-from app.platform.job_runtime.relay import JobOutboxRelay
+from app.contracts.technical_jobs import JobRequest
 from app.platform.configuration import ApplicationConfiguration
 from app.platform.postgres import (
     PostgresConnection,
@@ -29,7 +27,6 @@ from app.source_processing.application.original_queries import (
     OriginalHashMismatchError,
     VerifiedOriginalBinary,
 )
-from app.source_processing.adapters.postgres_job_outbox import PostgresJobOutbox
 from app.source_processing.domain.document_processing_run import (
     DiagnosticVersion,
     DocumentProcessingRun,
@@ -396,13 +393,10 @@ class PostgresDocumentPersistence:
     def submit_processing_run(
         self,
         processing_run: DocumentProcessingRun,
-        job_queue: PostgresJobQueue,
         job_request: JobRequest,
     ) -> OutboxSubmissionDecision:
         if not isinstance(processing_run, DocumentProcessingRun):
             raise ValueError("processing_run invalide")
-        if not isinstance(job_queue, PostgresJobQueue):
-            raise ValueError("PERSISTENT_JOB_QUEUE_REQUIRED")
         with self._connection_factory.connect() as connection:
             with connection.transaction():
                 submission = self._enqueue_job_outbox(
@@ -426,13 +420,10 @@ class PostgresDocumentPersistence:
     def submit_conversion_request(
         self,
         conversion_state: DocumentConversionState,
-        job_queue: PostgresJobQueue,
         job_request: JobRequest,
     ) -> OutboxSubmissionDecision:
         if not isinstance(conversion_state, DocumentConversionState):
             raise ValueError("conversion_state invalide")
-        if not isinstance(job_queue, PostgresJobQueue):
-            raise ValueError("PERSISTENT_JOB_QUEUE_REQUIRED")
         with self._connection_factory.connect() as connection:
             with connection.transaction():
                 submission = self._enqueue_job_outbox(
@@ -921,10 +912,9 @@ class PostgresProcessingRunRepository:
     def submit_processing_run(
         self,
         processing_run: DocumentProcessingRun,
-        job_queue: PostgresJobQueue,
         job_request: JobRequest,
     ) -> OutboxSubmissionDecision:
-        return self._persistence.submit_processing_run(processing_run, job_queue, job_request)
+        return self._persistence.submit_processing_run(processing_run, job_request)
 
 
 class PostgresDocumentConversionRepository:
@@ -941,10 +931,9 @@ class PostgresDocumentConversionRepository:
     def submit_conversion_request(
         self,
         conversion_state: DocumentConversionState,
-        job_queue: PostgresJobQueue,
         job_request: JobRequest,
     ) -> OutboxSubmissionDecision:
-        return self._persistence.submit_conversion_request(conversion_state, job_queue, job_request)
+        return self._persistence.submit_conversion_request(conversion_state, job_request)
 
 
 @dataclass(frozen=True)
@@ -955,8 +944,6 @@ class DocumentPersistenceAdapters:
     source_document_repository: PostgresDocumentPersistence
     processing_run_repository: PostgresProcessingRunRepository
     document_conversion_repository: PostgresDocumentConversionRepository
-    job_queue: PostgresJobQueue
-    job_outbox_relay: JobOutboxRelay
 
 
 def build_document_persistence(
@@ -971,10 +958,6 @@ def build_document_persistence(
     if not callable(getattr(connection_factory, "connect", None)):
         raise ValueError("connection_factory invalide")
     persistence = PostgresDocumentPersistence(connection_factory=connection_factory)
-    job_queue = PostgresJobQueue(
-        connection_factory=connection_factory,
-        catalog=JOB_RUNTIME_CATALOG,
-    )
     return DocumentPersistenceAdapters(
         original_source_store=CorpusOriginalSourceStore(
             corpus_root=Path(application_configuration.paths.corpus_root)
@@ -982,11 +965,6 @@ def build_document_persistence(
         source_document_repository=persistence,
         processing_run_repository=PostgresProcessingRunRepository(persistence),
         document_conversion_repository=PostgresDocumentConversionRepository(persistence),
-        job_queue=job_queue,
-        job_outbox_relay=JobOutboxRelay(
-            outbox=PostgresJobOutbox(connection_factory=connection_factory),
-            consumer=job_queue,
-        ),
     )
 
 

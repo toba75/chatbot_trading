@@ -31,7 +31,9 @@ from app.platform.postgres_migrations import (
 from app.source_processing.adapters.document_http import SourceProcessingHttpAdapter
 from app.source_processing.adapters.http import build_document_command_router
 from app.source_processing.adapters.original_http import build_original_pdf_router
-from app.source_processing.adapters.pdf_document_inspector import CorpusPdfDocumentInspector
+from app.source_processing.adapters.pdf_document_inspector import (
+    build_m13_corpus_pdf_document_inspector,
+)
 from app.source_processing.adapters.postgres_document_persistence import (
     build_document_persistence,
 )
@@ -218,11 +220,10 @@ def build_orchestrator_composition_root(
     document_commands = DocumentCommandService(
         original_source_store=persistence.original_source_store,
         source_document_repository=persistence.source_document_repository,
-        document_inspector=CorpusPdfDocumentInspector(
-            original_source_store=persistence.original_source_store
+        document_inspector=build_m13_corpus_pdf_document_inspector(
+            original_source_store=persistence.original_source_store,
         ),
         processing_run_repository=persistence.processing_run_repository,
-        job_queue=persistence.job_queue,
         diagnosis_configuration_hash=configuration.configuration_hash,
         code_version=version("chatbot-trading"),
         model_version=f"pypdf-{version('pypdf')}",

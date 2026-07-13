@@ -7,6 +7,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from hashlib import sha256
 from typing import Any, Protocol
+from uuid import UUID
 
 from app.platform.job_runtime import JobIdempotenceKey, JobPriority, JobRequest
 
@@ -77,11 +78,25 @@ class ClaimedRelayMessage:
 
     message: RelayedJobMessage
     owner_id: str
+    claim_generation: int
+    claim_token: str
 
     def __post_init__(self) -> None:
         if not isinstance(self.message, RelayedJobMessage):
             raise ValueError("message relayé invalide")
         _required_text(self.owner_id, "owner_id")
+        if (
+            isinstance(self.claim_generation, bool)
+            or not isinstance(self.claim_generation, int)
+            or self.claim_generation < 1
+        ):
+            raise ValueError("génération claim relais invalide")
+        try:
+            token = UUID(_required_text(self.claim_token, "claim_token"))
+        except ValueError as exc:
+            raise ValueError("claim_token relais invalide") from exc
+        if token.version != 4:
+            raise ValueError("claim_token relais invalide")
 
 
 class RelayOutbox(Protocol):

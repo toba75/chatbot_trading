@@ -25,6 +25,7 @@ from app.source_processing.adapters.pypdf_diagnostic_inspector import (
     PdfInspectionBudget,
     PdfInspectionError,
 )
+from app.source_processing.adapters.pdf_inspection_process import IsolatedPdfInspector
 from app.source_processing.adapters.worker_runtime import JobLeaseHeartbeat
 from app.source_processing.application.document_worker import DiagnosticInspector
 from app.source_processing.domain.document_processing_run import (
@@ -61,8 +62,9 @@ class RenewingQueue:
         self.renewals = 0
         self.finished = False
 
-    def renew_lease(self, *, job_id, owner_id, lease_seconds):
+    def renew_lease(self, *, job_id, owner_id, claim_generation, claim_token, lease_seconds):
         assert job_id == "JOB-LONG" and owner_id == "WORKER-A" and lease_seconds == 1
+        assert claim_generation == 1 and claim_token == "00000000-0000-4000-8000-000000000001"
         self.renewals += 1
 
 
@@ -109,6 +111,8 @@ heartbeat = JobLeaseHeartbeat(
     job_queue=queue,
     job_id="JOB-LONG",
     owner_id="WORKER-A",
+    claim_generation=1,
+    claim_token="00000000-0000-4000-8000-000000000001",
     lease_seconds=1,
     heartbeat_seconds=0.02,
 )
@@ -122,6 +126,8 @@ lost = JobLeaseHeartbeat(
     job_queue=LostQueue(),
     job_id="JOB-LONG",
     owner_id="WORKER-A",
+    claim_generation=1,
+    claim_token="00000000-0000-4000-8000-000000000001",
     lease_seconds=1,
     heartbeat_seconds=0.01,
 )
@@ -152,23 +158,28 @@ with tempfile.TemporaryDirectory() as directory:
         max_text_characters_per_page=10_000,
         max_total_text_characters=20_000,
         max_xobjects_per_page=16,
+        max_process_memory_bytes=256 * 1024 * 1024,
     )
-    inspector = PdfDiagnosticInspector(original_source_store=FakeStore(pdf_path), budget=budget)
+    inspector = PdfDiagnosticInspector(
+        original_source_store=FakeStore(pdf_path),
+        inspector=IsolatedPdfInspector(budget=budget),
+    )
     assert isinstance(inspector, DiagnosticInspector)
     diagnostics = inspector.inspect("originals/a.pdf")
     assert len(diagnostics) == 1
-    assert diagnostics[0].signals.corruption_state.value == "CORRUPT"
+    assert diagnostics[0].signals.corruption_state.value == "NONE"
 
     oversized = PdfDiagnosticInspector(
         original_source_store=FakeStore(pdf_path),
-        budget=PdfInspectionBudget(
+        inspector=IsolatedPdfInspector(budget=PdfInspectionBudget(
             max_pdf_bytes=8,
             max_pages=4,
             max_elapsed_seconds=2.0,
             max_text_characters_per_page=10_000,
             max_total_text_characters=20_000,
             max_xobjects_per_page=16,
-        ),
+            max_process_memory_bytes=256 * 1024 * 1024,
+        )),
     )
     try:
         oversized.inspect("originals/a.pdf")

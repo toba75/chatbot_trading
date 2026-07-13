@@ -56,6 +56,7 @@ class PageDecisionState(str, Enum):
     OCR_BAD = "OCR_BAD"
     MIXED_CONTENT = "MIXED_CONTENT"
     COMPLEX_VISUAL = "COMPLEX_VISUAL"
+    EMPTY = "EMPTY"
     UNSUPPORTED_OR_CORRUPT = "UNSUPPORTED_OR_CORRUPT"
 
     @classmethod
@@ -592,6 +593,12 @@ class PageDiagnosticPolicy:
             page_state = PageDecisionState.NATIVE_SUSPECT
         elif parsed_signals.native_text_state is NativeTextSignal.RELIABLE:
             page_state = PageDecisionState.NATIVE_OK
+        elif (
+            parsed_signals.native_text_state is NativeTextSignal.ABSENT
+            and parsed_signals.image_state is PageImageSignal.NONE
+            and parsed_signals.existing_ocr_state is ExistingOcrSignal.NONE
+        ):
+            page_state = PageDecisionState.EMPTY
         else:
             raise ValueError("signaux diagnostiques insuffisants")
 
@@ -1504,7 +1511,10 @@ def _manual_review_reason_for_page(
     parsed_page_decision = _ensure_page_decision(page_decision)
     parsed_configuration = _ensure_routing_configuration(routing_configuration)
 
-    if parsed_page_decision.page_state is PageDecisionState.UNSUPPORTED_OR_CORRUPT:
+    if parsed_page_decision.page_state in (
+        PageDecisionState.EMPTY,
+        PageDecisionState.UNSUPPORTED_OR_CORRUPT,
+    ):
         return (
             f"page {parsed_page_decision.page_number.value} "
             "sans route documentaire admissible"

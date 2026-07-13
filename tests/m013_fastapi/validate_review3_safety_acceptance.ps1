@@ -46,6 +46,12 @@ from app.source_processing.adapters.pdf_inspection_process import (
 )
 from app.source_processing.adapters.pypdf_diagnostic_inspector import PdfDiagnosticInspector
 from app.source_processing.application.document_worker import DiagnosticInspector
+from app.source_processing.domain.document_processing_run import (
+    DiagnosticVersion,
+    PageDecisionState,
+    PageDiagnosticPolicy,
+    PageNumber,
+)
 from app.source_processing.adapters.worker_runtime import (
     _classify_processing_error,
     _settle_processing_failure,
@@ -253,6 +259,33 @@ with tempfile.TemporaryDirectory() as directory:
     assert isinstance(diagnostic, DiagnosticInspector)
     result = diagnostic.inspect("artifact:blank.pdf")
     assert result[0].signals.corruption_state.value == "NONE"
+    decision = PageDiagnosticPolicy().classify(
+        page_number=PageNumber.from_value(1),
+        signals=result[0].signals,
+        diagnostic_version=DiagnosticVersion.from_value(result[0].diagnostic_version),
+        justification=result[0].justification,
+    )
+    assert decision.page_state is PageDecisionState.EMPTY
+
+    try:
+        isolated.inspect_content(b"%PDF-1.7\nmarqueurs seulement\n%%EOF\n")
+    except PdfInspectionProcessError as exc:
+        assert exc.error_code in {"PDF_CORRUPTED", "PDF_PAGE_COUNT_INVALID"}
+    else:
+        raise AssertionError("faux PDF à marqueurs accepté")
+
+    too_many_pages = Path(directory) / "too-many-pages.pdf"
+    writer = PdfWriter()
+    for _ in range(5):
+        writer.add_blank_page(width=595, height=842)
+    with too_many_pages.open("wb") as stream:
+        writer.write(stream)
+    try:
+        isolated.inspect_path(too_many_pages)
+    except PdfInspectionProcessError as exc:
+        assert exc.error_code == "PDF_PAGE_BUDGET_EXCEEDED"
+    else:
+        raise AssertionError("budget de pages non appliqué")
 
 
 # Given une projection SEARCHABLE,

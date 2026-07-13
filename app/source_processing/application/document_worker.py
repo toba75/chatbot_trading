@@ -5,8 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any, Protocol, runtime_checkable
 
-from app.platform.job_runtime import JobStatus
-from app.platform.job_runtime.postgres import ClaimedJob
+from app.contracts.technical_jobs import ClaimedJob, JobStatus
 from app.source_processing.application.record_page_diagnostics import (
     PageDiagnosticInput,
     RecordPageDiagnosticsCommand,

@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
-from dataclasses import dataclass
-from datetime import datetime
 from typing import Any
 
 from app.platform.job_runtime import (
@@ -17,6 +15,7 @@ from app.platform.job_runtime import (
     JobStatus,
     JobSubmissionDecision,
 )
+from app.contracts.technical_jobs import ClaimedJob
 from app.platform.job_runtime.relay import RelayedJobMessage
 from app.platform.postgres import PostgresConnection, PostgresConnectionFactory
 from app.platform.request_context import current_trace_id
@@ -34,16 +33,6 @@ class JobRelayMessageConflictError(RuntimeError):
 
     def __init__(self) -> None:
         super().__init__("JOB_RELAY_MESSAGE_CONFLICT")
-
-
-@dataclass(frozen=True, slots=True)
-class ClaimedJob:
-    """Job réclamé et corrélé, sans exposer son payload dans les logs."""
-
-    job: JobRecord
-    trace_id: str
-    lease_owner: str
-    lease_expires_at: datetime
 
 
 class PostgresJobQueue:
@@ -328,24 +317,24 @@ class PostgresJobQueue:
                                    status = 'pending'
                                    OR (status = 'running' AND lease_expires_at <= CURRENT_TIMESTAMP)
                                )
-                             ORDER BY CASE priority
-                                 WHEN 'P0' THEN 0 WHEN 'P1' THEN 1 WHEN 'P2' THEN 2
-                                 WHEN 'P3' THEN 3 WHEN 'P4' THEN 4 WHEN 'P5' THEN 5
-                             END, sequence
+                             ORDER BY priority, sequence
                              FOR UPDATE SKIP LOCKED
                              LIMIT 1
                         )
                         UPDATE platform.technical_jobs AS job
                            SET status = 'running', lease_owner = %s,
                                lease_expires_at = CURRENT_TIMESTAMP + (%s * INTERVAL '1 second'),
-                               execution_attempts = execution_attempts + 1
+                               execution_attempts = execution_attempts + 1,
+                               claim_generation = claim_generation + 1,
+                               claim_token = gen_random_uuid()
                           FROM candidate
                          WHERE job.sequence = candidate.sequence
                         RETURNING job.sequence, job.job_id, job.job_name, job.priority,
                                   job.input_hash, job.configuration_hash, job.code_version,
                                   job.model_version, job.payload, job.status, job.result,
                                   job.failure_reason, job.trace_id, job.lease_owner,
-                                  job.lease_expires_at
+                                  job.lease_expires_at, job.claim_generation,
+                                  job.claim_token, job.execution_attempts
                         """,
                         (list(parsed_names), parsed_owner, parsed_lease),
                     )
@@ -357,12 +346,25 @@ class PostgresJobQueue:
             trace_id=row[12],
             lease_owner=row[13],
             lease_expires_at=row[14],
+            claim_generation=row[15],
+            claim_token=str(row[16]),
+            execution_attempts=row[17],
         )
 
-    def renew_lease(self, *, job_id: str, owner_id: str, lease_seconds: int) -> ClaimedJob:
+    def renew_lease(
+        self,
+        *,
+        job_id: str,
+        owner_id: str,
+        claim_generation: int,
+        claim_token: str,
+        lease_seconds: int,
+    ) -> ClaimedJob:
         return self._transition_lease(
             job_id=job_id,
             owner_id=owner_id,
+            claim_generation=claim_generation,
+            claim_token=claim_token,
             lease_seconds=lease_seconds,
         )
 
@@ -371,68 +373,78 @@ class PostgresJobQueue:
         *,
         job_id: str,
         owner_id: str,
+        claim_generation: int,
+        claim_token: str,
         result: Mapping[str, Any],
     ) -> JobRecord:
         parsed_result = _required_mapping(result, "result")
         return self._finish(
             job_id=job_id,
             owner_id=owner_id,
+            claim_generation=claim_generation,
+            claim_token=claim_token,
             status="succeeded",
             result=json.dumps(dict(parsed_result), separators=(",", ":"), sort_keys=True),
             failure_reason=None,
         )
 
-    def mark_failed(self, *, job_id: str, owner_id: str, failure_reason: str) -> JobRecord:
+    def mark_failed(
+        self,
+        *,
+        job_id: str,
+        owner_id: str,
+        claim_generation: int,
+        claim_token: str,
+        failure_reason: str,
+    ) -> JobRecord:
         return self._finish(
             job_id=job_id,
             owner_id=owner_id,
+            claim_generation=claim_generation,
+            claim_token=claim_token,
             status="failed",
             result=None,
             failure_reason=_ensure_text(failure_reason, "failure_reason"),
         )
 
-    def retry_or_fail(
+    def schedule_retry(
         self,
         *,
         job_id: str,
         owner_id: str,
-        error_code: str,
+        claim_generation: int,
+        claim_token: str,
         max_attempts: int,
     ) -> JobRecord:
-        """Relâche un échec transitoire ou le rend terminal au budget épuisé."""
+        """Relâche uniquement une tentative encore sous budget."""
 
         parsed_job_id = _ensure_text(job_id, "job_id")
         parsed_owner = _ensure_text(owner_id, "owner_id")
-        parsed_error_code = _ensure_text(error_code, "error_code")
+        parsed_generation = _ensure_positive_integer(claim_generation, "claim_generation")
+        parsed_token = _ensure_text(claim_token, "claim_token")
         parsed_max_attempts = _ensure_positive_integer(max_attempts, "max_attempts")
         with self._connection_factory.connect() as connection:
             with connection.transaction(), connection.cursor() as cursor:
                 cursor.execute(
                     """
                     UPDATE platform.technical_jobs
-                       SET status = CASE
-                               WHEN execution_attempts < %s THEN 'pending'
-                               ELSE 'failed'
-                           END,
-                           result = NULL,
-                           failure_reason = CASE
-                               WHEN execution_attempts < %s THEN NULL
-                               ELSE %s
-                           END,
-                           lease_owner = NULL,
-                           lease_expires_at = NULL
+                       SET status = 'pending', result = NULL, failure_reason = NULL,
+                           lease_owner = NULL, lease_expires_at = NULL,
+                           claim_token = NULL
                      WHERE job_id = %s AND status = 'running'
                        AND lease_owner = %s AND lease_expires_at > CURRENT_TIMESTAMP
+                       AND claim_generation = %s AND claim_token = %s::uuid
+                       AND execution_attempts < %s
                     RETURNING sequence, job_id, job_name, priority, input_hash,
                               configuration_hash, code_version, model_version,
                               payload, status, result, failure_reason
                     """,
                     (
-                        parsed_max_attempts,
-                        parsed_max_attempts,
-                        parsed_error_code,
                         parsed_job_id,
                         parsed_owner,
+                        parsed_generation,
+                        parsed_token,
+                        parsed_max_attempts,
                     ),
                 )
                 row = cursor.fetchone()
@@ -445,10 +457,14 @@ class PostgresJobQueue:
         *,
         job_id: str,
         owner_id: str,
+        claim_generation: int,
+        claim_token: str,
         lease_seconds: int,
     ) -> ClaimedJob:
         parsed_job_id = _ensure_text(job_id, "job_id")
         parsed_owner = _ensure_text(owner_id, "owner_id")
+        parsed_generation = _ensure_positive_integer(claim_generation, "claim_generation")
+        parsed_token = _ensure_text(claim_token, "claim_token")
         parsed_lease = _ensure_positive_integer(lease_seconds, "lease_seconds")
         with self._connection_factory.connect() as connection:
             with connection.transaction():
@@ -459,29 +475,37 @@ class PostgresJobQueue:
                            SET lease_expires_at = CURRENT_TIMESTAMP + (%s * INTERVAL '1 second')
                          WHERE job_id = %s AND status = 'running'
                            AND lease_owner = %s AND lease_expires_at > CURRENT_TIMESTAMP
+                           AND claim_generation = %s AND claim_token = %s::uuid
                         RETURNING sequence, job_id, job_name, priority, input_hash,
                                   configuration_hash, code_version, model_version,
                                   payload, status, result, failure_reason, trace_id,
-                                  lease_owner, lease_expires_at
+                                  lease_owner, lease_expires_at, claim_generation,
+                                  claim_token, execution_attempts
                         """,
-                        (parsed_lease, parsed_job_id, parsed_owner),
+                        (parsed_lease, parsed_job_id, parsed_owner, parsed_generation, parsed_token),
                     )
                     row = cursor.fetchone()
         if row is None:
             raise JobLeaseConflictError()
-        return ClaimedJob(_job_from_row(row), row[12], row[13], row[14])
+        return ClaimedJob(
+            _job_from_row(row), row[12], row[13], row[14], row[15], str(row[16]), row[17]
+        )
 
     def _finish(
         self,
         *,
         job_id: str,
         owner_id: str,
+        claim_generation: int,
+        claim_token: str,
         status: str,
         result: str | None,
         failure_reason: str | None,
     ) -> JobRecord:
         parsed_job_id = _ensure_text(job_id, "job_id")
         parsed_owner = _ensure_text(owner_id, "owner_id")
+        parsed_generation = _ensure_positive_integer(claim_generation, "claim_generation")
+        parsed_token = _ensure_text(claim_token, "claim_token")
         with self._connection_factory.connect() as connection:
             with connection.transaction():
                 with connection.cursor() as cursor:
@@ -489,14 +513,19 @@ class PostgresJobQueue:
                         """
                         UPDATE platform.technical_jobs
                            SET status = %s, result = %s::jsonb, failure_reason = %s,
-                               lease_owner = NULL, lease_expires_at = NULL
+                               lease_owner = NULL, lease_expires_at = NULL,
+                               claim_token = NULL
                          WHERE job_id = %s AND status = 'running'
                            AND lease_owner = %s AND lease_expires_at > CURRENT_TIMESTAMP
+                           AND claim_generation = %s AND claim_token = %s::uuid
                         RETURNING sequence, job_id, job_name, priority, input_hash,
                                   configuration_hash, code_version, model_version,
                                   payload, status, result, failure_reason
                         """,
-                        (status, result, failure_reason, parsed_job_id, parsed_owner),
+                        (
+                            status, result, failure_reason, parsed_job_id, parsed_owner,
+                            parsed_generation, parsed_token,
+                        ),
                     )
                     row = cursor.fetchone()
         if row is None:

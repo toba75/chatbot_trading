@@ -45,13 +45,17 @@ class PostgresJobOutbox:
                        SET status = 'relaying', relay_owner = %s,
                            relay_lease_expires_at =
                                CURRENT_TIMESTAMP + (%s * INTERVAL '1 second'),
-                           relay_attempts = relay_attempts + 1
+                           relay_attempts = relay_attempts + 1,
+                           relay_claim_generation = relay_claim_generation + 1,
+                           relay_claim_token = gen_random_uuid()
                       FROM candidate
                      WHERE message.sequence = candidate.sequence
                     RETURNING message.outbox_id, message.job_name, message.priority,
                               message.input_hash, message.configuration_hash,
                               message.code_version, message.model_version,
-                              message.payload, message.trace_id
+                              message.payload, message.trace_id,
+                              message.relay_claim_generation,
+                              message.relay_claim_token
                     """,
                     (parsed_owner, parsed_lease),
                 )
@@ -71,6 +75,8 @@ class PostgresJobOutbox:
                 trace_id=row[8],
             ),
             owner_id=parsed_owner,
+            claim_generation=row[9],
+            claim_token=str(row[10]),
         )
 
     def acknowledge(
@@ -89,12 +95,21 @@ class PostgresJobOutbox:
                     UPDATE source_processing.job_outbox
                        SET status = 'relayed', platform_job_id = %s,
                            relayed_at = CURRENT_TIMESTAMP,
-                           relay_owner = NULL, relay_lease_expires_at = NULL
+                           relay_owner = NULL, relay_lease_expires_at = NULL,
+                           relay_claim_token = NULL
                      WHERE outbox_id = %s AND status = 'relaying'
                        AND relay_owner = %s
+                       AND relay_claim_generation = %s
+                       AND relay_claim_token = %s::uuid
                        AND relay_lease_expires_at > CURRENT_TIMESTAMP
                     """,
-                    (parsed_job_id, claim.message.message_id, claim.owner_id),
+                    (
+                        parsed_job_id,
+                        claim.message.message_id,
+                        claim.owner_id,
+                        claim.claim_generation,
+                        claim.claim_token,
+                    ),
                 )
                 if cursor.rowcount != 1:
                     raise JobOutboxLeaseConflictError()

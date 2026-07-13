@@ -60,6 +60,7 @@ CONTRACT_MODULE_ALLOWED_CONSUMERS: dict[str, frozenset[str]] = {
     "app.contracts.research_outcomes": RESEARCH_OUTCOME_CONSUMERS,
     "app.contracts.event_envelope": ALL_CONTEXT_CODES,
     "app.contracts.document_public_statuses": ALL_CONTEXT_CODES,
+    "app.contracts.technical_jobs": ALL_CONTEXT_CODES,
 }
 CONTRACT_SYMBOL_ALLOWED_CONSUMERS: dict[tuple[str, str], frozenset[str]] = {
     ("app.contracts", "ContractSchemaVersion"): ALL_CONTEXT_CODES,

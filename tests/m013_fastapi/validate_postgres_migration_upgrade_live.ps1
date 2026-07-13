@@ -21,8 +21,13 @@ $volume = "ostrading-m13-prevolume-$suffix"
 $port = Get-FreeTcpPort
 $temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) $container
 $secret = Join-Path $temporaryRoot "postgres_password"
+$migrations007 = Join-Path $temporaryRoot "migrations-007"
 $image = "postgres@sha256:7e5df973a74872482e320dcbdeb055e178d6f42de0558b083892c50cda833c96"
 New-Item -ItemType Directory -Path $temporaryRoot -Force | Out-Null
+New-Item -ItemType Directory -Path $migrations007 -Force | Out-Null
+Get-ChildItem (Join-Path $repoRoot "deploy/postgres/migrations") -Filter "*.sql" |
+    Where-Object { $_.Name -match '^00[1-7]_' } |
+    Copy-Item -Destination $migrations007
 [System.IO.File]::WriteAllText($secret, "m13-migration-password", [System.Text.UTF8Encoding]::new($false))
 
 function Start-Postgres {
@@ -57,6 +62,7 @@ try {
     $env:M13_MIGRATION_URL = "postgresql://app@127.0.0.1:$port/app"
     $env:M13_MIGRATION_SECRET = $secret
     $env:M13_MIGRATION_PATH = Join-Path $repoRoot "deploy/postgres/migrations"
+    $env:M13_MIGRATION_PATH_007 = $migrations007
     @'
 import os
 from concurrent.futures import ThreadPoolExecutor
@@ -71,6 +77,16 @@ factory = PsycopgConnectionFactory(
     password_path=Path(os.environ["M13_MIGRATION_SECRET"]),
     connect_timeout_seconds=5,
 )
+runner007 = PostgresMigrationRunner(
+    connection_factory=factory,
+    migrations_path=Path(os.environ["M13_MIGRATION_PATH_007"]),
+    operation_timeout_seconds=30,
+)
+with ThreadPoolExecutor(max_workers=2) as executor:
+    list(executor.map(lambda _: runner007.run(), range(2)))
+assert runner007.required_schema_version == 7
+assert runner007.is_required_schema_ready()
+
 runner = PostgresMigrationRunner(
     connection_factory=factory,
     migrations_path=Path(os.environ["M13_MIGRATION_PATH"]),
@@ -91,10 +107,11 @@ with factory.connect() as connection:
             (5, "005_source_processing_read_performance.sql"),
             (6, "006_worker_resilience_and_ka_version.sql"),
             (7, "007_job_outbox_context_boundary.sql"),
+            (8, "008_claim_fencing_and_projection_replay.sql"),
         ]
         cursor.execute("SELECT to_regclass('knowledge_access.knowledge_projections')", ())
         assert cursor.fetchone() == ("knowledge_access.knowledge_projections",)
-print("upgrade-volume-pre-M13=schema-007; ledger=idempotent; lock=advisory")
+print("upgrade-volume-007=schema-008; ledger=idempotent; lock=advisory")
 '@ | & $python -B -
     if ($LASTEXITCODE -ne 0) { throw "POSTGRES_MIGRATION_UPGRADE_FAILED" }
 }
@@ -102,6 +119,7 @@ finally {
     Remove-Item Env:M13_MIGRATION_URL -ErrorAction SilentlyContinue
     Remove-Item Env:M13_MIGRATION_SECRET -ErrorAction SilentlyContinue
     Remove-Item Env:M13_MIGRATION_PATH -ErrorAction SilentlyContinue
+    Remove-Item Env:M13_MIGRATION_PATH_007 -ErrorAction SilentlyContinue
     & docker rm --force $container *> $null
     & docker volume rm $volume *> $null
     Remove-Item -LiteralPath $temporaryRoot -Recurse -Force -ErrorAction SilentlyContinue

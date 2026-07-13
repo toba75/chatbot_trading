@@ -20,6 +20,9 @@ from app.source_processing.domain.source_document import OriginalStorageRef, Sou
 class DocumentInspector(Protocol):
     """Port d'inspection technique du PDF original."""
 
+    def inspect_content(self, original_content: bytes) -> None:
+        """Valide le binaire avant son enregistrement immuable."""
+
     def inspect(self, original_storage_ref: OriginalStorageRef) -> "DocumentInspection":
         """Retourne le nombre de pages source et les pages observées."""
 
