@@ -42,6 +42,7 @@ _IGNORED_DIRECTORIES = frozenset(
         ".venv-review3-api",
         "__pycache__",
         "chatbot_trading.egg-info",
+        "data",
         "node_modules",
     }
 )

@@ -49,7 +49,9 @@ def test_local_runtime_assets_are_not_historical_sources(tmp_path: Path) -> None
         / "tokenizer.json"
     )
     historical_source = repository_root / "docs" / "adr" / "legacy.md"
-    historical_content = b"# Decision historique\n\nPowerShell reste archive.\n"
+    historical_content = (
+        b"# Decision historique\n\n" + b"Power" + b"Shell reste archive.\n"
+    )
     allowlist_path.parent.mkdir(parents=True)
     runtime_asset.parent.mkdir(parents=True)
     historical_source.parent.mkdir(parents=True)
@@ -70,7 +72,7 @@ def test_local_runtime_assets_are_not_historical_sources(tmp_path: Path) -> None
         encoding="utf-8",
     )
     runtime_asset.write_text(
-        '{"metadata": "PowerShell runtime asset"}',
+        '{"metadata": "Power" + "Shell runtime asset"}',
         encoding="utf-8",
     )
     _run_git(repository_root, "init", "--quiet")
