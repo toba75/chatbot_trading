@@ -10,18 +10,24 @@ def test_validate_m004_conversion_runtime_governance_acceptance() -> None:
         if (parent / "pyproject.toml").is_file()
     )
     adr_path = repository_root / "docs/adr/ADR-032-execution-reelle-conversion-canonique.md"
+    ocr_routing_adr_path = repository_root / "docs/adr/ADR-033-priorite-signaux-routage-ocr.md"
+    adr_index_path = repository_root / "docs/adr/index.md"
     specification_path = repository_root / "docs/specs/m004_version_canonique_publiee.md"
 
-    # Given une page ayant une route M-003 explicite.
-    # When la gouvernance contrôle la décision d'exécution de la conversion.
-    # Then l'outil imposé, son runtime reproductible et son échec public restent
-    #      nommés sans conversion de remplacement.
+    # Given ADR-032, ADR-033 et leurs preuves de runtime réel sont livrées.
+    # When la gouvernance clôt M04-conversion.
+    # Then les deux ADR et leur index portent le statut Acceptée, sans masquer
+    #      l'échec terminal OCR vers Granite ni introduire de fallback.
     assert adr_path.is_file(), "ADR-032 doit décider l'exécution réelle de la conversion."
+    assert ocr_routing_adr_path.is_file(), "ADR-033 doit décider la priorité des signaux OCR."
+    assert adr_index_path.is_file(), "L'index ADR doit tracer les décisions acceptées."
     adr = adr_path.read_text(encoding="utf-8")
+    ocr_routing_adr = ocr_routing_adr_path.read_text(encoding="utf-8")
+    adr_index = adr_index_path.read_text(encoding="utf-8")
     specification = specification_path.read_text(encoding="utf-8")
 
     required_adr_fragments = (
-        "**Statut :** Proposée",
+        "**Statut :** Acceptée",
         "ADR-001",
         "ADR-002",
         "ADR-003",
@@ -50,6 +56,22 @@ def test_validate_m004_conversion_runtime_governance_acceptance() -> None:
     )
     for fragment in required_adr_fragments:
         assert fragment in adr, f"ADR-032 doit imposer : {fragment}"
+
+    assert "**Statut :** Acceptée" in ocr_routing_adr
+    assert "PREPROCESS_GRANITE" in ocr_routing_adr
+    assert "BAD_OCR_TO_GRANITE" in ocr_routing_adr
+    assert "issue terminale et publique" in ocr_routing_adr
+
+    assert (
+        "| [ADR-032](ADR-032-execution-reelle-conversion-canonique.md) | "
+        "Exécution réelle et reproductible de la conversion canonique | Acceptée | "
+        "2026-07-13 | Aucun | Aucune |"
+    ) in adr_index
+    assert (
+        "| [ADR-033](ADR-033-priorite-signaux-routage-ocr.md) | "
+        "Priorité des signaux pour les routes OCR atteignables | Acceptée | "
+        "2026-07-14 | Aucun | Aucune |"
+    ) in adr_index
 
     assert "## Exécution réelle et disponibilité des convertisseurs" in specification
     assert "ADR-032" in specification
