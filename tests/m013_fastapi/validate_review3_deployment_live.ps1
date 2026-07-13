@@ -158,10 +158,10 @@ for _ in range(120):
     status, _, body = request(f"/v1/documents/{document_id}/diagnostic")
     assert status == 200, (status, body)
     completed = json.loads(body)
-    if completed["diagnostic_status"] in {"COMPLETED", "FAILED"}:
+    if completed["diagnostic_status"] in {"DIAGNOSED", "FAILED"}:
         break
     time.sleep(0.5)
-assert completed["diagnostic_status"] == "COMPLETED", completed
+assert completed["diagnostic_status"] == "DIAGNOSED", completed
 print(json.dumps({"document_id": document_id, "diagnostic_status": completed["diagnostic_status"]}, sort_keys=True))
 '@ | & $python -B -
     if ($LASTEXITCODE -ne 0) { throw "COMPOSE_REAL_PDF_SCENARIO_FAILED" }
