@@ -51,7 +51,14 @@ class UrllibLlmInferenceGateway:
         started_ns = time.perf_counter_ns()
         try:
             with urllib.request.urlopen(http_request, timeout=self._timeout_seconds) as response:
-                payload = _json_object(response.read())
+                try:
+                    payload = _json_object(response.read())
+                except ValueError:
+                    return LlmInferenceResponse(
+                        status_code=502,
+                        payload={"error_code": "LLM_GATEWAY_RESPONSE_INVALID"},
+                        latency_ms=_elapsed_ms(started_ns),
+                    )
                 return LlmInferenceResponse(
                     status_code=response.status,
                     payload=payload,
