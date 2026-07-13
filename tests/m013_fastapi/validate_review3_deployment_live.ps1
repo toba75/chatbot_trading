@@ -21,8 +21,9 @@ $project = "ostm13$suffix"
 $edgePort = Get-FreeTcpPort
 $composePath = Join-Path $exportRoot "deploy/local-compose/compose.yaml"
 $secretPath = Join-Path $exportRoot "deploy/local-compose/secrets/postgres_password"
-$python = Join-Path $repoRoot ".venv/Scripts/python.exe"
-if (-not (Test-Path -LiteralPath $python -PathType Leaf)) { throw "UV_PROJECT_PYTHON_REQUIRED" }
+$pythonCommand = Get-Command python -CommandType Application -ErrorAction SilentlyContinue
+if ($null -eq $pythonCommand) { throw "PYTHON_TEST_DRIVER_REQUIRED" }
+$python = $pythonCommand.Source
 
 $previousRevision = $env:OSTRADING_IMAGE_REVISION
 $previousSchema = $env:OSTRADING_POSTGRES_SCHEMA_VERSION
@@ -172,7 +173,14 @@ finally {
     Remove-Item Env:M013_COMPOSE_ORIGIN -ErrorAction SilentlyContinue
     Remove-Item Env:M013_COMPOSE_PROJECT -ErrorAction SilentlyContinue
     Remove-Item Env:M013_COMPOSE_FILE -ErrorAction SilentlyContinue
-    & docker compose --project-name $project -f $composePath down --volumes --remove-orphans *> $null
+    $cleanupErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        & docker compose --project-name $project -f $composePath down --volumes --remove-orphans *> $null
+    }
+    finally {
+        $ErrorActionPreference = $cleanupErrorActionPreference
+    }
     if ($null -eq $previousRevision) { Remove-Item Env:OSTRADING_IMAGE_REVISION -ErrorAction SilentlyContinue } else { $env:OSTRADING_IMAGE_REVISION = $previousRevision }
     if ($null -eq $previousSchema) { Remove-Item Env:OSTRADING_POSTGRES_SCHEMA_VERSION -ErrorAction SilentlyContinue } else { $env:OSTRADING_POSTGRES_SCHEMA_VERSION = $previousSchema }
     if ($null -eq $previousEdgePort) { Remove-Item Env:OST_EDGE_HTTPS_PORT -ErrorAction SilentlyContinue } else { $env:OST_EDGE_HTTPS_PORT = $previousEdgePort }
