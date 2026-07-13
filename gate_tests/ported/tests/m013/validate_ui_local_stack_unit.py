@@ -46,7 +46,18 @@ with tempfile.TemporaryDirectory() as temporary_directory:
     root = Path(temporary_directory)
     source_config = root / "config" / "application.yaml"
     source_config.parent.mkdir(parents=True)
-    source_text = "services:\\n  postgres:\\n    url: postgresql+psycopg://app@postgres/app\\n"
+    source_text = (
+        "deployment:\\n"
+        "  hosts:\\n"
+        "    docker_local:\\n"
+        "      container_listen_host: 0.0.0.0\\n"
+        "services:\\n"
+        "  postgres:\\n"
+        "    url: postgresql+psycopg://app@postgres/app\\n"
+        "  api:\\n"
+        "    bind_host: 0.0.0.0\\n"
+        "    port: 8080\\n"
+    )
     source_config.write_text(source_text, encoding="utf-8")
 
     runtime_configuration = build_local_ui_runtime_configuration(
@@ -61,8 +72,19 @@ with tempfile.TemporaryDirectory() as temporary_directory:
     )
     assert_equal(
         runtime_configuration.path.read_text(encoding="utf-8"),
-        "services:\\n  postgres:\\n    url: postgresql+psycopg://app@127.0.0.1:55432/app\\n",
-        "Le runtime doit rendre PostgreSQL hôte explicitement adressable.",
+        (
+            "deployment:\\n"
+            "  hosts:\\n"
+            "    docker_local:\\n"
+            "      container_listen_host: 127.0.0.1\\n"
+            "services:\\n"
+            "  postgres:\\n"
+            "    url: postgresql+psycopg://app@127.0.0.1:55432/app\\n"
+            "  api:\\n"
+            "    bind_host: 127.0.0.1\\n"
+            "    port: 8080\\n"
+        ),
+        "Le runtime doit rendre les dépendances hôte explicitement locales.",
     )
     assert_equal(
         source_config.read_text(encoding="utf-8"),
