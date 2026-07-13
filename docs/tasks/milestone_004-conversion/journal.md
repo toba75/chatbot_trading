@@ -51,7 +51,7 @@ frontières UI/API d'ADR-018 et ADR-031.
 
 | Tâche | Commit RED | Commit GREEN | ADR | Validations | État |
 |---|---|---|---|---|---|
-| T-001 | `f66c85eac`, `e922b14c3` | À venir | ADR-029 | Gate de gouvernance, ancêtre `master`, checkout LF/CRLF, catalogue fermé de 67 preuves | GREEN ciblé |
+| T-001 | `f66c85eac`, `e922b14c3` | `fb440e229` | ADR-029 | Gate de gouvernance, ancêtre `master`, checkout LF/CRLF, catalogue fermé de 67 preuves | GREEN ciblé |
 | T-002 | À venir | À venir | ADR-032 | Tests ciblés, gate | À faire |
 | T-003 | À venir | À venir | ADR-032; ADR-001 à ADR-004 | Tests ciblés, gate | À faire |
 | T-004 | À venir | À venir | ADR-018; ADR-019; ADR-024; ADR-031 | Tests ciblés, gate, UI réelle | À faire |
