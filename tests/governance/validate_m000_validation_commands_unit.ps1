@@ -2,6 +2,7 @@
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
 $aggregatorPath = Join-Path $repoRoot "scripts/m000_validation_gate.ps1"
+$acceptancePath = Join-Path $repoRoot "tests/governance/validate_m000_validation_commands_acceptance.ps1"
 $temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m000_validation_commands_unit_" + [System.Guid]::NewGuid().ToString("N"))
 $eAcute = [char] 0x00E9
 
@@ -102,6 +103,32 @@ function Assert-OutputContains {
 
 if (-not (Test-Path -LiteralPath $aggregatorPath -PathType Leaf)) {
     throw "Agrégateur de validation M-000 absent: scripts/m000_validation_gate.ps1"
+}
+
+if (-not (Test-Path -LiteralPath $acceptancePath -PathType Leaf)) {
+    throw "Test d'acceptation des commandes M-000 absent: tests/governance/validate_m000_validation_commands_acceptance.ps1"
+}
+
+$acceptanceContent = Get-Content -Raw -Encoding UTF8 -LiteralPath $acceptancePath
+$expectedGateVolumes = @(
+    'DEFAULT|37|309',
+    'OST_M003_PRECONDITION_ACCEPTANCE_RUNNING|14|175',
+    'OST_M004_PRECONDITION_ACCEPTANCE_RUNNING|15|176',
+    'OST_M005_PRECONDITION_ACCEPTANCE_RUNNING|16|176',
+    'OST_M006_PRECONDITION_ACCEPTANCE_RUNNING|17|175',
+    'OST_M007_PRECONDITION_ACCEPTANCE_RUNNING|18|178',
+    'OST_M008_PRECONDITION_ACCEPTANCE_RUNNING|19|199',
+    'OST_M009_PRECONDITION_ACCEPTANCE_RUNNING|20|200',
+    'OST_M010_PRECONDITION_ACCEPTANCE_RUNNING|21|221',
+    'OST_M011_PRECONDITION_ACCEPTANCE_RUNNING|23|261',
+    'OST_M012_PRECONDITION_ACCEPTANCE_RUNNING|25|273',
+    'OST_M013_PRECONDITION_ACCEPTANCE_RUNNING|25|298'
+)
+
+foreach ($expectedGateVolume in $expectedGateVolumes) {
+    if (-not $acceptanceContent.Contains('"' + $expectedGateVolume + '"')) {
+        throw "Volume de gate M-000 absent ou obsolète: $expectedGateVolume"
+    }
 }
 
 $aggregatorContent = Get-Content -Raw -Encoding UTF8 -LiteralPath $aggregatorPath
