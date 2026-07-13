@@ -10,6 +10,16 @@
 - Pas de fallback.
 - Aucun comportement alternatif ne doit être déclenché silencieusement.
 
+## Actions UI asynchrones
+
+- Une action UI ne peut être disponible que si sa chaîne réelle complète est
+  démarrée et supervisée : contrat public, écriture, outbox, relais, worker,
+  persistance et lecture publique.
+- Toute action asynchrone disponible doit publier une progression cohérente,
+  avec phase, unités réalisées, total et erreur terminale éventuelle.
+- L'UI ne doit jamais déduire cette progression de logs, d'état local ou d'un
+  compteur synthétique ; elle consomme exclusivement le contrat public.
+
 ## ADR
 
 - Les décisions d'architecture structurantes sont documentées dans `docs/adr/`.

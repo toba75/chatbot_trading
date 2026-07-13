@@ -18,6 +18,9 @@ Exécuter une tâche verticale à partir du métier du portefeuille convexe-anti
 5. Inspecter le code et les tests du bounded context concerné avant de modifier.
 6. Vérifier l'état Git avec `git status --short`; préserver les changements utilisateur et ne jamais les revert sans demande explicite.
 7. Si la tâche est ambiguë sur le comportement métier attendu ou sur la décision ADR à tracer, poser une seule question courte avant d'implémenter.
+8. Pour une action UI asynchrone, vérifier avant toute disponibilité la chaîne
+   complète `API -> outbox -> relais -> worker -> état public`, la supervision
+   des participants réels et le contrat public de progression.
 
 ## Analyse DDD
 
@@ -117,6 +120,10 @@ Si Git signale `dubious ownership`, relancer les commandes Git avec `git -c safe
 - Ne pas rendre un test GREEN en affaiblissant l'assertion métier.
 - Ne pas ajouter de dépendance, framework ou abstraction sans nécessité démontrée par le domaine.
 - Ne pas finaliser tant que les validations prévues n'ont pas été exécutées ou que leur impossibilité n'est pas expliquée.
+- Pour une action UI asynchrone, ne pas considérer le contrat API seul comme
+  un câblage complet : prouver le parcours réel jusqu’au worker et l’issue
+  publique, puis rendre phase, unités réalisées, total et erreur terminale
+  sans compteur synthétique ni lecture UI de l’infrastructure.
 
 ## Réponse Finale
 

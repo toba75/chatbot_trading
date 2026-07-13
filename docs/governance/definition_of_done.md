@@ -26,6 +26,7 @@ Elle ne remplace pas les définitions de terminé propres aux bounded contexts d
 | Tests | Tests ciblés, validateurs pertinents et suite disponible exécutés avec résultat GREEN. | Refuser la clôture si une validation échouée est ignorée ou si un test requis est absent sans blocage documenté. |
 | Gate | `uv run --locked gate` exécuté avec le pipeline M-013 réel et rapport JSON unique. | Refuser la clôture si un nœud échoue, est ignoré ou est exécuté plusieurs fois. |
 | Frontière UI/API | Pour toute tâche UI, preuve automatisée que chaque commande, lecture et contenu métier passe exclusivement par un contrat public de `orchestrator-api` câblé au cas d'usage réel, conformément à ADR-018. | Refuser la clôture si le contrat est absent ou non câblé au cas d'usage réel, si l'UI appelle directement un composant interne ou si elle remplace le contrat par un mock, stub, fake, état local, réponse synthétique ou fallback. |
+| Action UI asynchrone | Toute action UI disponible prouve la chaîne `API -> outbox -> relais -> worker -> état public`, la supervision des participants réels et une progression publique cohérente de l’attente à l’issue terminale. | Refuser la clôture si un participant requis n’est pas démarré ou supervisé, si l’UI masque une action acceptée sans état public, si la progression est synthétique ou si le parcours réel complet n’est pas prouvé. |
 
 ## Critères de preuve
 
@@ -42,6 +43,16 @@ Pour toute tâche qui crée ou modifie une surface UI, la preuve d'achèvement *
 L'UI **NE DOIT PAS** accéder directement aux handlers applicatifs, repositories, stockages, fichiers métier, files de jobs, workers, Spark, Qdrant ou services internes des bounded contexts. Elle **NE DOIT PAS** implémenter ou mémoriser une capacité métier absente de l'API au moyen d'un mock, stub, fake, état en mémoire, réponse statique, donnée synthétique ou fallback dans son chemin d'exécution.
 
 Les doubles de test sont autorisés uniquement dans des tests automatisés isolés. Une preuve d'acceptation du chemin réel **DOIT** exercer `UI -> orchestrator-api -> adaptateur applicatif -> cas d'usage réel` et vérifier le blocage public lorsque le contrat requis est absent, non câblé ou indisponible.
+
+Lorsqu’une commande UI est asynchrone, ce chemin réel inclut obligatoirement
+`API -> outbox -> relais -> worker -> état public`. Le runtime qui expose cette
+commande **DOIT** démarrer et superviser chacun de ses participants réels avant
+de rendre l’UI disponible. Le contrat public **DOIT** distinguer l’état métier
+de la phase d’exécution et exposer une progression publique avec phase, unités
+réalisées, total connu et erreur terminale éventuelle. L’UI **DOIT** rendre ce
+contrat et se rafraîchir tant que la phase est non terminale ; elle **NE DOIT
+PAS** masquer l’action acceptée, déduire la progression depuis un log ou
+présenter un compteur synthétique.
 
 Si le contrat API requis est absent ou non câblé au cas d'usage réel, la fonction UI correspondante reste explicitement non opérationnelle et la tâche UI reste inachevée ou explicitement bloquée. Une interface qui simule cette capacité **NE DOIT PAS** être déclarée opérationnelle.
 
