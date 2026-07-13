@@ -13,6 +13,7 @@ frontières UI/API d'ADR-018 et ADR-031.
 3. T-003 - Convertir un document natif et publier son artefact canonique.
 4. T-004 - Exposer la conversion et sa progression publique dans l'UI.
 5. T-005 - Traiter explicitement les routes non natives et prouver le pipeline.
+6. T-006 - Accepter les décisions de conversion effectivement livrées.
 
 ## État initial
 
@@ -231,3 +232,4 @@ rejouée depuis le formulaire UI sur `DOC-F91FE126FBFFA374` :
 | T-003 | `b789b3360` | `fb5b398b9` | ADR-032; ADR-001 à ADR-004 | Tests ciblés, assets SHA-256 hors ligne, scope M-004, gate canonique complète 404 nœuds | GREEN réel natif |
 | T-004 | `e8b82bf47` | `bd27e2433` | ADR-018; ADR-019; ADR-024; ADR-031; ADR-032 | 7 tests ciblés, `uv sync --locked`, gate complète 406 nœuds, `git diff --check`, UI réelle `QUEUED` puis `SUCCEEDED` | GREEN réel UI |
 | T-005 | `ada4b6a0e`, `e62c60a2d`, `bfd5438e7` | `96be704d8` | ADR-002; ADR-003; ADR-031; ADR-032; ADR-033 | 17 tests ciblés, migration 013, UI native/Granite/OCR réelle, absence de publication partielle, gate complète 406 nœuds | GREEN |
+| T-006 | À venir | À venir | ADR-032; ADR-033 | Gouvernance ADR, allowlist historique, gate canonique complète | À faire |
