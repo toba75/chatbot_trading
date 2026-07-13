@@ -5,7 +5,7 @@
 - Identifiant : `M013-Runbook-PdfIngestion-1.1`.
 - Contextes : UI locale, SP et plateforme.
 - Sources : `docs/specs/m003_source_enregistree_diagnostiquee_routee.md`, `docs/specs/m013_fastapi_api_orchestratrice.md` et `docs/specs/ui.md`.
-- ADR applicables : ADR-018, ADR-020, ADR-021, ADR-025, ADR-028 et ADR-030.
+- ADR applicables : ADR-018, ADR-020, ADR-021, ADR-025, ADR-028, ADR-030 et ADR-031.
 - Limite : la conversion canonique M-004 et l'indexation KA ne sont pas livrées par M13-FastAPI.
 
 ## Scénario BDD
@@ -16,9 +16,9 @@
 
 ## Préconditions
 
-1. Exécuter `uv run ui` depuis la racine du dépôt. Cette commande vérifie Docker, prépare PostgreSQL local, l'API orchestratrice réelle et les secrets locaux absents hors Git.
+1. Exécuter `uv run ui` depuis la racine du dépôt. Cette commande vérifie Docker, prépare PostgreSQL local, le gateway LLM, l'API orchestratrice réelle, le worker documentaire réel et les secrets locaux absents hors Git.
 2. Attendre l'ouverture de l'UI sur `http://127.0.0.1:8081/ui/corpus-pdf`.
-3. Si un port requis, Docker ou l'API est indisponible, corriger l'erreur publique affichée ; aucun service ou secret de substitution n'est utilisé.
+3. Si un port requis, Docker, le gateway, l'API ou le worker est indisponible, corriger l'erreur publique affichée ; aucun service, worker ou secret de substitution n'est utilisé.
 
 L'UI et l'API utilisent le même secret local. Le navigateur ne reçoit jamais le token : le serveur UI l'ajoute uniquement à l'appel backend.
 
@@ -45,7 +45,9 @@ Le quota agrégé est `paths.corpus_quota_bytes`. PostgreSQL sérialise les admi
 
 ## Diagnostiquer et inspecter
 
-- Depuis le corpus, demander le diagnostic du document. Le worker réel doit produire un statut persistant, un manifeste et des signaux page par page.
+- Depuis le corpus, demander le diagnostic du document. La réponse de commande `DIAGNOSTIC_REQUESTED` confirme seulement la prise en compte; l’écran de diagnostic affiche ensuite l’action `DIAGNOSE`, sa phase publique (`QUEUED`, `RUNNING`, `SUCCEEDED` ou `FAILED`) et les unités persistées sur le total connu. Il se rafraîchit tant que l’action est non terminale.
+- `MANIFEST_CREATED` signifie que l’action attend le worker; `DIAGNOSING` signifie que le worker réel l’exécute. Aucun de ces états ne constitue une réussite.
+- Le worker réel produit ensuite le manifeste et les signaux page par page. `SUCCEEDED` exige que le nombre de pages diagnostiquées soit égal au total affiché.
 - `MANUAL_REVIEW` affiche `manual_review_reason`; `FAILED` affiche `failure_error_code`.
 - Ouvrir le visualiseur en lecture seule ou télécharger l'original. Le contenu est streamé et vérifié par SHA-256 avant exposition; `original_storage_ref` ne devient jamais public.
 - Plus de cent documents sont parcourus page par page. L'UI ne charge jamais tout le corpus ni les manifestes de chaque document pour construire la liste.
@@ -58,8 +60,6 @@ M13-FastAPI s'arrête au diagnostic documentaire. Aucun adaptateur Docling/OCRmy
 
 Les termes historiques `SourceDocumentId`, `SourceLocator`, quarantaine, route explicite et version canonique restent les marqueurs normatifs des spécifications M-003 et M-004. Leur présence dans ce runbook ne déclare pas le runtime M-004 livré par M13-FastAPI.
 
-- Commande vérifiée : `uv run --locked gate`.
-- Commande vérifiée : `uv run --locked gate`.
 - Résultat attendu : les contrats de spécification restent cohérents et chaque statut public conserve son sens normatif.
 - Erreur explicite : toute absence de route, quarantaine active, autorité textuelle manquante ou `SourceLocator` non résoluble bloque la publication canonique; M13-FastAPI ne contourne pas ce blocage.
 - Preuve à conserver : sorties des validateurs, identifiant `SourceDocumentId` et, uniquement lorsqu'un futur runtime M-004 les produit réellement, `SourceLocator` et référence de version canonique.
@@ -68,12 +68,9 @@ Les termes historiques `SourceDocumentId`, `SourceLocator`, quarantaine, route e
 
 ```console
 uv run --locked gate
-uv run --locked gate
-uv run --locked gate
-uv run --locked gate
 ```
 
-La dernière commande exporte le commit HEAD, construit les images schéma 009, exécute le parcours PDF réel, redémarre PostgreSQL et l'API, relit l'original puis supprime conteneurs, volumes et secrets temporaires.
+La gate valide les contrats et l’absence de fallback. La preuve opératoire locale s’exécute séparément avec `uv run ui`, qui démarre les participants réels et rend l’avancement public observable.
 
 ## Garde-fous
 

@@ -14,6 +14,7 @@ from pydantic import (
 )
 
 from app.contracts.document_public_statuses import (
+    PublicActionPhase,
     PublicConversionStatus,
     PublicDiagnosticStatus,
     PublicProjectionStatus,
@@ -197,6 +198,38 @@ class DocumentDuplicateResponse(DocumentRegisteredResponse):
 class DiagnosticAcceptedResponse(PublicApiModel):
     document_id: str
     diagnostic_status: PublicDiagnosticStatus
+
+
+class DocumentActionProgressResponse(PublicApiModel):
+    action_name: Literal["DIAGNOSE"]
+    phase: PublicActionPhase
+    completed_units: int = Field(ge=0)
+    total_units: int | None = Field(default=None, ge=1)
+    failure_error_code: str | None
+
+    @model_validator(mode="after")
+    def validate_progress(self) -> "DocumentActionProgressResponse":
+        if self.phase is PublicActionPhase.NOT_REQUESTED:
+            if (
+                self.completed_units != 0
+                or self.total_units is not None
+                or self.failure_error_code is not None
+            ):
+                raise ValueError("progression non demandée incohérente")
+            return self
+        if self.total_units is None:
+            raise ValueError("total d'unités requis")
+        if self.completed_units > self.total_units:
+            raise ValueError("progression supérieure au total")
+        if self.phase is PublicActionPhase.SUCCEEDED:
+            if self.completed_units != self.total_units or self.failure_error_code is not None:
+                raise ValueError("progression réussie incohérente")
+        elif self.phase is PublicActionPhase.FAILED:
+            if self.failure_error_code is None:
+                raise ValueError("code d'échec progression requis")
+        elif self.failure_error_code is not None:
+            raise ValueError("code d'échec interdit hors échec")
+        return self
 
 
 class DocumentCorpusItemResponse(PublicApiModel):
@@ -439,6 +472,7 @@ __all__ = [
     "DiagnosticPageResponse",
     "DocumentConversionResponse",
     "DocumentCorpusItemResponse",
+    "DocumentActionProgressResponse",
     "DocumentCorpusResponse",
     "DocumentDiagnosticResponse",
     "DocumentDuplicateResponse",

@@ -37,6 +37,9 @@ _API_TOKEN_SECRET_RELATIVE_PATH = Path("config") / "secrets" / "local" / "local_
 _API_STARTUP_TIMEOUT_SECONDS = 60
 _LLM_GATEWAY_STARTUP_TIMEOUT_SECONDS = 60
 _POSTGRES_STARTUP_ATTEMPTS = 120
+_DOCUMENT_WORKER_LEASE_SECONDS = 30
+_DOCUMENT_WORKER_POLL_SECONDS = 0.1
+_DOCUMENT_WORKER_STARTUP_STABILITY_SECONDS = 0.5
 
 
 @dataclass(frozen=True, slots=True)
@@ -105,6 +108,7 @@ def start_local_ui_stack(launch_configuration: Any) -> Iterator[Any]:
     )
     api_process: subprocess.Popen[bytes] | None = None
     llm_gateway_process: subprocess.Popen[bytes] | None = None
+    document_worker_process: subprocess.Popen[bytes] | None = None
     postgres_started = False
     try:
         postgres_started = _start_local_postgres(repository_root=repository_root)
@@ -119,8 +123,14 @@ def start_local_ui_stack(launch_configuration: Any) -> Iterator[Any]:
             runtime_configuration=runtime_configuration,
         )
         _wait_for_api(api_process)
+        document_worker_process = _start_local_document_worker(
+            repository_root=repository_root,
+            runtime_configuration=runtime_configuration,
+        )
+        _wait_for_document_worker(document_worker_process)
         yield replace(launch_configuration, config_path=str(runtime_configuration.path))
     finally:
+        _stop_process(document_worker_process)
         _stop_process(api_process)
         _stop_process(llm_gateway_process)
         if postgres_started:
@@ -292,6 +302,29 @@ def _start_local_llm_gateway(
     )
 
 
+def _start_local_document_worker(
+    *,
+    repository_root: Path,
+    runtime_configuration: LocalUiRuntimeConfiguration,
+) -> subprocess.Popen[bytes]:
+    return subprocess.Popen(
+        (
+            sys.executable,
+            "-m",
+            "app.source_processing.adapters.worker_runtime",
+            "--config",
+            str(runtime_configuration.path),
+            "--worker-id",
+            "uv-run-ui-document-worker",
+            "--lease-seconds",
+            str(_DOCUMENT_WORKER_LEASE_SECONDS),
+            "--poll-seconds",
+            str(_DOCUMENT_WORKER_POLL_SECONDS),
+        ),
+        cwd=repository_root,
+    )
+
+
 def _wait_for_llm_gateway(llm_gateway_process: subprocess.Popen[bytes]) -> None:
     deadline = time.monotonic() + _LLM_GATEWAY_STARTUP_TIMEOUT_SECONDS
     while time.monotonic() < deadline:
@@ -332,6 +365,12 @@ def _wait_for_api(api_process: subprocess.Popen[bytes]) -> None:
         except (URLError, TimeoutError, OSError):
             time.sleep(0.25)
     raise ValueError("UI_LOCAL_API_STARTUP_TIMEOUT")
+
+
+def _wait_for_document_worker(document_worker_process: subprocess.Popen[bytes]) -> None:
+    time.sleep(_DOCUMENT_WORKER_STARTUP_STABILITY_SECONDS)
+    if document_worker_process.poll() is not None:
+        raise ValueError("UI_LOCAL_DOCUMENT_WORKER_START_FAILED")
 
 
 def _run_docker(

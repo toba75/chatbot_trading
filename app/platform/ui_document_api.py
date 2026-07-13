@@ -16,6 +16,7 @@ from urllib.parse import urlsplit
 from pydantic import ValidationError
 
 from app.platform.orchestrator_api_models import (
+    DocumentActionProgressResponse,
     DocumentCorpusResponse,
     DocumentDiagnosticResponse,
     ProjectionResponse,
@@ -39,7 +40,9 @@ _DOCUMENT_ID_PATTERN = r"[^/]+"
 _DIAGNOSE_PATH_PATTERN = re.compile(
     rf"^/v1/documents/(?P<document_id>{_DOCUMENT_ID_PATTERN})/diagnose$"
 )
-_PUBLIC_DOCUMENT_PATH_PATTERN = re.compile(r"^/v1/documents(?:/[^/]+(?:/[^/]+)?)?$")
+_PUBLIC_DOCUMENT_PATH_PATTERN = re.compile(
+    r"^/v1/documents(?:/[^/]+(?:/(?:diagnose|diagnostic/progress|diagnostic|conversion|projection|original))?)?$"
+)
 _INTERNAL_FIELD_NAMES = frozenset(
     {
         "original_storage_ref",
@@ -377,6 +380,25 @@ class UiDocumentApiClient:
             _validate_diagnostic_payload(
                 response.payload,
                 expected_document_id=parsed_document_id,
+            )
+        return response
+
+    def read_document_action_progress(self, document_id: str) -> UiDocumentJsonResponse:
+        parsed_document_id = _ensure_document_id(document_id)
+        response = self._json_request(
+            method="GET",
+            path=f"/v1/documents/{parsed_document_id}/diagnostic/progress",
+            body=None,
+            content_type=None,
+        )
+        if response.status_code == 200:
+            try:
+                validated = DocumentActionProgressResponse.model_validate(response.payload)
+            except ValidationError as exc:
+                raise ValueError("progression publique incompatible") from exc
+            return UiDocumentJsonResponse(
+                status_code=response.status_code,
+                payload=validated.model_dump(mode="json"),
             )
         return response
 

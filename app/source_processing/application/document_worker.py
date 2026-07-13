@@ -91,7 +91,10 @@ class DocumentDiagnosticWorker:
                 processing_run.failure_error_code or "PROCESSING_RUN_FAILED",
                 retryable=False,
             )
-        if processing_run.status is not DocumentProcessingRunStatus.MANIFEST_CREATED:
+        if processing_run.status is DocumentProcessingRunStatus.MANIFEST_CREATED:
+            processing_run = processing_run.begin_diagnosis()
+            self._processing_run_repository.save(processing_run)
+        if processing_run.status is not DocumentProcessingRunStatus.DIAGNOSING:
             raise WorkerProcessingError("PROCESSING_RUN_STATUS_INVALID", retryable=False)
 
         diagnostics = self._diagnostic_inspector.inspect(source.original_storage_ref.value)

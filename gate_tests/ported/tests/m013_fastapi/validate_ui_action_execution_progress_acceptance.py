@@ -105,8 +105,8 @@ def test_validate_ui_action_execution_progress_acceptance() -> None:
         ),
     )
 
-    # Given une action réellement prise par son worker.
-    # When l'UI lit sa progression via l'API orchestratrice.
+    # Given une action dont le worker a persisté la progression publique.
+    # When l'UI lit cette progression via l'API orchestratrice.
     # Then le contrat public expose seulement la phase et les unités persistées.
     async def scenario() -> None:
         async with application.router.lifespan_context(application):

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 
 from app.contracts.document_public_statuses import (
+    PublicActionPhase,
     PublicConversionStatus,
     PublicDiagnosticStatus,
     PublicSourceStatus,
@@ -17,6 +18,7 @@ from app.source_processing.application.document_commands import (
 )
 from app.source_processing.domain.document_processing_run import (
     DocumentProcessingRun,
+    DocumentProcessingRunStatus,
     PageDecision,
     PageRoute,
 )
@@ -169,6 +171,51 @@ class DocumentDiagnosticView:
 
 
 @dataclass(frozen=True, slots=True)
+class DocumentActionProgressView:
+    """Progression publique générique, issue exclusivement de l'état SP."""
+
+    action_name: str
+    phase: PublicActionPhase
+    completed_units: int
+    total_units: int | None
+    failure_error_code: str | None
+
+    def __post_init__(self) -> None:
+        if self.action_name != "DIAGNOSE":
+            raise ValueError("action publique inconnue")
+        object.__setattr__(self, "phase", PublicActionPhase.from_value(self.phase))
+        if isinstance(self.completed_units, bool) or not isinstance(self.completed_units, int):
+            raise ValueError("unités réalisées invalides")
+        if self.completed_units < 0:
+            raise ValueError("unités réalisées invalides")
+        if self.total_units is not None:
+            if isinstance(self.total_units, bool) or not isinstance(self.total_units, int):
+                raise ValueError("total d'unités invalide")
+            if self.total_units < 1 or self.completed_units > self.total_units:
+                raise ValueError("total d'unités incohérent")
+        if self.phase is PublicActionPhase.NOT_REQUESTED:
+            if self.completed_units != 0 or self.total_units is not None or self.failure_error_code is not None:
+                raise ValueError("progression non demandée incohérente")
+            return
+        if self.total_units is None:
+            raise ValueError("total d'unités requis")
+        if self.phase is PublicActionPhase.SUCCEEDED and self.completed_units != self.total_units:
+            raise ValueError("progression réussie incomplète")
+        if self.phase is PublicActionPhase.FAILED:
+            _ensure_text(self.failure_error_code, "code d'échec progression requis")
+            return
+        if self.failure_error_code is not None:
+            raise ValueError("code d'échec interdit hors échec")
+
+    @classmethod
+    def from_processing_run(
+        cls,
+        processing_run: DocumentProcessingRun | None,
+    ) -> "DocumentActionProgressView":
+        return _document_action_progress(processing_run)
+
+
+@dataclass(frozen=True, slots=True)
 class DocumentConversionView:
     """État public de conversion et décision QA disponible."""
 
@@ -250,6 +297,11 @@ class DocumentQueryService:
             raise DiagnosticNotRequestedError(parsed_document_id.value)
         parsed_processing_run = _ensure_processing_run(snapshot.processing_run)
         return _diagnostic_view(parsed_processing_run)
+
+    def read_document_action_progress(self, document_id: str) -> DocumentActionProgressView:
+        parsed_document_id = DocumentId.from_value(document_id)
+        snapshot = self._require_snapshot(parsed_document_id)
+        return DocumentActionProgressView.from_processing_run(snapshot.processing_run)
 
     def read_conversion(self, document_id: str) -> DocumentConversionView:
         parsed_document_id = DocumentId.from_value(document_id)
@@ -357,6 +409,37 @@ def _diagnostic_view(processing_run: DocumentProcessingRun) -> DocumentDiagnosti
     )
 
 
+def _document_action_progress(
+    processing_run: DocumentProcessingRun | None,
+) -> DocumentActionProgressView:
+    if processing_run is None:
+        return DocumentActionProgressView(
+            action_name="DIAGNOSE",
+            phase=PublicActionPhase.NOT_REQUESTED,
+            completed_units=0,
+            total_units=None,
+            failure_error_code=None,
+        )
+    source_page_count = processing_run.page_manifest.source_page_count
+    completed_units = len(processing_run.page_decisions)
+    if processing_run.status is DocumentProcessingRunStatus.MANIFEST_CREATED:
+        phase = PublicActionPhase.QUEUED
+    elif processing_run.status is DocumentProcessingRunStatus.DIAGNOSING:
+        phase = PublicActionPhase.RUNNING
+    elif processing_run.status is DocumentProcessingRunStatus.FAILED:
+        phase = PublicActionPhase.FAILED
+    else:
+        phase = PublicActionPhase.SUCCEEDED
+        completed_units = source_page_count
+    return DocumentActionProgressView(
+        action_name="DIAGNOSE",
+        phase=phase,
+        completed_units=completed_units,
+        total_units=source_page_count,
+        failure_error_code=processing_run.failure_error_code,
+    )
+
+
 def _page_diagnostic_view(decision: PageDecision | None) -> PageDiagnosticView | None:
     if decision is None:
         return None
@@ -420,6 +503,7 @@ __all__ = [
     "DocumentConversionView",
     "DocumentCorpusItem",
     "DocumentCorpusPageView",
+    "DocumentActionProgressView",
     "DocumentDiagnosticView",
     "DocumentQueryService",
     "DocumentSnapshotRepository",

@@ -391,7 +391,12 @@ def render_pdf_viewer(document: CorpusPdfDocument) -> str:
     )
 
 
-def render_document_inspection(*, title: str, response: Any) -> str:
+def render_document_inspection(
+    *,
+    title: str,
+    response: Any,
+    action_progress: Any | None,
+) -> str:
     """Rend une sortie ou erreur publique déjà validée par le client UI."""
 
     parsed_title = _ensure_text(title, "titre inspection requis")
@@ -432,6 +437,7 @@ def render_document_inspection(*, title: str, response: Any) -> str:
             )
         )
     elif parsed_title.casefold() == "diagnostic":
+        progress_html, refresh_html = _render_action_progress(action_progress)
         pages = payload.get("pages")
         if not isinstance(pages, list):
             raise ValueError("pages diagnostic requises pour le rendu")
@@ -451,6 +457,7 @@ def render_document_inspection(*, title: str, response: Any) -> str:
             (
                 '<section aria-labelledby="resume-diagnostic">',
                 '<h2 id="resume-diagnostic">Résumé du diagnostic</h2>',
+                progress_html,
                 f'<p>Statut : <code>{_escape(str(payload.get("diagnostic_status")))}</code></p>',
                 f'<p>Pages diagnostiquées : {_escape(str(payload.get("diagnosed_page_count")))} / {_escape(str(payload.get("source_page_count")))}</p>',
                 f"<ol>{page_items}</ol></section>",
@@ -469,7 +476,9 @@ def render_document_inspection(*, title: str, response: Any) -> str:
         (
             "<!doctype html>",
             '<html lang="fr">',
-            '<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Inspection documentaire</title></head>',
+            '<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">',
+            refresh_html if parsed_title.casefold() == "diagnostic" and status_code < 400 else "",
+            '<title>Inspection documentaire</title></head>',
             "<body>",
             f"<h1>{_escape(parsed_title)}</h1>",
             f"<p>Statut HTTP public: <code>{status_code}</code></p>",
@@ -478,6 +487,61 @@ def render_document_inspection(*, title: str, response: Any) -> str:
             "</body>",
             "</html>",
         )
+    )
+
+
+def _render_action_progress(value: Any) -> tuple[str, str]:
+    if value is None:
+        raise ValueError("progression d'action requise")
+    payload = getattr(value, "payload", value)
+    if isinstance(payload, Mapping):
+        action_name = payload.get("action_name")
+        phase = payload.get("phase")
+        completed_units = payload.get("completed_units")
+        total_units = payload.get("total_units")
+        failure_error_code = payload.get("failure_error_code")
+    else:
+        action_name = getattr(payload, "action_name", None)
+        phase = getattr(payload, "phase", None)
+        completed_units = getattr(payload, "completed_units", None)
+        total_units = getattr(payload, "total_units", None)
+        failure_error_code = getattr(payload, "failure_error_code", None)
+    if action_name != "DIAGNOSE":
+        raise ValueError("action de progression invalide")
+    if phase not in {"NOT_REQUESTED", "QUEUED", "RUNNING", "SUCCEEDED", "FAILED"}:
+        raise ValueError("phase de progression invalide")
+    if isinstance(completed_units, bool) or not isinstance(completed_units, int) or completed_units < 0:
+        raise ValueError("unités réalisées invalides")
+    if isinstance(total_units, bool) or not isinstance(total_units, int) or total_units < 1:
+        raise ValueError("total d'unités invalide")
+    if completed_units > total_units:
+        raise ValueError("progression supérieure au total")
+    if phase == "FAILED":
+        _ensure_text(failure_error_code, "code d'échec progression requis")
+    elif failure_error_code is not None:
+        raise ValueError("code d'échec interdit hors échec")
+    refresh_html = (
+        '<meta http-equiv="refresh" content="1">'
+        if phase in {"QUEUED", "RUNNING"}
+        else ""
+    )
+    failure_html = (
+        ""
+        if failure_error_code is None
+        else f'<p>Erreur : <code>{_escape(failure_error_code)}</code></p>'
+    )
+    return (
+        "".join(
+            (
+                '<section aria-live="polite" aria-label="Progression de l’action">',
+                f'<p>Action : <code>{_escape(action_name)}</code></p>',
+                f'<p>Phase : <code>{_escape(phase)}</code></p>',
+                f'<p>Avancement : {_escape(str(completed_units))} / {_escape(str(total_units))}</p>',
+                failure_html,
+                "</section>",
+            )
+        ),
+        refresh_html,
     )
 
 

@@ -24,9 +24,20 @@ class PublicSourceStatus(_StrictPublicStatus):
     QUARANTINED = "QUARANTINED"
 
 
+class PublicActionPhase(_StrictPublicStatus):
+    """Phase d'exécution publique commune aux actions asynchrones."""
+
+    NOT_REQUESTED = "NOT_REQUESTED"
+    QUEUED = "QUEUED"
+    RUNNING = "RUNNING"
+    SUCCEEDED = "SUCCEEDED"
+    FAILED = "FAILED"
+
+
 class PublicDiagnosticStatus(_StrictPublicStatus):
     DIAGNOSTIC_NOT_REQUESTED = "DIAGNOSTIC_NOT_REQUESTED"
     MANIFEST_CREATED = "MANIFEST_CREATED"
+    DIAGNOSING = "DIAGNOSING"
     DIAGNOSED = "DIAGNOSED"
     ROUTE_PLANNED = "ROUTE_PLANNED"
     MANUAL_REVIEW = "MANUAL_REVIEW"
@@ -55,6 +66,7 @@ class PublicProjectionStatus(_StrictPublicStatus):
 
 
 __all__ = [
+    "PublicActionPhase",
     "PublicConversionStatus",
     "PublicDiagnosticStatus",
     "PublicProjectionStatus",

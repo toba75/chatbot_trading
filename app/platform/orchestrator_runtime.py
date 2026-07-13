@@ -51,6 +51,7 @@ from app.source_processing.application.document_commands import DocumentCommandS
 from app.source_processing.application.document_queries import (
     DocumentCorpusItem,
     DocumentCorpusPageView,
+    DocumentActionProgressView,
     DocumentConversionView,
     DocumentDiagnosticView,
     DocumentQueryService,
@@ -67,6 +68,7 @@ PROJECTION_SOURCE_LOCATOR_LIMIT = 3
 class SourceProcessingCorpusPagePort(Protocol):
     def list_documents(self, *, limit: int, cursor: str | None) -> DocumentCorpusPageView: ...
     def read_diagnostic(self, document_id: str) -> DocumentDiagnosticView: ...
+    def read_document_action_progress(self, document_id: str) -> DocumentActionProgressView: ...
     def read_conversion(self, document_id: str) -> DocumentConversionView: ...
 
 
@@ -139,6 +141,9 @@ class OrchestratorDocumentCatalogService:
 
     def read_diagnostic(self, document_id: str) -> DocumentDiagnosticView:
         return self._source_processing_pages.read_diagnostic(document_id)
+
+    def read_document_action_progress(self, document_id: str) -> DocumentActionProgressView:
+        return self._source_processing_pages.read_document_action_progress(document_id)
 
     def read_conversion(self, document_id: str) -> DocumentConversionView:
         return self._source_processing_pages.read_conversion(document_id)

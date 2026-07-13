@@ -18,6 +18,7 @@ class DocumentProcessingRunStatus(str, Enum):
     """État métier explicite d'une tentative de traitement documentaire."""
 
     MANIFEST_CREATED = "MANIFEST_CREATED"
+    DIAGNOSING = "DIAGNOSING"
     DIAGNOSED = "DIAGNOSED"
     ROUTE_PLANNED = "ROUTE_PLANNED"
     MANUAL_REVIEW = "MANUAL_REVIEW"
@@ -897,7 +898,10 @@ class DocumentProcessingRun:
         self,
         page_decisions: Sequence[PageDecision],
     ) -> "DocumentProcessingRun":
-        if self.status is not DocumentProcessingRunStatus.MANIFEST_CREATED:
+        if self.status not in (
+            DocumentProcessingRunStatus.MANIFEST_CREATED,
+            DocumentProcessingRunStatus.DIAGNOSING,
+        ):
             raise ValueError("transition de diagnostic interdite")
 
         parsed_page_decisions = _ensure_page_decisions(page_decisions)
@@ -926,6 +930,24 @@ class DocumentProcessingRun:
             status=DocumentProcessingRunStatus.DIAGNOSED,
             aggregate_version=self.aggregate_version + 1,
             events=self.events + diagnostic_events,
+        )
+
+    def begin_diagnosis(self) -> "DocumentProcessingRun":
+        """Publie l'exécution réelle avant toute inspection du PDF."""
+
+        if self.status is not DocumentProcessingRunStatus.MANIFEST_CREATED:
+            raise ValueError("transition d'exécution diagnostic interdite")
+        return DocumentProcessingRun(
+            processing_run_id=self.processing_run_id,
+            document_id=self.document_id,
+            page_manifest=self.page_manifest,
+            page_decisions=(),
+            route_plan=None,
+            manual_review_reason=None,
+            blocking_policy_version=None,
+            status=DocumentProcessingRunStatus.DIAGNOSING,
+            aggregate_version=self.aggregate_version + 1,
+            events=self.events,
         )
 
     def decide_route_plan(
@@ -1059,6 +1081,7 @@ class DocumentProcessingRun:
 
         if self.status not in (
             DocumentProcessingRunStatus.MANIFEST_CREATED,
+            DocumentProcessingRunStatus.DIAGNOSING,
             DocumentProcessingRunStatus.DIAGNOSED,
             DocumentProcessingRunStatus.MANUAL_REVIEW,
         ):
@@ -1132,9 +1155,15 @@ class DocumentProcessingRun:
                 ),
             ):
                 raise ValueError("event DocumentProcessingRun invalide")
-        if self.status is DocumentProcessingRunStatus.MANIFEST_CREATED and len(page_decisions) != 0:
-            raise ValueError("diagnostics interdits sur tentative créée")
-        if self.status is DocumentProcessingRunStatus.MANIFEST_CREATED:
+        if self.status in (
+            DocumentProcessingRunStatus.MANIFEST_CREATED,
+            DocumentProcessingRunStatus.DIAGNOSING,
+        ) and len(page_decisions) != 0:
+            raise ValueError("diagnostics interdits avant fin d'exécution")
+        if self.status in (
+            DocumentProcessingRunStatus.MANIFEST_CREATED,
+            DocumentProcessingRunStatus.DIAGNOSING,
+        ):
             if route_plan is not None or manual_review_reason is not None:
                 raise ValueError("route interdite sur tentative créée")
             if blocking_policy_version is not None:

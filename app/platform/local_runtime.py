@@ -260,6 +260,7 @@ def _serve_http(
                             body=render_document_inspection(
                                 title="PDF original",
                                 response=_json_response_for_ui_error(response),
+                                action_progress=None,
                             ),
                         )
                     return
@@ -273,11 +274,17 @@ def _serve_http(
                             document_id=document_id,
                             step=step,
                         )
+                        action_progress = (
+                            api_client.read_document_action_progress(document_id)
+                            if step == "diagnostic" and response.status_code < 400
+                            else None
+                        )
                     except UiDocumentApiUnavailableError:
                         response = UiDocumentJsonResponse(
                             status_code=503,
                             payload={"error_code": ORCHESTRATOR_API_UNAVAILABLE},
                         )
+                        action_progress = None
                     _write_text_response(
                         self,
                         status_code=response.status_code,
@@ -285,6 +292,7 @@ def _serve_http(
                         body=render_document_inspection(
                             title=step.capitalize(),
                             response=response,
+                            action_progress=action_progress,
                         ),
                     )
                     return
@@ -372,7 +380,14 @@ def _serve_http(
                         status_code=404,
                         payload={"error_code": "UI_DOCUMENT_COMMAND_FORBIDDEN"},
                     )
-                if response.status_code < 400:
+                diagnosis_match = _DIAGNOSE_PATH_PATTERN.fullmatch(self.path)
+                if response.status_code < 400 and diagnosis_match is not None:
+                    document_id = str(response.payload.get("document_id", ""))
+                    _write_redirect_response(
+                        self,
+                        location=f"/ui/documents/{document_id}/diagnostic",
+                    )
+                elif response.status_code < 400:
                     query = urlencode(
                         {
                             "document_id": str(response.payload.get("document_id", "")),
@@ -388,6 +403,7 @@ def _serve_http(
                         body=render_document_inspection(
                             title="Erreur documentaire",
                             response=response,
+                            action_progress=None,
                         ),
                     )
                 return

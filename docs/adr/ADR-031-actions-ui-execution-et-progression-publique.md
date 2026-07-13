@@ -1,6 +1,6 @@
 # ADR-031 - Actions UI exécutables et progression publique
 
-**Statut :** Proposée
+**Statut :** Acceptée
 **Date :** 2026-07-13
 **Décideurs :** Équipe OSTrading
 **Remplace :** Aucun
@@ -85,10 +85,11 @@ public de progression qui doit rester cohérent pendant son exécution.
 
 - Spécification : `docs/specs/ui.md` UI-019.
 - Plan d'implémentation : `docs/tasks/milestone_013-fastapi/0012_executer_actions_ui_avec_progression.md`.
-- Tests d'acceptation : `gate_tests/ported/tests/m013_fastapi/validate_ui_action_execution_progress_acceptance.py`.
-- Commits : à compléter à l’acceptation.
+- Tests d'acceptation : `gate_tests/ported/tests/m013_fastapi/validate_ui_action_execution_progress_acceptance.py`,
+  complété par la preuve locale réelle `uv run ui` sur un PDF du corpus.
+- Commits : RED `b40f92b6f`; GREEN à compléter dans le journal de tâche.
 
 ## Notes
 
-Cette décision complète ADR-018 et ADR-030 sans modifier leur sens. Elle reste
-proposée jusqu’à ce que la migration soit intégralement prouvée GREEN.
+Cette décision complète ADR-018 et ADR-030 sans modifier leur sens. Elle est
+acceptée après la preuve GREEN du parcours local réel et de la gate canonique.

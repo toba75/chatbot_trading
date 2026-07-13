@@ -13,12 +13,14 @@ from starlette.concurrency import run_in_threadpool
 from app.source_processing.application.document_queries import (
     ConversionNotRequestedError,
     DiagnosticNotRequestedError,
+    DocumentActionProgressView,
     DocumentConversionView,
     DocumentDiagnosticView,
     SourceNotFoundError,
 )
 from app.source_processing.domain.source_document import DocumentId
 from app.platform.orchestrator_api_models import (
+    DocumentActionProgressResponse,
     DocumentConversionResponse,
     DocumentCorpusResponse,
     DocumentDiagnosticResponse,
@@ -47,6 +49,9 @@ class DocumentQueryPort(Protocol):
     def read_diagnostic(self, document_id: str) -> DocumentDiagnosticView:
         """Retourne le diagnostic public d'un document."""
 
+    def read_document_action_progress(self, document_id: str) -> DocumentActionProgressView:
+        """Retourne la progression publique de l'action documentaire."""
+
     def read_conversion(self, document_id: str) -> DocumentConversionView:
         """Retourne la conversion publique d'un document."""
 
@@ -73,6 +78,25 @@ def build_document_query_router(*, document_queries: DocumentQueryPort) -> APIRo
         )
         if not hasattr(view, "documents") or not hasattr(view, "next_cursor"):
             raise TypeError("read-model de page corpus invalide")
+        return JSONResponse(status_code=200, content=asdict(view))
+
+    @router.get(
+        "/v1/documents/{document_id}/diagnostic/progress",
+        response_model=DocumentActionProgressResponse,
+        responses=PUBLIC_ERROR_RESPONSES,
+    )
+    async def read_document_action_progress(document_id: str) -> JSONResponse:
+        if not _is_valid_document_id(document_id):
+            return _invalid_document_id_response()
+        try:
+            view = await run_in_threadpool(
+                parsed_queries.read_document_action_progress,
+                document_id,
+            )
+        except SourceNotFoundError as exc:
+            return _source_not_found_response(exc)
+        if not isinstance(view, DocumentActionProgressView):
+            raise TypeError("read-model de progression invalide")
         return JSONResponse(status_code=200, content=asdict(view))
 
     @router.get(
@@ -159,6 +183,8 @@ def _ensure_document_queries(value: object) -> DocumentQueryPort:
         raise ValueError("document_queries sans liste documentaire")
     if not callable(getattr(value, "read_diagnostic", None)):
         raise ValueError("document_queries sans lecture diagnostic")
+    if not callable(getattr(value, "read_document_action_progress", None)):
+        raise ValueError("document_queries sans lecture progression")
     if not callable(getattr(value, "read_conversion", None)):
         raise ValueError("document_queries sans lecture conversion")
     return cast(DocumentQueryPort, value)

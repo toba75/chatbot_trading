@@ -257,7 +257,10 @@ Si ces lectures n'existent pas encore, l'UI doit être considérée non impléme
 |---|---|
 | `SOURCE_REGISTERED` | PDF enregistré, pas encore forcément diagnostiqué. |
 | `DUPLICATE_SOURCE` | Source binaire déjà connue; l'UI affiche l'identité existante. |
-| `DIAGNOSTIC_REQUESTED` | Diagnostic accepté et en attente ou en cours. |
+| `DIAGNOSTIC_REQUESTED` | Accusé de réception de la commande; ce n’est pas un état persistant du diagnostic. |
+| `MANIFEST_CREATED` | Diagnostic mis en file; la progression publique est `QUEUED`. |
+| `DIAGNOSING` | Worker réel en cours; la progression publique est `RUNNING`. |
+| `DIAGNOSED` | Diagnostic persistant terminé; la progression publique est `SUCCEEDED`. |
 | `ROUTE_EXPLICIT` | Route documentaire décidée explicitement. |
 | `MANUAL_REVIEW` | Décision humaine requise avant poursuite. |
 | `SOURCE_QUARANTINED` | Source bloquée et non publiable. |

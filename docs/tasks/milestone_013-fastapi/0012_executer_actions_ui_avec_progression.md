@@ -44,5 +44,5 @@
 - Dépendances : T-006, T-007, T-010, T-011 ; ADR-018, ADR-024, ADR-025,
   ADR-030 et ADR-031.
 - Commande de validation finale : `uv run --locked gate`.
-- Commit RED : à compléter.
-- Commit GREEN : à compléter.
+- Commit RED : `b40f92b6f`, `test(ui): couvrir action réelle et progression ADR-031`.
+- Commit GREEN : à compléter après `uv run --locked gate`.
