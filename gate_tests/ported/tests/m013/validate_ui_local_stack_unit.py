@@ -106,6 +106,51 @@ finally:
     ui_local_stack.time.sleep = original_sleep
 assert_equal(len(calls), 2, "Le bootstrap doit réessayer jusqu'à readiness PostgreSQL.")
 
+
+# Given aucun conteneur PostgreSQL de développement n'existe encore.
+# When `uv run ui` crée son conteneur local.
+# Then son marqueur de propriété est exactement `com.ostrading.managed-by=uv-run-ui`.
+with tempfile.TemporaryDirectory() as temporary_directory:
+    root = Path(temporary_directory)
+    secret_path = root / "config" / "secrets" / "local" / "postgres_password"
+    secret_path.parent.mkdir(parents=True)
+    secret_path.write_text("a" * 32, encoding="ascii")
+    docker_calls = []
+    original_run_docker = ui_local_stack._run_docker
+
+    def fake_docker_creation(arguments, error_code, *, allowed_returncodes=frozenset((0,))):
+        docker_calls.append(arguments)
+        if arguments[0] == "version":
+            return CompletedProcess(args=arguments, returncode=0, stdout="16.0", stderr="")
+        if arguments[:2] == ("container", "inspect"):
+            return CompletedProcess(args=arguments, returncode=1, stdout="", stderr="")
+        if arguments[0] == "run":
+            label_index = arguments.index("--label")
+            assert_equal(
+                arguments[label_index + 1],
+                "com.ostrading.managed-by=uv-run-ui",
+                "Le conteneur local doit porter un marqueur de propriété non ambigu.",
+            )
+            return CompletedProcess(args=arguments, returncode=0, stdout="container-id", stderr="")
+        if arguments[0] == "port":
+            return CompletedProcess(
+                args=arguments,
+                returncode=0,
+                stdout="127.0.0.1:55432",
+                stderr="",
+            )
+        raise AssertionError(f"Commande Docker inattendue: {arguments}")
+
+    ui_local_stack._run_docker = fake_docker_creation
+    try:
+        assert_equal(
+            ui_local_stack._start_local_postgres(repository_root=root),
+            True,
+            "Le bootstrap doit créer le conteneur PostgreSQL local géré.",
+        )
+    finally:
+        ui_local_stack._run_docker = original_run_docker
+
 print("Tests unitaires bootstrap local uv run ui: OK")
 '''
         namespace = {"__name__": __name__, "__file__": str(Path(__file__))}
