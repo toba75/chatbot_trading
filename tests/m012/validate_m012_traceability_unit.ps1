@@ -254,7 +254,7 @@ try {
         -Mutate {
             param($projectRoot)
             $path = Join-Path $projectRoot "tests/governance/validate_m000_validation_commands_acceptance.ps1"
-            (Get-Content -Raw -Encoding UTF8 -LiteralPath $path).Replace('$expectedTestSummary = "Gate test GREEN: 35 validation(s), $expectedTestCount test(s)."', '$expectedTestSummary = "Gate test GREEN"') |
+            (Get-Content -Raw -Encoding UTF8 -LiteralPath $path).Replace('"DEFAULT|37|309"', '"DEFAULT|37|"') |
                 Set-Content -Encoding UTF8 -LiteralPath $path
         }
 
@@ -264,7 +264,7 @@ try {
         -Mutate {
             param($projectRoot)
             $path = Join-Path $projectRoot "tests/governance/validate_m000_validation_commands_acceptance.ps1"
-            (Get-Content -Raw -Encoding UTF8 -LiteralPath $path).Replace('Gate lint GREEN: 35 validation(s), 0 test(s).', 'Gate lint GREEN') |
+            (Get-Content -Raw -Encoding UTF8 -LiteralPath $path).Replace('Gate lint GREEN: 38 validation(s), 0 test(s).', 'Gate lint GREEN') |
                 Set-Content -Encoding UTF8 -LiteralPath $path
         }
 

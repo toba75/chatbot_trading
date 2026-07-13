@@ -228,6 +228,16 @@
 - Écart historique explicite : certains lots antérieurs ont adapté ou ajouté des tests dans leur commit GREEN. Les hashes sont conservés et cet écart à la séparation RED/GREEN stricte est documenté sans réécriture. Pour ADR-026, le contrat a été commité RED, le harness a été stabilisé dans des commits exclusivement tests, puis l'implémentation a été commitée GREEN sans assouplir le contrat.
 - Préservation utilisateur : le hunk `tests/m013/validate_m013_reality_product_acceptance.ps1` reste hors staging et hors commits.
 
+## Correctif de maintenance - installation du projet en clone propre
+
+- Date : 2026-07-13.
+- État initial : la gate isolée synchronisait uniquement les dépendances avec `--no-install-project`; `importlib.metadata.version("chatbot-trading")` ne fonctionnait que grâce à un `chatbot_trading.egg-info` local non suivi.
+- Scénario BDD : Given une copie Git sans `*.egg-info`; When la gate M13-FastAPI crée son environnement depuis `uv.lock`; Then elle installe le projet, prouve la métadonnée `chatbot-trading==0.1.0` et refuse toute version absente ou différente.
+- Commit RED : `cc9002d78`, `test(opérations): exiger le paquet installé en clone propre`.
+- Implémentation : `uv sync --frozen --no-dev --active` installe le projet avec le backend setuptools épinglé, puis la gate contrôle sa version via `importlib.metadata` avant toute preuve statique ou live.
+- Fixture : les copies de traçabilité partagent la copie stricte de `.dockerignore`, `pyproject.toml` et `uv.lock`; la copie M000 ajoute `config/`, conserve `master` comme ancêtre de `codex/m13-fastapi` et interdit explicitement tout `*.egg-info` local.
+- Préservation utilisateur : le hunk `tests/m013/validate_m013_reality_product_acceptance.ps1` reste hors staging et hors commits.
+
 ## Correctif final - Politique environnement M13-config
 
 - Date : 2026-07-13.

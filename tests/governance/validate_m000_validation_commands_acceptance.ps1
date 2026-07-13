@@ -1,45 +1,47 @@
 ﻿$ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
+. (Join-Path $repoRoot "tests/governance/traceability_fixture.ps1")
 $testCommandPath = Join-Path $repoRoot "scripts/test.ps1"
 $lintCommandPath = Join-Path $repoRoot "scripts/lint.ps1"
 $temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m000_validation_commands_acceptance_" + [System.Guid]::NewGuid().ToString("N"))
 $eAcute = [char] 0x00E9
-$expectedTestCount = 290
-if ($env:OST_M003_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
-    $expectedTestCount = 146
+$gateVolumeRows = @(
+    "DEFAULT|37|309",
+    "OST_M003_PRECONDITION_ACCEPTANCE_RUNNING|14|175",
+    "OST_M004_PRECONDITION_ACCEPTANCE_RUNNING|15|176",
+    "OST_M005_PRECONDITION_ACCEPTANCE_RUNNING|16|176",
+    "OST_M006_PRECONDITION_ACCEPTANCE_RUNNING|17|175",
+    "OST_M007_PRECONDITION_ACCEPTANCE_RUNNING|18|178",
+    "OST_M008_PRECONDITION_ACCEPTANCE_RUNNING|19|199",
+    "OST_M009_PRECONDITION_ACCEPTANCE_RUNNING|20|200",
+    "OST_M010_PRECONDITION_ACCEPTANCE_RUNNING|21|221",
+    "OST_M011_PRECONDITION_ACCEPTANCE_RUNNING|23|261",
+    "OST_M012_PRECONDITION_ACCEPTANCE_RUNNING|25|273",
+    "OST_M013_PRECONDITION_ACCEPTANCE_RUNNING|25|298"
+)
+$activePreconditionContexts = @(
+    $gateVolumeRows |
+        ForEach-Object { ($_ -split "\|", 2)[0] } |
+        Where-Object { ($_ -ne "DEFAULT") -and ([Environment]::GetEnvironmentVariable($_) -eq "1") }
+)
+
+$activeGateContext = if ($activePreconditionContexts.Count -gt 0) {
+    $activePreconditionContexts[0]
 }
-elseif ($env:OST_M004_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
-    $expectedTestCount = 147
+else {
+    "DEFAULT"
 }
-elseif ($env:OST_M005_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
-    $expectedTestCount = 147
+$selectedGateVolumeRows = @($gateVolumeRows | Where-Object { $_.StartsWith("$activeGateContext|", [System.StringComparison]::Ordinal) })
+
+if ($selectedGateVolumeRows.Count -ne 1) {
+    throw "Volume de gate M-000 introuvable ou ambigu pour le contexte: $activeGateContext"
 }
-elseif ($env:OST_M006_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
-    $expectedTestCount = 148
-}
-elseif ($env:OST_M007_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
-    $expectedTestCount = 149
-}
-elseif ($env:OST_M008_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
-    $expectedTestCount = 170
-}
-elseif ($env:OST_M009_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
-    $expectedTestCount = 171
-}
-elseif ($env:OST_M010_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
-    $expectedTestCount = 192
-}
-elseif ($env:OST_M011_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
-    $expectedTestCount = 244
-}
-elseif ($env:OST_M012_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
-    $expectedTestCount = 256
-}
-elseif ($env:OST_M013_PRECONDITION_ACCEPTANCE_RUNNING -eq "1") {
-    $expectedTestCount = 279
-}
-$expectedTestSummary = "Gate test GREEN: 35 validation(s), $expectedTestCount test(s)."
+
+$selectedGateVolume = $selectedGateVolumeRows[0] -split "\|"
+$expectedValidationCount = [int] $selectedGateVolume[1]
+$expectedTestCount = [int] $selectedGateVolume[2]
+$expectedTestSummary = "Gate test GREEN: $expectedValidationCount validation(s), $expectedTestCount test(s)."
 
 function Split-MarkdownRow {
     param(
@@ -136,7 +138,10 @@ function New-TemporaryProject {
     Copy-Item -LiteralPath (Join-Path $repoRoot "docs/traceability") -Destination (Join-Path $projectRoot "docs/traceability") -Recurse
     Copy-Item -LiteralPath (Join-Path $repoRoot "docs/user") -Destination (Join-Path $projectRoot "docs/user") -Recurse
     Copy-Item -LiteralPath (Join-Path $repoRoot "app") -Destination (Join-Path $projectRoot "app") -Recurse
+    Copy-Item -LiteralPath (Join-Path $repoRoot "config") -Destination (Join-Path $projectRoot "config") -Recurse
     Copy-Item -LiteralPath (Join-Path $repoRoot "deploy") -Destination (Join-Path $projectRoot "deploy") -Recurse
+    Copy-TraceabilityRootArtifacts -SourceRoot $repoRoot -DestinationRoot $projectRoot
+    New-TrackedCorpusPdfPlaceholders -SourceRoot $repoRoot -DestinationRoot $projectRoot
 
     return $projectRoot
 }
@@ -231,6 +236,7 @@ function Initialize-GitBaseline {
     & git -C $ProjectRoot -c core.autocrlf=false -c user.email="m000@example.test" -c user.name="M000" commit -m "baseline m000 validation commands" 2>$null | Out-Null
     $masterRevision = (& git -C $ProjectRoot rev-parse HEAD).Trim()
     & git -C $ProjectRoot update-ref refs/remotes/origin/master $masterRevision 2>$null | Out-Null
+    & git -C $ProjectRoot checkout --quiet -b codex/m13-fastapi 2>$null | Out-Null
 }
 
 if (-not (Test-Path -LiteralPath $testCommandPath -PathType Leaf)) {
@@ -253,10 +259,17 @@ try {
     # When les gates globales de test et de lint sont exécutées.
     # Then elles retournent GREEN sur un dépôt valide ou RED avec la validation fautive nommée.
     $validProjectRoot = New-TemporaryProject -Name "valid"
+    $unexpectedPackageMetadata = @(Get-ChildItem -LiteralPath $validProjectRoot -Filter "*.egg-info" -Directory -Force)
+    if ($unexpectedPackageMetadata.Count -ne 0) {
+        throw "La copie de clone propre ne doit pas reprendre de métadonnée egg-info locale."
+    }
     Initialize-GitBaseline -ProjectRoot $validProjectRoot
     $testResult = Invoke-ProjectCommand -ProjectRoot $validProjectRoot -RelativePath "scripts/test.ps1"
     Assert-ExitCode -Actual $testResult.ExitCode -Expected 0 -Message "La gate de test M-000 conforme doit réussir."
     Assert-OutputContains -Output $testResult.Output -Expected "Gate test GREEN" -Message "La gate de test doit annoncer son état GREEN."
+    if ($activeGateContext -eq "DEFAULT") {
+        Assert-OutputContains -Output $testResult.Output -Expected "M013_FASTAPI_PROJECT_VERSION: 0.1.0" -Message "Le clone propre doit installer la métadonnée exacte du projet."
+    }
     Assert-OutputContains -Output $testResult.Output -Expected $expectedTestSummary -Message "La gate de test doit prouver le nombre exact de validations et tests."
     Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/governance/validate_m000_precondition_report_acceptance.ps1" -Message "La gate de test doit exécuter le test d'acceptation T-001."
     Assert-OutputContains -Output $testResult.Output -Expected "Test GREEN: tests/governance/validate_definition_of_done_unit.ps1" -Message "La gate de test doit exécuter le dernier test unitaire T-005."
@@ -385,7 +398,7 @@ try {
     $lintResult = Invoke-ProjectCommand -ProjectRoot $validProjectRoot -RelativePath "scripts/lint.ps1"
     Assert-ExitCode -Actual $lintResult.ExitCode -Expected 0 -Message "La gate de lint M-000 conforme doit réussir."
     Assert-OutputContains -Output $lintResult.Output -Expected "Gate lint GREEN" -Message "La gate de lint doit annoncer son état GREEN."
-    Assert-OutputContains -Output $lintResult.Output -Expected "Gate lint GREEN: 35 validation(s), 0 test(s)." -Message "La gate de lint doit prouver le nombre exact de validations et tests."
+    Assert-OutputContains -Output $lintResult.Output -Expected "Gate lint GREEN: 38 validation(s), 0 test(s)." -Message "La gate de lint doit prouver le nombre exact de validations et tests."
     Assert-OutputContains -Output $lintResult.Output -Expected "Validation GREEN: scripts/validate_local_compose.ps1" -Message "La gate de lint doit exécuter le validateur Compose local M-002."
     Assert-OutputContains -Output $lintResult.Output -Expected "Validation GREEN: scripts/validate_network_boundary.ps1" -Message "La gate de lint doit exécuter le validateur de frontière réseau M-002."
     Assert-OutputContains -Output $lintResult.Output -Expected "Validation GREEN: scripts/validate_m004_specification.ps1" -Message "La gate de lint doit exécuter le validateur de spécification M-004."

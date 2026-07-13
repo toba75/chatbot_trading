@@ -1,6 +1,7 @@
 ﻿$ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
+. (Join-Path $repoRoot "tests/governance/traceability_fixture.ps1")
 . (Join-Path $repoRoot "scripts/require_python.ps1")
 $pythonExecutable = Get-RequiredPythonExecutable
 $validatorPath = Join-Path $repoRoot "scripts/validate_traceability.ps1"
@@ -133,6 +134,7 @@ function New-TemporaryProject {
     Copy-Item -LiteralPath (Join-Path $repoRoot "app") -Destination (Join-Path $projectRoot "app") -Recurse
     Copy-Item -LiteralPath (Join-Path $repoRoot "config") -Destination (Join-Path $projectRoot "config") -Recurse
     Copy-Item -LiteralPath (Join-Path $repoRoot "deploy") -Destination (Join-Path $projectRoot "deploy") -Recurse
+    Copy-TraceabilityRootArtifacts -SourceRoot $repoRoot -DestinationRoot $projectRoot
 
     return $projectRoot
 }

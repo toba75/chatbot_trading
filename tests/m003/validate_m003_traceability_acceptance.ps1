@@ -1,6 +1,7 @@
 ﻿$ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
+. (Join-Path $repoRoot "tests/governance/traceability_fixture.ps1")
 $validatorPath = Join-Path $repoRoot "scripts/validate_traceability.ps1"
 $matrixPath = Join-Path $repoRoot "docs/traceability/matrix.md"
 $temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m003_traceability_acceptance_" + [System.Guid]::NewGuid().ToString("N"))
@@ -129,6 +130,7 @@ function New-TemporaryProject {
     Copy-Item -LiteralPath (Join-Path $repoRoot "app") -Destination (Join-Path $projectRoot "app") -Recurse
     Copy-Item -LiteralPath (Join-Path $repoRoot "config") -Destination (Join-Path $projectRoot "config") -Recurse
     Copy-Item -LiteralPath (Join-Path $repoRoot "deploy") -Destination (Join-Path $projectRoot "deploy") -Recurse
+    Copy-TraceabilityRootArtifacts -SourceRoot $repoRoot -DestinationRoot $projectRoot
 
     return $projectRoot
 }

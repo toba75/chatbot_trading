@@ -25,7 +25,7 @@ La stack d'exploitation est construite depuis une archive Git, jamais depuis le 
 
 | Contrôle | Preuve actuelle | Verdict |
 |---|---|---|
-| Interpréteur et dépendances | Python `3.12.8`, setuptools, Pydantic et Starlette directs et exacts, `uv lock --check` | Couvert |
+| Interpréteur, projet et dépendances | Python `3.12.8`, paquet `chatbot-trading` en version `0.1.0`, setuptools, Pydantic et Starlette directs et exacts, `uv lock --check` | Couvert, y compris depuis un clone sans `*.egg-info` local |
 | Contexte de build | Archive Git complète et `.dockerignore` racine borné | Couvert par ADR-026 et test statique |
 | Identité PostgreSQL | rôle/base `ostrading`, URL conteneur et secret cohérents | Couvert par Compose réel |
 | Identité images | commit complet et schéma 009 dans tags et labels API/worker | Inspectée avant démarrage |

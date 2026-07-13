@@ -1,6 +1,7 @@
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "../..")
+. (Join-Path $repoRoot "tests/governance/traceability_fixture.ps1")
 $validatorPath = Join-Path $repoRoot "scripts/validate_traceability.ps1"
 $temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("ost_m003_traceability_unit_" + [System.Guid]::NewGuid().ToString("N"))
 $eAcute = [char] 0x00E9
@@ -180,6 +181,7 @@ function New-TemporaryProject {
 
     New-Item -ItemType Directory -Path (Join-Path $projectRoot "docs/traceability") -Force | Out-Null
     New-M003MatrixContent | Set-Content -Encoding UTF8 -LiteralPath (Join-Path $projectRoot "docs/traceability/matrix.md")
+    Copy-TraceabilityRootArtifacts -SourceRoot $repoRoot -DestinationRoot $projectRoot
 
     return $projectRoot
 }

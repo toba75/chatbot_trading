@@ -395,9 +395,27 @@ foreach ($testPath in $expectedM012TestPaths) {
 
 Assert-Condition -Condition ($testGateContent.Contains('scripts/validate_m012_traceability.ps1')) -Message "Gate test sans validateur M-012"
 Assert-Condition -Condition ($lintGateContent.Contains('scripts/validate_m012_traceability.ps1')) -Message "Gate lint sans validateur M-012"
-Assert-Condition -Condition ($governanceTestContent.Contains('$expectedTestSummary = "Gate test GREEN: 35 validation(s), $expectedTestCount test(s)."')) -Message "Contrôle compteur test M-000 absent"
-Assert-Condition -Condition ($governanceTestContent.Contains('Gate lint GREEN: 35 validation(s), 0 test(s).')) -Message "Contrôle compteur lint M-000 absent"
-Assert-Condition -Condition ([regex]::IsMatch($governanceTestContent, '\$expectedTestCount\s*=\s*\d+')) -Message "Compteur test attendu M-000 absent"
+$requiredM000GateVolumes = @(
+    "DEFAULT|37|309",
+    "OST_M003_PRECONDITION_ACCEPTANCE_RUNNING|14|175",
+    "OST_M004_PRECONDITION_ACCEPTANCE_RUNNING|15|176",
+    "OST_M005_PRECONDITION_ACCEPTANCE_RUNNING|16|176",
+    "OST_M006_PRECONDITION_ACCEPTANCE_RUNNING|17|175",
+    "OST_M007_PRECONDITION_ACCEPTANCE_RUNNING|18|178",
+    "OST_M008_PRECONDITION_ACCEPTANCE_RUNNING|19|199",
+    "OST_M009_PRECONDITION_ACCEPTANCE_RUNNING|20|200",
+    "OST_M010_PRECONDITION_ACCEPTANCE_RUNNING|21|221",
+    "OST_M011_PRECONDITION_ACCEPTANCE_RUNNING|23|261",
+    "OST_M012_PRECONDITION_ACCEPTANCE_RUNNING|25|273",
+    "OST_M013_PRECONDITION_ACCEPTANCE_RUNNING|25|298"
+)
+
+foreach ($requiredM000GateVolume in $requiredM000GateVolumes) {
+    Assert-Condition -Condition ($governanceTestContent.Contains('"' + $requiredM000GateVolume + '"')) -Message "Contrôle compteur test M-000 absent"
+}
+
+Assert-Condition -Condition ($governanceTestContent.Contains('$expectedTestSummary = "Gate test GREEN: $expectedValidationCount validation(s), $expectedTestCount test(s)."')) -Message "Contrôle compteur test M-000 absent"
+Assert-Condition -Condition ($governanceTestContent.Contains('Gate lint GREEN: 38 validation(s), 0 test(s).')) -Message "Contrôle compteur lint M-000 absent"
 
 $statusesByContext = ConvertTo-GapStatusMap -GapReportContent $gapReportContent
 foreach ($context in $expectedGapContexts) {

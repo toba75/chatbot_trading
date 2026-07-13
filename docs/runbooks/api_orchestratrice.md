@@ -148,7 +148,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_fast
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_fastapi.ps1 -Mode Live
 ```
 
-Les deux modes matérialisent l'environnement verrouillé par `uv sync --frozen --no-dev --no-install-project`. Le mode `Live` exporte `HEAD`, construit et démarre la stack finale : PostgreSQL, Qdrant, `llm-gateway`, `orchestrator-api`, deux workers, UI et Caddy. Il vérifie les labels, l'utilisateur, les entrypoints, la migration 008, la readiness PostgreSQL + LLM et un PDF réel. Il redémarre ensuite PostgreSQL et l'API dans de nouveaux processus, puis relit le diagnostic et le SHA-256 original : c'est la preuve réelle T-005. Le test historique `validate_document_persistence_restart_acceptance.ps1` reste une preuve de contrat isolée et ne remplace pas ce parcours Compose.
+Les deux modes matérialisent l'environnement verrouillé par `uv sync --frozen --no-dev`. Cette synchronisation installe aussi le paquet `chatbot-trading` en version `0.1.0` et la gate refuse toute métadonnée absente ou différente. Le mode `Live` exporte `HEAD`, construit et démarre la stack finale : PostgreSQL, Qdrant, `llm-gateway`, `orchestrator-api`, deux workers, UI et Caddy. Il vérifie les labels, l'utilisateur, les entrypoints, la migration 008, la readiness PostgreSQL + LLM et un PDF réel. Il redémarre ensuite PostgreSQL et l'API dans de nouveaux processus, puis relit le diagnostic et le SHA-256 original : c'est la preuve réelle T-005. Le test historique `validate_document_persistence_restart_acceptance.ps1` reste une preuve de contrat isolée et ne remplace pas ce parcours Compose.
 
 ## Migration ascendante d'un volume existant
 

@@ -115,14 +115,21 @@ try {
     $env:UV_PROJECT_ENVIRONMENT = $temporaryEnvironment
     $env:M013_FASTAPI_PYTHON = $lockedPython
     $env:PATH = "$lockedPythonDirectory;$previousPath"
-    & $uvCommand.Source sync --frozen --no-dev --active --no-install-project --python $lockedPython
+    & $uvCommand.Source sync --frozen --no-dev --active --python $lockedPython
     if ($LASTEXITCODE -ne 0) {
-        throw "M013_FASTAPI_UV_SYNC_FAILED: uv sync --frozen --no-dev --active --no-install-project a échoué dans l'environnement isolé."
+        throw "M013_FASTAPI_UV_SYNC_FAILED: uv sync --frozen --no-dev --active a échoué dans l'environnement isolé."
     }
     $resolvedVersion = (& $lockedPython -c "import platform; print(platform.python_version())").Trim()
     if ($LASTEXITCODE -ne 0 -or $resolvedVersion -ne $lockedPythonVersion) {
         throw "M013_FASTAPI_LOCKED_PYTHON_REQUIRED: version attendue=$lockedPythonVersion; obtenue=$resolvedVersion."
     }
+    $expectedProjectVersion = "0.1.0"
+    $projectVersionCommand = "from importlib.metadata import version; print(version('chatbot-trading'))"
+    $resolvedProjectVersion = (& $lockedPython -c $projectVersionCommand).Trim()
+    if ($LASTEXITCODE -ne 0 -or $resolvedProjectVersion -ne $expectedProjectVersion) {
+        throw "M013_FASTAPI_PROJECT_VERSION_REQUIRED: version attendue=$expectedProjectVersion; obtenue=$resolvedProjectVersion."
+    }
+    Write-Host "M013_FASTAPI_PROJECT_VERSION: $resolvedProjectVersion"
     if ($Mode -eq "Live") {
         . (Join-Path $repoRoot "scripts\m013_fastapi_live_gateway.ps1")
         $liveGateway = Start-M013FastApiLiveGateway `
