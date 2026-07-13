@@ -24,12 +24,12 @@ Elle ne remplace pas les définitions de terminé propres aux bounded contexts d
 | ADR | ADR créée, remplacée ou absence d'ADR explicitement justifiée après consultation du registre. | Refuser la clôture si une décision structurante reste implicite ou change le sens d'une ADR acceptée. |
 | Traçabilité | Ligne de `docs/traceability/matrix.md` reliant exigence, test, commande, code et ADR. | Refuser la clôture si l'exigence touchée n'est pas reliée à une preuve vérifiable. |
 | Tests | Tests ciblés, validateurs pertinents et suite disponible exécutés avec résultat GREEN. | Refuser la clôture si une validation échouée est ignorée ou si un test requis est absent sans blocage documenté. |
-| Lint | `scripts/lint.ps1` ou validation statique configurée exécutée quand elle existe, sinon absence tracée jusqu'à T-006. | Refuser la clôture si un lint configuré échoue ou si son absence est masquée. |
+| Gate | `uv run --locked gate` exécuté avec le pipeline M-013 réel et rapport JSON unique. | Refuser la clôture si un nœud échoue, est ignoré ou est exécuté plusieurs fois. |
 | Frontière UI/API | Pour toute tâche UI, preuve automatisée que chaque commande, lecture et contenu métier passe exclusivement par un contrat public de `orchestrator-api` câblé au cas d'usage réel, conformément à ADR-018. | Refuser la clôture si le contrat est absent ou non câblé au cas d'usage réel, si l'UI appelle directement un composant interne ou si elle remplace le contrat par un mock, stub, fake, état local, réponse synthétique ou fallback. |
 
 ## Critères de preuve
 
-Chaque gate possède une preuve explicite, datable dans Git et reliée à une commande PowerShell vérifiable quand une commande existe.
+Chaque gate possède une preuve explicite, datable dans Git et reliée à `uv run --locked gate`.
 
 Une preuve ne peut pas être remplacée par une intention, un commentaire de confort, une valeur par défaut implicite ou un fallback silencieux.
 
@@ -61,9 +61,9 @@ Une ligne marquée `Couvert` doit pointer vers une commande vérifiable et vers 
 
 ## Validation finale
 
-La validation finale exécute les tests ciblés de la tâche, les validateurs de gouvernance disponibles, `scripts/test.ps1` et `scripts/lint.ps1` dès leur création par T-006.
+La validation finale exécute les tests ciblés de la tâche, les validateurs de gouvernance disponibles et `uv run --locked gate`.
 
-Avant T-006, l'absence de `scripts/test.ps1` et `scripts/lint.ps1` reste un risque résiduel tracé; elle ne doit pas être convertie en succès silencieux.
+L’absence d’un nœud requis du manifeste reste un refus explicite ; elle ne doit jamais être convertie en succès silencieux.
 
 ## Refus de clôture
 

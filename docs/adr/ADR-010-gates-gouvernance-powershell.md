@@ -1,10 +1,10 @@
 # ADR-010 - Gates de gouvernance PowerShell
 
-**Statut :** Acceptée
+**Statut :** Remplacée
 **Date :** 2026-06-21
 **Décideurs :** Propriétaire du projet
 **Remplace :** Aucun
-**Remplacée par :** Aucune
+**Remplacée par :** ADR-029-gate-python-uv-manifeste-unique
 **Source :** `docs/specs/plan_implementation_milestones_workstreams.md`, M-000
 
 ## Contexte

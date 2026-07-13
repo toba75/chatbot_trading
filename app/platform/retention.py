@@ -79,7 +79,7 @@ _EXPECTED_RETENTION_MONTHS_BY_CATEGORY = {
     CATEGORY_EX_EXPERIMENT_RESULTS: 120,
     CATEGORY_EV_GOVERNANCE_DECISIONS: 120,
 }
-_COMMAND_PREFIX = "powershell -NoProfile -ExecutionPolicy Bypass -File .\\"
+_COMMAND_PREFIX = "uv run rebuild-knowledge-projection"
 
 
 @dataclass(frozen=True)
@@ -355,8 +355,8 @@ def build_m013_retention_policy() -> RetentionPolicy:
                 preserve_negative_or_superseded=False,
                 regenerable_projection=True,
                 reconstruction_command=(
-                    "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\rebuild_knowledge_projection.ps1 "
-                    "-Source SP -SourceRoot .\\data\\sp-authority -Target .\\data\\ka-projection"
+                    "uv run rebuild-knowledge-projection --source SP --source-root .\\data\\sp-authority "
+                    "--target .\\data\\ka-projection"
                 ),
                 read_compatibility_rule="La projection est reconstruite depuis les originaux et versions canoniques conservés.",
             ),

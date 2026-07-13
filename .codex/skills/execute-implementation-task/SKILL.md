@@ -54,7 +54,7 @@ Respecter l'ordre suivant pour chaque tâche d'implémentation:
 
 1. **Vérification GREEN initiale**
    - Exécuter la suite pertinente avant tout changement.
-   - Préférer les commandes du dépôt, par exemple `.\scripts\test.ps1` et `.\scripts\lint.ps1` quand elles existent.
+   - Préférer la commande canonique du dépôt : `uv run --locked gate`.
    - Si la suite est déjà RED pour une raison indépendante, arrêter l'implémentation et documenter le blocage, sauf si la tâche demandée est précisément de remettre la suite au vert.
 
 2. **Décision ADR**

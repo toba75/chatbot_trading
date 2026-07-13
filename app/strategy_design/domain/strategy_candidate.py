@@ -688,7 +688,7 @@ class ParameterCalibrationPolicy:
                     _parameter_diagnostic(
                         code=CompilationDiagnosticCode.VALIDATION_PLAN_REQUIRED,
                         parameter_id=parameter.parameter_id,
-                        description="Plan de validation absent pour un paramÃ¨tre Ã  calibrer.",
+                        description="Plan de validation absent pour un paramètre à calibrer.",
                     ),
                 )
             return ()
@@ -809,18 +809,18 @@ class CompatibilityFinding:
 
     def __post_init__(self) -> None:
         if isinstance(self.code, str) and not isinstance(self.code, CompatibilityFindingCode):
-            raise ValueError("code finding compatibilitÃ© libre interdit")
+            raise ValueError("code finding compatibilité libre interdit")
         if not isinstance(self.code, CompatibilityFindingCode):
-            raise ValueError("code finding compatibilitÃ© invalide")
-        _ensure_text(self.description, "description finding compatibilitÃ©")
+            raise ValueError("code finding compatibilité invalide")
+        _ensure_text(self.description, "description finding compatibilité")
         if not isinstance(self.blocking, bool):
-            raise ValueError("blocking finding compatibilitÃ© non boolÃ©en")
+            raise ValueError("blocking finding compatibilité non booléen")
         if self.rule_id is not None:
-            _ensure_text(self.rule_id, "rule_id finding compatibilitÃ©")
+            _ensure_text(self.rule_id, "rule_id finding compatibilité")
         if self.parameter_id is not None:
-            _ensure_text(self.parameter_id, "parameter_id finding compatibilitÃ©")
+            _ensure_text(self.parameter_id, "parameter_id finding compatibilité")
         if self.rule_id is not None and self.parameter_id is not None:
-            raise ValueError("finding de compatibilitÃ© Ã  cible multiple")
+            raise ValueError("finding de compatibilité à cible multiple")
 
     def to_diagnostic(self) -> CompilationDiagnostic:
         return CompilationDiagnostic(
@@ -897,17 +897,17 @@ class ExecutionProfile:
         object.__setattr__(
             self,
             "expected_turnover",
-            _ensure_non_negative_measure(self.expected_turnover, "coÃ»t attendu invalide"),
+            _ensure_non_negative_measure(self.expected_turnover, "coût attendu invalide"),
         )
         object.__setattr__(
             self,
             "expected_liquidity_usage",
-            _ensure_non_negative_measure(self.expected_liquidity_usage, "coÃ»t attendu invalide"),
+            _ensure_non_negative_measure(self.expected_liquidity_usage, "coût attendu invalide"),
         )
         object.__setattr__(
             self,
             "expected_leverage",
-            _ensure_non_negative_measure(self.expected_leverage, "coÃ»t attendu invalide"),
+            _ensure_non_negative_measure(self.expected_leverage, "coût attendu invalide"),
         )
 
 
@@ -958,12 +958,12 @@ class PointInTimeDataPolicy:
             if not isinstance(availability, DataAvailability):
                 raise ValueError("DataAvailability attendu")
             if availability.requirement_id != requirement.requirement_id:
-                raise ValueError("disponibilitÃ© de donnÃ©e incohÃ©rente")
+                raise ValueError("disponibilité de donnée incohérente")
             if _parse_utc_instant(availability.available_at, "available_at") > decision_time:
                 findings.append(
                     CompatibilityFinding(
                         code=CompatibilityFindingCode.POINT_IN_TIME_VIOLATION,
-                        description="DonnÃ©e indisponible au moment de dÃ©cision.",
+                        description="Donnée indisponible au moment de décision.",
                         blocking=True,
                         rule_id=rule_id,
                         parameter_id=None,
@@ -973,7 +973,7 @@ class PointInTimeDataPolicy:
                 findings.append(
                     CompatibilityFinding(
                         code=CompatibilityFindingCode.DATA_FREQUENCY_INCOMPATIBLE,
-                        description="FrÃ©quence de donnÃ©e incompatible avec l'horizon du signal.",
+                        description="Fréquence de donnée incompatible avec l'horizon du signal.",
                         blocking=True,
                         rule_id=rule_id,
                         parameter_id=None,
@@ -1006,7 +1006,7 @@ class ExecutionFeasibilityPolicy:
             findings.append(
                 CompatibilityFinding(
                     code=CompatibilityFindingCode.CALENDAR_UNAVAILABLE,
-                    description="Calendrier de marchÃ© absent.",
+                    description="Calendrier de marché absent.",
                     blocking=True,
                     rule_id=rule_id,
                     parameter_id=None,
@@ -1016,7 +1016,7 @@ class ExecutionFeasibilityPolicy:
             findings.append(
                 CompatibilityFinding(
                     code=CompatibilityFindingCode.IMPLICIT_COST_MODEL,
-                    description="ModÃ¨le de coÃ»ts explicite absent.",
+                    description="Modèle de coûts explicite absent.",
                     blocking=True,
                     rule_id=rule_id,
                     parameter_id=None,
@@ -1027,7 +1027,7 @@ class ExecutionFeasibilityPolicy:
             findings.append(
                 CompatibilityFinding(
                     code=CompatibilityFindingCode.TURNOVER_CONSTRAINT_VIOLATION,
-                    description="Turnover attendu supÃ©rieur au mandat.",
+                    description="Turnover attendu supérieur au mandat.",
                     blocking=True,
                     rule_id=rule_id,
                     parameter_id=None,
@@ -1038,7 +1038,7 @@ class ExecutionFeasibilityPolicy:
             findings.append(
                 CompatibilityFinding(
                     code=CompatibilityFindingCode.LIQUIDITY_CONSTRAINT_VIOLATION,
-                    description="Usage de liquiditÃ© attendu supÃ©rieur au mandat.",
+                    description="Usage de liquidité attendu supérieur au mandat.",
                     blocking=True,
                     rule_id=rule_id,
                     parameter_id=None,
@@ -1049,7 +1049,7 @@ class ExecutionFeasibilityPolicy:
             findings.append(
                 CompatibilityFinding(
                     code=CompatibilityFindingCode.LEVERAGE_CONSTRAINT_VIOLATION,
-                    description="Levier attendu supÃ©rieur au mandat.",
+                    description="Levier attendu supérieur au mandat.",
                     blocking=True,
                     rule_id=rule_id,
                     parameter_id=None,
@@ -1106,7 +1106,7 @@ class StrategyCompatibilityPolicy:
             findings.append(
                 CompatibilityFinding(
                     code=CompatibilityFindingCode.HORIZON_MISMATCH,
-                    description="Horizon de dÃ©tention incompatible avec le mandat.",
+                    description="Horizon de détention incompatible avec le mandat.",
                     blocking=True,
                     rule_id=context.rule_id,
                     parameter_id=None,
@@ -1120,7 +1120,7 @@ class StrategyCompatibilityPolicy:
                     findings.append(
                         CompatibilityFinding(
                             code=CompatibilityFindingCode.EVIDENCE_SCOPE_MISMATCH,
-                            description="PortÃ©e des preuves incompatible avec le mandat.",
+                            description="Portée des preuves incompatible avec le mandat.",
                             blocking=True,
                             rule_id=context.rule_id,
                             parameter_id=None,
@@ -1825,23 +1825,23 @@ class RuleExpressionValidation:
     def __post_init__(self) -> None:
         _ensure_text(self.rule_id, "rule_id validation expression")
         if not isinstance(self.valid, bool):
-            raise ValueError("valid expression non boolÃ©en")
+            raise ValueError("valid expression non booléen")
         if not isinstance(self.is_deterministic, bool):
-            raise ValueError("deterministic expression non boolÃ©en")
+            raise ValueError("deterministic expression non booléen")
         object.__setattr__(
             self,
             "normalized_expression",
-            _ensure_parameter_optional_text(self.normalized_expression, "expression normalisÃ©e"),
+            _ensure_parameter_optional_text(self.normalized_expression, "expression normalisée"),
         )
         object.__setattr__(
             self,
             "random_mechanism",
-            _ensure_parameter_optional_text(self.random_mechanism, "mÃ©canisme alÃ©atoire"),
+            _ensure_parameter_optional_text(self.random_mechanism, "mécanisme aléatoire"),
         )
         object.__setattr__(
             self,
             "seed",
-            _ensure_parameter_optional_text(self.seed, "graine alÃ©atoire"),
+            _ensure_parameter_optional_text(self.seed, "graine aléatoire"),
         )
         object.__setattr__(
             self,
@@ -1849,13 +1849,13 @@ class RuleExpressionValidation:
             _ensure_parameter_optional_text(self.reason, "raison validation expression"),
         )
         if self.valid and self.is_deterministic and self.normalized_expression is None:
-            raise ValueError("expression dÃ©terministe sans forme normalisÃ©e")
+            raise ValueError("expression déterministe sans forme normalisée")
         if not self.valid and self.reason is None:
             raise ValueError("expression invalide sans raison")
         if self.is_deterministic and (self.random_mechanism is not None or self.seed is not None):
-            raise ValueError("expression dÃ©terministe avec alÃ©a dÃ©clarÃ©")
+            raise ValueError("expression déterministe avec aléa déclaré")
         if self.seed is not None and self.random_mechanism is None:
-            raise ValueError("graine sans mÃ©canisme alÃ©atoire")
+            raise ValueError("graine sans mécanisme aléatoire")
 
     @property
     def has_explicit_randomness(self) -> bool:
@@ -1894,11 +1894,11 @@ class CompiledRule:
         if not isinstance(validation, RuleExpressionValidation):
             raise ValueError("RuleExpressionValidation attendue")
         if validation.rule_id != rule.rule_id:
-            raise ValueError("validation expression hors rÃ¨gle")
+            raise ValueError("validation expression hors règle")
         if not validation.is_compilable:
             raise ValueError("validation expression non compilable")
         if rule.origin is None:
-            raise ValueError("rÃ¨gle sans origine non compilable")
+            raise ValueError("règle sans origine non compilable")
 
         normalized_expression = (
             validation.normalized_expression
@@ -1917,27 +1917,27 @@ class CompiledRule:
         )
 
     def __post_init__(self) -> None:
-        _ensure_text(self.rule_id, "rule_id compilÃ©")
-        _ensure_text(self.rule_kind, "rule_kind compilÃ©")
-        _ensure_text(self.normalized_expression, "expression compilÃ©e")
-        _ensure_text(self.origin_type, "origin_type compilÃ©")
-        _ensure_text(self.origin_hash, "origin_hash compilÃ©")
+        _ensure_text(self.rule_id, "rule_id compilé")
+        _ensure_text(self.rule_kind, "rule_kind compilé")
+        _ensure_text(self.normalized_expression, "expression compilée")
+        _ensure_text(self.origin_type, "origin_type compilé")
+        _ensure_text(self.origin_hash, "origin_hash compilé")
         if not isinstance(self.deterministic, bool):
-            raise ValueError("deterministic compilÃ© non boolÃ©en")
+            raise ValueError("deterministic compilé non booléen")
         object.__setattr__(
             self,
             "random_mechanism",
-            _ensure_parameter_optional_text(self.random_mechanism, "mÃ©canisme alÃ©atoire compilÃ©"),
+            _ensure_parameter_optional_text(self.random_mechanism, "mécanisme aléatoire compilé"),
         )
         object.__setattr__(
             self,
             "seed",
-            _ensure_parameter_optional_text(self.seed, "graine compilÃ©e"),
+            _ensure_parameter_optional_text(self.seed, "graine compilée"),
         )
         if self.deterministic and (self.random_mechanism is not None or self.seed is not None):
-            raise ValueError("rÃ¨gle compilÃ©e dÃ©terministe avec alÃ©a")
+            raise ValueError("règle compilée déterministe avec aléa")
         if not self.deterministic and (self.random_mechanism is None or self.seed is None):
-            raise ValueError("rÃ¨gle compilÃ©e alÃ©atoire sans mÃ©canisme ou graine")
+            raise ValueError("règle compilée aléatoire sans mécanisme ou graine")
 
     def to_payload(self) -> dict[str, Any]:
         return {
@@ -1988,33 +1988,33 @@ class CompiledParameter:
         )
 
     def __post_init__(self) -> None:
-        _ensure_text(self.parameter_id, "parameter_id compilÃ©")
-        _ensure_text(self.name, "nom paramÃ¨tre compilÃ©")
-        _ensure_text(self.origin_type, "origin_type paramÃ¨tre compilÃ©")
+        _ensure_text(self.parameter_id, "parameter_id compilé")
+        _ensure_text(self.name, "nom paramètre compilé")
+        _ensure_text(self.origin_type, "origin_type paramètre compilé")
         object.__setattr__(
             self,
             "value_hash",
-            _ensure_parameter_optional_text(self.value_hash, "hash valeur paramÃ¨tre"),
+            _ensure_parameter_optional_text(self.value_hash, "hash valeur paramètre"),
         )
         object.__setattr__(
             self,
             "domain_hash",
-            _ensure_parameter_optional_text(self.domain_hash, "hash domaine paramÃ¨tre"),
+            _ensure_parameter_optional_text(self.domain_hash, "hash domaine paramètre"),
         )
         object.__setattr__(
             self,
             "validation_plan_hash",
             _ensure_parameter_optional_text(
                 self.validation_plan_hash,
-                "hash plan validation paramÃ¨tre",
+                "hash plan validation paramètre",
             ),
         )
         if not isinstance(self.blocking, bool):
-            raise ValueError("blocking paramÃ¨tre compilÃ© non boolÃ©en")
+            raise ValueError("blocking paramètre compilé non booléen")
         if self.value_hash is None and self.domain_hash is None:
-            raise ValueError("paramÃ¨tre compilÃ© sans valeur ni domaine")
+            raise ValueError("paramètre compilé sans valeur ni domaine")
         if self.origin_type == RuleOriginType.PARAMETER_TO_CALIBRATE.value and self.validation_plan_hash is None:
-            raise ValueError("paramÃ¨tre compilÃ© sans plan de validation")
+            raise ValueError("paramètre compilé sans plan de validation")
 
     def to_payload(self) -> dict[str, Any]:
         return {
@@ -2099,20 +2099,20 @@ class CompiledStrategyRepresentation:
     def __post_init__(self) -> None:
         _ensure_strategy_id(self.strategy_id)
         if not isinstance(self.strategy_version, int) or isinstance(self.strategy_version, bool):
-            raise ValueError("strategy_version compilÃ©e non entiÃ¨re")
+            raise ValueError("strategy_version compilée non entière")
         if self.strategy_version < 0:
-            raise ValueError("strategy_version compilÃ©e nÃ©gative")
+            raise ValueError("strategy_version compilée négative")
         _ensure_text(self.compiler_version, "version compilateur")
-        _ensure_text(self.mandate_hash, "hash mandat compilÃ©")
-        _ensure_text(self.verified_research_hash, "hash recherche compilÃ©e")
-        _ensure_text(self.representation_hash, "hash reprÃ©sentation")
+        _ensure_text(self.mandate_hash, "hash mandat compilé")
+        _ensure_text(self.verified_research_hash, "hash recherche compilée")
+        _ensure_text(self.representation_hash, "hash représentation")
         if not isinstance(self.rules, tuple) or any(not isinstance(rule, CompiledRule) for rule in self.rules):
-            raise ValueError("rÃ¨gles compilÃ©es invalides")
+            raise ValueError("règles compilées invalides")
         if not isinstance(self.parameters, tuple) or any(
             not isinstance(parameter, CompiledParameter)
             for parameter in self.parameters
         ):
-            raise ValueError("paramÃ¨tres compilÃ©s invalides")
+            raise ValueError("paramètres compilés invalides")
 
     def to_payload(self) -> dict[str, Any]:
         return {
@@ -2193,7 +2193,7 @@ class StrategyCompilationResult:
             raise ValueError("statut de compilation inconnu")
         _ensure_strategy_id(self.strategy_id)
         if not isinstance(self.strategy_version, int) or isinstance(self.strategy_version, bool):
-            raise ValueError("strategy_version resultat non entiÃ¨re")
+            raise ValueError("strategy_version resultat non entière")
         if self.representation is not None and not isinstance(self.representation, CompiledStrategyRepresentation):
             raise ValueError("CompiledStrategyRepresentation attendue")
         if not isinstance(self.diagnostics, tuple) or any(
@@ -2368,7 +2368,7 @@ class StrategyCompilationPolicy:
             diagnostics.append(
                 CompilationDiagnostic(
                     code=CompilationDiagnosticCode.STRATEGY_NOT_COMPILABLE,
-                    description="Statut de stratÃ©gie non compilable.",
+                    description="Statut de stratégie non compilable.",
                     blocking=True,
                     rule_id=None,
                     parameter_id=None,
@@ -2382,7 +2382,7 @@ class StrategyCompilationPolicy:
             if not isinstance(validation, RuleExpressionValidation):
                 raise ValueError("RuleExpressionValidation attendue")
             if validation.rule_id != rule.rule_id:
-                raise ValueError("validation expression hors rÃ¨gle")
+                raise ValueError("validation expression hors règle")
             rule_validations.append(validation)
             if not validation.valid:
                 diagnostics.append(
@@ -2391,7 +2391,7 @@ class StrategyCompilationPolicy:
                         rule_id=rule.rule_id,
                         description=validation.reason
                         if validation.reason is not None
-                        else "Expression de rÃ¨gle invalide.",
+                        else "Expression de règle invalide.",
                     )
                 )
             elif not validation.is_compilable:
@@ -2401,7 +2401,7 @@ class StrategyCompilationPolicy:
                         rule_id=rule.rule_id,
                         description=validation.reason
                         if validation.reason is not None
-                        else "RÃ¨gle non dÃ©terministe sans mÃ©canisme et graine explicites.",
+                        else "Règle non déterministe sans mécanisme et graine explicites.",
                     )
                 )
 

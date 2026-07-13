@@ -1,0 +1,16 @@
+from __future__ import annotations
+
+from pathlib import Path
+import sys
+
+
+def test_validate_contract_identity_acceptance() -> None:
+    original_argv = sys.argv[:]
+    repository_root = next(parent for parent in Path(__file__).resolve().parents if (parent / 'pyproject.toml').is_file())
+    try:
+        sys.argv = [str(Path(__file__)), str(repository_root), str(repository_root / 'tests/fixtures/m001/contracts/identity_primitives_v1.json'), str(repository_root / 'tests/fixtures/m001/contracts/identity_primitives_missing_schema_version.json'), str(repository_root / 'tests/fixtures/m001/contracts/identity_primitives_technical_primary_identity.json')]
+        source = 'import json\nimport sys\nfrom pathlib import Path\n\nsys.path.insert(0, sys.argv[1])\n\nfrom app.contracts.identity import (\n    ALLOWED_DOMAIN_IDENTIFIER_PREFIXES,\n    serialize_contract_payload,\n    validate_contract_payload,\n)\n\n\nEXPECTED_PREFIXES = {\n    "DOC",\n    "CSRC",\n    "CVER",\n    "PROJ",\n    "CLM",\n    "VER",\n    "DEP",\n    "RSC",\n    "EVS",\n    "ANS",\n    "CONV",\n    "TURN",\n    "STRAT",\n    "SVER",\n    "EXP",\n    "DATA",\n}\n\n\ndef load_payload(path):\n    return json.loads(Path(path).read_text(encoding="utf-8"))\n\n\ndef assert_raises(expected_fragment, action):\n    try:\n        action()\n    except ValueError as exc:\n        if expected_fragment not in str(exc):\n            raise AssertionError(f"Erreur inattendue: {exc}")\n    else:\n        raise AssertionError(f"Erreur attendue absente: {expected_fragment}")\n\n\nvalid_payload = load_payload(sys.argv[2])\nmissing_schema_payload = load_payload(sys.argv[3])\ntechnical_identity_payload = load_payload(sys.argv[4])\n\n# Given un contexte publie un contrat pour un autre contexte.\n# When le contrat est serialise et valide.\n# Then chaque identite metier est opaque, prefixee, versionnee et independante des chemins ou identifiants techniques.\nvalidated = validate_contract_payload(valid_payload, supported_schema_versions={"1.0"})\nserialized = serialize_contract_payload(validated, supported_schema_versions={"1.0"})\nroundtrip_payload = json.loads(serialized)\nroundtrip_validated = validate_contract_payload(roundtrip_payload, supported_schema_versions={"1.0"})\n\nactual_prefixes = {\n    identifier.split("-", 1)[0]\n    for identifier in roundtrip_validated["identities"].values()\n}\n\nif actual_prefixes != EXPECTED_PREFIXES:\n    raise AssertionError(f"Prefixes couverts invalides: {sorted(actual_prefixes)}")\n\nif ALLOWED_DOMAIN_IDENTIFIER_PREFIXES != EXPECTED_PREFIXES:\n    raise AssertionError("La politique de prefixes publies ne couvre pas T-004.")\n\nif roundtrip_validated["schema_version"] != "1.0":\n    raise AssertionError("schema_version doit etre conservee au round-trip.")\n\nassert_raises(\n    "schema_version absent",\n    lambda: validate_contract_payload(missing_schema_payload, supported_schema_versions={"1.0"}),\n)\nassert_raises(\n    "Identifiant technique interdit",\n    lambda: validate_contract_payload(technical_identity_payload, supported_schema_versions={"1.0"}),\n)\n\nprint("Contrat d\'identite M-001 accepte et garde-fous refuses.")'
+        namespace = {'__name__': __name__, '__file__': str(Path(__file__))}
+        exec(compile(source, str(Path(__file__)), 'exec'), namespace)
+    finally:
+        sys.argv = original_argv

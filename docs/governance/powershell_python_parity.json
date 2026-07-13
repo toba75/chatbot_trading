@@ -1,0 +1,2997 @@
+{
+  "version": 1,
+  "records": [
+    {
+      "legacy_path": "tests/governance/traceability_fixture.ps1",
+      "node_id": "test.governance.traceability-fixture",
+      "python_path": "gate_tests/ported/tests/governance/traceability_fixture.py",
+      "classification": "git",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de traceability_fixture."
+    },
+    {
+      "legacy_path": "tests/governance/validate_adr_system_acceptance.ps1",
+      "node_id": "test.governance.validate-adr-system-acceptance",
+      "python_path": "gate_tests/ported/tests/governance/validate_adr_system_acceptance.py",
+      "classification": "git",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_adr_system_acceptance."
+    },
+    {
+      "legacy_path": "tests/governance/validate_adr_system_unit.ps1",
+      "node_id": "test.governance.validate-adr-system-unit",
+      "python_path": "gate_tests/ported/tests/governance/validate_adr_system_unit.py",
+      "classification": "git",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_adr_system_unit."
+    },
+    {
+      "legacy_path": "tests/governance/validate_definition_of_done_acceptance.ps1",
+      "node_id": "test.governance.validate-definition-of-done-acceptance",
+      "python_path": "gate_tests/ported/tests/governance/validate_definition_of_done_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_definition_of_done_acceptance."
+    },
+    {
+      "legacy_path": "tests/governance/validate_definition_of_done_unit.ps1",
+      "node_id": "test.governance.validate-definition-of-done-unit",
+      "python_path": "gate_tests/ported/tests/governance/validate_definition_of_done_unit.py",
+      "classification": "git",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_definition_of_done_unit."
+    },
+    {
+      "legacy_path": "tests/governance/validate_git_lfs_acceptance.ps1",
+      "node_id": "test.governance.validate-git-lfs-acceptance",
+      "python_path": "gate_tests/ported/tests/governance/validate_git_lfs_acceptance.py",
+      "classification": "git",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_git_lfs_acceptance."
+    },
+    {
+      "legacy_path": "tests/governance/validate_gitignore_acceptance.ps1",
+      "node_id": "test.governance.validate-gitignore-acceptance",
+      "python_path": "gate_tests/ported/tests/governance/validate_gitignore_acceptance.py",
+      "classification": "git",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_gitignore_acceptance."
+    },
+    {
+      "legacy_path": "tests/governance/validate_m000_precondition_report_acceptance.ps1",
+      "node_id": "test.governance.validate-m000-precondition-report-acceptance",
+      "python_path": "gate_tests/ported/tests/governance/validate_m000_precondition_report_acceptance.py",
+      "classification": "git",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m000_precondition_report_acceptance."
+    },
+    {
+      "legacy_path": "tests/governance/validate_m000_precondition_report_unit.ps1",
+      "node_id": "test.governance.validate-m000-precondition-report-unit",
+      "python_path": "gate_tests/ported/tests/governance/validate_m000_precondition_report_unit.py",
+      "classification": "git",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m000_precondition_report_unit."
+    },
+    {
+      "legacy_path": "tests/governance/validate_m000_validation_commands_acceptance.ps1",
+      "node_id": "test.governance.validate-m000-validation-commands-acceptance",
+      "python_path": "gate_tests/ported/tests/governance/validate_m000_validation_commands_acceptance.py",
+      "classification": "git",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m000_validation_commands_acceptance."
+    },
+    {
+      "legacy_path": "tests/governance/validate_m000_validation_commands_unit.ps1",
+      "node_id": "test.governance.validate-m000-validation-commands-unit",
+      "python_path": "gate_tests/ported/tests/governance/validate_m000_validation_commands_unit.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m000_validation_commands_unit."
+    },
+    {
+      "legacy_path": "tests/governance/validate_task_system_acceptance.ps1",
+      "node_id": "test.governance.validate-task-system-acceptance",
+      "python_path": "gate_tests/ported/tests/governance/validate_task_system_acceptance.py",
+      "classification": "git",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_task_system_acceptance."
+    },
+    {
+      "legacy_path": "tests/governance/validate_task_system_unit.ps1",
+      "node_id": "test.governance.validate-task-system-unit",
+      "python_path": "gate_tests/ported/tests/governance/validate_task_system_unit.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_task_system_unit."
+    },
+    {
+      "legacy_path": "tests/governance/validate_traceability_acceptance.ps1",
+      "node_id": "test.governance.validate-traceability-acceptance",
+      "python_path": "gate_tests/ported/tests/governance/validate_traceability_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_traceability_acceptance."
+    },
+    {
+      "legacy_path": "tests/governance/validate_traceability_unit.ps1",
+      "node_id": "test.governance.validate-traceability-unit",
+      "python_path": "gate_tests/ported/tests/governance/validate_traceability_unit.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_traceability_unit."
+    },
+    {
+      "legacy_path": "tests/m001/validate_architecture_boundaries_acceptance.ps1",
+      "node_id": "test.m001.validate-architecture-boundaries-acceptance",
+      "python_path": "gate_tests/ported/tests/m001/validate_architecture_boundaries_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_architecture_boundaries_acceptance."
+    },
+    {
+      "legacy_path": "tests/m001/validate_architecture_boundaries_unit.ps1",
+      "node_id": "test.m001.validate-architecture-boundaries-unit",
+      "python_path": "gate_tests/ported/tests/m001/validate_architecture_boundaries_unit.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_architecture_boundaries_unit."
+    },
+    {
+      "legacy_path": "tests/m001/validate_context_modules_acceptance.ps1",
+      "node_id": "test.m001.validate-context-modules-acceptance",
+      "python_path": "gate_tests/ported/tests/m001/validate_context_modules_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_context_modules_acceptance."
+    },
+    {
+      "legacy_path": "tests/m001/validate_context_registry_unit.ps1",
+      "node_id": "test.m001.validate-context-registry-unit",
+      "python_path": "gate_tests/ported/tests/m001/validate_context_registry_unit.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_context_registry_unit."
+    },
+    {
+      "legacy_path": "tests/m001/validate_contract_identity_acceptance.ps1",
+      "node_id": "test.m001.validate-contract-identity-acceptance",
+      "python_path": "gate_tests/ported/tests/m001/validate_contract_identity_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_contract_identity_acceptance."
+    },
+    {
+      "legacy_path": "tests/m001/validate_contract_identity_unit.ps1",
+      "node_id": "test.m001.validate-contract-identity-unit",
+      "python_path": "gate_tests/ported/tests/m001/validate_contract_identity_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_contract_identity_unit."
+    },
+    {
+      "legacy_path": "tests/m001/validate_event_envelope_acceptance.ps1",
+      "node_id": "test.m001.validate-event-envelope-acceptance",
+      "python_path": "gate_tests/ported/tests/m001/validate_event_envelope_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_event_envelope_acceptance."
+    },
+    {
+      "legacy_path": "tests/m001/validate_event_envelope_unit.ps1",
+      "node_id": "test.m001.validate-event-envelope-unit",
+      "python_path": "gate_tests/ported/tests/m001/validate_event_envelope_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_event_envelope_unit."
+    },
+    {
+      "legacy_path": "tests/m001/validate_evidence_claim_contracts_acceptance.ps1",
+      "node_id": "test.m001.validate-evidence-claim-contracts-acceptance",
+      "python_path": "gate_tests/ported/tests/m001/validate_evidence_claim_contracts_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_evidence_claim_contracts_acceptance."
+    },
+    {
+      "legacy_path": "tests/m001/validate_evidence_claim_contracts_unit.ps1",
+      "node_id": "test.m001.validate-evidence-claim-contracts-unit",
+      "python_path": "gate_tests/ported/tests/m001/validate_evidence_claim_contracts_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_evidence_claim_contracts_unit."
+    },
+    {
+      "legacy_path": "tests/m001/validate_m001_specification_acceptance.ps1",
+      "node_id": "test.m001.validate-m001-specification-acceptance",
+      "python_path": "gate_tests/ported/tests/m001/validate_m001_specification_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m001_specification_acceptance."
+    },
+    {
+      "legacy_path": "tests/m001/validate_m001_specification_unit.ps1",
+      "node_id": "test.m001.validate-m001-specification-unit",
+      "python_path": "gate_tests/ported/tests/m001/validate_m001_specification_unit.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m001_specification_unit."
+    },
+    {
+      "legacy_path": "tests/m001/validate_m001_traceability_acceptance.ps1",
+      "node_id": "test.m001.validate-m001-traceability-acceptance",
+      "python_path": "gate_tests/ported/tests/m001/validate_m001_traceability_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m001_traceability_acceptance."
+    },
+    {
+      "legacy_path": "tests/m001/validate_m001_traceability_unit.ps1",
+      "node_id": "test.m001.validate-m001-traceability-unit",
+      "python_path": "gate_tests/ported/tests/m001/validate_m001_traceability_unit.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m001_traceability_unit."
+    },
+    {
+      "legacy_path": "tests/m001/validate_research_outcome_contract_acceptance.ps1",
+      "node_id": "test.m001.validate-research-outcome-contract-acceptance",
+      "python_path": "gate_tests/ported/tests/m001/validate_research_outcome_contract_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_research_outcome_contract_acceptance."
+    },
+    {
+      "legacy_path": "tests/m001/validate_research_outcome_contract_unit.ps1",
+      "node_id": "test.m001.validate-research-outcome-contract-unit",
+      "python_path": "gate_tests/ported/tests/m001/validate_research_outcome_contract_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_research_outcome_contract_unit."
+    },
+    {
+      "legacy_path": "tests/m001/validate_source_contracts_acceptance.ps1",
+      "node_id": "test.m001.validate-source-contracts-acceptance",
+      "python_path": "gate_tests/ported/tests/m001/validate_source_contracts_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_source_contracts_acceptance."
+    },
+    {
+      "legacy_path": "tests/m001/validate_source_locator_unit.ps1",
+      "node_id": "test.m001.validate-source-locator-unit",
+      "python_path": "gate_tests/ported/tests/m001/validate_source_locator_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_source_locator_unit."
+    },
+    {
+      "legacy_path": "tests/m001/validate_strategy_experiment_contracts_acceptance.ps1",
+      "node_id": "test.m001.validate-strategy-experiment-contracts-acceptance",
+      "python_path": "gate_tests/ported/tests/m001/validate_strategy_experiment_contracts_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_strategy_experiment_contracts_acceptance."
+    },
+    {
+      "legacy_path": "tests/m001/validate_strategy_experiment_contracts_unit.ps1",
+      "node_id": "test.m001.validate-strategy-experiment-contracts-unit",
+      "python_path": "gate_tests/ported/tests/m001/validate_strategy_experiment_contracts_unit.py",
+      "classification": "git",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_strategy_experiment_contracts_unit."
+    },
+    {
+      "legacy_path": "tests/m002/validate_gateway_observability_acceptance.ps1",
+      "node_id": "test.m002.validate-gateway-observability-acceptance",
+      "python_path": "gate_tests/ported/tests/m002/validate_gateway_observability_acceptance.py",
+      "classification": "process",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_gateway_observability_acceptance."
+    },
+    {
+      "legacy_path": "tests/m002/validate_gateway_observability_unit.ps1",
+      "node_id": "test.m002.validate-gateway-observability-unit",
+      "python_path": "gate_tests/ported/tests/m002/validate_gateway_observability_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_gateway_observability_unit."
+    },
+    {
+      "legacy_path": "tests/m002/validate_job_runtime_acceptance.ps1",
+      "node_id": "test.m002.validate-job-runtime-acceptance",
+      "python_path": "gate_tests/ported/tests/m002/validate_job_runtime_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_job_runtime_acceptance."
+    },
+    {
+      "legacy_path": "tests/m002/validate_job_runtime_unit.ps1",
+      "node_id": "test.m002.validate-job-runtime-unit",
+      "python_path": "gate_tests/ported/tests/m002/validate_job_runtime_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_job_runtime_unit."
+    },
+    {
+      "legacy_path": "tests/m002/validate_llm_gateway_contract_acceptance.ps1",
+      "node_id": "test.m002.validate-llm-gateway-contract-acceptance",
+      "python_path": "gate_tests/ported/tests/m002/validate_llm_gateway_contract_acceptance.py",
+      "classification": "process",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_llm_gateway_contract_acceptance."
+    },
+    {
+      "legacy_path": "tests/m002/validate_llm_gateway_contract_unit.ps1",
+      "node_id": "test.m002.validate-llm-gateway-contract-unit",
+      "python_path": "gate_tests/ported/tests/m002/validate_llm_gateway_contract_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_llm_gateway_contract_unit."
+    },
+    {
+      "legacy_path": "tests/m002/validate_llm_gateway_failures_acceptance.ps1",
+      "node_id": "test.m002.validate-llm-gateway-failures-acceptance",
+      "python_path": "gate_tests/ported/tests/m002/validate_llm_gateway_failures_acceptance.py",
+      "classification": "process",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_llm_gateway_failures_acceptance."
+    },
+    {
+      "legacy_path": "tests/m002/validate_llm_gateway_failures_unit.ps1",
+      "node_id": "test.m002.validate-llm-gateway-failures-unit",
+      "python_path": "gate_tests/ported/tests/m002/validate_llm_gateway_failures_unit.py",
+      "classification": "process",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_llm_gateway_failures_unit."
+    },
+    {
+      "legacy_path": "tests/m002/validate_local_compose_acceptance.ps1",
+      "node_id": "test.m002.validate-local-compose-acceptance",
+      "python_path": "gate_tests/ported/tests/m002/validate_local_compose_acceptance.py",
+      "classification": "process",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_local_compose_acceptance."
+    },
+    {
+      "legacy_path": "tests/m002/validate_local_compose_unit.ps1",
+      "node_id": "test.m002.validate-local-compose-unit",
+      "python_path": "gate_tests/ported/tests/m002/validate_local_compose_unit.py",
+      "classification": "process",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_local_compose_unit."
+    },
+    {
+      "legacy_path": "tests/m002/validate_m002_precondition_acceptance.ps1",
+      "node_id": "test.m002.validate-m002-precondition-acceptance",
+      "python_path": "gate_tests/ported/tests/m002/validate_m002_precondition_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m002_precondition_acceptance."
+    },
+    {
+      "legacy_path": "tests/m002/validate_m002_precondition_unit.ps1",
+      "node_id": "test.m002.validate-m002-precondition-unit",
+      "python_path": "gate_tests/ported/tests/m002/validate_m002_precondition_unit.py",
+      "classification": "git",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m002_precondition_unit."
+    },
+    {
+      "legacy_path": "tests/m002/validate_m002_specification_acceptance.ps1",
+      "node_id": "test.m002.validate-m002-specification-acceptance",
+      "python_path": "gate_tests/ported/tests/m002/validate_m002_specification_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m002_specification_acceptance."
+    },
+    {
+      "legacy_path": "tests/m002/validate_m002_specification_unit.ps1",
+      "node_id": "test.m002.validate-m002-specification-unit",
+      "python_path": "gate_tests/ported/tests/m002/validate_m002_specification_unit.py",
+      "classification": "process",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m002_specification_unit."
+    },
+    {
+      "legacy_path": "tests/m002/validate_m002_traceability_acceptance.ps1",
+      "node_id": "test.m002.validate-m002-traceability-acceptance",
+      "python_path": "gate_tests/ported/tests/m002/validate_m002_traceability_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m002_traceability_acceptance."
+    },
+    {
+      "legacy_path": "tests/m002/validate_m002_traceability_unit.ps1",
+      "node_id": "test.m002.validate-m002-traceability-unit",
+      "python_path": "gate_tests/ported/tests/m002/validate_m002_traceability_unit.py",
+      "classification": "process",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m002_traceability_unit."
+    },
+    {
+      "legacy_path": "tests/m002/validate_network_boundary_acceptance.ps1",
+      "node_id": "test.m002.validate-network-boundary-acceptance",
+      "python_path": "gate_tests/ported/tests/m002/validate_network_boundary_acceptance.py",
+      "classification": "process",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_network_boundary_acceptance."
+    },
+    {
+      "legacy_path": "tests/m002/validate_network_boundary_unit.ps1",
+      "node_id": "test.m002.validate-network-boundary-unit",
+      "python_path": "gate_tests/ported/tests/m002/validate_network_boundary_unit.py",
+      "classification": "process",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_network_boundary_unit."
+    },
+    {
+      "legacy_path": "tests/m002/validate_outbox_acceptance.ps1",
+      "node_id": "test.m002.validate-outbox-acceptance",
+      "python_path": "gate_tests/ported/tests/m002/validate_outbox_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_outbox_acceptance."
+    },
+    {
+      "legacy_path": "tests/m002/validate_outbox_unit.ps1",
+      "node_id": "test.m002.validate-outbox-unit",
+      "python_path": "gate_tests/ported/tests/m002/validate_outbox_unit.py",
+      "classification": "process",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_outbox_unit."
+    },
+    {
+      "legacy_path": "tests/m002/validate_platform_topology_acceptance.ps1",
+      "node_id": "test.m002.validate-platform-topology-acceptance",
+      "python_path": "gate_tests/ported/tests/m002/validate_platform_topology_acceptance.py",
+      "classification": "process",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_platform_topology_acceptance."
+    },
+    {
+      "legacy_path": "tests/m002/validate_platform_topology_unit.ps1",
+      "node_id": "test.m002.validate-platform-topology-unit",
+      "python_path": "gate_tests/ported/tests/m002/validate_platform_topology_unit.py",
+      "classification": "process",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_platform_topology_unit."
+    },
+    {
+      "legacy_path": "tests/m003/validate_document_commands_acceptance.ps1",
+      "node_id": "test.m003.validate-document-commands-acceptance",
+      "python_path": "gate_tests/ported/tests/m003/validate_document_commands_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_document_commands_acceptance."
+    },
+    {
+      "legacy_path": "tests/m003/validate_document_commands_unit.ps1",
+      "node_id": "test.m003.validate-document-commands-unit",
+      "python_path": "gate_tests/ported/tests/m003/validate_document_commands_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_document_commands_unit."
+    },
+    {
+      "legacy_path": "tests/m003/validate_document_http_contract_acceptance.ps1",
+      "node_id": "test.m003.validate-document-http-contract-acceptance",
+      "python_path": "gate_tests/ported/tests/m003/validate_document_http_contract_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_document_http_contract_acceptance."
+    },
+    {
+      "legacy_path": "tests/m003/validate_m003_audit_signals_acceptance.ps1",
+      "node_id": "test.m003.validate-m003-audit-signals-acceptance",
+      "python_path": "gate_tests/ported/tests/m003/validate_m003_audit_signals_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_m003_audit_signals_acceptance."
+    },
+    {
+      "legacy_path": "tests/m003/validate_m003_precondition_acceptance.ps1",
+      "node_id": "test.m003.validate-m003-precondition-acceptance",
+      "python_path": "gate_tests/ported/tests/m003/validate_m003_precondition_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m003_precondition_acceptance."
+    },
+    {
+      "legacy_path": "tests/m003/validate_m003_precondition_unit.ps1",
+      "node_id": "test.m003.validate-m003-precondition-unit",
+      "python_path": "gate_tests/ported/tests/m003/validate_m003_precondition_unit.py",
+      "classification": "git",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m003_precondition_unit."
+    },
+    {
+      "legacy_path": "tests/m003/validate_m003_specification_acceptance.ps1",
+      "node_id": "test.m003.validate-m003-specification-acceptance",
+      "python_path": "gate_tests/ported/tests/m003/validate_m003_specification_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m003_specification_acceptance."
+    },
+    {
+      "legacy_path": "tests/m003/validate_m003_specification_unit.ps1",
+      "node_id": "test.m003.validate-m003-specification-unit",
+      "python_path": "gate_tests/ported/tests/m003/validate_m003_specification_unit.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m003_specification_unit."
+    },
+    {
+      "legacy_path": "tests/m003/validate_m003_traceability_acceptance.ps1",
+      "node_id": "test.m003.validate-m003-traceability-acceptance",
+      "python_path": "gate_tests/ported/tests/m003/validate_m003_traceability_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m003_traceability_acceptance."
+    },
+    {
+      "legacy_path": "tests/m003/validate_m003_traceability_unit.ps1",
+      "node_id": "test.m003.validate-m003-traceability-unit",
+      "python_path": "gate_tests/ported/tests/m003/validate_m003_traceability_unit.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m003_traceability_unit."
+    },
+    {
+      "legacy_path": "tests/m003/validate_page_diagnostics_acceptance.ps1",
+      "node_id": "test.m003.validate-page-diagnostics-acceptance",
+      "python_path": "gate_tests/ported/tests/m003/validate_page_diagnostics_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_page_diagnostics_acceptance."
+    },
+    {
+      "legacy_path": "tests/m003/validate_page_diagnostics_unit.ps1",
+      "node_id": "test.m003.validate-page-diagnostics-unit",
+      "python_path": "gate_tests/ported/tests/m003/validate_page_diagnostics_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_page_diagnostics_unit."
+    },
+    {
+      "legacy_path": "tests/m003/validate_page_manifest_acceptance.ps1",
+      "node_id": "test.m003.validate-page-manifest-acceptance",
+      "python_path": "gate_tests/ported/tests/m003/validate_page_manifest_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_page_manifest_acceptance."
+    },
+    {
+      "legacy_path": "tests/m003/validate_page_manifest_unit.ps1",
+      "node_id": "test.m003.validate-page-manifest-unit",
+      "python_path": "gate_tests/ported/tests/m003/validate_page_manifest_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_page_manifest_unit."
+    },
+    {
+      "legacy_path": "tests/m003/validate_review_quarantine_acceptance.ps1",
+      "node_id": "test.m003.validate-review-quarantine-acceptance",
+      "python_path": "gate_tests/ported/tests/m003/validate_review_quarantine_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_review_quarantine_acceptance."
+    },
+    {
+      "legacy_path": "tests/m003/validate_review_quarantine_unit.ps1",
+      "node_id": "test.m003.validate-review-quarantine-unit",
+      "python_path": "gate_tests/ported/tests/m003/validate_review_quarantine_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_review_quarantine_unit."
+    },
+    {
+      "legacy_path": "tests/m003/validate_route_plan_acceptance.ps1",
+      "node_id": "test.m003.validate-route-plan-acceptance",
+      "python_path": "gate_tests/ported/tests/m003/validate_route_plan_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_route_plan_acceptance."
+    },
+    {
+      "legacy_path": "tests/m003/validate_route_plan_unit.ps1",
+      "node_id": "test.m003.validate-route-plan-unit",
+      "python_path": "gate_tests/ported/tests/m003/validate_route_plan_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_route_plan_unit."
+    },
+    {
+      "legacy_path": "tests/m003/validate_source_registration_acceptance.ps1",
+      "node_id": "test.m003.validate-source-registration-acceptance",
+      "python_path": "gate_tests/ported/tests/m003/validate_source_registration_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_source_registration_acceptance."
+    },
+    {
+      "legacy_path": "tests/m003/validate_source_registration_unit.ps1",
+      "node_id": "test.m003.validate-source-registration-unit",
+      "python_path": "gate_tests/ported/tests/m003/validate_source_registration_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_source_registration_unit."
+    },
+    {
+      "legacy_path": "tests/m004/validate_canonical_publication_acceptance.ps1",
+      "node_id": "test.m004.validate-canonical-publication-acceptance",
+      "python_path": "gate_tests/ported/tests/m004/validate_canonical_publication_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_canonical_publication_acceptance."
+    },
+    {
+      "legacy_path": "tests/m004/validate_canonical_publication_event_acceptance.ps1",
+      "node_id": "test.m004.validate-canonical-publication-event-acceptance",
+      "python_path": "gate_tests/ported/tests/m004/validate_canonical_publication_event_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_canonical_publication_event_acceptance."
+    },
+    {
+      "legacy_path": "tests/m004/validate_canonical_publication_event_unit.ps1",
+      "node_id": "test.m004.validate-canonical-publication-event-unit",
+      "python_path": "gate_tests/ported/tests/m004/validate_canonical_publication_event_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_canonical_publication_event_unit."
+    },
+    {
+      "legacy_path": "tests/m004/validate_canonical_publication_unit.ps1",
+      "node_id": "test.m004.validate-canonical-publication-unit",
+      "python_path": "gate_tests/ported/tests/m004/validate_canonical_publication_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_canonical_publication_unit."
+    },
+    {
+      "legacy_path": "tests/m004/validate_canonical_quality_acceptance.ps1",
+      "node_id": "test.m004.validate-canonical-quality-acceptance",
+      "python_path": "gate_tests/ported/tests/m004/validate_canonical_quality_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_canonical_quality_acceptance."
+    },
+    {
+      "legacy_path": "tests/m004/validate_canonical_quality_unit.ps1",
+      "node_id": "test.m004.validate-canonical-quality-unit",
+      "python_path": "gate_tests/ported/tests/m004/validate_canonical_quality_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_canonical_quality_unit."
+    },
+    {
+      "legacy_path": "tests/m004/validate_document_conversion_command_acceptance.ps1",
+      "node_id": "test.m004.validate-document-conversion-command-acceptance",
+      "python_path": "gate_tests/ported/tests/m004/validate_document_conversion_command_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_document_conversion_command_acceptance."
+    },
+    {
+      "legacy_path": "tests/m004/validate_document_conversion_command_unit.ps1",
+      "node_id": "test.m004.validate-document-conversion-command-unit",
+      "python_path": "gate_tests/ported/tests/m004/validate_document_conversion_command_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_document_conversion_command_unit."
+    },
+    {
+      "legacy_path": "tests/m004/validate_m004_precondition_acceptance.ps1",
+      "node_id": "test.m004.validate-m004-precondition-acceptance",
+      "python_path": "gate_tests/ported/tests/m004/validate_m004_precondition_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m004_precondition_acceptance."
+    },
+    {
+      "legacy_path": "tests/m004/validate_m004_precondition_unit.ps1",
+      "node_id": "test.m004.validate-m004-precondition-unit",
+      "python_path": "gate_tests/ported/tests/m004/validate_m004_precondition_unit.py",
+      "classification": "git",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m004_precondition_unit."
+    },
+    {
+      "legacy_path": "tests/m004/validate_m004_specification_acceptance.ps1",
+      "node_id": "test.m004.validate-m004-specification-acceptance",
+      "python_path": "gate_tests/ported/tests/m004/validate_m004_specification_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m004_specification_acceptance."
+    },
+    {
+      "legacy_path": "tests/m004/validate_m004_specification_unit.ps1",
+      "node_id": "test.m004.validate-m004-specification-unit",
+      "python_path": "gate_tests/ported/tests/m004/validate_m004_specification_unit.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m004_specification_unit."
+    },
+    {
+      "legacy_path": "tests/m004/validate_m004_traceability_acceptance.ps1",
+      "node_id": "test.m004.validate-m004-traceability-acceptance",
+      "python_path": "gate_tests/ported/tests/m004/validate_m004_traceability_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m004_traceability_acceptance."
+    },
+    {
+      "legacy_path": "tests/m004/validate_m004_traceability_unit.ps1",
+      "node_id": "test.m004.validate-m004-traceability-unit",
+      "python_path": "gate_tests/ported/tests/m004/validate_m004_traceability_unit.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m004_traceability_unit."
+    },
+    {
+      "legacy_path": "tests/m004/validate_page_conversion_acceptance.ps1",
+      "node_id": "test.m004.validate-page-conversion-acceptance",
+      "python_path": "gate_tests/ported/tests/m004/validate_page_conversion_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_page_conversion_acceptance."
+    },
+    {
+      "legacy_path": "tests/m004/validate_page_conversion_unit.ps1",
+      "node_id": "test.m004.validate-page-conversion-unit",
+      "python_path": "gate_tests/ported/tests/m004/validate_page_conversion_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_page_conversion_unit."
+    },
+    {
+      "legacy_path": "tests/m004/validate_source_locator_resolution_acceptance.ps1",
+      "node_id": "test.m004.validate-source-locator-resolution-acceptance",
+      "python_path": "gate_tests/ported/tests/m004/validate_source_locator_resolution_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_source_locator_resolution_acceptance."
+    },
+    {
+      "legacy_path": "tests/m004/validate_source_locator_resolution_unit.ps1",
+      "node_id": "test.m004.validate-source-locator-resolution-unit",
+      "python_path": "gate_tests/ported/tests/m004/validate_source_locator_resolution_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_source_locator_resolution_unit."
+    },
+    {
+      "legacy_path": "tests/m004/validate_text_authority_acceptance.ps1",
+      "node_id": "test.m004.validate-text-authority-acceptance",
+      "python_path": "gate_tests/ported/tests/m004/validate_text_authority_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_text_authority_acceptance."
+    },
+    {
+      "legacy_path": "tests/m004/validate_text_authority_unit.ps1",
+      "node_id": "test.m004.validate-text-authority-unit",
+      "python_path": "gate_tests/ported/tests/m004/validate_text_authority_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_text_authority_unit."
+    },
+    {
+      "legacy_path": "tests/m005/validate_hierarchical_chunking_acceptance.ps1",
+      "node_id": "test.m005.validate-hierarchical-chunking-acceptance",
+      "python_path": "gate_tests/ported/tests/m005/validate_hierarchical_chunking_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_hierarchical_chunking_acceptance."
+    },
+    {
+      "legacy_path": "tests/m005/validate_hierarchical_chunking_unit.ps1",
+      "node_id": "test.m005.validate-hierarchical-chunking-unit",
+      "python_path": "gate_tests/ported/tests/m005/validate_hierarchical_chunking_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_hierarchical_chunking_unit."
+    },
+    {
+      "legacy_path": "tests/m005/validate_hybrid_search_acceptance.ps1",
+      "node_id": "test.m005.validate-hybrid-search-acceptance",
+      "python_path": "gate_tests/ported/tests/m005/validate_hybrid_search_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_hybrid_search_acceptance."
+    },
+    {
+      "legacy_path": "tests/m005/validate_hybrid_search_unit.ps1",
+      "node_id": "test.m005.validate-hybrid-search-unit",
+      "python_path": "gate_tests/ported/tests/m005/validate_hybrid_search_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_hybrid_search_unit."
+    },
+    {
+      "legacy_path": "tests/m005/validate_index_command_acceptance.ps1",
+      "node_id": "test.m005.validate-index-command-acceptance",
+      "python_path": "gate_tests/ported/tests/m005/validate_index_command_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_index_command_acceptance."
+    },
+    {
+      "legacy_path": "tests/m005/validate_knowledge_projection_acceptance.ps1",
+      "node_id": "test.m005.validate-knowledge-projection-acceptance",
+      "python_path": "gate_tests/ported/tests/m005/validate_knowledge_projection_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_knowledge_projection_acceptance."
+    },
+    {
+      "legacy_path": "tests/m005/validate_knowledge_projection_events_acceptance.ps1",
+      "node_id": "test.m005.validate-knowledge-projection-events-acceptance",
+      "python_path": "gate_tests/ported/tests/m005/validate_knowledge_projection_events_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_knowledge_projection_events_acceptance."
+    },
+    {
+      "legacy_path": "tests/m005/validate_knowledge_projection_unit.ps1",
+      "node_id": "test.m005.validate-knowledge-projection-unit",
+      "python_path": "gate_tests/ported/tests/m005/validate_knowledge_projection_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_knowledge_projection_unit."
+    },
+    {
+      "legacy_path": "tests/m005/validate_m005_precondition_acceptance.ps1",
+      "node_id": "test.m005.validate-m005-precondition-acceptance",
+      "python_path": "gate_tests/ported/tests/m005/validate_m005_precondition_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m005_precondition_acceptance."
+    },
+    {
+      "legacy_path": "tests/m005/validate_m005_precondition_unit.ps1",
+      "node_id": "test.m005.validate-m005-precondition-unit",
+      "python_path": "gate_tests/ported/tests/m005/validate_m005_precondition_unit.py",
+      "classification": "git",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m005_precondition_unit."
+    },
+    {
+      "legacy_path": "tests/m005/validate_m005_specification_acceptance.ps1",
+      "node_id": "test.m005.validate-m005-specification-acceptance",
+      "python_path": "gate_tests/ported/tests/m005/validate_m005_specification_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m005_specification_acceptance."
+    },
+    {
+      "legacy_path": "tests/m005/validate_m005_specification_unit.ps1",
+      "node_id": "test.m005.validate-m005-specification-unit",
+      "python_path": "gate_tests/ported/tests/m005/validate_m005_specification_unit.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m005_specification_unit."
+    },
+    {
+      "legacy_path": "tests/m005/validate_m005_traceability_acceptance.ps1",
+      "node_id": "test.m005.validate-m005-traceability-acceptance",
+      "python_path": "gate_tests/ported/tests/m005/validate_m005_traceability_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_m005_traceability_acceptance."
+    },
+    {
+      "legacy_path": "tests/m005/validate_m005_traceability_unit.ps1",
+      "node_id": "test.m005.validate-m005-traceability-unit",
+      "python_path": "gate_tests/ported/tests/m005/validate_m005_traceability_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_m005_traceability_unit."
+    },
+    {
+      "legacy_path": "tests/m005/validate_projection_encoding_acceptance.ps1",
+      "node_id": "test.m005.validate-projection-encoding-acceptance",
+      "python_path": "gate_tests/ported/tests/m005/validate_projection_encoding_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_projection_encoding_acceptance."
+    },
+    {
+      "legacy_path": "tests/m005/validate_projection_encoding_unit.ps1",
+      "node_id": "test.m005.validate-projection-encoding-unit",
+      "python_path": "gate_tests/ported/tests/m005/validate_projection_encoding_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_projection_encoding_unit."
+    },
+    {
+      "legacy_path": "tests/m005/validate_projection_metadata_filters_acceptance.ps1",
+      "node_id": "test.m005.validate-projection-metadata-filters-acceptance",
+      "python_path": "gate_tests/ported/tests/m005/validate_projection_metadata_filters_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_projection_metadata_filters_acceptance."
+    },
+    {
+      "legacy_path": "tests/m005/validate_projection_metadata_filters_unit.ps1",
+      "node_id": "test.m005.validate-projection-metadata-filters-unit",
+      "python_path": "gate_tests/ported/tests/m005/validate_projection_metadata_filters_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_projection_metadata_filters_unit."
+    },
+    {
+      "legacy_path": "tests/m005/validate_qdrant_projection_acceptance.ps1",
+      "node_id": "test.m005.validate-qdrant-projection-acceptance",
+      "python_path": "gate_tests/ported/tests/m005/validate_qdrant_projection_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_qdrant_projection_acceptance."
+    },
+    {
+      "legacy_path": "tests/m005/validate_qdrant_projection_unit.ps1",
+      "node_id": "test.m005.validate-qdrant-projection-unit",
+      "python_path": "gate_tests/ported/tests/m005/validate_qdrant_projection_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_qdrant_projection_unit."
+    },
+    {
+      "legacy_path": "tests/m005/validate_search_command_acceptance.ps1",
+      "node_id": "test.m005.validate-search-command-acceptance",
+      "python_path": "gate_tests/ported/tests/m005/validate_search_command_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_search_command_acceptance."
+    },
+    {
+      "legacy_path": "tests/m005/validate_search_command_unit.ps1",
+      "node_id": "test.m005.validate-search-command-unit",
+      "python_path": "gate_tests/ported/tests/m005/validate_search_command_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_search_command_unit."
+    },
+    {
+      "legacy_path": "tests/m005/validate_search_trace_acceptance.ps1",
+      "node_id": "test.m005.validate-search-trace-acceptance",
+      "python_path": "gate_tests/ported/tests/m005/validate_search_trace_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_search_trace_acceptance."
+    },
+    {
+      "legacy_path": "tests/m006/validate_claim_evidence_attachment_acceptance.ps1",
+      "node_id": "test.m006.validate-claim-evidence-attachment-acceptance",
+      "python_path": "gate_tests/ported/tests/m006/validate_claim_evidence_attachment_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_claim_evidence_attachment_acceptance."
+    },
+    {
+      "legacy_path": "tests/m006/validate_claim_evidence_attachment_unit.ps1",
+      "node_id": "test.m006.validate-claim-evidence-attachment-unit",
+      "python_path": "gate_tests/ported/tests/m006/validate_claim_evidence_attachment_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_claim_evidence_attachment_unit."
+    },
+    {
+      "legacy_path": "tests/m006/validate_claim_extraction_acceptance.ps1",
+      "node_id": "test.m006.validate-claim-extraction-acceptance",
+      "python_path": "gate_tests/ported/tests/m006/validate_claim_extraction_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_claim_extraction_acceptance."
+    },
+    {
+      "legacy_path": "tests/m006/validate_claim_extraction_unit.ps1",
+      "node_id": "test.m006.validate-claim-extraction-unit",
+      "python_path": "gate_tests/ported/tests/m006/validate_claim_extraction_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_claim_extraction_unit."
+    },
+    {
+      "legacy_path": "tests/m006/validate_claim_http_contract_acceptance.ps1",
+      "node_id": "test.m006.validate-claim-http-contract-acceptance",
+      "python_path": "gate_tests/ported/tests/m006/validate_claim_http_contract_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_claim_http_contract_acceptance."
+    },
+    {
+      "legacy_path": "tests/m006/validate_claim_http_contract_unit.ps1",
+      "node_id": "test.m006.validate-claim-http-contract-unit",
+      "python_path": "gate_tests/ported/tests/m006/validate_claim_http_contract_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_claim_http_contract_unit."
+    },
+    {
+      "legacy_path": "tests/m006/validate_claim_relation_acceptance.ps1",
+      "node_id": "test.m006.validate-claim-relation-acceptance",
+      "python_path": "gate_tests/ported/tests/m006/validate_claim_relation_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_claim_relation_acceptance."
+    },
+    {
+      "legacy_path": "tests/m006/validate_claim_relation_unit.ps1",
+      "node_id": "test.m006.validate-claim-relation-unit",
+      "python_path": "gate_tests/ported/tests/m006/validate_claim_relation_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_claim_relation_unit."
+    },
+    {
+      "legacy_path": "tests/m006/validate_claim_retention_acceptance.ps1",
+      "node_id": "test.m006.validate-claim-retention-acceptance",
+      "python_path": "gate_tests/ported/tests/m006/validate_claim_retention_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_claim_retention_acceptance."
+    },
+    {
+      "legacy_path": "tests/m006/validate_claim_retention_unit.ps1",
+      "node_id": "test.m006.validate-claim-retention-unit",
+      "python_path": "gate_tests/ported/tests/m006/validate_claim_retention_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_claim_retention_unit."
+    },
+    {
+      "legacy_path": "tests/m006/validate_claim_verification_acceptance.ps1",
+      "node_id": "test.m006.validate-claim-verification-acceptance",
+      "python_path": "gate_tests/ported/tests/m006/validate_claim_verification_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_claim_verification_acceptance."
+    },
+    {
+      "legacy_path": "tests/m006/validate_claim_verification_unit.ps1",
+      "node_id": "test.m006.validate-claim-verification-unit",
+      "python_path": "gate_tests/ported/tests/m006/validate_claim_verification_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_claim_verification_unit."
+    },
+    {
+      "legacy_path": "tests/m006/validate_dependency_group_acceptance.ps1",
+      "node_id": "test.m006.validate-dependency-group-acceptance",
+      "python_path": "gate_tests/ported/tests/m006/validate_dependency_group_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_dependency_group_acceptance."
+    },
+    {
+      "legacy_path": "tests/m006/validate_dependency_group_unit.ps1",
+      "node_id": "test.m006.validate-dependency-group-unit",
+      "python_path": "gate_tests/ported/tests/m006/validate_dependency_group_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_dependency_group_unit."
+    },
+    {
+      "legacy_path": "tests/m006/validate_m006_precondition_acceptance.ps1",
+      "node_id": "test.m006.validate-m006-precondition-acceptance",
+      "python_path": "gate_tests/ported/tests/m006/validate_m006_precondition_acceptance.py",
+      "classification": "git",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m006_precondition_acceptance."
+    },
+    {
+      "legacy_path": "tests/m006/validate_m006_precondition_unit.ps1",
+      "node_id": "test.m006.validate-m006-precondition-unit",
+      "python_path": "gate_tests/ported/tests/m006/validate_m006_precondition_unit.py",
+      "classification": "git",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m006_precondition_unit."
+    },
+    {
+      "legacy_path": "tests/m006/validate_m006_specification_acceptance.ps1",
+      "node_id": "test.m006.validate-m006-specification-acceptance",
+      "python_path": "gate_tests/ported/tests/m006/validate_m006_specification_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m006_specification_acceptance."
+    },
+    {
+      "legacy_path": "tests/m006/validate_m006_specification_unit.ps1",
+      "node_id": "test.m006.validate-m006-specification-unit",
+      "python_path": "gate_tests/ported/tests/m006/validate_m006_specification_unit.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m006_specification_unit."
+    },
+    {
+      "legacy_path": "tests/m006/validate_m006_traceability_acceptance.ps1",
+      "node_id": "test.m006.validate-m006-traceability-acceptance",
+      "python_path": "gate_tests/ported/tests/m006/validate_m006_traceability_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_m006_traceability_acceptance."
+    },
+    {
+      "legacy_path": "tests/m006/validate_m006_traceability_unit.ps1",
+      "node_id": "test.m006.validate-m006-traceability-unit",
+      "python_path": "gate_tests/ported/tests/m006/validate_m006_traceability_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_m006_traceability_unit."
+    },
+    {
+      "legacy_path": "tests/m007/validate_answer_assertion_extraction_acceptance.ps1",
+      "node_id": "test.m007.validate-answer-assertion-extraction-acceptance",
+      "python_path": "gate_tests/ported/tests/m007/validate_answer_assertion_extraction_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_answer_assertion_extraction_acceptance."
+    },
+    {
+      "legacy_path": "tests/m007/validate_answer_assertion_extraction_unit.ps1",
+      "node_id": "test.m007.validate-answer-assertion-extraction-unit",
+      "python_path": "gate_tests/ported/tests/m007/validate_answer_assertion_extraction_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_answer_assertion_extraction_unit."
+    },
+    {
+      "legacy_path": "tests/m007/validate_answer_http_contract_acceptance.ps1",
+      "node_id": "test.m007.validate-answer-http-contract-acceptance",
+      "python_path": "gate_tests/ported/tests/m007/validate_answer_http_contract_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_answer_http_contract_acceptance."
+    },
+    {
+      "legacy_path": "tests/m007/validate_answer_http_contract_unit.ps1",
+      "node_id": "test.m007.validate-answer-http-contract-unit",
+      "python_path": "gate_tests/ported/tests/m007/validate_answer_http_contract_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_answer_http_contract_unit."
+    },
+    {
+      "legacy_path": "tests/m007/validate_answer_support_acceptance.ps1",
+      "node_id": "test.m007.validate-answer-support-acceptance",
+      "python_path": "gate_tests/ported/tests/m007/validate_answer_support_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_answer_support_acceptance."
+    },
+    {
+      "legacy_path": "tests/m007/validate_answer_support_unit.ps1",
+      "node_id": "test.m007.validate-answer-support-unit",
+      "python_path": "gate_tests/ported/tests/m007/validate_answer_support_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_answer_support_unit."
+    },
+    {
+      "legacy_path": "tests/m007/validate_contradiction_gap_acceptance.ps1",
+      "node_id": "test.m007.validate-contradiction-gap-acceptance",
+      "python_path": "gate_tests/ported/tests/m007/validate_contradiction_gap_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_contradiction_gap_acceptance."
+    },
+    {
+      "legacy_path": "tests/m007/validate_contradiction_gap_unit.ps1",
+      "node_id": "test.m007.validate-contradiction-gap-unit",
+      "python_path": "gate_tests/ported/tests/m007/validate_contradiction_gap_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_contradiction_gap_unit."
+    },
+    {
+      "legacy_path": "tests/m007/validate_current_data_abstention_acceptance.ps1",
+      "node_id": "test.m007.validate-current-data-abstention-acceptance",
+      "python_path": "gate_tests/ported/tests/m007/validate_current_data_abstention_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_current_data_abstention_acceptance."
+    },
+    {
+      "legacy_path": "tests/m007/validate_current_data_abstention_unit.ps1",
+      "node_id": "test.m007.validate-current-data-abstention-unit",
+      "python_path": "gate_tests/ported/tests/m007/validate_current_data_abstention_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_current_data_abstention_unit."
+    },
+    {
+      "legacy_path": "tests/m007/validate_evidence_set_sealing_acceptance.ps1",
+      "node_id": "test.m007.validate-evidence-set-sealing-acceptance",
+      "python_path": "gate_tests/ported/tests/m007/validate_evidence_set_sealing_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_evidence_set_sealing_acceptance."
+    },
+    {
+      "legacy_path": "tests/m007/validate_evidence_set_sealing_unit.ps1",
+      "node_id": "test.m007.validate-evidence-set-sealing-unit",
+      "python_path": "gate_tests/ported/tests/m007/validate_evidence_set_sealing_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_evidence_set_sealing_unit."
+    },
+    {
+      "legacy_path": "tests/m007/validate_m007_precondition_acceptance.ps1",
+      "node_id": "test.m007.validate-m007-precondition-acceptance",
+      "python_path": "gate_tests/ported/tests/m007/validate_m007_precondition_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m007_precondition_acceptance."
+    },
+    {
+      "legacy_path": "tests/m007/validate_m007_precondition_unit.ps1",
+      "node_id": "test.m007.validate-m007-precondition-unit",
+      "python_path": "gate_tests/ported/tests/m007/validate_m007_precondition_unit.py",
+      "classification": "git",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m007_precondition_unit."
+    },
+    {
+      "legacy_path": "tests/m007/validate_m007_specification_acceptance.ps1",
+      "node_id": "test.m007.validate-m007-specification-acceptance",
+      "python_path": "gate_tests/ported/tests/m007/validate_m007_specification_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m007_specification_acceptance."
+    },
+    {
+      "legacy_path": "tests/m007/validate_m007_specification_unit.ps1",
+      "node_id": "test.m007.validate-m007-specification-unit",
+      "python_path": "gate_tests/ported/tests/m007/validate_m007_specification_unit.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m007_specification_unit."
+    },
+    {
+      "legacy_path": "tests/m007/validate_m007_traceability_acceptance.ps1",
+      "node_id": "test.m007.validate-m007-traceability-acceptance",
+      "python_path": "gate_tests/ported/tests/m007/validate_m007_traceability_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_m007_traceability_acceptance."
+    },
+    {
+      "legacy_path": "tests/m007/validate_m007_traceability_unit.ps1",
+      "node_id": "test.m007.validate-m007-traceability-unit",
+      "python_path": "gate_tests/ported/tests/m007/validate_m007_traceability_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_m007_traceability_unit."
+    },
+    {
+      "legacy_path": "tests/m007/validate_research_case_mandate_acceptance.ps1",
+      "node_id": "test.m007.validate-research-case-mandate-acceptance",
+      "python_path": "gate_tests/ported/tests/m007/validate_research_case_mandate_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_research_case_mandate_acceptance."
+    },
+    {
+      "legacy_path": "tests/m007/validate_research_case_mandate_unit.ps1",
+      "node_id": "test.m007.validate-research-case-mandate-unit",
+      "python_path": "gate_tests/ported/tests/m007/validate_research_case_mandate_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_research_case_mandate_unit."
+    },
+    {
+      "legacy_path": "tests/m008/validate_chat_answer_presentation_acceptance.ps1",
+      "node_id": "test.m008.validate-chat-answer-presentation-acceptance",
+      "python_path": "gate_tests/ported/tests/m008/validate_chat_answer_presentation_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_chat_answer_presentation_acceptance."
+    },
+    {
+      "legacy_path": "tests/m008/validate_chat_answer_presentation_unit.ps1",
+      "node_id": "test.m008.validate-chat-answer-presentation-unit",
+      "python_path": "gate_tests/ported/tests/m008/validate_chat_answer_presentation_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_chat_answer_presentation_unit."
+    },
+    {
+      "legacy_path": "tests/m008/validate_chat_completions_contract_acceptance.ps1",
+      "node_id": "test.m008.validate-chat-completions-contract-acceptance",
+      "python_path": "gate_tests/ported/tests/m008/validate_chat_completions_contract_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_chat_completions_contract_acceptance."
+    },
+    {
+      "legacy_path": "tests/m008/validate_chat_completions_contract_unit.ps1",
+      "node_id": "test.m008.validate-chat-completions-contract-unit",
+      "python_path": "gate_tests/ported/tests/m008/validate_chat_completions_contract_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_chat_completions_contract_unit."
+    },
+    {
+      "legacy_path": "tests/m008/validate_conversation_context_snapshot_acceptance.ps1",
+      "node_id": "test.m008.validate-conversation-context-snapshot-acceptance",
+      "python_path": "gate_tests/ported/tests/m008/validate_conversation_context_snapshot_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_conversation_context_snapshot_acceptance."
+    },
+    {
+      "legacy_path": "tests/m008/validate_conversation_context_snapshot_unit.ps1",
+      "node_id": "test.m008.validate-conversation-context-snapshot-unit",
+      "python_path": "gate_tests/ported/tests/m008/validate_conversation_context_snapshot_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_conversation_context_snapshot_unit."
+    },
+    {
+      "legacy_path": "tests/m008/validate_conversation_http_contract_acceptance.ps1",
+      "node_id": "test.m008.validate-conversation-http-contract-acceptance",
+      "python_path": "gate_tests/ported/tests/m008/validate_conversation_http_contract_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_conversation_http_contract_acceptance."
+    },
+    {
+      "legacy_path": "tests/m008/validate_conversation_http_contract_unit.ps1",
+      "node_id": "test.m008.validate-conversation-http-contract-unit",
+      "python_path": "gate_tests/ported/tests/m008/validate_conversation_http_contract_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_conversation_http_contract_unit."
+    },
+    {
+      "legacy_path": "tests/m008/validate_conversation_mode_routing_acceptance.ps1",
+      "node_id": "test.m008.validate-conversation-mode-routing-acceptance",
+      "python_path": "gate_tests/ported/tests/m008/validate_conversation_mode_routing_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_conversation_mode_routing_acceptance."
+    },
+    {
+      "legacy_path": "tests/m008/validate_conversation_mode_routing_unit.ps1",
+      "node_id": "test.m008.validate-conversation-mode-routing-unit",
+      "python_path": "gate_tests/ported/tests/m008/validate_conversation_mode_routing_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_conversation_mode_routing_unit."
+    },
+    {
+      "legacy_path": "tests/m008/validate_conversation_turn_append_only_acceptance.ps1",
+      "node_id": "test.m008.validate-conversation-turn-append-only-acceptance",
+      "python_path": "gate_tests/ported/tests/m008/validate_conversation_turn_append_only_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_conversation_turn_append_only_acceptance."
+    },
+    {
+      "legacy_path": "tests/m008/validate_conversation_turn_append_only_unit.ps1",
+      "node_id": "test.m008.validate-conversation-turn-append-only-unit",
+      "python_path": "gate_tests/ported/tests/m008/validate_conversation_turn_append_only_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_conversation_turn_append_only_unit."
+    },
+    {
+      "legacy_path": "tests/m008/validate_followup_question_resolution_acceptance.ps1",
+      "node_id": "test.m008.validate-followup-question-resolution-acceptance",
+      "python_path": "gate_tests/ported/tests/m008/validate_followup_question_resolution_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_followup_question_resolution_acceptance."
+    },
+    {
+      "legacy_path": "tests/m008/validate_followup_question_resolution_unit.ps1",
+      "node_id": "test.m008.validate-followup-question-resolution-unit",
+      "python_path": "gate_tests/ported/tests/m008/validate_followup_question_resolution_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_followup_question_resolution_unit."
+    },
+    {
+      "legacy_path": "tests/m008/validate_m008_precondition_acceptance.ps1",
+      "node_id": "test.m008.validate-m008-precondition-acceptance",
+      "python_path": "gate_tests/ported/tests/m008/validate_m008_precondition_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m008_precondition_acceptance."
+    },
+    {
+      "legacy_path": "tests/m008/validate_m008_precondition_unit.ps1",
+      "node_id": "test.m008.validate-m008-precondition-unit",
+      "python_path": "gate_tests/ported/tests/m008/validate_m008_precondition_unit.py",
+      "classification": "git",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m008_precondition_unit."
+    },
+    {
+      "legacy_path": "tests/m008/validate_m008_specification_acceptance.ps1",
+      "node_id": "test.m008.validate-m008-specification-acceptance",
+      "python_path": "gate_tests/ported/tests/m008/validate_m008_specification_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m008_specification_acceptance."
+    },
+    {
+      "legacy_path": "tests/m008/validate_m008_specification_unit.ps1",
+      "node_id": "test.m008.validate-m008-specification-unit",
+      "python_path": "gate_tests/ported/tests/m008/validate_m008_specification_unit.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m008_specification_unit."
+    },
+    {
+      "legacy_path": "tests/m008/validate_m008_traceability_acceptance.ps1",
+      "node_id": "test.m008.validate-m008-traceability-acceptance",
+      "python_path": "gate_tests/ported/tests/m008/validate_m008_traceability_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_m008_traceability_acceptance."
+    },
+    {
+      "legacy_path": "tests/m008/validate_m008_traceability_unit.ps1",
+      "node_id": "test.m008.validate-m008-traceability-unit",
+      "python_path": "gate_tests/ported/tests/m008/validate_m008_traceability_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_m008_traceability_unit."
+    },
+    {
+      "legacy_path": "tests/m008/validate_verified_answer_attachment_unit.ps1",
+      "node_id": "test.m008.validate-verified-answer-attachment-unit",
+      "python_path": "gate_tests/ported/tests/m008/validate_verified_answer_attachment_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_verified_answer_attachment_unit."
+    },
+    {
+      "legacy_path": "tests/m008/validate_verified_result_reuse_acceptance.ps1",
+      "node_id": "test.m008.validate-verified-result-reuse-acceptance",
+      "python_path": "gate_tests/ported/tests/m008/validate_verified_result_reuse_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_verified_result_reuse_acceptance."
+    },
+    {
+      "legacy_path": "tests/m009/validate_deep_contradiction_classification_acceptance.ps1",
+      "node_id": "test.m009.validate-deep-contradiction-classification-acceptance",
+      "python_path": "gate_tests/ported/tests/m009/validate_deep_contradiction_classification_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_deep_contradiction_classification_acceptance."
+    },
+    {
+      "legacy_path": "tests/m009/validate_deep_contradiction_classification_unit.ps1",
+      "node_id": "test.m009.validate-deep-contradiction-classification-unit",
+      "python_path": "gate_tests/ported/tests/m009/validate_deep_contradiction_classification_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_deep_contradiction_classification_unit."
+    },
+    {
+      "legacy_path": "tests/m009/validate_deep_research_http_contract_acceptance.ps1",
+      "node_id": "test.m009.validate-deep-research-http-contract-acceptance",
+      "python_path": "gate_tests/ported/tests/m009/validate_deep_research_http_contract_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_deep_research_http_contract_acceptance."
+    },
+    {
+      "legacy_path": "tests/m009/validate_deep_research_http_contract_unit.ps1",
+      "node_id": "test.m009.validate-deep-research-http-contract-unit",
+      "python_path": "gate_tests/ported/tests/m009/validate_deep_research_http_contract_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_deep_research_http_contract_unit."
+    },
+    {
+      "legacy_path": "tests/m009/validate_deep_research_metrics_acceptance.ps1",
+      "node_id": "test.m009.validate-deep-research-metrics-acceptance",
+      "python_path": "gate_tests/ported/tests/m009/validate_deep_research_metrics_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_deep_research_metrics_acceptance."
+    },
+    {
+      "legacy_path": "tests/m009/validate_deep_research_metrics_unit.ps1",
+      "node_id": "test.m009.validate-deep-research-metrics-unit",
+      "python_path": "gate_tests/ported/tests/m009/validate_deep_research_metrics_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_deep_research_metrics_unit."
+    },
+    {
+      "legacy_path": "tests/m009/validate_deep_research_planning_acceptance.ps1",
+      "node_id": "test.m009.validate-deep-research-planning-acceptance",
+      "python_path": "gate_tests/ported/tests/m009/validate_deep_research_planning_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_deep_research_planning_acceptance."
+    },
+    {
+      "legacy_path": "tests/m009/validate_deep_research_planning_unit.ps1",
+      "node_id": "test.m009.validate-deep-research-planning-unit",
+      "python_path": "gate_tests/ported/tests/m009/validate_deep_research_planning_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_deep_research_planning_unit."
+    },
+    {
+      "legacy_path": "tests/m009/validate_insufficient_deep_coverage_acceptance.ps1",
+      "node_id": "test.m009.validate-insufficient-deep-coverage-acceptance",
+      "python_path": "gate_tests/ported/tests/m009/validate_insufficient_deep_coverage_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_insufficient_deep_coverage_acceptance."
+    },
+    {
+      "legacy_path": "tests/m009/validate_insufficient_deep_coverage_unit.ps1",
+      "node_id": "test.m009.validate-insufficient-deep-coverage-unit",
+      "python_path": "gate_tests/ported/tests/m009/validate_insufficient_deep_coverage_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_insufficient_deep_coverage_unit."
+    },
+    {
+      "legacy_path": "tests/m009/validate_m009_precondition_acceptance.ps1",
+      "node_id": "test.m009.validate-m009-precondition-acceptance",
+      "python_path": "gate_tests/ported/tests/m009/validate_m009_precondition_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m009_precondition_acceptance."
+    },
+    {
+      "legacy_path": "tests/m009/validate_m009_precondition_unit.ps1",
+      "node_id": "test.m009.validate-m009-precondition-unit",
+      "python_path": "gate_tests/ported/tests/m009/validate_m009_precondition_unit.py",
+      "classification": "git",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m009_precondition_unit."
+    },
+    {
+      "legacy_path": "tests/m009/validate_m009_specification_acceptance.ps1",
+      "node_id": "test.m009.validate-m009-specification-acceptance",
+      "python_path": "gate_tests/ported/tests/m009/validate_m009_specification_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m009_specification_acceptance."
+    },
+    {
+      "legacy_path": "tests/m009/validate_m009_specification_unit.ps1",
+      "node_id": "test.m009.validate-m009-specification-unit",
+      "python_path": "gate_tests/ported/tests/m009/validate_m009_specification_unit.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m009_specification_unit."
+    },
+    {
+      "legacy_path": "tests/m009/validate_m009_traceability_acceptance.ps1",
+      "node_id": "test.m009.validate-m009-traceability-acceptance",
+      "python_path": "gate_tests/ported/tests/m009/validate_m009_traceability_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m009_traceability_acceptance."
+    },
+    {
+      "legacy_path": "tests/m009/validate_m009_traceability_unit.ps1",
+      "node_id": "test.m009.validate-m009-traceability-unit",
+      "python_path": "gate_tests/ported/tests/m009/validate_m009_traceability_unit.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m009_traceability_unit."
+    },
+    {
+      "legacy_path": "tests/m009/validate_multi_query_evidence_collection_acceptance.ps1",
+      "node_id": "test.m009.validate-multi-query-evidence-collection-acceptance",
+      "python_path": "gate_tests/ported/tests/m009/validate_multi_query_evidence_collection_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_multi_query_evidence_collection_acceptance."
+    },
+    {
+      "legacy_path": "tests/m009/validate_multi_query_evidence_collection_unit.ps1",
+      "node_id": "test.m009.validate-multi-query-evidence-collection-unit",
+      "python_path": "gate_tests/ported/tests/m009/validate_multi_query_evidence_collection_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_multi_query_evidence_collection_unit."
+    },
+    {
+      "legacy_path": "tests/m009/validate_multi_source_synthesis_acceptance.ps1",
+      "node_id": "test.m009.validate-multi-source-synthesis-acceptance",
+      "python_path": "gate_tests/ported/tests/m009/validate_multi_source_synthesis_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_multi_source_synthesis_acceptance."
+    },
+    {
+      "legacy_path": "tests/m009/validate_multi_source_synthesis_unit.ps1",
+      "node_id": "test.m009.validate-multi-source-synthesis-unit",
+      "python_path": "gate_tests/ported/tests/m009/validate_multi_source_synthesis_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_multi_source_synthesis_unit."
+    },
+    {
+      "legacy_path": "tests/m009/validate_verified_claim_dependency_resolution_acceptance.ps1",
+      "node_id": "test.m009.validate-verified-claim-dependency-resolution-acceptance",
+      "python_path": "gate_tests/ported/tests/m009/validate_verified_claim_dependency_resolution_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_verified_claim_dependency_resolution_acceptance."
+    },
+    {
+      "legacy_path": "tests/m009/validate_verified_claim_dependency_resolution_unit.ps1",
+      "node_id": "test.m009.validate-verified-claim-dependency-resolution-unit",
+      "python_path": "gate_tests/ported/tests/m009/validate_verified_claim_dependency_resolution_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_verified_claim_dependency_resolution_unit."
+    },
+    {
+      "legacy_path": "tests/m010/validate_m010_precondition_acceptance.ps1",
+      "node_id": "test.m010.validate-m010-precondition-acceptance",
+      "python_path": "gate_tests/ported/tests/m010/validate_m010_precondition_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m010_precondition_acceptance."
+    },
+    {
+      "legacy_path": "tests/m010/validate_m010_precondition_unit.ps1",
+      "node_id": "test.m010.validate-m010-precondition-unit",
+      "python_path": "gate_tests/ported/tests/m010/validate_m010_precondition_unit.py",
+      "classification": "git",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m010_precondition_unit."
+    },
+    {
+      "legacy_path": "tests/m010/validate_m010_specification_acceptance.ps1",
+      "node_id": "test.m010.validate-m010-specification-acceptance",
+      "python_path": "gate_tests/ported/tests/m010/validate_m010_specification_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m010_specification_acceptance."
+    },
+    {
+      "legacy_path": "tests/m010/validate_m010_specification_unit.ps1",
+      "node_id": "test.m010.validate-m010-specification-unit",
+      "python_path": "gate_tests/ported/tests/m010/validate_m010_specification_unit.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m010_specification_unit."
+    },
+    {
+      "legacy_path": "tests/m010/validate_m010_traceability_acceptance.ps1",
+      "node_id": "test.m010.validate-m010-traceability-acceptance",
+      "python_path": "gate_tests/ported/tests/m010/validate_m010_traceability_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m010_traceability_acceptance."
+    },
+    {
+      "legacy_path": "tests/m010/validate_m010_traceability_unit.ps1",
+      "node_id": "test.m010.validate-m010-traceability-unit",
+      "python_path": "gate_tests/ported/tests/m010/validate_m010_traceability_unit.py",
+      "classification": "process",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_m010_traceability_unit."
+    },
+    {
+      "legacy_path": "tests/m010/validate_strategy_candidate_creation_acceptance.ps1",
+      "node_id": "test.m010.validate-strategy-candidate-creation-acceptance",
+      "python_path": "gate_tests/ported/tests/m010/validate_strategy_candidate_creation_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_strategy_candidate_creation_acceptance."
+    },
+    {
+      "legacy_path": "tests/m010/validate_strategy_candidate_creation_unit.ps1",
+      "node_id": "test.m010.validate-strategy-candidate-creation-unit",
+      "python_path": "gate_tests/ported/tests/m010/validate_strategy_candidate_creation_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_strategy_candidate_creation_unit."
+    },
+    {
+      "legacy_path": "tests/m010/validate_strategy_candidate_diagnostics_acceptance.ps1",
+      "node_id": "test.m010.validate-strategy-candidate-diagnostics-acceptance",
+      "python_path": "gate_tests/ported/tests/m010/validate_strategy_candidate_diagnostics_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_strategy_candidate_diagnostics_acceptance."
+    },
+    {
+      "legacy_path": "tests/m010/validate_strategy_candidate_diagnostics_unit.ps1",
+      "node_id": "test.m010.validate-strategy-candidate-diagnostics-unit",
+      "python_path": "gate_tests/ported/tests/m010/validate_strategy_candidate_diagnostics_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_strategy_candidate_diagnostics_unit."
+    },
+    {
+      "legacy_path": "tests/m010/validate_strategy_compatibility_acceptance.ps1",
+      "node_id": "test.m010.validate-strategy-compatibility-acceptance",
+      "python_path": "gate_tests/ported/tests/m010/validate_strategy_compatibility_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_strategy_compatibility_acceptance."
+    },
+    {
+      "legacy_path": "tests/m010/validate_strategy_compatibility_unit.ps1",
+      "node_id": "test.m010.validate-strategy-compatibility-unit",
+      "python_path": "gate_tests/ported/tests/m010/validate_strategy_compatibility_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_strategy_compatibility_unit."
+    },
+    {
+      "legacy_path": "tests/m010/validate_strategy_compilation_acceptance.ps1",
+      "node_id": "test.m010.validate-strategy-compilation-acceptance",
+      "python_path": "gate_tests/ported/tests/m010/validate_strategy_compilation_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_strategy_compilation_acceptance."
+    },
+    {
+      "legacy_path": "tests/m010/validate_strategy_compilation_unit.ps1",
+      "node_id": "test.m010.validate-strategy-compilation-unit",
+      "python_path": "gate_tests/ported/tests/m010/validate_strategy_compilation_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_strategy_compilation_unit."
+    },
+    {
+      "legacy_path": "tests/m010/validate_strategy_http_contract_acceptance.ps1",
+      "node_id": "test.m010.validate-strategy-http-contract-acceptance",
+      "python_path": "gate_tests/ported/tests/m010/validate_strategy_http_contract_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_strategy_http_contract_acceptance."
+    },
+    {
+      "legacy_path": "tests/m010/validate_strategy_http_contract_unit.ps1",
+      "node_id": "test.m010.validate-strategy-http-contract-unit",
+      "python_path": "gate_tests/ported/tests/m010/validate_strategy_http_contract_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_strategy_http_contract_unit."
+    },
+    {
+      "legacy_path": "tests/m010/validate_strategy_parameter_calibration_acceptance.ps1",
+      "node_id": "test.m010.validate-strategy-parameter-calibration-acceptance",
+      "python_path": "gate_tests/ported/tests/m010/validate_strategy_parameter_calibration_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_strategy_parameter_calibration_acceptance."
+    },
+    {
+      "legacy_path": "tests/m010/validate_strategy_parameter_calibration_unit.ps1",
+      "node_id": "test.m010.validate-strategy-parameter-calibration-unit",
+      "python_path": "gate_tests/ported/tests/m010/validate_strategy_parameter_calibration_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_strategy_parameter_calibration_unit."
+    },
+    {
+      "legacy_path": "tests/m010/validate_strategy_rule_origin_acceptance.ps1",
+      "node_id": "test.m010.validate-strategy-rule-origin-acceptance",
+      "python_path": "gate_tests/ported/tests/m010/validate_strategy_rule_origin_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_strategy_rule_origin_acceptance."
+    },
+    {
+      "legacy_path": "tests/m010/validate_strategy_rule_origin_unit.ps1",
+      "node_id": "test.m010.validate-strategy-rule-origin-unit",
+      "python_path": "gate_tests/ported/tests/m010/validate_strategy_rule_origin_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_strategy_rule_origin_unit."
+    },
+    {
+      "legacy_path": "tests/m010/validate_strategy_snapshot_acceptance.ps1",
+      "node_id": "test.m010.validate-strategy-snapshot-acceptance",
+      "python_path": "gate_tests/ported/tests/m010/validate_strategy_snapshot_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_strategy_snapshot_acceptance."
+    },
+    {
+      "legacy_path": "tests/m010/validate_strategy_snapshot_unit.ps1",
+      "node_id": "test.m010.validate-strategy-snapshot-unit",
+      "python_path": "gate_tests/ported/tests/m010/validate_strategy_snapshot_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_strategy_snapshot_unit."
+    },
+    {
+      "legacy_path": "tests/m011/run_m011_case.ps1",
+      "node_id": "test.m011.run-m011-case",
+      "python_path": "gate_tests/ported/tests/m011/run_m011_case.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de run_m011_case."
+    },
+    {
+      "legacy_path": "tests/m011/validate_cost_environment_freeze_acceptance.ps1",
+      "node_id": "test.m011.validate-cost-environment-freeze-acceptance",
+      "python_path": "gate_tests/ported/tests/m011/validate_cost_environment_freeze_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_cost_environment_freeze_acceptance."
+    },
+    {
+      "legacy_path": "tests/m011/validate_cost_environment_freeze_unit.ps1",
+      "node_id": "test.m011.validate-cost-environment-freeze-unit",
+      "python_path": "gate_tests/ported/tests/m011/validate_cost_environment_freeze_unit.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_cost_environment_freeze_unit."
+    },
+    {
+      "legacy_path": "tests/m011/validate_data_snapshot_freeze_acceptance.ps1",
+      "node_id": "test.m011.validate-data-snapshot-freeze-acceptance",
+      "python_path": "gate_tests/ported/tests/m011/validate_data_snapshot_freeze_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_data_snapshot_freeze_acceptance."
+    },
+    {
+      "legacy_path": "tests/m011/validate_data_snapshot_freeze_unit.ps1",
+      "node_id": "test.m011.validate-data-snapshot-freeze-unit",
+      "python_path": "gate_tests/ported/tests/m011/validate_data_snapshot_freeze_unit.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_data_snapshot_freeze_unit."
+    },
+    {
+      "legacy_path": "tests/m011/validate_deterministic_backtest_acceptance.ps1",
+      "node_id": "test.m011.validate-deterministic-backtest-acceptance",
+      "python_path": "gate_tests/ported/tests/m011/validate_deterministic_backtest_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_deterministic_backtest_acceptance."
+    },
+    {
+      "legacy_path": "tests/m011/validate_deterministic_backtest_unit.ps1",
+      "node_id": "test.m011.validate-deterministic-backtest-unit",
+      "python_path": "gate_tests/ported/tests/m011/validate_deterministic_backtest_unit.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_deterministic_backtest_unit."
+    },
+    {
+      "legacy_path": "tests/m011/validate_experiment_http_contract_acceptance.ps1",
+      "node_id": "test.m011.validate-experiment-http-contract-acceptance",
+      "python_path": "gate_tests/ported/tests/m011/validate_experiment_http_contract_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_experiment_http_contract_acceptance."
+    },
+    {
+      "legacy_path": "tests/m011/validate_experiment_http_contract_unit.ps1",
+      "node_id": "test.m011.validate-experiment-http-contract-unit",
+      "python_path": "gate_tests/ported/tests/m011/validate_experiment_http_contract_unit.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_experiment_http_contract_unit."
+    },
+    {
+      "legacy_path": "tests/m011/validate_experiment_planning_acceptance.ps1",
+      "node_id": "test.m011.validate-experiment-planning-acceptance",
+      "python_path": "gate_tests/ported/tests/m011/validate_experiment_planning_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_experiment_planning_acceptance."
+    },
+    {
+      "legacy_path": "tests/m011/validate_experiment_planning_unit.ps1",
+      "node_id": "test.m011.validate-experiment-planning-unit",
+      "python_path": "gate_tests/ported/tests/m011/validate_experiment_planning_unit.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_experiment_planning_unit."
+    },
+    {
+      "legacy_path": "tests/m011/validate_experiment_reproducibility_acceptance.ps1",
+      "node_id": "test.m011.validate-experiment-reproducibility-acceptance",
+      "python_path": "gate_tests/ported/tests/m011/validate_experiment_reproducibility_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_experiment_reproducibility_acceptance."
+    },
+    {
+      "legacy_path": "tests/m011/validate_experiment_reproducibility_unit.ps1",
+      "node_id": "test.m011.validate-experiment-reproducibility-unit",
+      "python_path": "gate_tests/ported/tests/m011/validate_experiment_reproducibility_unit.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_experiment_reproducibility_unit."
+    },
+    {
+      "legacy_path": "tests/m011/validate_experiment_result_acceptance.ps1",
+      "node_id": "test.m011.validate-experiment-result-acceptance",
+      "python_path": "gate_tests/ported/tests/m011/validate_experiment_result_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_experiment_result_acceptance."
+    },
+    {
+      "legacy_path": "tests/m011/validate_experiment_result_unit.ps1",
+      "node_id": "test.m011.validate-experiment-result-unit",
+      "python_path": "gate_tests/ported/tests/m011/validate_experiment_result_unit.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_experiment_result_unit."
+    },
+    {
+      "legacy_path": "tests/m011/validate_experiment_retention_acceptance.ps1",
+      "node_id": "test.m011.validate-experiment-retention-acceptance",
+      "python_path": "gate_tests/ported/tests/m011/validate_experiment_retention_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_experiment_retention_acceptance."
+    },
+    {
+      "legacy_path": "tests/m011/validate_experiment_retention_unit.ps1",
+      "node_id": "test.m011.validate-experiment-retention-unit",
+      "python_path": "gate_tests/ported/tests/m011/validate_experiment_retention_unit.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_experiment_retention_unit."
+    },
+    {
+      "legacy_path": "tests/m011/validate_experiment_start_lock_acceptance.ps1",
+      "node_id": "test.m011.validate-experiment-start-lock-acceptance",
+      "python_path": "gate_tests/ported/tests/m011/validate_experiment_start_lock_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_experiment_start_lock_acceptance."
+    },
+    {
+      "legacy_path": "tests/m011/validate_experiment_start_lock_unit.ps1",
+      "node_id": "test.m011.validate-experiment-start-lock-unit",
+      "python_path": "gate_tests/ported/tests/m011/validate_experiment_start_lock_unit.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_experiment_start_lock_unit."
+    },
+    {
+      "legacy_path": "tests/m011/validate_m011_precondition_acceptance.ps1",
+      "node_id": "test.m011.validate-m011-precondition-acceptance",
+      "python_path": "gate_tests/ported/tests/m011/validate_m011_precondition_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m011_precondition_acceptance."
+    },
+    {
+      "legacy_path": "tests/m011/validate_m011_precondition_unit.ps1",
+      "node_id": "test.m011.validate-m011-precondition-unit",
+      "python_path": "gate_tests/ported/tests/m011/validate_m011_precondition_unit.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m011_precondition_unit."
+    },
+    {
+      "legacy_path": "tests/m011/validate_m011_specification_acceptance.ps1",
+      "node_id": "test.m011.validate-m011-specification-acceptance",
+      "python_path": "gate_tests/ported/tests/m011/validate_m011_specification_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m011_specification_acceptance."
+    },
+    {
+      "legacy_path": "tests/m011/validate_m011_specification_unit.ps1",
+      "node_id": "test.m011.validate-m011-specification-unit",
+      "python_path": "gate_tests/ported/tests/m011/validate_m011_specification_unit.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m011_specification_unit."
+    },
+    {
+      "legacy_path": "tests/m011/validate_m011_traceability_acceptance.ps1",
+      "node_id": "test.m011.validate-m011-traceability-acceptance",
+      "python_path": "gate_tests/ported/tests/m011/validate_m011_traceability_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m011_traceability_acceptance."
+    },
+    {
+      "legacy_path": "tests/m011/validate_m011_traceability_unit.ps1",
+      "node_id": "test.m011.validate-m011-traceability-unit",
+      "python_path": "gate_tests/ported/tests/m011/validate_m011_traceability_unit.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m011_traceability_unit."
+    },
+    {
+      "legacy_path": "tests/m012/validate_calibration_decisions_acceptance.ps1",
+      "node_id": "test.m012.validate-calibration-decisions-acceptance",
+      "python_path": "gate_tests/ported/tests/m012/validate_calibration_decisions_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_calibration_decisions_acceptance."
+    },
+    {
+      "legacy_path": "tests/m012/validate_calibration_decisions_unit.ps1",
+      "node_id": "test.m012.validate-calibration-decisions-unit",
+      "python_path": "gate_tests/ported/tests/m012/validate_calibration_decisions_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_calibration_decisions_unit."
+    },
+    {
+      "legacy_path": "tests/m012/validate_document_quality_calibration_acceptance.ps1",
+      "node_id": "test.m012.validate-document-quality-calibration-acceptance",
+      "python_path": "gate_tests/ported/tests/m012/validate_document_quality_calibration_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_document_quality_calibration_acceptance."
+    },
+    {
+      "legacy_path": "tests/m012/validate_document_quality_calibration_unit.ps1",
+      "node_id": "test.m012.validate-document-quality-calibration-unit",
+      "python_path": "gate_tests/ported/tests/m012/validate_document_quality_calibration_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_document_quality_calibration_unit."
+    },
+    {
+      "legacy_path": "tests/m012/validate_document_route_benchmark_acceptance.ps1",
+      "node_id": "test.m012.validate-document-route-benchmark-acceptance",
+      "python_path": "gate_tests/ported/tests/m012/validate_document_route_benchmark_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_document_route_benchmark_acceptance."
+    },
+    {
+      "legacy_path": "tests/m012/validate_document_route_benchmark_unit.ps1",
+      "node_id": "test.m012.validate-document-route-benchmark-unit",
+      "python_path": "gate_tests/ported/tests/m012/validate_document_route_benchmark_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_document_route_benchmark_unit."
+    },
+    {
+      "legacy_path": "tests/m012/validate_knowledge_search_benchmark_acceptance.ps1",
+      "node_id": "test.m012.validate-knowledge-search-benchmark-acceptance",
+      "python_path": "gate_tests/ported/tests/m012/validate_knowledge_search_benchmark_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_knowledge_search_benchmark_acceptance."
+    },
+    {
+      "legacy_path": "tests/m012/validate_knowledge_search_benchmark_unit.ps1",
+      "node_id": "test.m012.validate-knowledge-search-benchmark-unit",
+      "python_path": "gate_tests/ported/tests/m012/validate_knowledge_search_benchmark_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_knowledge_search_benchmark_unit."
+    },
+    {
+      "legacy_path": "tests/m012/validate_llm_benchmark_real_path_acceptance.ps1",
+      "node_id": "test.m012.validate-llm-benchmark-real-path-acceptance",
+      "python_path": "gate_tests/ported/tests/m012/validate_llm_benchmark_real_path_acceptance.py",
+      "classification": "process",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_llm_benchmark_real_path_acceptance."
+    },
+    {
+      "legacy_path": "tests/m012/validate_llm_benchmark_real_path_unit.ps1",
+      "node_id": "test.m012.validate-llm-benchmark-real-path-unit",
+      "python_path": "gate_tests/ported/tests/m012/validate_llm_benchmark_real_path_unit.py",
+      "classification": "process",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_llm_benchmark_real_path_unit."
+    },
+    {
+      "legacy_path": "tests/m012/validate_m012_precondition_acceptance.ps1",
+      "node_id": "test.m012.validate-m012-precondition-acceptance",
+      "python_path": "gate_tests/ported/tests/m012/validate_m012_precondition_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m012_precondition_acceptance."
+    },
+    {
+      "legacy_path": "tests/m012/validate_m012_precondition_unit.ps1",
+      "node_id": "test.m012.validate-m012-precondition-unit",
+      "python_path": "gate_tests/ported/tests/m012/validate_m012_precondition_unit.py",
+      "classification": "git",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m012_precondition_unit."
+    },
+    {
+      "legacy_path": "tests/m012/validate_m012_specification_acceptance.ps1",
+      "node_id": "test.m012.validate-m012-specification-acceptance",
+      "python_path": "gate_tests/ported/tests/m012/validate_m012_specification_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m012_specification_acceptance."
+    },
+    {
+      "legacy_path": "tests/m012/validate_m012_specification_unit.ps1",
+      "node_id": "test.m012.validate-m012-specification-unit",
+      "python_path": "gate_tests/ported/tests/m012/validate_m012_specification_unit.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m012_specification_unit."
+    },
+    {
+      "legacy_path": "tests/m012/validate_m012_traceability_acceptance.ps1",
+      "node_id": "test.m012.validate-m012-traceability-acceptance",
+      "python_path": "gate_tests/ported/tests/m012/validate_m012_traceability_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m012_traceability_acceptance."
+    },
+    {
+      "legacy_path": "tests/m012/validate_m012_traceability_unit.ps1",
+      "node_id": "test.m012.validate-m012-traceability-unit",
+      "python_path": "gate_tests/ported/tests/m012/validate_m012_traceability_unit.py",
+      "classification": "process",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m012_traceability_unit."
+    },
+    {
+      "legacy_path": "tests/m012/validate_page_annotation_set_acceptance.ps1",
+      "node_id": "test.m012.validate-page-annotation-set-acceptance",
+      "python_path": "gate_tests/ported/tests/m012/validate_page_annotation_set_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_page_annotation_set_acceptance."
+    },
+    {
+      "legacy_path": "tests/m012/validate_page_annotation_set_unit.ps1",
+      "node_id": "test.m012.validate-page-annotation-set-unit",
+      "python_path": "gate_tests/ported/tests/m012/validate_page_annotation_set_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_page_annotation_set_unit."
+    },
+    {
+      "legacy_path": "tests/m012/validate_pilot_corpus_acceptance.ps1",
+      "node_id": "test.m012.validate-pilot-corpus-acceptance",
+      "python_path": "gate_tests/ported/tests/m012/validate_pilot_corpus_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_pilot_corpus_acceptance."
+    },
+    {
+      "legacy_path": "tests/m012/validate_pilot_corpus_unit.ps1",
+      "node_id": "test.m012.validate-pilot-corpus-unit",
+      "python_path": "gate_tests/ported/tests/m012/validate_pilot_corpus_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_pilot_corpus_unit."
+    },
+    {
+      "legacy_path": "tests/m012/validate_strategy_backtest_benchmark_acceptance.ps1",
+      "node_id": "test.m012.validate-strategy-backtest-benchmark-acceptance",
+      "python_path": "gate_tests/ported/tests/m012/validate_strategy_backtest_benchmark_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_strategy_backtest_benchmark_acceptance."
+    },
+    {
+      "legacy_path": "tests/m012/validate_strategy_backtest_benchmark_unit.ps1",
+      "node_id": "test.m012.validate-strategy-backtest-benchmark-unit",
+      "python_path": "gate_tests/ported/tests/m012/validate_strategy_backtest_benchmark_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_strategy_backtest_benchmark_unit."
+    },
+    {
+      "legacy_path": "tests/m012/validate_verified_answer_benchmark_acceptance.ps1",
+      "node_id": "test.m012.validate-verified-answer-benchmark-acceptance",
+      "python_path": "gate_tests/ported/tests/m012/validate_verified_answer_benchmark_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_verified_answer_benchmark_acceptance."
+    },
+    {
+      "legacy_path": "tests/m012/validate_verified_answer_benchmark_unit.ps1",
+      "node_id": "test.m012.validate-verified-answer-benchmark-unit",
+      "python_path": "gate_tests/ported/tests/m012/validate_verified_answer_benchmark_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_verified_answer_benchmark_unit."
+    },
+    {
+      "legacy_path": "tests/m013/validate_backup_restore_acceptance.ps1",
+      "node_id": "test.m013.validate-backup-restore-acceptance",
+      "python_path": "gate_tests/ported/tests/m013/validate_backup_restore_acceptance.py",
+      "classification": "git",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_backup_restore_acceptance."
+    },
+    {
+      "legacy_path": "tests/m013/validate_backup_restore_unit.ps1",
+      "node_id": "test.m013.validate-backup-restore-unit",
+      "python_path": "gate_tests/ported/tests/m013/validate_backup_restore_unit.py",
+      "classification": "process",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_backup_restore_unit."
+    },
+    {
+      "legacy_path": "tests/m013/validate_document_api_wiring_acceptance.ps1",
+      "node_id": "test.m013.validate-document-api-wiring-acceptance",
+      "python_path": "gate_tests/ported/tests/m013/validate_document_api_wiring_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_document_api_wiring_acceptance."
+    },
+    {
+      "legacy_path": "tests/m013/validate_llm_gateway_real_spark_acceptance.ps1",
+      "node_id": "test.m013.validate-llm-gateway-real-spark-acceptance",
+      "python_path": "gate_tests/ported/tests/m013/validate_llm_gateway_real_spark_acceptance.py",
+      "classification": "live",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_llm_gateway_real_spark_acceptance."
+    },
+    {
+      "legacy_path": "tests/m013/validate_local_monitoring_acceptance.ps1",
+      "node_id": "test.m013.validate-local-monitoring-acceptance",
+      "python_path": "gate_tests/ported/tests/m013/validate_local_monitoring_acceptance.py",
+      "classification": "process",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_local_monitoring_acceptance."
+    },
+    {
+      "legacy_path": "tests/m013/validate_local_monitoring_unit.ps1",
+      "node_id": "test.m013.validate-local-monitoring-unit",
+      "python_path": "gate_tests/ported/tests/m013/validate_local_monitoring_unit.py",
+      "classification": "process",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_local_monitoring_unit."
+    },
+    {
+      "legacy_path": "tests/m013/validate_m013_network_security_acceptance.ps1",
+      "node_id": "test.m013.validate-m013-network-security-acceptance",
+      "python_path": "gate_tests/ported/tests/m013/validate_m013_network_security_acceptance.py",
+      "classification": "process",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m013_network_security_acceptance."
+    },
+    {
+      "legacy_path": "tests/m013/validate_m013_network_security_unit.ps1",
+      "node_id": "test.m013.validate-m013-network-security-unit",
+      "python_path": "gate_tests/ported/tests/m013/validate_m013_network_security_unit.py",
+      "classification": "process",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m013_network_security_unit."
+    },
+    {
+      "legacy_path": "tests/m013/validate_m013_precondition_acceptance.ps1",
+      "node_id": "test.m013.validate-m013-precondition-acceptance",
+      "python_path": "gate_tests/ported/tests/m013/validate_m013_precondition_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m013_precondition_acceptance."
+    },
+    {
+      "legacy_path": "tests/m013/validate_m013_precondition_unit.ps1",
+      "node_id": "test.m013.validate-m013-precondition-unit",
+      "python_path": "gate_tests/ported/tests/m013/validate_m013_precondition_unit.py",
+      "classification": "git",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m013_precondition_unit."
+    },
+    {
+      "legacy_path": "tests/m013/validate_m013_reality_product_acceptance.ps1",
+      "node_id": "test.m013.validate-m013-reality-product-acceptance",
+      "python_path": "gate_tests/ported/tests/m013/validate_m013_reality_product_acceptance.py",
+      "classification": "live",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_m013_reality_product_acceptance."
+    },
+    {
+      "legacy_path": "tests/m013/validate_m013_reality_product_unit.ps1",
+      "node_id": "test.m013.validate-m013-reality-product-unit",
+      "python_path": "gate_tests/ported/tests/m013/validate_m013_reality_product_unit.py",
+      "classification": "live",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_m013_reality_product_unit."
+    },
+    {
+      "legacy_path": "tests/m013/validate_m013_specification_acceptance.ps1",
+      "node_id": "test.m013.validate-m013-specification-acceptance",
+      "python_path": "gate_tests/ported/tests/m013/validate_m013_specification_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m013_specification_acceptance."
+    },
+    {
+      "legacy_path": "tests/m013/validate_m013_specification_unit.ps1",
+      "node_id": "test.m013.validate-m013-specification-unit",
+      "python_path": "gate_tests/ported/tests/m013/validate_m013_specification_unit.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m013_specification_unit."
+    },
+    {
+      "legacy_path": "tests/m013/validate_retention_purge_acceptance.ps1",
+      "node_id": "test.m013.validate-retention-purge-acceptance",
+      "python_path": "gate_tests/ported/tests/m013/validate_retention_purge_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_retention_purge_acceptance."
+    },
+    {
+      "legacy_path": "tests/m013/validate_retention_purge_unit.ps1",
+      "node_id": "test.m013.validate-retention-purge-unit",
+      "python_path": "gate_tests/ported/tests/m013/validate_retention_purge_unit.py",
+      "classification": "process",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_retention_purge_unit."
+    },
+    {
+      "legacy_path": "tests/m013/validate_runbooks_user_docs_acceptance.ps1",
+      "node_id": "test.m013.validate-runbooks-user-docs-acceptance",
+      "python_path": "gate_tests/ported/tests/m013/validate_runbooks_user_docs_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_runbooks_user_docs_acceptance."
+    },
+    {
+      "legacy_path": "tests/m013/validate_runbooks_user_docs_unit.ps1",
+      "node_id": "test.m013.validate-runbooks-user-docs-unit",
+      "python_path": "gate_tests/ported/tests/m013/validate_runbooks_user_docs_unit.py",
+      "classification": "process",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_runbooks_user_docs_unit."
+    },
+    {
+      "legacy_path": "tests/m013/validate_spark_failure_acceptance.ps1",
+      "node_id": "test.m013.validate-spark-failure-acceptance",
+      "python_path": "gate_tests/ported/tests/m013/validate_spark_failure_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_spark_failure_acceptance."
+    },
+    {
+      "legacy_path": "tests/m013/validate_spark_failure_unit.ps1",
+      "node_id": "test.m013.validate-spark-failure-unit",
+      "python_path": "gate_tests/ported/tests/m013/validate_spark_failure_unit.py",
+      "classification": "process",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_spark_failure_unit."
+    },
+    {
+      "legacy_path": "tests/m013/validate_ui_corpus_backend_connection_acceptance.ps1",
+      "node_id": "test.m013.validate-ui-corpus-backend-connection-acceptance",
+      "python_path": "gate_tests/ported/tests/m013/validate_ui_corpus_backend_connection_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_ui_corpus_backend_connection_acceptance."
+    },
+    {
+      "legacy_path": "tests/m013/validate_ui_corpus_backend_connection_unit.ps1",
+      "node_id": "test.m013.validate-ui-corpus-backend-connection-unit",
+      "python_path": "gate_tests/ported/tests/m013/validate_ui_corpus_backend_connection_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_ui_corpus_backend_connection_unit."
+    },
+    {
+      "legacy_path": "tests/m013/validate_ui_corpus_pdf_screen_acceptance.ps1",
+      "node_id": "test.m013.validate-ui-corpus-pdf-screen-acceptance",
+      "python_path": "gate_tests/ported/tests/m013/validate_ui_corpus_pdf_screen_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_ui_corpus_pdf_screen_acceptance."
+    },
+    {
+      "legacy_path": "tests/m013/validate_ui_corpus_pdf_screen_unit.ps1",
+      "node_id": "test.m013.validate-ui-corpus-pdf-screen-unit",
+      "python_path": "gate_tests/ported/tests/m013/validate_ui_corpus_pdf_screen_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_ui_corpus_pdf_screen_unit."
+    },
+    {
+      "legacy_path": "tests/m013/validate_ui_pdf_viewer_layout_acceptance.ps1",
+      "node_id": "test.m013.validate-ui-pdf-viewer-layout-acceptance",
+      "python_path": "gate_tests/ported/tests/m013/validate_ui_pdf_viewer_layout_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_ui_pdf_viewer_layout_acceptance."
+    },
+    {
+      "legacy_path": "tests/m013/validate_ui_pdf_viewer_layout_unit.ps1",
+      "node_id": "test.m013.validate-ui-pdf-viewer-layout-unit",
+      "python_path": "gate_tests/ported/tests/m013/validate_ui_pdf_viewer_layout_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_ui_pdf_viewer_layout_unit."
+    },
+    {
+      "legacy_path": "tests/m013/validate_uv_run_ui_command_acceptance.ps1",
+      "node_id": "test.m013.validate-uv-run-ui-command-acceptance",
+      "python_path": "gate_tests/ported/tests/m013/validate_uv_run_ui_command_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_uv_run_ui_command_acceptance."
+    },
+    {
+      "legacy_path": "tests/m013/validate_uv_run_ui_command_unit.ps1",
+      "node_id": "test.m013.validate-uv-run-ui-command-unit",
+      "python_path": "gate_tests/ported/tests/m013/validate_uv_run_ui_command_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_uv_run_ui_command_unit."
+    },
+    {
+      "legacy_path": "tests/m013/validate_v1_acceptance_report_acceptance.ps1",
+      "node_id": "test.m013.validate-v1-acceptance-report-acceptance",
+      "python_path": "gate_tests/ported/tests/m013/validate_v1_acceptance_report_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_v1_acceptance_report_acceptance."
+    },
+    {
+      "legacy_path": "tests/m013/validate_v1_acceptance_report_unit.ps1",
+      "node_id": "test.m013.validate-v1-acceptance-report-unit",
+      "python_path": "gate_tests/ported/tests/m013/validate_v1_acceptance_report_unit.py",
+      "classification": "process",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_v1_acceptance_report_unit."
+    },
+    {
+      "legacy_path": "tests/m013/validate_v1_antipatterns_acceptance.ps1",
+      "node_id": "test.m013.validate-v1-antipatterns-acceptance",
+      "python_path": "gate_tests/ported/tests/m013/validate_v1_antipatterns_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_v1_antipatterns_acceptance."
+    },
+    {
+      "legacy_path": "tests/m013/validate_v1_antipatterns_unit.ps1",
+      "node_id": "test.m013.validate-v1-antipatterns-unit",
+      "python_path": "gate_tests/ported/tests/m013/validate_v1_antipatterns_unit.py",
+      "classification": "process",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_v1_antipatterns_unit."
+    },
+    {
+      "legacy_path": "tests/m013/validate_v1_gap_decisions_acceptance.ps1",
+      "node_id": "test.m013.validate-v1-gap-decisions-acceptance",
+      "python_path": "gate_tests/ported/tests/m013/validate_v1_gap_decisions_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_v1_gap_decisions_acceptance."
+    },
+    {
+      "legacy_path": "tests/m013/validate_v1_gap_decisions_unit.ps1",
+      "node_id": "test.m013.validate-v1-gap-decisions-unit",
+      "python_path": "gate_tests/ported/tests/m013/validate_v1_gap_decisions_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_v1_gap_decisions_unit."
+    },
+    {
+      "legacy_path": "tests/m013/validate_v1_regression_suite_acceptance.ps1",
+      "node_id": "test.m013.validate-v1-regression-suite-acceptance",
+      "python_path": "gate_tests/ported/tests/m013/validate_v1_regression_suite_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_v1_regression_suite_acceptance."
+    },
+    {
+      "legacy_path": "tests/m013/validate_v1_regression_suite_unit.ps1",
+      "node_id": "test.m013.validate-v1-regression-suite-unit",
+      "python_path": "gate_tests/ported/tests/m013/validate_v1_regression_suite_unit.py",
+      "classification": "process",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_v1_regression_suite_unit."
+    },
+    {
+      "legacy_path": "tests/m013_config/validate_application_config_loader_acceptance.ps1",
+      "node_id": "test.m013-config.validate-application-config-loader-acceptance",
+      "python_path": "gate_tests/ported/tests/m013_config/validate_application_config_loader_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_application_config_loader_acceptance."
+    },
+    {
+      "legacy_path": "tests/m013_config/validate_application_config_loader_dependencies_unit.ps1",
+      "node_id": "test.m013-config.validate-application-config-loader-dependencies-unit",
+      "python_path": "gate_tests/ported/tests/m013_config/validate_application_config_loader_dependencies_unit.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_application_config_loader_dependencies_unit."
+    },
+    {
+      "legacy_path": "tests/m013_config/validate_application_config_loader_unit.ps1",
+      "node_id": "test.m013-config.validate-application-config-loader-unit",
+      "python_path": "gate_tests/ported/tests/m013_config/validate_application_config_loader_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_application_config_loader_unit."
+    },
+    {
+      "legacy_path": "tests/m013_config/validate_application_config_specification_acceptance.ps1",
+      "node_id": "test.m013-config.validate-application-config-specification-acceptance",
+      "python_path": "gate_tests/ported/tests/m013_config/validate_application_config_specification_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_application_config_specification_acceptance."
+    },
+    {
+      "legacy_path": "tests/m013_config/validate_application_config_specification_unit.ps1",
+      "node_id": "test.m013-config.validate-application-config-specification-unit",
+      "python_path": "gate_tests/ported/tests/m013_config/validate_application_config_specification_unit.py",
+      "classification": "git",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_application_config_specification_unit."
+    },
+    {
+      "legacy_path": "tests/m013_config/validate_compose_config_file_acceptance.ps1",
+      "node_id": "test.m013-config.validate-compose-config-file-acceptance",
+      "python_path": "gate_tests/ported/tests/m013_config/validate_compose_config_file_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_compose_config_file_acceptance."
+    },
+    {
+      "legacy_path": "tests/m013_config/validate_compose_config_file_unit.ps1",
+      "node_id": "test.m013-config.validate-compose-config-file-unit",
+      "python_path": "gate_tests/ported/tests/m013_config/validate_compose_config_file_unit.py",
+      "classification": "process",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_compose_config_file_unit."
+    },
+    {
+      "legacy_path": "tests/m013_config/validate_config_runbooks_acceptance.ps1",
+      "node_id": "test.m013-config.validate-config-runbooks-acceptance",
+      "python_path": "gate_tests/ported/tests/m013_config/validate_config_runbooks_acceptance.py",
+      "classification": "git",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_config_runbooks_acceptance."
+    },
+    {
+      "legacy_path": "tests/m013_config/validate_config_runbooks_unit.ps1",
+      "node_id": "test.m013-config.validate-config-runbooks-unit",
+      "python_path": "gate_tests/ported/tests/m013_config/validate_config_runbooks_unit.py",
+      "classification": "git",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_config_runbooks_unit."
+    },
+    {
+      "legacy_path": "tests/m013_config/validate_environment_input_rejection_acceptance.ps1",
+      "node_id": "test.m013-config.validate-environment-input-rejection-acceptance",
+      "python_path": "gate_tests/ported/tests/m013_config/validate_environment_input_rejection_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_environment_input_rejection_acceptance."
+    },
+    {
+      "legacy_path": "tests/m013_config/validate_environment_input_rejection_unit.ps1",
+      "node_id": "test.m013-config.validate-environment-input-rejection-unit",
+      "python_path": "gate_tests/ported/tests/m013_config/validate_environment_input_rejection_unit.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_environment_input_rejection_unit."
+    },
+    {
+      "legacy_path": "tests/m013_config/validate_llm_gateway_config_file_acceptance.ps1",
+      "node_id": "test.m013-config.validate-llm-gateway-config-file-acceptance",
+      "python_path": "gate_tests/ported/tests/m013_config/validate_llm_gateway_config_file_acceptance.py",
+      "classification": "process",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_llm_gateway_config_file_acceptance."
+    },
+    {
+      "legacy_path": "tests/m013_config/validate_llm_gateway_config_file_unit.ps1",
+      "node_id": "test.m013-config.validate-llm-gateway-config-file-unit",
+      "python_path": "gate_tests/ported/tests/m013_config/validate_llm_gateway_config_file_unit.py",
+      "classification": "process",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_llm_gateway_config_file_unit."
+    },
+    {
+      "legacy_path": "tests/m013_config/validate_m013_config_traceability_acceptance.ps1",
+      "node_id": "test.m013-config.validate-m013-config-traceability-acceptance",
+      "python_path": "gate_tests/ported/tests/m013_config/validate_m013_config_traceability_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m013_config_traceability_acceptance."
+    },
+    {
+      "legacy_path": "tests/m013_config/validate_m013_config_traceability_unit.ps1",
+      "node_id": "test.m013-config.validate-m013-config-traceability-unit",
+      "python_path": "gate_tests/ported/tests/m013_config/validate_m013_config_traceability_unit.py",
+      "classification": "git",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m013_config_traceability_unit."
+    },
+    {
+      "legacy_path": "tests/m013_fastapi/resolve_m013_fastapi_live_gateway.ps1",
+      "node_id": "test.m013-fastapi.resolve-m013-fastapi-live-gateway",
+      "python_path": "gate_tests/ported/tests/m013_fastapi/resolve_m013_fastapi_live_gateway.py",
+      "classification": "live",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de resolve_m013_fastapi_live_gateway."
+    },
+    {
+      "legacy_path": "tests/m013_fastapi/resolve_m013_fastapi_python.ps1",
+      "node_id": "test.m013-fastapi.resolve-m013-fastapi-python",
+      "python_path": "gate_tests/ported/tests/m013_fastapi/resolve_m013_fastapi_python.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de resolve_m013_fastapi_python."
+    },
+    {
+      "legacy_path": "tests/m013_fastapi/validate_api_ui_iteration2_acceptance.ps1",
+      "node_id": "test.m013-fastapi.validate-api-ui-iteration2-acceptance",
+      "python_path": "gate_tests/ported/tests/m013_fastapi/validate_api_ui_iteration2_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_api_ui_iteration2_acceptance."
+    },
+    {
+      "legacy_path": "tests/m013_fastapi/validate_document_command_router_unit.ps1",
+      "node_id": "test.m013-fastapi.validate-document-command-router-unit",
+      "python_path": "gate_tests/ported/tests/m013_fastapi/validate_document_command_router_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_document_command_router_unit."
+    },
+    {
+      "legacy_path": "tests/m013_fastapi/validate_document_commands_http_acceptance.ps1",
+      "node_id": "test.m013-fastapi.validate-document-commands-http-acceptance",
+      "python_path": "gate_tests/ported/tests/m013_fastapi/validate_document_commands_http_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_document_commands_http_acceptance."
+    },
+    {
+      "legacy_path": "tests/m013_fastapi/validate_document_http_live_acceptance.ps1",
+      "node_id": "test.m013-fastapi.validate-document-http-live-acceptance",
+      "python_path": "gate_tests/ported/tests/m013_fastapi/validate_document_http_live_acceptance.py",
+      "classification": "live",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_document_http_live_acceptance."
+    },
+    {
+      "legacy_path": "tests/m013_fastapi/validate_document_persistence_restart_acceptance.ps1",
+      "node_id": "test.m013-fastapi.validate-document-persistence-restart-acceptance",
+      "python_path": "gate_tests/ported/tests/m013_fastapi/validate_document_persistence_restart_acceptance.py",
+      "classification": "process",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_document_persistence_restart_acceptance."
+    },
+    {
+      "legacy_path": "tests/m013_fastapi/validate_document_persistence_unit.ps1",
+      "node_id": "test.m013-fastapi.validate-document-persistence-unit",
+      "python_path": "gate_tests/ported/tests/m013_fastapi/validate_document_persistence_unit.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_document_persistence_unit."
+    },
+    {
+      "legacy_path": "tests/m013_fastapi/validate_document_queries_unit.ps1",
+      "node_id": "test.m013-fastapi.validate-document-queries-unit",
+      "python_path": "gate_tests/ported/tests/m013_fastapi/validate_document_queries_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_document_queries_unit."
+    },
+    {
+      "legacy_path": "tests/m013_fastapi/validate_document_read_models_acceptance.ps1",
+      "node_id": "test.m013-fastapi.validate-document-read-models-acceptance",
+      "python_path": "gate_tests/ported/tests/m013_fastapi/validate_document_read_models_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_document_read_models_acceptance."
+    },
+    {
+      "legacy_path": "tests/m013_fastapi/validate_document_worker_live.ps1",
+      "node_id": "test.m013-fastapi.validate-document-worker-live",
+      "python_path": "gate_tests/ported/tests/m013_fastapi/validate_document_worker_live.py",
+      "classification": "live",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_document_worker_live."
+    },
+    {
+      "legacy_path": "tests/m013_fastapi/validate_document_worker_runtime_acceptance.ps1",
+      "node_id": "test.m013-fastapi.validate-document-worker-runtime-acceptance",
+      "python_path": "gate_tests/ported/tests/m013_fastapi/validate_document_worker_runtime_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_document_worker_runtime_acceptance."
+    },
+    {
+      "legacy_path": "tests/m013_fastapi/validate_existing_api_contract_parity_acceptance.ps1",
+      "node_id": "test.m013-fastapi.validate-existing-api-contract-parity-acceptance",
+      "python_path": "gate_tests/ported/tests/m013_fastapi/validate_existing_api_contract_parity_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_existing_api_contract_parity_acceptance."
+    },
+    {
+      "legacy_path": "tests/m013_fastapi/validate_existing_api_routers_unit.ps1",
+      "node_id": "test.m013-fastapi.validate-existing-api-routers-unit",
+      "python_path": "gate_tests/ported/tests/m013_fastapi/validate_existing_api_routers_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_existing_api_routers_unit."
+    },
+    {
+      "legacy_path": "tests/m013_fastapi/validate_fastapi_architecture_policy_unit.ps1",
+      "node_id": "test.m013-fastapi.validate-fastapi-architecture-policy-unit",
+      "python_path": "gate_tests/ported/tests/m013_fastapi/validate_fastapi_architecture_policy_unit.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_fastapi_architecture_policy_unit."
+    },
+    {
+      "legacy_path": "tests/m013_fastapi/validate_fastapi_specification_acceptance.ps1",
+      "node_id": "test.m013-fastapi.validate-fastapi-specification-acceptance",
+      "python_path": "gate_tests/ported/tests/m013_fastapi/validate_fastapi_specification_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_fastapi_specification_acceptance."
+    },
+    {
+      "legacy_path": "tests/m013_fastapi/validate_job_outbox_boundary_acceptance.ps1",
+      "node_id": "test.m013-fastapi.validate-job-outbox-boundary-acceptance",
+      "python_path": "gate_tests/ported/tests/m013_fastapi/validate_job_outbox_boundary_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_job_outbox_boundary_acceptance."
+    },
+    {
+      "legacy_path": "tests/m013_fastapi/validate_job_outbox_boundary_live.ps1",
+      "node_id": "test.m013-fastapi.validate-job-outbox-boundary-live",
+      "python_path": "gate_tests/ported/tests/m013_fastapi/validate_job_outbox_boundary_live.py",
+      "classification": "live",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_job_outbox_boundary_live."
+    },
+    {
+      "legacy_path": "tests/m013_fastapi/validate_ka_projection_persistence_live.ps1",
+      "node_id": "test.m013-fastapi.validate-ka-projection-persistence-live",
+      "python_path": "gate_tests/ported/tests/m013_fastapi/validate_ka_projection_persistence_live.py",
+      "classification": "live",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_ka_projection_persistence_live."
+    },
+    {
+      "legacy_path": "tests/m013_fastapi/validate_ka_projection_persistence_unit.ps1",
+      "node_id": "test.m013-fastapi.validate-ka-projection-persistence-unit",
+      "python_path": "gate_tests/ported/tests/m013_fastapi/validate_ka_projection_persistence_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_ka_projection_persistence_unit."
+    },
+    {
+      "legacy_path": "tests/m013_fastapi/validate_live_gateway_harness_acceptance.ps1",
+      "node_id": "test.m013-fastapi.validate-live-gateway-harness-acceptance",
+      "python_path": "gate_tests/ported/tests/m013_fastapi/validate_live_gateway_harness_acceptance.py",
+      "classification": "live",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_live_gateway_harness_acceptance."
+    },
+    {
+      "legacy_path": "tests/m013_fastapi/validate_m013_fastapi_traceability_unit.ps1",
+      "node_id": "test.m013-fastapi.validate-m013-fastapi-traceability-unit",
+      "python_path": "gate_tests/ported/tests/m013_fastapi/validate_m013_fastapi_traceability_unit.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_m013_fastapi_traceability_unit."
+    },
+    {
+      "legacy_path": "tests/m013_fastapi/validate_orchestrator_app_factory_unit.ps1",
+      "node_id": "test.m013-fastapi.validate-orchestrator-app-factory-unit",
+      "python_path": "gate_tests/ported/tests/m013_fastapi/validate_orchestrator_app_factory_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_orchestrator_app_factory_unit."
+    },
+    {
+      "legacy_path": "tests/m013_fastapi/validate_orchestrator_asgi_health_acceptance.ps1",
+      "node_id": "test.m013-fastapi.validate-orchestrator-asgi-health-acceptance",
+      "python_path": "gate_tests/ported/tests/m013_fastapi/validate_orchestrator_asgi_health_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_orchestrator_asgi_health_acceptance."
+    },
+    {
+      "legacy_path": "tests/m013_fastapi/validate_orchestrator_deployment_acceptance.ps1",
+      "node_id": "test.m013-fastapi.validate-orchestrator-deployment-acceptance",
+      "python_path": "gate_tests/ported/tests/m013_fastapi/validate_orchestrator_deployment_acceptance.py",
+      "classification": "process",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_orchestrator_deployment_acceptance."
+    },
+    {
+      "legacy_path": "tests/m013_fastapi/validate_orchestrator_deployment_unit.ps1",
+      "node_id": "test.m013-fastapi.validate-orchestrator-deployment-unit",
+      "python_path": "gate_tests/ported/tests/m013_fastapi/validate_orchestrator_deployment_unit.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_orchestrator_deployment_unit."
+    },
+    {
+      "legacy_path": "tests/m013_fastapi/validate_original_pdf_retrieval_acceptance.ps1",
+      "node_id": "test.m013-fastapi.validate-original-pdf-retrieval-acceptance",
+      "python_path": "gate_tests/ported/tests/m013_fastapi/validate_original_pdf_retrieval_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_original_pdf_retrieval_acceptance."
+    },
+    {
+      "legacy_path": "tests/m013_fastapi/validate_original_pdf_stream_unit.ps1",
+      "node_id": "test.m013-fastapi.validate-original-pdf-stream-unit",
+      "python_path": "gate_tests/ported/tests/m013_fastapi/validate_original_pdf_stream_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_original_pdf_stream_unit."
+    },
+    {
+      "legacy_path": "tests/m013_fastapi/validate_postgres_migration_upgrade_live.ps1",
+      "node_id": "test.m013-fastapi.validate-postgres-migration-upgrade-live",
+      "python_path": "gate_tests/ported/tests/m013_fastapi/validate_postgres_migration_upgrade_live.py",
+      "classification": "live",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_postgres_migration_upgrade_live."
+    },
+    {
+      "legacy_path": "tests/m013_fastapi/validate_precondition_acceptance.ps1",
+      "node_id": "test.m013-fastapi.validate-precondition-acceptance",
+      "python_path": "gate_tests/ported/tests/m013_fastapi/validate_precondition_acceptance.py",
+      "classification": "git",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_precondition_acceptance."
+    },
+    {
+      "legacy_path": "tests/m013_fastapi/validate_precondition_unit.ps1",
+      "node_id": "test.m013-fastapi.validate-precondition-unit",
+      "python_path": "gate_tests/ported/tests/m013_fastapi/validate_precondition_unit.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_precondition_unit."
+    },
+    {
+      "legacy_path": "tests/m013_fastapi/validate_projection_queries_unit.ps1",
+      "node_id": "test.m013-fastapi.validate-projection-queries-unit",
+      "python_path": "gate_tests/ported/tests/m013_fastapi/validate_projection_queries_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_projection_queries_unit."
+    },
+    {
+      "legacy_path": "tests/m013_fastapi/validate_projection_read_model_acceptance.ps1",
+      "node_id": "test.m013-fastapi.validate-projection-read-model-acceptance",
+      "python_path": "gate_tests/ported/tests/m013_fastapi/validate_projection_read_model_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_projection_read_model_acceptance."
+    },
+    {
+      "legacy_path": "tests/m013_fastapi/validate_reproducible_operations_acceptance.ps1",
+      "node_id": "test.m013-fastapi.validate-reproducible-operations-acceptance",
+      "python_path": "gate_tests/ported/tests/m013_fastapi/validate_reproducible_operations_acceptance.py",
+      "classification": "git",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_reproducible_operations_acceptance."
+    },
+    {
+      "legacy_path": "tests/m013_fastapi/validate_review3_api_architecture_acceptance.ps1",
+      "node_id": "test.m013-fastapi.validate-review3-api-architecture-acceptance",
+      "python_path": "gate_tests/ported/tests/m013_fastapi/validate_review3_api_architecture_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_review3_api_architecture_acceptance."
+    },
+    {
+      "legacy_path": "tests/m013_fastapi/validate_review3_deployment_acceptance.ps1",
+      "node_id": "test.m013-fastapi.validate-review3-deployment-acceptance",
+      "python_path": "gate_tests/ported/tests/m013_fastapi/validate_review3_deployment_acceptance.py",
+      "classification": "git",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_review3_deployment_acceptance."
+    },
+    {
+      "legacy_path": "tests/m013_fastapi/validate_review3_deployment_live.ps1",
+      "node_id": "test.m013-fastapi.validate-review3-deployment-live",
+      "python_path": "gate_tests/ported/tests/m013_fastapi/validate_review3_deployment_live.py",
+      "classification": "live",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_review3_deployment_live."
+    },
+    {
+      "legacy_path": "tests/m013_fastapi/validate_review3_maintenance_acceptance.ps1",
+      "node_id": "test.m013-fastapi.validate-review3-maintenance-acceptance",
+      "python_path": "gate_tests/ported/tests/m013_fastapi/validate_review3_maintenance_acceptance.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_review3_maintenance_acceptance."
+    },
+    {
+      "legacy_path": "tests/m013_fastapi/validate_review3_safety_acceptance.ps1",
+      "node_id": "test.m013-fastapi.validate-review3-safety-acceptance",
+      "python_path": "gate_tests/ported/tests/m013_fastapi/validate_review3_safety_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_review3_safety_acceptance."
+    },
+    {
+      "legacy_path": "tests/m013_fastapi/validate_review3_safety_live.ps1",
+      "node_id": "test.m013-fastapi.validate-review3-safety-live",
+      "python_path": "gate_tests/ported/tests/m013_fastapi/validate_review3_safety_live.py",
+      "classification": "live",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_review3_safety_live."
+    },
+    {
+      "legacy_path": "tests/m013_fastapi/validate_review3_ui_security_acceptance.ps1",
+      "node_id": "test.m013-fastapi.validate-review3-ui-security-acceptance",
+      "python_path": "gate_tests/ported/tests/m013_fastapi/validate_review3_ui_security_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_review3_ui_security_acceptance."
+    },
+    {
+      "legacy_path": "tests/m013_fastapi/validate_review3_ui_security_live.ps1",
+      "node_id": "test.m013-fastapi.validate-review3-ui-security-live",
+      "python_path": "gate_tests/ported/tests/m013_fastapi/validate_review3_ui_security_live.py",
+      "classification": "live",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_review3_ui_security_live."
+    },
+    {
+      "legacy_path": "tests/m013_fastapi/validate_review_governance_performance_acceptance.ps1",
+      "node_id": "test.m013-fastapi.validate-review-governance-performance-acceptance",
+      "python_path": "gate_tests/ported/tests/m013_fastapi/validate_review_governance_performance_acceptance.py",
+      "classification": "process",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_review_governance_performance_acceptance."
+    },
+    {
+      "legacy_path": "tests/m013_fastapi/validate_runtime_operations_acceptance.ps1",
+      "node_id": "test.m013-fastapi.validate-runtime-operations-acceptance",
+      "python_path": "gate_tests/ported/tests/m013_fastapi/validate_runtime_operations_acceptance.py",
+      "classification": "process",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_runtime_operations_acceptance."
+    },
+    {
+      "legacy_path": "tests/m013_fastapi/validate_ui_document_api_client_unit.ps1",
+      "node_id": "test.m013-fastapi.validate-ui-document-api-client-unit",
+      "python_path": "gate_tests/ported/tests/m013_fastapi/validate_ui_document_api_client_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_ui_document_api_client_unit."
+    },
+    {
+      "legacy_path": "tests/m013_fastapi/validate_ui_orchestrator_document_flow_acceptance.ps1",
+      "node_id": "test.m013-fastapi.validate-ui-orchestrator-document-flow-acceptance",
+      "python_path": "gate_tests/ported/tests/m013_fastapi/validate_ui_orchestrator_document_flow_acceptance.py",
+      "classification": "process",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_ui_orchestrator_document_flow_acceptance."
+    },
+    {
+      "legacy_path": "tests/m013_fastapi/validate_ui_product_contracts_unit.ps1",
+      "node_id": "test.m013-fastapi.validate-ui-product-contracts-unit",
+      "python_path": "gate_tests/ported/tests/m013_fastapi/validate_ui_product_contracts_unit.py",
+      "classification": "unit",
+      "port_kind": "embedded_python",
+      "behavior": "Comportement porté de validate_ui_product_contracts_unit."
+    },
+    {
+      "legacy_path": "tests/m013_fastapi/validate_worker_data_resilience_acceptance.ps1",
+      "node_id": "test.m013-fastapi.validate-worker-data-resilience-acceptance",
+      "python_path": "gate_tests/ported/tests/m013_fastapi/validate_worker_data_resilience_acceptance.py",
+      "classification": "unit",
+      "port_kind": "native_contract",
+      "behavior": "Comportement porté de validate_worker_data_resilience_acceptance."
+    }
+  ]
+}

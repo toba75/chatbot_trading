@@ -40,7 +40,7 @@ _ALLOWED_VERDICTS = frozenset(
     {V1_ACCEPTANCE_STATUS_ACCEPTED, V1_ACCEPTANCE_STATUS_DEFERRED, V1_ACCEPTANCE_STATUS_BLOCKING}
 )
 _ALLOWED_GATE_STATUSES = frozenset({"GREEN", "NON_ACCEPTATION", "DIFFÉRÉ", "BLOQUANT"})
-_COMMAND_PREFIX = "powershell -NoProfile -ExecutionPolicy Bypass -File .\\"
+_COMMAND_PREFIX = "uv run gate"
 
 
 @dataclass(frozen=True)
@@ -222,7 +222,7 @@ def build_m013_v1_acceptance_report() -> V1AcceptanceReport:
                 gap_status="différé",
                 decision="différé",
                 evidence_artifact="docs/governance/m013_v1_gap_decisions.md",
-                evidence_command="powershell -NoProfile -ExecutionPolicy Bypass -File .\\tests\\m012\\validate_document_quality_calibration_acceptance.ps1",
+                evidence_command="uv run gate --scope m012",
                 final_impact="Écart non accepté: qualité documentaire pilote différée.",
             ),
             _criterion(
@@ -232,7 +232,7 @@ def build_m013_v1_acceptance_report() -> V1AcceptanceReport:
                 gap_status="différé",
                 decision="différé",
                 evidence_artifact="docs/governance/m013_v1_gap_decisions.md",
-                evidence_command="powershell -NoProfile -ExecutionPolicy Bypass -File .\\tests\\m012\\validate_knowledge_search_benchmark_acceptance.ps1",
+                evidence_command="uv run gate --scope m012",
                 final_impact="Écart non accepté: rappel pilote KA sous seuil.",
             ),
             _criterion(
@@ -242,7 +242,7 @@ def build_m013_v1_acceptance_report() -> V1AcceptanceReport:
                 gap_status="satisfait",
                 decision="accepté",
                 evidence_artifact="docs/governance/m013_v1_gap_decisions.md",
-                evidence_command="powershell -NoProfile -ExecutionPolicy Bypass -File .\\tests\\m012\\validate_verified_answer_benchmark_acceptance.ps1",
+                evidence_command="uv run gate --scope m012",
                 final_impact="Accepté: gouvernance des preuves séparée de RA.",
             ),
             _criterion(
@@ -252,7 +252,7 @@ def build_m013_v1_acceptance_report() -> V1AcceptanceReport:
                 gap_status="différé",
                 decision="différé",
                 evidence_artifact="docs/governance/m013_v1_gap_decisions.md",
-                evidence_command="powershell -NoProfile -ExecutionPolicy Bypass -File .\\tests\\m012\\validate_verified_answer_benchmark_acceptance.ps1",
+                evidence_command="uv run gate --scope m012",
                 final_impact="Écart non accepté: abstention correcte à renforcer.",
             ),
             _criterion(
@@ -262,7 +262,7 @@ def build_m013_v1_acceptance_report() -> V1AcceptanceReport:
                 gap_status="satisfait",
                 decision="accepté",
                 evidence_artifact="docs/governance/m013_v1_gap_decisions.md",
-                evidence_command="powershell -NoProfile -ExecutionPolicy Bypass -File .\\tests\\m012\\validate_calibration_decisions_acceptance.ps1",
+                evidence_command="uv run gate --scope m012",
                 final_impact="Accepté: critères conversationnels V1 satisfaits.",
             ),
             _criterion(
@@ -272,7 +272,7 @@ def build_m013_v1_acceptance_report() -> V1AcceptanceReport:
                 gap_status="bloquant",
                 decision="bloquant",
                 evidence_artifact="docs/governance/m013_v1_gap_decisions.md",
-                evidence_command="powershell -NoProfile -ExecutionPolicy Bypass -File .\\tests\\m012\\validate_strategy_backtest_benchmark_acceptance.ps1",
+                evidence_command="uv run gate --scope m012",
                 final_impact="Écart bloquant: paramètres sans plan de calibration.",
             ),
             _criterion(
@@ -282,7 +282,7 @@ def build_m013_v1_acceptance_report() -> V1AcceptanceReport:
                 gap_status="bloquant",
                 decision="bloquant",
                 evidence_artifact="docs/governance/m013_v1_gap_decisions.md",
-                evidence_command="powershell -NoProfile -ExecutionPolicy Bypass -File .\\tests\\m012\\validate_llm_benchmark_real_path_acceptance.ps1",
+                evidence_command="uv run gate --scope m012",
                 final_impact="Écart bloquant: checkpoint principal non promu sur toutes les tâches obligatoires.",
             ),
             _criterion(
@@ -292,18 +292,18 @@ def build_m013_v1_acceptance_report() -> V1AcceptanceReport:
                 gap_status="satisfait",
                 decision="accepté",
                 evidence_artifact="docs/governance/m013_v1_gap_decisions.md",
-                evidence_command="powershell -NoProfile -ExecutionPolicy Bypass -File .\\tests\\m012\\validate_strategy_backtest_benchmark_acceptance.ps1",
+                evidence_command="uv run gate --scope m012",
                 final_impact="Accepté: expériences reproductibles et résultats négatifs conservés.",
             ),
         ),
         final_gates=(
-            _gate("GATE-M013-ACCEPTANCE-001", "powershell -NoProfile -ExecutionPolicy Bypass -File .\\tests\\m013\\validate_v1_acceptance_report_acceptance.ps1", "GREEN"),
-            _gate("GATE-M013-ACCEPTANCE-002", "powershell -NoProfile -ExecutionPolicy Bypass -File .\\tests\\m013\\validate_v1_acceptance_report_unit.ps1", "GREEN"),
-            _gate("GATE-M013-ACCEPTANCE-003", "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\validate_m013_acceptance.ps1", "NON_ACCEPTATION"),
-            _gate("GATE-M013-ACCEPTANCE-004", "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\validate_traceability.ps1", "GREEN"),
-            _gate("GATE-M013-ACCEPTANCE-005", "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\validate_m013_specification.ps1", "GREEN"),
-            _gate("GATE-M013-ACCEPTANCE-006", "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\lint.ps1", "GREEN"),
-            _gate("GATE-M013-ACCEPTANCE-007", "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\test.ps1", "GREEN"),
+            _gate("GATE-M013-ACCEPTANCE-001", "uv run gate --scope m013", "GREEN"),
+            _gate("GATE-M013-ACCEPTANCE-002", "uv run gate --scope m013", "GREEN"),
+            _gate("GATE-M013-ACCEPTANCE-003", "uv run gate --scope m013", "NON_ACCEPTATION"),
+            _gate("GATE-M013-ACCEPTANCE-004", "uv run gate --scope m013", "GREEN"),
+            _gate("GATE-M013-ACCEPTANCE-005", "uv run gate --scope m013", "GREEN"),
+            _gate("GATE-M013-ACCEPTANCE-006", "uv run gate --scope m012", "GREEN"),
+            _gate("GATE-M013-ACCEPTANCE-007", "uv run gate --scope m012", "GREEN"),
         ),
         gap_decision_register=build_m013_v1_gap_decision_register(),
         traceability_requirement_id="REQ-M013-012",

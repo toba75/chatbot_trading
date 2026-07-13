@@ -132,7 +132,7 @@ Chaque fichier de tâche doit contenir la structure détaillée de la tâche con
 - Prévoir les tests avant l'implémentation.
 - Refuser les valeurs par défaut implicites, les fallbacks silencieux et les conversions ambiguës.
 - Rendre chaque garde-fou testable.
-- Préférer les commandes de validation du dépôt, par exemple `.\scripts\test.ps1` et `.\scripts\lint.ps1` quand elles existent.
+- Préférer la commande de validation canonique : `uv run --locked gate`.
 - Ne jamais planifier un milestone si un milestone amont requis est absent de `master`, même s'il existe sur une branche de milestone ou une branche remote non fusionnée dans `master`.
 - Ne pas planifier l'UI, les connecteurs externes ou la persistance avant le contrat de domaine qui les justifie.
 - Ne pas inclure de refactor transverse sans lien direct avec le comportement du milestone.

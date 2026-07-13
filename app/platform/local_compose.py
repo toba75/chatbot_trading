@@ -478,7 +478,7 @@ def _validate_service_environment(service: ComposeService) -> None:
 
         allowed_keys = ALLOWED_TECHNICAL_ENVIRONMENT_BY_SERVICE.get(service.id, frozenset())
         if key not in allowed_keys:
-            raise ValueError(f"Variable non allowlistÃ©e pour service {service.id}: {key}")
+            raise ValueError(f"Variable non allowlistée pour service {service.id}: {key}")
 
         key_upper = key.upper()
         is_secret_file_reference = key_upper.endswith("_FILE") or key_upper.endswith("_BUNDLE")

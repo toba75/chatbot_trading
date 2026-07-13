@@ -35,7 +35,7 @@ _EXPECTED_M012_STATUSES = frozenset(
 _EXPECTED_DECISION_STATUSES = frozenset(
     {V1_GAP_DECISION_CORRECTED, V1_GAP_DECISION_ACCEPTED, V1_GAP_DECISION_DEFERRED, V1_GAP_DECISION_BLOCKING}
 )
-_COMMAND_PREFIX = "powershell -NoProfile -ExecutionPolicy Bypass -File .\\"
+_COMMAND_PREFIX = "uv run gate"
 
 _SOURCE_STATUSES_BY_CONTEXT = {
     CONTEXT_SP: V1_GAP_STATUS_DEFERRED,
@@ -217,7 +217,7 @@ def build_m013_v1_gap_decision_register() -> V1GapDecisionRegister:
                 v1_criterion_id="V1-SP-QUALITE-DOCUMENTAIRE",
                 benchmark_source_id="RBRUN-M012-DOCUMENT-ROUTES-0001",
                 calibration_decision_id="DEC-M012-SP-DEFERRED",
-                evidence_command="powershell -NoProfile -ExecutionPolicy Bypass -File .\\tests\\m012\\validate_document_quality_calibration_acceptance.ps1",
+                evidence_command="uv run gate --scope m012",
                 m013_green_proof="Non applicable: le test scientifique RED documentaire reste visible.",
                 non_acceptance_justification="document_cell_accuracy reste un Test scientifique RED; report visible avant le rapport final V1.",
                 acceptance_impact="Écart non accepté transmis au V1AcceptanceReport.",
@@ -230,7 +230,7 @@ def build_m013_v1_gap_decision_register() -> V1GapDecisionRegister:
                 v1_criterion_id="V1-KA-RECHERCHE-PAGES",
                 benchmark_source_id="KSRUN-M012-KNOWLEDGE-0001",
                 calibration_decision_id="DEC-M012-KA-REJECTED",
-                evidence_command="powershell -NoProfile -ExecutionPolicy Bypass -File .\\tests\\m012\\validate_knowledge_search_benchmark_acceptance.ps1",
+                evidence_command="uv run gate --scope m012",
                 m013_green_proof="Non applicable: le test scientifique RED KA reste visible.",
                 non_acceptance_justification="Recall@10 pilote sous seuil; report visible avant le rapport final V1.",
                 acceptance_impact="Écart non accepté transmis au V1AcceptanceReport.",
@@ -243,7 +243,7 @@ def build_m013_v1_gap_decision_register() -> V1GapDecisionRegister:
                 v1_criterion_id="V1-EG-GOUVERNANCE-PREUVES",
                 benchmark_source_id="EGRUN-M012-0001",
                 calibration_decision_id="DEC-M012-EG-ACCEPTED",
-                evidence_command="powershell -NoProfile -ExecutionPolicy Bypass -File .\\tests\\m012\\validate_verified_answer_benchmark_acceptance.ps1",
+                evidence_command="uv run gate --scope m012",
                 m013_green_proof="Preuve M-012 conservée: gouvernance des preuves séparée de RA.",
                 non_acceptance_justification="Non applicable: écart satisfait et accepté explicitement.",
                 acceptance_impact="Ne bloque pas l'acceptation V1.",
@@ -256,7 +256,7 @@ def build_m013_v1_gap_decision_register() -> V1GapDecisionRegister:
                 v1_criterion_id="V1-RA-REPONSES-VERIFIEES",
                 benchmark_source_id="VARUN-M012-VERIFIED-ANSWERS-0001",
                 calibration_decision_id="DEC-M012-RA-DEFERRED",
-                evidence_command="powershell -NoProfile -ExecutionPolicy Bypass -File .\\tests\\m012\\validate_verified_answer_benchmark_acceptance.ps1",
+                evidence_command="uv run gate --scope m012",
                 m013_green_proof="Non applicable: le test scientifique RED RA reste visible.",
                 non_acceptance_justification="answer_correct_abstention_rate reste à renforcer; report visible avant le rapport final V1.",
                 acceptance_impact="Écart non accepté transmis au V1AcceptanceReport.",
@@ -269,7 +269,7 @@ def build_m013_v1_gap_decision_register() -> V1GapDecisionRegister:
                 v1_criterion_id="V1-CV-CONVERSATION-PRODUIT",
                 benchmark_source_id="CVRUN-M012-CRITERIA-0001",
                 calibration_decision_id="DEC-M012-CV-ACCEPTED",
-                evidence_command="powershell -NoProfile -ExecutionPolicy Bypass -File .\\tests\\m012\\validate_calibration_decisions_acceptance.ps1",
+                evidence_command="uv run gate --scope m012",
                 m013_green_proof="Preuve M-012 conservée: critères conversationnels V1 satisfaits.",
                 non_acceptance_justification="Non applicable: écart satisfait et accepté explicitement.",
                 acceptance_impact="Ne bloque pas l'acceptation V1.",
@@ -282,7 +282,7 @@ def build_m013_v1_gap_decision_register() -> V1GapDecisionRegister:
                 v1_criterion_id="V1-SD-PARAMETRES-CALIBRABLES",
                 benchmark_source_id="SBRUN-M012-STRATEGY-BACKTEST-0001",
                 calibration_decision_id="DEC-M012-SD-REJECTED",
-                evidence_command="powershell -NoProfile -ExecutionPolicy Bypass -File .\\tests\\m012\\validate_strategy_backtest_benchmark_acceptance.ps1",
+                evidence_command="uv run gate --scope m012",
                 m013_green_proof="Non applicable: aucune correction M-013 ne prouve SD GREEN.",
                 non_acceptance_justification="Paramètres sans plan de calibration; l'écart bloque toute acceptation V1.",
                 acceptance_impact="Acceptation V1 refusée tant que l'écart reste bloquant.",
@@ -295,7 +295,7 @@ def build_m013_v1_gap_decision_register() -> V1GapDecisionRegister:
                 v1_criterion_id="V1-LLM-CHECKPOINT-PRINCIPAL",
                 benchmark_source_id="LLMRUN-M012-REAL-PATH-0001",
                 calibration_decision_id="DEC-M012-LLM-REJECTED",
-                evidence_command="powershell -NoProfile -ExecutionPolicy Bypass -File .\\tests\\m012\\validate_llm_benchmark_real_path_acceptance.ps1",
+                evidence_command="uv run gate --scope m012",
                 m013_green_proof="Non applicable: aucune correction M-013 ne prouve LLM GREEN.",
                 non_acceptance_justification="Checkpoint principal non promu sur toutes les tâches obligatoires; l'écart bloque l'acceptation V1.",
                 acceptance_impact="Acceptation V1 refusée tant que l'écart reste bloquant.",
@@ -308,7 +308,7 @@ def build_m013_v1_gap_decision_register() -> V1GapDecisionRegister:
                 v1_criterion_id="V1-EX-BACKTESTS-REPRODUCTIBLES",
                 benchmark_source_id="SBRUN-M012-EXPERIMENTS-0001",
                 calibration_decision_id="DEC-M012-EX-ACCEPTED",
-                evidence_command="powershell -NoProfile -ExecutionPolicy Bypass -File .\\tests\\m012\\validate_strategy_backtest_benchmark_acceptance.ps1",
+                evidence_command="uv run gate --scope m012",
                 m013_green_proof="Preuve M-012 conservée: backtests pilotes reproductibles et résultats négatifs conservés.",
                 non_acceptance_justification="Non applicable: écart satisfait et accepté explicitement.",
                 acceptance_impact="Ne bloque pas l'acceptation V1.",

@@ -1,0 +1,4335 @@
+schema_version = 1
+
+[[nodes]]
+id = "gate.manifest"
+path = "gate_tests/ost_gate/test_manifest_contract.py"
+kind = "test"
+scope = "governance"
+phase = "gate-core"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = []
+live = false
+
+[[nodes]]
+id = "gate.planner"
+path = "gate_tests/ost_gate/test_planner_contract.py"
+kind = "test"
+scope = "governance"
+phase = "gate-core"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["gate.manifest"]
+live = false
+
+[[nodes]]
+id = "gate.executor"
+path = "gate_tests/ost_gate/test_executor_contract.py"
+kind = "test"
+scope = "governance"
+phase = "gate-core"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["gate.planner"]
+live = false
+
+[[nodes]]
+id = "gate.report"
+path = "gate_tests/ost_gate/test_report_contract.py"
+kind = "test"
+scope = "governance"
+phase = "gate-core"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["gate.executor"]
+live = false
+
+[[nodes]]
+id = "precondition.governance"
+path = "gate_tests/preconditions/test_governance.py"
+kind = "test"
+scope = "governance"
+phase = "precondition"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["gate.report"]
+live = false
+
+[[nodes]]
+id = "precondition.m001"
+path = "gate_tests/preconditions/test_m001.py"
+kind = "test"
+scope = "m001"
+phase = "precondition"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.governance"]
+live = false
+
+[[nodes]]
+id = "precondition.m002"
+path = "gate_tests/preconditions/test_m002.py"
+kind = "test"
+scope = "m002"
+phase = "precondition"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m001"]
+live = false
+
+[[nodes]]
+id = "precondition.m003"
+path = "gate_tests/preconditions/test_m003.py"
+kind = "test"
+scope = "m003"
+phase = "precondition"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m002"]
+live = false
+
+[[nodes]]
+id = "precondition.m004"
+path = "gate_tests/preconditions/test_m004.py"
+kind = "test"
+scope = "m004"
+phase = "precondition"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m003"]
+live = false
+
+[[nodes]]
+id = "precondition.m005"
+path = "gate_tests/preconditions/test_m005.py"
+kind = "test"
+scope = "m005"
+phase = "precondition"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m004"]
+live = false
+
+[[nodes]]
+id = "precondition.m006"
+path = "gate_tests/preconditions/test_m006.py"
+kind = "test"
+scope = "m006"
+phase = "precondition"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m005"]
+live = false
+
+[[nodes]]
+id = "precondition.m007"
+path = "gate_tests/preconditions/test_m007.py"
+kind = "test"
+scope = "m007"
+phase = "precondition"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m006"]
+live = false
+
+[[nodes]]
+id = "precondition.m008"
+path = "gate_tests/preconditions/test_m008.py"
+kind = "test"
+scope = "m008"
+phase = "precondition"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m007"]
+live = false
+
+[[nodes]]
+id = "precondition.m009"
+path = "gate_tests/preconditions/test_m009.py"
+kind = "test"
+scope = "m009"
+phase = "precondition"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m008"]
+live = false
+
+[[nodes]]
+id = "precondition.m010"
+path = "gate_tests/preconditions/test_m010.py"
+kind = "test"
+scope = "m010"
+phase = "precondition"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m009"]
+live = false
+
+[[nodes]]
+id = "precondition.m011"
+path = "gate_tests/preconditions/test_m011.py"
+kind = "test"
+scope = "m011"
+phase = "precondition"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m010"]
+live = false
+
+[[nodes]]
+id = "precondition.m012"
+path = "gate_tests/preconditions/test_m012.py"
+kind = "test"
+scope = "m012"
+phase = "precondition"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m011"]
+live = false
+
+[[nodes]]
+id = "precondition.m013_config"
+path = "gate_tests/preconditions/test_m013_config.py"
+kind = "test"
+scope = "m013_config"
+phase = "precondition"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m012"]
+live = false
+
+[[nodes]]
+id = "precondition.m013_fastapi"
+path = "gate_tests/preconditions/test_m013_fastapi.py"
+kind = "test"
+scope = "m013_fastapi"
+phase = "precondition"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013_config"]
+live = false
+
+[[nodes]]
+id = "precondition.m013"
+path = "gate_tests/preconditions/test_m013.py"
+kind = "test"
+scope = "m013"
+phase = "precondition"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013_fastapi"]
+live = false
+
+[[nodes]]
+id = "test.governance.traceability-fixture"
+path = "gate_tests/ported/tests/governance/traceability_fixture.py"
+kind = "test"
+scope = "governance"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "git"
+depends_on = ["precondition.governance"]
+live = false
+
+[[nodes]]
+id = "test.governance.validate-adr-system-acceptance"
+path = "gate_tests/ported/tests/governance/validate_adr_system_acceptance.py"
+kind = "test"
+scope = "governance"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "git"
+depends_on = ["precondition.governance"]
+live = false
+
+[[nodes]]
+id = "test.governance.validate-adr-system-unit"
+path = "gate_tests/ported/tests/governance/validate_adr_system_unit.py"
+kind = "test"
+scope = "governance"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "git"
+depends_on = ["precondition.governance"]
+live = false
+
+[[nodes]]
+id = "test.governance.validate-definition-of-done-acceptance"
+path = "gate_tests/ported/tests/governance/validate_definition_of_done_acceptance.py"
+kind = "test"
+scope = "governance"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.governance"]
+live = false
+
+[[nodes]]
+id = "test.governance.validate-definition-of-done-unit"
+path = "gate_tests/ported/tests/governance/validate_definition_of_done_unit.py"
+kind = "test"
+scope = "governance"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "git"
+depends_on = ["precondition.governance"]
+live = false
+
+[[nodes]]
+id = "test.governance.validate-git-lfs-acceptance"
+path = "gate_tests/ported/tests/governance/validate_git_lfs_acceptance.py"
+kind = "test"
+scope = "governance"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "git"
+depends_on = ["precondition.governance"]
+live = false
+
+[[nodes]]
+id = "test.governance.validate-gitignore-acceptance"
+path = "gate_tests/ported/tests/governance/validate_gitignore_acceptance.py"
+kind = "test"
+scope = "governance"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "git"
+depends_on = ["precondition.governance"]
+live = false
+
+[[nodes]]
+id = "test.governance.validate-m000-precondition-report-acceptance"
+path = "gate_tests/ported/tests/governance/validate_m000_precondition_report_acceptance.py"
+kind = "test"
+scope = "governance"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "git"
+depends_on = ["precondition.governance"]
+live = false
+
+[[nodes]]
+id = "test.governance.validate-m000-precondition-report-unit"
+path = "gate_tests/ported/tests/governance/validate_m000_precondition_report_unit.py"
+kind = "test"
+scope = "governance"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "git"
+depends_on = ["precondition.governance"]
+live = false
+
+[[nodes]]
+id = "test.governance.validate-m000-validation-commands-acceptance"
+path = "gate_tests/ported/tests/governance/validate_m000_validation_commands_acceptance.py"
+kind = "test"
+scope = "governance"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "git"
+depends_on = ["precondition.governance"]
+live = false
+
+[[nodes]]
+id = "test.governance.validate-m000-validation-commands-unit"
+path = "gate_tests/ported/tests/governance/validate_m000_validation_commands_unit.py"
+kind = "test"
+scope = "governance"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.governance"]
+live = false
+
+[[nodes]]
+id = "test.governance.validate-task-system-acceptance"
+path = "gate_tests/ported/tests/governance/validate_task_system_acceptance.py"
+kind = "test"
+scope = "governance"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "git"
+depends_on = ["precondition.governance"]
+live = false
+
+[[nodes]]
+id = "test.governance.validate-task-system-unit"
+path = "gate_tests/ported/tests/governance/validate_task_system_unit.py"
+kind = "test"
+scope = "governance"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.governance"]
+live = false
+
+[[nodes]]
+id = "test.governance.validate-traceability-acceptance"
+path = "gate_tests/ported/tests/governance/validate_traceability_acceptance.py"
+kind = "test"
+scope = "governance"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.governance"]
+live = false
+
+[[nodes]]
+id = "test.governance.validate-traceability-unit"
+path = "gate_tests/ported/tests/governance/validate_traceability_unit.py"
+kind = "test"
+scope = "governance"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.governance"]
+live = false
+
+[[nodes]]
+id = "test.m001.validate-architecture-boundaries-acceptance"
+path = "gate_tests/ported/tests/m001/validate_architecture_boundaries_acceptance.py"
+kind = "test"
+scope = "m001"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m001"]
+live = false
+
+[[nodes]]
+id = "test.m001.validate-architecture-boundaries-unit"
+path = "gate_tests/ported/tests/m001/validate_architecture_boundaries_unit.py"
+kind = "test"
+scope = "m001"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m001"]
+live = false
+
+[[nodes]]
+id = "test.m001.validate-context-modules-acceptance"
+path = "gate_tests/ported/tests/m001/validate_context_modules_acceptance.py"
+kind = "test"
+scope = "m001"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m001"]
+live = false
+
+[[nodes]]
+id = "test.m001.validate-context-registry-unit"
+path = "gate_tests/ported/tests/m001/validate_context_registry_unit.py"
+kind = "test"
+scope = "m001"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m001"]
+live = false
+
+[[nodes]]
+id = "test.m001.validate-contract-identity-acceptance"
+path = "gate_tests/ported/tests/m001/validate_contract_identity_acceptance.py"
+kind = "test"
+scope = "m001"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m001"]
+live = false
+
+[[nodes]]
+id = "test.m001.validate-contract-identity-unit"
+path = "gate_tests/ported/tests/m001/validate_contract_identity_unit.py"
+kind = "test"
+scope = "m001"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m001"]
+live = false
+
+[[nodes]]
+id = "test.m001.validate-event-envelope-acceptance"
+path = "gate_tests/ported/tests/m001/validate_event_envelope_acceptance.py"
+kind = "test"
+scope = "m001"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m001"]
+live = false
+
+[[nodes]]
+id = "test.m001.validate-event-envelope-unit"
+path = "gate_tests/ported/tests/m001/validate_event_envelope_unit.py"
+kind = "test"
+scope = "m001"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m001"]
+live = false
+
+[[nodes]]
+id = "test.m001.validate-evidence-claim-contracts-acceptance"
+path = "gate_tests/ported/tests/m001/validate_evidence_claim_contracts_acceptance.py"
+kind = "test"
+scope = "m001"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m001"]
+live = false
+
+[[nodes]]
+id = "test.m001.validate-evidence-claim-contracts-unit"
+path = "gate_tests/ported/tests/m001/validate_evidence_claim_contracts_unit.py"
+kind = "test"
+scope = "m001"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m001"]
+live = false
+
+[[nodes]]
+id = "test.m001.validate-m001-specification-acceptance"
+path = "gate_tests/ported/tests/m001/validate_m001_specification_acceptance.py"
+kind = "test"
+scope = "m001"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m001"]
+live = false
+
+[[nodes]]
+id = "test.m001.validate-m001-specification-unit"
+path = "gate_tests/ported/tests/m001/validate_m001_specification_unit.py"
+kind = "test"
+scope = "m001"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m001"]
+live = false
+
+[[nodes]]
+id = "test.m001.validate-m001-traceability-acceptance"
+path = "gate_tests/ported/tests/m001/validate_m001_traceability_acceptance.py"
+kind = "test"
+scope = "m001"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m001"]
+live = false
+
+[[nodes]]
+id = "test.m001.validate-m001-traceability-unit"
+path = "gate_tests/ported/tests/m001/validate_m001_traceability_unit.py"
+kind = "test"
+scope = "m001"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m001"]
+live = false
+
+[[nodes]]
+id = "test.m001.validate-research-outcome-contract-acceptance"
+path = "gate_tests/ported/tests/m001/validate_research_outcome_contract_acceptance.py"
+kind = "test"
+scope = "m001"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m001"]
+live = false
+
+[[nodes]]
+id = "test.m001.validate-research-outcome-contract-unit"
+path = "gate_tests/ported/tests/m001/validate_research_outcome_contract_unit.py"
+kind = "test"
+scope = "m001"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m001"]
+live = false
+
+[[nodes]]
+id = "test.m001.validate-source-contracts-acceptance"
+path = "gate_tests/ported/tests/m001/validate_source_contracts_acceptance.py"
+kind = "test"
+scope = "m001"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m001"]
+live = false
+
+[[nodes]]
+id = "test.m001.validate-source-locator-unit"
+path = "gate_tests/ported/tests/m001/validate_source_locator_unit.py"
+kind = "test"
+scope = "m001"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m001"]
+live = false
+
+[[nodes]]
+id = "test.m001.validate-strategy-experiment-contracts-acceptance"
+path = "gate_tests/ported/tests/m001/validate_strategy_experiment_contracts_acceptance.py"
+kind = "test"
+scope = "m001"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m001"]
+live = false
+
+[[nodes]]
+id = "test.m001.validate-strategy-experiment-contracts-unit"
+path = "gate_tests/ported/tests/m001/validate_strategy_experiment_contracts_unit.py"
+kind = "test"
+scope = "m001"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "git"
+depends_on = ["precondition.m001"]
+live = false
+
+[[nodes]]
+id = "test.m002.validate-gateway-observability-acceptance"
+path = "gate_tests/ported/tests/m002/validate_gateway_observability_acceptance.py"
+kind = "test"
+scope = "m002"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "process"
+depends_on = ["precondition.m002"]
+live = false
+
+[[nodes]]
+id = "test.m002.validate-gateway-observability-unit"
+path = "gate_tests/ported/tests/m002/validate_gateway_observability_unit.py"
+kind = "test"
+scope = "m002"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m002"]
+live = false
+
+[[nodes]]
+id = "test.m002.validate-job-runtime-acceptance"
+path = "gate_tests/ported/tests/m002/validate_job_runtime_acceptance.py"
+kind = "test"
+scope = "m002"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m002"]
+live = false
+
+[[nodes]]
+id = "test.m002.validate-job-runtime-unit"
+path = "gate_tests/ported/tests/m002/validate_job_runtime_unit.py"
+kind = "test"
+scope = "m002"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m002"]
+live = false
+
+[[nodes]]
+id = "test.m002.validate-llm-gateway-contract-acceptance"
+path = "gate_tests/ported/tests/m002/validate_llm_gateway_contract_acceptance.py"
+kind = "test"
+scope = "m002"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "process"
+depends_on = ["precondition.m002"]
+live = false
+
+[[nodes]]
+id = "test.m002.validate-llm-gateway-contract-unit"
+path = "gate_tests/ported/tests/m002/validate_llm_gateway_contract_unit.py"
+kind = "test"
+scope = "m002"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m002"]
+live = false
+
+[[nodes]]
+id = "test.m002.validate-llm-gateway-failures-acceptance"
+path = "gate_tests/ported/tests/m002/validate_llm_gateway_failures_acceptance.py"
+kind = "test"
+scope = "m002"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "process"
+depends_on = ["precondition.m002"]
+live = false
+
+[[nodes]]
+id = "test.m002.validate-llm-gateway-failures-unit"
+path = "gate_tests/ported/tests/m002/validate_llm_gateway_failures_unit.py"
+kind = "test"
+scope = "m002"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "process"
+depends_on = ["precondition.m002"]
+live = false
+
+[[nodes]]
+id = "test.m002.validate-local-compose-acceptance"
+path = "gate_tests/ported/tests/m002/validate_local_compose_acceptance.py"
+kind = "test"
+scope = "m002"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "process"
+depends_on = ["precondition.m002"]
+live = false
+
+[[nodes]]
+id = "test.m002.validate-local-compose-unit"
+path = "gate_tests/ported/tests/m002/validate_local_compose_unit.py"
+kind = "test"
+scope = "m002"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "process"
+depends_on = ["precondition.m002"]
+live = false
+
+[[nodes]]
+id = "test.m002.validate-m002-precondition-acceptance"
+path = "gate_tests/ported/tests/m002/validate_m002_precondition_acceptance.py"
+kind = "test"
+scope = "m002"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m002"]
+live = false
+
+[[nodes]]
+id = "test.m002.validate-m002-precondition-unit"
+path = "gate_tests/ported/tests/m002/validate_m002_precondition_unit.py"
+kind = "test"
+scope = "m002"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "git"
+depends_on = ["precondition.m002"]
+live = false
+
+[[nodes]]
+id = "test.m002.validate-m002-specification-acceptance"
+path = "gate_tests/ported/tests/m002/validate_m002_specification_acceptance.py"
+kind = "test"
+scope = "m002"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m002"]
+live = false
+
+[[nodes]]
+id = "test.m002.validate-m002-specification-unit"
+path = "gate_tests/ported/tests/m002/validate_m002_specification_unit.py"
+kind = "test"
+scope = "m002"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "process"
+depends_on = ["precondition.m002"]
+live = false
+
+[[nodes]]
+id = "test.m002.validate-m002-traceability-acceptance"
+path = "gate_tests/ported/tests/m002/validate_m002_traceability_acceptance.py"
+kind = "test"
+scope = "m002"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m002"]
+live = false
+
+[[nodes]]
+id = "test.m002.validate-m002-traceability-unit"
+path = "gate_tests/ported/tests/m002/validate_m002_traceability_unit.py"
+kind = "test"
+scope = "m002"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "process"
+depends_on = ["precondition.m002"]
+live = false
+
+[[nodes]]
+id = "test.m002.validate-network-boundary-acceptance"
+path = "gate_tests/ported/tests/m002/validate_network_boundary_acceptance.py"
+kind = "test"
+scope = "m002"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "process"
+depends_on = ["precondition.m002"]
+live = false
+
+[[nodes]]
+id = "test.m002.validate-network-boundary-unit"
+path = "gate_tests/ported/tests/m002/validate_network_boundary_unit.py"
+kind = "test"
+scope = "m002"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "process"
+depends_on = ["precondition.m002"]
+live = false
+
+[[nodes]]
+id = "test.m002.validate-outbox-acceptance"
+path = "gate_tests/ported/tests/m002/validate_outbox_acceptance.py"
+kind = "test"
+scope = "m002"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m002"]
+live = false
+
+[[nodes]]
+id = "test.m002.validate-outbox-unit"
+path = "gate_tests/ported/tests/m002/validate_outbox_unit.py"
+kind = "test"
+scope = "m002"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "process"
+depends_on = ["precondition.m002"]
+live = false
+
+[[nodes]]
+id = "test.m002.validate-platform-topology-acceptance"
+path = "gate_tests/ported/tests/m002/validate_platform_topology_acceptance.py"
+kind = "test"
+scope = "m002"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "process"
+depends_on = ["precondition.m002"]
+live = false
+
+[[nodes]]
+id = "test.m002.validate-platform-topology-unit"
+path = "gate_tests/ported/tests/m002/validate_platform_topology_unit.py"
+kind = "test"
+scope = "m002"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "process"
+depends_on = ["precondition.m002"]
+live = false
+
+[[nodes]]
+id = "test.m003.validate-document-commands-acceptance"
+path = "gate_tests/ported/tests/m003/validate_document_commands_acceptance.py"
+kind = "test"
+scope = "m003"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m003"]
+live = false
+
+[[nodes]]
+id = "test.m003.validate-document-commands-unit"
+path = "gate_tests/ported/tests/m003/validate_document_commands_unit.py"
+kind = "test"
+scope = "m003"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m003"]
+live = false
+
+[[nodes]]
+id = "test.m003.validate-document-http-contract-acceptance"
+path = "gate_tests/ported/tests/m003/validate_document_http_contract_acceptance.py"
+kind = "test"
+scope = "m003"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m003"]
+live = false
+
+[[nodes]]
+id = "test.m003.validate-m003-audit-signals-acceptance"
+path = "gate_tests/ported/tests/m003/validate_m003_audit_signals_acceptance.py"
+kind = "test"
+scope = "m003"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m003"]
+live = false
+
+[[nodes]]
+id = "test.m003.validate-m003-precondition-acceptance"
+path = "gate_tests/ported/tests/m003/validate_m003_precondition_acceptance.py"
+kind = "test"
+scope = "m003"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m003"]
+live = false
+
+[[nodes]]
+id = "test.m003.validate-m003-precondition-unit"
+path = "gate_tests/ported/tests/m003/validate_m003_precondition_unit.py"
+kind = "test"
+scope = "m003"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "git"
+depends_on = ["precondition.m003"]
+live = false
+
+[[nodes]]
+id = "test.m003.validate-m003-specification-acceptance"
+path = "gate_tests/ported/tests/m003/validate_m003_specification_acceptance.py"
+kind = "test"
+scope = "m003"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m003"]
+live = false
+
+[[nodes]]
+id = "test.m003.validate-m003-specification-unit"
+path = "gate_tests/ported/tests/m003/validate_m003_specification_unit.py"
+kind = "test"
+scope = "m003"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m003"]
+live = false
+
+[[nodes]]
+id = "test.m003.validate-m003-traceability-acceptance"
+path = "gate_tests/ported/tests/m003/validate_m003_traceability_acceptance.py"
+kind = "test"
+scope = "m003"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m003"]
+live = false
+
+[[nodes]]
+id = "test.m003.validate-m003-traceability-unit"
+path = "gate_tests/ported/tests/m003/validate_m003_traceability_unit.py"
+kind = "test"
+scope = "m003"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m003"]
+live = false
+
+[[nodes]]
+id = "test.m003.validate-page-diagnostics-acceptance"
+path = "gate_tests/ported/tests/m003/validate_page_diagnostics_acceptance.py"
+kind = "test"
+scope = "m003"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m003"]
+live = false
+
+[[nodes]]
+id = "test.m003.validate-page-diagnostics-unit"
+path = "gate_tests/ported/tests/m003/validate_page_diagnostics_unit.py"
+kind = "test"
+scope = "m003"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m003"]
+live = false
+
+[[nodes]]
+id = "test.m003.validate-page-manifest-acceptance"
+path = "gate_tests/ported/tests/m003/validate_page_manifest_acceptance.py"
+kind = "test"
+scope = "m003"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m003"]
+live = false
+
+[[nodes]]
+id = "test.m003.validate-page-manifest-unit"
+path = "gate_tests/ported/tests/m003/validate_page_manifest_unit.py"
+kind = "test"
+scope = "m003"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m003"]
+live = false
+
+[[nodes]]
+id = "test.m003.validate-review-quarantine-acceptance"
+path = "gate_tests/ported/tests/m003/validate_review_quarantine_acceptance.py"
+kind = "test"
+scope = "m003"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m003"]
+live = false
+
+[[nodes]]
+id = "test.m003.validate-review-quarantine-unit"
+path = "gate_tests/ported/tests/m003/validate_review_quarantine_unit.py"
+kind = "test"
+scope = "m003"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m003"]
+live = false
+
+[[nodes]]
+id = "test.m003.validate-route-plan-acceptance"
+path = "gate_tests/ported/tests/m003/validate_route_plan_acceptance.py"
+kind = "test"
+scope = "m003"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m003"]
+live = false
+
+[[nodes]]
+id = "test.m003.validate-route-plan-unit"
+path = "gate_tests/ported/tests/m003/validate_route_plan_unit.py"
+kind = "test"
+scope = "m003"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m003"]
+live = false
+
+[[nodes]]
+id = "test.m003.validate-source-registration-acceptance"
+path = "gate_tests/ported/tests/m003/validate_source_registration_acceptance.py"
+kind = "test"
+scope = "m003"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m003"]
+live = false
+
+[[nodes]]
+id = "test.m003.validate-source-registration-unit"
+path = "gate_tests/ported/tests/m003/validate_source_registration_unit.py"
+kind = "test"
+scope = "m003"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m003"]
+live = false
+
+[[nodes]]
+id = "test.m004.validate-canonical-publication-acceptance"
+path = "gate_tests/ported/tests/m004/validate_canonical_publication_acceptance.py"
+kind = "test"
+scope = "m004"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m004"]
+live = false
+
+[[nodes]]
+id = "test.m004.validate-canonical-publication-event-acceptance"
+path = "gate_tests/ported/tests/m004/validate_canonical_publication_event_acceptance.py"
+kind = "test"
+scope = "m004"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m004"]
+live = false
+
+[[nodes]]
+id = "test.m004.validate-canonical-publication-event-unit"
+path = "gate_tests/ported/tests/m004/validate_canonical_publication_event_unit.py"
+kind = "test"
+scope = "m004"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m004"]
+live = false
+
+[[nodes]]
+id = "test.m004.validate-canonical-publication-unit"
+path = "gate_tests/ported/tests/m004/validate_canonical_publication_unit.py"
+kind = "test"
+scope = "m004"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m004"]
+live = false
+
+[[nodes]]
+id = "test.m004.validate-canonical-quality-acceptance"
+path = "gate_tests/ported/tests/m004/validate_canonical_quality_acceptance.py"
+kind = "test"
+scope = "m004"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m004"]
+live = false
+
+[[nodes]]
+id = "test.m004.validate-canonical-quality-unit"
+path = "gate_tests/ported/tests/m004/validate_canonical_quality_unit.py"
+kind = "test"
+scope = "m004"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m004"]
+live = false
+
+[[nodes]]
+id = "test.m004.validate-document-conversion-command-acceptance"
+path = "gate_tests/ported/tests/m004/validate_document_conversion_command_acceptance.py"
+kind = "test"
+scope = "m004"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m004"]
+live = false
+
+[[nodes]]
+id = "test.m004.validate-document-conversion-command-unit"
+path = "gate_tests/ported/tests/m004/validate_document_conversion_command_unit.py"
+kind = "test"
+scope = "m004"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m004"]
+live = false
+
+[[nodes]]
+id = "test.m004.validate-m004-precondition-acceptance"
+path = "gate_tests/ported/tests/m004/validate_m004_precondition_acceptance.py"
+kind = "test"
+scope = "m004"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m004"]
+live = false
+
+[[nodes]]
+id = "test.m004.validate-m004-precondition-unit"
+path = "gate_tests/ported/tests/m004/validate_m004_precondition_unit.py"
+kind = "test"
+scope = "m004"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "git"
+depends_on = ["precondition.m004"]
+live = false
+
+[[nodes]]
+id = "test.m004.validate-m004-specification-acceptance"
+path = "gate_tests/ported/tests/m004/validate_m004_specification_acceptance.py"
+kind = "test"
+scope = "m004"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m004"]
+live = false
+
+[[nodes]]
+id = "test.m004.validate-m004-specification-unit"
+path = "gate_tests/ported/tests/m004/validate_m004_specification_unit.py"
+kind = "test"
+scope = "m004"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m004"]
+live = false
+
+[[nodes]]
+id = "test.m004.validate-m004-traceability-acceptance"
+path = "gate_tests/ported/tests/m004/validate_m004_traceability_acceptance.py"
+kind = "test"
+scope = "m004"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m004"]
+live = false
+
+[[nodes]]
+id = "test.m004.validate-m004-traceability-unit"
+path = "gate_tests/ported/tests/m004/validate_m004_traceability_unit.py"
+kind = "test"
+scope = "m004"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m004"]
+live = false
+
+[[nodes]]
+id = "test.m004.validate-page-conversion-acceptance"
+path = "gate_tests/ported/tests/m004/validate_page_conversion_acceptance.py"
+kind = "test"
+scope = "m004"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m004"]
+live = false
+
+[[nodes]]
+id = "test.m004.validate-page-conversion-unit"
+path = "gate_tests/ported/tests/m004/validate_page_conversion_unit.py"
+kind = "test"
+scope = "m004"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m004"]
+live = false
+
+[[nodes]]
+id = "test.m004.validate-source-locator-resolution-acceptance"
+path = "gate_tests/ported/tests/m004/validate_source_locator_resolution_acceptance.py"
+kind = "test"
+scope = "m004"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m004"]
+live = false
+
+[[nodes]]
+id = "test.m004.validate-source-locator-resolution-unit"
+path = "gate_tests/ported/tests/m004/validate_source_locator_resolution_unit.py"
+kind = "test"
+scope = "m004"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m004"]
+live = false
+
+[[nodes]]
+id = "test.m004.validate-text-authority-acceptance"
+path = "gate_tests/ported/tests/m004/validate_text_authority_acceptance.py"
+kind = "test"
+scope = "m004"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m004"]
+live = false
+
+[[nodes]]
+id = "test.m004.validate-text-authority-unit"
+path = "gate_tests/ported/tests/m004/validate_text_authority_unit.py"
+kind = "test"
+scope = "m004"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m004"]
+live = false
+
+[[nodes]]
+id = "test.m005.validate-hierarchical-chunking-acceptance"
+path = "gate_tests/ported/tests/m005/validate_hierarchical_chunking_acceptance.py"
+kind = "test"
+scope = "m005"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m005"]
+live = false
+
+[[nodes]]
+id = "test.m005.validate-hierarchical-chunking-unit"
+path = "gate_tests/ported/tests/m005/validate_hierarchical_chunking_unit.py"
+kind = "test"
+scope = "m005"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m005"]
+live = false
+
+[[nodes]]
+id = "test.m005.validate-hybrid-search-acceptance"
+path = "gate_tests/ported/tests/m005/validate_hybrid_search_acceptance.py"
+kind = "test"
+scope = "m005"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m005"]
+live = false
+
+[[nodes]]
+id = "test.m005.validate-hybrid-search-unit"
+path = "gate_tests/ported/tests/m005/validate_hybrid_search_unit.py"
+kind = "test"
+scope = "m005"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m005"]
+live = false
+
+[[nodes]]
+id = "test.m005.validate-index-command-acceptance"
+path = "gate_tests/ported/tests/m005/validate_index_command_acceptance.py"
+kind = "test"
+scope = "m005"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m005"]
+live = false
+
+[[nodes]]
+id = "test.m005.validate-knowledge-projection-acceptance"
+path = "gate_tests/ported/tests/m005/validate_knowledge_projection_acceptance.py"
+kind = "test"
+scope = "m005"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m005"]
+live = false
+
+[[nodes]]
+id = "test.m005.validate-knowledge-projection-events-acceptance"
+path = "gate_tests/ported/tests/m005/validate_knowledge_projection_events_acceptance.py"
+kind = "test"
+scope = "m005"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m005"]
+live = false
+
+[[nodes]]
+id = "test.m005.validate-knowledge-projection-unit"
+path = "gate_tests/ported/tests/m005/validate_knowledge_projection_unit.py"
+kind = "test"
+scope = "m005"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m005"]
+live = false
+
+[[nodes]]
+id = "test.m005.validate-m005-precondition-acceptance"
+path = "gate_tests/ported/tests/m005/validate_m005_precondition_acceptance.py"
+kind = "test"
+scope = "m005"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m005"]
+live = false
+
+[[nodes]]
+id = "test.m005.validate-m005-precondition-unit"
+path = "gate_tests/ported/tests/m005/validate_m005_precondition_unit.py"
+kind = "test"
+scope = "m005"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "git"
+depends_on = ["precondition.m005"]
+live = false
+
+[[nodes]]
+id = "test.m005.validate-m005-specification-acceptance"
+path = "gate_tests/ported/tests/m005/validate_m005_specification_acceptance.py"
+kind = "test"
+scope = "m005"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m005"]
+live = false
+
+[[nodes]]
+id = "test.m005.validate-m005-specification-unit"
+path = "gate_tests/ported/tests/m005/validate_m005_specification_unit.py"
+kind = "test"
+scope = "m005"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m005"]
+live = false
+
+[[nodes]]
+id = "test.m005.validate-m005-traceability-acceptance"
+path = "gate_tests/ported/tests/m005/validate_m005_traceability_acceptance.py"
+kind = "test"
+scope = "m005"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m005"]
+live = false
+
+[[nodes]]
+id = "test.m005.validate-m005-traceability-unit"
+path = "gate_tests/ported/tests/m005/validate_m005_traceability_unit.py"
+kind = "test"
+scope = "m005"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m005"]
+live = false
+
+[[nodes]]
+id = "test.m005.validate-projection-encoding-acceptance"
+path = "gate_tests/ported/tests/m005/validate_projection_encoding_acceptance.py"
+kind = "test"
+scope = "m005"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m005"]
+live = false
+
+[[nodes]]
+id = "test.m005.validate-projection-encoding-unit"
+path = "gate_tests/ported/tests/m005/validate_projection_encoding_unit.py"
+kind = "test"
+scope = "m005"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m005"]
+live = false
+
+[[nodes]]
+id = "test.m005.validate-projection-metadata-filters-acceptance"
+path = "gate_tests/ported/tests/m005/validate_projection_metadata_filters_acceptance.py"
+kind = "test"
+scope = "m005"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m005"]
+live = false
+
+[[nodes]]
+id = "test.m005.validate-projection-metadata-filters-unit"
+path = "gate_tests/ported/tests/m005/validate_projection_metadata_filters_unit.py"
+kind = "test"
+scope = "m005"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m005"]
+live = false
+
+[[nodes]]
+id = "test.m005.validate-qdrant-projection-acceptance"
+path = "gate_tests/ported/tests/m005/validate_qdrant_projection_acceptance.py"
+kind = "test"
+scope = "m005"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m005"]
+live = false
+
+[[nodes]]
+id = "test.m005.validate-qdrant-projection-unit"
+path = "gate_tests/ported/tests/m005/validate_qdrant_projection_unit.py"
+kind = "test"
+scope = "m005"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m005"]
+live = false
+
+[[nodes]]
+id = "test.m005.validate-search-command-acceptance"
+path = "gate_tests/ported/tests/m005/validate_search_command_acceptance.py"
+kind = "test"
+scope = "m005"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m005"]
+live = false
+
+[[nodes]]
+id = "test.m005.validate-search-command-unit"
+path = "gate_tests/ported/tests/m005/validate_search_command_unit.py"
+kind = "test"
+scope = "m005"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m005"]
+live = false
+
+[[nodes]]
+id = "test.m005.validate-search-trace-acceptance"
+path = "gate_tests/ported/tests/m005/validate_search_trace_acceptance.py"
+kind = "test"
+scope = "m005"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m005"]
+live = false
+
+[[nodes]]
+id = "test.m006.validate-claim-evidence-attachment-acceptance"
+path = "gate_tests/ported/tests/m006/validate_claim_evidence_attachment_acceptance.py"
+kind = "test"
+scope = "m006"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m006"]
+live = false
+
+[[nodes]]
+id = "test.m006.validate-claim-evidence-attachment-unit"
+path = "gate_tests/ported/tests/m006/validate_claim_evidence_attachment_unit.py"
+kind = "test"
+scope = "m006"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m006"]
+live = false
+
+[[nodes]]
+id = "test.m006.validate-claim-extraction-acceptance"
+path = "gate_tests/ported/tests/m006/validate_claim_extraction_acceptance.py"
+kind = "test"
+scope = "m006"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m006"]
+live = false
+
+[[nodes]]
+id = "test.m006.validate-claim-extraction-unit"
+path = "gate_tests/ported/tests/m006/validate_claim_extraction_unit.py"
+kind = "test"
+scope = "m006"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m006"]
+live = false
+
+[[nodes]]
+id = "test.m006.validate-claim-http-contract-acceptance"
+path = "gate_tests/ported/tests/m006/validate_claim_http_contract_acceptance.py"
+kind = "test"
+scope = "m006"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m006"]
+live = false
+
+[[nodes]]
+id = "test.m006.validate-claim-http-contract-unit"
+path = "gate_tests/ported/tests/m006/validate_claim_http_contract_unit.py"
+kind = "test"
+scope = "m006"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m006"]
+live = false
+
+[[nodes]]
+id = "test.m006.validate-claim-relation-acceptance"
+path = "gate_tests/ported/tests/m006/validate_claim_relation_acceptance.py"
+kind = "test"
+scope = "m006"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m006"]
+live = false
+
+[[nodes]]
+id = "test.m006.validate-claim-relation-unit"
+path = "gate_tests/ported/tests/m006/validate_claim_relation_unit.py"
+kind = "test"
+scope = "m006"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m006"]
+live = false
+
+[[nodes]]
+id = "test.m006.validate-claim-retention-acceptance"
+path = "gate_tests/ported/tests/m006/validate_claim_retention_acceptance.py"
+kind = "test"
+scope = "m006"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m006"]
+live = false
+
+[[nodes]]
+id = "test.m006.validate-claim-retention-unit"
+path = "gate_tests/ported/tests/m006/validate_claim_retention_unit.py"
+kind = "test"
+scope = "m006"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m006"]
+live = false
+
+[[nodes]]
+id = "test.m006.validate-claim-verification-acceptance"
+path = "gate_tests/ported/tests/m006/validate_claim_verification_acceptance.py"
+kind = "test"
+scope = "m006"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m006"]
+live = false
+
+[[nodes]]
+id = "test.m006.validate-claim-verification-unit"
+path = "gate_tests/ported/tests/m006/validate_claim_verification_unit.py"
+kind = "test"
+scope = "m006"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m006"]
+live = false
+
+[[nodes]]
+id = "test.m006.validate-dependency-group-acceptance"
+path = "gate_tests/ported/tests/m006/validate_dependency_group_acceptance.py"
+kind = "test"
+scope = "m006"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m006"]
+live = false
+
+[[nodes]]
+id = "test.m006.validate-dependency-group-unit"
+path = "gate_tests/ported/tests/m006/validate_dependency_group_unit.py"
+kind = "test"
+scope = "m006"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m006"]
+live = false
+
+[[nodes]]
+id = "test.m006.validate-m006-precondition-acceptance"
+path = "gate_tests/ported/tests/m006/validate_m006_precondition_acceptance.py"
+kind = "test"
+scope = "m006"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "git"
+depends_on = ["precondition.m006"]
+live = false
+
+[[nodes]]
+id = "test.m006.validate-m006-precondition-unit"
+path = "gate_tests/ported/tests/m006/validate_m006_precondition_unit.py"
+kind = "test"
+scope = "m006"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "git"
+depends_on = ["precondition.m006"]
+live = false
+
+[[nodes]]
+id = "test.m006.validate-m006-specification-acceptance"
+path = "gate_tests/ported/tests/m006/validate_m006_specification_acceptance.py"
+kind = "test"
+scope = "m006"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m006"]
+live = false
+
+[[nodes]]
+id = "test.m006.validate-m006-specification-unit"
+path = "gate_tests/ported/tests/m006/validate_m006_specification_unit.py"
+kind = "test"
+scope = "m006"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m006"]
+live = false
+
+[[nodes]]
+id = "test.m006.validate-m006-traceability-acceptance"
+path = "gate_tests/ported/tests/m006/validate_m006_traceability_acceptance.py"
+kind = "test"
+scope = "m006"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m006"]
+live = false
+
+[[nodes]]
+id = "test.m006.validate-m006-traceability-unit"
+path = "gate_tests/ported/tests/m006/validate_m006_traceability_unit.py"
+kind = "test"
+scope = "m006"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m006"]
+live = false
+
+[[nodes]]
+id = "test.m007.validate-answer-assertion-extraction-acceptance"
+path = "gate_tests/ported/tests/m007/validate_answer_assertion_extraction_acceptance.py"
+kind = "test"
+scope = "m007"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m007"]
+live = false
+
+[[nodes]]
+id = "test.m007.validate-answer-assertion-extraction-unit"
+path = "gate_tests/ported/tests/m007/validate_answer_assertion_extraction_unit.py"
+kind = "test"
+scope = "m007"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m007"]
+live = false
+
+[[nodes]]
+id = "test.m007.validate-answer-http-contract-acceptance"
+path = "gate_tests/ported/tests/m007/validate_answer_http_contract_acceptance.py"
+kind = "test"
+scope = "m007"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m007"]
+live = false
+
+[[nodes]]
+id = "test.m007.validate-answer-http-contract-unit"
+path = "gate_tests/ported/tests/m007/validate_answer_http_contract_unit.py"
+kind = "test"
+scope = "m007"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m007"]
+live = false
+
+[[nodes]]
+id = "test.m007.validate-answer-support-acceptance"
+path = "gate_tests/ported/tests/m007/validate_answer_support_acceptance.py"
+kind = "test"
+scope = "m007"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m007"]
+live = false
+
+[[nodes]]
+id = "test.m007.validate-answer-support-unit"
+path = "gate_tests/ported/tests/m007/validate_answer_support_unit.py"
+kind = "test"
+scope = "m007"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m007"]
+live = false
+
+[[nodes]]
+id = "test.m007.validate-contradiction-gap-acceptance"
+path = "gate_tests/ported/tests/m007/validate_contradiction_gap_acceptance.py"
+kind = "test"
+scope = "m007"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m007"]
+live = false
+
+[[nodes]]
+id = "test.m007.validate-contradiction-gap-unit"
+path = "gate_tests/ported/tests/m007/validate_contradiction_gap_unit.py"
+kind = "test"
+scope = "m007"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m007"]
+live = false
+
+[[nodes]]
+id = "test.m007.validate-current-data-abstention-acceptance"
+path = "gate_tests/ported/tests/m007/validate_current_data_abstention_acceptance.py"
+kind = "test"
+scope = "m007"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m007"]
+live = false
+
+[[nodes]]
+id = "test.m007.validate-current-data-abstention-unit"
+path = "gate_tests/ported/tests/m007/validate_current_data_abstention_unit.py"
+kind = "test"
+scope = "m007"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m007"]
+live = false
+
+[[nodes]]
+id = "test.m007.validate-evidence-set-sealing-acceptance"
+path = "gate_tests/ported/tests/m007/validate_evidence_set_sealing_acceptance.py"
+kind = "test"
+scope = "m007"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m007"]
+live = false
+
+[[nodes]]
+id = "test.m007.validate-evidence-set-sealing-unit"
+path = "gate_tests/ported/tests/m007/validate_evidence_set_sealing_unit.py"
+kind = "test"
+scope = "m007"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m007"]
+live = false
+
+[[nodes]]
+id = "test.m007.validate-m007-precondition-acceptance"
+path = "gate_tests/ported/tests/m007/validate_m007_precondition_acceptance.py"
+kind = "test"
+scope = "m007"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m007"]
+live = false
+
+[[nodes]]
+id = "test.m007.validate-m007-precondition-unit"
+path = "gate_tests/ported/tests/m007/validate_m007_precondition_unit.py"
+kind = "test"
+scope = "m007"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "git"
+depends_on = ["precondition.m007"]
+live = false
+
+[[nodes]]
+id = "test.m007.validate-m007-specification-acceptance"
+path = "gate_tests/ported/tests/m007/validate_m007_specification_acceptance.py"
+kind = "test"
+scope = "m007"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m007"]
+live = false
+
+[[nodes]]
+id = "test.m007.validate-m007-specification-unit"
+path = "gate_tests/ported/tests/m007/validate_m007_specification_unit.py"
+kind = "test"
+scope = "m007"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m007"]
+live = false
+
+[[nodes]]
+id = "test.m007.validate-m007-traceability-acceptance"
+path = "gate_tests/ported/tests/m007/validate_m007_traceability_acceptance.py"
+kind = "test"
+scope = "m007"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m007"]
+live = false
+
+[[nodes]]
+id = "test.m007.validate-m007-traceability-unit"
+path = "gate_tests/ported/tests/m007/validate_m007_traceability_unit.py"
+kind = "test"
+scope = "m007"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m007"]
+live = false
+
+[[nodes]]
+id = "test.m007.validate-research-case-mandate-acceptance"
+path = "gate_tests/ported/tests/m007/validate_research_case_mandate_acceptance.py"
+kind = "test"
+scope = "m007"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m007"]
+live = false
+
+[[nodes]]
+id = "test.m007.validate-research-case-mandate-unit"
+path = "gate_tests/ported/tests/m007/validate_research_case_mandate_unit.py"
+kind = "test"
+scope = "m007"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m007"]
+live = false
+
+[[nodes]]
+id = "test.m008.validate-chat-answer-presentation-acceptance"
+path = "gate_tests/ported/tests/m008/validate_chat_answer_presentation_acceptance.py"
+kind = "test"
+scope = "m008"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m008"]
+live = false
+
+[[nodes]]
+id = "test.m008.validate-chat-answer-presentation-unit"
+path = "gate_tests/ported/tests/m008/validate_chat_answer_presentation_unit.py"
+kind = "test"
+scope = "m008"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m008"]
+live = false
+
+[[nodes]]
+id = "test.m008.validate-chat-completions-contract-acceptance"
+path = "gate_tests/ported/tests/m008/validate_chat_completions_contract_acceptance.py"
+kind = "test"
+scope = "m008"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m008"]
+live = false
+
+[[nodes]]
+id = "test.m008.validate-chat-completions-contract-unit"
+path = "gate_tests/ported/tests/m008/validate_chat_completions_contract_unit.py"
+kind = "test"
+scope = "m008"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m008"]
+live = false
+
+[[nodes]]
+id = "test.m008.validate-conversation-context-snapshot-acceptance"
+path = "gate_tests/ported/tests/m008/validate_conversation_context_snapshot_acceptance.py"
+kind = "test"
+scope = "m008"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m008"]
+live = false
+
+[[nodes]]
+id = "test.m008.validate-conversation-context-snapshot-unit"
+path = "gate_tests/ported/tests/m008/validate_conversation_context_snapshot_unit.py"
+kind = "test"
+scope = "m008"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m008"]
+live = false
+
+[[nodes]]
+id = "test.m008.validate-conversation-http-contract-acceptance"
+path = "gate_tests/ported/tests/m008/validate_conversation_http_contract_acceptance.py"
+kind = "test"
+scope = "m008"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m008"]
+live = false
+
+[[nodes]]
+id = "test.m008.validate-conversation-http-contract-unit"
+path = "gate_tests/ported/tests/m008/validate_conversation_http_contract_unit.py"
+kind = "test"
+scope = "m008"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m008"]
+live = false
+
+[[nodes]]
+id = "test.m008.validate-conversation-mode-routing-acceptance"
+path = "gate_tests/ported/tests/m008/validate_conversation_mode_routing_acceptance.py"
+kind = "test"
+scope = "m008"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m008"]
+live = false
+
+[[nodes]]
+id = "test.m008.validate-conversation-mode-routing-unit"
+path = "gate_tests/ported/tests/m008/validate_conversation_mode_routing_unit.py"
+kind = "test"
+scope = "m008"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m008"]
+live = false
+
+[[nodes]]
+id = "test.m008.validate-conversation-turn-append-only-acceptance"
+path = "gate_tests/ported/tests/m008/validate_conversation_turn_append_only_acceptance.py"
+kind = "test"
+scope = "m008"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m008"]
+live = false
+
+[[nodes]]
+id = "test.m008.validate-conversation-turn-append-only-unit"
+path = "gate_tests/ported/tests/m008/validate_conversation_turn_append_only_unit.py"
+kind = "test"
+scope = "m008"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m008"]
+live = false
+
+[[nodes]]
+id = "test.m008.validate-followup-question-resolution-acceptance"
+path = "gate_tests/ported/tests/m008/validate_followup_question_resolution_acceptance.py"
+kind = "test"
+scope = "m008"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m008"]
+live = false
+
+[[nodes]]
+id = "test.m008.validate-followup-question-resolution-unit"
+path = "gate_tests/ported/tests/m008/validate_followup_question_resolution_unit.py"
+kind = "test"
+scope = "m008"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m008"]
+live = false
+
+[[nodes]]
+id = "test.m008.validate-m008-precondition-acceptance"
+path = "gate_tests/ported/tests/m008/validate_m008_precondition_acceptance.py"
+kind = "test"
+scope = "m008"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m008"]
+live = false
+
+[[nodes]]
+id = "test.m008.validate-m008-precondition-unit"
+path = "gate_tests/ported/tests/m008/validate_m008_precondition_unit.py"
+kind = "test"
+scope = "m008"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "git"
+depends_on = ["precondition.m008"]
+live = false
+
+[[nodes]]
+id = "test.m008.validate-m008-specification-acceptance"
+path = "gate_tests/ported/tests/m008/validate_m008_specification_acceptance.py"
+kind = "test"
+scope = "m008"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m008"]
+live = false
+
+[[nodes]]
+id = "test.m008.validate-m008-specification-unit"
+path = "gate_tests/ported/tests/m008/validate_m008_specification_unit.py"
+kind = "test"
+scope = "m008"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m008"]
+live = false
+
+[[nodes]]
+id = "test.m008.validate-m008-traceability-acceptance"
+path = "gate_tests/ported/tests/m008/validate_m008_traceability_acceptance.py"
+kind = "test"
+scope = "m008"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m008"]
+live = false
+
+[[nodes]]
+id = "test.m008.validate-m008-traceability-unit"
+path = "gate_tests/ported/tests/m008/validate_m008_traceability_unit.py"
+kind = "test"
+scope = "m008"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m008"]
+live = false
+
+[[nodes]]
+id = "test.m008.validate-verified-answer-attachment-unit"
+path = "gate_tests/ported/tests/m008/validate_verified_answer_attachment_unit.py"
+kind = "test"
+scope = "m008"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m008"]
+live = false
+
+[[nodes]]
+id = "test.m008.validate-verified-result-reuse-acceptance"
+path = "gate_tests/ported/tests/m008/validate_verified_result_reuse_acceptance.py"
+kind = "test"
+scope = "m008"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m008"]
+live = false
+
+[[nodes]]
+id = "test.m009.validate-deep-contradiction-classification-acceptance"
+path = "gate_tests/ported/tests/m009/validate_deep_contradiction_classification_acceptance.py"
+kind = "test"
+scope = "m009"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m009"]
+live = false
+
+[[nodes]]
+id = "test.m009.validate-deep-contradiction-classification-unit"
+path = "gate_tests/ported/tests/m009/validate_deep_contradiction_classification_unit.py"
+kind = "test"
+scope = "m009"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m009"]
+live = false
+
+[[nodes]]
+id = "test.m009.validate-deep-research-http-contract-acceptance"
+path = "gate_tests/ported/tests/m009/validate_deep_research_http_contract_acceptance.py"
+kind = "test"
+scope = "m009"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m009"]
+live = false
+
+[[nodes]]
+id = "test.m009.validate-deep-research-http-contract-unit"
+path = "gate_tests/ported/tests/m009/validate_deep_research_http_contract_unit.py"
+kind = "test"
+scope = "m009"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m009"]
+live = false
+
+[[nodes]]
+id = "test.m009.validate-deep-research-metrics-acceptance"
+path = "gate_tests/ported/tests/m009/validate_deep_research_metrics_acceptance.py"
+kind = "test"
+scope = "m009"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m009"]
+live = false
+
+[[nodes]]
+id = "test.m009.validate-deep-research-metrics-unit"
+path = "gate_tests/ported/tests/m009/validate_deep_research_metrics_unit.py"
+kind = "test"
+scope = "m009"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m009"]
+live = false
+
+[[nodes]]
+id = "test.m009.validate-deep-research-planning-acceptance"
+path = "gate_tests/ported/tests/m009/validate_deep_research_planning_acceptance.py"
+kind = "test"
+scope = "m009"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m009"]
+live = false
+
+[[nodes]]
+id = "test.m009.validate-deep-research-planning-unit"
+path = "gate_tests/ported/tests/m009/validate_deep_research_planning_unit.py"
+kind = "test"
+scope = "m009"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m009"]
+live = false
+
+[[nodes]]
+id = "test.m009.validate-insufficient-deep-coverage-acceptance"
+path = "gate_tests/ported/tests/m009/validate_insufficient_deep_coverage_acceptance.py"
+kind = "test"
+scope = "m009"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m009"]
+live = false
+
+[[nodes]]
+id = "test.m009.validate-insufficient-deep-coverage-unit"
+path = "gate_tests/ported/tests/m009/validate_insufficient_deep_coverage_unit.py"
+kind = "test"
+scope = "m009"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m009"]
+live = false
+
+[[nodes]]
+id = "test.m009.validate-m009-precondition-acceptance"
+path = "gate_tests/ported/tests/m009/validate_m009_precondition_acceptance.py"
+kind = "test"
+scope = "m009"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m009"]
+live = false
+
+[[nodes]]
+id = "test.m009.validate-m009-precondition-unit"
+path = "gate_tests/ported/tests/m009/validate_m009_precondition_unit.py"
+kind = "test"
+scope = "m009"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "git"
+depends_on = ["precondition.m009"]
+live = false
+
+[[nodes]]
+id = "test.m009.validate-m009-specification-acceptance"
+path = "gate_tests/ported/tests/m009/validate_m009_specification_acceptance.py"
+kind = "test"
+scope = "m009"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m009"]
+live = false
+
+[[nodes]]
+id = "test.m009.validate-m009-specification-unit"
+path = "gate_tests/ported/tests/m009/validate_m009_specification_unit.py"
+kind = "test"
+scope = "m009"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m009"]
+live = false
+
+[[nodes]]
+id = "test.m009.validate-m009-traceability-acceptance"
+path = "gate_tests/ported/tests/m009/validate_m009_traceability_acceptance.py"
+kind = "test"
+scope = "m009"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m009"]
+live = false
+
+[[nodes]]
+id = "test.m009.validate-m009-traceability-unit"
+path = "gate_tests/ported/tests/m009/validate_m009_traceability_unit.py"
+kind = "test"
+scope = "m009"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m009"]
+live = false
+
+[[nodes]]
+id = "test.m009.validate-multi-query-evidence-collection-acceptance"
+path = "gate_tests/ported/tests/m009/validate_multi_query_evidence_collection_acceptance.py"
+kind = "test"
+scope = "m009"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m009"]
+live = false
+
+[[nodes]]
+id = "test.m009.validate-multi-query-evidence-collection-unit"
+path = "gate_tests/ported/tests/m009/validate_multi_query_evidence_collection_unit.py"
+kind = "test"
+scope = "m009"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m009"]
+live = false
+
+[[nodes]]
+id = "test.m009.validate-multi-source-synthesis-acceptance"
+path = "gate_tests/ported/tests/m009/validate_multi_source_synthesis_acceptance.py"
+kind = "test"
+scope = "m009"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m009"]
+live = false
+
+[[nodes]]
+id = "test.m009.validate-multi-source-synthesis-unit"
+path = "gate_tests/ported/tests/m009/validate_multi_source_synthesis_unit.py"
+kind = "test"
+scope = "m009"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m009"]
+live = false
+
+[[nodes]]
+id = "test.m009.validate-verified-claim-dependency-resolution-acceptance"
+path = "gate_tests/ported/tests/m009/validate_verified_claim_dependency_resolution_acceptance.py"
+kind = "test"
+scope = "m009"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m009"]
+live = false
+
+[[nodes]]
+id = "test.m009.validate-verified-claim-dependency-resolution-unit"
+path = "gate_tests/ported/tests/m009/validate_verified_claim_dependency_resolution_unit.py"
+kind = "test"
+scope = "m009"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m009"]
+live = false
+
+[[nodes]]
+id = "test.m010.validate-m010-precondition-acceptance"
+path = "gate_tests/ported/tests/m010/validate_m010_precondition_acceptance.py"
+kind = "test"
+scope = "m010"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m010"]
+live = false
+
+[[nodes]]
+id = "test.m010.validate-m010-precondition-unit"
+path = "gate_tests/ported/tests/m010/validate_m010_precondition_unit.py"
+kind = "test"
+scope = "m010"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "git"
+depends_on = ["precondition.m010"]
+live = false
+
+[[nodes]]
+id = "test.m010.validate-m010-specification-acceptance"
+path = "gate_tests/ported/tests/m010/validate_m010_specification_acceptance.py"
+kind = "test"
+scope = "m010"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m010"]
+live = false
+
+[[nodes]]
+id = "test.m010.validate-m010-specification-unit"
+path = "gate_tests/ported/tests/m010/validate_m010_specification_unit.py"
+kind = "test"
+scope = "m010"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m010"]
+live = false
+
+[[nodes]]
+id = "test.m010.validate-m010-traceability-acceptance"
+path = "gate_tests/ported/tests/m010/validate_m010_traceability_acceptance.py"
+kind = "test"
+scope = "m010"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m010"]
+live = false
+
+[[nodes]]
+id = "test.m010.validate-m010-traceability-unit"
+path = "gate_tests/ported/tests/m010/validate_m010_traceability_unit.py"
+kind = "test"
+scope = "m010"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "process"
+depends_on = ["precondition.m010"]
+live = false
+
+[[nodes]]
+id = "test.m010.validate-strategy-candidate-creation-acceptance"
+path = "gate_tests/ported/tests/m010/validate_strategy_candidate_creation_acceptance.py"
+kind = "test"
+scope = "m010"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m010"]
+live = false
+
+[[nodes]]
+id = "test.m010.validate-strategy-candidate-creation-unit"
+path = "gate_tests/ported/tests/m010/validate_strategy_candidate_creation_unit.py"
+kind = "test"
+scope = "m010"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m010"]
+live = false
+
+[[nodes]]
+id = "test.m010.validate-strategy-candidate-diagnostics-acceptance"
+path = "gate_tests/ported/tests/m010/validate_strategy_candidate_diagnostics_acceptance.py"
+kind = "test"
+scope = "m010"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m010"]
+live = false
+
+[[nodes]]
+id = "test.m010.validate-strategy-candidate-diagnostics-unit"
+path = "gate_tests/ported/tests/m010/validate_strategy_candidate_diagnostics_unit.py"
+kind = "test"
+scope = "m010"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m010"]
+live = false
+
+[[nodes]]
+id = "test.m010.validate-strategy-compatibility-acceptance"
+path = "gate_tests/ported/tests/m010/validate_strategy_compatibility_acceptance.py"
+kind = "test"
+scope = "m010"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m010"]
+live = false
+
+[[nodes]]
+id = "test.m010.validate-strategy-compatibility-unit"
+path = "gate_tests/ported/tests/m010/validate_strategy_compatibility_unit.py"
+kind = "test"
+scope = "m010"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m010"]
+live = false
+
+[[nodes]]
+id = "test.m010.validate-strategy-compilation-acceptance"
+path = "gate_tests/ported/tests/m010/validate_strategy_compilation_acceptance.py"
+kind = "test"
+scope = "m010"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m010"]
+live = false
+
+[[nodes]]
+id = "test.m010.validate-strategy-compilation-unit"
+path = "gate_tests/ported/tests/m010/validate_strategy_compilation_unit.py"
+kind = "test"
+scope = "m010"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m010"]
+live = false
+
+[[nodes]]
+id = "test.m010.validate-strategy-http-contract-acceptance"
+path = "gate_tests/ported/tests/m010/validate_strategy_http_contract_acceptance.py"
+kind = "test"
+scope = "m010"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m010"]
+live = false
+
+[[nodes]]
+id = "test.m010.validate-strategy-http-contract-unit"
+path = "gate_tests/ported/tests/m010/validate_strategy_http_contract_unit.py"
+kind = "test"
+scope = "m010"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m010"]
+live = false
+
+[[nodes]]
+id = "test.m010.validate-strategy-parameter-calibration-acceptance"
+path = "gate_tests/ported/tests/m010/validate_strategy_parameter_calibration_acceptance.py"
+kind = "test"
+scope = "m010"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m010"]
+live = false
+
+[[nodes]]
+id = "test.m010.validate-strategy-parameter-calibration-unit"
+path = "gate_tests/ported/tests/m010/validate_strategy_parameter_calibration_unit.py"
+kind = "test"
+scope = "m010"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m010"]
+live = false
+
+[[nodes]]
+id = "test.m010.validate-strategy-rule-origin-acceptance"
+path = "gate_tests/ported/tests/m010/validate_strategy_rule_origin_acceptance.py"
+kind = "test"
+scope = "m010"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m010"]
+live = false
+
+[[nodes]]
+id = "test.m010.validate-strategy-rule-origin-unit"
+path = "gate_tests/ported/tests/m010/validate_strategy_rule_origin_unit.py"
+kind = "test"
+scope = "m010"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m010"]
+live = false
+
+[[nodes]]
+id = "test.m010.validate-strategy-snapshot-acceptance"
+path = "gate_tests/ported/tests/m010/validate_strategy_snapshot_acceptance.py"
+kind = "test"
+scope = "m010"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m010"]
+live = false
+
+[[nodes]]
+id = "test.m010.validate-strategy-snapshot-unit"
+path = "gate_tests/ported/tests/m010/validate_strategy_snapshot_unit.py"
+kind = "test"
+scope = "m010"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m010"]
+live = false
+
+[[nodes]]
+id = "test.m011.run-m011-case"
+path = "gate_tests/ported/tests/m011/run_m011_case.py"
+kind = "test"
+scope = "m011"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m011"]
+live = false
+
+[[nodes]]
+id = "test.m011.validate-cost-environment-freeze-acceptance"
+path = "gate_tests/ported/tests/m011/validate_cost_environment_freeze_acceptance.py"
+kind = "test"
+scope = "m011"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m011"]
+live = false
+
+[[nodes]]
+id = "test.m011.validate-cost-environment-freeze-unit"
+path = "gate_tests/ported/tests/m011/validate_cost_environment_freeze_unit.py"
+kind = "test"
+scope = "m011"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m011"]
+live = false
+
+[[nodes]]
+id = "test.m011.validate-data-snapshot-freeze-acceptance"
+path = "gate_tests/ported/tests/m011/validate_data_snapshot_freeze_acceptance.py"
+kind = "test"
+scope = "m011"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m011"]
+live = false
+
+[[nodes]]
+id = "test.m011.validate-data-snapshot-freeze-unit"
+path = "gate_tests/ported/tests/m011/validate_data_snapshot_freeze_unit.py"
+kind = "test"
+scope = "m011"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m011"]
+live = false
+
+[[nodes]]
+id = "test.m011.validate-deterministic-backtest-acceptance"
+path = "gate_tests/ported/tests/m011/validate_deterministic_backtest_acceptance.py"
+kind = "test"
+scope = "m011"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m011"]
+live = false
+
+[[nodes]]
+id = "test.m011.validate-deterministic-backtest-unit"
+path = "gate_tests/ported/tests/m011/validate_deterministic_backtest_unit.py"
+kind = "test"
+scope = "m011"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m011"]
+live = false
+
+[[nodes]]
+id = "test.m011.validate-experiment-http-contract-acceptance"
+path = "gate_tests/ported/tests/m011/validate_experiment_http_contract_acceptance.py"
+kind = "test"
+scope = "m011"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m011"]
+live = false
+
+[[nodes]]
+id = "test.m011.validate-experiment-http-contract-unit"
+path = "gate_tests/ported/tests/m011/validate_experiment_http_contract_unit.py"
+kind = "test"
+scope = "m011"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m011"]
+live = false
+
+[[nodes]]
+id = "test.m011.validate-experiment-planning-acceptance"
+path = "gate_tests/ported/tests/m011/validate_experiment_planning_acceptance.py"
+kind = "test"
+scope = "m011"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m011"]
+live = false
+
+[[nodes]]
+id = "test.m011.validate-experiment-planning-unit"
+path = "gate_tests/ported/tests/m011/validate_experiment_planning_unit.py"
+kind = "test"
+scope = "m011"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m011"]
+live = false
+
+[[nodes]]
+id = "test.m011.validate-experiment-reproducibility-acceptance"
+path = "gate_tests/ported/tests/m011/validate_experiment_reproducibility_acceptance.py"
+kind = "test"
+scope = "m011"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m011"]
+live = false
+
+[[nodes]]
+id = "test.m011.validate-experiment-reproducibility-unit"
+path = "gate_tests/ported/tests/m011/validate_experiment_reproducibility_unit.py"
+kind = "test"
+scope = "m011"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m011"]
+live = false
+
+[[nodes]]
+id = "test.m011.validate-experiment-result-acceptance"
+path = "gate_tests/ported/tests/m011/validate_experiment_result_acceptance.py"
+kind = "test"
+scope = "m011"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m011"]
+live = false
+
+[[nodes]]
+id = "test.m011.validate-experiment-result-unit"
+path = "gate_tests/ported/tests/m011/validate_experiment_result_unit.py"
+kind = "test"
+scope = "m011"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m011"]
+live = false
+
+[[nodes]]
+id = "test.m011.validate-experiment-retention-acceptance"
+path = "gate_tests/ported/tests/m011/validate_experiment_retention_acceptance.py"
+kind = "test"
+scope = "m011"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m011"]
+live = false
+
+[[nodes]]
+id = "test.m011.validate-experiment-retention-unit"
+path = "gate_tests/ported/tests/m011/validate_experiment_retention_unit.py"
+kind = "test"
+scope = "m011"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m011"]
+live = false
+
+[[nodes]]
+id = "test.m011.validate-experiment-start-lock-acceptance"
+path = "gate_tests/ported/tests/m011/validate_experiment_start_lock_acceptance.py"
+kind = "test"
+scope = "m011"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m011"]
+live = false
+
+[[nodes]]
+id = "test.m011.validate-experiment-start-lock-unit"
+path = "gate_tests/ported/tests/m011/validate_experiment_start_lock_unit.py"
+kind = "test"
+scope = "m011"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m011"]
+live = false
+
+[[nodes]]
+id = "test.m011.validate-m011-precondition-acceptance"
+path = "gate_tests/ported/tests/m011/validate_m011_precondition_acceptance.py"
+kind = "test"
+scope = "m011"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m011"]
+live = false
+
+[[nodes]]
+id = "test.m011.validate-m011-precondition-unit"
+path = "gate_tests/ported/tests/m011/validate_m011_precondition_unit.py"
+kind = "test"
+scope = "m011"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m011"]
+live = false
+
+[[nodes]]
+id = "test.m011.validate-m011-specification-acceptance"
+path = "gate_tests/ported/tests/m011/validate_m011_specification_acceptance.py"
+kind = "test"
+scope = "m011"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m011"]
+live = false
+
+[[nodes]]
+id = "test.m011.validate-m011-specification-unit"
+path = "gate_tests/ported/tests/m011/validate_m011_specification_unit.py"
+kind = "test"
+scope = "m011"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m011"]
+live = false
+
+[[nodes]]
+id = "test.m011.validate-m011-traceability-acceptance"
+path = "gate_tests/ported/tests/m011/validate_m011_traceability_acceptance.py"
+kind = "test"
+scope = "m011"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m011"]
+live = false
+
+[[nodes]]
+id = "test.m011.validate-m011-traceability-unit"
+path = "gate_tests/ported/tests/m011/validate_m011_traceability_unit.py"
+kind = "test"
+scope = "m011"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m011"]
+live = false
+
+[[nodes]]
+id = "test.m012.validate-calibration-decisions-acceptance"
+path = "gate_tests/ported/tests/m012/validate_calibration_decisions_acceptance.py"
+kind = "test"
+scope = "m012"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m012"]
+live = false
+
+[[nodes]]
+id = "test.m012.validate-calibration-decisions-unit"
+path = "gate_tests/ported/tests/m012/validate_calibration_decisions_unit.py"
+kind = "test"
+scope = "m012"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m012"]
+live = false
+
+[[nodes]]
+id = "test.m012.validate-document-quality-calibration-acceptance"
+path = "gate_tests/ported/tests/m012/validate_document_quality_calibration_acceptance.py"
+kind = "test"
+scope = "m012"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m012"]
+live = false
+
+[[nodes]]
+id = "test.m012.validate-document-quality-calibration-unit"
+path = "gate_tests/ported/tests/m012/validate_document_quality_calibration_unit.py"
+kind = "test"
+scope = "m012"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m012"]
+live = false
+
+[[nodes]]
+id = "test.m012.validate-document-route-benchmark-acceptance"
+path = "gate_tests/ported/tests/m012/validate_document_route_benchmark_acceptance.py"
+kind = "test"
+scope = "m012"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m012"]
+live = false
+
+[[nodes]]
+id = "test.m012.validate-document-route-benchmark-unit"
+path = "gate_tests/ported/tests/m012/validate_document_route_benchmark_unit.py"
+kind = "test"
+scope = "m012"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m012"]
+live = false
+
+[[nodes]]
+id = "test.m012.validate-knowledge-search-benchmark-acceptance"
+path = "gate_tests/ported/tests/m012/validate_knowledge_search_benchmark_acceptance.py"
+kind = "test"
+scope = "m012"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m012"]
+live = false
+
+[[nodes]]
+id = "test.m012.validate-knowledge-search-benchmark-unit"
+path = "gate_tests/ported/tests/m012/validate_knowledge_search_benchmark_unit.py"
+kind = "test"
+scope = "m012"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m012"]
+live = false
+
+[[nodes]]
+id = "test.m012.validate-llm-benchmark-real-path-acceptance"
+path = "gate_tests/ported/tests/m012/validate_llm_benchmark_real_path_acceptance.py"
+kind = "test"
+scope = "m012"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "process"
+depends_on = ["precondition.m012"]
+live = false
+
+[[nodes]]
+id = "test.m012.validate-llm-benchmark-real-path-unit"
+path = "gate_tests/ported/tests/m012/validate_llm_benchmark_real_path_unit.py"
+kind = "test"
+scope = "m012"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "process"
+depends_on = ["precondition.m012"]
+live = false
+
+[[nodes]]
+id = "test.m012.validate-m012-precondition-acceptance"
+path = "gate_tests/ported/tests/m012/validate_m012_precondition_acceptance.py"
+kind = "test"
+scope = "m012"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m012"]
+live = false
+
+[[nodes]]
+id = "test.m012.validate-m012-precondition-unit"
+path = "gate_tests/ported/tests/m012/validate_m012_precondition_unit.py"
+kind = "test"
+scope = "m012"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "git"
+depends_on = ["precondition.m012"]
+live = false
+
+[[nodes]]
+id = "test.m012.validate-m012-specification-acceptance"
+path = "gate_tests/ported/tests/m012/validate_m012_specification_acceptance.py"
+kind = "test"
+scope = "m012"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m012"]
+live = false
+
+[[nodes]]
+id = "test.m012.validate-m012-specification-unit"
+path = "gate_tests/ported/tests/m012/validate_m012_specification_unit.py"
+kind = "test"
+scope = "m012"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m012"]
+live = false
+
+[[nodes]]
+id = "test.m012.validate-m012-traceability-acceptance"
+path = "gate_tests/ported/tests/m012/validate_m012_traceability_acceptance.py"
+kind = "test"
+scope = "m012"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m012"]
+live = false
+
+[[nodes]]
+id = "test.m012.validate-m012-traceability-unit"
+path = "gate_tests/ported/tests/m012/validate_m012_traceability_unit.py"
+kind = "test"
+scope = "m012"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "process"
+depends_on = ["precondition.m012"]
+live = false
+
+[[nodes]]
+id = "test.m012.validate-page-annotation-set-acceptance"
+path = "gate_tests/ported/tests/m012/validate_page_annotation_set_acceptance.py"
+kind = "test"
+scope = "m012"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m012"]
+live = false
+
+[[nodes]]
+id = "test.m012.validate-page-annotation-set-unit"
+path = "gate_tests/ported/tests/m012/validate_page_annotation_set_unit.py"
+kind = "test"
+scope = "m012"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m012"]
+live = false
+
+[[nodes]]
+id = "test.m012.validate-pilot-corpus-acceptance"
+path = "gate_tests/ported/tests/m012/validate_pilot_corpus_acceptance.py"
+kind = "test"
+scope = "m012"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m012"]
+live = false
+
+[[nodes]]
+id = "test.m012.validate-pilot-corpus-unit"
+path = "gate_tests/ported/tests/m012/validate_pilot_corpus_unit.py"
+kind = "test"
+scope = "m012"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m012"]
+live = false
+
+[[nodes]]
+id = "test.m012.validate-strategy-backtest-benchmark-acceptance"
+path = "gate_tests/ported/tests/m012/validate_strategy_backtest_benchmark_acceptance.py"
+kind = "test"
+scope = "m012"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m012"]
+live = false
+
+[[nodes]]
+id = "test.m012.validate-strategy-backtest-benchmark-unit"
+path = "gate_tests/ported/tests/m012/validate_strategy_backtest_benchmark_unit.py"
+kind = "test"
+scope = "m012"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m012"]
+live = false
+
+[[nodes]]
+id = "test.m012.validate-verified-answer-benchmark-acceptance"
+path = "gate_tests/ported/tests/m012/validate_verified_answer_benchmark_acceptance.py"
+kind = "test"
+scope = "m012"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m012"]
+live = false
+
+[[nodes]]
+id = "test.m012.validate-verified-answer-benchmark-unit"
+path = "gate_tests/ported/tests/m012/validate_verified_answer_benchmark_unit.py"
+kind = "test"
+scope = "m012"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m012"]
+live = false
+
+[[nodes]]
+id = "test.m013.validate-backup-restore-acceptance"
+path = "gate_tests/ported/tests/m013/validate_backup_restore_acceptance.py"
+kind = "test"
+scope = "m013"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "git"
+depends_on = ["precondition.m013"]
+live = false
+
+[[nodes]]
+id = "test.m013.validate-backup-restore-unit"
+path = "gate_tests/ported/tests/m013/validate_backup_restore_unit.py"
+kind = "test"
+scope = "m013"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "process"
+depends_on = ["precondition.m013"]
+live = false
+
+[[nodes]]
+id = "test.m013.validate-document-api-wiring-acceptance"
+path = "gate_tests/ported/tests/m013/validate_document_api_wiring_acceptance.py"
+kind = "test"
+scope = "m013"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013"]
+live = false
+
+[[nodes]]
+id = "test.m013.validate-llm-gateway-real-spark-acceptance"
+path = "gate_tests/ported/tests/m013/validate_llm_gateway_real_spark_acceptance.py"
+kind = "test"
+scope = "m013"
+phase = "live"
+timeout_seconds = 120
+serial_group = "live"
+depends_on = ["precondition.m013"]
+live = true
+
+[[nodes]]
+id = "test.m013.validate-local-monitoring-acceptance"
+path = "gate_tests/ported/tests/m013/validate_local_monitoring_acceptance.py"
+kind = "test"
+scope = "m013"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "process"
+depends_on = ["precondition.m013"]
+live = false
+
+[[nodes]]
+id = "test.m013.validate-local-monitoring-unit"
+path = "gate_tests/ported/tests/m013/validate_local_monitoring_unit.py"
+kind = "test"
+scope = "m013"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "process"
+depends_on = ["precondition.m013"]
+live = false
+
+[[nodes]]
+id = "test.m013.validate-m013-network-security-acceptance"
+path = "gate_tests/ported/tests/m013/validate_m013_network_security_acceptance.py"
+kind = "test"
+scope = "m013"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "process"
+depends_on = ["precondition.m013"]
+live = false
+
+[[nodes]]
+id = "test.m013.validate-m013-network-security-unit"
+path = "gate_tests/ported/tests/m013/validate_m013_network_security_unit.py"
+kind = "test"
+scope = "m013"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "process"
+depends_on = ["precondition.m013"]
+live = false
+
+[[nodes]]
+id = "test.m013.validate-m013-precondition-acceptance"
+path = "gate_tests/ported/tests/m013/validate_m013_precondition_acceptance.py"
+kind = "test"
+scope = "m013"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013"]
+live = false
+
+[[nodes]]
+id = "test.m013.validate-m013-precondition-unit"
+path = "gate_tests/ported/tests/m013/validate_m013_precondition_unit.py"
+kind = "test"
+scope = "m013"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "git"
+depends_on = ["precondition.m013"]
+live = false
+
+[[nodes]]
+id = "test.m013.validate-m013-reality-product-acceptance"
+path = "gate_tests/ported/tests/m013/validate_m013_reality_product_acceptance.py"
+kind = "test"
+scope = "m013"
+phase = "live"
+timeout_seconds = 120
+serial_group = "live"
+depends_on = ["precondition.m013"]
+live = true
+
+[[nodes]]
+id = "test.m013.validate-m013-reality-product-unit"
+path = "gate_tests/ported/tests/m013/validate_m013_reality_product_unit.py"
+kind = "test"
+scope = "m013"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013"]
+live = false
+
+[[nodes]]
+id = "test.m013.validate-m013-specification-acceptance"
+path = "gate_tests/ported/tests/m013/validate_m013_specification_acceptance.py"
+kind = "test"
+scope = "m013"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013"]
+live = false
+
+[[nodes]]
+id = "test.m013.validate-m013-specification-unit"
+path = "gate_tests/ported/tests/m013/validate_m013_specification_unit.py"
+kind = "test"
+scope = "m013"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013"]
+live = false
+
+[[nodes]]
+id = "test.m013.validate-retention-purge-acceptance"
+path = "gate_tests/ported/tests/m013/validate_retention_purge_acceptance.py"
+kind = "test"
+scope = "m013"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013"]
+live = false
+
+[[nodes]]
+id = "test.m013.validate-retention-purge-unit"
+path = "gate_tests/ported/tests/m013/validate_retention_purge_unit.py"
+kind = "test"
+scope = "m013"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "process"
+depends_on = ["precondition.m013"]
+live = false
+
+[[nodes]]
+id = "test.m013.validate-runbooks-user-docs-acceptance"
+path = "gate_tests/ported/tests/m013/validate_runbooks_user_docs_acceptance.py"
+kind = "test"
+scope = "m013"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013"]
+live = false
+
+[[nodes]]
+id = "test.m013.validate-runbooks-user-docs-unit"
+path = "gate_tests/ported/tests/m013/validate_runbooks_user_docs_unit.py"
+kind = "test"
+scope = "m013"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "process"
+depends_on = ["precondition.m013"]
+live = false
+
+[[nodes]]
+id = "test.m013.validate-spark-failure-acceptance"
+path = "gate_tests/ported/tests/m013/validate_spark_failure_acceptance.py"
+kind = "test"
+scope = "m013"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013"]
+live = false
+
+[[nodes]]
+id = "test.m013.validate-spark-failure-unit"
+path = "gate_tests/ported/tests/m013/validate_spark_failure_unit.py"
+kind = "test"
+scope = "m013"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "process"
+depends_on = ["precondition.m013"]
+live = false
+
+[[nodes]]
+id = "test.m013.validate-ui-corpus-backend-connection-acceptance"
+path = "gate_tests/ported/tests/m013/validate_ui_corpus_backend_connection_acceptance.py"
+kind = "test"
+scope = "m013"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013"]
+live = false
+
+[[nodes]]
+id = "test.m013.validate-ui-corpus-backend-connection-unit"
+path = "gate_tests/ported/tests/m013/validate_ui_corpus_backend_connection_unit.py"
+kind = "test"
+scope = "m013"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013"]
+live = false
+
+[[nodes]]
+id = "test.m013.validate-ui-corpus-pdf-screen-acceptance"
+path = "gate_tests/ported/tests/m013/validate_ui_corpus_pdf_screen_acceptance.py"
+kind = "test"
+scope = "m013"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013"]
+live = false
+
+[[nodes]]
+id = "test.m013.validate-ui-corpus-pdf-screen-unit"
+path = "gate_tests/ported/tests/m013/validate_ui_corpus_pdf_screen_unit.py"
+kind = "test"
+scope = "m013"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013"]
+live = false
+
+[[nodes]]
+id = "test.m013.validate-ui-pdf-viewer-layout-acceptance"
+path = "gate_tests/ported/tests/m013/validate_ui_pdf_viewer_layout_acceptance.py"
+kind = "test"
+scope = "m013"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013"]
+live = false
+
+[[nodes]]
+id = "test.m013.validate-ui-pdf-viewer-layout-unit"
+path = "gate_tests/ported/tests/m013/validate_ui_pdf_viewer_layout_unit.py"
+kind = "test"
+scope = "m013"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013"]
+live = false
+
+[[nodes]]
+id = "test.m013.validate-uv-run-ui-command-acceptance"
+path = "gate_tests/ported/tests/m013/validate_uv_run_ui_command_acceptance.py"
+kind = "test"
+scope = "m013"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013"]
+live = false
+
+[[nodes]]
+id = "test.m013.validate-uv-run-ui-command-unit"
+path = "gate_tests/ported/tests/m013/validate_uv_run_ui_command_unit.py"
+kind = "test"
+scope = "m013"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013"]
+live = false
+
+[[nodes]]
+id = "test.m013.validate-v1-acceptance-report-acceptance"
+path = "gate_tests/ported/tests/m013/validate_v1_acceptance_report_acceptance.py"
+kind = "test"
+scope = "m013"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013"]
+live = false
+
+[[nodes]]
+id = "test.m013.validate-v1-acceptance-report-unit"
+path = "gate_tests/ported/tests/m013/validate_v1_acceptance_report_unit.py"
+kind = "test"
+scope = "m013"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "process"
+depends_on = ["precondition.m013"]
+live = false
+
+[[nodes]]
+id = "test.m013.validate-v1-antipatterns-acceptance"
+path = "gate_tests/ported/tests/m013/validate_v1_antipatterns_acceptance.py"
+kind = "test"
+scope = "m013"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013"]
+live = false
+
+[[nodes]]
+id = "test.m013.validate-v1-antipatterns-unit"
+path = "gate_tests/ported/tests/m013/validate_v1_antipatterns_unit.py"
+kind = "test"
+scope = "m013"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "process"
+depends_on = ["precondition.m013"]
+live = false
+
+[[nodes]]
+id = "test.m013.validate-v1-gap-decisions-acceptance"
+path = "gate_tests/ported/tests/m013/validate_v1_gap_decisions_acceptance.py"
+kind = "test"
+scope = "m013"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013"]
+live = false
+
+[[nodes]]
+id = "test.m013.validate-v1-gap-decisions-unit"
+path = "gate_tests/ported/tests/m013/validate_v1_gap_decisions_unit.py"
+kind = "test"
+scope = "m013"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013"]
+live = false
+
+[[nodes]]
+id = "test.m013.validate-v1-regression-suite-acceptance"
+path = "gate_tests/ported/tests/m013/validate_v1_regression_suite_acceptance.py"
+kind = "test"
+scope = "m013"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013"]
+live = false
+
+[[nodes]]
+id = "test.m013.validate-v1-regression-suite-unit"
+path = "gate_tests/ported/tests/m013/validate_v1_regression_suite_unit.py"
+kind = "test"
+scope = "m013"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "process"
+depends_on = ["precondition.m013"]
+live = false
+
+[[nodes]]
+id = "test.m013-config.validate-application-config-loader-acceptance"
+path = "gate_tests/ported/tests/m013_config/validate_application_config_loader_acceptance.py"
+kind = "test"
+scope = "m013_config"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013_config"]
+live = false
+
+[[nodes]]
+id = "test.m013-config.validate-application-config-loader-dependencies-unit"
+path = "gate_tests/ported/tests/m013_config/validate_application_config_loader_dependencies_unit.py"
+kind = "test"
+scope = "m013_config"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013_config"]
+live = false
+
+[[nodes]]
+id = "test.m013-config.validate-application-config-loader-unit"
+path = "gate_tests/ported/tests/m013_config/validate_application_config_loader_unit.py"
+kind = "test"
+scope = "m013_config"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013_config"]
+live = false
+
+[[nodes]]
+id = "test.m013-config.validate-application-config-specification-acceptance"
+path = "gate_tests/ported/tests/m013_config/validate_application_config_specification_acceptance.py"
+kind = "test"
+scope = "m013_config"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013_config"]
+live = false
+
+[[nodes]]
+id = "test.m013-config.validate-application-config-specification-unit"
+path = "gate_tests/ported/tests/m013_config/validate_application_config_specification_unit.py"
+kind = "test"
+scope = "m013_config"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "git"
+depends_on = ["precondition.m013_config"]
+live = false
+
+[[nodes]]
+id = "test.m013-config.validate-compose-config-file-acceptance"
+path = "gate_tests/ported/tests/m013_config/validate_compose_config_file_acceptance.py"
+kind = "test"
+scope = "m013_config"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013_config"]
+live = false
+
+[[nodes]]
+id = "test.m013-config.validate-compose-config-file-unit"
+path = "gate_tests/ported/tests/m013_config/validate_compose_config_file_unit.py"
+kind = "test"
+scope = "m013_config"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "process"
+depends_on = ["precondition.m013_config"]
+live = false
+
+[[nodes]]
+id = "test.m013-config.validate-config-runbooks-acceptance"
+path = "gate_tests/ported/tests/m013_config/validate_config_runbooks_acceptance.py"
+kind = "test"
+scope = "m013_config"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "git"
+depends_on = ["precondition.m013_config"]
+live = false
+
+[[nodes]]
+id = "test.m013-config.validate-config-runbooks-unit"
+path = "gate_tests/ported/tests/m013_config/validate_config_runbooks_unit.py"
+kind = "test"
+scope = "m013_config"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "git"
+depends_on = ["precondition.m013_config"]
+live = false
+
+[[nodes]]
+id = "test.m013-config.validate-environment-input-rejection-acceptance"
+path = "gate_tests/ported/tests/m013_config/validate_environment_input_rejection_acceptance.py"
+kind = "test"
+scope = "m013_config"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013_config"]
+live = false
+
+[[nodes]]
+id = "test.m013-config.validate-environment-input-rejection-unit"
+path = "gate_tests/ported/tests/m013_config/validate_environment_input_rejection_unit.py"
+kind = "test"
+scope = "m013_config"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013_config"]
+live = false
+
+[[nodes]]
+id = "test.m013-config.validate-llm-gateway-config-file-acceptance"
+path = "gate_tests/ported/tests/m013_config/validate_llm_gateway_config_file_acceptance.py"
+kind = "test"
+scope = "m013_config"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "process"
+depends_on = ["precondition.m013_config"]
+live = false
+
+[[nodes]]
+id = "test.m013-config.validate-llm-gateway-config-file-unit"
+path = "gate_tests/ported/tests/m013_config/validate_llm_gateway_config_file_unit.py"
+kind = "test"
+scope = "m013_config"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "process"
+depends_on = ["precondition.m013_config"]
+live = false
+
+[[nodes]]
+id = "test.m013-config.validate-m013-config-traceability-acceptance"
+path = "gate_tests/ported/tests/m013_config/validate_m013_config_traceability_acceptance.py"
+kind = "test"
+scope = "m013_config"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013_config"]
+live = false
+
+[[nodes]]
+id = "test.m013-config.validate-m013-config-traceability-unit"
+path = "gate_tests/ported/tests/m013_config/validate_m013_config_traceability_unit.py"
+kind = "test"
+scope = "m013_config"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "git"
+depends_on = ["precondition.m013_config"]
+live = false
+
+[[nodes]]
+id = "test.m013-fastapi.resolve-m013-fastapi-live-gateway"
+path = "gate_tests/ported/tests/m013_fastapi/resolve_m013_fastapi_live_gateway.py"
+kind = "test"
+scope = "m013_fastapi"
+phase = "live"
+timeout_seconds = 120
+serial_group = "live"
+depends_on = ["precondition.m013_fastapi"]
+live = true
+
+[[nodes]]
+id = "test.m013-fastapi.resolve-m013-fastapi-python"
+path = "gate_tests/ported/tests/m013_fastapi/resolve_m013_fastapi_python.py"
+kind = "test"
+scope = "m013_fastapi"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013_fastapi"]
+live = false
+
+[[nodes]]
+id = "test.m013-fastapi.validate-api-ui-iteration2-acceptance"
+path = "gate_tests/ported/tests/m013_fastapi/validate_api_ui_iteration2_acceptance.py"
+kind = "test"
+scope = "m013_fastapi"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013_fastapi"]
+live = false
+
+[[nodes]]
+id = "test.m013-fastapi.validate-document-command-router-unit"
+path = "gate_tests/ported/tests/m013_fastapi/validate_document_command_router_unit.py"
+kind = "test"
+scope = "m013_fastapi"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013_fastapi"]
+live = false
+
+[[nodes]]
+id = "test.m013-fastapi.validate-document-commands-http-acceptance"
+path = "gate_tests/ported/tests/m013_fastapi/validate_document_commands_http_acceptance.py"
+kind = "test"
+scope = "m013_fastapi"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013_fastapi"]
+live = false
+
+[[nodes]]
+id = "test.m013-fastapi.validate-document-http-live-acceptance"
+path = "gate_tests/ported/tests/m013_fastapi/validate_document_http_live_acceptance.py"
+kind = "test"
+scope = "m013_fastapi"
+phase = "live"
+timeout_seconds = 120
+serial_group = "live"
+depends_on = ["precondition.m013_fastapi"]
+live = true
+
+[[nodes]]
+id = "test.m013-fastapi.validate-document-persistence-restart-acceptance"
+path = "gate_tests/ported/tests/m013_fastapi/validate_document_persistence_restart_acceptance.py"
+kind = "test"
+scope = "m013_fastapi"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "process"
+depends_on = ["precondition.m013_fastapi"]
+live = false
+
+[[nodes]]
+id = "test.m013-fastapi.validate-document-persistence-unit"
+path = "gate_tests/ported/tests/m013_fastapi/validate_document_persistence_unit.py"
+kind = "test"
+scope = "m013_fastapi"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013_fastapi"]
+live = false
+
+[[nodes]]
+id = "test.m013-fastapi.validate-document-queries-unit"
+path = "gate_tests/ported/tests/m013_fastapi/validate_document_queries_unit.py"
+kind = "test"
+scope = "m013_fastapi"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013_fastapi"]
+live = false
+
+[[nodes]]
+id = "test.m013-fastapi.validate-document-read-models-acceptance"
+path = "gate_tests/ported/tests/m013_fastapi/validate_document_read_models_acceptance.py"
+kind = "test"
+scope = "m013_fastapi"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013_fastapi"]
+live = false
+
+[[nodes]]
+id = "test.m013-fastapi.validate-document-worker-live"
+path = "gate_tests/ported/tests/m013_fastapi/validate_document_worker_live.py"
+kind = "test"
+scope = "m013_fastapi"
+phase = "live"
+timeout_seconds = 120
+serial_group = "live"
+depends_on = ["precondition.m013_fastapi"]
+live = true
+
+[[nodes]]
+id = "test.m013-fastapi.validate-document-worker-runtime-acceptance"
+path = "gate_tests/ported/tests/m013_fastapi/validate_document_worker_runtime_acceptance.py"
+kind = "test"
+scope = "m013_fastapi"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013_fastapi"]
+live = false
+
+[[nodes]]
+id = "test.m013-fastapi.validate-existing-api-contract-parity-acceptance"
+path = "gate_tests/ported/tests/m013_fastapi/validate_existing_api_contract_parity_acceptance.py"
+kind = "test"
+scope = "m013_fastapi"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013_fastapi"]
+live = false
+
+[[nodes]]
+id = "test.m013-fastapi.validate-existing-api-routers-unit"
+path = "gate_tests/ported/tests/m013_fastapi/validate_existing_api_routers_unit.py"
+kind = "test"
+scope = "m013_fastapi"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013_fastapi"]
+live = false
+
+[[nodes]]
+id = "test.m013-fastapi.validate-fastapi-architecture-policy-unit"
+path = "gate_tests/ported/tests/m013_fastapi/validate_fastapi_architecture_policy_unit.py"
+kind = "test"
+scope = "m013_fastapi"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013_fastapi"]
+live = false
+
+[[nodes]]
+id = "test.m013-fastapi.validate-fastapi-specification-acceptance"
+path = "gate_tests/ported/tests/m013_fastapi/validate_fastapi_specification_acceptance.py"
+kind = "test"
+scope = "m013_fastapi"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013_fastapi"]
+live = false
+
+[[nodes]]
+id = "test.m013-fastapi.validate-job-outbox-boundary-acceptance"
+path = "gate_tests/ported/tests/m013_fastapi/validate_job_outbox_boundary_acceptance.py"
+kind = "test"
+scope = "m013_fastapi"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013_fastapi"]
+live = false
+
+[[nodes]]
+id = "test.m013-fastapi.validate-job-outbox-boundary-live"
+path = "gate_tests/ported/tests/m013_fastapi/validate_job_outbox_boundary_live.py"
+kind = "test"
+scope = "m013_fastapi"
+phase = "live"
+timeout_seconds = 120
+serial_group = "live"
+depends_on = ["precondition.m013_fastapi"]
+live = true
+
+[[nodes]]
+id = "test.m013-fastapi.validate-ka-projection-persistence-live"
+path = "gate_tests/ported/tests/m013_fastapi/validate_ka_projection_persistence_live.py"
+kind = "test"
+scope = "m013_fastapi"
+phase = "live"
+timeout_seconds = 120
+serial_group = "live"
+depends_on = ["precondition.m013_fastapi"]
+live = true
+
+[[nodes]]
+id = "test.m013-fastapi.validate-ka-projection-persistence-unit"
+path = "gate_tests/ported/tests/m013_fastapi/validate_ka_projection_persistence_unit.py"
+kind = "test"
+scope = "m013_fastapi"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013_fastapi"]
+live = false
+
+[[nodes]]
+id = "test.m013-fastapi.validate-live-gateway-harness-acceptance"
+path = "gate_tests/ported/tests/m013_fastapi/validate_live_gateway_harness_acceptance.py"
+kind = "test"
+scope = "m013_fastapi"
+phase = "live"
+timeout_seconds = 120
+serial_group = "live"
+depends_on = ["precondition.m013_fastapi"]
+live = true
+
+[[nodes]]
+id = "test.m013-fastapi.validate-m013-fastapi-traceability-unit"
+path = "gate_tests/ported/tests/m013_fastapi/validate_m013_fastapi_traceability_unit.py"
+kind = "test"
+scope = "m013_fastapi"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013_fastapi"]
+live = false
+
+[[nodes]]
+id = "test.m013-fastapi.validate-orchestrator-app-factory-unit"
+path = "gate_tests/ported/tests/m013_fastapi/validate_orchestrator_app_factory_unit.py"
+kind = "test"
+scope = "m013_fastapi"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013_fastapi"]
+live = false
+
+[[nodes]]
+id = "test.m013-fastapi.validate-orchestrator-asgi-health-acceptance"
+path = "gate_tests/ported/tests/m013_fastapi/validate_orchestrator_asgi_health_acceptance.py"
+kind = "test"
+scope = "m013_fastapi"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013_fastapi"]
+live = false
+
+[[nodes]]
+id = "test.m013-fastapi.validate-orchestrator-deployment-acceptance"
+path = "gate_tests/ported/tests/m013_fastapi/validate_orchestrator_deployment_acceptance.py"
+kind = "test"
+scope = "m013_fastapi"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "process"
+depends_on = ["precondition.m013_fastapi"]
+live = false
+
+[[nodes]]
+id = "test.m013-fastapi.validate-orchestrator-deployment-unit"
+path = "gate_tests/ported/tests/m013_fastapi/validate_orchestrator_deployment_unit.py"
+kind = "test"
+scope = "m013_fastapi"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013_fastapi"]
+live = false
+
+[[nodes]]
+id = "test.m013-fastapi.validate-original-pdf-retrieval-acceptance"
+path = "gate_tests/ported/tests/m013_fastapi/validate_original_pdf_retrieval_acceptance.py"
+kind = "test"
+scope = "m013_fastapi"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013_fastapi"]
+live = false
+
+[[nodes]]
+id = "test.m013-fastapi.validate-original-pdf-stream-unit"
+path = "gate_tests/ported/tests/m013_fastapi/validate_original_pdf_stream_unit.py"
+kind = "test"
+scope = "m013_fastapi"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013_fastapi"]
+live = false
+
+[[nodes]]
+id = "test.m013-fastapi.validate-postgres-migration-upgrade-live"
+path = "gate_tests/ported/tests/m013_fastapi/validate_postgres_migration_upgrade_live.py"
+kind = "test"
+scope = "m013_fastapi"
+phase = "live"
+timeout_seconds = 120
+serial_group = "live"
+depends_on = ["precondition.m013_fastapi"]
+live = true
+
+[[nodes]]
+id = "test.m013-fastapi.validate-precondition-acceptance"
+path = "gate_tests/ported/tests/m013_fastapi/validate_precondition_acceptance.py"
+kind = "test"
+scope = "m013_fastapi"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "git"
+depends_on = ["precondition.m013_fastapi"]
+live = false
+
+[[nodes]]
+id = "test.m013-fastapi.validate-precondition-unit"
+path = "gate_tests/ported/tests/m013_fastapi/validate_precondition_unit.py"
+kind = "test"
+scope = "m013_fastapi"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013_fastapi"]
+live = false
+
+[[nodes]]
+id = "test.m013-fastapi.validate-projection-queries-unit"
+path = "gate_tests/ported/tests/m013_fastapi/validate_projection_queries_unit.py"
+kind = "test"
+scope = "m013_fastapi"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013_fastapi"]
+live = false
+
+[[nodes]]
+id = "test.m013-fastapi.validate-projection-read-model-acceptance"
+path = "gate_tests/ported/tests/m013_fastapi/validate_projection_read_model_acceptance.py"
+kind = "test"
+scope = "m013_fastapi"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013_fastapi"]
+live = false
+
+[[nodes]]
+id = "test.m013-fastapi.validate-reproducible-operations-acceptance"
+path = "gate_tests/ported/tests/m013_fastapi/validate_reproducible_operations_acceptance.py"
+kind = "test"
+scope = "m013_fastapi"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "git"
+depends_on = ["precondition.m013_fastapi"]
+live = false
+
+[[nodes]]
+id = "test.m013-fastapi.validate-review3-api-architecture-acceptance"
+path = "gate_tests/ported/tests/m013_fastapi/validate_review3_api_architecture_acceptance.py"
+kind = "test"
+scope = "m013_fastapi"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013_fastapi"]
+live = false
+
+[[nodes]]
+id = "test.m013-fastapi.validate-review3-deployment-acceptance"
+path = "gate_tests/ported/tests/m013_fastapi/validate_review3_deployment_acceptance.py"
+kind = "test"
+scope = "m013_fastapi"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "git"
+depends_on = ["precondition.m013_fastapi"]
+live = false
+
+[[nodes]]
+id = "test.m013-fastapi.validate-review3-deployment-live"
+path = "gate_tests/ported/tests/m013_fastapi/validate_review3_deployment_live.py"
+kind = "test"
+scope = "m013_fastapi"
+phase = "live"
+timeout_seconds = 120
+serial_group = "live"
+depends_on = ["precondition.m013_fastapi"]
+live = true
+
+[[nodes]]
+id = "test.m013-fastapi.validate-review3-maintenance-acceptance"
+path = "gate_tests/ported/tests/m013_fastapi/validate_review3_maintenance_acceptance.py"
+kind = "test"
+scope = "m013_fastapi"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013_fastapi"]
+live = false
+
+[[nodes]]
+id = "test.m013-fastapi.validate-review3-safety-acceptance"
+path = "gate_tests/ported/tests/m013_fastapi/validate_review3_safety_acceptance.py"
+kind = "test"
+scope = "m013_fastapi"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013_fastapi"]
+live = false
+
+[[nodes]]
+id = "test.m013-fastapi.validate-review3-safety-live"
+path = "gate_tests/ported/tests/m013_fastapi/validate_review3_safety_live.py"
+kind = "test"
+scope = "m013_fastapi"
+phase = "live"
+timeout_seconds = 120
+serial_group = "live"
+depends_on = ["precondition.m013_fastapi"]
+live = true
+
+[[nodes]]
+id = "test.m013-fastapi.validate-review3-ui-security-acceptance"
+path = "gate_tests/ported/tests/m013_fastapi/validate_review3_ui_security_acceptance.py"
+kind = "test"
+scope = "m013_fastapi"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013_fastapi"]
+live = false
+
+[[nodes]]
+id = "test.m013-fastapi.validate-review3-ui-security-live"
+path = "gate_tests/ported/tests/m013_fastapi/validate_review3_ui_security_live.py"
+kind = "test"
+scope = "m013_fastapi"
+phase = "live"
+timeout_seconds = 120
+serial_group = "live"
+depends_on = ["precondition.m013_fastapi"]
+live = true
+
+[[nodes]]
+id = "test.m013-fastapi.validate-review-governance-performance-acceptance"
+path = "gate_tests/ported/tests/m013_fastapi/validate_review_governance_performance_acceptance.py"
+kind = "test"
+scope = "m013_fastapi"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "process"
+depends_on = ["precondition.m013_fastapi"]
+live = false
+
+[[nodes]]
+id = "test.m013-fastapi.validate-runtime-operations-acceptance"
+path = "gate_tests/ported/tests/m013_fastapi/validate_runtime_operations_acceptance.py"
+kind = "test"
+scope = "m013_fastapi"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "process"
+depends_on = ["precondition.m013_fastapi"]
+live = false
+
+[[nodes]]
+id = "test.m013-fastapi.validate-ui-document-api-client-unit"
+path = "gate_tests/ported/tests/m013_fastapi/validate_ui_document_api_client_unit.py"
+kind = "test"
+scope = "m013_fastapi"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013_fastapi"]
+live = false
+
+[[nodes]]
+id = "test.m013-fastapi.validate-ui-orchestrator-document-flow-acceptance"
+path = "gate_tests/ported/tests/m013_fastapi/validate_ui_orchestrator_document_flow_acceptance.py"
+kind = "test"
+scope = "m013_fastapi"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "process"
+depends_on = ["precondition.m013_fastapi"]
+live = false
+
+[[nodes]]
+id = "test.m013-fastapi.validate-ui-product-contracts-unit"
+path = "gate_tests/ported/tests/m013_fastapi/validate_ui_product_contracts_unit.py"
+kind = "test"
+scope = "m013_fastapi"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013_fastapi"]
+live = false
+
+[[nodes]]
+id = "test.m013-fastapi.validate-worker-data-resilience-acceptance"
+path = "gate_tests/ported/tests/m013_fastapi/validate_worker_data_resilience_acceptance.py"
+kind = "test"
+scope = "m013_fastapi"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013_fastapi"]
+live = false

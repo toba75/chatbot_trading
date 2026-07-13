@@ -20,7 +20,18 @@ dependencies = [
 [project.scripts]
 api = "app.platform.orchestrator_command:main"
 ui = "app.platform.ui_command:main"
+gate = "ost_gate.cli:main"
+backup-v1 = "ost_gate.operations.backup:main"
+restore-v1 = "ost_gate.operations.restore:main"
+rebuild-knowledge-projection = "ost_gate.operations.rebuild_knowledge_projection:main"
+
+[dependency-groups]
+dev = [
+    "pytest==8.4.2",
+    "pytest-timeout==2.4.0",
+    "pytest-xdist==3.8.0",
+]
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["app*"]
+include = ["app*", "ost_gate*"]

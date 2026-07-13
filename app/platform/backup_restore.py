@@ -371,12 +371,10 @@ def build_m013_backup_restore_drill() -> BackupRestoreDrill:
         manifest_id="M013-BACKUP-MANIFEST-0001",
         contract_version=BACKUP_MANIFEST_CONTRACT_VERSION,
         backup_command=(
-            "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\backup_v1.ps1 "
-            "-Manifest .\\restore\\manifest.json"
+            "uv run backup-v1 --manifest .\\restore\\manifest.json"
         ),
         restore_command=(
-            "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\restore_v1.ps1 "
-            "-Manifest .\\restore\\manifest.json -Target C:\\restore\\m013-isolated"
+            "uv run restore-v1 --manifest .\\restore\\manifest.json --target C:\\restore\\m013-isolated"
         ),
         restore_target="local_isolated",
         archive_encrypted=True,
