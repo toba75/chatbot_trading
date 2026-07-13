@@ -33,6 +33,53 @@ def test_historical_references_are_closed_and_immutable() -> None:
         )
 
 
+def test_local_runtime_assets_are_not_historical_sources(tmp_path: Path) -> None:
+    repository_root = tmp_path / "repository"
+    allowlist_path = (
+        repository_root
+        / "docs"
+        / "governance"
+        / "historical_reference_allowlist.json"
+    )
+    runtime_asset = (
+        repository_root
+        / "data"
+        / "docling_assets"
+        / "granite"
+        / "tokenizer.json"
+    )
+    historical_source = repository_root / "docs" / "adr" / "legacy.md"
+    historical_content = b"# Decision historique\n\nPowerShell reste archive.\n"
+    allowlist_path.parent.mkdir(parents=True)
+    runtime_asset.parent.mkdir(parents=True)
+    historical_source.parent.mkdir(parents=True)
+    historical_source.write_bytes(historical_content)
+    allowlist_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "allowed_paths": [
+                    {
+                        "path": "docs/adr/legacy.md",
+                        "reason": "preuve historique",
+                        "sha256": hashlib.sha256(historical_content).hexdigest(),
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    runtime_asset.write_text(
+        '{"metadata": "PowerShell runtime asset"}',
+        encoding="utf-8",
+    )
+    _run_git(repository_root, "init", "--quiet")
+    _run_git(repository_root, "config", "core.autocrlf", "false")
+    _run_git(repository_root, "add", "docs")
+
+    validate_historical_references(repository_root)
+
+
 def _assert_allowlist_uses_index_content_across_crlf_and_rejects_semantic_edit(
     tmp_path: Path,
 ) -> None:
