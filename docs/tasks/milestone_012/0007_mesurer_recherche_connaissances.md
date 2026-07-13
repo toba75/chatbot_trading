@@ -27,11 +27,11 @@
   - Given un jeu de 100 à 300 questions avec pages attendues.
   - When la recherche de connaissances est exécutée sur la projection versionnée du corpus pilote.
   - Then les métriques de rappel, rang, diversité et couverture sont publiées avec les échecs visibles.
-- Tests d'acceptation à écrire: `tests/m012/validate_knowledge_search_benchmark_acceptance.ps1`, qui échoue si le jeu contient moins de 100 ou plus de 300 questions, si une question n'a pas de page attendue, si Recall@5/10/20, MRR ou nDCG manque, ou si un candidat sans provenance est compté.
+- Tests d'acceptation à écrire: `uv run --locked gate`, qui échoue si le jeu contient moins de 100 ou plus de 300 questions, si une question n'a pas de page attendue, si Recall@5/10/20, MRR ou nDCG manque, ou si un candidat sans provenance est compté.
 - Tests unitaires à écrire: tests de calcul Recall@K, MRR, nDCG, exactitude de page, diversité documentaire, couverture de sous-thèmes, question sans page attendue, résultat dupliqué, projection obsolète et candidate sans `SourceLocator`.
 - Implémentation attendue: créer le jeu d'évaluation recherche, le runner KA, les calculateurs de métriques, le rapport de benchmark et les validations de projection versionnée.
 - Invariants et garde-fous: aucun retrait silencieux de question; aucune métrique sans dénominateur; aucune promotion si la projection est obsolète; aucune lecture de stockage KA par un autre contexte en dehors des ports.
 - Dépendances: T-004; `app/knowledge_access`; `docs/specs/m005_projection_connaissance_recherchable.md`; DDD-ADR-004; ADR-005.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m012\validate_knowledge_search_benchmark_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m012\validate_knowledge_search_benchmark_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m012_specification.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m012): couvrir le benchmark recherche`
 - Commit GREEN: `feat(m012): mesurer la recherche de connaissances`

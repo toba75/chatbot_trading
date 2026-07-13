@@ -189,25 +189,25 @@ Les garde-fous de mission sont explicites: aucune assertion factuelle non suppor
 
 | Comportement | Invariant | Scénario BDD | Test RED | ADR | Commande |
 |---|---|---|---|---|---|
-| RA-001 - Spécification exécutable M-007 | La spécification nomme mission RA, agrégats, objets-valeur, politiques, états, ports, événements, API, erreurs, métriques, exclusions et garde-fous. | Given un brouillon contenant une assertion factuelle importante; When la spécification M-007 est publiée; Then elle est validée par commande PowerShell. | T-002 | ADR-006; ADR-010; DDD-ADR-003; DDD-ADR-005; DDD-ADR-007; DDD-ADR-008 | powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m007_specification.ps1 |
-| RA-002 - Cas de recherche avec mandat explicite | Un ResearchCase possède question autonome et ResearchMandate explicite. | Given une question autonome et un mandat explicite; When RA ouvre un ResearchCase; Then le cas est CREATED avec mandat figé. | T-003 | ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_research_case_mandate_acceptance.ps1 |
-| RA-003 - Jeu de preuves scellé | EvidenceSet est scellé avant publication et ne change pas après réponse publiée. | Given des preuves candidates et claims vérifiés; When RA scelle le jeu de preuves; Then la version d'EvidenceSet est figée et rattachée à l'Answer. | T-004 | DDD-ADR-003; DDD-ADR-008 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_evidence_set_sealing_acceptance.ps1 |
-| RA-004 - Contradictions et lacunes classées | ContradictionAssessment et KnowledgeGap conservent portée et conditions. | Given deux claims opposés sur des horizons différents; When RA analyse les contradictions; Then la relation est qualifiée sans contradiction générale abusive. | T-005 | DDD-ADR-005 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_contradiction_gap_acceptance.ps1 |
-| RA-005 - Assertions de réponse extraites | Toute assertion importante du brouillon est évaluée. | Given un brouillon contenant une assertion factuelle importante; When RA extrait les assertions; Then chaque AnswerAssertion est reliée à origine, support attendu ou retrait. | T-006 | DDD-ADR-005; DDD-ADR-007 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_answer_assertion_extraction_acceptance.ps1 |
-| RA-006 - Support et citations évalués | SUPPORTED exige support et Citation ouvrable pour chaque assertion importante conservée. | Given une assertion non supportée et une citation absente; When RA évalue le support; Then ANSWER_ASSERTION_UNSUPPORTED ou ANSWER_CITATION_UNRESOLVABLE bloque SUPPORTED. | T-007 | ADR-006; DDD-ADR-003; DDD-ADR-005; DDD-ADR-007 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_answer_support_acceptance.ps1 |
-| RA-007 - Abstention données actuelles | Une donnée actuelle requise mais non autorisée produit abstention explicite. | Given une question nécessitant des prix récents; When aucune donnée actuelle n'est autorisée; Then REQUIRES_CURRENT_DATA est publié sans niveau de marché fabriqué. | T-008 | DDD-ADR-007 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_current_data_abstention_acceptance.ps1 |
-| RA-008 - Commande publique de réponse documentaire | POST /v1/answer expose le contrat RA sans stockage interne ni prompt public. | Given un ResearchMandate valide; When POST /v1/answer est appelé; Then la réponse publique contient VerifiedResearchOutcome, SupportStatus, citations, conflits et lacunes. | T-009 | ADR-010; DDD-ADR-003; DDD-ADR-005 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_answer_http_contract_acceptance.ps1 |
-| RA-009 - Traçabilité et métriques M-007 | Chaque exigence M-007 possède test, commande, ADR et métrique sans payload documentaire complet. | Given les preuves M-007; When les gates s'exécutent; Then traceability, test, lint et validate_m007_specification sont enrôlés. | T-010 | ADR-006; ADR-010; DDD-ADR-005; DDD-ADR-008 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_m007_traceability_acceptance.ps1 |
+| RA-001 - Spécification exécutable M-007 | La spécification nomme mission RA, agrégats, objets-valeur, politiques, états, ports, événements, API, erreurs, métriques, exclusions et garde-fous. | Given un brouillon contenant une assertion factuelle importante; When la spécification M-007 est publiée; Then elle est validée par commande uv run --locked gate
+| RA-002 - Cas de recherche avec mandat explicite | Un ResearchCase possède question autonome et ResearchMandate explicite. | Given une question autonome et un mandat explicite; When RA ouvre un ResearchCase; Then le cas est CREATED avec mandat figé. | T-003 | ADR-010 | uv run --locked gate
+| RA-003 - Jeu de preuves scellé | EvidenceSet est scellé avant publication et ne change pas après réponse publiée. | Given des preuves candidates et claims vérifiés; When RA scelle le jeu de preuves; Then la version d'EvidenceSet est figée et rattachée à l'Answer. | T-004 | DDD-ADR-003; DDD-ADR-008 | uv run --locked gate
+| RA-004 - Contradictions et lacunes classées | ContradictionAssessment et KnowledgeGap conservent portée et conditions. | Given deux claims opposés sur des horizons différents; When RA analyse les contradictions; Then la relation est qualifiée sans contradiction générale abusive. | T-005 | DDD-ADR-005 | uv run --locked gate
+| RA-005 - Assertions de réponse extraites | Toute assertion importante du brouillon est évaluée. | Given un brouillon contenant une assertion factuelle importante; When RA extrait les assertions; Then chaque AnswerAssertion est reliée à origine, support attendu ou retrait. | T-006 | DDD-ADR-005; DDD-ADR-007 | uv run --locked gate
+| RA-006 - Support et citations évalués | SUPPORTED exige support et Citation ouvrable pour chaque assertion importante conservée. | Given une assertion non supportée et une citation absente; When RA évalue le support; Then ANSWER_ASSERTION_UNSUPPORTED ou ANSWER_CITATION_UNRESOLVABLE bloque SUPPORTED. | T-007 | ADR-006; DDD-ADR-003; DDD-ADR-005; DDD-ADR-007 | uv run --locked gate
+| RA-007 - Abstention données actuelles | Une donnée actuelle requise mais non autorisée produit abstention explicite. | Given une question nécessitant des prix récents; When aucune donnée actuelle n'est autorisée; Then REQUIRES_CURRENT_DATA est publié sans niveau de marché fabriqué. | T-008 | DDD-ADR-007 | uv run --locked gate
+| RA-008 - Commande publique de réponse documentaire | POST /v1/answer expose le contrat RA sans stockage interne ni prompt public. | Given un ResearchMandate valide; When POST /v1/answer est appelé; Then la réponse publique contient VerifiedResearchOutcome, SupportStatus, citations, conflits et lacunes. | T-009 | ADR-010; DDD-ADR-003; DDD-ADR-005 | uv run --locked gate
+| RA-009 - Traçabilité et métriques M-007 | Chaque exigence M-007 possède test, commande, ADR et métrique sans payload documentaire complet. | Given les preuves M-007; When les gates s'exécutent; Then traceability, test, lint et validate_m007_specification sont enrôlés. | T-010 | ADR-006; ADR-010; DDD-ADR-005; DDD-ADR-008 | uv run --locked gate
 
 ## Commandes de validation
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_m007_specification_acceptance.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_m007_specification_unit.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m007_specification.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_traceability.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1
+```console
+uv run --locked gate
+uv run --locked gate
+uv run --locked gate
+uv run --locked gate
+uv run --locked gate
+uv run --locked gate
 ```
 
 ## Exclusions M-007

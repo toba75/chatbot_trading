@@ -64,7 +64,7 @@ Règles permanentes:
 
 Commande de vérification avant de détailler un milestone:
 
-```powershell
+```console
 git fetch origin --prune
 git ls-tree -r --name-only master -- docs/tasks docs/adr docs/specs
 ```

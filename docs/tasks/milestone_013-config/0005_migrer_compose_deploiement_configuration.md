@@ -32,11 +32,11 @@
   - Given le fichier `config/application.yaml` est monté en lecture seule dans les services applicatifs.
   - When la pile locale est validée et démarrée.
   - Then chaque processus reçoit `--config`, aucune valeur applicative n'est transmise par `environment:` ou `env_file`, et la frontière Spark reste contrôlée.
-- Tests d'acceptation à écrire: `tests/m013_config/validate_compose_config_file_acceptance.ps1`, couvrant absence de `env_file`, absence des anciennes variables applicatives dans Compose, présence de `--config`, montage read-only et refus d'un service qui expose une valeur applicative par environnement.
-- Tests unitaires à écrire: `tests/m013_config/validate_compose_config_file_unit.ps1`, couvrant parsing Compose, détection des services applicatifs, liste autorisée des variables non applicatives si indispensable au runtime conteneur, et refus des clés historiques.
-- Implémentation attendue: adapter `deploy/local-compose/compose.yaml`, `app/platform/local_compose.py`, `scripts/validate_local_compose.ps1` et README Compose pour lire et contrôler `config/application.yaml`; maintenir les contrôles de ports, réseaux, secrets et healthchecks.
+- Tests d'acceptation à écrire: `uv run --locked gate`, couvrant absence de `env_file`, absence des anciennes variables applicatives dans Compose, présence de `--config`, montage read-only et refus d'un service qui expose une valeur applicative par environnement.
+- Tests unitaires à écrire: `uv run --locked gate`, couvrant parsing Compose, détection des services applicatifs, liste autorisée des variables non applicatives si indispensable au runtime conteneur, et refus des clés historiques.
+- Implémentation attendue: adapter `deploy/local-compose/compose.yaml`, `app/platform/local_compose.py`, `uv run --locked gate` et README Compose pour lire et contrôler `config/application.yaml`; maintenir les contrôles de ports, réseaux, secrets et healthchecks.
 - Invariants et garde-fous: `environment:` ne transporte aucune configuration applicative; `env_file` est interdit; le fichier de configuration est monté `:ro`; aucun service interne n'est publié.
-- Dépendances: T-003; T-004; `deploy/local-compose/compose.yaml`; `app/platform/local_compose.py`; `scripts/validate_local_compose.ps1`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_compose_config_file_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_compose_config_file_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_local_compose.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Dépendances: T-003; T-004; `deploy/local-compose/compose.yaml`; `app/platform/local_compose.py`; `uv run --locked gate`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(platform): couvrir compose sans environnement applicatif`.
 - Commit GREEN: `feat(platform): piloter compose par application yaml`.

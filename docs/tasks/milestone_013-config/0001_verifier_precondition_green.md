@@ -32,11 +32,11 @@
   - Given le sous-milestone `M13-config` est demandé.
   - When la précondition de planification est contrôlée contre `master` et les gates locales.
   - Then M-000 à M-012 sont présents, M-013 n'est pas exigé comme clôturé, et les gates de gouvernance restent GREEN.
-- Tests d'acceptation à écrire: aucun nouveau test d'acceptation fonctionnel; réutiliser `tests/governance/validate_task_system_acceptance.ps1` pour la règle de sous-milestone.
-- Tests unitaires à écrire: aucun nouveau test unitaire applicatif; réutiliser `tests/governance/validate_task_system_unit.ps1`.
+- Tests d'acceptation à écrire: aucun nouveau test d'acceptation fonctionnel; réutiliser `uv run --locked gate` pour la règle de sous-milestone.
+- Tests unitaires à écrire: aucun nouveau test unitaire applicatif; réutiliser `uv run --locked gate`.
 - Implémentation attendue: produire le rapport de précondition dans `docs/tasks/milestone_013-config/journal.md` avec les commandes exécutées, les références Git observées et le statut GREEN/RED.
 - Invariants et garde-fous: ne pas modifier `app/...`; ne pas traiter `milestone_013-config` comme une clôture de `milestone_013`; ne pas ignorer un RED préexistant.
-- Dépendances: `AGENTS.md`; `docs/tasks/README.md`; `scripts/validate_task_system.ps1`; `docs/specs/plan_implementation_milestones_workstreams.md`.
-- Commandes de validation: `git fetch origin --prune`; `git ls-tree -r --name-only master -- docs/tasks/milestone_000 docs/tasks/milestone_001 docs/tasks/milestone_002 docs/tasks/milestone_003 docs/tasks/milestone_004 docs/tasks/milestone_005 docs/tasks/milestone_006 docs/tasks/milestone_007 docs/tasks/milestone_008 docs/tasks/milestone_009 docs/tasks/milestone_010 docs/tasks/milestone_011 docs/tasks/milestone_012`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_task_system.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Dépendances: `AGENTS.md`; `docs/tasks/README.md`; `uv run --locked gate`; `docs/specs/plan_implementation_milestones_workstreams.md`.
+- Commandes de validation: `git fetch origin --prune`; `git ls-tree -r --name-only master -- docs/tasks/milestone_000 docs/tasks/milestone_001 docs/tasks/milestone_002 docs/tasks/milestone_003 docs/tasks/milestone_004 docs/tasks/milestone_005 docs/tasks/milestone_006 docs/tasks/milestone_007 docs/tasks/milestone_008 docs/tasks/milestone_009 docs/tasks/milestone_010 docs/tasks/milestone_011 docs/tasks/milestone_012`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m13-config): verifier precondition configuration sans environnement`.
 - Commit GREEN: `docs(m13-config): publier preuve precondition green`.

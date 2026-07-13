@@ -19,10 +19,10 @@
 - Précondition: la stratégie candidate possède des origines de règles et un snapshot immuable; aucun paramètre inventé ou optimisé silencieusement n'est accepté.
 - Commande vérifiée:
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m010_specification.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m011_specification.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m012\validate_strategy_backtest_benchmark_acceptance.ps1
+```console
+uv run --locked gate
+uv run --locked gate
+uv run --locked gate
 ```
 
 - Résultat attendu: les contrats stratégie, expérience reproductible et benchmark pilote restent conformes; SD reste visible tant que l'écart est bloquant.

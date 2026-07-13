@@ -32,11 +32,11 @@
   - Given l'utilisateur demande "Quelle est la meilleure stratégie Short possible ?"
   - When le chatbot route la demande vers stratégie.
   - Then le système recherche les preuves réelles, propose uniquement des règles sourcées, refuse les paramètres non calibrés, et lance un backtest seulement si les données de marché versionnées sont disponibles.
-- Tests d'acceptation à écrire: `tests/m013/validate_real_strategy_short_acceptance.ps1`.
+- Tests d'acceptation à écrire: `uv run --locked gate`.
 - Tests unitaires à écrire: règle sans origine, paramètre sans calibration, donnée de marché absente, backtest non déterministe, résultat négatif supprimé, réponse générique non sourcée, preuve RA ignorée.
 - Implémentation attendue: relier CV vers SD/EX via les façades existantes et publier un diagnostic explicite lorsque le pipeline réel ne dispose pas des preuves ou données nécessaires.
 - Invariants et garde-fous: pas de conseil stratégique non sourcé; pas de "meilleure stratégie" universelle inventée; pas de backtest sur données fictives; aucun fallback vers résultats préfabriqués.
 - Dépendances: T-020, modules SD et EX M-010/M-011, données de marché versionnées.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_real_strategy_short_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_task_system.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m013): couvrir strategie short reelle`
 - Commit GREEN: `feat(m013): refuser strategie non prouvee`

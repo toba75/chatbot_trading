@@ -27,11 +27,11 @@
   - Given plusieurs recherches approfondies ont produit des statuts différents.
   - When les métriques M-009 sont publiées.
   - Then les signaux exposent couverture, diversité, contradictions, lacunes et statuts sans contenir les textes complets de sources, prompts ou réponses.
-- Tests d'acceptation à écrire: `tests/m009/validate_deep_research_metrics_acceptance.ps1`, qui échoue tant que les métriques M-009 ne sont pas publiées et protégées contre les payloads sensibles.
+- Tests d'acceptation à écrire: `uv run --locked gate`, qui échoue tant que les métriques M-009 ne sont pas publiées et protégées contre les payloads sensibles.
 - Tests unitaires à écrire: tests de snapshot pour obligation couverte, obligation manquante, diversité documentaire, groupes indépendants, contradiction bloquante, lacune, version KA/EG absente, payload sensible, compteur non déterministe et taux non fini.
 - Implémentation attendue: créer `app/research_answering/application/deep_research_metrics.py`, produire `docs/governance/m009_deep_research_metrics.json`, enrichir les validateurs de trace sans exposer de contenu complet.
 - Invariants et garde-fous: pas de prompt complet; pas de source complète; pas de réponse complète; pas de ratio non fini; pas de consensus déduit d'un compteur.
 - Dépendances: T-004 à T-009; `app/research_answering/application/traceability_metrics.py`; `tests/m007/fixtures/m007_response_metrics_fixture.json`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m009\validate_deep_research_metrics_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m009\validate_deep_research_metrics_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_m007_traceability_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_traceability.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m009): couvrir metriques recherche approfondie`
 - Commit GREEN: `feat(m009): publier metriques recherche approfondie`

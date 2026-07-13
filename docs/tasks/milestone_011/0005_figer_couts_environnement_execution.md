@@ -27,11 +27,11 @@
   - Given une expérience `PLANNED` possède un `StrategySnapshot` et un snapshot de données.
   - When le modèle de coûts et l'environnement sont figés.
   - Then EX conserve les hypothèses de coût, les versions de code et de dépendances, la graine requise et les hash correspondants avant toute exécution.
-- Tests d'acceptation à écrire: `tests/m011/validate_cost_environment_freeze_acceptance.ps1`, qui échoue tant qu'un coût absent devient zéro, qu'une version de code est vide, qu'une dépendance n'est pas enregistrée, qu'une graine requise manque ou que l'environnement est recalculé après démarrage.
+- Tests d'acceptation à écrire: `uv run --locked gate`, qui échoue tant qu'un coût absent devient zéro, qu'une version de code est vide, qu'une dépendance n'est pas enregistrée, qu'une graine requise manque ou que l'environnement est recalculé après démarrage.
 - Tests unitaires à écrire: tests de `CostModelSnapshot`, `ExecutionEnvironment`, `CostModelCompletenessPolicy`, `ExecutionEnvironmentInspector` et hash d'entrées pour frais absents, devise absente, slippage absent, code version vide, dépendance vide, graine manquante et mutation après gel.
 - Implémentation attendue: créer les objets-valeur de coûts et d'environnement, l'inspecteur strict pour les tests, la politique de complétude et l'attachement au `Experiment` sans valeur par défaut.
 - Invariants et garde-fous: aucun coût implicite; aucune chaîne vide; aucun recalcul silencieux; aucun accès au Spark; aucun remplacement automatique d'une dépendance inconnue.
 - Dépendances: T-004; `app/platform` pour l'empreinte locale si nécessaire; DDD-ADR-009.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m011\validate_cost_environment_freeze_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m011\validate_cost_environment_freeze_unit.ps1`; `python -m compileall app\experimentation`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `python -m compileall app\experimentation`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m011): couvrir gel couts environnement`
 - Commit GREEN: `feat(m011): figer couts environnement execution`

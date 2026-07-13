@@ -11,10 +11,10 @@
 - Objectif métier: prouver que les capacités M-000 à M-003 sont disponibles avant de convertir et publier une source canonique.
 - Langage ubiquitaire: précondition GREEN, milestone amont, branche courante, `master`, gate `test`, gate `lint`, rapport de précondition.
 - Invariants critiques: M-000, M-001, M-002 et M-003 doivent être visibles dans `master`; un test RED existant bloque M-004; une précondition de milestone clôturé ne doit pas imposer silencieusement une ancienne branche de travail.
-- Garde-fous: ne pas ignorer `tests/m003/validate_m003_precondition_acceptance.ps1`; ne pas supprimer une gate pour obtenir GREEN; ne pas créer de contournement local non tracé.
+- Garde-fous: ne pas ignorer `uv run --locked gate`; ne pas supprimer une gate pour obtenir GREEN; ne pas créer de contournement local non tracé.
 
 ## Blocages Ou Préconditions
-- État GREEN/RED connu: `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1` est GREEN; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1` est RED sur `tests/m003/validate_m003_precondition_acceptance.ps1` car `scripts/validate_m003_precondition.ps1` attend `codex/milestone-m003-source-routee` alors que la branche courante est `master`.
+- État GREEN/RED connu: `uv run --locked gate` est GREEN; `uv run --locked gate` est RED sur `uv run --locked gate` car `uv run --locked gate` attend `codex/milestone-m003-source-routee` alors que la branche courante est `master`.
 - Présence des milestones amont dans master: M-000, M-001, M-002 et M-003 sont présents dans `master` après `git fetch origin --prune`.
 - Décisions manquantes: aucune ADR si la correction rend seulement la précondition post-merge explicite; une ADR est requise si la stratégie de gate de milestone change structurellement.
 - Risques: masquer un RED historique; rendre les préconditions dépendantes d'un nom de branche obsolète; démarrer M-004 sans preuve que M-003 est accepté dans `master`.
@@ -27,11 +27,11 @@
   - Given M-000, M-001, M-002 et M-003 sont présents dans `master`.
   - When les gates de précondition M-004 sont exécutées depuis la base courante.
   - Then M-004 ne peut commencer que si `test`, `lint`, la traçabilité, les ADR, les frontières d'architecture et les preuves M-003 sont GREEN sans dépendre d'une ancienne branche M-003.
-- Tests d'acceptation à écrire: un test `tests/m004/validate_m004_precondition_acceptance.ps1` qui échoue tant que M-003 n'est pas vérifié dans `master` et tant que le RED de précondition M-003 post-merge reste présent.
+- Tests d'acceptation à écrire: un test `uv run --locked gate` qui échoue tant que M-003 n'est pas vérifié dans `master` et tant que le RED de précondition M-003 post-merge reste présent.
 - Tests unitaires à écrire: tests du validateur de précondition pour milestone amont absent, divergence `master`/`origin/master`, branche courante autorisée explicitement, gate RED conservée et rapport hors dépôt refusé.
-- Implémentation attendue: créer `scripts/validate_m004_precondition.ps1`, produire `docs/governance/m004_precondition_green.md`, corriger le validateur ou l'enrôlement M-003 pour que l'état post-merge soit explicite, puis rétablir `scripts/test.ps1` et `scripts/lint.ps1` en GREEN.
+- Implémentation attendue: créer `uv run --locked gate`, produire `docs/governance/m004_precondition_green.md`, corriger le validateur ou l'enrôlement M-003 pour que l'état post-merge soit explicite, puis rétablir `uv run --locked gate` et `uv run --locked gate` en GREEN.
 - Invariants et garde-fous: aucun test supprimé sans remplacement; aucune branche implicite; aucun rapport généré hors dépôt; aucun statut GREEN si une gate échoue.
-- Dépendances: `master`; `origin/master`; `docs/tasks/milestone_003`; `scripts/test.ps1`; `scripts/lint.ps1`; `scripts/validate_m003_precondition.ps1`.
-- Commandes de validation: `git fetch origin --prune`; `git ls-tree -r --name-only master -- docs/tasks/milestone_000 docs/tasks/milestone_001 docs/tasks/milestone_002 docs/tasks/milestone_003`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m004\validate_m004_precondition_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Dépendances: `master`; `origin/master`; `docs/tasks/milestone_003`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
+- Commandes de validation: `git fetch origin --prune`; `git ls-tree -r --name-only master -- docs/tasks/milestone_000 docs/tasks/milestone_001 docs/tasks/milestone_002 docs/tasks/milestone_003`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m004): couvrir la precondition green de version canonique`.
 - Commit GREEN: `test(m004): retablir la precondition green avant version canonique`.

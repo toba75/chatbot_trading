@@ -20,9 +20,9 @@
 - Règle utilisateur: historique non factuel.
 - Commande vérifiée:
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m008_specification.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_spark_failures.ps1
+```console
+uv run --locked gate
+uv run --locked gate
 ```
 
 - Résultat attendu: append-only conversation, routage de mode justifié, citations ouvrables, statuts publics et pannes Spark explicites restent conformes.

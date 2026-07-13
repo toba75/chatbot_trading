@@ -67,4 +67,4 @@ Prochaine DDD-ADR: DDD-ADR-013
 - Ne pas supprimer une ADR acceptée.
 - Quand une ADR est remplacée, mettre à jour son statut et le champ `Remplacée par`.
 - Quand une ADR remplace une décision antérieure, renseigner le champ `Remplace`.
-- Exécuter `.\scripts\validate_adr_system.ps1` avant chaque commit modifiant `docs/adr`.
+- Exécuter `uv run --locked gate` avant chaque commit modifiant `docs/adr`.

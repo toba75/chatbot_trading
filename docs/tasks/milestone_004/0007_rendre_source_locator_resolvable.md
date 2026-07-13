@@ -27,11 +27,11 @@
   - Given une version canonique publiée contenant une page avec plusieurs items.
   - When un contexte aval valide un `SourceLocator` vers un item précis.
   - Then SP confirme la version, la page, l'item et le `content_hash`, ou refuse explicitement le locator.
-- Tests d'acceptation à écrire: un test `tests/m004/validate_source_locator_resolution_acceptance.ps1` couvrant locator valide, item absent, page hors version, hash incohérent et version non disponible.
+- Tests d'acceptation à écrire: un test `uv run --locked gate` couvrant locator valide, item absent, page hors version, hash incohérent et version non disponible.
 - Tests unitaires à écrire: tests de construction item_id, stabilité du hash de contenu, mapping page-item, statut de version, refus des clés internes et intégration avec `SourceLocatorValidationPolicy`.
 - Implémentation attendue: générer le registre de résolvabilité par version canonique, fournir la politique de validation aux consommateurs et conserver la frontière Published Language M-001.
 - Invariants et garde-fous: item_id stable; `content_hash` obligatoire; aucune version non acceptée résolvable; aucun accès croisé au stockage SP; aucune correction silencieuse de locator.
 - Dépendances: T-006; `app/contracts/source_references.py`; DDD-ADR-003; tests M-001 SourceLocator.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m004\validate_source_locator_resolution_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m004\validate_source_locator_resolution_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m001\validate_source_locator_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_architecture_boundaries.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m004): couvrir la resolution des source locator`.
 - Commit GREEN: `feat(m004): rendre les source locator resolvables`.

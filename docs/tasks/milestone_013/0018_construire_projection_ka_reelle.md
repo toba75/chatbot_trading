@@ -32,11 +32,11 @@
   - Given une version canonique publiée d'un PDF réel.
   - When KA construit l'index et exécute les questions annotées.
   - Then les candidats retournés portent un `SourceLocator` résoluble et le rappel attendu est mesuré.
-- Tests d'acceptation à écrire: `tests/m013/validate_real_knowledge_search_acceptance.ps1`.
+- Tests d'acceptation à écrire: `uv run --locked gate`.
 - Tests unitaires à écrire: projection absente, index stale, candidat sans locator, score sans trace, page attendue non retrouvée, Qdrant indisponible, embeddings non déclarés, reranker remplacé silencieusement.
 - Implémentation attendue: brancher l'exécution de gate sur l'index réel et les services réels d'embedding et de reranking déclarés dans la topologie locale.
 - Invariants et garde-fous: pas d'`InMemoryHybridSearch` dans le gate réel; pas de succès vide; pas de candidat sans provenance ouvrable; aucun fallback vers recherche mémoire.
 - Dépendances: T-017, services d'indexation locaux, décisions KA existantes, `docs/governance/m012_v1_gap_report.md`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_real_knowledge_search_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_task_system.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m013): couvrir recherche reelle sur corpus`
 - Commit GREEN: `feat(m013): interroger projection reelle`

@@ -59,19 +59,19 @@ M13-FastAPI s'arrête au diagnostic documentaire. Aucun adaptateur Docling/OCRmy
 
 Les termes historiques `SourceDocumentId`, `SourceLocator`, quarantaine, route explicite et version canonique restent les marqueurs normatifs des spécifications M-003 et M-004. Leur présence dans ce runbook ne déclare pas le runtime M-004 livré par M13-FastAPI.
 
-- Commande vérifiée : `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m003_specification.ps1`.
-- Commande vérifiée : `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m004_specification.ps1`.
+- Commande vérifiée : `uv run --locked gate`.
+- Commande vérifiée : `uv run --locked gate`.
 - Résultat attendu : les contrats de spécification restent cohérents et chaque statut public conserve son sens normatif.
 - Erreur explicite : toute absence de route, quarantaine active, autorité textuelle manquante ou `SourceLocator` non résoluble bloque la publication canonique; M13-FastAPI ne contourne pas ce blocage.
 - Preuve à conserver : sorties des validateurs, identifiant `SourceDocumentId` et, uniquement lorsqu'un futur runtime M-004 les produit réellement, `SourceLocator` et référence de version canonique.
 
 ## Commandes de preuve
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_fastapi\validate_review3_ui_security_acceptance.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_fastapi\validate_review3_ui_security_live.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_fastapi\validate_ui_orchestrator_document_flow_acceptance.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_fastapi\validate_review3_deployment_live.ps1
+```console
+uv run --locked gate
+uv run --locked gate
+uv run --locked gate
+uv run --locked gate
 ```
 
 La dernière commande exporte le commit HEAD, construit les images schéma 009, exécute le parcours PDF réel, redémarre PostgreSQL et l'API, relit l'original puis supprime conteneurs, volumes et secrets temporaires.

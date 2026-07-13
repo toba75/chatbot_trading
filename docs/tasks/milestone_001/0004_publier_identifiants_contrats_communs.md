@@ -32,6 +32,6 @@
 - Implémentation attendue: créer les primitives de contrats partagées, leurs fixtures et la politique de versioning de lecture compatible.
 - Invariants et garde-fous: aucune valeur par défaut pour `schema_version`; aucune correction automatique de préfixe; aucun fallback vers chaîne brute.
 - Dépendances: T-002; T-003; section 2 de la spécification v4.1.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m001\validate_contract_identity_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m001\validate_contract_identity_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m001): couvrir les identifiants opaques des contrats`.
 - Commit GREEN: `feat(m001): publier les identifiants opaques versionnés`.

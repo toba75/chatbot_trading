@@ -33,4 +33,4 @@ Chaque `PageAnnotation` référence une page du `PilotCorpus` et déclare:
 
 ## ADR
 
-ADR: non requise. T-004 applique les décisions existantes ADR-002 pour les routes documentaires explicites et ADR-010 pour les gates PowerShell.
+ADR: non requise. T-004 applique les décisions existantes ADR-002 pour les routes documentaires explicites et ADR-010 pour les gates uv run --locked gate

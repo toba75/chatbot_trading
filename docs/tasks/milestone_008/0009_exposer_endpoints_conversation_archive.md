@@ -27,12 +27,12 @@
   - Given une conversation contient un tour rattaché à une réponse vérifiée.
   - When l'utilisateur archive la conversation.
   - Then la conversation passe en statut archivé sans supprimer la réponse vérifiée ni les preuves référencées.
-- Tests d'acceptation à écrire: `tests/m008/validate_conversation_http_contract_acceptance.ps1`, qui échoue tant que les endpoints internes de conversation et l'archivage sans cascade ne sont pas contrôlés.
+- Tests d'acceptation à écrire: `uv run --locked gate`, qui échoue tant que les endpoints internes de conversation et l'archivage sans cascade ne sont pas contrôlés.
 - Tests unitaires à écrire: tests de payload invalide, conversation absente, conversation archivée, message sans idempotency key, consultation de tours ordonnés, archive sans cascade et refus de champs internes.
 - Implémentation attendue: créer `app/conversation/adapters/conversation_http.py`, relier les handlers CV et publier les erreurs publiques M-008.
 - Invariants et garde-fous: aucune création implicite depuis `POST /messages`; aucune cascade hors CV; aucune erreur masquée; aucune exposition de repository interne.
 - Dépendances: T-003 à T-008; `ADR-010`; `DDD-ADR-002`; `DDD-ADR-008`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m008\validate_conversation_http_contract_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m008\validate_conversation_http_contract_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m008): couvrir contrat http conversation`
 - Commit GREEN: `feat(m008): exposer endpoints conversation archive`
 

@@ -32,11 +32,11 @@
   - Given un corpus réel est déclaré.
   - When un jeu d'évaluation référence ses questions.
   - Then chaque question possède des pages attendues, fragments attendus, assertions attendues et statut documentaire attendu.
-- Tests d'acceptation à écrire: `tests/m013/validate_real_question_set_acceptance.ps1`.
+- Tests d'acceptation à écrire: `uv run --locked gate`.
 - Tests unitaires à écrire: question sans PDF, page hors borne, fragment absent, assertion sans statut, citation non résoluble, question stratégie sans preuve exigée, question sans justification métier, doublon d'identifiant.
 - Implémentation attendue: créer un format strict de jeu annoté local, sans contenu PDF complet en Git si les PDF restent privés, et valider que chaque annotation pointe vers le manifeste T-015.
 - Invariants et garde-fous: aucune question synthétique cachée dans le code; aucune citation artificielle; aucun succès si une annotation attendue manque; aucun remplacement par corpus fixture.
 - Dépendances: T-015, `docs/specs/plan_remediation_m13.md`, `docs/evaluation/m012`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_real_question_set_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_task_system.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m013): exiger questions annotees reelles`
 - Commit GREEN: `feat(m013): valider jeu annote reel`

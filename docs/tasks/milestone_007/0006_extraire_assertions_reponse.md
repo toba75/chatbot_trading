@@ -27,12 +27,12 @@
   - Given un jeu de preuves scellé et un brouillon contenant deux assertions factuelles et une déduction.
   - When RA extrait les assertions importantes.
   - Then les assertions deviennent atomiques, portent leur origine, et aucune n'est marquée supportée avant évaluation.
-- Tests d'acceptation à écrire: `tests/m007/validate_answer_assertion_extraction_acceptance.ps1`, qui échoue tant que RA ne sépare pas brouillon, assertions et origines.
+- Tests d'acceptation à écrire: `uv run --locked gate`, qui échoue tant que RA ne sépare pas brouillon, assertions et origines.
 - Tests unitaires à écrire: tests pour brouillon vide, assertion composite, origine absente, assertion factuelle non extraite, déduction sans prémisses, mutation d'une version de brouillon publiée et tentative du générateur de fixer le statut final.
 - Implémentation attendue: ajouter le modèle `Answer`, le port de génération, l'extracteur déterministe local, le repository mémoire et les règles d'atomicité des assertions RA.
 - Invariants et garde-fous: aucun statut `SUPPORTED` en sortie de génération; aucune assertion importante sans origine; aucun brouillon final immuable avant publication; aucun fallback si l'extracteur ne couvre pas une assertion.
 - Dépendances: T-004; T-005 recommandé; `EvidenceSet` scellé; `AnswerGenerator` via port.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_answer_assertion_extraction_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_answer_assertion_extraction_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m007): couvrir extraction assertions reponse`
 - Commit GREEN: `feat(m007): extraire assertions reponse`
 

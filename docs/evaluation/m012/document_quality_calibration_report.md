@@ -12,7 +12,7 @@
 - Source benchmark: `RouteBenchmarkResult` produit par T-005.
 - Corpus: corpus pilote M-012 référencé par le `RouteBenchmarkRun`.
 - ADR appliquées: ADR-002, ADR-004 et ADR-010.
-- ADR nouvelle: non requise; T-006 applique le routage explicite, l'autorité textuelle unique par page et les gates PowerShell sans changer leur sens.
+- ADR nouvelle: non requise; T-006 applique le routage explicite, l'autorité textuelle unique par page et les gates uv run --locked gate
 
 ## Seuils SP calibrés
 

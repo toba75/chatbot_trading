@@ -14,9 +14,9 @@
 - Garde-fous: exécuter les gates M-000, consigner le RED exact, corriger le contrôle ou la donnée fautive par test RED avant toute tâche de contrat.
 
 ## Blocages Ou Préconditions
-- État GREEN/RED connu: `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1` et `.\scripts\lint.ps1` sont RED au 2026-06-25 car `scripts/validate_task_system.ps1` refuse `docs/tasks/milestone_000/0001_verifier_precondition_green.md` avec `Titre de tâche invalide ou absent`.
+- État GREEN/RED connu: `uv run --locked gate` et `uv run --locked gate` sont RED au 2026-06-25 car `uv run --locked gate` refuse `docs/tasks/milestone_000/0001_verifier_precondition_green.md` avec `Titre de tâche invalide ou absent`.
 - Présence des milestones amont dans master: `git fetch origin --prune` a réussi; `git ls-tree -r --name-only master -- docs/tasks docs/adr docs/specs scripts` montre `docs/tasks/milestone_000`, les scripts M-000, les ADR et les specs.
-- Décisions manquantes: aucune décision structurante nouvelle n'est identifiée pour corriger la précondition; ADR-010 cadre déjà les gates PowerShell.
+- Décisions manquantes: aucune décision structurante nouvelle n'est identifiée pour corriger la précondition; ADR-010 cadre déjà les gates uv run --locked gate
 - Risques: planifier les contrats M-001 malgré une gate documentaire RED; corriger la convention en tolérant des titres invalides; modifier le sens des tâches M-000 acceptées.
 
 ## Tâches
@@ -27,11 +27,11 @@
   - Given M-000 est présent dans `master` et les fichiers de tâches utilisent la convention publiée.
   - When les gates M-000 sont exécutées avant M-001.
   - Then tout RED existant est corrigé par test explicite ou bloque les contrats M-001 sans fallback silencieux.
-- Tests d'acceptation à écrire: un test qui exécute `scripts/validate_task_system.ps1` sur les tâches M-000 et M-001, reproduit le RED de titre observé, puis exige un message ciblé ou un passage GREEN après correction.
+- Tests d'acceptation à écrire: un test qui exécute `uv run --locked gate` sur les tâches M-000 et M-001, reproduit le RED de titre observé, puis exige un message ciblé ou un passage GREEN après correction.
 - Tests unitaires à écrire: tests du contrôle de titre de tâche avec fins de ligne CRLF et LF, titre manquant, numéro incohérent et fichier `journal.md` ignoré comme tâche.
 - Implémentation attendue: corriger uniquement le validateur ou les fins de ligne fautives nécessaires pour que les titres valides soient acceptés et que les titres invalides restent refusés; ne pas changer le sens des tâches M-000.
 - Invariants et garde-fous: aucun assouplissement global du regex de tâche; aucun `try/catch` de confort; aucune normalisation silencieuse qui transforme un titre invalide en titre valide.
-- Dépendances: M-000 présent dans `master`; `scripts/test.ps1`; `scripts/lint.ps1`; `scripts/validate_task_system.ps1`; ADR-010.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_task_system.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Dépendances: M-000 présent dans `master`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; ADR-010.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m001): reproduire le red de précondition des tâches`.
 - Commit GREEN: `fix(m001): restaurer la précondition green des tâches`.

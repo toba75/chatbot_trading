@@ -32,6 +32,6 @@
 - Implémentation attendue: créer les abstractions d'outbox et de consommation idempotente avec stockage local explicite ou double contrôlé, sans bus distribué externe.
 - Invariants et garde-fous: aucun partage direct de stockage métier; aucune livraison exactement une fois supposée; aucun événement sans producteur; aucun fallback de version d'événement.
 - Dépendances: T-002; contrat M-001 `EventEnvelope`; DDD-ADR-006; DDD-ADR-008; tests d'architecture M-001.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m002\validate_outbox_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m002\validate_outbox_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m002): couvrir outbox et idempotence`.
 - Commit GREEN: `feat(m002): livrer outbox idempotente`.

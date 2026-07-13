@@ -12,7 +12,7 @@ Permettre au projet de connaître précisément le coût et la couverture de sa 
 
 ## Scénario BDD
 
-- Given le dépôt courant et sa gate PowerShell historique.
+- Given le dépôt courant et sa gate uv run --locked gate
 - When l’inventaire des commandes et fichiers est calculé.
 - Then les écarts sont documentés et les 15 tests M13-config sont nommés.
 
@@ -23,7 +23,7 @@ Permettre au projet de connaître précisément le coût et la couverture de sa 
 
 ## Validation
 
-- Inventaire Git des `.ps1` et analyse statique de `scripts/test.ps1`.
+- Inventaire Git des scripts historiques et analyse statique de `uv run --locked gate`.
 
 ## ADR
 

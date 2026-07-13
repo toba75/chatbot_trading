@@ -32,11 +32,11 @@
   - Given l'exploitant prépare un fichier `config/application.yaml`.
   - When le contrat de configuration est validé.
   - Then chaque valeur nécessaire au démarrage est présente dans le fichier, le schéma refuse les absences et aucun fallback environnement n'est décrit.
-- Tests d'acceptation à écrire: `tests/m013_config/validate_application_config_specification_acceptance.ps1`, couvrant la présence de la spécification, du schéma, des sections obligatoires, des erreurs `CONFIG_*` et de l'interdiction des variables d'environnement.
-- Tests unitaires à écrire: `tests/m013_config/validate_application_config_specification_unit.ps1`, couvrant section manquante, clé obligatoire absente, placeholder, secret en clair, clé environnement historique non migrée et chemin secret absent.
+- Tests d'acceptation à écrire: `uv run --locked gate`, couvrant la présence de la spécification, du schéma, des sections obligatoires, des erreurs `CONFIG_*` et de l'interdiction des variables d'environnement.
+- Tests unitaires à écrire: `uv run --locked gate`, couvrant section manquante, clé obligatoire absente, placeholder, secret en clair, clé environnement historique non migrée et chemin secret absent.
 - Implémentation attendue: créer `docs/specs/m013_config_configuration_applicative.md`, `config/application.schema.json` et un exemple non secret `config/application.example.yaml`; définir les sections minimales `deployment`, `services`, `models.llm`, `paths`, `security`, `quality_gates`, `observability` et `runtime`; documenter le mapping des anciens noms vers les nouvelles clés.
 - Invariants et garde-fous: le fichier exemple ne contient aucun secret; les clés `GEMMA_*`, `DATABASE_URL`, `QDRANT_URL`, `LLM_GATEWAY_URL` ne sont pas des entrées acceptées; les valeurs vides ou `TO_BE_FILLED` sont refusées.
 - Dépendances: ADR-016; `docs/specs/specification_unifiee_ddd_technique_chatbot_trading_v4_1.md`; `docs/specs/plan_implementation_milestones_workstreams.md`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_application_config_specification_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_application_config_specification_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_adr_system.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m13-config): couvrir specification configuration applicative`.
 - Commit GREEN: `docs(m13-config): publier contrat configuration applicative`.

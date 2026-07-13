@@ -31,14 +31,14 @@
   - Given un SourceDocument enregistré avec un original immuable
   - When le client demande son contenu par le `DocumentId` public
   - Then l'API restitue exactement le PDF enregistré avec son type public sans exposer ni accepter de référence de stockage
-- Tests d'acceptation à écrire: `tests/m013_fastapi/validate_original_pdf_retrieval_acceptance.ps1`, couvrant contenu, hash, document absent et identifiant invalide.
-- Tests unitaires à écrire: `tests/m013_fastapi/validate_original_pdf_stream_unit.ps1`, couvrant résolution interne, taille, en-têtes, streaming et refus de chemins.
+- Tests d'acceptation à écrire: `uv run --locked gate`, couvrant contenu, hash, document absent et identifiant invalide.
+- Tests unitaires à écrire: `uv run --locked gate`, couvrant résolution interne, taille, en-têtes, streaming et refus de chemins.
 - Implémentation attendue: ajouter le port SP de lecture de l'original et une réponse streaming `application/pdf` avec nom public neutralisé.
 - Invariants et garde-fous: `Content-Disposition` ne reprend aucun chemin; pas de lecture hors `corpus_root`; échec explicite si le hash stocké ne correspond pas.
 - Dépendances: T-005; T-007; ADR-018; DDD-ADR-003.
 - Commandes de validation:
-  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_fastapi\validate_original_pdf_retrieval_acceptance.ps1`
-  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_fastapi\validate_original_pdf_stream_unit.ps1`
-  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_architecture_boundaries.ps1`
+  - `uv run --locked gate`
+  - `uv run --locked gate`
+  - `uv run --locked gate`
 - Commit RED: `test(sp): couvrir recuperation pdf original`.
 - Commit GREEN: `feat(sp): servir pdf original controle`.

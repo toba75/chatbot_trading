@@ -27,11 +27,11 @@
   - Given une question autonome demande une synthèse multi-sources sur Kelly et volatility targeting avec un mandat explicite.
   - When RA planifie la recherche approfondie.
   - Then le `ResearchCase` passe à `PLANNED` avec des sous-questions et des obligations couvrant méthodes, preuves favorables, preuves défavorables, dépendances, limites et zones non documentées.
-- Tests d'acceptation à écrire: `tests/m009/validate_deep_research_planning_acceptance.ps1`, qui échoue tant que RA ne sait pas créer un plan approfondi depuis un mandat explicite.
+- Tests d'acceptation à écrire: `uv run --locked gate`, qui échoue tant que RA ne sait pas créer un plan approfondi depuis un mandat explicite.
 - Tests unitaires à écrire: tests de `ResearchMode` pour `DEEP_RESEARCH`, de `DeepResearchPlanningPolicy` pour sous-questions vides, obligation dupliquée, obligation hors mandat, absence de preuve défavorable, absence de limite, mode documentaire simple refusé et plan non déterministe.
 - Implémentation attendue: étendre `app/research_answering/domain/research_case.py`, `app/research_answering/domain/research_planning.py` et `app/research_answering/application/open_research_case.py` sans casser M-007; créer les objets-valeur nécessaires au plan approfondi; conserver une politique M-007 séparée si elle reste documentaire simple.
 - Invariants et garde-fous: plan obligatoire avant collecte; mode approfondi explicite; pas de sous-question hors mandat; pas de fallback vers `DOCUMENTARY_SIMPLE`.
-- Dépendances: T-002; `app/research_answering/domain/research_case.py`; `app/research_answering/domain/research_planning.py`; `tests/m007/validate_research_case_mandate_acceptance.ps1`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m009\validate_deep_research_planning_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m009\validate_deep_research_planning_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_research_case_mandate_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`.
+- Dépendances: T-002; `app/research_answering/domain/research_case.py`; `app/research_answering/domain/research_planning.py`; `uv run --locked gate`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m009): couvrir planification recherche approfondie`
 - Commit GREEN: `feat(m009): planifier recherche approfondie`

@@ -27,11 +27,11 @@
   - Given un PDF original lisible est ajouté au corpus avec des métadonnées bibliographiques validées.
   - When la source documentaire est enregistrée.
   - Then le système calcule son empreinte stable, conserve une référence d'original immuable et refuse toute fusion automatique avec une édition différente.
-- Tests d'acceptation à écrire: un test `tests/m003/validate_source_registration_acceptance.ps1` couvrant l'enregistrement nominal, la copie binaire exacte, l'édition distincte et le PDF corrompu envoyé en revue explicite.
+- Tests d'acceptation à écrire: un test `uv run --locked gate` couvrant l'enregistrement nominal, la copie binaire exacte, l'édition distincte et le PDF corrompu envoyé en revue explicite.
 - Tests unitaires à écrire: tests de `SourceFingerprint`, `DocumentId`, `SourceDocument.registerOriginal`, `DuplicateEditionPolicy` et validation des métadonnées bibliographiques obligatoires.
 - Implémentation attendue: implémenter le modèle de domaine SP minimal, les ports nécessaires et le handler `RegisterSourceDocumentHandler` sans dépendance Docling, ORM ou framework web dans le domaine.
 - Invariants et garde-fous: l'original n'est jamais réécrit; l'empreinte est calculée sur le contenu binaire; l'absence de métadonnée requise est une erreur explicite; aucune valeur par défaut de statut n'est injectée.
 - Dépendances: T-002; contrats d'identité M-001; `app/source_processing/domain`; `app/source_processing/application`; `app/contracts/source_references.py`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m003\validate_source_registration_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m003\validate_source_registration_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m003): couvrir l'enregistrement immuable des sources`.
 - Commit GREEN: `feat(m003): enregistrer les sources documentaires immuables`.

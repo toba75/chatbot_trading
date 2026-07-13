@@ -27,11 +27,11 @@
   - Given une affirmation à l'état `EVIDENCE_ATTACHED`.
   - When elle est soumise à vérification puis qu'aucune preuve admissible `SUPPORTS_DIRECTLY` n'existe.
   - Then l'événement `ClaimSubmittedForVerification` est enregistré, l'affirmation atteint `UNDER_VERIFICATION`, ne passe pas à `VERIFIED` et la raison `INSUFFICIENT_DIRECT_EVIDENCE` est enregistrée.
-- Tests d'acceptation à écrire: `tests/m006/validate_claim_verification_acceptance.ps1`, couvrant soumission à vérification, acceptation `ENTAILED`, refus sans preuve directe, refus de portée élargie et rejet explicite.
+- Tests d'acceptation à écrire: `uv run --locked gate`, couvrant soumission à vérification, acceptation `ENTAILED`, refus sans preuve directe, refus de portée élargie et rejet explicite.
 - Tests unitaires à écrire: tests de `SubmitClaimForVerification`, `ClaimSubmittedForVerification`, `ClaimVerificationPolicy`, `ScopePreservationPolicy`, immutabilité de `VerificationCase`, transitions interdites, métadonnées de décision absentes et verdict partiel.
 - Implémentation attendue: implémenter la soumission en vérification, le cycle de vérification, le port `IndependentClaimVerifier`, le handler `VerifyClaimHandler` et la publication contrôlée de `VerifiedClaimRef`.
 - Invariants et garde-fous: pas de valeur par défaut pour le verdict; pas de passage `DRAFT` vers `UNDER_VERIFICATION` ou `VERIFIED`; pas de fallback vers revue humaine silencieuse; pas de publication de `VerifiedClaimRef` sans preuve.
 - Dépendances: T-004; `app/contracts/evidence_claims.py`; ADR-006; DDD-ADR-005; DDD-ADR-007.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m006\validate_claim_verification_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m006\validate_claim_verification_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m006): couvrir verification claim preuve directe`
 - Commit GREEN: `feat(m006): verifier claims par preuve directe`

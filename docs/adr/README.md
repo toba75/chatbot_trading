@@ -70,7 +70,7 @@ Ne pas créer d'ADR pour une correction locale, un renommage mineur ou une tâch
 3. Renseigner le contexte, la décision, les conséquences et les liens de traçabilité.
 4. Ajouter l'entrée dans `index.md`.
 5. Mettre à jour les tâches, tests ou spécifications concernés.
-6. Exécuter `.\scripts\validate_adr_system.ps1`.
+6. Exécuter `uv run --locked gate`.
 
 ## Index
 

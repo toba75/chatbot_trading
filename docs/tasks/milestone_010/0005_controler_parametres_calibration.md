@@ -27,11 +27,11 @@
   - Given un lookback est déclaré `PARAMETER_TO_CALIBRATE`.
   - When aucun domaine ni protocole de calibration n'est fourni.
   - Then la compilation est refusée avec un diagnostic bloquant sur le paramètre.
-- Tests d'acceptation à écrire: `tests/m010/validate_strategy_parameter_calibration_acceptance.ps1`, qui échoue tant qu'un paramètre à calibrer peut être compilé sans domaine et protocole.
+- Tests d'acceptation à écrire: `uv run --locked gate`, qui échoue tant qu'un paramètre à calibrer peut être compilé sans domaine et protocole.
 - Tests unitaires à écrire: tests de `StrategyParameter` et `ParameterCalibrationPolicy` pour valeur fixe valide, domaine vide, protocole absent, sensibilité absente, statut bloquant non résolu, paramètre non bloquant justifié et normalisation de l'unité.
 - Implémentation attendue: créer le modèle de paramètre SD, les politiques de calibration, la commande de définition de plan et l'intégration des diagnostics dans `StrategyCandidate`.
 - Invariants et garde-fous: aucune valeur par défaut; aucun domaine ouvert sans justification; aucun protocole vide; aucune mutation silencieuse d'un paramètre bloquant en non bloquant.
 - Dépendances: T-004; DDD-ADR-010; contrats `StrategySnapshot` existants.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m010\validate_strategy_parameter_calibration_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m010\validate_strategy_parameter_calibration_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m010): couvrir parametres calibration strategie`
 - Commit GREEN: `feat(m010): controler parametres calibration strategie`

@@ -11,7 +11,7 @@
 - Objectif métier: rendre M-001 clôturable seulement si les exigences, tests, code, documentation et ADR sont reliés.
 - Langage ubiquitaire: matrice de traçabilité, exigence M-001, test de contrat, test d'architecture, ADR, gate, définition de terminé.
 - Invariants critiques: chaque exigence M-001 touchée a une ligne de traçabilité; chaque ligne pointe vers un test et une commande; une absence d'ADR est justifiée; les gates standard restent GREEN.
-- Garde-fous: ne pas déclarer M-001 terminé sur des tests isolés; ne pas ignorer `scripts/test.ps1` ou `scripts/lint.ps1`; ne pas modifier le sens d'une ADR acceptée.
+- Garde-fous: ne pas déclarer M-001 terminé sur des tests isolés; ne pas ignorer `uv run --locked gate` ou `uv run --locked gate`; ne pas modifier le sens d'une ADR acceptée.
 
 ## Blocages Ou Préconditions
 - État GREEN/RED connu: toutes les tâches T-001 à T-010 doivent être GREEN avant clôture de cette tâche.
@@ -32,6 +32,6 @@
 - Implémentation attendue: mettre à jour `docs/traceability/matrix.md`, compléter les validations de traçabilité si nécessaire et documenter les résultats de clôture dans `docs/tasks/milestone_001/journal.md`.
 - Invariants et garde-fous: aucune ligne de matrice avec chemin introuvable; aucune commande non vérifiable; aucun statut `Couvert` sans test exécuté; aucun contournement de la définition d'achèvement.
 - Dépendances: T-001; T-002; T-003; T-004; T-005; T-006; T-007; T-008; T-009; T-010; `docs/governance/definition_of_done.md`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_traceability.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_definition_of_done.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m001): couvrir la tracabilite des contrats publies`.
 - Commit GREEN: `docs(m001): relier m001 aux gates et a la tracabilite`.

@@ -2,7 +2,7 @@
 
 ## Objectif
 
-Remplacer l’orchestration PowerShell récursive par une gate Python unique, reproductible avec `uv`, qui couvre les validations de gouvernance, d’architecture, de plateforme, de configuration, de sécurité et le pipeline produit réel M-013.
+Remplacer l’orchestration uv run --locked gate`uv`, qui couvre les validations de gouvernance, d’architecture, de plateforme, de configuration, de sécurité et le pipeline produit réel M-013.
 
 ## Scénarios BDD
 
@@ -37,17 +37,17 @@ Remplacer l’orchestration PowerShell récursive par une gate Python unique, re
 - Les tests `unit` ne lancent ni Git, ni processus, ni service, ni vrai timeout.
 - Les groupes séries ne se chevauchent jamais.
 - Une sortie `skipped`, `xfail` ou un écart de collecte interdit le GREEN canonique.
-- Les commandes et sources actives ne contiennent pas `powershell`, `pwsh` ni une référence `.ps1`.
+- Les commandes et sources actives ne contiennent aucun appel à un shell de scripts historique ni aucune extension de script historique.
 
 ## Mesure de départ
 
 | Mesure | Diagnostic initial | État observé | Écart |
 |---|---:|---:|---:|
-| Scripts PowerShell sous `scripts/` | 58 | 61 | +3 |
-| Tests PowerShell sous `tests/` | 329 | 374 | +45 |
-| Fichiers `.ps1` suivis | 387 | 435 | +48 |
-| Validations déclarées par `scripts/test.ps1` | 36 | 37 | +1 |
-| Tests déclarés par `scripts/test.ps1` | 309 | 309 | 0 |
+| Scripts uv run --locked gate`scripts/` | 58 | 61 | +3 |
+| Tests uv run --locked gate`tests/` | 329 | 374 | +45 |
+| Fichiers de scripts historiques suivis | 387 | 435 | +48 |
+| Validations déclarées par `uv run --locked gate` | 36 | 37 | +1 |
+| Tests déclarés par `uv run --locked gate` | 309 | 309 | 0 |
 | Tests `m013_config` | 15 | 15 | 0 |
 
 L’amplification, le nombre de sous-commandes et les multiplicités de test sont recalculés par le rapport comparatif avant la bascule ; ils ne sont pas déduits d’un ancien état de branche.

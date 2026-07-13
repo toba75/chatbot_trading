@@ -27,11 +27,11 @@
   - Given une tentative contient une page corrompue ou une route insuffisamment justifiée.
   - When le traitement tente de poursuivre vers une route prête pour conversion.
   - Then la tentative est placée en revue ou quarantaine avec justification et aucune publication documentaire n'est autorisée.
-- Tests d'acceptation à écrire: un test `tests/m003/validate_review_quarantine_acceptance.ps1` couvrant revue manuelle, quarantaine, rejet, tentative de poursuite bloquée et création d'une nouvelle tentative.
+- Tests d'acceptation à écrire: un test `uv run --locked gate` couvrant revue manuelle, quarantaine, rejet, tentative de poursuite bloquée et création d'une nouvelle tentative.
 - Tests unitaires à écrire: tests de transitions autorisées, transitions interdites, conservation de justification, refus de réouverture d'un run finalisé et refus de publication documentaire depuis un état bloquant.
 - Implémentation attendue: implémenter les états bloquants, les transitions strictes et les erreurs explicites exposant qu'une tentative M-003 n'est pas publiable.
 - Invariants et garde-fous: aucun état final ne revient à `CREATED`; aucune source bloquée n'est publiée; toute décision bloquante conserve la cause et la version de politique.
 - Dépendances: T-006; `DocumentProcessingRun`; ADR-002; états M-003 `ROUTE_PLANNED`, `MANUAL_REVIEW` et `QUARANTINED`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m003\validate_review_quarantine_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m003\validate_review_quarantine_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m003): couvrir les blocages revue quarantaine`.
 - Commit GREEN: `feat(m003): bloquer les sources en revue ou quarantaine`.

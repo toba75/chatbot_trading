@@ -32,6 +32,6 @@
 - Implémentation attendue: créer les politiques réseau vérifiables, scripts d'audit local et artefacts de configuration firewall sans dépendre d'un environnement Spark réel.
 - Invariants et garde-fous: aucun port public implicite; aucun contournement TLS; aucun callback Spark; aucun secret permettant au navigateur d'appeler vLLM.
 - Dépendances: T-004; T-006; ADR-007; ADR-008; ADR-009; exigences de sécurité v4.1.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m002\validate_network_boundary_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m002\validate_network_boundary_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m002): couvrir la frontiere reseau locale`.
 - Commit GREEN: `feat(m002): verrouiller la frontiere reseau locale`.

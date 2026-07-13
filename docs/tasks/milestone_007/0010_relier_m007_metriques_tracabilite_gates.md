@@ -27,12 +27,12 @@
   - Given les comportements M-007 sont implémentés et testés.
   - When la matrice de traçabilité et les gates sont exécutés.
   - Then chaque exigence M-007 est rattachée à un test GREEN, une commande de validation et une ADR ou justification explicite.
-- Tests d'acceptation à écrire: `tests/m007/validate_m007_traceability_acceptance.ps1`, qui échoue tant que M-007 n'est pas relié à la matrice et aux gates.
+- Tests d'acceptation à écrire: `uv run --locked gate`, qui échoue tant que M-007 n'est pas relié à la matrice et aux gates.
 - Tests unitaires à écrire: tests des métriques RA pour statuts, citations, lacunes, contradictions, abstentions, latence, absence de texte complet, absence de prompt et refus de signal non anonymisé.
 - Implémentation attendue: créer `app/research_answering/application/traceability_metrics.py`, produire le snapshot de métriques M-007, compléter `docs/traceability/matrix.md`, enrôler les validations M-007 et documenter la clôture dans le journal.
 - Invariants et garde-fous: aucun payload de réponse complet dans les métriques; aucune preuve complète ni prompt persistant; aucun statut M-007 absent de la traçabilité; aucune gate ignorée.
-- Dépendances: T-001 à T-009; `scripts/test.ps1`; `scripts/lint.ps1`; `scripts/validate_traceability.ps1`; `scripts/validate_architecture_boundaries.ps1`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_m007_traceability_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_m007_traceability_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_traceability.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`; `git diff --check`.
+- Dépendances: T-001 à T-009; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `git diff --check`.
 - Commit RED: `test(m007): couvrir tracabilite metriques gates`
 - Commit GREEN: `chore(m007): relier metriques tracabilite gates`
 

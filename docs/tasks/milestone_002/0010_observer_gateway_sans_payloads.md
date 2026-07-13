@@ -32,6 +32,6 @@
 - Implémentation attendue: créer les primitives d'observabilité et les collecteurs locaux minimaux pour gateway, jobs et outbox sans dépendre d'un service externe.
 - Invariants et garde-fous: aucune donnée sensible en log; aucune métrique avec contenu complet; aucune suppression silencieuse d'une erreur importante; aucun outil externe obligatoire non validé.
 - Dépendances: T-005; T-006; T-008; exigences observabilité v4.1.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m002\validate_gateway_observability_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m002\validate_gateway_observability_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m002): couvrir observabilite gateway`.
 - Commit GREEN: `feat(m002): observer le gateway sans payloads`.

@@ -27,11 +27,11 @@
   - Given une stratégie candidate contient une règle sans origine.
   - When `POST /v1/strategies/compile` est appelé.
   - Then l'API retourne un refus de compilation avec le diagnostic bloquant, le code public `STRATEGY_RULE_ORIGIN_MISSING` et aucun snapshot n'est créé.
-- Tests d'acceptation à écrire: `tests/m010/validate_strategy_http_contract_acceptance.ps1`, qui échoue tant que les endpoints `POST /v1/strategies/compile` et `GET /v1/strategies/{id}` ne publient pas les diagnostics, origines et codes publics stables `STRATEGY_RULE_ORIGIN_MISSING`, `STRATEGY_CONFLICT_UNRESOLVED` et `CURRENT_DATA_REQUIRED`.
+- Tests d'acceptation à écrire: `uv run --locked gate`, qui échoue tant que les endpoints `POST /v1/strategies/compile` et `GET /v1/strategies/{id}` ne publient pas les diagnostics, origines et codes publics stables `STRATEGY_RULE_ORIGIN_MISSING`, `STRATEGY_CONFLICT_UNRESOLVED` et `CURRENT_DATA_REQUIRED`.
 - Tests unitaires à écrire: tests d'adaptateur HTTP pour requête invalide, stratégie absente, compilation refusée avec `STRATEGY_RULE_ORIGIN_MISSING`, conflit bloquant exposé avec `STRATEGY_CONFLICT_UNRESOLVED`, donnée actuelle manquante exposée avec `CURRENT_DATA_REQUIRED`, compilation acceptée, lecture de snapshot, absence de backtest, mapping d'erreur et rejet de champ inconnu.
 - Implémentation attendue: créer `app/strategy_design/adapters/strategy_http.py`, câbler les handlers applicatifs, définir les DTO publics stricts, mapper explicitement les diagnostics SD vers les codes publics stables et enrôler les routes sans dépendance du domaine au framework web.
 - Invariants et garde-fous: aucune création implicite au `GET`; aucun HTTP 200 pour diagnostic bloquant sans statut métier explicite et code public stable; aucun backtest; aucun fallback vers un dépôt global caché.
 - Dépendances: T-009; `app/web_app.py` ou registre d'adaptateurs existant; contrats M-001; DDD-ADR-008.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m010\validate_strategy_http_contract_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m010\validate_strategy_http_contract_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_architecture_boundaries.ps1 -AppRoot .\app -ContextRegistryPath .\app\context_registry.json -SpecificationPath .\docs\specs\m001_frontieres_ddd_contrats_publies.md`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m010): couvrir contrat http strategies`
 - Commit GREEN: `feat(m010): exposer endpoints strategies`

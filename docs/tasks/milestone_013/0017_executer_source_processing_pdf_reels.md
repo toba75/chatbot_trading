@@ -32,11 +32,11 @@
   - Given un PDF réel du manifeste.
   - When le pipeline SP le traite.
   - Then chaque page reçoit une route explicite, un artefact canonique ou une quarantaine, et la pagination d'origine reste traçable.
-- Tests d'acceptation à écrire: `tests/m013/validate_real_source_processing_acceptance.ps1`.
+- Tests d'acceptation à écrire: `uv run --locked gate`.
 - Tests unitaires à écrire: original modifié, page omise, route absente, Docling JSON absent, OCRmyPDF appliqué sans condition, quarantaine non explicite, hash canonique absent, outil requis indisponible masqué.
 - Implémentation attendue: brancher le runtime local sur les vrais adaptateurs Docling, Granite-Docling et OCRmyPDF conditionnel, ou échouer explicitement si l'outil requis par la route déclarée est absent.
 - Invariants et garde-fous: pas de conversion fixture; pas de page ignorée; pas de route par défaut; pas d'OCR global; aucun statut GREEN sans PDF local résolvable.
 - Dépendances: T-015, T-016, ADR de routes documentaires, contrats SP existants.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_real_source_processing_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_task_system.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m013): couvrir traitement pdf reel`
 - Commit GREEN: `feat(m013): traiter corpus pdf reel`

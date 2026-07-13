@@ -22,7 +22,7 @@
 ## Tâches
 ### T-011 - Relier M-002 à la traçabilité et aux gates
 - But métier: fournir la preuve finale que la plateforme locale peut exécuter traitements, jobs et inférences sans exposition publique ni panne masquée.
-- Portée DDD: matrice `REQ-M002-*`, journal M-002, définition de terminé, ADR applicables, gates PowerShell et contrôles d'architecture.
+- Portée DDD: matrice `REQ-M002-*`, journal M-002, définition de terminé, ADR applicables, gates uv run --locked gate
 - Scénario BDD:
   - Given les composants M-002 sont implémentés et testés.
   - When les gates de clôture sont exécutées.
@@ -32,6 +32,6 @@
 - Implémentation attendue: mettre à jour `docs/traceability/matrix.md`, compléter les validateurs si nécessaire et documenter la clôture dans `docs/tasks/milestone_002/journal.md`.
 - Invariants et garde-fous: aucune preuve manquante; aucune commande non exécutable; aucun statut `Couvert` sans artefact; aucune modification silencieuse d'une ADR acceptée.
 - Dépendances: T-001; T-002; T-003; T-004; T-005; T-006; T-007; T-008; T-009; T-010; `docs/governance/definition_of_done.md`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_traceability.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_definition_of_done.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m002): couvrir la tracabilite plateforme`.
 - Commit GREEN: `docs(m002): relier m002 aux gates et a la tracabilite`.

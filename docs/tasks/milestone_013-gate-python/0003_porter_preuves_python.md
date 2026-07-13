@@ -1,4 +1,4 @@
-# T-0003 - Porter les preuves sans processus PowerShell
+# T-0003 - Porter les preuves sans processus uv run --locked gate
 
 ## But métier
 
@@ -6,9 +6,9 @@ Conserver la couverture réellement observée des milestones tout en supprimant 
 
 ## Scénario BDD
 
-- Given un ancien validateur ou test PowerShell déclaré par la gate.
+- Given un ancien validateur ou test uv run --locked gate
 - When son comportement est porté en Python.
-- Then la table de parité relie le chemin historique, le node ID et le comportement couvert sans appeler PowerShell.
+- Then la table de parité relie le chemin historique, le node ID et le comportement couvert sans appeler uv run --locked gate
 
 ## Implémentation attendue
 

@@ -27,11 +27,11 @@
   - Given une version canonique publiée avec pages, items et hashes.
   - When KA applique un profil de chunking hiérarchique explicite.
   - Then chaque chunk porte ses pages, ses item ids, son `SourceLocator` résolvable et un `content_hash` cohérent.
-- Tests d'acceptation à écrire: `tests/m005/validate_hierarchical_chunking_acceptance.ps1`, couvrant chunk parent/enfant, conservation de page, item, hash et refus d'un item sans locator.
+- Tests d'acceptation à écrire: `uv run --locked gate`, couvrant chunk parent/enfant, conservation de page, item, hash et refus d'un item sans locator.
 - Tests unitaires à écrire: tests de `ChunkingProfile`, `KnowledgeChunk`, `HierarchicalChunkProjector`, limites de taille explicites, parents obligatoires et hash cohérent.
 - Implémentation attendue: créer le modèle de chunk KA et un port `CanonicalSourceReader` qui lit uniquement le contrat public canonique M-004.
 - Invariants et garde-fous: pas de chunk sans source; pas de limite implicite; pas de fallback vers texte brut si le document canonique est invalide; pas de stockage de claim dans un chunk.
 - Dépendances: T-003; M-004 T-007 `SourceLocator`; ADR-001; DDD-ADR-003; DDD-ADR-004.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_hierarchical_chunking_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_hierarchical_chunking_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m004\validate_source_locator_resolution_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m005): couvrir le chunking tracable`
 - Commit GREEN: `feat(m005): decouper le contenu canonique en chunks`

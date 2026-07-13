@@ -32,11 +32,11 @@
   - Given un run réel exécute corpus, recherche, réponse, chat et éventuellement stratégie.
   - When le run se termine.
   - Then un rapport conserve les identifiants, hashes, versions d'outils, métriques, citations et échecs sans stocker de secrets ni payloads sensibles complets.
-- Tests d'acceptation à écrire: `tests/m013/validate_real_pipeline_report_acceptance.ps1`.
+- Tests d'acceptation à écrire: `uv run --locked gate`.
 - Tests unitaires à écrire: version outil absente, hash PDF absent, citation non listée, métrique obligatoire absente, secret présent, échec non reporté, prompt complet stocké, rapport sans commande source.
 - Implémentation attendue: produire `docs/evaluation/m013/real_pipeline_run_report.md` ou un artefact local équivalent contrôlé par gate, avec séparation explicite entre preuve versionnée et données privées locales.
 - Invariants et garde-fous: aucun rapport GREEN sans run; aucun secret; aucun prompt complet; aucune correction manuelle des résultats; aucun effacement d'échec.
 - Dépendances: T-015 à T-021, observabilité M-013, politiques de rétention existantes.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_real_pipeline_report_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_task_system.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m013): couvrir rapport pipeline reel`
 - Commit GREEN: `docs(m013): publier rapport pipeline reel`

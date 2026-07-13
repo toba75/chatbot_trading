@@ -31,17 +31,17 @@
   - Given l'application ASGI et les contrats documentaires sont GREEN
   - When la stack locale démarre puis exécute le parcours PDF jusqu'aux lectures publiques
   - Then un seul `orchestrator-api` sert les contrats, chaque appel est traçable et toute régression bloque la gate M13-FastAPI
-- Tests d'acceptation à écrire: `tests/m013_fastapi/validate_orchestrator_deployment_acceptance.ps1` et `tests/m013_fastapi/validate_document_http_live_acceptance.ps1`, couvrant démarrage, healthcheck, OpenAPI et parcours HTTP réel.
-- Tests unitaires à écrire: `tests/m013_fastapi/validate_orchestrator_deployment_unit.ps1` et `tests/m013_fastapi/validate_m013_fastapi_traceability_unit.ps1`.
-- Implémentation attendue: ajouter une commande `uv run api`, migrer le service Compose `orchestrator-api`, conserver le port 8080, publier le runbook et le rapport d'audit, enrôler le validateur dans `scripts/test.ps1` et `scripts/lint.ps1`.
+- Tests d'acceptation à écrire: `uv run --locked gate` et `uv run --locked gate`, couvrant démarrage, healthcheck, OpenAPI et parcours HTTP réel.
+- Tests unitaires à écrire: `uv run --locked gate` et `uv run --locked gate`.
+- Implémentation attendue: ajouter une commande `uv run api`, migrer le service Compose `orchestrator-api`, conserver le port 8080, publier le runbook et le rapport d'audit, enrôler le validateur dans `uv run --locked gate` et `uv run --locked gate`.
 - Invariants et garde-fous: UI et `llm-gateway` ne sont pas migrés vers FastAPI par effet de bord; arrêt explicite si la configuration ou une dépendance obligatoire manque; aucun ancien dispatch documentaire conservé.
 - Dépendances: T-003 à T-010; M-002; M13-config; ADR-018; ADR-019.
 - Commandes de validation:
-  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_fastapi\validate_orchestrator_deployment_acceptance.ps1`
-  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_fastapi\validate_document_http_live_acceptance.ps1`
-  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_fastapi.ps1 -Mode Live`
-  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_traceability.ps1`
-  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`
-  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`
+  - `uv run --locked gate`
+  - `uv run --locked gate`
+  - `uv run --locked gate`
+  - `uv run --locked gate`
+  - `uv run --locked gate`
+  - `uv run --locked gate`
 - Commit RED: `test(platform): couvrir deploiement audit m13 fastapi`.
 - Commit GREEN: `feat(platform): deployer api orchestratrice fastapi`.

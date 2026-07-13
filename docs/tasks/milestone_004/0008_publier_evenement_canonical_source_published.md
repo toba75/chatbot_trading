@@ -27,11 +27,11 @@
   - Given une version canonique vient d'être publiée par SP.
   - When l'intégration intercontextes est traitée.
   - Then un événement `CanonicalSourcePublished` versionné est inscrit dans l'outbox avec un payload `CanonicalSourceRef` et aucune donnée interne SP.
-- Tests d'acceptation à écrire: un test `tests/m004/validate_canonical_publication_event_acceptance.ps1` couvrant émission nominale, idempotence sur retry, refus avant publication et compatibilité de l'enveloppe.
+- Tests d'acceptation à écrire: un test `uv run --locked gate` couvrant émission nominale, idempotence sur retry, refus avant publication et compatibilité de l'enveloppe.
 - Tests unitaires à écrire: tests de payload `CanonicalSourceRef`, cohérence `aggregate_id`, `occurred_at`, version d'événement, déduplication outbox et absence de clés internes.
 - Implémentation attendue: connecter la publication T-006 à l'outbox M-002, produire l'enveloppe existante et ajouter les fixtures M-004 ou réutiliser les fixtures M-001 quand elles suffisent.
 - Invariants et garde-fous: un seul événement par version; payload contractuel uniquement; idempotence vérifiée; aucune transaction aval synchrone; aucun accès direct aux stockages KA ou EG.
 - Dépendances: T-006; T-007; M-001 `EventEnvelope`; M-002 outbox; `tests/fixtures/m001/contracts/sp_to_ka_canonical_source_published_event_v1.json`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m004\validate_canonical_publication_event_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m004\validate_canonical_publication_event_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m001\validate_event_envelope_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m002\validate_outbox_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m004): couvrir l evenement canonical source published`.
 - Commit GREEN: `feat(m004): publier l evenement canonical source published`.

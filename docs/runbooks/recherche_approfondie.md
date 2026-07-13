@@ -19,8 +19,8 @@
 - Précondition: la question possède un mandat explicite; une recherche approfondie ne complète pas silencieusement une conversation insuffisante.
 - Commande vérifiée:
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m009_specification.ps1
+```console
+uv run --locked gate
 ```
 
 - Résultat attendu: plan de recherche, collecte multi-sources, couverture insuffisante, contradiction et synthèse traçable restent conformes.

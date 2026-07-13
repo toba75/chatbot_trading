@@ -42,7 +42,7 @@ Chaque `RoutePageMeasurement` conserve `status`, `output_id` et `failure_reason`
 
 ## Commandes de preuve
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m012\validate_document_route_benchmark_acceptance.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m012\validate_document_route_benchmark_unit.ps1
+```console
+uv run --locked gate
+uv run --locked gate
 ```

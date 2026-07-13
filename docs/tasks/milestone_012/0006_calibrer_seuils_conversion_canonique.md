@@ -27,11 +27,11 @@
   - Given les routes documentaires ont été mesurées sur le corpus pilote.
   - When les seuils de conversion canonique sont calibrés.
   - Then chaque seuil publié référence les métriques qui le justifient et toute insuffisance reste visible comme écart V1.
-- Tests d'acceptation à écrire: `tests/m012/validate_document_quality_calibration_acceptance.ps1`, qui échoue si un seuil n'a pas de benchmark source, si une valeur de développement est promue sans décision, si une route sous le seuil est acceptée, ou si un écart V1 n'est pas publié.
+- Tests d'acceptation à écrire: `uv run --locked gate`, qui échoue si un seuil n'a pas de benchmark source, si une valeur de développement est promue sans décision, si une route sous le seuil est acceptée, ou si un écart V1 n'est pas publié.
 - Tests unitaires à écrire: tests de `DocumentQualityCalibrationPolicy` pour seuil sans métrique, seuil sans strate, résultat incomplet, promotion interdite, écart V1 obligatoire, changement de version de politique, métrique manquante et décision contradictoire.
 - Implémentation attendue: créer la politique de calibration documentaire, le format de décision, le rapport de seuils SP, l'adaptation contrôlée de `quality_gates.yaml` ou de son équivalent projet, et les validations de cohérence entre benchmark et seuil.
 - Invariants et garde-fous: aucun seuil global qui efface une strate critique; aucune valeur par défaut; aucune promotion automatique d'une route; aucun seuil modifié sans nouvelle décision versionnée.
 - Dépendances: T-005; `docs/specs/m004_version_canonique_publiee.md`; ADR-002; ADR-004; `docs/adr/index.md`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m012\validate_document_quality_calibration_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m012\validate_document_quality_calibration_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m012_specification.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m012): couvrir la calibration documentaire`
 - Commit GREEN: `feat(m012): calibrer les seuils documentaires`

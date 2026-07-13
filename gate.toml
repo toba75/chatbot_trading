@@ -12,6 +12,17 @@ depends_on = []
 live = false
 
 [[nodes]]
+id = "gate.historical-references"
+path = "gate_tests/ost_gate/test_historical_references_contract.py"
+kind = "test"
+scope = "governance"
+phase = "gate-core"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["gate.manifest"]
+live = false
+
+[[nodes]]
 id = "gate.planner"
 path = "gate_tests/ost_gate/test_planner_contract.py"
 kind = "test"
@@ -19,7 +30,7 @@ scope = "governance"
 phase = "gate-core"
 timeout_seconds = 120
 serial_group = "parallel"
-depends_on = ["gate.manifest"]
+depends_on = ["gate.historical-references"]
 live = false
 
 [[nodes]]

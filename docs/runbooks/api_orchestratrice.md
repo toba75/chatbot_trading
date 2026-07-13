@@ -18,13 +18,13 @@
 
 La recette hôte n'est pas un chemin d'exploitation : PostgreSQL est adressé par le DNS interne `postgres` et le gateway par `llm-gateway`. Il est interdit de lancer directement l'entrée `api` hors de Compose. La commande historique `python -m app.platform.local_runtime serve-http orchestrator-api 8080` reste interdite et retourne `ORCHESTRATOR_LEGACY_RUNTIME_FORBIDDEN`.
 
-Les outils requis sont Git, Docker Engine avec Compose v2, PowerShell et `tar.exe`. Le secret PostgreSQL existe hors Git dans un fichier lisible par l'opérateur. L'identité technique est fixe : base `ostrading`, rôle `ostrading`, URL `postgresql+psycopg://ostrading@postgres/ostrading`. Aucune variable `POSTGRES_DB` ou `POSTGRES_USER` ne peut la redéfinir.
+Les outils requis sont Git, Docker Engine avec Compose v2, uv run --locked gate`tar.exe`. Le secret PostgreSQL existe hors Git dans un fichier lisible par l'opérateur. L'identité technique est fixe : base `ostrading`, rôle `ostrading`, URL `postgresql+psycopg://ostrading@postgres/ostrading`. Aucune variable `POSTGRES_DB` ou `POSTGRES_USER` ne peut la redéfinir.
 
 ## Export immuable et préparation
 
 Exécuter depuis la racine du dépôt :
 
-```powershell
+```console
 $edgePort = "8443"
 $caddyAdmin = "localhost:2019"
 $sourceCommit = (git rev-parse HEAD).Trim()
@@ -84,7 +84,7 @@ Le contexte Docker est l'archive du commit, jamais le worktree. Le `.dockerignor
 
 ## Construction et inspection avant démarrage
 
-```powershell
+```console
 Invoke-ComposeWithTechnicalInterpolation -Revision $sourceCommit -PostgresSchemaVersion $schemaVersion -Operation {
     docker compose -f .\deploy\local-compose\compose.yaml build orchestrator-api worker-documents llm-gateway ui
     if ($LASTEXITCODE -ne 0) { throw "COMPOSE_BUILD_FAILED" }
@@ -116,7 +116,7 @@ Le raccourci historique `docker compose -f .\deploy\local-compose\compose.yaml u
 
 ## Contrôles opératoires
 
-```powershell
+```console
 Invoke-ComposeWithTechnicalInterpolation -Revision $sourceCommit -PostgresSchemaVersion $schemaVersion -Operation {
     $edgeAuthority = docker compose -f .\deploy\local-compose\compose.yaml port edge-gateway 8443
     curl.exe --fail --insecure "https://$edgeAuthority/api/health"
@@ -143,16 +143,16 @@ Caddy et l'ASGI refusent les corps `/api/*` supérieurs à 54 Mo, y compris sans
 
 ## Gates statique et live
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_fastapi.ps1 -Mode Static
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_fastapi.ps1 -Mode Live
+```console
+uv run --locked gate
+uv run --locked gate
 ```
 
-Les deux modes matérialisent l'environnement verrouillé par `uv sync --frozen --no-dev`. Cette synchronisation installe aussi le paquet `chatbot-trading` en version `0.1.0` et la gate refuse toute métadonnée absente ou différente. Le mode `Live` exporte `HEAD`, construit et démarre la stack finale : PostgreSQL, Qdrant, `llm-gateway`, `orchestrator-api`, deux workers, UI et Caddy. Il vérifie les labels, l'utilisateur, les entrypoints, la migration 008, la readiness PostgreSQL + LLM et un PDF réel. Il redémarre ensuite PostgreSQL et l'API dans de nouveaux processus, puis relit le diagnostic et le SHA-256 original : c'est la preuve réelle T-005. Le test historique `validate_document_persistence_restart_acceptance.ps1` reste une preuve de contrat isolée et ne remplace pas ce parcours Compose.
+Les deux modes matérialisent l'environnement verrouillé par `uv sync --frozen --no-dev`. Cette synchronisation installe aussi le paquet `chatbot-trading` en version `0.1.0` et la gate refuse toute métadonnée absente ou différente. Le mode `Live` exporte `HEAD`, construit et démarre la stack finale : PostgreSQL, Qdrant, `llm-gateway`, `orchestrator-api`, deux workers, UI et Caddy. Il vérifie les labels, l'utilisateur, les entrypoints, la migration 008, la readiness PostgreSQL + LLM et un PDF réel. Il redémarre ensuite PostgreSQL et l'API dans de nouveaux processus, puis relit le diagnostic et le SHA-256 original : c'est la preuve réelle T-005. Le test historique `uv run --locked gate` reste une preuve de contrat isolée et ne remplace pas ce parcours Compose.
 
 ## Migration ascendante d'un volume existant
 
-```powershell
+```console
 Invoke-ComposeWithTechnicalInterpolation -Revision $sourceCommit -PostgresSchemaVersion $schemaVersion -Operation {
     docker compose -f .\deploy\local-compose\compose.yaml up -d postgres
     docker compose -f .\deploy\local-compose\compose.yaml run --rm --no-deps orchestrator-api python -m app.platform.postgres_migrations --config /workspace/config/application.yaml
@@ -165,7 +165,7 @@ La sortie attendue est `POSTGRES_SCHEMA_READY:<OSTRADING_POSTGRES_SCHEMA_VERSION
 
 L'arrêt conserve les volumes :
 
-```powershell
+```console
 Invoke-ComposeWithTechnicalInterpolation -Revision $sourceCommit -PostgresSchemaVersion $schemaVersion -Operation {
     docker compose -f .\deploy\local-compose\compose.yaml down
 }
@@ -173,7 +173,7 @@ Invoke-ComposeWithTechnicalInterpolation -Revision $sourceCommit -PostgresSchema
 
 Le rollback prévalide le ledger **avant** export, build et remplacement :
 
-```powershell
+```console
 $target = git rev-parse <commit-complet-compatible>
 if ($LASTEXITCODE -ne 0 -or $target -notmatch '^[0-9a-f]{40}$') { throw "IMAGE_REVISION_MUTABLE_REJECTED" }
 

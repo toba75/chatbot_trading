@@ -31,14 +31,14 @@
   - Given un document possède ou non une KnowledgeProjection publiée par KA
   - When le client lit la projection par le DocumentId
   - Then KA retourne son état réel, son profil, sa fraîcheur et ses sorties bornées sans exposer son stockage technique
-- Tests d'acceptation à écrire: `tests/m013_fastapi/validate_projection_read_model_acceptance.ps1`, couvrant absence, build, searchable, stale et failed.
-- Tests unitaires à écrire: `tests/m013_fastapi/validate_projection_queries_unit.ps1`, couvrant mapping d'état, version canonique, `chunk_count`, échantillons bornés et SourceLocator.
+- Tests d'acceptation à écrire: `uv run --locked gate`, couvrant absence, build, searchable, stale et failed.
+- Tests unitaires à écrire: `uv run --locked gate`, couvrant mapping d'état, version canonique, `chunk_count`, échantillons bornés et SourceLocator.
 - Implémentation attendue: ajouter un query service KA et injecter son port dans le routeur documentaire de l'API orchestratrice.
 - Invariants et garde-fous: `PROJECTION_NOT_REQUESTED` vient de l'absence réelle; `SEARCHABLE` vient de l'agrégat KA; `qdrant_collection` et identifiants de points sont interdits.
 - Dépendances: T-007; M-005; DDD-ADR-004; ADR-018.
 - Commandes de validation:
-  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_fastapi\validate_projection_read_model_acceptance.ps1`
-  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_fastapi\validate_projection_queries_unit.ps1`
-  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_architecture_boundaries.ps1`
+  - `uv run --locked gate`
+  - `uv run --locked gate`
+  - `uv run --locked gate`
 - Commit RED: `test(ka): couvrir lecture projection documentaire`.
 - Commit GREEN: `feat(ka): publier read model projection`.

@@ -27,11 +27,11 @@
   - Given une stratégie candidate `COMPILABLE` contient des règles déterministes, des paramètres résolus et un plan de validation.
   - When la compilation est demandée.
   - Then SD produit une représentation intermédiaire hashable sans exécuter de backtest.
-- Tests d'acceptation à écrire: `tests/m010/validate_strategy_compilation_acceptance.ps1`, qui échoue tant qu'une stratégie non compilable ou non déterministe peut produire une représentation compilée.
+- Tests d'acceptation à écrire: `uv run --locked gate`, qui échoue tant qu'une stratégie non compilable ou non déterministe peut produire une représentation compilée.
 - Tests unitaires à écrire: tests du compilateur pour statut invalide, règle non déterministe sans graine, expression invalide, backend absent, paramètre bloquant, plan de validation absent, hash stable et absence d'appel EX.
 - Implémentation attendue: créer le service de compilation, les ports abstraits, un backend déterministe de test, la validation d'expression et la production d'un artefact compilé hashable dans SD.
 - Invariants et garde-fous: aucun backtest; aucun import EX dans le domaine SD; aucune correction silencieuse d'expression; aucun backend par défaut.
 - Dépendances: T-007; `RuleExpressionValidator`; `StrategyCompilerBackend`; DDD-ADR-009.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m010\validate_strategy_compilation_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m010\validate_strategy_compilation_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_architecture_boundaries.ps1 -AppRoot .\app -ContextRegistryPath .\app\context_registry.json -SpecificationPath .\docs\specs\m001_frontieres_ddd_contrats_publies.md`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m010): couvrir compilation strategie deterministe`
 - Commit GREEN: `feat(m010): compiler strategie candidate deterministe`

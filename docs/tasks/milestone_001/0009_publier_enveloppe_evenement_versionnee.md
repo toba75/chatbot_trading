@@ -32,6 +32,6 @@
 - Implémentation attendue: créer l'enveloppe de contrat, les validateurs, les fixtures et une abstraction de test d'idempotence sans outbox persistante.
 - Invariants et garde-fous: aucun producteur implicite; aucun event type vide; aucun fallback de version; aucun bus distribué ou stockage outbox opérationnel dans cette tâche.
 - Dépendances: T-003; T-004; DDD-ADR-006; DDD-ADR-008; section 15 de la spécification v4.1.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m001\validate_event_envelope_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m001\validate_event_envelope_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m001): couvrir l'enveloppe evenement versionnee`.
 - Commit GREEN: `feat(m001): publier l'enveloppe evenement versionnee`.

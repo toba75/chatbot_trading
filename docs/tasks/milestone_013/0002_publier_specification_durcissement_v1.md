@@ -14,7 +14,7 @@
 - Garde-fous: aucune acceptation implicite; aucune valeur de seuil non sourcée; aucun critère V1 supprimé; aucune décision structurante sans ADR; aucune documentation d'exploitation qui décrit un fallback non implémenté.
 
 ## Blocages Ou Préconditions
-- État GREEN/RED connu: dépend de T-001; `scripts/test.ps1` est RED tant que la précondition M-013 n'a pas été rétablie.
+- État GREEN/RED connu: dépend de T-001; `uv run --locked gate` est RED tant que la précondition M-013 n'a pas été rétablie.
 - Présence des milestones amont dans master: M-012 présent dans `master`.
 - Décisions manquantes: ADR requise si la spécification M-013 impose une nouvelle politique de rétention, rend mTLS obligatoire ou remplace une décision de topologie existante.
 - Risques: écrire une checklist technique sans critères métier; accepter V1 malgré un écart bloquant; mélanger runbook d'exploitation et décision d'architecture non documentée.
@@ -27,11 +27,11 @@
   - Given le système complet a été mesuré par M-012 et les critères V1 sont publiés.
   - When la spécification M-013 est publiée.
   - Then chaque comportement de durcissement nomme son invariant, son scénario BDD, son test RED, ses ADR applicables et sa commande de validation.
-- Tests d'acceptation à écrire: `tests/m013/validate_m013_specification_acceptance.ps1`, qui échoue tant que `docs/specs/m013_durcissement_acceptation_v1.md` et son validateur n'existent pas ou tant que la spécification ne couvre pas les livrables M-013.
-- Tests unitaires à écrire: tests de `scripts/validate_m013_specification.ps1` pour mission absente, critères V1 absents, rapport M-012 absent, statuts d'écarts absents, sécurité réseau absente, sauvegarde absente, restauration absente, rétention absente, monitoring absent, runbooks absents, documentation utilisateur absente, anti-patterns absents, rapport d'acceptation absent et ADR manquante.
-- Implémentation attendue: créer `docs/specs/m013_durcissement_acceptation_v1.md`, créer `scripts/validate_m013_specification.ps1`, y définir les comportements vérifiables M-013, enrôler la validation dans `scripts/test.ps1` et `scripts/lint.ps1`, puis relier les exigences M-013 à `docs/traceability/matrix.md`.
+- Tests d'acceptation à écrire: `uv run --locked gate`, qui échoue tant que `docs/specs/m013_durcissement_acceptation_v1.md` et son validateur n'existent pas ou tant que la spécification ne couvre pas les livrables M-013.
+- Tests unitaires à écrire: tests de `uv run --locked gate` pour mission absente, critères V1 absents, rapport M-012 absent, statuts d'écarts absents, sécurité réseau absente, sauvegarde absente, restauration absente, rétention absente, monitoring absent, runbooks absents, documentation utilisateur absente, anti-patterns absents, rapport d'acceptation absent et ADR manquante.
+- Implémentation attendue: créer `docs/specs/m013_durcissement_acceptation_v1.md`, créer `uv run --locked gate`, y définir les comportements vérifiables M-013, enrôler la validation dans `uv run --locked gate` et `uv run --locked gate`, puis relier les exigences M-013 à `docs/traceability/matrix.md`.
 - Invariants et garde-fous: aucun critère V1 hors spécification; aucun écart V1 sans statut exploitable; aucun anti-pattern interdit ignoré; aucun contrat public ou ADR modifié sans traçabilité.
 - Dépendances: T-001; `docs/tasks/README.md`; `docs/specs/plan_implementation_milestones_workstreams.md`; `docs/specs/specification_unifiee_ddd_technique_chatbot_trading_v4_1.md`; `docs/governance/m012_v1_gap_report.md`; ADR-007; ADR-008; ADR-009; ADR-010; DDD-ADR-006; DDD-ADR-010; DDD-ADR-011.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_m013_specification_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_m013_specification_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_specification.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m013): couvrir specification acceptation v1`
 - Commit GREEN: `docs(m013): publier specification acceptation v1`

@@ -4,4 +4,4 @@ from gate_tests.ported_support import assert_native_parity
 
 
 def test_validate_m003_traceability_acceptance() -> None:
-    assert_native_parity('tests/m003/validate_m003_traceability_acceptance.ps1', 'gate_tests/ported/tests/m003/validate_m003_traceability_acceptance.py', 'unit')
+    assert_native_parity('gate_tests/ported/tests/m003/validate_m003_traceability_acceptance.py', 'unit')

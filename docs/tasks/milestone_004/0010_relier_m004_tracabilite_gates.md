@@ -22,16 +22,16 @@
 ## Tâches
 ### T-010 - Relier M-004 à la traçabilité et aux gates
 - But métier: fournir la preuve finale que SP sait publier une version canonique fiable, immutable et consommable par les contextes aval.
-- Portée DDD: matrice `REQ-M004-*`, journal M-004, définition de terminé, ADR applicables, gates PowerShell, contrôles d'architecture, métriques de conversion et logs d'audit sans contenu documentaire.
+- Portée DDD: matrice `REQ-M004-*`, journal M-004, définition de terminé, ADR applicables, gates uv run --locked gate
 - Scénario BDD:
   - Given les comportements M-004 sont implémentés et testés.
   - When les gates de clôture sont exécutées.
   - Then chaque exigence M-004 est reliée à une preuve et la clôture est refusée si un test, une ADR, une commande, un locator ou un signal d'audit manque.
-- Tests d'acceptation à écrire: un test `tests/m004/validate_m004_traceability_acceptance.ps1` qui échoue tant qu'une exigence M-004 n'a pas de ligne dans `docs/traceability/matrix.md` avec test, commande, code, ADR ou justification et preuve d'audit.
+- Tests d'acceptation à écrire: un test `uv run --locked gate` qui échoue tant qu'une exigence M-004 n'a pas de ligne dans `docs/traceability/matrix.md` avec test, commande, code, ADR ou justification et preuve d'audit.
 - Tests unitaires à écrire: tests du validateur de matrice pour statuts M-004, preuves de domaine, preuves d'adaptateur, ADR-001 à ADR-004, commandes introuvables, exigences sans code et métriques ou logs absents.
 - Implémentation attendue: mettre à jour `docs/traceability/matrix.md`, compléter les validateurs ou l'agrégateur de gates si nécessaire, vérifier les métriques `versions_canoniques_publiees`, `pages_refusees_qa`, `autorites_textuelles_ambigues`, `refus_canoniques` et documenter la clôture dans `docs/tasks/milestone_004/journal.md`.
 - Invariants et garde-fous: aucune preuve manquante; aucune commande non exécutable; aucun statut `Couvert` sans artefact; aucun locator non résolvable; aucun log ne contient le contenu intégral d'un document.
 - Dépendances: T-001; T-002; T-003; T-004; T-005; T-006; T-007; T-008; T-009; `docs/governance/definition_of_done.md`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_traceability.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m004\validate_m004_traceability_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m004\validate_m004_traceability_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m004): couvrir la tracabilite de version canonique`.
 - Commit GREEN: `docs(m004): relier m004 aux gates et a la tracabilite`.

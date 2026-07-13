@@ -32,11 +32,11 @@
   - Given `config/application.yaml` déclare le Spark réel, le modèle et la provenance LLM.
   - When le chat produit ou le benchmark LLM exécute une inférence.
   - Then le gateway utilise uniquement les valeurs du fichier, rejette les homonymes d'environnement et conserve la provenance complète.
-- Tests d'acceptation à écrire: `tests/m013_config/validate_llm_gateway_config_file_acceptance.ps1`, couvrant chat produit, benchmark LLM, variable `GEMMA_BASE_URL` polluante, provenance absente du fichier, mode `none` sans Authorization et pannes Spark explicites.
-- Tests unitaires à écrire: `tests/m013_config/validate_llm_gateway_config_file_unit.ps1`, couvrant construction `GatewayConfiguration` depuis objet config, refus de champs vides, mapping des timeouts, refus d'environnement, conservation du circuit breaker et hash de configuration dans les métriques.
+- Tests d'acceptation à écrire: `uv run --locked gate`, couvrant chat produit, benchmark LLM, variable `GEMMA_BASE_URL` polluante, provenance absente du fichier, mode `none` sans Authorization et pannes Spark explicites.
+- Tests unitaires à écrire: `uv run --locked gate`, couvrant construction `GatewayConfiguration` depuis objet config, refus de champs vides, mapping des timeouts, refus d'environnement, conservation du circuit breaker et hash de configuration dans les métriques.
 - Implémentation attendue: remplacer dans `app/platform/local_runtime.py` et les points d'entrée gateway la construction depuis `os.environ` par la configuration validée; adapter les tests M-013 reality pour fournir `--config`; préserver les erreurs existantes `LLM_UNAVAILABLE` et la provenance ADR-015.
 - Invariants et garde-fous: aucune lecture de `GEMMA_*` comme source; aucune valeur par défaut pour modèle ou endpoint; aucune réponse factuelle si la configuration LLM est invalide.
-- Dépendances: T-003; `app/platform/local_runtime.py`; `app/platform/llm_gateway/__init__.py`; `tests/m013/validate_m013_reality_product_acceptance.ps1`; `tests/m013/validate_llm_gateway_real_spark_acceptance.ps1`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_llm_gateway_config_file_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_llm_gateway_config_file_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_reality.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Dépendances: T-003; `app/platform/local_runtime.py`; `app/platform/llm_gateway/__init__.py`; `uv run --locked gate`; `uv run --locked gate`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(platform): couvrir gateway llm configure par fichier`.
 - Commit GREEN: `feat(platform): migrer gateway llm vers application yaml`.

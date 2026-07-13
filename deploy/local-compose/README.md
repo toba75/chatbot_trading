@@ -30,15 +30,15 @@ Aucune valeur applicative OSTrading ne doit être transmise par `environment:` o
 
 ## Validation statique
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_local_compose.ps1 -Path .\deploy\local-compose\compose.yaml
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_network_boundary.ps1 -ApplicationConfigPath .\deploy\local-compose\application.compose.yaml
+```console
+uv run --locked gate --scope m002
+uv run --locked gate --scope m013
 docker compose -f .\deploy\local-compose\compose.yaml config
 ```
 
 ## Démarrage local
 
-```powershell
+```console
 docker compose -f .\deploy\local-compose\compose.yaml up --build
 ```
 

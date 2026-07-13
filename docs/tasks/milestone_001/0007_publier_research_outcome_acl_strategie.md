@@ -32,6 +32,6 @@
 - Implémentation attendue: créer le contrat `VerifiedResearchOutcome`, ses fixtures et un adaptateur de traduction SD minimal qui expose les décisions de traduction sans compiler de stratégie.
 - Invariants et garde-fous: aucun statut implicite; aucun conflit supprimé; aucune règle SD créée par fallback; aucun accès direct à l'agrégat RA.
 - Dépendances: T-004; T-006; section 4 relation RA vers SD; sections 8 et 10 de la spécification v4.1.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m001\validate_research_outcome_contract_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m001\validate_research_outcome_contract_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m001): couvrir verified research outcome`.
 - Commit GREEN: `feat(m001): publier le contrat research outcome`.

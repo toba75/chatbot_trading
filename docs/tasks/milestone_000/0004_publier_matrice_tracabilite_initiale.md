@@ -32,6 +32,6 @@
 - Implémentation attendue: créer `docs/traceability/matrix.md` ou un emplacement équivalent documenté; y inscrire les exigences initiales de M-000; créer un validateur strict de la matrice.
 - Invariants et garde-fous: aucune couverture implicite; les statuts autorisés doivent être définis; une absence de code métier doit être déclarée comme hors portée de M-000, pas comme réussite silencieuse.
 - Dépendances: T-001; T-002; plan de milestones; critères d'acceptation DDD de la section 21.
-- Commandes de validation: future commande `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_traceability.ps1`; puis `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1` après T-006.
+- Commandes de validation: future commande `uv run --locked gate`; puis `uv run --locked gate` après T-006.
 - Commit RED: `test(m000): couvrir la matrice de traçabilité initiale`.
 - Commit GREEN: `feat(m000): publier la traçabilité initiale`.

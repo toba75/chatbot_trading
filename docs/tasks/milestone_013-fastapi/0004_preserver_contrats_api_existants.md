@@ -31,14 +31,14 @@
   - Given un corpus de requêtes publiques capturant succès, refus et indisponibilités existants
   - When ces requêtes sont rejouées contre l'application ASGI
   - Then les statuts HTTP, codes d'erreur et champs publics restent identiques hors changement explicitement spécifié
-- Tests d'acceptation à écrire: `tests/m013_fastapi/validate_existing_api_contract_parity_acceptance.ps1`, comparant l'ancien adaptateur borné et le nouveau routeur.
-- Tests unitaires à écrire: `tests/m013_fastapi/validate_existing_api_routers_unit.ps1`, couvrant validation des entrées et mapping des erreurs par route.
+- Tests d'acceptation à écrire: `uv run --locked gate`, comparant l'ancien adaptateur borné et le nouveau routeur.
+- Tests unitaires à écrire: `uv run --locked gate`, couvrant validation des entrées et mapping des erreurs par route.
 - Implémentation attendue: créer des `APIRouter` séparés par surface, déléguer aux fonctions/cas d'usage existants, puis retirer de `_local_post_response` uniquement les branches migrées.
 - Invariants et garde-fous: pas de logique métier dans les fonctions de route; pas de `except Exception`; pas de modification de contrat non documentée.
 - Dépendances: T-003; contrats M-005, M-008, M-013.
 - Commandes de validation:
-  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_fastapi\validate_existing_api_contract_parity_acceptance.ps1`
-  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_fastapi\validate_existing_api_routers_unit.ps1`
-  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_architecture_boundaries.ps1`
+  - `uv run --locked gate`
+  - `uv run --locked gate`
+  - `uv run --locked gate`
 - Commit RED: `test(api): couvrir parite contrats orchestrateur`.
 - Commit GREEN: `refactor(api): migrer contrats existants vers asgi`.

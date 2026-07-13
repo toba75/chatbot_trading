@@ -27,11 +27,11 @@
   - Given une projection `SEARCHABLE`.
   - When une recherche retourne un passage.
   - Then le passage contient un `SourceLocator` résolvable, un `content_hash` cohérent, des scores distincts, une trace de fusion et une trace de recherche persistée avec les paramètres et versions utilisés.
-- Tests d'acceptation à écrire: `tests/m005/validate_hybrid_search_acceptance.ps1`, couvrant recherche dense+sparse, fusion, reranking, filtre, diversification, locator résolvable, refus projection stale et trace persistée.
+- Tests d'acceptation à écrire: `uv run --locked gate`, couvrant recherche dense+sparse, fusion, reranking, filtre, diversification, locator résolvable, refus projection stale et trace persistée.
 - Tests unitaires à écrire: tests de `SearchRequest`, `SearchResponse`, `RetrievalCandidate`, `SearchScoreBundle`, fusion RRF déterministe, expansion parent, politique de fraîcheur, `SearchTracePolicy` et `SearchTraceStore`.
 - Implémentation attendue: créer l'application `search_knowledge.py`, les ports de recherche, reranking, résolution de locator et stockage de trace, puis retourner une réponse indépendante de Qdrant avec avertissements de fraîcheur.
 - Invariants et garde-fous: aucun score global sans détail dense/sparse/rerank; aucun candidat sans citation; aucun fallback vers une projection stale; aucune conclusion métier dans KA; aucune recherche auditable sans versions de projection, modèles, profils et filtres dans la trace.
 - Dépendances: T-007; ADR-005; DDD-ADR-003; DDD-ADR-004; M-004 T-007.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_hybrid_search_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_hybrid_search_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_search_trace_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m004\validate_source_locator_resolution_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m005): couvrir la recherche hybride tracable`
 - Commit GREEN: `feat(m005): rechercher des preuves candidates hybrides`

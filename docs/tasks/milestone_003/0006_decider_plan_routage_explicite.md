@@ -27,11 +27,11 @@
   - Given toutes les pages d'une source ont un état diagnostique et une version de politique.
   - When le plan de routage est décidé.
   - Then chaque page reçoit une route et une justification, ou la tentative passe en `MANUAL_REVIEW` sans route de remplacement implicite.
-- Tests d'acceptation à écrire: un test `tests/m003/validate_route_plan_acceptance.ps1` couvrant route native, route Granite, prétraitement conditionnel, page complexe en benchmark et route incertaine refusée.
+- Tests d'acceptation à écrire: un test `uv run --locked gate` couvrant route native, route Granite, prétraitement conditionnel, page complexe en benchmark et route incertaine refusée.
 - Tests unitaires à écrire: tests de mapping état-route, seuils de confiance, exceptions par page, version de politique obligatoire et refus d'OCRmyPDF sans état admissible.
 - Implémentation attendue: implémenter la politique de routage pure, la décision de plan, les justifications et le stockage de la version de configuration appliquée.
 - Invariants et garde-fous: aucune route implicite; aucune route sans diagnostic; aucune modification d'un plan approuvé; aucune dépendance du domaine à Docling, Granite-Docling ou OCRmyPDF.
 - Dépendances: T-005; ADR-002; ADR-003; configuration `routing.yaml` ou équivalent versionné; `DocumentProcessingRun`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m003\validate_route_plan_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m003\validate_route_plan_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m003): couvrir le plan de routage explicite`.
 - Commit GREEN: `feat(m003): decider le plan de routage explicite`.

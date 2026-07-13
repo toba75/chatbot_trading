@@ -27,11 +27,11 @@
   - Given une question autonome et un mandat documentaire explicite.
   - When RA ouvre puis planifie le cas de recherche.
   - Then le cas passe à `PLANNED` avec des obligations de couverture nommées et sans utiliser l'historique conversationnel comme preuve.
-- Tests d'acceptation à écrire: `tests/m007/validate_research_case_mandate_acceptance.ps1`, qui échoue tant que RA ne crée pas un cas planifié à partir d'une question et d'un mandat explicites.
+- Tests d'acceptation à écrire: `uv run --locked gate`, qui échoue tant que RA ne crée pas un cas planifié à partir d'une question et d'un mandat explicites.
 - Tests unitaires à écrire: tests pour question absente, mandat absent, mode inconnu, obligation de couverture vide, transition invalide, planification dupliquée, mutation du plan publié et tentative d'injecter un historique de conversation comme preuve.
 - Implémentation attendue: ajouter les modèles de domaine RA nécessaires, le handler `OpenResearchCaseHandler`, le repository mémoire strict et un planificateur local déterministe pour M-007.
 - Invariants et garde-fous: aucun mode implicite; aucune obligation de couverture par défaut; aucun accès aux preuves avant planification; aucun contenu conversationnel brut dans le cas de recherche.
 - Dépendances: T-002; contrat `VerifiedResearchOutcome` M-001; context registry RA.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_research_case_mandate_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_research_case_mandate_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_architecture_boundaries.ps1 -AppRoot .\app -ContextRegistryPath .\app\context_registry.json -SpecificationPath .\docs\specs\m001_frontieres_ddd_contrats_publies.md`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m007): couvrir cas recherche mandat explicite`
 - Commit GREEN: `feat(m007): ouvrir cas recherche mandat explicite`

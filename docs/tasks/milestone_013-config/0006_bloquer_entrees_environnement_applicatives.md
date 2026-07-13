@@ -32,11 +32,11 @@
   - Given une modification introduit une lecture de variable d'environnement applicative.
   - When la gate M13-config inspecte le code, Compose, scripts et documentation d'exploitation.
   - Then la validation échoue avec `CONFIG_ENV_INPUT_REJECTED` ou un diagnostic ciblé avant tout démarrage.
-- Tests d'acceptation à écrire: `tests/m013_config/validate_environment_input_rejection_acceptance.ps1`, couvrant `os.environ`, `getenv`, `process.env`, `.env`, `env_file`, `environment:` applicatif, variable homonyme dans le shell et exceptions techniques documentées.
-- Tests unitaires à écrire: `tests/m013_config/validate_environment_input_rejection_unit.ps1`, couvrant scanner de fichiers, allowlist limitée, faux positifs sur texte historique, diagnostic de ligne, et refus de clé historique.
-- Implémentation attendue: créer `scripts/validate_m013_config_environment.ps1` et un module de contrôle si nécessaire; enrôler la validation dans `scripts/test.ps1` et `scripts/lint.ps1`; maintenir une allowlist explicite pour les variables de contrôle des tests PowerShell qui ne pilotent pas l'application.
+- Tests d'acceptation à écrire: `uv run --locked gate`, couvrant `os.environ`, `getenv`, `process.env`, `.env`, `env_file`, `environment:` applicatif, variable homonyme dans le shell et exceptions techniques documentées.
+- Tests unitaires à écrire: `uv run --locked gate`, couvrant scanner de fichiers, allowlist limitée, faux positifs sur texte historique, diagnostic de ligne, et refus de clé historique.
+- Implémentation attendue: créer `uv run --locked gate` et un module de contrôle si nécessaire; enrôler la validation dans `uv run --locked gate` et `uv run --locked gate`; maintenir une allowlist explicite pour les variables de contrôle des tests uv run --locked gate
 - Invariants et garde-fous: aucun fallback vers environnement; aucune variable dangereuse ignorée; les exceptions sont nommées, justifiées et testées.
-- Dépendances: T-003 à T-005; `scripts/test.ps1`; `scripts/lint.ps1`; `app/platform/configuration`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_environment_input_rejection_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_environment_input_rejection_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_config_environment.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Dépendances: T-003 à T-005; `uv run --locked gate`; `uv run --locked gate`; `app/platform/configuration`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(governance): couvrir rejet environnement applicatif`.
 - Commit GREEN: `feat(governance): bloquer entrees environnement applicatives`.

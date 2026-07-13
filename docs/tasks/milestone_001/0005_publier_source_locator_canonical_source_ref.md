@@ -32,6 +32,6 @@
 - Implémentation attendue: créer les modèles de contrat, validateurs stricts, fixtures JSON et tests de round-trip pour SP vers KA et SP vers EG.
 - Invariants et garde-fous: aucun champ requis vide; aucun fallback vers `document_id` seul; aucun avertissement implicite pour version invalide; aucune dépendance à une classe interne SP.
 - Dépendances: T-004; DDD-ADR-003; sections 4 et 21 de la spécification v4.1.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m001\validate_source_contracts_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m001\validate_source_locator_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m001): couvrir source locator et canonical source ref`.
 - Commit GREEN: `feat(m001): publier les contrats documentaires`.

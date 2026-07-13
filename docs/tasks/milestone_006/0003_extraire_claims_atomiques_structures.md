@@ -27,11 +27,11 @@
   - Given un passage source publié contient deux conclusions et une limitation explicite.
   - When EG extrait les claims candidats.
   - Then deux claims `DRAFT` atomiques sont créés avec leur portée, leur limitation et leur span de preuve sans statut `VERIFIED`.
-- Tests d'acceptation à écrire: `tests/m006/validate_claim_extraction_acceptance.ps1`, couvrant extraction atomique, conservation des conditions et absence de vérification automatique.
+- Tests d'acceptation à écrire: `uv run --locked gate`, couvrant extraction atomique, conservation des conditions et absence de vérification automatique.
 - Tests unitaires à écrire: tests de `ClaimAtomicityPolicy`, `ClaimCanonicalizationPolicy`, parsing de sortie structurée, refus de champ absent, refus de claim vide et conservation de négation/modalité.
 - Implémentation attendue: créer les objets de domaine EG nécessaires, le port `ClaimExtractor`, un double déterministe de test, le handler d'extraction et le repository de brouillons sans persistance structurante.
 - Invariants et garde-fous: pas de valeur par défaut pour le type de claim; pas de correction silencieuse des champs manquants; pas de `try/catch` masquant une sortie LLM invalide.
 - Dépendances: T-002; `app/contracts/evidence_claims.py`; `app/knowledge_access/application/search_knowledge.py`; ADR-006; DDD-ADR-005; DDD-ADR-007.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m006\validate_claim_extraction_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m006\validate_claim_extraction_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m006): couvrir extraction claims atomiques`
 - Commit GREEN: `feat(m006): extraire claims atomiques structures`

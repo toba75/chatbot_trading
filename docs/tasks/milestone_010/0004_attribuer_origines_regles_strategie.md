@@ -27,11 +27,11 @@
   - Given une stratégie candidate comporte une règle d'entrée sans `RuleOrigin`.
   - When la validation de compilation est demandée.
   - Then la stratégie passe à `INCOMPLETE` et la règle devient un diagnostic bloquant.
-- Tests d'acceptation à écrire: `tests/m010/validate_strategy_rule_origin_acceptance.ps1`, qui échoue tant qu'une règle sans origine ou une règle `SOURCE` sans claim versionné peut atteindre l'état compilable.
+- Tests d'acceptation à écrire: `uv run --locked gate`, qui échoue tant qu'une règle sans origine ou une règle `SOURCE` sans claim versionné peut atteindre l'état compilable.
 - Tests unitaires à écrire: tests de `RuleOriginPolicy` pour chaque origine autorisée, origine inconnue, `SOURCE` sans `VerifiedClaimRef`, claim non versionné, déduction sans prémisses, choix de conception sans justification et contrainte utilisateur sans mandat.
 - Implémentation attendue: créer `StrategyRule`, `RuleOrigin`, `RuleOriginPolicy`, les commandes d'ajout et d'attribution, puis faire remonter les diagnostics bloquants dans l'agrégat.
 - Invariants et garde-fous: aucune origine par défaut; aucune chaîne libre acceptée comme origine; aucune preuve non versionnée; aucune règle `SOURCE` sans traçabilité.
 - Dépendances: T-003; `app/contracts/evidence_claims.py`; `app/contracts/research_outcomes.py`; DDD-ADR-005.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m010\validate_strategy_rule_origin_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m010\validate_strategy_rule_origin_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m010): couvrir origines regles strategie`
 - Commit GREEN: `feat(m010): attribuer origines regles strategie`

@@ -44,9 +44,9 @@ Le benchmark T-010 agrège uniquement des observations SD et EX déjà produites
 
 ## Validations
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m012\validate_strategy_backtest_benchmark_acceptance.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m012\validate_strategy_backtest_benchmark_unit.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m012_specification.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1
+```console
+uv run --locked gate
+uv run --locked gate
+uv run --locked gate
+uv run --locked gate
 ```

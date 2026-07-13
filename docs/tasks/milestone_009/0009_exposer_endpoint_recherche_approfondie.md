@@ -27,11 +27,11 @@
   - Given une conversation active et une question résolue demandant une recherche approfondie.
   - When CV sélectionne le mode `RECHERCHE_APPROFONDIE`.
   - Then RA exécute `POST /v1/research/deep` par façade explicite et le tour reçoit un résultat vérifié sans fallback documentaire simple.
-- Tests d'acceptation à écrire: `tests/m009/validate_deep_research_http_contract_acceptance.ps1`, qui échoue tant que l'endpoint et le routage CV ne publient pas le contrat M-009.
+- Tests d'acceptation à écrire: `uv run --locked gate`, qui échoue tant que l'endpoint et le routage CV ne publient pas le contrat M-009.
 - Tests unitaires à écrire: tests de payload interdit, mandat absent, mode forcé indisponible, fallback documentaire simple refusé, réponse RA sans citations, erreur publique instable, stockage interne exposé et régression `/v1/answer`.
 - Implémentation attendue: créer ou étendre `app/research_answering/adapters/answer_http.py` pour `POST /v1/research/deep`, ajouter le workflow RA approfondi, rendre le mode disponible dans l'orchestration CV lorsque la façade RA M-009 est fournie et préserver les endpoints M-008.
 - Invariants et garde-fous: RA reste propriétaire du comportement; CV ne lit pas les preuves internes; mode explicite obligatoire; erreurs publiques stables.
-- Dépendances: T-008; `app/research_answering/adapters/answer_http.py`; `app/conversation/domain/mode_routing.py`; `app/conversation/application/answer_conversation_turn.py`; `tests/m008/validate_conversation_mode_routing_acceptance.ps1`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m009\validate_deep_research_http_contract_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m009\validate_deep_research_http_contract_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m008\validate_conversation_mode_routing_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_answer_http_contract_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`.
+- Dépendances: T-008; `app/research_answering/adapters/answer_http.py`; `app/conversation/domain/mode_routing.py`; `app/conversation/application/answer_conversation_turn.py`; `uv run --locked gate`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m009): couvrir endpoint recherche approfondie`
 - Commit GREEN: `feat(m009): exposer endpoint recherche approfondie`

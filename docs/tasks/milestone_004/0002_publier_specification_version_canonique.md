@@ -14,7 +14,7 @@
 - Garde-fous: ne pas traiter Markdown ou HTML comme source de vérité; ne pas fusionner silencieusement des transcriptions concurrentes; ne pas publier une sortie Docling non contrôlée.
 
 ## Blocages Ou Préconditions
-- État GREEN/RED connu: T-001 doit rétablir `scripts/test.ps1` et `scripts/lint.ps1` en GREEN avant cette tâche.
+- État GREEN/RED connu: T-001 doit rétablir `uv run --locked gate` et `uv run --locked gate` en GREEN avant cette tâche.
 - Présence des milestones amont dans master: M-000, M-001, M-002 et M-003 sont présents dans `master`.
 - Décisions manquantes: aucune si M-004 applique ADR-001, ADR-002, ADR-003 et ADR-004 sans changer leur sens; toute évolution de l'autorité canonique ou de l'adjudication doit créer une nouvelle ADR.
 - Risques: spécifier une conversion technique sans invariant de publication; oublier les exclusions de M-005; confondre artefact canonique et projection de recherche.
@@ -27,11 +27,11 @@
   - Given une source M-003 enregistrée, diagnostiquée et routée.
   - When la spécification M-004 est publiée.
   - Then chaque comportement de version canonique nomme son invariant, son scénario BDD, son test RED, ses ADR applicables et sa commande de validation.
-- Tests d'acceptation à écrire: un test `tests/m004/validate_m004_specification_acceptance.ps1` qui échoue tant que la spécification M-004 ne contient pas mission, agrégat `CanonicalSource`, fusion pagewise, politiques nommées, états, événements, QA pré et post-conversion, contrat HTTP et exclusions M-005.
+- Tests d'acceptation à écrire: un test `uv run --locked gate` qui échoue tant que la spécification M-004 ne contient pas mission, agrégat `CanonicalSource`, fusion pagewise, politiques nommées, états, événements, QA pré et post-conversion, contrat HTTP et exclusions M-005.
 - Tests unitaires à écrire: tests du validateur de spécification pour section manquante, ADR documentaire absente, absence d'autorité textuelle, omission de page, mutation en place, politique normative renommée ou absente et projection KA introduite trop tôt.
-- Implémentation attendue: créer la spécification M-004, créer `scripts/validate_m004_specification.ps1`, relier la commande au gate standard seulement après son RED initial et conserver les exclusions de recherche M-005.
+- Implémentation attendue: créer la spécification M-004, créer `uv run --locked gate`, relier la commande au gate standard seulement après son RED initial et conserver les exclusions de recherche M-005.
 - Invariants et garde-fous: aucune conversion implicite; aucun fallback Docling vers Granite; aucune publication de source quarantinée; aucune modification silencieuse d'une ADR acceptée.
 - Dépendances: T-001; ADR-001; ADR-002; ADR-003; ADR-004; DDD-ADR-003; `docs/specs/m003_source_enregistree_diagnostiquee_routee.md`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m004\validate_m004_specification_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m004_specification.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m004): couvrir la specification de version canonique`.
 - Commit GREEN: `docs(m004): publier la specification de version canonique`.

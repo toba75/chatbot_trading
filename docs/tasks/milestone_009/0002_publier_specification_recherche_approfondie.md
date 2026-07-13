@@ -14,7 +14,7 @@
 - Garde-fous: aucune recherche approfondie sans mandat explicite; aucun accès RA direct à Qdrant ou au registre EG interne; aucun paramètre de stratégie inventé; aucune valeur de marché actuelle fabriquée.
 
 ## Blocages Ou Préconditions
-- État GREEN/RED connu: dépend de T-001; `scripts/test.ps1` doit être rejoué avec un délai suffisant avant de démarrer l'implémentation.
+- État GREEN/RED connu: dépend de T-001; `uv run --locked gate` doit être rejoué avec un délai suffisant avant de démarrer l'implémentation.
 - Présence des milestones amont dans master: M-008 présent dans `master`.
 - Décisions manquantes: aucune pour appliquer ADR-006, ADR-010, DDD-ADR-003, DDD-ADR-005, DDD-ADR-007 et DDD-ADR-008; ADR requise si M-009 modifie le sens du registre de claims, de la cohérence éventuelle ou de la surface d'API.
 - Risques: spécification trop technique centrée sur HTTP; doublon avec M-007 documentaire simple; absence d'exclusions vers M-010 à M-011; métriques de couverture non reliées à la traceabilité.
@@ -27,11 +27,11 @@
   - Given la mission M-009 est d'analyser plusieurs sources sans effacer nuances, limites et contradictions.
   - When la spécification de recherche approfondie est publiée.
   - Then chaque comportement M-009 nomme son invariant, son scénario BDD, son test RED, ses ADR applicables et sa commande de validation.
-- Tests d'acceptation à écrire: `tests/m009/validate_m009_specification_acceptance.ps1`, qui échoue tant que `docs/specs/m009_recherche_approfondie_multi_sources.md` et son validateur n'existent pas.
-- Tests unitaires à écrire: tests de `scripts/validate_m009_specification.ps1` pour mission absente, mode approfondi absent, obligations de couverture absentes, dépendances EG absentes, endpoint absent, erreurs publiques absentes, métriques absentes, confusion consensus-fréquence, absence d'exclusions M-010/M-011 et ADR manquantes.
-- Implémentation attendue: créer `docs/specs/m009_recherche_approfondie_multi_sources.md`, créer `scripts/validate_m009_specification.ps1`, enrôler la validation dans `scripts/test.ps1` et `scripts/lint.ps1`, puis relier les exigences M-009 à `docs/traceability/matrix.md`.
+- Tests d'acceptation à écrire: `uv run --locked gate`, qui échoue tant que `docs/specs/m009_recherche_approfondie_multi_sources.md` et son validateur n'existent pas.
+- Tests unitaires à écrire: tests de `uv run --locked gate` pour mission absente, mode approfondi absent, obligations de couverture absentes, dépendances EG absentes, endpoint absent, erreurs publiques absentes, métriques absentes, confusion consensus-fréquence, absence d'exclusions M-010/M-011 et ADR manquantes.
+- Implémentation attendue: créer `docs/specs/m009_recherche_approfondie_multi_sources.md`, créer `uv run --locked gate`, enrôler la validation dans `uv run --locked gate` et `uv run --locked gate`, puis relier les exigences M-009 à `docs/traceability/matrix.md`.
 - Invariants et garde-fous: aucune décision structurante implicite; aucun scoring probabiliste présenté comme vérité; aucune exposition de stockage KA, EG ou SP; aucune synthèse supportée sans couverture minimale.
 - Dépendances: T-001; ADR-006; ADR-010; DDD-ADR-003; DDD-ADR-005; DDD-ADR-007; DDD-ADR-008; `docs/tasks/README.md`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m009\validate_m009_specification_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m009_specification.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_traceability.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m009): couvrir la specification recherche approfondie`
 - Commit GREEN: `docs(m009): publier la specification recherche approfondie`

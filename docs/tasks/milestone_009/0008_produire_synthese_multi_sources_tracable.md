@@ -27,11 +27,11 @@
   - Given un EvidenceSet approfondi contient preuves favorables, preuves défavorables, dépendances et contradictions qualifiées.
   - When RA produit la synthèse multi-sources.
   - Then la réponse finale expose mandat, périmètre, méthodes, conditions, preuves, dépendances, contradictions, limites, zones non documentées et conclusion avec citations ouvrables.
-- Tests d'acceptation à écrire: `tests/m009/validate_multi_source_synthesis_acceptance.ps1`, qui échoue tant que la synthèse approfondie ne respecte pas la structure obligatoire et la vérification des assertions.
+- Tests d'acceptation à écrire: `uv run --locked gate`, qui échoue tant que la synthèse approfondie ne respecte pas la structure obligatoire et la vérification des assertions.
 - Tests unitaires à écrire: tests de structure obligatoire, citation absente, assertion non supportée, origine implicite, preuve défavorable omise, contradiction omise, paramètre de stratégie inventé, dépendance absente, zone non documentée absente, brouillon publié sans vérification, générateur en échec et conservation du `ResearchCase`, du plan et de l'`EvidenceSet` scellé.
 - Implémentation attendue: créer les objets de rapport RA nécessaires, étendre le flux de brouillon et vérification sans modifier le DTO M-007 de façon incompatible, produire une version finale immuable et conserver les citations ouvrables; si le générateur échoue, enregistrer un statut ou événement explicite non terminal pour la publication et conserver les artefacts de recherche déjà scellés sans relance silencieuse.
 - Invariants et garde-fous: assertion importante vérifiée; distinction source/déduction/conception; aucune stratégie candidate en sortie; aucune synthèse supportée sans EvidenceSet scellé; aucun échec LLM ne supprime ni ne remplace silencieusement le cas de recherche.
 - Dépendances: T-005; T-006; T-007; `app/research_answering/domain/answer.py`; `app/research_answering/application/draft_answer.py`; `app/research_answering/application/verify_answer.py`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m009\validate_multi_source_synthesis_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m009\validate_multi_source_synthesis_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_answer_support_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m009): couvrir synthese multi sources`
 - Commit GREEN: `feat(m009): produire synthese multi sources`

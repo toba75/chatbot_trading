@@ -172,25 +172,25 @@ Les garde-fous de mission sont explicites: aucun claim EG stocké dans l'index d
 
 | Comportement | Invariant | Scénario BDD | Test RED | ADR | Commande |
 |---|---|---|---|---|---|
-| EG-001 - Spécification exécutable M-006 | La spécification nomme mission EG, agrégats, objets-valeur, politiques, états, ports, événements, API, erreurs, métriques, exclusions et garde-fous. | Given des preuves candidates KA avec SourceLocator résolvable; When la spécification M-006 est publiée; Then elle est validée par commande PowerShell. | T-002 | ADR-006; ADR-010; DDD-ADR-003; DDD-ADR-005; DDD-ADR-007; DDD-ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m006_specification.ps1 |
-| EG-002 - Extraction atomique structurée | Une sortie de modèle crée seulement des claims DRAFT atomiques. | Given un passage avec deux conclusions et une limitation; When EG extrait les claims candidats; Then deux claims DRAFT conservent portée, limitation et span. | T-003 | ADR-006; DDD-ADR-005; DDD-ADR-007 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m006\validate_claim_extraction_acceptance.ps1 |
-| EG-003 - Preuves admissibles avec SourceLocator | Toute preuve publique contient EvidenceRef, SourceLocator, relation et hash de span. | Given un claim DRAFT et une preuve candidate résoluble; When la preuve SUPPORTS_DIRECTLY est attachée; Then le claim devient EVIDENCE_ATTACHED. | T-004 | DDD-ADR-003; DDD-ADR-005 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m006\validate_claim_evidence_attachment_acceptance.ps1 |
-| EG-004 - Vérification par preuve directe et portée | VERIFIED exige preuve directe admissible, portée compatible et décision indépendante. | Given une affirmation EVIDENCE_ATTACHED; When aucune preuve SUPPORTS_DIRECTLY admissible n'existe; Then VERIFIED est refusé avec INSUFFICIENT_DIRECT_EVIDENCE. | T-005 | ADR-006; DDD-ADR-005; DDD-ADR-007 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m006\validate_claim_verification_acceptance.ps1 |
-| EG-005 - Confirmations indépendantes par DependencyGroup | Plusieurs documents du même DependencyGroup comptent comme une seule confirmation indépendante. | Given trois documents rattachés au même DependencyGroup; When le support indépendant est calculé; Then une seule confirmation est comptabilisée. | T-006 | ADR-006; DDD-ADR-005; DDD-ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m006\validate_dependency_group_acceptance.ps1 |
-| EG-006 - Relations après comparaison de portée | Une contradiction exige portée comparable et versions explicites. | Given deux claims opposés avec horizons différents; When EG évalue leur relation; Then CONTRADICTS n'est pas créé et la non-comparabilité est enregistrée. | T-007 | DDD-ADR-005; DDD-ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m006\validate_claim_relation_acceptance.ps1 |
-| EG-007 - Conservation des claims rejetés et supersédés | Les rejets et supersessions restent consultables. | Given un claim vérifié publié; When une meilleure formulation le supersède; Then l'ancienne version reste résoluble et pointe vers la nouvelle. | T-008 | ADR-006; DDD-ADR-005; DDD-ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m006\validate_claim_retention_acceptance.ps1 |
-| EG-008 - API claims et preuves publiques | L'API expose handlers EG, erreurs stables et EvidenceRef résolubles sans stockage interne. | Given un claim vérifié avec preuves directes; When GET /v1/claims/{claim_id}/evidence est appelé; Then les preuves publiques sont retournées sans prompt ni détail de stockage. | T-009 | ADR-006; ADR-010; DDD-ADR-003; DDD-ADR-005 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m006\validate_claim_http_contract_acceptance.ps1 |
-| EG-009 - Traçabilité et métriques M-006 | Chaque exigence M-006 possède test, commande, ADR et métrique sans payload documentaire complet. | Given les preuves M-006; When les gates s'exécutent; Then traceability, test, lint et validate_m006_specification sont enrôlés. | T-010 | ADR-006; ADR-010; DDD-ADR-005; DDD-ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m006\validate_m006_traceability_acceptance.ps1 |
+| EG-001 - Spécification exécutable M-006 | La spécification nomme mission EG, agrégats, objets-valeur, politiques, états, ports, événements, API, erreurs, métriques, exclusions et garde-fous. | Given des preuves candidates KA avec SourceLocator résolvable; When la spécification M-006 est publiée; Then elle est validée par commande uv run --locked gate
+| EG-002 - Extraction atomique structurée | Une sortie de modèle crée seulement des claims DRAFT atomiques. | Given un passage avec deux conclusions et une limitation; When EG extrait les claims candidats; Then deux claims DRAFT conservent portée, limitation et span. | T-003 | ADR-006; DDD-ADR-005; DDD-ADR-007 | uv run --locked gate
+| EG-003 - Preuves admissibles avec SourceLocator | Toute preuve publique contient EvidenceRef, SourceLocator, relation et hash de span. | Given un claim DRAFT et une preuve candidate résoluble; When la preuve SUPPORTS_DIRECTLY est attachée; Then le claim devient EVIDENCE_ATTACHED. | T-004 | DDD-ADR-003; DDD-ADR-005 | uv run --locked gate
+| EG-004 - Vérification par preuve directe et portée | VERIFIED exige preuve directe admissible, portée compatible et décision indépendante. | Given une affirmation EVIDENCE_ATTACHED; When aucune preuve SUPPORTS_DIRECTLY admissible n'existe; Then VERIFIED est refusé avec INSUFFICIENT_DIRECT_EVIDENCE. | T-005 | ADR-006; DDD-ADR-005; DDD-ADR-007 | uv run --locked gate
+| EG-005 - Confirmations indépendantes par DependencyGroup | Plusieurs documents du même DependencyGroup comptent comme une seule confirmation indépendante. | Given trois documents rattachés au même DependencyGroup; When le support indépendant est calculé; Then une seule confirmation est comptabilisée. | T-006 | ADR-006; DDD-ADR-005; DDD-ADR-010 | uv run --locked gate
+| EG-006 - Relations après comparaison de portée | Une contradiction exige portée comparable et versions explicites. | Given deux claims opposés avec horizons différents; When EG évalue leur relation; Then CONTRADICTS n'est pas créé et la non-comparabilité est enregistrée. | T-007 | DDD-ADR-005; DDD-ADR-010 | uv run --locked gate
+| EG-007 - Conservation des claims rejetés et supersédés | Les rejets et supersessions restent consultables. | Given un claim vérifié publié; When une meilleure formulation le supersède; Then l'ancienne version reste résoluble et pointe vers la nouvelle. | T-008 | ADR-006; DDD-ADR-005; DDD-ADR-010 | uv run --locked gate
+| EG-008 - API claims et preuves publiques | L'API expose handlers EG, erreurs stables et EvidenceRef résolubles sans stockage interne. | Given un claim vérifié avec preuves directes; When GET /v1/claims/{claim_id}/evidence est appelé; Then les preuves publiques sont retournées sans prompt ni détail de stockage. | T-009 | ADR-006; ADR-010; DDD-ADR-003; DDD-ADR-005 | uv run --locked gate
+| EG-009 - Traçabilité et métriques M-006 | Chaque exigence M-006 possède test, commande, ADR et métrique sans payload documentaire complet. | Given les preuves M-006; When les gates s'exécutent; Then traceability, test, lint et validate_m006_specification sont enrôlés. | T-010 | ADR-006; ADR-010; DDD-ADR-005; DDD-ADR-010 | uv run --locked gate
 
 ## Commandes de validation
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m006\validate_m006_specification_acceptance.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m006\validate_m006_specification_unit.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m006_specification.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_traceability.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1
+```console
+uv run --locked gate
+uv run --locked gate
+uv run --locked gate
+uv run --locked gate
+uv run --locked gate
+uv run --locked gate
 ```
 
 ## Exclusions M-006

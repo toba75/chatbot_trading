@@ -27,11 +27,11 @@
   - Given un manifeste complet contient des pages natives, scannées et corrompues.
   - When les diagnostics de pages sont enregistrés.
   - Then chaque page reçoit un état diagnostique explicite avec justification, ou la tentative est marquée pour revue sans route implicite.
-- Tests d'acceptation à écrire: un test `tests/m003/validate_page_diagnostics_acceptance.ps1` couvrant les états principaux, la page corrompue, la page non diagnostiquée et la conservation de la version de diagnostic.
+- Tests d'acceptation à écrire: un test `uv run --locked gate` couvrant les états principaux, la page corrompue, la page non diagnostiquée et la conservation de la version de diagnostic.
 - Tests unitaires à écrire: tests de classification des signaux, validation d'exhaustivité du diagnostic, refus d'état inconnu et transition interdite depuis un run non créé.
 - Implémentation attendue: implémenter l'enregistrement de diagnostics page par page, les types de signaux nécessaires et les erreurs explicites de diagnostic incomplet.
 - Invariants et garde-fous: un diagnostic absent bloque le routage; un état inconnu est refusé; la version de politique est obligatoire; aucun état par défaut n'est appliqué.
 - Dépendances: T-004; `DocumentInspector`; `DocumentProcessingRun`; `PageDecision`; `ModelVersion` ou version de diagnostic équivalente.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m003\validate_page_diagnostics_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m003\validate_page_diagnostics_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m003): couvrir le diagnostic des pages source`.
 - Commit GREEN: `feat(m003): diagnostiquer les pages source`.

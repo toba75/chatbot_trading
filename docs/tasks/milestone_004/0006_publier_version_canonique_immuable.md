@@ -27,11 +27,11 @@
   - Given une source routée, convertie, adjugée et validée par QA.
   - When la publication canonique est demandée.
   - Then une version canonique immutable est créée avec `CanonicalSourceRef`, hash d'artefact, page count et statut accepté, sans modifier les versions antérieures.
-- Tests d'acceptation à écrire: un test `tests/m004/validate_canonical_publication_acceptance.ps1` couvrant publication nominale, correction créant une nouvelle version, refus de mutation en place et refus de publication sans QA GREEN.
+- Tests d'acceptation à écrire: un test `uv run --locked gate` couvrant publication nominale, correction créant une nouvelle version, refus de mutation en place et refus de publication sans QA GREEN.
 - Tests unitaires à écrire: tests de `CanonicalSource`, identifiants `CSRC` et `CVER`, hash d'artefact, statut de version, immutabilité, exports régénérables et interdiction des artefacts dérivés comme vérité.
 - Implémentation attendue: créer `app/source_processing/domain/canonical_source.py`, les handlers applicatifs de publication, le port de stockage d'artefact et la production déterministe de `CanonicalSourceRef`.
 - Invariants et garde-fous: version publiée immutable; correction par nouvelle version; Docling JSON canonique obligatoire; export Markdown ou HTML non canonique; source quarantinée refusée.
 - Dépendances: T-005; M-001 `CanonicalSourceRef`; ADR-001; `app/contracts/source_references.py`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m004\validate_canonical_publication_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m004\validate_canonical_publication_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m001\validate_source_contracts_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m004): couvrir la publication canonique immuable`.
 - Commit GREEN: `feat(m004): publier une version canonique immuable`.

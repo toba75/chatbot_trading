@@ -27,11 +27,11 @@
   - Given un brouillon contient une assertion factuelle importante sans preuve admissible.
   - When RA évalue le support de la réponse.
   - Then l'assertion est retirée ou reformulée comme incertaine, et la réponse ne reçoit pas le statut `SUPPORTED` tant que le défaut subsiste.
-- Tests d'acceptation à écrire: `tests/m007/validate_answer_support_acceptance.ps1`, qui échoue tant que RA peut publier `SUPPORTED` avec une assertion importante non supportée.
+- Tests d'acceptation à écrire: `uv run --locked gate`, qui échoue tant que RA peut publier `SUPPORTED` avec une assertion importante non supportée.
 - Tests unitaires à écrire: tests pour assertion non supportée, citation non ouvrable, conflit non résolu, preuve indirecte seule, statut `PARTIALLY_SUPPORTED`, version publiée immuable, source obsolète, politique de support obsolète, `AnswerSuperseded`, `VerifiedResearchOutcome` invalide et suppression silencieuse d'assertion sans trace.
 - Implémentation attendue: ajouter l'évaluateur de support, le vérificateur de citations, la publication immuable de réponse, la conversion vers `VerifiedResearchOutcome`, les raisons de qualification, la politique de fraîcheur et la supersession explicite d'une réponse publiée devenue obsolète.
 - Invariants et garde-fous: aucune citation cassée; aucun statut par défaut; aucune preuve indirecte seule pour `SUPPORTED`; aucune mutation de version publiée; aucune omission de contradiction pertinente; aucune réutilisation de réponse obsolète sans revalidation ou supersession explicite.
 - Dépendances: T-004; T-005; T-006; contrat `VerifiedResearchOutcome` M-001; claims EG M-006.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_answer_support_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_answer_support_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_architecture_boundaries.ps1 -AppRoot .\app -ContextRegistryPath .\app\context_registry.json -SpecificationPath .\docs\specs\m001_frontieres_ddd_contrats_publies.md`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m007): couvrir support citations reponse`
 - Commit GREEN: `feat(m007): evaluer support citations reponse`

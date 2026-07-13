@@ -32,11 +32,11 @@
   - Given l'utilisateur déclare un corpus local de PDF trading et investissement.
   - When le gate de réalité charge le manifeste.
   - Then chaque PDF existe, possède un hash stable, une strate documentaire et une justification d'inclusion.
-- Tests d'acceptation à écrire: `tests/m013/validate_real_corpus_manifest_acceptance.ps1`.
+- Tests d'acceptation à écrire: `uv run --locked gate`.
 - Tests unitaires à écrire: manifeste absent, chemin non résolvable, hash manquant, hash divergent, strate absente, doublon binaire, document hors plage 50-100, exclusion non justifiée, PDF généré par le test.
 - Implémentation attendue: créer un format strict de manifeste local, par exemple `docs/evaluation/m013/real_corpus_manifest.schema.json`, et un validateur qui lit un chemin explicite fourni par variable d'environnement obligatoire.
 - Invariants et garde-fous: aucun PDF généré; aucun chemin par défaut; aucun corpus minimal de secours; aucun original modifié; aucun contenu PDF privé ajouté au dépôt sans décision explicite.
 - Dépendances: exigences M-012 de corpus pilote, `docs/specs/plan_remediation_m13.md`, `docs/governance/m012_v1_gap_report.md`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_real_corpus_manifest_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_task_system.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m013): exiger manifeste corpus reel`
 - Commit GREEN: `feat(m013): valider manifeste corpus reel`

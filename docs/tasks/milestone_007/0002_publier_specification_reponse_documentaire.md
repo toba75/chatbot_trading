@@ -27,12 +27,12 @@
   - Given un brouillon contenant une assertion factuelle importante.
   - When la spécification M-007 est publiée.
   - Then chaque comportement de réponse nomme son invariant, son scénario BDD, son test RED, ses ADR applicables et sa commande de validation.
-- Tests d'acceptation à écrire: `tests/m007/validate_m007_specification_acceptance.ps1`, qui échoue tant que `docs/specs/m007_reponse_documentaire_verifiee.md` et son validateur n'existent pas.
-- Tests unitaires à écrire: tests de `scripts/validate_m007_specification.ps1` pour section manquante, invariant absent, statut de support absent, citation absente, erreur publique absente, ADR absente, confusion entre brouillon et réponse publiée, et accès direct à Qdrant ou au registre EG interne.
-- Implémentation attendue: créer `docs/specs/m007_reponse_documentaire_verifiee.md`, créer `scripts/validate_m007_specification.ps1`, enrôler la validation dans les gates et relier les exigences M-007 à la matrice de traçabilité.
+- Tests d'acceptation à écrire: `uv run --locked gate`, qui échoue tant que `docs/specs/m007_reponse_documentaire_verifiee.md` et son validateur n'existent pas.
+- Tests unitaires à écrire: tests de `uv run --locked gate` pour section manquante, invariant absent, statut de support absent, citation absente, erreur publique absente, ADR absente, confusion entre brouillon et réponse publiée, et accès direct à Qdrant ou au registre EG interne.
+- Implémentation attendue: créer `docs/specs/m007_reponse_documentaire_verifiee.md`, créer `uv run --locked gate`, enrôler la validation dans les gates et relier les exigences M-007 à la matrice de traçabilité.
 - Invariants et garde-fous: aucune décision structurante implicite; aucun fallback de génération; aucun statut par défaut; aucun prompt, brouillon ou détail de stockage publié comme contrat public.
 - Dépendances: T-001; ADR-006; ADR-010; DDD-ADR-003; DDD-ADR-005; DDD-ADR-007; DDD-ADR-008; `docs/tasks/README.md`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_m007_specification_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m007_specification.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_traceability.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m007): couvrir la specification reponse documentaire`
 - Commit GREEN: `docs(m007): publier la specification reponse documentaire`
 

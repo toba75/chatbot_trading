@@ -30,7 +30,7 @@
 
 ## Commandes de preuve
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m012\validate_calibration_decisions_acceptance.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m012\validate_calibration_decisions_unit.ps1
+```console
+uv run --locked gate
+uv run --locked gate
 ```

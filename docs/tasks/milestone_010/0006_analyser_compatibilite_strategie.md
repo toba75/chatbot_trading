@@ -27,11 +27,11 @@
   - Given une règle de signal utilise des données publiées après le moment de décision.
   - When l'analyse de compatibilité est exécutée.
   - Then un finding bloquant `POINT_IN_TIME_VIOLATION` est enregistré et la stratégie ne peut pas devenir `COMPILABLE`.
-- Tests d'acceptation à écrire: `tests/m010/validate_strategy_compatibility_acceptance.ps1`, qui échoue tant qu'une violation point-in-time ou une contrainte de mandat ignorée ne bloque pas la stratégie.
+- Tests d'acceptation à écrire: `uv run --locked gate`, qui échoue tant qu'une violation point-in-time ou une contrainte de mandat ignorée ne bloque pas la stratégie.
 - Tests unitaires à écrire: tests de `StrategyCompatibilityAnalyzer` pour horizon signal/détention, fréquence de données/décision, disponibilité point-in-time, coûts, turnover, liquidité, levier, contraintes du mandat et portée des preuves.
 - Implémentation attendue: créer les objets `CompatibilityFinding`, les politiques de compatibilité, les ports `MarketCalendarCatalog` et `DataAvailabilityCatalog` abstraits, puis rattacher les findings au cycle de validation de `StrategyCandidate`.
 - Invariants et garde-fous: aucun finding non typé; aucun accès à données de marché réelles; aucun fallback de calendrier; aucune contrainte de mandat ignorée.
 - Dépendances: T-005; `StrategyMandate`; `DataRequirement`; DDD-ADR-007.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m010\validate_strategy_compatibility_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m010\validate_strategy_compatibility_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m010): couvrir compatibilite strategie`
 - Commit GREEN: `feat(m010): analyser compatibilite strategie`

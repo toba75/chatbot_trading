@@ -27,11 +27,11 @@
   - Given une réponse précédente contient une assertion sans `VerifiedAnswerVersion`.
   - When l'utilisateur réutilise cette assertion dans un nouveau tour documentaire.
   - Then CV appelle `ResearchFacade` pour rechercher et vérifier à nouveau l'assertion avant de rattacher le résultat public RA au tour.
-- Tests d'acceptation à écrire: `tests/m008/validate_verified_result_reuse_acceptance.ps1`, qui échoue tant qu'une assertion historique sans `VerifiedAnswerVersion` peut être utilisée sans nouvelle vérification RA.
+- Tests d'acceptation à écrire: `uv run --locked gate`, qui échoue tant qu'une assertion historique sans `VerifiedAnswerVersion` peut être utilisée sans nouvelle vérification RA.
 - Tests unitaires à écrire: tests de résultat RA invalide, statut absent, citation absente du DTO public RA, rattachement à un tour inexistant, double rattachement, corrélation question-réponse, assertion historique sans version vérifiée, assertion historique avec version vérifiée et absence d'import d'adaptateur RA interne.
 - Implémentation attendue: créer `app/conversation/application/answer_conversation_turn.py`, `app/conversation/application/attach_verified_answer.py`, `app/conversation/application/reuse_verified_result.py` et les ports CV vers RA; définir côté CV un DTO d'intégration qui référence `VerifiedResearchOutcome` et transporte séparément les champs publics RA nécessaires à la présentation, notamment texte et citations.
 - Invariants et garde-fous: aucune mutation RA; aucune preuve possédée par CV; aucun statut inventé par CV; aucun rattachement sans question résolue; aucune assertion historique non versionnée utilisée sans revalidation; aucune extension silencieuse de `VerifiedResearchOutcome`.
 - Dépendances: T-006; `app/research_answering/application/answer_question.py`; `app/contracts/research_outcomes.py`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m008\validate_verified_result_reuse_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m008\validate_verified_answer_attachment_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_architecture_boundaries.ps1 -AppRoot .\app -ContextRegistryPath .\app\context_registry.json -SpecificationPath .\docs\specs\m001_frontieres_ddd_contrats_publies.md`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m008): couvrir revalidation historique`
 - Commit GREEN: `feat(m008): revalider historique et rattacher reponse`

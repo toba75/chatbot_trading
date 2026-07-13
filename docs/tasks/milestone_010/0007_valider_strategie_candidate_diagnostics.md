@@ -27,11 +27,11 @@
   - Given une stratégie candidate contient une règle attribuée, un paramètre bloquant non résolu et un conflit documentaire bloquant.
   - When la validation de stratégie est demandée.
   - Then la stratégie passe à `INCOMPLETE` avec deux diagnostics bloquants conservés.
-- Tests d'acceptation à écrire: `tests/m010/validate_strategy_candidate_diagnostics_acceptance.ps1`, qui échoue tant qu'un verdict `COMPILABLE` peut être obtenu avec un diagnostic bloquant.
+- Tests d'acceptation à écrire: `uv run --locked gate`, qui échoue tant qu'un verdict `COMPILABLE` peut être obtenu avec un diagnostic bloquant.
 - Tests unitaires à écrire: tests de transitions d'état, diagnostic typé, conflit bloquant, conflit résolu, paramètre bloquant, règle manquante, version négative conservée et refus de transition illégale.
 - Implémentation attendue: créer la politique de complétude, le modèle `CompilationDiagnostic`, la validation de l'agrégat et la conservation des versions `INCOMPLETE` ou `INCONSISTENT` dans le dépôt.
 - Invariants et garde-fous: aucun diagnostic effacé sans résolution explicite; aucune transition illégale; aucun verdict `COMPILABLE` avec blocage; aucune réécriture silencieuse d'une version négative.
 - Dépendances: T-006; DDD-ADR-010; `StrategyRepository`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m010\validate_strategy_candidate_diagnostics_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m010\validate_strategy_candidate_diagnostics_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m010): couvrir diagnostics strategie candidate`
 - Commit GREEN: `feat(m010): valider strategie candidate avec diagnostics`

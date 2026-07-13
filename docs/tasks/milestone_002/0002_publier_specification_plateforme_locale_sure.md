@@ -29,9 +29,9 @@
   - Then chaque règle de plateforme nomme le comportement attendu, les invariants, les tests et les ADR qui la gouvernent.
 - Tests d'acceptation à écrire: un test qui valide la présence des sections M-002, des scénarios Given-When-Then, des règles `docker-local`/`spark-inference`, du gateway unique, de l'outbox et des commandes de validation.
 - Tests unitaires à écrire: tests du validateur de spécification pour section manquante, ADR absente, règle de placement incohérente, fallback silencieux ou endpoint Spark codé en dur.
-- Implémentation attendue: créer `docs/specs/m002_plateforme_locale_sure.md` et un validateur PowerShell dédié, sans implémenter encore la plateforme.
+- Implémentation attendue: créer `docs/specs/m002_plateforme_locale_sure.md` et un validateur uv run --locked gate
 - Invariants et garde-fous: aucune règle implicite; aucune valeur par défaut non documentée; aucun comportement alternatif silencieux; aucune modification de sens d'une ADR acceptée.
 - Dépendances: T-001; ADR-007; ADR-008; ADR-009; DDD-ADR-006; DDD-ADR-008; `docs/specs/m001_frontieres_ddd_contrats_publies.md`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m002_specification.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m002): couvrir la spécification de plateforme locale`.
 - Commit GREEN: `docs(m002): publier la spécification de plateforme locale`.

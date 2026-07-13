@@ -32,6 +32,6 @@
 - Implémentation attendue: créer les contrats, fixtures et validateurs stricts pour snapshots et résultats; ne pas implémenter de moteur de backtest.
 - Invariants et garde-fous: aucune entrée mutable; aucun statut par défaut; aucun résultat supprimé; aucun accès EX au modèle interne SD.
 - Dépendances: T-004; DDD-ADR-009; sections 10 et 11 de la spécification v4.1.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m001\validate_strategy_experiment_contracts_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m001\validate_strategy_experiment_contracts_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m001): couvrir snapshot strategie et resultat experience`.
 - Commit GREEN: `feat(m001): publier les contrats strategie experience`.

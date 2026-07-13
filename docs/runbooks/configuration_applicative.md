@@ -27,10 +27,10 @@
 
 Commande vérifiée:
 
-```powershell
+```console
 Copy-Item -LiteralPath .\config\application.example.yaml -Destination .\config\application.yaml
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_application_config_loader_acceptance.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_application_config_loader_unit.ps1
+uv run --locked gate
+uv run --locked gate
 ```
 
 Résultat attendu: le chargeur `load_application_configuration` valide le fichier avec `config/application.schema.json`, refuse les clés absentes, les valeurs vides, les placeholders et les secrets en clair.
@@ -43,10 +43,10 @@ Preuve à conserver: chemin du fichier chargé, hash SHA-256 `configuration_hash
 
 Commande vérifiée:
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_config_environment.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_local_compose.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_network_boundary.ps1 -ApplicationConfigPath .\config\application.yaml
+```console
+uv run --locked gate
+uv run --locked gate
+uv run --locked gate
 ```
 
 Résultat attendu: la gate environnement reste GREEN, Compose monte le fichier applicatif en lecture seule, et le seul chemin Spark autorisé reste `llm-gateway -> spark-inference`.
@@ -59,7 +59,7 @@ Preuve à conserver: sorties des trois validateurs et hash du fichier `deploy/lo
 
 Commande vérifiée:
 
-```powershell
+```console
 docker compose -f .\deploy\local-compose\compose.yaml up --build
 ```
 
@@ -73,7 +73,7 @@ Preuve à conserver: sortie Compose, identifiant d'image, horodatage du démarra
 
 Cette commande démarre un service applicatif hors Compose uniquement pour reproduire un diagnostic local; l'arrêt manuel est attendu après capture de la preuve.
 
-```powershell
+```console
 python -m app.platform.local_runtime serve-http llm-gateway 8090 --config .\config\application.yaml
 ```
 

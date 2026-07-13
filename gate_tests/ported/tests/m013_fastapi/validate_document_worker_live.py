@@ -4,4 +4,4 @@ from gate_tests.ported_support import assert_native_parity
 
 
 def test_validate_document_worker_live() -> None:
-    assert_native_parity('tests/m013_fastapi/validate_document_worker_live.ps1', 'gate_tests/ported/tests/m013_fastapi/validate_document_worker_live.py', 'live')
+    assert_native_parity('gate_tests/ported/tests/m013_fastapi/validate_document_worker_live.py', 'live')

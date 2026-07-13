@@ -27,11 +27,11 @@
   - Given un `StrategySnapshot` consultable et des entrées de backtest explicites.
   - When `POST /v1/strategies/{id}/backtest` est appelé.
   - Then EX planifie l'expérience ou renvoie une erreur publique stable, et `GET /v1/experiments/{id}` expose le statut et le résultat public sans stockage interne.
-- Tests d'acceptation à écrire: `tests/m011/validate_experiment_http_contract_acceptance.ps1`, qui échoue tant qu'un champ interne est accepté, qu'un statut public est ambigu, qu'un résultat moteur brut fuit, qu'un snapshot absent retourne un succès ou qu'un `GET` crée une expérience.
+- Tests d'acceptation à écrire: `uv run --locked gate`, qui échoue tant qu'un champ interne est accepté, qu'un statut public est ambigu, qu'un résultat moteur brut fuit, qu'un snapshot absent retourne un succès ou qu'un `GET` crée une expérience.
 - Tests unitaires à écrire: tests de l'adaptateur HTTP EX pour corps invalide, champ interdit, snapshot absent, données absentes, coût absent, statut `PLANNED`, statut `RUNNING`, statut `COMPLETED`, statut `FAILED`, résultat archivé et mapping des erreurs.
 - Implémentation attendue: créer un adaptateur HTTP framework-free pour EX, connecter les cas d'usage M-011, définir les DTO publics, mapper les diagnostics vers codes publics et enrôler les tests HTTP.
 - Invariants et garde-fous: aucun stockage interne exposé; aucune création par `GET`; aucune réponse 200 pour diagnostic bloquant; aucun payload d'artefact non public; aucun fallback vers une stratégie courante.
 - Dépendances: T-010; adaptateur HTTP SD M-010; `app/contracts/strategy_experiments.py`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m011\validate_experiment_http_contract_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m011\validate_experiment_http_contract_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_architecture_boundaries.ps1 -AppRoot .\app -ContextRegistryPath .\app\context_registry.json -SpecificationPath .\docs\specs\m001_frontieres_ddd_contrats_publies.md`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m011): couvrir contrat http experiences`
 - Commit GREEN: `feat(m011): exposer endpoints backtest experiences`

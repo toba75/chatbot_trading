@@ -27,12 +27,12 @@
   - Given une question nécessite des prix de marché récents.
   - When aucun accès autorisé à des données actuelles n'est présent dans le mandat.
   - Then RA retourne `REQUIRES_CURRENT_DATA`, enregistre la lacune, et n'invente aucune valeur de marché.
-- Tests d'acceptation à écrire: `tests/m007/validate_current_data_abstention_acceptance.ps1`, qui échoue tant qu'une question dépendante de données actuelles peut produire une réponse factuelle sans source autorisée.
+- Tests d'acceptation à écrire: `uv run --locked gate`, qui échoue tant qu'une question dépendante de données actuelles peut produire une réponse factuelle sans source autorisée.
 - Tests unitaires à écrire: tests pour donnée actuelle requise, source actuelle absente, source actuelle non autorisée, mandat qui interdit l'externe, statut `REQUIRES_CURRENT_DATA`, erreur publique `CURRENT_DATA_REQUIRED` et refus d'une valeur inventée.
 - Implémentation attendue: ajouter la politique de fraîcheur RA, la classification de besoin en données actuelles, la raison d'abstention et le mapping vers statut/erreur publique.
 - Invariants et garde-fous: aucun fallback vers mémoire interne; aucun appel web implicite; aucun prix ou niveau de marché sans preuve autorisée; aucune conversion de `REQUIRES_CURRENT_DATA` en `INSUFFICIENT_EVIDENCE`.
 - Dépendances: T-003; T-002; mandat RA; contrats d'erreur publics.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_current_data_abstention_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_current_data_abstention_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m007): couvrir abstention donnees actuelles`
 - Commit GREEN: `feat(m007): declarer abstention donnees actuelles`
 

@@ -8,7 +8,7 @@
 
 ## Commandes
 
-```powershell
+```console
 uv sync --locked
 uv run --locked gate
 ```

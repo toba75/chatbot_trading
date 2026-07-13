@@ -27,11 +27,11 @@
   - Given une instance V1 contient corpus, versions canoniques, claims, réponses, conversations, stratégies, expériences, décisions et écarts V1.
   - When une sauvegarde chiffrée est restaurée dans un environnement local isolé.
   - Then les identifiants stables, artefacts immuables, résultats négatifs et décisions restent vérifiables sans secret en clair ni stockage métier sur Spark.
-- Tests d'acceptation à écrire: `tests/m013/validate_backup_restore_acceptance.ps1`, qui échoue si une catégorie d'artefact V1 manque, si la clé est versionnée, si un hash restauré diverge, si un résultat négatif disparaît, si une projection régénérable est traitée comme source ou si la restauration exige le Spark pour les données métier.
-- Tests unitaires à écrire: tests de `scripts/validate_m013_backup_restore.ps1` pour manifeste incomplet, archive non chiffrée, secret détecté, catégorie de contexte absente, hash absent, projection non marquée régénérable, restauration destructive, rapport sans commande et chemin Spark interdit.
+- Tests d'acceptation à écrire: `uv run --locked gate`, qui échoue si une catégorie d'artefact V1 manque, si la clé est versionnée, si un hash restauré diverge, si un résultat négatif disparaît, si une projection régénérable est traitée comme source ou si la restauration exige le Spark pour les données métier.
+- Tests unitaires à écrire: tests de `uv run --locked gate` pour manifeste incomplet, archive non chiffrée, secret détecté, catégorie de contexte absente, hash absent, projection non marquée régénérable, restauration destructive, rapport sans commande et chemin Spark interdit.
 - Implémentation attendue: créer le contrat de manifeste de sauvegarde, le script ou validateur de restauration M-013, les fixtures de restauration, `docs/governance/m013_backup_restore_drill.md`, les tests d'intégrité et l'enrôlement dans les gates.
 - Invariants et garde-fous: aucune clé ou secret dans Git; aucune donnée métier sur Spark; aucune restauration sans vérification; aucune suppression de versions négatives ou supersédées; aucune projection traitée comme autorité.
 - Dépendances: T-006; SP; KA; EG; RA; CV; SD; EX; EV; DDD-ADR-006; DDD-ADR-010.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_backup_restore_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_backup_restore_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_backup_restore.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m013): couvrir restauration sauvegardes`
 - Commit GREEN: `feat(m013): valider sauvegardes restauration`

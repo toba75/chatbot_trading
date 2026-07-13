@@ -27,11 +27,11 @@
   - Given un claim `DRAFT` et une preuve candidate dont le `SourceLocator` pointe vers une version canonique publiée.
   - When la preuve est attachée avec la relation `SUPPORTS_DIRECTLY`.
   - Then le claim passe à `EVIDENCE_ATTACHED` et conserve le `EvidenceRef` complet avec son hash de span.
-- Tests d'acceptation à écrire: `tests/m006/validate_claim_evidence_attachment_acceptance.ps1`, couvrant attachement admissible et refus de localisateur non publié.
+- Tests d'acceptation à écrire: `uv run --locked gate`, couvrant attachement admissible et refus de localisateur non publié.
 - Tests unitaires à écrire: tests de relation non autorisée, hash absent, `SourceLocator` non résolvable, preuve de version retirée, doublon d'évidence et transition d'état interdite.
 - Implémentation attendue: implémenter l'attachement dans l'agrégat `Claim`, le port de lecture des preuves canoniques et un repository mémoire EG utilisé par les tests.
 - Invariants et garde-fous: pas de création de preuve sans `SourceLocator`; pas de relation par défaut; pas de fallback vers une page voisine si le span n'est pas résolvable.
 - Dépendances: T-003; `app/contracts/evidence_claims.py`; `app/contracts/source_references.py`; DDD-ADR-003; DDD-ADR-005.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m006\validate_claim_evidence_attachment_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m006\validate_claim_evidence_attachment_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m006): couvrir attachement preuve claim`
 - Commit GREEN: `feat(m006): attacher preuves admissibles aux claims`

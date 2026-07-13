@@ -32,6 +32,6 @@
 - Implémentation attendue: créer les fichiers Compose et scripts de validation statique nécessaires, avec valeurs injectées explicitement par environnement et secrets hors dépôt.
 - Invariants et garde-fous: aucune variable implicite; aucun endpoint `127.0.0.1:8000` supposé; aucun secret versionné; aucun fallback de configuration.
 - Dépendances: T-003; ADR-007; ADR-008; ADR-009; `deploy/local-compose`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m002\validate_local_compose_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m002\validate_local_compose_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m002): couvrir la stack docker locale`.
 - Commit GREEN: `feat(m002): configurer la stack docker locale`.

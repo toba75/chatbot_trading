@@ -116,17 +116,17 @@ Le runtime exige Python `3.12.8` exactement. FastAPI, Uvicorn, Pydantic, Starlet
 
 ## Gates T-002
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_fastapi\validate_fastapi_specification_acceptance.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_fastapi\validate_fastapi_architecture_policy_unit.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_adr_system.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_fastapi_specification.ps1
+```console
+uv run --locked gate
+uv run --locked gate
+uv run --locked gate
+uv run --locked gate
 ```
 
 ## Traçabilité
 
 - ADR: ADR-018; ADR-019; ADR-020; ADR-021; ADR-023; ADR-024; ADR-025; ADR-026; ADR-028; DDD-ADR-001.
 - Tâche: `docs/tasks/milestone_013-fastapi/0002_decider_frontiere_http_publique.md`.
-- Tests: `tests/m013_fastapi/validate_fastapi_specification_acceptance.ps1`; `tests/m013_fastapi/validate_fastapi_architecture_policy_unit.ps1`.
+- Tests: `gate_tests/ported/tests/m013_fastapi/validate_fastapi_specification_acceptance.py`; `gate_tests/ported/tests/m013_fastapi/validate_fastapi_architecture_policy_unit.py`.
 - Commit RED: `7a3c3c231`, `test(architecture): couvrir frontiere asgi orchestratrice`.
 - Commit GREEN: `docs(architecture): decider fastapi uvicorn ADR-019`.

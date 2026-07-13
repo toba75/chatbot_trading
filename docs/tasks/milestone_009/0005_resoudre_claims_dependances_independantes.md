@@ -27,11 +27,11 @@
   - Given trois documents reprennent la même étude primaire pour soutenir un claim.
   - When RA résout les claims vérifiés et leurs dépendances.
   - Then une seule confirmation indépendante est comptée et la synthèse conserve la dépendance documentaire.
-- Tests d'acceptation à écrire: `tests/m009/validate_verified_claim_dependency_resolution_acceptance.ps1`, qui échoue tant que RA ne publie pas les dépendances indépendantes associées au jeu de preuves.
+- Tests d'acceptation à écrire: `uv run --locked gate`, qui échoue tant que RA ne publie pas les dépendances indépendantes associées au jeu de preuves.
 - Tests unitaires à écrire: tests de résolution pour claim non vérifié, evidence_ref non attachée, groupe de dépendance absent, groupe dupliqué, version de claim absente, confirmation indépendante incohérente et lecture EG interne interdite.
 - Implémentation attendue: créer ou étendre un composant RA de résolution publique des claims, utiliser `ReadPublicClaimHandler` ou le port EG existant, produire une structure de dépendances RA consultable par la synthèse et préserver les invariants M-006/M-007.
 - Invariants et garde-fous: seuls les claims vérifiés soutiennent la conclusion; aucune confirmation par fréquence brute; aucune mutation EG depuis RA; aucune perte de version.
 - Dépendances: T-004; `app/evidence_governance/application/read_claims.py`; `app/evidence_governance/domain/dependency_group.py`; `app/research_answering/application/collect_evidence.py`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m009\validate_verified_claim_dependency_resolution_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m009\validate_verified_claim_dependency_resolution_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m006\validate_dependency_group_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m009): couvrir dependances claims verifiees`
 - Commit GREEN: `feat(m009): resoudre dependances claims verifiees`

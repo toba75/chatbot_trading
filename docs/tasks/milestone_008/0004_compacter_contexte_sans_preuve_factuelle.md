@@ -27,11 +27,11 @@
   - Given une conversation contient une préférence utilisateur et une réponse précédente vérifiée.
   - When le contexte conversationnel est compacté.
   - Then le snapshot conserve la préférence et la référence vérifiée sans recopier l'historique comme preuve factuelle.
-- Tests d'acceptation à écrire: `tests/m008/validate_conversation_context_snapshot_acceptance.ps1`, qui échoue tant que le snapshot ne distingue pas préférence, ambiguïté et résultat vérifié.
+- Tests d'acceptation à écrire: `uv run --locked gate`, qui échoue tant que le snapshot ne distingue pas préférence, ambiguïté et résultat vérifié.
 - Tests unitaires à écrire: tests de marquage d'une assertion historique sans `VerifiedAnswerVersion` comme non factuelle et à revalider par T-007, conservation des documents explicitement sélectionnés, conservation du mandat actif, exclusion de tours bruts, absence de payload sensible et sérialisation stable du snapshot.
 - Implémentation attendue: créer `app/conversation/domain/context_snapshot.py`, `app/conversation/application/compact_context.py` et `app/conversation/adapters/in_memory_context_store.py`.
 - Invariants et garde-fous: aucune preuve créée par résumé; aucune copie aveugle de l'historique; aucune suppression des ambiguïtés non résolues; aucune dépendance à RA interne; aucune assertion historique sans version vérifiée ne devient utilisable sans revalidation RA.
 - Dépendances: T-003; contrat `VerifiedResearchOutcome`; `SourceLocator`; `docs/specs/m007_reponse_documentaire_verifiee.md`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m008\validate_conversation_context_snapshot_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m008\validate_conversation_context_snapshot_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m008): couvrir snapshot contexte sans preuve`
 - Commit GREEN: `feat(m008): compacter contexte sans preuve factuelle`

@@ -27,11 +27,11 @@
   - Given deux claims opposés portent sur des horizons différents.
   - When RA analyse les contradictions du jeu de preuves scellé.
   - Then la relation est classée `DIFFERENT_HORIZON`, la réponse future doit l'expliquer, et aucun statut `SUPPORTED` général n'est autorisé par simplification.
-- Tests d'acceptation à écrire: `tests/m007/validate_contradiction_gap_acceptance.ps1`, qui échoue tant que RA ne classe pas les contradictions conditionnelles et lacunes avant réponse.
+- Tests d'acceptation à écrire: `uv run --locked gate`, qui échoue tant que RA ne classe pas les contradictions conditionnelles et lacunes avant réponse.
 - Tests unitaires à écrire: tests pour conflit non enregistré, horizon différent, métrique différente, lacune d'obligation, preuves insuffisantes, consensus par fréquence interdit, contradiction résolue par qualification, transition vers `CONFLICTING_EVIDENCE`, événement `ResearchEvidenceFoundInsufficient` et événement `ResearchEvidenceFoundConflicting`.
 - Implémentation attendue: ajouter le classificateur de contradictions RA, les raisons publiques de lacune, l'enregistrement dans `ResearchCase` et les événements associés, y compris les événements de décision finale d'insuffisance ou de conflit.
 - Invariants et garde-fous: aucune contradiction pertinente omise; aucune généralisation abusive; aucune obligation de couverture ignorée; aucune décision par score ou nombre de citations.
 - Dépendances: T-004; relations EG M-006; `VerifiedClaimRef`; `EvidenceSet` scellé.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_contradiction_gap_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_contradiction_gap_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m007): couvrir contradictions lacunes reponse`
 - Commit GREEN: `feat(m007): classer contradictions lacunes reponse`

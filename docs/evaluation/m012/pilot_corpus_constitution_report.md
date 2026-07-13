@@ -10,7 +10,7 @@
 
 - Artefact livré: modèle de manifeste, politique de couverture et validateur `PilotCorpus`.
 - Corpus personnel réel: non versionné dans Git.
-- Fixture logicielle: générée temporairement par `tests/m012/validate_pilot_corpus_acceptance.ps1`.
+- Fixture logicielle: générée temporairement par `gate_tests/ported/tests/m012/validate_pilot_corpus_acceptance.py`.
 - ADR consultées: ADR-001, ADR-002, ADR-010, DDD-ADR-001, DDD-ADR-003.
 - ADR créée ou modifiée: aucune.
 
@@ -54,7 +54,7 @@ Le hash `frozen_manifest_sha256` est calculé sur le manifeste sans ce champ. Un
 
 ## Commandes de preuve
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m012\validate_pilot_corpus_acceptance.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m012\validate_pilot_corpus_unit.ps1
+```console
+uv run --locked gate
+uv run --locked gate
 ```

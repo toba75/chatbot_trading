@@ -198,26 +198,26 @@
 
 | Comportement | Invariant | Scénario BDD | Test RED | ADR | Commande |
 |---|---|---|---|---|---|
-| SD-001 - Spécification exécutable M-010 | La spécification nomme mission SD, agrégat, origines, paramètres, compatibilité, snapshot, API, erreurs, métriques, exclusions et garde-fous. | Given la mission M-010 est de formaliser une hypothèse de stratégie attribuée et vérifiable; When la spécification de stratégie candidate est publiée; Then elle est validée par commande PowerShell. | T-002 | ADR-010; DDD-ADR-009; DDD-ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m010_specification.ps1 |
-| SD-002 - Ouverture depuis résultat vérifié | Une StrategyCandidate s'ouvre depuis VerifiedResearchOutcome et mandat explicite. | Given un résultat vérifié RA et un mandat utilisateur; When SD ouvre la stratégie candidate; Then la candidate porte les références publiques sans lire RA interne. | T-003 | ADR-010; DDD-ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m010\validate_strategy_candidate_opening_acceptance.ps1 |
-| SD-003 - Origines de règles attribuées | Chaque StrategyRule possède une RuleOrigin autorisée. | Given une règle d'entrée sans RuleOrigin; When la validation de compilation est demandée; Then la stratégie passe à INCOMPLETE avec diagnostic bloquant. | T-004 | ADR-010; DDD-ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m010\validate_strategy_rule_origin_acceptance.ps1 |
-| SD-004 - Paramètres à calibrer cadrés | Un PARAMETER_TO_CALIBRATE possède ParameterDomain et protocole. | Given un lookback à calibrer sans domaine; When la compilation est demandée; Then PARAMETER_CALIBRATION_REQUIRED bloque la compilation. | T-005 | ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m010\validate_strategy_parameter_calibration_acceptance.ps1 |
-| SD-005 - Compatibilité analysée | Les horizons, données, coûts, liquidité, levier et mandat sont compatibles avant compilation. | Given un signal quotidien appliqué à une donnée mensuelle tardive; When SD analyse la compatibilité; Then StrategyCompatibilityPolicy produit un diagnostic bloquant. | T-006 | ADR-010; DDD-ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m010\validate_strategy_compatibility_acceptance.ps1 |
-| SD-006 - Diagnostics bloquants de validation | INCOMPLETE et INCONSISTENT conservent les diagnostics publics. | Given une candidate avec conflit bloquant; When la validation est demandée; Then aucun fallback ne rend la stratégie COMPILABLE. | T-007 | ADR-010; DDD-ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m010\validate_strategy_candidate_diagnostics_acceptance.ps1 |
-| SD-007 - Compilation déterministe sans backtest | StrategyCompiler produit une représentation intermédiaire sans lancer EX. | Given une candidate complète et compatible; When la compilation est demandée; Then StrategyCompiled est publié sans résultat de backtest. | T-008 | ADR-010; DDD-ADR-009 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m010\validate_strategy_compilation_acceptance.ps1 |
-| SD-008 - Snapshot immuable hashé | StrategySnapshot est complet, versionné, hashé et non modifiable. | Given une stratégie compilable; When le snapshot est créé; Then EX ne recevra qu'un StrategySnapshot immuable. | T-009 | DDD-ADR-009; DDD-ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m010\validate_strategy_snapshot_acceptance.ps1 |
-| SD-009 - Endpoints stratégies sans stockage interne | Les endpoints SD exposent seulement le contrat public. | Given une requête de compilation; When l'API SD répond; Then aucun champ RA, EG, KA ou stockage SD interne n'est exposé. | T-010 | ADR-010; DDD-ADR-009 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m010\validate_strategy_http_contract_acceptance.ps1 |
-| SD-010 - Traçabilité et métriques M-010 | Chaque exigence M-010 possède test, commande, ADR et métriques sans payload sensible. | Given les comportements M-010 sont implémentés; When les gates s'exécutent; Then traceability, test, lint et validate_m010_specification sont enrôlés. | T-011 | ADR-010; DDD-ADR-009; DDD-ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m010\validate_m010_traceability_acceptance.ps1 |
+| SD-001 - Spécification exécutable M-010 | La spécification nomme mission SD, agrégat, origines, paramètres, compatibilité, snapshot, API, erreurs, métriques, exclusions et garde-fous. | Given la mission M-010 est de formaliser une hypothèse de stratégie attribuée et vérifiable; When la spécification de stratégie candidate est publiée; Then elle est validée par commande uv run --locked gate
+| SD-002 - Ouverture depuis résultat vérifié | Une StrategyCandidate s'ouvre depuis VerifiedResearchOutcome et mandat explicite. | Given un résultat vérifié RA et un mandat utilisateur; When SD ouvre la stratégie candidate; Then la candidate porte les références publiques sans lire RA interne. | T-003 | ADR-010; DDD-ADR-010 | uv run --locked gate
+| SD-003 - Origines de règles attribuées | Chaque StrategyRule possède une RuleOrigin autorisée. | Given une règle d'entrée sans RuleOrigin; When la validation de compilation est demandée; Then la stratégie passe à INCOMPLETE avec diagnostic bloquant. | T-004 | ADR-010; DDD-ADR-010 | uv run --locked gate
+| SD-004 - Paramètres à calibrer cadrés | Un PARAMETER_TO_CALIBRATE possède ParameterDomain et protocole. | Given un lookback à calibrer sans domaine; When la compilation est demandée; Then PARAMETER_CALIBRATION_REQUIRED bloque la compilation. | T-005 | ADR-010 | uv run --locked gate
+| SD-005 - Compatibilité analysée | Les horizons, données, coûts, liquidité, levier et mandat sont compatibles avant compilation. | Given un signal quotidien appliqué à une donnée mensuelle tardive; When SD analyse la compatibilité; Then StrategyCompatibilityPolicy produit un diagnostic bloquant. | T-006 | ADR-010; DDD-ADR-010 | uv run --locked gate
+| SD-006 - Diagnostics bloquants de validation | INCOMPLETE et INCONSISTENT conservent les diagnostics publics. | Given une candidate avec conflit bloquant; When la validation est demandée; Then aucun fallback ne rend la stratégie COMPILABLE. | T-007 | ADR-010; DDD-ADR-010 | uv run --locked gate
+| SD-007 - Compilation déterministe sans backtest | StrategyCompiler produit une représentation intermédiaire sans lancer EX. | Given une candidate complète et compatible; When la compilation est demandée; Then StrategyCompiled est publié sans résultat de backtest. | T-008 | ADR-010; DDD-ADR-009 | uv run --locked gate
+| SD-008 - Snapshot immuable hashé | StrategySnapshot est complet, versionné, hashé et non modifiable. | Given une stratégie compilable; When le snapshot est créé; Then EX ne recevra qu'un StrategySnapshot immuable. | T-009 | DDD-ADR-009; DDD-ADR-010 | uv run --locked gate
+| SD-009 - Endpoints stratégies sans stockage interne | Les endpoints SD exposent seulement le contrat public. | Given une requête de compilation; When l'API SD répond; Then aucun champ RA, EG, KA ou stockage SD interne n'est exposé. | T-010 | ADR-010; DDD-ADR-009 | uv run --locked gate
+| SD-010 - Traçabilité et métriques M-010 | Chaque exigence M-010 possède test, commande, ADR et métriques sans payload sensible. | Given les comportements M-010 sont implémentés; When les gates s'exécutent; Then traceability, test, lint et validate_m010_specification sont enrôlés. | T-011 | ADR-010; DDD-ADR-009; DDD-ADR-010 | uv run --locked gate
 
 ## Commandes de validation
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m010\validate_m010_specification_acceptance.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m010\validate_m010_specification_unit.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m010_specification.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_traceability.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1
+```console
+uv run --locked gate
+uv run --locked gate
+uv run --locked gate
+uv run --locked gate
+uv run --locked gate
+uv run --locked gate
 ```
 
 ## Exclusions M-010

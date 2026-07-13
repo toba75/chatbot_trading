@@ -27,11 +27,11 @@
   - Given un client appelle `/v1/chat/completions` avec un `conversation_id` et un message utilisateur.
   - When CV traite la requête compatible.
   - Then un tour CV est créé et la réponse expose le texte assistant avec statut documentaire et citations dans les champs produit.
-- Tests d'acceptation à écrire: `tests/m008/validate_chat_completions_contract_acceptance.ps1`, qui échoue tant que l'endpoint compatible ne crée pas de tour CV traçable.
+- Tests d'acceptation à écrire: `uv run --locked gate`, qui échoue tant que l'endpoint compatible ne crée pas de tour CV traçable.
 - Tests unitaires à écrire: tests de payload minimal valide, champ non supporté, conversation absente, absence d'idempotence, mapping des rôles, conservation des citations depuis le DTO public RA, refus de `prompt_override`, refus d'un accès direct au LLM et absence d'hypothèse de champ `citations` dans `VerifiedResearchOutcome`.
 - Implémentation attendue: créer `app/conversation/adapters/chat_completions_http.py` et les DTO de compatibilité stricts.
 - Invariants et garde-fous: aucun mode chat générique; aucun statut documentaire inventé; aucun champ externe accepté silencieusement; aucune dépendance au protocole vLLM dans le domaine CV.
 - Dépendances: T-009; `app/conversation/adapters/conversation_http.py`; `app/platform/llm_gateway` uniquement derrière les ports applicatifs autorisés.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m008\validate_chat_completions_contract_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m008\validate_chat_completions_contract_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_architecture_boundaries.ps1 -AppRoot .\app -ContextRegistryPath .\app\context_registry.json -SpecificationPath .\docs\specs\m001_frontieres_ddd_contrats_publies.md`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m008): couvrir contrat chat completions`
 - Commit GREEN: `feat(m008): exposer chat completions compatible`

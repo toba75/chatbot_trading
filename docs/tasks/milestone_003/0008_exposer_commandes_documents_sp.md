@@ -27,11 +27,11 @@
   - Given un client soumet un PDF original puis demande son diagnostic.
   - When les commandes documentaires SP sont appelées.
   - Then l'enregistrement retourne une identité de document stable et le diagnostic retourne un statut explicite sans exposer de structure interne ni lancer de conversion.
-- Tests d'acceptation à écrire: un test `tests/m003/validate_document_commands_acceptance.ps1` couvrant les deux endpoints HTTP requis, les erreurs de source inconnue, source illisible, diagnostic déjà demandé et absence de conversion.
+- Tests d'acceptation à écrire: un test `uv run --locked gate` couvrant les deux endpoints HTTP requis, les erreurs de source inconnue, source illisible, diagnostic déjà demandé et absence de conversion.
 - Tests unitaires à écrire: tests des handlers applicatifs, mapping d'erreurs métier, idempotence contrôlée de demande de diagnostic et absence d'import de framework dans `app/source_processing/domain`.
 - Implémentation attendue: créer la surface HTTP SP, connecter les handlers au runtime local existant et garder l'adaptateur de transport hors du domaine; une CLI ne peut être ajoutée qu'en complément, jamais comme substitut aux endpoints M-003.
 - Invariants et garde-fous: aucune décision de routage dans l'adaptateur; aucune conversion M-004 déclenchée; aucune erreur métier avalée; aucun import framework dans le domaine.
-- Dépendances: T-007; M-002 job runtime; `app/platform/job_runtime`; `app/source_processing/application`; `scripts/validate_architecture_boundaries.ps1`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m003\validate_document_commands_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m003\validate_document_commands_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m003\validate_document_http_contract_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_architecture_boundaries.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Dépendances: T-007; M-002 job runtime; `app/platform/job_runtime`; `app/source_processing/application`; `uv run --locked gate`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m003): couvrir les commandes documentaires sp`.
 - Commit GREEN: `feat(m003): exposer les commandes documentaires sp`.

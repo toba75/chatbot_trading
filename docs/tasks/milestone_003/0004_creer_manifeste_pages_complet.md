@@ -27,11 +27,11 @@
   - Given une source documentaire enregistrée avec un PDF de cinq pages dont une page vide.
   - When une tentative de traitement est démarrée.
   - Then le manifeste contient cinq entrées ordonnées, la page vide est explicitement représentée et aucune tentative existante n'est modifiée.
-- Tests d'acceptation à écrire: un test `tests/m003/validate_page_manifest_acceptance.ps1` couvrant PDF nominal, page vide, page illisible et refus d'un nombre de pages indéterminé.
+- Tests d'acceptation à écrire: un test `uv run --locked gate` couvrant PDF nominal, page vide, page illisible et refus d'un nombre de pages indéterminé.
 - Tests unitaires à écrire: tests de `DocumentProcessingRun.start`, `PageManifest`, `PageNumber`, validation d'ordre strict et protection contre la mutation d'une tentative passée.
 - Implémentation attendue: ajouter la création de manifeste page par page, le démarrage de tentative et la persistance abstraite via ports sans dépendance à une bibliothèque PDF dans le domaine.
 - Invariants et garde-fous: aucune page manquante; aucune page créée hors plage; aucune modification d'un run historique; erreur explicite si l'inspecteur ne peut pas fournir le nombre de pages.
 - Dépendances: T-003; `DocumentInspector`; `ProcessingRunRepository`; états `CREATED` et `DIAGNOSED` non encore franchis.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m003\validate_page_manifest_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m003\validate_page_manifest_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m003): couvrir le manifeste complet des pages`.
 - Commit GREEN: `feat(m003): creer le manifeste complet des pages`.

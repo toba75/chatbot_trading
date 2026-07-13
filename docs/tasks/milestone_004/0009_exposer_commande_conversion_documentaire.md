@@ -27,11 +27,11 @@
   - Given un document enregistré, diagnostiqué et routé.
   - When un client appelle `POST /v1/documents/{id}/convert`.
   - Then la conversion canonique est acceptée comme job idempotent ou refusée avec une erreur explicite sans exposer les structures internes SP.
-- Tests d'acceptation à écrire: un test `tests/m004/validate_document_conversion_command_acceptance.ps1` couvrant conversion acceptée, source inconnue, source en quarantaine, route absente, conversion déjà demandée et QA refusée.
+- Tests d'acceptation à écrire: un test `uv run --locked gate` couvrant conversion acceptée, source inconnue, source en quarantaine, route absente, conversion déjà demandée et QA refusée.
 - Tests unitaires à écrire: tests du service applicatif, mapping HTTP, idempotence de job, absence d'import framework dans le domaine et absence de conversion depuis l'endpoint de diagnostic M-003.
 - Implémentation attendue: créer la commande applicative de conversion, connecter le job runtime, exposer l'adaptateur HTTP et documenter les statuts publics sans fuite d'identifiants internes.
 - Invariants et garde-fous: route préalable obligatoire; idempotency key explicite; aucune publication partielle; aucune erreur avalée; aucun import transport dans `app/source_processing/domain`.
 - Dépendances: T-008; M-002 job runtime; M-003 commandes documentaires; `app/source_processing/adapters/document_http.py`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m004\validate_document_conversion_command_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m004\validate_document_conversion_command_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m003\validate_document_http_contract_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_architecture_boundaries.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m004): couvrir la commande de conversion documentaire`.
 - Commit GREEN: `feat(m004): exposer la commande de conversion documentaire`.

@@ -27,11 +27,11 @@
   - Given la mission M-010 est de formaliser une hypothèse de stratégie attribuée et vérifiable.
   - When la spécification de stratégie candidate est publiée.
   - Then chaque comportement M-010 nomme son invariant, son scénario BDD, son test RED, ses ADR applicables et sa commande de validation.
-- Tests d'acceptation à écrire: `tests/m010/validate_m010_specification_acceptance.ps1`, qui échoue tant que `docs/specs/m010_strategie_candidate_attribuee.md` et son validateur n'existent pas.
-- Tests unitaires à écrire: tests de `scripts/validate_m010_specification.ps1` pour mission absente, agrégat absent, origines absentes, paramètre à calibrer absent, compatibilité absente, snapshot absent, endpoints absents, erreurs publiques absentes, métriques absentes, exclusion du backtest absente et ADR manquantes.
-- Implémentation attendue: créer `docs/specs/m010_strategie_candidate_attribuee.md`, créer `scripts/validate_m010_specification.ps1`, enrôler la validation dans `scripts/test.ps1` et `scripts/lint.ps1`, puis relier les exigences M-010 à `docs/traceability/matrix.md`.
+- Tests d'acceptation à écrire: `uv run --locked gate`, qui échoue tant que `docs/specs/m010_strategie_candidate_attribuee.md` et son validateur n'existent pas.
+- Tests unitaires à écrire: tests de `uv run --locked gate` pour mission absente, agrégat absent, origines absentes, paramètre à calibrer absent, compatibilité absente, snapshot absent, endpoints absents, erreurs publiques absentes, métriques absentes, exclusion du backtest absente et ADR manquantes.
+- Implémentation attendue: créer `docs/specs/m010_strategie_candidate_attribuee.md`, créer `uv run --locked gate`, enrôler la validation dans `uv run --locked gate` et `uv run --locked gate`, puis relier les exigences M-010 à `docs/traceability/matrix.md`.
 - Invariants et garde-fous: aucune décision structurante implicite; aucune déclaration de rentabilité; aucun contrat mutable vers EX; aucune exposition de stockage interne RA, EG ou SD.
 - Dépendances: T-001; DDD-ADR-009; DDD-ADR-010; `docs/tasks/README.md`; `docs/specs/plan_implementation_milestones_workstreams.md`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m010\validate_m010_specification_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m010_specification.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_traceability.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m010): couvrir la specification strategie candidate`
 - Commit GREEN: `docs(m010): publier la specification strategie candidate`

@@ -27,11 +27,11 @@
   - Given la spécification v4.1 définit SP comme propriétaire du diagnostic et du routage documentaire.
   - When la spécification M-003 est publiée.
   - Then chaque comportement M-003 nomme son invariant, son scénario BDD, son test RED, ses ADR applicables et sa commande de validation.
-- Tests d'acceptation à écrire: un test `tests/m003/validate_m003_specification_acceptance.ps1` qui échoue tant que la spécification M-003 ne contient pas mission, agrégats, politiques, états, gates et exclusions M-004.
+- Tests d'acceptation à écrire: un test `uv run --locked gate` qui échoue tant que la spécification M-003 ne contient pas mission, agrégats, politiques, états, gates et exclusions M-004.
 - Tests unitaires à écrire: tests du validateur de spécification pour section manquante, ADR absente, fallback silencieux, route par défaut et exigence M-004 glissée dans M-003.
-- Implémentation attendue: créer la spécification M-003, créer `scripts/validate_m003_specification.ps1` et relier la commande au gate standard seulement après son RED initial.
+- Implémentation attendue: créer la spécification M-003, créer `uv run --locked gate` et relier la commande au gate standard seulement après son RED initial.
 - Invariants et garde-fous: aucune valeur par défaut implicite; aucune modification silencieuse d'ADR acceptée; aucune conversion canonique publiée dans M-003.
 - Dépendances: T-001; ADR-002; ADR-003; DDD-ADR-003; `docs/specs/m001_frontieres_ddd_contrats_publies.md`; `docs/specs/m002_plateforme_locale_sure.md`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m003\validate_m003_specification_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m003_specification.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m003): couvrir la specification des sources routees`.
 - Commit GREEN: `docs(m003): publier la specification des sources routees`.

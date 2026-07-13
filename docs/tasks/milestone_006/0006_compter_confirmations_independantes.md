@@ -27,11 +27,11 @@
   - Given trois documents rattachés au même `DependencyGroup`.
   - When le nombre de confirmations indépendantes est calculé.
   - Then une seule confirmation indépendante est comptabilisée.
-- Tests d'acceptation à écrire: `tests/m006/validate_dependency_group_acceptance.ps1`, couvrant reprises d'une même étude, groupes distincts et comptage par claim.
+- Tests d'acceptation à écrire: `uv run --locked gate`, couvrant reprises d'une même étude, groupes distincts et comptage par claim.
 - Tests unitaires à écrire: tests de création de groupe, affectation explicite, doublon de groupe, document sans groupe, groupe modifié après vérification et agrégation des compteurs.
 - Implémentation attendue: créer `DependencyGroup`, repository associé, handler `AnalyzeSourceDependencyHandler` ou `AssignClaimDependencyGroup`, et service de comptage indépendant exposé au contexte EG.
 - Invariants et garde-fous: aucun groupe par défaut; aucun regroupement silencieux; aucune suppression d'une dépendance liée à un claim vérifié.
 - Dépendances: T-005; ADR-006; DDD-ADR-005; DDD-ADR-010.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m006\validate_dependency_group_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m006\validate_dependency_group_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m006): couvrir confirmations independantes`
 - Commit GREEN: `feat(m006): compter confirmations independantes`

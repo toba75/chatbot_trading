@@ -32,11 +32,11 @@
   - Given un processus applicatif reçoit `--config config/application.yaml`.
   - When le fichier est lisible, conforme et qu'aucune variable homonyme n'est présente.
   - Then le chargeur retourne une configuration validée et aucun accès à l'environnement ne pilote l'application.
-- Tests d'acceptation à écrire: `tests/m013_config/validate_application_config_loader_acceptance.ps1`, couvrant chargement nominal, absence de `--config`, fichier absent, fichier illisible, schéma invalide, clé vide, placeholder et variable homonyme rejetée.
-- Tests unitaires à écrire: `tests/m013_config/validate_application_config_loader_unit.ps1`, couvrant parse YAML, validation de types, rejet des sections inconnues critiques, détection des anciens noms `GEMMA_*`, `DATABASE_URL`, `QDRANT_URL`, `LLM_GATEWAY_URL`, hash stable de configuration et messages `CONFIG_*`.
+- Tests d'acceptation à écrire: `uv run --locked gate`, couvrant chargement nominal, absence de `--config`, fichier absent, fichier illisible, schéma invalide, clé vide, placeholder et variable homonyme rejetée.
+- Tests unitaires à écrire: `uv run --locked gate`, couvrant parse YAML, validation de types, rejet des sections inconnues critiques, détection des anciens noms `GEMMA_*`, `DATABASE_URL`, `QDRANT_URL`, `LLM_GATEWAY_URL`, hash stable de configuration et messages `CONFIG_*`.
 - Implémentation attendue: implémenter `app/platform/configuration/__init__.py` avec value objects de configuration, `load_application_configuration(config_path, environment_snapshot)`, erreurs nommées, calcul de hash et absence de lecture directe de `os.environ` hors snapshot fourni par le point d'entrée.
 - Invariants et garde-fous: le chargeur ne complète jamais une valeur manquante depuis l'environnement; toute clé obligatoire vide échoue; les chemins secrets sont validés comme chemins, pas lus comme contenu secret.
 - Dépendances: T-002; ADR-016; `config/application.schema.json`; `app/platform/configuration/__init__.py`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_application_config_loader_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_application_config_loader_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_architecture_boundaries.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(platform): couvrir chargement configuration fichier unique`.
 - Commit GREEN: `feat(platform): charger configuration applicative sans environnement`.

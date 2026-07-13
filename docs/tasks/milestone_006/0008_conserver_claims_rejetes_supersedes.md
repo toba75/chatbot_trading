@@ -27,11 +27,11 @@
   - Given un claim vérifié possède une preuve directe et une version publiée.
   - When une meilleure formulation le supersède.
   - Then l'ancien claim reste consultable avec sa décision et pointe explicitement vers la nouvelle version.
-- Tests d'acceptation à écrire: `tests/m006/validate_claim_retention_acceptance.ps1`, couvrant rejet conservé, supersession conservée et refus de suppression ordinaire.
+- Tests d'acceptation à écrire: `uv run --locked gate`, couvrant rejet conservé, supersession conservée et refus de suppression ordinaire.
 - Tests unitaires à écrire: tests de transition destructive interdite, raison de rejet obligatoire, lien de supersession absent, version inchangée modifiée et consultation de version supersédée.
 - Implémentation attendue: implémenter la conservation dans l'agrégat et le repository EG, exposer les lectures nécessaires et préserver les événements de rejet/supersession.
 - Invariants et garde-fous: aucune suppression logique cachée; aucune mutation d'une décision immuable; aucune création de nouvelle version sans lien explicite.
 - Dépendances: T-007; ADR-006; DDD-ADR-005; DDD-ADR-010.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m006\validate_claim_retention_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m006\validate_claim_retention_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m006): couvrir conservation claims rejetes`
 - Commit GREEN: `feat(m006): conserver claims rejetes supersedes`

@@ -1,0 +1,341 @@
+{
+    "schema_version":  1,
+    "description":  "Closed list of historical documents allowed to retain removed script references.",
+    "allowed_paths":  [
+                          {
+                              "path":  "docs/adr/ADR-010-gates-gouvernance-powershell.md",
+                              "sha256":  "74daed4c16f55a76a5e8ed624dabed6a89248afd36cd9d6d9be4c33ddd413e5c",
+                              "reason":  "ADR historical or transition decision"
+                          },
+                          {
+                              "path":  "docs/adr/ADR-011-python-outille-pour-validateurs-architecture.md",
+                              "sha256":  "5f53d016c53d2683b4179a29d139cc995df83963db9b1f9b16e7feb46526b6f1",
+                              "reason":  "ADR historical or transition decision"
+                          },
+                          {
+                              "path":  "docs/adr/ADR-012-python-outille-pour-validateurs-plateforme.md",
+                              "sha256":  "9d19c4f537bc0e634978ec4441fd737ab1b8105e3b9dbf90b10d2f67bd040fb7",
+                              "reason":  "ADR historical or transition decision"
+                          },
+                          {
+                              "path":  "docs/adr/ADR-013-contrat-manifeste-sauvegarde-restauration.md",
+                              "sha256":  "7984b0456d5ebec71022fcb2fbe37f22d195b00479b01b6648d144f111c79c65",
+                              "reason":  "ADR historical or transition decision"
+                          },
+                          {
+                              "path":  "docs/adr/ADR-014-spark-docker-externe-sans-cle-api.md",
+                              "sha256":  "b1d18c1408c84a87a6786c7b2d2c5f7a23e10c46ac66b4842914806539f1172f",
+                              "reason":  "ADR historical or transition decision"
+                          },
+                          {
+                              "path":  "docs/adr/ADR-015-provenance-llm-declaree-gateway.md",
+                              "sha256":  "2969c5236ffd108b4a1f3ed82f8c580fbcac134d224b5753c8df8b150e87b0a3",
+                              "reason":  "ADR historical or transition decision"
+                          },
+                          {
+                              "path":  "docs/adr/ADR-017-pdf-sources-suivis-par-git-lfs.md",
+                              "sha256":  "d6f1fb43b66c058fe77738f9e9159fa265f4ab68fca6b1f9f0a53fa46cdfa69e",
+                              "reason":  "ADR historical or transition decision"
+                          },
+                          {
+                              "path":  "docs/adr/ADR-018-ui-exclusivement-via-api-orchestratrice.md",
+                              "sha256":  "4fda78df7acc0d0a5c31e9eca419515029e0a2876a839ff707337f3d03d72992",
+                              "reason":  "ADR historical or transition decision"
+                          },
+                          {
+                              "path":  "docs/adr/ADR-019-api-orchestratrice-fastapi-uvicorn.md",
+                              "sha256":  "d6149765c4b4776006c8fc62b97327aeac22c5f97a793d86baf7179e45643229",
+                              "reason":  "ADR historical or transition decision"
+                          },
+                          {
+                              "path":  "docs/adr/ADR-020-frontiere-http-binaire-bornee.md",
+                              "sha256":  "c65fd89132faf920c786459b045ece659de8ba15418f4545e083b7c530c82bcd",
+                              "reason":  "ADR historical or transition decision"
+                          },
+                          {
+                              "path":  "docs/adr/ADR-021-migrations-postgresql-au-demarrage.md",
+                              "sha256":  "ecb47301268e2bdbb40834c93ea0155e3d8669f4becdea37443771d92fa5e171",
+                              "reason":  "ADR historical or transition decision"
+                          },
+                          {
+                              "path":  "docs/adr/ADR-022-outbox-sp-et-leases-jobs-postgresql.md",
+                              "sha256":  "4819799a7d98b61d5aec0cf3bd3bd70fbe1f942d551a07c8ebe89dea2a641a8a",
+                              "reason":  "ADR historical or transition decision"
+                          },
+                          {
+                              "path":  "docs/adr/ADR-023-version-optimiste-agregats-postgresql.md",
+                              "sha256":  "23eefde89dca54028f36b7f7c48dab1d46ccba071dc4544876fa7b6d43772649",
+                              "reason":  "ADR historical or transition decision"
+                          },
+                          {
+                              "path":  "docs/adr/ADR-024-relais-outbox-transactions-locales.md",
+                              "sha256":  "6ddb6f93298edf15937291f94ff78095e642a994b49a74d2dfa6d67ed9246a8c",
+                              "reason":  "ADR historical or transition decision"
+                          },
+                          {
+                              "path":  "docs/adr/ADR-025-fencing-claims-inspection-pdf-isolee.md",
+                              "sha256":  "8285dc713ace752a699c35d45c08a680ac1df878d9675c1d0e438672bf7e6cf4",
+                              "reason":  "ADR historical or transition decision"
+                          },
+                          {
+                              "path":  "docs/adr/ADR-026-deploiement-compose-reproductible.md",
+                              "sha256":  "fc2c4dd82d14eb6db37509bf33c66fa6585821c8034eb4f63e60a6ae86b1e3f7",
+                              "reason":  "ADR historical or transition decision"
+                          },
+                          {
+                              "path":  "docs/adr/ADR-027-composition-http-et-observation-flux.md",
+                              "sha256":  "2725fd23bc48981d214e82f29b155156a6700fad69f216e3bad95cc5be96ff3a",
+                              "reason":  "ADR historical or transition decision"
+                          },
+                          {
+                              "path":  "docs/adr/ADR-028-admission-documentaire-locale-authentifiee.md",
+                              "sha256":  "8f343c686a432af7d4324b2c43dad1cb297741e2a5d364ca23141548fd187942",
+                              "reason":  "ADR historical or transition decision"
+                          },
+                          {
+                              "path":  "docs/adr/ADR-029-gate-python-uv-manifeste-unique.md",
+                              "sha256":  "f59fb522080b87b513355be4de89ead6255398292004e73f9e05ba8a0778a9cf",
+                              "reason":  "ADR historical or transition decision"
+                          },
+                          {
+                              "path":  "docs/adr/DDD-ADR-011-contexte-evaluation-pilote.md",
+                              "sha256":  "03dd12cd0ce9667490a6e478c3d102a29a76145781a047afb41545c926401945",
+                              "reason":  "ADR historical or transition decision"
+                          },
+                          {
+                              "path":  "docs/adr/DDD-ADR-012-politique-retention-purge-administrative-v1.md",
+                              "sha256":  "f951d0945fda4d917d87f38abbe81d7e79949d44453b2b59855f434ec9f72609",
+                              "reason":  "ADR historical or transition decision"
+                          },
+                          {
+                              "path":  "docs/adr/index.md",
+                              "sha256":  "7beb51319a52d3ed05b03e0746cc0f3429fee3898ea66030472a5256afa6451c",
+                              "reason":  "ADR historical or transition decision"
+                          },
+                          {
+                              "path":  "docs/governance/historical_python_parity.json",
+                              "sha256":  "b3563d7d966eedd3a57e6ab8f0d59a311876fdb383ee2ce6b701e9c793c42e51",
+                              "reason":  "historical migration parity table"
+                          },
+                          {
+                              "path":  "docs/governance/m000_precondition_green_initiale.md",
+                              "sha256":  "c23b52062997d249033eb30534664bca788095583c30999d8896ec3eac1626e1",
+                              "reason":  "published historical governance evidence"
+                          },
+                          {
+                              "path":  "docs/governance/m002_precondition_green.md",
+                              "sha256":  "f8ca2a302458621d35713227b556594ff9b7b1ba5eea7158e4509641d2479f89",
+                              "reason":  "published historical governance evidence"
+                          },
+                          {
+                              "path":  "docs/governance/m003_precondition_green.md",
+                              "sha256":  "d1496b1504d883674c63c9b51e4de9030e7071e27f0c400a54344d5d8b19afec",
+                              "reason":  "published historical governance evidence"
+                          },
+                          {
+                              "path":  "docs/governance/m004_precondition_green.md",
+                              "sha256":  "b9a2305ff8fdb59fa1f879393fff8bd35f96b9c0cd71cde28d1b7de3ad02338f",
+                              "reason":  "published historical governance evidence"
+                          },
+                          {
+                              "path":  "docs/governance/m005_precondition_green.md",
+                              "sha256":  "b366d84bd641c1d6c97bf0b1c02d551a6601495ae899c5d4baa90fcb076cebd6",
+                              "reason":  "published historical governance evidence"
+                          },
+                          {
+                              "path":  "docs/governance/m006_precondition_green.md",
+                              "sha256":  "63179bfeba501f7d7b457b440196f51ce0a2954a446b3614ade5ef18fbca797a",
+                              "reason":  "published historical governance evidence"
+                          },
+                          {
+                              "path":  "docs/governance/m007_precondition_green.md",
+                              "sha256":  "ef9e92b60ab8a26710b68eb4ed7666d8a99aa672ffb114375a52e5aabf053574",
+                              "reason":  "published historical governance evidence"
+                          },
+                          {
+                              "path":  "docs/governance/m008_precondition_green.md",
+                              "sha256":  "35fa6ad67637efa36e34d2fea150fa115641ee1e60c2ffe484180603c476bfe7",
+                              "reason":  "published historical governance evidence"
+                          },
+                          {
+                              "path":  "docs/governance/m009_deep_research_metrics.json",
+                              "sha256":  "2a079687034b67cbbdc35744db45a5f51b753664e5e19e52514cdf863b2eb22b",
+                              "reason":  "published historical governance evidence"
+                          },
+                          {
+                              "path":  "docs/governance/m009_precondition_green.md",
+                              "sha256":  "0b03f5f64ac2fe685ac1a904f72853925f620224ebccafcf11a0f07ba3f303bb",
+                              "reason":  "published historical governance evidence"
+                          },
+                          {
+                              "path":  "docs/governance/m010_precondition_green.md",
+                              "sha256":  "ceae810a643dfb1db43f713be0342ac581f08ee79478e31d9c04bc753f15eb4a",
+                              "reason":  "published historical governance evidence"
+                          },
+                          {
+                              "path":  "docs/governance/m011_precondition_green.md",
+                              "sha256":  "1aa7076931152fc7b99da8b2877e62ab1a6fede0b13172a9dab24ee9c1f7b60f",
+                              "reason":  "published historical governance evidence"
+                          },
+                          {
+                              "path":  "docs/governance/m012_precondition_green.md",
+                              "sha256":  "3a2245473df888c0ab99989f61634f7ef4e7cb90b1f7961405f940f945e007e8",
+                              "reason":  "published historical governance evidence"
+                          },
+                          {
+                              "path":  "docs/governance/m012_v1_gap_report.md",
+                              "sha256":  "6da61a75d23156c4dc894c178390558f4227064198621ae2f493ba97206b2534",
+                              "reason":  "published historical governance evidence"
+                          },
+                          {
+                              "path":  "docs/governance/m013_antipattern_review.md",
+                              "sha256":  "1adbf4dfce1649cd89c904a32446a045f8aa929d5a4d5f739ffe7372e003270a",
+                              "reason":  "published historical governance evidence"
+                          },
+                          {
+                              "path":  "docs/governance/m013_backup_restore_drill.md",
+                              "sha256":  "d99f7e13a039caf3e42c1e0780bdbd07b3ba3118330dd905130f25d81a1d9109",
+                              "reason":  "published historical governance evidence"
+                          },
+                          {
+                              "path":  "docs/governance/m013_config_audit.md",
+                              "sha256":  "d15e2bf8c0ba161658512d85273a20afc54280dfff35c230dd9e56c4d3af349f",
+                              "reason":  "published historical governance evidence"
+                          },
+                          {
+                              "path":  "docs/governance/m013_documentation_index.md",
+                              "sha256":  "fa5be6bd1584599704027b9581defd5ba13345c02d47a1ff50942ea208f414b5",
+                              "reason":  "published historical governance evidence"
+                          },
+                          {
+                              "path":  "docs/governance/m013_fastapi_audit.md",
+                              "sha256":  "637562f763d00afca6ec9d415fccb822f8789ebd8558b3875113b484a5299c42",
+                              "reason":  "published historical governance evidence"
+                          },
+                          {
+                              "path":  "docs/governance/m013_fastapi_precondition.md",
+                              "sha256":  "2fa0ffba3d193d503829c3bf890c0ee6a81509c7c8b4f27cdd79b41277b1e186",
+                              "reason":  "published historical governance evidence"
+                          },
+                          {
+                              "path":  "docs/governance/m013_local_monitoring.md",
+                              "sha256":  "ab47def416c8eaeec1cdfb450f4cd8a0c27c25713cdf15da8fa84eff6b22d787",
+                              "reason":  "published historical governance evidence"
+                          },
+                          {
+                              "path":  "docs/governance/m013_precondition_green.md",
+                              "sha256":  "90683c025b86f377ca624201f11b2836e5099636a152b075d278a3ee50f4b33e",
+                              "reason":  "published historical governance evidence"
+                          },
+                          {
+                              "path":  "docs/governance/m013_resource_profile.md",
+                              "sha256":  "e40b9a3d46bb9c6bd56204a7f02ac2037e984fb7339b7255a5caca2de2c9ce7a",
+                              "reason":  "published historical governance evidence"
+                          },
+                          {
+                              "path":  "docs/governance/m013_retention_policy.md",
+                              "sha256":  "71d54e2d1ed2dfa8d03edc3137989d46da0397e1b908ef8a0ad3a5c6b6daa0ff",
+                              "reason":  "published historical governance evidence"
+                          },
+                          {
+                              "path":  "docs/governance/m013_security_audit.md",
+                              "sha256":  "a5f591a08c78cd2f68b3e8b4532d06adaa5231f1d0230f8d448c4b4a0c1f9d4e",
+                              "reason":  "published historical governance evidence"
+                          },
+                          {
+                              "path":  "docs/governance/m013_spark_failure_drill.md",
+                              "sha256":  "29e0352a4a76fe8e13d7d0c1589a0f7865abc05cc1e7dd7c08ccaf81e87e9725",
+                              "reason":  "published historical governance evidence"
+                          },
+                          {
+                              "path":  "docs/governance/m013_v1_acceptance_report.md",
+                              "sha256":  "ff51c3a0f078f766afa6cf398e5776b05362b2e66419cb4bc396df0ae7b56750",
+                              "reason":  "published historical governance evidence"
+                          },
+                          {
+                              "path":  "docs/governance/m013_v1_gap_decisions.md",
+                              "sha256":  "d9cd29d503a0f8fa2bd4142a0db2b68fbc0820a96ad8674174b3a4da2ae15c31",
+                              "reason":  "published historical governance evidence"
+                          },
+                          {
+                              "path":  "docs/tasks/milestone_000/journal.md",
+                              "sha256":  "9e9340b660dd14762e0f3c03f09e77ef1b60f89118e2a9382b3c1fdf10d9276c",
+                              "reason":  "historical execution journal"
+                          },
+                          {
+                              "path":  "docs/tasks/milestone_001/journal.md",
+                              "sha256":  "e81e2cd6bafa10c5f7a84d7ba41cc532adb02c18d0263030a1d2d03e20567a50",
+                              "reason":  "historical execution journal"
+                          },
+                          {
+                              "path":  "docs/tasks/milestone_002/journal.md",
+                              "sha256":  "6e1e4488b54fbbf4e838f817ceb68b57a3504266d21d3f659cf498eb29d4a928",
+                              "reason":  "historical execution journal"
+                          },
+                          {
+                              "path":  "docs/tasks/milestone_003/journal.md",
+                              "sha256":  "1728983dd0bceff1d1ac62c7210b70767b7f52e2c7175d8ed49cc69fd1fecaa8",
+                              "reason":  "historical execution journal"
+                          },
+                          {
+                              "path":  "docs/tasks/milestone_004/journal.md",
+                              "sha256":  "be2c3640ef0b43e15d0966d8ec5296ad282f9eae1259b1b554c039d2c7e58836",
+                              "reason":  "historical execution journal"
+                          },
+                          {
+                              "path":  "docs/tasks/milestone_005/journal.md",
+                              "sha256":  "2a8373487e14e4e5c47d1425fd2687243771ef460359b55086c915a7eae30dca",
+                              "reason":  "historical execution journal"
+                          },
+                          {
+                              "path":  "docs/tasks/milestone_006/journal.md",
+                              "sha256":  "5b1f38579f39e291c62570a6330a5b9e4176b3b6f574ecc220405d1c6eba2cbe",
+                              "reason":  "historical execution journal"
+                          },
+                          {
+                              "path":  "docs/tasks/milestone_007/journal.md",
+                              "sha256":  "e38bd5240989f04c21fa41e54465df80b78641dd322eb4a8c8d42f0e46e03c50",
+                              "reason":  "historical execution journal"
+                          },
+                          {
+                              "path":  "docs/tasks/milestone_008/journal.md",
+                              "sha256":  "6578a66dbe1e59be07ffb4c940f1de6bfb1890663d476a5375bff0f536c3b714",
+                              "reason":  "historical execution journal"
+                          },
+                          {
+                              "path":  "docs/tasks/milestone_009/journal.md",
+                              "sha256":  "e1cac4fe1e463ac922df855c146e2ff1a3de5f97136ea9147cceb61eb0f504ae",
+                              "reason":  "historical execution journal"
+                          },
+                          {
+                              "path":  "docs/tasks/milestone_010/journal.md",
+                              "sha256":  "e042ed03d3536d9418773bcb7a3bb993df2f8f3c7cf66055d3fb56f599e2a213",
+                              "reason":  "historical execution journal"
+                          },
+                          {
+                              "path":  "docs/tasks/milestone_011/journal.md",
+                              "sha256":  "9a9f5084b8463611235195dfab181f128e3cb78b8de765c672456ca1e82a6aa9",
+                              "reason":  "historical execution journal"
+                          },
+                          {
+                              "path":  "docs/tasks/milestone_012/journal.md",
+                              "sha256":  "9f4bb6c2857369d8288bbf34171ebf168263a085fcba285ef6c878f0b96ea2c0",
+                              "reason":  "historical execution journal"
+                          },
+                          {
+                              "path":  "docs/tasks/milestone_013/journal.md",
+                              "sha256":  "9cc6aac01d5bdd0c3656ee2d15b1d7ed73902a82e94bf6659557fd6d2d2a3f40",
+                              "reason":  "historical execution journal"
+                          },
+                          {
+                              "path":  "docs/tasks/milestone_013-config/journal.md",
+                              "sha256":  "59304442d9d6dad8c554c0a1063d2ca716e91d669cd8d1d314581705d299c5e1",
+                              "reason":  "historical execution journal"
+                          },
+                          {
+                              "path":  "docs/tasks/milestone_013-fastapi/journal.md",
+                              "sha256":  "f391b935faf211a01708d6365912d7ed6a3d4eec8066e456bdff6875fc55d77a",
+                              "reason":  "historical execution journal"
+                          }
+                      ]
+}

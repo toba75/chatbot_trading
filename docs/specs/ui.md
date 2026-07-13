@@ -17,7 +17,7 @@
 
 ## Mission
 
-L'UI minimale doit permettre à un utilisateur non technique d'utiliser le chatbot local sans passer par les commandes PowerShell pour le parcours courant: ajouter un PDF, attendre qu'il devienne interrogeable, poser une question et vérifier les preuves.
+L'UI minimale doit permettre à un utilisateur non technique d'utiliser le chatbot local sans passer par les commandes uv run --locked gate
 
 L'UI n'est pas un nouveau bounded context métier. Elle est un client local des contrats publics et des read-models nécessaires. Elle ne décide aucune vérité documentaire, ne choisit aucune route documentaire implicite, ne publie aucun brouillon LLM comme réponse, ne remplace aucune projection indisponible et ne masque aucune panne.
 

@@ -32,11 +32,11 @@
   - Given un utilisateur pose une question en langage naturel dans une conversation locale.
   - When `/v1/chat/completions` traite la demande.
   - Then le tour CV est créé, le mode est justifié, RA récupère les preuves réelles, Gemma répond via `llm-gateway`, et la réponse expose les citations ouvrables.
-- Tests d'acceptation à écrire: `tests/m013/validate_real_chat_pipeline_acceptance.ps1`.
+- Tests d'acceptation à écrire: `uv run --locked gate`.
 - Tests unitaires à écrire: conversation absente, idempotence absente, mode injustifié, RA contourné, citation non exposée, Spark appelé directement, réponse factuelle sans preuve.
 - Implémentation attendue: relier l'orchestrateur local au vrai handler CV et à ses ports applicatifs au lieu d'un endpoint chat simplifié limité au LLM.
 - Invariants et garde-fous: pas de chat générique; pas de réponse sans tour CV; pas de prompt produit codé en dur comme preuve; pas d'accès direct à Spark.
 - Dépendances: T-019, endpoint CV M-008, `llm-gateway`, Spark.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_real_chat_pipeline_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_task_system.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m013): couvrir chat pipeline reel`
 - Commit GREEN: `feat(m013): brancher chat produit sur pipeline reel`

@@ -14,7 +14,7 @@
 - Garde-fous: ne pas accepter une branche locale comme preuve d'un milestone amont; ne pas ignorer un timeout ou une erreur de gate; ne pas créer de fallback de vérification.
 
 ## Blocages Ou Préconditions
-- État GREEN/RED connu: `scripts/validate_task_system.ps1` GREEN; `scripts/lint.ps1` GREEN avec 14 validation(s), 0 test(s); `git diff --check` GREEN; `scripts/test.ps1` non conclu dans les fenêtres locales de 304 puis 904 secondes et doit être relancé ou rétabli explicitement avant T-002.
+- État GREEN/RED connu: `uv run --locked gate` GREEN; `uv run --locked gate` GREEN avec 14 validation(s), 0 test(s); `git diff --check` GREEN; `uv run --locked gate` non conclu dans les fenêtres locales de 304 puis 904 secondes et doit être relancé ou rétabli explicitement avant T-002.
 - Présence des milestones amont dans master: M-004 et M-005 sont présents dans `master` au commit `09dbcfde15c334545794c921906f9c819e62a58b`, identique à `origin/master` après `git fetch origin --prune`.
 - Décisions manquantes: aucune pour la précondition; ADR obligatoire seulement si la politique durable des gates change.
 - Risques: commencer EG avec une projection KA absente; traiter un score de recherche comme preuve; publier un rapport GREEN incomplet.
@@ -27,11 +27,11 @@
   - Given M-004 et M-005 sont présents dans `master`.
   - When les gates de précondition M-006 sont exécutées.
   - Then M-006 ne peut commencer que si les validations, la traçabilité, les ADR, les frontières d'architecture et les preuves M-005 sont GREEN ou si le blocage exact est isolé.
-- Tests d'acceptation à écrire: `tests/m006/validate_m006_precondition_acceptance.ps1`, qui échoue tant que le validateur M-006, le rapport de précondition et la présence M-004/M-005 dans `master` ne sont pas vérifiés.
-- Tests unitaires à écrire: tests du validateur pour milestone amont absent, `origin/master` divergent, `scripts/test.ps1` non concluant, gate RED, rapport hors dépôt et statut GREEN déclaré sans preuve.
-- Implémentation attendue: créer `scripts/validate_m006_precondition.ps1`, produire `docs/governance/m006_precondition_green.md`, enrôler la précondition dans les gates si nécessaire, puis obtenir `scripts/test.ps1` et `scripts/lint.ps1` GREEN.
+- Tests d'acceptation à écrire: `uv run --locked gate`, qui échoue tant que le validateur M-006, le rapport de précondition et la présence M-004/M-005 dans `master` ne sont pas vérifiés.
+- Tests unitaires à écrire: tests du validateur pour milestone amont absent, `origin/master` divergent, `uv run --locked gate` non concluant, gate RED, rapport hors dépôt et statut GREEN déclaré sans preuve.
+- Implémentation attendue: créer `uv run --locked gate`, produire `docs/governance/m006_precondition_green.md`, enrôler la précondition dans les gates si nécessaire, puis obtenir `uv run --locked gate` et `uv run --locked gate` GREEN.
 - Invariants et garde-fous: aucun contournement de gate; aucun statut GREEN sans sortie de commande; aucun fallback silencieux en cas de timeout; aucune dépendance à une branche M-005 non fusionnée.
-- Dépendances: `master`; `origin/master`; `docs/tasks/milestone_004`; `docs/tasks/milestone_005`; `docs/specs/m005_projection_connaissance_recherchable.md`; `scripts/test.ps1`; `scripts/lint.ps1`.
-- Commandes de validation: `git fetch origin --prune`; `git ls-tree -r --name-only master -- docs/tasks/milestone_004 docs/tasks/milestone_005 docs/specs/m005_projection_connaissance_recherchable.md scripts tests/m005`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m006\validate_m006_precondition_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Dépendances: `master`; `origin/master`; `docs/tasks/milestone_004`; `docs/tasks/milestone_005`; `docs/specs/m005_projection_connaissance_recherchable.md`; `uv run --locked gate`; `uv run --locked gate`.
+- Commandes de validation: `git fetch origin --prune`; `git ls-tree -r --name-only master -- docs/tasks/milestone_004 docs/tasks/milestone_005 docs/specs/m005_projection_connaissance_recherchable.md scripts tests/m005`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m006): couvrir la precondition green des claims`
 - Commit GREEN: `test(m006): etablir la precondition green des claims`

@@ -14,7 +14,7 @@
 - Garde-fous: partir des sections canoniques de la spécification v4.1; ne pas inventer de contexte; ne pas créer de persistance concrète avant le contrat de domaine.
 
 ## Blocages Ou Préconditions
-- État GREEN/RED connu: dépend du retour GREEN de T-001; le RED de `validate_task_system.ps1` doit être traité avant clôture de cette tâche.
+- État GREEN/RED connu: dépend du retour GREEN de T-001; le RED de `uv run --locked gate` doit être traité avant clôture de cette tâche.
 - Présence des milestones amont dans master: M-000 est présent dans `master` avec les tâches, ADR, matrice et gates M-000.
 - Décisions manquantes: aucune ADR nouvelle n'est requise si la tâche matérialise DDD-ADR-001, DDD-ADR-002, DDD-ADR-003 et les décisions existantes sans en changer le sens.
 - Risques: recopier la spécification sans critères testables; mélanger contexte métier et adaptateur de plateforme; publier une frontière sans responsabilité propriétaire.
@@ -32,6 +32,6 @@
 - Implémentation attendue: créer `docs/specs/m001_frontieres_ddd_contrats_publies.md` avec contexte DDD, langage ubiquitaire, contrats, règles de dépendance, invariants et critères d'acceptation M-001.
 - Invariants et garde-fous: aucune relation implicite; aucune table ou classe interne citée comme contrat; aucune extension de périmètre vers UI, connecteurs externes ou persistance opérationnelle.
 - Dépendances: T-001; `docs/specs/plan_implementation_milestones_workstreams.md`; `docs/specs/specification_unifiee_ddd_technique_chatbot_trading_v4_1.md`; `docs/adr/index.md`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m001\validate_m001_specification_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m001\validate_m001_specification_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m001): couvrir la spécification des frontières ddd`.
 - Commit GREEN: `docs(m001): publier la spécification des frontières ddd`.

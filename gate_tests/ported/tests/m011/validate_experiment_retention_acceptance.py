@@ -4,4 +4,4 @@ from gate_tests.ported_support import assert_native_parity
 
 
 def test_validate_experiment_retention_acceptance() -> None:
-    assert_native_parity('tests/m011/validate_experiment_retention_acceptance.ps1', 'gate_tests/ported/tests/m011/validate_experiment_retention_acceptance.py', 'unit')
+    assert_native_parity('gate_tests/ported/tests/m011/validate_experiment_retention_acceptance.py', 'unit')

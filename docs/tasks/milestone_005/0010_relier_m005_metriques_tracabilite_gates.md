@@ -22,16 +22,16 @@
 ## Tâches
 ### T-010 - Relier M-005 aux métriques, à la traçabilité et aux gates
 - But métier: rendre la sortie M-005 vérifiable avant que RA et EG consomment les preuves candidates.
-- Portée DDD: matrice de traçabilité M-005, signaux d'audit KA, métriques initiales de recherche, validations PowerShell et enrôlement dans `scripts/test.ps1`.
+- Portée DDD: matrice de traçabilité M-005, signaux d'audit KA, métriques initiales de recherche, validations uv run --locked gate`uv run --locked gate`.
 - Scénario BDD:
   - Given les comportements M-005 sont implémentés et testés.
   - When les gates de clôture M-005 s'exécutent.
   - Then chaque exigence M-005 est reliée à une preuve et les métriques Recall@k, MRR et nDCG initiales sont publiées comme mesures non définitives.
-- Tests d'acceptation à écrire: `tests/m005/validate_m005_traceability_acceptance.ps1`, couvrant exigences M-005, commandes, ADR, métriques et absence de contenu documentaire dans les signaux.
+- Tests d'acceptation à écrire: `uv run --locked gate`, couvrant exigences M-005, commandes, ADR, métriques et absence de contenu documentaire dans les signaux.
 - Tests unitaires à écrire: tests du validateur de traçabilité M-005, calcul déterministe de métriques sur fixture, refus de métrique sans jeu de questions et refus de log contenant un passage complet.
-- Implémentation attendue: mettre à jour `docs/traceability/matrix.md`, créer les signaux d'audit KA, publier les fixtures de mesure initiale, enrôler les tests M-005 dans `scripts/test.ps1` et vérifier `scripts/lint.ps1`.
+- Implémentation attendue: mettre à jour `docs/traceability/matrix.md`, créer les signaux d'audit KA, publier les fixtures de mesure initiale, enrôler les tests M-005 dans `uv run --locked gate` et vérifier `uv run --locked gate`.
 - Invariants et garde-fous: aucun GREEN implicite; aucune métrique sans corpus/fixture identifiée; aucune donnée sensible ou texte intégral dans logs et métriques; aucune suppression de test existant pour réduire le coût de la gate.
 - Dépendances: T-001 à T-009; ADR-005; ADR-006; ADR-010; DDD-ADR-004; DDD-ADR-008.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_m005_traceability_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_m005_traceability_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_traceability.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m005): couvrir la tracabilite de projection`
 - Commit GREEN: `docs(m005): relier m005 aux gates et metriques`

@@ -97,37 +97,37 @@ Les métriques EX ne contiennent ni secret, ni prompt, ni donnée de marché com
 
 | Comportement | Invariant | Scénario BDD | Test RED | ADR | Commande |
 |---|---|---|---|---|---|
-| EX-001 - Précondition GREEN | M-010 est visible dans `master` et les validateurs amont acceptent M-011 | Given M-010 fusionné, When la précondition M-011 est validée, Then les gates ont une preuve exploitable | T-001 | ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m011_precondition.ps1 |
-| EX-002 - Spécification exécutable | Les termes EX sont publiés avant le code | Given la mission EX, When la spec est lue, Then les invariants et tests sont nommés | T-002 | ADR-010; DDD-ADR-009; DDD-ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m011_specification.ps1 |
-| EX-003 - Planification depuis snapshot | `Experiment` ne lit jamais une stratégie mutable | Given un `StrategySnapshot`, When EX planifie, Then `PLANNED` est append-only | T-003 | DDD-ADR-009; DDD-ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m011\validate_experiment_planning_acceptance.ps1 |
-| EX-004 - Données point-in-time | `DataSnapshotRef` refuse `/latest` | Given une expérience `PLANNED`, When les données sont attachées, Then le snapshot est figé | T-004 | DDD-ADR-009 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m011\validate_data_snapshot_freeze_acceptance.ps1 |
-| EX-005 - Coûts et environnement figés | Aucun coût ou environnement implicite | Given données figées, When coûts et environnement sont attachés, Then `FrozenInputs` est complet | T-005 | DDD-ADR-009 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m011\validate_cost_environment_freeze_acceptance.ps1 |
-| EX-006 - Démarrage verrouillé | `PLANNED -> SCHEDULED -> RUNNING` et `SCHEDULED -> CANCELLED` sont explicites | Given entrées verrouillées, When l'expérience démarre ou s'annule, Then chaque transition est événementée | T-006 | DDD-ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m011\validate_experiment_start_lock_acceptance.ps1 |
-| EX-007 - Backtest déterministe | Les mêmes entrées produisent les mêmes métriques | Given `RUNNING`, When le moteur s'exécute deux fois, Then métriques et contrôles minimaux sont stables | T-007 | DDD-ADR-009 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m011\validate_deterministic_backtest_acceptance.ps1 |
-| EX-008 - Résultat immuable | `ExperimentResultRepository` est append-only | Given un résultat, When il est enregistré, Then sa réécriture est refusée | T-008 | DDD-ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m011\validate_experiment_result_acceptance.ps1 |
-| EX-009 - Conservation négative | Les échecs et résultats défavorables restent consultables | Given un échec, When EX le conserve, Then la suppression est interdite | T-009 | DDD-ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m011\validate_experiment_retention_acceptance.ps1 |
-| EX-010 - Répétition et comparaison | `RepeatExperiment` crée une nouvelle expérience et `CompareExperiments` ne mute rien | Given un résultat `COMPLETED`, When une répétition est demandée, Then `ExperimentComparisonCompleted` compare sans écraser | T-010 | DDD-ADR-009; DDD-ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m011\validate_experiment_reproducibility_acceptance.ps1 |
-| EX-011 - Contrat HTTP | Les endpoints publics ne fuient aucun stockage interne | Given une requête publique, When EX répond, Then le statut et les erreurs sont stables | T-011 | ADR-010; DDD-ADR-001 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m011\validate_experiment_http_contract_acceptance.ps1 |
-| EX-012 - Traçabilité et métriques | Toutes les exigences, métriques et gates M-011 sont reliées | Given M-011 livré, When les gates tournent, Then la matrice couvre tests, code et métriques | T-012 | ADR-010; DDD-ADR-008 | powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m011_traceability.ps1 |
+| EX-001 - Précondition GREEN | M-010 est visible dans `master` et les validateurs amont acceptent M-011 | Given M-010 fusionné, When la précondition M-011 est validée, Then les gates ont une preuve exploitable | T-001 | ADR-010 | uv run --locked gate
+| EX-002 - Spécification exécutable | Les termes EX sont publiés avant le code | Given la mission EX, When la spec est lue, Then les invariants et tests sont nommés | T-002 | ADR-010; DDD-ADR-009; DDD-ADR-010 | uv run --locked gate
+| EX-003 - Planification depuis snapshot | `Experiment` ne lit jamais une stratégie mutable | Given un `StrategySnapshot`, When EX planifie, Then `PLANNED` est append-only | T-003 | DDD-ADR-009; DDD-ADR-010 | uv run --locked gate
+| EX-004 - Données point-in-time | `DataSnapshotRef` refuse `/latest` | Given une expérience `PLANNED`, When les données sont attachées, Then le snapshot est figé | T-004 | DDD-ADR-009 | uv run --locked gate
+| EX-005 - Coûts et environnement figés | Aucun coût ou environnement implicite | Given données figées, When coûts et environnement sont attachés, Then `FrozenInputs` est complet | T-005 | DDD-ADR-009 | uv run --locked gate
+| EX-006 - Démarrage verrouillé | `PLANNED -> SCHEDULED -> RUNNING` et `SCHEDULED -> CANCELLED` sont explicites | Given entrées verrouillées, When l'expérience démarre ou s'annule, Then chaque transition est événementée | T-006 | DDD-ADR-010 | uv run --locked gate
+| EX-007 - Backtest déterministe | Les mêmes entrées produisent les mêmes métriques | Given `RUNNING`, When le moteur s'exécute deux fois, Then métriques et contrôles minimaux sont stables | T-007 | DDD-ADR-009 | uv run --locked gate
+| EX-008 - Résultat immuable | `ExperimentResultRepository` est append-only | Given un résultat, When il est enregistré, Then sa réécriture est refusée | T-008 | DDD-ADR-010 | uv run --locked gate
+| EX-009 - Conservation négative | Les échecs et résultats défavorables restent consultables | Given un échec, When EX le conserve, Then la suppression est interdite | T-009 | DDD-ADR-010 | uv run --locked gate
+| EX-010 - Répétition et comparaison | `RepeatExperiment` crée une nouvelle expérience et `CompareExperiments` ne mute rien | Given un résultat `COMPLETED`, When une répétition est demandée, Then `ExperimentComparisonCompleted` compare sans écraser | T-010 | DDD-ADR-009; DDD-ADR-010 | uv run --locked gate
+| EX-011 - Contrat HTTP | Les endpoints publics ne fuient aucun stockage interne | Given une requête publique, When EX répond, Then le statut et les erreurs sont stables | T-011 | ADR-010; DDD-ADR-001 | uv run --locked gate
+| EX-012 - Traçabilité et métriques | Toutes les exigences, métriques et gates M-011 sont reliées | Given M-011 livré, When les gates tournent, Then la matrice couvre tests, code et métriques | T-012 | ADR-010; DDD-ADR-008 | uv run --locked gate
 
 ## Commandes de validation
 
-- powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m011\validate_m011_precondition_acceptance.ps1
-- powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m011\validate_m011_specification_acceptance.ps1
-- powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m011\validate_experiment_planning_acceptance.ps1
-- powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m011\validate_data_snapshot_freeze_acceptance.ps1
-- powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m011\validate_cost_environment_freeze_acceptance.ps1
-- powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m011\validate_experiment_start_lock_acceptance.ps1
-- powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m011\validate_deterministic_backtest_acceptance.ps1
-- powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m011\validate_experiment_result_acceptance.ps1
-- powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m011\validate_experiment_retention_acceptance.ps1
-- powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m011\validate_experiment_reproducibility_acceptance.ps1
-- powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m011\validate_experiment_http_contract_acceptance.ps1
-- powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m011\validate_m011_traceability_acceptance.ps1
-- powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m011_specification.ps1
-- powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m011_traceability.ps1
-- powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1
-- powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1
+- uv run --locked gate
+- uv run --locked gate
+- uv run --locked gate
+- uv run --locked gate
+- uv run --locked gate
+- uv run --locked gate
+- uv run --locked gate
+- uv run --locked gate
+- uv run --locked gate
+- uv run --locked gate
+- uv run --locked gate
+- uv run --locked gate
+- uv run --locked gate
+- uv run --locked gate
+- uv run --locked gate
+- uv run --locked gate
 
 ## Exclusions M-011
 

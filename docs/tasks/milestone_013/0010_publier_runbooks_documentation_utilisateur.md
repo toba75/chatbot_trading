@@ -27,11 +27,11 @@
   - Given la V1 possède des gates, sauvegardes, monitoring et décisions d'écarts.
   - When l'utilisateur suit les runbooks et la documentation V1.
   - Then chaque action critique référence une commande vérifiée, expose les statuts attendus et ne propose aucun fallback silencieux.
-- Tests d'acceptation à écrire: `tests/m013/validate_runbooks_user_docs_acceptance.ps1`, qui échoue si un runbook critique manque, si une commande référencée n'existe pas, si un écart V1 non accepté est absent, si une procédure expose Spark publiquement, si une sauvegarde n'est pas reliée au drill ou si une promesse de rentabilité apparaît.
-- Tests unitaires à écrire: tests de `scripts/validate_m013_runbooks.ps1` pour document absent, commande absente, secret détecté, fallback textuel, procédure destructive sans précondition, écart non mentionné, statut public absent, runbook panne Spark absent et lien de preuve cassé.
+- Tests d'acceptation à écrire: `uv run --locked gate`, qui échoue si un runbook critique manque, si une commande référencée n'existe pas, si un écart V1 non accepté est absent, si une procédure expose Spark publiquement, si une sauvegarde n'est pas reliée au drill ou si une promesse de rentabilité apparaît.
+- Tests unitaires à écrire: tests de `uv run --locked gate` pour document absent, commande absente, secret détecté, fallback textuel, procédure destructive sans précondition, écart non mentionné, statut public absent, runbook panne Spark absent et lien de preuve cassé.
 - Implémentation attendue: créer les runbooks sous `docs/runbooks/`, créer ou compléter la documentation utilisateur V1, publier `docs/governance/m013_documentation_index.md`, créer le validateur documentaire M-013 et relier les documents à la traçabilité.
 - Invariants et garde-fous: aucun secret; aucune commande destructive sans garde-fou; aucun fallback; aucune promesse financière; aucun service interne publié; aucune limitation V1 cachée.
 - Dépendances: T-009; `docs/governance/m013_security_audit.md`; `docs/governance/m013_backup_restore_drill.md`; `docs/governance/m013_v1_gap_decisions.md`; `docs/governance/m013_local_monitoring.md`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_runbooks_user_docs_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_runbooks_user_docs_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_runbooks.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m013): couvrir runbooks documentation v1`
 - Commit GREEN: `docs(m013): publier runbooks documentation v1`

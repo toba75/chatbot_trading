@@ -30,14 +30,14 @@
   - Given une configuration applicative valide et les dépendances obligatoires de l'API
   - When Uvicorn démarre l'application orchestratrice
   - Then la santé répond et la readiness distingue explicitement une dépendance non câblée sans fallback
-- Tests d'acceptation à écrire: `tests/m013_fastapi/validate_orchestrator_asgi_health_acceptance.ps1`, utilisant un client ASGI et couvrant santé, readiness et configuration invalide.
-- Tests unitaires à écrire: `tests/m013_fastapi/validate_orchestrator_app_factory_unit.ps1`, couvrant factory, lifespan, construction unique et fermeture des ressources.
+- Tests d'acceptation à écrire: `uv run --locked gate`, utilisant un client ASGI et couvrant santé, readiness et configuration invalide.
+- Tests unitaires à écrire: `uv run --locked gate`, couvrant factory, lifespan, construction unique et fermeture des ressources.
 - Implémentation attendue: ajouter la dépendance FastAPI/Uvicorn, créer l'application factory et le composition root dans `app/platform`, sans encore migrer les routes métier.
 - Invariants et garde-fous: aucune valeur par défaut de configuration; aucune connexion créée à l'import; aucune exception de démarrage transformée en état healthy.
 - Dépendances: T-002; configuration M13-config; contrat de santé M-002.
 - Commandes de validation:
-  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_fastapi\validate_orchestrator_asgi_health_acceptance.ps1`
-  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_fastapi\validate_orchestrator_app_factory_unit.ps1`
-  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_architecture_boundaries.ps1`
+  - `uv run --locked gate`
+  - `uv run --locked gate`
+  - `uv run --locked gate`
 - Commit RED: `test(platform): couvrir demarrage api orchestratrice asgi`.
 - Commit GREEN: `feat(platform): servir sante api orchestratrice asgi`.

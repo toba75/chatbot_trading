@@ -27,11 +27,11 @@
   - Given des chunks éligibles avec métadonnées et profil d'encodage explicite.
   - When KA encode la projection.
   - Then chaque chunk possède un résultat dense et sparse versionné ou la projection échoue avec un code explicite.
-- Tests d'acceptation à écrire: `tests/m005/validate_projection_encoding_acceptance.ps1`, couvrant encodage dense+sparse, version obligatoire, refus d'encodage partiel et absence d'appel Spark.
+- Tests d'acceptation à écrire: `uv run --locked gate`, couvrant encodage dense+sparse, version obligatoire, refus d'encodage partiel et absence d'appel Spark.
 - Tests unitaires à écrire: tests de ports encodeurs, résultat d'encodage, erreurs `DENSE_ENCODING_FAILED`, `SPARSE_ENCODING_FAILED`, version manquante et empreinte de build.
 - Implémentation attendue: créer les ports d'encodage KA et un orchestrateur d'encodage testable avec doubles déterministes.
 - Invariants et garde-fous: pas de fallback dense vers sparse ni sparse vers dense; pas de valeur de modèle par défaut; pas de stockage de texte documentaire complet dans les logs d'encodage.
 - Dépendances: T-005; ADR-005; ADR-007; ADR-009; DDD-ADR-004.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_projection_encoding_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_projection_encoding_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_network_boundary.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m005): couvrir l encodage dense sparse`
 - Commit GREEN: `feat(m005): encoder la projection dense sparse`

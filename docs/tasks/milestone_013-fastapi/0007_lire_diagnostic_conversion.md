@@ -31,14 +31,14 @@
   - Given des documents sont à des étapes différentes du traitement SP
   - When le client liste le corpus ou ouvre les sorties d'un document
   - Then chaque statut, manifeste, diagnostic de page, route, QA et version canonique disponibles sont rendus sans champ interne ni état synthétique
-- Tests d'acceptation à écrire: `tests/m013_fastapi/validate_document_read_models_acceptance.ps1`, couvrant source seule, diagnostic demandé, routage, conversion acceptée et rejetée.
-- Tests unitaires à écrire: `tests/m013_fastapi/validate_document_queries_unit.ps1`, couvrant projection des états, ordre des pages, nullabilité explicite et erreurs `SOURCE_NOT_FOUND`.
+- Tests d'acceptation à écrire: `uv run --locked gate`, couvrant source seule, diagnostic demandé, routage, conversion acceptée et rejetée.
+- Tests unitaires à écrire: `uv run --locked gate`, couvrant projection des états, ordre des pages, nullabilité explicite et erreurs `SOURCE_NOT_FOUND`.
 - Implémentation attendue: créer des ports de lecture SP et un query service propriétaire; le routeur ne reçoit que des DTO publics immuables.
 - Invariants et garde-fous: `original_storage_ref`, job id, table et artefact interne interdits; `DIAGNOSTIC_NOT_REQUESTED` et `CONVERSION_NOT_REQUESTED` ne sont produits que par absence constatée dans le repository réel.
 - Dépendances: T-006; spécifications M-003/M-004; UI-003/UI-004/UI-005.
 - Commandes de validation:
-  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_fastapi\validate_document_read_models_acceptance.ps1`
-  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_fastapi\validate_document_queries_unit.ps1`
-  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_architecture_boundaries.ps1`
+  - `uv run --locked gate`
+  - `uv run --locked gate`
+  - `uv run --locked gate`
 - Commit RED: `test(sp): couvrir lectures diagnostic conversion`.
 - Commit GREEN: `feat(sp): publier lectures diagnostic conversion`.

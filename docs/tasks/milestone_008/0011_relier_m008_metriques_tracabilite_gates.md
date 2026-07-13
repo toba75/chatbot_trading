@@ -17,7 +17,7 @@
 - État GREEN/RED connu: T-001 à T-010 terminés.
 - Présence des milestones amont dans master: M-007 présent.
 - Décisions manquantes: aucune pour métriques locales; ADR requise si une solution d'observabilité durable ou une rétention de logs persistante est introduite.
-- Risques: traçabilité incomplète; fuite de messages utilisateur dans les signaux; tests M-008 non enrôlés dans `scripts/test.ps1` ou `scripts/lint.ps1`.
+- Risques: traçabilité incomplète; fuite de messages utilisateur dans les signaux; tests M-008 non enrôlés dans `uv run --locked gate` ou `uv run --locked gate`.
 
 ## Tâches
 ### T-011 - Relier M-008 aux métriques, à la traçabilité et aux gates
@@ -27,12 +27,12 @@
   - Given les comportements M-008 sont implémentés et testés.
   - When la matrice de traçabilité et les gates sont exécutées.
   - Then chaque exigence M-008 est rattachée à un test GREEN, une commande de validation et une ADR ou justification explicite.
-- Tests d'acceptation à écrire: `tests/m008/validate_m008_traceability_acceptance.ps1`, qui échoue tant que M-008 n'est pas relié à la matrice et aux gates.
+- Tests d'acceptation à écrire: `uv run --locked gate`, qui échoue tant que M-008 n'est pas relié à la matrice et aux gates.
 - Tests unitaires à écrire: tests des métriques CV pour conversations créées, tours ajoutés, questions résolues, ambiguïtés, modes sélectionnés, réponses attachées, archives, absence de message complet, absence de prompt et absence de texte documentaire.
 - Implémentation attendue: créer `app/conversation/application/traceability_metrics.py`, produire `docs/governance/m008_conversation_metrics.json`, compléter `docs/traceability/matrix.md`, enrôler toutes les validations M-008 et documenter la clôture dans `docs/tasks/milestone_008/journal.md`.
 - Invariants et garde-fous: aucun payload complet dans les métriques; aucune preuve complète ni prompt persistant; aucun comportement M-008 absent de la traçabilité; aucune gate ignorée.
-- Dépendances: T-001 à T-010; `scripts/test.ps1`; `scripts/lint.ps1`; `scripts/validate_traceability.ps1`; `scripts/validate_architecture_boundaries.ps1`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m008\validate_m008_traceability_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m008\validate_m008_traceability_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_traceability.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`; `git diff --check`.
+- Dépendances: T-001 à T-010; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `git diff --check`.
 - Commit RED: `test(m008): couvrir tracabilite metriques gates`
 - Commit GREEN: `chore(m008): relier metriques tracabilite gates`
 

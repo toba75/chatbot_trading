@@ -41,7 +41,7 @@ FORBIDDEN_EXACT_KEYS = frozenset(
 FORBIDDEN_PREFIXES = ("GEMMA_",)
 ALLOWED_SHELL_ENVIRONMENT_KEYS = frozenset({"PYTHONIOENCODING"})
 ALLOWED_SHELL_ENVIRONMENT_BY_PATH = {
-    "scripts/validate_m013_fastapi.ps1": frozenset(
+    "scripts/validate_m013_fastapi.py": frozenset(
         {
             "PATH",
             "VIRTUAL_ENV",
@@ -62,18 +62,9 @@ HISTORICAL_REGISTRY_PATHS = frozenset(
         "app/platform/security/network_boundary.py",
     }
 )
-M13_SECRET_SCANNER_PATHS = frozenset(
-    {
-        "scripts/validate_m013_acceptance.ps1",
-        "scripts/validate_m013_backup_restore.ps1",
-        "scripts/validate_m013_monitoring.ps1",
-        "scripts/validate_m013_runbooks.ps1",
-        "scripts/validate_m013_security.ps1",
-    }
-)
+M13_SECRET_SCANNER_PATHS = frozenset()
 IGNORED_EXACT_PATHS = frozenset(
     {
-        "scripts/validate_m013_config_environment.ps1",
         "scripts/validate_m013_config_environment.py",
     }
 )
@@ -83,7 +74,6 @@ CODE_PROVIDER_ENV_PATTERN = re.compile(r"(?<![$\{])\bEnv:([A-Za-z_][A-Za-z0-9_]*
 CODE_DOTNET_ENV_PATTERN = re.compile(
     r"\[Environment\]::GetEnvironmentVariable\(\s*['\"]([A-Za-z_][A-Za-z0-9_]*)['\"]\s*\)"
 )
-OST_RECURSION_GUARD_PATTERN = re.compile(r"^OST_M\d{3}_PRECONDITION_ACCEPTANCE_RUNNING$")
 COMPOSE_ENVIRONMENT_KEY_PATTERN = re.compile(r"^\s{6}([A-Za-z_][A-Za-z0-9_]*)\s*:")
 COMPOSE_ENVIRONMENT_LIST_KEY_PATTERN = re.compile(r"^\s{6}-\s*([A-Za-z_][A-Za-z0-9_]*)=")
 SERVICE_PATTERN = re.compile(r"^  ([A-Za-z0-9_.-]+):\s*$")
@@ -122,7 +112,7 @@ class EnvironmentScanner:
         if relative_path.startswith("app/"):
             return relative_path.endswith((".py", ".js", ".ts"))
         if relative_path.startswith("scripts/"):
-            return relative_path.endswith((".ps1", ".psm1", ".py", ".js", ".ts"))
+            return relative_path.endswith((".py", ".js", ".ts"))
         if relative_path.startswith("deploy/"):
             return relative_path.endswith((".yaml", ".yml", ".md"))
         if relative_path.startswith("docs/runbooks/"):
@@ -234,7 +224,6 @@ class EnvironmentScanner:
         if (
             name in ALLOWED_SHELL_ENVIRONMENT_KEYS
             or name in allowed_for_path
-            or OST_RECURSION_GUARD_PATTERN.fullmatch(name) is not None
         ):
             self.exception_count += 1
             return

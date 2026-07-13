@@ -107,10 +107,10 @@ Dans Compose, `deploy/local-compose/application.compose.yaml` est une variante v
 
 ## Commandes de validation
 
-- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_application_config_specification_acceptance.ps1`
-- `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_application_config_specification_unit.ps1`
-- `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_adr_system.ps1`
-- `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`
+- `uv run --locked gate`
+- `uv run --locked gate`
+- `uv run --locked gate`
+- `uv run --locked gate`
 
 ## Exclusions historiques T-002
 

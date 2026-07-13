@@ -32,6 +32,6 @@
 - Implémentation attendue: créer un document de définition d'achèvement transverse et un validateur strict; intégrer les critères de la section 21 sans redéfinir les ADR acceptées.
 - Invariants et garde-fous: aucun milestone ne peut être marqué terminé si la validation M-000 échoue; pas de dérogation implicite; toute exception doit être documentée comme blocage ou décision préalable.
 - Dépendances: T-001; T-004; AGENTS; section 20 et section 21 de la spécification.
-- Commandes de validation: future commande `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_definition_of_done.ps1`; puis `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1` après T-006.
+- Commandes de validation: future commande `uv run --locked gate`; puis `uv run --locked gate` après T-006.
 - Commit RED: `test(m000): couvrir la définition d'achèvement transverse`.
 - Commit GREEN: `feat(m000): publier l'achèvement transverse vérifiable`.

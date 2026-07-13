@@ -27,11 +27,11 @@
   - Given une expérience `PLANNED` et des exigences de données point-in-time issues du `StrategySnapshot`.
   - When EX attache un snapshot de données résolvable.
   - Then l'expérience conserve `DataSnapshotId`, période, univers, fréquence et hash, et refuse toute référence mutable ou donnée postérieure à la tranche déclarée.
-- Tests d'acceptation à écrire: `tests/m011/validate_data_snapshot_freeze_acceptance.ps1`, qui échoue tant qu'une expérience accepte `/latest`, une donnée non résolvable, une période absente, un hash absent, une fréquence incompatible ou une tranche out-of-sample déclarée après consultation du résultat.
+- Tests d'acceptation à écrire: `uv run --locked gate`, qui échoue tant qu'une expérience accepte `/latest`, une donnée non résolvable, une période absente, un hash absent, une fréquence incompatible ou une tranche out-of-sample déclarée après consultation du résultat.
 - Tests unitaires à écrire: tests de `DataSnapshotRef`, `DataSnapshotCatalog`, `PointInTimeIntegrityPolicy` et transition d'expérience pour identifiant invalide, hash absent, période inversée, univers vide, fréquence incompatible, donnée non point-in-time et modification après démarrage.
 - Implémentation attendue: créer les objets-valeur de snapshot de données, le catalogue en mémoire strict, la politique point-in-time, l'attachement de données sur `Experiment` et les diagnostics publics sans appeler de fournisseur externe.
 - Invariants et garde-fous: aucune référence vivante; aucune date par défaut; aucune fréquence corrigée automatiquement; aucune tranche de validation absente; aucun accès direct à un stockage SD.
 - Dépendances: T-003; `StrategySnapshot.data_requirements`; DDD-ADR-009.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m011\validate_data_snapshot_freeze_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m011\validate_data_snapshot_freeze_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_architecture_boundaries.ps1 -AppRoot .\app -ContextRegistryPath .\app\context_registry.json -SpecificationPath .\docs\specs\m001_frontieres_ddd_contrats_publies.md`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m011): couvrir gel snapshot donnees`
 - Commit GREEN: `feat(m011): figer snapshot donnees point in time`

@@ -2,7 +2,7 @@
 
 ## But métier
 
-Préserver les contrats de sauvegarde, restauration et reconstruction sans dépendre de PowerShell.
+Préserver les contrats de sauvegarde, restauration et reconstruction sans dépendre de uv run --locked gate
 
 ## Scénario BDD
 

@@ -19,8 +19,8 @@
 
 - Commande vérifiée:
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_monitoring.ps1
+```console
+uv run --locked gate
 ```
 
 - Résultat attendu: le validateur contrôle `v1_health_status`, `v1_error_total`, `v1_latency_ms`, `spark_inference_availability`, `backup_restore_result`, `v1_gap_status`, `network_security_violation_total` et le profil CPU/GPU/I/O.

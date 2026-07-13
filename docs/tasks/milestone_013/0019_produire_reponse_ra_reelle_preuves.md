@@ -32,11 +32,11 @@
   - Given une question annotée possède des preuves attendues dans le corpus réel.
   - When RA répond à la question.
   - Then la réponse est supportée, partiellement supportée, conflictuelle ou abstinente selon les preuves réelles, avec citations ouvrables.
-- Tests d'acceptation à écrire: `tests/m013/validate_real_verified_answer_acceptance.ps1`.
+- Tests d'acceptation à écrire: `uv run --locked gate`.
 - Tests unitaires à écrire: assertion non supportée, citation absente, citation non ouvrable, obligation de recherche manquante, contradiction ignorée, abstention attendue non produite, réponse LLM publiée malgré échec de preuve.
 - Implémentation attendue: orchestrer RA avec KA réel, EG réel et `llm-gateway` réel pour la génération, puis vérifier les assertions avant publication.
 - Invariants et garde-fous: aucune réponse plausible sans preuve; aucun fallback vers mémoire conversationnelle; aucun statut documentaire inventé; aucune publication factuelle si Spark ou KA échoue.
 - Dépendances: T-018, `llm-gateway`, Spark, règles EG et RA existantes.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_real_verified_answer_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_task_system.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m013): couvrir reponse verifiee reelle`
 - Commit GREEN: `feat(m013): produire reponse reelle citee`

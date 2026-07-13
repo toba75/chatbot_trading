@@ -27,11 +27,11 @@
   - Given une page avec une sortie native et une sortie Granite qui divergent.
   - When l'adjudication d'autorité textuelle est exécutée.
   - Then une seule autorité est retenue avec justification, les sorties non retenues restent auditées et la page ambiguë bloque la publication si la politique ne peut pas trancher.
-- Tests d'acceptation à écrire: un test `tests/m004/validate_text_authority_acceptance.ps1` couvrant une page native fiable, une page Granite retenue, une divergence bloquante et l'absence de fusion silencieuse.
+- Tests d'acceptation à écrire: un test `uv run --locked gate` couvrant une page native fiable, une page Granite retenue, une divergence bloquante et l'absence de fusion silencieuse.
 - Tests unitaires à écrire: tests de `TextAuthoritySelectionPolicy`, unicité par page, justification obligatoire, conservation des candidats, refus d'autorité vide et refus de décision sans version de politique.
 - Implémentation attendue: créer le modèle `TextAuthority` et `TextAuthoritySelectionPolicy`, rattacher la décision aux sorties T-003 et préparer les erreurs métier `PAGE_AUTHORITY_MISSING` et `PAGE_AUTHORITY_AMBIGUOUS`.
 - Invariants et garde-fous: exactement une autorité par page publiée; aucun candidat effacé; aucune autorité sans outil source; aucune publication si l'adjudication reste ambiguë.
 - Dépendances: T-003; ADR-004; ADR-001; `PageRoute`; sorties de conversion pagewise.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m004\validate_text_authority_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m004\validate_text_authority_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m004): couvrir l autorite textuelle par page`.
 - Commit GREEN: `feat(m004): adjuger l autorite textuelle par page`.

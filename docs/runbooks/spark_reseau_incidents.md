@@ -20,9 +20,9 @@
 - Précondition: exécuter depuis la racine du dépôt avec la configuration locale versionnée.
 - Commande vérifiée:
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_security.ps1 -ApplicationConfigPath .\config\application.yaml
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_network_boundary.ps1 -ApplicationConfigPath .\config\application.yaml
+```console
+uv run --locked gate
+uv run --locked gate
 ```
 
 - Résultat attendu: seul `llm-gateway -> spark-inference` est autorisé, `services.llm_gateway.auth_mode=none`, `services.llm_gateway.tls_mode=disabled`, `services.llm_gateway.spark_endpoint_url`, `models.llm.model_revision` et `models.llm.runtime_version` sont explicites dans `config/application.yaml`, PostgreSQL, Qdrant, workers et Spark ne sont pas publiés.
@@ -33,8 +33,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_network_b
 
 - Commande vérifiée:
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_spark_failures.ps1
+```console
+uv run --locked gate
 ```
 
 - Résultat attendu: les statuts publics suivants restent visibles: `LLM_UNAVAILABLE`, `LLM_FIRST_TOKEN_TIMEOUT`, `LLM_TLS_CERTIFICATE_INVALID`, `LLM_AUTHENTICATION_FAILED`, `LLM_PARTIAL_OUTPUT`, `LLM_CIRCUIT_OPEN`, `LLM_RECOVERED`.

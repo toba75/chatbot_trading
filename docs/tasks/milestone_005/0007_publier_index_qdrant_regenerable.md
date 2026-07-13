@@ -27,11 +27,11 @@
   - Given une projection encodée avec tous ses chunks attendus.
   - When KA publie l'index technique.
   - Then la projection devient `SEARCHABLE` et publie `KnowledgeProjectionBecameSearchable` seulement si l'index contient tous les points versionnés et peut être reconstruit depuis les mêmes entrées.
-- Tests d'acceptation à écrire: `tests/m005/validate_qdrant_projection_acceptance.ps1`, couvrant publication complète, reconstruction, suppression sans perte canonique, événement `KnowledgeProjectionBecameSearchable`, événement `KnowledgeProjectionFailed` sur échec et absence d'accès direct RA.
+- Tests d'acceptation à écrire: `uv run --locked gate`, couvrant publication complète, reconstruction, suppression sans perte canonique, événement `KnowledgeProjectionBecameSearchable`, événement `KnowledgeProjectionFailed` sur échec et absence d'accès direct RA.
 - Tests unitaires à écrire: tests de `VectorIndex`, adaptateur en mémoire, transitions `BUILDING` vers `SEARCHABLE`, `FAILED`, `STALE` et `RETIRED`, détection d'index partiel, payload public des événements KA et idempotence outbox.
 - Implémentation attendue: créer l'adaptateur Qdrant derrière `VectorIndex`, un service de publication d'index, le producteur d'événements KA et les règles d'import interdisant RA/EG vers Qdrant.
 - Invariants et garde-fous: aucun statut `SEARCHABLE` partiel; aucun événement de succès avant publication complète; aucun client Qdrant dans RA ou EG; aucune donnée de claim dans la collection documentaire; aucun fallback vers une recherche en mémoire non déclarée.
-- Dépendances: T-006; ADR-005; DDD-ADR-004; DDD-ADR-008; `scripts/validate_architecture_boundaries.ps1`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_qdrant_projection_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_qdrant_projection_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_knowledge_projection_events_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_architecture_boundaries.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Dépendances: T-006; ADR-005; DDD-ADR-004; DDD-ADR-008; `uv run --locked gate`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m005): couvrir l index qdrant regenerable`
 - Commit GREEN: `feat(m005): publier l index qdrant regenerable`

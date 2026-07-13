@@ -32,6 +32,6 @@
 - Implémentation attendue: créer un validateur d'architecture ou une suite de tests qui inspecte les imports Python et échoue sur les violations des règles M-001.
 - Invariants et garde-fous: aucune liste blanche non documentée; aucun import adaptateur dans `domain`; aucun cycle masqué; aucun `try/catch` qui transforme une analyse incomplète en GREEN.
 - Dépendances: T-003; T-004; T-005; T-006; T-007; T-008; T-009; DDD-ADR-001; ADR-011.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m001\validate_architecture_boundaries_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m001\validate_architecture_boundaries_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m001): couvrir les couplages intercontextes interdits`.
 - Commit GREEN: `feat(m001): verrouiller les frontières d'import`.

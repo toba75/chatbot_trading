@@ -27,11 +27,11 @@
   - Given un corpus personnel de test et les contextes M-001 à M-012 livrés.
   - When la suite de régression V1 rejoue les parcours de bout en bout.
   - Then chaque critère V1 possède un verdict GREEN ou un écart non accepté relié au rapport V1.
-- Tests d'acceptation à écrire: `tests/m013/validate_v1_regression_suite_acceptance.ps1`, qui échoue si un critère V1 n'a ni test ni écart, si un parcours utilise un contrat interne, si une citation n'est pas ouvrable, si un résultat négatif disparaît ou si une décision V1 n'est pas reliée à la régression.
-- Tests unitaires à écrire: tests de `scripts/validate_m013_regression.ps1` pour critère non couvert, commande manquante, fixture non déclarée, dépendance directe à un stockage interne, résultat sans preuve, écart non relié et sortie contenant un payload sensible.
-- Implémentation attendue: créer les tests de régression M-013, créer `scripts/validate_m013_regression.ps1`, définir les fixtures de parcours V1, relier les tests à `docs/traceability/matrix.md`, enrôler la suite dans `scripts/test.ps1` et documenter les limites dans le journal M-013.
+- Tests d'acceptation à écrire: `uv run --locked gate`, qui échoue si un critère V1 n'a ni test ni écart, si un parcours utilise un contrat interne, si une citation n'est pas ouvrable, si un résultat négatif disparaît ou si une décision V1 n'est pas reliée à la régression.
+- Tests unitaires à écrire: tests de `uv run --locked gate` pour critère non couvert, commande manquante, fixture non déclarée, dépendance directe à un stockage interne, résultat sans preuve, écart non relié et sortie contenant un payload sensible.
+- Implémentation attendue: créer les tests de régression M-013, créer `uv run --locked gate`, définir les fixtures de parcours V1, relier les tests à `docs/traceability/matrix.md`, enrôler la suite dans `uv run --locked gate` et documenter les limites dans le journal M-013.
 - Invariants et garde-fous: aucun contrat interne consommé par la suite; aucune mutation d'artefact immuable; aucun payload documentaire complet, prompt complet, secret ou donnée de marché complète dans les sorties; aucune réussite si un critère V1 reste orphelin.
-- Dépendances: T-003; tous les contextes M-001 à M-012; `docs/traceability/matrix.md`; `scripts/test.ps1`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_v1_regression_suite_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_v1_regression_suite_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_regression.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Dépendances: T-003; tous les contextes M-001 à M-012; `docs/traceability/matrix.md`; `uv run --locked gate`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m013): couvrir regression v1`
 - Commit GREEN: `test(m013): construire regression v1`

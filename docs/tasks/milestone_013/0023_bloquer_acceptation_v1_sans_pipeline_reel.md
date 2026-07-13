@@ -3,7 +3,7 @@
 ## Milestone
 
 - Nom: M-013 - Durcissement et acceptation V1, tranche `M13-remediation`.
-- Source: `docs/specs/plan_remediation_m13.md`, `docs/governance/m013_v1_acceptance_report.md`, `scripts/validate_m013_reality.ps1` et gates V1.
+- Source: `docs/specs/plan_remediation_m13.md`, `docs/governance/m013_v1_acceptance_report.md`, `uv run --locked gate` et gates V1.
 - Objectif métier: empêcher l'acceptation V1 si seul le smoke test LLM est GREEN et si le pipeline PDF réel n'a pas été exécuté.
 
 ## Contexte DDD
@@ -17,10 +17,10 @@
 
 ## Blocages Ou Préconditions
 
-- État GREEN/RED connu: `scripts/validate_m013_reality.ps1` valide le chemin LLM live; `scripts/validate_m013_real_pipeline.ps1` n'existe pas encore comme gate produit réel.
+- État GREEN/RED connu: `uv run --locked gate` valide le chemin LLM live; `uv run --locked gate` n'existe pas encore comme gate produit réel.
 - Présence des milestones amont dans master: M-003 à M-013 sont présents dans `master`; cette tâche clôt la tranche M13-remediation dans le dossier M-013 existant.
 - Décisions manquantes: créer une ADR seulement si le critère d'acceptation V1 ou le périmètre de gate durable change au-delà de la remédiation décrite.
-- Risques: gate final contournable; `scripts/test.ps1` GREEN sans pipeline réel; rapport V1 non mis à jour; confusion entre indisponibilité d'environnement et succès logiciel.
+- Risques: gate final contournable; `uv run --locked gate` GREEN sans pipeline réel; rapport V1 non mis à jour; confusion entre indisponibilité d'environnement et succès logiciel.
 
 ## Tâches
 
@@ -32,11 +32,11 @@
   - Given les smoke tests techniques sont GREEN mais le pipeline PDF réel n'a pas été exécuté.
   - When le gate M-013 d'acceptation est lancé.
   - Then le gate échoue avec un diagnostic explicite.
-- Tests d'acceptation à écrire: `tests/m013/validate_real_pipeline_gate_acceptance.ps1`.
+- Tests d'acceptation à écrire: `uv run --locked gate`.
 - Tests unitaires à écrire: script M-013 sans gate E2E, rapport V1 sans run réel, matrice de traçabilité sans preuve E2E, smoke test utilisé comme preuve produit, prérequis absent traité comme succès.
-- Implémentation attendue: faire appeler les validations T-015 à T-022 par `scripts/validate_m013_reality.ps1` ou créer `scripts/validate_m013_real_pipeline.ps1`, puis enrôler le gate dans `scripts/test.ps1`, `scripts/lint.ps1` si pertinent, la traçabilité et le rapport V1.
+- Implémentation attendue: faire appeler les validations T-015 à T-022 par `uv run --locked gate` ou créer `uv run --locked gate`, puis enrôler le gate dans `uv run --locked gate`, `uv run --locked gate` si pertinent, la traçabilité et le rapport V1.
 - Invariants et garde-fous: aucun fallback vers le validateur LLM seul; aucun opt-out silencieux; tout prérequis absent échoue avec erreur nommée; aucun rapport V1 accepté sans preuve réelle.
-- Dépendances: T-022, `scripts/validate_m013_reality.ps1`, `scripts/test.ps1`, `scripts/lint.ps1`, `docs/traceability/matrix.md`, rapport V1.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_real_pipeline.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_real_pipeline_gate_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Dépendances: T-022, `uv run --locked gate`, `uv run --locked gate`, `uv run --locked gate`, `docs/traceability/matrix.md`, rapport V1.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m013): rendre pipeline reel bloquant`
 - Commit GREEN: `chore(m013): bloquer acceptation sans pipeline reel`

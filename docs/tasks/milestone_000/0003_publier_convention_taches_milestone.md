@@ -32,6 +32,6 @@
 - Implémentation attendue: créer la documentation de convention des tâches et un validateur strict du dossier `docs/tasks`; intégrer cette validation à la future commande de test M-000.
 - Invariants et garde-fous: pas de dossier de milestone aval si ses dépendances amont manquent dans `master`; pas de tâche sans validation; pas de correction silencieuse des slugs ou numéros.
 - Dépendances: T-001; plan de milestones; règles AGENTS BDD/TDD; structure `docs/tasks`.
-- Commandes de validation: future commande `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_task_system.ps1`; puis `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1` après T-006.
+- Commandes de validation: future commande `uv run --locked gate`; puis `uv run --locked gate` après T-006.
 - Commit RED: `test(m000): couvrir la convention des tâches de milestone`.
 - Commit GREEN: `feat(m000): publier la convention contrôlée des tâches`.

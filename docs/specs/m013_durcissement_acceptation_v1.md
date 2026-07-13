@@ -57,14 +57,14 @@ Aucune valeur de seuil non sourcée n'est créée par T-002. Les seuils et promo
 
 | Contexte | Statut M-012 | Décision M-013 | Commande de preuve | Blocage d'acceptation |
 |---|---|---|---|---|
-| SP | différé | Reprise par V1AcceptanceGate avec preuve ou acceptation explicite. | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m012\validate_document_quality_calibration_acceptance.ps1 | Bloque si le report n'est pas accepté dans V1AcceptanceReport. |
-| KA | différé | Reprise par V1AcceptanceGate avec preuve ou acceptation explicite. | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m012\validate_knowledge_search_benchmark_acceptance.ps1 | Bloque si le report n'est pas accepté dans V1AcceptanceReport. |
-| EG | satisfait | Conservé comme preuve d'acceptation. | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m012\validate_verified_answer_benchmark_acceptance.ps1 | Ne bloque pas. |
-| RA | différé | Reprise par V1AcceptanceGate avec preuve ou acceptation explicite. | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m012\validate_verified_answer_benchmark_acceptance.ps1 | Bloque si le report n'est pas accepté dans V1AcceptanceReport. |
-| CV | satisfait | Conservé comme preuve d'acceptation. | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m012\validate_calibration_decisions_acceptance.ps1 | Ne bloque pas. |
-| SD | bloquant | Correction obligatoire avant acceptation V1. | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m012\validate_strategy_backtest_benchmark_acceptance.ps1 | Bloque tant que le statut reste bloquant. |
-| LLM | bloquant | Correction obligatoire avant acceptation V1. | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m012\validate_llm_benchmark_real_path_acceptance.ps1 | Bloque tant que le statut reste bloquant. |
-| EX | satisfait | Conservé comme preuve d'acceptation. | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m012\validate_strategy_backtest_benchmark_acceptance.ps1 | Ne bloque pas. |
+| SP | différé | Reprise par V1AcceptanceGate avec preuve ou acceptation explicite. | uv run --locked gate
+| KA | différé | Reprise par V1AcceptanceGate avec preuve ou acceptation explicite. | uv run --locked gate
+| EG | satisfait | Conservé comme preuve d'acceptation. | uv run --locked gate
+| RA | différé | Reprise par V1AcceptanceGate avec preuve ou acceptation explicite. | uv run --locked gate
+| CV | satisfait | Conservé comme preuve d'acceptation. | uv run --locked gate
+| SD | bloquant | Correction obligatoire avant acceptation V1. | uv run --locked gate
+| LLM | bloquant | Correction obligatoire avant acceptation V1. | uv run --locked gate
+| EX | satisfait | Conservé comme preuve d'acceptation. | uv run --locked gate
 
 ## Objets de gouvernance M-013
 
@@ -193,7 +193,7 @@ M-013 contrôle les anti-patterns de la section 23, notamment:
 
 Chaque anti-pattern interdit doit être couvert par un test, une validation statique ou une revue documentée avant `V1AcceptanceReport`.
 
-La preuve T-011 est `docs/governance/m013_antipattern_review.md`, contrôlée par `scripts/validate_m013_antipatterns.ps1` et par `tests/m013/validate_v1_antipatterns_acceptance.ps1`. Les questions ouvertes de la section 23 restent ouvertes contrôlées tant qu'une ADR ne les résout pas explicitement.
+La preuve T-011 est `docs/governance/m013_antipattern_review.md`, contrôlée par `uv run --locked gate` et par `gate_tests/ported/tests/m013/validate_v1_antipatterns_acceptance.py`. Les questions ouvertes de la section 23 restent ouvertes contrôlées tant qu'une ADR ne les résout pas explicitement.
 
 ## Rapport d'acceptation V1
 
@@ -214,26 +214,26 @@ Le verdict final est refusé si un écart bloquant existe, si un écart différ�
 
 | Comportement | Invariant | Scénario BDD | Test RED | ADR | Commande |
 |---|---|---|---|---|---|
-| V1-001 - Spécification exécutable M-013 | La spécification nomme mission, critères V1, écarts M-012, sécurité, sauvegarde, restauration, rétention, monitoring, runbooks, documentation, anti-patterns, rapport d'acceptation, ADR et commandes. | Given le système complet a été mesuré par M-012 et les critères V1 sont publiés; When la spécification M-013 est publiée; Then chaque comportement de durcissement nomme invariant, scénario BDD, test RED, ADR et commande. | T-002 | ADR-007; ADR-008; ADR-009; ADR-010; DDD-ADR-006; DDD-ADR-010; DDD-ADR-011 | powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_specification.ps1 |
-| V1-002 - Contrôle des écarts V1 M-012 | Chaque écart M-012 a un statut exploitable et les bloquants interdisent l'acceptation. | Given le rapport d'écarts M-012 est publié; When V1AcceptanceGate lit les écarts; Then tout écart bloquant ou non accepté bloque le verdict. | T-003 | ADR-010; DDD-ADR-010; DDD-ADR-011 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_v1_gap_decisions_acceptance.ps1 |
-| V1-003 - Suite de régression V1 | La RegressionSuite couvre les comportements livrés sans masquer les tests scientifiques RED. | Given les comportements M-000 à M-012 sont livrés; When la suite de régression V1 est exécutée; Then les tests logiciels passent et les écarts scientifiques restent visibles. | T-004 | ADR-010; DDD-ADR-011 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_v1_regression_suite_acceptance.ps1 |
-| V1-004 - Audit réseau et sécurité Spark | Le Spark est accessible uniquement depuis llm-gateway et aucune donnée métier durable n'y réside. | Given docker-local et spark-inference sont configurés; When SecurityAuditReport est produit; Then aucun port public, accès navigateur direct ou stockage métier Spark n'est accepté. | T-005 | ADR-007; ADR-008; ADR-009 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_m013_network_security_acceptance.ps1 |
-| V1-005 - Pannes Spark sans fallback | Une panne Spark produit un état explicite sans corruption d'état. | Given une demande nécessitant Gemma; When le Spark est indisponible ou le flux est coupé; Then LLM_UNAVAILABLE ou l'erreur TLS explicite est publiée sans fallback silencieux. | T-006 | ADR-008; ADR-009; DDD-ADR-006 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_spark_failure_acceptance.ps1 |
-| V1-006 - Sauvegarde chiffrée et restauration testée | BackupRestoreDrill produit une preuve de restauration avant acceptation. | Given les données docker-local sont sauvegardées; When la restauration isolée est exécutée; Then restore_test_result prouve la restauration chiffrée et exploitable. | T-007 | ADR-009; ADR-013; DDD-ADR-004; DDD-ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_backup_restore_acceptance.ps1 |
-| V1-007 - Rétention et purge administrative | Les versions négatives et supersédées restent consultables. | Given des artefacts négatifs ou supersédés existent; When la rétention est validée; Then aucune purge implicite ne les supprime. | T-008 | DDD-ADR-010; DDD-ADR-012 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_retention_purge_acceptance.ps1 |
-| V1-008 - Monitoring local d'exploitation | LocalMonitoringProfile publie les signaux sans payload sensible. | Given la plateforme locale est exécutée; When les métriques sont collectées; Then latence, erreurs, ressources et circuit breaker sont visibles sans secrets ni contenus complets. | T-009 | ADR-008; ADR-009; ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_local_monitoring_acceptance.ps1 |
-| V1-009 - Runbooks et documentation utilisateur | Les procédures et la documentation décrivent des actions vérifiables sans fallback. | Given l'utilisateur exploite la V1 locale; When il lit runbooks et documentation; Then chaque action sensible nomme commande, résultat attendu, erreur explicite et preuve. | T-010 | ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_runbooks_user_docs_acceptance.ps1 |
-| V1-010 - Anti-patterns interdits V1 | Chaque anti-pattern interdit est testé ou revu. | Given les anti-patterns section 23 sont publiés; When la revue M-013 est exécutée; Then aucun anti-pattern interdit n'est ignoré. | T-011 | ADR-007; ADR-008; ADR-009; DDD-ADR-006; DDD-ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_v1_antipatterns_acceptance.ps1 |
-| V1-011 - Rapport d'acceptation V1 | V1AcceptanceReport référence preuves, commandes, décisions et écarts. | Given toutes les preuves M-013 sont produites; When le rapport d'acceptation est publié; Then le verdict refuse tout écart bloquant ou non accepté. | T-012 | ADR-010; DDD-ADR-010; DDD-ADR-011 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_v1_acceptance_report_acceptance.ps1 |
+| V1-001 - Spécification exécutable M-013 | La spécification nomme mission, critères V1, écarts M-012, sécurité, sauvegarde, restauration, rétention, monitoring, runbooks, documentation, anti-patterns, rapport d'acceptation, ADR et commandes. | Given le système complet a été mesuré par M-012 et les critères V1 sont publiés; When la spécification M-013 est publiée; Then chaque comportement de durcissement nomme invariant, scénario BDD, test RED, ADR et commande. | T-002 | ADR-007; ADR-008; ADR-009; ADR-010; DDD-ADR-006; DDD-ADR-010; DDD-ADR-011 | uv run --locked gate
+| V1-002 - Contrôle des écarts V1 M-012 | Chaque écart M-012 a un statut exploitable et les bloquants interdisent l'acceptation. | Given le rapport d'écarts M-012 est publié; When V1AcceptanceGate lit les écarts; Then tout écart bloquant ou non accepté bloque le verdict. | T-003 | ADR-010; DDD-ADR-010; DDD-ADR-011 | uv run --locked gate
+| V1-003 - Suite de régression V1 | La RegressionSuite couvre les comportements livrés sans masquer les tests scientifiques RED. | Given les comportements M-000 à M-012 sont livrés; When la suite de régression V1 est exécutée; Then les tests logiciels passent et les écarts scientifiques restent visibles. | T-004 | ADR-010; DDD-ADR-011 | uv run --locked gate
+| V1-004 - Audit réseau et sécurité Spark | Le Spark est accessible uniquement depuis llm-gateway et aucune donnée métier durable n'y réside. | Given docker-local et spark-inference sont configurés; When SecurityAuditReport est produit; Then aucun port public, accès navigateur direct ou stockage métier Spark n'est accepté. | T-005 | ADR-007; ADR-008; ADR-009 | uv run --locked gate
+| V1-005 - Pannes Spark sans fallback | Une panne Spark produit un état explicite sans corruption d'état. | Given une demande nécessitant Gemma; When le Spark est indisponible ou le flux est coupé; Then LLM_UNAVAILABLE ou l'erreur TLS explicite est publiée sans fallback silencieux. | T-006 | ADR-008; ADR-009; DDD-ADR-006 | uv run --locked gate
+| V1-006 - Sauvegarde chiffrée et restauration testée | BackupRestoreDrill produit une preuve de restauration avant acceptation. | Given les données docker-local sont sauvegardées; When la restauration isolée est exécutée; Then restore_test_result prouve la restauration chiffrée et exploitable. | T-007 | ADR-009; ADR-013; DDD-ADR-004; DDD-ADR-010 | uv run --locked gate
+| V1-007 - Rétention et purge administrative | Les versions négatives et supersédées restent consultables. | Given des artefacts négatifs ou supersédés existent; When la rétention est validée; Then aucune purge implicite ne les supprime. | T-008 | DDD-ADR-010; DDD-ADR-012 | uv run --locked gate
+| V1-008 - Monitoring local d'exploitation | LocalMonitoringProfile publie les signaux sans payload sensible. | Given la plateforme locale est exécutée; When les métriques sont collectées; Then latence, erreurs, ressources et circuit breaker sont visibles sans secrets ni contenus complets. | T-009 | ADR-008; ADR-009; ADR-010 | uv run --locked gate
+| V1-009 - Runbooks et documentation utilisateur | Les procédures et la documentation décrivent des actions vérifiables sans fallback. | Given l'utilisateur exploite la V1 locale; When il lit runbooks et documentation; Then chaque action sensible nomme commande, résultat attendu, erreur explicite et preuve. | T-010 | ADR-010 | uv run --locked gate
+| V1-010 - Anti-patterns interdits V1 | Chaque anti-pattern interdit est testé ou revu. | Given les anti-patterns section 23 sont publiés; When la revue M-013 est exécutée; Then aucun anti-pattern interdit n'est ignoré. | T-011 | ADR-007; ADR-008; ADR-009; DDD-ADR-006; DDD-ADR-010 | uv run --locked gate
+| V1-011 - Rapport d'acceptation V1 | V1AcceptanceReport référence preuves, commandes, décisions et écarts. | Given toutes les preuves M-013 sont produites; When le rapport d'acceptation est publié; Then le verdict refuse tout écart bloquant ou non accepté. | T-012 | ADR-010; DDD-ADR-010; DDD-ADR-011 | uv run --locked gate
 
 ## Commandes de validation
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_m013_specification_acceptance.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_m013_specification_unit.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_specification.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1
+```console
+uv run --locked gate
+uv run --locked gate
+uv run --locked gate
+uv run --locked gate
+uv run --locked gate
 ```
 
 ## Exclusions M-013

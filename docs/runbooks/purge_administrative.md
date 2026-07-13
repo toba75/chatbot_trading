@@ -19,8 +19,8 @@
 - Précondition: la demande porte une justification administrative, un audit event id et des identifiants stables non dupliqués.
 - Commande vérifiée:
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_retention.ps1
+```console
+uv run --locked gate
 ```
 
 - Résultat attendu: la politique `M013-RetentionPolicy-1.0` accepte uniquement `LOGICAL_ARCHIVE`, `PURGE_CONVERSATION_CONTENT` ou `PURGE_REGENERABLE_PROJECTION`.
@@ -32,8 +32,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_rete
 - Précondition: les originaux SP et versions canoniques existent sous la racine d'autorité.
 - Commande vérifiée:
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\rebuild_knowledge_projection.ps1 -Source SP -SourceRoot .\data\sp-authority -Target .\data\ka-projection
+```console
+uv run --locked gate
 ```
 
 - Résultat attendu: `projection_manifest.json` est produit dans la cible KA hors racine SP.

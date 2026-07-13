@@ -32,11 +32,11 @@
   - Given un exploitant local lit les runbooks après M13-config.
   - When il prépare et démarre la pile V1.
   - Then chaque commande utilise `--config`, les anciennes variables sont présentées comme entrées rejetées, et la preuve d'audit cite le fichier chargé.
-- Tests d'acceptation à écrire: `tests/m013_config/validate_config_runbooks_acceptance.ps1`, couvrant absence de `GEMMA_*` comme précondition, présence du mapping de migration, commandes `--config`, secrets hors Git et preuve d'audit.
-- Tests unitaires à écrire: `tests/m013_config/validate_config_runbooks_unit.ps1`, couvrant chaque runbook concerné, README Compose, interdiction de `env_file`, interdiction de secret en clair et cohérence des chemins.
+- Tests d'acceptation à écrire: `uv run --locked gate`, couvrant absence de `GEMMA_*` comme précondition, présence du mapping de migration, commandes `--config`, secrets hors Git et preuve d'audit.
+- Tests unitaires à écrire: `uv run --locked gate`, couvrant chaque runbook concerné, README Compose, interdiction de `env_file`, interdiction de secret en clair et cohérence des chemins.
 - Implémentation attendue: mettre à jour `docs/runbooks/exploitation_locale.md`, `docs/runbooks/spark_reseau_incidents.md`, `docs/runbooks/certificats_spark.md`, `deploy/local-compose/README.md` et publier `docs/runbooks/configuration_applicative.md` avec migration des anciennes clés vers `config/application.yaml`.
 - Invariants et garde-fous: aucun exemple ne lance un processus avec variables applicatives; les anciennes clés sont documentées seulement comme valeurs à refuser ou à migrer; aucun secret n'est versionné.
 - Dépendances: T-002; T-005; T-006; ADR-016.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_config_runbooks_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_config\validate_config_runbooks_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_runbooks.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(docs): couvrir runbooks configuration sans environnement`.
 - Commit GREEN: `docs(runbooks): publier migration application yaml`.

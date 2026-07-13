@@ -31,15 +31,15 @@
   - Given l'API orchestratrice est prête et expose les contrats documentaires raccordés
   - When l'utilisateur ouvre le corpus, ajoute un PDF, lance le diagnostic ou inspecte une étape
   - Then l'UI appelle exclusivement ces contrats et affiche leurs sorties ou leur erreur publique sans comportement alternatif
-- Tests d'acceptation à écrire: `tests/m013_fastapi/validate_ui_orchestrator_document_flow_acceptance.ps1`, couvrant le trajet HTTP réel UI/API et les états succès/erreur.
-- Tests unitaires à écrire: `tests/m013_fastapi/validate_ui_document_api_client_unit.ps1`, couvrant URL relative publique, parsing strict, absence de données internes et affichage des indisponibilités.
+- Tests d'acceptation à écrire: `uv run --locked gate`, couvrant le trajet HTTP réel UI/API et les états succès/erreur.
+- Tests unitaires à écrire: `uv run --locked gate`, couvrant URL relative publique, parsing strict, absence de données internes et affichage des indisponibilités.
 - Implémentation attendue: remplacer `build_unconnected_corpus_pdf_state` et les réponses 503 codées en dur par un client des routes `/v1/documents`; conserver le blocage explicite seulement pour une erreur réellement retournée.
 - Invariants et garde-fous: aucune importation de repository/cas d'usage dans l'UI; aucun cache métier; aucun fallback vers `data/corpus`; bouton Diagnostiquer visible seulement pour `DIAGNOSTIC_NOT_REQUESTED`.
 - Dépendances: T-006, T-007, T-008, T-009; ADR-018; UI-015.
 - Commandes de validation:
-  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_fastapi\validate_ui_orchestrator_document_flow_acceptance.ps1`
-  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_fastapi\validate_ui_document_api_client_unit.ps1`
-  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_ui_corpus_backend_connection_acceptance.ps1`
-  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_ui_pdf_viewer_layout_acceptance.ps1`
+  - `uv run --locked gate`
+  - `uv run --locked gate`
+  - `uv run --locked gate`
+  - `uv run --locked gate`
 - Commit RED: `test(ui): couvrir parcours documentaire via orchestrateur`.
 - Commit GREEN: `feat(ui): brancher corpus sur api orchestratrice`.

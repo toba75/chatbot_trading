@@ -101,13 +101,13 @@ Les relations M-001 restent gouvernées par leurs producteurs et consommateurs. 
 
 La commande sans `-Path` cible exclusivement `docs/specs/m002_plateforme_locale_sure.md`.
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m002_specification.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_platform_topology.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m002\validate_platform_topology_acceptance.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m002\validate_platform_topology_unit.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1
+```console
+uv run --locked gate
+uv run --locked gate
+uv run --locked gate
+uv run --locked gate
+uv run --locked gate
+uv run --locked gate
 ```
 
 ## Critères d'acceptation M-002

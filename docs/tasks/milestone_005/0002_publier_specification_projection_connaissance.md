@@ -27,11 +27,11 @@
   - Given une version canonique M-004 publiée.
   - When la spécification M-005 est publiée.
   - Then chaque comportement de projection et recherche nomme son invariant, son scénario BDD, son test RED, ses ADR applicables et sa commande de validation.
-- Tests d'acceptation à écrire: `tests/m005/validate_m005_specification_acceptance.ps1`, qui échoue tant que `docs/specs/m005_projection_connaissance_recherchable.md` et son validateur n'existent pas.
-- Tests unitaires à écrire: tests de `scripts/validate_m005_specification.ps1` pour sections manquantes, comportements incomplets, ADR absente, endpoint d'indexation absent, événements KA absents, `SearchTraceStore` absent, projection Qdrant traitée comme source, claim stocké dans l'index et accès RA direct à Qdrant.
-- Implémentation attendue: créer `docs/specs/m005_projection_connaissance_recherchable.md`, créer `scripts/validate_m005_specification.ps1`, enrôler la validation dans les gates et relier les exigences M-005 à la matrice de traçabilité, en couvrant explicitement `KnowledgeProjectionBecameSearchable` et la journalisation des paramètres de recherche.
+- Tests d'acceptation à écrire: `uv run --locked gate`, qui échoue tant que `docs/specs/m005_projection_connaissance_recherchable.md` et son validateur n'existent pas.
+- Tests unitaires à écrire: tests de `uv run --locked gate` pour sections manquantes, comportements incomplets, ADR absente, endpoint d'indexation absent, événements KA absents, `SearchTraceStore` absent, projection Qdrant traitée comme source, claim stocké dans l'index et accès RA direct à Qdrant.
+- Implémentation attendue: créer `docs/specs/m005_projection_connaissance_recherchable.md`, créer `uv run --locked gate`, enrôler la validation dans les gates et relier les exigences M-005 à la matrice de traçabilité, en couvrant explicitement `KnowledgeProjectionBecameSearchable` et la journalisation des paramètres de recherche.
 - Invariants et garde-fous: aucune décision structurante implicite; pas de fallback lexical ou dense silencieux; pas de seuil métier non justifié; pas de dépendance applicative publique à une collection Qdrant.
 - Dépendances: T-001; ADR-005; ADR-006; DDD-ADR-004; DDD-ADR-008; ADR-010; `docs/tasks/README.md`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_m005_specification_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m005_specification.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_traceability.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m005): couvrir la specification de projection`
 - Commit GREEN: `docs(m005): publier la specification de projection`

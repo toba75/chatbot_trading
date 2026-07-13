@@ -32,6 +32,6 @@
 - Implémentation attendue: créer le registre de topologie M-002, l'intégrer aux validateurs et documenter le mapping des services sans démarrer de runtime.
 - Invariants et garde-fous: aucun service sans hôte; aucun stockage durable sur Spark; aucune valeur de placement par défaut; aucune correction automatique d'un service mal placé.
 - Dépendances: T-002; ADR-007; ADR-009; critères v4.1 sur `docker-local` et `spark-inference`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m002\validate_platform_topology_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m002\validate_platform_topology_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m002): couvrir la topologie docker spark`.
 - Commit GREEN: `feat(m002): déclarer la topologie docker spark`.

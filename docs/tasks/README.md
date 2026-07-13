@@ -1,6 +1,6 @@
 # Convention des tâches de milestone
 
-Ce document publie la convention exécutable des tâches de milestone. Il complète les règles de création détaillées du plan d'implémentation v4.1 et sert de source humaine au validateur `scripts/validate_task_system.ps1`.
+Ce document publie la convention exécutable des tâches de milestone. Il complète les règles de création détaillées du plan d'implémentation v4.1 et sert de source humaine au validateur `uv run --locked gate`.
 
 ## Chemin canonique
 

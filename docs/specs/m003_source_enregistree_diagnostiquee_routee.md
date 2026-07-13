@@ -83,14 +83,14 @@ M-003 ne publie aucune version canonique et ne décide pas l'autorité textuelle
 
 | Comportement | Invariant | Scénario BDD | Test RED | ADR | Commande |
 |---|---|---|---|---|---|
-| SP-001 - Enregistrement immuable | L'original reste immuable et l'empreinte stable identifie la source. | Given un PDF original ajouté; When SP enregistre la source; Then l'original et son empreinte stable sont conservés sans modification. | T-003 | DDD-ADR-003 | powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m003_specification.ps1 |
-| SP-002 - Manifeste complet | Chaque page est représentée dans le manifeste de pages. | Given un SourceDocument enregistré; When le manifeste est créé; Then aucune page du PDF original ne reste hors manifeste. | T-004 | DDD-ADR-003 | powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m003_specification.ps1 |
-| SP-003 - Diagnostic page par page | Chaque page possède un diagnostic avant routage. | Given un manifeste complet; When le diagnostic est demandé; Then chaque page reçoit ses signaux documentaires. | T-005 | ADR-002; ADR-003 | powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m003_specification.ps1 |
-| SP-004 - Routage explicite | La route de page est nommée et justifiée. | Given des diagnostics complets; When la politique de routage s'exécute; Then chaque page reçoit une route explicite. | T-006 | ADR-002 | powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m003_specification.ps1 |
-| SP-005 - Revue manuelle d'incertitude | Une route incertaine produit une revue manuelle explicite. | Given des signaux contradictoires; When aucune route sûre ne peut être décidée; Then SP demande une revue manuelle au lieu de changer de route implicitement. | T-006 | ADR-002; ADR-003 | powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m003_specification.ps1 |
-| SP-006 - Quarantaine non publiable | Une source en quarantaine n'est pas publiable. | Given une source en quarantaine; When une publication est demandée; Then la publication est refusée explicitement. | T-007 | DDD-ADR-003 | powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m003_specification.ps1 |
-| SP-007 - Commandes de validation | Aucun GREEN n'est implicite. | Given la spécification M-003; When les gates sont exécutés; Then le validateur M-003, test et lint sont tous nommés. | T-002 | ADR-002; ADR-003; DDD-ADR-003 | powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m003_specification.ps1 |
-| SP-008 - Contrat HTTP documentaire | Les commandes publiques exposent les statuts et erreurs client sans identifiant interne. | Given un client appelle les commandes documentaires SP; When l'enregistrement ou le diagnostic est demandé; Then les réponses HTTP nomment création, doublon, acceptation, erreurs client et erreurs métier sans fallback. | T-008 | DDD-ADR-003; ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m003_specification.ps1 |
+| SP-001 - Enregistrement immuable | L'original reste immuable et l'empreinte stable identifie la source. | Given un PDF original ajouté; When SP enregistre la source; Then l'original et son empreinte stable sont conservés sans modification. | T-003 | DDD-ADR-003 | uv run --locked gate
+| SP-002 - Manifeste complet | Chaque page est représentée dans le manifeste de pages. | Given un SourceDocument enregistré; When le manifeste est créé; Then aucune page du PDF original ne reste hors manifeste. | T-004 | DDD-ADR-003 | uv run --locked gate
+| SP-003 - Diagnostic page par page | Chaque page possède un diagnostic avant routage. | Given un manifeste complet; When le diagnostic est demandé; Then chaque page reçoit ses signaux documentaires. | T-005 | ADR-002; ADR-003 | uv run --locked gate
+| SP-004 - Routage explicite | La route de page est nommée et justifiée. | Given des diagnostics complets; When la politique de routage s'exécute; Then chaque page reçoit une route explicite. | T-006 | ADR-002 | uv run --locked gate
+| SP-005 - Revue manuelle d'incertitude | Une route incertaine produit une revue manuelle explicite. | Given des signaux contradictoires; When aucune route sûre ne peut être décidée; Then SP demande une revue manuelle au lieu de changer de route implicitement. | T-006 | ADR-002; ADR-003 | uv run --locked gate
+| SP-006 - Quarantaine non publiable | Une source en quarantaine n'est pas publiable. | Given une source en quarantaine; When une publication est demandée; Then la publication est refusée explicitement. | T-007 | DDD-ADR-003 | uv run --locked gate
+| SP-007 - Commandes de validation | Aucun GREEN n'est implicite. | Given la spécification M-003; When les gates sont exécutés; Then le validateur M-003, test et lint sont tous nommés. | T-002 | ADR-002; ADR-003; DDD-ADR-003 | uv run --locked gate
+| SP-008 - Contrat HTTP documentaire | Les commandes publiques exposent les statuts et erreurs client sans identifiant interne. | Given un client appelle les commandes documentaires SP; When l'enregistrement ou le diagnostic est demandé; Then les réponses HTTP nomment création, doublon, acceptation, erreurs client et erreurs métier sans fallback. | T-008 | DDD-ADR-003; ADR-010 | uv run --locked gate
 
 ## Contrat HTTP M-003
 
@@ -103,11 +103,11 @@ M-003 ne publie aucune version canonique et ne décide pas l'autorité textuelle
 
 La commande sans `-Path` cible exclusivement `docs/specs/m003_source_enregistree_diagnostiquee_routee.md`.
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m003\validate_m003_specification_acceptance.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m003_specification.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1
+```console
+uv run --locked gate
+uv run --locked gate
+uv run --locked gate
+uv run --locked gate
 ```
 
 ## Exclusions M-004

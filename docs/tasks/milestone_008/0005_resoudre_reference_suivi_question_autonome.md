@@ -27,12 +27,12 @@
   - Given une conversation portant sur le volatility targeting.
   - When l'utilisateur écrit `compare-la maintenant à Kelly`.
   - Then une question autonome mentionnant explicitement le volatility targeting et Kelly est produite avant tout appel à RA.
-- Tests d'acceptation à écrire: `tests/m008/validate_followup_question_resolution_acceptance.ps1`, qui échoue tant que le scénario volatility targeting versus Kelly ne produit pas une question autonome.
+- Tests d'acceptation à écrire: `uv run --locked gate`, qui échoue tant que le scénario volatility targeting versus Kelly ne produit pas une question autonome.
 - Tests unitaires à écrire: tests de pronoms ambigus, documents sélectionnés, mandat actif, référence vers réponse vérifiée, ambiguïté nécessitant clarification, refus de question résolue vide et absence d'appel RA avant résolution.
 - Implémentation attendue: créer `app/conversation/application/resolve_followup_question.py`, une implémentation déterministe locale de `QuestionResolver` pour les cas de test, et les événements CV associés.
 - Invariants et garde-fous: aucune question ambiguë transmise à RA; aucune résolution implicite sans justification; aucune preuve dérivée du texte historique seul.
 - Dépendances: T-004; `ConversationContextSnapshot`; `VerifiedResearchOutcome`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m008\validate_followup_question_resolution_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m008\validate_followup_question_resolution_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m008): couvrir resolution reference suivi`
 - Commit GREEN: `feat(m008): resoudre references en questions autonomes`
 

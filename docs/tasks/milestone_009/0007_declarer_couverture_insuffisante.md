@@ -27,11 +27,11 @@
   - Given un plan approfondi exige des preuves défavorables et des sources primaires.
   - When la collecte ne couvre que des sources secondaires favorables.
   - Then RA publie `INSUFFICIENT_EVIDENCE` avec les obligations manquantes au lieu de produire une conclusion supportée.
-- Tests d'acceptation à écrire: `tests/m009/validate_insufficient_deep_coverage_acceptance.ps1`, qui échoue tant que les obligations critiques manquantes ne produisent pas un statut explicite.
+- Tests d'acceptation à écrire: `uv run --locked gate`, qui échoue tant que les obligations critiques manquantes ne produisent pas un statut explicite.
 - Tests unitaires à écrire: tests de politique pour obligation critique manquante, obligation non critique qualifiée, absence de preuve défavorable, source primaire absente, donnée actuelle requise séparée, lacune dupliquée et raison publique absente.
 - Implémentation attendue: étendre la politique de couverture RA, enrichir les événements `KnowledgeGapRecorded` et `ResearchEvidenceFoundInsufficient` si nécessaire, et exposer les lacunes dans les résultats approfondis sans changer le sens de M-007.
 - Invariants et garde-fous: pas de statut supporté sans couverture; pas de fallback vers réponse simple; pas de confusion `CURRENT_DATA_REQUIRED`; pas de lacune non traçable.
 - Dépendances: T-004; T-006; `app/research_answering/domain/evidence_set.py`; `app/research_answering/domain/research_case.py`; `app/research_answering/domain/contradiction_assessment.py`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m009\validate_insufficient_deep_coverage_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m009\validate_insufficient_deep_coverage_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_current_data_abstention_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m009): couvrir couverture insuffisante`
 - Commit GREEN: `feat(m009): declarer couverture insuffisante`

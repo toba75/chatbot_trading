@@ -27,11 +27,11 @@
   - Given une requête `POST /v1/answer` contient une question autonome, un mandat et une clé d'idempotence.
   - When RA produit une réponse vérifiée, partielle, conflictuelle, insuffisante ou abstinente.
   - Then la réponse publique expose le statut documentaire, les citations ouvrables, les lacunes et la trace sans prompt ni détail de stockage.
-- Tests d'acceptation à écrire: `tests/m007/validate_answer_http_contract_acceptance.ps1`, qui échoue tant que l'endpoint RA public n'expose pas les statuts et erreurs M-007.
+- Tests d'acceptation à écrire: `uv run --locked gate`, qui échoue tant que l'endpoint RA public n'expose pas les statuts et erreurs M-007.
 - Tests unitaires à écrire: tests pour méthode ou chemin invalide, question absente, mandat absent, idempotence absente, champ interdit, contexte non autorisé, erreur `ANSWER_ASSERTION_UNSUPPORTED`, erreur `CURRENT_DATA_REQUIRED`, fuite de prompt, fuite de repository et accès direct à KA/EG/SP depuis l'adaptateur.
 - Implémentation attendue: ajouter l'adaptateur HTTP minimal RA, les DTO publics, le mapping strict des erreurs, les réponses publiques et l'enrôlement dans les tests de contrat.
 - Invariants et garde-fous: aucune logique métier dans l'adaptateur; aucun fallback en cas de handler absent; aucun corps interne publié; aucun accès direct Qdrant, repository EG ou table SP.
 - Dépendances: T-003; T-004; T-007; T-008; ADR-010; `VerifiedResearchOutcome`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_answer_http_contract_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_answer_http_contract_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_architecture_boundaries.ps1 -AppRoot .\app -ContextRegistryPath .\app\context_registry.json -SpecificationPath .\docs\specs\m001_frontieres_ddd_contrats_publies.md`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m007): couvrir contrat http reponse documentaire`
 - Commit GREEN: `feat(m007): exposer commande reponse documentaire`

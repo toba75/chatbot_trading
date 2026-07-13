@@ -158,25 +158,25 @@ Le contexte consommateur de `POST /v1/search` est fourni par le transport authen
 
 | Comportement | Invariant | Scénario BDD | Test RED | ADR | Commande |
 |---|---|---|---|---|---|
-| KA-001 - Spécification exécutable M-005 | La spécification nomme mission KA, KnowledgeProjection, états, politiques, ports, événements, API, erreurs, métriques, exclusions et garde-fous. | Given une version canonique M-004 publiée; When la spécification M-005 est publiée; Then elle est validée par commande PowerShell. | T-002 | ADR-001; ADR-005; ADR-006; ADR-007; ADR-009; ADR-010; DDD-ADR-003; DDD-ADR-004; DDD-ADR-008 | powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m005_specification.ps1 |
-| KA-002 - Projection depuis version canonique | Une projection ne naît que depuis une version canonique publiée. | Given une CanonicalSource publiée; When RequestKnowledgeProjection est accepté; Then KnowledgeProjection est REQUESTED sans mutation SP. | T-003 | DDD-ADR-004; DDD-ADR-008; ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_knowledge_projection_acceptance.ps1 |
-| KA-003 - Chunking traçable | Chaque chunk conserve SourceLocator et ContentHash. | Given un contenu canonique; When KA découpe le contenu; Then chaque chunk reste relié à la version canonique. | T-004 | ADR-001; ADR-006; DDD-ADR-003; DDD-ADR-004 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_hierarchical_chunking_acceptance.ps1 |
-| KA-004 - Métadonnées filtrables | Un filtre demandé est appliqué ou refusé explicitement. | Given une projection avec métadonnées; When SearchKnowledge reçoit des filtres; Then les filtres sont appliqués ou refusés. | T-005 | ADR-005; DDD-ADR-004 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_projection_metadata_filters_acceptance.ps1 |
-| KA-005 - Encodage dense et sparse | Les versions de modèles et paramètres sont obligatoires. | Given une projection construite; When l'encodage démarre; Then dense et sparse sont produits sans fallback silencieux. | T-006 | ADR-005; ADR-007; ADR-009; DDD-ADR-004 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_projection_encoding_acceptance.ps1 |
-| KA-006 - Index Qdrant régénérable | Qdrant reste une projection technique reconstruisible. | Given des encodages complets; When l'index est publié; Then KnowledgeProjectionBecameSearchable est émis après publication complète. | T-007 | ADR-005; DDD-ADR-004; DDD-ADR-008 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_qdrant_projection_acceptance.ps1 |
-| KA-007 - Recherche hybride traçable | Chaque résultat contient SourceLocator, ContentHash, SearchScoreBundle et trace de fusion. | Given une projection SEARCHABLE; When SearchKnowledge exécute une recherche hybride; Then KA retourne des preuves candidates auditées. | T-008 | ADR-005; ADR-006; DDD-ADR-003; DDD-ADR-004; DDD-ADR-008 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_hybrid_search_acceptance.ps1 |
-| KA-008 - Commande de recherche publique | Le contrat POST /v1/search masque Qdrant et expose seulement KA. | Given un client appelle POST /v1/search; When la recherche est valide; Then la réponse contient seulement le contrat public KA. | T-009 | ADR-005; ADR-006; ADR-010; DDD-ADR-003; DDD-ADR-004 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_search_command_acceptance.ps1 |
-| KA-009 - Traçabilité et métriques M-005 | Aucun GREEN n'est implicite et les métriques ne sont pas des seuils V1. | Given les preuves M-005; When les gates s'exécutent; Then test, lint, traceability et validate_m005_specification sont enrôlés. | T-010 | ADR-005; ADR-006; ADR-010; DDD-ADR-004; DDD-ADR-008 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_m005_traceability_acceptance.ps1 |
+| KA-001 - Spécification exécutable M-005 | La spécification nomme mission KA, KnowledgeProjection, états, politiques, ports, événements, API, erreurs, métriques, exclusions et garde-fous. | Given une version canonique M-004 publiée; When la spécification M-005 est publiée; Then elle est validée par commande uv run --locked gate
+| KA-002 - Projection depuis version canonique | Une projection ne naît que depuis une version canonique publiée. | Given une CanonicalSource publiée; When RequestKnowledgeProjection est accepté; Then KnowledgeProjection est REQUESTED sans mutation SP. | T-003 | DDD-ADR-004; DDD-ADR-008; ADR-010 | uv run --locked gate
+| KA-003 - Chunking traçable | Chaque chunk conserve SourceLocator et ContentHash. | Given un contenu canonique; When KA découpe le contenu; Then chaque chunk reste relié à la version canonique. | T-004 | ADR-001; ADR-006; DDD-ADR-003; DDD-ADR-004 | uv run --locked gate
+| KA-004 - Métadonnées filtrables | Un filtre demandé est appliqué ou refusé explicitement. | Given une projection avec métadonnées; When SearchKnowledge reçoit des filtres; Then les filtres sont appliqués ou refusés. | T-005 | ADR-005; DDD-ADR-004 | uv run --locked gate
+| KA-005 - Encodage dense et sparse | Les versions de modèles et paramètres sont obligatoires. | Given une projection construite; When l'encodage démarre; Then dense et sparse sont produits sans fallback silencieux. | T-006 | ADR-005; ADR-007; ADR-009; DDD-ADR-004 | uv run --locked gate
+| KA-006 - Index Qdrant régénérable | Qdrant reste une projection technique reconstruisible. | Given des encodages complets; When l'index est publié; Then KnowledgeProjectionBecameSearchable est émis après publication complète. | T-007 | ADR-005; DDD-ADR-004; DDD-ADR-008 | uv run --locked gate
+| KA-007 - Recherche hybride traçable | Chaque résultat contient SourceLocator, ContentHash, SearchScoreBundle et trace de fusion. | Given une projection SEARCHABLE; When SearchKnowledge exécute une recherche hybride; Then KA retourne des preuves candidates auditées. | T-008 | ADR-005; ADR-006; DDD-ADR-003; DDD-ADR-004; DDD-ADR-008 | uv run --locked gate
+| KA-008 - Commande de recherche publique | Le contrat POST /v1/search masque Qdrant et expose seulement KA. | Given un client appelle POST /v1/search; When la recherche est valide; Then la réponse contient seulement le contrat public KA. | T-009 | ADR-005; ADR-006; ADR-010; DDD-ADR-003; DDD-ADR-004 | uv run --locked gate
+| KA-009 - Traçabilité et métriques M-005 | Aucun GREEN n'est implicite et les métriques ne sont pas des seuils V1. | Given les preuves M-005; When les gates s'exécutent; Then test, lint, traceability et validate_m005_specification sont enrôlés. | T-010 | ADR-005; ADR-006; ADR-010; DDD-ADR-004; DDD-ADR-008 | uv run --locked gate
 
 ## Commandes de validation
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_m005_specification_acceptance.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_m005_specification_unit.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m005_specification.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_traceability.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1
+```console
+uv run --locked gate
+uv run --locked gate
+uv run --locked gate
+uv run --locked gate
+uv run --locked gate
+uv run --locked gate
 ```
 
 ## Exclusions M-006 et M-007

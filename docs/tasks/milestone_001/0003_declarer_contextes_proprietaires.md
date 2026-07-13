@@ -32,6 +32,6 @@
 - Implémentation attendue: créer les modules de contexte, un registre explicite des propriétaires de données et une documentation courte liant chaque module à sa responsabilité v4.1.
 - Invariants et garde-fous: pas d'import de framework dans `domain`; pas de modèle métier dans `platform`; pas de propriétaire implicite; pas de valeur par défaut pour un contexte inconnu.
 - Dépendances: T-001; T-002; DDD-ADR-001; section 14 de la spécification v4.1.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m001\validate_context_modules_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m001\validate_context_registry_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m001): couvrir les modules et propriétaires de contexte`.
 - Commit GREEN: `feat(m001): déclarer les contextes propriétaires`.

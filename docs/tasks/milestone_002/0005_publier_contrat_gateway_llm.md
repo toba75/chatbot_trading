@@ -32,6 +32,6 @@
 - Implémentation attendue: créer le port et l'adaptateur minimal du gateway, les objets de contrat et les tests contre un double HTTP contrôlé.
 - Invariants et garde-fous: aucune URL par défaut; aucun provider distant silencieux; aucun import vLLM dans `domain/`; aucune décision métier dans le gateway.
 - Dépendances: T-004; ADR-008; ADR-009; `app/platform/llm_gateway`; tests d'architecture M-001.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m002\validate_llm_gateway_contract_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m002\validate_llm_gateway_contract_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m002): couvrir le contrat gateway llm`.
 - Commit GREEN: `feat(m002): publier le contrat gateway llm`.

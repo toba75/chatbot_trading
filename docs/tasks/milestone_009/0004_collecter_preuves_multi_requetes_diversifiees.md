@@ -27,11 +27,11 @@
   - Given un plan approfondi contient trois sous-questions et des obligations de couverture.
   - When RA collecte les preuves candidates auprès de KA.
   - Then chaque obligation satisfaite référence au moins une preuve traçable et aucun document ne domine automatiquement l'EvidenceSet.
-- Tests d'acceptation à écrire: `tests/m009/validate_multi_query_evidence_collection_acceptance.ps1`, qui échoue tant que RA ne collecte pas par sous-question avec diversité et versions de projection.
+- Tests d'acceptation à écrire: `uv run --locked gate`, qui échoue tant que RA ne collecte pas par sous-question avec diversité et versions de projection.
 - Tests unitaires à écrire: tests de `CollectDeepResearchEvidenceHandler` pour requête sans sous-question, candidat sans `SourceLocator`, projection version absente, preuve dupliquée, dépassement `result_limit`, domination documentaire, obligation non couverte et ordre de callbacks permuté.
 - Implémentation attendue: étendre ou créer un handler RA de collecte approfondie distinct du flux M-007, enrichir les requêtes vers `KnowledgeSearch`, enregistrer les versions de projection dans le résultat RA et conserver le comportement M-007 inchangé.
 - Invariants et garde-fous: pas d'accès direct à KA interne; pas de consensus par volume de passages; pas de fallback mono-requête; pas de preuve sans provenance résolvable.
 - Dépendances: T-003; `app/research_answering/application/collect_evidence.py`; `app/research_answering/domain/evidence_set.py`; contrats KA publiés par M-005.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m009\validate_multi_query_evidence_collection_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m009\validate_multi_query_evidence_collection_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m007\validate_evidence_set_sealing_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m009): couvrir collecte multi sources`
 - Commit GREEN: `feat(m009): collecter preuves multi sources`

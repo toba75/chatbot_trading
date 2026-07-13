@@ -14,7 +14,7 @@
 - Garde-fous: vérifier `master`, exécuter les validations existantes, consigner les commandes absentes et refuser les conclusions implicites.
 
 ## Blocages Ou Préconditions
-- État GREEN/RED connu: `scripts/validate_adr_system.ps1` existe et a été observé GREEN; `scripts/test.ps1` et `scripts/lint.ps1` sont absents et doivent être créés par M-000.
+- État GREEN/RED connu: `uv run --locked gate` existe et a été observé GREEN; `uv run --locked gate` et `uv run --locked gate` sont absents et doivent être créés par M-000.
 - Présence des milestones amont dans master: M-000 n'a aucune dépendance amont; `git ls-tree -r --name-only master -- docs/tasks docs/adr docs/specs` montre les ADR et specs, mais aucun dossier `docs/tasks/milestone_000` versionné.
 - Décisions manquantes: aucune nouvelle décision structurante n'est requise pour cette tâche; toute nouvelle règle de gouvernance structurante doit créer une ADR.
 - Risques: confondre un registre ADR valide avec une suite projet complète; masquer l'absence de commandes génériques de test et de lint.
@@ -31,7 +31,7 @@
 - Tests unitaires à écrire: tests du parseur ou validateur de rapport pour refuser un champ vide, une valeur d'état inconnue ou une commande non datée.
 - Implémentation attendue: créer un rapport de précondition M-000 dans la documentation de gouvernance et un validateur strict de sa structure; le rapport doit citer les commandes utilisées et leur résultat observé.
 - Invariants et garde-fous: aucune mention `GREEN` ne peut être produite si une commande obligatoire échoue; une commande absente doit être nommée; aucune valeur par défaut ne remplace un résultat manquant.
-- Dépendances: `AGENTS.md`; plan de milestones; spécification v4.1; `scripts/validate_adr_system.ps1`; `master` rafraîchi avec `git fetch origin --prune`.
-- Commandes de validation: `git fetch origin --prune`; `git ls-tree -r --name-only master -- docs/tasks docs/adr docs/specs`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_adr_system.ps1`.
+- Dépendances: `AGENTS.md`; plan de milestones; spécification v4.1; `uv run --locked gate`; `master` rafraîchi avec `git fetch origin --prune`.
+- Commandes de validation: `git fetch origin --prune`; `git ls-tree -r --name-only master -- docs/tasks docs/adr docs/specs`; `uv run --locked gate`.
 - Commit RED: `test(m000): décrire la précondition de gouvernance initiale`.
 - Commit GREEN: `feat(m000): publier l'audit de précondition de gouvernance`.

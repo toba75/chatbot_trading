@@ -32,6 +32,6 @@
 - Implémentation attendue: implémenter la politique d'appel du gateway avec erreurs typées, retry borné, circuit breaker et résultat non publiable après streaming interrompu.
 - Invariants et garde-fous: aucun `except` générique masquant la cause; aucun retry après token; aucun remplacement de modèle; aucune mutation métier depuis `platform`.
 - Dépendances: T-005; ADR-008; ADR-009; DDD-ADR-007; critères de tests de processus v4.1.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m002\validate_llm_gateway_failures_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m002\validate_llm_gateway_failures_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m002): couvrir les pannes inference spark`.
 - Commit GREEN: `feat(m002): controler les pannes inference spark`.

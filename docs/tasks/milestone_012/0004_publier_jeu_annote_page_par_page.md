@@ -27,11 +27,11 @@
   - Given un corpus pilote figé.
   - When les pages échantillonnées sont annotées.
   - Then chaque page évaluée porte des attentes complètes et résolvables avant d'être utilisée par un benchmark.
-- Tests d'acceptation à écrire: `tests/m012/validate_page_annotation_set_acceptance.ps1`, qui échoue si une page évaluée n'a pas d'annotation, si une zone de provenance est non résolvable, si une valeur numérique critique perd signe ou unité, ou si une annotation générée par le système évalué est acceptée.
+- Tests d'acceptation à écrire: `uv run --locked gate`, qui échoue si une page évaluée n'a pas d'annotation, si une zone de provenance est non résolvable, si une valeur numérique critique perd signe ou unité, ou si une annotation générée par le système évalué est acceptée.
 - Tests unitaires à écrire: tests de `AnnotationCompletenessPolicy` pour annotation manquante, route attendue absente, transcription absente, tableau incomplet, ordre de lecture absent, zone de provenance invalide, page vide non déclarée et conflit d'état attendu.
 - Implémentation attendue: créer le format du jeu annoté, le validateur d'annotations, les fixtures d'annotation minimales et le lien entre annotations, documents pilotes et pages SP.
 - Invariants et garde-fous: aucune page utilisée par benchmark sans annotation suffisante; aucune correction silencieuse d'une annotation incohérente; aucune sortie de conversion traitée comme référence; aucune suppression d'annotation historique sans nouvelle version.
 - Dépendances: T-003; `SourceLocator`; `CanonicalSourceRef`; `docs/specs/m004_version_canonique_publiee.md`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m012\validate_page_annotation_set_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m012\validate_page_annotation_set_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m012_specification.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m012): couvrir le jeu annote page par page`
 - Commit GREEN: `feat(m012): publier le jeu annote page par page`

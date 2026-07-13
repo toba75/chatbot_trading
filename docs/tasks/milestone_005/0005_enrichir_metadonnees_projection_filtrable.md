@@ -27,11 +27,11 @@
   - Given une projection contient des chunks issus de plusieurs documents et auteurs.
   - When une recherche exige un filtre d'auteur, de période ou de type de contenu.
   - Then seuls les chunks satisfaisant explicitement le filtre sont éligibles, avec une trace de filtre consultable.
-- Tests d'acceptation à écrire: `tests/m005/validate_projection_metadata_filters_acceptance.ps1`, couvrant filtre appliqué, filtre inconnu refusé, projection stale refusée et diversité par document quand elle est demandée.
+- Tests d'acceptation à écrire: `uv run --locked gate`, couvrant filtre appliqué, filtre inconnu refusé, projection stale refusée et diversité par document quand elle est demandée.
 - Tests unitaires à écrire: tests de `SearchFilter`, `ProjectionMetadata`, `ProjectionFreshnessPolicy`, `EvidenceDiversificationPolicy` et sérialisation de trace.
 - Implémentation attendue: enrichir les chunks de métadonnées strictes, construire les filtres KA et refuser toute demande contenant une dimension non supportée.
 - Invariants et garde-fous: aucun filtre silencieusement ignoré; aucune recherche sur projection obsolète sans avertissement explicite prévu par le contrat; aucune métadonnée obligatoire vide.
 - Dépendances: T-004; ADR-005; DDD-ADR-004; métriques M-005 T-010.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_projection_metadata_filters_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_projection_metadata_filters_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m005_specification.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m005): couvrir les filtres de projection`
 - Commit GREEN: `feat(m005): enrichir les metadonnees filtrables`

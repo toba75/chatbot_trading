@@ -32,15 +32,15 @@
   - Given un utilisateur ouvre l'interface locale du chatbot.
   - When il consulte le corpus PDF, ajoute un PDF, retire un PDF de la sélection active ou ouvre un PDF.
   - Then l'écran affiche les documents avec leurs statuts publics, enregistre les nouveaux PDF par le contrat SP, retire seulement le document de la sélection conversationnelle active, et visualise le PDF sans supprimer ni purger l'original.
-- Tests d'acceptation à écrire: `tests/m013/validate_ui_corpus_pdf_screen_acceptance.ps1`, couvrant l'affichage de la liste PDF, le refus d'un ajout sans métadonnées obligatoires, l'appel strict à `POST /v1/documents`, l'absence d'action destructive, le retrait non destructif de `selected_documents`, et l'ouverture d'un visualiseur PDF sans `original_storage_ref`.
-- Tests unitaires à écrire: `tests/m013/validate_ui_corpus_pdf_screen_unit.ps1`, couvrant le rendu des statuts source/projection, l'état non sélectionnable des documents non `SEARCHABLE`, la construction du payload `bibliographic_metadata`, le rejet d'un champ de suppression, l'absence de chemin interne dans le HTML/JSON, et l'accessibilité minimale du visualiseur lecture seule.
+- Tests d'acceptation à écrire: `uv run --locked gate`, couvrant l'affichage de la liste PDF, le refus d'un ajout sans métadonnées obligatoires, l'appel strict à `POST /v1/documents`, l'absence d'action destructive, le retrait non destructif de `selected_documents`, et l'ouverture d'un visualiseur PDF sans `original_storage_ref`.
+- Tests unitaires à écrire: `uv run --locked gate`, couvrant le rendu des statuts source/projection, l'état non sélectionnable des documents non `SEARCHABLE`, la construction du payload `bibliographic_metadata`, le rejet d'un champ de suppression, l'absence de chemin interne dans le HTML/JSON, et l'accessibilité minimale du visualiseur lecture seule.
 - Implémentation attendue: servir un écran local depuis le service `ui` existant; créer un composant ou module UI minimal pour `CorpusPdfScreen`; exposer ou consommer un read-model public listant `document_id`, titre, statut source, statut diagnostic, statut conversion, `canonical_version_id` et statut projection; ajouter un formulaire PDF avec métadonnées explicites; remplacer la suppression par une action `retirer de la sélection active`; ouvrir le PDF via un endpoint local contrôlé qui ne divulgue pas le chemin de stockage.
 - Invariants et garde-fous: le PDF original reste immuable; aucune purge administrative; aucune suppression ordinaire; aucune lecture directe de tables SP, Qdrant ou stockage interne; aucun fallback vers un corpus fixture; aucun statut GREEN implicite pour un document non `SEARCHABLE`; aucune réponse de chatbot déclenchée par cet écran.
 - Dépendances: `docs/specs/ui.md`; `app/platform/local_runtime.py`; contrats SP `POST /v1/documents`; read-model documentaire à créer si absent; service local `ui` déclaré dans la topologie; contrats CV `selected_documents`.
 - Commandes de validation:
-  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_ui_corpus_pdf_screen_acceptance.ps1`
-  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013\validate_ui_corpus_pdf_screen_unit.ps1`
-  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_task_system.ps1`
-  - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`
+  - `uv run --locked gate`
+  - `uv run --locked gate`
+  - `uv run --locked gate`
+  - `uv run --locked gate`
 - Commit RED: `test(ui): couvrir premier ecran corpus pdf`
 - Commit GREEN: `feat(ui): creer premier ecran corpus pdf`

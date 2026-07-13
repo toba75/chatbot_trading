@@ -27,11 +27,11 @@
   - Given un tour assistant référence une réponse RA `PARTIALLY_SUPPORTED` avec une citation et une lacune.
   - When la réponse produit du tour est construite.
   - Then le statut, la citation ouvrable et la lacune sont visibles sans publier de prompt ni de stockage interne.
-- Tests d'acceptation à écrire: `tests/m008/validate_chat_answer_presentation_acceptance.ps1`, qui échoue tant que le statut documentaire et les citations ne sont pas exposés.
+- Tests d'acceptation à écrire: `uv run --locked gate`, qui échoue tant que le statut documentaire et les citations ne sont pas exposés.
 - Tests unitaires à écrire: tests de mapping `SUPPORTED`, `PARTIALLY_SUPPORTED`, `INSUFFICIENT_EVIDENCE`, `CONFLICTING_EVIDENCE`, `REQUIRES_CURRENT_DATA`, citation non ouvrable dans le DTO public RA, lacune manquante, contradiction manquante, absence de payload sensible et refus d'un DTO qui attendrait `citations` dans `VerifiedResearchOutcome`.
 - Implémentation attendue: créer `app/conversation/application/present_conversation_answer.py` et les DTO publics de réponse conversationnelle.
 - Invariants et garde-fous: aucun statut réinterprété; aucune citation retirée silencieusement; aucune fuite de prompt; aucune preuve complète dupliquée dans CV; aucun changement implicite du contrat `VerifiedResearchOutcome`.
 - Dépendances: T-007; DTO de résultat documentaire public RA; `VerifiedResearchOutcome`; `SourceLocator`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m008\validate_chat_answer_presentation_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m008\validate_chat_answer_presentation_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m008): couvrir presentation citations statuts`
 - Commit GREEN: `feat(m008): presenter citations statuts produit`

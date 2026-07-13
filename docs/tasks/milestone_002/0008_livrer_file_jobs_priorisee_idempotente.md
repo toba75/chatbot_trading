@@ -32,6 +32,6 @@
 - Implémentation attendue: créer le runtime de jobs local, le catalogue strict, les clés d'idempotence et les doubles de workers nécessaires.
 - Invariants et garde-fous: aucune priorité implicite; aucun job inconnu accepté; aucun recalcul silencieux; aucun accès direct au modèle interne d'un contexte.
 - Dépendances: T-002; T-007 pour distinguer outbox et jobs; `app/platform/job_runtime`; section 15 v4.1.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m002\validate_job_runtime_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m002\validate_job_runtime_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m002): couvrir la file de jobs idempotente`.
 - Commit GREEN: `feat(m002): livrer la file de jobs idempotente`.

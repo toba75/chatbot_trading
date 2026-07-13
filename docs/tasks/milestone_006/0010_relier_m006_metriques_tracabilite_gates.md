@@ -17,7 +17,7 @@
 - État GREEN/RED connu: T-009 attendue GREEN.
 - Présence des milestones amont dans master: M-004 et M-005 requis et présents.
 - Décisions manquantes: aucune pour les métriques initiales; ADR requise si une politique de rétention ou d'observabilité durable change.
-- Risques: traçabilité incomplète; signaux d'audit exposant des claims complets; gate M-006 non enrôlé dans `scripts/test.ps1`.
+- Risques: traçabilité incomplète; signaux d'audit exposant des claims complets; gate M-006 non enrôlé dans `uv run --locked gate`.
 
 ## Tâches
 ### T-010 - Relier M-006 aux métriques, à la traçabilité et aux gates
@@ -27,11 +27,11 @@
   - Given les comportements M-006 sont implémentés et testés.
   - When la matrice de traçabilité et les gates sont exécutés.
   - Then chaque exigence M-006 est rattachée à un test GREEN, une commande de validation et une ADR ou justification explicite.
-- Tests d'acceptation à écrire: `tests/m006/validate_m006_traceability_acceptance.ps1`, couvrant exigences M-006, métriques EG et enrôlement des validators.
+- Tests d'acceptation à écrire: `uv run --locked gate`, couvrant exigences M-006, métriques EG et enrôlement des validators.
 - Tests unitaires à écrire: tests de calcul des métriques sans payload, compteur de verdicts, proportion sans preuve directe, groupes de dépendance, supersession et délai de vérification.
-- Implémentation attendue: créer les métriques EG, mettre à jour `docs/traceability/matrix.md`, enrôler les validations M-006 dans `scripts/test.ps1` et `scripts/lint.ps1`, puis produire les preuves GREEN finales.
+- Implémentation attendue: créer les métriques EG, mettre à jour `docs/traceability/matrix.md`, enrôler les validations M-006 dans `uv run --locked gate` et `uv run --locked gate`, puis produire les preuves GREEN finales.
 - Invariants et garde-fous: aucune métrique contenant texte de claim complet; aucun statut de traçabilité sans test; aucune validation M-006 hors gates de dépôt.
 - Dépendances: T-009; ADR-006; ADR-010; DDD-ADR-005; DDD-ADR-010; `docs/governance/definition_of_done.md`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m006\validate_m006_traceability_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m006\validate_m006_traceability_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_traceability.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m006): couvrir tracabilite metriques gates`
 - Commit GREEN: `test(m006): relier metriques tracabilite gates`

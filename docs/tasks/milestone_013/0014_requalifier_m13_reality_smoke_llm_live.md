@@ -17,7 +17,7 @@
 
 ## Blocages Ou Préconditions
 
-- État GREEN/RED connu: `scripts/validate_task_system.ps1` et `scripts/lint.ps1` sont GREEN avant création de la tranche; le chemin LLM live M13 est GREEN, mais le pipeline produit réel bout-en-bout n'est pas prouvé.
+- État GREEN/RED connu: `uv run --locked gate` et `uv run --locked gate` sont GREEN avant création de la tranche; le chemin LLM live M13 est GREEN, mais le pipeline produit réel bout-en-bout n'est pas prouvé.
 - Présence des milestones amont dans master: après `git fetch origin --prune`, `master` et `origin/master` pointent sur `08ecd4f2d56f993899d3bec0f5abe28f57405514`; les dossiers `docs/tasks/milestone_003` à `docs/tasks/milestone_013` sont présents dans `master`.
 - Décisions manquantes: aucune décision structurante n'est requise pour requalifier la preuve; une ADR serait requise seulement si la définition de validation V1 changeait de sens.
 - Risques: continuer à utiliser `M13-reality` comme validation de PDF réels; diluer le verdict `non acceptée`; rendre la documentation plus floue au lieu de séparer preuve technique et preuve produit.
@@ -37,6 +37,6 @@
 - Implémentation attendue: renommer les preuves existantes dans la documentation et les rapports sans supprimer leur valeur technique, puis expliciter que la validation produit reste à établir par les tâches T-015 à T-023.
 - Invariants et garde-fous: aucune modification silencieuse d'ADR acceptée; aucun verdict V1 promu; aucun effacement des commandes GREEN existantes; aucune confusion entre prompt LLM et preuve documentaire.
 - Dépendances: `docs/tasks/milestone_013/0013_ancrer_gateway_llm_chemin_reel.md`, `docs/specs/m013_reality_closure.md`, `docs/specs/plan_remediation_m13.md`, `docs/traceability/matrix.md`, rapport V1.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_traceability.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_task_system.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m013): refuser confusion smoke llm et pipeline reel`
 - Commit GREEN: `docs(m013): requalifier reality en smoke test llm live`

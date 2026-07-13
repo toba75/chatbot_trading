@@ -19,8 +19,8 @@
 - Précondition: le rapport `M013-V1AcceptanceReport-1.0` et la matrice de traçabilité sont présents.
 - Commande vérifiée:
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_acceptance.ps1
+```console
+uv run --locked gate
 ```
 
 - Résultat attendu: le verdict final reste `non acceptée` si SP, KA, RA, SD ou LLM restent non acceptés.
@@ -32,8 +32,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_acce
 - Précondition: chaque exigence `REQ-M013-001` à `REQ-M013-012` est reliée à un test, une commande, un code ou document et une ADR ou justification.
 - Commande vérifiée:
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_traceability.ps1
+```console
+uv run --locked gate
 ```
 
 - Résultat attendu: la traçabilité confirme le lien entre T-012, les gates finales, les écarts V1 et la définition de terminé.

@@ -32,6 +32,6 @@
 - Implémentation attendue: créer les contrats, fixtures producteur-consommateur et validateurs stricts pour `EvidenceRef` et `VerifiedClaimRef`.
 - Invariants et garde-fous: aucune preuve vide; aucun statut par défaut; aucune portée implicite; aucun accès au modèle interne EG depuis RA ou SD.
 - Dépendances: T-004; T-005; DDD-ADR-005; sections 4 et 7 de la spécification v4.1.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m001\validate_evidence_claim_contracts_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m001\validate_evidence_claim_contracts_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m001): couvrir les contrats de preuves et claims`.
 - Commit GREEN: `feat(m001): publier les contrats evidence et verified claim`.

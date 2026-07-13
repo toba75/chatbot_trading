@@ -20,8 +20,8 @@
 - Point de configuration: le chemin `security.secrets.tls_ca_certificate_path` désigne un certificat public local, et le secret hors Git associé reste monté en lecture seule quand un mode futur l'exige.
 - Commande vérifiée:
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_security.ps1 -ApplicationConfigPath .\config\application.yaml
+```console
+uv run --locked gate
 ```
 
 - Résultat attendu: `llm-gateway -> spark-inference` reste le seul chemin autorisé; en mode actuel `disabled`, aucun CA n'est exigé; en mode futur `ca_bundle`, tout accès direct Spark depuis navigateur reste interdit.
@@ -33,8 +33,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_secu
 - Précondition: le nouveau certificat est installé localement sur le plan Spark avant exposition au gateway et `services.llm_gateway.tls_mode=ca_bundle` est déclaré explicitement dans `config/application.yaml`.
 - Commande vérifiée:
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_network_boundary.ps1 -ApplicationConfigPath .\config\application.yaml
+```console
+uv run --locked gate
 ```
 
 - Résultat attendu: le gateway conserve la frontière `spark-inference`, le mode TLS déclaré dans `config/application.yaml`, le chemin `security.secrets.tls_ca_certificate_path` et l'authentification explicite; aucun service interne n'est publié.

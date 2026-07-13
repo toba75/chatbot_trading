@@ -27,11 +27,11 @@
   - Given la mission M-008 est de permettre une conversation suivie sans preuve historique implicite.
   - When la spécification de conversation produit est publiée.
   - Then chaque comportement CV nomme son invariant, son scénario BDD, son test RED, ses ADR applicables et sa commande de validation.
-- Tests d'acceptation à écrire: `tests/m008/validate_m008_specification_acceptance.ps1`, qui échoue tant que `docs/specs/m008_conversation_produit.md` et son validateur n'existent pas.
-- Tests unitaires à écrire: tests de `scripts/validate_m008_specification.ps1` pour mission absente, agrégat absent, objet-valeur absent, mode absent, endpoint absent, erreur publique absente, ADR absente, confusion historique-preuve, fallback de mode, revalidation RA absente pour assertion historique sans `VerifiedAnswerVersion` et confusion entre `VerifiedResearchOutcome` et le DTO public RA contenant texte et citations.
-- Implémentation attendue: créer `docs/specs/m008_conversation_produit.md`, créer `scripts/validate_m008_specification.ps1`, enrôler la validation dans `scripts/test.ps1` et `scripts/lint.ps1`, puis relier les exigences M-008 à `docs/traceability/matrix.md`.
+- Tests d'acceptation à écrire: `uv run --locked gate`, qui échoue tant que `docs/specs/m008_conversation_produit.md` et son validateur n'existent pas.
+- Tests unitaires à écrire: tests de `uv run --locked gate` pour mission absente, agrégat absent, objet-valeur absent, mode absent, endpoint absent, erreur publique absente, ADR absente, confusion historique-preuve, fallback de mode, revalidation RA absente pour assertion historique sans `VerifiedAnswerVersion` et confusion entre `VerifiedResearchOutcome` et le DTO public RA contenant texte et citations.
+- Implémentation attendue: créer `docs/specs/m008_conversation_produit.md`, créer `uv run --locked gate`, enrôler la validation dans `uv run --locked gate` et `uv run --locked gate`, puis relier les exigences M-008 à `docs/traceability/matrix.md`.
 - Invariants et garde-fous: aucune décision structurante implicite; aucune valeur par défaut de mode non déclarée; aucun prompt ni résumé interne publié comme source de vérité; aucune mutation d'agrégat RA depuis CV; aucune extension silencieuse du contrat `VerifiedResearchOutcome`.
 - Dépendances: T-001; ADR-010; DDD-ADR-001; DDD-ADR-002; DDD-ADR-003; DDD-ADR-007; DDD-ADR-008; `docs/tasks/README.md`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m008\validate_m008_specification_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m008_specification.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_traceability.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m008): couvrir la specification conversation produit`
 - Commit GREEN: `docs(m008): publier la specification conversation produit`

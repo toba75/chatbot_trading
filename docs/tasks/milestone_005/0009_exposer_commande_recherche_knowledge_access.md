@@ -27,11 +27,11 @@
   - Given une projection actuelle est `SEARCHABLE`.
   - When un client appelle `POST /v1/search` avec une requête valide.
   - Then KA retourne des preuves candidates citées, scorées et traçables sans exposer la collection Qdrant.
-- Tests d'acceptation à écrire: `tests/m005/validate_search_command_acceptance.ps1`, couvrant succès, requête invalide, projection absente, projection stale, filtre non supporté et absence de champs internes.
+- Tests d'acceptation à écrire: `uv run --locked gate`, couvrant succès, requête invalide, projection absente, projection stale, filtre non supporté et absence de champs internes.
 - Tests unitaires à écrire: tests de validation de requête, mapping erreurs publiques, sérialisation `SearchResponse` et refus de corps ambigu.
 - Implémentation attendue: créer l'adaptateur HTTP KA, les DTO publics de recherche et l'intégration avec le port `KnowledgeSearchPort`.
 - Invariants et garde-fous: aucun fallback vers une recherche vide; aucun `200` sur erreur métier; aucun texte documentaire complet dans les logs; aucun endpoint RA livré dans M-005; aucune confusion entre commande d'indexation KA et requête de recherche KA.
 - Dépendances: T-008; ADR-010; ADR-005; DDD-ADR-004; conventions HTTP existantes M-003/M-004.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_search_command_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_search_command_unit.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m005\validate_hybrid_search_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m005): couvrir la commande de recherche`
 - Commit GREEN: `feat(m005): exposer la recherche knowledge access`

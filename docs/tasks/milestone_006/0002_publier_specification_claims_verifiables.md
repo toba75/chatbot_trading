@@ -27,11 +27,11 @@
   - Given des preuves candidates KA avec `SourceLocator` résolvable.
   - When la spécification M-006 est publiée.
   - Then chaque comportement de claim nomme son invariant, son scénario BDD, son test RED, ses ADR applicables et sa commande de validation.
-- Tests d'acceptation à écrire: `tests/m006/validate_m006_specification_acceptance.ps1`, qui échoue tant que `docs/specs/m006_claims_verifiables.md` et son validateur n'existent pas.
-- Tests unitaires à écrire: tests de `scripts/validate_m006_specification.ps1` pour section manquante, invariant absent, ADR absente, `DDD-ADR-003` absent, `SourceLocator` absent des preuves, API claims absente, erreur publique absente, confusion entre score et verdict, et accès direct à Qdrant.
-- Implémentation attendue: créer `docs/specs/m006_claims_verifiables.md`, créer `scripts/validate_m006_specification.ps1`, enrôler la validation dans les gates et relier les exigences M-006 à la matrice de traçabilité.
+- Tests d'acceptation à écrire: `uv run --locked gate`, qui échoue tant que `docs/specs/m006_claims_verifiables.md` et son validateur n'existent pas.
+- Tests unitaires à écrire: tests de `uv run --locked gate` pour section manquante, invariant absent, ADR absente, `DDD-ADR-003` absent, `SourceLocator` absent des preuves, API claims absente, erreur publique absente, confusion entre score et verdict, et accès direct à Qdrant.
+- Implémentation attendue: créer `docs/specs/m006_claims_verifiables.md`, créer `uv run --locked gate`, enrôler la validation dans les gates et relier les exigences M-006 à la matrice de traçabilité.
 - Invariants et garde-fous: aucune décision structurante implicite; aucune valeur par défaut pour politique de vérification; aucun fallback de modèle; aucune dépendance EG à une collection Qdrant; aucune preuve publique sans `SourceLocator` publié.
 - Dépendances: T-001; ADR-006; ADR-010; DDD-ADR-003; DDD-ADR-005; DDD-ADR-007; DDD-ADR-010; `docs/tasks/README.md`.
-- Commandes de validation: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m006\validate_m006_specification_acceptance.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m006_specification.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_traceability.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1`; `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1`.
+- Commandes de validation: `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`; `uv run --locked gate`.
 - Commit RED: `test(m006): couvrir la specification des claims verifiables`
 - Commit GREEN: `docs(m006): publier la specification des claims verifiables`

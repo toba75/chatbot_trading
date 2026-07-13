@@ -252,27 +252,27 @@ M-012 ne crée pas d'endpoint HTTP. Les statuts ci-dessous décrivent les diagno
 
 | Comportement | Invariant | Scénario BDD | Test RED | ADR | Commande |
 |---|---|---|---|---|---|
-| EV-001 - Spécification exécutable M-012 | La spécification nomme mission, artefacts, corpus, annotations, métriques SP/KA/EG/RA/CV/SD/EX, benchmark LLM, décisions, écarts V1, erreurs, gates et exclusions. | Given la mission M-012 est de mesurer le système sur corpus pilote avant acceptation V1; When la spécification d'évaluation pilote est publiée; Then elle est validée par commande PowerShell. | T-002 | ADR-002; ADR-005; ADR-008; ADR-010; DDD-ADR-007; DDD-ADR-009; DDD-ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m012_specification.ps1 |
-| EV-002 - Corpus pilote représentatif | PilotCorpus contient 50 à 100 PDF et toutes les strates. | Given les sources candidates sont disponibles; When le corpus pilote est constitué; Then chaque PDF porte identifiant, strate et chemin résolvable. | T-003 | ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m012\validate_pilot_corpus_acceptance.ps1 |
-| EV-003 - Jeu annoté page par page | PageAnnotation couvre chaque page évaluée. | Given un PilotCorpus figé; When le jeu annoté est publié; Then route, transcription, valeurs, tableaux, ordre et provenance sont vérifiables. | T-004 | ADR-002; ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m012\validate_page_annotation_set_acceptance.ps1 |
-| EV-004 - Benchmarks de routes documentaires | Les routes documentaires conservent échecs, temps, mémoire et stabilité. | Given un jeu annoté; When les routes documentaires sont mesurées; Then CER/WER, nombres, signes, formules, cellules, ordre, temps, mémoire et stabilité sont publiés. | T-005 | ADR-002; ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m012\validate_document_route_benchmark_acceptance.ps1 |
-| EV-005 - Calibration documentaire | Une décision documentaire référence son benchmark. | Given des résultats de routes documentaires; When un seuil est calibré; Then aucune valeur non sourcée n'est promue. | T-006 | ADR-002; ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m012\validate_document_quality_calibration_acceptance.ps1 |
-| EV-006 - Recherche de connaissances | KA publie Recall@5, Recall@10, Recall@20, MRR et nDCG. | Given 100 à 300 questions annotées; When la recherche est mesurée; Then les pages attendues et candidats traçables justifient les métriques. | T-007 | ADR-005; ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m012\validate_knowledge_search_benchmark_acceptance.ps1 |
-| EV-007 - Réponses vérifiées, abstention et preuves | EG et RA restent séparés et mesurés. | Given des questions et preuves annotées; When les réponses sont évaluées; Then statuts, citations, abstention, claims et contradictions sont mesurés. | T-008 | ADR-010; DDD-ADR-007 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m012\validate_verified_answer_benchmark_acceptance.ps1 |
-| EV-008 - LLM principal par chemin réel | Le modèle est mesuré via docker-local -> llm-gateway -> Spark. | Given les checkpoints candidats; When le benchmark LLM est exécuté; Then les tâches obligatoires et métriques techniques sont comparables sans payload complet. | T-009 | ADR-008; ADR-010; DDD-ADR-007 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m012\validate_llm_benchmark_real_path_acceptance.ps1 |
-| EV-009 - Stratégies et backtests pilotes | SD et EX publient limites, coûts, résultats négatifs et répétitions. | Given des stratégies candidates attribuées; When les backtests pilotes sont mesurés; Then les métriques SD et EX proviennent des artefacts déterministes. | T-010 | ADR-010; DDD-ADR-009; DDD-ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m012\validate_strategy_backtest_benchmark_acceptance.ps1 |
-| EV-010 - Décisions de calibration et promotion | Toute décision conserve son benchmark source et son statut. | Given les benchmarks M-012 publiés; When une décision est prise; Then acceptation, refus ou report sont versionnés et auditables. | T-011 | ADR-010; DDD-ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m012\validate_calibration_decisions_acceptance.ps1 |
-| EV-011 - Écarts V1 et traçabilité gates | M-013 reçoit des écarts V1 exploitables. | Given M-012 a livré corpus, annotations, benchmarks et décisions; When la traçabilité est validée; Then chaque exigence relie test, commande, artefact, ADR et écart éventuel. | T-012 | ADR-010; DDD-ADR-010 | powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m012\validate_m012_traceability_acceptance.ps1 |
+| EV-001 - Spécification exécutable M-012 | La spécification nomme mission, artefacts, corpus, annotations, métriques SP/KA/EG/RA/CV/SD/EX, benchmark LLM, décisions, écarts V1, erreurs, gates et exclusions. | Given la mission M-012 est de mesurer le système sur corpus pilote avant acceptation V1; When la spécification d'évaluation pilote est publiée; Then elle est validée par commande uv run --locked gate
+| EV-002 - Corpus pilote représentatif | PilotCorpus contient 50 à 100 PDF et toutes les strates. | Given les sources candidates sont disponibles; When le corpus pilote est constitué; Then chaque PDF porte identifiant, strate et chemin résolvable. | T-003 | ADR-010 | uv run --locked gate
+| EV-003 - Jeu annoté page par page | PageAnnotation couvre chaque page évaluée. | Given un PilotCorpus figé; When le jeu annoté est publié; Then route, transcription, valeurs, tableaux, ordre et provenance sont vérifiables. | T-004 | ADR-002; ADR-010 | uv run --locked gate
+| EV-004 - Benchmarks de routes documentaires | Les routes documentaires conservent échecs, temps, mémoire et stabilité. | Given un jeu annoté; When les routes documentaires sont mesurées; Then CER/WER, nombres, signes, formules, cellules, ordre, temps, mémoire et stabilité sont publiés. | T-005 | ADR-002; ADR-010 | uv run --locked gate
+| EV-005 - Calibration documentaire | Une décision documentaire référence son benchmark. | Given des résultats de routes documentaires; When un seuil est calibré; Then aucune valeur non sourcée n'est promue. | T-006 | ADR-002; ADR-010 | uv run --locked gate
+| EV-006 - Recherche de connaissances | KA publie Recall@5, Recall@10, Recall@20, MRR et nDCG. | Given 100 à 300 questions annotées; When la recherche est mesurée; Then les pages attendues et candidats traçables justifient les métriques. | T-007 | ADR-005; ADR-010 | uv run --locked gate
+| EV-007 - Réponses vérifiées, abstention et preuves | EG et RA restent séparés et mesurés. | Given des questions et preuves annotées; When les réponses sont évaluées; Then statuts, citations, abstention, claims et contradictions sont mesurés. | T-008 | ADR-010; DDD-ADR-007 | uv run --locked gate
+| EV-008 - LLM principal par chemin réel | Le modèle est mesuré via docker-local -> llm-gateway -> Spark. | Given les checkpoints candidats; When le benchmark LLM est exécuté; Then les tâches obligatoires et métriques techniques sont comparables sans payload complet. | T-009 | ADR-008; ADR-010; DDD-ADR-007 | uv run --locked gate
+| EV-009 - Stratégies et backtests pilotes | SD et EX publient limites, coûts, résultats négatifs et répétitions. | Given des stratégies candidates attribuées; When les backtests pilotes sont mesurés; Then les métriques SD et EX proviennent des artefacts déterministes. | T-010 | ADR-010; DDD-ADR-009; DDD-ADR-010 | uv run --locked gate
+| EV-010 - Décisions de calibration et promotion | Toute décision conserve son benchmark source et son statut. | Given les benchmarks M-012 publiés; When une décision est prise; Then acceptation, refus ou report sont versionnés et auditables. | T-011 | ADR-010; DDD-ADR-010 | uv run --locked gate
+| EV-011 - Écarts V1 et traçabilité gates | M-013 reçoit des écarts V1 exploitables. | Given M-012 a livré corpus, annotations, benchmarks et décisions; When la traçabilité est validée; Then chaque exigence relie test, commande, artefact, ADR et écart éventuel. | T-012 | ADR-010; DDD-ADR-010 | uv run --locked gate
 
 ## Commandes de validation
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m012\validate_m012_specification_acceptance.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m012\validate_m012_specification_unit.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m012_specification.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_traceability.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\lint.ps1
+```console
+uv run --locked gate
+uv run --locked gate
+uv run --locked gate
+uv run --locked gate
+uv run --locked gate
+uv run --locked gate
 ```
 
 ## Exclusions M-012
