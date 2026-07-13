@@ -35,6 +35,7 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 | [ADR-027](ADR-027-composition-http-et-observation-flux.md) | Composition HTTP précoce et observation complète des flux | Acceptée | 2026-07-13 | Aucun | Aucune |
 | [ADR-028](ADR-028-admission-documentaire-locale-authentifiee.md) | Admission documentaire locale authentifiée et bornée | Acceptée | 2026-07-13 | Aucun | Aucune |
 | [ADR-029](ADR-029-gate-python-uv-manifeste-unique.md) | Gate Python uv à manifeste unique | Acceptée | 2026-07-13 | ADR-010 | Aucune |
+| [ADR-030](ADR-030-bootstrap-local-ui-api.md) | Bootstrap local de l’UI via l’API réelle | Proposée | 2026-07-13 | Aucun | Aucune |
 
 ## ADR DDD
 
@@ -56,7 +57,7 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 ## Prochains numéros disponibles
 
 ```text
-Prochaine ADR technique: ADR-030
+Prochaine ADR technique: ADR-031
 Prochaine DDD-ADR: DDD-ADR-013
 ```
 

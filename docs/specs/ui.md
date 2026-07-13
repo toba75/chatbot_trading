@@ -25,6 +25,16 @@ L'UI doit permettre à l'utilisateur de juger visuellement les sorties du pipeli
 
 La cible ergonomique est un outil de travail sobre, pas une landing page. Le premier écran est l'espace opérationnel: état local, corpus, conversation et preuves.
 
+## Démarrage local en une commande
+
+Scénario BDD :
+
+- Given un utilisateur local possède le dépôt et Docker mais n’a pas démarré manuellement PostgreSQL ni `orchestrator-api`.
+- When il exécute `uv run ui`.
+- Then le bootstrap local prépare les dépendances réelles, sert l’UI sur son port publié et conserve le trajet UI vers `orchestrator-api` ; une dépendance indisponible produit une erreur explicite sans backend de substitution.
+
+Ce bootstrap est un parcours de développement local. Il ne remplace pas le déploiement Compose reproductible d’ADR-026 et ne prétend pas lever les limites métier explicitement non livrées.
+
 ## Frontière UI/API orchestratrice obligatoire
 
 Toute commande, lecture ou récupération de contenu métier initiée par l'UI passe exclusivement par un contrat public de `orchestrator-api`. L'UI reste un adaptateur de présentation et ne devient ni une façade métier concurrente, ni un client direct des composants internes.

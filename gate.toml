@@ -3565,6 +3565,28 @@ depends_on = ["precondition.m013"]
 live = false
 
 [[nodes]]
+id = "test.m013.validate-ui-local-stack-unit"
+path = "gate_tests/ported/tests/m013/validate_ui_local_stack_unit.py"
+kind = "test"
+scope = "m013"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013"]
+live = false
+
+[[nodes]]
+id = "test.m013.validate-uv-run-ui-local-stack-acceptance"
+path = "gate_tests/ported/tests/m013/validate_uv_run_ui_local_stack_acceptance.py"
+kind = "test"
+scope = "m013"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013"]
+live = false
+
+[[nodes]]
 id = "test.m013.validate-v1-acceptance-report-acceptance"
 path = "gate_tests/ported/tests/m013/validate_v1_acceptance_report_acceptance.py"
 kind = "test"
