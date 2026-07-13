@@ -1,6 +1,6 @@
 # ADR-032 - Exécution réelle et reproductible de la conversion canonique
 
-**Statut :** Proposée
+**Statut :** Acceptée
 **Date :** 2026-07-13
 **Décideurs :** Équipe OSTrading
 **Remplace :** Aucun

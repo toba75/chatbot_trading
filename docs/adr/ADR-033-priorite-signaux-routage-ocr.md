@@ -1,6 +1,6 @@
 # ADR-033 - Priorité des signaux pour les routes OCR atteignables
 
-**Statut :** Proposée
+**Statut :** Acceptée
 **Date :** 2026-07-14
 **Décideurs :** Équipe OSTrading
 **Remplace :** Aucun

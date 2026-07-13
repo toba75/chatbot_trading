@@ -60,7 +60,7 @@ def test_validate_m004_conversion_runtime_governance_acceptance() -> None:
     assert "**Statut :** Acceptée" in ocr_routing_adr
     assert "PREPROCESS_GRANITE" in ocr_routing_adr
     assert "BAD_OCR_TO_GRANITE" in ocr_routing_adr
-    assert "issue terminale et publique" in ocr_routing_adr
+    assert "L'issue reste terminale et publique" in ocr_routing_adr
 
     assert (
         "| [ADR-032](ADR-032-execution-reelle-conversion-canonique.md) | "
