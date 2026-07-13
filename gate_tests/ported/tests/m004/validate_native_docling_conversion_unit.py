@@ -48,10 +48,10 @@ def _store_request(*, content: bytes) -> StoreCanonicalArtifactRequest:
     )
 
 
-def test_manifest_refuses_missing_or_divergent_assets(tmp_path: Path) -> None:
+def _manifest_refuses_missing_or_divergent_assets(tmp_path: Path) -> None:
     runtime = _runtime_module()
     assets_root = tmp_path / "assets"
-    assets_root.mkdir()
+    assets_root.mkdir(parents=True)
     manifest_path = tmp_path / "native-assets.json"
 
     manifest_path.write_text(json.dumps(_manifest_payload(sha256="a" * 64)), encoding="utf-8")
@@ -73,7 +73,7 @@ def test_manifest_refuses_missing_or_divergent_assets(tmp_path: Path) -> None:
         runtime.DoclingAssetManifest.load(manifest_path=manifest_path, assets_root=assets_root)
 
 
-def test_artifact_store_is_hashed_and_immutable(tmp_path: Path) -> None:
+def _artifact_store_is_hashed_and_immutable(tmp_path: Path) -> None:
     runtime = _runtime_module()
     store = runtime.CanonicalArtifactFileStore(root=tmp_path / "canonical")
     request = _store_request(content=b'{"schema_version":"1.0","producer":"Docling"}')
@@ -89,7 +89,7 @@ def test_artifact_store_is_hashed_and_immutable(tmp_path: Path) -> None:
         store.store_docling_json(request)
 
 
-def test_runner_refuses_page_omission_and_missing_provenance() -> None:
+def _runner_refuses_page_omission_and_missing_provenance() -> None:
     runtime = _runtime_module()
     request = runtime.NativeDoclingConversionRequest(
         document_id="DOC-0000000000000001",
@@ -118,3 +118,10 @@ def test_runner_refuses_page_omission_and_missing_provenance() -> None:
                 ],
             },
         )
+
+
+def test_validate_native_docling_conversion_unit(tmp_path: Path) -> None:
+    """Given le protocole Docling natif, when ses invariants sont évalués, then aucun état incomplet ne passe."""
+    _manifest_refuses_missing_or_divergent_assets(tmp_path / "manifest")
+    _artifact_store_is_hashed_and_immutable(tmp_path / "store")
+    _runner_refuses_page_omission_and_missing_provenance()

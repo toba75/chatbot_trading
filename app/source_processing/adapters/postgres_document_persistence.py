@@ -23,6 +23,9 @@ from app.source_processing.application.document_commands import (
     DocumentConversionStatus,
 )
 from app.source_processing.application.document_queries import DocumentStateSnapshot
+from app.source_processing.application.native_document_conversion_worker import (
+    NativeCanonicalPublication,
+)
 from app.source_processing.application.original_queries import (
     OriginalHashMismatchError,
     VerifiedOriginalBinary,
@@ -849,6 +852,78 @@ class PostgresDocumentPersistence:
                             raise RuntimeError("CONVERSION_PERSISTENCE_CONFLICT")
                 return submission
 
+    def complete_native_conversion(self, publication: NativeCanonicalPublication) -> None:
+        if not isinstance(publication, NativeCanonicalPublication):
+            raise ValueError("publication native invalide")
+        with self._connection_factory.connect() as connection:
+            with connection.transaction(), connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO source_processing.canonical_source_versions (
+                        canonical_source_id, canonical_version_id, document_id,
+                        canonical_artifact_ref, canonical_artifact_sha256,
+                        route_name, tool_version
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (canonical_version_id) DO NOTHING
+                    """,
+                    (
+                        publication.canonical_source_id,
+                        publication.canonical_version_id,
+                        publication.document_id.value,
+                        publication.canonical_artifact_ref,
+                        publication.canonical_artifact_sha256,
+                        publication.route_name,
+                        publication.tool_version,
+                    ),
+                )
+                cursor.execute(
+                    """
+                    UPDATE source_processing.document_conversion_requests
+                       SET conversion_status = 'CANONICAL_ACCEPTED',
+                           canonical_version_id = %s,
+                           rejection_error_code = NULL,
+                           canonical_artifact_ref = %s,
+                           canonical_artifact_sha256 = %s,
+                           route_name = %s,
+                           tool_version = %s,
+                           accepted_at = CURRENT_TIMESTAMP
+                     WHERE document_id = %s
+                       AND conversion_status = 'CONVERSION_REQUESTED'
+                    """,
+                    (
+                        publication.canonical_version_id,
+                        publication.canonical_artifact_ref,
+                        publication.canonical_artifact_sha256,
+                        publication.route_name,
+                        publication.tool_version,
+                        publication.document_id.value,
+                    ),
+                )
+                if cursor.rowcount != 1:
+                    raise RuntimeError("CONVERSION_PERSISTENCE_CONFLICT")
+
+    def reject_native_conversion(self, *, document_id: DocumentId, error_code: str) -> None:
+        if not isinstance(document_id, DocumentId):
+            raise ValueError("document_id invalide")
+        if not isinstance(error_code, str) or error_code.strip() == "" or error_code != error_code.strip():
+            raise ValueError("error_code invalide")
+        with self._connection_factory.connect() as connection:
+            with connection.transaction(), connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE source_processing.document_conversion_requests
+                       SET conversion_status = 'QA_REJECTED',
+                           rejection_error_code = %s,
+                           canonical_version_id = NULL
+                     WHERE document_id = %s
+                       AND conversion_status = 'CONVERSION_REQUESTED'
+                    """,
+                    (error_code, document_id.value),
+                )
+                if cursor.rowcount != 1:
+                    raise RuntimeError("CONVERSION_PERSISTENCE_CONFLICT")
+
     def _enqueue_job_outbox(
         self,
         *,
@@ -1322,6 +1397,12 @@ class PostgresDocumentConversionRepository:
         job_request: JobRequest,
     ) -> OutboxSubmissionDecision:
         return self._persistence.submit_conversion_request(conversion_state, job_request)
+
+    def complete_native_conversion(self, publication: NativeCanonicalPublication) -> None:
+        self._persistence.complete_native_conversion(publication)
+
+    def reject_native_conversion(self, *, document_id: DocumentId, error_code: str) -> None:
+        self._persistence.reject_native_conversion(document_id=document_id, error_code=error_code)
 
 
 @dataclass(frozen=True)

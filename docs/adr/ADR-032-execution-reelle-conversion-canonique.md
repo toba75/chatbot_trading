@@ -124,6 +124,11 @@ chaîne native doit être livrée et vérifiée comme un runtime isolé.
   read-models de progression.
 - Configuration concernée : `pyproject.toml`, `uv.lock`, manifeste versionné
   des actifs Docling/Granite/OCRmyPDF et répertoires d'artefacts locaux.
+- Le parcours `NATIVE_STANDARD` livré par T-003 utilise
+  `config/docling-assets.native.json`. Le provisionnement reste explicite :
+  `uv run --locked preload-docling-native-assets --assets-root data/docling_assets/native --manifest-path config/docling-assets.native.json`.
+  Le manifeste est refusé si le répertoire n'est pas déjà présent et scellé ;
+  la conversion ne le crée ni ne le modifie.
 - Tests attendus : gouvernance ADR-032, route native, route Granite, route
   OCRmyPDF conditionnel, actif absent ou altéré, outil absent, stockage
   immuable, progression publique et parcours UI réel.
@@ -135,10 +140,15 @@ chaîne native doit être livrée et vérifiée comme un runtime isolé.
   « Exécution réelle et disponibilité des convertisseurs » ; T-004 de
   `docs/specs/plan_remediation_m13.md`.
 - Plan d'implémentation :
-  `docs/tasks/milestone_004-conversion/0002_decider_execution_reelle_conversion.md`.
+  `docs/tasks/milestone_004-conversion/0002_decider_execution_reelle_conversion.md`
+  et `docs/tasks/milestone_004-conversion/0003_convertir_document_natif_et_publier_artefact.md`.
 - Tests d'acceptation :
-  `gate_tests/ported/tests/governance/validate_m004_conversion_runtime_governance_acceptance.py`.
-- Commits : RED `d21b71718`; GREEN `ef05c09eb`.
+  `gate_tests/ported/tests/governance/validate_m004_conversion_runtime_governance_acceptance.py`
+  et `gate_tests/ported/tests/m004/validate_native_docling_conversion_acceptance.py`.
+- Tests de contrat :
+  `gate_tests/ported/tests/m004/validate_native_docling_conversion_unit.py`
+  et `gate_tests/ported/tests/m004/validate_native_document_conversion_worker_unit.py`.
+- Commits : RED `d21b71718`, `b789b3360`; GREEN `ef05c09eb`.
 
 ## Notes
 

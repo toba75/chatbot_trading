@@ -21,6 +21,10 @@ from app.platform.postgres import PsycopgConnectionFactory
 from app.platform.postgres_migrations import build_configured_postgres_migration_runner
 from app.platform.request_context import bind_trace_id, reset_trace_id
 from app.source_processing.adapters.postgres_document_persistence import build_document_persistence
+from app.source_processing.adapters.docling_native_conversion import (
+    CanonicalArtifactFileStore,
+    IsolatedNativeDoclingConverter,
+)
 from app.source_processing.adapters.postgres_job_outbox import PostgresJobOutbox
 from app.source_processing.adapters.pypdf_diagnostic_inspector import (
     PdfDiagnosticInspector,
@@ -29,6 +33,9 @@ from app.source_processing.adapters.pdf_inspection_process import build_m13_isol
 from app.source_processing.application.document_worker import (
     DocumentDiagnosticWorker,
     WorkerProcessingError,
+)
+from app.source_processing.application.native_document_conversion_worker import (
+    NativeDocumentConversionWorker,
 )
 
 
@@ -179,6 +186,24 @@ def _run_worker(
             inspector=build_m13_isolated_pdf_inspector(),
         ),
     )
+    native_worker = NativeDocumentConversionWorker(
+        source_document_repository=persistence.source_document_repository,
+        processing_run_repository=persistence.processing_run_repository,
+        conversion_repository=persistence.document_conversion_repository,
+        original_source_store=persistence.original_source_store,
+        native_converter=IsolatedNativeDoclingConverter(
+            asset_manifest_path=Path("config/docling-assets.native.json"),
+            assets_root=Path(application_configuration.paths.data_root) / "docling_assets" / "native",
+            timeout_seconds=application_configuration.runtime.timeouts.request_seconds,
+        ),
+        artifact_store=CanonicalArtifactFileStore(
+            root=Path(application_configuration.paths.canonical_sources_root)
+        ),
+    )
+    workers = {
+        "DIAGNOSE": worker,
+        "CONVERT_DOCUMENT": native_worker,
+    }
     processed = 0
     while max_jobs is None or processed < max_jobs:
         try:
@@ -190,7 +215,7 @@ def _run_worker(
             claimed = job_runtime.queue.claim_next(
                 owner_id=instance_owner_id,
                 lease_seconds=lease_seconds,
-                job_names=("DIAGNOSE",),
+                job_names=("DIAGNOSE", "CONVERT_DOCUMENT"),
             )
         except OperationalError:
             _log_runtime_error(owner_id=instance_owner_id, error_code="POSTGRES_TRANSIENT_FAILURE")
@@ -218,7 +243,8 @@ def _run_worker(
         error_code: str | None = None
         try:
             try:
-                result = worker.execute(claimed)
+                claimed_worker = workers[claimed.job.request.job_name]
+                result = claimed_worker.execute(claimed)
             except Exception as exc:
                 error_code, retryable = _classify_processing_error(exc)
                 status = _settle_processing_failure(
@@ -226,7 +252,7 @@ def _run_worker(
                     error_code=error_code,
                     retryable=retryable,
                     max_attempts=MAX_TRANSIENT_ATTEMPTS,
-                    worker=worker,
+                    worker=claimed_worker,
                     job_queue=job_runtime.queue,
                     heartbeat=heartbeat,
                 )

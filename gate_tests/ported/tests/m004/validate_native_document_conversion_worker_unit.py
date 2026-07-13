@@ -1,4 +1,4 @@
-"""Parcours d'acceptation d'un PDF natif réellement converti par Docling."""
+"""Worker M-004 : publication native atomique après conversion Docling réelle."""
 
 from __future__ import annotations
 
@@ -6,9 +6,6 @@ import hashlib
 from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
-
-from pypdf import PdfWriter
-from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
 
 from app.contracts.technical_jobs import (
     ClaimedJob,
@@ -20,7 +17,9 @@ from app.contracts.technical_jobs import (
 )
 from app.source_processing.adapters.docling_native_conversion import (
     CanonicalArtifactFileStore,
-    IsolatedNativeDoclingConverter,
+    NativeDoclingConversionResponse,
+    NativeDoclingPage,
+    NativeDoclingPageItem,
 )
 from app.source_processing.application.document_commands import (
     DocumentConversionState,
@@ -54,18 +53,18 @@ from app.source_processing.domain.source_document import (
 
 class _SourceRepository:
     def __init__(self, source: SourceDocument) -> None:
-        self._source = source
+        self.source = source
 
     def find_by_document_id(self, document_id: DocumentId) -> SourceDocument | None:
-        return self._source if document_id == self._source.document_id else None
+        return self.source if document_id == self.source.document_id else None
 
 
 class _RunRepository:
     def __init__(self, run: DocumentProcessingRun) -> None:
-        self._run = run
+        self.run = run
 
     def find_by_document_id(self, document_id: DocumentId) -> DocumentProcessingRun | None:
-        return self._run if document_id == self._run.document_id else None
+        return self.run if document_id == self.run.document_id else None
 
 
 class _ConversionRepository:
@@ -101,35 +100,37 @@ class _ConversionRepository:
 
 class _OriginalStore:
     def __init__(self, path: Path) -> None:
-        self._path = path
+        self.path = path
 
     def resolve_internal_path(self, storage_ref: OriginalStorageRef) -> Path:
-        return self._path
+        return self.path
 
 
-def _write_native_pdf(path: Path) -> None:
-    """Produit un vrai PDF avec couche texte native, sans fixture Docling."""
-    writer = PdfWriter()
-    page = writer.add_blank_page(width=612, height=792)
-    font = DictionaryObject(
-        {
-            NameObject("/Type"): NameObject("/Font"),
-            NameObject("/Subtype"): NameObject("/Type1"),
-            NameObject("/BaseFont"): NameObject("/Helvetica"),
-        }
-    )
-    page[NameObject("/Resources")] = DictionaryObject(
-        {NameObject("/Font"): DictionaryObject({NameObject("/F1"): writer._add_object(font)})}
-    )
-    contents = DecodedStreamObject()
-    contents.set_data(b"BT /F1 16 Tf 72 720 Td (Conversion native Docling reelle) Tj ET")
-    page[NameObject("/Contents")] = writer._add_object(contents)
-    with path.open("wb") as stream:
-        writer.write(stream)
+class _RealProtocolConverter:
+    """Double du port seulement : l'acceptance exécute le véritable sous-processus Docling."""
+
+    def convert(self, request):
+        assert request.expected_page_numbers == (1,)
+        return NativeDoclingConversionResponse(
+            tool_version="2.111.0",
+            pages=(
+                NativeDoclingPage(
+                    page_number=1,
+                    items=(
+                        NativeDoclingPageItem(
+                            text="Texte converti par Docling.",
+                            bbox=(0.1, 0.1, 0.9, 0.2),
+                            provenance={"page_number": 1, "source": "docling"},
+                        ),
+                    ),
+                ),
+            ),
+        )
 
 
-def _source_and_run(source_path: Path) -> tuple[SourceDocument, DocumentProcessingRun]:
-    fingerprint = SourceFingerprint.from_content(source_path.read_bytes())
+def _source_and_run() -> tuple[SourceDocument, DocumentProcessingRun]:
+    content = b"%PDF-1.7\nconversion native worker\n%%EOF\n"
+    fingerprint = SourceFingerprint.from_content(content)
     document_id = DocumentId.from_fingerprint(fingerprint)
     source = SourceDocument.register_original(
         document_id=document_id,
@@ -139,7 +140,7 @@ def _source_and_run(source_path: Path) -> tuple[SourceDocument, DocumentProcessi
         ),
         metadata=BibliographicMetadata.from_payload(
             {
-                "title": "Conversion native Docling réelle",
+                "title": "Conversion native worker",
                 "authors": ["Perry J. Kaufman"],
                 "publication_year": 2020,
                 "edition": "1re édition",
@@ -151,7 +152,7 @@ def _source_and_run(source_path: Path) -> tuple[SourceDocument, DocumentProcessi
         entries=(PageManifestEntry(PageNumber.from_value(1), PageManifestEntryState.PRESENT),),
     )
     run = DocumentProcessingRun.start(
-        processing_run_id=ProcessingRunId.from_value("RUN-M004-T003-ACCEPTANCE"),
+        processing_run_id=ProcessingRunId.from_value("RUN-M004-T003-WORKER"),
         source_document=source,
         page_manifest=manifest,
     ).record_page_diagnostics(
@@ -191,7 +192,7 @@ def _claimed_job(source: SourceDocument, run: DocumentProcessingRun) -> ClaimedJ
             job_name="CONVERT_DOCUMENT",
             input_hash=source.fingerprint.value,
             configuration_hash="a" * 64,
-            code_version="m004-native-acceptance",
+            code_version="m004-native-worker",
             model_version="docling-2.111.0",
         ),
         payload={
@@ -204,8 +205,8 @@ def _claimed_job(source: SourceDocument, run: DocumentProcessingRun) -> ClaimedJ
     )
     return ClaimedJob(
         job=JobRecord(1, "JOB-M002-000001", request, JobStatus.RUNNING, None, None),
-        trace_id="TRACE-M004-T003-ACCEPTANCE",
-        lease_owner="worker-acceptance",
+        trace_id="TRACE-M004-T003-WORKER",
+        lease_owner="worker-test",
         lease_expires_at=datetime.now(UTC),
         claim_generation=1,
         claim_token=str(uuid4()),
@@ -213,48 +214,28 @@ def _claimed_job(source: SourceDocument, run: DocumentProcessingRun) -> ClaimedJ
     )
 
 
-def test_native_pdf_is_converted_and_published_by_the_real_uv_isolated_worker(tmp_path: Path) -> None:
-    # Given un PDF natif réel et les actifs Docling préchargés, hachés et scellés.
-    # When le worker CONVERT_DOCUMENT appelle le runner isolé du même environnement uv.
-    # Then son artefact immuable est haché et l'état durable devient CANONICAL_ACCEPTED.
-    repository_root = next(
-        parent
-        for parent in Path(__file__).resolve().parents
-        if (parent / "pyproject.toml").is_file()
-    )
-    manifest_path = repository_root / "config" / "docling-assets.native.json"
-    assets_root = repository_root / "data" / "docling_assets" / "native"
-    assert manifest_path.is_file(), "CONVERSION_ASSET_MANIFEST_INVALID: manifeste Docling natif absent."
-    assert assets_root.is_dir(), "CONVERSION_ASSET_MANIFEST_INVALID: actifs Docling natifs absents."
-
-    source_path = tmp_path / "native.pdf"
-    _write_native_pdf(source_path)
-    source, run = _source_and_run(source_path)
-    conversion_repository = _ConversionRepository(source)
+def test_native_worker_persists_hashed_immutable_canonical_acceptance(tmp_path: Path) -> None:
+    # Given un job CONVERT_DOCUMENT dont le manifeste M-003 ne contient que NATIVE_STANDARD.
+    # When le worker reçoit la sortie Docling contrôlée.
+    # Then l'artefact est immuable, haché et la persistance marque CANONICAL_ACCEPTED atomiquement.
+    source, run = _source_and_run()
+    original_path = tmp_path / "original.pdf"
+    original_path.write_bytes(b"%PDF-1.7\noriginal\n%%EOF\n")
+    conversions = _ConversionRepository(source)
     worker = NativeDocumentConversionWorker(
         source_document_repository=_SourceRepository(source),
         processing_run_repository=_RunRepository(run),
-        conversion_repository=conversion_repository,
-        original_source_store=_OriginalStore(source_path),
-        native_converter=IsolatedNativeDoclingConverter(
-            asset_manifest_path=manifest_path,
-            assets_root=assets_root,
-            timeout_seconds=120.0,
-        ),
+        conversion_repository=conversions,
+        original_source_store=_OriginalStore(original_path),
+        native_converter=_RealProtocolConverter(),
         artifact_store=CanonicalArtifactFileStore(root=tmp_path / "canonical"),
     )
 
     result = worker.execute(_claimed_job(source, run))
 
     assert result["conversion_status"] == "CANONICAL_ACCEPTED"
-    assert conversion_repository.state.conversion_status is DocumentConversionStatus.CANONICAL_ACCEPTED
-    assert conversion_repository.publication is not None
-    artifact_path = (
-        tmp_path
-        / "canonical"
-        / conversion_repository.publication.canonical_source_id
-        / conversion_repository.publication.canonical_version_id
-        / "docling.json"
-    )
-    assert artifact_path.is_file()
-    assert hashlib.sha256(artifact_path.read_bytes()).hexdigest() == result["canonical_artifact_sha256"]
+    assert conversions.state.conversion_status is DocumentConversionStatus.CANONICAL_ACCEPTED
+    assert conversions.publication is not None
+    stored = tmp_path / "canonical" / conversions.publication.canonical_source_id / conversions.publication.canonical_version_id / "docling.json"
+    assert stored.is_file()
+    assert hashlib.sha256(stored.read_bytes()).hexdigest() == conversions.publication.canonical_artifact_sha256
