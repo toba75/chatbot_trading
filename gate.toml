@@ -3400,6 +3400,17 @@ depends_on = ["precondition.governance"]
 live = false
 
 [[nodes]]
+id = "test.governance.validate-m004-conversion-runtime-governance-acceptance"
+path = "gate_tests/ported/tests/governance/validate_m004_conversion_runtime_governance_acceptance.py"
+kind = "test"
+scope = "governance"
+phase = "tests"
+timeout_seconds = 30
+serial_group = "parallel"
+depends_on = ["precondition.governance"]
+live = false
+
+[[nodes]]
 id = "test.m013.validate-m013-specification-acceptance"
 path = "gate_tests/ported/tests/m013/validate_m013_specification_acceptance.py"
 kind = "test"
