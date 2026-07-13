@@ -89,6 +89,8 @@ try {
     $env:M013_COMPOSE_ORIGIN = "https://localhost:$edgePort/api"
     $env:M013_COMPOSE_PROJECT = $project
     $env:M013_COMPOSE_FILE = $composePath
+    $resultPath = Join-Path $temporaryRoot "document-result.json"
+    $env:M013_COMPOSE_RESULT = $resultPath
     @'
 import json
 import os
@@ -96,6 +98,7 @@ import ssl
 import time
 import urllib.request
 import uuid
+import hashlib
 from pathlib import Path
 
 from pypdf import PdfWriter
@@ -162,9 +165,45 @@ for _ in range(120):
         break
     time.sleep(0.5)
 assert completed["diagnostic_status"] == "DIAGNOSED", completed
-print(json.dumps({"document_id": document_id, "diagnostic_status": completed["diagnostic_status"]}, sort_keys=True))
+result = {
+    "document_id": document_id,
+    "diagnostic_status": completed["diagnostic_status"],
+    "pdf_sha256": hashlib.sha256(pdf_bytes).hexdigest(),
+}
+Path(os.environ["M013_COMPOSE_RESULT"]).write_text(json.dumps(result, sort_keys=True), encoding="utf-8")
+print(json.dumps(result, sort_keys=True))
 '@ | & $python -B -
     if ($LASTEXITCODE -ne 0) { throw "COMPOSE_REAL_PDF_SCENARIO_FAILED" }
+
+    $documentResult = Get-Content -Raw -Encoding UTF8 $resultPath | ConvertFrom-Json
+    & docker compose --project-name $project -f $composePath restart postgres
+    if ($LASTEXITCODE -ne 0) { throw "POSTGRES_REAL_RESTART_FAILED" }
+    $postgresContainer = (& docker compose --project-name $project -f $composePath ps --quiet postgres).Trim()
+    $postgresReady = $false
+    for ($attempt = 0; $attempt -lt 120; $attempt++) {
+        $postgresHealth = (& docker inspect --format '{{.State.Health.Status}}' $postgresContainer).Trim()
+        if ($postgresHealth -eq "healthy") { $postgresReady = $true; break }
+        Start-Sleep -Milliseconds 500
+    }
+    if (-not $postgresReady) { throw "POSTGRES_REAL_RESTART_NOT_READY" }
+
+    & docker compose --project-name $project -f $composePath restart orchestrator-api
+    if ($LASTEXITCODE -ne 0) { throw "ORCHESTRATOR_NEW_PROCESS_FAILED" }
+    $newProcessReady = $false
+    for ($attempt = 0; $attempt -lt 120; $attempt++) {
+        $status = & curl.exe --insecure --silent --output NUL --write-out "%{http_code}" "https://localhost:$edgePort/api/ready"
+        if ($LASTEXITCODE -eq 0 -and $status -eq "200") { $newProcessReady = $true; break }
+        Start-Sleep -Milliseconds 500
+    }
+    if (-not $newProcessReady) { throw "ORCHESTRATOR_NEW_PROCESS_NOT_READY" }
+
+    $reloadedDiagnostic = (& curl.exe --insecure --silent "https://localhost:$edgePort/api/v1/documents/$($documentResult.document_id)/diagnostic") | ConvertFrom-Json
+    if ($reloadedDiagnostic.diagnostic_status -ne "DIAGNOSED") { throw "T005_POSTGRES_RESTART_DIAGNOSTIC_LOST" }
+    $reloadedOriginalPath = Join-Path $temporaryRoot "reloaded-original.pdf"
+    & curl.exe --insecure --silent --output $reloadedOriginalPath "https://localhost:$edgePort/api/v1/documents/$($documentResult.document_id)/original"
+    if ($LASTEXITCODE -ne 0) { throw "T005_POSTGRES_RESTART_ORIGINAL_UNREADABLE" }
+    $reloadedSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $reloadedOriginalPath).Hash.ToLowerInvariant()
+    if ($reloadedSha256 -ne $documentResult.pdf_sha256) { throw "T005_POSTGRES_RESTART_ORIGINAL_DIVERGENCE" }
 
     $ledgerVersion = (& docker compose --project-name $project -f $composePath exec -T postgres psql -At -U ostrading -d ostrading -c "SELECT max(version) FROM platform.schema_migrations").Trim()
     if ($LASTEXITCODE -ne 0 -or $ledgerVersion -ne "8") { throw "POSTGRES_LEDGER_SCHEMA_008_REQUIRED:$ledgerVersion" }
@@ -173,6 +212,7 @@ finally {
     Remove-Item Env:M013_COMPOSE_ORIGIN -ErrorAction SilentlyContinue
     Remove-Item Env:M013_COMPOSE_PROJECT -ErrorAction SilentlyContinue
     Remove-Item Env:M013_COMPOSE_FILE -ErrorAction SilentlyContinue
+    Remove-Item Env:M013_COMPOSE_RESULT -ErrorAction SilentlyContinue
     $cleanupErrorActionPreference = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
     try {
