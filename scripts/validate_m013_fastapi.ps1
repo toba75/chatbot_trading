@@ -69,7 +69,8 @@ $staticTests = @(
     "tests/m013_fastapi/validate_review3_deployment_acceptance.ps1",
     "tests/m013_fastapi/validate_review3_api_architecture_acceptance.ps1",
     "tests/m013_fastapi/validate_review3_ui_security_acceptance.ps1",
-    "tests/m013_fastapi/validate_review3_maintenance_acceptance.ps1"
+    "tests/m013_fastapi/validate_review3_maintenance_acceptance.ps1",
+    "tests/m013_fastapi/validate_live_gateway_harness_acceptance.ps1"
 )
 $liveTests = @(
     "tests/m013_fastapi/validate_postgres_migration_upgrade_live.ps1",
