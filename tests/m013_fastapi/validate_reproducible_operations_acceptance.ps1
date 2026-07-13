@@ -31,11 +31,14 @@ foreach ($marker in @(
     'UV_PROJECT_ENVIRONMENT',
     'M013_FASTAPI_PYTHON',
     'M013_FASTAPI_TEMP_ENVIRONMENT',
-    'M013_FASTAPI_LOCKED_PYTHON_REQUIRED'
+    'M013_FASTAPI_LOCKED_PYTHON_REQUIRED',
+    'M013_FASTAPI_PROJECT_VERSION_REQUIRED',
+    'from importlib.metadata import version'
 )) {
     Assert-Contains $gate $marker "Bootstrap verrouillé de la gate absent."
 }
 Assert-NotContains $gate 'Join-Path $repoRoot ".venv\Scripts"' "La gate reproductible ne doit pas écrire la .venv partagée."
+Assert-NotContains $gate '--no-install-project' "La gate isolée doit installer le projet et sa métadonnée de version."
 
 Assert-Contains $dockerfile 'ghcr.io/astral-sh/uv@sha256:' "Image uv non épinglée par digest."
 Assert-Contains $dockerfile 'python:3.12.8-slim-bookworm@sha256:' "Image Python non épinglée par digest."
@@ -73,6 +76,8 @@ foreach ($forbiddenEnvironmentInput in @(
     Assert-NotContains $runbook $forbiddenEnvironmentInput "Le runbook ne doit pas publier d'entrée environnement opérationnelle."
 }
 Assert-NotContains $runbook 'uv run api --config' "La recette hôte non reproductible reste documentée."
+Assert-NotContains $runbook '--no-install-project' "Le runbook ne doit pas décrire une installation sans le projet."
+Assert-Contains $runbook 'chatbot-trading` en version `0.1.0' "La preuve de métadonnée du paquet installé manque au runbook."
 Assert-Contains $runbook 'POST /v1/documents' "Contrat OpenAPI de création absent."
 Assert-Contains $runbook '201 application/json' "Média OpenAPI de création imprécis."
 Assert-Contains $runbook 'GET /v1/documents/{document_id}/original' "Contrat OpenAPI de restitution absent."
@@ -85,6 +90,7 @@ foreach ($marker in @(
     'org.opencontainers.image.revision',
     'validate_m013_fastapi.ps1 -Mode Live',
     'scripts/test.ps1',
+    'chatbot-trading` en version `0.1.0',
     'non concluant'
 )) {
     Assert-Contains $audit $marker "Audit courant/historique incomplet."
