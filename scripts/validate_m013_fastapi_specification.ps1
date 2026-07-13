@@ -128,7 +128,7 @@ Assert-Markers -Label "ADR-019" -Content $adrContent -Markers @(
 
 Assert-Markers -Label "Index ADR" -Content $adrIndexContent -Markers @(
     "[ADR-019](ADR-019-api-orchestratrice-fastapi-uvicorn.md)",
-    "Prochaine ADR technique: ADR-026"
+    "Prochaine ADR technique: ADR-028"
 )
 
 $actualAdr018Sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $adr018Path).Hash

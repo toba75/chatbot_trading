@@ -241,7 +241,11 @@ async def main(repo_root):
             assert invalid[1]["x-trace-id"].startswith("TRACE-")
             not_found = await asgi_request(app, "/route-absente", headers=((b"x-trace-id", b"TRACE-404"),))
             assert_equal(not_found[0], 404, "Une route absente doit conserver 404.")
-            assert_equal(not_found[2], {"error_code": "HTTP_ROUTE_NOT_FOUND"}, "Erreur 404 publique invalide.")
+            assert_equal(
+                not_found[2],
+                {"error_code": "ENDPOINT_NOT_FOUND", "path": "/route-absente"},
+                "Erreur 404 publique invalide.",
+            )
             assert_equal(not_found[1]["x-trace-id"], "TRACE-404", "Trace de l'erreur 404 absente.")
             failed = await asgi_request(app, "/boom", headers=((b"x-trace-id", b"TRACE-FAIL"),))
             assert_equal(failed[0], 500, "Une exception infrastructure doit produire 500.")
@@ -253,7 +257,21 @@ async def main(repo_root):
     log_text = logs.getvalue()
     assert "SECRET_PAYLOAD_MUST_NOT_LEAK" not in log_text
     records = [json.loads(line) for line in log_text.splitlines()]
-    assert_equal([record["status_code"] for record in records], [400, 404, 500, 504], "Un log JSON est requis pour chaque erreur.")
+    request_records = [
+        record for record in records
+        if record["event_type"] == "orchestrator_http_request"
+    ]
+    assert_equal(
+        [record["status_code"] for record in request_records],
+        [400, 404, 500, 504],
+        "Un log JSON est requis pour chaque erreur.",
+    )
+    internal_records = [
+        record for record in records
+        if record["event_type"] == "orchestrator_internal_error"
+    ]
+    assert_equal(len(internal_records), 1, "L'erreur interne sûre doit être observée une fois.")
+    assert_equal(internal_records[0]["trace_id"], "TRACE-FAIL", "Trace interne absente.")
 
     # Un timeout pendant HTTPError.read() est une indisponibilité explicite.
     class TimedOutHttpError(urllib.error.HTTPError):
