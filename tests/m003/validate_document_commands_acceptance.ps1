@@ -85,9 +85,13 @@ class ExplicitDocumentInspector:
         self.inspected_refs.append(original_storage_ref.value)
         return self.inspections_by_ref[original_storage_ref.value]
 
+    def inspect_content(self, original_content):
+        return None
+
 
 class InMemoryProcessingRunRepository:
-    def __init__(self):
+    def __init__(self, job_queue):
+        self.job_queue = job_queue
         self.runs_by_document_id = {}
         self.saved_runs = []
 
@@ -101,8 +105,8 @@ class InMemoryProcessingRunRepository:
     def find_by_document_id(self, document_id):
         return self.runs_by_document_id.get(document_id.value)
 
-    def submit_processing_run(self, processing_run, job_queue, job_request):
-        submission = job_queue.submit(request=job_request, recalculate=False)
+    def submit_processing_run(self, processing_run, job_request):
+        submission = self.job_queue.submit(request=job_request, recalculate=False)
         if not submission.created:
             return submission
         self.save(processing_run)
@@ -165,14 +169,13 @@ corrupted_pdf = b"%PDF-1.7\n1 0 obj\n<< /Type /Catalog >>\nendobj\n"
 store = InMemoryOriginalSourceStore()
 source_repository = InMemorySourceDocumentRepository()
 inspector = ExplicitDocumentInspector()
-processing_repository = InMemoryProcessingRunRepository()
 job_queue = InMemoryJobQueue.empty(catalog=JOB_RUNTIME_CATALOG)
+processing_repository = InMemoryProcessingRunRepository(job_queue)
 commands = DocumentCommandService(
     original_source_store=store,
     source_document_repository=source_repository,
     document_inspector=inspector,
     processing_run_repository=processing_repository,
-    job_queue=job_queue,
     diagnosis_configuration_hash="d" * 64,
     code_version="m003-t008-document-commands",
     model_version="diagnosis-policy-v1",

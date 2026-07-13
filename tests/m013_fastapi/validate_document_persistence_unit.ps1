@@ -19,6 +19,7 @@ from app.platform.job_runtime import (
     JobSubmissionDecision,
 )
 from app.platform.job_runtime.postgres import PostgresJobQueue
+from app.platform.job_runtime.composition import build_postgres_job_runtime
 from app.platform.request_context import bind_trace_id, reset_trace_id
 from app.source_processing.adapters.postgres_document_persistence import (
     CorpusOriginalSourceStore,
@@ -26,6 +27,7 @@ from app.source_processing.adapters.postgres_document_persistence import (
     PostgresDocumentPersistence,
     build_document_persistence,
 )
+from app.source_processing.adapters.postgres_job_outbox import PostgresJobOutbox
 from app.source_processing.domain.document_processing_run import (
     DocumentProcessingRun,
     PageManifest,
@@ -100,7 +102,11 @@ adapters = build_document_persistence(
     connection_factory=connection_factory,
 )
 assert isinstance(adapters.source_document_repository, PostgresDocumentPersistence)
-assert isinstance(adapters.job_queue, PostgresJobQueue)
+job_runtime = build_postgres_job_runtime(
+    connection_factory=connection_factory,
+    outbox=PostgresJobOutbox(connection_factory=connection_factory),
+)
+assert isinstance(job_runtime.queue, PostgresJobQueue)
 
 
 class TransactionState:
@@ -200,7 +206,7 @@ queue = PostgresJobQueue(
 trace_token = bind_trace_id("TRACE-M13-PERSISTENCE-UNIT")
 try:
     try:
-        failing_persistence.submit_processing_run(processing_run, queue, request)
+        failing_persistence.submit_processing_run(processing_run, request)
     except RuntimeError as exc:
         assert str(exc) == "PROCESSING_RUN_PERSISTENCE_FAILED"
     else:

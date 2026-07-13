@@ -21,6 +21,7 @@ for method_name in (
     "renew_lease",
     "mark_succeeded",
     "mark_failed",
+    "schedule_retry",
 ):
     assert callable(getattr(PostgresJobQueue, method_name, None)), method_name
 assert callable(getattr(JobOutboxRelay, "relay_pending", None))
@@ -68,7 +69,7 @@ $runtime = Get-Content -Raw -Encoding UTF8 (Join-Path $repoRoot "app\source_proc
 if ($runtime.Contains("threading.Event().wait()")) {
     throw "worker-documents attend encore sans consommer la file."
 }
-foreach ($marker in @("DocumentDiagnosticWorker", "claim_next", "job_outbox_relay.relay_pending")) {
+foreach ($marker in @("DocumentDiagnosticWorker", "claim_next", "job_runtime.outbox_relay.relay_pending")) {
     if (-not $runtime.Contains($marker)) { throw "Raccordement worker absent: $marker" }
 }
 

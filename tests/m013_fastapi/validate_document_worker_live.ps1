@@ -83,6 +83,7 @@ import io
 import json
 import os
 import subprocess
+import threading
 import time
 import urllib.request
 import uuid
@@ -93,11 +94,13 @@ from pypdf import PdfWriter
 
 from app.platform.configuration import load_application_configuration
 from app.platform.job_runtime.postgres import PostgresJobQueue
+from app.platform.job_runtime.composition import build_postgres_job_runtime
 from app.platform.postgres import PsycopgConnectionFactory
 from app.source_processing.adapters.postgres_document_persistence import (
     ProcessingRunVersionConflictError,
     build_document_persistence,
 )
+from app.source_processing.adapters.postgres_job_outbox import PostgresJobOutbox
 from app.source_processing.domain.source_document import DocumentId
 from app.source_processing.domain.document_processing_run import RoutingPolicyVersion
 
@@ -144,7 +147,7 @@ def register_and_diagnose(index):
     return document_id, trace_id
 
 
-documents = [register_and_diagnose(index) for index in range(1, 5)]
+documents = [register_and_diagnose(index) for index in range(1, 4)]
 os.chdir(runtime_root)
 configuration = load_application_configuration(config_path, environment_snapshot={})
 connection_factory = PsycopgConnectionFactory(
@@ -153,7 +156,11 @@ connection_factory = PsycopgConnectionFactory(
     connect_timeout_seconds=configuration.runtime.timeouts.startup_seconds,
 )
 adapters = build_document_persistence(configuration, connection_factory=connection_factory)
-assert isinstance(adapters.job_queue, PostgresJobQueue)
+job_runtime = build_postgres_job_runtime(
+    connection_factory=connection_factory,
+    outbox=PostgresJobOutbox(connection_factory=connection_factory),
+)
+assert isinstance(job_runtime.queue, PostgresJobQueue)
 
 # Deux processus réclament deux jobs concurrents; SKIP LOCKED interdit un double claim actif.
 commands = [
@@ -166,9 +173,18 @@ for process in processes:
     assert process.returncode == 0, (stdout, stderr)
 
 # Le troisième job est réclamé par un processus qui s'arrête avant résultat; une lease expirée permet la reprise.
-claimed = adapters.job_queue.claim_next(owner_id="LIVE-CRASHED", lease_seconds=1, job_names=("DIAGNOSE",))
+claimed = job_runtime.queue.claim_next(owner_id="LIVE-CRASHED:INSTANCE", lease_seconds=1, job_names=("DIAGNOSE",))
 assert claimed is not None
-time.sleep(1.2)
+deadline = time.monotonic() + 4.0
+while time.monotonic() < deadline:
+    with connection_factory.connect() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT lease_expires_at <= CURRENT_TIMESTAMP FROM platform.technical_jobs WHERE job_id = %s", (claimed.job.job_id,))
+            if cursor.fetchone() == (True,):
+                break
+    threading.Event().wait(0.05)
+else:
+    raise AssertionError("deadline expiration lease dépassée")
 recovery = subprocess.run(
     [python, "-B", "-m", "app.source_processing.adapters.worker_runtime", "--config", str(config_path), "--max-jobs", "1", "--worker-id", "LIVE-RECOVERY", "--lease-seconds", "5", "--poll-seconds", "0.1"],
     cwd=runtime_root, env=worker_environment, capture_output=True, text=True, timeout=30,
@@ -177,7 +193,9 @@ assert recovery.returncode == 0, (recovery.stdout, recovery.stderr)
 
 # Le quatrième original devient illisible après sa soumission : l'échec permanent
 # doit terminer le job et devenir visible dans le read-model public.
-failed_document_id, _ = documents[3]
+failed_document = register_and_diagnose(4)
+documents.append(failed_document)
+failed_document_id, _ = failed_document
 failed_source = adapters.source_document_repository.find_by_document_id(
     DocumentId.from_value(failed_document_id)
 )
@@ -205,7 +223,7 @@ assert status == 200
 assert failed_diagnostic["diagnostic_status"] == "FAILED", failed_diagnostic
 assert failed_diagnostic["diagnosed_page_count"] == 0
 
-with adapters.job_queue._connection_factory.connect() as connection:
+with job_runtime.queue._connection_factory.connect() as connection:
     with connection.cursor() as cursor:
         cursor.execute("SELECT status, trace_id, payload ? 'trace_id', lease_owner, lease_expires_at FROM platform.technical_jobs ORDER BY sequence", ())
         rows = cursor.fetchall()
@@ -232,7 +250,7 @@ else:
     raise AssertionError("PROCESSING_RUN_VERSION_CONFLICT absent")
 
 # PostgreSQL réel confirme qu'un interleaving sous REPEATABLE READ conserve le même snapshot.
-factory = adapters.job_queue._connection_factory
+factory = job_runtime.queue._connection_factory
 with factory.connect() as reader, factory.connect() as writer:
     with reader.transaction():
         with reader.cursor() as cursor:

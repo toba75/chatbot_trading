@@ -98,15 +98,16 @@ class InMemoryProcessingRunRepository:
         return submission
 
 class InMemoryDocumentConversionRepository:
-    def __init__(self):
+    def __init__(self, job_queue):
+        self.job_queue = job_queue
         self.conversions_by_document_id = {}
         self.submitted_conversion_requests = []
 
     def find_conversion_by_document_id(self, document_id):
         return self.conversions_by_document_id.get(document_id.value)
 
-    def submit_conversion_request(self, conversion_state, job_queue, job_request):
-        submission = job_queue.submit(request=job_request, recalculate=False)
+    def submit_conversion_request(self, conversion_state, job_request):
+        submission = self.job_queue.submit(request=job_request, recalculate=False)
         if not submission.created:
             return submission
         self.conversions_by_document_id[conversion_state.document_id.value] = conversion_state
@@ -221,15 +222,14 @@ def diagnosed_run(document, run_suffix):
 
 
 def build_service():
+    job_queue = InMemoryJobQueue.empty(catalog=JOB_RUNTIME_CATALOG)
     source_repository = InMemorySourceDocumentRepository()
     processing_repository = InMemoryProcessingRunRepository()
-    conversion_repository = InMemoryDocumentConversionRepository()
-    job_queue = InMemoryJobQueue.empty(catalog=JOB_RUNTIME_CATALOG)
+    conversion_repository = InMemoryDocumentConversionRepository(job_queue)
     service = DocumentConversionCommandService(
         source_document_repository=source_repository,
         processing_run_repository=processing_repository,
         document_conversion_repository=conversion_repository,
-        job_queue=job_queue,
         conversion_configuration_hash="c" * 64,
         code_version="m004-t009-document-commands",
         model_version="document-conversion-policy-v1",

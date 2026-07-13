@@ -25,6 +25,7 @@ from app.platform.orchestrator_composition import (
 from app.source_processing.adapters.document_http import SourceProcessingHttpAdapter
 from app.source_processing.adapters.http import build_document_command_router
 from app.source_processing.adapters.pdf_document_inspector import CorpusPdfDocumentInspector
+from app.source_processing.adapters.pdf_inspection_process import build_m13_isolated_pdf_inspector
 from app.source_processing.adapters.postgres_document_persistence import CorpusOriginalSourceStore
 from app.source_processing.application.document_commands import DocumentCommandService
 
@@ -160,16 +161,10 @@ class SharedPersistence:
     def find_processing_run(self, document_id):
         return self.runs.get(document_id.value)
 
-    def submit_processing_run(self, processing_run, job_queue, job_request):
-        submission = job_queue.submit(job_request, recalculate=False)
-        if submission.created:
-            self.runs[processing_run.document_id.value] = processing_run
-        return submission
-
-
 class ProcessingRuns:
-    def __init__(self, persistence):
+    def __init__(self, persistence, job_queue):
         self.persistence = persistence
+        self.job_queue = job_queue
 
     def save(self, processing_run):
         self.persistence.save(processing_run)
@@ -177,8 +172,11 @@ class ProcessingRuns:
     def find_by_document_id(self, document_id):
         return self.persistence.find_processing_run(document_id)
 
-    def submit_processing_run(self, processing_run, job_queue, job_request):
-        return self.persistence.submit_processing_run(processing_run, job_queue, job_request)
+    def submit_processing_run(self, processing_run, job_request):
+        submission = self.job_queue.submit(job_request, recalculate=False)
+        if submission.created:
+            self.persistence.runs[processing_run.document_id.value] = processing_run
+        return submission
 
 
 class PersistentJobQueue:
@@ -224,12 +222,15 @@ async def scenario(repo_root):
         original_store = CorpusOriginalSourceStore(
             corpus_root=Path(temporary_directory) / "corpus"
         )
+        job_queue = PersistentJobQueue(persistence)
         commands = DocumentCommandService(
             original_source_store=original_store,
             source_document_repository=persistence,
-            document_inspector=CorpusPdfDocumentInspector(original_source_store=original_store),
-            processing_run_repository=ProcessingRuns(persistence),
-            job_queue=PersistentJobQueue(persistence),
+            document_inspector=CorpusPdfDocumentInspector(
+                original_source_store=original_store,
+                inspector=build_m13_isolated_pdf_inspector(),
+            ),
+            processing_run_repository=ProcessingRuns(persistence, job_queue),
             diagnosis_configuration_hash="a" * 64,
             code_version="acceptance-test",
             model_version="document-diagnostic-v1",
@@ -254,6 +255,17 @@ async def scenario(repo_root):
         body = multipart_body(boundary=boundary, pdf_content=pdf_content)
 
         async with application.router.lifespan_context(application):
+            rejected_status, rejected = await asgi_post(
+                application,
+                "/v1/documents",
+                multipart_body(
+                    boundary="ost-m013-false-pdf",
+                    pdf_content=b"%PDF-1.7\nmarqueurs seulement\n%%EOF\n",
+                ),
+                "multipart/form-data; boundary=ost-m013-false-pdf",
+            )
+            assert_equal(rejected_status, 422, "Un faux PDF doit être refusé sans erreur 500.")
+            assert_equal(rejected["error_code"], "SOURCE_UNREADABLE", "L'erreur publique PDF doit rester stable.")
             registered_status, registered = await asgi_post(
                 application,
                 "/v1/documents",

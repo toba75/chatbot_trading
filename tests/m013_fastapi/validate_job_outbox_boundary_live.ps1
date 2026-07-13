@@ -81,7 +81,7 @@ runner007 = PostgresMigrationRunner(
 )
 runner007.run()
 runner007.run()
-assert runner007.required_schema_version == 7
+assert runner007.required_schema_version == 8
 assert runner007.is_required_schema_ready()
 
 
@@ -180,13 +180,13 @@ with base_factory.connect() as connection:
         )
         assert cursor.fetchone() == (0,)
         cursor.execute("SELECT version FROM platform.schema_migrations ORDER BY version", ())
-        assert cursor.fetchall() == [(1,), (2,), (3,), (4,), (5,), (6,), (7,)]
+        assert cursor.fetchall() == [(1,), (2,), (3,), (4,), (5,), (6,), (7,), (8,)]
 
 # Claim SP, commit platform et ACK SP ouvrent chacun leur transaction locale.
 assert tracking.connection_count >= 8, tracking.connection_count
 print(
     "relay-live=concurrent-claim; crash-redelivery=idempotent; "
-    "cross-schema-fk=absent; schema=007; transactions=separate"
+    "cross-schema-fk=absent; schema=008; transactions=separate"
 )
 '@ | & $python -B -
     if ($LASTEXITCODE -ne 0) { throw "JOB_OUTBOX_BOUNDARY_LIVE_FAILED" }

@@ -56,7 +56,12 @@ message = RelayedJobMessage(
     payload={"document_id": "DOC-M013-UNIT"},
     trace_id="TRACE-M13-RELAY-UNIT",
 )
-claim = ClaimedRelayMessage(message=message, owner_id="RELAY-UNIT")
+claim = ClaimedRelayMessage(
+    message=message,
+    owner_id="RELAY-UNIT",
+    claim_generation=1,
+    claim_token="00000000-0000-4000-8000-000000000001",
+)
 outbox = CrashBeforeAckOutbox(claim)
 consumer = IdempotentConsumer()
 relay = JobOutboxRelay(outbox=outbox, consumer=consumer)

@@ -86,9 +86,13 @@ class ExplicitDocumentInspector:
         self.inspected_refs.append(original_storage_ref.value)
         return self.inspections_by_ref[original_storage_ref.value]
 
+    def inspect_content(self, original_content):
+        return None
+
 
 class InMemoryProcessingRunRepository:
-    def __init__(self):
+    def __init__(self, job_queue):
+        self.job_queue = job_queue
         self.runs_by_document_id = {}
         self.saved_runs = []
 
@@ -102,8 +106,8 @@ class InMemoryProcessingRunRepository:
     def find_by_document_id(self, document_id):
         return self.runs_by_document_id.get(document_id.value)
 
-    def submit_processing_run(self, processing_run, job_queue, job_request):
-        submission = job_queue.submit(request=job_request, recalculate=False)
+    def submit_processing_run(self, processing_run, job_request):
+        submission = self.job_queue.submit(request=job_request, recalculate=False)
         if not submission.created:
             return submission
         self.save(processing_run)
@@ -114,7 +118,7 @@ class SaveFailingProcessingRunRepository(InMemoryProcessingRunRepository):
     def save(self, processing_run):
         raise RuntimeError("dépôt de tentatives indisponible")
 
-    def submit_processing_run(self, processing_run, job_queue, job_request):
+    def submit_processing_run(self, processing_run, job_request):
         raise RuntimeError("dépôt de tentatives indisponible")
 
 
@@ -162,14 +166,13 @@ def build_service(job_queue=None):
     store = InMemoryOriginalSourceStore()
     source_repository = InMemorySourceDocumentRepository()
     inspector = ExplicitDocumentInspector()
-    processing_repository = InMemoryProcessingRunRepository()
     configured_job_queue = job_queue if job_queue is not None else InMemoryJobQueue.empty(catalog=JOB_RUNTIME_CATALOG)
+    processing_repository = InMemoryProcessingRunRepository(configured_job_queue)
     service = DocumentCommandService(
         original_source_store=store,
         source_document_repository=source_repository,
         document_inspector=inspector,
         processing_run_repository=processing_repository,
-        job_queue=configured_job_queue,
         diagnosis_configuration_hash="e" * 64,
         code_version="m003-t008-document-commands",
         model_version="diagnosis-policy-v1",
@@ -268,13 +271,12 @@ assert_equal(
 
 # Une panne de persistance de tentative ne doit pas créer de job orphelin.
 save_failing_service, save_failing_source_repository, save_failing_inspector, _, save_failing_queue = build_service()
-save_failing_processing_repository = SaveFailingProcessingRunRepository()
+save_failing_processing_repository = SaveFailingProcessingRunRepository(save_failing_queue)
 save_failing_service = DocumentCommandService(
     original_source_store=InMemoryOriginalSourceStore(),
     source_document_repository=save_failing_source_repository,
     document_inspector=save_failing_inspector,
     processing_run_repository=save_failing_processing_repository,
-    job_queue=save_failing_queue,
     diagnosis_configuration_hash="e" * 64,
     code_version="m003-t008-document-commands",
     model_version="diagnosis-policy-v1",
