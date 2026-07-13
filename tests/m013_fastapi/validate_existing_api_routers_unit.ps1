@@ -47,6 +47,11 @@ class ReadyDependency:
         return DependencyReadiness(name="router-unit", status="ready")
 
 
+class UnusedInferenceGateway:
+    def infer(self, request):
+        raise AssertionError("Le gateway ne doit pas être appelé par ces scénarios de routage.")
+
+
 async def asgi_post(application, path, raw_body, headers):
     sent_messages = []
     request_delivered = False
@@ -90,7 +95,10 @@ async def scenario(repo_root):
         config_path=repo_root / "config" / "application.example.yaml",
         environment_snapshot={},
     )
-    services = build_public_contract_services(configuration)
+    services = build_public_contract_services(
+        configuration,
+        inference_gateway=UnusedInferenceGateway(),
+    )
     router_factories = (
         (build_health_router, ()),
         (build_conversation_router, (services.conversation,)),

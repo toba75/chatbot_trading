@@ -16,8 +16,8 @@ from fastapi import APIRouter
 
 sys.path.insert(0, sys.argv[1])
 
+from app.contracts.llm_inference import LlmInferenceResponse
 from app.platform.configuration import load_application_configuration
-import app.platform.application.public_contract_use_cases as public_use_cases
 from app.platform.orchestrator_asgi import create_orchestrator_app
 from app.platform.orchestrator_composition import DependencyReadiness, OrchestratorCompositionRoot
 from app.platform.orchestrator_contract_routers import build_public_contract_router
@@ -107,23 +107,28 @@ def benchmark_body(configuration):
     }
 
 
-def fake_gateway_response(body, application_configuration):
-    if body["schema_name"] == "m13_reality_product_chat":
-        structured_output = {"answer": "Réponse stable"}
-        raw_response_id = "RAW-CHAT-PARITY"
-    else:
-        task_name = body["prompt_id"].removeprefix("PROMPT-M013-REALITY-LLM-TASK-")
-        structured_output = {
-            "task_name": task_name,
-            "evaluation_marker": f"M013-REALITY-{task_name}",
-            "answer": f"Résultat {task_name}",
-        }
-        raw_response_id = f"RAW-{task_name}"
-    return 200, {
-        "structured_output": structured_output,
-        "raw_response_id": raw_response_id,
-        "provenance": {"provider": "vllm-spark"},
-    }, 12.5
+class FakeInferenceGateway:
+    def infer(self, request):
+        if request.schema_name == "m13_reality_product_chat":
+            structured_output = {"answer": "Réponse stable"}
+            raw_response_id = "RAW-CHAT-PARITY"
+        else:
+            task_name = request.prompt_id.removeprefix("PROMPT-M013-REALITY-LLM-TASK-")
+            structured_output = {
+                "task_name": task_name,
+                "evaluation_marker": f"M013-REALITY-{task_name}",
+                "answer": f"Résultat {task_name}",
+            }
+            raw_response_id = f"RAW-{task_name}"
+        return LlmInferenceResponse(
+            status_code=200,
+            payload={
+                "structured_output": structured_output,
+                "raw_response_id": raw_response_id,
+                "provenance": {"provider": "vllm-spark"},
+            },
+            latency_ms=12.5,
+        )
 
 
 async def scenario(repo_root):
@@ -131,7 +136,10 @@ async def scenario(repo_root):
         config_path=repo_root / "config" / "application.example.yaml",
         environment_snapshot={},
     )
-    services = build_public_contract_services(configuration)
+    services = build_public_contract_services(
+        configuration,
+        inference_gateway=FakeInferenceGateway(),
+    )
 
     def root_factory(validated_configuration):
         return OrchestratorCompositionRoot(
@@ -145,17 +153,22 @@ async def scenario(repo_root):
         composition_root_factory=root_factory,
     )
 
-    original_gateway = public_use_cases._infer
-    original_time = public_use_cases.time.time
-    public_use_cases._infer = fake_gateway_response
-    public_use_cases.time.time = lambda: 1_720_000_000
-    try:
-        direct_chat = public_use_cases.ConversationUseCase(configuration).handle(chat_body(configuration))
-        direct_benchmark = public_use_cases.EvaluationUseCase(configuration).handle(benchmark_body(configuration))
-        direct_search = public_use_cases.SearchUseCase().handle({})
-        direct_index = public_use_cases.IndexingUseCase().handle("DOC-M013-FASTAPI-PARITY", {})
+    direct_chat = services.conversation.handle(
+        chat_body(configuration),
+        trace_id="TRACE-M013-FASTAPI-PARITY",
+    )
+    direct_benchmark = services.evaluation.handle(
+        benchmark_body(configuration),
+        trace_id="TRACE-M013-FASTAPI-BENCHMARK",
+    )
+    direct_search = services.search.handle({}, trace_id="TRACE-M013-FASTAPI-SEARCH")
+    direct_index = services.indexing.handle(
+        "DOC-M013-FASTAPI-PARITY",
+        {},
+        trace_id="TRACE-M013-FASTAPI-INDEX",
+    )
 
-        async with application.router.lifespan_context(application):
+    async with application.router.lifespan_context(application):
             assert_equal(
                 await asgi_request(application, "GET", "/health"),
                 (200, {"service": "orchestrator-api", "status": "healthy"}),
@@ -199,11 +212,6 @@ async def scenario(repo_root):
                 (400, {"error_code": "HTTP_REQUEST_INVALID", "field": "document_id"}),
                 "L'identifiant d'indexation invalide doit conserver son contrat public.",
             )
-    finally:
-        public_use_cases._infer = original_gateway
-        public_use_cases.time.time = original_time
-
-
 asyncio.run(scenario(Path(sys.argv[1])))
 print("Test d'acceptation de parité des contrats API existants: OK")
 '@

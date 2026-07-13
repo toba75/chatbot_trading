@@ -95,10 +95,10 @@ async def scenario(repo_root):
         configuration=configuration,
         composition_root_factory=root_factory,
     )
-    assert_equal(root_factory_count, 0, "La factory ne doit pas être appelée à l'import ni à la création ASGI.")
+    assert_equal(root_factory_count, 1, "La factory doit enregistrer les routes exactement une fois à la création ASGI.")
 
     async with application.router.lifespan_context(application):
-        assert_equal(root_factory_count, 1, "La factory doit être appelée exactement une fois par lifespan.")
+        assert_equal(root_factory_count, 1, "Le lifespan ne doit pas recréer la composition déjà routée.")
         root = application.state.composition_root
         snapshot = root.readiness_snapshot()
         assert_equal(
@@ -139,7 +139,7 @@ async def scenario(repo_root):
         },
         "Uvicorn doit recevoir le bind, le port et les budgets de la configuration validée.",
     )
-    assert_equal(root_factory_count, 1, "Le serveur ne doit pas créer la composition avant le lifespan Uvicorn.")
+    assert_equal(root_factory_count, 2, "Le serveur doit créer une composition routée avant de passer l'application à Uvicorn.")
 
     try:
         DependencyReadiness(name="postgres", status="unknown")
@@ -148,13 +148,11 @@ async def scenario(repo_root):
     else:
         raise AssertionError("Un statut de readiness inconnu ne doit pas être accepté.")
 
-    invalid_application = create_orchestrator_app(
-        configuration=configuration,
-        composition_root_factory=lambda validated_configuration: object(),
-    )
     try:
-        async with invalid_application.router.lifespan_context(invalid_application):
-            raise AssertionError("Un objet arbitraire ne doit pas devenir composition root.")
+        create_orchestrator_app(
+            configuration=configuration,
+            composition_root_factory=lambda validated_configuration: object(),
+        )
     except TypeError as exc:
         assert_equal(
             str(exc),
