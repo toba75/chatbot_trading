@@ -20,6 +20,11 @@ import tempfile
 sys.path.insert(0, sys.argv[1])
 
 import app.platform.local_runtime as local_runtime_module  # noqa: E402
+import app.platform.llm_gateway.orchestrator_http as orchestrator_http_module  # noqa: E402
+from app.contracts.llm_inference import (  # noqa: E402
+    LlmInferenceMessage,
+    LlmInferenceRequest,
+)
 from app.platform.configuration import (  # noqa: E402
     ApplicationConfigurationError,
     load_application_configuration,
@@ -42,8 +47,8 @@ from app.platform.local_runtime import (  # noqa: E402
     _configured_http_port,
     _llm_gateway_readiness_response,
     _llm_gateway_post_response,
-    _post_local_gateway_inference,
 )
+from app.platform.llm_gateway.orchestrator_http import UrllibLlmInferenceGateway  # noqa: E402
 from app.platform.observability import InMemoryObservabilityCollector  # noqa: E402
 
 
@@ -363,19 +368,32 @@ class InvalidJsonResponse:
         return b"not-json"
 
 
-original_urlopen = local_runtime_module.urllib.request.urlopen
+original_urlopen = orchestrator_http_module.urllib.request.urlopen
 try:
-    local_runtime_module.urllib.request.urlopen = lambda request, timeout: InvalidJsonResponse()
-    invalid_status, invalid_payload, _elapsed = _post_local_gateway_inference(
-        body={"messages": [], "output_schema": {}, "schema_name": "invalid", "schema_version": "1.0"},
-        application_configuration=configuration,
+    orchestrator_http_module.urllib.request.urlopen = lambda request, timeout: InvalidJsonResponse()
+    invalid_response = UrllibLlmInferenceGateway(
+        endpoint_url=f"{configuration.services.llm_gateway.url}/v1/infer",
+        timeout_seconds=configuration.services.llm_gateway.timeout_seconds,
+    ).infer(
+        LlmInferenceRequest(
+            messages=(LlmInferenceMessage(role="user", content="Réponse JSON attendue."),),
+            output_schema={"type": "object"},
+            schema_name="m013_config_invalid_response",
+            schema_version="1.0",
+            trace_id="TRACE-M013-CONFIG-INVALID",
+            request_id="REQUEST-M013-CONFIG-INVALID",
+            idempotency_key="IDEMPOTENCY-M013-CONFIG-INVALID",
+            prompt_id="PROMPT-M013-CONFIG-INVALID",
+            prompt_version="1.0",
+            sampling_parameters={"temperature": 0},
+        )
     )
 finally:
-    local_runtime_module.urllib.request.urlopen = original_urlopen
+    orchestrator_http_module.urllib.request.urlopen = original_urlopen
 
-assert_equal(invalid_status, 502, "Une réponse gateway 200 non JSON doit être traduite en 502.")
+assert_equal(invalid_response.status_code, 502, "Une réponse gateway 200 non JSON doit être traduite en 502.")
 assert_equal(
-    invalid_payload["error_code"],
+    invalid_response.payload["error_code"],
     "LLM_GATEWAY_RESPONSE_INVALID",
     "Une réponse gateway 200 non JSON doit avoir un code stable.",
 )
