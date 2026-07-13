@@ -226,7 +226,7 @@ guarded_failure_outbox._entries_by_event_id = GuardedEntryDict(
 guarded_failure_outbox.mark_failed(guarded_failure_event.event_id, "consumer unavailable")
 
 assert_raises(
-    "producer_context vide",
+    "producer_context invalide",
     lambda: ProducerStateMutation(
         mutation_id="MUT-INVALID",
         producer_context="",
