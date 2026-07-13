@@ -131,6 +131,14 @@ foreach ($expectedGateVolume in $expectedGateVolumes) {
     }
 }
 
+if ($acceptanceContent.Contains("Plusieurs contextes de précondition sont actifs")) {
+    throw "Le sélecteur M-000 doit conserver la priorité ordonnée des contextes imbriqués."
+}
+
+if (-not $acceptanceContent.Contains('$activePreconditionContexts[0]')) {
+    throw "La priorité ordonnée des contextes de précondition M-000 est absente."
+}
+
 $aggregatorContent = Get-Content -Raw -Encoding UTF8 -LiteralPath $aggregatorPath
 if ($aggregatorContent.Contains("GetEncoding(1252)") -or $aggregatorContent.Contains("UTF8.GetString")) {
     throw "L'agrégateur M-000 ne doit pas réparer silencieusement l'encodage des sorties."
