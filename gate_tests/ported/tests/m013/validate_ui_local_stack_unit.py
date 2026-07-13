@@ -19,6 +19,8 @@ if str(repo_root) not in sys.path:
     sys.path.insert(0, str(repo_root))
 
 from app.platform.ui_local_stack import build_local_ui_runtime_configuration  # noqa: E402
+import app.platform.ui_local_stack as ui_local_stack  # noqa: E402
+from subprocess import CompletedProcess
 
 
 def assert_equal(actual, expected, message):
@@ -75,6 +77,34 @@ with tempfile.TemporaryDirectory() as temporary_directory:
             source_configuration_path=source_config,
         ),
     )
+
+
+# Given PostgreSQL initialise encore son cluster local.
+# When `pg_isready` retourne son code transitoire 1 avant un code 0.
+# Then le bootstrap attend la readiness au lieu de présenter une panne prématurée.
+calls = []
+original_run_docker = ui_local_stack._run_docker
+original_sleep = ui_local_stack.time.sleep
+
+def fake_run_docker(arguments, error_code, *, allowed_returncodes=frozenset((0,))):
+    calls.append(allowed_returncodes)
+    if len(calls) == 1:
+        assert_equal(
+            allowed_returncodes,
+            frozenset((0, 1, 2)),
+            "Le code transitoire pg_isready doit être explicitement accepté.",
+        )
+        return CompletedProcess(args=arguments, returncode=1, stdout="", stderr="")
+    return CompletedProcess(args=arguments, returncode=0, stdout="", stderr="")
+
+ui_local_stack._run_docker = fake_run_docker
+ui_local_stack.time.sleep = lambda _: None
+try:
+    ui_local_stack._wait_for_postgres()
+finally:
+    ui_local_stack._run_docker = original_run_docker
+    ui_local_stack.time.sleep = original_sleep
+assert_equal(len(calls), 2, "Le bootstrap doit réessayer jusqu'à readiness PostgreSQL.")
 
 print("Tests unitaires bootstrap local uv run ui: OK")
 '''
