@@ -228,6 +228,17 @@
 - Écart historique explicite : certains lots antérieurs ont adapté ou ajouté des tests dans leur commit GREEN. Les hashes sont conservés et cet écart à la séparation RED/GREEN stricte est documenté sans réécriture. Pour ADR-026, le contrat a été commité RED, le harness a été stabilisé dans des commits exclusivement tests, puis l'implémentation a été commitée GREEN sans assouplir le contrat.
 - Préservation utilisateur : le hunk `tests/m013/validate_m013_reality_product_acceptance.ps1` reste hors staging et hors commits.
 
+## Correctif final - Politique environnement M13-config
+
+- Date : 2026-07-13.
+- État initial : `scripts/lint.ps1` était RED uniquement sur `scripts/validate_m013_config_environment.ps1`; la gate FastAPI et le runbook exposaient des variables techniques comme des entrées environnement non bornées, et les noms du helper contenaient deux clés applicatives historiques interdites.
+- Scénario BDD : Given la configuration applicative provient exclusivement du fichier strict; When la gate FastAPI matérialise son interpréteur et son endpoint de preuve; Then seules cinq variables techniques sont admises dans le chemin exact `scripts/validate_m013_fastapi.ps1`, les mêmes lectures restent rejetées dans tout autre script ou module applicatif, et chaque interpolation Compose du runbook est éphémère puis restaurée.
+- Commit RED : `fa006fa8d`, `test(configuration): borner exceptions environnement gate M13`.
+- Commit GREEN : `36d54aafa`, `fix(configuration): borner environnement technique gate M13`.
+- Implémentation : allowlist path-scopée pour `PATH`, `VIRTUAL_ENV`, `UV_PROJECT_ENVIRONMENT`, `M013_FASTAPI_PYTHON` et `M013_FASTAPI_GATEWAY_ENDPOINT`; endpoint et erreurs du helper renommés sans reprendre `LLM_GATEWAY_URL` ou `LLM_GATEWAY_PORT`; variables locales et `[System.IO.Path]::GetTempPath()` dans le runbook.
+- Preuves GREEN : gate environnement sur `308` fichiers, tests unitaires et d'acceptation de rejet, opérations reproductibles, déploiement orchestrateur et gate M13-FastAPI Static `37/37`.
+- Préservation utilisateur : le hunk `tests/m013/validate_m013_reality_product_acceptance.ps1` reste hors staging et hors commits.
+
 ## Correctif de revue 3 - Admission UI, sécurité et quota ADR-028
 
 - Date : 2026-07-13.
