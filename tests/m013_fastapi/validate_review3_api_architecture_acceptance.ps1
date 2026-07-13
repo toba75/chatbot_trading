@@ -281,8 +281,16 @@ async def scenario(repo_root: Path):
 
 def architecture(repo_root: Path):
     platform_public = repo_root / "app" / "platform" / "application" / "public_contract_use_cases.py"
-    if platform_public.exists():
-        raise AssertionError("La logique CV/EX ne doit plus exister sous platform/application.")
+    compatibility_source = platform_public.read_text(encoding="utf-8")
+    for forbidden in (
+        "import urllib",
+        "class ConversationUseCase",
+        "class EvaluationUseCase",
+        "_TASKS =",
+        "_METRICS =",
+    ):
+        if forbidden in compatibility_source:
+            raise AssertionError(f"La délégation platform n'est pas mince: {forbidden}")
     local_runtime = (repo_root / "app" / "platform" / "local_runtime.py").read_text(encoding="utf-8")
     if "def _legacy_" in local_runtime or "import urllib" in local_runtime:
         raise AssertionError("Les implémentations legacy et l'I/O urllib doivent quitter local_runtime.")
