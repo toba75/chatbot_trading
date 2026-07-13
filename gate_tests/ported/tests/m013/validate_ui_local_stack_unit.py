@@ -20,6 +20,7 @@ if str(repo_root) not in sys.path:
 
 from app.platform.ui_local_stack import build_local_ui_runtime_configuration  # noqa: E402
 import app.platform.ui_local_stack as ui_local_stack  # noqa: E402
+from app.platform.ui_command import UILaunchConfiguration  # noqa: E402
 from subprocess import CompletedProcess
 
 
@@ -150,6 +151,81 @@ with tempfile.TemporaryDirectory() as temporary_directory:
         )
     finally:
         ui_local_stack._run_docker = original_run_docker
+
+
+# Given `uv run ui` doit rendre l'API orchestratrice réellement prête.
+# When la stack locale est ouverte.
+# Then PostgreSQL, le llm-gateway réel et l'API démarrent dans cet ordre, puis sont arrêtés en sens inverse.
+with tempfile.TemporaryDirectory() as temporary_directory:
+    root = Path(temporary_directory)
+    source_config = root / "config" / "application.yaml"
+    source_config.parent.mkdir(parents=True)
+    source_config.write_text(
+        "services:\\n  postgres:\\n    url: postgresql+psycopg://app@postgres/app\\n",
+        encoding="utf-8",
+    )
+    events = []
+    originals = {
+        name: getattr(ui_local_stack, name)
+        for name in (
+            "_require_available_port",
+            "_ensure_local_secret",
+            "_start_local_postgres",
+            "_wait_for_postgres",
+            "_start_local_llm_gateway",
+            "_wait_for_llm_gateway",
+            "_start_orchestrator_api",
+            "_wait_for_api",
+            "_stop_process",
+            "_stop_local_postgres",
+        )
+    }
+    ui_local_stack._require_available_port = lambda *, port, error_code: events.append(f"port:{port}")
+    ui_local_stack._ensure_local_secret = lambda path: events.append(f"secret:{path.name}")
+    ui_local_stack._start_local_postgres = lambda *, repository_root: events.append("postgres-start") or True
+    ui_local_stack._wait_for_postgres = lambda: events.append("postgres-ready")
+    ui_local_stack._start_local_llm_gateway = (
+        lambda *, repository_root, runtime_configuration: events.append("gateway-start") or "gateway"
+    )
+    ui_local_stack._wait_for_llm_gateway = lambda gateway_process: events.append("gateway-ready")
+    ui_local_stack._start_orchestrator_api = (
+        lambda *, repository_root, runtime_configuration: events.append("api-start") or "api"
+    )
+    ui_local_stack._wait_for_api = lambda api_process: events.append("api-ready")
+    ui_local_stack._stop_process = lambda process: events.append(f"stop:{process}")
+    ui_local_stack._stop_local_postgres = lambda: events.append("postgres-stop")
+    try:
+        with ui_local_stack.start_local_ui_stack(
+            UILaunchConfiguration(service_id="ui", port=8081, config_path=str(source_config))
+        ) as runtime_configuration:
+            assert_equal(
+                runtime_configuration.config_path,
+                str(root / ".tmp" / "ost-ui-runtime" / "application.yaml"),
+                "L'UI doit utiliser la configuration runtime après readiness des dépendances.",
+            )
+    finally:
+        for name, original in originals.items():
+            setattr(ui_local_stack, name, original)
+    assert_equal(
+        events,
+        [
+            "port:8080",
+            "port:8090",
+            "port:8081",
+            "secret:postgres_password",
+            "secret:local_api_token",
+            "postgres-start",
+            "postgres-ready",
+            "gateway-start",
+            "gateway-ready",
+            "api-start",
+            "api-ready",
+            "stop:api",
+            "stop:gateway",
+            "postgres-stop",
+        ],
+        "Le bootstrap doit encadrer toutes les dépendances réelles de l'UI.",
+    )
 
 print("Tests unitaires bootstrap local uv run ui: OK")
 '''
