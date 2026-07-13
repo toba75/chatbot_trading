@@ -37,6 +37,7 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 | [ADR-029](ADR-029-gate-python-uv-manifeste-unique.md) | Gate Python uv à manifeste unique | Acceptée | 2026-07-13 | ADR-010 | Aucune |
 | [ADR-030](ADR-030-bootstrap-local-ui-api.md) | Bootstrap local de l’UI via l’API réelle | Acceptée | 2026-07-13 | Aucun | Aucune |
 | [ADR-031](ADR-031-actions-ui-execution-et-progression-publique.md) | Actions UI exécutables et progression publique | Acceptée | 2026-07-13 | Aucun | Aucune |
+| [ADR-032](ADR-032-execution-reelle-conversion-canonique.md) | Exécution réelle et reproductible de la conversion canonique | Proposée | 2026-07-13 | Aucun | Aucune |
 
 ## ADR DDD
 
@@ -58,7 +59,7 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 ## Prochains numéros disponibles
 
 ```text
-Prochaine ADR technique: ADR-032
+Prochaine ADR technique: ADR-033
 Prochaine DDD-ADR: DDD-ADR-013
 ```
 

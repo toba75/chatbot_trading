@@ -5,9 +5,9 @@
 - Milestone: M-004 - Version canonique publiée.
 - Source canonique: `docs/specs/plan_implementation_milestones_workstreams.md`, section `M-004 - Version canonique publiée`.
 - Spécification normative: `docs/specs/specification_unifiee_ddd_technique_chatbot_trading_v4_1.md`, sections 5, 12, 14, 17, 19, 20 et 21.
-- ADR consultées: ADR-001, ADR-002, ADR-003, ADR-004, ADR-010, DDD-ADR-003, DDD-ADR-006, DDD-ADR-008, DDD-ADR-010.
+- ADR consultées: ADR-001, ADR-002, ADR-003, ADR-004, ADR-010, ADR-031, ADR-032, DDD-ADR-003, DDD-ADR-006, DDD-ADR-008, DDD-ADR-010.
 - Contrats amont: `docs/specs/m003_source_enregistree_diagnostiquee_routee.md`, `docs/specs/m001_frontieres_ddd_contrats_publies.md`.
-- ADR: non requise, car M-004 applique les décisions existantes sur les artefacts canoniques, le routage hybride, OCRmyPDF conditionnel, l'autorité textuelle unique, SourceLocator, l'outbox, la cohérence éventuelle, les gates uv run --locked gate
+- ADR: ADR-032 est proposée pour fixer le runtime réellement exécutable des adaptateurs, de leurs actifs et du stockage canonique; elle ne modifie pas le sens des ADR-001 à ADR-004.
 
 ## Scénario BDD
 
@@ -95,6 +95,29 @@ Les statuts admis sont `PASS`, `PASS_WITH_WARNINGS`, `RETRY_WITH_ALTERNATIVE_ROU
 La QA post-conversion contrôle le nombre de pages, le JSON valide, les identifiants uniques, l'ordre des pages, la provenance de chaque item, les coordonnées, les nombres, signes négatifs, pourcentages, séparateurs décimaux, tableaux, figures et l'autorité textuelle enregistrée.
 
 `CanonicalAcceptancePolicy` refuse toute version candidate qui laisse une page sans autorité, qui référence une page inexistante, qui produit un item sans `SourceLocator`, qui perd une page du manifeste ou qui transforme une alerte bloquante en avertissement non bloquant.
+
+## Exécution réelle et disponibilité des convertisseurs
+
+ADR-032 fixe l'exécution réelle des ports M-004. `NATIVE_STANDARD` appelle
+Docling standard; `SCAN_GRANITE`, `BAD_OCR_TO_GRANITE`, `MIXED_PAGEWISE` et
+`TARGETED_ENRICHMENT` appellent Granite-Docling; `PREPROCESS_GRANITE` appelle
+d'abord OCRmyPDF puis Granite-Docling. Une route ne peut jamais choisir un
+outil voisin en cas d'échec : il n'y a pas de fallback.
+
+Les adaptateurs Docling s'exécutent dans un processus isolé de l'environnement
+`uv`, sur `docling[vlm]==2.111.0` verrouillé dans `uv.lock`. Les modèles et
+l'image OCRmyPDF sont décrits par révision et SHA-256 dans un manifeste
+d'actifs; ils sont préchargés par une commande explicite. Pendant la conversion
+ou `uv run ui`, tout actif absent, altéré ou non vérifiable produit
+`CONVERSION_ASSET_MANIFEST_INVALID`; aucun téléchargement silencieux n'est
+autorisé.
+
+Chaque conversion conserve la route, l'outil, sa version, les hashes des
+artefacts pagewise et le SHA-256 de l'artefact canonique immuable. L'absence de
+Docling standard, Granite-Docling, OCRmyPDF ou du stockage canonique est une
+issue publique stable et terminale du worker. Selon ADR-031, elle est rendue
+par le contrat de progression et ne rend jamais `Convertir` disponible avant
+que toute la chaîne réelle soit prête.
 
 ## Événements M-004
 
