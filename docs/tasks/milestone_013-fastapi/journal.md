@@ -227,3 +227,20 @@
 - Validations GREEN : déploiement revue 3 statique et live, opérations reproductibles, déploiement orchestrateur, configuration M13-config, Compose local, migration PostgreSQL live, `uv lock --check` et système ADR.
 - Écart historique explicite : certains lots antérieurs ont adapté ou ajouté des tests dans leur commit GREEN. Les hashes sont conservés et cet écart à la séparation RED/GREEN stricte est documenté sans réécriture. Pour ADR-026, le contrat a été commité RED, le harness a été stabilisé dans des commits exclusivement tests, puis l'implémentation a été commitée GREEN sans assouplir le contrat.
 - Préservation utilisateur : le hunk `tests/m013/validate_m013_reality_product_acceptance.ps1` reste hors staging et hors commits.
+
+## Correctif de revue 3 - Admission UI, sécurité et quota ADR-028
+
+- Date : 2026-07-13.
+- Scénario BDD : Given l’interface locale, un jeton Bearer conservé côté serveur et un quota corpus PostgreSQL; When plusieurs transferts documentaires concurrents traversent l’UI et l’API; Then les mutations sont authentifiées, les requêtes intersites sont refusées, les octets restent diffusés par blocs, l’admission est atomique et la saturation retourne une erreur publique explicite sans fallback.
+- Décision : ADR-028 complète ADR-018 et ADR-020. Le navigateur reste client de l’UI locale, qui injecte le secret uniquement vers l’API; les lectures et la santé restent publiques, tandis que l’enregistrement et le diagnostic exigent le jeton local.
+- Commit RED : `9a487beb7`, `test(api-ui): couvrir sécurité streaming et quota RED`.
+- Commit GREEN : `6d6d58c89`, `feat(api-ui): sécuriser les transferts et le quota corpus`.
+- Configuration et données : `security.secrets.local_api_token_path` désigne un secret d’au moins 32 octets hors Git; `paths.corpus_quota_bytes` fixe le quota obligatoire; la migration ascendante `009_corpus_quota.sql` ajoute le verrou d’admission singleton et les réservations idempotentes par empreinte.
+- Frontière HTTP : les mutations documentaires répondent `401` ou `403` sans jeton valide; l’UI impose `Origin == Host`, borne quatre requêtes concurrentes, applique des timeouts socket et backend de 30 secondes et retourne `503` lorsqu’elle est saturée.
+- Flux binaires : upload navigateur vers UI puis API, stockage temporaire et téléchargement API vers UI puis navigateur sont transmis par blocs de 64 Kio; le PDF métier reste borné à 50 Mio et un dépassement retourne une page `413` accessible.
+- Read-model : le corpus est lu page par page par lots de 100, sans fan-out `1+N`; les raisons publiques de revue manuelle et les codes d’échec restent inspectables; le POST-Redirect-GET conserve `document_id` et `duplicate`.
+- Quota réel : deux réservations PostgreSQL concurrentes de 600 octets sous un quota de 1 000 n’en acceptent qu’une; l’autre échoue avec `CORPUS_QUOTA_EXCEEDED`, et le rejeu de la même empreinte reste idempotent.
+- Preuves GREEN : acceptation statique sécurité/streaming/quota; preuve live PostgreSQL du quota; parcours réel UI/FastAPI/PostgreSQL/worker; upgrade 007 vers 009; outbox et sûreté live; artefact Compose exporté depuis le commit GREEN, migrations 001 à 009, redémarrage PostgreSQL/API et relecture du diagnostic et du SHA-256 original.
+- Nettoyage prouvé : les processus UI, API et gateway, les conteneurs PostgreSQL temporaires, les secrets temporaires, les répertoires de travail et les variables de test sont supprimés dans les blocs `finally`; aucun conteneur de preuve n’est resté actif.
+- Limite M004 : la conversion canonique n’est pas livrée; l’UI affiche exactement `fonctionnalité non livrée`, sans retry, projection inventée ni statut de succès implicite.
+- Préservation utilisateur : le hunk `tests/m013/validate_m013_reality_product_acceptance.ps1` reste hors staging et hors commits.

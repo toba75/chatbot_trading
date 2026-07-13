@@ -33,6 +33,7 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 | [ADR-025](ADR-025-fencing-claims-inspection-pdf-isolee.md) | Fencing des claims et inspection PDF isolée | Acceptée | 2026-07-13 | Aucun | Aucune |
 | [ADR-026](ADR-026-deploiement-compose-reproductible.md) | Déploiement Compose reproductible depuis un commit complet | Acceptée | 2026-07-13 | Aucun | Aucune |
 | [ADR-027](ADR-027-composition-http-et-observation-flux.md) | Composition HTTP précoce et observation complète des flux | Acceptée | 2026-07-13 | Aucun | Aucune |
+| [ADR-028](ADR-028-admission-documentaire-locale-authentifiee.md) | Admission documentaire locale authentifiée et bornée | Acceptée | 2026-07-13 | Aucun | Aucune |
 
 ## ADR DDD
 
@@ -54,7 +55,7 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 ## Prochains numéros disponibles
 
 ```text
-Prochaine ADR technique: ADR-028
+Prochaine ADR technique: ADR-029
 Prochaine DDD-ADR: DDD-ADR-013
 ```
 

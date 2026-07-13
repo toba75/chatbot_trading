@@ -102,6 +102,18 @@ Le runtime exige Python `3.12.8` exactement. FastAPI, Uvicorn, Pydantic, Starlet
 - La readiness vérifie distinctement le ledger PostgreSQL et `/health` de `llm-gateway`; l'indisponibilité d'une dépendance est visible sans exposer son URL ni ses secrets.
 - ADR-026 impose une construction depuis une archive Git, des images API/worker identifiées par commit et schéma, deux replicas worker et une preuve Compose finale incluant UI et Caddy.
 
+## Admission documentaire locale
+
+- ADR-028 impose un token backend hors Git pour les mutations documentaires, un contrôle same-origin au serveur UI, des transferts streaming bornés et un quota corpus sérialisé dans PostgreSQL.
+- `POST /v1/documents` et `POST /v1/documents/{document_id}/diagnose` exigent `Authorization: Bearer <token>` entre l'UI et `orchestrator-api`. Le token provient exclusivement de `security.secrets.local_api_token_path`, contient au moins 32 octets et n'apparaît dans aucun contrat public.
+- Une mutation directe sans token répond `401 LOCAL_API_TOKEN_REQUIRED`; une valeur incorrecte répond `403 LOCAL_API_TOKEN_INVALID`. Les lectures, `/health` et `/ready` ne sont pas protégées par ce mécanisme.
+- Une mutation navigateur doit prouver `Origin` identique à `Host`; `Sec-Fetch-Site`, s'il est présent, vaut `same-origin`. Le serveur UI refuse avant lecture du corps avec `403 UI_ORIGIN_FORBIDDEN`.
+- Le PDF est borné à 50 Mio. UI, API et stockage le transmettent ou le copient par chunks de 64 Kio; aucune couche ne matérialise le PDF complet. Les longueurs de titre, auteurs et édition ainsi que le nombre d'auteurs sont bornés avant appel applicatif.
+- Le serveur UI accepte au plus quatre requêtes simultanées, applique des timeouts socket et backend de 30 secondes et répond `503 UI_TRANSFER_CAPACITY_EXHAUSTED` en saturation. Un dépassement de taille répond `413` dans une page française accessible.
+- `paths.corpus_quota_bytes` fixe le quota agrégé. La migration `009_corpus_quota.sql` porte le compteur et les réservations; `SELECT ... FOR UPDATE` sérialise l'admission et `507 CORPUS_QUOTA_EXCEEDED` refuse un dépassement.
+- Le corpus UI charge exactement une page de cent documents par navigation. La lecture SP utilise une requête SQL légère et ne charge ni manifeste, ni décisions de pages, ni routes.
+- Une redirection `303` après enregistrement conserve `document_id` et `duplicate`. Une conversion ou une projection M-004 absente affiche exactement `fonctionnalité non livrée` sans conseil de retry.
+
 ## Gates T-002
 
 ```powershell
@@ -113,7 +125,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_fast
 
 ## Traçabilité
 
-- ADR: ADR-018; ADR-019; ADR-020; ADR-021; ADR-023; ADR-024; ADR-025; ADR-026; DDD-ADR-001.
+- ADR: ADR-018; ADR-019; ADR-020; ADR-021; ADR-023; ADR-024; ADR-025; ADR-026; ADR-028; DDD-ADR-001.
 - Tâche: `docs/tasks/milestone_013-fastapi/0002_decider_frontiere_http_publique.md`.
 - Tests: `tests/m013_fastapi/validate_fastapi_specification_acceptance.ps1`; `tests/m013_fastapi/validate_fastapi_architecture_policy_unit.ps1`.
 - Commit RED: `7a3c3c231`, `test(architecture): couvrir frontiere asgi orchestratrice`.

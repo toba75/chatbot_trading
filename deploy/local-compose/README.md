@@ -6,6 +6,7 @@
 - La configuration conteneur versionnée est `deploy/local-compose/application.compose.yaml`; elle respecte `config/application.schema.json` et les DNS Compose.
 - Fournir le secret hors dépôt dans `deploy/local-compose/secrets/`:
   - `postgres_password`
+  - `local_api_token` d'au moins 32 octets aléatoires, partagé uniquement par `ui` et `orchestrator-api`
 - Le gateway LLM cible uniquement l'endpoint Docker Spark déclaré dans `services.llm_gateway.spark_endpoint_url`.
 - La provenance LLM est déclarée explicitement dans `models.llm.served_model_name`, `models.llm.model_revision` et `models.llm.runtime_version`.
 - Les processus applicatifs reçoivent tous `--config /workspace/config/application.yaml`.
@@ -41,4 +42,4 @@ docker compose -f .\deploy\local-compose\compose.yaml config
 docker compose -f .\deploy\local-compose\compose.yaml up --build
 ```
 
-L'entrée utilisateur est `edge-gateway` liée à `127.0.0.1:${OST_EDGE_HTTPS_PORT}` et accessible via `https://localhost:${OST_EDGE_HTTPS_PORT}`. Aucun service interne ne publie de port hôte; `llm-gateway` est le seul service rattaché au réseau `spark-egress`.
+L'entrée utilisateur est `edge-gateway` liée à `127.0.0.1:${OST_EDGE_HTTPS_PORT}` et accessible via `https://localhost:${OST_EDGE_HTTPS_PORT}`. Aucun service interne ne publie de port hôte; `llm-gateway` est le seul service rattaché au réseau `spark-egress`. Le token local n'est jamais transmis au navigateur : le serveur UI le lit depuis `/run/secrets/local_api_token` pour authentifier uniquement ses mutations backend.

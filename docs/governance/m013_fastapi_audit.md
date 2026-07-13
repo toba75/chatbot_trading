@@ -4,12 +4,12 @@
 
 - Tâche : T-011, déployer et auditer l'API orchestratrice.
 - Date de consolidation : 2026-07-13.
-- Décisions courantes : ADR-018, ADR-019, ADR-020, ADR-021, ADR-023, ADR-024, ADR-025 et ADR-026.
+- Décisions courantes : ADR-018, ADR-019, ADR-020, ADR-021, ADR-023, ADR-024, ADR-025, ADR-026, ADR-027 et ADR-028.
 - Configuration : fichier M13-config unique, `configuration_hash` obligatoire et variante conteneur versionnée `deploy/local-compose/application.compose.yaml`.
 
 ## État courant
 
-Le schéma courant est le préfixe numérique maximal de `deploy/postgres/migrations/*.sql`. La gate live vérifie le même ensemble via le ledger `platform.schema_migrations`; elle prouve actuellement la migration 008 et sa réexécution idempotente.
+Le schéma courant est le préfixe numérique maximal de `deploy/postgres/migrations/*.sql`. La gate live vérifie le même ensemble via le ledger `platform.schema_migrations`; elle prouve actuellement la migration 009, l'upgrade depuis un volume arrêté à 007 et la réexécution idempotente.
 
 Les images API et worker utilisent respectivement `ostrading/orchestrator-api:0.1.0-m013-fastapi-schema-<schéma>-<commit-complet>` et `ostrading/worker-documents:0.1.0-m013-fastapi-schema-<schéma>-<commit-complet>`. Elles exposent `org.ostrading.postgres-schema-version` et `org.opencontainers.image.revision`, s'exécutent sous `ostrading` et possèdent un entrypoint explicite. Une branche, `latest`, un hash abrégé ou le tag worker historique ne constitue pas une preuve de rollback.
 
@@ -17,7 +17,7 @@ La stack d'exploitation est construite depuis une archive Git, jamais depuis le 
 
 ## Scénario audité
 
-- Given un clone propre, un commit Git complet, ses migrations et le secret PostgreSQL hors Git.
+- Given un clone propre, un commit Git complet, ses migrations, le secret PostgreSQL et le token API local hors Git.
 - When la gate exporte le commit, construit les images finales et démarre la stack Compose.
 - Then PostgreSQL, Qdrant, `llm-gateway`, Uvicorn, deux workers, UI et Caddy réalisent le parcours PDF, puis la donnée survit au redémarrage réel de PostgreSQL et de l'API.
 
@@ -28,12 +28,14 @@ La stack d'exploitation est construite depuis une archive Git, jamais depuis le 
 | Interpréteur et dépendances | Python `3.12.8`, setuptools, Pydantic et Starlette directs et exacts, `uv lock --check` | Couvert |
 | Contexte de build | Archive Git complète et `.dockerignore` racine borné | Couvert par ADR-026 et test statique |
 | Identité PostgreSQL | rôle/base `ostrading`, URL conteneur et secret cohérents | Couvert par Compose réel |
-| Identité images | commit complet et schéma 008 dans tags et labels API/worker | Inspectée avant démarrage |
+| Identité images | commit complet et schéma 009 dans tags et labels API/worker | Inspectée avant démarrage |
 | Runtime public unique | entrypoint `api`; ancien `local_runtime` refusé | Couvert |
 | Readiness | ledger PostgreSQL requis et `/health` de `llm-gateway` | Couvert par preuve Compose |
 | Workers | deux replicas, identités distinctes et claims fenced | Couvert par ADR-025/ADR-026 |
 | Persistance T-005 | PDF traité, PostgreSQL redémarré, API recréée, diagnostic et SHA-256 relus | Couvert par preuve Compose réelle |
 | OpenAPI et binaire | multipart, `201`, PDF `200`, bornes Caddy/ASGI et hash avant streaming | Couvert |
+| Mutations locales | token backend hors Git, 401/403 directs, Origin/Host strict et absence du secret dans OpenAPI, HTML et logs | Couvert par ADR-028 et preuves UI/Compose |
+| Admission corpus | PDF 50 Mio, métadonnées bornées, streaming 64 Kio, quatre transferts simultanés et quota PostgreSQL agrégé | Couvert par migration 009 et course concurrente |
 | Bind réseau | seul Caddy publie `127.0.0.1` | Couvert |
 | Traçabilité | `X-Trace-ID`, `trace_id`, `configuration_hash`, statut et durée sans payload | Couvert |
 | Aucun fallback | dépendance, migration, image ou configuration invalide arrête l'opération | Couvert |
@@ -45,6 +47,9 @@ uv lock --check
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_fastapi\validate_review3_deployment_acceptance.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_fastapi\validate_review3_deployment_live.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_fastapi\validate_postgres_migration_upgrade_live.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_fastapi\validate_review3_ui_security_acceptance.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_fastapi\validate_review3_ui_security_live.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\m013_fastapi\validate_ui_orchestrator_document_flow_acceptance.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_fastapi.ps1 -Mode Static
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\validate_m013_fastapi.ps1 -Mode Live
 ```
@@ -55,6 +60,7 @@ La preuve live exporte le commit, construit la stack finale et emploie Docker En
 
 - L'UI reste cliente HTTP de `orchestrator-api`; elle n'est pas réécrite en FastAPI.
 - Le runtime M004 de conversion canonique n'est pas livré par ce sous-milestone. Aucun adaptateur Docling/OCRmyPDF réel ni publication durable `CanonicalSourcePublished` ne permet encore à `/index` de recevoir un `CanonicalSourceRef` complet. L'indexation et la sélection conversationnelle restent bloquées explicitement ; aucune projection n'est fabriquée depuis `DIAGNOSED`.
+- L'UI affiche `fonctionnalité non livrée` sans retry pour conversion et projection absentes. Ce message est un blocage produit explicite, pas une preuve M004.
 - Une publication future devra attendre fusion Docling, adjudication d'autorité textuelle, QA, stockage et calcul de `canonical_artifact_sha256`, puis respecter DDD-ADR-008 par inbox idempotente. Cette description est une contrainte future, pas une preuve M004 livrée.
 - `llm-gateway` reste le seul adaptateur réseau vers Spark. Qdrant n'est pas une source de vérité.
 - Les migrations restent ascendantes ; aucun rollback de schéma destructif n'est automatisé.
@@ -74,6 +80,7 @@ Ces éléments conservent l'historique sans décrire l'image, le schéma ou la c
 - Déploiement Compose ADR-026 : RED `c64311691` ; corrections du seul harness live `3df97b3b2`, `6b9a94c48`, `fd72ab75d`, `03d301088` et `d38a2142c` ; GREEN fonctionnel `f49ffded1`.
 - Contrats produit KA/SP/UI : RED `d5f682fdf` et `f3bf36660`, GREEN `3521770cc` et `27bef8d48`.
 - Gouvernance/performance : RED `4a448c2c7`, GREEN `f9a7ff3c1` ; API/KA/UI paginées : RED `510d85ac6`, GREEN `c1aadb5f7`.
+- Admission UI, sécurité et quota : RED `9a487beb7`, GREEN `6d6d58c89`; migration 009, auth 401/403, CSRF, streaming, saturation 4+1, quota concurrent et Compose exporté depuis HEAD GREEN.
 
 ## Écarts historiques BDD/TDD explicités
 

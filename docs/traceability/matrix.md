@@ -13,6 +13,14 @@
 - `Planifié`: exigence visible et rattachée à une tâche non exécutée.
 - `Hors périmètre M-000`: exigence explicitement exclue du milestone courant.
 
+## Complément transversal ADR-028
+
+- `REQ-M013-FASTAPI-005` et `REQ-M013-FASTAPI-011` : le quota corpus durable et atomique est porté par `deploy/postgres/migrations/009_corpus_quota.sql`, `app/source_processing/adapters/postgres_document_persistence.py` et `tests/m013_fastapi/validate_review3_ui_security_live.ps1`.
+- `REQ-M013-FASTAPI-006`, `REQ-M013-FASTAPI-010` et `REQ-UI-015` : l’authentification locale, le contrôle `Origin == Host`, la capacité bornée et le parcours navigateur réel sont portés par `app/platform/local_authorization.py`, `app/platform/local_runtime.py`, `tests/m013_fastapi/validate_review3_ui_security_acceptance.ps1` et `tests/m013_fastapi/validate_ui_orchestrator_document_flow_acceptance.ps1`.
+- `REQ-M013-FASTAPI-007` : le read-model léger, paginé par lots de 100 et sans fan-out `1+N`, ainsi que les raisons publiques d’échec et de revue manuelle, sont prouvés par `tests/m013_fastapi/validate_review3_ui_security_acceptance.ps1` et le parcours UI réel.
+- `REQ-M013-FASTAPI-008` : les transferts de l’original PDF restent diffusés par blocs de l’API vers l’UI puis le navigateur, sans matérialisation complète en mémoire, sous `tests/m013_fastapi/validate_ui_orchestrator_document_flow_acceptance.ps1`.
+- Décision structurante : `ADR-028` complète `ADR-018` et `ADR-020`; le jeton local reste hors du navigateur, les mutations documentaires exigent Bearer, le quota est sérialisé dans PostgreSQL et toute saturation échoue explicitement en `503` ou `507`.
+
 ## Matrice
 
 | Exigence | Source | Statut | Test | Commande | Code | ADR | Justification ADR |
