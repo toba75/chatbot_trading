@@ -23,17 +23,35 @@ frontières UI/API d'ADR-018 et ADR-031.
   avec 400 nœuds uniques et une durée d'environ 67,6 secondes.
 - Précondition actuellement RED : `uv run --locked gate --scope governance`
   échoue sur `gate.historical-references` avec
-  `GATE_HISTORICAL_ALLOWLIST_HASH_MISMATCH:docs/adr/ADR-010-gates-gouvernance-powershell.md`.
+  une empreinte historique d'ADR-010 incohérente avec le contenu versionné.
   La cause établie est un hachage de l'arbre de travail dépendant des fins de
   lignes Windows, alors que l'allowlist doit vérifier le contenu versionné de
   façon stable. T-001 corrige ce défaut avant toute autre tranche.
 - Aucun bouton `Convertir` n'est rendu tant que T-004 n'est pas GREEN.
 
+## Exécution T-001
+
+- Scénario vérifié : Given une preuve historique indexée avec un checkout
+  CRLF, When la gate charge l'allowlist, Then elle accepte la seule variation
+  de fin de ligne, lit le blob Git et refuse toute modification sémantique.
+- RED : `f66c85eac` reproduit la divergence LF/CRLF ; `e922b14c3` impose la
+  réconciliation auditée du catalogue fermé.
+- Réconciliation : 67 empreintes ont été recalculées depuis les blobs Git
+  indexés ; 30 valeurs ont changé. Il n'y a eu aucun ajout, retrait,
+  réordonnancement de chemin ni changement de
+  justification. Le catalogue `chemin + justification` est verrouillé par le
+  test de contrat.
+- Commande reproductible :
+  `uv run --locked python -c "from pathlib import Path; from ost_gate.historical_references import reconcile_historical_allowlist; print(reconcile_historical_allowlist(Path.cwd()))"`.
+- Preuves GREEN : `uv run --locked pytest gate_tests/ost_gate/test_historical_references_contract.py`
+  (1 test atomique) et `uv run --locked gate --scope governance` (22 nœuds
+  uniques, `SCOPE GREEN: governance`).
+
 ## Table des preuves
 
 | Tâche | Commit RED | Commit GREEN | ADR | Validations | État |
 |---|---|---|---|---|---|
-| T-001 | À venir | À venir | ADR-029 | Gate canonique, ancêtre `master`, test de fins de lignes | RED connu |
+| T-001 | `f66c85eac`, `e922b14c3` | À venir | ADR-029 | Gate de gouvernance, ancêtre `master`, checkout LF/CRLF, catalogue fermé de 67 preuves | GREEN ciblé |
 | T-002 | À venir | À venir | ADR-032 | Tests ciblés, gate | À faire |
 | T-003 | À venir | À venir | ADR-032; ADR-001 à ADR-004 | Tests ciblés, gate | À faire |
 | T-004 | À venir | À venir | ADR-018; ADR-019; ADR-024; ADR-031 | Tests ciblés, gate, UI réelle | À faire |

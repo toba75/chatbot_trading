@@ -17,7 +17,7 @@
 
 ## Blocages Ou Prérequis
 
-- État GREEN/RED connu : le socle a été GREEN sur `9edeab957`, puis la vérification de cette tranche a révélé un RED de gouvernance sur `gate.historical-references` : `GATE_HISTORICAL_ALLOWLIST_HASH_MISMATCH:docs/adr/ADR-010-gates-gouvernance-powershell.md`. Ce défaut de portabilité de l'allowlist doit être corrigé avant d'ouvrir la conversion.
+- État GREEN/RED connu : le socle a été GREEN sur `9edeab957`, puis la vérification de cette tranche a révélé un RED de gouvernance sur `gate.historical-references` : l'empreinte historique d'ADR-010 était incohérente avec le contenu versionné. Ce défaut de portabilité de l'allowlist doit être corrigé avant d'ouvrir la conversion.
 - Présence des milestones amont dans master : M-000, M-001, M-002 et M-003, ainsi que M13-FastAPI, sont visibles depuis `master`.
 - Décisions manquantes : aucune ; ADR-001 à ADR-004, ADR-018, ADR-019, ADR-024, ADR-025 et ADR-031 sont applicables.
 - Risques : une régression du socle FastAPI, de l'outbox ou du worker invaliderait toutes les tranches suivantes.

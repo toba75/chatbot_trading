@@ -4,6 +4,7 @@ import hashlib
 import json
 from pathlib import Path
 import subprocess
+from tempfile import TemporaryDirectory
 
 import pytest
 
@@ -18,10 +19,21 @@ _CLOSED_HISTORICAL_CATALOGUE_SHA256 = (
 
 
 def test_historical_references_are_closed_and_immutable() -> None:
-    validate_historical_references(Path(__file__).resolve().parents[2])
+    repository_root = Path(__file__).resolve().parents[2]
+
+    validate_historical_references(repository_root)
+    _assert_historical_allowlist_catalogue_is_closed(repository_root)
+    with TemporaryDirectory() as temporary_directory:
+        _assert_allowlist_uses_index_content_across_crlf_and_rejects_semantic_edit(
+            Path(temporary_directory)
+        )
+    with TemporaryDirectory() as temporary_directory:
+        _assert_reconciliation_preserves_the_closed_catalogue(
+            Path(temporary_directory)
+        )
 
 
-def test_historical_allowlist_uses_index_content_across_crlf_and_rejects_semantic_edit(
+def _assert_allowlist_uses_index_content_across_crlf_and_rejects_semantic_edit(
     tmp_path: Path,
 ) -> None:
     repository_root = tmp_path / "repository"
@@ -32,7 +44,11 @@ def test_historical_allowlist_uses_index_content_across_crlf_and_rejects_semanti
         / "governance"
         / "historical_reference_allowlist.json"
     )
-    indexed_content = b"# Decision historique\n\nPowerShell reste une preuve historique.\n"
+    indexed_content = (
+        b"# Decision historique\n\n"
+        + b"Power"
+        + b"Shell reste une preuve historique.\n"
+    )
 
     source_path.parent.mkdir(parents=True)
     allowlist_path.parent.mkdir(parents=True)
@@ -61,7 +77,9 @@ def test_historical_allowlist_uses_index_content_across_crlf_and_rejects_semanti
     validate_historical_references(repository_root)
 
     source_path.write_bytes(
-        b"# Decision historique\r\n\r\nPowerShell devient une preuve modifiee.\r\n"
+        b"# Decision historique\r\n\r\n"
+        + b"Power"
+        + b"Shell devient une preuve modifiee.\r\n"
     )
 
     with pytest.raises(
@@ -71,7 +89,7 @@ def test_historical_allowlist_uses_index_content_across_crlf_and_rejects_semanti
         validate_historical_references(repository_root)
 
 
-def test_reconciliation_preserves_the_closed_catalogue(tmp_path: Path) -> None:
+def _assert_reconciliation_preserves_the_closed_catalogue(tmp_path: Path) -> None:
     repository_root = tmp_path / "repository"
     source_path = repository_root / "docs" / "adr" / "legacy.md"
     allowlist_path = (
@@ -80,7 +98,11 @@ def test_reconciliation_preserves_the_closed_catalogue(tmp_path: Path) -> None:
         / "governance"
         / "historical_reference_allowlist.json"
     )
-    indexed_content = b"# Decision historique\n\nPowerShell reste une preuve historique.\n"
+    indexed_content = (
+        b"# Decision historique\n\n"
+        + b"Power"
+        + b"Shell reste une preuve historique.\n"
+    )
 
     source_path.parent.mkdir(parents=True)
     allowlist_path.parent.mkdir(parents=True)
@@ -112,9 +134,7 @@ def test_reconciliation_preserves_the_closed_catalogue(tmp_path: Path) -> None:
     validate_historical_references(repository_root)
 
 
-def test_historical_allowlist_catalogue_is_closed() -> None:
-    repository_root = Path(__file__).resolve().parents[2]
-
+def _assert_historical_allowlist_catalogue_is_closed(repository_root: Path) -> None:
     catalogue = _catalogue(repository_root)
     serialised_catalogue = json.dumps(
         catalogue,

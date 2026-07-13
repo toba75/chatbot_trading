@@ -4,7 +4,7 @@
     "allowed_paths":  [
                           {
                               "path":  "docs/adr/ADR-010-gates-gouvernance-powershell.md",
-                              "sha256":  "74daed4c16f55a76a5e8ed624dabed6a89248afd36cd9d6d9be4c33ddd413e5c",
+                              "sha256":  "d7c77c801c89b7e50885eeaec2b15b9f8c9eaedd6845449b0ddc20a9e55224cd",
                               "reason":  "ADR historical or transition decision"
                           },
                           {
@@ -14,7 +14,7 @@
                           },
                           {
                               "path":  "docs/adr/ADR-012-python-outille-pour-validateurs-plateforme.md",
-                              "sha256":  "9d19c4f537bc0e634978ec4441fd737ab1b8105e3b9dbf90b10d2f67bd040fb7",
+                              "sha256":  "e67473eef0cdf313328d696efc494781ba43f8d88f692d5a026085555925e5a5",
                               "reason":  "ADR historical or transition decision"
                           },
                           {
@@ -24,22 +24,22 @@
                           },
                           {
                               "path":  "docs/adr/ADR-014-spark-docker-externe-sans-cle-api.md",
-                              "sha256":  "b1d18c1408c84a87a6786c7b2d2c5f7a23e10c46ac66b4842914806539f1172f",
+                              "sha256":  "43a0c6efc11c51280008a8a84f3011a91c5744e28b149f11f8a9385ae0914f77",
                               "reason":  "ADR historical or transition decision"
                           },
                           {
                               "path":  "docs/adr/ADR-015-provenance-llm-declaree-gateway.md",
-                              "sha256":  "2969c5236ffd108b4a1f3ed82f8c580fbcac134d224b5753c8df8b150e87b0a3",
+                              "sha256":  "0944d03b9bfe20d41c1d0e10d0d1b53062c46a155ea8cb1f79af922494b69fe0",
                               "reason":  "ADR historical or transition decision"
                           },
                           {
                               "path":  "docs/adr/ADR-017-pdf-sources-suivis-par-git-lfs.md",
-                              "sha256":  "d6f1fb43b66c058fe77738f9e9159fa265f4ab68fca6b1f9f0a53fa46cdfa69e",
+                              "sha256":  "d5371e78d64321e68a5db80c991c0ade622acfa3a417bcaa2918c8aee8b1a807",
                               "reason":  "ADR historical or transition decision"
                           },
                           {
                               "path":  "docs/adr/ADR-018-ui-exclusivement-via-api-orchestratrice.md",
-                              "sha256":  "4fda78df7acc0d0a5c31e9eca419515029e0a2876a839ff707337f3d03d72992",
+                              "sha256":  "8792970fffbf33e4090f399093f4314477e79c17a8dd60b90f3275f57cb8cc3a",
                               "reason":  "ADR historical or transition decision"
                           },
                           {
@@ -109,52 +109,52 @@
                           },
                           {
                               "path":  "docs/adr/index.md",
-                                "sha256":  "f055ef0035cddeab8c7bad48a0769b0fd321d250eb9aeef82cf194f518bd0efe",
+                                "sha256":  "e310c42e69ed6f8dba296bb2240f29ad4ce7b679f0d9b2f217d0c20ae7af98ed",
                               "reason":  "ADR historical or transition decision"
                           },
                           {
                               "path":  "docs/governance/historical_python_parity.json",
-                              "sha256":  "b3563d7d966eedd3a57e6ab8f0d59a311876fdb383ee2ce6b701e9c793c42e51",
+                              "sha256":  "0d6a14a4c92161d329303f8303500232fe517667e812936a23556b71bb181749",
                               "reason":  "historical migration parity table"
                           },
                           {
                               "path":  "docs/governance/m000_precondition_green_initiale.md",
-                              "sha256":  "c23b52062997d249033eb30534664bca788095583c30999d8896ec3eac1626e1",
+                              "sha256":  "74309cb71be1cc48412f9b6894c8355ab4f02c564707209332cd37f748afa531",
                               "reason":  "published historical governance evidence"
                           },
                           {
                               "path":  "docs/governance/m002_precondition_green.md",
-                              "sha256":  "f8ca2a302458621d35713227b556594ff9b7b1ba5eea7158e4509641d2479f89",
+                              "sha256":  "cdad20714c9144a0ee34316e3d018eb59b9c6eb8ede5fe206da505a073f054d3",
                               "reason":  "published historical governance evidence"
                           },
                           {
                               "path":  "docs/governance/m003_precondition_green.md",
-                              "sha256":  "d1496b1504d883674c63c9b51e4de9030e7071e27f0c400a54344d5d8b19afec",
+                              "sha256":  "545755a24372de33fa8d6536a90add83959647eb927a76ab8dbd498bff585c1b",
                               "reason":  "published historical governance evidence"
                           },
                           {
                               "path":  "docs/governance/m004_precondition_green.md",
-                              "sha256":  "b9a2305ff8fdb59fa1f879393fff8bd35f96b9c0cd71cde28d1b7de3ad02338f",
+                              "sha256":  "30dc25683b6e12b03f41b5655e5fc2510fd70a9275352d8f8ba6bf2dbbe6ca29",
                               "reason":  "published historical governance evidence"
                           },
                           {
                               "path":  "docs/governance/m005_precondition_green.md",
-                              "sha256":  "b366d84bd641c1d6c97bf0b1c02d551a6601495ae899c5d4baa90fcb076cebd6",
+                              "sha256":  "120bba3b57ac4dc1dc6103d5e5bf8fab608cfb05b94b66e767af1a7bff1d359a",
                               "reason":  "published historical governance evidence"
                           },
                           {
                               "path":  "docs/governance/m006_precondition_green.md",
-                              "sha256":  "63179bfeba501f7d7b457b440196f51ce0a2954a446b3614ade5ef18fbca797a",
+                              "sha256":  "f458ed7703086530aa9371672a4118c31d1896f1f5013fd5f9161b360a9678cd",
                               "reason":  "published historical governance evidence"
                           },
                           {
                               "path":  "docs/governance/m007_precondition_green.md",
-                              "sha256":  "ef9e92b60ab8a26710b68eb4ed7666d8a99aa672ffb114375a52e5aabf053574",
+                              "sha256":  "2c97efd9c22a155ec8ff9e4b9971075ff32d49af0304138e8999f42f76f032f7",
                               "reason":  "published historical governance evidence"
                           },
                           {
                               "path":  "docs/governance/m008_precondition_green.md",
-                              "sha256":  "35fa6ad67637efa36e34d2fea150fa115641ee1e60c2ffe484180603c476bfe7",
+                              "sha256":  "a06c53f3c2250dc7ad9a9538c3221653a238bf0df6612b1fe5030e11351ed197",
                               "reason":  "published historical governance evidence"
                           },
                           {
@@ -164,12 +164,12 @@
                           },
                           {
                               "path":  "docs/governance/m009_precondition_green.md",
-                              "sha256":  "0b03f5f64ac2fe685ac1a904f72853925f620224ebccafcf11a0f07ba3f303bb",
+                              "sha256":  "bb148db6f3019f880e8f00bee774470ea0b4965c5cd87e6d351b1ee6af564aec",
                               "reason":  "published historical governance evidence"
                           },
                           {
                               "path":  "docs/governance/m010_precondition_green.md",
-                              "sha256":  "ceae810a643dfb1db43f713be0342ac581f08ee79478e31d9c04bc753f15eb4a",
+                              "sha256":  "57407fc259a1c2fbabc4e29f02de7a4af214223a8f367af71e962813c2a1fe50",
                               "reason":  "published historical governance evidence"
                           },
                           {
@@ -179,7 +179,7 @@
                           },
                           {
                               "path":  "docs/governance/m012_precondition_green.md",
-                              "sha256":  "3a2245473df888c0ab99989f61634f7ef4e7cb90b1f7961405f940f945e007e8",
+                              "sha256":  "0c0a5ffba01d7381b04004ef13631300d6d3e747a59a0159697bb3c5f466fc72",
                               "reason":  "published historical governance evidence"
                           },
                           {
@@ -224,7 +224,7 @@
                           },
                           {
                               "path":  "docs/governance/m013_precondition_green.md",
-                              "sha256":  "90683c025b86f377ca624201f11b2836e5099636a152b075d278a3ee50f4b33e",
+                              "sha256":  "4da6a73ea1a9275ed3cf628dc92070234b9c5fa0e4a0b0e27f979c2aef34432c",
                               "reason":  "published historical governance evidence"
                           },
                           {
@@ -239,7 +239,7 @@
                           },
                           {
                               "path":  "docs/governance/m013_security_audit.md",
-                              "sha256":  "a5f591a08c78cd2f68b3e8b4532d06adaa5231f1d0230f8d448c4b4a0c1f9d4e",
+                              "sha256":  "a61de9339a6818bca83db866ede3e9d0e54ebdcf4dc5b8a2240320568eec12ab",
                               "reason":  "published historical governance evidence"
                           },
                           {
@@ -259,7 +259,7 @@
                           },
                           {
                               "path":  "docs/tasks/milestone_000/journal.md",
-                              "sha256":  "9e9340b660dd14762e0f3c03f09e77ef1b60f89118e2a9382b3c1fdf10d9276c",
+                              "sha256":  "c36c5b684623cd87d24a72d8d5a709e7180636362a55bc9721df939b9cc6cbde",
                               "reason":  "historical execution journal"
                           },
                           {
@@ -269,27 +269,27 @@
                           },
                           {
                               "path":  "docs/tasks/milestone_002/journal.md",
-                              "sha256":  "6e1e4488b54fbbf4e838f817ceb68b57a3504266d21d3f659cf498eb29d4a928",
+                              "sha256":  "16331fda7e2bf4111c6d46f65318201b0bcefded8b973038d04271dd49ff5d67",
                               "reason":  "historical execution journal"
                           },
                           {
                               "path":  "docs/tasks/milestone_003/journal.md",
-                              "sha256":  "1728983dd0bceff1d1ac62c7210b70767b7f52e2c7175d8ed49cc69fd1fecaa8",
+                              "sha256":  "a0040da78ea05b7e15d9afcf284f1c8c249232cce5a321b7ba9417b4390d903d",
                               "reason":  "historical execution journal"
                           },
                           {
                               "path":  "docs/tasks/milestone_004/journal.md",
-                              "sha256":  "be2c3640ef0b43e15d0966d8ec5296ad282f9eae1259b1b554c039d2c7e58836",
+                              "sha256":  "e804b6a7a79f580367f4ea7d0280a36a191d7c0c766eb4b574233a612f598818",
                               "reason":  "historical execution journal"
                           },
                           {
                               "path":  "docs/tasks/milestone_005/journal.md",
-                              "sha256":  "2a8373487e14e4e5c47d1425fd2687243771ef460359b55086c915a7eae30dca",
+                              "sha256":  "d65335da46ae7ed9c5bc23c7ae81468099f9ce9e483094ddb5bc35a22bf2644d",
                               "reason":  "historical execution journal"
                           },
                           {
                               "path":  "docs/tasks/milestone_006/journal.md",
-                              "sha256":  "5b1f38579f39e291c62570a6330a5b9e4176b3b6f574ecc220405d1c6eba2cbe",
+                              "sha256":  "f11149f73ed9dd2c12f1645ed555c8b7fa58bfdbc1e3058fd32630360971cd37",
                               "reason":  "historical execution journal"
                           },
                           {
@@ -309,7 +309,7 @@
                           },
                           {
                               "path":  "docs/tasks/milestone_010/journal.md",
-                              "sha256":  "e042ed03d3536d9418773bcb7a3bb993df2f8f3c7cf66055d3fb56f599e2a213",
+                              "sha256":  "fbb8e255f9f4feee889e18f0f0d81b1f3208decce928afc1a6f77277faf3599f",
                               "reason":  "historical execution journal"
                           },
                           {
@@ -324,7 +324,7 @@
                           },
                           {
                               "path":  "docs/tasks/milestone_013/journal.md",
-                              "sha256":  "9cc6aac01d5bdd0c3656ee2d15b1d7ed73902a82e94bf6659557fd6d2d2a3f40",
+                              "sha256":  "35ee3439a0cab17908458868e925f95801e3ee202a36d64efe8ccd3456e613b1",
                               "reason":  "historical execution journal"
                           },
                           {
@@ -334,7 +334,7 @@
                           },
                           {
                               "path":  "docs/tasks/milestone_013-fastapi/journal.md",
-                              "sha256":  "c8f2cea56f1a85fa27104e57e28b9b2e7b482abdb4aec7bc7f31674cd1360aa1",
+                              "sha256":  "4b708b023e18df22c4af65f66ab21ce1a3968cec0530d803a092f87c73a382b8",
                               "reason":  "historical execution journal"
                           }
                       ]
