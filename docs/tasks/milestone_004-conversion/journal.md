@@ -106,6 +106,46 @@ frontières UI/API d'ADR-018 et ADR-031.
   `uv sync --locked`, `git diff --check` et `uv run --locked gate` (404 nœuds
   uniques, `Gate GREEN`, 94,5 s).
 
+## Exécution T-004
+
+- Scénario livré : Given un document dont toutes les pages sont routées
+  `NATIVE_STANDARD`, When l'utilisateur clique `Convertir` dans l'UI, Then
+  l'UI transmet `POST /v1/documents/{id}/convert`, ne consomme ensuite que les
+  contrats publics de conversion et de progression, affiche phase et unités
+  persistées, et le bouton disparaît dès que la demande existe.
+- Contrat livré : `POST /v1/documents/{id}/convert` retourne seulement
+  `document_id`, `conversion_status` et, après succès canonique, la version
+  publique. La commande persiste `QUEUED`, son job `CONVERT_DOCUMENT` est
+  relayé par l'outbox existante, le worker persiste `RUNNING` avant Docling,
+  puis `SUCCEEDED` ou `FAILED` avec les unités et l'erreur publique stable.
+  `GET /v1/documents/{id}/conversion/progress` expose ce seul état public.
+- Disponibilité : le read-model marque l'action disponible uniquement avant
+  toute demande, pour une route complète `NATIVE_STANDARD`. Le runtime de
+  l'UI supervise le worker documentaire réel ; ce worker construit le
+  convertisseur Docling et vérifie le manifeste SHA-256 des actifs avant de
+  pouvoir démarrer. Il initialise aussi la racine du stockage canonique avant
+  sa boucle ; un actif absent ou altéré, ou un stockage indisponible, bloque
+  donc le démarrage UI au lieu de rendre le bouton disponible avec un fallback.
+- Preuves automatisées GREEN :
+  `uv run --locked pytest gate_tests/ported/tests/m004/validate_conversion_public_progress_acceptance.py gate_tests/ported/tests/m004/validate_ui_conversion_progress_unit.py gate_tests/ported/tests/m004/validate_document_conversion_command_acceptance.py gate_tests/ported/tests/m004/validate_document_conversion_command_unit.py gate_tests/ported/tests/m004/validate_native_docling_conversion_acceptance.py gate_tests/ported/tests/m004/validate_native_document_conversion_worker_unit.py -q`
+  complété par `validate_native_docling_conversion_unit.py` (7 tests, 7,01 s) ;
+  `uv sync --locked` ; `uv run --locked gate` (406 nœuds, `Gate GREEN`,
+  97,7 s) ; `git diff --check` GREEN.
+- Preuve locale réelle : `uv run ui` a démarré PostgreSQL, l'API, le gateway
+  local et le worker SP, avec les actifs Docling natifs provisionnés. Le PDF
+  réel « The Original Turtle Trading Rules », page 3 native extraite à
+  l'identique pour former une source d'une page, a obtenu `ROUTE_PLANNED` et
+  le bouton `Convertir` dans `/ui/corpus-pdf`. Son action UI a redirigé vers
+  l'inspection de conversion ; celle-ci a rendu publiquement `QUEUED`, `0 / 1`,
+  puis `SUCCEEDED`, `1 / 1`, `CANONICAL_ACCEPTED` et
+  `CVER-M004-NATIVE-35B0B2F10D5D541993F217CC`. Après succès, le bouton était
+  absent. L'UI n'a lu ni table ni log ; la lecture s'est faite exclusivement
+  via `GET /v1/documents/{id}/conversion` et
+  `GET /v1/documents/{id}/conversion/progress`.
+- Commit GREEN : `bd27e2433` (`feat(ui): exécuter conversion et progression
+  publique`). Le runtime temporaire a été arrêté après la preuve ; le port
+  `8081` est libre.
+
 ## Table des preuves
 
 | Tâche | Commit RED | Commit GREEN | ADR | Validations | État |
@@ -113,5 +153,5 @@ frontières UI/API d'ADR-018 et ADR-031.
 | T-001 | `f66c85eac`, `e922b14c3` | `fb440e229` | ADR-029 | Gate de gouvernance, ancêtre `master`, checkout LF/CRLF, catalogue fermé de 67 preuves | GREEN ciblé |
 | T-002 | `d21b71718` | `ef05c09eb` | ADR-032 (Proposée) | Test de gouvernance, contrat historique, gate canonique complète 401 nœuds | GREEN documentaire |
 | T-003 | `b789b3360` | `fb5b398b9` | ADR-032; ADR-001 à ADR-004 | Tests ciblés, assets SHA-256 hors ligne, scope M-004, gate canonique complète 404 nœuds | GREEN réel natif |
-| T-004 | À venir | À venir | ADR-018; ADR-019; ADR-024; ADR-031 | Tests ciblés, gate, UI réelle | À faire |
+| T-004 | `e8b82bf47` | `bd27e2433` | ADR-018; ADR-019; ADR-024; ADR-031; ADR-032 | 7 tests ciblés, `uv sync --locked`, gate complète 406 nœuds, `git diff --check`, UI réelle `QUEUED` puis `SUCCEEDED` | GREEN réel UI |
 | T-005 | À venir | À venir | ADR-002; ADR-003; ADR-031 | Tests ciblés, gate, UI réelle | À faire |
