@@ -84,21 +84,21 @@ if key_v1.identity_tuple() != (
     raise AssertionError(f"Cle d'idempotence incomplete: {key_v1.identity_tuple()}")
 
 assert_raises("input_hash invalide", lambda: key_for("VERIFY_RESPONSE", "not-a-sha256", "model@1"))
-assert_raises("configuration_hash vide", lambda: JobIdempotenceKey(
+assert_raises("configuration_hash invalide", lambda: JobIdempotenceKey(
     job_name="VERIFY_RESPONSE",
     input_hash="a" * 64,
     configuration_hash="",
     code_version="runtime-tests@2026.06.25",
     model_version="model@1",
 ))
-assert_raises("code_version vide", lambda: JobIdempotenceKey(
+assert_raises("code_version invalide", lambda: JobIdempotenceKey(
     job_name="VERIFY_RESPONSE",
     input_hash="a" * 64,
     configuration_hash="b" * 64,
     code_version="",
     model_version="model@1",
 ))
-assert_raises("model_version vide", lambda: JobIdempotenceKey(
+assert_raises("model_version invalide", lambda: JobIdempotenceKey(
     job_name="VERIFY_RESPONSE",
     input_hash="a" * 64,
     configuration_hash="b" * 64,
@@ -107,7 +107,7 @@ assert_raises("model_version vide", lambda: JobIdempotenceKey(
 ))
 
 assert_raises(
-    "idempotence_key incoherente",
+    "idempotence_key incoh\u00e9rente avec job_name",
     lambda: JobRequest(
         job_name="VERIFY_RESPONSE",
         priority=JobPriority.P1,
@@ -125,7 +125,7 @@ assert_raises(
     ),
 )
 assert_raises(
-    "payload non objet",
+    "payload invalide",
     lambda: JobRequest(
         job_name="VERIFY_RESPONSE",
         priority=JobPriority.P1,
@@ -200,8 +200,8 @@ assert_raises("job inconnu", lambda: queue.submit(
     recalculate=False,
 ))
 assert_raises("job inconnu", lambda: queue.status_of("JOB-M002-999999"))
-assert_raises("result vide", lambda: queue.mark_succeeded(job_id=p4_submission.job.job_id, result={}))
-assert_raises("failure_reason vide", lambda: queue.mark_failed(job_id=p4_submission.job.job_id, failure_reason=""))
+assert_raises("result invalide", lambda: queue.mark_succeeded(job_id=p4_submission.job.job_id, result={}))
+assert_raises("failure_reason invalide", lambda: queue.mark_failed(job_id=p4_submission.job.job_id, failure_reason=""))
 
 handled_payloads = []
 workers = InMemoryJobWorkerRegistry.from_workers(
