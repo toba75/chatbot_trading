@@ -71,12 +71,47 @@ frontières UI/API d'ADR-018 et ADR-031.
   69,2 secondes). Cette dernière est la gate canonique complète, pas un scope
   partiel.
 
+## Exécution T-003
+
+- GREEN initial : `uv run --locked gate` a validé 401 nœuds uniques en
+  69,7 secondes avant le test RED.
+- Scénario vérifié : Given un PDF natif réel dont toutes les pages sont
+  routées `NATIVE_STANDARD`, When `CONVERT_DOCUMENT` est exécuté, Then le
+  processus Docling isolé et hors ligne produit le JSON canonique haché,
+  immuable, puis la persistance transactionnelle publie la version et l'état
+  `CANONICAL_ACCEPTED`.
+- RED : `b789b3360` enrôle les invariants d'actifs scellés, de provenance,
+  d'intégrité et d'immuabilité ainsi que le parcours d'acceptation Docling
+  réel.
+- Implémentation : `docling[vlm]==2.111.0` est verrouillé par `uv`; le worker
+  lance seulement l'interpréteur de l'environnement courant, jamais un binaire
+  global. Les actifs locaux sont préchargés explicitement par
+  `uv run --locked preload-docling-native-assets --assets-root data/docling_assets/native --manifest-path config/docling-assets.native.json`, puis
+  vérifiés par SHA-256 avant toute conversion avec `HF_HUB_OFFLINE=1`.
+  L'absence ou l'altération de ces actifs reste RED avec un code stable : elle
+  ne déclenche aucun téléchargement ni changement de route.
+- Publication : le JSON Docling est créé une seule fois sous
+  `paths.canonical_sources_root`; son hash, sa référence, la route native, la
+  version de l'outil et `CANONICAL_ACCEPTED` sont persistés dans la même
+  transaction PostgreSQL. La migration `011` introduit cette cohérence et la
+  table des versions canoniques.
+- GREEN : `fb5b398b9` livre l'adaptateur, le sous-processus, le worker, le
+  stockage immuable, la persistance, le manifeste et les tests. Cette tranche
+  ne rend pas encore le bouton UI disponible : T-004 doit encore publier le
+  contrat de progression de bout en bout.
+- Preuves GREEN :
+  `uv run --locked pytest gate_tests/ported/tests/m004/validate_native_docling_conversion_unit.py gate_tests/ported/tests/m004/validate_native_document_conversion_worker_unit.py gate_tests/ported/tests/m004/validate_native_docling_conversion_acceptance.py -q`
+  (3 tests, 6,43 s), puis `uv run --locked gate --scope m004` (33 nœuds
+  uniques, `SCOPE GREEN: m004`, donc partiel), puis `uv lock --check`,
+  `uv sync --locked`, `git diff --check` et `uv run --locked gate` (404 nœuds
+  uniques, `Gate GREEN`, 94,5 s).
+
 ## Table des preuves
 
 | Tâche | Commit RED | Commit GREEN | ADR | Validations | État |
 |---|---|---|---|---|---|
 | T-001 | `f66c85eac`, `e922b14c3` | `fb440e229` | ADR-029 | Gate de gouvernance, ancêtre `master`, checkout LF/CRLF, catalogue fermé de 67 preuves | GREEN ciblé |
 | T-002 | `d21b71718` | `ef05c09eb` | ADR-032 (Proposée) | Test de gouvernance, contrat historique, gate canonique complète 401 nœuds | GREEN documentaire |
-| T-003 | À venir | À venir | ADR-032; ADR-001 à ADR-004 | Tests ciblés, gate | À faire |
+| T-003 | `b789b3360` | `fb5b398b9` | ADR-032; ADR-001 à ADR-004 | Tests ciblés, assets SHA-256 hors ligne, scope M-004, gate canonique complète 404 nœuds | GREEN réel natif |
 | T-004 | À venir | À venir | ADR-018; ADR-019; ADR-024; ADR-031 | Tests ciblés, gate, UI réelle | À faire |
 | T-005 | À venir | À venir | ADR-002; ADR-003; ADR-031 | Tests ciblés, gate, UI réelle | À faire |
