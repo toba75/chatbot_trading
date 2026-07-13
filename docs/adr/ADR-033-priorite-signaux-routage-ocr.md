@@ -85,7 +85,7 @@ propre.
 - Spécification : `docs/specs/m003_source_enregistree_diagnostiquee_routee.md`.
 - Plan d'implémentation : `docs/tasks/milestone_004-conversion/0005_traiter_routes_non_natives_et_prouver_pipeline.md`.
 - Tests d'acceptation : `gate_tests/ported/tests/m004/validate_diagnostic_route_planning_unit.py`.
-- Commits : RED et GREEN T-005 à renseigner après exécution complète.
+- Commits : RED `bfd5438e7`; GREEN `96be704d8`.
 
 ## Notes
 

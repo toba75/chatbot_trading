@@ -146,6 +146,82 @@ frontières UI/API d'ADR-018 et ADR-031.
   publique`). Le runtime temporaire a été arrêté après la preuve ; le port
   `8081` est libre.
 
+### Correctif de preuve T-004 constaté pendant T-005
+
+La preuve T-004 historique affirmait `ROUTE_PLANNED` après l'action UI
+`Diagnostiquer`, mais le worker réel s'arrêtait en fait à `DIAGNOSED` : il
+n'appelait pas `ApproveRoutePlan` et le bouton n'était donc pas atteignable
+pour une source nouvellement diagnostiquée. T-005 a rétabli la chaîne dans le
+worker, avec persistance optimiste de transition. La preuve native a été
+rejouée depuis le formulaire UI sur `DOC-F91FE126FBFFA374` :
+`ROUTE_PLANNED/NATIVE_STANDARD`, `QUEUED 0/1`, puis `SUCCEEDED 1/1` et
+`CVER-M004-ROUTED-F91FE126FBFFA37438719227`.
+
+## Exécution T-005
+
+- BDD : Given une page M-003 routée hors native, When l'action UI Convertir
+  est acceptée, Then seul l'outil de sa route est exécuté et la progression
+  publique atteint soit une version canonique, soit une erreur terminale sans
+  artefact canonique partiel.
+- Baseline GREEN : les six tests T-004 de conversion publique, UI, commande et
+  Docling natif ont passé (`6 passed in 8.02s`).
+- RED principal : `ada4b6a0e` (`test(m04): couvrir routes non natives et preuve
+  réelle`) a ajouté les contrats Granite-Docling, OCRmyPDF et les erreurs
+  terminales. RED d'intégration UI : `e62c60a2d` (`test(m04): exiger le
+  routage après diagnostic`) a exposé l'arrêt incorrect en `DIAGNOSED`.
+- Décision et RED de politique : les signaux réels d'une page dégradée étaient
+  simultanément mixtes, donc les routes OCR étaient inatteignables. ADR-033
+  est proposée pour fixer l'ordre corruption, complexité, dégradation physique,
+  OCR mauvais, mélange sain, scan propre, texte natif. `bfd5438e7`
+  (`test(m003): rendre routes OCR atteignables ADR-033`) a vérifié
+  `PREPROCESS_GRANITE`, `BAD_OCR_TO_GRANITE` et `MIXED_PAGEWISE` sans
+  fallback.
+- GREEN : `96be704d8` (`feat(m04): exécuter routes documentaires réelles`)
+  livre les convertisseurs isolés, les manifestes scellés, OCRmyPDF Docker,
+  le worker routé, le plan de route automatique après diagnostic, la migration
+  `013` pour les routes non natives et les erreurs publiques persistables.
+- Provisionnement explicite :
+  `uv run --locked preload-docling-granite-assets --assets-root data/docling_assets/granite --manifest-path config/docling-assets.granite.json`
+  a scellé `ibm-granite/granite-docling-258M` à
+  `982fe3b40f2fa73c365bdb1bcacf6c81b7184bfe`; `uv run --locked
+  preload-ocrmypdf-image` a obtenu l'image
+  `jbarlow83/ocrmypdf@sha256:88d50f2ce7c054e5aacfc48794eca50dbb8af9a6ef1d2a540456dcd9a4687e42`.
+  Aucun actif n'est téléchargé pendant une conversion.
+- Preuve UI Granite réelle : le formulaire UI a enregistré la page 1 de
+  `the-original-turtle-trading-rules.pdf` sous `DOC-36C1D89AA482316F`. Le
+  diagnostic public a produit `ROUTE_PLANNED/MIXED_PAGEWISE`; l'action UI a
+  publié `QUEUED 0/1`, `RUNNING 0/1`, puis `SUCCEEDED 1/1`,
+  `CANONICAL_ACCEPTED` et
+  `CVER-M004-ROUTED-36C1D89AA482316FB00F7B3F`.
+- Preuve UI OCR réelle : la page 123 de `trading-on-momentum.pdf` a été
+  enregistrée sous `DOC-57B6154F051878A6`. Après ADR-033, le diagnostic public
+  a produit `ROUTE_PLANNED/PREPROCESS_GRANITE` et
+  `OCR_PHYSICAL_PREPROCESSING`. L'action UI a publié `QUEUED 0/1`, `RUNNING
+  0/1`, puis `FAILED 0/1` avec `GRANITE_DOCLING_UNAVAILABLE`. OCRmyPDF a bien
+  produit l'artefact d'audit
+  `data/docling_audit/RUN-DIAGNOSE-DOC-57B6154F051878A6/page-001-preprocessed.pdf`
+  (22 024 octets, SHA-256
+  `f292da7d3ebde804195e00ea6b2b5edbc334586bcce2a2794d6bc5c8517eaff0`), mais
+  Granite n'a fourni aucun item textuel : aucun artefact canonique n'a été
+  publié. Cette limite est une issue terminale vérifiée, non une conversion
+  présentée comme réussie.
+- Une première tentative Granite a révélé la contrainte PostgreSQL historique
+  réservée à `NATIVE_STANDARD`. La migration `013` accepte les six routes
+  M-003 et l'état persistant `POSTGRES_INTEGRITY_FAILURE` est maintenant lu
+  publiquement comme `FAILED`, sans masquer l'incident.
+- La connexion de navigateur visuel n'était pas disponible dans
+  l'environnement. Les preuves ont donc soumis les formulaires réels de l'UI
+  locale (`Origin` même origine, `multipart/form-data`, redirections `303`)
+  et lu exclusivement les endpoints publics; aucune table, log ou état local
+  n'a servi à déterminer les phases affichées.
+- Validations finales ciblées : les neuf modules de tests M-004 (contrat
+  public, UI, commande, conversion native, routes non natives et routage après
+  diagnostic) ont passé, soit `17 passed in 8.96s`; `uv lock --check` et
+  `uv sync --locked` sont également GREEN. La gate canonique a validé
+  406 nœuds uniques en 94 secondes (`Gate GREEN`). La vérification historique
+  ignore désormais les actifs locaux sous `data/`, non versionnés et fournis
+  explicitement, sans élargir son catalogue fermé de preuves historiques.
+
 ## Table des preuves
 
 | Tâche | Commit RED | Commit GREEN | ADR | Validations | État |
@@ -154,4 +230,4 @@ frontières UI/API d'ADR-018 et ADR-031.
 | T-002 | `d21b71718` | `ef05c09eb` | ADR-032 (Proposée) | Test de gouvernance, contrat historique, gate canonique complète 401 nœuds | GREEN documentaire |
 | T-003 | `b789b3360` | `fb5b398b9` | ADR-032; ADR-001 à ADR-004 | Tests ciblés, assets SHA-256 hors ligne, scope M-004, gate canonique complète 404 nœuds | GREEN réel natif |
 | T-004 | `e8b82bf47` | `bd27e2433` | ADR-018; ADR-019; ADR-024; ADR-031; ADR-032 | 7 tests ciblés, `uv sync --locked`, gate complète 406 nœuds, `git diff --check`, UI réelle `QUEUED` puis `SUCCEEDED` | GREEN réel UI |
-| T-005 | À venir | À venir | ADR-002; ADR-003; ADR-031 | Tests ciblés, gate, UI réelle | À faire |
+| T-005 | `ada4b6a0e`, `e62c60a2d`, `bfd5438e7` | `96be704d8` | ADR-002; ADR-003; ADR-031; ADR-032; ADR-033 | 17 tests ciblés, migration 013, UI native/Granite/OCR réelle, absence de publication partielle, gate complète 406 nœuds | GREEN |
