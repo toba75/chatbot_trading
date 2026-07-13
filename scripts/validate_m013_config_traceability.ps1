@@ -70,10 +70,10 @@ $expectedRequirements = @(
     [ordered] @{
         Id = "REQ-M013-CONFIG-005"
         Source = "docs/tasks/milestone_013-config/0005_migrer_compose_deploiement_configuration.md"
-        Test = "tests/m013_config/validate_compose_config_file_acceptance.ps1"
+        Test = "tests/m013_config/validate_compose_config_file_acceptance.ps1; tests/m013_fastapi/validate_review3_deployment_acceptance.ps1"
         Command = "scripts/validate_local_compose.ps1"
-        Code = "deploy/local-compose/compose.yaml; app/platform/local_compose.py; app/platform/security/network_boundary.py"
-        Adr = "ADR-016"
+        Code = "deploy/local-compose/application.compose.yaml; deploy/local-compose/compose.yaml; app/platform/local_compose.py; app/platform/security/network_boundary.py"
+        Adr = "ADR-016; ADR-026"
     },
     [ordered] @{
         Id = "REQ-M013-CONFIG-006"
