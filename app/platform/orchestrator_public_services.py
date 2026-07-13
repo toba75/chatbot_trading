@@ -1,56 +1,29 @@
-"""Ports et services publics injectés aux routeurs de l'orchestrateur."""
+"""Composition des ports publics injectés aux routeurs de l'orchestrateur."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Protocol
 
-from app.platform.application.public_contract_use_cases import (
-    ConversationUseCase,
-    EvaluationUseCase,
-    IndexingUseCase,
-    SearchUseCase,
-)
+from app.contracts.llm_inference import JsonObject, JsonValue, LlmInferenceGateway
 from app.platform.configuration import ApplicationConfiguration
 
 
-PublicResponse = tuple[int, dict[str, Any]]
+PublicResponse = tuple[int, dict[str, JsonValue]]
 
 
 class JsonCommandHandler(Protocol):
-    def handle(self, body: dict[str, Any]) -> PublicResponse: ...
+    def handle(self, body: JsonObject, *, trace_id: str) -> PublicResponse: ...
 
 
 class IndexCommandHandler(Protocol):
-    def handle(self, document_id: str, body: dict[str, Any]) -> PublicResponse: ...
-
-
-@dataclass(frozen=True, slots=True)
-class ConversationService:
-    configuration: ApplicationConfiguration
-
-    def handle(self, body: dict[str, Any]) -> PublicResponse:
-        return ConversationUseCase(self.configuration).handle(body)
-
-
-@dataclass(frozen=True, slots=True)
-class EvaluationService:
-    configuration: ApplicationConfiguration
-
-    def handle(self, body: dict[str, Any]) -> PublicResponse:
-        return EvaluationUseCase(self.configuration).handle(body)
-
-
-@dataclass(frozen=True, slots=True)
-class SearchService:
-    def handle(self, body: dict[str, Any]) -> PublicResponse:
-        return SearchUseCase().handle(body)
-
-
-@dataclass(frozen=True, slots=True)
-class IndexingService:
-    def handle(self, document_id: str, body: dict[str, Any]) -> PublicResponse:
-        return IndexingUseCase().handle(document_id, body)
+    def handle(
+        self,
+        document_id: str,
+        body: JsonObject,
+        *,
+        trace_id: str,
+    ) -> PublicResponse: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,17 +33,22 @@ class PublicContractServices:
     search: JsonCommandHandler
     indexing: IndexCommandHandler
 
+    def __post_init__(self) -> None:
+        for field_name in ("conversation", "evaluation", "search", "indexing"):
+            if not callable(getattr(getattr(self, field_name), "handle", None)):
+                raise TypeError(f"service public {field_name} invalide")
+
 
 def build_public_contract_services(
     configuration: ApplicationConfiguration,
+    *,
+    inference_gateway: LlmInferenceGateway,
 ) -> PublicContractServices:
-    if not isinstance(configuration, ApplicationConfiguration):
-        raise TypeError("configuration applicative validée obligatoire")
-    return PublicContractServices(
-        conversation=ConversationService(configuration),
-        evaluation=EvaluationService(configuration),
-        search=SearchService(),
-        indexing=IndexingService(),
+    from app.platform.orchestrator_runtime import compose_public_contract_services
+
+    return compose_public_contract_services(
+        configuration,
+        inference_gateway=inference_gateway,
     )
 
 

@@ -41,7 +41,10 @@ ORCHESTRATOR_COMPOSITION_ALLOWED_IMPORTS = frozenset(
     {
         "app.knowledge_access.adapters.http",
         "app.knowledge_access.adapters.postgres_projection_read",
+        "app.knowledge_access.application.public_commands",
         "app.knowledge_access.application.projection_queries",
+        "app.conversation.application.public_chat",
+        "app.evaluation.application.llm_real_path",
         "app.source_processing.adapters.document_http",
         "app.source_processing.adapters.http",
         "app.source_processing.adapters.original_http",
@@ -61,6 +64,8 @@ CONTRACT_MODULE_ALLOWED_CONSUMERS: dict[str, frozenset[str]] = {
     "app.contracts.event_envelope": ALL_CONTEXT_CODES,
     "app.contracts.document_public_statuses": ALL_CONTEXT_CODES,
     "app.contracts.technical_jobs": ALL_CONTEXT_CODES,
+    "app.contracts.llm_inference": frozenset({"CV", "EV"}),
+    "app.contracts.outbox": frozenset({"SP", "KA"}),
 }
 CONTRACT_SYMBOL_ALLOWED_CONSUMERS: dict[tuple[str, str], frozenset[str]] = {
     ("app.contracts", "ContractSchemaVersion"): ALL_CONTEXT_CODES,
@@ -706,6 +711,22 @@ def domain_layer_violations(
     return violations
 
 
+def application_platform_violations(
+    source: SourceModule,
+    target: ImportedModule,
+    import_reference: ImportReference,
+) -> list[str]:
+    if source.layer != "application" or target.kind != "platform":
+        return []
+
+    location = format_source_location(source, import_reference.line_number)
+    return [
+        "Import de plateforme interdit dans application: "
+        f"contexte {source.context_code}, module {source.module_name}, "
+        f"import {target.name}, ligne {location}."
+    ]
+
+
 def direct_qdrant_access_violations(
     source: SourceModule,
     target: ImportedModule,
@@ -820,6 +841,7 @@ def analyze_architecture(
 
             violations.extend(direct_qdrant_access_violations(source, target, import_reference))
             violations.extend(domain_layer_violations(source, target, import_reference))
+            violations.extend(application_platform_violations(source, target, import_reference))
 
             if target.kind != "bounded_context":
                 continue

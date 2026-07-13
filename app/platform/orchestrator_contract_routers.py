@@ -1,18 +1,36 @@
+"""Routeurs FastAPI minces des contrats publics historiques."""
+
 from __future__ import annotations
 
-import json
-from typing import Any
+from typing import TypeVar
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
-from app.platform.llm_gateway import LLMGatewayContractError
+from app.contracts.llm_inference import LlmContractError
+from app.platform.orchestrator_api_models import (
+    BenchmarkRequest,
+    BenchmarkResponse,
+    ChatCompletionRequest,
+    ChatCompletionResponse,
+    IndexRequest,
+    IndexUnavailableResponse,
+    PUBLIC_ERROR_RESPONSES,
+    PublicErrorResponse,
+    SearchRequest,
+    SearchUnavailableResponse,
+)
 from app.platform.orchestrator_public_services import (
     IndexCommandHandler,
     JsonCommandHandler,
     PublicContractServices,
 )
+from app.platform.request_context import current_trace_id
+
+
+PublicModel = TypeVar("PublicModel", bound=BaseModel)
 
 
 def build_health_router() -> APIRouter:
@@ -29,16 +47,24 @@ def build_conversation_router(handler: JsonCommandHandler) -> APIRouter:
     parsed_handler = _require_json_handler(handler, "conversation")
     router = APIRouter()
 
-    @router.post("/v1/chat/completions")
-    async def chat_completions(request: Request) -> JSONResponse:
-        body_result = await _read_json_object(request)
-        if isinstance(body_result, JSONResponse):
-            return body_result
+    @router.post(
+        "/v1/chat/completions",
+        response_model=ChatCompletionResponse,
+        responses=PUBLIC_ERROR_RESPONSES,
+    )
+    async def chat_completions(payload: ChatCompletionRequest) -> JSONResponse:
         try:
-            response = await run_in_threadpool(parsed_handler.handle, body_result)
-        except LLMGatewayContractError as exc:
-            response = 400, {"error_code": exc.code, "message": exc.message}
-        return _json_response(response)
+            response = await run_in_threadpool(
+                parsed_handler.handle,
+                payload.model_dump(mode="json"),
+                trace_id=current_trace_id(),
+            )
+        except LlmContractError as error:
+            response = 400, {"error_code": error.code, "message": error.message}
+        return _validated_response(
+            response,
+            success_model=ChatCompletionResponse,
+        )
 
     return router
 
@@ -47,16 +73,21 @@ def build_evaluation_router(handler: JsonCommandHandler) -> APIRouter:
     parsed_handler = _require_json_handler(handler, "evaluation")
     router = APIRouter()
 
-    @router.post("/v1/evaluation/llm-real-path-benchmark")
-    async def llm_real_path_benchmark(request: Request) -> JSONResponse:
-        body_result = await _read_json_object(request)
-        if isinstance(body_result, JSONResponse):
-            return body_result
+    @router.post(
+        "/v1/evaluation/llm-real-path-benchmark",
+        response_model=BenchmarkResponse,
+        responses=PUBLIC_ERROR_RESPONSES,
+    )
+    async def llm_real_path_benchmark(payload: BenchmarkRequest) -> JSONResponse:
         try:
-            response = await run_in_threadpool(parsed_handler.handle, body_result)
-        except LLMGatewayContractError as exc:
-            response = 400, {"error_code": exc.code, "message": exc.message}
-        return _json_response(response)
+            response = await run_in_threadpool(
+                parsed_handler.handle,
+                payload.model_dump(mode="json"),
+                trace_id=current_trace_id(),
+            )
+        except LlmContractError as error:
+            response = 400, {"error_code": error.code, "message": error.message}
+        return _validated_response(response, success_model=BenchmarkResponse)
 
     return router
 
@@ -65,12 +96,23 @@ def build_search_router(handler: JsonCommandHandler) -> APIRouter:
     parsed_handler = _require_json_handler(handler, "recherche")
     router = APIRouter()
 
-    @router.post("/v1/search")
-    async def search(request: Request) -> JSONResponse:
-        body_result = await _read_json_object(request)
-        if isinstance(body_result, JSONResponse):
-            return body_result
-        return _json_response(await run_in_threadpool(parsed_handler.handle, body_result))
+    @router.post(
+        "/v1/search",
+        response_model=SearchUnavailableResponse,
+        status_code=503,
+        responses={**PUBLIC_ERROR_RESPONSES, 503: {"model": SearchUnavailableResponse}},
+    )
+    async def search(payload: SearchRequest) -> JSONResponse:
+        response = await run_in_threadpool(
+            parsed_handler.handle,
+            payload.model_dump(mode="json"),
+            trace_id=current_trace_id(),
+        )
+        return _validated_response(
+            response,
+            success_model=SearchUnavailableResponse,
+            success_status=503,
+        )
 
     return router
 
@@ -79,13 +121,23 @@ def build_indexing_router(handler: IndexCommandHandler) -> APIRouter:
     parsed_handler = _require_index_handler(handler)
     router = APIRouter()
 
-    @router.post("/v1/documents/{document_id}/index")
-    async def index_document(document_id: str, request: Request) -> JSONResponse:
-        body_result = await _read_json_object(request)
-        if isinstance(body_result, JSONResponse):
-            return body_result
-        return _json_response(
-            await run_in_threadpool(parsed_handler.handle, document_id, body_result)
+    @router.post(
+        "/v1/documents/{document_id}/index",
+        response_model=IndexUnavailableResponse,
+        status_code=503,
+        responses={**PUBLIC_ERROR_RESPONSES, 503: {"model": IndexUnavailableResponse}},
+    )
+    async def index_document(document_id: str, payload: IndexRequest) -> JSONResponse:
+        response = await run_in_threadpool(
+            parsed_handler.handle,
+            document_id,
+            payload.model_dump(mode="json"),
+            trace_id=current_trace_id(),
+        )
+        return _validated_response(
+            response,
+            success_model=IndexUnavailableResponse,
+            success_status=503,
         )
 
     return router
@@ -102,48 +154,32 @@ def build_public_contract_router(services: PublicContractServices) -> APIRouter:
     return router
 
 
-async def _read_json_object(request: Request) -> dict[str, Any] | JSONResponse:
-    raw_length = request.headers.get("content-length")
-    if raw_length is None:
-        return _invalid_request_response("content_length")
-    try:
-        content_length = int(raw_length)
-    except ValueError:
-        return _invalid_request_response("content_length")
-    if content_length < 0:
-        return _invalid_request_response("content_length")
-    if content_length == 0:
-        return {}
-
-    raw_body = await request.body()
-    try:
-        parsed_body = json.loads(raw_body.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError):
-        return _invalid_request_response("body")
-    if not isinstance(parsed_body, dict):
-        return _invalid_request_response("body")
-    return parsed_body
-
-
-def _invalid_request_response(field: str) -> JSONResponse:
+def _validated_response(
+    response: tuple[int, dict[str, object]],
+    *,
+    success_model: type[PublicModel],
+    success_status: int = 200,
+) -> JSONResponse:
+    status_code, body = response
+    model_type: type[BaseModel]
+    if status_code == success_status:
+        model_type = success_model
+    else:
+        model_type = PublicErrorResponse
+    validated = model_type.model_validate(body)
     return JSONResponse(
-        status_code=400,
-        content={"error_code": "HTTP_REQUEST_INVALID", "field": field},
+        status_code=status_code,
+        content=validated.model_dump(mode="json", exclude_unset=True),
     )
 
 
-def _json_response(response: tuple[int, dict[str, Any]]) -> JSONResponse:
-    status_code, body = response
-    return JSONResponse(status_code=status_code, content=body)
-
-
-def _require_json_handler(value: Any, label: str) -> JsonCommandHandler:
+def _require_json_handler(value: object, label: str) -> JsonCommandHandler:
     if not callable(getattr(value, "handle", None)):
         raise TypeError(f"handler {label} obligatoire")
     return value
 
 
-def _require_index_handler(value: Any) -> IndexCommandHandler:
+def _require_index_handler(value: object) -> IndexCommandHandler:
     if not callable(getattr(value, "handle", None)):
         raise TypeError("handler indexation obligatoire")
     return value

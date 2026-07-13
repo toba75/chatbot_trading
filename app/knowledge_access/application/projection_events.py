@@ -7,15 +7,12 @@ import json
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Protocol
 
 from app.contracts.event_envelope import EventEnvelope
+from app.contracts.outbox import OutboxEntry, ProducerStateMutation
 from app.knowledge_access.domain.knowledge_projection import KnowledgeProjection
 from app.knowledge_access.domain.time import ensure_utc_instant
-from app.platform.event_bus import (
-    OutboxEntry,
-    ProducerStateMutation,
-)
 
 
 _CORRELATION_ID_PATTERN = re.compile(r"^CORR-[A-Z0-9][A-Z0-9-]*$")
@@ -193,7 +190,7 @@ class KnowledgeProjectionEventFactory:
         event_type: str,
         projection: KnowledgeProjection,
         aggregate_version: int,
-        payload: dict[str, Any],
+        payload: dict[str, object],
     ) -> EventEnvelope:
         parsed_projection = _ensure_projection(projection)
         parsed_payload = dict(payload)
@@ -258,7 +255,7 @@ def _event_id_for(
     occurred_at: str,
     correlation_id: str,
     causation_id: str,
-    payload: dict[str, Any],
+    payload: dict[str, object],
 ) -> str:
     parsed_event_type = _ensure_text(event_type, "event_type")
     parsed_projection_id = _ensure_text(projection_id, "projection_id")
@@ -309,26 +306,26 @@ def _ensure_events(value: Iterable[EventEnvelope]) -> tuple[EventEnvelope, ...]:
     return events
 
 
-def _ensure_positive_integer(value: Any, field_name: str) -> int:
+def _ensure_positive_integer(value: object, field_name: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or value < 1:
         raise ValueError(f"{field_name} invalide")
     return value
 
 
-def _ensure_non_negative_integer(value: Any, field_name: str) -> int:
+def _ensure_non_negative_integer(value: object, field_name: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or value < 0:
         raise ValueError(f"{field_name} invalide")
     return value
 
 
-def _ensure_prefixed_text(value: Any, expected_prefix: str, field_name: str) -> str:
+def _ensure_prefixed_text(value: object, expected_prefix: str, field_name: str) -> str:
     text = _ensure_text(value, field_name)
     if not text.startswith(expected_prefix):
         raise ValueError(f"{field_name} invalide")
     return text
 
 
-def _ensure_sha256(value: Any, field_name: str) -> str:
+def _ensure_sha256(value: object, field_name: str) -> str:
     text = _ensure_text(value, field_name)
     if len(text) != 64:
         raise ValueError(f"{field_name} invalide")
@@ -338,21 +335,21 @@ def _ensure_sha256(value: Any, field_name: str) -> str:
     return text
 
 
-def _ensure_correlation_id(value: Any) -> str:
+def _ensure_correlation_id(value: object) -> str:
     text = _ensure_text(value, "correlation_id")
     if _CORRELATION_ID_PATTERN.fullmatch(text) is None:
         raise ValueError("correlation_id invalide")
     return text
 
 
-def _ensure_causation_id(value: Any) -> str:
+def _ensure_causation_id(value: object) -> str:
     text = _ensure_text(value, "causation_id")
     if _CAUSATION_ID_PATTERN.fullmatch(text) is None:
         raise ValueError("causation_id invalide")
     return text
 
 
-def _ensure_text(value: Any, field_name: str) -> str:
+def _ensure_text(value: object, field_name: str) -> str:
     if not isinstance(value, str):
         raise ValueError(f"{field_name} non textuel")
     if value.strip() == "":

@@ -6,13 +6,17 @@ from dataclasses import dataclass, field
 from importlib.metadata import version
 from pathlib import Path
 import asyncio
-import json
-from typing import Any, Mapping, Protocol, Sequence
-from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from typing import Mapping, Protocol, Sequence
 
 from fastapi import APIRouter
 
+from app.contracts.llm_inference import LlmInferenceGateway
+from app.conversation.application.public_chat import ProductConversationHandler
+from app.evaluation.application.llm_real_path import LlmRealPathBenchmarkHandler
+from app.knowledge_access.application.public_commands import (
+    IndexingUnavailableHandler,
+    SearchUnavailableHandler,
+)
 from app.contracts.document_public_statuses import PublicProjectionStatus
 from app.knowledge_access.adapters.postgres_projection_read import (
     PostgresProjectionReadRepository,
@@ -25,7 +29,9 @@ from app.platform.orchestrator_composition import (
     OrchestratorCompositionRoot,
 )
 from app.platform.orchestrator_contract_routers import build_public_contract_router
-from app.platform.orchestrator_public_services import build_public_contract_services
+from app.platform.orchestrator_public_services import PublicContractServices
+from app.platform.llm_gateway.orchestrator_health import HttpHealthOrchestratorDependency
+from app.platform.llm_gateway.orchestrator_http import UrllibLlmInferenceGateway
 from app.platform.postgres import PsycopgConnectionFactory
 from app.platform.postgres_migrations import (
     POSTGRES_MIGRATIONS_PATH,
@@ -139,7 +145,7 @@ class OrchestratorDocumentCatalogService:
 def _enrich_corpus_item(
     item: DocumentCorpusItem,
     *,
-    projection_status: Any,
+    projection_status: object,
 ) -> OrchestratorDocumentCorpusItem:
     if not isinstance(item, DocumentCorpusItem):
         raise TypeError("document corpus SP invalide")
@@ -195,62 +201,8 @@ class PostgresOrchestratorDependency:
         return DependencyReadiness(
             name="postgres",
             status=status,
+            error_code=None if status == "ready" else "POSTGRES_SCHEMA_VERSION_REQUIRED",
         )
-
-
-@dataclass(slots=True)
-class HttpHealthOrchestratorDependency:
-    """Dépendance HTTP stricte dont la panne reste exprimée par un code sûr."""
-
-    name: str
-    health_url: str
-    timeout_seconds: int
-    not_ready_error_code: str
-    _opened: bool = field(init=False, default=False)
-
-    def __post_init__(self) -> None:
-        if self.name != "llm-gateway":
-            raise ValueError("nom de dépendance HTTP non supporté")
-        if not self.health_url.startswith("http://") and not self.health_url.startswith("https://"):
-            raise ValueError("URL health HTTP explicite obligatoire")
-        if isinstance(self.timeout_seconds, bool) or not isinstance(self.timeout_seconds, int) or self.timeout_seconds < 1:
-            raise ValueError("timeout health HTTP invalide")
-        if self.not_ready_error_code != "LLM_GATEWAY_NOT_READY":
-            raise ValueError("code readiness HTTP non supporté")
-
-    async def open(self) -> None:
-        if self._opened:
-            raise RuntimeError("dépendance HTTP déjà ouverte")
-        if not await asyncio.to_thread(self._is_ready):
-            raise RuntimeError(self.not_ready_error_code)
-        self._opened = True
-
-    async def close(self) -> None:
-        if not self._opened:
-            raise RuntimeError("dépendance HTTP non ouverte")
-        self._opened = False
-
-    def readiness(self) -> DependencyReadiness:
-        status = "ready" if self._opened and self._is_ready() else "unavailable"
-        return DependencyReadiness(name=self.name, status=status)
-
-    def _is_ready(self) -> bool:
-        request = Request(self.health_url, method="GET", headers={"Accept": "application/json"})
-        try:
-            with urlopen(request, timeout=self.timeout_seconds) as response:
-                if response.status != 200:
-                    return False
-                payload = json.loads(response.read().decode("utf-8"))
-        except (HTTPError, URLError, TimeoutError, OSError, ValueError, UnicodeDecodeError):
-            return False
-        if not isinstance(payload, dict):
-            return False
-        configuration_hash = payload.get("configuration_hash")
-        return payload == {
-            "service": "llm-gateway",
-            "status": "ready",
-            "configuration_hash": configuration_hash,
-        } and isinstance(configuration_hash, str) and len(configuration_hash) == 64
 
 
 def build_orchestrator_composition_root(
@@ -309,7 +261,15 @@ def build_orchestrator_composition_root(
 
     document_router = APIRouter()
     document_router.include_router(
-        build_public_contract_router(build_public_contract_services(configuration))
+        build_public_contract_router(
+            compose_public_contract_services(
+                configuration,
+                inference_gateway=UrllibLlmInferenceGateway(
+                    endpoint_url=f"{configuration.services.llm_gateway.url.rstrip('/')}/v1/infer",
+                    timeout_seconds=configuration.services.llm_gateway.timeout_seconds,
+                ),
+            )
+        )
     )
     document_router.include_router(
         build_document_command_router(
@@ -339,6 +299,34 @@ def build_orchestrator_composition_root(
     )
 
 
+def compose_public_contract_services(
+    configuration: ApplicationConfiguration,
+    *,
+    inference_gateway: LlmInferenceGateway,
+) -> PublicContractServices:
+    """Compose les handlers propriétaires sans déplacer leur logique dans platform."""
+
+    if not isinstance(configuration, ApplicationConfiguration):
+        raise TypeError("configuration applicative validée obligatoire")
+    if not callable(getattr(inference_gateway, "infer", None)):
+        raise TypeError("port d'inférence obligatoire")
+    return PublicContractServices(
+        conversation=ProductConversationHandler(
+            served_model=configuration.models.llm.served_model_name,
+            configuration_hash=configuration.configuration_hash,
+            gateway_endpoint=f"{configuration.services.llm_gateway.url.rstrip('/')}/v1/infer",
+            inference_gateway=inference_gateway,
+        ),
+        evaluation=LlmRealPathBenchmarkHandler(
+            served_model=configuration.models.llm.served_model_name,
+            configuration_hash=configuration.configuration_hash,
+            inference_gateway=inference_gateway,
+        ),
+        search=SearchUnavailableHandler(),
+        indexing=IndexingUnavailableHandler(),
+    )
+
+
 __all__ = [
     "MAX_PDF_BYTES",
     "POSTGRES_MIGRATIONS_PATH",
@@ -348,4 +336,5 @@ __all__ = [
     "OrchestratorDocumentCorpusItem",
     "OrchestratorDocumentCorpusPage",
     "build_orchestrator_composition_root",
+    "compose_public_contract_services",
 ]

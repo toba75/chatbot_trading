@@ -3,20 +3,15 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
 import re
 import sys
 import threading
-import time
-import urllib.error
-import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
-from app.contracts.identity import DomainIdentifier
 from app.platform.configuration import (
     ApplicationConfiguration,
     ApplicationConfigurationError,
@@ -38,12 +33,6 @@ from app.platform.llm_gateway import (
     UrllibOpenAICompatibleTransport,
 )
 from app.platform.observability import GatewayObservation, InMemoryObservabilityCollector
-from app.platform.application.public_contract_use_cases import (
-    index_post_response as _public_index_post_response,
-    llm_real_path_benchmark_post_response as _public_llm_real_path_benchmark_post_response,
-    product_chat_completions_post_response as _public_product_chat_completions_post_response,
-    search_post_response as _public_search_post_response,
-)
 from app.platform.orchestrator_asgi import MAX_REQUEST_BODY_BYTES
 from app.platform.ui_corpus import (
     CorpusPdfScreenState,
@@ -51,6 +40,14 @@ from app.platform.ui_corpus import (
     render_document_inspection,
     ui_get_response,
 )
+
+
+def _benchmark_marker_for_task(task_name: str) -> str:
+    """Compatibilité du harness M-013-config, sans logique d'exécution métier."""
+
+    if not isinstance(task_name, str) or task_name.strip() == "":
+        raise ValueError("task_name invalide")
+    return f"M013-REALITY-{task_name}"
 from app.platform.ui_document_api import (
     ORCHESTRATOR_API_UNAVAILABLE,
     UiDocumentApiClient,
@@ -81,47 +78,6 @@ _UI_PDF_CONTENT_PATH_PATTERN = re.compile(
 _LLM_GATEWAY_LOCK = threading.Lock()
 _LLM_GATEWAY_INSTANCE: OpenAICompatibleLocalLanguageModelGateway | None = None
 _LLM_GATEWAY_CONFIGURATION_HASH: str | None = None
-_M013_REALITY_PATH_SEGMENTS = ("docker-local", "orchestrator-api", "llm-gateway", "vllm-spark")
-_M013_PRODUCT_CHAT_SCHEMA = {
-    "type": "object",
-    "properties": {"answer": {"type": "string"}},
-    "required": ["answer"],
-    "additionalProperties": False,
-}
-_M013_LLM_TASK_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "task_name": {"type": "string"},
-        "evaluation_marker": {"type": "string"},
-        "answer": {"type": "string"},
-    },
-    "required": ["task_name", "evaluation_marker", "answer"],
-    "additionalProperties": False,
-}
-_M013_REQUIRED_LLM_TASKS = (
-    "json_valide",
-    "extraction_atomique",
-    "conservation_negations",
-    "exactitude_nombres",
-    "conditions_application",
-    "limites",
-    "entailment",
-    "contradiction",
-    "synthese_fr_en",
-    "tool_calling",
-    "citations",
-)
-_M013_REQUIRED_LLM_TECHNICAL_METRICS = (
-    "llm_gateway_latency_ms",
-    "llm_network_latency_ms",
-    "llm_vllm_queue_time_ms",
-    "llm_time_to_first_token_ms",
-    "llm_tokens_per_second",
-    "llm_error_rate",
-    "llm_retry_before_first_token_total",
-    "llm_structured_output_stability_rate",
-    "llm_spark_restart_recovery_rate",
-)
 
 
 class _StdoutGatewayObservabilityCollector(InMemoryObservabilityCollector):
@@ -638,420 +594,12 @@ def _local_post_response(
     return 404, {"error_code": "ENDPOINT_NOT_FOUND", "path": path}
 
 
-def _legacy_search_post_response() -> tuple[int, dict[str, Any]]:
-    return 503, {
-        "error_code": "SERVICE_NOT_CONFIGURED",
-        "endpoint": "POST /v1/search",
-    }
-
-
-def _legacy_index_post_response(*, document_id: str) -> tuple[int, dict[str, Any]]:
-    try:
-        validated_document_id = str(DomainIdentifier.parse_with_prefix(document_id, "DOC"))
-    except ValueError:
-        return 400, {"error_code": "HTTP_REQUEST_INVALID", "field": "document_id"}
-    return 503, {
-        "document_id": validated_document_id,
-        "error_code": "SERVICE_NOT_CONFIGURED",
-        "endpoint": "POST /v1/documents/{document_id}/index",
-    }
-
-
 def _required_application_configuration(
     application_configuration: ApplicationConfiguration | None,
 ) -> ApplicationConfiguration:
     if not isinstance(application_configuration, ApplicationConfiguration):
         raise LLMGatewayContractError(CONFIG_FILE_REQUIRED, "Configuration applicative requise.")
     return application_configuration
-
-
-def _legacy_product_chat_completions_post_response(
-    *,
-    body: dict[str, Any],
-    application_configuration: ApplicationConfiguration,
-) -> tuple[int, dict[str, Any]]:
-    status_code, gateway_body, _gateway_latency_ms = _post_local_gateway_inference(
-        body=_build_product_chat_inference_body(body, application_configuration=application_configuration),
-        application_configuration=application_configuration,
-    )
-    if status_code != 200:
-        return status_code, gateway_body
-
-    structured_output = _required_gateway_mapping(gateway_body, "structured_output")
-    answer = _required_gateway_text(structured_output, "answer")
-    provenance = _provenance_with_configuration_hash(
-        _required_gateway_mapping(gateway_body, "provenance"),
-        application_configuration=application_configuration,
-    )
-    raw_response_id = _required_gateway_text(gateway_body, "raw_response_id")
-    model = _required_matching_model(body, application_configuration=application_configuration)
-
-    return 200, {
-        "id": _required_body_text(body, "request_id"),
-        "object": "chat.completion",
-        "created": int(time.time()),
-        "model": model,
-        "choices": [
-            {
-                "index": 0,
-                "message": {"role": "assistant", "content": answer},
-                "finish_reason": "stop",
-            }
-        ],
-        "ost_product": {
-            "execution_mode": "live_spark",
-            "path_segments": list(_M013_REALITY_PATH_SEGMENTS),
-            "gateway_endpoint": _local_gateway_infer_endpoint(application_configuration),
-            "raw_response_id": raw_response_id,
-            "provenance": provenance,
-        },
-    }
-
-
-def _legacy_llm_real_path_benchmark_post_response(
-    *,
-    body: dict[str, Any],
-    application_configuration: ApplicationConfiguration,
-) -> tuple[int, dict[str, Any]]:
-    model = _required_matching_model(body, application_configuration=application_configuration)
-    run_id = _required_body_text(body, "run_id")
-    task_results: list[dict[str, Any]] = []
-    for task_index, task_name in enumerate(_M013_REQUIRED_LLM_TASKS, start=1):
-        status_code, gateway_body, gateway_latency_ms = _post_local_gateway_inference(
-            body=_build_live_benchmark_task_inference_body(
-                body,
-                task_name=task_name,
-                task_index=task_index,
-                application_configuration=application_configuration,
-            ),
-            application_configuration=application_configuration,
-        )
-        if status_code != 200:
-            return status_code, {
-                "error_code": "LLM_REAL_PATH_BENCHMARK_TASK_FAILED",
-                "task_name": task_name,
-                "gateway_status_code": status_code,
-                "gateway_response": gateway_body,
-            }
-        task_results.append(
-            _build_live_benchmark_task_result(
-                task_name=task_name,
-                gateway_body=gateway_body,
-                gateway_latency_ms=gateway_latency_ms,
-                application_configuration=application_configuration,
-            )
-        )
-
-    return 200, {
-        "object": "llm_real_path_benchmark.run",
-        "run_id": run_id,
-        "execution_mode": "live_spark",
-        "model": model,
-        "configuration_hash": application_configuration.configuration_hash,
-        "path_segments": list(_M013_REALITY_PATH_SEGMENTS),
-        "task_names": list(_M013_REQUIRED_LLM_TASKS),
-        "task_results": task_results,
-        "technical_metric_names": list(_M013_REQUIRED_LLM_TECHNICAL_METRICS),
-        "technical_metrics": _build_live_benchmark_technical_metrics(task_results),
-    }
-
-
-def _build_product_chat_inference_body(
-    body: dict[str, Any],
-    *,
-    application_configuration: ApplicationConfiguration,
-) -> dict[str, Any]:
-    _required_matching_model(body, application_configuration=application_configuration)
-    _required_body_text(body, "conversation_id")
-    messages_payload = _required_body_sequence(body, "messages")
-    messages = [
-        {
-            "role": "system",
-            "content": (
-                "Tu es le chat produit OSTrading local. Réponds uniquement avec un JSON conforme au schéma. "
-                "Le champ answer contient la réponse publiable à l'utilisateur."
-            ),
-        }
-    ]
-    for item in messages_payload:
-        if not isinstance(item, dict):
-            raise LLMGatewayContractError("HTTP_REQUEST_INVALID", "Message chat produit non objet.")
-        messages.append(
-            {
-                "role": _required_body_text(item, "role"),
-                "content": _required_body_text(item, "content"),
-            }
-        )
-
-    return {
-        "messages": messages,
-        "output_schema": dict(_M013_PRODUCT_CHAT_SCHEMA),
-        "schema_name": "m13_reality_product_chat",
-        "schema_version": "1.0",
-        "trace_id": _required_body_text(body, "trace_id"),
-        "request_id": _required_body_text(body, "request_id"),
-        "idempotency_key": _required_body_text(body, "idempotency_key"),
-        "prompt_id": "PROMPT-M013-REALITY-PRODUCT-CHAT",
-        "prompt_version": "1.0",
-        "sampling_parameters": _required_body_mapping(body, "sampling_parameters"),
-    }
-
-
-def _build_live_benchmark_task_inference_body(
-    body: dict[str, Any],
-    *,
-    task_name: str,
-    task_index: int,
-    application_configuration: ApplicationConfiguration,
-) -> dict[str, Any]:
-    _required_matching_model(body, application_configuration=application_configuration)
-    if task_name not in _M013_REQUIRED_LLM_TASKS:
-        raise LLMGatewayContractError("LOCAL_RUNTIME_LLM_TASK_UNKNOWN", f"Tâche LLM inconnue: {task_name}")
-    if isinstance(task_index, bool) or not isinstance(task_index, int) or task_index < 1:
-        raise LLMGatewayContractError("HTTP_REQUEST_INVALID", "Index de tâche LLM invalide.")
-
-    base_trace_id = _required_body_text(body, "trace_id")
-    base_request_id = _required_body_text(body, "request_id")
-    base_idempotency_key = _required_body_text(body, "idempotency_key")
-    marker = _benchmark_marker_for_task(task_name)
-    return {
-        "messages": [
-            {
-                "role": "system",
-                "content": (
-                    "Tu exécutes une évaluation LLM M13-reality sur le chemin réel. "
-                    "Réponds uniquement avec le JSON demandé."
-                ),
-            },
-            {
-                "role": "user",
-                "content": _benchmark_prompt_for_task(task_name=task_name, marker=marker),
-            },
-        ],
-        "output_schema": dict(_M013_LLM_TASK_SCHEMA),
-        "schema_name": "m13_reality_llm_benchmark_task",
-        "schema_version": "1.0",
-        "trace_id": f"{base_trace_id}-{task_name}",
-        "request_id": f"{base_request_id}-{task_index:02d}",
-        "idempotency_key": f"{base_idempotency_key}-{task_name}",
-        "prompt_id": f"PROMPT-M013-REALITY-LLM-TASK-{task_name}",
-        "prompt_version": "1.0",
-        "sampling_parameters": _required_body_mapping(body, "sampling_parameters"),
-    }
-
-
-def _post_local_gateway_inference(
-    *,
-    body: dict[str, Any],
-    application_configuration: ApplicationConfiguration,
-) -> tuple[int, dict[str, Any], float]:
-    request = urllib.request.Request(
-        _local_gateway_infer_endpoint(application_configuration),
-        data=_canonical_json(body).encode("utf-8"),
-        headers={"Content-Type": "application/json; charset=utf-8"},
-        method="POST",
-    )
-    started_ns = time.perf_counter_ns()
-    timeout_seconds = application_configuration.services.llm_gateway.timeout_seconds
-    try:
-        with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
-            try:
-                payload = json.loads(response.read().decode("utf-8"))
-            except (UnicodeDecodeError, json.JSONDecodeError):
-                return 502, {"error_code": "LLM_GATEWAY_RESPONSE_INVALID"}, _elapsed_ms_since(started_ns)
-            if not isinstance(payload, dict):
-                return 502, {"error_code": "LLM_GATEWAY_RESPONSE_INVALID"}, _elapsed_ms_since(started_ns)
-            return response.status, payload, _elapsed_ms_since(started_ns)
-    except urllib.error.HTTPError as exc:
-        return exc.code, _read_http_error_payload(exc), _elapsed_ms_since(started_ns)
-    except (TimeoutError, urllib.error.URLError) as exc:
-        return (
-            502,
-            {
-                "error_code": "LLM_GATEWAY_UNAVAILABLE",
-                "message": str(exc),
-            },
-            _elapsed_ms_since(started_ns),
-        )
-
-
-def _read_http_error_payload(error: urllib.error.HTTPError) -> dict[str, Any]:
-    raw_body = error.read().decode("utf-8", errors="replace")
-    try:
-        payload = json.loads(raw_body)
-    except json.JSONDecodeError:
-        return {"error_code": "LLM_GATEWAY_HTTP_ERROR", "status_code": error.code, "body": raw_body}
-    if not isinstance(payload, dict):
-        return {"error_code": "LLM_GATEWAY_HTTP_ERROR", "status_code": error.code, "body": payload}
-    return payload
-
-
-def _build_live_benchmark_task_result(
-    *,
-    task_name: str,
-    gateway_body: dict[str, Any],
-    gateway_latency_ms: float,
-    application_configuration: ApplicationConfiguration,
-) -> dict[str, Any]:
-    structured_output = _required_gateway_mapping(gateway_body, "structured_output")
-    provenance = _provenance_with_configuration_hash(
-        _required_gateway_mapping(gateway_body, "provenance"),
-        application_configuration=application_configuration,
-    )
-    raw_response_id = _required_gateway_text(gateway_body, "raw_response_id")
-    answer = _required_gateway_text(structured_output, "answer")
-    output_task_name = _required_gateway_text(structured_output, "task_name")
-    evaluation_marker = _required_gateway_text(structured_output, "evaluation_marker")
-    return {
-        "task_name": task_name,
-        "passed": output_task_name == task_name and evaluation_marker == _benchmark_marker_for_task(task_name),
-        "raw_response_id": raw_response_id,
-        "response_json_sha256": _sha256_json(structured_output),
-        "answer_sha256": hashlib.sha256(answer.encode("utf-8")).hexdigest(),
-        "gateway_latency_ms": _format_metric(gateway_latency_ms),
-        "provenance": provenance,
-    }
-
-
-def _provenance_with_configuration_hash(
-    provenance: dict[str, Any],
-    *,
-    application_configuration: ApplicationConfiguration,
-) -> dict[str, Any]:
-    enriched = dict(provenance)
-    existing_hash = enriched.get("configuration_hash")
-    if existing_hash is not None and existing_hash != application_configuration.configuration_hash:
-        raise LLMGatewayContractError(
-            "LLM_GATEWAY_RESPONSE_INVALID",
-            "Hash de configuration gateway incohérent.",
-        )
-    enriched["configuration_hash"] = application_configuration.configuration_hash
-    return enriched
-
-
-def _build_live_benchmark_technical_metrics(task_results: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    total_tasks = len(task_results)
-    passed_tasks = sum(1 for result in task_results if result.get("passed") is True)
-    failed_tasks = total_tasks - passed_tasks
-    gateway_latency_values = [float(result["gateway_latency_ms"]) for result in task_results]
-    average_gateway_latency = sum(gateway_latency_values) / total_tasks
-    success_rate = passed_tasks / total_tasks
-    error_rate = failed_tasks / total_tasks
-    return [
-        _measured_metric("llm_gateway_latency_ms", average_gateway_latency, total_tasks, total_tasks),
-        _measured_metric("llm_network_latency_ms", average_gateway_latency, total_tasks, total_tasks),
-        _unavailable_metric("llm_vllm_queue_time_ms", "metrique_non_exposee_par_llm_gateway_v1"),
-        _unavailable_metric("llm_time_to_first_token_ms", "metrique_non_exposee_par_llm_gateway_v1"),
-        _unavailable_metric("llm_tokens_per_second", "usage_tokens_non_expose_par_llm_gateway_v1"),
-        _measured_metric("llm_error_rate", error_rate, failed_tasks, total_tasks),
-        _unavailable_metric("llm_retry_before_first_token_total", "retry_count_non_expose_par_llm_gateway_v1"),
-        _measured_metric("llm_structured_output_stability_rate", success_rate, passed_tasks, total_tasks),
-        _unavailable_metric("llm_spark_restart_recovery_rate", "drill_redemarrage_spark_non_execute_par_ce_endpoint"),
-    ]
-
-
-def _measured_metric(name: str, value: float, numerator: int, denominator: int) -> dict[str, Any]:
-    return {
-        "name": name,
-        "value": _format_metric(value),
-        "numerator": numerator,
-        "denominator": denominator,
-        "measured": True,
-    }
-
-
-def _unavailable_metric(name: str, reason: str) -> dict[str, Any]:
-    return {
-        "name": name,
-        "value": None,
-        "numerator": None,
-        "denominator": None,
-        "measured": False,
-        "unavailable_reason": reason,
-    }
-
-
-def _benchmark_prompt_for_task(*, task_name: str, marker: str) -> str:
-    prompts = {
-        "json_valide": "Contrôle la production JSON stricte.",
-        "extraction_atomique": "Extrait le fait atomique: le chiffre d'affaires vaut 42 millions EUR.",
-        "conservation_negations": "Préserve la négation: la société n'a pas de dette nette.",
-        "exactitude_nombres": "Préserve les nombres: marge 12,5 pour cent et 3 incidents.",
-        "conditions_application": "Préserve la condition: acheter seulement si marge supérieure à 20 pour cent.",
-        "limites": "Préserve la limite: conclusion limitée aux données 2024.",
-        "entailment": "Vérifie l'entailment: si A implique B et A est vrai, B est vrai.",
-        "contradiction": "Détecte la contradiction: marge supérieure à 20 pour cent et marge inférieure à 10 pour cent.",
-        "synthese_fr_en": "Synthèse en français: revenue grew but cash flow decreased.",
-        "tool_calling": "Choisis l'outil lookup_document pour le document DOC-M013.",
-        "citations": "Associe la réponse à la citation source SRC-M013-1.",
-    }
-    prompt = prompts.get(task_name)
-    if prompt is None:
-        raise LLMGatewayContractError("LOCAL_RUNTIME_LLM_TASK_UNKNOWN", f"Tâche LLM inconnue: {task_name}")
-    return (
-        f"{prompt} Retourne exactement un objet JSON avec task_name=\"{task_name}\", "
-        f"evaluation_marker=\"{marker}\" et answer non vide."
-    )
-
-
-def _benchmark_marker_for_task(task_name: str) -> str:
-    if task_name not in _M013_REQUIRED_LLM_TASKS:
-        raise LLMGatewayContractError("LOCAL_RUNTIME_LLM_TASK_UNKNOWN", f"Tâche LLM inconnue: {task_name}")
-    return f"M013-REALITY-{task_name}"
-
-
-def _local_gateway_infer_endpoint(application_configuration: ApplicationConfiguration) -> str:
-    return f"{application_configuration.services.llm_gateway.url.rstrip('/')}/v1/infer"
-
-
-def _required_matching_model(
-    body: dict[str, Any],
-    *,
-    application_configuration: ApplicationConfiguration,
-) -> str:
-    model = _required_body_text(body, "model")
-    expected_model = application_configuration.models.llm.served_model_name
-    if model != expected_model:
-        raise LLMGatewayContractError(
-            "LOCAL_RUNTIME_MODEL_MISMATCH",
-            f"Modele local attendu {expected_model}, obtenu {model}.",
-        )
-    return model
-
-
-def _required_gateway_mapping(body: dict[str, Any], name: str) -> dict[str, Any]:
-    value = body.get(name)
-    if not isinstance(value, dict) or len(value) == 0:
-        raise LLMGatewayContractError("LLM_GATEWAY_RESPONSE_INVALID", f"Objet gateway requis absent: {name}")
-    return value
-
-
-def _required_gateway_text(body: dict[str, Any], name: str) -> str:
-    value = body.get(name)
-    if not isinstance(value, str) or value.strip() == "":
-        raise LLMGatewayContractError("LLM_GATEWAY_RESPONSE_INVALID", f"Champ gateway requis absent: {name}")
-    if value != value.strip():
-        raise LLMGatewayContractError("LLM_GATEWAY_RESPONSE_INVALID", f"Champ gateway non normalise: {name}")
-    return value
-
-
-def _elapsed_ms_since(started_ns: int) -> float:
-    elapsed_ns = time.perf_counter_ns() - started_ns
-    if elapsed_ns < 0:
-        raise LLMGatewayContractError("LOCAL_RUNTIME_CLOCK_INVALID", "Horloge monotone locale invalide.")
-    return elapsed_ns / 1_000_000
-
-
-def _format_metric(value: float) -> str:
-    return f"{value:.12f}"
-
-
-def _canonical_json(value: Any) -> str:
-    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-
-
-def _sha256_json(value: Any) -> str:
-    return hashlib.sha256(_canonical_json(value).encode("utf-8")).hexdigest()
 
 
 def _llm_gateway_post_response(
@@ -1257,11 +805,3 @@ def _require_worker_service(service_id: str) -> None:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
-
-# Compatibilité de tests M13-config antérieurs. Les routeurs ASGI n'utilisent plus
-# ces noms privés; la composition injecte les services publics ci-dessus.
-_search_post_response = _public_search_post_response
-_index_post_response = _public_index_post_response
-_product_chat_completions_post_response = _public_product_chat_completions_post_response
-_llm_real_path_benchmark_post_response = _public_llm_real_path_benchmark_post_response

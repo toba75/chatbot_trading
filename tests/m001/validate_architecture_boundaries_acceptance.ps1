@@ -147,6 +147,26 @@ def read_source_model():
     Assert-OutputContains -Output $invalidResult.Output -Expected "app.knowledge_access.domain.direct_source_model"
     Assert-OutputContains -Output $invalidResult.Output -Expected "app.source_processing.domain.canonical_source"
     Assert-OutputContains -Output $invalidResult.Output -Expected "contrat publi$($eAcute) attendu: CanonicalSourcePublished"
+
+    Remove-Item -LiteralPath (Join-Path $sampleAppRoot "knowledge_access/domain/direct_source_model.py") -Force
+    New-PythonPackageFile -Path (Join-Path $sampleAppRoot "source_processing/application/platform_leak.py") -Content @"
+from app.platform import runtime
+"@
+
+    # Given une couche application tente d'importer un détail de platform.
+    # When le validateur contrôle les frontières après ADR-025.
+    # Then le couplage application vers platform est refusé explicitement.
+    $applicationPlatformResult = Invoke-ArchitectureBoundaryValidator `
+        -AppRoot $sampleAppRoot `
+        -ContextRegistryPath (Join-Path $sampleAppRoot "context_registry.json") `
+        -SpecificationPath $specificationPath
+
+    if ($applicationPlatformResult.ExitCode -eq 0) {
+        throw "Le validateur devait refuser l'import application vers platform."
+    }
+    Assert-OutputContains -Output $applicationPlatformResult.Output -Expected "Import de plateforme interdit dans application"
+    Assert-OutputContains -Output $applicationPlatformResult.Output -Expected "contexte SP"
+    Assert-OutputContains -Output $applicationPlatformResult.Output -Expected "app.platform"
 }
 finally {
     if (Test-Path -LiteralPath $tempRoot) {

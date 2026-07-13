@@ -2,10 +2,23 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, RootModel
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    JsonValue as PydanticJsonValue,
+    RootModel,
+    model_validator,
+)
 
+from app.contracts.document_public_statuses import (
+    PublicConversionStatus,
+    PublicDiagnosticStatus,
+    PublicProjectionStatus,
+    PublicSourceStatus,
+)
 from app.contracts.identity import DomainIdentifier
 
 
@@ -19,11 +32,162 @@ class PublicErrorResponse(PublicApiModel):
     document_id: str | None = None
     reason: str | None = None
     max_body_bytes: int | None = None
+    message: str | None = None
+    path: str | None = None
+    endpoint: str | None = None
+    status_code: int | None = None
+    task_name: str | None = None
+    gateway_status_code: int | None = None
+    gateway_response: dict[str, PydanticJsonValue] | None = None
+
+
+class ChatMessageRequest(PublicApiModel):
+    role: Literal["system", "user", "assistant"]
+    content: str = Field(min_length=1)
+
+
+class ChatCompletionRequest(PublicApiModel):
+    model: str = Field(min_length=1)
+    conversation_id: str = Field(min_length=1)
+    messages: list[ChatMessageRequest] = Field(min_length=1)
+    trace_id: str = Field(min_length=1)
+    request_id: str = Field(min_length=1)
+    idempotency_key: str = Field(min_length=1)
+    sampling_parameters: dict[str, PydanticJsonValue] = Field(min_length=1)
+
+
+class BenchmarkRequest(PublicApiModel):
+    model: str = Field(min_length=1)
+    run_id: str = Field(min_length=1)
+    trace_id: str = Field(min_length=1)
+    request_id: str = Field(min_length=1)
+    idempotency_key: str = Field(min_length=1)
+    sampling_parameters: dict[str, PydanticJsonValue] = Field(min_length=1)
+
+
+class SearchRequest(PublicApiModel):
+    query_text: str = Field(min_length=1, max_length=4096)
+
+
+class IndexRequest(PublicApiModel):
+    """Corps vide historique tant que le service KA n'est pas composé."""
+
+
+class ChatChoiceMessageResponse(PublicApiModel):
+    role: Literal["assistant"]
+    content: str = Field(min_length=1)
+
+
+class ChatChoiceResponse(PublicApiModel):
+    index: int = Field(ge=0)
+    message: ChatChoiceMessageResponse
+    finish_reason: Literal["stop"]
+
+
+class ChatProductProvenanceResponse(PublicApiModel):
+    provider: str | None = None
+    model_id: str | None = None
+    model_revision: str | None = None
+    runtime_version: str | None = None
+    prompt_id: str | None = None
+    prompt_version: str | None = None
+    schema_version: str | None = None
+    input_hash: str | None = None
+    output_hash: str | None = None
+    started_at: str | None = None
+    completed_at: str | None = None
+    configuration_hash: str
+
+
+class ChatProductResponse(PublicApiModel):
+    execution_mode: Literal["live_spark"]
+    path_segments: tuple[
+        Literal["docker-local"],
+        Literal["orchestrator-api"],
+        Literal["llm-gateway"],
+        Literal["vllm-spark"],
+    ]
+    gateway_endpoint: str
+    raw_response_id: str
+    provenance: ChatProductProvenanceResponse
+
+
+class ChatCompletionResponse(PublicApiModel):
+    id: str
+    object: Literal["chat.completion"]
+    created: int = Field(ge=0)
+    model: str
+    choices: list[ChatChoiceResponse] = Field(min_length=1)
+    ost_product: ChatProductResponse
+
+
+class BenchmarkTaskResultResponse(PublicApiModel):
+    task_name: str
+    passed: bool
+    raw_response_id: str
+    response_json_sha256: str = Field(min_length=64, max_length=64)
+    answer_sha256: str = Field(min_length=64, max_length=64)
+    gateway_latency_ms: str
+    provenance: ChatProductProvenanceResponse
+
+
+class BenchmarkMetricResponse(PublicApiModel):
+    name: str
+    value: str | None
+    numerator: int | None
+    denominator: int | None
+    measured: bool
+    unavailable_reason: str | None = None
+
+    @model_validator(mode="after")
+    def validate_measurement(self) -> "BenchmarkMetricResponse":
+        if self.measured:
+            if self.value is None or self.numerator is None or self.denominator is None:
+                raise ValueError("métrique mesurée partielle")
+            if self.unavailable_reason is not None:
+                raise ValueError("raison indisponible interdite pour métrique mesurée")
+        elif (
+            self.value is not None
+            or self.numerator is not None
+            or self.denominator is not None
+            or self.unavailable_reason is None
+        ):
+            raise ValueError("métrique indisponible partielle")
+        return self
+
+
+class BenchmarkResponse(PublicApiModel):
+    object: Literal["llm_real_path_benchmark.run"]
+    run_id: str
+    execution_mode: Literal["live_spark"]
+    model: str
+    configuration_hash: str = Field(min_length=64, max_length=64)
+    path_segments: tuple[
+        Literal["docker-local"],
+        Literal["orchestrator-api"],
+        Literal["llm-gateway"],
+        Literal["vllm-spark"],
+    ]
+    task_names: list[str] = Field(min_length=1)
+    task_results: list[BenchmarkTaskResultResponse] = Field(min_length=1)
+    technical_metric_names: list[str] = Field(min_length=1)
+    technical_metrics: list[BenchmarkMetricResponse] = Field(min_length=1)
+
+
+class SearchUnavailableResponse(PublicApiModel):
+    error_code: Literal["SERVICE_NOT_CONFIGURED"]
+    endpoint: Literal["POST /v1/search"]
+
+
+class IndexUnavailableResponse(PublicApiModel):
+    document_id: str
+    error_code: Literal["SERVICE_NOT_CONFIGURED"]
+    endpoint: Literal["POST /v1/documents/{document_id}/index"]
 
 
 class DocumentRegisteredResponse(PublicApiModel):
     document_id: str
-    document_status: str
+    document_status: PublicSourceStatus
 
 
 class DocumentDuplicateResponse(DocumentRegisteredResponse):
@@ -32,17 +196,24 @@ class DocumentDuplicateResponse(DocumentRegisteredResponse):
 
 class DiagnosticAcceptedResponse(PublicApiModel):
     document_id: str
-    diagnostic_status: str
+    diagnostic_status: PublicDiagnosticStatus
 
 
 class DocumentCorpusItemResponse(PublicApiModel):
     document_id: str
     title: str
-    document_status: str
-    diagnostic_status: str
-    conversion_status: str
+    document_status: PublicSourceStatus
+    diagnostic_status: PublicDiagnosticStatus
+    conversion_status: PublicConversionStatus
     canonical_version_id: str | None
-    projection_status: str
+    projection_status: PublicProjectionStatus
+
+    @model_validator(mode="after")
+    def validate_canonical_version(self) -> "DocumentCorpusItemResponse":
+        accepted = self.conversion_status is PublicConversionStatus.CANONICAL_ACCEPTED
+        if accepted != (self.canonical_version_id is not None):
+            raise ValueError("version canonique incohérente avec le statut de conversion")
+        return self
 
 
 class DocumentCorpusResponse(PublicApiModel):
@@ -87,7 +258,7 @@ class DiagnosticPageResponse(PublicApiModel):
 
 class DocumentDiagnosticResponse(PublicApiModel):
     document_id: str
-    diagnostic_status: str
+    diagnostic_status: PublicDiagnosticStatus
     source_page_count: int = Field(ge=1)
     diagnosed_page_count: int = Field(ge=0)
     manual_review_reason: str | None
@@ -97,9 +268,21 @@ class DocumentDiagnosticResponse(PublicApiModel):
 
 class DocumentConversionResponse(PublicApiModel):
     document_id: str
-    conversion_status: str
+    conversion_status: PublicConversionStatus
     qa_rejection_error_code: str | None
     canonical_version_id: str | None
+
+    @model_validator(mode="after")
+    def validate_conversion_outputs(self) -> "DocumentConversionResponse":
+        if self.conversion_status is PublicConversionStatus.CANONICAL_ACCEPTED:
+            if self.canonical_version_id is None or self.qa_rejection_error_code is not None:
+                raise ValueError("conversion canonique partielle")
+        elif self.conversion_status is PublicConversionStatus.QA_REJECTED:
+            if self.qa_rejection_error_code is None or self.canonical_version_id is not None:
+                raise ValueError("rejet QA partiel")
+        elif self.qa_rejection_error_code is not None or self.canonical_version_id is not None:
+            raise ValueError("sortie de conversion prématurée")
+        return self
 
 
 class ProjectionProfileResponse(PublicApiModel):
@@ -157,10 +340,24 @@ class KnowledgeProjectionResponse(PublicApiModel):
     chunk_count: int = Field(ge=0)
     chunk_samples: list[ProjectionChunkSampleResponse]
 
+    @model_validator(mode="after")
+    def validate_searchable_projection(self) -> "KnowledgeProjectionResponse":
+        if self.projection_status == "SEARCHABLE" and (
+            self.chunk_count < 1 or len(self.chunk_samples) == 0
+        ):
+            raise ValueError("projection SEARCHABLE incomplète")
+        if len(self.chunk_samples) > self.chunk_count:
+            raise ValueError("échantillons de projection incohérents")
+        return self
 
-class ProjectionResponse(
-    RootModel[ProjectionNotRequestedResponse | KnowledgeProjectionResponse]
-):
+
+ProjectionResponseUnion = Annotated[
+    ProjectionNotRequestedResponse | KnowledgeProjectionResponse,
+    Field(discriminator="projection_status"),
+]
+
+
+class ProjectionResponse(RootModel[ProjectionResponseUnion]):
     """Union publique: absence explicite ou projection KA complète."""
 
 
@@ -175,13 +372,13 @@ PUBLIC_ERROR_RESPONSES = {
 }
 
 
-def parse_public_document_id(value: Any) -> str:
+def parse_public_document_id(value: object) -> str:
     if not isinstance(value, str):
         raise ValueError("document_id public invalide")
     return str(DomainIdentifier.parse_with_prefix(value, "DOC"))
 
 
-def public_error(error_code: str, **fields: Any) -> dict[str, Any]:
+def public_error(error_code: str, **fields: object) -> dict[str, object]:
     if not isinstance(error_code, str) or error_code == "" or error_code != error_code.strip():
         raise ValueError("error_code public invalide")
     return {"error_code": error_code, **fields}
@@ -221,6 +418,17 @@ DOCUMENT_MULTIPART_OPENAPI = {
 
 
 __all__ = [
+    "BenchmarkMetricResponse",
+    "BenchmarkRequest",
+    "BenchmarkResponse",
+    "BenchmarkTaskResultResponse",
+    "ChatChoiceMessageResponse",
+    "ChatChoiceResponse",
+    "ChatCompletionRequest",
+    "ChatCompletionResponse",
+    "ChatMessageRequest",
+    "ChatProductProvenanceResponse",
+    "ChatProductResponse",
     "DiagnosticAcceptedResponse",
     "DiagnosticPageResponse",
     "DocumentConversionResponse",
@@ -231,6 +439,8 @@ __all__ = [
     "DocumentRegisteredResponse",
     "DOCUMENT_MULTIPART_OPENAPI",
     "KnowledgeProjectionResponse",
+    "IndexRequest",
+    "IndexUnavailableResponse",
     "PageDiagnosticSignalsResponse",
     "PageManifestEntryResponse",
     "PageRouteResponse",
@@ -241,6 +451,8 @@ __all__ = [
     "ProjectionResponse",
     "PUBLIC_ERROR_RESPONSES",
     "PublicErrorResponse",
+    "SearchRequest",
+    "SearchUnavailableResponse",
     "SourceLocatorResponse",
     "parse_public_document_id",
     "public_error",

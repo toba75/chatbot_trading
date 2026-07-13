@@ -116,10 +116,15 @@ async def scenario(repo_root):
         composition_root_factory=composition_root_factory,
     )
 
-    assert_equal(factory_calls, [], "La composition ne doit créer aucune connexion à la construction de l'application.")
+    assert_equal(
+        factory_calls,
+        [configuration],
+        "La composition doit enregistrer les routes avant le lifespan sans ouvrir ses dépendances.",
+    )
+    assert_equal(dependency.open_count, 0, "La construction ne doit ouvrir aucune dépendance.")
 
     async with application.router.lifespan_context(application):
-        assert_equal(factory_calls, [configuration], "La composition root doit être construite une seule fois au démarrage.")
+        assert_equal(factory_calls, [configuration], "La composition root doit rester unique pendant le démarrage.")
         assert_equal(dependency.open_count, 1, "La dépendance doit être ouverte une seule fois par le lifespan.")
 
         health_status, health_body = await asgi_get(application, "/health")

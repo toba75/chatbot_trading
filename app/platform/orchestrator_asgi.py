@@ -5,8 +5,10 @@ from contextlib import asynccontextmanager
 from dataclasses import asdict
 import asyncio
 import json
+from pathlib import Path
 import re
 import time
+import traceback
 from typing import Any
 from uuid import uuid4
 
@@ -27,6 +29,13 @@ from app.platform.orchestrator_contract_routers import (
 
 CompositionRootFactory = Callable[[ApplicationConfiguration], OrchestratorCompositionRoot]
 MAX_REQUEST_BODY_BYTES = 54_000_000
+_STRICT_JSON_BODY_PATHS = frozenset(
+    (
+        "/v1/chat/completions",
+        "/v1/evaluation/llm-real-path-benchmark",
+        "/v1/search",
+    )
+)
 
 
 class RequestBodyTooLargeError(ValueError):
@@ -56,7 +65,7 @@ class BoundedReceive:
 
 
 class BoundedRequestBodyMiddleware:
-    """Borne et spoule le corps complet avant tout parsing applicatif."""
+    """Borne le flux reçu sans le recopier ni le spouler avant le parsing."""
 
     def __init__(
         self,
@@ -78,6 +87,13 @@ class BoundedRequestBodyMiddleware:
             return
 
         content_length = _content_length(scope)
+        if (
+            scope.get("method") == "POST"
+            and scope.get("path") in _STRICT_JSON_BODY_PATHS
+            and content_length is None
+        ):
+            await _send_invalid_content_length(send)
+            return
         if content_length is not None and content_length < 0:
             await _send_invalid_content_length(send)
             return
@@ -103,6 +119,86 @@ class BoundedRequestBodyMiddleware:
                 raise
             await _send_body_too_large(send, self._max_body_bytes)
 
+
+class StreamingFailureObservationMiddleware:
+    """Observe une rupture après envoi des en-têtes, hors BaseHTTPMiddleware."""
+
+    def __init__(
+        self,
+        application: Any,
+        *,
+        configuration: ApplicationConfiguration,
+    ) -> None:
+        if not callable(application):
+            raise ValueError("application ASGI invalide")
+        if not isinstance(configuration, ApplicationConfiguration):
+            raise TypeError("configuration applicative validée obligatoire")
+        self._application = application
+        self._configuration = configuration
+
+    async def __call__(self, scope: Any, receive: Callable, send: Callable) -> None:
+        if scope.get("type") != "http":
+            await self._application(scope, receive, send)
+            return
+
+        request = Request(scope, receive=receive)
+        started_ns = time.perf_counter_ns()
+        response_status: int | None = None
+        response_volume_bytes = 0
+        response_trace_id: str | None = None
+
+        async def observed_send(message: dict[str, Any]) -> None:
+            nonlocal response_status, response_trace_id, response_volume_bytes
+            status: int | None = None
+            trace_id: str | None = None
+            body_size = 0
+            if message.get("type") == "http.response.start":
+                candidate_status = message.get("status")
+                if isinstance(candidate_status, int):
+                    status = candidate_status
+                for name, value in message.get("headers", ()):
+                    if name.lower() == b"x-trace-id":
+                        trace_id = value.decode("ascii")
+            elif message.get("type") == "http.response.body":
+                body = message.get("body", b"")
+                if isinstance(body, bytes):
+                    body_size = len(body)
+            await send(message)
+            if status is not None:
+                response_status = status
+            if trace_id is not None:
+                response_trace_id = trace_id
+            response_volume_bytes += body_size
+
+        try:
+            await self._application(scope, receive, observed_send)
+        except BaseException as exception:
+            if response_status is not None:
+                trace_id = response_trace_id or _safe_scope_trace_id(scope)
+                response = Response(status_code=response_status)
+                _print_http_observation(
+                    response=response,
+                    trace_id=trace_id,
+                    configuration=self._configuration,
+                    request=request,
+                    started_ns=started_ns,
+                    response_volume_bytes=response_volume_bytes,
+                    error_code="HTTP_STREAM_INTERRUPTED",
+                    succeeded=False,
+                )
+                _log_safe_exception(
+                    event_type="orchestrator_http_stream_failure",
+                    error_code="HTTP_STREAM_INTERRUPTED",
+                    exception=exception,
+                    trace_id=trace_id,
+                    configuration=self._configuration,
+                    request=request,
+                )
+            raise
+        pending_observation = scope.pop("ost.http_stream_success_observation", None)
+        if isinstance(pending_observation, dict):
+            _print_http_observation(**pending_observation)
+
 def create_orchestrator_app(
     *,
     configuration: ApplicationConfiguration,
@@ -111,19 +207,17 @@ def create_orchestrator_app(
     if not isinstance(configuration, ApplicationConfiguration):
         raise TypeError("configuration applicative validée obligatoire")
 
+    composition_root = composition_root_factory(configuration)
+    if not isinstance(composition_root, OrchestratorCompositionRoot):
+        raise TypeError("composition_root_factory doit construire OrchestratorCompositionRoot")
+
     @asynccontextmanager
     async def lifespan(application: FastAPI) -> AsyncIterator[None]:
-        composition_root = composition_root_factory(configuration)
-        if not isinstance(composition_root, OrchestratorCompositionRoot):
-            raise TypeError("composition_root_factory doit construire OrchestratorCompositionRoot")
-
         try:
             async with asyncio.timeout(configuration.runtime.timeouts.startup_seconds):
                 await composition_root.open()
         except TimeoutError as exc:
             raise TimeoutError("ORCHESTRATOR_STARTUP_TIMEOUT") from exc
-        application.state.composition_root = composition_root
-        application.include_router(composition_root.document_command_router)
         try:
             yield
         finally:
@@ -140,13 +234,21 @@ def create_orchestrator_app(
         BoundedRequestBodyMiddleware,
         max_body_bytes=MAX_REQUEST_BODY_BYTES,
     )
+    application.state.composition_root = composition_root
+    application.include_router(composition_root.document_command_router)
 
     @application.exception_handler(RequestValidationError)
     async def validation_error_handler(
         request: Request,
         exception: RequestValidationError,
     ) -> JSONResponse:
-        del request, exception
+        del request
+        public_shape_errors = {"json_invalid", "model_attributes_type", "model_type"}
+        if any(error.get("type") in public_shape_errors for error in exception.errors()):
+            return JSONResponse(
+                status_code=400,
+                content={"error_code": "HTTP_REQUEST_INVALID", "field": "body"},
+            )
         return JSONResponse(
             status_code=422,
             content={"error_code": "HTTP_REQUEST_INVALID"},
@@ -157,16 +259,18 @@ def create_orchestrator_app(
         request: Request,
         exception: StarletteHttpException,
     ) -> JSONResponse:
-        del request
         error_codes = {
-            404: "HTTP_ROUTE_NOT_FOUND",
+            404: "ENDPOINT_NOT_FOUND",
             405: "HTTP_METHOD_NOT_ALLOWED",
         }
+        content: dict[str, Any] = {
+            "error_code": error_codes.get(exception.status_code, "HTTP_ERROR")
+        }
+        if exception.status_code == 404:
+            content["path"] = request.url.path
         return JSONResponse(
             status_code=exception.status_code,
-            content={
-                "error_code": error_codes.get(exception.status_code, "HTTP_ERROR")
-            },
+            content=content,
         )
 
     @application.middleware("http")
@@ -198,13 +302,30 @@ def create_orchestrator_app(
                     status_code=504,
                     content={"error_code": "ORCHESTRATOR_REQUEST_TIMEOUT"},
                 )
-            except Exception:
+            except Exception as exception:
+                _log_internal_exception(
+                    exception=exception,
+                    trace_id=trace_id,
+                    configuration=configuration,
+                    request=request,
+                )
                 response = JSONResponse(
                     status_code=500,
                     content={"error_code": "ORCHESTRATOR_INTERNAL_ERROR"},
                 )
         finally:
             reset_trace_id(trace_token)
+        if hasattr(response, "body_iterator"):
+            response.headers["X-Trace-ID"] = trace_id
+            response.body_iterator = _observed_body_iterator(
+                response.body_iterator,
+                response=response,
+                trace_id=trace_id,
+                configuration=configuration,
+                request=request,
+                started_ns=started_ns,
+            )
+            return response
         _complete_traced_response(
             response=response,
             trace_id=trace_id,
@@ -225,9 +346,21 @@ def create_orchestrator_app(
             content={
                 "service": "orchestrator-api",
                 "status": "ready" if is_ready else "not_ready",
-                "dependencies": [asdict(dependency) for dependency in dependencies],
+                "dependencies": [
+                    {
+                        key: value
+                        for key, value in asdict(dependency).items()
+                        if value is not None
+                    }
+                    for dependency in dependencies
+                ],
             },
         )
+
+    application.add_middleware(
+        StreamingFailureObservationMiddleware,
+        configuration=configuration,
+    )
 
     return application
 
@@ -249,6 +382,112 @@ def _new_trace_id() -> str:
     return f"TRACE-{uuid4().hex.upper()}"
 
 
+def _safe_scope_trace_id(scope: Any) -> str:
+    for name, value in scope.get("headers", ()):
+        if name.lower() == b"x-trace-id":
+            try:
+                trace_id = value.decode("ascii")
+            except UnicodeDecodeError:
+                break
+            if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}", trace_id):
+                return trace_id
+            break
+    return _new_trace_id()
+
+
+async def _observed_body_iterator(
+    body_iterator: AsyncIterator[bytes],
+    *,
+    response: Response,
+    trace_id: str,
+    configuration: ApplicationConfiguration,
+    request: Request,
+    started_ns: int,
+) -> AsyncIterator[bytes]:
+    response_volume_bytes = 0
+    json_preview = bytearray()
+    capture_json = response.headers.get("content-type", "").startswith("application/json")
+    async for chunk in body_iterator:
+        if not isinstance(chunk, bytes):
+            raise TypeError("HTTP_RESPONSE_CHUNK_INVALID")
+        response_volume_bytes += len(chunk)
+        if capture_json and len(json_preview) < 65_536:
+            remaining = 65_536 - len(json_preview)
+            json_preview.extend(chunk[:remaining])
+        yield chunk
+    request.scope["ost.http_stream_success_observation"] = {
+        "response": response,
+        "trace_id": trace_id,
+        "configuration": configuration,
+        "request": request,
+        "started_ns": started_ns,
+        "response_volume_bytes": response_volume_bytes,
+        "error_code": _error_code_from_json_bytes(
+            bytes(json_preview), response.status_code
+        ),
+        "succeeded": response.status_code < 400,
+    }
+
+
+def _log_internal_exception(
+    *,
+    exception: BaseException,
+    trace_id: str,
+    configuration: ApplicationConfiguration,
+    request: Request,
+) -> None:
+    _log_safe_exception(
+        event_type="orchestrator_internal_error",
+        error_code="ORCHESTRATOR_INTERNAL_ERROR",
+        exception=exception,
+        trace_id=trace_id,
+        configuration=configuration,
+        request=request,
+    )
+
+
+def _log_safe_exception(
+    *,
+    event_type: str,
+    error_code: str,
+    exception: BaseException,
+    trace_id: str,
+    configuration: ApplicationConfiguration,
+    request: Request,
+) -> None:
+    stack = [
+        {
+            "file": Path(frame.filename).name,
+            "function": frame.name,
+            "line": frame.lineno,
+        }
+        for frame in traceback.extract_tb(exception.__traceback__)
+    ]
+    cause_types: list[str] = []
+    cause = exception.__cause__
+    while cause is not None:
+        cause_types.append(type(cause).__name__)
+        cause = cause.__cause__
+    print(
+        json.dumps(
+            {
+                "cause_types": cause_types,
+                "configuration_hash": configuration.configuration_hash,
+                "error_code": error_code,
+                "event_type": event_type,
+                "exception_type": type(exception).__name__,
+                "method": request.method,
+                "path": request.url.path,
+                "stack": stack,
+                "trace_id": trace_id,
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        ),
+        flush=True,
+    )
+
+
 def _complete_traced_response(
     *,
     response: Response,
@@ -257,8 +496,33 @@ def _complete_traced_response(
     request: Request,
     started_ns: int,
 ) -> None:
-    duration_ms = (time.perf_counter_ns() - started_ns) / 1_000_000
     response.headers["X-Trace-ID"] = trace_id
+    body = getattr(response, "body", b"")
+    response_volume_bytes = len(body) if isinstance(body, bytes) else 0
+    _print_http_observation(
+        response=response,
+        trace_id=trace_id,
+        configuration=configuration,
+        request=request,
+        started_ns=started_ns,
+        response_volume_bytes=response_volume_bytes,
+        error_code=_response_error_code(response),
+        succeeded=response.status_code < 400,
+    )
+
+
+def _print_http_observation(
+    *,
+    response: Response,
+    trace_id: str,
+    configuration: ApplicationConfiguration,
+    request: Request,
+    started_ns: int,
+    response_volume_bytes: int,
+    error_code: str | None,
+    succeeded: bool,
+) -> None:
+    duration_ms = (time.perf_counter_ns() - started_ns) / 1_000_000
     print(
         json.dumps(
             {
@@ -268,11 +532,12 @@ def _complete_traced_response(
                 "method": request.method,
                 "path": request.url.path,
                 "status_code": response.status_code,
-                "error_code": _response_error_code(response),
+                "error_code": error_code,
                 "trace_id": trace_id,
-                "success_count": 1 if response.status_code < 400 else 0,
-                "error_count": 1 if response.status_code >= 400 else 0,
+                "success_count": 1 if succeeded else 0,
+                "error_count": 0 if succeeded else 1,
                 "request_volume_bytes": _request_volume_bytes(request),
+                "response_volume_bytes": response_volume_bytes,
                 "tracing_enabled": configuration.observability.tracing.enabled,
             },
             ensure_ascii=False,
@@ -302,6 +567,21 @@ def _response_error_code(response: Response) -> str | None:
             error_code = payload.get("error_code")
             if isinstance(error_code, str) and re.fullmatch(r"[A-Z][A-Z0-9_]{2,127}", error_code):
                 return error_code
+    return "HTTP_RESPONSE_ERROR"
+
+
+def _error_code_from_json_bytes(body: bytes, status_code: int) -> str | None:
+    if status_code < 400:
+        return None
+    try:
+        payload = json.loads(body.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return "HTTP_RESPONSE_ERROR"
+    if not isinstance(payload, dict):
+        return "HTTP_RESPONSE_ERROR"
+    error_code = payload.get("error_code")
+    if isinstance(error_code, str) and re.fullmatch(r"[A-Z][A-Z0-9_]{2,127}", error_code):
+        return error_code
     return "HTTP_RESPONSE_ERROR"
 
 

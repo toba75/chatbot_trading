@@ -16,10 +16,19 @@ _READINESS_STATUSES = frozenset(("ready", "not_wired", "unavailable"))
 class DependencyReadiness:
     name: str
     status: ReadinessStatus
+    error_code: str | None = None
 
     def __post_init__(self) -> None:
         if self.status not in _READINESS_STATUSES:
             raise ValueError(f"Statut de readiness invalide: {self.status}")
+        if self.status == "ready" and self.error_code is not None:
+            raise ValueError("cause de readiness interdite pour une dépendance prête")
+        if self.error_code is not None and (
+            not isinstance(self.error_code, str)
+            or self.error_code.strip() == ""
+            or self.error_code != self.error_code.strip()
+        ):
+            raise ValueError("error_code de readiness invalide")
 
 
 class OrchestratorDependency(Protocol):

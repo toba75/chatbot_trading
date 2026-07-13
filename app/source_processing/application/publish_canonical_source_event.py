@@ -8,11 +8,8 @@ from typing import Any, Protocol
 
 from app.contracts.event_envelope import EventEnvelope
 from app.contracts.identity import DomainIdentifier
+from app.contracts.outbox import OutboxEntry, ProducerStateMutation
 from app.contracts.source_references import CanonicalSourceRef
-from app.platform.event_bus.outbox import (
-    OutboxEntry,
-    ProducerStateMutation,
-)
 from app.source_processing.application.publish_canonical_source import PublishCanonicalSourceResult
 from app.source_processing.domain.canonical_source import CanonicalSourceStatus
 

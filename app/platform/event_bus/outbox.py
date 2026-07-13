@@ -6,63 +6,13 @@ import re
 import threading
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from enum import Enum
 from typing import Any
 
-from app.contracts.event_envelope import ALLOWED_EVENT_PRODUCER_CONTEXTS, EventEnvelope
+from app.contracts.event_envelope import EventEnvelope
+from app.contracts.outbox import OutboxEntry, OutboxMessageStatus, ProducerStateMutation
 
 
 _EVENT_ID_PATTERN = re.compile(r"^EVT-[A-Z0-9][A-Z0-9-]*$")
-
-
-class OutboxMessageStatus(str, Enum):
-    """Statut explicite d'un message outbox."""
-
-    PENDING = "pending"
-    DELIVERED = "delivered"
-    FAILED = "failed"
-
-
-@dataclass(frozen=True)
-class ProducerStateMutation:
-    """Mutation productrice liee atomiquement a un evenement outbox."""
-
-    mutation_id: str
-    producer_context: str
-    aggregate_type: str
-    aggregate_id: str
-    aggregate_version: int
-
-    def __post_init__(self) -> None:
-        _ensure_text(self.mutation_id, "mutation_id")
-        producer_context = _ensure_text(self.producer_context, "producer_context")
-        if producer_context not in ALLOWED_EVENT_PRODUCER_CONTEXTS:
-            raise ValueError(f"producer_context inconnu: {producer_context}")
-        _ensure_text(self.aggregate_type, "aggregate_type")
-        _ensure_text(self.aggregate_id, "aggregate_id")
-        _ensure_positive_integer(self.aggregate_version, "aggregate_version")
-
-
-@dataclass(frozen=True)
-class OutboxEntry:
-    """Message outbox stocke localement avec sa mutation productrice."""
-
-    sequence: int
-    state_mutation: ProducerStateMutation
-    event: EventEnvelope
-    status: OutboxMessageStatus
-    failure_reason: str | None
-
-    def __post_init__(self) -> None:
-        _ensure_positive_integer(self.sequence, "sequence")
-        _ensure_state_mutation(self.state_mutation)
-        _ensure_event(self.event)
-        if not isinstance(self.status, OutboxMessageStatus):
-            raise ValueError("status outbox invalide")
-        if self.status is OutboxMessageStatus.FAILED:
-            _ensure_text(self.failure_reason, "failure_reason")
-        elif self.failure_reason is not None:
-            raise ValueError("failure_reason interdit sans statut failed")
 
 
 @dataclass(frozen=True)

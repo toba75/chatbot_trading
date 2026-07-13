@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import re
+import time
 from collections.abc import Mapping
 from dataclasses import dataclass
 from hashlib import sha256
@@ -150,10 +152,68 @@ class JobOutboxRelay:
             )
             if claim is None:
                 return relayed
-            platform_job_id = self._consumer.consume_relay_message(claim.message)
-            self._outbox.acknowledge(claim, platform_job_id=platform_job_id)
+            started_ns = time.perf_counter_ns()
+            try:
+                platform_job_id = self._consumer.consume_relay_message(claim.message)
+                self._outbox.acknowledge(claim, platform_job_id=platform_job_id)
+            except Exception as exception:
+                _print_relay_observation(
+                    claim=claim,
+                    relayed_count=relayed,
+                    started_ns=started_ns,
+                    error_code=_safe_relay_error_code(exception),
+                    succeeded=False,
+                )
+                raise
             relayed += 1
+            _print_relay_observation(
+                claim=claim,
+                relayed_count=relayed,
+                started_ns=started_ns,
+                error_code=None,
+                succeeded=True,
+            )
         return relayed
+
+
+def _print_relay_observation(
+    *,
+    claim: ClaimedRelayMessage,
+    relayed_count: int,
+    started_ns: int,
+    error_code: str | None,
+    succeeded: bool,
+) -> None:
+    print(
+        json.dumps(
+            {
+                "configuration_hash": claim.message.configuration_hash,
+                "duration_ms": round(
+                    (time.perf_counter_ns() - started_ns) / 1_000_000,
+                    3,
+                ),
+                "error_code": error_code,
+                "error_count": 0 if succeeded else 1,
+                "event_type": "job_outbox_relay",
+                "message_id": claim.message.message_id,
+                "relayed_count": relayed_count,
+                "success_count": 1 if succeeded else 0,
+                "trace_id": claim.message.trace_id,
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        ),
+        flush=True,
+    )
+
+
+def _safe_relay_error_code(exception: Exception) -> str:
+    candidate = getattr(exception, "code", None)
+    if not isinstance(candidate, str):
+        candidate = str(exception)
+    if re.fullmatch(r"[A-Z][A-Z0-9_]{2,127}", candidate):
+        return candidate
+    return "JOB_OUTBOX_RELAY_FAILED"
 
 
 def _required_text(value: object, field_name: str) -> str:

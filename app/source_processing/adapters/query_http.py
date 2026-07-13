@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import asdict
-from typing import Any, Protocol
+from typing import Protocol, cast
 
 from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
@@ -27,6 +28,11 @@ from app.platform.orchestrator_api_models import (
 )
 
 
+class DocumentCorpusPagePort(Protocol):
+    documents: Sequence[object]
+    next_cursor: str | None
+
+
 class DocumentQueryPort(Protocol):
     """Port applicatif strict consommé par le routeur de lecture."""
 
@@ -35,7 +41,7 @@ class DocumentQueryPort(Protocol):
         *,
         limit: int,
         cursor: str | None,
-    ) -> Any:
+    ) -> DocumentCorpusPagePort:
         """Retourne une page bornée du corpus public."""
 
     def read_diagnostic(self, document_id: str) -> DocumentDiagnosticView:
@@ -148,14 +154,18 @@ def _is_valid_document_id(value: str) -> bool:
     return True
 
 
-def _ensure_document_queries(value: Any) -> DocumentQueryPort:
+def _ensure_document_queries(value: object) -> DocumentQueryPort:
     if not callable(getattr(value, "list_documents", None)):
         raise ValueError("document_queries sans liste documentaire")
     if not callable(getattr(value, "read_diagnostic", None)):
         raise ValueError("document_queries sans lecture diagnostic")
     if not callable(getattr(value, "read_conversion", None)):
         raise ValueError("document_queries sans lecture conversion")
-    return value
+    return cast(DocumentQueryPort, value)
 
 
-__all__ = ["DocumentQueryPort", "build_document_query_router"]
+__all__ = [
+    "DocumentCorpusPagePort",
+    "DocumentQueryPort",
+    "build_document_query_router",
+]
