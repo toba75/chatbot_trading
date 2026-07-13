@@ -12,7 +12,8 @@ foreach ($marker in @(
     'Start-M013FastApiLiveGateway',
     'Stop-M013FastApiLiveGateway',
     'M013_FASTAPI_LLM_GATEWAY_REUSED',
-    'M013_FASTAPI_LLM_GATEWAY_STARTED'
+    'M013_FASTAPI_LLM_GATEWAY_STARTED',
+    'M013_FASTAPI_LLM_GATEWAY_URL'
 )) {
     if (-not $gateSource.Contains($marker)) {
         throw "Cycle de vie llm-gateway absent de la gate Live: $marker"
@@ -20,8 +21,34 @@ foreach ($marker in @(
 }
 
 . (Join-Path $PSScriptRoot "resolve_m013_fastapi_python.ps1")
+. (Join-Path $PSScriptRoot "resolve_m013_fastapi_live_gateway.ps1")
 . $harnessPath
 $python = Resolve-M013FastApiPython -RepoRoot $repoRoot
+
+$previousGatewayUrl = [System.Environment]::GetEnvironmentVariable(
+    "M013_FASTAPI_LLM_GATEWAY_URL",
+    "Process"
+)
+$env:M013_FASTAPI_LLM_GATEWAY_URL = "http://127.0.0.1:8090"
+if ((Resolve-M013FastApiLiveGatewayUrl) -ne "http://127.0.0.1:8090") {
+    throw "La résolution explicite de l'URL gateway Live a dérivé."
+}
+$env:M013_FASTAPI_LLM_GATEWAY_URL = "http://service-inattendu:8090"
+try {
+    Resolve-M013FastApiLiveGatewayUrl | Out-Null
+    throw "Une URL gateway non loopback aurait dû être refusée."
+}
+catch {
+    if (-not $_.Exception.Message.Contains("M013_FASTAPI_LLM_GATEWAY_URL_INVALID")) {
+        throw
+    }
+}
+if ($null -eq $previousGatewayUrl) {
+    Remove-Item Env:M013_FASTAPI_LLM_GATEWAY_URL
+}
+else {
+    $env:M013_FASTAPI_LLM_GATEWAY_URL = $previousGatewayUrl
+}
 
 function Get-FreeTcpPort {
     $listener = [System.Net.Sockets.TcpListener]::new(
@@ -38,8 +65,8 @@ function Get-FreeTcpPort {
 }
 
 function New-GatewayConfig([string] $Root, [int] $Port) {
-    $source = Get-Content -Raw -Encoding UTF8 (Join-Path $repoRoot "config\application.yaml")
-    $content = $source.Replace("http://127.0.0.1:8090", "http://127.0.0.1:$Port")
+    $source = Get-Content -Raw -Encoding UTF8 (Join-Path $repoRoot "config\application.example.yaml")
+    $content = $source.Replace("http://llm-gateway:8090", "http://127.0.0.1:$Port")
     $content = $content.Replace("    port: 8090", "    port: $Port")
     $path = Join-Path $Root "application-$Port.yaml"
     [System.IO.File]::WriteAllText($path, $content, [System.Text.UTF8Encoding]::new($false))

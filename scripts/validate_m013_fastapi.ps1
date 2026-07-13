@@ -30,7 +30,9 @@ $previousPath = $env:PATH
 $previousVirtualEnvironment = [System.Environment]::GetEnvironmentVariable("VIRTUAL_ENV", "Process")
 $previousUvProjectEnvironment = [System.Environment]::GetEnvironmentVariable("UV_PROJECT_ENVIRONMENT", "Process")
 $previousM013Python = [System.Environment]::GetEnvironmentVariable("M013_FASTAPI_PYTHON", "Process")
+$previousM013GatewayUrl = [System.Environment]::GetEnvironmentVariable("M013_FASTAPI_LLM_GATEWAY_URL", "Process")
 $locationPushed = $false
+$liveGateway = $null
 Write-Host "M013_FASTAPI_TEMP_ENVIRONMENT: $temporaryEnvironment"
 
 $staticTests = @(
@@ -121,6 +123,22 @@ try {
     if ($LASTEXITCODE -ne 0 -or $resolvedVersion -ne $lockedPythonVersion) {
         throw "M013_FASTAPI_LOCKED_PYTHON_REQUIRED: version attendue=$lockedPythonVersion; obtenue=$resolvedVersion."
     }
+    if ($Mode -eq "Live") {
+        . (Join-Path $repoRoot "scripts\m013_fastapi_live_gateway.ps1")
+        $liveGateway = Start-M013FastApiLiveGateway `
+            -PythonPath $lockedPython `
+            -RepoRoot $repoRoot `
+            -TemporaryRoot $temporaryEnvironment `
+            -ConfigPath (Join-Path $repoRoot "config\application.example.yaml") `
+            -Port 8090
+        if ($liveGateway.Owned) {
+            Write-Host "M013_FASTAPI_LLM_GATEWAY_STARTED: port=8090; ownership=gate"
+        }
+        else {
+            Write-Host "M013_FASTAPI_LLM_GATEWAY_REUSED: port=8090; ownership=external"
+        }
+        $env:M013_FASTAPI_LLM_GATEWAY_URL = "http://127.0.0.1:8090"
+    }
 
     foreach ($test in $tests) {
         $testPath = Join-Path $repoRoot $test
@@ -133,24 +151,32 @@ try {
     }
 }
 finally {
-    if ($locationPushed) {
-        Pop-Location
-    }
-    $env:PATH = $previousPath
-    foreach ($variable in @(
-        @{ Name = "VIRTUAL_ENV"; Value = $previousVirtualEnvironment },
-        @{ Name = "UV_PROJECT_ENVIRONMENT"; Value = $previousUvProjectEnvironment },
-        @{ Name = "M013_FASTAPI_PYTHON"; Value = $previousM013Python }
-    )) {
-        if ($null -eq $variable.Value) {
-            Remove-Item -Path "Env:$($variable.Name)" -ErrorAction SilentlyContinue
-        }
-        else {
-            Set-Item -Path "Env:$($variable.Name)" -Value $variable.Value
+    try {
+        if ($null -ne $liveGateway) {
+            Stop-M013FastApiLiveGateway -Gateway $liveGateway
         }
     }
-    if (Test-Path -LiteralPath $temporaryEnvironment) {
-        Remove-Item -LiteralPath $temporaryEnvironment -Recurse -Force
+    finally {
+        if ($locationPushed) {
+            Pop-Location
+        }
+        $env:PATH = $previousPath
+        foreach ($variable in @(
+            @{ Name = "VIRTUAL_ENV"; Value = $previousVirtualEnvironment },
+            @{ Name = "UV_PROJECT_ENVIRONMENT"; Value = $previousUvProjectEnvironment },
+            @{ Name = "M013_FASTAPI_PYTHON"; Value = $previousM013Python },
+            @{ Name = "M013_FASTAPI_LLM_GATEWAY_URL"; Value = $previousM013GatewayUrl }
+        )) {
+            if ($null -eq $variable.Value) {
+                Remove-Item -Path "Env:$($variable.Name)" -ErrorAction SilentlyContinue
+            }
+            else {
+                Set-Item -Path "Env:$($variable.Name)" -Value $variable.Value
+            }
+        }
+        if (Test-Path -LiteralPath $temporaryEnvironment) {
+            Remove-Item -LiteralPath $temporaryEnvironment -Recurse -Force
+        }
     }
 }
 

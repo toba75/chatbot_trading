@@ -11,7 +11,9 @@ if ($LASTEXITCODE -ne 0) {
     throw "DOCKER_ENGINE_REQUIRED"
 }
 . (Join-Path $PSScriptRoot "resolve_m013_fastapi_python.ps1")
+. (Join-Path $PSScriptRoot "resolve_m013_fastapi_live_gateway.ps1")
 $apiPython = Resolve-M013FastApiPython -RepoRoot $repoRoot
+$llmGatewayUrl = Resolve-M013FastApiLiveGatewayUrl
 
 function Get-FreeTcpPort {
     $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
@@ -27,6 +29,8 @@ $apiPort = Get-FreeTcpPort
 $temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) "ostrading-m13-fastapi-$suffix"
 $configPath = Join-Path $temporaryRoot "application.yaml"
 $secretPath = Join-Path $temporaryRoot "config\secrets\local\postgres_password"
+$localTokenPath = Join-Path $temporaryRoot "config\secrets\local\local_api_token"
+$localToken = "m013-fastapi-live-$([guid]::NewGuid().ToString('N'))"
 $corpusRoot = Join-Path $temporaryRoot "data\corpus"
 $stdoutPath = Join-Path $temporaryRoot "api.stdout.log"
 $stderrPath = Join-Path $temporaryRoot "api.stderr.log"
@@ -36,9 +40,11 @@ $env:PYTHONPATH = $repoRoot
 
 New-Item -ItemType Directory -Path $temporaryRoot, $corpusRoot, (Split-Path -Parent $secretPath) -Force | Out-Null
 [System.IO.File]::WriteAllText($secretPath, "m13-fastapi-live-password", [System.Text.UTF8Encoding]::new($false))
+[System.IO.File]::WriteAllText($localTokenPath, $localToken, [System.Text.UTF8Encoding]::new($false))
 
 $config = Get-Content -Raw -Encoding UTF8 (Join-Path $repoRoot "config\application.example.yaml")
 $config = $config.Replace("postgresql+psycopg://app@postgres/app", "postgresql+psycopg://app@127.0.0.1:$postgresPort/app")
+$config = $config.Replace("http://llm-gateway:8090", $llmGatewayUrl)
 $config = $config.Replace("  api:`r`n    bind_host: 0.0.0.0`r`n    port: 8080", "  api:`r`n    bind_host: 127.0.0.1`r`n    port: $apiPort")
 $config = $config.Replace("  api:`n    bind_host: 0.0.0.0`n    port: 8080", "  api:`n    bind_host: 127.0.0.1`n    port: $apiPort")
 [System.IO.File]::WriteAllText($configPath, $config, [System.Text.UTF8Encoding]::new($false))
@@ -110,6 +116,7 @@ try {
 
     $env:M13_FASTAPI_LIVE_ORIGIN = $origin
     $env:M13_FASTAPI_LIVE_ROOT = $temporaryRoot
+    $env:M13_FASTAPI_LIVE_TOKEN = $localToken
     $scenario = @'
 import hashlib
 import json
@@ -122,6 +129,7 @@ from pypdf import PdfWriter
 
 origin = os.environ["M13_FASTAPI_LIVE_ORIGIN"]
 root = Path(os.environ["M13_FASTAPI_LIVE_ROOT"])
+authorization = "Bearer " + os.environ["M13_FASTAPI_LIVE_TOKEN"]
 pdf_path = root / "preuve-reelle.pdf"
 writer = PdfWriter()
 writer.add_blank_page(width=595, height=842)
@@ -166,7 +174,7 @@ status, headers, body = request(
     "/v1/documents",
     method="POST",
     data=payload,
-    headers={"Content-Type": f"multipart/form-data; boundary={boundary}", "X-Trace-Id": "TRACE-M13-PDF-REGISTER"},
+    headers={"Content-Type": f"multipart/form-data; boundary={boundary}", "X-Trace-Id": "TRACE-M13-PDF-REGISTER", "Authorization": authorization},
 )
 assert status == 201, (status, body)
 registered = json.loads(body)
@@ -182,7 +190,7 @@ status, _, original = request(f"/v1/documents/{document_id}/original", headers={
 assert status == 200
 assert hashlib.sha256(original).hexdigest() == hashlib.sha256(pdf_bytes).hexdigest()
 
-status, _, body = request(f"/v1/documents/{document_id}/diagnose", method="POST", data=b"", headers={"X-Trace-Id": "TRACE-M13-PDF-DIAGNOSE"})
+status, _, body = request(f"/v1/documents/{document_id}/diagnose", method="POST", data=b"", headers={"X-Trace-Id": "TRACE-M13-PDF-DIAGNOSE", "Authorization": authorization})
 assert status == 202, (status, body)
 status, _, body = request(f"/v1/documents/{document_id}/diagnostic", headers={"X-Trace-Id": "TRACE-M13-PDF-DIAGNOSTIC"})
 assert status == 200, (status, body)

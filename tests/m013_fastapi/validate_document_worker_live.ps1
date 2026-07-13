@@ -2,7 +2,9 @@ $ErrorActionPreference = "Stop"
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 . (Join-Path $PSScriptRoot "resolve_m013_fastapi_python.ps1")
+. (Join-Path $PSScriptRoot "resolve_m013_fastapi_live_gateway.ps1")
 $python = Resolve-M013FastApiPython -RepoRoot $repoRoot
+$llmGatewayUrl = Resolve-M013FastApiLiveGatewayUrl
 $null = & docker info --format '{{.ServerVersion}}' 2>&1
 if ($LASTEXITCODE -ne 0) { throw "DOCKER_ENGINE_REQUIRED" }
 
@@ -20,14 +22,18 @@ $apiPort = Get-FreeTcpPort
 $temporaryRoot = Join-Path ([System.IO.Path]::GetTempPath()) $container
 $configPath = Join-Path $temporaryRoot "application.yaml"
 $secretPath = Join-Path $temporaryRoot "config\secrets\local\postgres_password"
+$localTokenPath = Join-Path $temporaryRoot "config\secrets\local\local_api_token"
+$localToken = "m013-worker-live-$([guid]::NewGuid().ToString('N'))"
 $stdoutPath = Join-Path $temporaryRoot "api.stdout.log"
 $stderrPath = Join-Path $temporaryRoot "api.stderr.log"
 $apiProcess = $null
 
 New-Item -ItemType Directory -Path $temporaryRoot, (Split-Path -Parent $secretPath), (Join-Path $temporaryRoot "data\corpus") -Force | Out-Null
 [System.IO.File]::WriteAllText($secretPath, "m13-worker-live-password", [System.Text.UTF8Encoding]::new($false))
+[System.IO.File]::WriteAllText($localTokenPath, $localToken, [System.Text.UTF8Encoding]::new($false))
 $config = Get-Content -Raw -Encoding UTF8 (Join-Path $repoRoot "config\application.example.yaml")
 $config = $config.Replace("postgresql+psycopg://app@postgres/app", "postgresql+psycopg://app@127.0.0.1:$postgresPort/app")
+$config = $config.Replace("http://llm-gateway:8090", $llmGatewayUrl)
 $config = $config.Replace("  api:`r`n    bind_host: 0.0.0.0`r`n    port: 8080", "  api:`r`n    bind_host: 127.0.0.1`r`n    port: $apiPort")
 $config = $config.Replace("  api:`n    bind_host: 0.0.0.0`n    port: 8080", "  api:`n    bind_host: 127.0.0.1`n    port: $apiPort")
 [System.IO.File]::WriteAllText($configPath, $config, [System.Text.UTF8Encoding]::new($false))
@@ -78,6 +84,7 @@ try {
     $env:M13_WORKER_LIVE_ROOT = $temporaryRoot
     $env:M13_WORKER_LIVE_PYTHON = $python
     $env:M13_WORKER_LIVE_REPO = $repoRoot
+    $env:M13_WORKER_LIVE_TOKEN = $localToken
     @'
 import io
 import json
@@ -109,6 +116,7 @@ config_path = Path(os.environ["M13_WORKER_LIVE_CONFIG"])
 python = os.environ["M13_WORKER_LIVE_PYTHON"]
 repo = os.environ["M13_WORKER_LIVE_REPO"]
 runtime_root = os.environ["M13_WORKER_LIVE_ROOT"]
+authorization = "Bearer " + os.environ["M13_WORKER_LIVE_TOKEN"]
 worker_environment = dict(os.environ)
 worker_environment["PYTHONPATH"] = repo
 
@@ -138,11 +146,11 @@ def register_and_diagnose(index):
     trace_id = f"TRACE-M13-WORKER-{index}"
     status, registered = request(
         "/v1/documents", method="POST", data=b"".join(parts),
-        headers={"Content-Type": f"multipart/form-data; boundary={boundary}", "X-Trace-Id": trace_id},
+        headers={"Content-Type": f"multipart/form-data; boundary={boundary}", "X-Trace-Id": trace_id, "Authorization": authorization},
     )
     assert status == 201
     document_id = registered["document_id"]
-    status, _ = request(f"/v1/documents/{document_id}/diagnose", method="POST", data=b"", headers={"X-Trace-Id": trace_id})
+    status, _ = request(f"/v1/documents/{document_id}/diagnose", method="POST", data=b"", headers={"X-Trace-Id": trace_id, "Authorization": authorization})
     assert status == 202
     return document_id, trace_id
 
