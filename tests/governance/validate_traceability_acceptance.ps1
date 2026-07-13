@@ -164,6 +164,17 @@ try {
     $validResult = Invoke-Validator -ProjectRoot $validProjectRoot
     Assert-ExitCode -Actual $validResult.ExitCode -Expected 0 -Message "La matrice initiale conforme doit être acceptée."
 
+    $missingRootArtifactProjectRoot = New-TemporaryProject -Name "missing-root-artifact"
+    Remove-Item -LiteralPath (Join-Path $missingRootArtifactProjectRoot "uv.lock")
+    $missingRootArtifactResult = Invoke-Validator -ProjectRoot $missingRootArtifactProjectRoot
+    Assert-ExitCode `
+        -Actual $missingRootArtifactResult.ExitCode `
+        -Expected 1 `
+        -Message "Un artefact racine tracé mais absent doit être refusé."
+    if (-not $missingRootArtifactResult.Output.Contains("uv.lock")) {
+        throw "Le rejet doit nommer l'artefact racine absent. Sortie: $($missingRootArtifactResult.Output)"
+    }
+
     $emptyCellProjectRoot = New-TemporaryProject -Name "empty-cell"
     Set-MatrixCell `
         -Path (Join-Path $emptyCellProjectRoot "docs/traceability/matrix.md") `
