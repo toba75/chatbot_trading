@@ -228,6 +228,16 @@
 - Écart historique explicite : certains lots antérieurs ont adapté ou ajouté des tests dans leur commit GREEN. Les hashes sont conservés et cet écart à la séparation RED/GREEN stricte est documenté sans réécriture. Pour ADR-026, le contrat a été commité RED, le harness a été stabilisé dans des commits exclusivement tests, puis l'implémentation a été commitée GREEN sans assouplir le contrat.
 - Préservation utilisateur : le hunk `tests/m013/validate_m013_reality_product_acceptance.ps1` reste hors staging et hors commits.
 
+## Correctif T-012 - Actions UI exécutables et progression publique
+
+- Date : 2026-07-13.
+- Scénario BDD : Given un PDF réel dont le diagnostic est demandé depuis l’UI ; When `uv run ui` démarre PostgreSQL, le gateway LLM, l’API et le worker documentaire ; Then l’outbox est relayée, le worker persiste `DIAGNOSING` avant l’inspection, l’UI affiche la phase et les unités persistées, puis la réussite ou l’échec terminal sans fallback.
+- Gouvernance : ADR-031 acceptée ; la définition de terminé, la spécification UI-019, la trace REQ-UI-019 et le workflow d’implémentation imposent désormais `UI -> API -> outbox -> relais -> worker -> état public` pour toute action asynchrone disponible.
+- Commit RED : `b40f92b6f`, `test(ui): couvrir action réelle et progression ADR-031`.
+- Commit GREEN : `245410d75`, `feat(ui): exécuter diagnostics et afficher progression ADR-031`.
+- Preuve locale réelle : le document `DOC-073F361EBB4AC6C1` a été consommé par le worker démarré par `uv run ui`; l’API et l’UI ont exposé `DIAGNOSE`, `SUCCEEDED`, `38 / 38` et 38 pages diagnostiquées.
+- Validations : tests ciblés UI `6/6`, scope M13-FastAPI `70` nœuds uniques `SCOPE GREEN`, puis gate canonique verrouillée `400` nœuds uniques `Gate GREEN`.
+
 ## Correctif de maintenance - installation du projet en clone propre
 
 - Date : 2026-07-13.

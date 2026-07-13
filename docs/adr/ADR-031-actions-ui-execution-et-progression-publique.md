@@ -87,7 +87,7 @@ public de progression qui doit rester cohérent pendant son exécution.
 - Plan d'implémentation : `docs/tasks/milestone_013-fastapi/0012_executer_actions_ui_avec_progression.md`.
 - Tests d'acceptation : `gate_tests/ported/tests/m013_fastapi/validate_ui_action_execution_progress_acceptance.py`,
   complété par la preuve locale réelle `uv run ui` sur un PDF du corpus.
-- Commits : RED `b40f92b6f`; GREEN à compléter dans le journal de tâche.
+- Commits : RED `b40f92b6f`; GREEN `245410d75`.
 
 ## Notes
 

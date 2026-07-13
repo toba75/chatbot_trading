@@ -45,4 +45,4 @@
   ADR-030 et ADR-031.
 - Commande de validation finale : `uv run --locked gate`.
 - Commit RED : `b40f92b6f`, `test(ui): couvrir action réelle et progression ADR-031`.
-- Commit GREEN : à compléter après `uv run --locked gate`.
+- Commit GREEN : `245410d75`, `feat(ui): exécuter diagnostics et afficher progression ADR-031`.
