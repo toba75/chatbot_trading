@@ -138,7 +138,7 @@ chaîne native doit être livrée et vérifiée comme un runtime isolé.
   `docs/tasks/milestone_004-conversion/0002_decider_execution_reelle_conversion.md`.
 - Tests d'acceptation :
   `gate_tests/ported/tests/governance/validate_m004_conversion_runtime_governance_acceptance.py`.
-- Commits : RED `d21b71718`; GREEN à renseigner après la décision documentaire.
+- Commits : RED `d21b71718`; GREEN `ef05c09eb`.
 
 ## Notes
 

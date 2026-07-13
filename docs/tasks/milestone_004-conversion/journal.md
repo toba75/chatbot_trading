@@ -47,12 +47,36 @@ frontières UI/API d'ADR-018 et ADR-031.
   (1 test atomique) et `uv run --locked gate --scope governance` (22 nœuds
   uniques, `SCOPE GREEN: governance`).
 
+## Exécution T-002
+
+- GREEN initial : `uv run --locked gate` a validé 400 nœuds uniques en
+  69,1 secondes avant le test RED.
+- Scénario vérifié : Given une page possède une route M-003 explicite, When le
+  worker de conversion la traite, Then il emploie l'adaptateur réel imposé ou
+  publie son indisponibilité explicite, sans route de remplacement.
+- RED : `d21b71718` ajoute le contrôle de gouvernance qui échoue en l'absence
+  d'ADR-032.
+- Décision : ADR-032 reste Proposée et impose Docling standard,
+  Granite-Docling et OCRmyPDF conditionnel dans des runtimes isolés, avec
+  actifs scellés par SHA-256, dépendance `uv` verrouillée et erreurs publiques
+  stables. Aucun exécutable global, téléchargement silencieux ni fallback ne
+  peut rendre `Convertir` disponible.
+- GREEN : `ef05c09eb` crée ADR-032, met à jour son index et la spécification
+  M-004. La réconciliation auditée de l'allowlist historique a conservé son
+  catalogue fermé de 67 chemins et n'a mis à jour que l'empreinte de l'index
+  ADR versionné.
+- Preuves GREEN :
+  `uv run --locked pytest gate_tests/ost_gate/test_historical_references_contract.py gate_tests/ported/tests/governance/validate_m004_conversion_runtime_governance_acceptance.py`
+  (2 tests) puis `uv run --locked gate` (401 nœuds uniques, `Gate GREEN`,
+  69,2 secondes). Cette dernière est la gate canonique complète, pas un scope
+  partiel.
+
 ## Table des preuves
 
 | Tâche | Commit RED | Commit GREEN | ADR | Validations | État |
 |---|---|---|---|---|---|
 | T-001 | `f66c85eac`, `e922b14c3` | `fb440e229` | ADR-029 | Gate de gouvernance, ancêtre `master`, checkout LF/CRLF, catalogue fermé de 67 preuves | GREEN ciblé |
-| T-002 | À venir | À venir | ADR-032 | Tests ciblés, gate | À faire |
+| T-002 | `d21b71718` | `ef05c09eb` | ADR-032 (Proposée) | Test de gouvernance, contrat historique, gate canonique complète 401 nœuds | GREEN documentaire |
 | T-003 | À venir | À venir | ADR-032; ADR-001 à ADR-004 | Tests ciblés, gate | À faire |
 | T-004 | À venir | À venir | ADR-018; ADR-019; ADR-024; ADR-031 | Tests ciblés, gate, UI réelle | À faire |
 | T-005 | À venir | À venir | ADR-002; ADR-003; ADR-031 | Tests ciblés, gate, UI réelle | À faire |
