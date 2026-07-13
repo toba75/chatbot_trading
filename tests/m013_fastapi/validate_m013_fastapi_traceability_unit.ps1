@@ -47,7 +47,9 @@ foreach ($testPath in @(
     "tests/m013_fastapi/validate_ka_projection_persistence_live.ps1",
     "tests/m013_fastapi/validate_orchestrator_deployment_unit.ps1",
     "tests/m013_fastapi/validate_m013_fastapi_traceability_unit.ps1",
-    "tests/m013_fastapi/validate_review_governance_performance_acceptance.ps1"
+    "tests/m013_fastapi/validate_review_governance_performance_acceptance.ps1",
+    "tests/m013_fastapi/validate_review3_safety_acceptance.ps1",
+    "tests/m013_fastapi/validate_review3_safety_live.ps1"
 )) {
     Assert-Contains $gate $testPath "Test T-011 absent de la gate M13-FastAPI."
 }
@@ -70,7 +72,8 @@ foreach ($marker in @(
     "ADR-019",
     "ADR-020",
     "ADR-021",
-    "ADR-024"
+    "ADR-024",
+    "ADR-025"
 )) {
     Assert-Contains $traceability $marker "Traçabilité T-011 incomplète."
 }

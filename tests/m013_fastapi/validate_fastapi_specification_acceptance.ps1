@@ -81,7 +81,7 @@ Assert-Contains `
     -Message "ADR-019 absente de l'index canonique."
 Assert-Contains `
     -Content $adrIndexContent `
-    -Expected "Prochaine ADR technique: ADR-024" `
+    -Expected "Prochaine ADR technique: ADR-026" `
     -Message "Prochain numéro ADR technique non actualisé."
 
 foreach ($marker in @(

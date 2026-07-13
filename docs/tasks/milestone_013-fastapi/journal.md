@@ -194,3 +194,18 @@
 - Blocages explicites : conversion absente en `409 CONVERSION_NOT_REQUESTED`; commande d'indexation hors parcours UI en `404 UI_DOCUMENT_COMMAND_FORBIDDEN`; champ obligatoire absent en `400 HTTP_REQUEST_INVALID`; document inconnu en `404`, toujours rendu en page HTML `role=alert` avec retour au corpus.
 - Performance UI : une lecture de corpus produit un seul appel paginé `GET /v1/documents`; aucun appel `1+N` vers `/projection` n'est émis.
 - Catalogue : la preuve dépendante de Docker quitte `-Mode Static` et rejoint exclusivement `-Mode Live`; la gate Static reste autonome.
+
+## Correctif de revue 3 - Sûreté, concurrence et isolation PDF
+
+- Date : 2026-07-13.
+- Scénario BDD : Given des claims réattribuables, un worker susceptible de tomber entre deux écritures, une projection KA rejouée et un PDF non fiable; When la lease expire, qu'un ancien writer tente une transition, que les retries s'épuisent, que les sorties divergent ou que le parseur dépasse un budget; Then génération et token fenced refusent l'ancien détenteur, l'échec SP précède l'échec plateforme, le replay divergent est rejeté et le sous-processus PDF est arrêté sans fallback.
+- Décision : ADR-025 complète ADR-024 par une génération monotone et un token UUID v4 sur chaque claim job/outbox; elle complète ADR-020 par une inspection `pypdf` exclusivement dans un sous-processus jetable à budgets explicites.
+- Contrats : les DTO de jobs techniques deviennent neutres dans `app.contracts.technical_jobs`; les applications SP ne dépendent plus de la file PostgreSQL concrète et la composition plateforme injecte le port outbox.
+- Données : la migration ascendante `008_claim_fencing_and_projection_replay.sql` ajoute le fencing, l'empreinte complète de replay KA et les index partiels des claims pending/expirés.
+- Retry : les erreurs transitoires sont replanifiées jusqu'à trois exécutions; les erreurs d'intégrité sont terminales dès la première; toute terminalisation publie d'abord l'échec SP et reste réconciliable après crash.
+- PDF : faux marqueur, document illisible, dépassement de taille/pages/texte/XObjects/mémoire/temps et timeout échouent explicitement; une page réellement blanche devient `EMPTY` et requiert une revue manuelle.
+- Commits RED : `31ca4dc5c`, `test(runtime): couvrir fencing retries et PDF isolé ADR-025`; `c46b15e36`, `test(worker): couvrir épuisement retry récupérable ADR-025`.
+- Commit GREEN : `3cd3c98f6`, `feat(runtime): clôturer sûreté concurrence review3 ADR-025`.
+- Preuves GREEN ciblées : architecture `215` fichiers; sûreté unitaire; lint ciblé; compilation; PostgreSQL live `schema=008`, lease renouvelée, réattribution fenced, identités de réplicas distinctes, trois tentatives transitoires, erreur d'intégrité permanente, ancien ACK fenced et replay KA strict.
+- Upgrade réel : volume au schéma 007 migré vers 008, ledger idempotent et verrou advisory GREEN.
+- Hors staging : les adaptations mécaniques des tests historiques restent séparées; le hunk utilisateur `tests/m013/validate_m013_reality_product_acceptance.ps1` reste hors index et hors commits.
