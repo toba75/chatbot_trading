@@ -23,7 +23,6 @@ from app.platform.request_context import bind_trace_id, reset_trace_id
 from app.source_processing.adapters.postgres_document_persistence import build_document_persistence
 from app.source_processing.adapters.docling_native_conversion import (
     CanonicalArtifactFileStore,
-    IsolatedNativeDoclingConverter,
 )
 from app.source_processing.adapters.postgres_job_outbox import PostgresJobOutbox
 from app.source_processing.adapters.pypdf_diagnostic_inspector import (
@@ -34,12 +33,19 @@ from app.source_processing.application.document_worker import (
     DocumentDiagnosticWorker,
     WorkerProcessingError,
 )
-from app.source_processing.application.native_document_conversion_worker import (
-    NativeDocumentConversionWorker,
+from app.source_processing.domain.document_processing_run import (
+    PageRoutingConfiguration,
+    RoutingPolicyVersion,
+)
+from app.source_processing.application.routed_document_conversion_worker import (
+    build_routed_document_conversion_worker,
 )
 
 
 MAX_TRANSIENT_ATTEMPTS = 3
+DOCUMENT_ROUTING_POLICY_VERSION = "routing-v1"
+DOCUMENT_ROUTING_AUTO_CONFIDENCE_MIN = 0.90
+DOCUMENT_ROUTING_BENCHMARK_CONFIDENCE_MIN = 0.85
 
 
 class JobLeaseHeartbeat:
@@ -185,24 +191,33 @@ def _run_worker(
             original_source_store=persistence.original_source_store,
             inspector=build_m13_isolated_pdf_inspector(),
         ),
+        routing_configuration=PageRoutingConfiguration(
+            routing_policy_version=RoutingPolicyVersion.from_value(
+                DOCUMENT_ROUTING_POLICY_VERSION
+            ),
+            auto_confidence_min=DOCUMENT_ROUTING_AUTO_CONFIDENCE_MIN,
+            benchmark_confidence_min=DOCUMENT_ROUTING_BENCHMARK_CONFIDENCE_MIN,
+        ),
     )
-    native_worker = NativeDocumentConversionWorker(
+    routed_conversion_worker = build_routed_document_conversion_worker(
         source_document_repository=persistence.source_document_repository,
         processing_run_repository=persistence.processing_run_repository,
         conversion_repository=persistence.document_conversion_repository,
         original_source_store=persistence.original_source_store,
-        native_converter=IsolatedNativeDoclingConverter(
-            asset_manifest_path=Path("config/docling-assets.native.json"),
-            assets_root=Path(application_configuration.paths.data_root) / "docling_assets" / "native",
-            timeout_seconds=application_configuration.runtime.timeouts.request_seconds,
-        ),
+        native_asset_manifest_path=Path("config/docling-assets.native.json"),
+        native_assets_root=Path(application_configuration.paths.data_root) / "docling_assets" / "native",
+        granite_asset_manifest_path=Path("config/docling-assets.granite.json"),
+        granite_assets_root=Path(application_configuration.paths.data_root) / "docling_assets" / "granite",
+        ocrmypdf_manifest_path=Path("config/ocrmypdf-image.json"),
+        audit_root=Path(application_configuration.paths.data_root) / "docling_audit",
+        timeout_seconds=application_configuration.runtime.timeouts.request_seconds,
         artifact_store=CanonicalArtifactFileStore(
             root=Path(application_configuration.paths.canonical_sources_root)
         ),
     )
     workers = {
         "DIAGNOSE": worker,
-        "CONVERT_DOCUMENT": native_worker,
+        "CONVERT_DOCUMENT": routed_conversion_worker,
     }
     processed = 0
     while max_jobs is None or processed < max_jobs:

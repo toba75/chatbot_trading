@@ -61,8 +61,8 @@
 | REQ-M003-002 | docs/tasks/milestone_003/0002_publier_specification_source_routee.md | Couvert | gate_tests/ported/tests/m003/validate_m003_specification_acceptance.py | uv run --locked gate
 | REQ-M003-003 | docs/tasks/milestone_003/0003_enregistrer_source_immuable.md | Couvert | gate_tests/ported/tests/m003/validate_source_registration_acceptance.py | uv run --locked gate
 | REQ-M003-004 | docs/tasks/milestone_003/0004_creer_manifeste_pages_complet.md | Couvert | gate_tests/ported/tests/m003/validate_page_manifest_acceptance.py | uv run --locked gate
-| REQ-M003-005 | docs/tasks/milestone_003/0005_diagnostiquer_pages_source.md | Couvert | gate_tests/ported/tests/m003/validate_page_diagnostics_acceptance.py | uv run --locked gate
-| REQ-M003-006 | docs/tasks/milestone_003/0006_decider_plan_routage_explicite.md | Couvert | gate_tests/ported/tests/m003/validate_route_plan_acceptance.py | uv run --locked gate
+| REQ-M003-005 | docs/tasks/milestone_003/0005_diagnostiquer_pages_source.md | Couvert | gate_tests/ported/tests/m003/validate_page_diagnostics_acceptance.py; gate_tests/ported/tests/m004/validate_diagnostic_route_planning_unit.py | uv run --locked gate`ADR-033 fixe la priorité des signaux OCR et mixtes pour que les routes restent atteignables sans fallback. |
+| REQ-M003-006 | docs/tasks/milestone_003/0006_decider_plan_routage_explicite.md | Couvert | gate_tests/ported/tests/m003/validate_route_plan_acceptance.py; gate_tests/ported/tests/m004/validate_diagnostic_route_planning_unit.py | uv run --locked gate`ADR-033 rend PREPROCESS_GRANITE et BAD_OCR_TO_GRANITE explicitement vérifiables. |
 | REQ-M003-007 | docs/tasks/milestone_003/0007_bloquer_revue_quarantaine.md | Couvert | gate_tests/ported/tests/m003/validate_review_quarantine_acceptance.py | uv run --locked gate
 | REQ-M003-008 | docs/tasks/milestone_003/0008_exposer_commandes_documents_sp.md | Couvert | gate_tests/ported/tests/m003/validate_document_commands_acceptance.py | uv run --locked gate
 | REQ-M003-009 | docs/tasks/milestone_003/0009_relier_m003_tracabilite_gates.md | Couvert | gate_tests/ported/tests/m003/validate_m003_audit_signals_acceptance.py | uv run --locked gate

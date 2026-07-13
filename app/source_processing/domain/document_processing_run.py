@@ -580,14 +580,14 @@ class PageDiagnosticPolicy:
 
         if parsed_signals.corruption_state is PageCorruptionSignal.CORRUPT:
             page_state = PageDecisionState.UNSUPPORTED_OR_CORRUPT
-        elif parsed_signals.mixed_content_detected:
-            page_state = PageDecisionState.MIXED_CONTENT
         elif parsed_signals.layout_complexity is LayoutComplexitySignal.COMPLEX:
             page_state = PageDecisionState.COMPLEX_VISUAL
-        elif parsed_signals.existing_ocr_state is ExistingOcrSignal.BAD:
-            page_state = PageDecisionState.OCR_BAD
         elif parsed_signals.image_state is PageImageSignal.SCAN_DEGRADED:
             page_state = PageDecisionState.SCAN_DEGRADED
+        elif parsed_signals.existing_ocr_state is ExistingOcrSignal.BAD:
+            page_state = PageDecisionState.OCR_BAD
+        elif parsed_signals.mixed_content_detected:
+            page_state = PageDecisionState.MIXED_CONTENT
         elif parsed_signals.image_state is PageImageSignal.SCAN_CLEAN:
             page_state = PageDecisionState.SCAN_CLEAN
         elif parsed_signals.native_text_state is NativeTextSignal.SUSPECT:

@@ -6,12 +6,19 @@ from collections.abc import Mapping
 from typing import Any, Protocol, runtime_checkable
 
 from app.contracts.technical_jobs import ClaimedJob, JobStatus
+from app.source_processing.application.approve_route_plan import (
+    ApproveRoutePlanCommand,
+    ApproveRoutePlanHandler,
+)
 from app.source_processing.application.record_page_diagnostics import (
     PageDiagnosticInput,
     RecordPageDiagnosticsCommand,
     RecordPageDiagnosticsHandler,
 )
-from app.source_processing.domain.document_processing_run import DocumentProcessingRunStatus
+from app.source_processing.domain.document_processing_run import (
+    DocumentProcessingRunStatus,
+    PageRoutingConfiguration,
+)
 from app.source_processing.domain.source_document import DocumentId
 
 
@@ -43,6 +50,7 @@ class DocumentDiagnosticWorker:
         source_document_repository: Any,
         processing_run_repository: Any,
         diagnostic_inspector: DiagnosticInspector,
+        routing_configuration: PageRoutingConfiguration,
     ) -> None:
         if not callable(getattr(source_document_repository, "find_by_document_id", None)):
             raise ValueError("source_document_repository invalide")
@@ -52,10 +60,16 @@ class DocumentDiagnosticWorker:
             raise ValueError("processing_run_repository sans sauvegarde")
         if not isinstance(diagnostic_inspector, DiagnosticInspector):
             raise ValueError("diagnostic_inspector invalide")
+        if not isinstance(routing_configuration, PageRoutingConfiguration):
+            raise ValueError("routing_configuration invalide")
         self._source_document_repository = source_document_repository
         self._processing_run_repository = processing_run_repository
         self._diagnostic_inspector = diagnostic_inspector
+        self._routing_configuration = routing_configuration
         self._diagnostics_handler = RecordPageDiagnosticsHandler(
+            processing_run_repository=processing_run_repository
+        )
+        self._route_plan_handler = ApproveRoutePlanHandler(
             processing_run_repository=processing_run_repository
         )
 
@@ -85,7 +99,7 @@ class DocumentDiagnosticWorker:
             raise WorkerProcessingError("PROCESSING_RUN_ID_MISMATCH", retryable=False)
 
         if processing_run.status is DocumentProcessingRunStatus.DIAGNOSED:
-            return _diagnosis_result(processing_run)
+            return _diagnosis_result(self._approve_route_plan(processing_run))
         if processing_run.status is DocumentProcessingRunStatus.FAILED:
             raise WorkerProcessingError(
                 processing_run.failure_error_code or "PROCESSING_RUN_FAILED",
@@ -104,7 +118,17 @@ class DocumentDiagnosticWorker:
                 diagnostics=diagnostics,
             )
         )
-        return _diagnosis_result(diagnosed)
+        return _diagnosis_result(self._approve_route_plan(diagnosed))
+
+    def _approve_route_plan(self, processing_run: Any) -> Any:
+        """Termine la chaîne DIAGNOSE avec l'unique politique M-003 versionnée."""
+
+        return self._route_plan_handler.handle(
+            ApproveRoutePlanCommand(
+                processing_run=processing_run,
+                routing_configuration=self._routing_configuration,
+            )
+        )
 
     def mark_failed(self, claimed_job: ClaimedJob, error_code: str) -> None:
         """Rend l'échec terminal visible dans l'agrégat SP public."""

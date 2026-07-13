@@ -504,10 +504,7 @@ def _conversion_action_available(
     if processing_run.route_plan is None:
         return False
     routes = processing_run.route_plan.page_routes
-    return (
-        len(routes) == processing_run.page_manifest.source_page_count
-        and all(route.route_name.value == "NATIVE_STANDARD" for route in routes)
-    )
+    return len(routes) == processing_run.page_manifest.source_page_count
 
 
 def _page_diagnostic_view(decision: PageDecision | None) -> PageDiagnosticView | None:

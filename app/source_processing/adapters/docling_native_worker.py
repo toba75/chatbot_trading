@@ -57,7 +57,11 @@ def _convert(payload: Any) -> dict[str, object]:
         allowed_formats=[InputFormat.PDF],
         format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)},
     )
-    result = converter.convert(source_pdf_path, max_num_pages=len(expected_pages))
+    result = converter.convert(
+        source_pdf_path,
+        page_range=(expected_pages[0], expected_pages[-1]),
+        max_num_pages=1_000,
+    )
     document = result.document
     pages = [_page_payload(document=document, page_number=page_number) for page_number in expected_pages]
     return {"schema_version": "1.0", "tool_version": "2.111.0", "pages": pages}

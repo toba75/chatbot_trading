@@ -205,7 +205,10 @@ def test_ocrmypdf_manifest_refuses_an_unpinned_image_and_no_network_command(tmp_
     with pytest.raises(runtime.OcrmyPdfImageManifestError, match="CONVERSION_ASSET_MANIFEST_INVALID"):
         runtime.OcrmyPdfImageManifest.load(manifest_path=manifest_path, require_local_image=False)
 
-    image_reference = "jbarlow83/ocrmypdf@sha256:" + "c" * 64
+    image_reference = (
+        "jbarlow83/ocrmypdf@sha256:"
+        "88d50f2ce7c054e5aacfc48794eca50dbb8af9a6ef1d2a540456dcd9a4687e42"
+    )
     manifest_path.write_text(
         json.dumps(
             {

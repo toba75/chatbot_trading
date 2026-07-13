@@ -708,11 +708,6 @@ class PostgresDocumentPersistence:
                                    AND (SELECT COUNT(*) FROM source_processing.page_routes AS route
                                         WHERE route.processing_run_id = run.processing_run_id)
                                        = run.source_page_count
-                                   AND NOT EXISTS (
-                                       SELECT 1 FROM source_processing.page_routes AS route
-                                        WHERE route.processing_run_id = run.processing_run_id
-                                          AND route.route_name <> 'NATIVE_STANDARD'
-                                   )
                                ) AS conversion_action_available
                           FROM source_processing.source_documents AS source
                           LEFT JOIN source_processing.document_processing_runs AS run
@@ -1430,6 +1425,21 @@ class PostgresProcessingRunRepository:
         self._persistence = persistence
 
     def save(self, processing_run: DocumentProcessingRun) -> None:
+        self._persistence.save(processing_run)
+
+    def save_transition(
+        self,
+        processing_run: DocumentProcessingRun,
+        *,
+        expected_status: DocumentProcessingRunStatus,
+    ) -> None:
+        if not isinstance(processing_run, DocumentProcessingRun):
+            raise ValueError("processing_run invalide")
+        if not isinstance(expected_status, DocumentProcessingRunStatus):
+            raise ValueError("expected_status invalide")
+        current = self.find_by_document_id(processing_run.document_id)
+        if current is None or current.status is not expected_status:
+            raise ProcessingRunVersionConflictError()
         self._persistence.save(processing_run)
 
     def find_by_document_id(self, document_id: DocumentId) -> DocumentProcessingRun | None:

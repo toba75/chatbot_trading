@@ -788,6 +788,8 @@ def _ensure_quality_rejection_error_code(value: Any) -> str:
         "SOURCE_NOT_CANONICAL",
         "PAGE_AUTHORITY_MISSING",
         "DOCLING_STANDARD_UNAVAILABLE",
+        "GRANITE_DOCLING_UNAVAILABLE",
+        "OCRMYPDF_UNAVAILABLE",
         "CONVERSION_ASSET_MANIFEST_INVALID",
         "CANONICAL_ARTIFACT_STORE_UNAVAILABLE",
         "SOURCE_FINGERPRINT_MISMATCH",
@@ -799,6 +801,9 @@ def _ensure_quality_rejection_error_code(value: Any) -> str:
         "CONVERSION_NOT_EXECUTABLE",
         "DOCLING_PAGE_MANIFEST_MISMATCH",
         "DOCLING_PROVENANCE_MISSING",
+        "POSTGRES_TRANSIENT_FAILURE",
+        "POSTGRES_INTEGRITY_FAILURE",
+        "POSTGRES_PERMANENT_FAILURE",
         "WORKER_UNEXPECTED_ERROR",
     }:
         raise ValueError("rejection_error_code invalide")
