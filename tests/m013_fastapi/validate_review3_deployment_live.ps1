@@ -172,11 +172,11 @@ finally {
     Remove-Item Env:M013_COMPOSE_ORIGIN -ErrorAction SilentlyContinue
     Remove-Item Env:M013_COMPOSE_PROJECT -ErrorAction SilentlyContinue
     Remove-Item Env:M013_COMPOSE_FILE -ErrorAction SilentlyContinue
+    & docker compose --project-name $project -f $composePath down --volumes --remove-orphans *> $null
     if ($null -eq $previousRevision) { Remove-Item Env:OSTRADING_IMAGE_REVISION -ErrorAction SilentlyContinue } else { $env:OSTRADING_IMAGE_REVISION = $previousRevision }
     if ($null -eq $previousSchema) { Remove-Item Env:OSTRADING_POSTGRES_SCHEMA_VERSION -ErrorAction SilentlyContinue } else { $env:OSTRADING_POSTGRES_SCHEMA_VERSION = $previousSchema }
     if ($null -eq $previousEdgePort) { Remove-Item Env:OST_EDGE_HTTPS_PORT -ErrorAction SilentlyContinue } else { $env:OST_EDGE_HTTPS_PORT = $previousEdgePort }
     if ($null -eq $previousCaddyAdmin) { Remove-Item Env:CADDY_ADMIN -ErrorAction SilentlyContinue } else { $env:CADDY_ADMIN = $previousCaddyAdmin }
-    & docker compose --project-name $project -f $composePath down --volumes --remove-orphans *> $null
     if (Test-Path -LiteralPath $temporaryRoot) {
         Remove-Item -LiteralPath $temporaryRoot -Recurse -Force
     }
