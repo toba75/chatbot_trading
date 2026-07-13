@@ -223,6 +223,35 @@ rejouée depuis le formulaire UI sur `DOC-F91FE126FBFFA374` :
   ignore désormais les actifs locaux sous `data/`, non versionnés et fournis
   explicitement, sans élargir son catalogue fermé de preuves historiques.
 
+## Exécution T-006
+
+- BDD : Given ADR-032 et ADR-033 sont proposées alors que leurs adaptateurs,
+  actifs, parcours UI et preuves réelles sont livrés, When la gouvernance
+  clôture M04-conversion, Then les deux ADR et leur index deviennent
+  `Acceptée` et l'allowlist historique reste fermée et intègre.
+- Baseline GREEN : `uv sync --locked`, `uv lock --check`, `uv run --locked
+  gate` (406 nœuds uniques) et `git diff --check` ont passé avec un worktree
+  propre avant le RED.
+- RED : `65577c74f` (`test(gouvernance): exiger ADR conversion acceptées`) a
+  exigé le statut `Acceptée` d'ADR-032 et ADR-033 ainsi que leurs entrées
+  exactes dans l'index. Il échouait sur ADR-032 encore `Proposée`.
+- GREEN : `572bc89c2` (`docs(m04): accepter décisions conversion livrées`)
+  accepte les deux ADR sans modifier leur décision, aligne leurs deux lignes
+  d'index et réconcilie exclusivement l'empreinte de `docs/adr/index.md`.
+  L'allowlist conserve ses 67 chemins et leurs justifications : aucun chemin
+  n'est ajouté, supprimé ou réordonné.
+- Garde-fou historique : `RECONCILED=67`; le contrat historique confirme que
+  la variation CRLF/LF reste admise pour le contenu indexé, tandis qu'une
+  modification sémantique non autorisée reste RED avec
+  `GATE_HISTORICAL_ALLOWLIST_HASH_MISMATCH`.
+- Garde-fou produit : la preuve OCR réelle de `trading-on-momentum.pdf`, page
+  123, reste `FAILED 0/1` avec `GRANITE_DOCLING_UNAVAILABLE`. Le PDF
+  prétraité OCR est seulement un artefact d'audit ; aucun artefact canonique
+  ni succès de conversion n'est publié.
+- Preuves GREEN : le test de gouvernance M04 et le contrat d'allowlist ont
+  passé (`2 passed`), puis `uv run --locked gate --scope governance` a validé
+  23 nœuds uniques, y compris les validateurs ADR et historiques.
+
 ## Table des preuves
 
 | Tâche | Commit RED | Commit GREEN | ADR | Validations | État |
@@ -232,4 +261,4 @@ rejouée depuis le formulaire UI sur `DOC-F91FE126FBFFA374` :
 | T-003 | `b789b3360` | `fb5b398b9` | ADR-032; ADR-001 à ADR-004 | Tests ciblés, assets SHA-256 hors ligne, scope M-004, gate canonique complète 404 nœuds | GREEN réel natif |
 | T-004 | `e8b82bf47` | `bd27e2433` | ADR-018; ADR-019; ADR-024; ADR-031; ADR-032 | 7 tests ciblés, `uv sync --locked`, gate complète 406 nœuds, `git diff --check`, UI réelle `QUEUED` puis `SUCCEEDED` | GREEN réel UI |
 | T-005 | `ada4b6a0e`, `e62c60a2d`, `bfd5438e7` | `96be704d8` | ADR-002; ADR-003; ADR-031; ADR-032; ADR-033 | 17 tests ciblés, migration 013, UI native/Granite/OCR réelle, absence de publication partielle, gate complète 406 nœuds | GREEN |
-| T-006 | À venir | À venir | ADR-032; ADR-033 | Gouvernance ADR, allowlist historique, gate canonique complète | À faire |
+| T-006 | `65577c74f` | `572bc89c2` | ADR-032; ADR-033 | Gouvernance ADR, allowlist historique fermée, erreur OCR → Granite terminale, scope gouvernance 23 nœuds | GREEN documentaire |
