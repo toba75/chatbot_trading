@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from ost_gate.models import GateNode, GatePlan, NodeResult
@@ -53,11 +54,27 @@ def execute_plan(plan: GatePlan, parallel_workers: int) -> tuple[list[NodeResult
 def _run_batch(
     plan: GatePlan, nodes: list[GateNode], workers: int
 ) -> tuple[list[NodeResult], int]:
+    if workers <= 0:
+        raise ValueError("GATE_PARALLEL_WORKERS_INVALID")
+    if workers == 1:
+        outcomes = [_run_node(plan, node) for node in nodes]
+    else:
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            futures = [executor.submit(_run_node, plan, node) for node in nodes]
+            outcomes = [future.result() for future in futures]
+    results = [result for result, _ in outcomes]
+    exit_code = next((code for _, code in outcomes if code != 0), 0)
+    return results, exit_code
+
+
+def _run_node(plan: GatePlan, node: GateNode) -> tuple[NodeResult, int]:
+    """Exécute un seul nœud dans son processus pytest isolé."""
+
     with tempfile.TemporaryDirectory(prefix="ost_gate_") as temporary_directory_name:
         temporary_directory = Path(temporary_directory_name)
         result_path = temporary_directory / "pytest-results.json"
-        expected = {str(node.path): node.identifier for node in nodes}
-        timeouts = {node.identifier: node.timeout_seconds for node in nodes}
+        expected = {str(node.path): node.identifier}
+        timeouts = {node.identifier: node.timeout_seconds}
         environment = os.environ.copy()
         existing_pythonpath = environment.get("PYTHONPATH")
         environment["PYTHONPATH"] = (
@@ -79,9 +96,7 @@ def _run_batch(
             "-p",
             "ost_gate.pytest_plugin",
         ]
-        if workers > 1 and len(nodes) > 1:
-            command.extend(("-n", str(workers)))
-        command.extend(str(node.path) for node in nodes)
+        command.append(str(node.path))
         completed = subprocess.run(
             command,
             cwd=plan.repository_root,
@@ -94,7 +109,7 @@ def _run_batch(
         )
         detail = _command_detail(completed)
         if not result_path.is_file():
-            return [
+            return (
                 NodeResult(
                     identifier=node.identifier,
                     scope=node.scope,
@@ -103,14 +118,14 @@ def _run_batch(
                     duration_seconds=0.0,
                     executions=1,
                     detail=f"GATE_PYTEST_REPORT_REQUIRED:{detail}",
-                )
-                for node in nodes
-            ], completed.returncode or 1
+                ),
+                completed.returncode or 1,
+            )
         try:
             report = json.loads(result_path.read_text(encoding="utf-8"))
             raw_results = report["results"]
         except (json.JSONDecodeError, KeyError, TypeError) as error:
-            return [
+            return (
                 NodeResult(
                     identifier=node.identifier,
                     scope=node.scope,
@@ -119,40 +134,36 @@ def _run_batch(
                     duration_seconds=0.0,
                     executions=1,
                     detail=f"GATE_PYTEST_REPORT_INVALID:{error}",
-                )
-                for node in nodes
-            ], completed.returncode or 1
-        results = []
-        for node in nodes:
-            raw_result = raw_results.get(node.identifier)
-            if not isinstance(raw_result, dict):
-                results.append(
-                    NodeResult(
-                        identifier=node.identifier,
-                        scope=node.scope,
-                        phase=node.phase,
-                        status="RED",
-                        duration_seconds=0.0,
-                        executions=1,
-                        detail="GATE_PYTEST_NODE_RESULT_REQUIRED",
-                    )
-                )
-                continue
-            status = raw_result.get("status")
-            duration = raw_result.get("duration_seconds")
-            raw_detail = raw_result.get("detail")
-            results.append(
+                ),
+                completed.returncode or 1,
+            )
+        raw_result = raw_results.get(node.identifier)
+        if not isinstance(raw_result, dict):
+            return (
                 NodeResult(
                     identifier=node.identifier,
                     scope=node.scope,
                     phase=node.phase,
-                    status="GREEN" if status == "GREEN" else "RED",
-                    duration_seconds=float(duration) if isinstance(duration, (int, float)) else 0.0,
+                    status="RED",
+                    duration_seconds=0.0,
                     executions=1,
-                    detail=None if status == "GREEN" else str(raw_detail or detail),
-                )
+                    detail="GATE_PYTEST_NODE_RESULT_REQUIRED",
+                ),
+                completed.returncode or 1,
             )
-        return results, completed.returncode
+        status = raw_result.get("status")
+        duration = raw_result.get("duration_seconds")
+        raw_detail = raw_result.get("detail")
+        result = NodeResult(
+            identifier=node.identifier,
+            scope=node.scope,
+            phase=node.phase,
+            status="GREEN" if status == "GREEN" else "RED",
+            duration_seconds=float(duration) if isinstance(duration, (int, float)) else 0.0,
+            executions=1,
+            detail=None if status == "GREEN" else str(raw_detail or detail),
+        )
+        return result, completed.returncode or (0 if result.status == "GREEN" else 1)
 
 
 def _not_run(node: GateNode, detail: str) -> NodeResult:
