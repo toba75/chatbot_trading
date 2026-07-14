@@ -150,7 +150,8 @@ def _page_payload(
     source_page_number: int,
     output_page_number: int,
 ) -> dict[str, object]:
-    page = document.pages.get(source_page_number)
+    local_page_number = 1
+    page = document.pages.get(local_page_number)
     if page is None:
         raise ValueError("page Granite absente")
     page_size = page.size
@@ -159,12 +160,12 @@ def _page_payload(
     if width <= 0 or height <= 0:
         raise ValueError("taille page invalide")
     items: list[dict[str, object]] = []
-    for item, _ in document.iterate_items(page_no=source_page_number):
+    for item, _ in document.iterate_items(page_no=local_page_number):
         text = getattr(item, "text", None)
         provenances = getattr(item, "prov", None)
         if not isinstance(text, str) or text.strip() == "" or not isinstance(provenances, list) or len(provenances) == 0:
             continue
-        provenance = next((candidate for candidate in provenances if getattr(candidate, "page_no", None) == source_page_number), None)
+        provenance = next((candidate for candidate in provenances if getattr(candidate, "page_no", None) == local_page_number), None)
         if provenance is None:
             continue
         box = provenance.bbox
