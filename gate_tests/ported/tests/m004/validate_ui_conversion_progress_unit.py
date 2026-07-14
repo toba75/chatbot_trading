@@ -136,7 +136,8 @@ def _verifier_bouton_conversion_natif_disponible() -> None:
 def _verifier_inspection_conversion_en_cours() -> None:
     # Given une progression CONVERT_DOCUMENT réellement persistée par le worker.
     # When l'utilisateur ouvre l'inspection de conversion.
-    # Then l'UI rend phase, unités persistées et rafraîchit tant qu'elle est non terminale.
+    # Then l'UI rend phase, pourcentage et barre à partir des unités persistées,
+    #      puis rafraîchit tant que l'action est non terminale.
     progress = DocumentActionProgressView(
         action_name="CONVERT_DOCUMENT",
         phase=PublicActionPhase.RUNNING,
@@ -164,8 +165,49 @@ def _verifier_inspection_conversion_en_cours() -> None:
 
     assert "CONVERT_DOCUMENT" in html
     assert "RUNNING" in html
-    assert "0 / 2" in html
+    assert "Avancement : 0 % (0 / 2)" in html
+    assert (
+        '<progress aria-label="Avancement de la conversion : 0 %" value="0" max="2">0 %</progress>'
+        in html
+    )
     assert 'http-equiv="refresh"' in html
+
+
+def _verifier_inspection_conversion_terminee() -> None:
+    # Given une conversion réellement terminée par le worker.
+    # When l'utilisateur ouvre l'inspection de conversion.
+    # Then l'UI rend 100 % et une barre remplie, sans rafraîchissement.
+    progress = DocumentActionProgressView(
+        action_name="CONVERT_DOCUMENT",
+        phase=PublicActionPhase.SUCCEEDED,
+        completed_units=1,
+        total_units=1,
+        failure_error_code=None,
+    )
+    html = render_document_inspection(
+        title="Conversion",
+        response=type(
+            "Response",
+            (),
+            {
+                "status_code": 200,
+                "payload": {
+                    "document_id": "DOC-1111111111111111",
+                    "conversion_status": "CANONICAL_ACCEPTED",
+                    "qa_rejection_error_code": None,
+                    "canonical_version_id": "CVER-M004-1111111111111111",
+                },
+            },
+        )(),
+        action_progress=progress,
+    )
+
+    assert "Avancement : 100 % (1 / 1)" in html
+    assert (
+        '<progress aria-label="Avancement de la conversion : 100 %" value="1" max="1">100 %</progress>'
+        in html
+    )
+    assert 'http-equiv="refresh"' not in html
 
 
 def _verifier_client_ui_conversion_publique() -> None:
@@ -199,4 +241,5 @@ def test_la_conversion_ui_est_reelle_et_observable() -> None:
     _verifier_contrat_pydantic_de_progression()
     _verifier_bouton_conversion_natif_disponible()
     _verifier_inspection_conversion_en_cours()
+    _verifier_inspection_conversion_terminee()
     _verifier_client_ui_conversion_publique()
