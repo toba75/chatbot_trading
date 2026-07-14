@@ -702,13 +702,16 @@ class PostgresDocumentPersistence:
                                conversion.canonical_version_id,
                                run.manual_review_reason,
                                run.failure_error_code,
-                               (
-                                   conversion.document_id IS NULL
-                                   AND run.status = 'ROUTE_PLANNED'
-                                   AND (SELECT COUNT(*) FROM source_processing.page_routes AS route
-                                        WHERE route.processing_run_id = run.processing_run_id)
-                                       = run.source_page_count
-                               ) AS conversion_action_available
+                                COALESCE(
+                                    (
+                                        conversion.document_id IS NULL
+                                        AND run.status = 'ROUTE_PLANNED'
+                                        AND (SELECT COUNT(*) FROM source_processing.page_routes AS route
+                                             WHERE route.processing_run_id = run.processing_run_id)
+                                            = run.source_page_count
+                                    ),
+                                    FALSE
+                                ) AS conversion_action_available
                           FROM source_processing.source_documents AS source
                           LEFT JOIN source_processing.document_processing_runs AS run
                             ON run.document_id = source.document_id
