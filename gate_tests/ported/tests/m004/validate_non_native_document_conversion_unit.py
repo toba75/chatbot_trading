@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import hashlib
+import io
+import importlib
 import json
 from pathlib import Path
+import subprocess
 
 import pytest
 
@@ -258,3 +261,120 @@ def test_every_non_native_route_calls_granite_and_ocr_is_never_global() -> None:
     preprocessed = handler._ocrmypdf_preprocessor.preprocess_page(_preprocessing_request())
     assert preprocessed.route_name is PageRouteName.PREPROCESS_GRANITE
     assert preprocessed.tool_name is ConversionToolName.OCRMYPDF
+
+
+def _isolated_granite_converter(tmp_path: Path):
+    runtime = _granite_runtime()
+    assets_root = tmp_path / "assets"
+    model_path = assets_root / "ibm-granite--granite-docling-258M" / "config.json"
+    model_path.parent.mkdir(parents=True)
+    model_path.write_bytes(b'{"model_type":"granite_docling"}')
+    manifest_path = tmp_path / "granite-assets.json"
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "1.0",
+                "tool": "granite_docling",
+                "tool_version": "2.111.0",
+                "model_repository": "ibm-granite/granite-docling-258M",
+                "model_revision": runtime.GRANITE_DOCLING_MODEL_REVISION,
+                "assets": [
+                    {
+                        "relative_path": "ibm-granite--granite-docling-258M/config.json",
+                        "sha256": hashlib.sha256(model_path.read_bytes()).hexdigest(),
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    source_path = tmp_path / "source.pdf"
+    source_path.write_bytes(b"%PDF-1.7\nsource unicode granite\n%%EOF\n")
+    request = runtime.GraniteDoclingConversionRequest(
+        document_id="DOC-0000000000000001",
+        processing_run_id="RUN-M004-UNICODE-GRANITE",
+        source_sha256=hashlib.sha256(source_path.read_bytes()).hexdigest(),
+        source_pdf_path=source_path,
+        page_number=1,
+        source_page_number=1,
+        route_name="TARGETED_ENRICHMENT",
+        routing_policy_version="routing-v1",
+    )
+    return runtime, runtime.IsolatedGraniteDoclingConverter(
+        asset_manifest_path=manifest_path,
+        assets_root=assets_root,
+        timeout_seconds=1.0,
+    ), request
+
+
+def test_granite_isolated_protocol_uses_utf8_bytes_and_names_invalid_output(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Given une page TARGETED_ENRICHMENT contient le caractère Unicode © dans sa sortie Granite.
+    # When le parent reçoit la réponse du processus isolé.
+    # Then le protocole transporte des octets UTF-8 et un flux invalide devient GRANITE_DOCLING_UNAVAILABLE.
+    runtime, converter, request = _isolated_granite_converter(tmp_path)
+    response = json.dumps(
+        {
+            "schema_version": "1.0",
+            "tool_version": "2.111.0",
+            "pages": [
+                {
+                    "page_number": 1,
+                    "items": [
+                        {
+                            "text": "Droit ©",
+                            "bbox": [0.1, 0.1, 0.9, 0.9],
+                            "provenance": {"page_number": 1, "source": "granite_docling"},
+                        }
+                    ],
+                }
+            ],
+        },
+        ensure_ascii=False,
+    ).encode("utf-8")
+
+    def valid_run(*args, **kwargs):
+        assert isinstance(kwargs["input"], bytes)
+        assert "text" not in kwargs
+        assert "encoding" not in kwargs
+        return subprocess.CompletedProcess(args=args, returncode=0, stdout=response, stderr=b"\xa9")
+
+    monkeypatch.setattr(runtime.subprocess, "run", valid_run)
+    converted = converter.convert(request)
+    assert converted.pages[0].items[0].text == "Droit ©"
+
+    monkeypatch.setattr(
+        runtime.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args=args,
+            returncode=0,
+            stdout=b"\xa9",
+            stderr=b"",
+        ),
+    )
+    with pytest.raises(runtime.GraniteDoclingConversionError, match="GRANITE_DOCLING_UNAVAILABLE"):
+        converter.convert(request)
+
+
+def test_granite_worker_emits_utf8_even_when_the_host_stream_is_cp1252(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Given le processus Granite tourne sous un hôte Windows dont stdout est CP-1252.
+    # When il publie une réponse contenant ©.
+    # Then le protocole borné reste UTF-8 et le parent peut le décoder sans ambiguïté.
+    worker = importlib.import_module("app.source_processing.adapters.docling_granite_worker")
+    raw_stdout = io.BytesIO()
+    stdout = io.TextIOWrapper(raw_stdout, encoding="cp1252")
+    monkeypatch.setattr(worker.sys, "stdin", io.StringIO("{}"))
+    monkeypatch.setattr(worker.sys, "stdout", stdout)
+    monkeypatch.setattr(
+        worker,
+        "_convert",
+        lambda payload: {
+            "schema_version": "1.0",
+            "tool_version": "2.111.0",
+            "pages": [{"page_number": 1, "items": [{"text": "Droit ©"}]}],
+        },
+    )
+
+    assert worker.main() == 0
+    stdout.flush()
+    assert "Droit ©" in json.loads(raw_stdout.getvalue().decode("utf-8"))["pages"][0]["items"][0]["text"]

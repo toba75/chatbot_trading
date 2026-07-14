@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import importlib
 import json
 from pathlib import Path
+import subprocess
 
 import pytest
 
@@ -120,6 +122,111 @@ def _runner_refuses_page_omission_and_missing_provenance() -> None:
                 ],
             },
         )
+
+
+def _isolated_native_converter(tmp_path: Path):
+    runtime = _runtime_module()
+    assets_root = tmp_path / "assets"
+    model_path = assets_root / "models" / "layout.bin"
+    model_path.parent.mkdir(parents=True)
+    model_path.write_bytes(b"actif Docling scellé")
+    manifest_path = tmp_path / "native-assets.json"
+    manifest_path.write_text(
+        json.dumps(
+            _manifest_payload(
+                sha256=hashlib.sha256(model_path.read_bytes()).hexdigest()
+            )
+        ),
+        encoding="utf-8",
+    )
+    source_path = tmp_path / "source.pdf"
+    source_path.write_bytes(b"%PDF-1.7\nsource unicode\n%%EOF\n")
+    request = runtime.NativeDoclingConversionRequest(
+        document_id="DOC-0000000000000001",
+        processing_run_id="RUN-M004-UNICODE-NATIVE",
+        source_sha256=hashlib.sha256(source_path.read_bytes()).hexdigest(),
+        source_pdf_path=source_path,
+        expected_page_numbers=(1,),
+        routing_policy_version="routing-v1",
+    )
+    return runtime, runtime.IsolatedNativeDoclingConverter(
+        asset_manifest_path=manifest_path,
+        assets_root=assets_root,
+        timeout_seconds=1.0,
+    ), request
+
+
+def test_native_isolated_protocol_uses_utf8_bytes_and_names_invalid_output(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Given une page native contient le caractère Unicode © dans sa sortie Docling.
+    # When le parent reçoit la réponse du processus isolé.
+    # Then le protocole transporte des octets UTF-8 et un flux invalide devient DOCLING_STANDARD_UNAVAILABLE.
+    runtime, converter, request = _isolated_native_converter(tmp_path)
+    response = json.dumps(
+        {
+            "schema_version": "1.0",
+            "tool_version": "2.111.0",
+            "pages": [
+                {
+                    "page_number": 1,
+                    "items": [
+                        {
+                            "text": "Droit ©",
+                            "bbox": [0.1, 0.1, 0.9, 0.9],
+                            "provenance": {"page_number": 1, "source": "docling"},
+                        }
+                    ],
+                }
+            ],
+        },
+        ensure_ascii=False,
+    ).encode("utf-8")
+
+    def valid_run(*args, **kwargs):
+        assert isinstance(kwargs["input"], bytes)
+        assert "text" not in kwargs
+        assert "encoding" not in kwargs
+        return subprocess.CompletedProcess(args=args, returncode=0, stdout=response, stderr=b"\xa9")
+
+    monkeypatch.setattr(runtime.subprocess, "run", valid_run)
+    converted = converter.convert(request)
+    assert converted.pages[0].items[0].text == "Droit ©"
+
+    monkeypatch.setattr(
+        runtime.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args=args,
+            returncode=0,
+            stdout=b"\xa9",
+            stderr=b"",
+        ),
+    )
+    with pytest.raises(runtime.DoclingNativeConversionError, match="DOCLING_STANDARD_UNAVAILABLE"):
+        converter.convert(request)
+
+
+def test_native_worker_emits_utf8_even_when_the_host_stream_is_cp1252(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Given le processus Docling tourne sous un hôte Windows dont stdout est CP-1252.
+    # When il publie une réponse contenant ©.
+    # Then le protocole borné reste UTF-8 et le parent peut le décoder sans ambiguïté.
+    worker = importlib.import_module("app.source_processing.adapters.docling_native_worker")
+    raw_stdout = io.BytesIO()
+    stdout = io.TextIOWrapper(raw_stdout, encoding="cp1252")
+    monkeypatch.setattr(worker.sys, "stdin", io.StringIO("{}"))
+    monkeypatch.setattr(worker.sys, "stdout", stdout)
+    monkeypatch.setattr(
+        worker,
+        "_convert",
+        lambda payload: {
+            "schema_version": "1.0",
+            "tool_version": "2.111.0",
+            "pages": [{"page_number": 1, "items": [{"text": "Droit ©"}]}],
+        },
+    )
+
+    assert worker.main() == 0
+    stdout.flush()
+    assert "Droit ©" in json.loads(raw_stdout.getvalue().decode("utf-8"))["pages"][0]["items"][0]["text"]
 
 
 def test_validate_native_docling_conversion_unit(tmp_path: Path) -> None:
