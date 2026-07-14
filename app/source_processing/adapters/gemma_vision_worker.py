@@ -161,15 +161,17 @@ def _structured_items(
             or len(bbox) != 4
             or any(isinstance(value, bool) or not isinstance(value, (int, float)) for value in bbox)
             or any(value < 0 or value > 1000 for value in bbox)
-            or bbox[0] >= bbox[2]
-            or bbox[1] >= bbox[3]
         ):
+            raise GemmaVisionConversionError("GEMMA_VISION_OUTPUT_INVALID")
+        left, top, right, bottom = bbox
+        normalized_bbox = [min(left, right), min(top, bottom), max(left, right), max(top, bottom)]
+        if normalized_bbox[0] == normalized_bbox[2] or normalized_bbox[1] == normalized_bbox[3]:
             raise GemmaVisionConversionError("GEMMA_VISION_OUTPUT_INVALID")
         items.append(
             {
                 "text": text,
                 "bbox": _bbox_dans_repere_source(
-                    bbox,
+                    normalized_bbox,
                     render_rotation_degrees=render_rotation_degrees,
                 ),
             }
