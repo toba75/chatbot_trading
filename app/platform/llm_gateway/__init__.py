@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
 import hashlib
 import json
+import re
 import ssl
 import time
 import urllib.error
@@ -30,6 +33,8 @@ _TLS_MODE_CA_BUNDLE = "ca_bundle"
 _MODEL_REVISION_HEADER = "x-model-revision"
 _RUNTIME_VERSION_HEADER = "x-runtime-version"
 _TTFT_HEADER = "x-ttft-ms"
+_ALLOWED_IMAGE_MEDIA_TYPES = frozenset({"image/jpeg", "image/png"})
+_MAX_INFERENCE_IMAGE_BYTES = 10 * 1024 * 1024
 
 
 class LLMGatewayContractError(ValueError):
@@ -419,8 +424,84 @@ class InferenceMessage:
 
 
 @dataclass(frozen=True)
+class InferenceImage:
+    """Image bornée, hachée et transmissible uniquement par le gateway."""
+
+    media_type: str
+    data_base64: str
+    sha256: str
+
+    @property
+    def byte_size(self) -> int:
+        return len(_decode_inference_image_data(self.data_base64))
+
+    def __post_init__(self) -> None:
+        _require_text(self.media_type, "media_type", "LLM_IMAGE_MEDIA_TYPE_INVALID")
+        if self.media_type not in _ALLOWED_IMAGE_MEDIA_TYPES:
+            raise LLMGatewayContractError(
+                "LLM_IMAGE_MEDIA_TYPE_INVALID",
+                f"Type MIME image refusé: {self.media_type}",
+            )
+        image_data = _decode_inference_image_data(self.data_base64)
+        if len(image_data) > _MAX_INFERENCE_IMAGE_BYTES:
+            raise LLMGatewayContractError(
+                "LLM_IMAGE_TOO_LARGE",
+                "Image d'inférence supérieure à la limite autorisée.",
+            )
+        if self.media_type == "image/png" and not image_data.startswith(b"\x89PNG\r\n\x1a\n"):
+            raise LLMGatewayContractError(
+                "LLM_IMAGE_PAYLOAD_INVALID",
+                "Signature PNG absente.",
+            )
+        if self.media_type == "image/jpeg" and not image_data.startswith(b"\xff\xd8\xff"):
+            raise LLMGatewayContractError(
+                "LLM_IMAGE_PAYLOAD_INVALID",
+                "Signature JPEG absente.",
+            )
+        _require_text(self.sha256, "sha256", "LLM_IMAGE_HASH_INVALID")
+        if re.fullmatch(r"[0-9a-f]{64}", self.sha256) is None:
+            raise LLMGatewayContractError(
+                "LLM_IMAGE_HASH_INVALID",
+                "SHA-256 image invalide.",
+            )
+        if hashlib.sha256(image_data).hexdigest() != self.sha256:
+            raise LLMGatewayContractError(
+                "LLM_IMAGE_HASH_INVALID",
+                "SHA-256 image non concordant.",
+            )
+
+
+@dataclass(frozen=True)
+class InferenceImageMessage:
+    """Instruction textuelle et images explicites pour une inférence multimodale."""
+
+    role: str
+    content: str
+    images: tuple[InferenceImage, ...]
+
+    def __post_init__(self) -> None:
+        _require_text(self.role, "role", "LLM_MESSAGE_ROLE_REQUIRED")
+        _require_text(self.content, "content", "LLM_MESSAGE_CONTENT_REQUIRED")
+        if self.role not in {"system", "user", "assistant", "tool"}:
+            raise LLMGatewayContractError(
+                "LLM_MESSAGE_ROLE_INVALID",
+                f"Rôle OpenAI compatible invalide: {self.role}",
+            )
+        if not isinstance(self.images, tuple) or len(self.images) == 0:
+            raise LLMGatewayContractError(
+                "LLM_MESSAGE_IMAGE_REQUIRED",
+                "Un message multimodal exige au moins une image.",
+            )
+        if any(not isinstance(image, InferenceImage) for image in self.images):
+            raise LLMGatewayContractError(
+                "LLM_MESSAGE_IMAGE_INVALID",
+                "Chaque image doit respecter le contrat InferenceImage.",
+            )
+
+
+@dataclass(frozen=True)
 class InferenceRequest:
-    messages: tuple[InferenceMessage, ...]
+    messages: tuple[InferenceMessage | InferenceImageMessage, ...]
     output_schema: Mapping[str, Any]
     schema_name: str
     schema_version: str
@@ -438,10 +519,10 @@ class InferenceRequest:
                 "Une demande d'inférence doit contenir au moins un message.",
             )
         for message in self.messages:
-            if not isinstance(message, InferenceMessage):
+            if not isinstance(message, InferenceMessage | InferenceImageMessage):
                 raise LLMGatewayContractError(
                     "LLM_MESSAGE_INVALID",
-                    "Chaque message d'inférence doit utiliser InferenceMessage.",
+                    "Chaque message d'inférence doit utiliser un contrat de message explicite.",
                 )
 
         _require_mapping(self.output_schema, "output_schema", "LLM_OUTPUT_SCHEMA_REQUIRED")
@@ -830,7 +911,7 @@ def build_openai_chat_completion_request(
 ) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "model": configuration.served_model,
-        "messages": [{"role": message.role, "content": message.content} for message in request.messages],
+        "messages": [_openai_message(message) for message in request.messages],
         "response_format": {
             "type": "json_schema",
             "json_schema": {
@@ -924,11 +1005,48 @@ def _build_gateway_observation(
 
 def _prompt_hash(request: InferenceRequest) -> str:
     prompt_payload = {
-        "messages": [{"role": message.role, "content": message.content} for message in request.messages],
+        "messages": [_openai_message(message) for message in request.messages],
         "prompt_id": request.prompt_id,
         "prompt_version": request.prompt_version,
     }
     return sha256_text(_canonical_json(prompt_payload))
+
+
+def _openai_message(message: InferenceMessage | InferenceImageMessage) -> dict[str, Any]:
+    if isinstance(message, InferenceMessage):
+        return {"role": message.role, "content": message.content}
+    return {
+        "role": message.role,
+        "content": [
+            {"type": "text", "text": message.content},
+            *[
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:{image.media_type};base64,{image.data_base64}",
+                    },
+                }
+                for image in message.images
+            ],
+        ],
+    }
+
+
+def _decode_inference_image_data(data_base64: str) -> bytes:
+    _require_text(data_base64, "data_base64", "LLM_IMAGE_PAYLOAD_INVALID")
+    try:
+        decoded = base64.b64decode(data_base64.encode("ascii"), validate=True)
+    except (UnicodeEncodeError, binascii.Error) as exc:
+        raise LLMGatewayContractError(
+            "LLM_IMAGE_PAYLOAD_INVALID",
+            "Données image Base64 invalides.",
+        ) from exc
+    if base64.b64encode(decoded).decode("ascii") != data_base64:
+        raise LLMGatewayContractError(
+            "LLM_IMAGE_PAYLOAD_INVALID",
+            "Données image Base64 non canoniques.",
+        )
+    return decoded
 
 
 def _payload_size_bytes(payload: Mapping[str, Any]) -> int:

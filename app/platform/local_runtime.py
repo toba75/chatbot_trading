@@ -26,6 +26,8 @@ from app.platform.llm_gateway import (
     GatewayConfiguration,
     GatewayFailureMetricRecorder,
     GatewayRetryPolicy,
+    InferenceImage,
+    InferenceImageMessage,
     InferenceMessage,
     InferenceRequest,
     LLMGatewayContractError,
@@ -915,12 +917,15 @@ def _build_inference_request(body: dict[str, Any]) -> InferenceRequest:
     for item in messages_payload:
         if not isinstance(item, dict):
             raise LLMGatewayContractError("HTTP_REQUEST_INVALID", "Message d'inference non objet.")
-        messages.append(
-            InferenceMessage(
-                role=_required_body_text(item, "role"),
-                content=_required_body_text(item, "content"),
-            )
-        )
+        role = _required_body_text(item, "role")
+        content = item.get("content")
+        if isinstance(content, str):
+            messages.append(InferenceMessage(role=role, content=content))
+            continue
+        if isinstance(content, list):
+            messages.append(_build_inference_image_message(role=role, content=content))
+            continue
+        raise LLMGatewayContractError("HTTP_REQUEST_INVALID", "Contenu de message invalide.")
 
     return InferenceRequest(
         messages=tuple(messages),
@@ -933,6 +938,37 @@ def _build_inference_request(body: dict[str, Any]) -> InferenceRequest:
         prompt_id=_required_body_text(body, "prompt_id"),
         prompt_version=_required_body_text(body, "prompt_version"),
         sampling_parameters=_required_body_mapping(body, "sampling_parameters"),
+    )
+
+
+def _build_inference_image_message(*, role: str, content: list[Any]) -> InferenceImageMessage:
+    if len(content) < 2:
+        raise LLMGatewayContractError(
+            "HTTP_REQUEST_INVALID",
+            "Un message multimodal exige un texte et au moins une image.",
+        )
+    text_part = content[0]
+    if not isinstance(text_part, dict) or set(text_part) != {"type", "text"} or text_part["type"] != "text":
+        raise LLMGatewayContractError("HTTP_REQUEST_INVALID", "Première partie multimodale invalide.")
+    images = []
+    for image_part in content[1:]:
+        if (
+            not isinstance(image_part, dict)
+            or set(image_part) != {"type", "media_type", "data_base64", "sha256"}
+            or image_part["type"] != "image"
+        ):
+            raise LLMGatewayContractError("HTTP_REQUEST_INVALID", "Partie image multimodale invalide.")
+        images.append(
+            InferenceImage(
+                media_type=image_part["media_type"],
+                data_base64=image_part["data_base64"],
+                sha256=image_part["sha256"],
+            )
+        )
+    return InferenceImageMessage(
+        role=role,
+        content=_required_body_text(text_part, "text"),
+        images=tuple(images),
     )
 
 
