@@ -349,6 +349,75 @@ def _verifier_contrat_gemma_compact_pour_table_dense() -> None:
     assert "N’omets aucun texte lisible" in _PAGE_TRANSCRIPTION_PROMPT
 
 
+def _verifier_recuperation_orientation_gemma_apres_bbox_invalide(tmp_path: Path) -> None:
+    # Given Granite a échoué et le premier rendu Gemma retourne des bboxes invalides.
+    # When la récupération d'orientation explicitement bornée est déclenchée.
+    # Then Gemma reçoit exactement un second rendu à 90 degrés, ses coordonnées
+    #      sont réexprimées dans le repère PDF initial et la provenance le rend lisible.
+    from app.source_processing.adapters.gemma_vision_conversion import (
+        GemmaVisionConversionError,
+        GemmaVisionConversionResponse,
+        GemmaVisionPageItem,
+    )
+    from app.source_processing.adapters.gemma_vision_worker import (
+        _bbox_dans_repere_source,
+    )
+    from app.source_processing.application.routed_document_conversion_worker import (
+        _GemmaVisionFallbackPageConverter,
+    )
+
+    source_path = tmp_path / "source.pdf"
+    source_path.write_bytes(b"%PDF-1.7\nGemma orientation recovery\n%%EOF\n")
+    request = _request()
+
+    class _GemmaAvecRecuperationOrientation:
+        def __init__(self) -> None:
+            self.requests = []
+
+        def convert(self, gemma_request):
+            self.requests.append(gemma_request)
+            if gemma_request.render_rotation_degrees == 0:
+                raise GemmaVisionConversionError("GEMMA_VISION_OUTPUT_INVALID")
+            if gemma_request.render_rotation_degrees != 90:
+                raise AssertionError("La récupération ne doit essayer aucune autre orientation.")
+            return GemmaVisionConversionResponse(
+                tool_version=(
+                    "google/gemma-4-26B-A4B-it@immutable;nim-1.7.0;"
+                    "render-rotation-090"
+                ),
+                items=(
+                    GemmaVisionPageItem(
+                        text="Titre réorienté",
+                        bbox=(925.0, 46.0, 938.0, 159.0),
+                    ),
+                ),
+            )
+
+    gemma_port = _GemmaAvecRecuperationOrientation()
+    converter = _GemmaVisionFallbackPageConverter(
+        converter=gemma_port,
+        resolve_source_path=lambda artifact_ref: source_path,
+        gateway_endpoint_url="http://llm-gateway.local/v1/infer",
+        gateway_timeout_seconds=120,
+        gateway_max_output_tokens=2048,
+        expected_model_id="google/gemma-4-26B-A4B-it",
+    )
+
+    recovered = converter.recover_page(
+        request,
+        granite_error_code="GRANITE_DOCLING_UNAVAILABLE",
+    )
+
+    assert [entry.render_rotation_degrees for entry in gemma_port.requests] == [0, 90]
+    assert recovered.tool_version.endswith("render-rotation-090")
+    assert _bbox_dans_repere_source([841, 925, 954, 938], render_rotation_degrees=90) == [
+        925,
+        46,
+        938,
+        159,
+    ]
+
+
 def test_recuperation_gemma_explicite_apres_absence_de_provenance_granite(tmp_path: Path) -> None:
     """Exécute un unique scénario atomique, conformément au manifeste de gate."""
     _verifier_recuperation_granite_autorisee("DOCLING_PROVENANCE_MISSING")
@@ -357,3 +426,4 @@ def test_recuperation_gemma_explicite_apres_absence_de_provenance_granite(tmp_pa
     _verifier_trace_gemma_obligatoire()
     _verifier_adaptateur_gemma_apres_indisponibilite_granite(tmp_path)
     _verifier_contrat_gemma_compact_pour_table_dense()
+    _verifier_recuperation_orientation_gemma_apres_bbox_invalide(tmp_path)
