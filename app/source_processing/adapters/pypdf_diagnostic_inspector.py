@@ -55,7 +55,7 @@ class PdfDiagnosticInspector:
                     has_table=page.has_table,
                     has_formula=page.has_formula,
                 ),
-                diagnostic_version="pypdf-isolated-v3",
+                diagnostic_version="pypdf-isolated-v4",
                 justification=(
                     "Inspection pypdf isolée et bornée: "
                     f"texte={page.text_characters}; images={page.image_count}; "

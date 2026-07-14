@@ -17,6 +17,11 @@ _TABLE_ROW = re.compile(r"(?m)^\s*\S+(?:\s{2,}|\t)\S+(?:\s{2,}|\t)\S+")
 _FORMULA = re.compile(r"(?:[=±×÷∑∫√≤≥]|\b(?:sin|cos|log|exp)\s*\()")
 
 
+_NUMERIC_VISUAL_LABEL = re.compile(r"[\d\s.,:+\-()/]+\Z")
+_MIN_VISUAL_NUMERIC_FRAGMENTS = 8
+_MIN_VISUAL_NUMERIC_SHARE = 0.75
+
+
 class InspectionRejected(RuntimeError):
     pass
 
@@ -29,6 +34,18 @@ def _limit_process(memory_bytes: int, elapsed_seconds: float) -> None:
     resource.setrlimit(resource.RLIMIT_AS, (memory_bytes, memory_bytes))
     cpu_seconds = max(1, int(elapsed_seconds) + 1)
     resource.setrlimit(resource.RLIMIT_CPU, (cpu_seconds, cpu_seconds))
+
+
+def _is_dense_visual_numeric_layout(fragments: tuple[str, ...]) -> bool:
+    """Repère un graphique vectoriel dont le texte extrait est surtout une grille de nombres."""
+
+    if len(fragments) < _MIN_VISUAL_NUMERIC_FRAGMENTS:
+        return False
+    numeric_labels = sum(
+        _NUMERIC_VISUAL_LABEL.fullmatch(fragment) is not None
+        for fragment in fragments
+    )
+    return numeric_labels / len(fragments) >= _MIN_VISUAL_NUMERIC_SHARE
 
 
 def _inspect_page(page_number: int, page: Any, budget: dict[str, Any], total: list[int]) -> dict[str, Any]:
@@ -63,6 +80,7 @@ def _inspect_page(page_number: int, page: Any, budget: dict[str, Any], total: li
     text_characters = len(text)
     has_text = text_characters > 0
     has_image = image_count > 0
+    dense_visual_numeric_layout = _is_dense_visual_numeric_layout(tuple(fragments))
     ratio = 0.0 if not has_text else sum(character.isalnum() for character in text) / text_characters
     has_table = bool(_TABLE_ROW.search(text))
     has_formula = bool(_FORMULA.search(text))
@@ -77,7 +95,9 @@ def _inspect_page(page_number: int, page: Any, budget: dict[str, Any], total: li
         "has_table": has_table,
         "image_count": image_count,
         "image_state": image_state,
-        "layout_complexity": "COMPLEX" if has_table or has_formula or image_count > 1 else "SIMPLE",
+        "layout_complexity": "COMPLEX"
+        if has_table or has_formula or image_count > 1 or dense_visual_numeric_layout
+        else "SIMPLE",
         "manifest_state": "PRESENT" if has_text or has_image else "EMPTY",
         "mixed_content_detected": mixed,
         "native_text_state": native_text_state,
