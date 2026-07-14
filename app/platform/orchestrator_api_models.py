@@ -72,6 +72,11 @@ class SearchRequest(PublicApiModel):
 
 class IndexRequest(PublicApiModel):
     """Corps vide historique tant que le service KA n'est pas composé."""
+    projection_profile_id: str = Field(min_length=1)
+    chunking_profile: str = Field(min_length=1)
+    embedding_model: str = Field(min_length=1)
+    sparse_profile: str = Field(min_length=1)
+    index_schema: str = Field(min_length=1)
 
 
 class ChatChoiceMessageResponse(PublicApiModel):
@@ -184,6 +189,13 @@ class IndexUnavailableResponse(PublicApiModel):
     document_id: str
     error_code: Literal["SERVICE_NOT_CONFIGURED"]
     endpoint: Literal["POST /v1/documents/{document_id}/index"]
+
+
+class IndexAcceptedResponse(PublicApiModel):
+    document_id: str
+    projection_id: str
+    projection_status: PublicProjectionStatus
+    canonical_version_id: str
 
 
 class DocumentRegisteredResponse(PublicApiModel):

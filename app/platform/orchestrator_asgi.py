@@ -140,7 +140,11 @@ class LocalMutationAuthorizationMiddleware:
         path = scope.get("path")
         if method != "POST" or not (
             path == "/v1/documents"
-            or (isinstance(path, str) and path.startswith("/v1/documents/") and path.endswith("/diagnose"))
+            or (
+                isinstance(path, str)
+                and path.startswith("/v1/documents/")
+                and (path.endswith("/diagnose") or path.endswith("/index"))
+            )
         ):
             await self._application(scope, receive, send)
             return

@@ -26,7 +26,6 @@ def test_validate_projection_command_http_acceptance() -> None:
     from app.knowledge_access.adapters.in_memory_projection_repository import (
         InMemoryKnowledgeProjectionRepository,
     )
-    from app.knowledge_access.domain.knowledge_projection import ProjectionProfile
     from app.platform.configuration import load_application_configuration
     from app.platform.event_bus.outbox import InMemoryTransactionalOutbox
     from app.platform.orchestrator_asgi import create_orchestrator_app

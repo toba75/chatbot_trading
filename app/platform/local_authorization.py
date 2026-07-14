@@ -66,7 +66,10 @@ class LocalMutationAuthorizer:
 def _is_persistent_document_mutation(path: Any) -> bool:
     return isinstance(path, str) and (
         path == "/v1/documents"
-        or (path.startswith("/v1/documents/") and path.endswith("/diagnose"))
+        or (
+            path.startswith("/v1/documents/")
+            and (path.endswith("/diagnose") or path.endswith("/index"))
+        )
     )
 
 

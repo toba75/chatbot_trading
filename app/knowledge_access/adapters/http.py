@@ -10,10 +10,16 @@ from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
 from app.platform.orchestrator_api_models import (
+    IndexAcceptedResponse,
+    IndexRequest,
     ProjectionResponse,
     PUBLIC_ERROR_RESPONSES,
     parse_public_document_id,
     public_error,
+)
+from app.knowledge_access.adapters.projection_http import (
+    HttpRequest as ProjectionHttpRequest,
+    HttpResponse as ProjectionHttpResponse,
 )
 from app.knowledge_access.application.projection_queries import (
     KnowledgeProjectionView,
@@ -27,6 +33,50 @@ class ProjectionQueryPort(Protocol):
 
     def read_projection(self, document_id: str) -> ProjectionView:
         """Lit la projection courante sans exposer son stockage."""
+
+
+class ProjectionCommandHttpAdapter(Protocol):
+    """Adaptateur KA de la commande publique d'indexation."""
+
+    def handle(self, request: ProjectionHttpRequest) -> ProjectionHttpResponse:
+        """Demande une projection sans connaÃ®tre FastAPI."""
+
+
+def build_projection_command_router(
+    *,
+    projection_command_adapter: ProjectionCommandHttpAdapter,
+) -> APIRouter:
+    """Expose POST /index via le cas d'usage KA, sans stub historique."""
+
+    parsed_adapter = _ensure_projection_command_adapter(projection_command_adapter)
+    router = APIRouter()
+
+    @router.post(
+        "/v1/documents/{document_id}/index",
+        response_model=IndexAcceptedResponse,
+        status_code=202,
+        responses=PUBLIC_ERROR_RESPONSES,
+    )
+    async def request_projection(
+        document_id: str,
+        payload: IndexRequest,
+    ) -> JSONResponse:
+        if not _is_valid_document_id(document_id):
+            return _invalid_document_id_response()
+        response = await run_in_threadpool(
+            parsed_adapter.handle,
+            ProjectionHttpRequest(
+                method="POST",
+                path=f"/v1/documents/{document_id}/index",
+                body=payload.model_dump(mode="json"),
+                authenticated_context="KA",
+            ),
+        )
+        if not isinstance(response, ProjectionHttpResponse):
+            raise TypeError("rÃ©ponse de commande projection invalide")
+        return JSONResponse(status_code=response.status_code, content=dict(response.body))
+
+    return router
 
 
 def build_projection_query_router(
@@ -75,4 +125,15 @@ def _ensure_projection_queries(value: Any) -> ProjectionQueryPort:
     return value
 
 
-__all__ = ["ProjectionQueryPort", "build_projection_query_router"]
+def _ensure_projection_command_adapter(value: Any) -> ProjectionCommandHttpAdapter:
+    if not callable(getattr(value, "handle", None)):
+        raise ValueError("projection_command_adapter invalide")
+    return value
+
+
+__all__ = [
+    "ProjectionCommandHttpAdapter",
+    "ProjectionQueryPort",
+    "build_projection_command_router",
+    "build_projection_query_router",
+]
