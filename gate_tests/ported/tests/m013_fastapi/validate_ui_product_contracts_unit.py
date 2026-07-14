@@ -97,7 +97,12 @@ def test_validate_ui_product_contracts_unit() -> None:
         action_progress=progress,
     )
     assert 'aria-label="Progression de l’action"' in inspection
-    assert "RUNNING" in inspection and "0 / 2" in inspection
+    assert "RUNNING" in inspection
+    assert "Avancement : 0 % (0 / 2)" in inspection
+    assert (
+        '<progress aria-label="Avancement du diagnostic : 0 %" value="0" max="2">0 %</progress>'
+        in inspection
+    )
     assert 'http-equiv="refresh"' in inspection
 
     invalid_progress_client = UiDocumentApiClient(

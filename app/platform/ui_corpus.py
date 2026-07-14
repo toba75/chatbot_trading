@@ -575,13 +575,22 @@ def _render_action_progress(
         if failure_error_code is None
         else f'<p>Erreur : <code>{_escape(failure_error_code)}</code></p>'
     )
+    progress_percentage = completed_units * 100 // total_units
+    progress_label = {
+        "CONVERT_DOCUMENT": "Avancement de la conversion",
+        "DIAGNOSE": "Avancement du diagnostic",
+    }[action_name]
     return (
         "".join(
             (
                 '<section aria-live="polite" aria-label="Progression de l’action">',
                 f'<p>Action : <code>{_escape(action_name)}</code></p>',
                 f'<p>Phase : <code>{_escape(phase)}</code></p>',
-                f'<p>Avancement : {_escape(str(completed_units))} / {_escape(str(total_units))}</p>',
+                f'<p>Avancement : {progress_percentage} % ({completed_units} / {total_units})</p>',
+                (
+                    f'<progress aria-label="{progress_label} : {progress_percentage} %" '
+                    f'value="{completed_units}" max="{total_units}">{progress_percentage} %</progress>'
+                ),
                 failure_html,
                 "</section>",
             )
