@@ -41,6 +41,7 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 | [ADR-033](ADR-033-priorite-signaux-routage-ocr.md) | Priorité des signaux pour les routes OCR atteignables | Acceptée | 2026-07-14 | Aucun | Aucune |
 | [ADR-034](ADR-034-gateway-llm-multimodal-borne.md) | Gateway LLM multimodal borné | Acceptée | 2026-07-14 | Aucun | Aucune |
 | [ADR-035](ADR-035-recuperation-gemma-explicite-apres-provenance-granite-absente.md) | Récupération Gemma explicite après provenance Granite absente | Acceptée | 2026-07-14 | ADR-032 | Aucune |
+| [ADR-036](ADR-036-recuperation-gemma-apres-echec-terminal-granite.md) | Récupération Gemma explicite après échec terminal Granite | Proposée | 2026-07-14 | ADR-035 | Aucune |
 
 ## ADR DDD
 
@@ -62,7 +63,7 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 ## Prochains numéros disponibles
 
 ```text
-Prochaine ADR technique: ADR-036
+Prochaine ADR technique: ADR-037
 Prochaine DDD-ADR: DDD-ADR-013
 ```
 

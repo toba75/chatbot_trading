@@ -7,9 +7,10 @@
 - Spécification normative: `docs/specs/specification_unifiee_ddd_technique_chatbot_trading_v4_1.md`, sections 5, 12, 14, 17, 19, 20 et 21.
 - ADR consultées: ADR-001, ADR-002, ADR-003, ADR-004, ADR-010, ADR-031, ADR-032, ADR-034, ADR-035, DDD-ADR-003, DDD-ADR-006, DDD-ADR-008, DDD-ADR-010.
 - Contrats amont: `docs/specs/m003_source_enregistree_diagnostiquee_routee.md`, `docs/specs/m001_frontieres_ddd_contrats_publies.md`.
-- ADR : ADR-035 remplace ADR-032 pour autoriser la seule récupération Gemma
-  explicitement traçable après `DOCLING_PROVENANCE_MISSING`; elle conserve les
-  invariants des ADR-001 à ADR-004.
+- ADR : ADR-036 proposée remplace ADR-035 pour autoriser la récupération Gemma
+  explicitement traçable après `DOCLING_PROVENANCE_MISSING` ou
+  `GRANITE_DOCLING_UNAVAILABLE`; elle conserve les invariants des ADR-001 à
+  ADR-004.
 
 ## Scénario BDD
 
@@ -100,14 +101,15 @@ La QA post-conversion contrôle le nombre de pages, le JSON valide, les identifi
 
 ## Exécution réelle et disponibilité des convertisseurs
 
-ADR-035 remplace ADR-032 pour l'exécution réelle des ports M-004. `NATIVE_STANDARD` appelle
+ADR-036 proposée remplace ADR-035 pour l'exécution réelle des ports M-004. `NATIVE_STANDARD` appelle
 Docling standard; `SCAN_GRANITE`, `BAD_OCR_TO_GRANITE`, `MIXED_PAGEWISE` et
 `TARGETED_ENRICHMENT` appellent Granite-Docling; `PREPROCESS_GRANITE` appelle
-d'abord OCRmyPDF puis Granite-Docling. Seule l'absence de provenance textuelle
-après une tentative Granite réellement terminée (`DOCLING_PROVENANCE_MISSING`)
-autorise une unique récupération Gemma 4 via `llm-gateway`; tout autre échec
-reste terminal. La sortie Gemma doit contenir texte et coordonnées, conserve la
-trace Granite dans l'artefact canonique et devient l'unique autorité de la page.
+d'abord OCRmyPDF puis Granite-Docling. Après une tentative Granite réellement
+terminée, `DOCLING_PROVENANCE_MISSING` ou `GRANITE_DOCLING_UNAVAILABLE`
+autorisent chacun une unique récupération Gemma 4 via `llm-gateway`; tout autre
+échec reste terminal. La sortie Gemma doit contenir texte et coordonnées,
+conserve la trace Granite dans l'artefact canonique et devient l'unique autorité
+de la page.
 
 Les adaptateurs Docling s'exécutent dans un processus isolé de l'environnement
 `uv`, sur `docling[vlm]==2.111.0` verrouillé dans `uv.lock`. Les modèles et

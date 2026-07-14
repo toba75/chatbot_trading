@@ -1,4 +1,4 @@
-"""Contrat unitaire de récupération Gemma après une absence de provenance Granite."""
+"""Contrat unitaire de récupération Gemma après un échec Granite autorisé."""
 
 from __future__ import annotations
 
@@ -82,7 +82,11 @@ def _item(text: str) -> PageConversionItem:
     )
 
 
-def _gemma_output(request: PageConversionRequest) -> PageConversionArtifact:
+def _gemma_output(
+    request: PageConversionRequest,
+    *,
+    granite_error_code: str,
+) -> PageConversionArtifact:
     text = "Trading on Momentum"
     return PageConversionArtifact(
         page_number=request.page_number,
@@ -93,7 +97,7 @@ def _gemma_output(request: PageConversionRequest) -> PageConversionArtifact:
         audit_artifact_ref=request.expected_output_artifact_ref,
         fallback_trace=PageConversionFallbackTrace(
             triggering_tool_name=ConversionToolName.GRANITE_DOCLING,
-            triggering_error_code="DOCLING_PROVENANCE_MISSING",
+            triggering_error_code=granite_error_code,
         ),
         items=(_item(text),),
     )
@@ -120,7 +124,7 @@ class _GemmaAfterGranite:
         granite_error_code: str,
     ) -> PageConversionArtifact:
         self.calls.append((request, granite_error_code))
-        return _gemma_output(request)
+        return _gemma_output(request, granite_error_code=granite_error_code)
 
 
 class _Native:
@@ -194,11 +198,11 @@ def _source_and_run() -> tuple[SourceDocument, DocumentProcessingRun]:
     return source, run
 
 
-def _verifier_recuperation_provenance_granite() -> None:
-    # Given Granite a réellement reçu une page SCAN_GRANITE mais ne produit aucune provenance textuelle.
-    # When la récupération explicitement décidée par ADR-035 est exécutée.
+def _verifier_recuperation_granite_autorisee(granite_error_code: str) -> None:
+    # Given Granite a réellement reçu une page SCAN_GRANITE et retourne un échec terminal autorisé.
+    # When la récupération explicitement décidée par ADR-036 est exécutée.
     # Then Gemma 4 est appelée une seule fois, le motif Granite est persisté et Gemma devient l'autorité unique.
-    granite = _GraniteWithoutProvenance("DOCLING_PROVENANCE_MISSING")
+    granite = _GraniteWithoutProvenance(granite_error_code)
     gemma = _GemmaAfterGranite()
     converter = GraniteThenGemmaPageConverter(
         granite_converter=granite,
@@ -209,11 +213,11 @@ def _verifier_recuperation_provenance_granite() -> None:
     recovered = converter.convert_page(request)
 
     assert granite.requests == [request]
-    assert gemma.calls == [(request, "DOCLING_PROVENANCE_MISSING")]
+    assert gemma.calls == [(request, granite_error_code)]
     assert recovered.tool_name is ConversionToolName.GEMMA_VISION
     assert recovered.fallback_trace == PageConversionFallbackTrace(
         triggering_tool_name=ConversionToolName.GRANITE_DOCLING,
-        triggering_error_code="DOCLING_PROVENANCE_MISSING",
+        triggering_error_code=granite_error_code,
     )
     source, run = _source_and_run()
     handler = ConvertRoutedPagesHandler(
@@ -232,22 +236,22 @@ def _verifier_recuperation_provenance_granite() -> None:
     assert payload["pages"][0]["conversion_tool_name"] == "GEMMA_VISION"
     assert payload["pages"][0]["fallback_trace"] == {
         "triggering_tool_name": "GRANITE_DOCLING",
-        "triggering_error_code": "DOCLING_PROVENANCE_MISSING",
+        "triggering_error_code": granite_error_code,
     }
 
 
-def _verifier_absence_de_recuperation_sur_indisponibilite() -> None:
-    # Given Granite est indisponible avant de produire une réponse exploitable.
+def _verifier_absence_de_recuperation_sur_echec_hors_contrat() -> None:
+    # Given Granite échoue avec un code qui ne fait pas partie de l'ADR-036.
     # When la conversion de page est demandée.
     # Then Gemma ne reçoit aucun appel et l'échec Granite reste terminal.
-    granite = _GraniteWithoutProvenance("GRANITE_DOCLING_UNAVAILABLE")
+    granite = _GraniteWithoutProvenance("SOURCE_FINGERPRINT_MISMATCH")
     gemma = _GemmaAfterGranite()
     converter = GraniteThenGemmaPageConverter(
         granite_converter=granite,
         gemma_converter=gemma,
     )
 
-    with pytest.raises(GraniteConversionFailure, match="GRANITE_DOCLING_UNAVAILABLE"):
+    with pytest.raises(GraniteConversionFailure, match="SOURCE_FINGERPRINT_MISMATCH"):
         converter.convert_page(_request())
 
     assert gemma.calls == []
@@ -273,6 +277,7 @@ def _verifier_trace_gemma_obligatoire() -> None:
 
 def test_recuperation_gemma_explicite_apres_absence_de_provenance_granite() -> None:
     """Exécute un unique scénario atomique, conformément au manifeste de gate."""
-    _verifier_recuperation_provenance_granite()
-    _verifier_absence_de_recuperation_sur_indisponibilite()
+    _verifier_recuperation_granite_autorisee("DOCLING_PROVENANCE_MISSING")
+    _verifier_recuperation_granite_autorisee("GRANITE_DOCLING_UNAVAILABLE")
+    _verifier_absence_de_recuperation_sur_echec_hors_contrat()
     _verifier_trace_gemma_obligatoire()
