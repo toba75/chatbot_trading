@@ -212,8 +212,8 @@ class _GemmaVisionFallbackPageConverter:
         if granite_error_code not in GEMMA_RECOVERY_GRANITE_ERROR_CODES:
             raise ValueError("récupération Gemma non autorisée")
         source_path = self._resolve_source_path(request.source_artifact_ref)
-        response = self._converter.convert(
-            GemmaVisionConversionRequest(
+        def gemma_request(*, render_rotation_degrees: int) -> GemmaVisionConversionRequest:
+            return GemmaVisionConversionRequest(
                 document_id=request.document_id.value,
                 processing_run_id=request.processing_run_id.value,
                 source_sha256=_sha256_file(source_path),
@@ -232,8 +232,14 @@ class _GemmaVisionFallbackPageConverter:
                 gateway_timeout_seconds=self._gateway_timeout_seconds,
                 max_output_tokens=self._gateway_max_output_tokens,
                 expected_model_id=self._expected_model_id,
+                render_rotation_degrees=render_rotation_degrees,
             )
-        )
+        try:
+            response = self._converter.convert(gemma_request(render_rotation_degrees=0))
+        except GemmaVisionConversionError as error:
+            if error.code != "GEMMA_VISION_OUTPUT_INVALID":
+                raise
+            response = self._converter.convert(gemma_request(render_rotation_degrees=90))
         return _gemma_page_output(
             response=response,
             page_number=request.page_number,

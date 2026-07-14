@@ -54,6 +54,7 @@ def _convert(payload: Mapping[str, Any]) -> dict[str, object]:
     image_bytes = _render_page_png(
         source_path=source_path,
         source_page_number=_required_positive_int(payload, "source_page_number"),
+        render_rotation_degrees=_required_render_rotation_degrees(payload),
     )
     image = LlmInferenceImage(
         media_type="image/png",
@@ -99,18 +100,28 @@ def _convert(payload: Mapping[str, Any]) -> dict[str, object]:
         raise GemmaVisionConversionError("GEMMA_VISION_MODEL_MISMATCH")
     model_revision = _required_text(provenance, "model_revision")
     runtime_version = _required_text(provenance, "runtime_version")
-    items = _structured_items(structured_output)
+    render_rotation_degrees = _required_render_rotation_degrees(payload)
+    items = _structured_items(
+        structured_output,
+        render_rotation_degrees=render_rotation_degrees,
+    )
     return {
         "tool_version": _tool_version(
             model_id=model_id,
             model_revision=model_revision,
             runtime_version=runtime_version,
+            render_rotation_degrees=render_rotation_degrees,
         ),
         "items": items,
     }
 
 
-def _render_page_png(*, source_path: Path, source_page_number: int) -> bytes:
+def _render_page_png(
+    *,
+    source_path: Path,
+    source_page_number: int,
+    render_rotation_degrees: int,
+) -> bytes:
     try:
         import pypdfium2
 
@@ -118,7 +129,7 @@ def _render_page_png(*, source_path: Path, source_page_number: int) -> bytes:
         if source_page_number > len(document):
             raise GemmaVisionConversionError("GEMMA_VISION_PAGE_MISSING")
         page = document[source_page_number - 1]
-        bitmap = page.render(scale=1.5)
+        bitmap = page.render(scale=1.5, rotation=render_rotation_degrees)
         image = bitmap.to_pil()
         buffer = io.BytesIO()
         image.save(buffer, format="PNG", optimize=True)
@@ -132,7 +143,11 @@ def _render_page_png(*, source_path: Path, source_page_number: int) -> bytes:
         raise GemmaVisionConversionError("GEMMA_VISION_RENDERING_FAILED") from error
 
 
-def _structured_items(structured_output: Mapping[str, Any]) -> list[dict[str, object]]:
+def _structured_items(
+    structured_output: Mapping[str, Any],
+    *,
+    render_rotation_degrees: int,
+) -> list[dict[str, object]]:
     if set(structured_output) != {"items"} or not isinstance(structured_output["items"], list):
         raise GemmaVisionConversionError("GEMMA_VISION_OUTPUT_INVALID")
     items: list[dict[str, object]] = []
@@ -150,16 +165,48 @@ def _structured_items(structured_output: Mapping[str, Any]) -> list[dict[str, ob
             or bbox[1] >= bbox[3]
         ):
             raise GemmaVisionConversionError("GEMMA_VISION_OUTPUT_INVALID")
-        items.append({"text": text, "bbox": list(bbox)})
+        items.append(
+            {
+                "text": text,
+                "bbox": _bbox_dans_repere_source(
+                    bbox,
+                    render_rotation_degrees=render_rotation_degrees,
+                ),
+            }
+        )
     if len(items) == 0:
         raise GemmaVisionConversionError("GEMMA_VISION_OUTPUT_INVALID")
     return items
 
 
-def _tool_version(*, model_id: str, model_revision: str, runtime_version: str) -> str:
-    if model_revision.startswith(f"{model_id}@"):
-        return f"{model_revision};{runtime_version}"
-    return f"{model_id}@{model_revision};{runtime_version}"
+def _bbox_dans_repere_source(
+    bbox: list[int | float],
+    *,
+    render_rotation_degrees: int,
+) -> list[int | float]:
+    if render_rotation_degrees == 0:
+        return list(bbox)
+    if render_rotation_degrees == 90:
+        left, top, right, bottom = bbox
+        return [top, 1000 - right, bottom, 1000 - left]
+    raise GemmaVisionConversionError("GEMMA_VISION_REQUEST_INVALID")
+
+
+def _tool_version(
+    *,
+    model_id: str,
+    model_revision: str,
+    runtime_version: str,
+    render_rotation_degrees: int,
+) -> str:
+    version = (
+        f"{model_revision};{runtime_version}"
+        if model_revision.startswith(f"{model_id}@")
+        else f"{model_id}@{model_revision};{runtime_version}"
+    )
+    if render_rotation_degrees == 0:
+        return version
+    return f"{version};render-rotation-{render_rotation_degrees:03d}"
 
 
 def _output_schema() -> dict[str, object]:
@@ -196,9 +243,9 @@ def _required_payload(payload: Any) -> Mapping[str, Any]:
         "schema_version", "document_id", "processing_run_id", "source_sha256", "source_pdf_path",
         "page_number", "source_page_number", "route_name", "routing_policy_version",
         "gateway_endpoint_url", "gateway_timeout_seconds", "max_output_tokens",
-        "expected_model_id",
+        "expected_model_id", "render_rotation_degrees",
     }
-    if not isinstance(payload, Mapping) or set(payload) != expected or payload["schema_version"] != "1.0":
+    if not isinstance(payload, Mapping) or set(payload) != expected or payload["schema_version"] != "1.1":
         raise GemmaVisionConversionError("GEMMA_VISION_REQUEST_INVALID")
     return payload
 
@@ -213,6 +260,13 @@ def _required_text(payload: Mapping[str, Any], field_name: str) -> str:
 def _required_positive_int(payload: Mapping[str, Any], field_name: str) -> int:
     value = payload.get(field_name)
     if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise GemmaVisionConversionError("GEMMA_VISION_REQUEST_INVALID")
+    return value
+
+
+def _required_render_rotation_degrees(payload: Mapping[str, Any]) -> int:
+    value = payload.get("render_rotation_degrees")
+    if value not in (0, 90) or isinstance(value, bool):
         raise GemmaVisionConversionError("GEMMA_VISION_REQUEST_INVALID")
     return value
 

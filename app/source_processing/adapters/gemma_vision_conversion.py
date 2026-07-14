@@ -34,6 +34,7 @@ class GemmaVisionConversionRequest:
     gateway_timeout_seconds: int
     max_output_tokens: int
     expected_model_id: str
+    render_rotation_degrees: int
 
     def __post_init__(self) -> None:
         for field_name in (
@@ -61,12 +62,14 @@ class GemmaVisionConversionRequest:
             value = getattr(self, field_name)
             if isinstance(value, bool) or not isinstance(value, int) or value < 1:
                 raise ValueError(f"{field_name} invalide")
+        if self.render_rotation_degrees not in (0, 90):
+            raise ValueError("render_rotation_degrees invalide")
         if not self.gateway_endpoint_url.endswith("/v1/infer"):
             raise ValueError("gateway_endpoint_url invalide")
 
     def to_payload(self) -> dict[str, object]:
         return {
-            "schema_version": "1.0",
+            "schema_version": "1.1",
             "document_id": self.document_id,
             "processing_run_id": self.processing_run_id,
             "source_sha256": self.source_sha256,
@@ -79,6 +82,7 @@ class GemmaVisionConversionRequest:
             "gateway_timeout_seconds": self.gateway_timeout_seconds,
             "max_output_tokens": self.max_output_tokens,
             "expected_model_id": self.expected_model_id,
+            "render_rotation_degrees": self.render_rotation_degrees,
         }
 
 

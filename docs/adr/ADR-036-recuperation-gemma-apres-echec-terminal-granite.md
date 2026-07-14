@@ -28,8 +28,13 @@ pour chaque page routée, ou publier un échec explicite de l'outil qui a aussi
 
 - ADR-035 est remplacée. Granite-Docling demeure le premier essai, unique et
   obligatoire de chaque route non native M-003.
-- Après cet essai réel, Gemma 4 **DOIT** être appelée exactement une fois pour
-  `DOCLING_PROVENANCE_MISSING` ou `GRANITE_DOCLING_UNAVAILABLE`.
+- Après cet essai réel, Gemma 4 **DOIT** recevoir un premier rendu non tourné
+  pour `DOCLING_PROVENANCE_MISSING` ou `GRANITE_DOCLING_UNAVAILABLE`.
+- Si, et seulement si, cette première réponse Gemma est refusée pour
+  `GEMMA_VISION_OUTPUT_INVALID`, le worker **DOIT** effectuer un second et
+  dernier appel Gemma avec le rendu tourné de 90 degrés. Les coordonnées de ce
+  rendu sont réexprimées dans le repère PDF initial et la version d'outil porte
+  explicitement `render-rotation-090`.
 - Cette récupération **DOIT** passer exclusivement par
   `llm-gateway/v1/infer`, avec le modèle configuré
   `google/gemma-4-26B-A4B-it`; aucun appel direct à Spark, vLLM ou un autre
@@ -39,8 +44,8 @@ pour chaque page routée, ou publier un échec explicite de l'outil qui a aussi
   obligatoirement la trace Granite exacte, y compris
   `GRANITE_DOCLING_UNAVAILABLE` lorsqu'elle en est issue.
 - Une erreur d'actif, d'OCRmyPDF, de source, de contrat, de stockage ou Gemma
-  elle-même **NE DOIT PAS** déclencher un autre essai. Elle reste terminale et
-  publique.
+  elle-même, hors `GEMMA_VISION_OUTPUT_INVALID` du premier rendu non tourné,
+  **NE DOIT PAS** déclencher un autre essai. Elle reste terminale et publique.
 - Le worker **DOIT** persister `RUNNING`, les unités réellement terminées, puis
   `CANONICAL_ACCEPTED` ou l'erreur terminale. L'UI lit uniquement cet état
   public persistant.
@@ -76,6 +81,9 @@ pour chaque page routée, ou publier un échec explicite de l'outil qui a aussi
   deux codes déclencheurs, testé explicitement.
 - Risque : publier une sortie Gemma incomplète. Contrôle : validation stricte
   du texte, du modèle et des coordonnées avant la QA canonique.
+- Risque : masquer une seconde tentative Gemma. Contrôle : elle est limitée à
+  l'erreur de contrat de coordonnées du rendu initial, à 90 degrés, une seule
+  fois, et elle est inscrite dans la version de l'outil canonique.
 
 ## Impact d'implémentation
 
@@ -84,8 +92,9 @@ pour chaque page routée, ou publier un échec explicite de l'outil qui a aussi
 - Configuration concernée : aucune nouvelle dépendance ni configuration ; le
   chemin `llm-gateway` existant est réemployé.
 - Tests attendus : déclencheur `GRANITE_DOCLING_UNAVAILABLE`, absence de
-  récupération pour un code hors contrat, trace canonique, progression et
-  parcours UI réel complet.
+  récupération pour un code hors contrat, seconde tentative 90 degrés bornée
+  après bbox invalide, repère de coordonnées restauré, trace canonique,
+  progression et parcours UI réel complet.
 - Milestones concernées : M-004, M-013.
 
 ## Liens de traçabilité
