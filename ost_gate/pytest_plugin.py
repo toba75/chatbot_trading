@@ -88,6 +88,7 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     """Écrit le résultat même quand pytest retourne RED."""
 
     if hasattr(session.config, "workerinput"):
+        session.config.workeroutput["ost_gate_results"] = _results
         return
     if _report_path is None:
         raise pytest.UsageError("OST_GATE_PYTEST_REPORT_REQUIRED")
@@ -104,3 +105,20 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     _report_path.write_text(
         json.dumps(payload, ensure_ascii=False), encoding="utf-8"
     )
+
+
+def pytest_testnodedown(node: object, error: object | None) -> None:
+    """Rapatrie les résultats d'un worker xdist avant le rapport maître."""
+
+    del error
+    worker_output = getattr(node, "workeroutput")
+    raw_results = worker_output.get("ost_gate_results")
+    if raw_results is None:
+        return
+    if not isinstance(raw_results, dict):
+        raise pytest.UsageError("OST_GATE_XDIST_RESULTS_INVALID")
+    expected_identifiers = set(_expected.values())
+    for identifier, result in raw_results.items():
+        if identifier not in expected_identifiers or not isinstance(result, dict):
+            raise pytest.UsageError("OST_GATE_XDIST_RESULTS_INVALID")
+        _results[identifier] = result
