@@ -349,6 +349,18 @@ def _verifier_contrat_gemma_compact_pour_table_dense() -> None:
     assert "N’omets aucun texte lisible" in _PAGE_TRANSCRIPTION_PROMPT
 
 
+def _verifier_normalisation_bbox_gemma_inversee() -> None:
+    # Given Gemma a lu le texte d'une page mais inverse les bornes d'une bbox.
+    # When le worker prépare l'artefact pagewise.
+    # Then la boîte est normalisée sans second appel modèle.
+    from app.source_processing.adapters.gemma_vision_worker import _structured_items
+
+    assert _structured_items(
+        {"items": [{"text": "Texte lu", "bbox": [104, 61, 74, 118]}]},
+        render_rotation_degrees=0,
+    ) == [{"text": "Texte lu", "bbox": [74, 61, 104, 118]}]
+
+
 def _verifier_recuperation_orientation_gemma_apres_bbox_invalide(tmp_path: Path) -> None:
     # Given Granite a échoué et le premier rendu Gemma retourne des bboxes invalides.
     # When la récupération d'orientation explicitement bornée est déclenchée.
@@ -426,4 +438,5 @@ def test_recuperation_gemma_explicite_apres_absence_de_provenance_granite(tmp_pa
     _verifier_trace_gemma_obligatoire()
     _verifier_adaptateur_gemma_apres_indisponibilite_granite(tmp_path)
     _verifier_contrat_gemma_compact_pour_table_dense()
+    _verifier_normalisation_bbox_gemma_inversee()
     _verifier_recuperation_orientation_gemma_apres_bbox_invalide(tmp_path)
