@@ -154,10 +154,10 @@ def start_local_ui_stack(launch_configuration: Any) -> Iterator[Any]:
         _stop_process(document_worker_process)
         _stop_process(api_process)
         _stop_process(llm_gateway_process)
-        if postgres_started:
-            _stop_local_postgres()
         if qdrant_started:
             _stop_local_qdrant()
+        if postgres_started:
+            _stop_local_postgres()
         _remove_runtime_configuration(runtime_configuration)
 
 
