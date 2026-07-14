@@ -22,7 +22,7 @@ class HttpHealthOrchestratorDependency:
     _opened: bool = field(init=False, default=False)
 
     def __post_init__(self) -> None:
-        if self.name != "llm-gateway":
+        if self.name not in {"llm-gateway", "qdrant"}:
             raise ValueError("nom de dépendance HTTP non supporté")
         if not self.health_url.startswith(("http://", "https://")):
             raise ValueError("URL health HTTP explicite obligatoire")
@@ -32,7 +32,7 @@ class HttpHealthOrchestratorDependency:
             or self.timeout_seconds < 1
         ):
             raise ValueError("timeout health HTTP invalide")
-        if self.not_ready_error_code != "LLM_GATEWAY_NOT_READY":
+        if self.not_ready_error_code not in {"LLM_GATEWAY_NOT_READY", "QDRANT_NOT_READY"}:
             raise ValueError("code readiness HTTP non supporté")
 
     async def open(self) -> None:
@@ -65,6 +65,8 @@ class HttpHealthOrchestratorDependency:
             with urlopen(request, timeout=self.timeout_seconds) as response:
                 if response.status != 200:
                     return False
+                if self.name == "qdrant":
+                    return True
                 payload = json.loads(response.read().decode("utf-8"))
         except (HTTPError, URLError, TimeoutError, OSError, ValueError, UnicodeDecodeError):
             return False

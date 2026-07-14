@@ -4,14 +4,16 @@ from __future__ import annotations
 
 from dataclasses import asdict
 from typing import Any, Protocol
+from collections.abc import Mapping
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
 from app.platform.orchestrator_api_models import (
+    DocumentActionProgressResponse,
     IndexAcceptedResponse,
-    IndexRequest,
+    ProjectionCommandRequest,
     ProjectionResponse,
     PUBLIC_ERROR_RESPONSES,
     parse_public_document_id,
@@ -42,6 +44,10 @@ class ProjectionCommandHttpAdapter(Protocol):
         """Demande une projection sans connaÃ®tre FastAPI."""
 
 
+class ProjectionProgressPort(Protocol):
+    def read_projection_progress(self, document_id: str) -> Mapping[str, Any]: ...
+
+
 def build_projection_command_router(
     *,
     projection_command_adapter: ProjectionCommandHttpAdapter,
@@ -59,7 +65,7 @@ def build_projection_command_router(
     )
     async def request_projection(
         document_id: str,
-        payload: IndexRequest,
+        payload: ProjectionCommandRequest,
     ) -> JSONResponse:
         if not _is_valid_document_id(document_id):
             return _invalid_document_id_response()
@@ -104,6 +110,29 @@ def build_projection_query_router(
     return router
 
 
+def build_projection_progress_router(*, projection_progress: ProjectionProgressPort) -> APIRouter:
+    if not callable(getattr(projection_progress, "read_projection_progress", None)):
+        raise ValueError("projection_progress invalide")
+    router = APIRouter()
+
+    @router.get(
+        "/v1/documents/{document_id}/projection/progress",
+        response_model=DocumentActionProgressResponse,
+        responses=PUBLIC_ERROR_RESPONSES,
+    )
+    async def read_projection_progress(document_id: str) -> JSONResponse:
+        if not _is_valid_document_id(document_id):
+            return _invalid_document_id_response()
+        payload = await run_in_threadpool(
+            projection_progress.read_projection_progress,
+            document_id,
+        )
+        validated = DocumentActionProgressResponse.model_validate(payload)
+        return JSONResponse(status_code=200, content=validated.model_dump(mode="json"))
+
+    return router
+
+
 def _invalid_document_id_response() -> JSONResponse:
     return JSONResponse(
         status_code=400,
@@ -133,7 +162,9 @@ def _ensure_projection_command_adapter(value: Any) -> ProjectionCommandHttpAdapt
 
 __all__ = [
     "ProjectionCommandHttpAdapter",
+    "ProjectionProgressPort",
     "ProjectionQueryPort",
     "build_projection_command_router",
     "build_projection_query_router",
+    "build_projection_progress_router",
 ]

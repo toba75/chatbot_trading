@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+from uuid import UUID
 from collections.abc import Mapping, Sequence
 from typing import Any, Protocol
 
@@ -127,13 +129,23 @@ def _qdrant_point_for(index_generation: str, point: VectorIndexPoint) -> dict[st
     parsed_point = _ensure_point(point)
     payload = dict(parsed_point.payload)
     payload["index_generation"] = _ensure_text(index_generation, "index_generation")
+    sparse_weights_by_index: dict[int, float] = {}
+    for token, weight in parsed_point.sparse_weights:
+        index = int.from_bytes(
+            hashlib.sha256(token.encode("utf-8")).digest()[:4],
+            "big",
+        )
+        sparse_weights_by_index[index] = sparse_weights_by_index.get(index, 0.0) + weight
     return {
-        "id": parsed_point.point_id,
+        "id": str(UUID(bytes=hashlib.sha256(parsed_point.point_id.encode("utf-8")).digest()[:16])),
         "vector": {
             "dense": parsed_point.dense_vector,
             "sparse": {
-                "indices": tuple(token for token, _ in parsed_point.sparse_weights),
-                "values": tuple(weight for _, weight in parsed_point.sparse_weights),
+                "indices": tuple(sorted(sparse_weights_by_index)),
+                "values": tuple(
+                    sparse_weights_by_index[index]
+                    for index in sorted(sparse_weights_by_index)
+                ),
             },
         },
         "payload": payload,

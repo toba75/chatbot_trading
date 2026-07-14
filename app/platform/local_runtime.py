@@ -83,6 +83,7 @@ _UI_PDF_CONTENT_PATH_PATTERN = re.compile(
 )
 _DIAGNOSE_PATH_PATTERN = re.compile(r"^/v1/documents/(?P<document_id>[^/]+)/diagnose$")
 _CONVERT_PATH_PATTERN = re.compile(r"^/v1/documents/(?P<document_id>[^/]+)/convert$")
+_INDEX_PATH_PATTERN = re.compile(r"^/v1/documents/(?P<document_id>[^/]+)/index$")
 _LLM_GATEWAY_LOCK = threading.Lock()
 _LLM_GATEWAY_INSTANCE: OpenAICompatibleLocalLanguageModelGateway | None = None
 _LLM_GATEWAY_CONFIGURATION_HASH: str | None = None
@@ -283,9 +284,13 @@ def _serve_http(
                                 document_id,
                                 "DIAGNOSE"
                                 if step == "diagnostic"
-                                else "CONVERT_DOCUMENT",
+                                else (
+                                    "CONVERT_DOCUMENT"
+                                    if step == "conversion"
+                                    else "PROJECT_DOCUMENT"
+                                ),
                             )
-                            if step in {"diagnostic", "conversion"}
+                            if step in {"diagnostic", "conversion", "projection"}
                             and response.status_code < 400
                             else None
                         )
@@ -367,7 +372,29 @@ def _serve_http(
                             ui_execution_context
                         ),
                     )
-                    if content_length == 0:
+                    if _INDEX_PATH_PATTERN.fullmatch(self.path) is not None:
+                        raw_body = self.rfile.read(content_length)
+                        if content_type.split(";", 1)[0].strip().lower() != "application/x-www-form-urlencoded":
+                            raise UiDocumentCommandForbiddenError("format projection UI invalide")
+                        form = parse_qs(raw_body.decode("utf-8"), strict_parsing=True)
+                        required_profile_fields = {
+                            "projection_profile_id",
+                            "chunking_profile",
+                            "embedding_model",
+                            "sparse_profile",
+                            "index_schema",
+                        }
+                        if set(form) != required_profile_fields or any(len(form[field]) != 1 for field in required_profile_fields):
+                            raise UiDocumentCommandForbiddenError("profil projection UI invalide")
+                        response = client.forward_document_command(
+                            path=self.path,
+                            body=json.dumps(
+                                {field: form[field][0] for field in sorted(required_profile_fields)},
+                                separators=(",", ":"),
+                            ).encode("utf-8"),
+                            content_type="application/json",
+                        )
+                    elif content_length == 0:
                         response = client.forward_document_command(
                             path=self.path,
                             body=b"",
@@ -390,6 +417,11 @@ def _serve_http(
                         status_code=404,
                         payload={"error_code": "UI_DOCUMENT_COMMAND_FORBIDDEN"},
                     )
+                except (UnicodeDecodeError, ValueError):
+                    response = UiDocumentJsonResponse(
+                        status_code=400,
+                        payload={"error_code": "HTTP_REQUEST_INVALID", "field": "body"},
+                    )
                 diagnosis_match = _DIAGNOSE_PATH_PATTERN.fullmatch(self.path)
                 if response.status_code < 400 and diagnosis_match is not None:
                     document_id = str(response.payload.get("document_id", ""))
@@ -402,6 +434,12 @@ def _serve_http(
                     _write_redirect_response(
                         self,
                         location=f"/ui/documents/{document_id}/conversion",
+                    )
+                elif response.status_code < 400 and _INDEX_PATH_PATTERN.fullmatch(self.path):
+                    document_id = str(response.payload.get("document_id", ""))
+                    _write_redirect_response(
+                        self,
+                        location=f"/ui/documents/{document_id}/projection",
                     )
                 elif response.status_code < 400:
                     query = urlencode(

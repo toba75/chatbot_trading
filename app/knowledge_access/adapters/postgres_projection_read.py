@@ -137,6 +137,21 @@ class PostgresKnowledgeProjectionRepository:
                     """
                     UPDATE knowledge_access.knowledge_projections
                        SET status = %s,
+                           execution_phase = CASE
+                               WHEN %s = 'REQUESTED' THEN 'QUEUED'
+                               WHEN %s IN ('BUILDING', 'BUILT', 'INDEXING') THEN 'RUNNING'
+                               WHEN %s IN ('SEARCHABLE', 'STALE', 'RETIRED') THEN 'SUCCEEDED'
+                               WHEN %s = 'FAILED' THEN 'FAILED'
+                               ELSE execution_phase
+                           END,
+                           failure_error_code = CASE
+                               WHEN %s = 'FAILED' THEN 'PROJECTION_FAILED'
+                               ELSE NULL
+                           END,
+                           completed_units = CASE
+                               WHEN %s IN ('SEARCHABLE', 'STALE', 'RETIRED') THEN total_units
+                               ELSE completed_units
+                           END,
                            state_observed_at = CURRENT_TIMESTAMP,
                            aggregate_version = %s
                      WHERE projection_id = %s
@@ -145,6 +160,12 @@ class PostgresKnowledgeProjectionRepository:
                     RETURNING projection_id
                     """,
                     (
+                        parsed_projection.status.value,
+                        parsed_projection.status.value,
+                        parsed_projection.status.value,
+                        parsed_projection.status.value,
+                        parsed_projection.status.value,
+                        parsed_projection.status.value,
                         parsed_projection.status.value,
                         parsed_projection.aggregate_version,
                         parsed_projection.projection_id,
@@ -214,16 +235,21 @@ class PostgresKnowledgeProjectionRepository:
                         projection_profile_id, chunking_profile, embedding_model,
                         sparse_profile, index_schema, build_fingerprint, status,
                         chunk_count, state_observed_at, aggregate_version,
-                        outputs_fingerprint
+                        outputs_fingerprint, execution_phase, completed_units,
+                        total_units, failure_error_code
                     )
 
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'SUCCEEDED', %s, %s, NULL)
                     ON CONFLICT (projection_id) DO UPDATE SET
                         status = EXCLUDED.status,
                         chunk_count = EXCLUDED.chunk_count,
                         state_observed_at = EXCLUDED.state_observed_at,
                         aggregate_version = EXCLUDED.aggregate_version,
-                        outputs_fingerprint = EXCLUDED.outputs_fingerprint
+                        outputs_fingerprint = EXCLUDED.outputs_fingerprint,
+                        execution_phase = EXCLUDED.execution_phase,
+                        completed_units = EXCLUDED.completed_units,
+                        total_units = EXCLUDED.total_units,
+                        failure_error_code = EXCLUDED.failure_error_code
                     """,
                     (
                         projection.projection_id,
@@ -240,6 +266,8 @@ class PostgresKnowledgeProjectionRepository:
                         observed_at,
                         projection.aggregate_version,
                         outputs_fingerprint,
+                        chunk_count,
+                        chunk_count,
                     ),
                 )
                 cursor.execute(
@@ -394,7 +422,7 @@ def _projection_record_from_rows(
     observed_at = row[12]
     if not callable(getattr(observed_at, "isoformat", None)):
         raise ValueError("state_observed_at PostgreSQL invalide")
-    observed_at_text = observed_at.isoformat().replace("+00:00", "Z")
+    observed_at_text = observed_at.strftime("%Y-%m-%dT%H:%M:%SZ")
     projection = _projection_from_row(row)
 
     return ProjectionReadRecord(
@@ -460,7 +488,7 @@ def _chunk_from_row(row: Any, *, projection: KnowledgeProjection) -> KnowledgeCh
         profile_id=row[6],
         profile_version=row[7],
         text=row[1],
-        pages=tuple(locator.page_pdf for locator in locators),
+        pages=tuple(dict.fromkeys(locator.page_pdf for locator in locators)),
         item_ids=tuple(locator.item_id for locator in locators),
         source_locators=locators,
         content_hash=row[2],

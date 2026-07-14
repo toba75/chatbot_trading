@@ -287,7 +287,7 @@ class ProjectionQueryService:
 
     def _sample_view(self, chunk: KnowledgeChunk) -> ProjectionChunkSampleView:
         parsed_chunk = _ensure_chunk(chunk)
-        preview = parsed_chunk.text[: self._text_preview_character_limit]
+        preview = parsed_chunk.text[: self._text_preview_character_limit].rstrip()
         locators = parsed_chunk.source_locators[: self._source_locator_limit]
         if len(locators) == 0:
             raise ValueError("SourceLocator absent du chunk public")

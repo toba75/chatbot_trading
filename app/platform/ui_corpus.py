@@ -68,6 +68,7 @@ class CorpusPdfDocument:
     projection_status: str
     conversion_action_available: bool
     selected: bool
+    projection_action_available: bool = False
     manual_review_reason: str | None = None
     failure_error_code: str | None = None
 
@@ -123,6 +124,14 @@ class CorpusPdfDocument:
             or self.conversion_status != "CONVERSION_NOT_REQUESTED"
         ):
             raise ValueError("disponibilité conversion incohérente")
+        if not isinstance(self.projection_action_available, bool):
+            raise ValueError("projection_action_available invalide")
+        if self.projection_action_available and (
+            self.conversion_status != "CANONICAL_ACCEPTED"
+            or self.canonical_version_id is None
+            or self.projection_status != "PROJECTION_NOT_REQUESTED"
+        ):
+            raise ValueError("projection_action_available incoherente")
         if not isinstance(self.selected, bool):
             raise ValueError("selection document invalide")
         if self.diagnostic_status == "MANUAL_REVIEW":
@@ -502,6 +511,21 @@ def render_document_inspection(
                 "</section>",
             )
         )
+    elif parsed_title.casefold() == "projection":
+        progress_html, refresh_html = _render_action_progress(
+            action_progress,
+            expected_action_name="PROJECT_DOCUMENT",
+        )
+        visible_items = _render_mapping_details(payload)
+        content = "".join(
+            (
+                '<section aria-labelledby="resume-projection">',
+                '<h2 id="resume-projection">Résumé de la projection</h2>',
+                progress_html,
+                visible_items,
+                "</section>",
+            )
+        )
     else:
         visible_items = _render_mapping_details(payload)
         content = "".join(
@@ -517,7 +541,7 @@ def render_document_inspection(
             '<html lang="fr">',
             '<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">',
             refresh_html
-            if parsed_title.casefold() in {"diagnostic", "conversion"} and status_code < 400
+            if parsed_title.casefold() in {"diagnostic", "conversion", "projection"} and status_code < 400
             else "",
             '<title>Inspection documentaire</title></head>',
             "<body>",
@@ -579,6 +603,7 @@ def _render_action_progress(
     progress_label = {
         "CONVERT_DOCUMENT": "Avancement de la conversion",
         "DIAGNOSE": "Avancement du diagnostic",
+        "PROJECT_DOCUMENT": "Avancement de la projection",
     }[action_name]
     return (
         "".join(
@@ -644,6 +669,7 @@ def _render_document_row(document: CorpusPdfDocument) -> str:
             _render_conversion_cell(document),
             "</td><td>",
             _escape(document.projection_status),
+            _render_projection_action(document),
             '<br><a href="/ui/documents/',
             _escape(document.document_id),
             '/projection">Inspecter</a>',
@@ -710,6 +736,27 @@ def _render_conversion_cell(document: CorpusPdfDocument) -> str:
             '<br><a href="/ui/documents/',
             escaped_document_id,
             '/conversion">Inspecter</a>',
+        )
+    )
+
+
+def _render_projection_action(document: CorpusPdfDocument) -> str:
+    parsed_document = _ensure_document(document)
+    if not parsed_document.projection_action_available:
+        return ""
+    document_id = _escape(parsed_document.document_id)
+    return "".join(
+        (
+            '<form class="row-action-form" method="post" action="/v1/documents/',
+            document_id,
+            '/index">',
+            '<input type="hidden" name="projection_profile_id" value="local-hash-projection-v1">',
+            '<input type="hidden" name="chunking_profile" value="hierarchical-pagewise-v1">',
+            '<input type="hidden" name="embedding_model" value="hashing-dense-256-v1">',
+            '<input type="hidden" name="sparse_profile" value="lexical-tf-v1">',
+            '<input type="hidden" name="index_schema" value="qdrant-hybrid-v1">',
+            '<button type="submit">Projeter</button>',
+            "</form>",
         )
     )
 

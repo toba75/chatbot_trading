@@ -21,8 +21,14 @@ from app.contracts.document_public_statuses import PublicProjectionStatus
 from app.knowledge_access.adapters.postgres_projection_read import (
     PostgresProjectionReadRepository,
 )
+from app.knowledge_access.adapters.projection_http import KnowledgeProjectionHttpAdapter
+from app.knowledge_access.adapters.projection_runtime import ProjectionRuntimeService
 from app.knowledge_access.application.projection_queries import ProjectionQueryService
-from app.knowledge_access.adapters.http import build_projection_query_router
+from app.knowledge_access.adapters.http import (
+    build_projection_command_router,
+    build_projection_progress_router,
+    build_projection_query_router,
+)
 from app.platform.configuration import ApplicationConfiguration
 from app.platform.orchestrator_composition import (
     DependencyReadiness,
@@ -97,6 +103,7 @@ class OrchestratorDocumentCorpusItem:
     diagnostic_status: str
     conversion_status: str
     conversion_action_available: bool
+    projection_action_available: bool
     canonical_version_id: str | None
     projection_status: str
     manual_review_reason: str | None
@@ -186,6 +193,11 @@ def _enrich_corpus_item(
         diagnostic_status=item.diagnostic_status,
         conversion_status=item.conversion_status,
         conversion_action_available=item.conversion_action_available,
+        projection_action_available=(
+            item.conversion_status == "CANONICAL_ACCEPTED"
+            and item.canonical_version_id is not None
+            and status == "PROJECTION_NOT_REQUESTED"
+        ),
         canonical_version_id=item.canonical_version_id,
         projection_status=status,
         manual_review_reason=item.manual_review_reason,
@@ -295,6 +307,13 @@ def build_orchestrator_composition_root(
         source_processing_pages=document_queries,
         projection_statuses=projection_read_repository,
     )
+    projection_runtime = ProjectionRuntimeService(
+        connection_factory=connection_factory,
+        canonical_sources_root=Path(configuration.paths.canonical_sources_root),
+        configuration_hash=configuration.configuration_hash,
+        qdrant_url=configuration.services.qdrant.url,
+        qdrant_timeout_seconds=configuration.runtime.timeouts.request_seconds,
+    )
 
     document_router = APIRouter()
     document_router.include_router(
@@ -305,7 +324,8 @@ def build_orchestrator_composition_root(
                     endpoint_url=f"{configuration.services.llm_gateway.url.rstrip('/')}/v1/infer",
                     timeout_seconds=configuration.services.llm_gateway.timeout_seconds,
                 ),
-            )
+            ),
+            include_indexing_router=False,
         )
     )
     document_router.include_router(
@@ -318,6 +338,16 @@ def build_orchestrator_composition_root(
         )
     )
     document_router.include_router(build_document_query_router(document_queries=document_catalog))
+    document_router.include_router(
+        build_projection_command_router(
+            projection_command_adapter=KnowledgeProjectionHttpAdapter(
+                projection_commands=projection_runtime,
+            )
+        )
+    )
+    document_router.include_router(
+        build_projection_progress_router(projection_progress=projection_runtime)
+    )
     document_router.include_router(build_original_pdf_router(original_pdf_queries=original_queries))
     document_router.include_router(build_projection_query_router(projection_queries=projection_queries))
 
@@ -333,6 +363,12 @@ def build_orchestrator_composition_root(
                 health_url=f"{configuration.services.llm_gateway.url}/health",
                 timeout_seconds=configuration.services.llm_gateway.timeout_seconds,
                 not_ready_error_code="LLM_GATEWAY_NOT_READY",
+            ),
+            HttpHealthOrchestratorDependency(
+                name="qdrant",
+                health_url=f"{configuration.services.qdrant.url.rstrip('/')}/healthz",
+                timeout_seconds=configuration.runtime.timeouts.request_seconds,
+                not_ready_error_code="QDRANT_NOT_READY",
             ),
         ),
         document_command_router=document_router,

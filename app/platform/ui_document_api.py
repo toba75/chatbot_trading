@@ -20,6 +20,7 @@ from app.platform.orchestrator_api_models import (
     DocumentActionProgressResponse,
     DocumentCorpusResponse,
     DocumentDiagnosticResponse,
+    IndexAcceptedResponse,
     ProjectionResponse,
 )
 from app.platform.orchestrator_asgi import MAX_REQUEST_BODY_BYTES
@@ -44,8 +45,11 @@ _DIAGNOSE_PATH_PATTERN = re.compile(
 _CONVERT_PATH_PATTERN = re.compile(
     rf"^/v1/documents/(?P<document_id>{_DOCUMENT_ID_PATTERN})/convert$"
 )
+_INDEX_PATH_PATTERN = re.compile(
+    rf"^/v1/documents/(?P<document_id>{_DOCUMENT_ID_PATTERN})/index$"
+)
 _PUBLIC_DOCUMENT_PATH_PATTERN = re.compile(
-    r"^/v1/documents(?:/[^/]+(?:/(?:diagnose|convert|diagnostic/progress|diagnostic|conversion/progress|conversion|projection|original))?)?$"
+    r"^/v1/documents(?:/[^/]+(?:/(?:diagnose|convert|index|diagnostic/progress|diagnostic|conversion/progress|conversion|projection/progress|projection|original))?)?$"
 )
 _INTERNAL_FIELD_NAMES = frozenset(
     {
@@ -352,6 +356,7 @@ class UiDocumentApiClient:
                     projection_status=document["projection_status"],
                     conversion_action_available=document["conversion_action_available"],
                     selected=document["document_id"] in selected_ids,
+                    projection_action_available=document["projection_action_available"],
                     manual_review_reason=document["manual_review_reason"],
                     failure_error_code=document["failure_error_code"],
                 )
@@ -398,6 +403,8 @@ class UiDocumentApiClient:
             progress_path = f"/v1/documents/{parsed_document_id}/diagnostic/progress"
         elif action_name == "CONVERT_DOCUMENT":
             progress_path = f"/v1/documents/{parsed_document_id}/conversion/progress"
+        elif action_name == "PROJECT_DOCUMENT":
+            progress_path = f"/v1/documents/{parsed_document_id}/projection/progress"
         else:
             raise ValueError("action de progression UI inconnue")
         response = self._json_request(
@@ -526,6 +533,8 @@ class UiDocumentApiClient:
                 _validate_registration_response(response)
             elif _DIAGNOSE_PATH_PATTERN.fullmatch(parsed_path) is not None:
                 _validate_diagnosis_response(response)
+            elif _INDEX_PATH_PATTERN.fullmatch(parsed_path) is not None:
+                _validate_projection_command_response(response)
             else:
                 _validate_conversion_command_response(response)
         return response
@@ -555,6 +564,8 @@ class UiDocumentApiClient:
                 _validate_registration_response(parsed)
             elif _DIAGNOSE_PATH_PATTERN.fullmatch(parsed_path) is not None:
                 _validate_diagnosis_response(parsed)
+            elif _INDEX_PATH_PATTERN.fullmatch(parsed_path) is not None:
+                _validate_projection_command_response(parsed)
             else:
                 _validate_conversion_command_response(parsed)
         else:
@@ -598,6 +609,7 @@ def _parse_corpus_document(value: Any) -> dict[str, Any]:
             "manual_review_reason",
             "failure_error_code",
             "conversion_action_available",
+            "projection_action_available",
         )
     )
     _require_exact_fields(value, expected, "document corpus")
@@ -621,6 +633,8 @@ def _parse_corpus_document(value: Any) -> dict[str, Any]:
         raise ValueError("projection_status public invalide")
     if not isinstance(value["conversion_action_available"], bool):
         raise ValueError("disponibilité conversion publique invalide")
+    if not isinstance(value["projection_action_available"], bool):
+        raise ValueError("projection_action_available publique invalide")
     manual_review_reason = value["manual_review_reason"]
     failure_error_code = value["failure_error_code"]
     if value["diagnostic_status"] == "MANUAL_REVIEW":
@@ -818,6 +832,15 @@ def _validate_conversion_command_response(response: UiDocumentJsonResponse) -> N
         raise ValueError("commande conversion publique incompatible") from exc
 
 
+def _validate_projection_command_response(response: UiDocumentJsonResponse) -> None:
+    if response.status_code != 202:
+        raise ValueError("statut projection public invalide")
+    try:
+        IndexAcceptedResponse.model_validate(response.payload)
+    except ValidationError as exc:
+        raise ValueError("commande projection publique incompatible") from exc
+
+
 def _require_success(
     response: UiDocumentJsonResponse,
     *,
@@ -915,6 +938,7 @@ def _ensure_document_command_path(value: str) -> str:
         path == "/v1/documents"
         or _DIAGNOSE_PATH_PATTERN.fullmatch(path) is not None
         or _CONVERT_PATH_PATTERN.fullmatch(path) is not None
+        or _INDEX_PATH_PATTERN.fullmatch(path) is not None
     ):
         return path
     raise UiDocumentCommandForbiddenError("commande documentaire UI interdite")

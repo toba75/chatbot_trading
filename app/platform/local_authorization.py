@@ -68,7 +68,10 @@ def _is_persistent_document_mutation(path: Any) -> bool:
         path == "/v1/documents"
         or (
             path.startswith("/v1/documents/")
-            and (path.endswith("/diagnose") or path.endswith("/index"))
+            and (
+                path.endswith("/diagnose")
+                or path.endswith("/convert")
+            )
         )
     )
 

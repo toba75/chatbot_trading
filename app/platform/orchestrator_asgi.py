@@ -143,7 +143,10 @@ class LocalMutationAuthorizationMiddleware:
             or (
                 isinstance(path, str)
                 and path.startswith("/v1/documents/")
-                and (path.endswith("/diagnose") or path.endswith("/index"))
+                and (
+                    path.endswith("/diagnose")
+                    or path.endswith("/convert")
+                )
             )
         ):
             await self._application(scope, receive, send)

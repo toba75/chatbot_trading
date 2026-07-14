@@ -143,14 +143,19 @@ def build_indexing_router(handler: IndexCommandHandler) -> APIRouter:
     return router
 
 
-def build_public_contract_router(services: PublicContractServices) -> APIRouter:
+def build_public_contract_router(
+    services: PublicContractServices,
+    *,
+    include_indexing_router: bool = True,
+) -> APIRouter:
     if not isinstance(services, PublicContractServices):
         raise TypeError("services de contrats publics obligatoires")
     router = APIRouter()
     router.include_router(build_conversation_router(services.conversation))
     router.include_router(build_evaluation_router(services.evaluation))
     router.include_router(build_search_router(services.search))
-    router.include_router(build_indexing_router(services.indexing))
+    if include_indexing_router:
+        router.include_router(build_indexing_router(services.indexing))
     return router
 
 

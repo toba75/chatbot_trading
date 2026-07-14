@@ -72,6 +72,11 @@ class SearchRequest(PublicApiModel):
 
 class IndexRequest(PublicApiModel):
     """Corps vide historique tant que le service KA n'est pas composé."""
+
+
+class ProjectionCommandRequest(PublicApiModel):
+    """Profil strict de la commande réelle de projection KA."""
+
     projection_profile_id: str = Field(min_length=1)
     chunking_profile: str = Field(min_length=1)
     embedding_model: str = Field(min_length=1)
@@ -231,7 +236,7 @@ class ConversionAcceptedResponse(PublicApiModel):
 
 
 class DocumentActionProgressResponse(PublicApiModel):
-    action_name: Literal["DIAGNOSE", "CONVERT_DOCUMENT"]
+    action_name: Literal["DIAGNOSE", "CONVERT_DOCUMENT", "PROJECT_DOCUMENT"]
     phase: PublicActionPhase
     completed_units: int = Field(ge=0)
     total_units: int | None = Field(default=None, ge=1)
@@ -273,6 +278,7 @@ class DocumentCorpusItemResponse(PublicApiModel):
     manual_review_reason: str | None = None
     failure_error_code: str | None = None
     conversion_action_available: bool
+    projection_action_available: bool = False
 
     @model_validator(mode="after")
     def validate_canonical_version(self) -> "DocumentCorpusItemResponse":
@@ -517,6 +523,7 @@ __all__ = [
     "PageManifestEntryResponse",
     "PageRouteResponse",
     "ProjectionChunkSampleResponse",
+    "ProjectionCommandRequest",
     "ProjectionFreshnessResponse",
     "ProjectionNotRequestedResponse",
     "ProjectionProfileResponse",

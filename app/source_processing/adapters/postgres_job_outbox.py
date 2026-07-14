@@ -14,10 +14,25 @@ class JobOutboxLeaseConflictError(RuntimeError):
 class PostgresJobOutbox:
     """Réclame et acquitte localement les messages SP avec une lease courte."""
 
-    def __init__(self, *, connection_factory: PostgresConnectionFactory) -> None:
+    _ALLOWED_TABLE_NAMES = frozenset(
+        {
+            "source_processing.job_outbox",
+            "knowledge_access.job_outbox",
+        }
+    )
+
+    def __init__(
+        self,
+        *,
+        connection_factory: PostgresConnectionFactory,
+        table_name: str = "source_processing.job_outbox",
+    ) -> None:
         if not callable(getattr(connection_factory, "connect", None)):
             raise ValueError("connection_factory outbox invalide")
+        if table_name not in self._ALLOWED_TABLE_NAMES:
+            raise ValueError("table outbox invalide")
         self._connection_factory = connection_factory
+        self._table_name = table_name
 
     def claim_next(
         self,
@@ -30,10 +45,10 @@ class PostgresJobOutbox:
         with self._connection_factory.connect() as connection:
             with connection.transaction(), connection.cursor() as cursor:
                 cursor.execute(
-                    """
+                    f"""
                     WITH candidate AS (
                         SELECT sequence
-                          FROM source_processing.job_outbox
+                          FROM {self._table_name}
                          WHERE status = 'pending'
                             OR (status = 'relaying'
                                 AND relay_lease_expires_at <= CURRENT_TIMESTAMP)
@@ -41,7 +56,7 @@ class PostgresJobOutbox:
                          FOR UPDATE SKIP LOCKED
                          LIMIT 1
                     )
-                    UPDATE source_processing.job_outbox AS message
+                    UPDATE {self._table_name} AS message
                        SET status = 'relaying', relay_owner = %s,
                            relay_lease_expires_at =
                                CURRENT_TIMESTAMP + (%s * INTERVAL '1 second'),
@@ -91,8 +106,8 @@ class PostgresJobOutbox:
         with self._connection_factory.connect() as connection:
             with connection.transaction(), connection.cursor() as cursor:
                 cursor.execute(
-                    """
-                    UPDATE source_processing.job_outbox
+                    f"""
+                    UPDATE {self._table_name}
                        SET status = 'relayed', platform_job_id = %s,
                            relayed_at = CURRENT_TIMESTAMP,
                            relay_owner = NULL, relay_lease_expires_at = NULL,

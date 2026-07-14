@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from dataclasses import replace
 from pathlib import Path
-from tempfile import TemporaryDirectory
 
 
 def test_validate_projection_command_http_acceptance() -> None:
@@ -83,7 +81,7 @@ def test_validate_projection_command_http_acceptance() -> None:
     )
     adapter = KnowledgeProjectionHttpAdapter(projection_commands=handler)
 
-    async def post(application, *, token: str | None) -> tuple[int, dict[str, object]]:
+    async def post(application) -> tuple[int, dict[str, object]]:
         sent: list[dict[str, object]] = []
         delivered = False
         body = json.dumps(profile_payload).encode("utf-8")
@@ -102,8 +100,6 @@ def test_validate_projection_command_http_acceptance() -> None:
             (b"content-type", b"application/json"),
             (b"content-length", str(len(body)).encode("ascii")),
         ]
-        if token is not None:
-            headers.append((b"authorization", f"Bearer {token}".encode("ascii")))
         path = f"/v1/documents/{document_id}/index"
         await application(
             {
@@ -135,45 +131,27 @@ def test_validate_projection_command_http_acceptance() -> None:
     configuration = load_application_configuration(
         repository_root / "config" / "application.example.yaml", {}
     )
-    with TemporaryDirectory(prefix="ost-projection-command-") as temporary_directory:
-        token = "m013-projection-command-token-00000001"
-        token_path = Path(temporary_directory) / "local_api_token"
-        token_path.write_text(token, encoding="ascii")
-        configuration = replace(
-            configuration,
-            security=replace(
-                configuration.security,
-                secrets=replace(
-                    configuration.security.secrets,
-                    local_api_token_path=str(token_path),
-                ),
+    application = create_orchestrator_app(
+        configuration=configuration,
+        composition_root_factory=lambda validated: OrchestratorCompositionRoot(
+            configuration=validated,
+            dependencies=(ReadyDependency(),),
+            document_command_router=build_projection_command_router(
+                projection_command_adapter=adapter,
             ),
-        )
-        application = create_orchestrator_app(
-            configuration=configuration,
-            composition_root_factory=lambda validated: OrchestratorCompositionRoot(
-                configuration=validated,
-                dependencies=(ReadyDependency(),),
-                document_command_router=build_projection_command_router(
-                    projection_command_adapter=adapter,
-                ),
-            ),
-        )
+        ),
+    )
 
-        # Given une version canonique acceptée et un profil de projection explicite.
-        # When l'UI demande POST /v1/documents/{document_id}/index.
-        # Then l'API authentifiée accepte la commande KA réelle et publie son état REQUESTED.
-        async def scenario() -> None:
-            async with application.router.lifespan_context(application):
-                assert await post(application, token=None) == (
-                    401,
-                    {"error_code": "LOCAL_API_TOKEN_REQUIRED"},
-                )
-                status, payload = await post(application, token=token)
-            assert status == 202
-            assert payload["document_id"] == document_id
-            assert payload["projection_status"] == "REQUESTED"
-            assert payload["canonical_version_id"] == canonical_ref.canonical_version_id
-            assert isinstance(payload["projection_id"], str)
+    # Given une version canonique acceptée et un profil de projection explicite.
+    # When l'UI demande POST /v1/documents/{document_id}/index.
+    # Then l'API accepte la commande KA réelle et publie son état REQUESTED.
+    async def scenario() -> None:
+        async with application.router.lifespan_context(application):
+            status, payload = await post(application)
+        assert status == 202
+        assert payload["document_id"] == document_id
+        assert payload["projection_status"] == "REQUESTED"
+        assert payload["canonical_version_id"] == canonical_ref.canonical_version_id
+        assert isinstance(payload["projection_id"], str)
 
-        asyncio.run(scenario())
+    asyncio.run(scenario())

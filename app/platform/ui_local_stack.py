@@ -17,16 +17,22 @@ from urllib.request import urlopen
 
 
 LOCAL_POSTGRES_CONTAINER = "ostrading-ui-postgres"
+LOCAL_QDRANT_CONTAINER = "ostrading-ui-qdrant"
 LOCAL_POSTGRES_LABEL = "com.ostrading.managed-by"
 LOCAL_POSTGRES_IMAGE = (
     "postgres@sha256:7e5df973a74872482e320dcbdeb055e178d6f42de0558b083892c50cda833c96"
 )
+LOCAL_QDRANT_IMAGE = "qdrant/qdrant@sha256:318c11b72aaab96b36e9662ad244de3cabd0653a1b942d4e8191f18296c81af0"
 LOCAL_POSTGRES_VOLUME = "ostrading-ui-postgres-data"
+LOCAL_QDRANT_VOLUME = "ostrading-ui-qdrant-data"
 LOCAL_POSTGRES_PORT = 55432
+LOCAL_QDRANT_PORT = 56333
 LOCAL_API_PORT = 8080
 LOCAL_LLM_GATEWAY_PORT = 8090
 _POSTGRES_SOURCE_URL = "postgresql+psycopg://app@postgres/app"
 _POSTGRES_LOCAL_URL = f"postgresql+psycopg://app@127.0.0.1:{LOCAL_POSTGRES_PORT}/app"
+_QDRANT_SOURCE_URL = "http://qdrant:6333"
+_QDRANT_LOCAL_URL = f"http://127.0.0.1:{LOCAL_QDRANT_PORT}"
 _CONTAINER_LISTEN_HOST_SOURCE = "      container_listen_host: 0.0.0.0\n"
 _CONTAINER_LISTEN_HOST_LOCAL = "      container_listen_host: 127.0.0.1\n"
 _API_BIND_HOST_SOURCE = "  api:\n    bind_host: 0.0.0.0\n"
@@ -38,6 +44,7 @@ _API_STARTUP_TIMEOUT_SECONDS = 60
 _LLM_GATEWAY_STARTUP_TIMEOUT_SECONDS = 60
 _POSTGRES_STARTUP_ATTEMPTS = 120
 _DOCUMENT_WORKER_LEASE_SECONDS = 30
+_PROJECTION_WORKER_LEASE_SECONDS = 300
 _DOCUMENT_WORKER_POLL_SECONDS = 0.1
 _DOCUMENT_WORKER_STARTUP_STABILITY_SECONDS = 0.5
 
@@ -72,6 +79,9 @@ def build_local_ui_runtime_configuration(
     runtime_text = source_text.replace(_POSTGRES_SOURCE_URL, _POSTGRES_LOCAL_URL)
     if runtime_text == source_text:
         raise ValueError("UI_LOCAL_POSTGRES_MAPPING_REQUIRED")
+    runtime_text = runtime_text.replace(_QDRANT_SOURCE_URL, _QDRANT_LOCAL_URL)
+    if _QDRANT_SOURCE_URL in runtime_text:
+        raise ValueError("UI_LOCAL_QDRANT_MAPPING_REQUIRED")
     runtime_text = runtime_text.replace(
         _CONTAINER_LISTEN_HOST_SOURCE,
         _CONTAINER_LISTEN_HOST_LOCAL,
@@ -96,6 +106,7 @@ def start_local_ui_stack(launch_configuration: Any) -> Iterator[Any]:
         port=LOCAL_LLM_GATEWAY_PORT,
         error_code="UI_LOCAL_LLM_GATEWAY_PORT_OCCUPIED",
     )
+    _require_available_port(port=LOCAL_QDRANT_PORT, error_code="UI_LOCAL_QDRANT_PORT_OCCUPIED")
     _require_available_port(
         port=int(launch_configuration.port),
         error_code="UI_LOCAL_PORT_OCCUPIED",
@@ -109,10 +120,14 @@ def start_local_ui_stack(launch_configuration: Any) -> Iterator[Any]:
     api_process: subprocess.Popen[bytes] | None = None
     llm_gateway_process: subprocess.Popen[bytes] | None = None
     document_worker_process: subprocess.Popen[bytes] | None = None
+    projection_worker_process: subprocess.Popen[bytes] | None = None
     postgres_started = False
+    qdrant_started = False
     try:
         postgres_started = _start_local_postgres(repository_root=repository_root)
         _wait_for_postgres()
+        qdrant_started = _start_local_qdrant()
+        _wait_for_qdrant()
         llm_gateway_process = _start_local_llm_gateway(
             repository_root=repository_root,
             runtime_configuration=runtime_configuration,
@@ -128,13 +143,21 @@ def start_local_ui_stack(launch_configuration: Any) -> Iterator[Any]:
             runtime_configuration=runtime_configuration,
         )
         _wait_for_document_worker(document_worker_process)
+        projection_worker_process = _start_local_projection_worker(
+            repository_root=repository_root,
+            runtime_configuration=runtime_configuration,
+        )
+        _wait_for_projection_worker(projection_worker_process)
         yield replace(launch_configuration, config_path=str(runtime_configuration.path))
     finally:
+        _stop_process(projection_worker_process)
         _stop_process(document_worker_process)
         _stop_process(api_process)
         _stop_process(llm_gateway_process)
         if postgres_started:
             _stop_local_postgres()
+        if qdrant_started:
+            _stop_local_qdrant()
         _remove_runtime_configuration(runtime_configuration)
 
 
@@ -252,6 +275,58 @@ def _require_postgres_port_mapping() -> None:
         raise ValueError("UI_LOCAL_POSTGRES_PORT_INVALID")
 
 
+def _start_local_qdrant() -> bool:
+    _run_docker(("version", "--format", "{{.Server.Version}}"), "UI_LOCAL_DOCKER_UNAVAILABLE")
+    inspect = _run_docker(
+        (
+            "container", "inspect", "--format",
+            "{{ index .Config.Labels \"com.ostrading.managed-by\" }}",
+            LOCAL_QDRANT_CONTAINER,
+        ),
+        "UI_LOCAL_QDRANT_INSPECTION_FAILED",
+        allowed_returncodes=frozenset((0, 1)),
+    )
+    if inspect.returncode == 0:
+        if inspect.stdout.strip() != "uv-run-ui":
+            raise ValueError("UI_LOCAL_QDRANT_OWNERSHIP_INVALID")
+        _run_docker(("start", LOCAL_QDRANT_CONTAINER), "UI_LOCAL_QDRANT_START_FAILED")
+        _require_qdrant_port_mapping()
+        return True
+    _run_docker(
+        (
+            "run", "--detach", "--name", LOCAL_QDRANT_CONTAINER,
+            "--label", f"{LOCAL_POSTGRES_LABEL}=uv-run-ui",
+            "--mount", f"type=volume,source={LOCAL_QDRANT_VOLUME},target=/qdrant/storage",
+            "--publish", f"127.0.0.1:{LOCAL_QDRANT_PORT}:6333",
+            LOCAL_QDRANT_IMAGE,
+        ),
+        "UI_LOCAL_QDRANT_START_FAILED",
+    )
+    _require_qdrant_port_mapping()
+    return True
+
+
+def _require_qdrant_port_mapping() -> None:
+    mapping = _run_docker(
+        ("port", LOCAL_QDRANT_CONTAINER, "6333/tcp"),
+        "UI_LOCAL_QDRANT_PORT_UNREADABLE",
+    ).stdout.strip()
+    if mapping != f"127.0.0.1:{LOCAL_QDRANT_PORT}":
+        raise ValueError("UI_LOCAL_QDRANT_PORT_INVALID")
+
+
+def _wait_for_qdrant() -> None:
+    deadline = time.monotonic() + _API_STARTUP_TIMEOUT_SECONDS
+    while time.monotonic() < deadline:
+        try:
+            with urlopen(f"http://127.0.0.1:{LOCAL_QDRANT_PORT}/healthz", timeout=1) as response:
+                if response.status == 200:
+                    return
+        except (URLError, TimeoutError, OSError):
+            time.sleep(0.25)
+    raise ValueError("UI_LOCAL_QDRANT_STARTUP_TIMEOUT")
+
+
 def _wait_for_postgres() -> None:
     for _ in range(_POSTGRES_STARTUP_ATTEMPTS):
         result = _run_docker(
@@ -325,6 +400,29 @@ def _start_local_document_worker(
     )
 
 
+def _start_local_projection_worker(
+    *,
+    repository_root: Path,
+    runtime_configuration: LocalUiRuntimeConfiguration,
+) -> subprocess.Popen[bytes]:
+    return subprocess.Popen(
+        (
+            sys.executable,
+            "-m",
+            "app.knowledge_access.adapters.worker_runtime",
+            "--config",
+            str(runtime_configuration.path),
+            "--worker-id",
+            "uv-run-ui-projection-worker",
+            "--lease-seconds",
+            str(_PROJECTION_WORKER_LEASE_SECONDS),
+            "--poll-seconds",
+            str(_DOCUMENT_WORKER_POLL_SECONDS),
+        ),
+        cwd=repository_root,
+    )
+
+
 def _wait_for_llm_gateway(llm_gateway_process: subprocess.Popen[bytes]) -> None:
     deadline = time.monotonic() + _LLM_GATEWAY_STARTUP_TIMEOUT_SECONDS
     while time.monotonic() < deadline:
@@ -373,6 +471,12 @@ def _wait_for_document_worker(document_worker_process: subprocess.Popen[bytes]) 
         raise ValueError("UI_LOCAL_DOCUMENT_WORKER_START_FAILED")
 
 
+def _wait_for_projection_worker(projection_worker_process: subprocess.Popen[bytes]) -> None:
+    time.sleep(_DOCUMENT_WORKER_STARTUP_STABILITY_SECONDS)
+    if projection_worker_process.poll() is not None:
+        raise ValueError("UI_LOCAL_PROJECTION_WORKER_START_FAILED")
+
+
 def _run_docker(
     arguments: tuple[str, ...],
     error_code: str,
@@ -407,6 +511,13 @@ def _stop_local_postgres() -> None:
     _run_docker(
         ("stop", LOCAL_POSTGRES_CONTAINER),
         "UI_LOCAL_POSTGRES_STOP_FAILED",
+    )
+
+
+def _stop_local_qdrant() -> None:
+    _run_docker(
+        ("stop", LOCAL_QDRANT_CONTAINER),
+        "UI_LOCAL_QDRANT_STOP_FAILED",
     )
 
 
