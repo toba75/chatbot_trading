@@ -203,10 +203,11 @@ class IsolatedGraniteDoclingConverter:
         try:
             completed = subprocess.run(
                 (sys.executable, "-B", "-m", "app.source_processing.adapters.docling_granite_worker"),
-                input=json.dumps(request.to_payload(assets_root=manifest.assets_root), separators=(",", ":")),
+                input=json.dumps(
+                    request.to_payload(assets_root=manifest.assets_root),
+                    separators=(",", ":"),
+                ).encode("utf-8"),
                 capture_output=True,
-                text=True,
-                encoding="utf-8",
                 env=environment,
                 timeout=self._timeout_seconds,
                 check=False,
@@ -215,7 +216,7 @@ class IsolatedGraniteDoclingConverter:
             raise GraniteDoclingConversionError() from error
         try:
             payload = json.loads(completed.stdout)
-        except json.JSONDecodeError as error:
+        except (TypeError, UnicodeDecodeError, json.JSONDecodeError) as error:
             raise GraniteDoclingConversionError() from error
         if completed.returncode != 0:
             code = payload.get("error_code") if isinstance(payload, Mapping) else None

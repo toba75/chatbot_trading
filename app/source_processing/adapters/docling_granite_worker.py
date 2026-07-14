@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import redirect_stdout
 import hashlib
 import json
 import sys
@@ -28,12 +29,19 @@ _GRANITE_ROUTE_NAMES = frozenset(
 def main() -> int:
     try:
         payload = json.loads(sys.stdin.read())
-        response = _convert(payload)
+        with redirect_stdout(sys.stderr):
+            response = _convert(payload)
     except Exception:
-        print(json.dumps({"error_code": "GRANITE_DOCLING_UNAVAILABLE"}), flush=True)
+        _write_protocol_response({"error_code": "GRANITE_DOCLING_UNAVAILABLE"})
         return 1
-    print(json.dumps(response, ensure_ascii=False, separators=(",", ":")), flush=True)
+    _write_protocol_response(response)
     return 0
+
+
+def _write_protocol_response(payload: Mapping[str, object]) -> None:
+    serialized = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    sys.stdout.buffer.write(serialized + b"\n")
+    sys.stdout.buffer.flush()
 
 
 def _convert(payload: Any) -> dict[str, object]:
