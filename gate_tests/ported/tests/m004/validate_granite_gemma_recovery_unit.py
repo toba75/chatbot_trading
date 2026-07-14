@@ -332,6 +332,23 @@ def _verifier_adaptateur_gemma_apres_indisponibilite_granite(tmp_path: Path) -> 
     )
 
 
+def _verifier_contrat_gemma_compact_pour_table_dense() -> None:
+    # Given une page non native contient un tableau dense et lisible.
+    # When Gemma prépare sa sortie canonique après Granite.
+    # Then il regroupe explicitement les cellules en régions TSV bornées,
+    #      sans tronquer la réponse ni omettre silencieusement la table.
+    from app.source_processing.adapters.gemma_vision_worker import (
+        _PAGE_TRANSCRIPTION_PROMPT,
+        _output_schema,
+    )
+
+    schema = _output_schema()
+    assert schema["properties"]["items"]["maxItems"] == 16
+    assert "tableau dense" in _PAGE_TRANSCRIPTION_PROMPT
+    assert "TSV" in _PAGE_TRANSCRIPTION_PROMPT
+    assert "N’omets aucun texte lisible" in _PAGE_TRANSCRIPTION_PROMPT
+
+
 def test_recuperation_gemma_explicite_apres_absence_de_provenance_granite(tmp_path: Path) -> None:
     """Exécute un unique scénario atomique, conformément au manifeste de gate."""
     _verifier_recuperation_granite_autorisee("DOCLING_PROVENANCE_MISSING")
@@ -339,3 +356,4 @@ def test_recuperation_gemma_explicite_apres_absence_de_provenance_granite(tmp_pa
     _verifier_absence_de_recuperation_sur_echec_hors_contrat()
     _verifier_trace_gemma_obligatoire()
     _verifier_adaptateur_gemma_apres_indisponibilite_granite(tmp_path)
+    _verifier_contrat_gemma_compact_pour_table_dense()
