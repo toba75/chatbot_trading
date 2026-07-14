@@ -40,6 +40,7 @@ class ConversionToolName(str, Enum):
 
     DOCLING_STANDARD = "DOCLING_STANDARD"
     GRANITE_DOCLING = "GRANITE_DOCLING"
+    GEMMA_VISION = "GEMMA_VISION"
     OCRMYPDF = "OCRMYPDF"
 
     @classmethod
@@ -194,6 +195,36 @@ class PageConversionItem:
 
 
 @dataclass(frozen=True)
+class PageConversionFallbackTrace:
+    """Trace obligatoire d'une récupération documentaire explicitement autorisée."""
+
+    triggering_tool_name: ConversionToolName
+    triggering_error_code: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "triggering_tool_name",
+            ConversionToolName.from_value(self.triggering_tool_name),
+        )
+        if self.triggering_tool_name is not ConversionToolName.GRANITE_DOCLING:
+            raise ValueError("outil déclencheur de récupération Gemma invalide")
+        error_code = _ensure_text(
+            self.triggering_error_code,
+            "code déclencheur de récupération Gemma invalide",
+        )
+        if error_code != "DOCLING_PROVENANCE_MISSING":
+            raise ValueError("code déclencheur de récupération Gemma invalide")
+        object.__setattr__(self, "triggering_error_code", error_code)
+
+    def to_payload(self) -> dict[str, str]:
+        return {
+            "triggering_tool_name": self.triggering_tool_name.value,
+            "triggering_error_code": self.triggering_error_code,
+        }
+
+
+@dataclass(frozen=True)
 class PageConversionArtifact:
     """Sortie auditable d'une page convertie par sa route explicite."""
 
@@ -204,6 +235,7 @@ class PageConversionArtifact:
     artifact_hash: str
     audit_artifact_ref: str
     items: tuple[PageConversionItem, ...]
+    fallback_trace: PageConversionFallbackTrace | None = None
 
     def __post_init__(self) -> None:
         _ensure_page_number(self.page_number)
@@ -225,6 +257,16 @@ class PageConversionArtifact:
             _ensure_artifact_ref(self.audit_artifact_ref),
         )
         object.__setattr__(self, "items", _ensure_conversion_items(self.items))
+        fallback_trace = self.fallback_trace
+        if fallback_trace is not None and not isinstance(
+            fallback_trace,
+            PageConversionFallbackTrace,
+        ):
+            raise ValueError("trace de récupération Gemma invalide")
+        if self.tool_name is ConversionToolName.GEMMA_VISION and fallback_trace is None:
+            raise ValueError("trace de récupération Gemma obligatoire")
+        if self.tool_name is not ConversionToolName.GEMMA_VISION and fallback_trace is not None:
+            raise ValueError("trace de récupération Gemma interdite")
 
 
 class TextAuthoritySelectionError(ValueError):
@@ -267,6 +309,11 @@ class PageConversionCandidate:
             "tool_version": self.page_output.tool_version,
             "artifact_hash": self.page_output.artifact_hash,
             "audit_artifact_ref": self.page_output.audit_artifact_ref,
+            "fallback_trace": (
+                None
+                if self.page_output.fallback_trace is None
+                else self.page_output.fallback_trace.to_payload()
+            ),
             "content_hashes": tuple(item.content_hash for item in self.page_output.items),
         }
 
@@ -1085,6 +1132,10 @@ class CanonicalDocumentPage:
     page_number: PageNumber
     route_name: PageRouteName
     conversion_artifact_hash: str
+    conversion_tool_name: ConversionToolName
+    conversion_tool_version: str
+    conversion_audit_artifact_ref: str
+    fallback_trace: PageConversionFallbackTrace | None
     items: tuple[CanonicalDocumentItem, ...]
 
     def __post_init__(self) -> None:
@@ -1095,6 +1146,30 @@ class CanonicalDocumentPage:
             "conversion_artifact_hash",
             _ensure_artifact_hash(self.conversion_artifact_hash),
         )
+        object.__setattr__(
+            self,
+            "conversion_tool_name",
+            ConversionToolName.from_value(self.conversion_tool_name),
+        )
+        object.__setattr__(
+            self,
+            "conversion_tool_version",
+            _ensure_text(self.conversion_tool_version, "version d'outil de conversion invalide"),
+        )
+        object.__setattr__(
+            self,
+            "conversion_audit_artifact_ref",
+            _ensure_artifact_ref(self.conversion_audit_artifact_ref),
+        )
+        if self.fallback_trace is not None and not isinstance(
+            self.fallback_trace,
+            PageConversionFallbackTrace,
+        ):
+            raise ValueError("trace de récupération Gemma invalide")
+        if self.conversion_tool_name is ConversionToolName.GEMMA_VISION and self.fallback_trace is None:
+            raise ValueError("trace de récupération Gemma obligatoire")
+        if self.conversion_tool_name is not ConversionToolName.GEMMA_VISION and self.fallback_trace is not None:
+            raise ValueError("trace de récupération Gemma interdite")
         items = _ensure_canonical_items(self.items)
         for item in items:
             if item.provenance.page_pdf != self.page_number.value:
@@ -1106,6 +1181,12 @@ class CanonicalDocumentPage:
             "page_pdf": self.page_number.value,
             "route_name": self.route_name.value,
             "conversion_artifact_hash": self.conversion_artifact_hash,
+            "conversion_tool_name": self.conversion_tool_name.value,
+            "conversion_tool_version": self.conversion_tool_version,
+            "conversion_audit_artifact_ref": self.conversion_audit_artifact_ref,
+            "fallback_trace": (
+                None if self.fallback_trace is None else self.fallback_trace.to_payload()
+            ),
             "items": tuple(item.to_payload() for item in self.items),
         }
 
@@ -1241,6 +1322,10 @@ def _canonical_page_from_output(
         page_number=page_output.page_number,
         route_name=page_output.route_name,
         conversion_artifact_hash=page_output.artifact_hash,
+        conversion_tool_name=page_output.tool_name,
+        conversion_tool_version=page_output.tool_version,
+        conversion_audit_artifact_ref=page_output.audit_artifact_ref,
+        fallback_trace=page_output.fallback_trace,
         items=items,
     )
 
@@ -2014,6 +2099,7 @@ __all__ = [
     "CriticalPageSelection",
     "PageConversionArtifact",
     "PageConversionCandidate",
+    "PageConversionFallbackTrace",
     "PageConversionItem",
     "PageConversionItemLabel",
     "PageItemGeometry",

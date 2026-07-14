@@ -16,6 +16,12 @@ from app.source_processing.adapters.docling_granite_conversion import (
     GraniteDoclingConversionRequest,
     IsolatedGraniteDoclingConverter,
 )
+from app.source_processing.adapters.gemma_vision_conversion import (
+    GemmaVisionConversionError,
+    GemmaVisionConversionRequest,
+    GemmaVisionConversionResponse,
+    IsolatedGemmaVisionPageConverter,
+)
 from app.source_processing.adapters.docling_native_conversion import (
     DoclingAssetManifestError,
     DoclingNativeConversionError,
@@ -39,6 +45,10 @@ from app.source_processing.application.document_commands import (
     DocumentConversionStatus,
 )
 from app.source_processing.application.document_worker import WorkerProcessingError
+from app.source_processing.application.granite_gemma_recovery import (
+    GraniteConversionFailure,
+    GraniteThenGemmaPageConverter,
+)
 from app.source_processing.application.native_document_conversion_worker import (
     NativeCanonicalPublication,
 )
@@ -54,6 +64,7 @@ from app.source_processing.domain.page_conversion import (
     ConversionToolName,
     CriticalPageSamplingPolicy,
     PageConversionArtifact,
+    PageConversionFallbackTrace,
     PageConversionCandidate,
     PageConversionItem,
     PageConversionItemLabel,
@@ -74,6 +85,11 @@ NON_NATIVE_TERMINAL_ERROR_CODES = frozenset(
         "CONVERSION_ASSET_MANIFEST_INVALID",
         "DOCLING_PAGE_MANIFEST_MISMATCH",
         "DOCLING_PROVENANCE_MISSING",
+        "GEMMA_VISION_UNAVAILABLE",
+        "GEMMA_VISION_OUTPUT_INVALID",
+        "GEMMA_VISION_MODEL_MISMATCH",
+        "GEMMA_VISION_RENDERING_FAILED",
+        "GEMMA_VISION_IMAGE_TOO_LARGE",
     }
 )
 
@@ -92,6 +108,9 @@ class RoutedConversionRepository(Protocol):
 
     def begin_native_conversion(self, *, document_id: DocumentId) -> None:
         """Persiste RUNNING avant tout processus d'outil."""
+
+    def record_conversion_progress(self, *, document_id: DocumentId, completed_units: int) -> None:
+        """Persiste chaque page réellement convertie avant la lecture publique."""
 
     def reject_native_conversion(self, *, document_id: DocumentId, error_code: str) -> None:
         """Persiste un échec terminal sans route de secours."""
@@ -130,8 +149,65 @@ class _GranitePageConverter:
 
     def convert_page(self, request: PageConversionRequest) -> PageConversionArtifact:
         source_path = self._resolve_source_path(request.source_artifact_ref)
+        try:
+            response = self._converter.convert(
+                GraniteDoclingConversionRequest(
+                    document_id=request.document_id.value,
+                    processing_run_id=request.processing_run_id.value,
+                    source_sha256=_sha256_file(source_path),
+                    source_pdf_path=source_path,
+                    page_number=request.page_number.value,
+                    source_page_number=(
+                        1
+                        if request.source_artifact_ref.startswith(
+                            "artifact:source_processing.page_conversion/"
+                        )
+                        else request.page_number.value
+                    ),
+                    route_name=request.route_name.value,
+                    routing_policy_version=request.routing_policy_version.value,
+                )
+            )
+        except GraniteDoclingConversionError as error:
+            raise GraniteConversionFailure(error.code) from error
+        return _page_output(
+            response=response,
+            page_number=request.page_number,
+            route_name=request.route_name,
+            tool_name=ConversionToolName.GRANITE_DOCLING,
+            expected_artifact_ref=request.expected_output_artifact_ref,
+        )
+
+
+class _GemmaVisionFallbackPageConverter:
+    """Produit une page Gemma seulement après l'échec Granite explicitement admis."""
+
+    def __init__(
+        self,
+        *,
+        converter: IsolatedGemmaVisionPageConverter,
+        resolve_source_path: Callable[[str], Path],
+        gateway_endpoint_url: str,
+        gateway_timeout_seconds: int,
+        expected_model_id: str,
+    ) -> None:
+        self._converter = converter
+        self._resolve_source_path = resolve_source_path
+        self._gateway_endpoint_url = gateway_endpoint_url
+        self._gateway_timeout_seconds = gateway_timeout_seconds
+        self._expected_model_id = expected_model_id
+
+    def recover_page(
+        self,
+        request: PageConversionRequest,
+        *,
+        granite_error_code: str,
+    ) -> PageConversionArtifact:
+        if granite_error_code != "DOCLING_PROVENANCE_MISSING":
+            raise ValueError("récupération Gemma non autorisée")
+        source_path = self._resolve_source_path(request.source_artifact_ref)
         response = self._converter.convert(
-            GraniteDoclingConversionRequest(
+            GemmaVisionConversionRequest(
                 document_id=request.document_id.value,
                 processing_run_id=request.processing_run_id.value,
                 source_sha256=_sha256_file(source_path),
@@ -146,14 +222,17 @@ class _GranitePageConverter:
                 ),
                 route_name=request.route_name.value,
                 routing_policy_version=request.routing_policy_version.value,
+                gateway_endpoint_url=self._gateway_endpoint_url,
+                gateway_timeout_seconds=self._gateway_timeout_seconds,
+                expected_model_id=self._expected_model_id,
             )
         )
-        return _page_output(
+        return _gemma_page_output(
             response=response,
             page_number=request.page_number,
             route_name=request.route_name,
-            tool_name=ConversionToolName.GRANITE_DOCLING,
             expected_artifact_ref=request.expected_output_artifact_ref,
+            granite_error_code=granite_error_code,
         )
 
 
@@ -176,6 +255,10 @@ class RoutedDocumentConversionWorker:
         original_source_store: OriginalPathResolver,
         native_converter: IsolatedNativeDoclingConverter,
         granite_converter: IsolatedGraniteDoclingConverter,
+        gemma_converter: IsolatedGemmaVisionPageConverter,
+        llm_gateway_url: str,
+        llm_gateway_timeout_seconds: int,
+        expected_gemma_model_id: str,
         ocrmypdf_manifest_path: Path,
         audit_root: Path,
         ocrmypdf_timeout_seconds: float,
@@ -186,11 +269,13 @@ class RoutedDocumentConversionWorker:
             (processing_run_repository, "find_by_document_id"),
             (conversion_repository, "find_conversion_by_document_id"),
             (conversion_repository, "begin_native_conversion"),
+            (conversion_repository, "record_conversion_progress"),
             (conversion_repository, "complete_native_conversion"),
             (conversion_repository, "reject_native_conversion"),
             (original_source_store, "resolve_internal_path"),
             (native_converter, "convert"),
             (granite_converter, "convert"),
+            (gemma_converter, "convert"),
             (artifact_store, "store_docling_json"),
         ):
             if not callable(getattr(dependency, method, None)):
@@ -201,6 +286,16 @@ class RoutedDocumentConversionWorker:
         self._original_source_store = original_source_store
         self._native_converter = native_converter
         self._granite_converter = granite_converter
+        self._gemma_converter = gemma_converter
+        self._llm_gateway_url = _required_gateway_url(llm_gateway_url)
+        self._llm_gateway_timeout_seconds = _required_positive_int(
+            llm_gateway_timeout_seconds,
+            "timeout gateway LLM invalide",
+        )
+        self._expected_gemma_model_id = _required_text_value(
+            expected_gemma_model_id,
+            "modèle Gemma attendu invalide",
+        )
         self._ocrmypdf_manifest_path = ocrmypdf_manifest_path
         self._audit_root = audit_root
         self._ocrmypdf_timeout_seconds = ocrmypdf_timeout_seconds
@@ -270,9 +365,18 @@ class RoutedDocumentConversionWorker:
                     converter=self._native_converter,
                     resolve_source_path=resolve_source_path,
                 ),
-                granite_converter=_GranitePageConverter(
-                    converter=self._granite_converter,
-                    resolve_source_path=resolve_source_path,
+                granite_converter=GraniteThenGemmaPageConverter(
+                    granite_converter=_GranitePageConverter(
+                        converter=self._granite_converter,
+                        resolve_source_path=resolve_source_path,
+                    ),
+                    gemma_converter=_GemmaVisionFallbackPageConverter(
+                        converter=self._gemma_converter,
+                        resolve_source_path=resolve_source_path,
+                        gateway_endpoint_url=self._llm_gateway_url,
+                        gateway_timeout_seconds=self._llm_gateway_timeout_seconds,
+                        expected_model_id=self._expected_gemma_model_id,
+                    ),
                 ),
                 ocrmypdf_preprocessor=preprocessor,
             )
@@ -281,11 +385,21 @@ class RoutedDocumentConversionWorker:
                     source_document=source_document,
                     processing_run=processing_run,
                     canonical_version_id=_canonical_version_id(source_sha256),
-                )
+                ),
+                on_page_converted=lambda page_output: self._conversion_repository.record_conversion_progress(
+                    document_id=document_id,
+                    completed_units=page_output.page_number.value,
+                ),
             )
         except (DoclingAssetManifestError, OcrmyPdfImageManifestError) as error:
             raise WorkerProcessingError("CONVERSION_ASSET_MANIFEST_INVALID", retryable=False) from error
-        except (DoclingNativeConversionError, GraniteDoclingConversionError, OcrmyPdfContainerError) as error:
+        except (
+            DoclingNativeConversionError,
+            GraniteDoclingConversionError,
+            GraniteConversionFailure,
+            GemmaVisionConversionError,
+            OcrmyPdfContainerError,
+        ) as error:
             raise WorkerProcessingError(getattr(error, "code", str(error)), retryable=False) from error
         except ValueError as error:
             raise WorkerProcessingError("DOCLING_PAGE_MANIFEST_MISMATCH", retryable=False) from error
@@ -381,6 +495,9 @@ def build_routed_document_conversion_worker(
     ocrmypdf_manifest_path: Path,
     audit_root: Path,
     timeout_seconds: float,
+    llm_gateway_url: str,
+    llm_gateway_timeout_seconds: int,
+    expected_gemma_model_id: str,
     artifact_store: CanonicalArtifactStore,
 ) -> RoutedDocumentConversionWorker:
     """Construit le worker uniquement si tous les runtimes réels annoncés sont prêts."""
@@ -406,6 +523,12 @@ def build_routed_document_conversion_worker(
             assets_root=granite_assets_root,
             timeout_seconds=timeout_seconds,
         ),
+        gemma_converter=IsolatedGemmaVisionPageConverter(
+            timeout_seconds=llm_gateway_timeout_seconds,
+        ),
+        llm_gateway_url=llm_gateway_url,
+        llm_gateway_timeout_seconds=llm_gateway_timeout_seconds,
+        expected_gemma_model_id=expected_gemma_model_id,
         ocrmypdf_manifest_path=ocrmypdf_manifest_path,
         audit_root=audit_root,
         ocrmypdf_timeout_seconds=timeout_seconds,
@@ -446,6 +569,61 @@ def _page_output(*, response: NativeDoclingConversionResponse, page_number: Page
         artifact_hash=hashlib.sha256(json.dumps(artifact_payload, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest(),
         audit_artifact_ref=expected_artifact_ref,
         items=items,
+    )
+
+
+def _gemma_page_output(
+    *,
+    response: GemmaVisionConversionResponse,
+    page_number: PageNumber,
+    route_name: PageRouteName,
+    expected_artifact_ref: str,
+    granite_error_code: str,
+) -> PageConversionArtifact:
+    items = tuple(
+        PageConversionItem(
+            label=PageConversionItemLabel.TEXT,
+            text=item.text,
+            geometry=PageItemGeometry(
+                left=item.bbox[0],
+                top=item.bbox[1],
+                right=item.bbox[2],
+                bottom=item.bbox[3],
+                page_width=1000.0,
+                page_height=1000.0,
+            ),
+            content_hash=hashlib.sha256(item.text.encode("utf-8")).hexdigest(),
+        )
+        for item in response.items
+    )
+    artifact_payload = {
+        "page_number": page_number.value,
+        "route_name": route_name.value,
+        "tool_name": ConversionToolName.GEMMA_VISION.value,
+        "tool_version": response.tool_version,
+        "fallback_trace": {
+            "triggering_tool_name": ConversionToolName.GRANITE_DOCLING.value,
+            "triggering_error_code": granite_error_code,
+        },
+        "items": [
+            {"text": item.text, "bbox": list(item.bbox)}
+            for item in response.items
+        ],
+    }
+    return PageConversionArtifact(
+        page_number=page_number,
+        route_name=route_name,
+        tool_name=ConversionToolName.GEMMA_VISION,
+        tool_version=response.tool_version,
+        artifact_hash=hashlib.sha256(
+            json.dumps(artifact_payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest(),
+        audit_artifact_ref=expected_artifact_ref,
+        items=items,
+        fallback_trace=PageConversionFallbackTrace(
+            triggering_tool_name=ConversionToolName.GRANITE_DOCLING,
+            triggering_error_code=granite_error_code,
+        ),
     )
 
 
@@ -504,6 +682,28 @@ def _required_text(payload: Mapping[str, Any], field_name: str) -> str:
     if not isinstance(value, str) or value.strip() == "" or value != value.strip():
         raise WorkerProcessingError(f"JOB_PAYLOAD_INVALID_{field_name.upper()}", retryable=False)
     return value
+
+
+def _required_text_value(value: Any, message: str) -> str:
+    if not isinstance(value, str) or value.strip() == "" or value != value.strip():
+        raise ValueError(message)
+    return value
+
+
+def _required_positive_int(value: Any, message: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise ValueError(message)
+    return value
+
+
+def _required_gateway_url(value: Any) -> str:
+    endpoint = _required_text_value(value, "URL gateway LLM invalide")
+    if not endpoint.startswith("http://") and not endpoint.startswith("https://"):
+        raise ValueError("URL gateway LLM invalide")
+    endpoint = endpoint.rstrip("/")
+    if endpoint.endswith("/v1/infer"):
+        return endpoint
+    return endpoint + "/v1/infer"
 
 
 __all__ = [

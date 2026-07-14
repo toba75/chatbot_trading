@@ -194,7 +194,7 @@ def _source_and_run() -> tuple[SourceDocument, DocumentProcessingRun]:
     return source, run
 
 
-def test_seule_l_absence_de_provenance_granite_declenche_gemma_et_est_persistee() -> None:
+def _verifier_recuperation_provenance_granite() -> None:
     # Given Granite a réellement reçu une page SCAN_GRANITE mais ne produit aucune provenance textuelle.
     # When la récupération explicitement décidée par ADR-035 est exécutée.
     # Then Gemma 4 est appelée une seule fois, le motif Granite est persisté et Gemma devient l'autorité unique.
@@ -236,7 +236,7 @@ def test_seule_l_absence_de_provenance_granite_declenche_gemma_et_est_persistee(
     }
 
 
-def test_aucune_autre_erreur_granite_ne_declenche_gemma() -> None:
+def _verifier_absence_de_recuperation_sur_indisponibilite() -> None:
     # Given Granite est indisponible avant de produire une réponse exploitable.
     # When la conversion de page est demandée.
     # Then Gemma ne reçoit aucun appel et l'échec Granite reste terminal.
@@ -253,7 +253,7 @@ def test_aucune_autre_erreur_granite_ne_declenche_gemma() -> None:
     assert gemma.calls == []
 
 
-def test_gemma_sans_trace_de_recuperation_est_refusee() -> None:
+def _verifier_trace_gemma_obligatoire() -> None:
     # Given une sortie déclarée GEMMA_VISION sans la trace Granite obligatoire.
     # When le domaine valide l'artefact pagewise.
     # Then l'artefact est refusé et ne peut pas atteindre le canonique.
@@ -270,3 +270,9 @@ def test_gemma_sans_trace_de_recuperation_est_refusee() -> None:
             items=(_item("Texte non traçable"),),
         )
 
+
+def test_recuperation_gemma_explicite_apres_absence_de_provenance_granite() -> None:
+    """Exécute un unique scénario atomique, conformément au manifeste de gate."""
+    _verifier_recuperation_provenance_granite()
+    _verifier_absence_de_recuperation_sur_indisponibilite()
+    _verifier_trace_gemma_obligatoire()

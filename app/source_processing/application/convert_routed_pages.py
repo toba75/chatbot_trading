@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -171,9 +171,16 @@ class ConvertRoutedPagesHandler:
         self._granite_converter = granite_converter
         self._ocrmypdf_preprocessor = ocrmypdf_preprocessor
 
-    def handle(self, command: ConvertRoutedPagesCommand) -> DocumentConversionResult:
+    def handle(
+        self,
+        command: ConvertRoutedPagesCommand,
+        *,
+        on_page_converted: Callable[[PageConversionArtifact], None] | None = None,
+    ) -> DocumentConversionResult:
         if not isinstance(command, ConvertRoutedPagesCommand):
             raise ValueError("commande ConvertRoutedPages invalide")
+        if on_page_converted is not None and not callable(on_page_converted):
+            raise ValueError("rapporteur de progression de conversion invalide")
 
         command.source_document.ensure_documentary_publication_allowed()
         if command.source_document.document_id != command.processing_run.document_id:
@@ -192,6 +199,8 @@ class ConvertRoutedPagesHandler:
                 page_route=page_route,
             )
             page_outputs.append(conversion_result.page_output)
+            if on_page_converted is not None:
+                on_page_converted(conversion_result.page_output)
             if conversion_result.preprocessed_artifact is not None:
                 preprocessed_artifacts.append(conversion_result.preprocessed_artifact)
 
@@ -230,7 +239,7 @@ class ConvertRoutedPagesHandler:
             _ensure_conversion_output(
                 page_output=page_output,
                 page_route=page_route,
-                expected_tool_name=ConversionToolName.DOCLING_STANDARD,
+                expected_tool_names=frozenset((ConversionToolName.DOCLING_STANDARD,)),
                 expected_artifact_ref=request.expected_output_artifact_ref,
             )
             return _PageConversionOrchestrationResult(
@@ -262,7 +271,7 @@ class ConvertRoutedPagesHandler:
             _ensure_conversion_output(
                 page_output=page_output,
                 page_route=page_route,
-                expected_tool_name=ConversionToolName.GRANITE_DOCLING,
+                expected_tool_names=_granite_route_output_tools(),
                 expected_artifact_ref=request.expected_output_artifact_ref,
             )
             return _PageConversionOrchestrationResult(
@@ -281,7 +290,7 @@ class ConvertRoutedPagesHandler:
             _ensure_conversion_output(
                 page_output=page_output,
                 page_route=page_route,
-                expected_tool_name=ConversionToolName.GRANITE_DOCLING,
+                expected_tool_names=_granite_route_output_tools(),
                 expected_artifact_ref=request.expected_output_artifact_ref,
             )
             return _PageConversionOrchestrationResult(
@@ -367,7 +376,7 @@ def _ensure_conversion_output(
     *,
     page_output: PageConversionArtifact,
     page_route: PageRoute,
-    expected_tool_name: ConversionToolName,
+    expected_tool_names: frozenset[ConversionToolName],
     expected_artifact_ref: str,
 ) -> PageConversionArtifact:
     if not isinstance(page_output, PageConversionArtifact):
@@ -376,11 +385,15 @@ def _ensure_conversion_output(
         raise ValueError("page de conversion incohérente")
     if page_output.route_name != page_route.route_name:
         raise ValueError("route de conversion incohérente")
-    if page_output.tool_name is not expected_tool_name:
+    if page_output.tool_name not in expected_tool_names:
         raise ValueError("outil de conversion incohérent")
     if page_output.audit_artifact_ref != expected_artifact_ref:
         raise ValueError("artefact de conversion incohérent")
     return page_output
+
+
+def _granite_route_output_tools() -> frozenset[ConversionToolName]:
+    return frozenset((ConversionToolName.GRANITE_DOCLING, ConversionToolName.GEMMA_VISION))
 
 
 def _ensure_preprocessed_artifact_for_route(

@@ -1,10 +1,10 @@
 # ADR-032 - Exécution réelle et reproductible de la conversion canonique
 
-**Statut :** Acceptée
+**Statut :** Remplacée
 **Date :** 2026-07-13
 **Décideurs :** Équipe OSTrading
 **Remplace :** Aucun
-**Remplacée par :** Aucune
+**Remplacée par :** ADR-035
 **Source :** `docs/tasks/milestone_004-conversion/0002_decider_execution_reelle_conversion.md`, ADR-001 à ADR-004, ADR-031 et T-004 de `docs/specs/plan_remediation_m13.md`
 
 ## Contexte

@@ -26,11 +26,22 @@ _GRANITE_ROUTE_NAMES = frozenset(
 )
 
 
+class GraniteDoclingWorkerError(RuntimeError):
+    """Erreur protocolaire déterministe du sous-processus Granite-Docling."""
+
+    def __init__(self, code: str) -> None:
+        self.code = code
+        super().__init__(code)
+
+
 def main() -> int:
     try:
         payload = json.loads(sys.stdin.read())
         with redirect_stdout(sys.stderr):
             response = _convert(payload)
+    except GraniteDoclingWorkerError as error:
+        _write_protocol_response({"error_code": error.code})
+        return 1
     except Exception:
         _write_protocol_response({"error_code": "GRANITE_DOCLING_UNAVAILABLE"})
         return 1
@@ -174,7 +185,7 @@ def _page_payload(
             }
         )
     if len(items) == 0:
-        raise ValueError("provenance Granite absente")
+        raise GraniteDoclingWorkerError("DOCLING_PROVENANCE_MISSING")
     return {"page_number": output_page_number, "items": items}
 
 

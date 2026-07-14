@@ -957,6 +957,33 @@ class PostgresDocumentPersistence:
                 if row is None or row[0] != "RUNNING":
                     raise RuntimeError("CONVERSION_PERSISTENCE_CONFLICT")
 
+    def record_conversion_progress(self, *, document_id: DocumentId, completed_units: int) -> None:
+        if not isinstance(document_id, DocumentId):
+            raise ValueError("document_id invalide")
+        if isinstance(completed_units, bool) or not isinstance(completed_units, int) or completed_units < 1:
+            raise ValueError("completed_units invalide")
+        with self._connection_factory.connect() as connection:
+            with connection.transaction(), connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE source_processing.document_conversion_requests
+                       SET completed_units = %s
+                     WHERE document_id = %s
+                       AND conversion_status = 'CONVERSION_REQUESTED'
+                       AND execution_phase = 'RUNNING'
+                       AND completed_units = %s
+                       AND total_units >= %s
+                    """,
+                    (
+                        completed_units,
+                        document_id.value,
+                        completed_units - 1,
+                        completed_units,
+                    ),
+                )
+                if cursor.rowcount != 1:
+                    raise RuntimeError("CONVERSION_PERSISTENCE_CONFLICT")
+
     def reject_native_conversion(self, *, document_id: DocumentId, error_code: str) -> None:
         if not isinstance(document_id, DocumentId):
             raise ValueError("document_id invalide")
@@ -1479,6 +1506,12 @@ class PostgresDocumentConversionRepository:
 
     def begin_native_conversion(self, *, document_id: DocumentId) -> None:
         self._persistence.begin_native_conversion(document_id=document_id)
+
+    def record_conversion_progress(self, *, document_id: DocumentId, completed_units: int) -> None:
+        self._persistence.record_conversion_progress(
+            document_id=document_id,
+            completed_units=completed_units,
+        )
 
     def reject_native_conversion(self, *, document_id: DocumentId, error_code: str) -> None:
         self._persistence.reject_native_conversion(document_id=document_id, error_code=error_code)

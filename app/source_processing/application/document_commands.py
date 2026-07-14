@@ -837,7 +837,10 @@ def _ensure_conversion_failure_error_code(
             DocumentConversionExecutionPhase.RUNNING,
         }:
             raise ValueError("phase de conversion demandée invalide")
-        if completed_units != 0 or failure_error_code is not None:
+        if (
+            (phase is DocumentConversionExecutionPhase.QUEUED and completed_units != 0)
+            or failure_error_code is not None
+        ):
             raise ValueError("progression de conversion demandée invalide")
         return None
     if status is DocumentConversionStatus.CANONICAL_ACCEPTED:

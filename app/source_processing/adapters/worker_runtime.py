@@ -211,6 +211,9 @@ def _run_worker(
         ocrmypdf_manifest_path=Path("config/ocrmypdf-image.json"),
         audit_root=Path(application_configuration.paths.data_root) / "docling_audit",
         timeout_seconds=application_configuration.runtime.timeouts.request_seconds,
+        llm_gateway_url=application_configuration.services.llm_gateway.url,
+        llm_gateway_timeout_seconds=application_configuration.services.llm_gateway.timeout_seconds,
+        expected_gemma_model_id=application_configuration.models.llm.reference_model,
         artifact_store=CanonicalArtifactFileStore(
             root=Path(application_configuration.paths.canonical_sources_root)
         ),
