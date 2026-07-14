@@ -20,6 +20,16 @@ from app.source_processing.adapters.gemma_vision_conversion import GemmaVisionCo
 
 
 _MAX_RENDERED_IMAGE_BYTES = 10 * 1024 * 1024
+_MAX_GEMMA_PAGE_ITEMS = 16
+_PAGE_TRANSCRIPTION_PROMPT = (
+    "Transcris uniquement le texte documentaire visible de cette page PDF. "
+    "Regroupe les éléments adjacents en régions de lecture complètes. "
+    "Pour un tableau dense, retourne toutes ses cellules dans un seul item texte TSV, "
+    "avec une bbox couvrant le tableau. N’omets aucun texte lisible. "
+    "Retourne au plus 16 items, chacun avec bbox=[left,top,right,bottom] "
+    "en coordonnées entières normalisées de 0 à 1000. "
+    "Ne fabrique aucun texte et ne retourne ni Markdown ni commentaire."
+)
 
 
 def main() -> int:
@@ -57,23 +67,18 @@ def _convert(payload: Mapping[str, Any]) -> dict[str, object]:
         messages=(
             LlmInferenceImageMessage(
                 role="user",
-                content=(
-                    "Transcris uniquement le texte documentaire visible de cette page PDF. "
-                    "Retourne chaque bloc lisible dans items avec bbox=[left,top,right,bottom] "
-                    "en coordonnées entières normalisées de 0 à 1000. "
-                    "Ne fabrique aucun texte et ne retourne ni Markdown ni commentaire."
-                ),
+                content=_PAGE_TRANSCRIPTION_PROMPT,
                 images=(image,),
             ),
         ),
         output_schema=_output_schema(),
         schema_name="source_processing_page_conversion",
-        schema_version="1.0",
+        schema_version="1.1",
         trace_id=f"TRACE-M004-GEMMA-{document_id.removeprefix('DOC-')}-P{page_number:03d}",
         request_id=f"REQ-M004-GEMMA-{processing_run_id}-P{page_number:03d}",
         idempotency_key=f"IDEMP-M004-GEMMA-{processing_run_id}-P{page_number:03d}",
         prompt_id="m004-gemma-vision-page-conversion",
-        prompt_version="1.0",
+        prompt_version="1.1",
         sampling_parameters={
             "temperature": 0.0,
             "max_tokens": _required_positive_int(payload, "max_output_tokens"),
@@ -166,6 +171,7 @@ def _output_schema() -> dict[str, object]:
             "items": {
                 "type": "array",
                 "minItems": 1,
+                "maxItems": _MAX_GEMMA_PAGE_ITEMS,
                 "items": {
                     "type": "object",
                     "additionalProperties": False,
