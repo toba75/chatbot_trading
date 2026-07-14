@@ -190,12 +190,17 @@ class _GemmaVisionFallbackPageConverter:
         resolve_source_path: Callable[[str], Path],
         gateway_endpoint_url: str,
         gateway_timeout_seconds: int,
+        gateway_max_output_tokens: int,
         expected_model_id: str,
     ) -> None:
         self._converter = converter
         self._resolve_source_path = resolve_source_path
         self._gateway_endpoint_url = gateway_endpoint_url
         self._gateway_timeout_seconds = gateway_timeout_seconds
+        self._gateway_max_output_tokens = _required_positive_int(
+            gateway_max_output_tokens,
+            "maximum de sortie gateway LLM invalide",
+        )
         self._expected_model_id = expected_model_id
 
     def recover_page(
@@ -225,6 +230,7 @@ class _GemmaVisionFallbackPageConverter:
                 routing_policy_version=request.routing_policy_version.value,
                 gateway_endpoint_url=self._gateway_endpoint_url,
                 gateway_timeout_seconds=self._gateway_timeout_seconds,
+                max_output_tokens=self._gateway_max_output_tokens,
                 expected_model_id=self._expected_model_id,
             )
         )
@@ -259,6 +265,7 @@ class RoutedDocumentConversionWorker:
         gemma_converter: IsolatedGemmaVisionPageConverter,
         llm_gateway_url: str,
         llm_gateway_timeout_seconds: int,
+        llm_gateway_max_output_tokens: int,
         expected_gemma_model_id: str,
         ocrmypdf_manifest_path: Path,
         audit_root: Path,
@@ -292,6 +299,10 @@ class RoutedDocumentConversionWorker:
         self._llm_gateway_timeout_seconds = _required_positive_int(
             llm_gateway_timeout_seconds,
             "timeout gateway LLM invalide",
+        )
+        self._llm_gateway_max_output_tokens = _required_positive_int(
+            llm_gateway_max_output_tokens,
+            "maximum de sortie gateway LLM invalide",
         )
         self._expected_gemma_model_id = _required_text_value(
             expected_gemma_model_id,
@@ -376,6 +387,7 @@ class RoutedDocumentConversionWorker:
                         resolve_source_path=resolve_source_path,
                         gateway_endpoint_url=self._llm_gateway_url,
                         gateway_timeout_seconds=self._llm_gateway_timeout_seconds,
+                        gateway_max_output_tokens=self._llm_gateway_max_output_tokens,
                         expected_model_id=self._expected_gemma_model_id,
                     ),
                 ),
@@ -498,6 +510,7 @@ def build_routed_document_conversion_worker(
     timeout_seconds: float,
     llm_gateway_url: str,
     llm_gateway_timeout_seconds: int,
+    llm_gateway_max_output_tokens: int,
     expected_gemma_model_id: str,
     artifact_store: CanonicalArtifactStore,
 ) -> RoutedDocumentConversionWorker:
@@ -529,6 +542,7 @@ def build_routed_document_conversion_worker(
         ),
         llm_gateway_url=llm_gateway_url,
         llm_gateway_timeout_seconds=llm_gateway_timeout_seconds,
+        llm_gateway_max_output_tokens=llm_gateway_max_output_tokens,
         expected_gemma_model_id=expected_gemma_model_id,
         ocrmypdf_manifest_path=ocrmypdf_manifest_path,
         audit_root=audit_root,

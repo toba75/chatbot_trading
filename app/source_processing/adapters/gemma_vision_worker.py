@@ -74,7 +74,10 @@ def _convert(payload: Mapping[str, Any]) -> dict[str, object]:
         idempotency_key=f"IDEMP-M004-GEMMA-{processing_run_id}-P{page_number:03d}",
         prompt_id="m004-gemma-vision-page-conversion",
         prompt_version="1.0",
-        sampling_parameters={"temperature": 0.0},
+        sampling_parameters={
+            "temperature": 0.0,
+            "max_tokens": _required_positive_int(payload, "max_output_tokens"),
+        },
     )
     response = UrllibLlmInferenceGateway(
         endpoint_url=_required_text(payload, "gateway_endpoint_url"),
@@ -186,7 +189,8 @@ def _required_payload(payload: Any) -> Mapping[str, Any]:
     expected = {
         "schema_version", "document_id", "processing_run_id", "source_sha256", "source_pdf_path",
         "page_number", "source_page_number", "route_name", "routing_policy_version",
-        "gateway_endpoint_url", "gateway_timeout_seconds", "expected_model_id",
+        "gateway_endpoint_url", "gateway_timeout_seconds", "max_output_tokens",
+        "expected_model_id",
     }
     if not isinstance(payload, Mapping) or set(payload) != expected or payload["schema_version"] != "1.0":
         raise GemmaVisionConversionError("GEMMA_VISION_REQUEST_INVALID")

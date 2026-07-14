@@ -32,6 +32,7 @@ class GemmaVisionConversionRequest:
     routing_policy_version: str
     gateway_endpoint_url: str
     gateway_timeout_seconds: int
+    max_output_tokens: int
     expected_model_id: str
 
     def __post_init__(self) -> None:
@@ -51,7 +52,12 @@ class GemmaVisionConversionRequest:
             raise ValueError("source_sha256 invalide")
         if not isinstance(self.source_pdf_path, Path):
             raise ValueError("source_pdf_path invalide")
-        for field_name in ("page_number", "source_page_number", "gateway_timeout_seconds"):
+        for field_name in (
+            "page_number",
+            "source_page_number",
+            "gateway_timeout_seconds",
+            "max_output_tokens",
+        ):
             value = getattr(self, field_name)
             if isinstance(value, bool) or not isinstance(value, int) or value < 1:
                 raise ValueError(f"{field_name} invalide")
@@ -71,6 +77,7 @@ class GemmaVisionConversionRequest:
             "routing_policy_version": self.routing_policy_version,
             "gateway_endpoint_url": self.gateway_endpoint_url,
             "gateway_timeout_seconds": self.gateway_timeout_seconds,
+            "max_output_tokens": self.max_output_tokens,
             "expected_model_id": self.expected_model_id,
         }
 
