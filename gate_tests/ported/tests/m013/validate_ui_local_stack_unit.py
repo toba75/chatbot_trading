@@ -66,8 +66,8 @@ def test_validate_ui_local_stack_unit() -> None:
 
     # Given `uv run ui` rend le diagnostic disponible.
     # When la stack locale est ouverte.
-    # Then PostgreSQL, gateway, API et worker réel sont démarrés, puis arrêtés
-    # dans l'ordre inverse sans chemin de remplacement.
+    # Then PostgreSQL, Qdrant, gateway, API et les workers réels sont démarrés,
+    # puis arrêtés dans l'ordre inverse sans chemin de remplacement.
     with TemporaryDirectory() as temporary_directory:
         root = Path(temporary_directory)
         source_config = root / "config" / "application.yaml"
@@ -84,28 +84,38 @@ def test_validate_ui_local_stack_unit() -> None:
                 "_ensure_local_secret",
                 "_start_local_postgres",
                 "_wait_for_postgres",
+                "_start_local_qdrant",
+                "_wait_for_qdrant",
                 "_start_local_llm_gateway",
                 "_wait_for_llm_gateway",
                 "_start_orchestrator_api",
                 "_wait_for_api",
                 "_start_local_document_worker",
                 "_wait_for_document_worker",
+                "_start_local_projection_worker",
+                "_wait_for_projection_worker",
                 "_stop_process",
                 "_stop_local_postgres",
+                "_stop_local_qdrant",
             )
         }
         ui_local_stack._require_available_port = lambda *, port, error_code: events.append(f"port:{port}")
         ui_local_stack._ensure_local_secret = lambda path: events.append(f"secret:{path.name}")
         ui_local_stack._start_local_postgres = lambda *, repository_root: events.append("postgres-start") or True
         ui_local_stack._wait_for_postgres = lambda: events.append("postgres-ready")
+        ui_local_stack._start_local_qdrant = lambda: events.append("qdrant-start") or True
+        ui_local_stack._wait_for_qdrant = lambda: events.append("qdrant-ready")
         ui_local_stack._start_local_llm_gateway = lambda **_: events.append("gateway-start") or "gateway"
         ui_local_stack._wait_for_llm_gateway = lambda _: events.append("gateway-ready")
         ui_local_stack._start_orchestrator_api = lambda **_: events.append("api-start") or "api"
         ui_local_stack._wait_for_api = lambda _: events.append("api-ready")
         ui_local_stack._start_local_document_worker = lambda **_: events.append("worker-start") or "worker"
         ui_local_stack._wait_for_document_worker = lambda _: events.append("worker-ready")
+        ui_local_stack._start_local_projection_worker = lambda **_: events.append("projection-worker-start") or "projection-worker"
+        ui_local_stack._wait_for_projection_worker = lambda _: events.append("projection-worker-ready")
         ui_local_stack._stop_process = lambda process: events.append(f"stop:{process}")
         ui_local_stack._stop_local_postgres = lambda: events.append("postgres-stop")
+        ui_local_stack._stop_local_qdrant = lambda: events.append("qdrant-stop")
         try:
             with ui_local_stack.start_local_ui_stack(
                 UILaunchConfiguration(service_id="ui", port=8081, config_path=str(source_config))
@@ -115,9 +125,12 @@ def test_validate_ui_local_stack_unit() -> None:
             for name, original in originals.items():
                 setattr(ui_local_stack, name, original)
         assert events == [
-            "port:8080", "port:8090", "port:8081",
+            "port:8080", "port:8090", "port:56333", "port:8081",
             "secret:postgres_password", "secret:local_api_token",
-            "postgres-start", "postgres-ready", "gateway-start", "gateway-ready",
+            "postgres-start", "postgres-ready", "qdrant-start", "qdrant-ready",
+            "gateway-start", "gateway-ready",
             "api-start", "api-ready", "worker-start", "worker-ready",
-            "stop:worker", "stop:api", "stop:gateway", "postgres-stop",
+            "projection-worker-start", "projection-worker-ready",
+            "stop:projection-worker", "stop:worker", "stop:api", "stop:gateway",
+            "qdrant-stop", "postgres-stop",
         ]
