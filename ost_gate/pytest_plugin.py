@@ -87,6 +87,8 @@ def pytest_runtest_logreport(report: pytest.TestReport) -> None:
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     """Écrit le résultat même quand pytest retourne RED."""
 
+    if hasattr(session.config, "workerinput"):
+        return
     if _report_path is None:
         raise pytest.UsageError("OST_GATE_PYTEST_REPORT_REQUIRED")
     for identifier in _expected.values():
