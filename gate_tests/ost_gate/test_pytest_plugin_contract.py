@@ -16,10 +16,22 @@ def test_xdist_worker_never_publishes_the_aggregated_gate_report(monkeypatch, tm
         "_expected",
         {tmp_path / "case.py": "case"},
     )
+    worker_results = {
+        "case": {"status": "GREEN", "duration_seconds": 0.1, "detail": None}
+    }
+    monkeypatch.setattr(gate_plugin, "_results", worker_results)
+    worker_output: dict[str, object] = {}
     worker_session = SimpleNamespace(
-        config=SimpleNamespace(workerinput={"workerid": "gw0"})
+        config=SimpleNamespace(
+            workerinput={"workerid": "gw0"},
+            workeroutput=worker_output,
+        )
     )
 
     gate_plugin.pytest_sessionfinish(worker_session, exitstatus=0)
 
     assert report_path.exists() is False
+    assert worker_output == {"ost_gate_results": worker_results}
+    monkeypatch.setattr(gate_plugin, "_results", {})
+    gate_plugin.pytest_testnodedown(SimpleNamespace(workeroutput=worker_output), None)
+    assert gate_plugin._results == worker_results
