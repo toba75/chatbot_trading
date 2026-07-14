@@ -16,6 +16,35 @@ from app.source_processing.adapters.query_http import build_document_query_route
 from app.source_processing.application.document_queries import DocumentActionProgressView
 
 
+def _verifier_echec_gemma_relisible_publiquement() -> None:
+    # Given Gemma a été l'unique récupération explicitement autorisée après Granite.
+    # When Gemma échoue, puis que l'API relit l'état de conversion persistant.
+    # Then l'échec terminal Gemma reste un état public 200, jamais une erreur interne 500.
+    from app.source_processing.application.document_commands import (
+        DocumentConversionExecutionPhase,
+        DocumentConversionState,
+        DocumentConversionStatus,
+    )
+    from app.source_processing.domain.source_document import DocumentId
+
+    conversion = DocumentConversionState(
+        document_id=DocumentId.from_value("DOC-4444444444444444"),
+        conversion_status=DocumentConversionStatus.QA_REJECTED,
+        canonical_version_id=None,
+        rejection_error_code="GEMMA_VISION_UNAVAILABLE",
+        execution_phase=DocumentConversionExecutionPhase.FAILED,
+        completed_units=4,
+        total_units=289,
+        failure_error_code="GEMMA_VISION_UNAVAILABLE",
+    )
+    progress = DocumentActionProgressView.from_conversion(conversion)
+
+    assert progress.phase is PublicActionPhase.FAILED
+    assert progress.completed_units == 4
+    assert progress.total_units == 289
+    assert progress.failure_error_code == "GEMMA_VISION_UNAVAILABLE"
+
+
 class _Queries:
     def list_documents(self, *, limit: int, cursor: str | None):
         raise AssertionError("La liste n'appartient pas à ce scénario.")
@@ -138,4 +167,5 @@ def test_la_progression_de_conversion_traverse_la_lecture_publique() -> None:
             "failure_error_code": None,
         }
 
+    _verifier_echec_gemma_relisible_publiquement()
     asyncio.run(scenario())

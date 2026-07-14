@@ -314,6 +314,7 @@ def _verifier_adaptateur_gemma_apres_indisponibilite_granite(tmp_path: Path) -> 
         resolve_source_path=lambda artifact_ref: source_path,
         gateway_endpoint_url="http://llm-gateway.local/v1/infer",
         gateway_timeout_seconds=120,
+        gateway_max_output_tokens=2048,
         expected_model_id="google/gemma-4-26B-A4B-it",
     )
 
@@ -323,6 +324,7 @@ def _verifier_adaptateur_gemma_apres_indisponibilite_granite(tmp_path: Path) -> 
     )
 
     assert len(gemma_port.requests) == 1
+    assert gemma_port.requests[0].max_output_tokens == 2048
     assert recovered.tool_name is ConversionToolName.GEMMA_VISION
     assert recovered.fallback_trace == PageConversionFallbackTrace(
         triggering_tool_name=ConversionToolName.GRANITE_DOCLING,
