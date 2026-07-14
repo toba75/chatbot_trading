@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+from pathlib import Path
 
 import pytest
 
@@ -275,9 +276,64 @@ def _verifier_trace_gemma_obligatoire() -> None:
         )
 
 
-def test_recuperation_gemma_explicite_apres_absence_de_provenance_granite() -> None:
+def _verifier_adaptateur_gemma_apres_indisponibilite_granite(tmp_path: Path) -> None:
+    # Given Granite a échoué après son essai réel avec GRANITE_DOCLING_UNAVAILABLE.
+    # When l'adaptateur Gemma concret reçoit la récupération autorisée par ADR-036.
+    # Then il appelle le port Gemma, conserve le code Granite et produit l'autorité Gemma.
+    from app.source_processing.adapters.gemma_vision_conversion import (
+        GemmaVisionConversionResponse,
+        GemmaVisionPageItem,
+    )
+    from app.source_processing.application.routed_document_conversion_worker import (
+        _GemmaVisionFallbackPageConverter,
+    )
+
+    source_path = tmp_path / "source.pdf"
+    source_path.write_bytes(b"%PDF-1.7\nGemma concrete recovery\n%%EOF\n")
+    request = _request()
+
+    class _ConcreteGemmaPort:
+        def __init__(self) -> None:
+            self.requests = []
+
+        def convert(self, gemma_request):
+            self.requests.append(gemma_request)
+            return GemmaVisionConversionResponse(
+                tool_version="google/gemma-4-26B-A4B-it@immutable;nim-1.7.0",
+                items=(
+                    GemmaVisionPageItem(
+                        text="Texte récupéré",
+                        bbox=(0.0, 0.0, 1000.0, 1000.0),
+                    ),
+                ),
+            )
+
+    gemma_port = _ConcreteGemmaPort()
+    converter = _GemmaVisionFallbackPageConverter(
+        converter=gemma_port,
+        resolve_source_path=lambda artifact_ref: source_path,
+        gateway_endpoint_url="http://llm-gateway.local/v1/infer",
+        gateway_timeout_seconds=120,
+        expected_model_id="google/gemma-4-26B-A4B-it",
+    )
+
+    recovered = converter.recover_page(
+        request,
+        granite_error_code="GRANITE_DOCLING_UNAVAILABLE",
+    )
+
+    assert len(gemma_port.requests) == 1
+    assert recovered.tool_name is ConversionToolName.GEMMA_VISION
+    assert recovered.fallback_trace == PageConversionFallbackTrace(
+        triggering_tool_name=ConversionToolName.GRANITE_DOCLING,
+        triggering_error_code="GRANITE_DOCLING_UNAVAILABLE",
+    )
+
+
+def test_recuperation_gemma_explicite_apres_absence_de_provenance_granite(tmp_path: Path) -> None:
     """Exécute un unique scénario atomique, conformément au manifeste de gate."""
     _verifier_recuperation_granite_autorisee("DOCLING_PROVENANCE_MISSING")
     _verifier_recuperation_granite_autorisee("GRANITE_DOCLING_UNAVAILABLE")
     _verifier_absence_de_recuperation_sur_echec_hors_contrat()
     _verifier_trace_gemma_obligatoire()
+    _verifier_adaptateur_gemma_apres_indisponibilite_granite(tmp_path)

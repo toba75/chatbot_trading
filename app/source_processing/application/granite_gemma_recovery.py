@@ -1,4 +1,4 @@
-"""Récupération explicitement autorisée après une absence de provenance Granite."""
+"""Récupération Gemma explicitement autorisée après un échec Granite tracé."""
 
 from __future__ import annotations
 
@@ -15,6 +15,14 @@ from app.source_processing.domain.page_conversion import (
 )
 
 
+GEMMA_RECOVERY_GRANITE_ERROR_CODES = frozenset(
+    {
+        "DOCLING_PROVENANCE_MISSING",
+        "GRANITE_DOCLING_UNAVAILABLE",
+    }
+)
+
+
 class GraniteConversionFailure(RuntimeError):
     """Échec Granite transmis au décideur de récupération M-004."""
 
@@ -26,7 +34,7 @@ class GraniteConversionFailure(RuntimeError):
 
 
 class GemmaRecoveryPageConverter(Protocol):
-    """Port réservé à Gemma après le seul échec Granite admissible."""
+    """Port réservé à Gemma après un échec Granite explicitement admis."""
 
     def recover_page(
         self,
@@ -38,7 +46,7 @@ class GemmaRecoveryPageConverter(Protocol):
 
 
 class GraniteThenGemmaPageConverter:
-    """Applique ADR-035 sans masquer la première tentative Granite."""
+    """Applique ADR-036 sans masquer la première tentative Granite."""
 
     def __init__(
         self,
@@ -59,7 +67,7 @@ class GraniteThenGemmaPageConverter:
         try:
             return self._granite_converter.convert_page(request)
         except GraniteConversionFailure as error:
-            if error.code != "DOCLING_PROVENANCE_MISSING":
+            if error.code not in GEMMA_RECOVERY_GRANITE_ERROR_CODES:
                 raise
             granite_error_code = error.code
             recovered = self._gemma_converter.recover_page(
@@ -88,6 +96,7 @@ def _ensure_explicit_gemma_recovery(
 
 
 __all__ = [
+    "GEMMA_RECOVERY_GRANITE_ERROR_CODES",
     "GemmaRecoveryPageConverter",
     "GraniteConversionFailure",
     "GraniteThenGemmaPageConverter",

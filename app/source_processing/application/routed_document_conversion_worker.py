@@ -46,6 +46,7 @@ from app.source_processing.application.document_commands import (
 )
 from app.source_processing.application.document_worker import WorkerProcessingError
 from app.source_processing.application.granite_gemma_recovery import (
+    GEMMA_RECOVERY_GRANITE_ERROR_CODES,
     GraniteConversionFailure,
     GraniteThenGemmaPageConverter,
 )
@@ -203,7 +204,7 @@ class _GemmaVisionFallbackPageConverter:
         *,
         granite_error_code: str,
     ) -> PageConversionArtifact:
-        if granite_error_code != "DOCLING_PROVENANCE_MISSING":
+        if granite_error_code not in GEMMA_RECOVERY_GRANITE_ERROR_CODES:
             raise ValueError("récupération Gemma non autorisée")
         source_path = self._resolve_source_path(request.source_artifact_ref)
         response = self._converter.convert(

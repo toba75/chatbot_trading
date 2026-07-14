@@ -1,4 +1,4 @@
-"""Adaptateur isolé de récupération Gemma Vision pour une page Granite sans provenance."""
+"""Adaptateur isolé de récupération Gemma Vision après un échec Granite tracé."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from typing import Any, Mapping
 
 
 class GemmaVisionConversionError(RuntimeError):
-    """Erreur stable de l'unique tentative Gemma autorisée par ADR-035."""
+    """Erreur stable de l'unique tentative Gemma autorisée par ADR-036."""
 
     def __init__(self, code: str) -> None:
         if not isinstance(code, str) or code.strip() == "" or code != code.strip():

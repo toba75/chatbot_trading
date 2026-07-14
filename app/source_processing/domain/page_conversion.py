@@ -30,6 +30,12 @@ from app.source_processing.domain.source_document import (
 _SOURCE_LOCATOR_SCHEMA_VERSION = "1.0"
 _PAGE_AUTHORITY_MISSING = "PAGE_AUTHORITY_MISSING"
 _PAGE_AUTHORITY_AMBIGUOUS = "PAGE_AUTHORITY_AMBIGUOUS"
+_GEMMA_RECOVERY_GRANITE_ERROR_CODES = frozenset(
+    {
+        "DOCLING_PROVENANCE_MISSING",
+        "GRANITE_DOCLING_UNAVAILABLE",
+    }
+)
 _ARTIFACT_REF_PATTERN = re.compile(
     r"^artifact:source_processing\.[a-z0-9_]+/[A-Za-z0-9_.@/-]+$"
 )
@@ -213,7 +219,7 @@ class PageConversionFallbackTrace:
             self.triggering_error_code,
             "code déclencheur de récupération Gemma invalide",
         )
-        if error_code != "DOCLING_PROVENANCE_MISSING":
+        if error_code not in _GEMMA_RECOVERY_GRANITE_ERROR_CODES:
             raise ValueError("code déclencheur de récupération Gemma invalide")
         object.__setattr__(self, "triggering_error_code", error_code)
 
