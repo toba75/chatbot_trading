@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import hashlib
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from uuid import UUID
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from typing import Any, Protocol
 
 from app.knowledge_access.domain.projection_index import (
@@ -41,8 +42,25 @@ class QdrantVectorIndex:
             raise ValueError("client Qdrant sans count")
         self._client = client
 
-    def publish_generation(self, request: VectorIndexPublishRequest) -> VectorIndexPublication:
+    def publish_generation(
+        self,
+        request: VectorIndexPublishRequest,
+        *,
+        max_parallel_batches: int = 1,
+        batch_size: int | None = None,
+        on_batch_published: Callable[[int], None] | None = None,
+    ) -> VectorIndexPublication:
         parsed_request = _ensure_publish_request(request)
+        parsed_max_parallel_batches = _ensure_positive_int(
+            max_parallel_batches,
+            "max_parallel_batches",
+        )
+        parsed_batch_size = _ensure_batch_size(
+            batch_size,
+            point_count=len(parsed_request.points),
+        )
+        if on_batch_published is not None and not callable(on_batch_published):
+            raise ValueError("rapporteur Qdrant invalide")
         existing_count = self._generation_count(
             collection_name=parsed_request.collection_name,
             index_generation=parsed_request.index_generation,
@@ -61,9 +79,16 @@ class QdrantVectorIndex:
                 idempotent=True,
             )
 
-        self._client.upsert(
+        qdrant_points = tuple(
+            _qdrant_point_for(parsed_request.index_generation, point)
+            for point in parsed_request.points
+        )
+        self._upsert_batches(
             collection_name=parsed_request.collection_name,
-            points=tuple(_qdrant_point_for(parsed_request.index_generation, point) for point in parsed_request.points),
+            qdrant_points=qdrant_points,
+            batch_size=parsed_batch_size,
+            max_parallel_batches=parsed_max_parallel_batches,
+            on_batch_published=on_batch_published,
         )
         published_count = self._generation_count(
             collection_name=parsed_request.collection_name,
@@ -81,6 +106,43 @@ class QdrantVectorIndex:
             expected_point_count=parsed_request.expected_point_count,
             idempotent=False,
         )
+
+    def _upsert_batches(
+        self,
+        *,
+        collection_name: str,
+        qdrant_points: Sequence[Mapping[str, Any]],
+        batch_size: int,
+        max_parallel_batches: int,
+        on_batch_published: Callable[[int], None] | None,
+    ) -> None:
+        batches = _point_batches(qdrant_points, batch_size=batch_size)
+        completed_points = 0
+        if max_parallel_batches == 1 or len(batches) == 1:
+            for batch in batches:
+                self._client.upsert(collection_name=collection_name, points=batch)
+                completed_points += len(batch)
+                if on_batch_published is not None:
+                    on_batch_published(completed_points)
+            return
+
+        with ThreadPoolExecutor(
+            max_workers=min(max_parallel_batches, len(batches)),
+            thread_name_prefix="ka-qdrant-upsert",
+        ) as executor:
+            futures = {
+                executor.submit(
+                    self._client.upsert,
+                    collection_name=collection_name,
+                    points=batch,
+                ): len(batch)
+                for batch in batches
+            }
+            for future in as_completed(futures):
+                future.result()
+                completed_points += futures[future]
+                if on_batch_published is not None:
+                    on_batch_published(completed_points)
 
     def generation_exists(self, *, collection_name: str, index_generation: str) -> bool:
         parsed_collection_name = _ensure_text(collection_name, "collection_name")
@@ -167,6 +229,29 @@ def _ensure_publish_request(value: VectorIndexPublishRequest) -> VectorIndexPubl
     if not isinstance(value, VectorIndexPublishRequest):
         raise ValueError("requete VectorIndex invalide")
     return value
+
+
+def _ensure_positive_int(value: object, field_name: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise ValueError(f"{field_name} invalide")
+    return value
+
+
+def _ensure_batch_size(value: int | None, *, point_count: int) -> int:
+    if value is None:
+        return _ensure_positive_int(point_count, "batch_size")
+    return _ensure_positive_int(value, "batch_size")
+
+
+def _point_batches(
+    points: Sequence[Mapping[str, Any]],
+    *,
+    batch_size: int,
+) -> tuple[tuple[Mapping[str, Any], ...], ...]:
+    return tuple(
+        tuple(points[index : index + batch_size])
+        for index in range(0, len(points), batch_size)
+    )
 
 
 def _ensure_point(value: VectorIndexPoint) -> VectorIndexPoint:

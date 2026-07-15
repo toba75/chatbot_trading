@@ -211,6 +211,7 @@ class IsolatedGraniteDoclingConverter:
                 env=environment,
                 timeout=self._timeout_seconds,
                 check=False,
+                creationflags=_worker_process_creation_flags(),
             )
         except subprocess.TimeoutExpired as error:
             raise GraniteDoclingConversionError() from error
@@ -247,6 +248,10 @@ def _native_response_request(request: GraniteDoclingConversionRequest):
 
 def _is_sha256(value: object) -> bool:
     return isinstance(value, str) and len(value) == 64 and all(character in "0123456789abcdef" for character in value)
+
+
+def _worker_process_creation_flags() -> int:
+    return int(getattr(subprocess, "BELOW_NORMAL_PRIORITY_CLASS", 0))
 
 
 __all__ = [

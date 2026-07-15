@@ -1,6 +1,6 @@
 # ADR-037 - Parallélisme documentaire et projection par lots
 
-**Statut :** Proposée
+**Statut :** Acceptée
 **Date :** 2026-07-15
 **Décideurs :** Équipe OSTrading
 **Remplace :** Aucun

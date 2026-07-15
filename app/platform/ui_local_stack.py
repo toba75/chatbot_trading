@@ -15,6 +15,8 @@ from typing import Any, Iterator
 from urllib.error import URLError
 from urllib.request import urlopen
 
+from app.platform.configuration import load_application_configuration
+
 
 LOCAL_POSTGRES_CONTAINER = "ostrading-ui-postgres"
 LOCAL_QDRANT_CONTAINER = "ostrading-ui-qdrant"
@@ -43,9 +45,9 @@ _API_TOKEN_SECRET_RELATIVE_PATH = Path("config") / "secrets" / "local" / "local_
 _API_STARTUP_TIMEOUT_SECONDS = 60
 _LLM_GATEWAY_STARTUP_TIMEOUT_SECONDS = 60
 _POSTGRES_STARTUP_ATTEMPTS = 120
-_DOCUMENT_WORKER_LEASE_SECONDS = 30
-_PROJECTION_WORKER_LEASE_SECONDS = 300
-_DOCUMENT_WORKER_POLL_SECONDS = 0.1
+_DOCUMENT_WORKER_LEASE_SECONDS = 3600
+_PROJECTION_WORKER_LEASE_SECONDS = 3600
+_DOCUMENT_WORKER_POLL_SECONDS = 5.0
 _DOCUMENT_WORKER_STARTUP_STABILITY_SECONDS = 0.5
 
 
@@ -116,10 +118,11 @@ def start_local_ui_stack(launch_configuration: Any) -> Iterator[Any]:
         repository_root=repository_root,
         source_configuration_path=source_config_path,
     )
+    worker_count = _configured_worker_concurrency(runtime_configuration)
     api_process: subprocess.Popen[bytes] | None = None
     llm_gateway_process: subprocess.Popen[bytes] | None = None
-    document_worker_process: subprocess.Popen[bytes] | None = None
-    projection_worker_process: subprocess.Popen[bytes] | None = None
+    document_worker_processes: tuple[subprocess.Popen[bytes], ...] = ()
+    projection_worker_processes: tuple[subprocess.Popen[bytes], ...] = ()
     postgres_started = False
     qdrant_started = False
     try:
@@ -137,20 +140,22 @@ def start_local_ui_stack(launch_configuration: Any) -> Iterator[Any]:
             runtime_configuration=runtime_configuration,
         )
         _wait_for_api(api_process)
-        document_worker_process = _start_local_document_worker(
+        document_worker_processes = _start_local_document_workers(
             repository_root=repository_root,
             runtime_configuration=runtime_configuration,
+            worker_count=worker_count,
         )
-        _wait_for_document_worker(document_worker_process)
-        projection_worker_process = _start_local_projection_worker(
+        _wait_for_document_workers(document_worker_processes)
+        projection_worker_processes = _start_local_projection_workers(
             repository_root=repository_root,
             runtime_configuration=runtime_configuration,
+            worker_count=worker_count,
         )
-        _wait_for_projection_worker(projection_worker_process)
+        _wait_for_projection_workers(projection_worker_processes)
         yield replace(launch_configuration, config_path=str(runtime_configuration.path))
     finally:
-        _stop_process(projection_worker_process)
-        _stop_process(document_worker_process)
+        _stop_processes(projection_worker_processes)
+        _stop_processes(document_worker_processes)
         _stop_process(api_process)
         _stop_process(llm_gateway_process)
         if qdrant_started:
@@ -376,10 +381,44 @@ def _start_local_llm_gateway(
     )
 
 
+def _configured_worker_concurrency(
+    runtime_configuration: LocalUiRuntimeConfiguration,
+) -> int:
+    configuration = load_application_configuration(
+        config_path=runtime_configuration.path,
+        environment_snapshot={},
+    )
+    return _require_worker_count(configuration.services.workers.concurrency)
+
+
+def _require_worker_count(value: Any) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise ValueError("UI_LOCAL_WORKER_CONCURRENCY_INVALID")
+    return value
+
+
+def _start_local_document_workers(
+    *,
+    repository_root: Path,
+    runtime_configuration: LocalUiRuntimeConfiguration,
+    worker_count: int,
+) -> tuple[subprocess.Popen[bytes], ...]:
+    count = _require_worker_count(worker_count)
+    return tuple(
+        _start_local_document_worker(
+            repository_root=repository_root,
+            runtime_configuration=runtime_configuration,
+            worker_id=f"uv-run-ui-document-worker-{number:02d}",
+        )
+        for number in range(1, count + 1)
+    )
+
+
 def _start_local_document_worker(
     *,
     repository_root: Path,
     runtime_configuration: LocalUiRuntimeConfiguration,
+    worker_id: str,
 ) -> subprocess.Popen[bytes]:
     return subprocess.Popen(
         (
@@ -389,7 +428,7 @@ def _start_local_document_worker(
             "--config",
             str(runtime_configuration.path),
             "--worker-id",
-            "uv-run-ui-document-worker",
+            worker_id,
             "--lease-seconds",
             str(_DOCUMENT_WORKER_LEASE_SECONDS),
             "--poll-seconds",
@@ -399,10 +438,28 @@ def _start_local_document_worker(
     )
 
 
+def _start_local_projection_workers(
+    *,
+    repository_root: Path,
+    runtime_configuration: LocalUiRuntimeConfiguration,
+    worker_count: int,
+) -> tuple[subprocess.Popen[bytes], ...]:
+    count = _require_worker_count(worker_count)
+    return tuple(
+        _start_local_projection_worker(
+            repository_root=repository_root,
+            runtime_configuration=runtime_configuration,
+            worker_id=f"uv-run-ui-projection-worker-{number:02d}",
+        )
+        for number in range(1, count + 1)
+    )
+
+
 def _start_local_projection_worker(
     *,
     repository_root: Path,
     runtime_configuration: LocalUiRuntimeConfiguration,
+    worker_id: str,
 ) -> subprocess.Popen[bytes]:
     return subprocess.Popen(
         (
@@ -412,7 +469,7 @@ def _start_local_projection_worker(
             "--config",
             str(runtime_configuration.path),
             "--worker-id",
-            "uv-run-ui-projection-worker",
+            worker_id,
             "--lease-seconds",
             str(_PROJECTION_WORKER_LEASE_SECONDS),
             "--poll-seconds",
@@ -464,16 +521,26 @@ def _wait_for_api(api_process: subprocess.Popen[bytes]) -> None:
     raise ValueError("UI_LOCAL_API_STARTUP_TIMEOUT")
 
 
-def _wait_for_document_worker(document_worker_process: subprocess.Popen[bytes]) -> None:
+def _wait_for_document_workers(
+    document_worker_processes: tuple[subprocess.Popen[bytes], ...],
+) -> None:
     time.sleep(_DOCUMENT_WORKER_STARTUP_STABILITY_SECONDS)
-    if document_worker_process.poll() is not None:
+    if len(document_worker_processes) == 0:
         raise ValueError("UI_LOCAL_DOCUMENT_WORKER_START_FAILED")
+    for process in document_worker_processes:
+        if process.poll() is not None:
+            raise ValueError("UI_LOCAL_DOCUMENT_WORKER_START_FAILED")
 
 
-def _wait_for_projection_worker(projection_worker_process: subprocess.Popen[bytes]) -> None:
+def _wait_for_projection_workers(
+    projection_worker_processes: tuple[subprocess.Popen[bytes], ...],
+) -> None:
     time.sleep(_DOCUMENT_WORKER_STARTUP_STABILITY_SECONDS)
-    if projection_worker_process.poll() is not None:
+    if len(projection_worker_processes) == 0:
         raise ValueError("UI_LOCAL_PROJECTION_WORKER_START_FAILED")
+    for process in projection_worker_processes:
+        if process.poll() is not None:
+            raise ValueError("UI_LOCAL_PROJECTION_WORKER_START_FAILED")
 
 
 def _run_docker(
@@ -504,6 +571,11 @@ def _stop_process(process: subprocess.Popen[bytes] | None) -> None:
     except subprocess.TimeoutExpired:
         process.kill()
         process.wait(timeout=10)
+
+
+def _stop_processes(processes: tuple[subprocess.Popen[bytes], ...]) -> None:
+    for process in processes:
+        _stop_process(process)
 
 
 def _stop_local_postgres() -> None:

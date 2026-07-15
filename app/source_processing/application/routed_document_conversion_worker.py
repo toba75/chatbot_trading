@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import threading
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -23,6 +24,7 @@ from app.source_processing.adapters.gemma_vision_conversion import (
     IsolatedGemmaVisionPageConverter,
 )
 from app.source_processing.adapters.docling_native_conversion import (
+    CanonicalArtifactStoreError,
     DoclingAssetManifestError,
     DoclingNativeConversionError,
     IsolatedNativeDoclingConverter,
@@ -277,6 +279,7 @@ class RoutedDocumentConversionWorker:
         audit_root: Path,
         ocrmypdf_timeout_seconds: float,
         artifact_store: CanonicalArtifactStore,
+        max_parallel_pages: int,
     ) -> None:
         for dependency, method in (
             (source_document_repository, "find_by_document_id"),
@@ -318,6 +321,10 @@ class RoutedDocumentConversionWorker:
         self._audit_root = audit_root
         self._ocrmypdf_timeout_seconds = ocrmypdf_timeout_seconds
         self._artifact_store = artifact_store
+        self._max_parallel_pages = _required_positive_int(
+            max_parallel_pages,
+            "parallélisme conversion invalide",
+        )
 
     def execute(self, claimed_job: ClaimedJob) -> Mapping[str, Any]:
         if not isinstance(claimed_job, ClaimedJob):
@@ -398,17 +405,29 @@ class RoutedDocumentConversionWorker:
                     ),
                 ),
                 ocrmypdf_preprocessor=preprocessor,
+                max_parallel_pages=self._max_parallel_pages,
             )
+            completed_lock = threading.Lock()
+            completed_units = 0
+
+            def record_completed_page(page_output: PageConversionArtifact) -> None:
+                del page_output
+                nonlocal completed_units
+                with completed_lock:
+                    completed_units += 1
+                    completed = completed_units
+                self._conversion_repository.record_conversion_progress(
+                    document_id=document_id,
+                    completed_units=completed,
+                )
+
             result = handler.handle(
                 ConvertRoutedPagesCommand(
                     source_document=source_document,
                     processing_run=processing_run,
                     canonical_version_id=_canonical_version_id(source_sha256),
                 ),
-                on_page_converted=lambda page_output: self._conversion_repository.record_conversion_progress(
-                    document_id=document_id,
-                    completed_units=page_output.page_number.value,
-                ),
+                on_page_converted=record_completed_page,
             )
         except (DoclingAssetManifestError, OcrmyPdfImageManifestError) as error:
             raise WorkerProcessingError("CONVERSION_ASSET_MANIFEST_INVALID", retryable=False) from error
@@ -441,28 +460,31 @@ class RoutedDocumentConversionWorker:
             pre_conversion_report=pre_report,
             post_conversion_report=post_report,
         )
-        publication = PublishCanonicalSourceHandler(artifact_store=self._artifact_store).handle(
-            PublishCanonicalSourceCommand(
-                source_document=source_document,
-                docling_document=docling_document,
-                text_authority_manifest=authority_manifest,
-                quality_decision=quality_decision,
-                accepted_at=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                expected_current_version_id=None,
-                existing_canonical_source=None,
+        try:
+            publication = PublishCanonicalSourceHandler(artifact_store=self._artifact_store).handle(
+                PublishCanonicalSourceCommand(
+                    source_document=source_document,
+                    docling_document=docling_document,
+                    text_authority_manifest=authority_manifest,
+                    quality_decision=quality_decision,
+                    accepted_at=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    expected_current_version_id=None,
+                    existing_canonical_source=None,
+                )
             )
-        )
-        self._conversion_repository.complete_native_conversion(
-            NativeCanonicalPublication(
-                document_id=document_id,
-                canonical_source_id=publication.canonical_source.canonical_source_id,
-                canonical_version_id=publication.published_version.canonical_version_id,
-                canonical_artifact_ref=publication.stored_artifact_ref,
-                canonical_artifact_sha256=publication.published_version.canonical_artifact.artifact_sha256,
-                route_name=processing_run.route_plan.dominant_route_name.value,
-                tool_version=";".join(sorted({output.tool_version for output in result.page_outputs})),
+            self._conversion_repository.complete_native_conversion(
+                NativeCanonicalPublication(
+                    document_id=document_id,
+                    canonical_source_id=publication.canonical_source.canonical_source_id,
+                    canonical_version_id=publication.published_version.canonical_version_id,
+                    canonical_artifact_ref=publication.stored_artifact_ref,
+                    canonical_artifact_sha256=publication.published_version.canonical_artifact.artifact_sha256,
+                    route_name=processing_run.route_plan.dominant_route_name.value,
+                    tool_version=";".join(sorted({output.tool_version for output in result.page_outputs})),
+                )
             )
-        )
+        except CanonicalArtifactStoreError as error:
+            raise WorkerProcessingError(str(error), retryable=False) from error
         return {
             "document_id": document_id.value,
             "conversion_status": DocumentConversionStatus.CANONICAL_ACCEPTED.value,
@@ -519,6 +541,7 @@ def build_routed_document_conversion_worker(
     llm_gateway_max_output_tokens: int,
     expected_gemma_model_id: str,
     artifact_store: CanonicalArtifactStore,
+    max_parallel_pages: int,
 ) -> RoutedDocumentConversionWorker:
     """Construit le worker uniquement si tous les runtimes réels annoncés sont prêts."""
 
@@ -554,6 +577,7 @@ def build_routed_document_conversion_worker(
         audit_root=audit_root,
         ocrmypdf_timeout_seconds=timeout_seconds,
         artifact_store=artifact_store,
+        max_parallel_pages=max_parallel_pages,
     )
 
 

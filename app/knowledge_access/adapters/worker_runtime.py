@@ -10,6 +10,8 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from psycopg import OperationalError
+
 from app.knowledge_access.adapters.projection_runtime import (
     PROJECT_DOCUMENT_JOB_NAME,
     ProjectionRuntimeError,
@@ -53,6 +55,7 @@ def _run_worker(
         configuration_hash=application_configuration.configuration_hash,
         qdrant_url=application_configuration.services.qdrant.url,
         qdrant_timeout_seconds=application_configuration.runtime.timeouts.request_seconds,
+        max_parallel_workers=application_configuration.services.workers.concurrency,
     )
     job_runtime = build_postgres_job_runtime(
         connection_factory=connection_factory,
@@ -64,16 +67,21 @@ def _run_worker(
     instance_owner_id = f"{owner_id}:{uuid4()}"
     processed = 0
     while max_jobs is None or processed < max_jobs:
-        job_runtime.outbox_relay.relay_pending(
-            limit=16,
-            owner_id=f"{instance_owner_id}-OUTBOX",
-            lease_seconds=lease_seconds,
-        )
-        claimed = job_runtime.queue.claim_next(
-            owner_id=instance_owner_id,
-            lease_seconds=lease_seconds,
-            job_names=(PROJECT_DOCUMENT_JOB_NAME,),
-        )
+        try:
+            job_runtime.outbox_relay.relay_pending(
+                limit=16,
+                owner_id=f"{instance_owner_id}-OUTBOX",
+                lease_seconds=lease_seconds,
+            )
+            claimed = job_runtime.queue.claim_next(
+                owner_id=instance_owner_id,
+                lease_seconds=lease_seconds,
+                job_names=(PROJECT_DOCUMENT_JOB_NAME,),
+            )
+        except OperationalError:
+            _log_runtime_error(owner_id=instance_owner_id, error_code="POSTGRES_TRANSIENT_FAILURE")
+            time.sleep(poll_seconds)
+            continue
         if claimed is None:
             if max_jobs is not None:
                 return
@@ -109,6 +117,22 @@ def _run_worker(
         finally:
             reset_trace_id(trace_token)
         processed += 1
+
+
+def _log_runtime_error(*, owner_id: str, error_code: str) -> None:
+    print(
+        json.dumps(
+            {
+                "error_code": error_code,
+                "event_type": "knowledge_projection_worker_runtime_error",
+                "owner_id": owner_id,
+                "status": "retrying",
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        ),
+        flush=True,
+    )
 
 
 def _log(*, claimed: Any, status: str, error_code: str | None, started: int) -> None:

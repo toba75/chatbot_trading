@@ -14,6 +14,11 @@ def test_validate_ui_local_stack_unit() -> None:
     # When `uv run ui` prépare son runtime local.
     # Then seule la configuration temporaire désigne les dépendances loopback.
     with TemporaryDirectory() as temporary_directory:
+        repository_root = next(
+            parent
+            for parent in Path(__file__).resolve().parents
+            if (parent / "pyproject.toml").is_file()
+        )
         root = Path(temporary_directory)
         source_config = root / "config" / "application.yaml"
         source_config.parent.mkdir(parents=True)
@@ -75,7 +80,7 @@ def test_validate_ui_local_stack_unit() -> None:
         source_config = root / "config" / "application.yaml"
         source_config.parent.mkdir(parents=True)
         source_config.write_text(
-            "services:\n  postgres:\n    url: postgresql+psycopg://app@postgres/app\n",
+            (repository_root / "config" / "application.example.yaml").read_text(encoding="utf-8"),
             encoding="utf-8",
         )
         events: list[str] = []
@@ -92,11 +97,12 @@ def test_validate_ui_local_stack_unit() -> None:
                 "_wait_for_llm_gateway",
                 "_start_orchestrator_api",
                 "_wait_for_api",
-                "_start_local_document_worker",
-                "_wait_for_document_worker",
-                "_start_local_projection_worker",
-                "_wait_for_projection_worker",
+                "_start_local_document_workers",
+                "_wait_for_document_workers",
+                "_start_local_projection_workers",
+                "_wait_for_projection_workers",
                 "_stop_process",
+                "_stop_processes",
                 "_stop_local_postgres",
                 "_stop_local_qdrant",
             )
@@ -111,11 +117,12 @@ def test_validate_ui_local_stack_unit() -> None:
         ui_local_stack._wait_for_llm_gateway = lambda _: events.append("gateway-ready")
         ui_local_stack._start_orchestrator_api = lambda **_: events.append("api-start") or "api"
         ui_local_stack._wait_for_api = lambda _: events.append("api-ready")
-        ui_local_stack._start_local_document_worker = lambda **_: events.append("worker-start") or "worker"
-        ui_local_stack._wait_for_document_worker = lambda _: events.append("worker-ready")
-        ui_local_stack._start_local_projection_worker = lambda **_: events.append("projection-worker-start") or "projection-worker"
-        ui_local_stack._wait_for_projection_worker = lambda _: events.append("projection-worker-ready")
+        ui_local_stack._start_local_document_workers = lambda **_: events.append("worker-start") or ("worker",)
+        ui_local_stack._wait_for_document_workers = lambda _: events.append("worker-ready")
+        ui_local_stack._start_local_projection_workers = lambda **_: events.append("projection-worker-start") or ("projection-worker",)
+        ui_local_stack._wait_for_projection_workers = lambda _: events.append("projection-worker-ready")
         ui_local_stack._stop_process = lambda process: events.append(f"stop:{process}")
+        ui_local_stack._stop_processes = lambda processes: events.append(f"stop:{','.join(processes)}")
         ui_local_stack._stop_local_postgres = lambda: events.append("postgres-stop")
         ui_local_stack._stop_local_qdrant = lambda: events.append("qdrant-stop")
         try:

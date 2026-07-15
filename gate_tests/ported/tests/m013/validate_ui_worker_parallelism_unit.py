@@ -61,3 +61,6 @@ def test_uv_run_ui_uses_configured_worker_concurrency_for_document_and_projectio
     projection_ids = sorted(command[command.index("--worker-id") + 1] for command in calls[8:])
     assert document_ids == [f"uv-run-ui-document-worker-{number:02d}" for number in range(1, 9)]
     assert projection_ids == [f"uv-run-ui-projection-worker-{number:02d}" for number in range(1, 9)]
+    assert {command[command.index("--lease-seconds") + 1] for command in calls[:8]} == {"3600"}
+    assert {command[command.index("--lease-seconds") + 1] for command in calls[8:]} == {"3600"}
+    assert {command[command.index("--poll-seconds") + 1] for command in calls} == {"5.0"}

@@ -11,6 +11,7 @@ from typing import Any, Protocol
 
 from app.contracts.technical_jobs import ClaimedJob, JobStatus
 from app.source_processing.adapters.docling_native_conversion import (
+    CanonicalArtifactStoreError,
     DoclingAssetManifestError,
     DoclingNativeConversionError,
     NativeDoclingConversionRequest,
@@ -210,28 +211,31 @@ class NativeDocumentConversionWorker:
             pre_conversion_report=pre_report,
             post_conversion_report=post_report,
         )
-        publication = PublishCanonicalSourceHandler(artifact_store=self._artifact_store).handle(
-            PublishCanonicalSourceCommand(
-                source_document=source_document,
-                docling_document=docling_document,
-                text_authority_manifest=authority_manifest,
-                quality_decision=quality_decision,
-                accepted_at=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                expected_current_version_id=None,
-                existing_canonical_source=None,
+        try:
+            publication = PublishCanonicalSourceHandler(artifact_store=self._artifact_store).handle(
+                PublishCanonicalSourceCommand(
+                    source_document=source_document,
+                    docling_document=docling_document,
+                    text_authority_manifest=authority_manifest,
+                    quality_decision=quality_decision,
+                    accepted_at=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    expected_current_version_id=None,
+                    existing_canonical_source=None,
+                )
             )
-        )
-        self._conversion_repository.complete_native_conversion(
-            NativeCanonicalPublication(
-                document_id=document_id,
-                canonical_source_id=publication.canonical_source.canonical_source_id,
-                canonical_version_id=publication.published_version.canonical_version_id,
-                canonical_artifact_ref=publication.stored_artifact_ref,
-                canonical_artifact_sha256=publication.published_version.canonical_artifact.artifact_sha256,
-                route_name=PageRouteName.NATIVE_STANDARD.value,
-                tool_version=response.tool_version,
+            self._conversion_repository.complete_native_conversion(
+                NativeCanonicalPublication(
+                    document_id=document_id,
+                    canonical_source_id=publication.canonical_source.canonical_source_id,
+                    canonical_version_id=publication.published_version.canonical_version_id,
+                    canonical_artifact_ref=publication.stored_artifact_ref,
+                    canonical_artifact_sha256=publication.published_version.canonical_artifact.artifact_sha256,
+                    route_name=PageRouteName.NATIVE_STANDARD.value,
+                    tool_version=response.tool_version,
+                )
             )
-        )
+        except CanonicalArtifactStoreError as error:
+            raise WorkerProcessingError(str(error), retryable=False) from error
         return {
             "document_id": document_id.value,
             "conversion_status": DocumentConversionStatus.CANONICAL_ACCEPTED.value,

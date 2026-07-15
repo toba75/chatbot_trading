@@ -143,6 +143,7 @@ class OcrmyPdfPagePreprocessor:
                 encoding="utf-8",
                 timeout=self._timeout_seconds,
                 check=False,
+                creationflags=_worker_process_creation_flags(),
             )
         except (OSError, subprocess.TimeoutExpired) as error:
             _remove_if_present(output_path)
@@ -237,6 +238,10 @@ def _remove_if_present(path: Path) -> None:
         path.unlink(missing_ok=True)
     except OSError:
         pass
+
+
+def _worker_process_creation_flags() -> int:
+    return int(getattr(subprocess, "BELOW_NORMAL_PRIORITY_CLASS", 0))
 
 
 __all__ = [

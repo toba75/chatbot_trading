@@ -157,6 +157,7 @@ class IsolatedGemmaVisionPageConverter:
                 capture_output=True,
                 timeout=self._timeout_seconds,
                 check=False,
+                creationflags=_worker_process_creation_flags(),
             )
         except subprocess.TimeoutExpired as error:
             raise GemmaVisionConversionError("GEMMA_VISION_UNAVAILABLE") from error
@@ -192,6 +193,10 @@ def _bbox_from_payload(payload: Any) -> tuple[float, float, float, float]:
     if any(isinstance(coordinate, bool) or not isinstance(coordinate, (int, float)) for coordinate in raw_bbox):
         raise ValueError("bbox Gemma Vision invalide")
     return tuple(float(coordinate) for coordinate in raw_bbox)  # type: ignore[return-value]
+
+
+def _worker_process_creation_flags() -> int:
+    return int(getattr(subprocess, "BELOW_NORMAL_PRIORITY_CLASS", 0))
 
 
 __all__ = [

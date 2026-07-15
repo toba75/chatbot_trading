@@ -36,7 +36,7 @@ services:
     port: 8080
   workers:
     queue_name: default
-    concurrency: 2
+    concurrency: 8
   llm_gateway:
     url: http://llm-gateway:8090
     port: 8090

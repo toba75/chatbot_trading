@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Any, Protocol, Sequence
 
 from app.contracts.identity import DomainIdentifier
 from app.knowledge_access.domain.chunking import HierarchicalChunkProjection, KnowledgeChunk
@@ -128,13 +129,20 @@ class EncodeProjectionCommand:
 class ProjectionEncodingHandler:
     """Orchestre l'encodage complet des chunks eligibles."""
 
-    def __init__(self, *, dense_encoder: DenseEncoder, sparse_encoder: SparseEncoder) -> None:
+    def __init__(
+        self,
+        *,
+        dense_encoder: DenseEncoder,
+        sparse_encoder: SparseEncoder,
+        max_parallel_chunks: int = 1,
+    ) -> None:
         if not callable(getattr(dense_encoder, "encode_dense", None)):
             raise ValueError("dense_encoder sans encode_dense")
         if not callable(getattr(sparse_encoder, "encode_sparse", None)):
             raise ValueError("sparse_encoder sans encode_sparse")
         self._dense_encoder = dense_encoder
         self._sparse_encoder = sparse_encoder
+        self._max_parallel_chunks = _ensure_positive_int(max_parallel_chunks, "max_parallel_chunks")
 
     def encode_projection(self, command: EncodeProjectionCommand) -> ProjectionEncodingResult:
         parsed_command = _ensure_command(command)
@@ -142,14 +150,10 @@ class ProjectionEncodingHandler:
             scope="projection_encoding",
             payload=parsed_command.encoding_profile.to_fingerprint_payload(),
         )
-        encoded_chunks: list[EncodedProjectionChunk] = []
-        for chunk in parsed_command.chunk_projection.chunks:
-            encoded_chunks.append(
-                self._encode_chunk(
-                    chunk=chunk,
-                    encoding_profile=parsed_command.encoding_profile,
-                )
-            )
+        encoded_chunks = self._encode_chunks(
+            chunks=parsed_command.chunk_projection.chunks,
+            encoding_profile=parsed_command.encoding_profile,
+        )
         trace = ProjectionEncodingTrace(
             projection_id=parsed_command.projection_id,
             build_fingerprint=encoding_fingerprint,
@@ -167,9 +171,43 @@ class ProjectionEncodingHandler:
             projection_id=parsed_command.projection_id,
             build_fingerprint=encoding_fingerprint,
             encoding_profile=parsed_command.encoding_profile,
-            encoded_chunks=tuple(encoded_chunks),
+            encoded_chunks=encoded_chunks,
             trace=trace,
         )
+
+    def _encode_chunks(
+        self,
+        *,
+        chunks: Sequence[KnowledgeChunk],
+        encoding_profile: ProjectionEncodingProfile,
+    ) -> tuple[EncodedProjectionChunk, ...]:
+        parsed_chunks = tuple(_ensure_chunk(chunk) for chunk in chunks)
+        if len(parsed_chunks) == 0:
+            raise ValueError("chunks de projection absents")
+        if self._max_parallel_chunks == 1 or len(parsed_chunks) == 1:
+            return tuple(
+                self._encode_chunk(
+                    chunk=chunk,
+                    encoding_profile=encoding_profile,
+                )
+                for chunk in parsed_chunks
+            )
+        results: list[EncodedProjectionChunk | None] = [None] * len(parsed_chunks)
+        with ThreadPoolExecutor(
+            max_workers=min(self._max_parallel_chunks, len(parsed_chunks)),
+            thread_name_prefix="ka-projection-encoding",
+        ) as executor:
+            futures = {
+                executor.submit(
+                    self._encode_chunk,
+                    chunk=chunk,
+                    encoding_profile=encoding_profile,
+                ): index
+                for index, chunk in enumerate(parsed_chunks)
+            }
+            for future in as_completed(futures):
+                results[futures[future]] = future.result()
+        return tuple(_ensure_encoded_chunk(value) for value in results)
 
     def _encode_chunk(
         self,
@@ -225,6 +263,18 @@ def _ensure_command(value: EncodeProjectionCommand) -> EncodeProjectionCommand:
 def _ensure_chunk(value: KnowledgeChunk) -> KnowledgeChunk:
     if not isinstance(value, KnowledgeChunk):
         raise ValueError("chunk invalide")
+    return value
+
+
+def _ensure_encoded_chunk(value: EncodedProjectionChunk | None) -> EncodedProjectionChunk:
+    if not isinstance(value, EncodedProjectionChunk):
+        raise ValueError("chunk encodé absent")
+    return value
+
+
+def _ensure_positive_int(value: Any, field_name: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise ValueError(f"{field_name} invalide")
     return value
 
 

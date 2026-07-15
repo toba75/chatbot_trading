@@ -344,6 +344,7 @@ def build_orchestrator_composition_root(
         configuration_hash=configuration.configuration_hash,
         qdrant_url=configuration.services.qdrant.url,
         qdrant_timeout_seconds=configuration.runtime.timeouts.request_seconds,
+        max_parallel_workers=configuration.services.workers.concurrency,
     )
     inference_gateway = UrllibLlmInferenceGateway(
         endpoint_url=f"{configuration.services.llm_gateway.url.rstrip('/')}/v1/infer",

@@ -81,6 +81,7 @@ _DENSE_DIMENSIONS = 256
 _CANONICAL_ARTIFACT_PREFIX = "artifact:source_processing.canonical_sources/"
 _TOKEN_PATTERN = re.compile(r"[\w'-]+", re.UNICODE)
 _QUALITY_POLICY_VERSION = "canonical-quality-m004-v1"
+_PROJECTION_INDEX_BATCH_SIZE = 32
 
 
 class ProjectionRuntimeError(RuntimeError):
@@ -222,6 +223,7 @@ class ProjectionRuntimeService:
     configuration_hash: str
     qdrant_url: str
     qdrant_timeout_seconds: int
+    max_parallel_workers: int
 
     def __post_init__(self) -> None:
         if not callable(getattr(self.connection_factory, "connect", None)):
@@ -232,6 +234,7 @@ class ProjectionRuntimeService:
             raise ValueError("CANONICAL_SOURCES_ROOT_UNAVAILABLE")
         if not re.fullmatch(r"[a-f0-9]{64}", self.configuration_hash):
             raise ValueError("configuration_hash projection invalide")
+        _required_positive_int(self.max_parallel_workers, "parallélisme projection invalide")
 
     def request_projection(
         self,
@@ -509,6 +512,7 @@ class ProjectionRuntimeService:
             encoded = ProjectionEncodingHandler(
                 dense_encoder=HashingDenseEncoder(),
                 sparse_encoder=LexicalSparseEncoder(),
+                max_parallel_chunks=self.max_parallel_workers,
             ).encode_projection(
                 EncodeProjectionCommand(
                     projection_id=indexing.projection_id,
@@ -545,7 +549,14 @@ class ProjectionRuntimeService:
                     build_fingerprint=encoded.build_fingerprint,
                     points=points,
                     expected_point_count=len(points),
-                )
+                ),
+                max_parallel_batches=self.max_parallel_workers,
+                batch_size=_PROJECTION_INDEX_BATCH_SIZE,
+                on_batch_published=lambda completed_units: self._set_running_progress(
+                    projection_id=indexing.projection_id,
+                    completed_units=completed_units,
+                    total_units=len(points),
+                ),
             )
             if publication.published_point_count != len(points):
                 raise ProjectionRuntimeError("INDEX_PARTIAL")
@@ -706,6 +717,12 @@ def _error_code(value: Any) -> str:
     if isinstance(value, str) and re.fullmatch(r"[A-Z][A-Z0-9_]{2,127}", value):
         return value
     raise ValueError("error_code projection invalide")
+
+
+def _required_positive_int(value: Any, message: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise ValueError(message)
+    return value
 
 
 def _projection_error_code(exception: Exception) -> str:

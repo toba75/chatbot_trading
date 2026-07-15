@@ -218,6 +218,7 @@ def _run_worker(
         artifact_store=CanonicalArtifactFileStore(
             root=Path(application_configuration.paths.canonical_sources_root)
         ),
+        max_parallel_pages=application_configuration.services.workers.concurrency,
     )
     workers = {
         "DIAGNOSE": worker,

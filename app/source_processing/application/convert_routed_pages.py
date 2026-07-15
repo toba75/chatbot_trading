@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -160,6 +161,7 @@ class ConvertRoutedPagesHandler:
         native_converter: PageConverter,
         granite_converter: PageConverter,
         ocrmypdf_preprocessor: PagePreprocessor,
+        max_parallel_pages: int = 1,
     ) -> None:
         if not callable(getattr(native_converter, "convert_page", None)):
             raise ValueError("native_converter invalide")
@@ -170,6 +172,7 @@ class ConvertRoutedPagesHandler:
         self._native_converter = native_converter
         self._granite_converter = granite_converter
         self._ocrmypdf_preprocessor = ocrmypdf_preprocessor
+        self._max_parallel_pages = _ensure_max_parallel_pages(max_parallel_pages)
 
     def handle(
         self,
@@ -190,19 +193,18 @@ class ConvertRoutedPagesHandler:
         if route_plan is None:
             raise ValueError("plan de routage absent")
 
-        page_outputs: list[PageConversionArtifact] = []
-        preprocessed_artifacts: list[PreprocessedPageArtifact] = []
-        for page_route in route_plan.page_routes:
-            conversion_result = self._convert_page_route(
-                source_document=command.source_document,
-                processing_run=command.processing_run,
-                page_route=page_route,
-            )
-            page_outputs.append(conversion_result.page_output)
-            if on_page_converted is not None:
-                on_page_converted(conversion_result.page_output)
-            if conversion_result.preprocessed_artifact is not None:
-                preprocessed_artifacts.append(conversion_result.preprocessed_artifact)
+        conversion_results = self._convert_page_routes(
+            source_document=command.source_document,
+            processing_run=command.processing_run,
+            page_routes=tuple(route_plan.page_routes),
+            on_page_converted=on_page_converted,
+        )
+        page_outputs = tuple(result.page_output for result in conversion_results)
+        preprocessed_artifacts = tuple(
+            result.preprocessed_artifact
+            for result in conversion_results
+            if result.preprocessed_artifact is not None
+        )
 
         docling_document = PagewiseDoclingFusionService().merge(
             document_id=command.source_document.document_id,
@@ -210,13 +212,60 @@ class ConvertRoutedPagesHandler:
             source_sha256=command.source_document.fingerprint,
             original_storage_ref=command.source_document.original_storage_ref,
             page_manifest=command.processing_run.page_manifest,
-            page_outputs=tuple(page_outputs),
+            page_outputs=page_outputs,
         )
         return DocumentConversionResult(
-            page_outputs=tuple(page_outputs),
-            preprocessed_artifacts=tuple(preprocessed_artifacts),
+            page_outputs=page_outputs,
+            preprocessed_artifacts=preprocessed_artifacts,
             docling_document=docling_document,
         )
+
+    def _convert_page_routes(
+        self,
+        *,
+        source_document: SourceDocument,
+        processing_run: DocumentProcessingRun,
+        page_routes: Sequence[PageRoute],
+        on_page_converted: Callable[[PageConversionArtifact], None] | None,
+    ) -> tuple["_PageConversionOrchestrationResult", ...]:
+        routes = tuple(page_routes)
+        if len(routes) == 0:
+            raise ValueError("routes de conversion absentes")
+        if self._max_parallel_pages == 1 or len(routes) == 1:
+            ordered_results: list[_PageConversionOrchestrationResult] = []
+            for page_route in routes:
+                result = self._convert_page_route(
+                    source_document=source_document,
+                    processing_run=processing_run,
+                    page_route=page_route,
+                )
+                ordered_results.append(result)
+                if on_page_converted is not None:
+                    on_page_converted(result.page_output)
+            return tuple(ordered_results)
+
+        max_workers = min(self._max_parallel_pages, len(routes))
+        results: list[_PageConversionOrchestrationResult | None] = [None] * len(routes)
+        with ThreadPoolExecutor(
+            max_workers=max_workers,
+            thread_name_prefix="sp-page-conversion",
+        ) as executor:
+            futures = {
+                executor.submit(
+                    self._convert_page_route,
+                    source_document=source_document,
+                    processing_run=processing_run,
+                    page_route=page_route,
+                ): index
+                for index, page_route in enumerate(routes)
+            }
+            for future in as_completed(futures):
+                result = future.result()
+                results[futures[future]] = result
+                if on_page_converted is not None:
+                    on_page_converted(result.page_output)
+
+        return tuple(_ensure_orchestration_result(result) for result in results)
 
     def _convert_page_route(
         self,
@@ -390,6 +439,20 @@ def _ensure_conversion_output(
     if page_output.audit_artifact_ref != expected_artifact_ref:
         raise ValueError("artefact de conversion incohérent")
     return page_output
+
+
+def _ensure_max_parallel_pages(value: int) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise ValueError("max_parallel_pages invalide")
+    return value
+
+
+def _ensure_orchestration_result(
+    value: _PageConversionOrchestrationResult | None,
+) -> _PageConversionOrchestrationResult:
+    if not isinstance(value, _PageConversionOrchestrationResult):
+        raise ValueError("résultat de conversion parallèle absent")
+    return value
 
 
 def _granite_route_output_tools() -> frozenset[ConversionToolName]:
