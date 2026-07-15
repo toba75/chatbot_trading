@@ -51,6 +51,9 @@ _INDEX_PATH_PATTERN = re.compile(
 _PUBLIC_DOCUMENT_PATH_PATTERN = re.compile(
     r"^/v1/documents(?:/[^/]+(?:/(?:diagnose|convert|index|diagnostic/progress|diagnostic|conversion/progress|conversion|projection/progress|projection|original))?)?$"
 )
+_PUBLIC_CONVERSATION_PATH_PATTERN = re.compile(
+    r"^/v1/conversations(?:/CONV-[A-Za-z0-9-]+(?:/(?:messages|turns))?)?$"
+)
 _INTERNAL_FIELD_NAMES = frozenset(
     {
         "original_storage_ref",
@@ -922,8 +925,12 @@ def _ensure_public_relative_path(value: str) -> str:
     parsed = urlsplit(path)
     if parsed.scheme != "" or parsed.netloc != "" or parsed.fragment != "":
         raise ValueError("chemin documentaire public invalide")
-    if not _PUBLIC_DOCUMENT_PATH_PATTERN.fullmatch(parsed.path) or "://" in path:
-        raise ValueError("chemin documentaire public invalide")
+    is_public_path = (
+        _PUBLIC_DOCUMENT_PATH_PATTERN.fullmatch(parsed.path) is not None
+        or _PUBLIC_CONVERSATION_PATH_PATTERN.fullmatch(parsed.path) is not None
+    )
+    if not is_public_path or "://" in path:
+        raise ValueError("chemin public UI invalide")
     if parsed.query != "" and re.fullmatch(
         r"limit=[1-9][0-9]{0,2}(?:&cursor=DOC-[A-Za-z0-9-]+)?",
         parsed.query,
