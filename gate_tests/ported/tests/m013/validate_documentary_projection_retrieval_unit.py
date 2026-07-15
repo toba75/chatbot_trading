@@ -32,7 +32,7 @@ def test_validate_documentary_projection_retrieval_unit() -> None:
             assert canonical_version_id == "CVER-M013-RETRIEVAL-001"
             return (
                 DocumentaryChunk(
-                    chunk_id="CHUNK-M013-RETRIEVAL-001-A",
+                    chunk_id="KCHK-M013-RETRIEVAL-001-A",
                     text="Le momentum suit la persistance de la tendance.",
                     source_locators=(
                         {
@@ -56,7 +56,7 @@ def test_validate_documentary_projection_retrieval_unit() -> None:
                     ),
                 ),
                 DocumentaryChunk(
-                    chunk_id="CHUNK-M013-RETRIEVAL-001-B",
+                    chunk_id="KCHK-M013-RETRIEVAL-001-B",
                     text="Le risque est distinct de la performance passée.",
                     source_locators=(
                         {
@@ -77,7 +77,7 @@ def test_validate_documentary_projection_retrieval_unit() -> None:
             assert projection_id == "PROJ-M013-RETRIEVAL-001"
             assert question == "Explique le momentum."
             assert limit == 4
-            return ("CHUNK-M013-RETRIEVAL-001-A",)
+            return ("KCHK-M013-RETRIEVAL-001-A",)
 
     retriever = DocumentaryProjectionRetriever(
         projection_reader=ProjectionReader(),
