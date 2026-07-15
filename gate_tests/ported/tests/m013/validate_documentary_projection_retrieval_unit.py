@@ -33,7 +33,8 @@ def test_validate_documentary_projection_retrieval_unit() -> None:
             return (
                 DocumentaryChunk(
                     chunk_id="KCHK-M013-RETRIEVAL-001-A",
-                    text="Le momentum suit la persistance de la tendance.",
+                    chunk_level="PARENT",
+                    text="Vue d'ensemble du document.",
                     source_locators=(
                         {
                             "schema_version": "1.0",
@@ -44,29 +45,30 @@ def test_validate_documentary_projection_retrieval_unit() -> None:
                             "bbox": (0.1, 0.2, 0.3, 0.4),
                             "content_hash": "a" * 64,
                         },
-                        {
-                            "schema_version": "1.0",
-                            "canonical_version_id": canonical_version_id,
-                            "document_id": "DOC-M013-RETRIEVAL-001",
-                            "page_pdf": 5,
-                            "item_id": "ITEM-M013-RETRIEVAL-001-A2",
-                            "bbox": (0.1, 0.2, 0.3, 0.4),
-                            "content_hash": "c" * 64,
-                        },
                     ),
                 ),
                 DocumentaryChunk(
                     chunk_id="KCHK-M013-RETRIEVAL-001-B",
-                    text="Le risque est distinct de la performance passée.",
+                    chunk_level="CHILD",
+                    text="Le momentum suit la persistance de la tendance.",
                     source_locators=(
                         {
                             "schema_version": "1.0",
                             "canonical_version_id": canonical_version_id,
                             "document_id": "DOC-M013-RETRIEVAL-001",
                             "page_pdf": 5,
-                            "item_id": "ITEM-M013-RETRIEVAL-001-B",
+                            "item_id": "ITEM-M013-RETRIEVAL-001-B1",
                             "bbox": (0.1, 0.2, 0.3, 0.4),
                             "content_hash": "b" * 64,
+                        },
+                        {
+                            "schema_version": "1.0",
+                            "canonical_version_id": canonical_version_id,
+                            "document_id": "DOC-M013-RETRIEVAL-001",
+                            "page_pdf": 6,
+                            "item_id": "ITEM-M013-RETRIEVAL-001-B2",
+                            "bbox": (0.1, 0.2, 0.3, 0.4),
+                            "content_hash": "c" * 64,
                         },
                     ),
                 ),
@@ -76,8 +78,11 @@ def test_validate_documentary_projection_retrieval_unit() -> None:
         def select_chunk_ids(self, *, projection_id: str, question: str, limit: int):
             assert projection_id == "PROJ-M013-RETRIEVAL-001"
             assert question == "Explique le momentum."
-            assert limit == 4
-            return ("KCHK-M013-RETRIEVAL-001-A",)
+            assert limit == 32
+            return (
+                "KCHK-M013-RETRIEVAL-001-A",
+                "KCHK-M013-RETRIEVAL-001-B",
+            )
 
     retriever = DocumentaryProjectionRetriever(
         projection_reader=ProjectionReader(),
@@ -96,4 +101,4 @@ def test_validate_documentary_projection_retrieval_unit() -> None:
     )
     assert len(evidence) == 1
     assert evidence[0].excerpt.startswith("Le momentum")
-    assert tuple(locator["page_pdf"] for locator in evidence[0].source_locators) == (4, 5)
+    assert tuple(locator["page_pdf"] for locator in evidence[0].source_locators) == (5, 6)
