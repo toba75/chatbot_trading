@@ -64,10 +64,12 @@ def test_validate_ui_local_stack_unit() -> None:
         ui_local_stack.time.sleep = original_sleep
     assert calls == [frozenset((0, 1, 2)), frozenset((0, 1, 2))]
 
-    # Given `uv run ui` rend le diagnostic disponible.
-    # When la stack locale est ouverte.
+    # Given un conteneur Qdrant déjà démarré et explicitement géré par
+    # `uv run ui` après un arrêt incomplet de l'interface.
+    # When la stack locale est relancée.
     # Then PostgreSQL, Qdrant, gateway, API et les workers réels sont démarrés,
-    # puis arrêtés dans l'ordre inverse sans chemin de remplacement.
+    # puis arrêtés dans l'ordre inverse sans chemin de remplacement ni refus
+    # du port que ce conteneur possède déjà.
     with TemporaryDirectory() as temporary_directory:
         root = Path(temporary_directory)
         source_config = root / "config" / "application.yaml"
@@ -125,7 +127,7 @@ def test_validate_ui_local_stack_unit() -> None:
             for name, original in originals.items():
                 setattr(ui_local_stack, name, original)
         assert events == [
-            "port:8080", "port:8090", "port:56333", "port:8081",
+            "port:8080", "port:8090", "port:8081",
             "secret:postgres_password", "secret:local_api_token",
             "postgres-start", "postgres-ready", "qdrant-start", "qdrant-ready",
             "gateway-start", "gateway-ready",
