@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Protocol
@@ -23,6 +24,9 @@ class DocumentaryEvidenceRetriever(Protocol):
         question: str,
         selected_document_ids: tuple[str, ...],
     ) -> tuple[DocumentaryEvidence, ...]: ...
+
+
+_EVIDENCE_MARKER_PATTERN = re.compile(r"\[EXTRAIT (?P<ordinal>[1-9][0-9]*)\]")
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,6 +81,12 @@ class LiveDocumentaryAnswerError(ValueError):
         super().__init__(self.error_code)
 
 
+@dataclass(frozen=True, slots=True)
+class _StructuredDocumentaryAnswer:
+    answer_text: str
+    used_evidence_ordinals: tuple[int, ...]
+
+
 class LiveDocumentaryAnswerService:
     """Construit le contexte LLM depuis KA et conserve les citations source."""
 
@@ -121,7 +131,10 @@ class LiveDocumentaryAnswerService:
                         role="system",
                         content=(
                             "Réponds en français exclusivement à partir des extraits documentaires fournis. "
-                            "N'ajoute aucun fait absent des extraits."
+                            "N'ajoute aucun fait absent des extraits. "
+                            "Ajoute des marqueurs [EXTRAIT n] dans la réponse pour chaque extrait réellement "
+                            "utilisé. N'inclus jamais un sommaire ou une table des matières qui ne soutient pas "
+                            "directement la réponse."
                         ),
                     ),
                     LlmInferenceMessage(
@@ -145,16 +158,16 @@ class LiveDocumentaryAnswerService:
                 sampling_parameters={"temperature": 0},
             )
         )
-        answer_text = _answer_text(inference)
+        structured_answer = _structured_answer(inference, evidence_count=len(evidence))
         answer_id = f"ANS-LIVE-{_short_hash(request.conversation_id + request.turn_id)}"
         return LiveDocumentaryAnswer(
             answer_id=answer_id,
-            answer_text=answer_text,
+            answer_text=structured_answer.answer_text,
             citations=tuple(
                 citation
-                for evidence_ordinal, item in enumerate(evidence, start=1)
+                for evidence_ordinal in structured_answer.used_evidence_ordinals
                 for citation in _citations_for(
-                    evidence_item=item,
+                    evidence_item=evidence[evidence_ordinal - 1],
                     evidence_ordinal=evidence_ordinal,
                     request=request,
                 )
@@ -165,7 +178,7 @@ class LiveDocumentaryAnswerService:
         )
 
 
-def _answer_text(response: object) -> str:
+def _structured_answer(response: object, *, evidence_count: int) -> _StructuredDocumentaryAnswer:
     if not isinstance(response, LlmInferenceResponse):
         raise ValueError("réponse gateway invalide")
     if response.status_code != 200:
@@ -177,10 +190,21 @@ def _answer_text(response: object) -> str:
     structured = response.payload.get("structured_output")
     if not isinstance(structured, Mapping):
         raise LiveDocumentaryAnswerError("LLM_GATEWAY_RESPONSE_INVALID")
+    if set(structured) != {"answer"}:
+        raise LiveDocumentaryAnswerError("LLM_GATEWAY_RESPONSE_INVALID")
     try:
-        return _ensure_text(structured.get("answer"), "answer")
+        marked_answer_text = _ensure_text(structured.get("answer"), "answer")
+        used_evidence_ordinals = _evidence_ordinals_from_marked_answer(
+            marked_answer_text,
+            evidence_count=evidence_count,
+        )
+        answer_text = _answer_without_evidence_markers(marked_answer_text)
     except ValueError as exc:
         raise LiveDocumentaryAnswerError("LLM_GATEWAY_RESPONSE_INVALID") from exc
+    return _StructuredDocumentaryAnswer(
+        answer_text=answer_text,
+        used_evidence_ordinals=used_evidence_ordinals,
+    )
 
 
 def _prompt(question: str, evidence: tuple[DocumentaryEvidence, ...]) -> str:
@@ -201,22 +225,48 @@ def _citations_for(
     evidence_ordinal: int,
     request: LiveDocumentaryAnswerRequest,
 ) -> tuple[Mapping[str, Any], ...]:
-    citations = []
-    for locator_ordinal, locator in enumerate(evidence_item.source_locators, start=1):
-        suffix = _short_hash(
-            f"{request.turn_id}:{evidence_ordinal}:{locator_ordinal}:{locator['content_hash']}"
-        )
-        citations.append(
-            {
-                "citation_id": f"CIT-LIVE-{suffix}",
-                "evidence_id": f"EVS-LIVE-{suffix}",
-                "quoted_span_hash": hashlib.sha256(
-                    evidence_item.excerpt.encode("utf-8")
-                ).hexdigest(),
-                "source_locator": locator,
-            }
-        )
-    return tuple(citations)
+    locator = _primary_source_locator(evidence_item)
+    suffix = _short_hash(
+        f"{request.turn_id}:{evidence_ordinal}:{locator['content_hash']}"
+    )
+    return (
+        {
+            "citation_id": f"CIT-LIVE-{suffix}",
+            "evidence_id": f"EVS-LIVE-{suffix}",
+            "quoted_span_hash": hashlib.sha256(
+                evidence_item.excerpt.encode("utf-8")
+            ).hexdigest(),
+            "source_locator": locator,
+        },
+    )
+
+
+def _evidence_ordinals_from_marked_answer(value: str, *, evidence_count: int) -> tuple[int, ...]:
+    if isinstance(evidence_count, bool) or not isinstance(evidence_count, int) or evidence_count < 1:
+        raise ValueError("evidence_count invalide")
+    _ensure_text(value, "answer")
+    ordinals = tuple(int(match.group("ordinal")) for match in _EVIDENCE_MARKER_PATTERN.finditer(value))
+    if len(ordinals) == 0:
+        raise ValueError("evidence_markers absents")
+    for ordinal in ordinals:
+        if ordinal < 1 or ordinal > evidence_count:
+            raise ValueError("evidence_marker hors plage")
+    return tuple(dict.fromkeys(ordinals))
+
+
+def _answer_without_evidence_markers(value: str) -> str:
+    without_markers = _EVIDENCE_MARKER_PATTERN.sub("", _ensure_text(value, "answer"))
+    answer_text = re.sub(r"\s+", " ", without_markers).strip()
+    return _ensure_text(answer_text, "answer")
+
+
+def _primary_source_locator(evidence_item: DocumentaryEvidence) -> Mapping[str, Any]:
+    if not isinstance(evidence_item, DocumentaryEvidence):
+        raise ValueError("evidence_item invalide")
+    locators = tuple(evidence_item.source_locators)
+    if len(locators) == 0:
+        raise ValueError("source_locators absents")
+    return locators[0]
 
 
 def _citation(value: object) -> Mapping[str, Any]:

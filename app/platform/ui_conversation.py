@@ -186,7 +186,7 @@ def _render_answer(turn: UiConversationTurn) -> str:
                 f'<code>{escape(citation.citation_id)}</code> — ',
                 f'Document <code>{escape(str(citation.source_locator["document_id"]))}</code>, ',
                 f'page {escape(str(citation.source_locator["page_pdf"]))}, ',
-                f'<a href="/ui/documents/{escape(str(citation.source_locator["document_id"]))}/pdf">ouvrir le PDF</a>',
+                _citation_pdf_link(citation.source_locator),
                 "</li>",
             )
         )
@@ -210,6 +210,17 @@ def _render_answer(turn: UiConversationTurn) -> str:
             f"<h3>Conflits non résolus</h3>{conflicts}",
             "</section>",
         )
+    )
+
+
+def _citation_pdf_link(source_locator: object) -> str:
+    if not isinstance(source_locator, dict):
+        raise ValueError("source_locator UI invalide")
+    document_id = str(source_locator["document_id"])
+    page_pdf = str(source_locator["page_pdf"])
+    return (
+        f'<a href="/ui/documents/{escape(document_id)}/pdf/content#page={escape(page_pdf)}">'
+        "ouvrir le PDF</a>"
     )
 
 

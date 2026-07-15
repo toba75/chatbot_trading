@@ -74,8 +74,7 @@ def test_validate_live_documentary_answer_unit() -> None:
                 status_code=200,
                 payload={
                     "structured_output": {
-                        "answer": "Le momentum décrit la persistance du mouvement de prix.",
-                        "used_evidence_ordinals": [2],
+                        "answer": "Le momentum décrit la persistance du mouvement de prix. [EXTRAIT 2]",
                     },
                     "raw_response_id": "RAW-M013-LIVE-001",
                     "provenance": {"configuration_hash": "c" * 64},
@@ -105,9 +104,10 @@ def test_validate_live_documentary_answer_unit() -> None:
     )
     assert answer.support_status == "PARTIALLY_SUPPORTED"
     assert tuple(citation["source_locator"]["page_pdf"] for citation in answer.citations) == (12,)
+    assert "[EXTRAIT 2]" not in answer.answer_text
     assert "persistance" in answer.answer_text
     assert gateway.request is not None
-    assert "Renvoie uniquement les numéros d'extraits réellement utilisés" in gateway.request.messages[0].content
+    assert "marqueurs [EXTRAIT n]" in gateway.request.messages[0].content
     assert "Le momentum mesure" in gateway.request.messages[1].content
 
     class EmptyRetriever:
