@@ -135,6 +135,34 @@ class UiConversationAnswer:
             _ensure_text(self.abstention_reason, "abstention_reason")
 
 
+@dataclass(frozen=True, slots=True)
+class UiConversationTurn:
+    conversation_id: str
+    turn_id: str
+    sequence: int
+    role: str
+    message: str
+    occurred_at: str
+    presentation: UiConversationAnswer | None
+
+    def __post_init__(self) -> None:
+        _ensure_identifier(self.conversation_id, "CONV", "conversation_id")
+        _ensure_identifier(self.turn_id, "TURN", "turn_id")
+        if isinstance(self.sequence, bool) or not isinstance(self.sequence, int) or self.sequence < 1:
+            raise ValueError("sequence conversation invalide")
+        if self.role != "USER":
+            raise ValueError("role conversation invalide")
+        _ensure_text(self.message, "message")
+        _ensure_utc(self.occurred_at, "occurred_at")
+        if self.presentation is not None:
+            if not isinstance(self.presentation, UiConversationAnswer):
+                raise ValueError("présentation conversation invalide")
+            if self.presentation.conversation_id != self.conversation_id:
+                raise ValueError("présentation conversation incohérente")
+            if self.presentation.turn_id != self.turn_id:
+                raise ValueError("présentation tour incohérente")
+
+
 class UiConversationApiUnavailableError(ConnectionError):
     """L'unique API orchestratrice n'est pas joignable."""
 
@@ -183,6 +211,16 @@ class UiConversationApiClient:
         response = self._json_request("GET", f"/v1/conversations/{identifier}", None)
         _require_status(response, {200})
         return _conversation_from_payload(response.payload)
+
+    def read_turns(self, conversation_id: str) -> tuple[UiConversationTurn, ...]:
+        identifier = _ensure_identifier(conversation_id, "CONV", "conversation_id")
+        response = self._json_request(
+            "GET",
+            f"/v1/conversations/{identifier}/turns",
+            None,
+        )
+        _require_status(response, {200})
+        return _turns_from_payload(response.payload, conversation_id=identifier)
 
     def send_message(
         self,
@@ -338,6 +376,56 @@ def _answer_from_payload(payload: Mapping[str, Any]) -> UiConversationAnswer:
     )
 
 
+def _turns_from_payload(
+    payload: Mapping[str, Any],
+    *,
+    conversation_id: str,
+) -> tuple[UiConversationTurn, ...]:
+    if set(payload) != {"conversation_id", "next_page_token", "turns"}:
+        raise ValueError("contrat d'historique conversationnel incompatible")
+    if payload["conversation_id"] != conversation_id:
+        raise ValueError("historique conversationnel incohérent")
+    if payload["next_page_token"] is not None:
+        raise ValueError("pagination conversationnelle non prise en charge")
+    raw_turns = payload["turns"]
+    if isinstance(raw_turns, (str, bytes)) or not isinstance(raw_turns, Sequence):
+        raise ValueError("tours conversationnels invalides")
+    turns: list[UiConversationTurn] = []
+    for raw_turn in raw_turns:
+        parsed = dict(_ensure_mapping(raw_turn, "tour conversationnel"))
+        required = {
+            "conversation_id",
+            "turn_id",
+            "sequence",
+            "role",
+            "message",
+            "occurred_at",
+        }
+        if set(parsed) not in (required, required | {"presentation"}):
+            raise ValueError("contrat de tour conversationnel incompatible")
+        presentation = (
+            None
+            if "presentation" not in parsed
+            else _answer_from_payload(
+                _ensure_mapping(parsed["presentation"], "présentation conversationnelle")
+            )
+        )
+        turns.append(
+            UiConversationTurn(
+                conversation_id=parsed["conversation_id"],
+                turn_id=parsed["turn_id"],
+                sequence=parsed["sequence"],
+                role=parsed["role"],
+                message=parsed["message"],
+                occurred_at=parsed["occurred_at"],
+                presentation=presentation,
+            )
+        )
+    if tuple(turn.sequence for turn in turns) != tuple(range(1, len(turns) + 1)):
+        raise ValueError("séquence conversationnelle invalide")
+    return tuple(turns)
+
+
 def _required(value: object, name: str) -> Any:
     mapping = _ensure_mapping(value, "citation")
     if name not in mapping:
@@ -400,5 +488,6 @@ __all__ = [
     "UiConversationApiResponse",
     "UiConversationApiUnavailableError",
     "UiConversationCitation",
+    "UiConversationTurn",
     "UiConversationView",
 ]

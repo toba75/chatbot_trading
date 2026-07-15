@@ -97,7 +97,7 @@ def test_validate_ui_conversation_screen_acceptance() -> None:
                                         "support_status": "SUPPORTED",
                                         "answer_id": "ANS-M013-CHAT-001",
                                         "verified_answer_ref": "ANS-M013-CHAT-001@1",
-                                        "answer_text": "Le momentum est documenté par le passage cité.",
+                                        "answer_text": "Le momentum est décrit dans le document sélectionné.",
                                         "knowledge_gaps": [],
                                         "unresolved_conflicts": [],
                                         "abstention_reason": None,

@@ -353,9 +353,12 @@ def _serve_http(
                         conversation = conversation_client.read_conversation(
                             conversation_match.group("conversation_id")
                         )
+                        turns = conversation_client.read_turns(
+                            conversation_match.group("conversation_id")
+                        )
                         body = render_conversation_page(
                             conversation=conversation,
-                            answer=None,
+                            turns=turns,
                             selectable_documents=_selectable_documents_for_conversation(state),
                         )
                         status_code = 200
@@ -456,30 +459,16 @@ def _serve_http(
                             )
                             return
                         assert message_match is not None
-                        answer = _post_ui_conversation_message_from_form(
+                        _post_ui_conversation_message_from_form(
                             conversation_client=conversation_client,
                             conversation_id=message_match.group("conversation_id"),
                             form=form,
                         )
-                        document_client = _build_ui_document_api_client(
-                            application_configuration=application_configuration,
-                            execution_context=_require_ui_execution_context(ui_execution_context),
-                        )
-                        state = _build_ui_corpus_state(
-                            application_configuration=application_configuration,
-                            api_client=document_client,
-                        )
-                        conversation = conversation_client.read_conversation(
-                            message_match.group("conversation_id")
-                        )
-                        _write_text_response(
+                        _write_redirect_response(
                             self,
-                            status_code=200,
-                            content_type="text/html; charset=utf-8",
-                            body=render_conversation_page(
-                                conversation=conversation,
-                                answer=answer,
-                                selectable_documents=_selectable_documents_for_conversation(state),
+                            location=(
+                                "/ui/conversations/"
+                                f"{message_match.group('conversation_id')}"
                             ),
                         )
                         return

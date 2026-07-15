@@ -110,6 +110,22 @@ class ProductConversationMessageResponse(PublicApiModel):
     abstention_reason: str | None
 
 
+class ProductConversationTurnResponse(PublicApiModel):
+    conversation_id: str
+    turn_id: str
+    sequence: int = Field(ge=1)
+    role: Literal["USER"]
+    message: str = Field(min_length=1)
+    occurred_at: str = Field(min_length=1)
+    presentation: ProductConversationMessageResponse | None = None
+
+
+class ProductConversationTurnsResponse(PublicApiModel):
+    conversation_id: str
+    next_page_token: str | None
+    turns: list[ProductConversationTurnResponse]
+
+
 class BenchmarkRequest(PublicApiModel):
     model: str = Field(min_length=1)
     run_id: str = Field(min_length=1)

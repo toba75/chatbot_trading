@@ -23,6 +23,7 @@ from app.platform.orchestrator_api_models import (
     ProductConversationMessageRequest,
     ProductConversationMessageResponse,
     ProductConversationResponse,
+    ProductConversationTurnsResponse,
     SearchRequest,
     SearchUnavailableResponse,
 )
@@ -127,6 +128,27 @@ def build_product_conversation_router(
             response.body,
             success_status=200,
             success_model=ProductConversationResponse,
+        )
+
+    @router.get(
+        "/v1/conversations/{conversation_id}/turns",
+        response_model=ProductConversationTurnsResponse,
+        responses=PUBLIC_ERROR_RESPONSES,
+    )
+    async def read_conversation_turns(conversation_id: str) -> JSONResponse:
+        response = await run_in_threadpool(
+            adapter.handle,
+            ProductConversationHttpRequest(
+                method="GET",
+                path=f"/v1/conversations/{conversation_id}/turns",
+                body={},
+            ),
+        )
+        return _product_response(
+            response.status_code,
+            response.body,
+            success_status=200,
+            success_model=ProductConversationTurnsResponse,
         )
 
     @router.post(

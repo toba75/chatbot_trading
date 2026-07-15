@@ -6,7 +6,7 @@ from collections.abc import Sequence
 from html import escape
 
 from app.platform.ui_conversation_api import (
-    UiConversationAnswer,
+    UiConversationTurn,
     UiConversationView,
 )
 
@@ -48,7 +48,7 @@ def render_new_conversation_page(
 def render_conversation_page(
     *,
     conversation: UiConversationView,
-    answer: UiConversationAnswer | None,
+    turns: Sequence[UiConversationTurn],
     selectable_documents: Sequence[tuple[str, str]],
     error_code: str | None = None,
 ) -> str:
@@ -56,8 +56,13 @@ def render_conversation_page(
 
     if not isinstance(conversation, UiConversationView):
         raise ValueError("conversation UI invalide")
+    history = tuple(turns)
+    if any(not isinstance(turn, UiConversationTurn) for turn in history):
+        raise ValueError("historique conversationnel UI invalide")
+    if any(turn.conversation_id != conversation.conversation_id for turn in history):
+        raise ValueError("historique conversationnel UI incohérent")
     document_choices = _selectable_documents(selectable_documents, checkbox=True)
-    answer_html = "" if answer is None else _render_answer(answer)
+    history_html = _render_history(history)
     error = "" if error_code is None else _error_notice(error_code)
     return "\n".join(
         (
@@ -70,7 +75,7 @@ def render_conversation_page(
             f"<p>Conversation : <code>{escape(conversation.conversation_id)}</code> — {escape(conversation.title)}</p>",
             f"<p>Statut : <code>{escape(conversation.status)}</code></p>",
             error,
-            answer_html,
+            history_html,
             f'<form method="post" action="/ui/conversations/{escape(conversation.conversation_id)}/messages">',
             '<label>Question autonome<textarea name="message" required maxlength="8000"></textarea></label>',
             '<input type="hidden" name="requested_mode" value="CHAT_DOCUMENTAIRE">',
@@ -84,9 +89,38 @@ def render_conversation_page(
     )
 
 
-def _render_answer(answer: UiConversationAnswer) -> str:
-    if not isinstance(answer, UiConversationAnswer):
-        raise ValueError("réponse conversationnelle UI invalide")
+def _render_history(turns: tuple[UiConversationTurn, ...]) -> str:
+    if len(turns) == 0:
+        return (
+            '<section aria-labelledby="historique-conversationnel">'
+            '<h2 id="historique-conversationnel">Historique</h2>'
+            "<p>Aucun tour.</p></section>"
+        )
+    articles = "".join(_render_turn(turn) for turn in turns)
+    return (
+        '<section aria-labelledby="historique-conversationnel">'
+        '<h2 id="historique-conversationnel">Historique</h2>'
+        f"{articles}</section>"
+    )
+
+
+def _render_turn(turn: UiConversationTurn) -> str:
+    presentation = "" if turn.presentation is None else _render_answer(turn)
+    return "".join(
+        (
+            "<article>",
+            f"<h3>Tour {turn.sequence}</h3>",
+            f"<p>Question utilisateur : {escape(turn.message)}</p>",
+            presentation,
+            "</article>",
+        )
+    )
+
+
+def _render_answer(turn: UiConversationTurn) -> str:
+    answer = turn.presentation
+    if answer is None:
+        raise ValueError("présentation conversationnelle UI absente")
     citations = "".join(
         "".join(
             (
@@ -104,8 +138,8 @@ def _render_answer(answer: UiConversationAnswer) -> str:
     conflicts = "" if len(answer.unresolved_conflicts) == 0 else f"<pre>{escape(str(answer.unresolved_conflicts))}</pre>"
     return "".join(
         (
-            '<section aria-labelledby="réponse-conversationnelle">',
-            '<h2 id="réponse-conversationnelle">Réponse conversationnelle</h2>',
+            '<section aria-label="Réponse conversationnelle">',
+            '<h4>Réponse conversationnelle</h4>',
             f'<p>Tour : <code>{escape(answer.turn_id)}</code></p>',
             f'<p>Question résolue : {escape(answer.resolved_question)}</p>',
             f'<p>Mode : <code>{escape(answer.mode)}</code></p>',
