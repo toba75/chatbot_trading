@@ -50,7 +50,8 @@ fieldset { display: grid; gap: .75rem; min-width: 0; border: 1px solid #c8d4e1; 
 fieldset label { grid-template-columns: auto minmax(0, 1fr); align-items: start; font-weight: 500; }
 fieldset input { width: auto; margin-top: .2rem; }
 button { padding: .85rem 1rem; border: 0; border-radius: 9px; background: #153f6b; color: #fff; font-weight: 750; cursor: pointer; }
-button:hover { background: #0e3156; }
+button:disabled { opacity: .48; cursor: not-allowed; }
+button:not(:disabled):hover { background: #0e3156; }
 @media (max-width: 640px) { .chat-shell { width: 100%; margin: 0; padding: 1rem; border: 0; border-radius: 0; box-shadow: none; } .chat-turn, .chat-answer { padding: 1rem; } }
 </style>"""
 
