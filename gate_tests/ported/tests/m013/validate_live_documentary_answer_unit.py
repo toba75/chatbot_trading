@@ -27,15 +27,26 @@ def test_validate_live_documentary_answer_unit() -> None:
             return (
                 DocumentaryEvidence(
                     excerpt="Le momentum mesure la persistance d'un mouvement de prix.",
-                    source_locator={
-                        "schema_version": "1.0",
-                        "canonical_version_id": "CVER-M013-LIVE-001",
-                        "document_id": "DOC-M013-LIVE-001",
-                        "page_pdf": 12,
-                        "item_id": "ITEM-M013-LIVE-001",
-                        "bbox": (0.1, 0.2, 0.3, 0.4),
-                        "content_hash": "a" * 64,
-                    },
+                    source_locators=(
+                        {
+                            "schema_version": "1.0",
+                            "canonical_version_id": "CVER-M013-LIVE-001",
+                            "document_id": "DOC-M013-LIVE-001",
+                            "page_pdf": 12,
+                            "item_id": "ITEM-M013-LIVE-001-A",
+                            "bbox": (0.1, 0.2, 0.3, 0.4),
+                            "content_hash": "a" * 64,
+                        },
+                        {
+                            "schema_version": "1.0",
+                            "canonical_version_id": "CVER-M013-LIVE-001",
+                            "document_id": "DOC-M013-LIVE-001",
+                            "page_pdf": 13,
+                            "item_id": "ITEM-M013-LIVE-001-B",
+                            "bbox": (0.1, 0.2, 0.3, 0.4),
+                            "content_hash": "b" * 64,
+                        },
+                    ),
                 ),
             )
 
@@ -78,7 +89,7 @@ def test_validate_live_documentary_answer_unit() -> None:
         )
     )
     assert answer.support_status == "PARTIALLY_SUPPORTED"
-    assert answer.citations[0]["source_locator"]["page_pdf"] == 12
+    assert tuple(citation["source_locator"]["page_pdf"] for citation in answer.citations) == (12, 13)
     assert "persistance" in answer.answer_text
     assert gateway.request is not None
     assert "Le momentum mesure" in gateway.request.messages[1].content
