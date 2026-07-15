@@ -104,6 +104,9 @@ def test_validate_live_documentary_answer_unit() -> None:
     )
     assert answer.support_status == "PARTIALLY_SUPPORTED"
     assert tuple(citation["source_locator"]["page_pdf"] for citation in answer.citations) == (12,)
+    assert tuple(citation["quoted_span"] for citation in answer.citations) == (
+        "Le momentum mesure la persistance d'un mouvement de prix.",
+    )
     assert "[EXTRAIT 2]" not in answer.answer_text
     assert "persistance" in answer.answer_text
     assert gateway.request is not None

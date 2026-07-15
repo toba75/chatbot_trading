@@ -61,6 +61,7 @@ def test_validate_ui_conversation_screen_acceptance() -> None:
                                 {
                                     "citation_id": "CIT-M013-CHAT-001",
                                     "evidence_id": "EVS-M013-CHAT-001",
+                                    "quoted_span": "Le momentum qualifie la persistance d'un mouvement de prix.",
                                     "quoted_span_hash": "a" * 64,
                                     "source_locator": {
                                         "schema_version": "1.0",
@@ -109,6 +110,7 @@ def test_validate_ui_conversation_screen_acceptance() -> None:
                                             {
                                                 "citation_id": "CIT-M013-CHAT-001",
                                                 "evidence_id": "EVS-M013-CHAT-001",
+                                                "quoted_span": "Le momentum qualifie la persistance d'un mouvement de prix.",
                                                 "quoted_span_hash": "a" * 64,
                                                 "source_locator": {
                                                     "schema_version": "1.0",
@@ -205,6 +207,7 @@ def test_validate_ui_conversation_screen_acceptance() -> None:
     assert "Le <strong>momentum</strong> est décrit" in html
     assert "overflow-wrap: anywhere" in html
     assert 'class="chat-shell"' in html
+    assert "Le momentum qualifie la persistance d&#x27;un mouvement de prix." in html
     assert "/ui/documents/DOC-M013-CHAT-001/pdf/content#page=7" in html
     assert "/ui/documents/DOC-M013-CHAT-001/pdf\"" not in html
     assert "qdrant" not in html.lower()
