@@ -215,6 +215,7 @@ def test_validate_ui_conversation_screen_acceptance() -> None:
     # est refusée sur le champ selected_documents, sans perdre le brouillon.
     assert 'data-document-selection-required="true"' in html
     assert '<button type="submit" disabled aria-disabled="true">' in html
+    assert "button:disabled" in html
     assert "Sélectionnez au moins un document SEARCHABLE" in html
     try:
         _post_ui_conversation_message_from_form(
