@@ -26,6 +26,20 @@ def test_validate_live_documentary_answer_unit() -> None:
             assert selected_document_ids == ("DOC-M013-LIVE-001",)
             return (
                 DocumentaryEvidence(
+                    excerpt="Sommaire\nMomentum\n12\nTendance\n18",
+                    source_locators=(
+                        {
+                            "schema_version": "1.0",
+                            "canonical_version_id": "CVER-M013-LIVE-001",
+                            "document_id": "DOC-M013-LIVE-001",
+                            "page_pdf": 1,
+                            "item_id": "ITEM-M013-LIVE-001-TOC",
+                            "bbox": (0.1, 0.2, 0.3, 0.4),
+                            "content_hash": "0" * 64,
+                        },
+                    ),
+                ),
+                DocumentaryEvidence(
                     excerpt="Le momentum mesure la persistance d'un mouvement de prix.",
                     source_locators=(
                         {
@@ -60,7 +74,8 @@ def test_validate_live_documentary_answer_unit() -> None:
                 status_code=200,
                 payload={
                     "structured_output": {
-                        "answer": "Le momentum décrit la persistance du mouvement de prix."
+                        "answer": "Le momentum décrit la persistance du mouvement de prix.",
+                        "used_evidence_ordinals": [2],
                     },
                     "raw_response_id": "RAW-M013-LIVE-001",
                     "provenance": {"configuration_hash": "c" * 64},
@@ -89,9 +104,10 @@ def test_validate_live_documentary_answer_unit() -> None:
         )
     )
     assert answer.support_status == "PARTIALLY_SUPPORTED"
-    assert tuple(citation["source_locator"]["page_pdf"] for citation in answer.citations) == (12, 13)
+    assert tuple(citation["source_locator"]["page_pdf"] for citation in answer.citations) == (12,)
     assert "persistance" in answer.answer_text
     assert gateway.request is not None
+    assert "Renvoie uniquement les numéros d'extraits réellement utilisés" in gateway.request.messages[0].content
     assert "Le momentum mesure" in gateway.request.messages[1].content
 
     class EmptyRetriever:

@@ -205,7 +205,8 @@ def test_validate_ui_conversation_screen_acceptance() -> None:
     assert "Le <strong>momentum</strong> est décrit" in html
     assert "overflow-wrap: anywhere" in html
     assert 'class="chat-shell"' in html
-    assert "/ui/documents/DOC-M013-CHAT-001/pdf" in html
+    assert "/ui/documents/DOC-M013-CHAT-001/pdf/content#page=7" in html
+    assert "/ui/documents/DOC-M013-CHAT-001/pdf\"" not in html
     assert "qdrant" not in html.lower()
     assert "vllm" not in html.lower()
 
