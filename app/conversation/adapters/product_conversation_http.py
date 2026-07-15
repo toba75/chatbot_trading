@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Protocol
@@ -364,11 +365,20 @@ def _message_payload(
 
 def _citation_payload(value: object) -> Mapping[str, Any]:
     citation = dict(_ensure_mapping(value, "citation"))
-    if set(citation) != {"citation_id", "evidence_id", "quoted_span_hash", "source_locator"}:
+    if set(citation) != {
+        "citation_id",
+        "evidence_id",
+        "quoted_span",
+        "quoted_span_hash",
+        "source_locator",
+    }:
         raise ValueError("citation invalide")
     _ensure_identifier(citation["citation_id"], "CIT", "citation_id")
     _ensure_identifier(citation["evidence_id"], "EVS", "evidence_id")
-    _ensure_hash(citation["quoted_span_hash"], "quoted_span_hash")
+    quoted_span = _ensure_text(citation["quoted_span"], "quoted_span")
+    quoted_span_hash = _ensure_hash(citation["quoted_span_hash"], "quoted_span_hash")
+    if quoted_span_hash != hashlib.sha256(quoted_span.encode("utf-8")).hexdigest():
+        raise ValueError("quoted_span_hash incoherent")
     locator = dict(_ensure_mapping(citation["source_locator"], "source_locator"))
     if set(locator) != {
         "schema_version", "canonical_version_id", "document_id", "page_pdf", "item_id", "bbox", "content_hash"

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 import sys
 
@@ -27,6 +28,9 @@ def test_validate_product_conversation_router_acceptance() -> None:
         build_product_conversation_router,
     )
 
+    quoted_span = "Passage RA cité."
+    quoted_span_hash = hashlib.sha256(quoted_span.encode("utf-8")).hexdigest()
+
     class IdFactory:
         def __init__(self, values: tuple[str, ...]) -> None:
             self.values = list(values)
@@ -43,7 +47,8 @@ def test_validate_product_conversation_router_acceptance() -> None:
                     {
                         "citation_id": "CIT-M013-ROUTER-001",
                         "evidence_id": "EVS-M013-ROUTER-001",
-                        "quoted_span_hash": "a" * 64,
+                        "quoted_span": quoted_span,
+                        "quoted_span_hash": quoted_span_hash,
                         "source_locator": {
                             "schema_version": "1.0",
                             "canonical_version_id": "CVER-M013-ROUTER-001",

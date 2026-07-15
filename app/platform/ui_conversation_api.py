@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -53,13 +54,17 @@ class UiConversationView:
 class UiConversationCitation:
     citation_id: str
     evidence_id: str
+    quoted_span: str
     quoted_span_hash: str
     source_locator: Mapping[str, Any]
 
     def __post_init__(self) -> None:
         _ensure_identifier(self.citation_id, "CIT", "citation_id")
         _ensure_identifier(self.evidence_id, "EVS", "evidence_id")
-        _ensure_hash(self.quoted_span_hash, "quoted_span_hash")
+        quoted_span = _ensure_text(self.quoted_span, "quoted_span")
+        quoted_span_hash = _ensure_hash(self.quoted_span_hash, "quoted_span_hash")
+        if quoted_span_hash != hashlib.sha256(quoted_span.encode("utf-8")).hexdigest():
+            raise ValueError("quoted_span_hash incohérent")
         locator = dict(_ensure_mapping(self.source_locator, "source_locator"))
         required = {
             "schema_version",
@@ -349,6 +354,7 @@ def _answer_from_payload(payload: Mapping[str, Any]) -> UiConversationAnswer:
         UiConversationCitation(
             citation_id=_required(item, "citation_id"),
             evidence_id=_required(item, "evidence_id"),
+            quoted_span=_required(item, "quoted_span"),
             quoted_span_hash=_required(item, "quoted_span_hash"),
             source_locator=_required(item, "source_locator"),
         )

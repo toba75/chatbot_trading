@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 import sys
 
@@ -22,6 +23,9 @@ def test_validate_product_conversation_http_acceptance() -> None:
         ProductConversationHttpAdapter,
     )
 
+    quoted_span = "Le momentum est documenté par le passage cité."
+    quoted_span_hash = hashlib.sha256(quoted_span.encode("utf-8")).hexdigest()
+
     class SequenceIdFactory:
         def __init__(self, values: tuple[str, ...]) -> None:
             self._values = list(values)
@@ -40,7 +44,8 @@ def test_validate_product_conversation_http_acceptance() -> None:
                     {
                         "citation_id": "CIT-M013-CHAT-001",
                         "evidence_id": "EVS-M013-CHAT-001",
-                        "quoted_span_hash": "a" * 64,
+                        "quoted_span": quoted_span,
+                        "quoted_span_hash": quoted_span_hash,
                         "source_locator": {
                             "schema_version": "1.0",
                             "canonical_version_id": "CVER-M013-CHAT-001",

@@ -41,6 +41,7 @@ code { overflow-wrap: anywhere; color: #153f6b; }
 .answer-text { line-height: 1.65; overflow-wrap: anywhere; }
 .citations { max-height: 24rem; overflow: auto; padding-right: .75rem; }
 .citations li { margin-bottom: .55rem; overflow-wrap: anywhere; }
+.citation-quote { margin: .35rem 0; padding: .65rem .85rem; border-left: 4px solid #6b8db1; background: #fff; color: #203b5c; }
 .chat-form { display: grid; gap: 1rem; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #d7e0eb; }
 label { display: grid; gap: .4rem; font-weight: 650; }
 input, select, textarea, button { width: 100%; font: inherit; }
@@ -184,6 +185,7 @@ def _render_answer(turn: UiConversationTurn) -> str:
             (
                 "<li>",
                 f'<code>{escape(citation.citation_id)}</code> — ',
+                f'<blockquote class="citation-quote">{escape(citation.quoted_span)}</blockquote>',
                 f'Document <code>{escape(str(citation.source_locator["document_id"]))}</code>, ',
                 f'page {escape(str(citation.source_locator["page_pdf"]))}, ',
                 _citation_pdf_link(citation.source_locator),

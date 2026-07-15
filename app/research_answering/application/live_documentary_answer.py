@@ -233,6 +233,7 @@ def _citations_for(
         {
             "citation_id": f"CIT-LIVE-{suffix}",
             "evidence_id": f"EVS-LIVE-{suffix}",
+            "quoted_span": evidence_item.excerpt,
             "quoted_span_hash": hashlib.sha256(
                 evidence_item.excerpt.encode("utf-8")
             ).hexdigest(),
@@ -271,11 +272,20 @@ def _primary_source_locator(evidence_item: DocumentaryEvidence) -> Mapping[str, 
 
 def _citation(value: object) -> Mapping[str, Any]:
     citation = dict(_mapping(value, "citation"))
-    if set(citation) != {"citation_id", "evidence_id", "quoted_span_hash", "source_locator"}:
+    if set(citation) != {
+        "citation_id",
+        "evidence_id",
+        "quoted_span",
+        "quoted_span_hash",
+        "source_locator",
+    }:
         raise ValueError("citation invalide")
     _ensure_identifier(citation["citation_id"], "CIT", "citation_id")
     _ensure_identifier(citation["evidence_id"], "EVS", "evidence_id")
-    _ensure_hash(citation["quoted_span_hash"], "quoted_span_hash")
+    quoted_span = _ensure_text(citation["quoted_span"], "quoted_span")
+    quoted_span_hash = _ensure_hash(citation["quoted_span_hash"], "quoted_span_hash")
+    if quoted_span_hash != hashlib.sha256(quoted_span.encode("utf-8")).hexdigest():
+        raise ValueError("quoted_span_hash incohérent")
     citation["source_locator"] = _source_locator(citation["source_locator"])
     return citation
 

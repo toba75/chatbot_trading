@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 import sys
@@ -24,6 +25,9 @@ def test_validate_ui_conversation_screen_acceptance() -> None:
         UiConversationFormError,
         _post_ui_conversation_message_from_form,
     )
+
+    quoted_span = "Le momentum qualifie la persistance d'un mouvement de prix."
+    quoted_span_hash = hashlib.sha256(quoted_span.encode("utf-8")).hexdigest()
 
     class RecordingTransport:
         def __init__(self) -> None:
@@ -61,8 +65,8 @@ def test_validate_ui_conversation_screen_acceptance() -> None:
                                 {
                                     "citation_id": "CIT-M013-CHAT-001",
                                     "evidence_id": "EVS-M013-CHAT-001",
-                                    "quoted_span": "Le momentum qualifie la persistance d'un mouvement de prix.",
-                                    "quoted_span_hash": "a" * 64,
+                                    "quoted_span": quoted_span,
+                                    "quoted_span_hash": quoted_span_hash,
                                     "source_locator": {
                                         "schema_version": "1.0",
                                         "canonical_version_id": "CVER-M013-CHAT-001",
@@ -110,8 +114,8 @@ def test_validate_ui_conversation_screen_acceptance() -> None:
                                             {
                                                 "citation_id": "CIT-M013-CHAT-001",
                                                 "evidence_id": "EVS-M013-CHAT-001",
-                                                "quoted_span": "Le momentum qualifie la persistance d'un mouvement de prix.",
-                                                "quoted_span_hash": "a" * 64,
+                                                "quoted_span": quoted_span,
+                                                "quoted_span_hash": quoted_span_hash,
                                                 "source_locator": {
                                                     "schema_version": "1.0",
                                                     "canonical_version_id": "CVER-M013-CHAT-001",

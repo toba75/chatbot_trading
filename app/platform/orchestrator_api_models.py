@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from typing import Annotated, Literal
 
 from pydantic import (
@@ -84,8 +85,16 @@ class ProductConversationResponse(PublicApiModel):
 class ProductConversationCitationResponse(PublicApiModel):
     citation_id: str
     evidence_id: str
+    quoted_span: str = Field(min_length=1)
     quoted_span_hash: str = Field(min_length=64, max_length=64)
     source_locator: "SourceLocatorResponse"
+
+    @model_validator(mode="after")
+    def validate_quoted_span_hash(self) -> "ProductConversationCitationResponse":
+        expected = hashlib.sha256(self.quoted_span.encode("utf-8")).hexdigest()
+        if self.quoted_span_hash != expected:
+            raise ValueError("quoted_span_hash incohérent")
+        return self
 
 
 class ProductConversationMessageResponse(PublicApiModel):
