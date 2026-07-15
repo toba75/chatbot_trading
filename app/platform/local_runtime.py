@@ -9,6 +9,7 @@ import re
 import sys
 import threading
 import socket
+from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
@@ -81,9 +82,22 @@ _UI_DOCUMENT_INSPECTION_PATH_PATTERN = re.compile(
 _UI_PDF_CONTENT_PATH_PATTERN = re.compile(
     r"^/ui/documents/(?P<document_id>[^/]+)/pdf/content$"
 )
+from app.platform.ui_conversation import (
+    render_conversation_page,
+    render_new_conversation_page,
+)
+from app.platform.ui_conversation_api import (
+    UiConversationApiClient,
+    UiConversationApiPublicError,
+    UiConversationApiUnavailableError,
+)
 _DIAGNOSE_PATH_PATTERN = re.compile(r"^/v1/documents/(?P<document_id>[^/]+)/diagnose$")
 _CONVERT_PATH_PATTERN = re.compile(r"^/v1/documents/(?P<document_id>[^/]+)/convert$")
 _INDEX_PATH_PATTERN = re.compile(r"^/v1/documents/(?P<document_id>[^/]+)/index$")
+_UI_CONVERSATION_PATH_PATTERN = re.compile(r"^/ui/conversations/(?P<conversation_id>CONV-[^/]+)$")
+_UI_CONVERSATION_MESSAGE_PATH_PATTERN = re.compile(
+    r"^/ui/conversations/(?P<conversation_id>CONV-[^/]+)/messages$"
+)
 _LLM_GATEWAY_LOCK = threading.Lock()
 _LLM_GATEWAY_INSTANCE: OpenAICompatibleLocalLanguageModelGateway | None = None
 _LLM_GATEWAY_CONFIGURATION_HASH: str | None = None
@@ -311,6 +325,59 @@ def _serve_http(
                         ),
                     )
                     return
+                if request_path == "/ui/chat":
+                    state = _build_ui_corpus_state(
+                        application_configuration=application_configuration,
+                        api_client=api_client,
+                    )
+                    _write_text_response(
+                        self,
+                        status_code=200,
+                        content_type="text/html; charset=utf-8",
+                        body=render_new_conversation_page(
+                            selectable_documents=_selectable_documents_for_conversation(state),
+                        ),
+                    )
+                    return
+                conversation_match = _UI_CONVERSATION_PATH_PATTERN.fullmatch(request_path)
+                if conversation_match is not None:
+                    state = _build_ui_corpus_state(
+                        application_configuration=application_configuration,
+                        api_client=api_client,
+                    )
+                    conversation_client = _build_ui_conversation_api_client(
+                        application_configuration=application_configuration,
+                        execution_context=_require_ui_execution_context(ui_execution_context),
+                    )
+                    try:
+                        conversation = conversation_client.read_conversation(
+                            conversation_match.group("conversation_id")
+                        )
+                        body = render_conversation_page(
+                            conversation=conversation,
+                            answer=None,
+                            selectable_documents=_selectable_documents_for_conversation(state),
+                        )
+                        status_code = 200
+                    except UiConversationApiPublicError as exc:
+                        body = render_new_conversation_page(
+                            selectable_documents=_selectable_documents_for_conversation(state),
+                            error_code=str(exc),
+                        )
+                        status_code = exc.status_code
+                    except UiConversationApiUnavailableError:
+                        body = render_new_conversation_page(
+                            selectable_documents=_selectable_documents_for_conversation(state),
+                            error_code=ORCHESTRATOR_API_UNAVAILABLE,
+                        )
+                        status_code = 503
+                    _write_text_response(
+                        self,
+                        status_code=status_code,
+                        content_type="text/html; charset=utf-8",
+                        body=body,
+                    )
+                    return
                 status_code, content_type, response_body = ui_get_response(
                     path=request_path,
                     state=_build_ui_corpus_state(
@@ -366,6 +433,56 @@ def _serve_http(
                     _write_text_response(self, status_code=400, content_type="text/html; charset=utf-8", body=_accessible_ui_error_page("HTTP_REQUEST_INVALID"))
                     return
                 try:
+                    message_match = _UI_CONVERSATION_MESSAGE_PATH_PATTERN.fullmatch(self.path)
+                    if self.path == "/ui/conversations" or message_match is not None:
+                        if content_type.split(";", 1)[0].strip().lower() != "application/x-www-form-urlencoded":
+                            raise ValueError("format conversation UI invalide")
+                        form = parse_qs(
+                            self.rfile.read(content_length).decode("utf-8"),
+                            strict_parsing=True,
+                        )
+                        conversation_client = _build_ui_conversation_api_client(
+                            application_configuration=application_configuration,
+                            execution_context=_require_ui_execution_context(ui_execution_context),
+                        )
+                        if self.path == "/ui/conversations":
+                            response = _create_ui_conversation_from_form(
+                                conversation_client=conversation_client,
+                                form=form,
+                            )
+                            _write_redirect_response(
+                                self,
+                                location=f"/ui/conversations/{response.conversation_id}",
+                            )
+                            return
+                        assert message_match is not None
+                        answer = _post_ui_conversation_message_from_form(
+                            conversation_client=conversation_client,
+                            conversation_id=message_match.group("conversation_id"),
+                            form=form,
+                        )
+                        document_client = _build_ui_document_api_client(
+                            application_configuration=application_configuration,
+                            execution_context=_require_ui_execution_context(ui_execution_context),
+                        )
+                        state = _build_ui_corpus_state(
+                            application_configuration=application_configuration,
+                            api_client=document_client,
+                        )
+                        conversation = conversation_client.read_conversation(
+                            message_match.group("conversation_id")
+                        )
+                        _write_text_response(
+                            self,
+                            status_code=200,
+                            content_type="text/html; charset=utf-8",
+                            body=render_conversation_page(
+                                conversation=conversation,
+                                answer=answer,
+                                selectable_documents=_selectable_documents_for_conversation(state),
+                            ),
+                        )
+                        return
                     client = _build_ui_document_api_client(
                         application_configuration=application_configuration,
                         execution_context=_require_ui_execution_context(
@@ -407,7 +524,7 @@ def _serve_http(
                             content_length=content_length,
                             content_type=content_type,
                         )
-                except UiDocumentApiUnavailableError:
+                except (UiDocumentApiUnavailableError, UiConversationApiUnavailableError):
                     response = UiDocumentJsonResponse(
                         status_code=503,
                         payload={"error_code": ORCHESTRATOR_API_UNAVAILABLE},
@@ -417,6 +534,14 @@ def _serve_http(
                         status_code=404,
                         payload={"error_code": "UI_DOCUMENT_COMMAND_FORBIDDEN"},
                     )
+                except UiConversationApiPublicError as exc:
+                    _write_text_response(
+                        self,
+                        status_code=exc.status_code,
+                        content_type="text/html; charset=utf-8",
+                        body=_accessible_ui_error_page(str(exc)),
+                    )
+                    return
                 except (UnicodeDecodeError, ValueError):
                     response = UiDocumentJsonResponse(
                         status_code=400,
@@ -977,6 +1102,83 @@ def _build_inference_request(body: dict[str, Any]) -> InferenceRequest:
         prompt_version=_required_body_text(body, "prompt_version"),
         sampling_parameters=_required_body_mapping(body, "sampling_parameters"),
     )
+
+
+def _build_ui_conversation_api_client(
+    *,
+    application_configuration: ApplicationConfiguration,
+    execution_context: str,
+) -> UiConversationApiClient:
+    configuration = _required_application_configuration(application_configuration)
+    return UiConversationApiClient(
+        transport=UrllibUiDocumentApiTransport(
+            orchestrator_origin=build_ui_orchestrator_origin(
+                configuration,
+                execution_context=execution_context,
+            ),
+            timeout_seconds=min(configuration.runtime.timeouts.request_seconds, UI_SOCKET_TIMEOUT_SECONDS),
+            token_path=configuration.security.secrets.local_api_token_path,
+        )
+    )
+
+
+def _selectable_documents_for_conversation(
+    state: CorpusPdfScreenState,
+) -> tuple[tuple[str, str], ...]:
+    if not isinstance(state, CorpusPdfScreenState):
+        raise TypeError("état corpus UI invalide")
+    return tuple(
+        (document.document_id, document.title)
+        for document in state.documents
+        if document.selectable_for_conversation
+    )
+
+
+def _create_ui_conversation_from_form(
+    *,
+    conversation_client: UiConversationApiClient,
+    form: dict[str, list[str]],
+):
+    required = {"title", "allowed_universe", "language", "detail_level", "format", "citation_style"}
+    if set(form) != required or any(len(form[field]) != 1 for field in required):
+        raise ValueError("formulaire de conversation invalide")
+    return conversation_client.create_conversation(
+        title=form["title"][0],
+        default_mandate={
+            "allowed_universe": [form["allowed_universe"][0]],
+            "language": form["language"][0],
+            "detail_level": form["detail_level"][0],
+        },
+        presentation_preferences={
+            "format": form["format"][0],
+            "citation_style": form["citation_style"][0],
+        },
+        occurred_at=_ui_now(),
+    )
+
+
+def _post_ui_conversation_message_from_form(
+    *,
+    conversation_client: UiConversationApiClient,
+    conversation_id: str,
+    form: dict[str, list[str]],
+):
+    if set(form) != {"message", "requested_mode", "selected_documents"}:
+        raise ValueError("message conversation invalide")
+    if len(form["message"]) != 1 or len(form["requested_mode"]) != 1:
+        raise ValueError("message conversation invalide")
+    return conversation_client.send_message(
+        conversation_id=conversation_id,
+        message=form["message"][0],
+        idempotency_key=f"ui-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}",
+        occurred_at=_ui_now(),
+        requested_mode=form["requested_mode"][0],
+        selected_documents=tuple(form["selected_documents"]),
+    )
+
+
+def _ui_now() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _build_inference_image_message(*, role: str, content: list[Any]) -> InferenceImageMessage:

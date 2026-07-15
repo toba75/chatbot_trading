@@ -334,6 +334,7 @@ def render_corpus_pdf_screen(state: CorpusPdfScreenState) -> str:
             "  <header>",
             "    <h1>Corpus PDF</h1>",
             f'    <p>Read-model documentaire: <span class="status">{_escape(parsed_state.read_model_status)}</span></p>',
+            '    <p><a href="/ui/chat">Ouvrir le chat documentaire</a></p>',
             f"    {blocking_notice}",
             f"    {registration_confirmation}",
             "  </header>",

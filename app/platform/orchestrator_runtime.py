@@ -7,11 +7,20 @@ from importlib.metadata import version
 from pathlib import Path
 import asyncio
 from typing import Mapping, Protocol, Sequence
+from uuid import uuid4
 
 from fastapi import APIRouter
 
 from app.contracts.llm_inference import LlmInferenceGateway
 from app.conversation.application.public_chat import ProductConversationHandler
+from app.conversation.adapters.in_memory_conversation_repository import (
+    InMemoryConversationRepository,
+)
+from app.conversation.adapters.in_memory_turn_repository import InMemoryTurnRepository
+from app.conversation.adapters.live_documentary_answer_provider import (
+    LiveDocumentaryConversationAnswerProvider,
+)
+from app.conversation.adapters.product_conversation_http import ProductConversationHttpAdapter
 from app.evaluation.application.llm_real_path import LlmRealPathBenchmarkHandler
 from app.knowledge_access.application.public_commands import (
     IndexingUnavailableHandler,
@@ -23,6 +32,12 @@ from app.knowledge_access.adapters.postgres_projection_read import (
 )
 from app.knowledge_access.adapters.projection_http import KnowledgeProjectionHttpAdapter
 from app.knowledge_access.adapters.projection_runtime import ProjectionRuntimeService
+from app.knowledge_access.adapters.live_documentary_retrieval import (
+    CanonicalProjectionChunkReader,
+    DocumentaryProjectionRetriever,
+    PostgresSearchableProjectionReader,
+    QdrantSparseChunkSelector,
+)
 from app.knowledge_access.application.projection_queries import ProjectionQueryService
 from app.knowledge_access.adapters.http import (
     build_projection_command_router,
@@ -35,6 +50,7 @@ from app.platform.orchestrator_composition import (
     OrchestratorCompositionRoot,
 )
 from app.platform.orchestrator_contract_routers import build_public_contract_router
+from app.platform.orchestrator_contract_routers import build_product_conversation_router
 from app.platform.orchestrator_public_services import PublicContractServices
 from app.platform.llm_gateway.orchestrator_health import HttpHealthOrchestratorDependency
 from app.platform.llm_gateway.orchestrator_http import UrllibLlmInferenceGateway
@@ -69,12 +85,27 @@ from app.source_processing.application.document_queries import (
     DocumentQueryService,
 )
 from app.source_processing.application.original_queries import OriginalPdfQueryService
+from app.research_answering.application.live_documentary_answer import (
+    LiveDocumentaryAnswerService,
+)
 
 
 MAX_PDF_BYTES = 50 * 1024 * 1024
 PROJECTION_CHUNK_SAMPLE_LIMIT = 3
 PROJECTION_TEXT_PREVIEW_CHARACTER_LIMIT = 500
 PROJECTION_SOURCE_LOCATOR_LIMIT = 3
+
+
+class RuntimeIdentifierFactory:
+    """Produit des identifiants métier opaques au bord de composition."""
+
+    def __init__(self, *, prefix: str) -> None:
+        if prefix not in {"CONV", "TURN"}:
+            raise ValueError("prefixe identifiant runtime invalide")
+        self._prefix = prefix
+
+    def next_id(self) -> str:
+        return f"{self._prefix}-{uuid4().hex.upper()}"
 
 
 class SourceProcessingCorpusPagePort(Protocol):
@@ -314,16 +345,45 @@ def build_orchestrator_composition_root(
         qdrant_url=configuration.services.qdrant.url,
         qdrant_timeout_seconds=configuration.runtime.timeouts.request_seconds,
     )
+    inference_gateway = UrllibLlmInferenceGateway(
+        endpoint_url=f"{configuration.services.llm_gateway.url.rstrip('/')}/v1/infer",
+        timeout_seconds=configuration.services.llm_gateway.timeout_seconds,
+    )
+    documentary_retriever = DocumentaryProjectionRetriever(
+        projection_reader=PostgresSearchableProjectionReader(
+            projection_read_repository=projection_read_repository,
+        ),
+        canonical_reader=CanonicalProjectionChunkReader(
+            projection_runtime=projection_runtime,
+        ),
+        chunk_selector=QdrantSparseChunkSelector(
+            qdrant_url=configuration.services.qdrant.url,
+            timeout_seconds=configuration.runtime.timeouts.request_seconds,
+        ),
+        result_limit=4,
+    )
+    product_conversation_adapter = ProductConversationHttpAdapter(
+        conversation_repository=InMemoryConversationRepository.empty(),
+        turn_repository=InMemoryTurnRepository.empty(),
+        conversation_id_factory=RuntimeIdentifierFactory(prefix="CONV"),
+        turn_id_factory=RuntimeIdentifierFactory(prefix="TURN"),
+        answer_provider=LiveDocumentaryConversationAnswerProvider(
+            answer_service=LiveDocumentaryAnswerService(
+                evidence_retriever=documentary_retriever,
+                inference_gateway=inference_gateway,
+                configuration_hash=configuration.configuration_hash,
+            )
+        ),
+        retention_policy_version="conversation-retention-m013-v1",
+    )
 
     document_router = APIRouter()
+    document_router.include_router(build_product_conversation_router(product_conversation_adapter))
     document_router.include_router(
         build_public_contract_router(
             compose_public_contract_services(
                 configuration,
-                inference_gateway=UrllibLlmInferenceGateway(
-                    endpoint_url=f"{configuration.services.llm_gateway.url.rstrip('/')}/v1/infer",
-                    timeout_seconds=configuration.services.llm_gateway.timeout_seconds,
-                ),
+                inference_gateway=inference_gateway,
             ),
             include_indexing_router=False,
         )
@@ -411,6 +471,7 @@ __all__ = [
     "OrchestratorDocumentCatalogService",
     "OrchestratorDocumentCorpusItem",
     "OrchestratorDocumentCorpusPage",
+    "RuntimeIdentifierFactory",
     "build_orchestrator_composition_root",
     "compose_public_contract_services",
 ]
