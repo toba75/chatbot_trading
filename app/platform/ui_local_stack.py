@@ -106,7 +106,6 @@ def start_local_ui_stack(launch_configuration: Any) -> Iterator[Any]:
         port=LOCAL_LLM_GATEWAY_PORT,
         error_code="UI_LOCAL_LLM_GATEWAY_PORT_OCCUPIED",
     )
-    _require_available_port(port=LOCAL_QDRANT_PORT, error_code="UI_LOCAL_QDRANT_PORT_OCCUPIED")
     _require_available_port(
         port=int(launch_configuration.port),
         error_code="UI_LOCAL_PORT_OCCUPIED",
