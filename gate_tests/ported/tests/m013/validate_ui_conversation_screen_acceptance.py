@@ -73,6 +73,57 @@ def test_validate_ui_conversation_screen_acceptance() -> None:
                         ensure_ascii=False,
                     ).encode("utf-8"),
                 ),
+                UiConversationApiResponse(
+                    status_code=200,
+                    content_type="application/json",
+                    body=json.dumps(
+                        {
+                            "conversation_id": "CONV-M013-CHAT-001",
+                            "next_page_token": None,
+                            "turns": [
+                                {
+                                    "conversation_id": "CONV-M013-CHAT-001",
+                                    "turn_id": "TURN-M013-CHAT-001",
+                                    "sequence": 1,
+                                    "role": "USER",
+                                    "message": "Explique le momentum.",
+                                    "occurred_at": "2026-07-15T10:01:00Z",
+                                    "presentation": {
+                                        "conversation_id": "CONV-M013-CHAT-001",
+                                        "turn_id": "TURN-M013-CHAT-001",
+                                        "resolved_question": "Explique le momentum.",
+                                        "mode": "CHAT_DOCUMENTAIRE",
+                                        "mode_justification": "Question documentaire explicitement demandée.",
+                                        "support_status": "SUPPORTED",
+                                        "answer_id": "ANS-M013-CHAT-001",
+                                        "verified_answer_ref": "ANS-M013-CHAT-001@1",
+                                        "answer_text": "Le momentum est documenté par le passage cité.",
+                                        "knowledge_gaps": [],
+                                        "unresolved_conflicts": [],
+                                        "abstention_reason": None,
+                                        "citations": [
+                                            {
+                                                "citation_id": "CIT-M013-CHAT-001",
+                                                "evidence_id": "EVS-M013-CHAT-001",
+                                                "quoted_span_hash": "a" * 64,
+                                                "source_locator": {
+                                                    "schema_version": "1.0",
+                                                    "canonical_version_id": "CVER-M013-CHAT-001",
+                                                    "document_id": "DOC-M013-CHAT-001",
+                                                    "page_pdf": 7,
+                                                    "item_id": "ITEM-M013-CHAT-001",
+                                                    "bbox": [0.1, 0.2, 0.3, 0.4],
+                                                    "content_hash": "b" * 64,
+                                                },
+                                            }
+                                        ],
+                                    },
+                                }
+                            ],
+                        },
+                        ensure_ascii=False,
+                    ).encode("utf-8"),
+                ),
             ]
 
         def request(
@@ -109,9 +160,10 @@ def test_validate_ui_conversation_screen_acceptance() -> None:
         requested_mode="CHAT_DOCUMENTAIRE",
         selected_documents=("DOC-M013-CHAT-001",),
     )
+    turns = client.read_turns(conversation.conversation_id)
     html = render_conversation_page(
         conversation=conversation,
-        answer=answer,
+        turns=turns,
         selectable_documents=(
             ("DOC-M013-CHAT-001", "Trading on Momentum"),
         ),
@@ -139,7 +191,10 @@ def test_validate_ui_conversation_screen_acceptance() -> None:
                 "selected_documents": ["DOC-M013-CHAT-001"],
             },
         ),
+        ("GET", "/v1/conversations/CONV-M013-CHAT-001/turns", None),
     ]
+    assert turns[0].presentation == answer
+    assert "Tour 1" in html
     assert "Question résolue" in html
     assert "CHAT_DOCUMENTAIRE" in html
     assert "SUPPORTED" in html

@@ -100,4 +100,21 @@ def test_validate_product_conversation_router_acceptance() -> None:
     payload = answered.json()
     assert payload["mode"] == "CHAT_DOCUMENTAIRE"
     assert payload["citations"][0]["source_locator"]["document_id"] == "DOC-M013-ROUTER-001"
+    history = client.get("/v1/conversations/CONV-M013-ROUTER-001/turns")
+    assert history.status_code == 200
+    assert history.json() == {
+        "conversation_id": "CONV-M013-ROUTER-001",
+        "next_page_token": None,
+        "turns": [
+            {
+                "conversation_id": "CONV-M013-ROUTER-001",
+                "turn_id": "TURN-M013-ROUTER-001",
+                "sequence": 1,
+                "role": "USER",
+                "message": "Explique le momentum.",
+                "occurred_at": "2026-07-15T10:01:00Z",
+                "presentation": payload,
+            }
+        ],
+    }
     assert client.post("/v1/chat/completions", json={}).status_code == 404
