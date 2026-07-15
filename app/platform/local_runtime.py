@@ -103,6 +103,19 @@ _LLM_GATEWAY_INSTANCE: OpenAICompatibleLocalLanguageModelGateway | None = None
 _LLM_GATEWAY_CONFIGURATION_HASH: str | None = None
 UI_MAX_CONCURRENT_TRANSFERS = 4
 UI_SOCKET_TIMEOUT_SECONDS = 30
+_UI_CONVERSATION_FORM_FIELDS = frozenset(
+    {"body", "message", "requested_mode", "selected_documents"}
+)
+
+
+class UiConversationFormError(ValueError):
+    """Erreur de formulaire UI nommant le champ refusé avant l'appel CV."""
+
+    def __init__(self, field: str) -> None:
+        if field not in _UI_CONVERSATION_FORM_FIELDS:
+            raise ValueError("champ de formulaire conversationnel invalide")
+        self.field = field
+        super().__init__(field)
 
 
 class BoundedThreadingHTTPServer(ThreadingHTTPServer):
@@ -459,11 +472,46 @@ def _serve_http(
                             )
                             return
                         assert message_match is not None
-                        _post_ui_conversation_message_from_form(
-                            conversation_client=conversation_client,
-                            conversation_id=message_match.group("conversation_id"),
-                            form=form,
-                        )
+                        try:
+                            _post_ui_conversation_message_from_form(
+                                conversation_client=conversation_client,
+                                conversation_id=message_match.group("conversation_id"),
+                                form=form,
+                            )
+                        except UiConversationFormError as exc:
+                            document_client = _build_ui_document_api_client(
+                                application_configuration=application_configuration,
+                                execution_context=_require_ui_execution_context(ui_execution_context),
+                            )
+                            state = _build_ui_corpus_state(
+                                application_configuration=application_configuration,
+                                api_client=document_client,
+                            )
+                            conversation_id = message_match.group("conversation_id")
+                            conversation = conversation_client.read_conversation(conversation_id)
+                            turns = conversation_client.read_turns(conversation_id)
+                            message_values = form.get("message", [])
+                            draft_message = (
+                                message_values[0]
+                                if len(message_values) == 1
+                                and message_values[0].strip() != ""
+                                and message_values[0] == message_values[0].strip()
+                                else None
+                            )
+                            _write_text_response(
+                                self,
+                                status_code=400,
+                                content_type="text/html; charset=utf-8",
+                                body=render_conversation_page(
+                                    conversation=conversation,
+                                    turns=turns,
+                                    selectable_documents=_selectable_documents_for_conversation(state),
+                                    error_code="HTTP_REQUEST_INVALID",
+                                    error_field=exc.field,
+                                    draft_message=draft_message,
+                                ),
+                            )
+                            return
                         _write_redirect_response(
                             self,
                             location=(
@@ -1152,17 +1200,30 @@ def _post_ui_conversation_message_from_form(
     conversation_id: str,
     form: dict[str, list[str]],
 ):
-    if set(form) != {"message", "requested_mode", "selected_documents"}:
-        raise ValueError("message conversation invalide")
-    if len(form["message"]) != 1 or len(form["requested_mode"]) != 1:
-        raise ValueError("message conversation invalide")
+    required = {"message", "requested_mode", "selected_documents"}
+    if not set(form).issubset(required):
+        raise UiConversationFormError("body")
+    if "message" not in form or len(form["message"]) != 1:
+        raise UiConversationFormError("message")
+    message = form["message"][0]
+    if message.strip() == "" or message != message.strip():
+        raise UiConversationFormError("message")
+    if "requested_mode" not in form or len(form["requested_mode"]) != 1:
+        raise UiConversationFormError("requested_mode")
+    if form["requested_mode"][0] != "CHAT_DOCUMENTAIRE":
+        raise UiConversationFormError("requested_mode")
+    if "selected_documents" not in form:
+        raise UiConversationFormError("selected_documents")
+    selected_documents = tuple(form["selected_documents"])
+    if len(selected_documents) == 0 or len(selected_documents) != len(set(selected_documents)):
+        raise UiConversationFormError("selected_documents")
     return conversation_client.send_message(
         conversation_id=conversation_id,
-        message=form["message"][0],
+        message=message,
         idempotency_key=f"ui-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}",
         occurred_at=_ui_now(),
         requested_mode=form["requested_mode"][0],
-        selected_documents=tuple(form["selected_documents"]),
+        selected_documents=selected_documents,
     )
 
 

@@ -13,6 +13,20 @@ from app.platform.ui_conversation_api import (
 
 
 _BOLD_MARKDOWN_PATTERN = re.compile(r"\*\*(?P<content>[^*\n]+)\*\*")
+_DOCUMENT_SELECTION_SCRIPT = """<script>
+(() => {
+  const form = document.querySelector('form[data-document-selection-required="true"]');
+  const submit = form.querySelector('button[type="submit"]');
+  const documents = Array.from(form.querySelectorAll('input[name="selected_documents"]'));
+  const synchronize = () => {
+    const selectionPresent = documents.some((document) => document.checked);
+    submit.disabled = !selectionPresent;
+    submit.setAttribute('aria-disabled', String(!selectionPresent));
+  };
+  documents.forEach((document) => document.addEventListener('change', synchronize));
+  synchronize();
+})();
+</script>"""
 _CHAT_STYLE = """<style>
 :root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, sans-serif; color: #10233d; background: #f3f6fa; }
 * { box-sizing: border-box; }
@@ -81,6 +95,8 @@ def render_conversation_page(
     turns: Sequence[UiConversationTurn],
     selectable_documents: Sequence[tuple[str, str]],
     error_code: str | None = None,
+    error_field: str | None = None,
+    draft_message: str | None = None,
 ) -> str:
     """Affiche une réponse CV publique et le formulaire du tour suivant."""
 
@@ -91,9 +107,18 @@ def render_conversation_page(
         raise ValueError("historique conversationnel UI invalide")
     if any(turn.conversation_id != conversation.conversation_id for turn in history):
         raise ValueError("historique conversationnel UI incohérent")
+    if error_code is None and error_field is not None:
+        raise ValueError("champ d'erreur sans code public")
+    if draft_message is not None and (
+        not isinstance(draft_message, str)
+        or draft_message.strip() == ""
+        or draft_message != draft_message.strip()
+    ):
+        raise ValueError("brouillon conversationnel invalide")
     document_choices = _selectable_documents(selectable_documents, checkbox=True)
     history_html = _render_history(history)
-    error = "" if error_code is None else _error_notice(error_code)
+    error = "" if error_code is None else _error_notice(error_code, field=error_field)
+    draft = "" if draft_message is None else escape(draft_message)
     return "\n".join(
         (
             "<!doctype html>",
@@ -106,13 +131,15 @@ def render_conversation_page(
             f"<p>Statut : <code>{escape(conversation.status)}</code></p>",
             error,
             history_html,
-            f'<form class="chat-form" method="post" action="/ui/conversations/{escape(conversation.conversation_id)}/messages">',
-            '<label>Question autonome<textarea name="message" required maxlength="8000"></textarea></label>',
+            f'<form class="chat-form" data-document-selection-required="true" method="post" action="/ui/conversations/{escape(conversation.conversation_id)}/messages">',
+            f'<label>Question autonome<textarea name="message" required maxlength="8000">{draft}</textarea></label>',
             '<input type="hidden" name="requested_mode" value="CHAT_DOCUMENTAIRE">',
             '<fieldset><legend>Documents SEARCHABLE à interroger</legend>',
+            '<p id="document-selection-help">Sélectionnez au moins un document SEARCHABLE pour rendre l’envoi disponible. La sélection doit être confirmée à chaque tour.</p>',
             document_choices,
             "</fieldset>",
-            '<button type="submit">Envoyer la question</button></form>',
+            '<button type="submit" disabled aria-disabled="true">Envoyer la question</button></form>',
+            _DOCUMENT_SELECTION_SCRIPT,
             '<p><a href="/ui/corpus-pdf">Retour au corpus</a></p>',
             "</main></body></html>",
         )
@@ -215,10 +242,23 @@ def _selectable_documents(
     return "".join(rendered)
 
 
-def _error_notice(error_code: str) -> str:
+def _error_notice(error_code: str, *, field: str | None = None) -> str:
     if not isinstance(error_code, str) or error_code.strip() == "":
         raise ValueError("error_code UI invalide")
-    return f'<section role="alert"><h2>Action impossible</h2><p><code>{escape(error_code)}</code></p></section>'
+    if field is not None and (
+        not isinstance(field, str) or field.strip() == "" or field != field.strip()
+    ):
+        raise ValueError("champ d'erreur UI invalide")
+    field_notice = (
+        ""
+        if field is None
+        else f"<p>Champ à corriger : <code>{escape(field)}</code>.</p>"
+    )
+    return (
+        '<section role="alert"><h2>Action impossible</h2>'
+        f'<p>Le service a répondu avec le code <code>{escape(error_code)}</code>.</p>'
+        f"{field_notice}</section>"
+    )
 
 
 __all__ = ["render_conversation_page", "render_new_conversation_page"]
