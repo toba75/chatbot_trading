@@ -20,6 +20,10 @@ def test_validate_ui_conversation_screen_acceptance() -> None:
         UiConversationApiClient,
         UiConversationApiResponse,
     )
+    from app.platform.local_runtime import (
+        UiConversationFormError,
+        _post_ui_conversation_message_from_form,
+    )
 
     class RecordingTransport:
         def __init__(self) -> None:
@@ -204,3 +208,36 @@ def test_validate_ui_conversation_screen_acceptance() -> None:
     assert "/ui/documents/DOC-M013-CHAT-001/pdf" in html
     assert "qdrant" not in html.lower()
     assert "vllm" not in html.lower()
+
+    # Given la conversation est active mais aucun document SEARCHABLE n'est sélectionné.
+    # When l'utilisateur prépare un nouveau message.
+    # Then l'action reste indisponible dans le navigateur et une soumission forgée
+    # est refusée sur le champ selected_documents, sans perdre le brouillon.
+    assert 'data-document-selection-required="true"' in html
+    assert '<button type="submit" disabled aria-disabled="true">' in html
+    assert "Sélectionnez au moins un document SEARCHABLE" in html
+    try:
+        _post_ui_conversation_message_from_form(
+            conversation_client=client,
+            conversation_id=conversation.conversation_id,
+            form={
+                "message": ["Compare maintenant le risque."],
+                "requested_mode": ["CHAT_DOCUMENTAIRE"],
+            },
+        )
+    except UiConversationFormError as error:
+        assert error.field == "selected_documents"
+    else:
+        raise AssertionError("Une question sans document sélectionné doit être refusée.")
+
+    error_html = render_conversation_page(
+        conversation=conversation,
+        turns=turns,
+        selectable_documents=(("DOC-M013-CHAT-001", "Trading on Momentum"),),
+        error_code="HTTP_REQUEST_INVALID",
+        error_field="selected_documents",
+        draft_message="Compare maintenant le risque.",
+    )
+    assert 'role="alert"' in error_html
+    assert "Champ à corriger : <code>selected_documents</code>" in error_html
+    assert ">Compare maintenant le risque.</textarea>" in error_html
