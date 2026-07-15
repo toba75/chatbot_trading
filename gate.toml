@@ -1343,6 +1343,17 @@ depends_on = ["precondition.m004"]
 live = false
 
 [[nodes]]
+id = "test.m004.validate-parallel-page-conversion-unit"
+path = "gate_tests/ported/tests/m004/validate_parallel_page_conversion_unit.py"
+kind = "test"
+scope = "m004"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m004"]
+live = false
+
+[[nodes]]
 id = "test.m004.validate-native-docling-conversion-acceptance"
 path = "gate_tests/ported/tests/m004/validate_native_docling_conversion_acceptance.py"
 kind = "test"
@@ -3796,6 +3807,17 @@ depends_on = ["precondition.m013"]
 live = false
 
 [[nodes]]
+id = "test.m013.validate-ui-worker-parallelism-unit"
+path = "gate_tests/ported/tests/m013/validate_ui_worker_parallelism_unit.py"
+kind = "test"
+scope = "m013"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013"]
+live = false
+
+[[nodes]]
 id = "test.m013.validate-uv-run-ui-local-stack-acceptance"
 path = "gate_tests/ported/tests/m013/validate_uv_run_ui_local_stack_acceptance.py"
 kind = "test"
@@ -4436,6 +4458,17 @@ live = false
 [[nodes]]
 id = "test.m013-fastapi.validate-projection-queries-unit"
 path = "gate_tests/ported/tests/m013_fastapi/validate_projection_queries_unit.py"
+kind = "test"
+scope = "m013_fastapi"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013_fastapi"]
+live = false
+
+[[nodes]]
+id = "test.m013-fastapi.validate-projection-parallel-batches-unit"
+path = "gate_tests/ported/tests/m013_fastapi/validate_projection_parallel_batches_unit.py"
 kind = "test"
 scope = "m013_fastapi"
 phase = "tests"
