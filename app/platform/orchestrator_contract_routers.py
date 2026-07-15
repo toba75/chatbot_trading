@@ -19,8 +19,16 @@ from app.platform.orchestrator_api_models import (
     IndexUnavailableResponse,
     PUBLIC_ERROR_RESPONSES,
     PublicErrorResponse,
+    ProductConversationCreateRequest,
+    ProductConversationMessageRequest,
+    ProductConversationMessageResponse,
+    ProductConversationResponse,
     SearchRequest,
     SearchUnavailableResponse,
+)
+from app.conversation.adapters.product_conversation_http import (
+    HttpRequest as ProductConversationHttpRequest,
+    ProductConversationHttpAdapter,
 )
 from app.platform.orchestrator_public_services import (
     IndexCommandHandler,
@@ -64,6 +72,85 @@ def build_conversation_router(handler: JsonCommandHandler) -> APIRouter:
         return _validated_response(
             response,
             success_model=ChatCompletionResponse,
+        )
+
+    return router
+
+
+def build_product_conversation_router(
+    adapter: ProductConversationHttpAdapter,
+) -> APIRouter:
+    """Expose le contrat CV natif, distinct de la compatibilité externe."""
+
+    if not isinstance(adapter, ProductConversationHttpAdapter):
+        raise TypeError("adaptateur conversation produit obligatoire")
+    router = APIRouter()
+
+    @router.post(
+        "/v1/conversations",
+        response_model=ProductConversationResponse,
+        status_code=201,
+        responses=PUBLIC_ERROR_RESPONSES,
+    )
+    async def create_conversation(payload: ProductConversationCreateRequest) -> JSONResponse:
+        response = await run_in_threadpool(
+            adapter.handle,
+            ProductConversationHttpRequest(
+                method="POST",
+                path="/v1/conversations",
+                body=payload.model_dump(mode="json"),
+            ),
+        )
+        return _product_response(
+            response.status_code,
+            response.body,
+            success_status=201,
+            success_model=ProductConversationResponse,
+        )
+
+    @router.get(
+        "/v1/conversations/{conversation_id}",
+        response_model=ProductConversationResponse,
+        responses=PUBLIC_ERROR_RESPONSES,
+    )
+    async def read_conversation(conversation_id: str) -> JSONResponse:
+        response = await run_in_threadpool(
+            adapter.handle,
+            ProductConversationHttpRequest(
+                method="GET",
+                path=f"/v1/conversations/{conversation_id}",
+                body={},
+            ),
+        )
+        return _product_response(
+            response.status_code,
+            response.body,
+            success_status=200,
+            success_model=ProductConversationResponse,
+        )
+
+    @router.post(
+        "/v1/conversations/{conversation_id}/messages",
+        response_model=ProductConversationMessageResponse,
+        responses=PUBLIC_ERROR_RESPONSES,
+    )
+    async def post_message(
+        conversation_id: str,
+        payload: ProductConversationMessageRequest,
+    ) -> JSONResponse:
+        response = await run_in_threadpool(
+            adapter.handle,
+            ProductConversationHttpRequest(
+                method="POST",
+                path=f"/v1/conversations/{conversation_id}/messages",
+                body=payload.model_dump(mode="json", exclude_none=True),
+            ),
+        )
+        return _product_response(
+            response.status_code,
+            response.body,
+            success_status=200,
+            success_model=ProductConversationMessageResponse,
         )
 
     return router
@@ -178,6 +265,21 @@ def _validated_response(
     )
 
 
+def _product_response(
+    status_code: int,
+    body: dict[str, object],
+    *,
+    success_status: int,
+    success_model: type[PublicModel],
+) -> JSONResponse:
+    model_type: type[BaseModel] = success_model if status_code == success_status else PublicErrorResponse
+    validated = model_type.model_validate(body)
+    return JSONResponse(
+        status_code=status_code,
+        content=validated.model_dump(mode="json", exclude_unset=True),
+    )
+
+
 def _require_json_handler(value: object, label: str) -> JsonCommandHandler:
     if not callable(getattr(value, "handle", None)):
         raise TypeError(f"handler {label} obligatoire")
@@ -195,6 +297,7 @@ __all__ = [
     "build_evaluation_router",
     "build_health_router",
     "build_indexing_router",
+    "build_product_conversation_router",
     "build_public_contract_router",
     "build_search_router",
 ]

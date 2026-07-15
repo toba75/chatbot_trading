@@ -57,6 +57,59 @@ class ChatCompletionRequest(PublicApiModel):
     sampling_parameters: dict[str, PydanticJsonValue] = Field(min_length=1)
 
 
+class ProductConversationCreateRequest(PublicApiModel):
+    title: str = Field(min_length=1, max_length=160)
+    default_mandate: dict[str, PydanticJsonValue] = Field(min_length=1)
+    presentation_preferences: dict[str, PydanticJsonValue] = Field(min_length=1)
+    occurred_at: str = Field(min_length=1)
+
+
+class ProductConversationMessageRequest(PublicApiModel):
+    message: str = Field(min_length=1, max_length=8000)
+    idempotency_key: str = Field(min_length=1)
+    occurred_at: str = Field(min_length=1)
+    requested_mode: Literal["CHAT_DOCUMENTAIRE"]
+    selected_documents: list[str] = Field(min_length=1)
+    research_mandate: dict[str, PydanticJsonValue] | None = None
+
+
+class ProductConversationResponse(PublicApiModel):
+    conversation_id: str
+    title: str
+    status: Literal["ACTIVE", "ARCHIVED"]
+    created_at: str
+    updated_at: str
+
+
+class ProductConversationCitationResponse(PublicApiModel):
+    citation_id: str
+    evidence_id: str
+    quoted_span_hash: str = Field(min_length=64, max_length=64)
+    source_locator: "SourceLocatorResponse"
+
+
+class ProductConversationMessageResponse(PublicApiModel):
+    conversation_id: str
+    turn_id: str
+    resolved_question: str
+    mode: Literal["CHAT_DOCUMENTAIRE"]
+    mode_justification: str
+    support_status: Literal[
+        "SUPPORTED",
+        "PARTIALLY_SUPPORTED",
+        "INSUFFICIENT_EVIDENCE",
+        "CONFLICTING_EVIDENCE",
+        "REQUIRES_CURRENT_DATA",
+    ]
+    answer_id: str
+    verified_answer_ref: str
+    answer_text: str
+    citations: list[ProductConversationCitationResponse] = Field(min_length=1)
+    knowledge_gaps: list[dict[str, PydanticJsonValue]]
+    unresolved_conflicts: list[dict[str, PydanticJsonValue]]
+    abstention_reason: str | None
+
+
 class BenchmarkRequest(PublicApiModel):
     model: str = Field(min_length=1)
     run_id: str = Field(min_length=1)
