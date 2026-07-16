@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -275,20 +275,44 @@ class ConvertRoutedPagesHandler:
             max_workers=max_workers,
             thread_name_prefix="sp-page-conversion",
         ) as executor:
-            futures = {
-                executor.submit(
+            futures: dict[Future[_PageConversionOrchestrationResult], int] = {}
+            next_route_index = 0
+
+            def submit_next_route() -> None:
+                nonlocal next_route_index
+                route_index = next_route_index
+                page_route = routes[route_index]
+                future = executor.submit(
                     self._convert_page_route,
                     source_document=source_document,
                     processing_run=processing_run,
                     page_route=page_route,
-                ): index
-                for index, page_route in enumerate(routes)
-            }
-            for future in as_completed(futures):
-                result = future.result()
-                results[futures[future]] = result
-                if on_page_converted is not None:
-                    on_page_converted(result.page_output)
+                )
+                futures[future] = route_index
+                next_route_index += 1
+
+            for _ in range(max_workers):
+                submit_next_route()
+
+            while len(futures) > 0:
+                completed_futures, _ = wait(
+                    tuple(futures),
+                    return_when=FIRST_COMPLETED,
+                )
+                completed_batch: list[_PageConversionOrchestrationResult] = []
+                for future in sorted(completed_futures, key=lambda item: futures[item]):
+                    route_index = futures.pop(future)
+                    result = future.result()
+                    results[route_index] = result
+                    completed_batch.append(result)
+
+                for result in completed_batch:
+                    if on_page_converted is not None:
+                        on_page_converted(result.page_output)
+
+                for _ in completed_batch:
+                    if next_route_index < len(routes):
+                        submit_next_route()
 
         return tuple(_ensure_orchestration_result(result) for result in results)
 
