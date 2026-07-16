@@ -279,3 +279,15 @@ rejouée depuis le formulaire UI sur `DOC-F91FE126FBFFA374` :
   19 de `DOC-7A3001E2DE57C3E0` en 1 386 items et 4 923 caractères, dont la
   table mensuelle. Le défaut est l’orchestration Granite exclusive de
   `TARGETED_ENRICHMENT`, contraire à la spécification unifiée.
+- Première preuve produit corrigée : la conversion publique a progressé
+  monotonement jusqu’à `SUCCEEDED 36/36`, puis la projection jusqu’à
+  `SUCCEEDED 248/248` et `SEARCHABLE` avec 247 chunks. L’artefact canonique
+  conserve 13 adjudications ciblées : Granite a été retenu deux fois et
+  Docling onze fois après `GRANITE_DOCLING_UNAVAILABLE`.
+- Diagnostic de capacité Granite : sur l’ensemble des 20 pages qui appellent
+  Granite, cinq ont réussi et quinze ont échoué sous le plafond pagewise de
+  huit. La page 1 échouée réussit seule en 60,5 secondes avec 12 items ; les
+  pages 6 et 7 échouées réussissent ensemble en 95 à 97 secondes avec 9 et 7
+  items. La cause est la concurrence de huit instances, pas un Granite nul.
+- Calibration retenue : huit pages orchestrées, mais un limiteur Granite
+  partagé de deux instances pour toutes les routes du worker.

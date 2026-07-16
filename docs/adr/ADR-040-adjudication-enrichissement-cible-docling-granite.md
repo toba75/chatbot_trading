@@ -3,7 +3,7 @@
 **Statut :** Proposée
 **Date :** 2026-07-16
 **Décideurs :** Équipe OSTrading
-**Remplace :** Pour `TARGETED_ENRICHMENT` seulement, les obligations de récupération Gemma d’ADR-035, ADR-036 et ADR-039 à l’acceptation
+**Remplace :** Pour `TARGETED_ENRICHMENT` seulement, les obligations de récupération Gemma d’ADR-035, ADR-036 et ADR-039, ainsi que le plafond unique de concurrence Granite d’ADR-037, à l’acceptation
 **Remplacée par :** Aucune
 **Source :** Parcours réel M-004 du document `DOC-7A3001E2DE57C3E0` et spécification unifiée 4.1
 
@@ -24,6 +24,13 @@ Docling standard 2.111.0 extrait réellement cette page en 1 386 items et
 
 Cette divergence masque un candidat valide, détourne Gemma vers une page déjà
 lisible et empêche la publication du document complet.
+
+Le premier parcours corrigé a ensuite mesuré cinq succès Granite sur vingt
+pages, soit 75 % d’échecs. Une page échouée sous huit processus Granite
+concurrents réussit seule en 60,5 secondes avec 12 items. Deux autres pages
+échouées réussissent simultanément en 95 à 97 secondes, avec 9 et 7 items. Le
+modèle est donc opérationnel ; le plafond pagewise de huit surcharge ses
+instances isolées et fabrique des indisponibilités.
 
 ## Décision
 
@@ -51,6 +58,14 @@ lisible et empêche la publication du document complet.
   standard n’est contractuellement produit.
 - La progression publique compte la page comme terminée seulement après
   l’adjudication complète ; elle ne compte pas séparément les deux candidats.
+- `services.workers.concurrency` **DOIT** rester le plafond pagewise explicite,
+  fixé à huit pour le runtime local courant.
+- `services.workers.granite_concurrency` **DOIT** borner séparément toutes les
+  tentatives Granite d’un même worker, routes ciblées et autres routes
+  confondues. Sa valeur explicite courante est deux et elle **NE DOIT PAS**
+  dépasser le plafond pagewise.
+- Toutes les routes **DOIVENT** partager le même limiteur Granite en mémoire ;
+  créer un limiteur par page ou par route est interdit.
 
 ## Options considérées
 
@@ -60,6 +75,8 @@ lisible et empêche la publication du document complet.
 | Dérouter la page vers `NATIVE_STANDARD` | Rejetée | Efface le besoin d’enrichissement et modifie silencieusement le plan M-003. |
 | Docling + Granite puis adjudication explicite | Retenue | Applique la spécification unifiée, conserve les preuves concurrentes et borne les issues. |
 | Fusionner les textes Docling et Granite | Rejetée | Crée deux autorités concurrentes et une provenance ambiguë. |
+| Huit processus Granite simultanés | Rejetée | Le parcours réel produit 75 % d’échecs alors que les mêmes pages réussissent seules ou par deux. |
+| Deux processus Granite, huit pages orchestrées | Retenue | Deux pages précédemment échouées réussissent simultanément sans supprimer le parallélisme Docling. |
 
 ## Conséquences
 
@@ -76,6 +93,8 @@ lisible et empêche la publication du document complet.
 - Chaque page `TARGETED_ENRICHMENT` exécute deux convertisseurs avant de
   publier une unité de progression.
 - Le contrat canonique gagne une trace d’adjudication structurée.
+- Les pages en attente de Granite occupent un thread pagewise sans lancer une
+  troisième instance du modèle.
 
 ### Risques et contrôles
 
@@ -85,12 +104,17 @@ lisible et empêche la publication du document complet.
   candidats sont distincts.
 - Risque de régression Gemma : un test prouve qu’aucun appel Gemma n’est émis
   pour cette route.
+- Risque de saturation Granite : un test de concurrence prouve que toutes les
+  routes partagent la limite de deux, tandis que quatre pages orchestrées
+  peuvent rester actives.
 
 ## Impact d'implémentation
 
 - Modules concernés : domaine de conversion pagewise, orchestration M-004,
   worker routé, fusion canonique et tests M-004.
-- Configuration concernée : aucune nouvelle valeur ni aucun défaut implicite.
+- Configuration concernée : `services.workers.granite_concurrency=2`, valeur
+  obligatoire, strictement positive et inférieure ou égale à
+  `services.workers.concurrency`.
 - Tests attendus : succès Granite, indisponibilité Granite avec sélection
   Docling, échec non autorisé terminal, trace canonique et absence d’appel
   Gemma.

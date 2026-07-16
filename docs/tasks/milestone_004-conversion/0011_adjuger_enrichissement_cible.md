@@ -26,6 +26,9 @@
 - Une seule autorité alimente la page canonique et sa trace d’adjudication est
   publiée dans l’artefact immuable.
 - Gemma reste réservée aux routes Granite sans candidat Docling standard.
+- Huit pages peuvent rester orchestrées en parallèle, mais toutes leurs
+  tentatives Granite partagent une limite explicite de deux processus, calibrée
+  sur deux pages précédemment échouées qui réussissent simultanément.
 
 ## Validation
 

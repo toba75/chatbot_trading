@@ -45,7 +45,7 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 | [ADR-037](ADR-037-parallelisme-documentaire-projection.md) | Parallélisme documentaire et projection par lots | Acceptée | 2026-07-15 | Aucun | Aucune |
 | [ADR-038](ADR-038-metadonnees-bibliographiques-apres-projection.md) | Métadonnées bibliographiques dérivées après projection | Acceptée | 2026-07-16 | Obligation bibliographique ADR-028 | Aucune |
 | [ADR-039](ADR-039-segmentation-gemma-bornee-pages-denses.md) | Segmentation Gemma bornée des pages denses | Proposée | 2026-07-16 | ADR-036 à l’acceptation | Aucune |
-| [ADR-040](ADR-040-adjudication-enrichissement-cible-docling-granite.md) | Adjudication explicite de l’enrichissement ciblé Docling et Granite | Proposée | 2026-07-16 | Clauses `TARGETED_ENRICHMENT` d’ADR-035, ADR-036 et ADR-039 à l’acceptation | Aucune |
+| [ADR-040](ADR-040-adjudication-enrichissement-cible-docling-granite.md) | Adjudication explicite de l’enrichissement ciblé Docling et Granite | Proposée | 2026-07-16 | Clauses `TARGETED_ENRICHMENT` d’ADR-035, ADR-036 et ADR-039 et plafond unique Granite d’ADR-037 à l’acceptation | Aucune |
 
 ## ADR DDD
 

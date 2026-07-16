@@ -125,7 +125,14 @@ les seuls codes `DOCLING_PROVENANCE_MISSING` et
 trace structurée de la tentative Granite. Tout autre échec reste terminal.
 Gemma n’est jamais appelée pour cette route, car un candidat Docling standard
 y est contractuellement produit.
-Chaque appel conserve un budget de 2 048 jetons et un identifiant distinct. Le
+
+Le parallélisme pagewise reste fixé par `services.workers.concurrency`, soit
+huit dans la configuration locale. Toutes les tentatives Granite du worker
+partagent toutefois le plafond distinct et obligatoire
+`services.workers.granite_concurrency`, fixé à deux après calibration réelle.
+Cette séparation évite que huit processus isolés chargent simultanément le
+modèle et transforment une saturation locale en indisponibilité documentaire.
+Chaque appel Gemma conserve un budget de 2 048 jetons et un identifiant distinct. Le
 délai client couvre toutes les tentatives avant premier token configurées par
 le gateway, plus 30 secondes de rendu, transport local et validation. Toute
 erreur de segment est terminale et aucun contenu partiel n'est publié.
