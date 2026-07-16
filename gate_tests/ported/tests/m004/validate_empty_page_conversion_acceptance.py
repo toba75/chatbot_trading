@@ -32,11 +32,17 @@ def test_validate_empty_page_conversion_acceptance() -> None:
         RoutingPolicyVersion,
     )
     from app.source_processing.domain.page_conversion import (
+        CanonicalAcceptancePolicy,
         ConversionToolName,
         PageConversionArtifact,
         PageConversionItem,
         PageConversionItemLabel,
         PageItemGeometry,
+        QualityDecisionStatus,
+    )
+    from app.source_processing.application.routed_document_conversion_worker import (
+        _authority_manifest,
+        _pre_conversion_report,
     )
     from app.source_processing.domain.source_document import (
         DocumentId,
@@ -154,3 +160,35 @@ def test_validate_empty_page_conversion_acceptance() -> None:
     assert tuple(page.value for page in result.skipped_page_numbers) == (2,)
     assert tuple(page.page_number.value for page in result.docling_document.pages) == (1, 3)
     assert tuple(output.page_number.value for output in result.page_outputs) == (1, 3)
+
+    # Given la page 2 est diagnostiquée EMPTY et explicitement ignorée par SKIP_EMPTY.
+    authority_manifest = _authority_manifest(
+        processing_run=routed,
+        page_outputs=result.page_outputs,
+    )
+    acceptance_policy = CanonicalAcceptancePolicy(
+        policy_version="m004-routed-docling-v1"
+    )
+
+    # When la QA post-conversion contrôle le document canonique sans page 2.
+    post_report = acceptance_policy.evaluate_post_conversion(
+        page_manifest=routed.page_manifest,
+        text_authority_manifest=authority_manifest,
+        docling_document=result.docling_document,
+        findings=(),
+    )
+    quality_decision = acceptance_policy.decide(
+        source_document=source,
+        page_manifest=routed.page_manifest,
+        text_authority_manifest=authority_manifest,
+        pre_conversion_report=_pre_conversion_report(
+            processing_run=routed,
+            policy_version=acceptance_policy.policy_version,
+        ),
+        post_conversion_report=post_report,
+    )
+
+    # Then la page vide n'est pas une omission et la publication reste autorisée.
+    assert post_report.status is QualityDecisionStatus.PASS
+    assert post_report.findings == ()
+    assert quality_decision.publication_allowed is True
