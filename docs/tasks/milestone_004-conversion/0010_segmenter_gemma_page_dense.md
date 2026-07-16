@@ -13,9 +13,10 @@
 - Given Granite a réellement échoué sur une page et Gemma retourne une sortie
   invalide à 0 degré puis tronquée sur le rendu complet à 90 degrés.
 - When le worker applique la récupération bornée d’ADR-039.
-- Then il soumet exactement les quatre quarts non chevauchants du rendu tourné,
-  remappe leurs coordonnées dans la page PDF source, fusionne leurs items dans
-  l’ordre et ne termine l’unité publique qu’après les quatre succès.
+- Then il soumet exactement les quatre bandes horizontales non chevauchantes de
+  la page source, découpées de droite à gauche dans le rendu tourné, remappe
+  leurs coordonnées dans la page PDF source, fusionne leurs items dans l’ordre
+  haut-bas et ne termine l’unité publique qu’après les quatre succès.
 
 ## Garde-fous
 
@@ -25,6 +26,8 @@
   complet à 90 degrés.
 - Deux moitiés sont interdites : la première moitié réelle reste tronquée ; le
   nombre contractuel est fixé à quatre segments.
+- Découper la hauteur du rendu déjà tourné est interdit : cela conserve toutes
+  les lignes d’un tableau dense dans chaque segment et ne borne pas sa sortie.
 - Les appels portent des identifiants distincts ; aucun segment, modèle, angle
   ou retry supplémentaire n’est autorisé.
 - Une erreur de segment reste terminale et aucun contenu partiel n’est publié.

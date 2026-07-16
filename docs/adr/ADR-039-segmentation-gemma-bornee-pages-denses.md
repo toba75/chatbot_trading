@@ -21,7 +21,9 @@ sortie du contrat courant. Porter ce budget à 4 096 jetons ne résout pas le
 problème sur le Spark : les essais réels n’ont produit aucun premier jeton dans
 le délai borné. Un premier essai avec deux moitiés a également produit
 `LLM_PARTIAL_OUTPUT` sur la première moitié après 80 secondes et 3 463 octets
-de réponse. L’erreur était en outre traduite à tort en
+de réponse. Un essai en quatre quarts découpés après rotation a encore tronqué
+le premier quart après 80 secondes et 3 304 octets : ce découpage isolait une
+colonne du tableau mais conservait ses 104 lignes. L’erreur était en outre traduite à tort en
 `GEMMA_VISION_UNAVAILABLE`, ce qui masquait que Gemma était disponible.
 
 Il faut reprendre cette page sans appliquer Gemma aux autres pages, sans
@@ -37,8 +39,10 @@ de transcriptions concurrentes.
   **DOIT** soumettre un second rendu complet à 90 degrés.
 - Seulement si ce second rendu produit `GEMMA_VISION_OUTPUT_TRUNCATED`, après
   traduction exacte de `LLM_PARTIAL_OUTPUT`, le worker **DOIT** découper le
-  rendu tourné en exactement quatre segments verticaux, ordonnés, non
-  chevauchants et couvrant ensemble toute la page.
+  page source en exactement quatre bandes horizontales, ordonnées du haut vers
+  le bas, non chevauchantes et couvrant ensemble toute la page. Sur le rendu à
+  90 degrés, ces bandes correspondent à quatre découpes verticales parcourues
+  de droite à gauche.
 - Le contrat de requête isolé **DOIT** publier explicitement
   `render_segment_index` et `render_segment_count`. Les deux valeurs sont soit
   nulles ensemble pour un rendu complet, soit un index de `1` à `4` et le
@@ -50,8 +54,9 @@ de transcriptions concurrentes.
   gateway, plus 30 secondes de marge ; avec la configuration courante, son
   délai de supervision vaut 270 secondes.
 - Les coordonnées produites pour un segment **DOIVENT** être réexprimées
-  d’abord dans le rendu complet tourné, puis dans le repère de la page PDF
-  source. Les items sont fusionnés uniquement dans l’ordre des segments.
+  d’abord dans la position horizontale du rendu complet tourné, puis dans le
+  repère de la page PDF source. Les items sont fusionnés uniquement dans
+  l’ordre haut-bas de la page source.
 - La version d’outil **DOIT** tracer `render-rotation-090` puis
   `render-segments-04`. Aucun item du rendu complet tronqué n’est publiable.
 - La page n’est comptée comme terminée qu’après la réussite des quatre segments.
@@ -70,7 +75,8 @@ de transcriptions concurrentes.
 | Augmenter globalement la sortie à 4 096 jetons | Rejetée | Les essais réels de la page dense n’ont produit aucun premier jeton dans le délai du Spark. |
 | Rejouer toute la page ou tout le document sans borne | Rejetée | Amplification, absence de progression fiable et risque de boucles. |
 | Deux segments explicites après troncature du rendu tourné | Rejetée | La première moitié réelle est encore tronquée après 80 secondes. |
-| Quatre segments explicites après troncature du rendu tourné | Retenue | Couverture déterministe compatible avec la densité observée, budget stable et nombre d’appels borné. |
+| Quatre quarts de la hauteur du rendu déjà tourné | Rejetée | Chaque quart conserve les 104 lignes du tableau et reste tronqué. |
+| Quatre bandes horizontales de la page source | Retenue | Chaque segment borne le nombre de lignes, conserve le budget et maintient un nombre d’appels déterministe. |
 | Appliquer Gemma à toutes les pages du document | Rejetée | Contredit le routage pagewise et masque le taux de fonctionnement réel de Granite. |
 
 ## Conséquences
@@ -90,8 +96,9 @@ de transcriptions concurrentes.
 
 ### Risques et contrôles
 
-- Risque de trou ou doublon entre segments : découpage non chevauchant couvrant
-  exactement le rendu et tests de remappage des quatre quarts.
+- Risque de trou, doublon ou ordre inversé entre segments : découpage source
+  haut-bas non chevauchant couvrant exactement la page et tests du crop
+  droite-gauche après rotation ainsi que du remappage des quatre bandes.
 - Risque de rejouer le même appel : suffixes de rotation et de segment dans les
   trois identifiants du gateway.
 - Risque de publication partielle : fusion seulement après les quatre réponses
