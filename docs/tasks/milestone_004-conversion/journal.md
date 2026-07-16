@@ -298,3 +298,11 @@ rejouée depuis le formulaire UI sur `DOC-F91FE126FBFFA374` :
   `SUCCEEDED 36/36`, `CANONICAL_ACCEPTED` ; Projection `SUCCEEDED 248/248`,
   `SEARCHABLE` ; corpus disponible sans erreur d’orchestrateur ni erreur
   console navigateur.
+## 2026-07-16 - T-012 pages vides et revue manuelle
+
+- GREEN initial : `uv run --locked gate --scope m004` (42 nœuds) et
+  `uv run --locked gate --scope m013_fastapi` (79 nœuds).
+- Décision : ADR-041 proposée; `EMPTY` devient `SKIP_EMPTY` et les vraies revues
+  deviennent actionnables et persistées.
+- Scénarios RED : routage/commande de revue M-003, conversion sans outil M-004,
+  contrat API et rendu UI M-013-FastAPI.

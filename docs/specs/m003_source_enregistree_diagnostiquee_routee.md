@@ -76,7 +76,7 @@ M-003 ne publie aucune version canonique et ne décide pas l'autorité textuelle
 | MANIFEST_CREATED | DocumentProcessingRun | Le manifeste de pages couvre toutes les pages attendues. | Vers DIAGNOSED ou QUARANTINED. |
 | DIAGNOSED | DocumentProcessingRun | Chaque page possède un diagnostic. | Vers ROUTE_PLANNED, MANUAL_REVIEW ou QUARANTINED. |
 | ROUTE_PLANNED | DocumentProcessingRun | Chaque page possède une route explicite et justifiée. | Fin M-003; M-004 pourra consommer la route. |
-| MANUAL_REVIEW | DocumentProcessingRun | Une incertitude exige une décision humaine explicite. | Vers ROUTE_PLANNED ou QUARANTINED après décision. |
+| MANUAL_REVIEW | DocumentProcessingRun | Une page non vide reste ambiguë ou sans route admissible. | Vers ROUTE_PLANNED ou REJECTED après décision publique persistée. |
 | QUARANTINED | SourceDocument | La source est bloquée et non publiable. | Fin bloquante tant qu'aucune décision explicite ne la remplace. |
 
 ## Comportements vérifiables M-003
@@ -117,3 +117,5 @@ uv run --locked gate
 - M-003 ne décide pas l'autorité textuelle unique par page.
 - M-003 ne publie aucun `CanonicalSourcePublished` vers KA ou EG.
 - M-003 n'introduit pas Docling comme modèle de domaine; Docling reste un outil de conversion gouverné par les politiques SP ultérieures.
+- Une page diagnostiquée `EMPTY` reçoit la disposition `SKIP_EMPTY`; elle ne déclenche ni revue manuelle, ni prétraitement, ni conversion.
+- Une revue manuelle expose les décisions explicites `CONFIRM_EMPTY`, `ASSIGN_ROUTE` et `REJECT_DOCUMENT`. Chaque décision conserve le numéro de page, le réviseur et le motif.

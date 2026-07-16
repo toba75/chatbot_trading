@@ -46,6 +46,7 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 | [ADR-038](ADR-038-metadonnees-bibliographiques-apres-projection.md) | Métadonnées bibliographiques dérivées après projection | Acceptée | 2026-07-16 | Obligation bibliographique ADR-028 | Aucune |
 | [ADR-039](ADR-039-segmentation-gemma-bornee-pages-denses.md) | Segmentation Gemma bornée des pages denses | Proposée | 2026-07-16 | ADR-036 à l’acceptation | ADR-040 pour `TARGETED_ENRICHMENT` seulement |
 | [ADR-040](ADR-040-adjudication-enrichissement-cible-docling-granite.md) | Adjudication explicite de l’enrichissement ciblé Docling et Granite | Acceptée | 2026-07-16 | Clauses `TARGETED_ENRICHMENT` d’ADR-035, ADR-036 et ADR-039 et plafond unique Granite d’ADR-037 | Aucune |
+| [ADR-041](ADR-041-pages-vides-et-revue-manuelle-actionnable.md) | Pages vides ignorées et revue manuelle actionnable | Proposée | 2026-07-16 | Obligation de revue des pages `EMPTY` d’ADR-025 | Aucune |
 
 ## ADR DDD
 
@@ -67,7 +68,7 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 ## Prochains numéros disponibles
 
 ```text
-Prochaine ADR technique: ADR-041
+Prochaine ADR technique: ADR-042
 Prochaine DDD-ADR: DDD-ADR-013
 ```
 

@@ -258,7 +258,7 @@ Si ces lectures n'existent pas encore, l'UI doit être considérée non impléme
 | `DIAGNOSING` | Worker réel en cours; la progression publique est `RUNNING`. |
 | `DIAGNOSED` | Diagnostic persistant terminé; la progression publique est `SUCCEEDED`. |
 | `ROUTE_EXPLICIT` | Route documentaire décidée explicitement. |
-| `MANUAL_REVIEW` | Décision humaine requise avant poursuite. |
+| `MANUAL_REVIEW` | Décision humaine requise et action `Examiner` disponible avant poursuite. |
 | `SOURCE_QUARANTINED` | Source bloquée et non publiable. |
 | `CONVERSION_REQUESTED` | Conversion canonique demandée. |
 | `CANONICAL_ACCEPTED` | Version canonique acceptée et référençable. |
@@ -288,6 +288,7 @@ Si ces lectures n'existent pas encore, l'UI doit être considérée non impléme
 | UI-001 - État local visible | Une dépendance bloquante interdit l'action concernée sans proposer de chemin alternatif. | Given Spark est indisponible; When l'utilisateur ouvre l'UI; Then l'état `LLM_UNAVAILABLE` est visible et aucun fournisseur de secours n'est proposé. |
 | UI-002 - PDF enregistré avec métadonnées explicites | Le PDF original et ses métadonnées sont requis. | Given un PDF sans titre documentaire; When l'utilisateur tente l'ajout; Then l'UI refuse l'envoi avant `POST /v1/documents`. |
 | UI-003 - Préparation documentaire ordonnée | Diagnostic, revue, conversion et indexation restent des étapes distinctes. | Given une source route incertaine; When le diagnostic produit `MANUAL_REVIEW`; Then l'UI bloque conversion et indexation. |
+| UI-003B - Revue documentaire actionnable | Une revue visible possède une commande publique complète. | Given une source en `MANUAL_REVIEW`; When l'utilisateur ouvre `Examiner`; Then il peut confirmer une page vide, assigner une route explicite ou rejeter le document avec son identité et un motif. |
 | UI-004 - Chat limité aux projections recherchables | Une source chargée mais non `SEARCHABLE` ne peut pas être sélectionnée comme corpus RA. | Given un PDF `REGISTERED`; When l'utilisateur prépare une question; Then le document reste non sélectionnable pour `selected_documents`. |
 | UI-005 - Conversation append-only et statutée | Chaque message affiche question résolue, mode, justification et statut. | Given une conversation active; When l'utilisateur pose une question; Then le tour présenté contient `resolved_question`, `mode`, `mode_justification` et `support_status`. |
 | UI-006 - Citations ouvrables | Une réponse supportée exige des citations résolubles. | Given RA retourne une citation; When l'utilisateur l'ouvre; Then l'UI affiche SourceLocator, page et version canonique. |

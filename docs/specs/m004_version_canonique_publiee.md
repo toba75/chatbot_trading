@@ -64,7 +64,7 @@ Le PDF original reste la référence éditoriale et visuelle. Les exports Markdo
 | Politique | Décision | Invariants | ADR |
 |---|---|---|---|
 | TextAuthoritySelectionPolicy | Sélectionne l'autorité textuelle unique d'une page. | Les transcriptions concurrentes ne sont pas fusionnées silencieusement. | ADR-004 |
-| CanonicalAcceptancePolicy | Décide si la conversion peut devenir `CanonicalSource`. | Aucune page ne peut être omise; une source en quarantaine est refusée. | ADR-001; ADR-002; ADR-003; ADR-004; DDD-ADR-003 |
+| CanonicalAcceptancePolicy | Décide si la conversion peut devenir `CanonicalSource`. | Chaque page possède une autorité textuelle ou une disposition `SKIP_EMPTY`; une source en quarantaine est refusée. | ADR-001; ADR-002; ADR-003; ADR-004; ADR-041; DDD-ADR-003 |
 | CriticalPageSamplingPolicy | Choisit les pages critiques pour contrôle renforcé. | Les tableaux, formules, pages faibles et routes minoritaires sont échantillonnés. | ADR-002; ADR-003; ADR-004 |
 
 ## Machine d'états M-004
@@ -167,7 +167,7 @@ rend jamais `Convertir` disponible avant que toute la chaîne réelle soit prêt
 | Comportement | Invariant | Scénario BDD | Test RED | ADR | Commande |
 |---|---|---|---|---|---|
 | SP-009 - Spécification exécutable M-004 | La spécification nomme mission, agrégat, politiques, QA, HTTP, ADR et exclusions. | Given une source M-003 routée; When la spécification M-004 est publiée; Then elle est validée par commande uv run --locked gate
-| SP-010 - Fusion pagewise vers DoclingDocument unique | Aucune page ne peut être omise. | Given des pages routées; When la conversion fusionne les sorties; Then le DoclingDocument unique conserve toutes les pages dans l'ordre. | T-003 | ADR-001; ADR-002; ADR-003; ADR-004 | uv run --locked gate
+| SP-010 - Fusion pagewise vers DoclingDocument unique | Toute page non vide est convertie et les pages `SKIP_EMPTY` sont auditées sans autorité synthétique. | Given des pages routées dont une page `EMPTY`; When la conversion fusionne les sorties; Then aucun outil ne reçoit la page vide et les numéros PDF restants sont conservés. | T-003; T-012 | ADR-001; ADR-002; ADR-003; ADR-004; ADR-041 | uv run --locked gate
 | SP-011 - Autorité textuelle unique par page | Chaque page possède une seule autorité. | Given une sortie native et Granite; When TextAuthoritySelectionPolicy arbitre; Then une seule autorité est retenue. | T-004 | ADR-004 | uv run --locked gate
 | SP-012 - QA pré et post-conversion | Les pages critiques et le Docling JSON sont contrôlés. | Given une conversion candidate; When CanonicalAcceptancePolicy évalue la version; Then les chiffres, signes, tableaux et provenance sont vérifiés. | T-005 | ADR-001; ADR-002; ADR-003; ADR-004 | uv run --locked gate
 | SP-013 - Publication immuable | Une correction crée une nouvelle version. | Given une version publiée; When une correction est acceptée; Then l'ancienne version reste résolvable et une nouvelle version est publiée. | T-006 | ADR-001; DDD-ADR-003; DDD-ADR-010 | uv run --locked gate
