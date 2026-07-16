@@ -20,6 +20,8 @@ _FORMULA = re.compile(r"(?:[=±×÷∑∫√≤≥]|\b(?:sin|cos|log|exp)\s*\()"
 _NUMERIC_VISUAL_LABEL = re.compile(r"[\d\s.,:+\-()/]+\Z")
 _MIN_VISUAL_NUMERIC_FRAGMENTS = 8
 _MIN_VISUAL_NUMERIC_SHARE = 0.75
+_MIN_RELIABLE_NATIVE_TEXT_CHARACTERS = 20
+_MIN_COMPLEX_VISUAL_NATIVE_TEXT_CHARACTERS = 80
 
 
 class InspectionRejected(RuntimeError):
@@ -85,8 +87,24 @@ def _inspect_page(page_number: int, page: Any, budget: dict[str, Any], total: li
     has_table = bool(_TABLE_ROW.search(text))
     has_formula = bool(_FORMULA.search(text))
     mixed = has_text and has_image
-    existing_ocr_state = "VALID" if mixed and text_characters >= 20 and ratio >= 0.55 else "BAD" if mixed else "NONE"
-    native_text_state = "RELIABLE" if has_text and text_characters >= 20 and ratio >= 0.55 else "SUSPECT" if has_text else "ABSENT"
+    complex_layout = has_table or has_formula or image_count > 1 or dense_visual_numeric_layout
+    reliable_native_minimum = (
+        _MIN_COMPLEX_VISUAL_NATIVE_TEXT_CHARACTERS
+        if has_image and complex_layout
+        else _MIN_RELIABLE_NATIVE_TEXT_CHARACTERS
+    )
+    existing_ocr_state = (
+        "VALID"
+        if mixed
+        and text_characters >= _MIN_RELIABLE_NATIVE_TEXT_CHARACTERS
+        and ratio >= 0.55
+        else "BAD" if mixed else "NONE"
+    )
+    native_text_state = (
+        "RELIABLE"
+        if has_text and text_characters >= reliable_native_minimum and ratio >= 0.55
+        else "SUSPECT" if has_text else "ABSENT"
+    )
     image_state = "SCAN_CLEAN" if has_image and existing_ocr_state != "BAD" else "SCAN_DEGRADED" if has_image else "NONE"
     return {
         "corruption_state": "NONE",
@@ -95,9 +113,7 @@ def _inspect_page(page_number: int, page: Any, budget: dict[str, Any], total: li
         "has_table": has_table,
         "image_count": image_count,
         "image_state": image_state,
-        "layout_complexity": "COMPLEX"
-        if has_table or has_formula or image_count > 1 or dense_visual_numeric_layout
-        else "SIMPLE",
+        "layout_complexity": "COMPLEX" if complex_layout else "SIMPLE",
         "manifest_state": "PRESENT" if has_text or has_image else "EMPTY",
         "mixed_content_detected": mixed,
         "native_text_state": native_text_state,

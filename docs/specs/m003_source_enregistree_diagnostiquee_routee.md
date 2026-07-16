@@ -5,7 +5,7 @@
 - Milestone: M-003 - Source enregistrée, diagnostiquée et routée.
 - Source canonique: `docs/specs/plan_implementation_milestones_workstreams.md`, section `M-003 - Source enregistrée, diagnostiquée et routée`.
 - Spécification normative: `docs/specs/specification_unifiee_ddd_technique_chatbot_trading_v4_1.md`, sections 5, 12, 17, 19, 20 et 21.
-- ADR consultées: ADR-002, ADR-003, ADR-010, ADR-033, ADR-043, DDD-ADR-003.
+- ADR consultées: ADR-002, ADR-003, ADR-010, ADR-033, ADR-043, ADR-044, DDD-ADR-003.
 - Contrats amont: `docs/specs/m001_frontieres_ddd_contrats_publies.md` et `docs/specs/m002_plateforme_locale_sure.md`.
 - ADR: non requise, car M-003 applique le routage hybride, l'usage OCRmyPDF conditionnel et le langage publié documentaire sans changer leur sens.
 
@@ -64,7 +64,7 @@ M-003 ne publie aucune version canonique et ne décide pas l'autorité textuelle
 |---|---|---|---|
 | SourceRegistrationPolicy | Accepte l'enregistrement seulement avec PDF original, empreinte stable et identité de source explicites. | L'original reste immuable. | DDD-ADR-003 |
 | PageManifestCompletenessPolicy | Refuse un diagnostic qui laisse une page hors manifeste. | Chaque page est représentée dans le manifeste. | DDD-ADR-003 |
-| PageDiagnosticPolicy | Mesure les signaux de texte natif, image, structure et OCR existant sans publier de conversion. | Le diagnostic précède tout routage; une dégradation physique précède un mélange technique lorsque les deux sont observés; un scan propre sans texte natif reste `SCAN_CLEAN` même si sa mise en page est complexe. | ADR-002; ADR-003; ADR-033; ADR-043 |
+| PageDiagnosticPolicy | Mesure les signaux de texte natif, image, structure et OCR existant sans publier de conversion. | Le diagnostic précède tout routage; une page complexe avec images exige 80 caractères pour qualifier son texte natif de fiable; un scan propre sans autorité native fiable reste `SCAN_CLEAN`. | ADR-002; ADR-003; ADR-033; ADR-043; ADR-044 |
 | PageRoutingPolicy | Choisit une route explicite ou demande une revue manuelle. | Une route incertaine produit une revue explicite; aucune bascule silencieuse n'est acceptée; `PREPROCESS_GRANITE` est réservé à `SCAN_DEGRADED` et `BAD_OCR_TO_GRANITE` à un OCR mauvais sans dégradation physique. | ADR-002; ADR-003; ADR-033 |
 | QuarantinePublicationPolicy | Bloque toute publication d'une source en quarantaine. | Une source en quarantaine n'est pas publiable. | DDD-ADR-003 |
 
@@ -85,8 +85,8 @@ M-003 ne publie aucune version canonique et ne décide pas l'autorité textuelle
 |---|---|---|---|---|---|
 | SP-001 - Enregistrement immuable | L'original reste immuable et l'empreinte stable identifie la source. | Given un PDF original ajouté; When SP enregistre la source; Then l'original et son empreinte stable sont conservés sans modification. | T-003 | DDD-ADR-003 | uv run --locked gate
 | SP-002 - Manifeste complet | Chaque page est représentée dans le manifeste de pages. | Given un SourceDocument enregistré; When le manifeste est créé; Then aucune page du PDF original ne reste hors manifeste. | T-004 | DDD-ADR-003 | uv run --locked gate
-| SP-003 - Diagnostic page par page | Chaque page possède un diagnostic avant routage. | Given un manifeste complet; When le diagnostic est demandé; Then chaque page reçoit ses signaux documentaires et leur priorité explicite, dont `SCAN_CLEAN` pour un scan propre sans texte natif même complexe. | T-005; T-014 | ADR-002; ADR-003; ADR-033; ADR-043 | uv run --locked gate
-| SP-004 - Routage explicite | La route de page est nommée et justifiée. | Given des diagnostics complets; When la politique de routage s'exécute; Then une dégradation physique est routée `PREPROCESS_GRANITE`, un OCR mauvais non dégradé `BAD_OCR_TO_GRANITE`, une page mixte saine `MIXED_PAGEWISE` et un scan propre sans texte natif `SCAN_GRANITE`. | T-006; T-014 | ADR-002; ADR-003; ADR-033; ADR-043 | uv run --locked gate
+| SP-003 - Diagnostic page par page | Chaque page possède un diagnostic avant routage. | Given un manifeste complet; When le diagnostic est demandé; Then chaque page reçoit ses signaux documentaires et leur priorité explicite, dont `SUSPECT` pour moins de 80 caractères natifs sur une page visuelle complexe. | T-005; T-014; T-015 | ADR-002; ADR-003; ADR-033; ADR-043; ADR-044 | uv run --locked gate
+| SP-004 - Routage explicite | La route de page est nommée et justifiée. | Given des diagnostics complets; When la politique de routage s'exécute; Then une page visuelle complexe sans autorité native fiable suit `SCAN_GRANITE`, tandis qu’une autorité native fiable conserve `TARGETED_ENRICHMENT`. | T-006; T-014; T-015 | ADR-002; ADR-003; ADR-033; ADR-043; ADR-044 | uv run --locked gate
 | SP-005 - Revue manuelle d'incertitude | Une route incertaine produit une revue manuelle explicite. | Given des signaux contradictoires; When aucune route sûre ne peut être décidée; Then SP demande une revue manuelle au lieu de changer de route implicitement. | T-006 | ADR-002; ADR-003 | uv run --locked gate
 | SP-006 - Quarantaine non publiable | Une source en quarantaine n'est pas publiable. | Given une source en quarantaine; When une publication est demandée; Then la publication est refusée explicitement. | T-007 | DDD-ADR-003 | uv run --locked gate
 | SP-007 - Commandes de validation | Aucun GREEN n'est implicite. | Given la spécification M-003; When les gates sont exécutés; Then le validateur M-003, test et lint sont tous nommés. | T-002 | ADR-002; ADR-003; DDD-ADR-003 | uv run --locked gate

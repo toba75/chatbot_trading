@@ -117,14 +117,17 @@ page source. Dans le rendu à 90 degrés, il les découpe de droite à gauche,
 réexprime leurs coordonnées dans la page source et les fusionne dans l'ordre
 haut-bas.
 
-Conformément à ADR-040 acceptée et à la spécification unifiée,
-`TARGETED_ENRICHMENT` exécute séparément Docling standard et Granite-Docling,
+Conformément à ADR-040 acceptée, complétée par ADR-044, et à la spécification unifiée,
+`TARGETED_ENRICHMENT` reste réservé aux pages complexes dont l’autorité native
+est fiable ; il exécute séparément Docling standard et Granite-Docling,
 puis adjudique une unique autorité. Granite est retenu lorsqu’il réussit. Pour
 les seuls codes `DOCLING_PROVENANCE_MISSING` et
 `GRANITE_DOCLING_UNAVAILABLE`, le candidat Docling valide est retenu avec une
 trace structurée de la tentative Granite. Tout autre échec reste terminal.
 Gemma n’est jamais appelée pour cette route, car un candidat Docling standard
-y est contractuellement produit.
+y est contractuellement produit. Une page visuelle complexe dont le texte
+natif est absent ou parcellaire suit `SCAN_GRANITE`, avec sa récupération Gemma
+explicite et strictement page par page.
 
 Le parallélisme pagewise reste fixé par `services.workers.concurrency`, soit
 huit dans la configuration locale. Toutes les tentatives Granite du worker
