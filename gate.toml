@@ -4676,6 +4676,17 @@ depends_on = ["precondition.m013_fastapi"]
 live = false
 
 [[nodes]]
+id = "test.m013-fastapi.validate-post-projection-metadata-extraction-acceptance"
+path = "gate_tests/ported/tests/m013_fastapi/validate_post_projection_metadata_extraction_acceptance.py"
+kind = "test"
+scope = "m013_fastapi"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013_fastapi"]
+live = false
+
+[[nodes]]
 id = "test.m013-fastapi.validate-ui-product-contracts-unit"
 path = "gate_tests/ported/tests/m013_fastapi/validate_ui_product_contracts_unit.py"
 kind = "test"

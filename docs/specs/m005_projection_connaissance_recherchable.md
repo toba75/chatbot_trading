@@ -108,6 +108,12 @@ La mission de M-005 est de rendre une version canonique M-004 recherchable par c
 | KnowledgeProjectionRetired | Une projection est retirée du service de recherche. | projection_id; retired_reason |
 | SearchKnowledgePerformed | Une recherche auditable est exécutée. | search_trace_id; projection_id; query_hash; filters_hash; result_count |
 
+Après publication complète de l'index, la projection exécute obligatoirement
+`EXTRACT_BIBLIOGRAPHIC_METADATA`. Le titre, les auteurs, l'année et l'édition
+effectivement trouvés sont persistés avec leurs preuves paginées. La projection
+ne devient `SEARCHABLE` qu'après cette persistance ; un échec de l'extraction
+produit `KnowledgeProjectionFailed` sans fallback.
+
 ## API publique KA
 
 | Endpoint | Succès | Erreurs publiques | Corps public |

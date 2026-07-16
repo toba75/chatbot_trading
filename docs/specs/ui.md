@@ -91,16 +91,12 @@ Une action bloquée reste visible avec sa raison. L'UI ne remplace pas l'action 
 
 ### 2. Ajouter un PDF
 
-Le formulaire d'ajout demande explicitement:
+Le formulaire d'ajout demande uniquement:
 
 | Champ | Règle UI |
 |---|---|
 | Fichier PDF original | Obligatoire. Le fichier est envoyé comme `original_content`. |
-| Titre documentaire | Obligatoire dans `bibliographic_metadata`; le nom de fichier ne devient pas titre par défaut. |
-| Émetteur ou origine | Obligatoire dans `bibliographic_metadata`; aucune origine implicite. |
-| Date documentaire | Obligatoire ou marquée explicitement `DATE_NON_RENSEIGNEE` par l'utilisateur. |
-| Type documentaire | Obligatoire parmi les types supportés par la configuration locale. |
-| Langue principale | Obligatoire ou marquée explicitement `LANGUE_NON_RENSEIGNEE` par l'utilisateur. |
+| Métadonnées bibliographiques | Absentes de l'admission. Elles sont extraites après projection avec preuves paginées; aucune valeur n'est déduite du nom de fichier. |
 
 Commande appelée:
 

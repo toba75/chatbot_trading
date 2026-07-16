@@ -96,7 +96,7 @@ M-003 ne publie aucune version canonique et ne décide pas l'autorité textuelle
 
 | Endpoint | Succès | Erreurs publiques | Corps public |
 |---|---|---|---|
-| POST /v1/documents | 201 pour une source créée; 200 avec `DUPLICATE_SOURCE` pour un doublon binaire existant. | 400 `HTTP_REQUEST_INVALID` pour `original_content` ou `bibliographic_metadata` absent; 422 `SOURCE_UNREADABLE` pour PDF corrompu ou chiffré. | `document_id`, `document_status`, et `duplicate` seulement quand le statut est `DUPLICATE_SOURCE`. |
+| POST /v1/documents | 201 pour une source créée; 200 avec `DUPLICATE_SOURCE` pour un doublon binaire existant. | 400 `HTTP_REQUEST_INVALID` pour `original_content` absent ou pour tout champ bibliographique désormais interdit; 422 `SOURCE_UNREADABLE` pour PDF corrompu ou chiffré. | Requête multipart limitée à `original_content`; réponse avec `document_id`, `document_status`, et `duplicate` seulement quand le statut est `DUPLICATE_SOURCE`. |
 | POST /v1/documents/{id}/diagnose | 202 `DIAGNOSTIC_REQUESTED` quand le job `DIAGNOSE` est accepté. | 400 `HTTP_REQUEST_INVALID` pour `document_id` invalide; 404 `SOURCE_NOT_FOUND`; 409 `DIAGNOSTIC_ALREADY_REQUESTED`. | `document_id` et `diagnostic_status`, sans `processing_run_id`, sans `original_storage_ref` et sans route. |
 
 ## Commandes de validation
