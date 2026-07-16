@@ -430,7 +430,73 @@ def _verifier_recuperation_orientation_gemma_apres_bbox_invalide(tmp_path: Path)
     ]
 
 
-def test_recuperation_gemma_explicite_apres_absence_de_provenance_granite(tmp_path: Path) -> None:
+def _verifier_json_gemma_invalide_declenche_recuperation_orientation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Given le llm-gateway a bien joint Gemma mais refuse sa sortie car elle n'est pas un JSON valide.
+    # When le worker Vision traduit le contrat public du gateway.
+    # Then il publie GEMMA_VISION_OUTPUT_INVALID afin d'autoriser uniquement le second rendu à 90 degrés d'ADR-036.
+    from app.contracts.llm_inference import LlmInferenceResponse
+    from app.source_processing.adapters import gemma_vision_worker
+    from app.source_processing.adapters.gemma_vision_conversion import (
+        GemmaVisionConversionError,
+    )
+
+    source_path = tmp_path / "source-gemma-json-invalide.pdf"
+    source_content = b"%PDF-1.7\nGemma invalid JSON\n%%EOF\n"
+    source_path.write_bytes(source_content)
+
+    class _GatewaySortieJsonInvalide:
+        def __init__(self, *, endpoint_url: str, timeout_seconds: int) -> None:
+            assert endpoint_url == "http://llm-gateway.local/v1/infer"
+            assert timeout_seconds == 120
+
+        def infer(self, request):
+            del request
+            return LlmInferenceResponse(
+                status_code=502,
+                payload={"error_code": "LLM_RESPONSE_INVALID_JSON"},
+                latency_ms=12.0,
+            )
+
+    monkeypatch.setattr(
+        gemma_vision_worker,
+        "UrllibLlmInferenceGateway",
+        _GatewaySortieJsonInvalide,
+    )
+    monkeypatch.setattr(
+        gemma_vision_worker,
+        "_render_page_png",
+        lambda **kwargs: b"\x89PNG\r\n\x1a\ncontract-test",
+    )
+
+    with pytest.raises(GemmaVisionConversionError) as captured:
+        gemma_vision_worker._convert(
+            {
+                "document_id": "DOC-0000000000000001",
+                "processing_run_id": "RUN-M004-GEMMA-JSON-INVALIDE",
+                "source_sha256": hashlib.sha256(source_content).hexdigest(),
+                "source_pdf_path": str(source_path),
+                "page_number": 14,
+                "source_page_number": 14,
+                "route_name": "TARGETED_ENRICHMENT",
+                "routing_policy_version": "routing-v1",
+                "gateway_endpoint_url": "http://llm-gateway.local/v1/infer",
+                "gateway_timeout_seconds": 120,
+                "max_output_tokens": 2048,
+                "expected_model_id": "google/gemma-4-26B-A4B-it",
+                "render_rotation_degrees": 0,
+            }
+        )
+
+    assert captured.value.code == "GEMMA_VISION_OUTPUT_INVALID"
+
+
+def test_recuperation_gemma_explicite_apres_absence_de_provenance_granite(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Exécute un unique scénario atomique, conformément au manifeste de gate."""
     _verifier_recuperation_granite_autorisee("DOCLING_PROVENANCE_MISSING")
     _verifier_recuperation_granite_autorisee("GRANITE_DOCLING_UNAVAILABLE")
@@ -440,3 +506,4 @@ def test_recuperation_gemma_explicite_apres_absence_de_provenance_granite(tmp_pa
     _verifier_contrat_gemma_compact_pour_table_dense()
     _verifier_normalisation_bbox_gemma_inversee()
     _verifier_recuperation_orientation_gemma_apres_bbox_invalide(tmp_path)
+    _verifier_json_gemma_invalide_declenche_recuperation_orientation(tmp_path, monkeypatch)
