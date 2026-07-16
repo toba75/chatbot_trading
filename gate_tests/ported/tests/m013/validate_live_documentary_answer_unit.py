@@ -74,7 +74,8 @@ def test_validate_live_documentary_answer_unit() -> None:
                 status_code=200,
                 payload={
                     "structured_output": {
-                        "answer": "Le momentum décrit la persistance du mouvement de prix. [EXTRAIT 2]",
+                        "answer": "Le momentum décrit la persistance du mouvement de prix.",
+                        "used_evidence_ordinals": [2],
                     },
                     "raw_response_id": "RAW-M013-LIVE-001",
                     "provenance": {"configuration_hash": "c" * 64},
@@ -107,11 +108,51 @@ def test_validate_live_documentary_answer_unit() -> None:
     assert tuple(citation["quoted_span"] for citation in answer.citations) == (
         "Le momentum mesure la persistance d'un mouvement de prix.",
     )
-    assert "[EXTRAIT 2]" not in answer.answer_text
     assert "persistance" in answer.answer_text
     assert gateway.request is not None
-    assert "marqueurs [EXTRAIT n]" in gateway.request.messages[0].content
+    assert "used_evidence_ordinals" in gateway.request.messages[0].content
+    assert gateway.request.prompt_version == "1.1"
+    assert gateway.request.schema_version == "1.1"
+    assert set(gateway.request.output_schema["properties"]) == {
+        "answer",
+        "used_evidence_ordinals",
+    }
     assert "Le momentum mesure" in gateway.request.messages[1].content
+
+    class UnsupportedGateway:
+        def infer(self, request):
+            return LlmInferenceResponse(
+                status_code=200,
+                payload={
+                    "structured_output": {
+                        "answer": "Les extraits ne soutiennent pas la réponse.",
+                        "used_evidence_ordinals": [],
+                    },
+                    "raw_response_id": "RAW-M013-LIVE-UNSUPPORTED",
+                    "provenance": {"configuration_hash": "c" * 64},
+                },
+                latency_ms=2.0,
+            )
+
+    unsupported = LiveDocumentaryAnswerService(
+        evidence_retriever=Retriever(),
+        inference_gateway=UnsupportedGateway(),
+        configuration_hash="c" * 64,
+    )
+    try:
+        unsupported.answer(
+            LiveDocumentaryAnswerRequest(
+                conversation_id="CONV-M013-LIVE-001",
+                turn_id="TURN-M013-LIVE-UNSUPPORTED",
+                resolved_question="Explique le momentum.",
+                selected_document_ids=("DOC-M013-LIVE-001",),
+                occurred_at="2026-07-15T10:01:00Z",
+            )
+        )
+    except LiveDocumentaryAnswerError as error:
+        assert error.error_code == "DOCUMENTARY_EVIDENCE_NOT_FOUND"
+    else:
+        raise AssertionError("Une sortie sans preuve utilisée doit produire un gap explicite.")
 
     class EmptyRetriever:
         def retrieve(self, *, question: str, selected_document_ids: tuple[str, ...]):
