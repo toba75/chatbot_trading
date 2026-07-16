@@ -1,6 +1,6 @@
 # ADR-038 - Métadonnées bibliographiques dérivées après projection
 
-**Statut :** Proposée
+**Statut :** Acceptée
 **Date :** 2026-07-16
 **Décideurs :** Équipe OSTrading
 **Remplace :** obligation de métadonnées bibliographiques à l'admission d'ADR-028
@@ -101,7 +101,26 @@ informations bibliographiques avec leurs preuves.
 - Spécification : `docs/specs/metadonnees_bibliographiques_apres_projection.md`.
 - Plan d'implémentation : demande utilisateur du 2026-07-16.
 - Tests d'acceptation : `gate_tests/ported/tests/m013_fastapi/validate_post_projection_metadata_extraction_acceptance.py`.
-- Commits : RED et GREEN à renseigner.
+- Commits RED : `cf802b707`, `65a065e1b`, `6701dd68e`.
+- Commit GREEN : `c9c7f35ef`.
+
+## Preuve produit d'acceptation
+
+Le 2026-07-16, le parcours réel exécuté avec `uv run ui` sur une copie binaire
+distincte de `Trading On Momentum.pdf` a produit :
+
+- document `DOC-2BA09DA0B0B1A5C1` admis sans métadonnées déclarées ;
+- diagnostic `SUCCEEDED` à `289 / 289` ;
+- conversion `SUCCEEDED` à `289 / 289`, version canonique
+  `CVER-M004-ROUTED-2BA09DA0B0B1A5C101A90AD6` ;
+- projection `PROJ-B6FF03D5C678C70B68F84F713FF1D06BCBF26D66D3AAFBCC35218E1DA0AEA11C`
+  `SEARCHABLE` et `SUCCEEDED` à `267 / 267`, dont 266 chunks et une unité
+  d'extraction bibliographique ;
+- titre, trois auteurs et année 2002 persistés avec trois preuves vérifiées sur
+  les pages PDF 1 et 5, provenance
+  `google/gemma-4-26B-A4B-it@533c7a07d8e220c4342168ecf816b21c49e8e9ce207b447349d51a7b2f7e1607` ;
+- conversation `CONV-2A93A978058A4BF486C8E4490CDBC922` répondue depuis la
+  projection avec une citation publique résoluble vers la page PDF 196.
 
 ## Notes
 
