@@ -117,7 +117,7 @@ page source. Dans le rendu à 90 degrés, il les découpe de droite à gauche,
 réexprime leurs coordonnées dans la page source et les fusionne dans l'ordre
 haut-bas.
 
-Conformément à ADR-040 proposée et à la spécification unifiée,
+Conformément à ADR-040 acceptée et à la spécification unifiée,
 `TARGETED_ENRICHMENT` exécute séparément Docling standard et Granite-Docling,
 puis adjudique une unique autorité. Granite est retenu lorsqu’il réussit. Pour
 les seuls codes `DOCLING_PROVENANCE_MISSING` et

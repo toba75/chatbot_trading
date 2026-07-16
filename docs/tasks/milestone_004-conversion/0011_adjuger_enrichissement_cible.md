@@ -33,8 +33,11 @@
 ## Validation
 
 - Test RED :
-  `gate_tests/ported/tests/m004/validate_non_native_document_conversion_unit.py`.
+  `gate_tests/ported/tests/m004/validate_non_native_document_conversion_unit.py`
+  et `gate_tests/ported/tests/m004/validate_granite_concurrency_unit.py`.
 - Preuve réelle : conversion publique de `DOC-7A3001E2DE57C3E0` jusqu’à
   `CANONICAL_ACCEPTED`, projection publique réussie et vérification UI.
 - Commandes : `uv run --locked gate --scope m004`,
   `uv run --locked gate`, `git diff --check`.
+- Résultat : ADR-040 acceptée, conversion et projection réelles GREEN, gate
+  complète GREEN avec 429 nœuds exécutés exactement une fois.

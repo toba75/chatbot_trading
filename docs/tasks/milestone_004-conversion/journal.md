@@ -264,7 +264,7 @@ rejouée depuis le formulaire UI sur `DOC-F91FE126FBFFA374` :
 | T-005 | `ada4b6a0e`, `e62c60a2d`, `bfd5438e7` | `96be704d8` | ADR-002; ADR-003; ADR-031; ADR-032; ADR-033 | 17 tests ciblés, migration 013, UI native/Granite/OCR réelle, absence de publication partielle, gate complète 406 nœuds | GREEN |
 | T-006 | `65577c74f` | `572bc89c2` | ADR-032; ADR-033 | Gouvernance ADR, allowlist historique fermée, erreur OCR → Granite terminale, scope gouvernance 23 nœuds | GREEN documentaire |
 | T-010 | À produire | À produire | ADR-039 (Proposée) | Mapping de troncature, segmentation bornée, conversion et projection réelles de `DOC-7A3001E2DE57C3E0` | EN COURS |
-| T-011 | À produire | À produire | ADR-040 (Proposée) | Adjudication Docling + Granite, absence de Gemma sur `TARGETED_ENRICHMENT`, conversion et projection réelles | EN COURS |
+| T-011 | `50b21a609`, `8e7fae70e` | `c3a20a141`, `000982d15` | ADR-040 (Acceptée) | Adjudication Docling + Granite, capacité Granite partagée, absence de Gemma sur `TARGETED_ENRICHMENT`, conversion et projection réelles, gate complète 429 nœuds | GREEN réel |
 
 ## Exécution T-011
 
@@ -291,3 +291,10 @@ rejouée depuis le formulaire UI sur `DOC-F91FE126FBFFA374` :
   items. La cause est la concurrence de huit instances, pas un Granite nul.
 - Calibration retenue : huit pages orchestrées, mais un limiteur Granite
   partagé de deux instances pour toutes les routes du worker.
+- GREEN final : `uv sync --locked`, les scopes `m004` et `m013_config`, puis
+  `uv run --locked gate` sont GREEN. Le rapport canonique contient 429 nœuds,
+  tous exécutés exactement une fois, sans absence, inattendu ni doublon.
+- Vérification UI réelle après redémarrage par `uv run ui` : Conversion
+  `SUCCEEDED 36/36`, `CANONICAL_ACCEPTED` ; Projection `SUCCEEDED 248/248`,
+  `SEARCHABLE` ; corpus disponible sans erreur d’orchestrateur ni erreur
+  console navigateur.

@@ -4,7 +4,7 @@
 **Date :** 2026-07-14
 **Décideurs :** Équipe OSTrading
 **Remplace :** ADR-035
-**Remplacée par :** Aucune
+**Remplacée par :** ADR-040 pour `TARGETED_ENRICHMENT` seulement
 **Source :** Parcours réel demandé par l’utilisateur le 2026-07-14 ;
 `docs/specs/m004_version_canonique_publiee.md` ; ADR-014, ADR-015, ADR-031,
 ADR-034 et ADR-035.

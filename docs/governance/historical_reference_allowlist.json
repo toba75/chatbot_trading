@@ -109,7 +109,7 @@
                           },
                           {
                               "path":  "docs/adr/index.md",
-                              "sha256":  "bf50e4fb62e52319c3d8ee6a097d271e6c2449c52b0524513eb9630303de5980",
+                              "sha256":  "d5f668209a5c5b68c6a3e667d18ff84b3cb21b61cf8d7130d3e264c797b9b590",
                               "reason":  "ADR historical or transition decision"
                           },
                           {

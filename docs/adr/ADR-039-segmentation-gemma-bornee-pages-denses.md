@@ -4,7 +4,7 @@
 **Date :** 2026-07-16
 **Décideurs :** Équipe OSTrading
 **Remplace :** ADR-036 à l’acceptation
-**Remplacée par :** Aucune
+**Remplacée par :** ADR-040 pour `TARGETED_ENRICHMENT` seulement
 **Source :** Parcours réel M-004 du document `DOC-7A3001E2DE57C3E0`
 
 ## Contexte

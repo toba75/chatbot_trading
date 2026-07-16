@@ -40,12 +40,12 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 | [ADR-032](ADR-032-execution-reelle-conversion-canonique.md) | Exécution réelle et reproductible de la conversion canonique | Remplacée | 2026-07-13 | Aucun | ADR-035 |
 | [ADR-033](ADR-033-priorite-signaux-routage-ocr.md) | Priorité des signaux pour les routes OCR atteignables | Acceptée | 2026-07-14 | Aucun | Aucune |
 | [ADR-034](ADR-034-gateway-llm-multimodal-borne.md) | Gateway LLM multimodal borné | Acceptée | 2026-07-14 | Aucun | Aucune |
-| [ADR-035](ADR-035-recuperation-gemma-explicite-apres-provenance-granite-absente.md) | Récupération Gemma explicite après provenance Granite absente | Acceptée | 2026-07-14 | ADR-032 | Aucune |
-| [ADR-036](ADR-036-recuperation-gemma-apres-echec-terminal-granite.md) | Récupération Gemma explicite après échec terminal Granite | Proposée | 2026-07-14 | ADR-035 | Aucune |
-| [ADR-037](ADR-037-parallelisme-documentaire-projection.md) | Parallélisme documentaire et projection par lots | Acceptée | 2026-07-15 | Aucun | Aucune |
+| [ADR-035](ADR-035-recuperation-gemma-explicite-apres-provenance-granite-absente.md) | Récupération Gemma explicite après provenance Granite absente | Acceptée | 2026-07-14 | ADR-032 | ADR-040 pour `TARGETED_ENRICHMENT` seulement |
+| [ADR-036](ADR-036-recuperation-gemma-apres-echec-terminal-granite.md) | Récupération Gemma explicite après échec terminal Granite | Proposée | 2026-07-14 | ADR-035 | ADR-040 pour `TARGETED_ENRICHMENT` seulement |
+| [ADR-037](ADR-037-parallelisme-documentaire-projection.md) | Parallélisme documentaire et projection par lots | Acceptée | 2026-07-15 | Aucun | ADR-040 pour le plafond de concurrence Granite seulement |
 | [ADR-038](ADR-038-metadonnees-bibliographiques-apres-projection.md) | Métadonnées bibliographiques dérivées après projection | Acceptée | 2026-07-16 | Obligation bibliographique ADR-028 | Aucune |
-| [ADR-039](ADR-039-segmentation-gemma-bornee-pages-denses.md) | Segmentation Gemma bornée des pages denses | Proposée | 2026-07-16 | ADR-036 à l’acceptation | Aucune |
-| [ADR-040](ADR-040-adjudication-enrichissement-cible-docling-granite.md) | Adjudication explicite de l’enrichissement ciblé Docling et Granite | Proposée | 2026-07-16 | Clauses `TARGETED_ENRICHMENT` d’ADR-035, ADR-036 et ADR-039 et plafond unique Granite d’ADR-037 à l’acceptation | Aucune |
+| [ADR-039](ADR-039-segmentation-gemma-bornee-pages-denses.md) | Segmentation Gemma bornée des pages denses | Proposée | 2026-07-16 | ADR-036 à l’acceptation | ADR-040 pour `TARGETED_ENRICHMENT` seulement |
+| [ADR-040](ADR-040-adjudication-enrichissement-cible-docling-granite.md) | Adjudication explicite de l’enrichissement ciblé Docling et Granite | Acceptée | 2026-07-16 | Clauses `TARGETED_ENRICHMENT` d’ADR-035, ADR-036 et ADR-039 et plafond unique Granite d’ADR-037 | Aucune |
 
 ## ADR DDD
 

@@ -13,6 +13,7 @@ def test_validate_m004_conversion_runtime_governance_acceptance() -> None:
     ocr_routing_adr_path = repository_root / "docs/adr/ADR-033-priorite-signaux-routage-ocr.md"
     recovery_adr_path = repository_root / "docs/adr/ADR-035-recuperation-gemma-explicite-apres-provenance-granite-absente.md"
     dense_recovery_adr_path = repository_root / "docs/adr/ADR-039-segmentation-gemma-bornee-pages-denses.md"
+    adjudication_adr_path = repository_root / "docs/adr/ADR-040-adjudication-enrichissement-cible-docling-granite.md"
     adr_index_path = repository_root / "docs/adr/index.md"
     specification_path = repository_root / "docs/specs/m004_version_canonique_publiee.md"
 
@@ -24,11 +25,13 @@ def test_validate_m004_conversion_runtime_governance_acceptance() -> None:
     assert ocr_routing_adr_path.is_file(), "ADR-033 doit décider la priorité des signaux OCR."
     assert recovery_adr_path.is_file(), "ADR-035 doit décider la récupération Gemma explicite."
     assert dense_recovery_adr_path.is_file(), "ADR-039 doit borner la récupération des pages denses."
+    assert adjudication_adr_path.is_file(), "ADR-040 doit décider l’adjudication ciblée et la capacité Granite."
     assert adr_index_path.is_file(), "L'index ADR doit tracer les décisions acceptées."
     adr = adr_path.read_text(encoding="utf-8")
     ocr_routing_adr = ocr_routing_adr_path.read_text(encoding="utf-8")
     recovery_adr = recovery_adr_path.read_text(encoding="utf-8")
     dense_recovery_adr = dense_recovery_adr_path.read_text(encoding="utf-8")
+    adjudication_adr = adjudication_adr_path.read_text(encoding="utf-8")
     adr_index = adr_index_path.read_text(encoding="utf-8")
     specification = specification_path.read_text(encoding="utf-8")
 
@@ -101,6 +104,22 @@ def test_validate_m004_conversion_runtime_governance_acceptance() -> None:
     for fragment in required_dense_recovery_adr_fragments:
         assert fragment in dense_recovery_adr, f"ADR-039 doit imposer : {fragment}"
 
+    required_adjudication_adr_fragments = (
+        "**Statut :** Acceptée",
+        "TARGETED_ENRICHMENT",
+        "Docling standard et",
+        "Granite-Docling ciblé",
+        "Gemma **NE DOIT PAS** être appelée",
+        "services.workers.concurrency",
+        "services.workers.granite_concurrency",
+        "même limiteur Granite en mémoire",
+        "SUCCEEDED 36/36",
+        "SUCCEEDED 248/248",
+        "429 nœuds",
+    )
+    for fragment in required_adjudication_adr_fragments:
+        assert fragment in adjudication_adr, f"ADR-040 doit imposer : {fragment}"
+
     assert "**Statut :** Acceptée" in ocr_routing_adr
     assert "PREPROCESS_GRANITE" in ocr_routing_adr
     assert "BAD_OCR_TO_GRANITE" in ocr_routing_adr
@@ -119,16 +138,23 @@ def test_validate_m004_conversion_runtime_governance_acceptance() -> None:
     assert (
         "| [ADR-035](ADR-035-recuperation-gemma-explicite-apres-provenance-granite-absente.md) | "
         "Récupération Gemma explicite après provenance Granite absente | Acceptée | "
-        "2026-07-14 | ADR-032 | Aucune |"
+        "2026-07-14 | ADR-032 | ADR-040 pour `TARGETED_ENRICHMENT` seulement |"
     ) in adr_index
     assert (
         "| [ADR-039](ADR-039-segmentation-gemma-bornee-pages-denses.md) | "
         "Segmentation Gemma bornée des pages denses | Proposée | "
-        "2026-07-16 | ADR-036 à l’acceptation | Aucune |"
+        "2026-07-16 | ADR-036 à l’acceptation | ADR-040 pour `TARGETED_ENRICHMENT` seulement |"
+    ) in adr_index
+    assert (
+        "| [ADR-040](ADR-040-adjudication-enrichissement-cible-docling-granite.md) | "
+        "Adjudication explicite de l’enrichissement ciblé Docling et Granite | Acceptée | "
+        "2026-07-16 | Clauses `TARGETED_ENRICHMENT` d’ADR-035, ADR-036 et ADR-039 "
+        "et plafond unique Granite d’ADR-037 | Aucune |"
     ) in adr_index
 
     assert "## Exécution réelle et disponibilité des convertisseurs" in specification
     assert "ADR-039" in specification
+    assert "ADR-040 acceptée" in specification
     assert "CONVERSION_ASSET_MANIFEST_INVALID" in specification
     assert "DOCLING_PROVENANCE_MISSING" in specification
     assert "Gemma 4" in specification

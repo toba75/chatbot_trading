@@ -4,7 +4,7 @@
 **Date :** 2026-07-15
 **Décideurs :** Équipe OSTrading
 **Remplace :** Aucun
-**Remplacée par :** Aucune
+**Remplacée par :** ADR-040 pour le plafond de concurrence Granite seulement
 **Source :** Demande utilisateur du 2026-07-15 sur l'accélération d'un PDF unique ; ADR-031 ; ADR-036 ; `docs/specs/m004_version_canonique_publiee.md` ; `docs/specs/m005_projection_connaissance_recherchable.md`.
 
 ## Contexte

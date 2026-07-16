@@ -1,9 +1,9 @@
 # ADR-040 - Adjudication explicite de l’enrichissement ciblé Docling et Granite
 
-**Statut :** Proposée
+**Statut :** Acceptée
 **Date :** 2026-07-16
 **Décideurs :** Équipe OSTrading
-**Remplace :** Pour `TARGETED_ENRICHMENT` seulement, les obligations de récupération Gemma d’ADR-035, ADR-036 et ADR-039, ainsi que le plafond unique de concurrence Granite d’ADR-037, à l’acceptation
+**Remplace :** Pour `TARGETED_ENRICHMENT` seulement, les obligations de récupération Gemma d’ADR-035, ADR-036 et ADR-039, ainsi que le plafond unique de concurrence Granite d’ADR-037
 **Remplacée par :** Aucune
 **Source :** Parcours réel M-004 du document `DOC-7A3001E2DE57C3E0` et spécification unifiée 4.1
 
@@ -128,10 +128,22 @@ instances isolées et fabrique des indisponibilités.
   `docs/tasks/milestone_004-conversion/0011_adjuger_enrichissement_cible.md`.
 - Tests d'acceptation :
   `gate_tests/ported/tests/m004/validate_non_native_document_conversion_unit.py`.
-- Commits : à compléter après les commits RED et GREEN.
+- Commits RED : `50b21a609` pour l’adjudication et `8e7fae70e` pour la
+  capacité Granite partagée.
+- Commits GREEN : `c3a20a141` pour l’adjudication et `000982d15` pour le
+  limiteur Granite et sa configuration stricte.
 
 ## Notes
 
-ADR-040 reste proposée tant que le document réel n’est pas converti, publié et
-projeté sans erreur. L’acceptation mettra à jour atomiquement les champs de
-remplacement des ADR concernées.
+ADR-040 est acceptée après la preuve réelle suivante :
+
+- `DOC-7A3001E2DE57C3E0` est `CANONICAL_ACCEPTED`, avec une progression
+  publique `SUCCEEDED 36/36` et 13 traces d’adjudication ciblée ;
+- sa projection est `SEARCHABLE`, avec une progression publique
+  `SUCCEEDED 248/248` et 247 chunks ;
+- le runtime relancé par `uv run ui` charge explicitement huit pages
+  orchestrées et une capacité Granite de deux ;
+- les pages Granite précédemment échouées réussissent seules ou par deux ;
+- les scopes `m004` et `m013_config` sont GREEN ;
+- `uv sync --locked` et `uv run --locked gate` sont GREEN, avec 429 nœuds
+  exécutés exactement une fois et aucun nœud absent, inattendu ou dupliqué.
