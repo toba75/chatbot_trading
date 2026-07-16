@@ -591,13 +591,18 @@ def _verifier_segmentation_gemma_bornee_apres_troncature(tmp_path: Path) -> None
                 raise GemmaVisionConversionError("GEMMA_VISION_OUTPUT_INVALID")
             if signature == (90, None, None):
                 raise GemmaVisionConversionError("GEMMA_VISION_OUTPUT_TRUNCATED")
-            if signature not in {(90, 1, 2), (90, 2, 2)}:
+            if signature not in {
+                (90, 1, 4),
+                (90, 2, 4),
+                (90, 3, 4),
+                (90, 4, 4),
+            }:
                 raise AssertionError(f"Appel Gemma hors contrat : {signature!r}")
             segment_index = gemma_request.render_segment_index
             return GemmaVisionConversionResponse(
                 tool_version=(
                     "google/gemma-4-26B-A4B-it@immutable;nim-1.7.0;"
-                    f"render-rotation-090;render-segment-{segment_index:02d}-of-02"
+                    f"render-rotation-090;render-segment-{segment_index:02d}-of-04"
                 ),
                 items=(
                     GemmaVisionPageItem(
@@ -629,9 +634,21 @@ def _verifier_segmentation_gemma_bornee_apres_troncature(tmp_path: Path) -> None
             entry.render_segment_count,
         )
         for entry in gemma_port.requests
-    ] == [(0, None, None), (90, None, None), (90, 1, 2), (90, 2, 2)]
-    assert [item.text for item in recovered.items] == ["Segment 1", "Segment 2"]
-    assert recovered.tool_version.endswith("render-rotation-090;render-segments-02")
+    ] == [
+        (0, None, None),
+        (90, None, None),
+        (90, 1, 4),
+        (90, 2, 4),
+        (90, 3, 4),
+        (90, 4, 4),
+    ]
+    assert [item.text for item in recovered.items] == [
+        "Segment 1",
+        "Segment 2",
+        "Segment 3",
+        "Segment 4",
+    ]
+    assert recovered.tool_version.endswith("render-rotation-090;render-segments-04")
     assert len(
         {
             _request_identity_suffix(
@@ -641,13 +658,13 @@ def _verifier_segmentation_gemma_bornee_apres_troncature(tmp_path: Path) -> None
             )
             for entry in gemma_port.requests
         }
-    ) == 4
+    ) == 6
     assert _structured_items(
         {"items": [{"text": "Bas du rendu", "bbox": [0, 0, 1000, 1000]}]},
         render_rotation_degrees=90,
-        render_segment_index=2,
-        render_segment_count=2,
-    ) == [{"text": "Bas du rendu", "bbox": [500.0, 0, 1000.0, 1000]}]
+        render_segment_index=4,
+        render_segment_count=4,
+    ) == [{"text": "Bas du rendu", "bbox": [750.0, 0, 1000.0, 1000]}]
 
 
 def _verifier_budget_gemma_et_supervision_du_retry() -> None:
