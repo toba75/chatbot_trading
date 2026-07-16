@@ -112,7 +112,7 @@ conserve la trace Granite dans l'artefact canonique et devient l'unique autorit�
 de la page. Un JSON ou un schéma Gemma invalide est une sortie invalide, pas une
 indisponibilité. Après une sortie invalide sur le rendu initial, un rendu complet
 à 90 degrés est autorisé. Si et seulement si ce second rendu est tronqué, le
-worker traite exactement quatre bandes horizontales non chevauchantes de la
+worker traite exactement seize bandes horizontales non chevauchantes de la
 page source. Dans le rendu à 90 degrés, il les découpe de droite à gauche,
 réexprime leurs coordonnées dans la page source et les fusionne dans l'ordre
 haut-bas.
