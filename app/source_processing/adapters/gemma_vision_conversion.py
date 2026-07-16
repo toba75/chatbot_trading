@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 
-GEMMA_DENSE_RENDER_SEGMENT_COUNT = 4
+GEMMA_DENSE_RENDER_SEGMENT_COUNT = 16
 
 
 class GemmaVisionConversionError(RuntimeError):
