@@ -487,14 +487,171 @@ def _verifier_json_gemma_invalide_declenche_recuperation_orientation(
                 "max_output_tokens": 2048,
                 "expected_model_id": "google/gemma-4-26B-A4B-it",
                 "render_rotation_degrees": 0,
+                "render_segment_index": None,
+                "render_segment_count": None,
             }
         )
 
     assert captured.value.code == "GEMMA_VISION_OUTPUT_INVALID"
 
 
+def _verifier_sortie_gemma_tronquee_est_explicite(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Given Gemma a émis des tokens mais le gateway refuse la sortie partielle.
+    # When le worker Vision traduit le contrat public du gateway.
+    # Then il distingue la troncature de l'indisponibilité du modèle.
+    from app.contracts.llm_inference import LlmInferenceResponse
+    from app.source_processing.adapters import gemma_vision_worker
+    from app.source_processing.adapters.gemma_vision_conversion import (
+        GemmaVisionConversionError,
+    )
+
+    source_path = tmp_path / "source-gemma-tronquee.pdf"
+    source_content = b"%PDF-1.7\nGemma partial output\n%%EOF\n"
+    source_path.write_bytes(source_content)
+
+    class _GatewaySortieTronquee:
+        def __init__(self, *, endpoint_url: str, timeout_seconds: int) -> None:
+            assert endpoint_url == "http://llm-gateway.local/v1/infer"
+            assert timeout_seconds == 120
+
+        def infer(self, request):
+            del request
+            return LlmInferenceResponse(
+                status_code=502,
+                payload={"error_code": "LLM_PARTIAL_OUTPUT"},
+                latency_ms=120_000.0,
+            )
+
+    monkeypatch.setattr(gemma_vision_worker, "UrllibLlmInferenceGateway", _GatewaySortieTronquee)
+    monkeypatch.setattr(
+        gemma_vision_worker,
+        "_render_page_png",
+        lambda **kwargs: b"\x89PNG\r\n\x1a\ncontract-test",
+    )
+
+    with pytest.raises(GemmaVisionConversionError) as captured:
+        gemma_vision_worker._convert(
+            {
+                "document_id": "DOC-0000000000000001",
+                "processing_run_id": "RUN-M004-GEMMA-TRONQUEE",
+                "source_sha256": hashlib.sha256(source_content).hexdigest(),
+                "source_pdf_path": str(source_path),
+                "page_number": 19,
+                "source_page_number": 19,
+                "route_name": "TARGETED_ENRICHMENT",
+                "routing_policy_version": "routing-v1",
+                "gateway_endpoint_url": "http://llm-gateway.local/v1/infer",
+                "gateway_timeout_seconds": 120,
+                "max_output_tokens": 2048,
+                "expected_model_id": "google/gemma-4-26B-A4B-it",
+                "render_rotation_degrees": 90,
+                "render_segment_index": None,
+                "render_segment_count": None,
+            }
+        )
+
+    assert captured.value.code == "GEMMA_VISION_OUTPUT_TRUNCATED"
+
+
+def _verifier_segmentation_gemma_bornee_apres_troncature(tmp_path: Path) -> None:
+    # Given le rendu complet initial est invalide et le rendu complet tourné est tronqué.
+    # When la récupération ADR-039 traite la page dense.
+    # Then exactement deux segments tournés sont appelés et fusionnés dans l'ordre.
+    from app.source_processing.adapters.gemma_vision_conversion import (
+        GemmaVisionConversionError,
+        GemmaVisionConversionResponse,
+        GemmaVisionPageItem,
+    )
+    from app.source_processing.adapters.gemma_vision_worker import (
+        _request_identity_suffix,
+        _structured_items,
+    )
+    from app.source_processing.application.routed_document_conversion_worker import (
+        _GemmaVisionFallbackPageConverter,
+    )
+
+    source_path = tmp_path / "source-gemma-dense.pdf"
+    source_path.write_bytes(b"%PDF-1.7\nGemma dense page\n%%EOF\n")
+
+    class _GemmaPageDense:
+        def __init__(self) -> None:
+            self.requests = []
+
+        def convert(self, gemma_request):
+            self.requests.append(gemma_request)
+            signature = (
+                gemma_request.render_rotation_degrees,
+                gemma_request.render_segment_index,
+                gemma_request.render_segment_count,
+            )
+            if signature == (0, None, None):
+                raise GemmaVisionConversionError("GEMMA_VISION_OUTPUT_INVALID")
+            if signature == (90, None, None):
+                raise GemmaVisionConversionError("GEMMA_VISION_OUTPUT_TRUNCATED")
+            if signature not in {(90, 1, 2), (90, 2, 2)}:
+                raise AssertionError(f"Appel Gemma hors contrat : {signature!r}")
+            segment_index = gemma_request.render_segment_index
+            return GemmaVisionConversionResponse(
+                tool_version=(
+                    "google/gemma-4-26B-A4B-it@immutable;nim-1.7.0;"
+                    f"render-rotation-090;render-segment-{segment_index:02d}-of-02"
+                ),
+                items=(
+                    GemmaVisionPageItem(
+                        text=f"Segment {segment_index}",
+                        bbox=(0.0, 0.0, 500.0, 1000.0),
+                    ),
+                ),
+            )
+
+    gemma_port = _GemmaPageDense()
+    converter = _GemmaVisionFallbackPageConverter(
+        converter=gemma_port,
+        resolve_source_path=lambda artifact_ref: source_path,
+        gateway_endpoint_url="http://llm-gateway.local/v1/infer",
+        gateway_timeout_seconds=120,
+        gateway_max_output_tokens=2048,
+        expected_model_id="google/gemma-4-26B-A4B-it",
+    )
+
+    recovered = converter.recover_page(
+        _request(),
+        granite_error_code="GRANITE_DOCLING_UNAVAILABLE",
+    )
+
+    assert [
+        (
+            entry.render_rotation_degrees,
+            entry.render_segment_index,
+            entry.render_segment_count,
+        )
+        for entry in gemma_port.requests
+    ] == [(0, None, None), (90, None, None), (90, 1, 2), (90, 2, 2)]
+    assert [item.text for item in recovered.items] == ["Segment 1", "Segment 2"]
+    assert recovered.tool_version.endswith("render-rotation-090;render-segments-02")
+    assert len(
+        {
+            _request_identity_suffix(
+                render_rotation_degrees=entry.render_rotation_degrees,
+                render_segment_index=entry.render_segment_index,
+                render_segment_count=entry.render_segment_count,
+            )
+            for entry in gemma_port.requests
+        }
+    ) == 4
+    assert _structured_items(
+        {"items": [{"text": "Bas du rendu", "bbox": [0, 0, 1000, 1000]}]},
+        render_rotation_degrees=90,
+        render_segment_index=2,
+        render_segment_count=2,
+    ) == [{"text": "Bas du rendu", "bbox": [500.0, 0, 1000.0, 1000]}]
+
+
 def _verifier_budget_gemma_et_supervision_du_retry() -> None:
-    # Given le gateway autorise un retry avant premier token et une page dense peut consommer 4 096 jetons.
+    # Given le gateway autorise un retry avant premier token et segmente les pages denses à budget constant.
     # When le worker documentaire construit le délai de son appel local au gateway.
     # Then il couvre les deux tentatives Spark et une marge explicite, sans interrompre le retry configuré.
     from app.platform.configuration import load_application_configuration
@@ -511,8 +668,8 @@ def _verifier_budget_gemma_et_supervision_du_retry() -> None:
         environment_snapshot={},
     )
 
-    assert configuration.models.llm.max_output_tokens == 4096
-    assert example_configuration.models.llm.max_output_tokens == 4096
+    assert configuration.models.llm.max_output_tokens == 2048
+    assert example_configuration.models.llm.max_output_tokens == 2048
     assert _gemma_gateway_supervision_timeout_seconds(
         spark_attempt_timeout_seconds=120,
         retry_before_first_token=1,
@@ -533,4 +690,6 @@ def test_recuperation_gemma_explicite_apres_absence_de_provenance_granite(
     _verifier_normalisation_bbox_gemma_inversee()
     _verifier_recuperation_orientation_gemma_apres_bbox_invalide(tmp_path)
     _verifier_json_gemma_invalide_declenche_recuperation_orientation(tmp_path, monkeypatch)
+    _verifier_sortie_gemma_tronquee_est_explicite(tmp_path, monkeypatch)
+    _verifier_segmentation_gemma_bornee_apres_troncature(tmp_path)
     _verifier_budget_gemma_et_supervision_du_retry()
