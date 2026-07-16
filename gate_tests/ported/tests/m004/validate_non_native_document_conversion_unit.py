@@ -8,6 +8,12 @@ from pathlib import Path
 
 import pytest
 
+from app.source_processing.application.granite_gemma_recovery import (
+    GraniteConversionFailure,
+)
+from app.source_processing.application.targeted_enrichment import (
+    TargetedEnrichmentPageConverter,
+)
 from app.source_processing.application.convert_routed_pages import (
     ConvertRoutedPagesHandler,
     PageConversionRequest,
@@ -121,6 +127,24 @@ class _GraniteOnly:
 
 class _NativeOnly:
     def convert_page(self, request: PageConversionRequest) -> PageConversionArtifact:
+        return _output(request, ConversionToolName.DOCLING_STANDARD)
+
+
+class _UnavailableGranite:
+    def __init__(self) -> None:
+        self.requests: list[PageConversionRequest] = []
+
+    def convert_page(self, request: PageConversionRequest) -> PageConversionArtifact:
+        self.requests.append(request)
+        raise GraniteConversionFailure("GRANITE_DOCLING_UNAVAILABLE")
+
+
+class _RecordingNative:
+    def __init__(self) -> None:
+        self.requests: list[PageConversionRequest] = []
+
+    def convert_page(self, request: PageConversionRequest) -> PageConversionArtifact:
+        self.requests.append(request)
         return _output(request, ConversionToolName.DOCLING_STANDARD)
 
 
@@ -258,3 +282,38 @@ def test_every_non_native_route_calls_granite_and_ocr_is_never_global() -> None:
     preprocessed = handler._ocrmypdf_preprocessor.preprocess_page(_preprocessing_request())
     assert preprocessed.route_name is PageRouteName.PREPROCESS_GRANITE
     assert preprocessed.tool_name is ConversionToolName.OCRMYPDF
+
+
+def test_targeted_enrichment_adjudicates_native_after_explicit_granite_unavailability() -> None:
+    # Given TARGETED_ENRICHMENT possède un candidat Docling valide et Granite
+    # termine avec un code d'indisponibilité explicitement autorisé.
+    native = _RecordingNative()
+    granite = _UnavailableGranite()
+    converter = TargetedEnrichmentPageConverter(
+        native_converter=native,
+        granite_converter=granite,
+        policy_version="targeted-enrichment-v1",
+    )
+
+    # When l'enrichissement ciblé est exécuté.
+    request = _request(PageRouteName.TARGETED_ENRICHMENT)
+    output = converter.convert_page(request)
+
+    # Then Docling est l'autorité explicite, les tentatives sont distinctes et
+    # aucune récupération Gemma n'appartient à cette chaîne.
+    assert len(native.requests) == 1
+    assert len(granite.requests) == 1
+    assert native.requests[0].expected_output_artifact_ref.endswith("-native-candidate.json")
+    assert granite.requests[0].expected_output_artifact_ref.endswith("-granite-candidate.json")
+    assert output.audit_artifact_ref == request.expected_output_artifact_ref
+    assert output.tool_name is ConversionToolName.DOCLING_STANDARD
+    assert output.fallback_trace is None
+    assert output.adjudication_trace is not None
+    assert output.adjudication_trace.policy_version == "targeted-enrichment-v1"
+    assert output.adjudication_trace.selected_tool_name is ConversionToolName.DOCLING_STANDARD
+    assert output.adjudication_trace.granite_error_code == "GRANITE_DOCLING_UNAVAILABLE"
+    assert output.adjudication_trace.native_candidate_artifact_ref == (
+        native.requests[0].expected_output_artifact_ref
+    )
+    assert output.adjudication_trace.granite_candidate_artifact_ref is None
+    assert output.adjudication_trace.to_payload()["justification"]
