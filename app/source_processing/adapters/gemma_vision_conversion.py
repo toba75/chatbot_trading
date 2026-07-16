@@ -10,6 +10,9 @@ from pathlib import Path
 from typing import Any, Mapping
 
 
+GEMMA_DENSE_RENDER_SEGMENT_COUNT = 4
+
+
 class GemmaVisionConversionError(RuntimeError):
     """Erreur stable de l'unique tentative Gemma autorisée par ADR-036."""
 
@@ -71,8 +74,11 @@ class GemmaVisionConversionRequest:
         if self.render_segment_index is not None:
             if (
                 self.render_rotation_degrees != 90
-                or self.render_segment_count != 2
-                or self.render_segment_index not in (1, 2)
+                or self.render_segment_count != GEMMA_DENSE_RENDER_SEGMENT_COUNT
+                or self.render_segment_index not in range(
+                    1,
+                    GEMMA_DENSE_RENDER_SEGMENT_COUNT + 1,
+                )
             ):
                 raise ValueError("segment de rendu Gemma invalide")
         if not self.gateway_endpoint_url.endswith("/v1/infer"):
@@ -213,6 +219,7 @@ def _worker_process_creation_flags() -> int:
 
 
 __all__ = [
+    "GEMMA_DENSE_RENDER_SEGMENT_COUNT",
     "GemmaVisionConversionError",
     "GemmaVisionConversionRequest",
     "GemmaVisionConversionResponse",

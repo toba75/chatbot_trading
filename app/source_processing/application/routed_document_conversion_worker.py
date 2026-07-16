@@ -18,6 +18,7 @@ from app.source_processing.adapters.docling_granite_conversion import (
     IsolatedGraniteDoclingConverter,
 )
 from app.source_processing.adapters.gemma_vision_conversion import (
+    GEMMA_DENSE_RENDER_SEGMENT_COUNT,
     GemmaVisionConversionError,
     GemmaVisionConversionRequest,
     GemmaVisionConversionResponse,
@@ -261,10 +262,10 @@ class _GemmaVisionFallbackPageConverter:
                         gemma_request(
                             render_rotation_degrees=90,
                             render_segment_index=segment_index,
-                            render_segment_count=2,
+                            render_segment_count=GEMMA_DENSE_RENDER_SEGMENT_COUNT,
                         )
                     )
-                    for segment_index in (1, 2)
+                    for segment_index in range(1, GEMMA_DENSE_RENDER_SEGMENT_COUNT + 1)
                 )
                 response = _merge_gemma_segment_responses(segment_responses)
         return _gemma_page_output(
@@ -279,12 +280,15 @@ class _GemmaVisionFallbackPageConverter:
 def _merge_gemma_segment_responses(
     responses: tuple[GemmaVisionConversionResponse, ...],
 ) -> GemmaVisionConversionResponse:
-    if len(responses) != 2:
+    if len(responses) != GEMMA_DENSE_RENDER_SEGMENT_COUNT:
         raise GemmaVisionConversionError("GEMMA_VISION_OUTPUT_INVALID")
     base_version: str | None = None
     items: list[GemmaVisionPageItem] = []
     for segment_index, response in enumerate(responses, start=1):
-        suffix = f";render-segment-{segment_index:02d}-of-02"
+        suffix = (
+            f";render-segment-{segment_index:02d}-"
+            f"of-{GEMMA_DENSE_RENDER_SEGMENT_COUNT:02d}"
+        )
         if not response.tool_version.endswith(suffix):
             raise GemmaVisionConversionError("GEMMA_VISION_OUTPUT_INVALID")
         response_base_version = response.tool_version.removesuffix(suffix)
@@ -296,7 +300,10 @@ def _merge_gemma_segment_responses(
     if base_version is None:
         raise GemmaVisionConversionError("GEMMA_VISION_OUTPUT_INVALID")
     return GemmaVisionConversionResponse(
-        tool_version=f"{base_version};render-segments-02",
+        tool_version=(
+            f"{base_version};render-segments-"
+            f"{GEMMA_DENSE_RENDER_SEGMENT_COUNT:02d}"
+        ),
         items=tuple(items),
     )
 

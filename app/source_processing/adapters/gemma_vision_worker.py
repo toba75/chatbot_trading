@@ -16,7 +16,10 @@ from app.contracts.llm_inference import (
     LlmInferenceRequest,
 )
 from app.platform.llm_gateway.orchestrator_http import UrllibLlmInferenceGateway
-from app.source_processing.adapters.gemma_vision_conversion import GemmaVisionConversionError
+from app.source_processing.adapters.gemma_vision_conversion import (
+    GEMMA_DENSE_RENDER_SEGMENT_COUNT,
+    GemmaVisionConversionError,
+)
 
 
 _MAX_RENDERED_IMAGE_BYTES = 10 * 1024 * 1024
@@ -234,7 +237,10 @@ def _bbox_dans_rendu_complet(
 ) -> list[int | float]:
     if render_segment_index is None and render_segment_count is None:
         return list(bbox)
-    if render_segment_index not in (1, 2) or render_segment_count != 2:
+    if (
+        render_segment_index not in range(1, GEMMA_DENSE_RENDER_SEGMENT_COUNT + 1)
+        or render_segment_count != GEMMA_DENSE_RENDER_SEGMENT_COUNT
+    ):
         raise GemmaVisionConversionError("GEMMA_VISION_REQUEST_INVALID")
     left, top, right, bottom = bbox
     segment_offset = 1000 * (render_segment_index - 1) / render_segment_count
@@ -292,7 +298,10 @@ def _request_identity_suffix(
     suffix = f"R{render_rotation_degrees:03d}"
     if render_segment_index is None and render_segment_count is None:
         return f"{suffix}-FULL"
-    if render_segment_index not in (1, 2) or render_segment_count != 2:
+    if (
+        render_segment_index not in range(1, GEMMA_DENSE_RENDER_SEGMENT_COUNT + 1)
+        or render_segment_count != GEMMA_DENSE_RENDER_SEGMENT_COUNT
+    ):
         raise GemmaVisionConversionError("GEMMA_VISION_REQUEST_INVALID")
     return f"{suffix}-S{render_segment_index:02d}OF{render_segment_count:02d}"
 
@@ -304,7 +313,10 @@ def _transcription_prompt(
 ) -> str:
     if render_segment_index is None and render_segment_count is None:
         return _PAGE_TRANSCRIPTION_PROMPT
-    if render_segment_index not in (1, 2) or render_segment_count != 2:
+    if (
+        render_segment_index not in range(1, GEMMA_DENSE_RENDER_SEGMENT_COUNT + 1)
+        or render_segment_count != GEMMA_DENSE_RENDER_SEGMENT_COUNT
+    ):
         raise GemmaVisionConversionError("GEMMA_VISION_REQUEST_INVALID")
     return (
         f"{_PAGE_TRANSCRIPTION_PROMPT} Cette image est le segment vertical "
@@ -385,8 +397,8 @@ def _required_render_segment(payload: Mapping[str, Any]) -> tuple[int | None, in
     if (
         isinstance(segment_index, bool)
         or isinstance(segment_count, bool)
-        or segment_index not in (1, 2)
-        or segment_count != 2
+        or segment_index not in range(1, GEMMA_DENSE_RENDER_SEGMENT_COUNT + 1)
+        or segment_count != GEMMA_DENSE_RENDER_SEGMENT_COUNT
         or _required_render_rotation_degrees(payload) != 90
     ):
         raise GemmaVisionConversionError("GEMMA_VISION_REQUEST_INVALID")
