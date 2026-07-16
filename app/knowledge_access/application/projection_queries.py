@@ -40,6 +40,48 @@ class ProjectionReadRepository(Protocol):
 
 
 @dataclass(frozen=True, slots=True)
+class ProjectionCatalogRecord:
+    """État KA minimal nécessaire au catalogue documentaire orchestré."""
+
+    document_id: str
+    projection_status: str
+    metadata_status: str
+    title: str | None
+    authors: tuple[str, ...] | None
+    publication_year: int | None
+    edition: str | None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "document_id", _ensure_document_id(self.document_id))
+        ProjectionStatus.from_value(self.projection_status)
+        if self.metadata_status not in {"PENDING", "EXTRACTED", "LEGACY_DECLARED"}:
+            raise ValueError("metadata_status KA invalide")
+        if self.metadata_status == "PENDING":
+            if any(
+                value is not None
+                for value in (self.title, self.authors, self.publication_year, self.edition)
+            ):
+                raise ValueError("métadonnées KA en attente incohérentes")
+            return
+        if not isinstance(self.title, str) or self.title.strip() == "":
+            raise ValueError("titre KA invalide")
+        if not isinstance(self.authors, tuple) or len(self.authors) == 0:
+            raise ValueError("auteurs KA invalides")
+        if any(not isinstance(author, str) or author.strip() == "" for author in self.authors):
+            raise ValueError("auteur KA invalide")
+        if self.publication_year is not None and (
+            isinstance(self.publication_year, bool)
+            or not isinstance(self.publication_year, int)
+            or not 1 <= self.publication_year <= 9999
+        ):
+            raise ValueError("année KA invalide")
+        if self.edition is not None and (
+            not isinstance(self.edition, str) or self.edition.strip() == ""
+        ):
+            raise ValueError("édition KA invalide")
+
+
+@dataclass(frozen=True, slots=True)
 class ProjectionReadRecord:
     """État KA lu depuis la source de vérité de projection."""
 
@@ -374,6 +416,7 @@ __all__ = [
     "ProjectionProfileView",
     "ProjectionQueryService",
     "ProjectionReadRecord",
+    "ProjectionCatalogRecord",
     "ProjectionReadRepository",
     "ProjectionView",
     "SourceLocatorView",

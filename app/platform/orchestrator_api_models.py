@@ -347,7 +347,11 @@ class DocumentActionProgressResponse(PublicApiModel):
 
 class DocumentCorpusItemResponse(PublicApiModel):
     document_id: str
-    title: str
+    title: str | None
+    authors: list[str] | None
+    publication_year: int | None = Field(ge=1, le=9999)
+    edition: str | None
+    metadata_status: Literal["PENDING", "EXTRACTED", "LEGACY_DECLARED"]
     document_status: PublicSourceStatus
     diagnostic_status: PublicDiagnosticStatus
     conversion_status: PublicConversionStatus
@@ -363,6 +367,14 @@ class DocumentCorpusItemResponse(PublicApiModel):
         accepted = self.conversion_status is PublicConversionStatus.CANONICAL_ACCEPTED
         if accepted != (self.canonical_version_id is not None):
             raise ValueError("version canonique incohérente avec le statut de conversion")
+        if self.metadata_status == "PENDING":
+            if any(
+                value is not None
+                for value in (self.title, self.authors, self.publication_year, self.edition)
+            ):
+                raise ValueError("métadonnées en attente incohérentes")
+        elif self.title is None or self.authors is None or len(self.authors) == 0:
+            raise ValueError("métadonnées publiées incomplètes")
         return self
 
 
@@ -547,22 +559,9 @@ DOCUMENT_MULTIPART_OPENAPI = {
                     "type": "object",
                     "required": [
                         "original_content",
-                        "title",
-                        "authors",
-                        "publication_year",
-                        "edition",
                     ],
                     "properties": {
                         "original_content": {"type": "string", "format": "binary"},
-                        "title": {"type": "string", "maxLength": 512},
-                        "authors": {
-                            "type": "array",
-                            "items": {"type": "string", "maxLength": 256},
-                            "minItems": 1,
-                            "maxItems": 16,
-                        },
-                        "publication_year": {"type": "integer", "minimum": 1, "maximum": 9999},
-                        "edition": {"type": "string", "maxLength": 64},
                     },
                 }
             }

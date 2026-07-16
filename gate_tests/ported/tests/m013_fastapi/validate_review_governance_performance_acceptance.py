@@ -1,16 +1,115 @@
+"""Revue gouvernance, OpenAPI, runtime, performance et observabilité."""
+
 from __future__ import annotations
 
+import inspect
 from pathlib import Path
+import subprocess
 import sys
+
+from fastapi import FastAPI
+
+from app.platform.configuration import load_application_configuration
+from app.platform.orchestrator_runtime import build_orchestrator_composition_root
+from app.source_processing.adapters.postgres_document_persistence import (
+    PostgresDocumentPersistence,
+)
 
 
 def test_validate_review_governance_performance_acceptance() -> None:
-    original_argv = sys.argv[:]
-    repository_root = next(parent for parent in Path(__file__).resolve().parents if (parent / 'pyproject.toml').is_file())
-    try:
-        sys.argv = [str(Path(__file__)), str(repository_root)]
-        source = '\nimport asyncio\nimport inspect\nimport json\nfrom pathlib import Path\nimport subprocess\nimport sys\n\nsys.path.insert(0, sys.argv[1])\n\nfrom app.platform.configuration import load_application_configuration\nfrom fastapi import FastAPI\nfrom app.platform.orchestrator_runtime import build_orchestrator_composition_root\nfrom app.source_processing.adapters.postgres_document_persistence import PostgresDocumentPersistence\n\n\nasync def scenario(repo_root: Path) -> None:\n    configuration = load_application_configuration(\n        config_path=repo_root / "config" / "application.example.yaml",\n        environment_snapshot={},\n    )\n\n    root = build_orchestrator_composition_root(configuration)\n    application = FastAPI()\n    application.include_router(root.document_command_router)\n    schema = application.openapi()\n    registration = schema["paths"]["/v1/documents"]["post"]\n    multipart = registration["requestBody"]["content"]["multipart/form-data"]["schema"]\n    required = set(multipart["required"])\n    assert required == {"original_content", "title", "authors", "publication_year", "edition"}\n    assert multipart["properties"]["original_content"]["format"] == "binary"\n    assert set(registration["responses"]) >= {"201", "400", "409", "422", "500"}\n    for status in ("201", "400", "409", "422", "500"):\n        response = registration["responses"][status]\n        assert "application/json" in response["content"], (status, response)\n        assert "$ref" in response["content"]["application/json"]["schema"], (status, response)\n    original = schema["paths"]["/v1/documents/{document_id}/original"]["get"]\n    assert "application/pdf" in original["responses"]["200"]["content"]\n    diagnose = schema["paths"]["/v1/documents/{document_id}/diagnose"]["post"]\n    assert set(diagnose["responses"]) >= {"202", "400", "404", "409", "422", "500"}\n\n    router_source = (repo_root / "app/platform/orchestrator_contract_routers.py").read_text(encoding="utf-8")\n    assert "local_runtime._" not in router_source\n    assert "build_public_contract_router" in inspect.getsource(build_orchestrator_composition_root)\n\n    build_source = inspect.getsource(build_orchestrator_composition_root)\n    assert build_source.count("PsycopgConnectionFactory(") == 1\n    assert "connection_factory=connection_factory" in build_source\n\n    persistence_source = inspect.getsource(PostgresDocumentPersistence.list_document_snapshots)\n    assert "limit" in persistence_source and "after_document_id" in persistence_source\n    assert "ANY(%s)" in persistence_source\n    assert persistence_source.count("cursor.execute(") <= 8\n\n    process = subprocess.run(\n        [\n            sys.executable,\n            "-m",\n            "app.platform.local_runtime",\n            "serve-http",\n            "orchestrator-api",\n            "8080",\n            "--config",\n            str(repo_root / "config" / "application.example.yaml"),\n        ],\n        cwd=repo_root,\n        capture_output=True,\n        text=True,\n        timeout=10,\n        check=False,\n    )\n    assert process.returncode != 0\n    assert "ORCHESTRATOR_LEGACY_RUNTIME_FORBIDDEN" in process.stderr\n\n\nasyncio.run(scenario(Path(sys.argv[1])))\n\nworker_source = (Path(sys.argv[1]) / "app/source_processing/adapters/worker_runtime.py").read_text(encoding="utf-8")\nfor marker in (\n    "bind_trace_id(claimed.trace_id)",\n    \'"success_count"\',\n    \'"error_count"\',\n    \'"duration_ms"\',\n    \'"processed_volume"\',\n    \'"tracing_enabled"\',\n):\n    assert marker in worker_source, marker\n\nmigration = (Path(sys.argv[1]) / "deploy/postgres/migrations/005_source_processing_read_performance.sql").read_text(encoding="utf-8")\nassert "source_documents_editorial_duplicate_idx" in migration\nassert "work_title, work_authors" in migration\n\npersistence_all = (Path(sys.argv[1]) / "app/source_processing/adapters/postgres_document_persistence.py").read_text(encoding="utf-8")\nfor marker in ("jsonb_to_recordset", "page_manifest_entries", "page_decisions", "page_routes"):\n    assert marker in persistence_all, marker\n\nprint("Revue gouvernance, OpenAPI, runtime, performance et observabilité: OK")'
-        namespace = {'__name__': __name__, '__file__': str(Path(__file__))}
-        exec(compile(source, str(Path(__file__)), 'exec'), namespace)
-    finally:
-        sys.argv = original_argv
+    repository_root = next(
+        parent for parent in Path(__file__).resolve().parents if (parent / "pyproject.toml").is_file()
+    )
+    configuration = load_application_configuration(
+        config_path=repository_root / "config" / "application.example.yaml",
+        environment_snapshot={},
+    )
+    root = build_orchestrator_composition_root(configuration)
+    application = FastAPI()
+    application.include_router(root.document_command_router)
+    schema = application.openapi()
+
+    registration = schema["paths"]["/v1/documents"]["post"]
+    multipart = registration["requestBody"]["content"]["multipart/form-data"]["schema"]
+    assert set(multipart["required"]) == {"original_content"}
+    assert set(multipart["properties"]) == {"original_content"}
+    assert multipart["properties"]["original_content"]["format"] == "binary"
+    assert set(registration["responses"]) >= {"201", "400", "409", "422", "500"}
+    for status in ("201", "400", "409", "422", "500"):
+        response = registration["responses"][status]
+        assert "application/json" in response["content"]
+        assert "$ref" in response["content"]["application/json"]["schema"]
+
+    original = schema["paths"]["/v1/documents/{document_id}/original"]["get"]
+    assert "application/pdf" in original["responses"]["200"]["content"]
+    diagnose = schema["paths"]["/v1/documents/{document_id}/diagnose"]["post"]
+    assert set(diagnose["responses"]) >= {"202", "400", "404", "409", "422", "500"}
+
+    router_source = (
+        repository_root / "app/platform/orchestrator_contract_routers.py"
+    ).read_text(encoding="utf-8")
+    assert "local_runtime._" not in router_source
+    assert "build_public_contract_router" in inspect.getsource(
+        build_orchestrator_composition_root
+    )
+    build_source = inspect.getsource(build_orchestrator_composition_root)
+    assert build_source.count("PsycopgConnectionFactory(") == 1
+    assert "connection_factory=connection_factory" in build_source
+
+    persistence_source = inspect.getsource(
+        PostgresDocumentPersistence.list_document_snapshots
+    )
+    assert "limit" in persistence_source and "after_document_id" in persistence_source
+    assert "ANY(%s)" in persistence_source
+    assert persistence_source.count("cursor.execute(") <= 8
+
+    process = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "app.platform.local_runtime",
+            "serve-http",
+            "orchestrator-api",
+            "8080",
+            "--config",
+            str(repository_root / "config" / "application.example.yaml"),
+        ],
+        cwd=repository_root,
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+    assert process.returncode != 0
+    assert "ORCHESTRATOR_LEGACY_RUNTIME_FORBIDDEN" in process.stderr
+
+    worker_source = (
+        repository_root / "app/source_processing/adapters/worker_runtime.py"
+    ).read_text(encoding="utf-8")
+    for marker in (
+        "bind_trace_id(claimed.trace_id)",
+        '"success_count"',
+        '"error_count"',
+        '"duration_ms"',
+        '"processed_volume"',
+        '"tracing_enabled"',
+    ):
+        assert marker in worker_source
+
+    migration = (
+        repository_root
+        / "deploy/postgres/migrations/005_source_processing_read_performance.sql"
+    ).read_text(encoding="utf-8")
+    assert "source_documents_editorial_duplicate_idx" in migration
+    assert "work_title, work_authors" in migration
+
+    persistence_all = (
+        repository_root / "app/source_processing/adapters/postgres_document_persistence.py"
+    ).read_text(encoding="utf-8")
+    for marker in (
+        "jsonb_to_recordset",
+        "page_manifest_entries",
+        "page_decisions",
+        "page_routes",
+    ):
+        assert marker in persistence_all

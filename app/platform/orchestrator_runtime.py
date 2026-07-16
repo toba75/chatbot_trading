@@ -39,6 +39,7 @@ from app.knowledge_access.adapters.live_documentary_retrieval import (
     QdrantSparseChunkSelector,
 )
 from app.knowledge_access.application.projection_queries import ProjectionQueryService
+from app.knowledge_access.application.projection_queries import ProjectionCatalogRecord
 from app.knowledge_access.adapters.http import (
     build_projection_command_router,
     build_projection_progress_router,
@@ -120,16 +121,20 @@ class SourceProcessingCorpusPagePort(Protocol):
 
 
 class KnowledgeProjectionStatusesPort(Protocol):
-    def current_projection_statuses_for_document_ids(
+    def current_projection_catalog_for_document_ids(
         self,
         document_ids: Sequence[str],
-    ) -> Mapping[str, str]: ...
+    ) -> Mapping[str, ProjectionCatalogRecord]: ...
 
 
 @dataclass(frozen=True, slots=True)
 class OrchestratorDocumentCorpusItem:
     document_id: str
-    title: str
+    title: str | None
+    authors: tuple[str, ...] | None
+    publication_year: int | None
+    edition: str | None
+    metadata_status: str
     document_status: str
     diagnostic_status: str
     conversion_status: str
@@ -159,9 +164,9 @@ class OrchestratorDocumentCatalogService:
         if not callable(getattr(source_processing_pages, "list_documents", None)):
             raise ValueError("source_processing_pages sans pagination")
         if not callable(
-            getattr(projection_statuses, "current_projection_statuses_for_document_ids", None)
+            getattr(projection_statuses, "current_projection_catalog_for_document_ids", None)
         ):
-            raise ValueError("projection_statuses sans lecture batch")
+            raise ValueError("projection_statuses sans catalogue batch")
         self._source_processing_pages = source_processing_pages
         self._projection_statuses = projection_statuses
 
@@ -175,14 +180,14 @@ class OrchestratorDocumentCatalogService:
         if not isinstance(page, DocumentCorpusPageView):
             raise TypeError("page SP invalide")
         document_ids = tuple(item.document_id for item in page.documents)
-        statuses = dict(
-            self._projection_statuses.current_projection_statuses_for_document_ids(document_ids)
+        projections = dict(
+            self._projection_statuses.current_projection_catalog_for_document_ids(document_ids)
         )
-        if set(statuses) - set(document_ids):
+        if set(projections) - set(document_ids):
             raise ValueError("statuts KA hors page SP")
         return OrchestratorDocumentCorpusPage(
             documents=tuple(
-                _enrich_corpus_item(item, projection_status=statuses.get(item.document_id))
+                _enrich_corpus_item(item, projection_record=projections.get(item.document_id))
                 for item in page.documents
             ),
             next_cursor=page.next_cursor,
@@ -208,18 +213,34 @@ class OrchestratorDocumentCatalogService:
 def _enrich_corpus_item(
     item: DocumentCorpusItem,
     *,
-    projection_status: object,
+    projection_record: ProjectionCatalogRecord | None,
 ) -> OrchestratorDocumentCorpusItem:
     if not isinstance(item, DocumentCorpusItem):
         raise TypeError("document corpus SP invalide")
     status = (
         "PROJECTION_NOT_REQUESTED"
-        if projection_status is None
-        else PublicProjectionStatus.from_value(projection_status).value
+        if projection_record is None
+        else PublicProjectionStatus.from_value(projection_record.projection_status).value
     )
+    if projection_record is None or projection_record.metadata_status == "PENDING":
+        title = item.title
+        authors = item.authors
+        publication_year = item.publication_year
+        edition = item.edition
+        metadata_status = item.metadata_status
+    else:
+        title = projection_record.title
+        authors = projection_record.authors
+        publication_year = projection_record.publication_year
+        edition = projection_record.edition
+        metadata_status = projection_record.metadata_status
     return OrchestratorDocumentCorpusItem(
         document_id=item.document_id,
-        title=item.title,
+        title=title,
+        authors=authors,
+        publication_year=publication_year,
+        edition=edition,
+        metadata_status=metadata_status,
         document_status=item.document_status,
         diagnostic_status=item.diagnostic_status,
         conversion_status=item.conversion_status,
@@ -338,6 +359,10 @@ def build_orchestrator_composition_root(
         source_processing_pages=document_queries,
         projection_statuses=projection_read_repository,
     )
+    inference_gateway = UrllibLlmInferenceGateway(
+        endpoint_url=f"{configuration.services.llm_gateway.url.rstrip('/')}/v1/infer",
+        timeout_seconds=configuration.services.llm_gateway.timeout_seconds,
+    )
     projection_runtime = ProjectionRuntimeService(
         connection_factory=connection_factory,
         canonical_sources_root=Path(configuration.paths.canonical_sources_root),
@@ -345,10 +370,7 @@ def build_orchestrator_composition_root(
         qdrant_url=configuration.services.qdrant.url,
         qdrant_timeout_seconds=configuration.runtime.timeouts.request_seconds,
         max_parallel_workers=configuration.services.workers.concurrency,
-    )
-    inference_gateway = UrllibLlmInferenceGateway(
-        endpoint_url=f"{configuration.services.llm_gateway.url.rstrip('/')}/v1/infer",
-        timeout_seconds=configuration.services.llm_gateway.timeout_seconds,
+        inference_gateway=inference_gateway,
     )
     documentary_retriever = DocumentaryProjectionRetriever(
         projection_reader=PostgresSearchableProjectionReader(

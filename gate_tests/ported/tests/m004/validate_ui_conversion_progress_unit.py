@@ -93,6 +93,10 @@ def _verifier_bouton_conversion_natif_disponible() -> None:
     native = CorpusPdfDocument(
         document_id="DOC-1111111111111111",
         title="PDF natif",
+        authors=("Auteur",),
+        publication_year=2026,
+        edition="1",
+        metadata_status="LEGACY_DECLARED",
         source_status="REGISTERED",
         diagnostic_status="ROUTE_PLANNED",
         conversion_status="CONVERSION_NOT_REQUESTED",
@@ -106,6 +110,10 @@ def _verifier_bouton_conversion_natif_disponible() -> None:
     non_native = CorpusPdfDocument(
         document_id="DOC-2222222222222222",
         title="PDF Granite",
+        authors=("Auteur",),
+        publication_year=2026,
+        edition="1",
+        metadata_status="LEGACY_DECLARED",
         source_status="REGISTERED",
         diagnostic_status="ROUTE_PLANNED",
         conversion_status="CONVERSION_NOT_REQUESTED",

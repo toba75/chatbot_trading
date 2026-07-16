@@ -165,7 +165,7 @@ class SourceDocument:
     document_id: DocumentId
     fingerprint: SourceFingerprint
     original_storage_ref: OriginalStorageRef
-    metadata: BibliographicMetadata
+    metadata: BibliographicMetadata | None
     status: SourceDocumentStatus
     events: tuple[SourceDocumentRegistered | SourceDocumentQuarantined, ...]
 
@@ -175,7 +175,7 @@ class SourceDocument:
         document_id: DocumentId,
         fingerprint: SourceFingerprint,
         original_storage_ref: OriginalStorageRef,
-        metadata: BibliographicMetadata,
+        metadata: BibliographicMetadata | None,
     ) -> "SourceDocument":
         parsed_document_id = _ensure_document_id(document_id)
         parsed_fingerprint = _ensure_fingerprint(fingerprint)
@@ -185,7 +185,7 @@ class SourceDocument:
             document_id=parsed_document_id,
             fingerprint=parsed_fingerprint,
         )
-        parsed_metadata = _ensure_metadata(metadata)
+        parsed_metadata = _ensure_optional_metadata(metadata)
         registered_event = SourceDocumentRegistered(
             document_id=parsed_document_id,
             fingerprint=parsed_fingerprint,
@@ -225,7 +225,7 @@ class SourceDocument:
         _ensure_document_id(self.document_id)
         _ensure_fingerprint(self.fingerprint)
         _ensure_storage_ref(self.original_storage_ref)
-        _ensure_metadata(self.metadata)
+        _ensure_optional_metadata(self.metadata)
         if not isinstance(self.status, SourceDocumentStatus):
             raise ValueError("source_document_status invalide")
         if not isinstance(self.events, tuple):
@@ -394,6 +394,14 @@ def _ensure_metadata(value: BibliographicMetadata) -> BibliographicMetadata:
     if not isinstance(value, BibliographicMetadata):
         raise ValueError("métadonnées bibliographiques invalides")
     return value
+
+
+def _ensure_optional_metadata(
+    value: BibliographicMetadata | None,
+) -> BibliographicMetadata | None:
+    if value is None:
+        return None
+    return _ensure_metadata(value)
 
 
 def _ensure_source_documents(value: Iterable[SourceDocument]) -> tuple[SourceDocument, ...]:

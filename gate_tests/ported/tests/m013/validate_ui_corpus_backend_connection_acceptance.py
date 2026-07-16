@@ -1,16 +1,113 @@
+"""Acceptation de la frontière UI vers l'API orchestratrice."""
+
 from __future__ import annotations
 
+import json
 from pathlib import Path
-import sys
+import tempfile
+
+from app.platform.configuration import load_application_configuration
+from app.platform.local_runtime import _build_ui_corpus_state
+from app.platform.ui_corpus import ui_get_response
+from app.platform.ui_document_api import (
+    UiDocumentApiClient,
+    UiDocumentApiResponse,
+)
+
+
+class RecordingTransport:
+    def __init__(self) -> None:
+        self.paths: list[str] = []
+        payload = {
+            "documents": [
+                {
+                    "document_id": "DOC-M013-UI-API01",
+                    "title": "Depuis API",
+                    "authors": ["Auteur API"],
+                    "publication_year": 2026,
+                    "edition": None,
+                    "metadata_status": "LEGACY_DECLARED",
+                    "document_status": "REGISTERED",
+                    "diagnostic_status": "DIAGNOSTIC_NOT_REQUESTED",
+                    "conversion_status": "CONVERSION_NOT_REQUESTED",
+                    "canonical_version_id": None,
+                    "projection_status": "PROJECTION_NOT_REQUESTED",
+                    "manual_review_reason": None,
+                    "failure_error_code": None,
+                    "conversion_action_available": False,
+                    "projection_action_available": False,
+                }
+            ],
+            "next_cursor": None,
+        }
+        self.responses = [
+            UiDocumentApiResponse(
+                200,
+                "application/json",
+                json.dumps(payload).encode("utf-8"),
+            )
+        ]
+
+    def request(self, *, method, path, body, content_type):
+        del method, body, content_type
+        self.paths.append(path)
+        return self.responses.pop(0)
 
 
 def test_validate_ui_corpus_backend_connection_acceptance() -> None:
-    original_argv = sys.argv[:]
-    repository_root = next(parent for parent in Path(__file__).resolve().parents if (parent / 'pyproject.toml').is_file())
-    try:
-        sys.argv = [str(Path(__file__)), str(repository_root)]
-        source = '\nfrom pathlib import Path\nimport sys\nimport tempfile\n\nrepo_root = sys.argv[1]\nif repo_root not in sys.path:\n    sys.path.insert(0, repo_root)\n\nfrom app.platform.configuration import load_application_configuration  # noqa: E402\nfrom app.platform.local_runtime import _build_ui_corpus_state  # noqa: E402\nfrom app.platform.ui_corpus import ui_get_response  # noqa: E402\nfrom app.platform.ui_document_api import (  # noqa: E402\n    UiDocumentApiClient,\n    UiDocumentApiResponse,\n)\n\n\ndef assert_equal(actual: object, expected: object, message: str) -> None:\n    if actual != expected:\n        raise AssertionError(f"{message} Valeur obtenue: {actual!r}")\n\n\ndef assert_contains(text: str, expected: str, message: str) -> None:\n    if expected not in text:\n        raise AssertionError(f"{message} Texte obtenu: {text!r}")\n\n\ndef assert_not_contains(text: str, forbidden: str, message: str) -> None:\n    if forbidden in text:\n        raise AssertionError(f"{message} Texte obtenu: {text!r}")\n\n\nclass RecordingTransport:\n    def __init__(self) -> None:\n        self.paths: list[str] = []\n        self.responses = [\n            UiDocumentApiResponse(\n                200,\n                "application/json",\n                b\'{"documents":[{"document_id":"DOC-M013-UI-API01","title":"Depuis API",\'\n                b\'"document_status":"REGISTERED","diagnostic_status":"DIAGNOSTIC_NOT_REQUESTED",\'\n                b\'"conversion_status":"CONVERSION_NOT_REQUESTED","canonical_version_id":null,\'\n                b\'"projection_status":"PROJECTION_NOT_REQUESTED","conversion_action_available":false}],"next_cursor":null}\',\n            ),\n        ]\n\n    def request(self, *, method: str, path: str, body: bytes | None, content_type: str | None) -> UiDocumentApiResponse:\n        self.paths.append(path)\n        return self.responses.pop(0)\n\n\ndef runtime_configuration_for(corpus_root: Path):\n    template_path = Path(repo_root) / "config" / "application.example.yaml"\n    config_text = template_path.read_text(encoding="utf-8")\n    config_text = config_text.replace(\n        "  corpus_root: data/corpus",\n        f\'  corpus_root: "{corpus_root.as_posix()}"\',\n    )\n    config_path = corpus_root.parent / "application.yaml"\n    config_path.write_text(config_text, encoding="utf-8")\n    return load_application_configuration(config_path=config_path, environment_snapshot={})\n\n\nwith tempfile.TemporaryDirectory() as temporary_root:\n    corpus_root = Path(temporary_root) / "corpus"\n    corpus_root.mkdir()\n    (corpus_root / "Ne doit pas être lu.pdf").write_bytes(b"%PDF-1.7\\ninterdit\\n%%EOF\\n")\n    configuration = runtime_configuration_for(corpus_root)\n    transport = RecordingTransport()\n    client = UiDocumentApiClient(transport=transport)\n\n    # Given un fichier existe dans corpus_root et l\'API expose un autre document.\n    # When le runtime UI construit le corpus.\n    # Then seul le read-model HTTP public est rendu, sans lecture de fichier ni fallback.\n    state = _build_ui_corpus_state(\n        application_configuration=configuration,\n        api_client=client,\n    )\n    assert_equal(state.read_model_status, "READ_MODEL_READY", "Le runtime doit refléter le contrat API prêt.")\n    assert_equal(state.documents[0].title, "Depuis API", "Le document doit venir de l\'orchestrateur.")\n    assert_equal(\n        transport.paths,\n        ["/v1/documents?limit=100"],\n        "Le trajet doit rester borné aux contrats documentaires publics.",\n    )\n\n    screen_status, screen_type, screen_body = ui_get_response(path="/ui/corpus-pdf", state=state)\n    assert_equal(screen_status, 200, "L\'écran raccordé doit être consultable.")\n    assert_equal(screen_type, "text/html; charset=utf-8", "L\'écran doit rester HTML.")\n    assert_contains(screen_body, "Depuis API", "Le read-model API doit être visible.")\n    assert_contains(screen_body, ">Diagnostiquer</button>", "La commande doit être active pour DIAGNOSTIC_NOT_REQUESTED.")\n    assert_not_contains(screen_body, "Ne doit pas être lu", "Le stockage direct ne doit pas fuiter dans l\'UI.")\n\nruntime_source = (Path(repo_root) / "app" / "platform" / "local_runtime.py").read_text(encoding="utf-8")\nui_source = (Path(repo_root) / "app" / "platform" / "ui_corpus.py").read_text(encoding="utf-8")\nfor forbidden in (\n    "build_unconnected_corpus_pdf_state",\n    "ORCHESTRATOR_API_CONTRACT_NOT_WIRED",\n    "UI_FUNCTION_NOT_OPERATIONAL",\n    "_UI_DIAGNOSTIC_REQUESTED_DOCUMENT_IDS",\n):\n    assert_not_contains(runtime_source + ui_source, forbidden, "L\'ancien chemin UI non raccordé doit être retiré.")\nfor forbidden in (".iterdir()", ".read_bytes()", "hashlib.sha256"):\n    assert_not_contains(ui_source, forbidden, "L\'adaptateur UI ne doit pas lire ni identifier directement les PDF.")\n\nprint("Test d\'acceptation frontière UI vers API orchestratrice: OK")'
-        namespace = {'__name__': __name__, '__file__': str(Path(__file__))}
-        exec(compile(source, str(Path(__file__)), 'exec'), namespace)
-    finally:
-        sys.argv = original_argv
+    repository_root = next(
+        parent for parent in Path(__file__).resolve().parents if (parent / "pyproject.toml").is_file()
+    )
+    with tempfile.TemporaryDirectory() as temporary_root:
+        corpus_root = Path(temporary_root) / "corpus"
+        corpus_root.mkdir()
+        (corpus_root / "Ne doit pas être lu.pdf").write_bytes(
+            b"%PDF-1.7\ninterdit\n%%EOF\n"
+        )
+        config_text = (
+            repository_root / "config/application.example.yaml"
+        ).read_text(encoding="utf-8").replace(
+            "  corpus_root: data/corpus",
+            f'  corpus_root: "{corpus_root.as_posix()}"',
+        )
+        config_path = Path(temporary_root) / "application.yaml"
+        config_path.write_text(config_text, encoding="utf-8")
+        configuration = load_application_configuration(
+            config_path=config_path,
+            environment_snapshot={},
+        )
+        transport = RecordingTransport()
+        state = _build_ui_corpus_state(
+            application_configuration=configuration,
+            api_client=UiDocumentApiClient(transport=transport),
+        )
+
+        assert state.read_model_status == "READ_MODEL_READY"
+        assert state.documents[0].title == "Depuis API"
+        assert state.documents[0].metadata_status == "LEGACY_DECLARED"
+        assert transport.paths == ["/v1/documents?limit=100"]
+        status, content_type, body = ui_get_response(
+            path="/ui/corpus-pdf",
+            state=state,
+        )
+        assert status == 200
+        assert content_type == "text/html; charset=utf-8"
+        assert "Depuis API" in body
+        assert ">Diagnostiquer</button>" in body
+        assert "Ne doit pas être lu" not in body
+
+    runtime_source = (repository_root / "app/platform/local_runtime.py").read_text(
+        encoding="utf-8"
+    )
+    ui_source = (repository_root / "app/platform/ui_corpus.py").read_text(
+        encoding="utf-8"
+    )
+    for forbidden in (
+        "build_unconnected_corpus_pdf_state",
+        "ORCHESTRATOR_API_CONTRACT_NOT_WIRED",
+        "UI_FUNCTION_NOT_OPERATIONAL",
+        "_UI_DIAGNOSTIC_REQUESTED_DOCUMENT_IDS",
+    ):
+        assert forbidden not in runtime_source + ui_source
+    for forbidden in (".iterdir()", ".read_bytes()", "hashlib.sha256"):
+        assert forbidden not in ui_source

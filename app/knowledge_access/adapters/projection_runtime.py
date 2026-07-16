@@ -15,6 +15,7 @@ from typing import Any, Mapping, Sequence
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from app.contracts.llm_inference import LlmInferenceGateway
 from app.contracts.source_references import (
     ACCEPTED_CANONICAL_VERSION_STATUS,
     CanonicalSourceRef,
@@ -34,6 +35,11 @@ from app.knowledge_access.application.encode_projection import (
     EncodeProjectionCommand,
     ProjectionEncodingHandler,
     SparseEncodingRequest,
+)
+from app.knowledge_access.application.extract_projected_bibliographic_metadata import (
+    ExtractProjectedBibliographicMetadataCommand,
+    ProjectedBibliographicMetadataExtractor,
+    ProjectedTextEvidence,
 )
 from app.knowledge_access.application.request_projection import (
     CanonicalSourceForProjection,
@@ -224,6 +230,7 @@ class ProjectionRuntimeService:
     qdrant_url: str
     qdrant_timeout_seconds: int
     max_parallel_workers: int
+    inference_gateway: LlmInferenceGateway
 
     def __post_init__(self) -> None:
         if not callable(getattr(self.connection_factory, "connect", None)):
@@ -235,6 +242,8 @@ class ProjectionRuntimeService:
         if not re.fullmatch(r"[a-f0-9]{64}", self.configuration_hash):
             raise ValueError("configuration_hash projection invalide")
         _required_positive_int(self.max_parallel_workers, "parallélisme projection invalide")
+        if not callable(getattr(self.inference_gateway, "infer", None)):
+            raise ValueError("gateway bibliographique de projection invalide")
 
     def request_projection(
         self,
@@ -505,7 +514,7 @@ class ProjectionRuntimeService:
             self._set_running_progress(
                 projection_id=building.projection_id,
                 completed_units=0,
-                total_units=len(chunk_projection.chunks),
+                total_units=len(chunk_projection.chunks) + 1,
             )
             built = repository.save_transition(building.mark_built())
             indexing = repository.save_transition(built.start_indexing())
@@ -555,11 +564,34 @@ class ProjectionRuntimeService:
                 on_batch_published=lambda completed_units: self._set_running_progress(
                     projection_id=indexing.projection_id,
                     completed_units=completed_units,
-                    total_units=len(points),
+                    total_units=len(points) + 1,
                 ),
             )
             if publication.published_point_count != len(points):
                 raise ProjectionRuntimeError("INDEX_PARTIAL")
+            canonical_document = self.find_chunking_source_by_version_id(
+                indexing.canonical_version_id
+            )
+            if canonical_document is None:
+                raise ProjectionRuntimeError("CANONICAL_SOURCE_NOT_FOUND")
+            metadata = ProjectedBibliographicMetadataExtractor(
+                inference_gateway=self.inference_gateway
+            ).extract(
+                ExtractProjectedBibliographicMetadataCommand(
+                    document_id=indexing.document_id,
+                    projection_id=indexing.projection_id,
+                    evidences=_bibliographic_text_evidences(canonical_document.items),
+                )
+            )
+            repository.save_bibliographic_metadata(
+                projection_id=indexing.projection_id,
+                metadata=metadata,
+            )
+            self._set_running_progress(
+                projection_id=indexing.projection_id,
+                completed_units=len(points) + 1,
+                total_units=len(points) + 1,
+            )
             searchable = indexing.mark_searchable()
             repository.save_projection_outputs(
                 projection=searchable,
@@ -569,14 +601,15 @@ class ProjectionRuntimeService:
             )
             self._mark_succeeded(
                 projection_id=searchable.projection_id,
-                completed_units=len(chunk_projection.chunks),
-                total_units=len(chunk_projection.chunks),
+                completed_units=len(chunk_projection.chunks) + 1,
+                total_units=len(chunk_projection.chunks) + 1,
             )
             return {
                 "projection_id": searchable.projection_id,
                 "chunk_count": len(chunk_projection.chunks),
                 "index_generation": generation,
                 "published_point_count": publication.published_point_count,
+                "bibliographic_metadata_status": "EXTRACTED",
             }
         except Exception as exc:
             error_code = _projection_error_code(exc)
@@ -653,6 +686,32 @@ def _canonical_items_payload(*, artifact: Any, canonical_ref: CanonicalSourceRef
     if len(items) == 0:
         raise ProjectionRuntimeError("CANONICAL_CONTENT_EMPTY")
     return tuple(items)
+
+
+def _bibliographic_text_evidences(items: Sequence[Any]) -> tuple[ProjectedTextEvidence, ...]:
+    page_texts: dict[int, list[str]] = {}
+    for item in items:
+        page_pdf = getattr(item, "page_pdf", None)
+        text = getattr(item, "text", None)
+        if not isinstance(page_pdf, int) or not 1 <= page_pdf <= 12:
+            continue
+        if not isinstance(text, str) or text.strip() == "":
+            continue
+        page_texts.setdefault(page_pdf, []).append(text)
+    evidences: list[ProjectedTextEvidence] = []
+    remaining = 40_000
+    for page_pdf in sorted(page_texts):
+        combined = "\n".join(page_texts[page_pdf])
+        if remaining <= 0:
+            break
+        bounded = combined[:remaining]
+        if bounded.strip() == "":
+            continue
+        evidences.append(ProjectedTextEvidence(page_pdf=page_pdf, text=bounded))
+        remaining -= len(bounded)
+    if len(evidences) == 0:
+        raise ProjectionRuntimeError("BIBLIOGRAPHIC_METADATA_EVIDENCE_MISSING")
+    return tuple(evidences)
 
 
 def _artifact_path(*, root: Path, artifact_ref: Any) -> Path:

@@ -352,6 +352,14 @@ class UiDocumentApiClient:
                 CorpusPdfDocument(
                     document_id=document["document_id"],
                     title=document["title"],
+                    authors=(
+                        None
+                        if document["authors"] is None
+                        else tuple(document["authors"])
+                    ),
+                    publication_year=document["publication_year"],
+                    edition=document["edition"],
+                    metadata_status=document["metadata_status"],
                     source_status=document["document_status"],
                     diagnostic_status=document["diagnostic_status"],
                     conversion_status=document["conversion_status"],
@@ -604,6 +612,10 @@ def _parse_corpus_document(value: Any) -> dict[str, Any]:
         (
             "document_id",
             "title",
+            "authors",
+            "publication_year",
+            "edition",
+            "metadata_status",
             "document_status",
             "diagnostic_status",
             "conversion_status",
@@ -617,7 +629,24 @@ def _parse_corpus_document(value: Any) -> dict[str, Any]:
     )
     _require_exact_fields(value, expected, "document corpus")
     _ensure_document_id(value["document_id"])
-    _ensure_text(value["title"], "titre documentaire public invalide")
+    if value["title"] is not None:
+        _ensure_text(value["title"], "titre documentaire public invalide")
+    if value["authors"] is not None:
+        if not isinstance(value["authors"], list) or len(value["authors"]) == 0:
+            raise ValueError("auteurs documentaires publics invalides")
+        for author in value["authors"]:
+            _ensure_text(author, "auteur documentaire public invalide")
+    if value["publication_year"] is not None:
+        if (
+            isinstance(value["publication_year"], bool)
+            or not isinstance(value["publication_year"], int)
+            or not 1 <= value["publication_year"] <= 9999
+        ):
+            raise ValueError("année documentaire publique invalide")
+    if value["edition"] is not None:
+        _ensure_text(value["edition"], "édition documentaire publique invalide")
+    if value["metadata_status"] not in {"PENDING", "EXTRACTED", "LEGACY_DECLARED"}:
+        raise ValueError("metadata_status public invalide")
     if value["document_status"] not in SOURCE_STATUSES:
         raise ValueError("statut source public invalide")
     if value["diagnostic_status"] not in DIAGNOSTIC_STATUSES:

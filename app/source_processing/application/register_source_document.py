@@ -55,12 +55,14 @@ class RegisterSourceDocumentCommand:
     """Commande applicative d'enregistrement d'un PDF original."""
 
     original_content: bytes
-    bibliographic_metadata: Mapping[str, Any]
+    bibliographic_metadata: Mapping[str, Any] | None
 
     def __post_init__(self) -> None:
         if not isinstance(self.original_content, bytes):
             raise ValueError("original_content non binaire")
-        if not isinstance(self.bibliographic_metadata, Mapping):
+        if self.bibliographic_metadata is not None and not isinstance(
+            self.bibliographic_metadata, Mapping
+        ):
             raise ValueError("bibliographic_metadata non objet")
 
 
@@ -126,7 +128,11 @@ class RegisterSourceDocumentHandler:
         if not isinstance(command, RegisterSourceDocumentCommand):
             raise ValueError("commande RegisterSourceDocument invalide")
 
-        metadata = BibliographicMetadata.from_payload(command.bibliographic_metadata)
+        metadata = (
+            None
+            if command.bibliographic_metadata is None
+            else BibliographicMetadata.from_payload(command.bibliographic_metadata)
+        )
         review_reason = _review_reason_for_unreadable_pdf(command.original_content)
         if review_reason is not None:
             return RegisterSourceDocumentResult(
@@ -148,13 +154,12 @@ class RegisterSourceDocumentHandler:
                 review_reason=None,
             )
 
-        work_duplicate = self._source_document_repository.find_by_work_key(
-            metadata.work_key
+        work_duplicate = (
+            None
+            if metadata is None
+            else self._source_document_repository.find_by_work_key(metadata.work_key)
         )
-        if work_duplicate is None:
-            duplicate_decision = "NEW_SOURCE"
-        else:
-            duplicate_decision = "DISTINCT_EDITION"
+        duplicate_decision = "NEW_SOURCE" if work_duplicate is None else "DISTINCT_EDITION"
 
         document_id = DocumentId.from_fingerprint(fingerprint)
         storage_ref = OriginalStorageRef.from_value(
@@ -200,11 +205,15 @@ class RegisterSourceDocumentHandler:
         self,
         *,
         original_path: Path,
-        bibliographic_metadata: Mapping[str, Any],
+        bibliographic_metadata: Mapping[str, Any] | None,
     ) -> RegisterSourceDocumentResult:
         if not isinstance(original_path, Path) or not original_path.is_file():
             raise ValueError("original_path invalide")
-        metadata = BibliographicMetadata.from_payload(bibliographic_metadata)
+        metadata = (
+            None
+            if bibliographic_metadata is None
+            else BibliographicMetadata.from_payload(bibliographic_metadata)
+        )
         review_reason = _review_reason_for_unreadable_pdf_path(original_path)
         if review_reason is not None:
             return RegisterSourceDocumentResult("REVIEW_REQUIRED", None, None, review_reason)
@@ -218,7 +227,11 @@ class RegisterSourceDocumentHandler:
             return RegisterSourceDocumentResult(
                 "BINARY_DUPLICATE", None, binary_duplicate.document_id, None
             )
-        work_duplicate = self._source_document_repository.find_by_work_key(metadata.work_key)
+        work_duplicate = (
+            None
+            if metadata is None
+            else self._source_document_repository.find_by_work_key(metadata.work_key)
+        )
         document_id = DocumentId.from_fingerprint(fingerprint)
         storage_ref = OriginalStorageRef.from_value(
             self._original_source_store.put_original_path_if_absent(

@@ -1164,11 +1164,14 @@ def _selectable_documents_for_conversation(
 ) -> tuple[tuple[str, str], ...]:
     if not isinstance(state, CorpusPdfScreenState):
         raise TypeError("état corpus UI invalide")
-    return tuple(
-        (document.document_id, document.title)
-        for document in state.documents
-        if document.selectable_for_conversation
-    )
+    selectable: list[tuple[str, str]] = []
+    for document in state.documents:
+        if not document.selectable_for_conversation:
+            continue
+        if document.title is None:
+            raise ValueError("titre sélectionnable absent")
+        selectable.append((document.document_id, document.title))
+    return tuple(selectable)
 
 
 def _create_ui_conversation_from_form(

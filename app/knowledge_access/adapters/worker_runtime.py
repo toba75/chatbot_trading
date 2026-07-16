@@ -21,6 +21,7 @@ from app.platform.configuration import ApplicationConfiguration, load_applicatio
 from app.platform.job_runtime.composition import build_postgres_job_runtime
 from app.platform.postgres import PsycopgConnectionFactory
 from app.platform.postgres_migrations import build_configured_postgres_migration_runner
+from app.platform.llm_gateway.orchestrator_http import UrllibLlmInferenceGateway
 from app.platform.request_context import bind_trace_id, reset_trace_id
 from app.source_processing.adapters.postgres_job_outbox import PostgresJobOutbox
 
@@ -56,6 +57,10 @@ def _run_worker(
         qdrant_url=application_configuration.services.qdrant.url,
         qdrant_timeout_seconds=application_configuration.runtime.timeouts.request_seconds,
         max_parallel_workers=application_configuration.services.workers.concurrency,
+        inference_gateway=UrllibLlmInferenceGateway(
+            endpoint_url=f"{application_configuration.services.llm_gateway.url.rstrip('/')}/v1/infer",
+            timeout_seconds=application_configuration.services.llm_gateway.timeout_seconds,
+        ),
     )
     job_runtime = build_postgres_job_runtime(
         connection_factory=connection_factory,

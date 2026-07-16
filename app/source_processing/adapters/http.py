@@ -35,7 +35,7 @@ class DocumentHttpAdapter(Protocol):
         self,
         *,
         original_path: Path,
-        bibliographic_metadata: Mapping[str, Any],
+        bibliographic_metadata: Mapping[str, Any] | None,
     ) -> HttpResponse: ...
 
 
@@ -44,13 +44,6 @@ class DocumentConversionHttpAdapter(Protocol):
 
     def handle(self, request: HttpRequest) -> HttpResponse:
         """Traite uniquement POST /v1/documents/{id}/convert."""
-
-
-MAX_TITLE_CHARACTERS = 512
-MAX_AUTHOR_CHARACTERS = 256
-MAX_AUTHORS = 16
-MAX_EDITION_CHARACTERS = 64
-MAX_PUBLICATION_YEAR = 9999
 
 
 def build_document_command_router(
@@ -84,8 +77,8 @@ def build_document_command_router(
         try:
             async with request.form(
                 max_files=1,
-                max_fields=MAX_AUTHORS + 4,
-                max_part_size=MAX_TITLE_CHARACTERS + 1,
+                max_fields=1,
+                max_part_size=1024,
             ) as form:
                 return await _register_document(
                     form=form,
@@ -143,9 +136,7 @@ async def _register_document(
     if not isinstance(form, FormData):
         raise TypeError("formulaire multipart invalide")
     field_names = tuple(key for key, _ in form.multi_items())
-    allowed_fields = frozenset(
-        {"original_content", "title", "authors", "publication_year", "edition"}
-    )
+    allowed_fields = frozenset({"original_content"})
     if any(field_name not in allowed_fields for field_name in field_names):
         return _invalid_request("body")
 
@@ -155,10 +146,6 @@ async def _register_document(
     upload: UploadFile | StarletteUploadFile = files[0]
     if upload.content_type != "application/pdf":
         return _invalid_request("original_content")
-
-    metadata_or_error = _bibliographic_metadata(form)
-    if isinstance(metadata_or_error, JSONResponse):
-        return metadata_or_error
 
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as staged:
         staged_path = Path(staged.name)
@@ -179,65 +166,11 @@ async def _register_document(
         response = await run_in_threadpool(
             document_http_adapter.handle_staged_registration,
             original_path=staged_path,
-            bibliographic_metadata=metadata_or_error,
+            bibliographic_metadata=None,
         )
         return _json_response(response)
     finally:
         staged_path.unlink(missing_ok=True)
-
-
-def _bibliographic_metadata(form: FormData) -> Mapping[str, Any] | JSONResponse:
-    title = _single_text_field(form, "title")
-    if title is None or len(title) > MAX_TITLE_CHARACTERS:
-        return _invalid_request("title")
-    authors = _repeated_text_field(form, "authors")
-    if (
-        authors is None
-        or len(authors) > MAX_AUTHORS
-        or any(len(author) > MAX_AUTHOR_CHARACTERS for author in authors)
-    ):
-        return _invalid_request("authors")
-    publication_year_text = _single_text_field(form, "publication_year")
-    if (
-        publication_year_text is None
-        or len(publication_year_text) > 4
-        or not publication_year_text.isdecimal()
-    ):
-        return _invalid_request("publication_year")
-    publication_year = int(publication_year_text)
-    if publication_year < 1 or publication_year > MAX_PUBLICATION_YEAR:
-        return _invalid_request("publication_year")
-    edition = _single_text_field(form, "edition")
-    if edition is None or len(edition) > MAX_EDITION_CHARACTERS:
-        return _invalid_request("edition")
-    return {
-        "title": title,
-        "authors": authors,
-        "publication_year": publication_year,
-        "edition": edition,
-    }
-
-
-def _single_text_field(form: FormData, field_name: str) -> str | None:
-    values = form.getlist(field_name)
-    if len(values) != 1:
-        return None
-    value = values[0]
-    if not isinstance(value, str) or value == "" or value != value.strip():
-        return None
-    return value
-
-
-def _repeated_text_field(form: FormData, field_name: str) -> tuple[str, ...] | None:
-    values = form.getlist(field_name)
-    if len(values) == 0:
-        return None
-    parsed: list[str] = []
-    for value in values:
-        if not isinstance(value, str) or value == "" or value != value.strip():
-            return None
-        parsed.append(value)
-    return tuple(parsed)
 
 
 def _is_multipart_request(request: Request) -> bool:

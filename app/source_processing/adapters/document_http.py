@@ -30,7 +30,7 @@ class DocumentCommandPort(Protocol):
         self,
         *,
         original_content: bytes,
-        bibliographic_metadata: Mapping[str, Any],
+        bibliographic_metadata: Mapping[str, Any] | None,
     ) -> RegisterDocumentAcceptance:
         """Enregistre un PDF original via SP."""
 
@@ -45,7 +45,7 @@ class DocumentCommandPort(Protocol):
         self,
         *,
         original_path: Path,
-        bibliographic_metadata: Mapping[str, Any],
+        bibliographic_metadata: Mapping[str, Any] | None,
     ) -> RegisterDocumentAcceptance: ...
 
 
@@ -114,12 +114,10 @@ class SourceProcessingHttpAdapter:
         body = request.body
         if "original_content" not in body:
             return _bad_request_response("original_content")
-        if "bibliographic_metadata" not in body:
-            return _bad_request_response("bibliographic_metadata")
         try:
             acceptance = self._document_commands.register_source_document(
                 original_content=body["original_content"],
-                bibliographic_metadata=body["bibliographic_metadata"],
+                bibliographic_metadata=body.get("bibliographic_metadata"),
             )
         except SourceUnreadableError as exc:
             return HttpResponse(
@@ -135,7 +133,7 @@ class SourceProcessingHttpAdapter:
         self,
         *,
         original_path: Path,
-        bibliographic_metadata: Mapping[str, Any],
+        bibliographic_metadata: Mapping[str, Any] | None,
     ) -> HttpResponse:
         register_path = getattr(self._document_commands, "register_source_document_path", None)
         if not callable(register_path):

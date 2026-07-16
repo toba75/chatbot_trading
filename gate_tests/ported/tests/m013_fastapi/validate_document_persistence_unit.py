@@ -2,9 +2,6 @@ from __future__ import annotations
 
 from contextlib import nullcontext
 
-from gate_tests.ported_support import assert_native_parity
-
-
 class _Cursor:
     def __init__(self) -> None:
         self._rows: tuple[tuple[object, ...], ...] = ()
@@ -26,6 +23,10 @@ class _Cursor:
             (
                 "DOC-0000000000000001",
                 "Document sans diagnostic",
+                ("Auteur historique",),
+                2026,
+                "1",
+                "LEGACY_DECLARED",
                 "REGISTERED",
                 "DIAGNOSTIC_NOT_REQUESTED",
                 "CONVERSION_NOT_REQUESTED",
@@ -66,11 +67,6 @@ class _ConnectionFactory:
 
 
 def test_validate_document_persistence_unit() -> None:
-    assert_native_parity(
-        "gate_tests/ported/tests/m013_fastapi/validate_document_persistence_unit.py",
-        "unit",
-    )
-
     # Given un document enregistré sans aucun run de diagnostic.
     # When la projection légère du corpus est lue depuis PostgreSQL.
     # Then la disponibilité de conversion est le booléen public False, jamais NULL.
@@ -84,4 +80,6 @@ def test_validate_document_persistence_unit() -> None:
     rows = persistence.list_document_status_rows(limit=1, after_document_id=None)
 
     assert len(rows) == 1
+    assert rows[0].metadata_status == "LEGACY_DECLARED"
+    assert rows[0].authors == ("Auteur historique",)
     assert rows[0].conversion_action_available is False

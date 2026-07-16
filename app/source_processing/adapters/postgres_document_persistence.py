@@ -230,7 +230,11 @@ class DocumentCorpusStatusRow:
     """Projection SQL légère de la liste, sans enfant documentaire."""
 
     document_id: str
-    title: str
+    title: str | None
+    authors: tuple[str, ...] | None
+    publication_year: int | None
+    edition: str | None
+    metadata_status: str
     document_status: str
     diagnostic_status: str
     conversion_status: str
@@ -696,6 +700,13 @@ class PostgresDocumentPersistence:
                         f"""
                         SELECT source.document_id,
                                source.title,
+                               source.authors,
+                               source.publication_year,
+                               source.edition,
+                               CASE
+                                   WHEN source.title IS NULL THEN 'PENDING'
+                                   ELSE 'LEGACY_DECLARED'
+                               END AS metadata_status,
                                source.status,
                                COALESCE(run.status, 'DIAGNOSTIC_NOT_REQUESTED'),
                                COALESCE(conversion.conversion_status, 'CONVERSION_NOT_REQUESTED'),
@@ -1570,32 +1581,45 @@ def _source_parameters(source: SourceDocument) -> tuple[Any, ...]:
     quarantine_reason = None
     if source.status is SourceDocumentStatus.QUARANTINED:
         quarantine_reason = source.events[-1].reason
+    metadata = source.metadata
+    metadata_values = (
+        (None, None, None, None, None, None)
+        if metadata is None
+        else (
+            metadata.title,
+            list(metadata.authors),
+            metadata.publication_year,
+            metadata.edition,
+            metadata.work_key[0],
+            list(metadata.work_key[1]),
+        )
+    )
     return (
         source.document_id.value,
         source.fingerprint.value,
         source.original_storage_ref.value,
-        source.metadata.title,
-        list(source.metadata.authors),
-        source.metadata.publication_year,
-        source.metadata.edition,
-        source.metadata.work_key[0],
-        list(source.metadata.work_key[1]),
+        *metadata_values,
         source.status.value,
         quarantine_reason,
     )
 
 
 def _source_from_row(row: Any) -> SourceDocument:
-    source = SourceDocument.register_original(
-        document_id=DocumentId.from_value(row[0]),
-        fingerprint=SourceFingerprint.from_value(row[1]),
-        original_storage_ref=OriginalStorageRef.from_value(row[2]),
-        metadata=BibliographicMetadata(
+    metadata = (
+        None
+        if row[3] is None
+        else BibliographicMetadata(
             title=row[3],
             authors=tuple(row[4]),
             publication_year=row[5],
             edition=row[6],
-        ),
+        )
+    )
+    source = SourceDocument.register_original(
+        document_id=DocumentId.from_value(row[0]),
+        fingerprint=SourceFingerprint.from_value(row[1]),
+        original_storage_ref=OriginalStorageRef.from_value(row[2]),
+        metadata=metadata,
     )
     if SourceDocumentStatus(row[7]) is SourceDocumentStatus.QUARANTINED:
         return source.quarantine(row[8])

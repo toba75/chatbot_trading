@@ -26,7 +26,7 @@ class DocumentaryEvidenceRetriever(Protocol):
     ) -> tuple[DocumentaryEvidence, ...]: ...
 
 
-_EVIDENCE_MARKER_PATTERN = re.compile(r"\[EXTRAIT (?P<ordinal>[1-9][0-9]*)\]")
+_DOCUMENTARY_ANSWER_CONTRACT_VERSION = "1.1"
 
 
 @dataclass(frozen=True, slots=True)
@@ -131,10 +131,10 @@ class LiveDocumentaryAnswerService:
                         role="system",
                         content=(
                             "Réponds en français exclusivement à partir des extraits documentaires fournis. "
-                            "N'ajoute aucun fait absent des extraits. "
-                            "Ajoute des marqueurs [EXTRAIT n] dans la réponse pour chaque extrait réellement "
-                            "utilisé. N'inclus jamais un sommaire ou une table des matières qui ne soutient pas "
-                            "directement la réponse."
+                            "N'ajoute aucun fait absent des extraits. Retourne dans used_evidence_ordinals "
+                            "les numéros des extraits réellement utilisés. Retourne une liste vide si aucun "
+                            "extrait ne soutient la réponse. N'inclus jamais un sommaire ou une table des "
+                            "matières qui ne soutient pas directement la réponse."
                         ),
                     ),
                     LlmInferenceMessage(
@@ -144,17 +144,31 @@ class LiveDocumentaryAnswerService:
                 ),
                 output_schema={
                     "type": "object",
-                    "properties": {"answer": {"type": "string"}},
-                    "required": ["answer"],
+                    "properties": {
+                        "answer": {"type": "string"},
+                        "used_evidence_ordinals": {
+                            "type": "array",
+                            "items": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": len(evidence),
+                            },
+                            "maxItems": len(evidence),
+                        },
+                    },
+                    "required": ["answer", "used_evidence_ordinals"],
                     "additionalProperties": False,
                 },
                 schema_name="documentary_conversation_answer",
-                schema_version="1.0",
+                schema_version=_DOCUMENTARY_ANSWER_CONTRACT_VERSION,
                 trace_id=f"TRACE-CV-{_short_hash(request.turn_id)}",
                 request_id=f"REQ-CV-{_short_hash(request.conversation_id + request.turn_id)}",
-                idempotency_key=f"idem-cv-{_short_hash(request.turn_id)}",
+                idempotency_key=(
+                    "idem-cv-"
+                    f"{_short_hash(request.turn_id + ':' + _DOCUMENTARY_ANSWER_CONTRACT_VERSION)}"
+                ),
                 prompt_id="PROMPT-RA-DOCUMENTARY-CONVERSATION",
-                prompt_version="1.0",
+                prompt_version=_DOCUMENTARY_ANSWER_CONTRACT_VERSION,
                 sampling_parameters={"temperature": 0},
             )
         )
@@ -190,17 +204,18 @@ def _structured_answer(response: object, *, evidence_count: int) -> _StructuredD
     structured = response.payload.get("structured_output")
     if not isinstance(structured, Mapping):
         raise LiveDocumentaryAnswerError("LLM_GATEWAY_RESPONSE_INVALID")
-    if set(structured) != {"answer"}:
+    if set(structured) != {"answer", "used_evidence_ordinals"}:
         raise LiveDocumentaryAnswerError("LLM_GATEWAY_RESPONSE_INVALID")
     try:
-        marked_answer_text = _ensure_text(structured.get("answer"), "answer")
-        used_evidence_ordinals = _evidence_ordinals_from_marked_answer(
-            marked_answer_text,
+        answer_text = _ensure_text(structured.get("answer"), "answer")
+        used_evidence_ordinals = _evidence_ordinals(
+            structured.get("used_evidence_ordinals"),
             evidence_count=evidence_count,
         )
-        answer_text = _answer_without_evidence_markers(marked_answer_text)
     except ValueError as exc:
         raise LiveDocumentaryAnswerError("LLM_GATEWAY_RESPONSE_INVALID") from exc
+    if len(used_evidence_ordinals) == 0:
+        raise LiveDocumentaryAnswerError("DOCUMENTARY_EVIDENCE_NOT_FOUND")
     return _StructuredDocumentaryAnswer(
         answer_text=answer_text,
         used_evidence_ordinals=used_evidence_ordinals,
@@ -242,23 +257,20 @@ def _citations_for(
     )
 
 
-def _evidence_ordinals_from_marked_answer(value: str, *, evidence_count: int) -> tuple[int, ...]:
+def _evidence_ordinals(value: object, *, evidence_count: int) -> tuple[int, ...]:
     if isinstance(evidence_count, bool) or not isinstance(evidence_count, int) or evidence_count < 1:
         raise ValueError("evidence_count invalide")
-    _ensure_text(value, "answer")
-    ordinals = tuple(int(match.group("ordinal")) for match in _EVIDENCE_MARKER_PATTERN.finditer(value))
-    if len(ordinals) == 0:
-        raise ValueError("evidence_markers absents")
+    if not isinstance(value, list):
+        raise ValueError("used_evidence_ordinals invalides")
+    ordinals = tuple(value)
     for ordinal in ordinals:
+        if isinstance(ordinal, bool) or not isinstance(ordinal, int):
+            raise ValueError("used_evidence_ordinal invalide")
         if ordinal < 1 or ordinal > evidence_count:
-            raise ValueError("evidence_marker hors plage")
-    return tuple(dict.fromkeys(ordinals))
-
-
-def _answer_without_evidence_markers(value: str) -> str:
-    without_markers = _EVIDENCE_MARKER_PATTERN.sub("", _ensure_text(value, "answer"))
-    answer_text = re.sub(r"\s+", " ", without_markers).strip()
-    return _ensure_text(answer_text, "answer")
+            raise ValueError("used_evidence_ordinal hors plage")
+    if len(ordinals) != len(set(ordinals)):
+        raise ValueError("used_evidence_ordinals dupliqués")
+    return ordinals
 
 
 def _primary_source_locator(evidence_item: DocumentaryEvidence) -> Mapping[str, Any]:

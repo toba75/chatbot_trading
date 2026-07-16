@@ -373,7 +373,7 @@ class DocumentCommandService:
         self,
         *,
         original_path: Path,
-        bibliographic_metadata: Mapping[str, Any],
+        bibliographic_metadata: Mapping[str, Any] | None,
     ) -> RegisterDocumentAcceptance:
         inspect_path = getattr(self._document_inspector, "inspect_path", None)
         if not callable(inspect_path):
@@ -405,7 +405,7 @@ class DocumentCommandService:
         self,
         *,
         original_content: bytes,
-        bibliographic_metadata: Mapping[str, Any],
+        bibliographic_metadata: Mapping[str, Any] | None,
     ) -> RegisterDocumentAcceptance:
         try:
             self._document_inspector.inspect_content(original_content)

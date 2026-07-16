@@ -1,16 +1,106 @@
+"""Tests unitaires du client UI du read-model documentaire."""
+
 from __future__ import annotations
 
-from pathlib import Path
-import sys
+import json
+
+import pytest
+
+from app.platform.ui_document_api import (
+    UiDocumentApiClient,
+    UiDocumentApiResponse,
+)
+
+
+class CorpusTransport:
+    def __init__(self, payload: dict[str, object]) -> None:
+        self.payload = payload
+        self.calls: list[tuple[str, str]] = []
+
+    def request(self, *, method: str, path: str, body, content_type):
+        self.calls.append((method, path))
+        return UiDocumentApiResponse(
+            status_code=200,
+            content_type="application/json",
+            body=json.dumps(self.payload).encode("utf-8"),
+        )
+
+
+def _public_document(**overrides) -> dict[str, object]:
+    document: dict[str, object] = {
+        "document_id": "DOC-M013-API-0001",
+        "title": "Trading on Momentum",
+        "authors": ["Ken Wolff"],
+        "publication_year": 2002,
+        "edition": None,
+        "metadata_status": "EXTRACTED",
+        "document_status": "REGISTERED",
+        "diagnostic_status": "ROUTE_PLANNED",
+        "conversion_status": "CANONICAL_ACCEPTED",
+        "canonical_version_id": "CANON-M013-API-0001",
+        "projection_status": "SEARCHABLE",
+        "manual_review_reason": None,
+        "failure_error_code": None,
+        "conversion_action_available": False,
+        "projection_action_available": False,
+    }
+    document.update(overrides)
+    return document
+
+
+def _client_transporte_les_metadonnees_extraites() -> None:
+    transport = CorpusTransport(
+        {"documents": [_public_document()], "next_cursor": None}
+    )
+    state = UiDocumentApiClient(transport=transport).build_corpus_state(
+        active_selected_document_ids=("DOC-M013-API-0001",)
+    )
+
+    assert transport.calls == [("GET", "/v1/documents?limit=100")]
+    assert len(state.documents) == 1
+    document = state.documents[0]
+    assert document.title == "Trading on Momentum"
+    assert document.authors == ("Ken Wolff",)
+    assert document.publication_year == 2002
+    assert document.metadata_status == "EXTRACTED"
+    assert document.selectable_for_conversation is True
+
+
+def _client_preserve_un_document_pending_non_selectionnable() -> None:
+    pending = _public_document(
+        title=None,
+        authors=None,
+        publication_year=None,
+        edition=None,
+        metadata_status="PENDING",
+        conversion_status="CONVERSION_NOT_REQUESTED",
+        canonical_version_id=None,
+        projection_status="PROJECTION_NOT_REQUESTED",
+    )
+    transport = CorpusTransport({"documents": [pending], "next_cursor": None})
+    document = UiDocumentApiClient(transport=transport).build_corpus_state(
+        active_selected_document_ids=()
+    ).documents[0]
+    assert document.metadata_status == "PENDING"
+    assert document.selectable_for_conversation is False
+
+
+def _client_refuse_un_read_model_bibliographique_incoherent() -> None:
+    transport = CorpusTransport(
+        {
+            "documents": [
+                _public_document(metadata_status="PENDING")
+            ],
+            "next_cursor": None,
+        }
+    )
+    with pytest.raises(ValueError, match="page de corpus publique incompatible"):
+        UiDocumentApiClient(transport=transport).build_corpus_state(
+            active_selected_document_ids=()
+        )
 
 
 def test_validate_ui_document_api_client_unit() -> None:
-    original_argv = sys.argv[:]
-    repository_root = next(parent for parent in Path(__file__).resolve().parents if (parent / 'pyproject.toml').is_file())
-    try:
-        sys.argv = [str(Path(__file__)), str(repository_root)]
-        source = '\nimport sys\n\nrepo_root = sys.argv[1]\nif repo_root not in sys.path:\n    sys.path.insert(0, repo_root)\n\nfrom app.platform.ui_document_api import (  # noqa: E402\n    UiDocumentApiClient,\n    UiDocumentApiResponse,\n    UiDocumentApiUnavailableError,\n)\n\n\ndef assert_equal(actual: object, expected: object, message: str) -> None:\n    if actual != expected:\n        raise AssertionError(f"{message} Valeur obtenue: {actual!r}")\n\n\ndef assert_raises(expected_type: type[BaseException], expected_fragment: str, action) -> None:\n    try:\n        action()\n    except expected_type as exc:\n        if expected_fragment not in str(exc):\n            raise AssertionError(f"Erreur inattendue: {exc}") from exc\n        return\n    raise AssertionError(f"Erreur attendue absente: {expected_type.__name__}")\n\n\nclass RecordingTransport:\n    def __init__(self, responses: list[UiDocumentApiResponse]) -> None:\n        self.responses = list(responses)\n        self.requests: list[tuple[str, str, bytes | None, str | None]] = []\n\n    def request(self, *, method: str, path: str, body: bytes | None, content_type: str | None) -> UiDocumentApiResponse:\n        self.requests.append((method, path, body, content_type))\n        if not self.responses:\n            raise AssertionError("Réponse de transport absente")\n        return self.responses.pop(0)\n\n\ndef json_response(status_code: int, body: str) -> UiDocumentApiResponse:\n    return UiDocumentApiResponse(\n        status_code=status_code,\n        content_type="application/json; charset=utf-8",\n        body=body.encode("utf-8"),\n    )\n\n\n# Given les contrats documentaires publics sont disponibles.\n# When le client UI construit le corpus et lit une étape.\n# Then il n\'émet que des URL relatives publiques et parse strictement les DTO.\ntransport = RecordingTransport(\n    [\n        json_response(\n            200,\n            \'{"documents":[{"document_id":"DOC-M013-FASTAPI-UI01","title":"Rapport",\'\n            \'"document_status":"REGISTERED","diagnostic_status":"DIAGNOSTIC_NOT_REQUESTED",\'\n            \'"conversion_status":"CONVERSION_NOT_REQUESTED","canonical_version_id":null,\'\n            \'"projection_status":"PROJECTION_NOT_REQUESTED","conversion_action_available":false}],"next_cursor":null}\',\n        ),\n        json_response(\n            409,\n            \'{"error_code":"DIAGNOSTIC_NOT_REQUESTED","document_id":"DOC-M013-FASTAPI-UI01"}\',\n        ),\n        json_response(\n            202,\n            \'{"document_id":"DOC-M013-FASTAPI-UI01","diagnostic_status":"DIAGNOSTIC_REQUESTED"}\',\n        ),\n    ]\n)\nclient = UiDocumentApiClient(transport=transport)\nstate = client.build_corpus_state(active_selected_document_ids=())\nassert_equal(state.read_model_status, "READ_MODEL_READY", "Le corpus doit provenir de l\'API.")\nassert_equal(state.documents[0].projection_status, "PROJECTION_NOT_REQUESTED", "La projection publique doit être lue.")\ndiagnostic_error = client.read_diagnostic("DOC-M013-FASTAPI-UI01")\nassert_equal(diagnostic_error.status_code, 409, "L\'absence de diagnostic doit rester publique.")\ncommand = client.forward_document_command(\n    path="/v1/documents/DOC-M013-FASTAPI-UI01/diagnose",\n    body=b"",\n    content_type="application/octet-stream",\n)\nassert_equal(command.status_code, 202, "La commande doit conserver le statut HTTP public.")\nassert_equal(\n    [request[1] for request in transport.requests],\n    [\n        "/v1/documents?limit=100",\n        "/v1/documents/DOC-M013-FASTAPI-UI01/diagnostic",\n        "/v1/documents/DOC-M013-FASTAPI-UI01/diagnose",\n    ],\n    "Le client UI doit utiliser exclusivement des URL publiques relatives.",\n)\n\nfor _, path, _, _ in transport.requests:\n    if not path.startswith("/v1/documents") or "://" in path:\n        raise AssertionError(f"URL UI non publique ou absolue: {path}")\n\n# Les données internes, champs supplémentaires et statuts inconnus sont refusés.\ninternal_transport = RecordingTransport(\n    [\n        json_response(\n            200,\n            \'{"documents":[{"document_id":"DOC-M013-FASTAPI-UI01","title":"Rapport",\'\n            \'"document_status":"REGISTERED","diagnostic_status":"DIAGNOSTIC_NOT_REQUESTED",\'\n            \'"conversion_status":"CONVERSION_NOT_REQUESTED","canonical_version_id":null,\'\n            \'"projection_status":"PROJECTION_NOT_REQUESTED","conversion_action_available":false,\'\n            \'"original_storage_ref":"/var/lib/private.pdf"}],"next_cursor":null}\',\n        )\n    ]\n)\nassert_raises(\n    ValueError,\n    "original_storage_ref",\n    lambda: UiDocumentApiClient(transport=internal_transport).build_corpus_state(\n        active_selected_document_ids=()\n    ),\n)\n\nunknown_status_transport = RecordingTransport(\n    [\n        json_response(\n            200,\n            \'{"documents":[{"document_id":"DOC-M013-FASTAPI-UI01","title":"Rapport",\'\n            \'"document_status":"REGISTERED","diagnostic_status":"DIAGNOSTIC_INVENTED",\'\n            \'"conversion_status":"CONVERSION_NOT_REQUESTED","canonical_version_id":null,\'\n            \'"projection_status":"PROJECTION_NOT_REQUESTED","conversion_action_available":false}],"next_cursor":null}\',\n        )\n    ]\n)\nassert_raises(\n    ValueError,\n    "page de corpus publique incompatible",\n    lambda: UiDocumentApiClient(transport=unknown_status_transport).build_corpus_state(\n        active_selected_document_ids=()\n    ),\n)\n\nclass UnavailableTransport:\n    def request(self, *, method: str, path: str, body: bytes | None, content_type: str | None) -> UiDocumentApiResponse:\n        raise UiDocumentApiUnavailableError("ORCHESTRATOR_API_UNAVAILABLE")\n\n\nassert_raises(\n    UiDocumentApiUnavailableError,\n    "ORCHESTRATOR_API_UNAVAILABLE",\n    lambda: UiDocumentApiClient(transport=UnavailableTransport()).build_corpus_state(\n        active_selected_document_ids=()\n    ),\n)\n\nprint("Tests unitaires client documentaire UI: OK")'
-        namespace = {'__name__': __name__, '__file__': str(Path(__file__))}
-        exec(compile(source, str(Path(__file__)), 'exec'), namespace)
-    finally:
-        sys.argv = original_argv
+    _client_transporte_les_metadonnees_extraites()
+    _client_preserve_un_document_pending_non_selectionnable()
+    _client_refuse_un_read_model_bibliographique_incoherent()

@@ -8,7 +8,13 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 from app.contracts.source_references import SourceLocator
-from app.knowledge_access.application.projection_queries import ProjectionReadRecord
+from app.knowledge_access.application.extract_projected_bibliographic_metadata import (
+    ProjectedBibliographicMetadata,
+)
+from app.knowledge_access.application.projection_queries import (
+    ProjectionCatalogRecord,
+    ProjectionReadRecord,
+)
 from app.knowledge_access.application.request_projection import (
     ProjectionAlreadyRequestedError,
     ProjectionPersistenceDecision,
@@ -238,7 +244,6 @@ class PostgresKnowledgeProjectionRepository:
                         outputs_fingerprint, execution_phase, completed_units,
                         total_units, failure_error_code
                     )
-
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'SUCCEEDED', %s, %s, NULL)
                     ON CONFLICT (projection_id) DO UPDATE SET
                         status = EXCLUDED.status,
@@ -266,8 +271,8 @@ class PostgresKnowledgeProjectionRepository:
                         observed_at,
                         projection.aggregate_version,
                         outputs_fingerprint,
-                        chunk_count,
-                        chunk_count,
+                        chunk_count + 1,
+                        chunk_count + 1,
                     ),
                 )
                 cursor.execute(
@@ -304,6 +309,58 @@ class PostgresKnowledgeProjectionRepository:
                             ),
                         ),
                     )
+
+    def save_bibliographic_metadata(
+        self,
+        *,
+        projection_id: str,
+        metadata: ProjectedBibliographicMetadata,
+    ) -> None:
+        if not isinstance(projection_id, str) or not projection_id.startswith("PROJ-"):
+            raise ValueError("projection_id bibliographique invalide")
+        if not isinstance(metadata, ProjectedBibliographicMetadata):
+            raise ValueError("métadonnées projetées invalides")
+        evidence_payload = [
+            {
+                "field": evidence.field,
+                "page_pdf": evidence.page_pdf,
+                "quoted_text": evidence.quoted_text,
+            }
+            for evidence in metadata.evidences
+        ]
+        with self._connection_factory.connect() as connection:
+            with connection.transaction(), connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE knowledge_access.knowledge_projections
+                       SET bibliographic_metadata_status = 'EXTRACTED',
+                           bibliographic_title = %s,
+                           bibliographic_authors = %s,
+                           bibliographic_publication_year = %s,
+                           bibliographic_edition = %s,
+                           bibliographic_evidence = %s::jsonb,
+                           bibliographic_model_id = %s,
+                           bibliographic_model_revision = %s,
+                           bibliographic_runtime_version = %s,
+                           state_observed_at = CURRENT_TIMESTAMP
+                     WHERE projection_id = %s
+                       AND status = 'INDEXING'
+                       AND bibliographic_metadata_status = 'PENDING'
+                    """,
+                    (
+                        metadata.title,
+                        list(metadata.authors),
+                        metadata.publication_year,
+                        metadata.edition,
+                        json.dumps(evidence_payload, ensure_ascii=False, separators=(",", ":")),
+                        metadata.model_id,
+                        metadata.model_revision,
+                        metadata.runtime_version,
+                        projection_id,
+                    ),
+                )
+                if cursor.rowcount != 1:
+                    raise KnowledgeProjectionVersionConflictError()
 
     def _find_projection(
         self,
@@ -367,6 +424,49 @@ class PostgresProjectionReadRepository:
                 )
                 rows = cursor.fetchall()
         return {str(document_id): str(status) for document_id, status in rows}
+
+    def current_projection_catalog_for_document_ids(
+        self,
+        document_ids: Sequence[str],
+    ) -> Mapping[str, ProjectionCatalogRecord]:
+        """Lit statut et métadonnées dérivées en une requête KA bornée."""
+
+        if isinstance(document_ids, (str, bytes)) or not isinstance(document_ids, Sequence):
+            raise ValueError("document_ids KA invalides")
+        parsed_ids = tuple(document_ids)
+        if len(parsed_ids) > 100 or len(set(parsed_ids)) != len(parsed_ids):
+            raise ValueError("document_ids KA invalides")
+        if any(not isinstance(document_id, str) or not document_id.startswith("DOC-") for document_id in parsed_ids):
+            raise ValueError("document_id KA invalide")
+        if len(parsed_ids) == 0:
+            return {}
+        with self._connection_factory.connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT DISTINCT ON (document_id)
+                           document_id, status, bibliographic_metadata_status,
+                           bibliographic_title, bibliographic_authors,
+                           bibliographic_publication_year, bibliographic_edition
+                      FROM knowledge_access.knowledge_projections
+                     WHERE document_id = ANY(%s)
+                     ORDER BY document_id, state_observed_at DESC, projection_id DESC
+                    """,
+                    (list(parsed_ids),),
+                )
+                rows = cursor.fetchall()
+        return {
+            str(row[0]): ProjectionCatalogRecord(
+                document_id=str(row[0]),
+                projection_status=str(row[1]),
+                metadata_status=str(row[2]),
+                title=row[3],
+                authors=None if row[4] is None else tuple(row[4]),
+                publication_year=row[5],
+                edition=row[6],
+            )
+            for row in rows
+        }
 
     def current_projection_for_document_id(
         self,

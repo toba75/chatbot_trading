@@ -1,16 +1,125 @@
+"""Tests unitaires du routeur public d'admission documentaire."""
+
 from __future__ import annotations
 
 from pathlib import Path
-import sys
+
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+from app.source_processing.adapters.document_http import HttpResponse
+from app.source_processing.adapters.http import build_document_command_router
+
+
+class RecordingDocumentAdapter:
+    def __init__(self) -> None:
+        self.calls: list[tuple[bytes, object]] = []
+
+    def handle(self, request):
+        raise AssertionError("Le chemin non streamé ne doit pas être utilisé.")
+
+    def handle_staged_registration(
+        self,
+        *,
+        original_path: Path,
+        bibliographic_metadata,
+    ) -> HttpResponse:
+        self.calls.append((original_path.read_bytes(), bibliographic_metadata))
+        return HttpResponse(
+            status_code=201,
+            body={
+                "document_id": "DOC-1111111111111111",
+                "document_status": "REGISTERED",
+            },
+        )
+
+
+class ForbiddenConversionAdapter:
+    def handle(self, request):
+        raise AssertionError("La conversion ne doit pas être appelée.")
+
+
+def _client(adapter: RecordingDocumentAdapter, *, max_pdf_bytes: int = 64) -> TestClient:
+    application = FastAPI()
+    application.include_router(
+        build_document_command_router(
+            document_http_adapter=adapter,
+            document_conversion_http_adapter=ForbiddenConversionAdapter(),
+            max_pdf_bytes=max_pdf_bytes,
+        )
+    )
+    return TestClient(application)
+
+
+def _routeur_admet_le_pdf_seul_et_delegue_none_comme_metadonnees() -> None:
+    adapter = RecordingDocumentAdapter()
+    pdf = b"%PDF-1.7\nbody\n%%EOF\n"
+    response = _client(adapter).post(
+        "/v1/documents",
+        files={"original_content": ("document.pdf", pdf, "application/pdf")},
+    )
+    assert response.status_code == 201
+    assert response.json() == {
+        "document_id": "DOC-1111111111111111",
+        "document_status": "REGISTERED",
+    }
+    assert adapter.calls == [(pdf, None)]
+
+
+def _routeur_refuse_les_anciens_champs_bibliographiques() -> None:
+    adapter = RecordingDocumentAdapter()
+    response = _client(adapter).post(
+        "/v1/documents",
+        files={
+            "original_content": (
+                "document.pdf",
+                b"%PDF-1.7\n%%EOF\n",
+                "application/pdf",
+            )
+        },
+        data={"title": "Titre manuel"},
+    )
+    assert response.status_code == 400
+    assert response.json() == {
+        "error_code": "HTTP_REQUEST_INVALID",
+        "field": "body",
+    }
+    assert adapter.calls == []
+
+
+def _routeur_refuse_type_mime_et_taille_invalides() -> None:
+    adapter = RecordingDocumentAdapter()
+    wrong_mime = _client(adapter).post(
+        "/v1/documents",
+        files={
+            "original_content": (
+                "document.pdf",
+                b"%PDF-1.7\n%%EOF\n",
+                "application/octet-stream",
+            )
+        },
+    )
+    assert wrong_mime.status_code == 400
+    assert wrong_mime.json()["field"] == "original_content"
+
+    oversized = _client(adapter, max_pdf_bytes=8).post(
+        "/v1/documents",
+        files={
+            "original_content": (
+                "document.pdf",
+                b"%PDF-1.7\nbody\n%%EOF\n",
+                "application/pdf",
+            )
+        },
+    )
+    assert oversized.status_code == 413
+    assert oversized.json() == {
+        "error_code": "HTTP_REQUEST_TOO_LARGE",
+        "max_pdf_bytes": 8,
+    }
 
 
 def test_validate_document_command_router_unit() -> None:
-    original_argv = sys.argv[:]
-    repository_root = next(parent for parent in Path(__file__).resolve().parents if (parent / 'pyproject.toml').is_file())
-    try:
-        sys.argv = [str(Path(__file__)), str(repository_root)]
-        source = '\nimport asyncio\nimport json\nfrom pathlib import Path\nimport sys\n\nsys.path.insert(0, sys.argv[1])\n\nfrom fastapi import FastAPI\nfrom app.platform.orchestrator_asgi import BoundedRequestBodyMiddleware\nfrom app.source_processing.adapters.http import build_document_command_router\nfrom app.source_processing.adapters.document_http import SourceProcessingHttpAdapter\nfrom app.source_processing.application.document_commands import (\n    DiagnosisAlreadyRequestedError,\n    DocumentDiagnosisAcceptance,\n    RegisterDocumentAcceptance,\n    SourceNotFoundError,\n    SourceUnreadableError,\n)\nfrom app.source_processing.domain.source_document import DocumentId, SourceFingerprint\n\n\ndef assert_equal(actual, expected, message):\n    if actual != expected:\n        raise AssertionError(f"{message} Attendu={expected!r}, obtenu={actual!r}")\n\n\ndef multipart(*, boundary, content, fields, content_type="application/pdf"):\n    chunks = [\n        f"--{boundary}\\r\\n".encode("ascii"),\n        b\'Content-Disposition: form-data; name="original_content"; filename="metadata-interdite.pdf"\\r\\n\',\n        f"Content-Type: {content_type}\\r\\n\\r\\n".encode("ascii"),\n        content,\n        b"\\r\\n",\n    ]\n    for name, value in fields:\n        chunks.extend(\n            (\n                f"--{boundary}\\r\\n".encode("ascii"),\n                f\'Content-Disposition: form-data; name="{name}"\\r\\n\\r\\n\'.encode("ascii"),\n                str(value).encode("utf-8"),\n                b"\\r\\n",\n            )\n        )\n    chunks.append(f"--{boundary}--\\r\\n".encode("ascii"))\n    return b"".join(chunks)\n\n\nasync def post(\n    application,\n    path,\n    body,\n    content_type,\n    *,\n    include_content_length=True,\n    receive_chunk_bytes=None,\n    receive_calls=None,\n):\n    sent = []\n    offset = 0\n    delivered_empty = False\n\n    async def receive():\n        nonlocal delivered_empty, offset\n        if receive_calls is not None:\n            receive_calls.append(offset)\n        if len(body) == 0 and not delivered_empty:\n            delivered_empty = True\n            return {"type": "http.request", "body": b"", "more_body": False}\n        if offset >= len(body):\n            return {"type": "http.disconnect"}\n        chunk_size = receive_chunk_bytes or len(body)\n        chunk = body[offset : offset + chunk_size]\n        offset += len(chunk)\n        return {\n            "type": "http.request",\n            "body": chunk,\n            "more_body": offset < len(body),\n        }\n\n    async def send(message):\n        sent.append(message)\n\n    headers = [(b"content-type", content_type.encode("ascii"))]\n    if include_content_length:\n        headers.append((b"content-length", str(len(body)).encode("ascii")))\n    await application(\n        {\n            "type": "http",\n            "asgi": {"version": "3.0", "spec_version": "2.3"},\n            "http_version": "1.1",\n            "method": "POST",\n            "scheme": "http",\n            "path": path,\n            "raw_path": path.encode("ascii"),\n            "query_string": b"",\n            "root_path": "",\n            "headers": headers,\n            "client": ("asgi-test", 50000),\n            "server": ("orchestrator-api", 8080),\n            "state": {},\n        },\n        receive,\n        send,\n    )\n    start = next(message for message in sent if message["type"] == "http.response.start")\n    raw = b"".join(message.get("body", b"") for message in sent if message["type"] == "http.response.body")\n    return start["status"], json.loads(raw.decode("utf-8"))\n\n\nclass RouterCommands:\n    def __init__(self):\n        self.registration_calls = []\n\n    def register_source_document(self, *, original_content, bibliographic_metadata):\n        self.registration_calls.append((original_content, dict(bibliographic_metadata)))\n        if original_content.endswith(b"corrupt\\n%%EOF\\n"):\n            raise SourceUnreadableError("PDF_CORRUPTED")\n        document_id = DocumentId.from_fingerprint(SourceFingerprint.from_content(original_content))\n        return RegisterDocumentAcceptance(document_id, "REGISTERED", False)\n\n    def register_source_document_path(self, *, original_path, bibliographic_metadata):\n        return self.register_source_document(\n            original_content=original_path.read_bytes(),\n            bibliographic_metadata=bibliographic_metadata,\n        )\n\n    def start_document_processing(self, *, document_id):\n        if document_id == "DOC-" + "A" * 16:\n            raise SourceNotFoundError(document_id)\n        if document_id == "DOC-" + "B" * 16:\n            raise DiagnosisAlreadyRequestedError(document_id)\n        return DocumentDiagnosisAcceptance(DocumentId.from_value(document_id), "DIAGNOSTIC_REQUESTED")\n\n\nasync def scenario():\n    commands = RouterCommands()\n    adapter = SourceProcessingHttpAdapter(commands)\n    class ConversionAdapter:\n        def handle(self, request):\n            raise AssertionError("La conversion ne doit pas être appelée dans ce scénario.")\n\n    conversion_adapter = ConversionAdapter()\n\n    application = FastAPI()\n    application.add_middleware(\n        BoundedRequestBodyMiddleware,\n        max_body_bytes=4096,\n    )\n    application.include_router(\n        build_document_command_router(\n            document_http_adapter=adapter,\n                document_conversion_http_adapter=conversion_adapter,\n            max_pdf_bytes=64,\n        )\n    )\n    boundary = "ost-router-unit"\n    fields = (\n        ("title", "Titre explicite"),\n        ("authors", "Auteur"),\n        ("publication_year", "2026"),\n        ("edition", "1"),\n    )\n    valid_pdf = b"%PDF-1.7\\nbody\\n%%EOF\\n"\n    valid_body = multipart(boundary=boundary, content=valid_pdf, fields=fields)\n    multipart_type = f"multipart/form-data; boundary={boundary}"\n\n    created = await post(application, "/v1/documents", valid_body, multipart_type)\n    assert_equal(created[0], 201, "Le routeur doit déléguer le multipart valide.")\n    assert_equal(len(commands.registration_calls), 1, "SP doit être appelé exactement une fois.")\n    delegated_content, delegated_metadata = commands.registration_calls[0]\n    assert_equal(delegated_content, valid_pdf, "Le PDF doit rester bit à bit.")\n    assert_equal(\n        delegated_metadata,\n        {"title": "Titre explicite", "authors": ("Auteur",), "publication_year": 2026, "edition": "1"},\n        "Les champs bibliographiques doivent être typés explicitement.",\n    )\n    if "filename" in repr(delegated_metadata) or "metadata-interdite.pdf" in repr(delegated_metadata):\n        raise AssertionError("Le nom du fichier ne doit jamais devenir une métadonnée bibliographique.")\n\n    wrong_mime = multipart(\n        boundary=boundary,\n        content=valid_pdf,\n        fields=fields,\n        content_type="application/octet-stream",\n    )\n    assert_equal(\n        await post(application, "/v1/documents", wrong_mime, multipart_type),\n        (400, {"error_code": "HTTP_REQUEST_INVALID", "field": "original_content"}),\n        "Un type MIME non PDF doit être refusé avant SP.",\n    )\n\n    oversized_pdf = b"%PDF-1.7\\n" + b"x" * 64 + b"\\n%%EOF\\n"\n    oversized = multipart(boundary=boundary, content=oversized_pdf, fields=fields)\n    assert_equal(\n        await post(application, "/v1/documents", oversized, multipart_type),\n        (413, {"error_code": "HTTP_REQUEST_TOO_LARGE", "max_pdf_bytes": 64}),\n        "La limite binaire explicite doit être appliquée avant SP.",\n    )\n\n    for field_name in ("title", "authors", "publication_year", "edition"):\n        body = multipart(\n            boundary=boundary,\n            content=valid_pdf,\n            fields=tuple(field for field in fields if field[0] != field_name),\n        )\n        assert_equal(\n            await post(application, "/v1/documents", body, multipart_type),\n            (400, {"error_code": "HTTP_REQUEST_INVALID", "field": field_name}),\n            f"Le champ {field_name} doit être obligatoire.",\n        )\n\n    invalid_year = multipart(\n        boundary=boundary,\n        content=valid_pdf,\n        fields=tuple((name, "20x6" if name == "publication_year" else value) for name, value in fields),\n    )\n    assert_equal(\n        await post(application, "/v1/documents", invalid_year, multipart_type),\n        (400, {"error_code": "HTTP_REQUEST_INVALID", "field": "publication_year"}),\n        "L\'année bibliographique doit être un entier explicite.",\n    )\n\n    oversized_metadata = (\n        ("title", "T" * 513),\n        ("authors", "Auteur"),\n        ("publication_year", "2026"),\n        ("edition", "1"),\n    )\n    assert_equal(\n        await post(\n            application,\n            "/v1/documents",\n            multipart(boundary=boundary, content=valid_pdf, fields=oversized_metadata),\n            multipart_type,\n        ),\n        (400, {"error_code": "HTTP_REQUEST_INVALID", "field": "title"}),\n        "Un titre de plus de 512 caractères doit être refusé.",\n    )\n    for field_name, fields_override in (\n        (\n            "authors",\n            (\n                ("title", "Titre"),\n                ("authors", "A" * 257),\n                ("publication_year", "2026"),\n                ("edition", "1"),\n            ),\n        ),\n        (\n            "authors",\n            (\n                ("title", "Titre"),\n                *(("authors", f"Auteur {index}") for index in range(17)),\n                ("publication_year", "2026"),\n                ("edition", "1"),\n            ),\n        ),\n        (\n            "publication_year",\n            (\n                ("title", "Titre"),\n                ("authors", "Auteur"),\n                ("publication_year", "10000"),\n                ("edition", "1"),\n            ),\n        ),\n        (\n            "edition",\n            (\n                ("title", "Titre"),\n                ("authors", "Auteur"),\n                ("publication_year", "2026"),\n                ("edition", "E" * 65),\n            ),\n        ),\n    ):\n        assert_equal(\n            await post(\n                application,\n                "/v1/documents",\n                multipart(boundary=boundary, content=valid_pdf, fields=fields_override),\n                multipart_type,\n            ),\n            (400, {"error_code": "HTTP_REQUEST_INVALID", "field": field_name}),\n            f"La limite métier de {field_name} doit être appliquée.",\n        )\n\n    aggregate_oversized_pdf = b"%PDF-1.7\\n" + b"x" * 5000 + b"\\n%%EOF\\n"\n    aggregate_oversized = multipart(\n        boundary=boundary,\n        content=aggregate_oversized_pdf,\n        fields=fields,\n    )\n    content_length_receive_calls = []\n    assert_equal(\n        await post(\n            application,\n            "/v1/documents",\n            aggregate_oversized,\n            multipart_type,\n            receive_calls=content_length_receive_calls,\n        ),\n        (413, {"error_code": "HTTP_REQUEST_TOO_LARGE", "max_body_bytes": 4096}),\n        "Un Content-Length excessif doit être refusé par la frontière ASGI.",\n    )\n    assert_equal(\n        content_length_receive_calls,\n        [],\n        "Un Content-Length excessif doit être refusé avant toute consommation.",\n    )\n    assert_equal(\n        await post(\n            application,\n            "/v1/documents",\n            aggregate_oversized,\n            multipart_type,\n            include_content_length=False,\n            receive_chunk_bytes=128,\n        ),\n        (413, {"error_code": "HTTP_REQUEST_TOO_LARGE", "max_body_bytes": 4096}),\n        "Un transfert chunked excessif doit être borné avant le parsing multipart.",\n    )\n\n    corrupt = multipart(\n        boundary=boundary,\n        content=b"%PDF-corrupt\\n%%EOF\\n",\n        fields=fields,\n    )\n    assert_equal(\n        await post(application, "/v1/documents", corrupt, multipart_type),\n        (422, {"error_code": "SOURCE_UNREADABLE", "reason": "PDF_CORRUPTED"}),\n        "L\'erreur SP SOURCE_UNREADABLE doit rester publique.",\n    )\n\n    assert_equal(\n        await post(application, "/v1/documents/id-invalide/diagnose", b"", "application/octet-stream"),\n        (400, {"error_code": "HTTP_REQUEST_INVALID", "field": "document_id"}),\n        "Un DocumentId invalide doit rester une erreur M-003.",\n    )\n    absent = "DOC-" + "A" * 16\n    assert_equal(\n        await post(application, f"/v1/documents/{absent}/diagnose", b"", "application/octet-stream"),\n        (404, {"error_code": "SOURCE_NOT_FOUND", "document_id": absent}),\n        "SOURCE_NOT_FOUND doit rester 404.",\n    )\n    repeated = "DOC-" + "B" * 16\n    assert_equal(\n        await post(application, f"/v1/documents/{repeated}/diagnose", b"", "application/octet-stream"),\n        (409, {"error_code": "DIAGNOSTIC_ALREADY_REQUESTED", "document_id": repeated}),\n        "DIAGNOSTIC_ALREADY_REQUESTED doit rester 409.",\n    )\n    unknown = await post(application, "/v1/document-fallback", b"", "application/octet-stream")\n    assert_equal(unknown[0], 404, "Aucune route de secours ne doit exister.")\n    assert_equal(len(commands.registration_calls), 2, "Seuls le PDF valide et le PDF corrompu doivent atteindre SP.")\n\n\nasyncio.run(scenario())\nprint("Tests unitaires du routeur de commandes documentaires: OK")'
-        namespace = {'__name__': __name__, '__file__': str(Path(__file__))}
-        exec(compile(source, str(Path(__file__)), 'exec'), namespace)
-    finally:
-        sys.argv = original_argv
+    _routeur_admet_le_pdf_seul_et_delegue_none_comme_metadonnees()
+    _routeur_refuse_les_anciens_champs_bibliographiques()
+    _routeur_refuse_type_mime_et_taille_invalides()

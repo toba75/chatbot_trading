@@ -60,7 +60,11 @@ class CorpusPdfDocument:
     """Document PDF affichable par le premier écran UI."""
 
     document_id: str
-    title: str
+    title: str | None
+    authors: tuple[str, ...] | None
+    publication_year: int | None
+    edition: str | None
+    metadata_status: str
     source_status: str
     diagnostic_status: str
     conversion_status: str
@@ -74,7 +78,27 @@ class CorpusPdfDocument:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "document_id", _ensure_document_id(self.document_id))
-        object.__setattr__(self, "title", _ensure_text(self.title, "titre requis"))
+        if self.metadata_status not in {"PENDING", "EXTRACTED", "LEGACY_DECLARED"}:
+            raise ValueError("statut de métadonnées invalide")
+        if self.metadata_status == "PENDING":
+            if any(
+                value is not None
+                for value in (self.title, self.authors, self.publication_year, self.edition)
+            ):
+                raise ValueError("métadonnées en attente incohérentes")
+        else:
+            object.__setattr__(self, "title", _ensure_text(self.title, "titre requis"))
+            if not isinstance(self.authors, tuple) or len(self.authors) == 0:
+                raise ValueError("auteurs requis")
+            object.__setattr__(
+                self,
+                "authors",
+                tuple(_ensure_text(author, "auteur requis") for author in self.authors),
+            )
+            if self.publication_year is not None:
+                _ensure_publication_year(self.publication_year)
+            if self.edition is not None:
+                object.__setattr__(self, "edition", _ensure_text(self.edition, "édition invalide"))
         object.__setattr__(
             self,
             "source_status",
@@ -145,7 +169,11 @@ class CorpusPdfDocument:
 
     @property
     def selectable_for_conversation(self) -> bool:
-        return self.projection_status == "SEARCHABLE"
+        return (
+            self.projection_status == "SEARCHABLE"
+            and self.metadata_status in {"EXTRACTED", "LEGACY_DECLARED"}
+            and self.title is not None
+        )
 
 
 @dataclass(frozen=True)
@@ -222,24 +250,12 @@ def build_unavailable_corpus_pdf_state(
 def build_registration_payload(
     *,
     original_content: bytes,
-    title: str,
-    authors: Sequence[str],
-    publication_year: int,
-    edition: str,
 ) -> Mapping[str, Any]:
     """Construit le payload strict de `POST /v1/documents`."""
 
     if not isinstance(original_content, bytes) or len(original_content) == 0:
         raise ValueError("original_content requis")
-    payload: dict[str, Any] = {
-        "original_content": original_content,
-        "bibliographic_metadata": {
-            "title": _ensure_text(title, "title requis"),
-            "authors": _ensure_authors(authors),
-            "publication_year": _ensure_publication_year(publication_year),
-            "edition": _ensure_text(edition, "edition requise"),
-        },
-    }
+    payload: dict[str, Any] = {"original_content": original_content}
     ensure_no_destructive_ui_fields(payload)
     return payload
 
@@ -341,14 +357,10 @@ def render_corpus_pdf_screen(state: CorpusPdfScreenState) -> str:
             "  <main>",
             '    <section aria-labelledby="ajout-pdf">',
             '      <h2 id="ajout-pdf">Ajouter un PDF</h2>',
-            '      <p>Contrat appelé: <code>POST /v1/documents</code>. PDF de 50 Mio maximum.</p>',
+            '      <p>Contrat appelé: <code>POST /v1/documents</code>. Le PDF seul est admis; ses métadonnées seront extraites après projection.</p>',
             '      <form class="document-registration-form" method="post" action="/v1/documents" enctype="multipart/form-data">',
             f"        <fieldset{fieldset_attributes}>",
             '        <label>Fichier PDF original<input name="original_content" type="file" accept="application/pdf" required></label>',
-            '        <label>Titre documentaire<input name="title" maxlength="512" type="text" required></label>',
-            '        <label>Auteur<input name="authors" maxlength="256" type="text" required></label>',
-            '        <label>Année de publication<input name="publication_year" type="number" min="1" required></label>',
-            '        <label>Édition<input name="edition" maxlength="64" type="text" required></label>',
             "        <button type=\"submit\">Ajouter au corpus</button>",
             "        </fieldset>",
             "      </form>",
@@ -395,7 +407,7 @@ def render_pdf_viewer(document: CorpusPdfDocument) -> str:
             "</head>",
             '<body class="pdf-viewer-page">',
             '  <header class="pdf-viewer-header">',
-            f"    <h1>PDF original {_escape(parsed_document.title)}</h1>",
+            f"    <h1>PDF original {_escape(parsed_document.title or parsed_document.document_id)}</h1>",
             f"    <p>Identifiant public: <code>{escaped_document_id}</code></p>",
             "    <p>Visualisation locale contrôlée en lecture seule.</p>",
             "  </header>",
@@ -657,10 +669,12 @@ def _render_document_row(document: CorpusPdfDocument) -> str:
             '" data-selectable="',
             selectable,
             '"><td><strong>',
-            _escape(document.title),
+            _escape(document.title or "Métadonnées en attente"),
             "</strong><br><code>",
             _escape(document.document_id),
-            "</code><br><span>",
+            "</code>",
+            _render_bibliographic_details(document),
+            "<br><span>",
             _escape(canonical),
             "</span></td><td>",
             _escape(document.source_status),
@@ -710,6 +724,22 @@ def _render_diagnostic_cell(document: CorpusPdfDocument) -> str:
             '<br><a href="/ui/documents/',
             escaped_document_id,
             '/diagnostic">Inspecter</a>',
+        )
+    )
+
+
+def _render_bibliographic_details(document: CorpusPdfDocument) -> str:
+    if document.metadata_status == "PENDING":
+        return '<br><span>Métadonnées : PENDING (extraction après projection)</span>'
+    authors = ", ".join(document.authors or ())
+    year = "Non renseignée" if document.publication_year is None else str(document.publication_year)
+    edition = "Non renseignée" if document.edition is None else document.edition
+    return "".join(
+        (
+            f"<br><span>Métadonnées : {_escape(document.metadata_status)}</span>",
+            f"<br><span>Auteurs : {_escape(authors)}</span>",
+            f"<br><span>Année : {_escape(year)}</span>",
+            f"<br><span>Édition : {_escape(edition)}</span>",
         )
     )
 

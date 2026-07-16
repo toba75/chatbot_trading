@@ -93,7 +93,11 @@ class DocumentCorpusItem:
     """État public minimal d'un document dans le corpus."""
 
     document_id: str
-    title: str
+    title: str | None
+    authors: tuple[str, ...] | None
+    publication_year: int | None
+    edition: str | None
+    metadata_status: str
     document_status: str
     diagnostic_status: str
     conversion_status: str
@@ -282,7 +286,8 @@ class DocumentQueryService:
 
     def _corpus_item_from_status_row(self, row: Any) -> DocumentCorpusItem:
         required = (
-            "document_id", "title", "document_status", "diagnostic_status",
+            "document_id", "title", "authors", "publication_year", "edition",
+            "metadata_status", "document_status", "diagnostic_status",
             "conversion_status", "canonical_version_id", "manual_review_reason",
             "failure_error_code", "conversion_action_available",
         )
@@ -290,7 +295,11 @@ class DocumentQueryService:
             raise TypeError("projection légère de corpus invalide")
         return DocumentCorpusItem(
             document_id=DocumentId.from_value(row.document_id).value,
-            title=_ensure_text(row.title, "title"),
+            title=_optional_text(row.title, "title"),
+            authors=_optional_authors(row.authors),
+            publication_year=_optional_publication_year(row.publication_year),
+            edition=_optional_text(row.edition, "edition"),
+            metadata_status=_source_metadata_status(row.metadata_status),
             document_status=PublicSourceStatus.from_value(row.document_status).value,
             diagnostic_status=PublicDiagnosticStatus.from_value(row.diagnostic_status).value,
             conversion_status=PublicConversionStatus.from_value(row.conversion_status).value,
@@ -560,6 +569,37 @@ def _ensure_conversion_state(value: Any) -> DocumentConversionState:
 def _ensure_text(value: Any, field_name: str) -> str:
     if not isinstance(value, str) or value.strip() == "" or value != value.strip():
         raise ValueError(f"{field_name} invalide")
+    return value
+
+
+def _optional_text(value: Any, field_name: str) -> str | None:
+    if value is None:
+        return None
+    return _ensure_text(value, field_name)
+
+
+def _optional_authors(value: Any) -> tuple[str, ...] | None:
+    if value is None:
+        return None
+    if isinstance(value, (str, bytes)) or not isinstance(value, (tuple, list)):
+        raise ValueError("authors invalides")
+    authors = tuple(_ensure_text(author, "author") for author in value)
+    if len(authors) == 0:
+        raise ValueError("authors invalides")
+    return authors
+
+
+def _optional_publication_year(value: Any) -> int | None:
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= 9999:
+        raise ValueError("publication_year invalide")
+    return value
+
+
+def _source_metadata_status(value: Any) -> str:
+    if value not in {"PENDING", "LEGACY_DECLARED"}:
+        raise ValueError("metadata_status SP invalide")
     return value
 
 

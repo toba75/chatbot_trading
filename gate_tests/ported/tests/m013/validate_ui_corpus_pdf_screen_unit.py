@@ -1,16 +1,93 @@
+"""Tests unitaires du read-model du corpus PDF après ADR-038."""
+
 from __future__ import annotations
 
-from pathlib import Path
-import sys
+import pytest
+
+from app.platform.ui_corpus import (
+    CorpusPdfDocument,
+    CorpusPdfScreenState,
+    build_registration_payload,
+    ensure_no_destructive_ui_fields,
+    render_corpus_pdf_screen,
+)
+
+
+def _document(**overrides) -> CorpusPdfDocument:
+    values = {
+        "document_id": "DOC-M013-UI-0001",
+        "title": "Rapport",
+        "authors": ("Auteur",),
+        "publication_year": 2026,
+        "edition": "1",
+        "metadata_status": "EXTRACTED",
+        "source_status": "REGISTERED",
+        "diagnostic_status": "ROUTE_PLANNED",
+        "conversion_status": "CANONICAL_ACCEPTED",
+        "canonical_version_id": "CANON-M013-UI-0001",
+        "projection_status": "SEARCHABLE",
+        "conversion_action_available": False,
+        "selected": True,
+    }
+    values.update(overrides)
+    return CorpusPdfDocument(**values)
+
+
+def _metadonnees_pending_sont_coherentes_et_non_selectionnables() -> None:
+    pending = _document(
+        title=None,
+        authors=None,
+        publication_year=None,
+        edition=None,
+        metadata_status="PENDING",
+        conversion_status="CONVERSION_NOT_REQUESTED",
+        canonical_version_id=None,
+        projection_status="PROJECTION_NOT_REQUESTED",
+        selected=False,
+    )
+    assert pending.selectable_for_conversation is False
+    with pytest.raises(ValueError, match="métadonnées en attente incohérentes"):
+        _document(metadata_status="PENDING")
+
+
+def _metadonnees_extraites_exigent_titre_et_auteurs() -> None:
+    with pytest.raises(ValueError, match="titre requis"):
+        _document(title=None)
+    with pytest.raises(ValueError, match="auteurs requis"):
+        _document(authors=None)
+
+
+def _formulaire_admet_uniquement_le_pdf() -> None:
+    payload = build_registration_payload(original_content=b"%PDF-1.7\n")
+    assert payload == {"original_content": b"%PDF-1.7\n"}
+    with pytest.raises(ValueError, match="original_content requis"):
+        build_registration_payload(original_content=b"")
+    with pytest.raises(ValueError, match="champ UI destructif interdit"):
+        ensure_no_destructive_ui_fields({"delete": True})
+
+
+def _rendu_echappe_les_metadonnees_et_affiche_leur_etat() -> None:
+    unsafe = _document(
+        title="<script>alert('x')</script>",
+        authors=("A&B",),
+        publication_year=None,
+        edition=None,
+    )
+    state = CorpusPdfScreenState(
+        documents=(unsafe,),
+        active_selected_document_ids=(unsafe.document_id,),
+        read_model_status="READ_MODEL_READY",
+    )
+    html = render_corpus_pdf_screen(state)
+    assert "<script>alert" not in html
+    assert "&lt;script&gt;" in html
+    assert "Métadonnées : EXTRACTED" in html
+    assert "Auteurs : A&amp;B" in html
+    assert "Année : Non renseignée" in html
 
 
 def test_validate_ui_corpus_pdf_screen_unit() -> None:
-    original_argv = sys.argv[:]
-    repository_root = next(parent for parent in Path(__file__).resolve().parents if (parent / 'pyproject.toml').is_file())
-    try:
-        sys.argv = [str(Path(__file__)), str(repository_root)]
-        source = '\nimport sys\n\nrepo_root = sys.argv[1]\nif repo_root not in sys.path:\n    sys.path.insert(0, repo_root)\n\nfrom app.platform.ui_corpus import (  # noqa: E402\n    CorpusPdfDocument,\n    CorpusPdfScreenState,\n    build_registration_payload,\n    ensure_no_destructive_ui_fields,\n    remove_from_active_selection,\n    render_corpus_pdf_screen,\n    render_pdf_viewer,\n)\n\n\ndef assert_contains(text: str, expected: str, message: str) -> None:\n    if expected not in text:\n        raise AssertionError(f"{message} Texte obtenu: {text!r}")\n\n\ndef assert_not_contains(text: str, forbidden: str, message: str) -> None:\n    if forbidden in text:\n        raise AssertionError(f"{message} Texte obtenu: {text!r}")\n\n\ndef assert_equal(actual: object, expected: object, message: str) -> None:\n    if actual != expected:\n        raise AssertionError(f"{message} Valeur obtenue: {actual!r}")\n\n\ndef assert_raises(expected_fragment: str, action) -> None:\n    try:\n        action()\n    except ValueError as exc:\n        if expected_fragment not in str(exc):\n            raise AssertionError(f"Erreur inattendue: {exc}") from exc\n        return\n    raise AssertionError(f"Erreur attendue absente: {expected_fragment}")\n\n\nassert_raises(\n    "document_id invalide",\n    lambda: CorpusPdfDocument(\n        document_id="BAD-0001",\n        title="Rapport",\n        source_status="REGISTERED",\n        diagnostic_status="ROUTE_PLANNED",\n        conversion_status="CANONICAL_ACCEPTED",\n        canonical_version_id="CANON-0001",\n        projection_status="SEARCHABLE",\n        conversion_action_available=False,\n        selected=True,\n    ),\n)\nassert_raises(\n    "statut source public invalide",\n    lambda: CorpusPdfDocument(\n        document_id="DOC-M013-UI-0001",\n        title="Rapport",\n        source_status="DELETE_REQUESTED",\n        diagnostic_status="ROUTE_PLANNED",\n        conversion_status="CANONICAL_ACCEPTED",\n        canonical_version_id="CANON-0001",\n        projection_status="SEARCHABLE",\n        conversion_action_available=False,\n        selected=True,\n    ),\n)\nassert_raises(\n    "titre requis",\n    lambda: CorpusPdfDocument(\n        document_id="DOC-M013-UI-0001",\n        title="",\n        source_status="REGISTERED",\n        diagnostic_status="ROUTE_PLANNED",\n        conversion_status="CANONICAL_ACCEPTED",\n        canonical_version_id="CANON-0001",\n        projection_status="SEARCHABLE",\n        conversion_action_available=False,\n        selected=True,\n    ),\n)\n\nunsafe_document = CorpusPdfDocument(\n    document_id="DOC-M013-UI-0001",\n    title="<script>alert(\'x\')</script>",\n    source_status="REGISTERED",\n    diagnostic_status="ROUTE_PLANNED",\n    conversion_status="CANONICAL_ACCEPTED",\n    canonical_version_id="CANON-M013-UI-0001",\n    projection_status="SEARCHABLE",\n    conversion_action_available=False,\n    selected=True,\n)\ndiagnostic_ready_document = CorpusPdfDocument(\n    document_id="DOC-M013-UI-0002",\n    title="Document à diagnostiquer",\n    source_status="REGISTERED",\n    diagnostic_status="DIAGNOSTIC_NOT_REQUESTED",\n    conversion_status="CONVERSION_NOT_REQUESTED",\n    canonical_version_id=None,\n    projection_status="PROJECTION_NOT_REQUESTED",\n    conversion_action_available=False,\n    selected=False,\n)\nmanual_review_document = CorpusPdfDocument(\n    document_id="DOC-M013-UI-0003",\n    title="Document en revue",\n    source_status="REGISTERED",\n    diagnostic_status="MANUAL_REVIEW",\n    manual_review_reason="REVUE_HUMAINE_REQUISE",\n    conversion_status="CONVERSION_NOT_REQUESTED",\n    canonical_version_id=None,\n    projection_status="PROJECTION_NOT_REQUESTED",\n    conversion_action_available=False,\n    selected=False,\n)\nexplicit_route_document = CorpusPdfDocument(\n    document_id="DOC-M013-UI-0004",\n    title="Document routé",\n    source_status="REGISTERED",\n    diagnostic_status="ROUTE_PLANNED",\n    conversion_status="CONVERSION_NOT_REQUESTED",\n    canonical_version_id=None,\n    projection_status="PROJECTION_NOT_REQUESTED",\n    conversion_action_available=False,\n    selected=False,\n)\nquarantined_diagnostic_document = CorpusPdfDocument(\n    document_id="DOC-M013-UI-0005",\n    title="Document diagnostic quarantainé",\n    source_status="QUARANTINED",\n    diagnostic_status="QUARANTINED",\n    conversion_status="CONVERSION_NOT_REQUESTED",\n    canonical_version_id=None,\n    projection_status="PROJECTION_NOT_REQUESTED",\n    conversion_action_available=False,\n    selected=False,\n)\nstate = CorpusPdfScreenState(\n    documents=(\n        unsafe_document,\n        diagnostic_ready_document,\n        manual_review_document,\n        explicit_route_document,\n        quarantined_diagnostic_document,\n    ),\n    active_selected_document_ids=("DOC-M013-UI-0001",),\n    read_model_status="READ_MODEL_READY",\n)\nhtml = render_corpus_pdf_screen(state)\nassert_contains(html, "&lt;script&gt;", "Le titre documentaire doit être échappé.")\nassert_not_contains(html, "<script>alert", "Le HTML ne doit pas injecter le titre brut.")\nassert_contains(html, \'action="/v1/documents/DOC-M013-UI-0002/diagnose"\', "Le diagnostic non demandé doit rendre la commande publique.")\nassert_contains(html, ">Diagnostiquer</button>", "Le bouton de diagnostic doit être libellé explicitement.")\nassert_not_contains(html, \'action="/v1/documents/DOC-M013-UI-0001/diagnose"\', "Un diagnostic déjà demandé ne doit pas rendre la commande.")\nassert_not_contains(html, \'action="/v1/documents/DOC-M013-UI-0003/diagnose"\', "Une revue manuelle ne doit pas rendre la commande de diagnostic.")\nassert_not_contains(html, \'action="/v1/documents/DOC-M013-UI-0004/diagnose"\', "Une route explicite ne doit pas rendre la commande de diagnostic.")\nassert_not_contains(html, \'action="/v1/documents/DOC-M013-UI-0005/diagnose"\', "Une source quarantainée ne doit pas rendre la commande de diagnostic.")\nassert_not_contains(html, \'data-action="retirer_selection_active"\', "Le bouton sans commande publique doit être retiré.")\nassert_not_contains(html.lower(), "delete", "Aucun contrôle delete ne doit être rendu.")\nassert_not_contains(html.lower(), "supprimer", "Aucun contrôle supprimer ne doit être rendu.")\nassert_not_contains(html.lower(), "purge", "Aucun contrôle purge ne doit être rendu.")\n\nviewer = render_pdf_viewer(unsafe_document)\nassert_contains(viewer, "PDF original", "Le visualiseur doit être explicite.")\nassert_contains(viewer, "DOC-M013-UI-0001", "Le visualiseur doit afficher l\'identifiant public.")\nassert_not_contains(viewer, "original_storage_ref", "Le visualiseur ne doit pas exposer de stockage interne.")\n\npayload = build_registration_payload(\n    original_content=b"%PDF-1.7\\n",\n    title="Rapport",\n    authors=("Auteur",),\n    publication_year=2026,\n    edition="1",\n)\nassert_equal(payload["bibliographic_metadata"]["publication_year"], 2026, "L\'année explicite doit être conservée.")\nassert_raises(\n    "original_content requis",\n    lambda: build_registration_payload(\n        original_content=b"",\n        title="Rapport",\n        authors=("Auteur",),\n        publication_year=2026,\n        edition="1",\n    ),\n)\nassert_raises(\n    "title requis",\n    lambda: build_registration_payload(\n        original_content=b"%PDF-1.7\\n",\n        title="",\n        authors=("Auteur",),\n        publication_year=2026,\n        edition="1",\n    ),\n)\nassert_raises(\n    "champ UI destructif interdit",\n    lambda: ensure_no_destructive_ui_fields({"delete": True}),\n)\nassert_raises(\n    "champ UI interne interdit",\n    lambda: ensure_no_destructive_ui_fields({"original_storage_ref": "/var/lib/documents/a.pdf"}),\n)\nassert_raises(\n    "document absent de la sélection active",\n    lambda: remove_from_active_selection(\n        selected_document_ids=("DOC-M013-UI-0002",),\n        document_id="DOC-M013-UI-0001",\n    ),\n)\n\nremaining = remove_from_active_selection(\n    selected_document_ids=("DOC-M013-UI-0001", "DOC-M013-UI-0002"),\n    document_id="DOC-M013-UI-0001",\n)\nassert_equal(remaining, ("DOC-M013-UI-0002",), "Le retrait doit préserver les autres documents sélectionnés.")\n\nprint("Tests unitaires T-024 premier écran corpus PDF UI: OK")'
-        namespace = {'__name__': __name__, '__file__': str(Path(__file__))}
-        exec(compile(source, str(Path(__file__)), 'exec'), namespace)
-    finally:
-        sys.argv = original_argv
+    _metadonnees_pending_sont_coherentes_et_non_selectionnables()
+    _metadonnees_extraites_exigent_titre_et_auteurs()
+    _formulaire_admet_uniquement_le_pdf()
+    _rendu_echappe_les_metadonnees_et_affiche_leur_etat()

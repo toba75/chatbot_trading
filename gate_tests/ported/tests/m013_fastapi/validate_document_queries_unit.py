@@ -1,16 +1,82 @@
+"""Tests unitaires des query services documentaires SP."""
+
 from __future__ import annotations
 
-from pathlib import Path
-import sys
+from types import SimpleNamespace
+
+import pytest
+
+from app.source_processing.application.document_queries import DocumentQueryService
+
+
+class StatusRows:
+    def __init__(self, rows: tuple[object, ...]) -> None:
+        self.rows = rows
+        self.calls: list[tuple[int, str | None]] = []
+
+    def list_document_status_rows(self, *, limit: int, after_document_id: str | None):
+        self.calls.append((limit, after_document_id))
+        return self.rows
+
+
+class Snapshots:
+    def find_document_snapshot(self, document_id):
+        return None
+
+
+def _row(**overrides):
+    values = {
+        "document_id": "DOC-0000000000000001",
+        "title": "Titre historique",
+        "authors": ("Auteur",),
+        "publication_year": 2026,
+        "edition": "1",
+        "metadata_status": "LEGACY_DECLARED",
+        "document_status": "REGISTERED",
+        "diagnostic_status": "DIAGNOSTIC_NOT_REQUESTED",
+        "conversion_status": "CONVERSION_NOT_REQUESTED",
+        "canonical_version_id": None,
+        "manual_review_reason": None,
+        "failure_error_code": None,
+        "conversion_action_available": False,
+    }
+    values.update(overrides)
+    return SimpleNamespace(**values)
 
 
 def test_validate_document_queries_unit() -> None:
-    original_argv = sys.argv[:]
-    repository_root = next(parent for parent in Path(__file__).resolve().parents if (parent / 'pyproject.toml').is_file())
-    try:
-        sys.argv = [str(Path(__file__)), str(repository_root)]
-        source = '\nfrom dataclasses import FrozenInstanceError\nimport sys\nfrom types import SimpleNamespace\n\nsys.path.insert(0, sys.argv[1])\n\nfrom app.source_processing.application.document_commands import (\n    DocumentConversionExecutionPhase,\n    DocumentConversionState,\n    DocumentConversionStatus,\n)\nfrom app.source_processing.application.document_queries import (\n    ConversionNotRequestedError,\n    DiagnosticNotRequestedError,\n    DocumentQueryService,\n    DocumentStateSnapshot,\n    SourceNotFoundError,\n)\nfrom app.source_processing.domain.document_processing_run import (\n    DiagnosticVersion,\n    DocumentProcessingRun,\n    PageDecision,\n    PageDecisionState,\n    PageDiagnosticSignals,\n    PageManifest,\n    PageManifestEntry,\n    PageManifestEntryState,\n    PageNumber,\n    PageRoutingConfiguration,\n    ProcessingRunId,\n    RoutingPolicyVersion,\n)\nfrom app.source_processing.domain.source_document import (\n    BibliographicMetadata,\n    DocumentId,\n    OriginalStorageRef,\n    SourceDocument,\n    SourceFingerprint,\n)\n\n\nclass SourceRepository:\n    def __init__(self, documents):\n        self.documents = tuple(documents)\n\n    def list_documents(self):\n        return tuple(reversed(self.documents))\n\n    def find_by_document_id(self, document_id):\n        return next(\n            (document for document in self.documents if document.document_id == document_id),\n            None,\n        )\n\n\nclass ProcessingRepository:\n    def __init__(self, runs):\n        self.runs = {run.document_id.value: run for run in runs}\n\n    def find_by_document_id(self, document_id):\n        return self.runs.get(document_id.value)\n\n\nclass ConversionRepository:\n    def __init__(self, conversions):\n        self.conversions = {\n            conversion.document_id.value: conversion for conversion in conversions\n        }\n\n    def find_conversion_by_document_id(self, document_id):\n        return self.conversions.get(document_id.value)\n\n\nclass SnapshotRepository:\n    def __init__(self, sources, runs, conversions):\n        self.sources = sources\n        self.runs = runs\n        self.conversions = conversions\n\n    def list_document_snapshots(self, *, limit, after_document_id):\n        assert limit == 3\n        assert after_document_id is None\n        return tuple(self.find_document_snapshot(document.document_id) for document in self.sources.list_documents())\n\n    def find_document_snapshot(self, document_id):\n        source = self.sources.find_by_document_id(document_id)\n        if source is None:\n            return None\n        return DocumentStateSnapshot(\n            source_document=source,\n            processing_run=self.runs.find_by_document_id(document_id),\n            conversion=self.conversions.find_conversion_by_document_id(document_id),\n        )\n\n    def list_document_status_rows(self, *, limit, after_document_id):\n        snapshots = self.list_document_snapshots(limit=limit, after_document_id=after_document_id)\n        rows = []\n        for snapshot in snapshots:\n            run = snapshot.processing_run\n            conversion = snapshot.conversion\n            rows.append(SimpleNamespace(\n                document_id=snapshot.source_document.document_id.value,\n                title=snapshot.source_document.metadata.title,\n                document_status=snapshot.source_document.status.value,\n                diagnostic_status="DIAGNOSTIC_NOT_REQUESTED" if run is None else run.status.value,\n                conversion_status="CONVERSION_NOT_REQUESTED" if conversion is None else conversion.conversion_status.value,\n                canonical_version_id=None if conversion is None else conversion.canonical_version_id,\n                manual_review_reason=None if run is None else run.manual_review_reason,\n                failure_error_code=None if run is None else run.failure_error_code,\n                conversion_action_available=False,\n            ))\n        return tuple(rows)\n\n\ndef source(label):\n    content = f"%PDF-1.7\\nunit-{label}\\n%%EOF\\n".encode("utf-8")\n    fingerprint = SourceFingerprint.from_content(content)\n    document_id = DocumentId.from_fingerprint(fingerprint)\n    return SourceDocument.register_original(\n        document_id=document_id,\n        fingerprint=fingerprint,\n        original_storage_ref=OriginalStorageRef.from_value(\n            f"artifact:source_processing.original_sources/{document_id.value}/{fingerprint.value}.pdf"\n        ),\n        metadata=BibliographicMetadata(\n            title=f"Titre {label}",\n            authors=("Auteur",),\n            publication_year=2026,\n            edition="1",\n        ),\n    )\n\n\ndef page_decision(number):\n    return PageDecision(\n        page_number=PageNumber.from_value(number),\n        page_state=PageDecisionState.NATIVE_OK,\n        signals=PageDiagnosticSignals(\n            native_text_state="RELIABLE",\n            image_state="NONE",\n            existing_ocr_state="NONE",\n            layout_complexity="SIMPLE",\n            corruption_state="NONE",\n            mixed_content_detected=False,\n            has_table=False,\n            has_formula=number == 3,\n        ),\n        diagnostic_version=DiagnosticVersion.from_value("diag-unit-v1"),\n        justification=f"Décision page {number}.",\n    )\n\n\ndef routed_run(document):\n    page_numbers = (1, 2, 3)\n    manifest = PageManifest.from_entries(\n        source_page_count=3,\n        entries=tuple(\n            PageManifestEntry(\n                page_number=PageNumber.from_value(number),\n                state=PageManifestEntryState.PRESENT,\n            )\n            for number in page_numbers\n        ),\n    )\n    started = DocumentProcessingRun.start(\n        processing_run_id=ProcessingRunId.from_value("RUN-M013-T007-UNIT"),\n        source_document=document,\n        page_manifest=manifest,\n    )\n    diagnosed = started.record_page_diagnostics(\n        tuple(page_decision(number) for number in page_numbers)\n    )\n    return diagnosed.decide_route_plan(\n        PageRoutingConfiguration(\n            routing_policy_version=RoutingPolicyVersion.from_value("routing-unit-v1"),\n            auto_confidence_min=0.90,\n            benchmark_confidence_min=0.85,\n        )\n    )\n\n\ndef assert_raises(expected_type, action):\n    try:\n        action()\n    except expected_type as exc:\n        return exc\n    except Exception as exc:\n        raise AssertionError(\n            f"Type d\'erreur inattendu: {type(exc).__name__}: {exc}"\n        ) from exc\n    raise AssertionError(f"Erreur attendue absente: {expected_type.__name__}")\n\n\ndocument = source("routed")\nsource_only = source("source-only")\nprocessing = routed_run(document)\nconversion = DocumentConversionState(\n    document_id=document.document_id,\n    conversion_status=DocumentConversionStatus.CANONICAL_ACCEPTED,\n    canonical_version_id="CVER-M013-T007-UNIT",\n    rejection_error_code=None,\n    execution_phase=DocumentConversionExecutionPhase.SUCCEEDED,\n    completed_units=1,\n    total_units=1,\n    failure_error_code=None,\n)\nsnapshot_repository = SnapshotRepository(\n        SourceRepository((document, source_only)),\n        ProcessingRepository((processing,)),\n        ConversionRepository((conversion,)),\n    )\nservice = DocumentQueryService(\n    document_snapshot_repository=snapshot_repository,\n    document_corpus_status_repository=snapshot_repository,\n)\n\n# La projection du corpus vient uniquement des absences ou états réels des repositories.\ncorpus = service.list_documents(limit=2, cursor=None)\nassert tuple(item.document_id for item in corpus.documents) == tuple(\n    sorted((document.document_id.value, source_only.document_id.value))\n)\nsource_only_item = next(\n    item for item in corpus.documents if item.document_id == source_only.document_id.value\n)\nassert source_only_item.diagnostic_status == "DIAGNOSTIC_NOT_REQUESTED"\nassert source_only_item.conversion_status == "CONVERSION_NOT_REQUESTED"\nassert source_only_item.canonical_version_id is None\nassert corpus.next_cursor is None\n\n# Les pages restent dans l\'ordre du manifeste et les DTO sont immuables.\ndiagnostic = service.read_diagnostic(document.document_id.value)\nassert tuple(entry.page_number for entry in diagnostic.manifest) == (1, 2, 3)\nassert tuple(page.page_number for page in diagnostic.pages) == (1, 2, 3)\nassert diagnostic.diagnosed_page_count == 3\nassert diagnostic.pages[2].diagnostic.has_formula is True\nassert all(page.route is not None for page in diagnostic.pages)\nassert_raises(\n    FrozenInstanceError,\n    lambda: setattr(diagnostic, "diagnostic_status", "INVENTED"),\n)\n\n# La nullabilité de la conversion est explicite et ne divulgue aucun champ technique.\nconversion_view = service.read_conversion(document.document_id.value)\nassert conversion_view.canonical_version_id == "CVER-M013-T007-UNIT"\nassert conversion_view.qa_rejection_error_code is None\nassert set(conversion_view.__dataclass_fields__) == {\n    "document_id",\n    "conversion_status",\n    "qa_rejection_error_code",\n    "canonical_version_id",\n}\n\n# Les erreurs sont produites uniquement après lecture des repositories propriétaires.\nunknown_id = "DOC-FFFFFFFFFFFFFFFF"\nnot_found = assert_raises(\n    SourceNotFoundError,\n    lambda: service.read_diagnostic(unknown_id),\n)\nassert not_found.document_id == unknown_id\ndiagnostic_absent = assert_raises(\n    DiagnosticNotRequestedError,\n    lambda: service.read_diagnostic(source_only.document_id.value),\n)\nassert diagnostic_absent.document_id == source_only.document_id.value\nconversion_absent = assert_raises(\n    ConversionNotRequestedError,\n    lambda: service.read_conversion(source_only.document_id.value),\n)\nassert conversion_absent.document_id == source_only.document_id.value\n\nprint("Tests unitaires des query services documentaires SP: OK")'
-        namespace = {'__name__': __name__, '__file__': str(Path(__file__))}
-        exec(compile(source, str(Path(__file__)), 'exec'), namespace)
-    finally:
-        sys.argv = original_argv
+    rows = StatusRows(
+        (
+            _row(document_id="DOC-0000000000000002"),
+            _row(
+                title=None,
+                authors=None,
+                publication_year=None,
+                edition=None,
+                metadata_status="PENDING",
+            ),
+        )
+    )
+    service = DocumentQueryService(
+        document_snapshot_repository=Snapshots(),
+        document_corpus_status_repository=rows,
+    )
+    page = service.list_documents(limit=2, cursor=None)
+    assert rows.calls == [(3, None)]
+    assert tuple(item.document_id for item in page.documents) == (
+        "DOC-0000000000000001",
+        "DOC-0000000000000002",
+    )
+    pending = page.documents[0]
+    assert pending.metadata_status == "PENDING"
+    assert pending.title is None
+    legacy = page.documents[1]
+    assert legacy.authors == ("Auteur",)
+
+    invalid_rows = StatusRows((SimpleNamespace(document_id="DOC-0000000000000001"),))
+    invalid_service = DocumentQueryService(
+        document_snapshot_repository=Snapshots(),
+        document_corpus_status_repository=invalid_rows,
+    )
+    with pytest.raises(TypeError, match="projection légère de corpus invalide"):
+        invalid_service.list_documents(limit=1, cursor=None)
