@@ -110,6 +110,7 @@ class ApiServiceConfiguration:
 class WorkerServiceConfiguration:
     queue_name: str
     concurrency: int
+    granite_concurrency: int
 
 
 @dataclass(frozen=True)
@@ -564,6 +565,14 @@ def _validate_cross_field_invariants(payload: Mapping[str, Any], path: Path) -> 
     deployment_network = payload["deployment"]["network"]
     gateway_service = payload["services"]["llm_gateway"]
     security = payload["security"]
+    workers = payload["services"]["workers"]
+
+    if workers["granite_concurrency"] > workers["concurrency"]:
+        raise ApplicationConfigurationError(
+            CONFIG_SCHEMA_INVALID,
+            "services.workers.granite_concurrency ne peut pas dépasser services.workers.concurrency",
+            str(path),
+        )
 
     docker_host = deployment_hosts["docker_local"]
     host_bind = docker_host["bind_host"]
@@ -894,6 +903,7 @@ def _build_application_configuration(
             workers=WorkerServiceConfiguration(
                 queue_name=services["workers"]["queue_name"],
                 concurrency=services["workers"]["concurrency"],
+                granite_concurrency=services["workers"]["granite_concurrency"],
             ),
             llm_gateway=LLMGatewayServiceConfiguration(
                 url=services["llm_gateway"]["url"],

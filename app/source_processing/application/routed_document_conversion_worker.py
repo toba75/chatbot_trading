@@ -43,6 +43,9 @@ from app.source_processing.application.convert_routed_pages import (
     ConvertRoutedPagesHandler,
     PageConversionRequest,
 )
+from app.source_processing.application.concurrency_limited_page_converter import (
+    ConcurrencyLimitedPageConverter,
+)
 from app.source_processing.application.document_commands import (
     DocumentConversionExecutionPhase,
     DocumentConversionState,
@@ -340,6 +343,7 @@ class RoutedDocumentConversionWorker:
         ocrmypdf_timeout_seconds: float,
         artifact_store: CanonicalArtifactStore,
         max_parallel_pages: int,
+        granite_max_concurrency: int,
     ) -> None:
         for dependency, method in (
             (source_document_repository, "find_by_document_id"),
@@ -385,6 +389,12 @@ class RoutedDocumentConversionWorker:
             max_parallel_pages,
             "parallélisme conversion invalide",
         )
+        self._granite_max_concurrency = _required_positive_int(
+            granite_max_concurrency,
+            "parallélisme Granite invalide",
+        )
+        if self._granite_max_concurrency > self._max_parallel_pages:
+            raise ValueError("parallélisme Granite supérieur au parallélisme des pages")
 
     def execute(self, claimed_job: ClaimedJob) -> Mapping[str, Any]:
         if not isinstance(claimed_job, ClaimedJob):
@@ -453,10 +463,14 @@ class RoutedDocumentConversionWorker:
                 converter=self._granite_converter,
                 resolve_source_path=resolve_source_path,
             )
+            granite_page_converter = ConcurrencyLimitedPageConverter(
+                page_converter=raw_granite_page_converter,
+                max_concurrency=self._granite_max_concurrency,
+            )
             handler = ConvertRoutedPagesHandler(
                 native_converter=native_page_converter,
                 granite_converter=GraniteThenGemmaPageConverter(
-                    granite_converter=raw_granite_page_converter,
+                    granite_converter=granite_page_converter,
                     gemma_converter=_GemmaVisionFallbackPageConverter(
                         converter=self._gemma_converter,
                         resolve_source_path=resolve_source_path,
@@ -468,7 +482,7 @@ class RoutedDocumentConversionWorker:
                 ),
                 targeted_enrichment_converter=TargetedEnrichmentPageConverter(
                     native_converter=native_page_converter,
-                    granite_converter=raw_granite_page_converter,
+                    granite_converter=granite_page_converter,
                     policy_version="targeted-enrichment-v1",
                 ),
                 ocrmypdf_preprocessor=preprocessor,
@@ -609,6 +623,7 @@ def build_routed_document_conversion_worker(
     expected_gemma_model_id: str,
     artifact_store: CanonicalArtifactStore,
     max_parallel_pages: int,
+    granite_max_concurrency: int,
 ) -> RoutedDocumentConversionWorker:
     """Construit le worker uniquement si tous les runtimes réels annoncés sont prêts."""
 
@@ -645,6 +660,7 @@ def build_routed_document_conversion_worker(
         ocrmypdf_timeout_seconds=timeout_seconds,
         artifact_store=artifact_store,
         max_parallel_pages=max_parallel_pages,
+        granite_max_concurrency=granite_max_concurrency,
     )
 
 

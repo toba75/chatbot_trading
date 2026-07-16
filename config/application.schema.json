@@ -224,13 +224,18 @@
           "additionalProperties": false,
           "required": [
             "queue_name",
-            "concurrency"
+            "concurrency",
+            "granite_concurrency"
           ],
           "properties": {
             "queue_name": {
               "$ref": "#/$defs/nonEmptyNonPlaceholderString"
             },
             "concurrency": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "granite_concurrency": {
               "type": "integer",
               "minimum": 1
             }
