@@ -1740,7 +1740,15 @@ def _post_conversion_integrity_findings(
     actual_pages = tuple(page.page_number.value for page in docling_document.pages)
     expected_page_set = set(expected_pages)
     actual_page_set = set(actual_pages)
-    missing_pages = tuple(page for page in expected_pages if page not in actual_page_set)
+    skipped_empty_page_set = {
+        skipped_page.page_number.value
+        for skipped_page in text_authority_manifest.skipped_empty_pages
+    }
+    missing_pages = tuple(
+        page
+        for page in expected_pages
+        if page not in actual_page_set and page not in skipped_empty_page_set
+    )
     unexpected_pages = tuple(page for page in actual_pages if page not in expected_page_set)
     missing_findings = tuple(
         PostConversionQualityFinding(
