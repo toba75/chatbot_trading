@@ -593,17 +593,15 @@ def _verifier_segmentation_gemma_bornee_apres_troncature(tmp_path: Path) -> None
             if signature == (90, None, None):
                 raise GemmaVisionConversionError("GEMMA_VISION_OUTPUT_TRUNCATED")
             if signature not in {
-                (90, 1, 4),
-                (90, 2, 4),
-                (90, 3, 4),
-                (90, 4, 4),
+                (90, segment_index, 16)
+                for segment_index in range(1, 17)
             }:
                 raise AssertionError(f"Appel Gemma hors contrat : {signature!r}")
             segment_index = gemma_request.render_segment_index
             return GemmaVisionConversionResponse(
                 tool_version=(
                     "google/gemma-4-26B-A4B-it@immutable;nim-1.7.0;"
-                    f"render-rotation-090;render-segment-{segment_index:02d}-of-04"
+                    f"render-rotation-090;render-segment-{segment_index:02d}-of-16"
                 ),
                 items=(
                     GemmaVisionPageItem(
@@ -638,18 +636,12 @@ def _verifier_segmentation_gemma_bornee_apres_troncature(tmp_path: Path) -> None
     ] == [
         (0, None, None),
         (90, None, None),
-        (90, 1, 4),
-        (90, 2, 4),
-        (90, 3, 4),
-        (90, 4, 4),
+        *((90, segment_index, 16) for segment_index in range(1, 17)),
     ]
     assert [item.text for item in recovered.items] == [
-        "Segment 1",
-        "Segment 2",
-        "Segment 3",
-        "Segment 4",
+        f"Segment {segment_index}" for segment_index in range(1, 17)
     ]
-    assert recovered.tool_version.endswith("render-rotation-090;render-segments-04")
+    assert recovered.tool_version.endswith("render-rotation-090;render-segments-16")
     assert len(
         {
             _request_identity_suffix(
@@ -659,27 +651,27 @@ def _verifier_segmentation_gemma_bornee_apres_troncature(tmp_path: Path) -> None
             )
             for entry in gemma_port.requests
         }
-    ) == 6
+    ) == 18
     assert _structured_items(
         {"items": [{"text": "Bas du rendu", "bbox": [0, 0, 1000, 1000]}]},
         render_rotation_degrees=90,
-        render_segment_index=4,
-        render_segment_count=4,
-    ) == [{"text": "Bas du rendu", "bbox": [0, 750.0, 1000, 1000.0]}]
+        render_segment_index=16,
+        render_segment_count=16,
+    ) == [{"text": "Bas du rendu", "bbox": [0, 937.5, 1000, 1000.0]}]
     assert _segment_crop_box(
         image_width=800,
         image_height=1200,
         render_rotation_degrees=90,
         render_segment_index=1,
-        render_segment_count=4,
-    ) == (600, 0, 800, 1200)
+        render_segment_count=16,
+    ) == (750, 0, 800, 1200)
     assert _segment_crop_box(
         image_width=800,
         image_height=1200,
         render_rotation_degrees=90,
-        render_segment_index=4,
-        render_segment_count=4,
-    ) == (0, 0, 200, 1200)
+        render_segment_index=16,
+        render_segment_count=16,
+    ) == (0, 0, 50, 1200)
 
 
 def _verifier_budget_gemma_et_supervision_du_retry() -> None:
