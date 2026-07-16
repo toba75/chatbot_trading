@@ -244,6 +244,7 @@ def _run_worker(
             root=Path(application_configuration.paths.canonical_sources_root)
         ),
         max_parallel_pages=application_configuration.services.workers.concurrency,
+        docling_max_concurrency=application_configuration.services.workers.docling_concurrency,
         granite_max_concurrency=application_configuration.services.workers.granite_concurrency,
     )
     workers = {

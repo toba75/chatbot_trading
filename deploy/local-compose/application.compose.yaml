@@ -37,6 +37,8 @@ services:
   workers:
     queue_name: default
     concurrency: 2
+    docling_concurrency: 2
+    granite_concurrency: 2
   llm_gateway:
     url: http://llm-gateway:8090
     port: 8090

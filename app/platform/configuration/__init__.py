@@ -110,6 +110,7 @@ class ApiServiceConfiguration:
 class WorkerServiceConfiguration:
     queue_name: str
     concurrency: int
+    docling_concurrency: int
     granite_concurrency: int
 
 
@@ -567,10 +568,24 @@ def _validate_cross_field_invariants(payload: Mapping[str, Any], path: Path) -> 
     security = payload["security"]
     workers = payload["services"]["workers"]
 
+    if workers["docling_concurrency"] > workers["concurrency"]:
+        raise ApplicationConfigurationError(
+            CONFIG_SCHEMA_INVALID,
+            "services.workers.docling_concurrency ne peut pas dépasser services.workers.concurrency",
+            str(path),
+        )
+
     if workers["granite_concurrency"] > workers["concurrency"]:
         raise ApplicationConfigurationError(
             CONFIG_SCHEMA_INVALID,
             "services.workers.granite_concurrency ne peut pas dépasser services.workers.concurrency",
+            str(path),
+        )
+
+    if workers["granite_concurrency"] > workers["docling_concurrency"]:
+        raise ApplicationConfigurationError(
+            CONFIG_SCHEMA_INVALID,
+            "services.workers.granite_concurrency ne peut pas dépasser services.workers.docling_concurrency",
             str(path),
         )
 
@@ -903,6 +918,7 @@ def _build_application_configuration(
             workers=WorkerServiceConfiguration(
                 queue_name=services["workers"]["queue_name"],
                 concurrency=services["workers"]["concurrency"],
+                docling_concurrency=services["workers"]["docling_concurrency"],
                 granite_concurrency=services["workers"]["granite_concurrency"],
             ),
             llm_gateway=LLMGatewayServiceConfiguration(

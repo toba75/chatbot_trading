@@ -225,6 +225,7 @@
           "required": [
             "queue_name",
             "concurrency",
+            "docling_concurrency",
             "granite_concurrency"
           ],
           "properties": {
@@ -232,6 +233,10 @@
               "$ref": "#/$defs/nonEmptyNonPlaceholderString"
             },
             "concurrency": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "docling_concurrency": {
               "type": "integer",
               "minimum": 1
             },

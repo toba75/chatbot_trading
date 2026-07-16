@@ -45,6 +45,7 @@ from app.source_processing.application.convert_routed_pages import (
 )
 from app.source_processing.application.concurrency_limited_page_converter import (
     ConcurrencyLimitedPageConverter,
+    SharedPageConversionCapacity,
 )
 from app.source_processing.application.document_commands import (
     DocumentConversionExecutionPhase,
@@ -350,6 +351,7 @@ class RoutedDocumentConversionWorker:
         ocrmypdf_timeout_seconds: float,
         artifact_store: CanonicalArtifactStore,
         max_parallel_pages: int,
+        docling_max_concurrency: int,
         granite_max_concurrency: int,
     ) -> None:
         for dependency, method in (
@@ -396,12 +398,20 @@ class RoutedDocumentConversionWorker:
             max_parallel_pages,
             "parallélisme conversion invalide",
         )
+        self._docling_max_concurrency = _required_positive_int(
+            docling_max_concurrency,
+            "parallélisme Docling invalide",
+        )
         self._granite_max_concurrency = _required_positive_int(
             granite_max_concurrency,
             "parallélisme Granite invalide",
         )
+        if self._docling_max_concurrency > self._max_parallel_pages:
+            raise ValueError("parallélisme Docling supérieur au parallélisme des pages")
         if self._granite_max_concurrency > self._max_parallel_pages:
             raise ValueError("parallélisme Granite supérieur au parallélisme des pages")
+        if self._granite_max_concurrency > self._docling_max_concurrency:
+            raise ValueError("parallélisme Granite supérieur à la capacité Docling")
 
     def execute(self, claimed_job: ClaimedJob) -> Mapping[str, Any]:
         if not isinstance(claimed_job, ClaimedJob):
@@ -462,16 +472,24 @@ class RoutedDocumentConversionWorker:
                 return original_path
 
         try:
-            native_page_converter = _NativePageConverter(
+            docling_capacity = SharedPageConversionCapacity(
+                max_concurrency=self._docling_max_concurrency,
+            )
+            raw_native_page_converter = _NativePageConverter(
                 converter=self._native_converter,
                 resolve_source_path=resolve_source_path,
+            )
+            native_page_converter = docling_capacity.limit(
+                page_converter=raw_native_page_converter,
             )
             raw_granite_page_converter = _GranitePageConverter(
                 converter=self._granite_converter,
                 resolve_source_path=resolve_source_path,
             )
             granite_page_converter = ConcurrencyLimitedPageConverter(
-                page_converter=raw_granite_page_converter,
+                page_converter=docling_capacity.limit(
+                    page_converter=raw_granite_page_converter,
+                ),
                 max_concurrency=self._granite_max_concurrency,
             )
             handler = ConvertRoutedPagesHandler(
@@ -642,6 +660,7 @@ def build_routed_document_conversion_worker(
     expected_gemma_model_id: str,
     artifact_store: CanonicalArtifactStore,
     max_parallel_pages: int,
+    docling_max_concurrency: int,
     granite_max_concurrency: int,
 ) -> RoutedDocumentConversionWorker:
     """Construit le worker uniquement si tous les runtimes réels annoncés sont prêts."""
@@ -679,6 +698,7 @@ def build_routed_document_conversion_worker(
         ocrmypdf_timeout_seconds=timeout_seconds,
         artifact_store=artifact_store,
         max_parallel_pages=max_parallel_pages,
+        docling_max_concurrency=docling_max_concurrency,
         granite_max_concurrency=granite_max_concurrency,
     )
 

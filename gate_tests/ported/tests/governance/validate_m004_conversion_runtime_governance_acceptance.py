@@ -14,6 +14,7 @@ def test_validate_m004_conversion_runtime_governance_acceptance() -> None:
     recovery_adr_path = repository_root / "docs/adr/ADR-035-recuperation-gemma-explicite-apres-provenance-granite-absente.md"
     dense_recovery_adr_path = repository_root / "docs/adr/ADR-039-segmentation-gemma-bornee-pages-denses.md"
     adjudication_adr_path = repository_root / "docs/adr/ADR-040-adjudication-enrichissement-cible-docling-granite.md"
+    shared_capacity_adr_path = repository_root / "docs/adr/ADR-042-capacite-docling-partagee.md"
     adr_index_path = repository_root / "docs/adr/index.md"
     specification_path = repository_root / "docs/specs/m004_version_canonique_publiee.md"
 
@@ -26,12 +27,14 @@ def test_validate_m004_conversion_runtime_governance_acceptance() -> None:
     assert recovery_adr_path.is_file(), "ADR-035 doit décider la récupération Gemma explicite."
     assert dense_recovery_adr_path.is_file(), "ADR-039 doit borner la récupération des pages denses."
     assert adjudication_adr_path.is_file(), "ADR-040 doit décider l’adjudication ciblée et la capacité Granite."
+    assert shared_capacity_adr_path.is_file(), "ADR-042 doit décider la capacité Docling partagée."
     assert adr_index_path.is_file(), "L'index ADR doit tracer les décisions acceptées."
     adr = adr_path.read_text(encoding="utf-8")
     ocr_routing_adr = ocr_routing_adr_path.read_text(encoding="utf-8")
     recovery_adr = recovery_adr_path.read_text(encoding="utf-8")
     dense_recovery_adr = dense_recovery_adr_path.read_text(encoding="utf-8")
     adjudication_adr = adjudication_adr_path.read_text(encoding="utf-8")
+    shared_capacity_adr = shared_capacity_adr_path.read_text(encoding="utf-8")
     adr_index = adr_index_path.read_text(encoding="utf-8")
     specification = specification_path.read_text(encoding="utf-8")
 
@@ -110,15 +113,27 @@ def test_validate_m004_conversion_runtime_governance_acceptance() -> None:
         "Docling standard et",
         "Granite-Docling ciblé",
         "Gemma **NE DOIT PAS** être appelée",
-        "services.workers.concurrency",
-        "services.workers.granite_concurrency",
-        "même limiteur Granite en mémoire",
+            "services.workers.concurrency",
+            "services.workers.granite_concurrency",
+            "même limiteur Granite en mémoire",
         "SUCCEEDED 36/36",
         "SUCCEEDED 248/248",
         "429 nœuds",
     )
     for fragment in required_adjudication_adr_fragments:
         assert fragment in adjudication_adr, f"ADR-040 doit imposer : {fragment}"
+
+    required_shared_capacity_fragments = (
+        "**Statut :** Proposée",
+        "services.workers.concurrency",
+        "services.workers.docling_concurrency",
+        "services.workers.granite_concurrency",
+        "Docling standard et Granite",
+        "même capacité en mémoire",
+        "huit pages restent",
+    )
+    for fragment in required_shared_capacity_fragments:
+        assert fragment in shared_capacity_adr, f"ADR-042 doit imposer : {fragment}"
 
     assert "**Statut :** Acceptée" in ocr_routing_adr
     assert "PREPROCESS_GRANITE" in ocr_routing_adr
