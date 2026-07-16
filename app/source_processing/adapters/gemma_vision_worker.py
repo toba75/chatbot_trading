@@ -169,9 +169,15 @@ def _render_page_png(
         bitmap = page.render(scale=1.5, rotation=render_rotation_degrees)
         image = bitmap.to_pil()
         if render_segment_index is not None and render_segment_count is not None:
-            top = image.height * (render_segment_index - 1) // render_segment_count
-            bottom = image.height * render_segment_index // render_segment_count
-            image = image.crop((0, top, image.width, bottom))
+            image = image.crop(
+                _segment_crop_box(
+                    image_width=image.width,
+                    image_height=image.height,
+                    render_rotation_degrees=render_rotation_degrees,
+                    render_segment_index=render_segment_index,
+                    render_segment_count=render_segment_count,
+                )
+            )
         buffer = io.BytesIO()
         image.save(buffer, format="PNG", optimize=True)
         rendered = buffer.getvalue()
@@ -212,6 +218,7 @@ def _structured_items(
             raise GemmaVisionConversionError("GEMMA_VISION_OUTPUT_INVALID")
         bbox_dans_rendu_complet = _bbox_dans_rendu_complet(
             normalized_bbox,
+            render_rotation_degrees=render_rotation_degrees,
             render_segment_index=render_segment_index,
             render_segment_count=render_segment_count,
         )
@@ -232,6 +239,7 @@ def _structured_items(
 def _bbox_dans_rendu_complet(
     bbox: list[int | float],
     *,
+    render_rotation_degrees: int,
     render_segment_index: int | None,
     render_segment_count: int | None,
 ) -> list[int | float]:
@@ -242,14 +250,44 @@ def _bbox_dans_rendu_complet(
         or render_segment_count != GEMMA_DENSE_RENDER_SEGMENT_COUNT
     ):
         raise GemmaVisionConversionError("GEMMA_VISION_REQUEST_INVALID")
+    if render_rotation_degrees != 90:
+        raise GemmaVisionConversionError("GEMMA_VISION_REQUEST_INVALID")
     left, top, right, bottom = bbox
-    segment_offset = 1000 * (render_segment_index - 1) / render_segment_count
+    segment_offset = (
+        1000 * (render_segment_count - render_segment_index) / render_segment_count
+    )
     return [
-        left,
-        segment_offset + top / render_segment_count,
-        right,
-        segment_offset + bottom / render_segment_count,
+        segment_offset + left / render_segment_count,
+        top,
+        segment_offset + right / render_segment_count,
+        bottom,
     ]
+
+
+def _segment_crop_box(
+    *,
+    image_width: int,
+    image_height: int,
+    render_rotation_degrees: int,
+    render_segment_index: int,
+    render_segment_count: int,
+) -> tuple[int, int, int, int]:
+    if (
+        isinstance(image_width, bool)
+        or not isinstance(image_width, int)
+        or image_width < 1
+        or isinstance(image_height, bool)
+        or not isinstance(image_height, int)
+        or image_height < 1
+        or render_rotation_degrees != 90
+        or render_segment_index
+        not in range(1, GEMMA_DENSE_RENDER_SEGMENT_COUNT + 1)
+        or render_segment_count != GEMMA_DENSE_RENDER_SEGMENT_COUNT
+    ):
+        raise GemmaVisionConversionError("GEMMA_VISION_REQUEST_INVALID")
+    left = image_width * (render_segment_count - render_segment_index) // render_segment_count
+    right = image_width * (render_segment_count - render_segment_index + 1) // render_segment_count
+    return left, 0, right, image_height
 
 
 def _bbox_dans_repere_source(
