@@ -49,6 +49,7 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 | [ADR-041](ADR-041-pages-vides-et-revue-manuelle-actionnable.md) | Pages vides ignorées et revue manuelle actionnable | Proposée | 2026-07-16 | Obligation de revue des pages `EMPTY` d’ADR-025 | Aucune |
 | [ADR-042](ADR-042-capacite-docling-partagee.md) | Capacité Docling partagée | Proposée | 2026-07-16 | Capacité des processus Docling d’ADR-040 | Aucune |
 | [ADR-043](ADR-043-priorite-scan-sans-texte-natif.md) | Priorité au scan sans texte natif | Proposée | 2026-07-16 | `COMPLEX_VISUAL` sans texte natif d’ADR-033 | Aucune |
+| [ADR-044](ADR-044-autorite-native-page-visuelle-complexe.md) | Autorité native d’une page visuelle complexe | Proposée | 2026-07-16 | Priorité ADR-033 et candidat natif ADR-040 pour texte parcellaire | Aucune |
 
 ## ADR DDD
 
@@ -70,7 +71,7 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 ## Prochains numéros disponibles
 
 ```text
-Prochaine ADR technique: ADR-042
+Prochaine ADR technique: ADR-045
 Prochaine DDD-ADR: DDD-ADR-013
 ```
 
