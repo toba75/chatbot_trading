@@ -13,9 +13,9 @@
 - Given Granite a réellement échoué sur une page et Gemma retourne une sortie
   invalide à 0 degré puis tronquée sur le rendu complet à 90 degrés.
 - When le worker applique la récupération bornée d’ADR-039.
-- Then il soumet exactement les deux moitiés non chevauchantes du rendu tourné,
+- Then il soumet exactement les quatre quarts non chevauchants du rendu tourné,
   remappe leurs coordonnées dans la page PDF source, fusionne leurs items dans
-  l’ordre et ne termine l’unité publique qu’après les deux succès.
+  l’ordre et ne termine l’unité publique qu’après les quatre succès.
 
 ## Garde-fous
 
@@ -23,6 +23,8 @@
   `GEMMA_VISION_OUTPUT_TRUNCATED`, jamais `GEMMA_VISION_UNAVAILABLE`.
 - La segmentation n’est autorisée qu’après la troncature du second rendu
   complet à 90 degrés.
+- Deux moitiés sont interdites : la première moitié réelle reste tronquée ; le
+  nombre contractuel est fixé à quatre segments.
 - Les appels portent des identifiants distincts ; aucun segment, modèle, angle
   ou retry supplémentaire n’est autorisé.
 - Une erreur de segment reste terminale et aucun contenu partiel n’est publié.

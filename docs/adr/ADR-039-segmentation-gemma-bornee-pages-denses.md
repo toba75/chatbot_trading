@@ -19,7 +19,9 @@ La page fautive contient un tableau de 1 428 mots, 6 314 caractères et 104
 lignes. Elle ne peut pas être transcrite intégralement dans les 2 048 jetons de
 sortie du contrat courant. Porter ce budget à 4 096 jetons ne résout pas le
 problème sur le Spark : les essais réels n’ont produit aucun premier jeton dans
-le délai borné. L’erreur `LLM_PARTIAL_OUTPUT` était en outre traduite à tort en
+le délai borné. Un premier essai avec deux moitiés a également produit
+`LLM_PARTIAL_OUTPUT` sur la première moitié après 80 secondes et 3 463 octets
+de réponse. L’erreur était en outre traduite à tort en
 `GEMMA_VISION_UNAVAILABLE`, ce qui masquait que Gemma était disponible.
 
 Il faut reprendre cette page sans appliquer Gemma aux autres pages, sans
@@ -35,12 +37,12 @@ de transcriptions concurrentes.
   **DOIT** soumettre un second rendu complet à 90 degrés.
 - Seulement si ce second rendu produit `GEMMA_VISION_OUTPUT_TRUNCATED`, après
   traduction exacte de `LLM_PARTIAL_OUTPUT`, le worker **DOIT** découper le
-  rendu tourné en exactement deux segments verticaux, ordonnés, non
+  rendu tourné en exactement quatre segments verticaux, ordonnés, non
   chevauchants et couvrant ensemble toute la page.
 - Le contrat de requête isolé **DOIT** publier explicitement
   `render_segment_index` et `render_segment_count`. Les deux valeurs sont soit
-  nulles ensemble pour un rendu complet, soit respectivement `1` ou `2` et
-  `2` pour un rendu segmenté à 90 degrés.
+  nulles ensemble pour un rendu complet, soit un index de `1` à `4` et le
+  compte `4` pour un rendu segmenté à 90 degrés.
 - Chaque rendu et chaque segment **DOIT** posséder des identifiants de requête,
   de trace et d’idempotence distincts, dérivés de la rotation et du segment.
 - Chaque segment conserve le budget de 2 048 jetons. Le client du worker
@@ -51,11 +53,11 @@ de transcriptions concurrentes.
   d’abord dans le rendu complet tourné, puis dans le repère de la page PDF
   source. Les items sont fusionnés uniquement dans l’ordre des segments.
 - La version d’outil **DOIT** tracer `render-rotation-090` puis
-  `render-segments-02`. Aucun item du rendu complet tronqué n’est publiable.
-- La page n’est comptée comme terminée qu’après la réussite des deux segments.
+  `render-segments-04`. Aucun item du rendu complet tronqué n’est publiable.
+- La page n’est comptée comme terminée qu’après la réussite des quatre segments.
   Une erreur sur un segment rend la page et la conversion terminalement RED
   avec son code exact.
-- Le worker **NE DOIT PAS** créer un troisième segment, une récursion, un
+- Le worker **NE DOIT PAS** créer un cinquième segment, une récursion, un
   chevauchement, un autre angle, un autre modèle, un OCR alternatif ou une
   nouvelle tentative Granite.
 - Le document **NE DOIT PAS** basculer toutes ses pages vers Gemma lorsqu’une
@@ -67,7 +69,8 @@ de transcriptions concurrentes.
 |---|---|---|
 | Augmenter globalement la sortie à 4 096 jetons | Rejetée | Les essais réels de la page dense n’ont produit aucun premier jeton dans le délai du Spark. |
 | Rejouer toute la page ou tout le document sans borne | Rejetée | Amplification, absence de progression fiable et risque de boucles. |
-| Deux segments explicites après troncature du rendu tourné | Retenue | Couverture déterministe, budget stable, provenance et nombre d’appels bornés. |
+| Deux segments explicites après troncature du rendu tourné | Rejetée | La première moitié réelle est encore tronquée après 80 secondes. |
+| Quatre segments explicites après troncature du rendu tourné | Retenue | Couverture déterministe compatible avec la densité observée, budget stable et nombre d’appels borné. |
 | Appliquer Gemma à toutes les pages du document | Rejetée | Contredit le routage pagewise et masque le taux de fonctionnement réel de Granite. |
 
 ## Conséquences
@@ -76,22 +79,22 @@ de transcriptions concurrentes.
 
 - Une page dense devient traitable sans augmenter le budget global du modèle.
 - L’indisponibilité et la troncature restent deux erreurs publiques distinctes.
-- Le nombre maximal d’appels Gemma pour une page est fixé à quatre.
+- Le nombre maximal d’appels Gemma pour une page est fixé à six.
 - Granite reste tenté et mesurable séparément pour chaque page.
 
 ### Négatives ou coûts
 
-- Une page dense en récupération consomme jusqu’à quatre inférences Gemma.
+- Une page dense en récupération consomme jusqu’à six inférences Gemma.
 - Le remappage des coordonnées segmentées ajoute un contrat géométrique à
   maintenir.
 
 ### Risques et contrôles
 
 - Risque de trou ou doublon entre segments : découpage non chevauchant couvrant
-  exactement le rendu et tests de remappage des deux moitiés.
+  exactement le rendu et tests de remappage des quatre quarts.
 - Risque de rejouer le même appel : suffixes de rotation et de segment dans les
   trois identifiants du gateway.
-- Risque de publication partielle : fusion seulement après les deux réponses
+- Risque de publication partielle : fusion seulement après les quatre réponses
   valides ; toute erreur reste terminale.
 
 ## Impact d'implémentation

@@ -112,7 +112,7 @@ conserve la trace Granite dans l'artefact canonique et devient l'unique autorit�
 de la page. Un JSON ou un schéma Gemma invalide est une sortie invalide, pas une
 indisponibilité. Après une sortie invalide sur le rendu initial, un rendu complet
 à 90 degrés est autorisé. Si et seulement si ce second rendu est tronqué, le
-worker traite exactement deux segments verticaux non chevauchants de ce rendu,
+worker traite exactement quatre segments verticaux non chevauchants de ce rendu,
 réexprime leurs coordonnées dans la page source et les fusionne dans l'ordre.
 Chaque appel conserve un budget de 2 048 jetons et un identifiant distinct. Le
 délai client couvre toutes les tentatives avant premier token configurées par

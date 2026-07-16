@@ -89,11 +89,11 @@ def test_validate_m004_conversion_runtime_governance_acceptance() -> None:
         "**Remplace :** ADR-036 à l’acceptation",
         "GEMMA_VISION_OUTPUT_TRUNCATED",
         "LLM_PARTIAL_OUTPUT",
-        "exactement deux segments verticaux",
+        "exactement quatre segments verticaux",
         "chevauchants",
         "render_segment_index",
         "render_segment_count",
-        "render-segments-02",
+        "render-segments-04",
         "2 048 jetons",
         "270 secondes",
     )
