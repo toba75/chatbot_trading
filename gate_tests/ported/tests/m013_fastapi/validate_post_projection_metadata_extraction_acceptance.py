@@ -82,3 +82,9 @@ def test_admission_sans_metadonnees_et_extraction_apres_projection() -> None:
     assert len(result.evidences) == 3
     assert len(gateway.requests) == 1
     assert gateway.requests[0].prompt_id == "m005-bibliographic-metadata-extraction"
+    assert gateway.requests[0].prompt_version == "1.1"
+    assert gateway.requests[0].schema_version == "1.1"
+    assert gateway.requests[0].output_schema["properties"]["evidence"]["items"]["properties"]["field"] == {
+        "type": "string",
+        "enum": ["title", "authors", "publication_year", "edition"],
+    }
