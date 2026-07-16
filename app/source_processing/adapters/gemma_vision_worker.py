@@ -21,6 +21,12 @@ from app.source_processing.adapters.gemma_vision_conversion import GemmaVisionCo
 
 _MAX_RENDERED_IMAGE_BYTES = 10 * 1024 * 1024
 _MAX_GEMMA_PAGE_ITEMS = 16
+_GATEWAY_GEMMA_OUTPUT_ERROR_CODES = frozenset(
+    {
+        "LLM_RESPONSE_INVALID_JSON",
+        "LLM_RESPONSE_SCHEMA_INVALID",
+    }
+)
 _PAGE_TRANSCRIPTION_PROMPT = (
     "Transcris uniquement le texte documentaire visible de cette page PDF. "
     "Regroupe les éléments adjacents en régions de lecture complètes. "
@@ -90,6 +96,9 @@ def _convert(payload: Mapping[str, Any]) -> dict[str, object]:
         timeout_seconds=_required_positive_int(payload, "gateway_timeout_seconds"),
     ).infer(request)
     if response.status_code != 200:
+        gateway_error_code = response.payload.get("error_code")
+        if gateway_error_code in _GATEWAY_GEMMA_OUTPUT_ERROR_CODES:
+            raise GemmaVisionConversionError("GEMMA_VISION_OUTPUT_INVALID")
         raise GemmaVisionConversionError("GEMMA_VISION_UNAVAILABLE")
     structured_output = response.payload.get("structured_output")
     provenance = response.payload.get("provenance")
