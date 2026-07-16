@@ -1376,6 +1376,17 @@ depends_on = ["precondition.m004"]
 live = false
 
 [[nodes]]
+id = "test.m004.validate-shared-docling-concurrency-unit"
+path = "gate_tests/ported/tests/m004/validate_shared_docling_concurrency_unit.py"
+kind = "test"
+scope = "m004"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m004"]
+live = false
+
+[[nodes]]
 id = "test.m004.validate-native-docling-conversion-acceptance"
 path = "gate_tests/ported/tests/m004/validate_native_docling_conversion_acceptance.py"
 kind = "test"
