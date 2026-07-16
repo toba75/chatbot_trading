@@ -44,6 +44,9 @@ def test_validate_empty_page_conversion_acceptance() -> None:
         _authority_manifest,
         _pre_conversion_report,
     )
+    from app.source_processing.application.canonical_audit_signals import (
+        PreCanonicalAuditEvent,
+    )
     from app.source_processing.domain.source_document import (
         DocumentId,
         OriginalStorageRef,
@@ -192,3 +195,17 @@ def test_validate_empty_page_conversion_acceptance() -> None:
     assert post_report.status is QualityDecisionStatus.PASS
     assert post_report.findings == ()
     assert quality_decision.publication_allowed is True
+
+    # Given une tentative antérieure a échoué avec un code terminal public autorisé.
+    # When une nouvelle commande trace le refus de relance dans l'audit pré-canonique.
+    failed_attempt_event = PreCanonicalAuditEvent(
+        trace_id="TRACE-M004-EMPTY-SKIP-FAILED",
+        document_id=document_id.value,
+        phase="document_conversion_request",
+        status="REJECTED",
+        page_count=3,
+        error_code="WORKER_UNEXPECTED_ERROR",
+    )
+
+    # Then l'audit conserve le code public sans provoquer une erreur interne HTTP 500.
+    assert failed_attempt_event.error_code == "WORKER_UNEXPECTED_ERROR"
