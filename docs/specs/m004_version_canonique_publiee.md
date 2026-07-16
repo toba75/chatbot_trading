@@ -7,8 +7,8 @@
 - Spécification normative: `docs/specs/specification_unifiee_ddd_technique_chatbot_trading_v4_1.md`, sections 5, 12, 14, 17, 19, 20 et 21.
 - ADR consultées: ADR-001, ADR-002, ADR-003, ADR-004, ADR-010, ADR-031, ADR-032, ADR-034, ADR-035, DDD-ADR-003, DDD-ADR-006, DDD-ADR-008, DDD-ADR-010.
 - Contrats amont: `docs/specs/m003_source_enregistree_diagnostiquee_routee.md`, `docs/specs/m001_frontieres_ddd_contrats_publies.md`.
-- ADR : ADR-036 proposée remplace ADR-035 pour autoriser la récupération Gemma
-  explicitement traçable après `DOCLING_PROVENANCE_MISSING` ou
+- ADR : ADR-039 proposée remplace ADR-036 à son acceptation pour borner la
+  récupération Gemma des pages denses après `DOCLING_PROVENANCE_MISSING` ou
   `GRANITE_DOCLING_UNAVAILABLE`; elle conserve les invariants des ADR-001 à
   ADR-004.
 
@@ -101,7 +101,7 @@ La QA post-conversion contrôle le nombre de pages, le JSON valide, les identifi
 
 ## Exécution réelle et disponibilité des convertisseurs
 
-ADR-036 proposée remplace ADR-035 pour l'exécution réelle des ports M-004. `NATIVE_STANDARD` appelle
+ADR-039 proposée remplace ADR-036 à son acceptation pour l'exécution réelle des ports M-004. `NATIVE_STANDARD` appelle
 Docling standard; `SCAN_GRANITE`, `BAD_OCR_TO_GRANITE`, `MIXED_PAGEWISE` et
 `TARGETED_ENRICHMENT` appellent Granite-Docling; `PREPROCESS_GRANITE` appelle
 d'abord OCRmyPDF puis Granite-Docling. Après une tentative Granite réellement
@@ -110,9 +110,14 @@ autorisent chacun une unique récupération Gemma 4 via `llm-gateway`; tout autr
 échec reste terminal. La sortie Gemma doit contenir texte et coordonnées,
 conserve la trace Granite dans l'artefact canonique et devient l'unique autorité
 de la page. Un JSON ou un schéma Gemma invalide est une sortie invalide, pas une
-indisponibilité. La conversion dispose de 4 096 jetons et son délai client
-couvre toutes les tentatives avant premier token configurées par le gateway,
-plus 30 secondes de rendu, transport local et validation.
+indisponibilité. Après une sortie invalide sur le rendu initial, un rendu complet
+à 90 degrés est autorisé. Si et seulement si ce second rendu est tronqué, le
+worker traite exactement deux segments verticaux non chevauchants de ce rendu,
+réexprime leurs coordonnées dans la page source et les fusionne dans l'ordre.
+Chaque appel conserve un budget de 2 048 jetons et un identifiant distinct. Le
+délai client couvre toutes les tentatives avant premier token configurées par
+le gateway, plus 30 secondes de rendu, transport local et validation. Toute
+erreur de segment est terminale et aucun contenu partiel n'est publié.
 
 Les adaptateurs Docling s'exécutent dans un processus isolé de l'environnement
 `uv`, sur `docling[vlm]==2.111.0` verrouillé dans `uv.lock`. Les modèles et

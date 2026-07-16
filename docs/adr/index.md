@@ -44,6 +44,7 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 | [ADR-036](ADR-036-recuperation-gemma-apres-echec-terminal-granite.md) | Récupération Gemma explicite après échec terminal Granite | Proposée | 2026-07-14 | ADR-035 | Aucune |
 | [ADR-037](ADR-037-parallelisme-documentaire-projection.md) | Parallélisme documentaire et projection par lots | Acceptée | 2026-07-15 | Aucun | Aucune |
 | [ADR-038](ADR-038-metadonnees-bibliographiques-apres-projection.md) | Métadonnées bibliographiques dérivées après projection | Acceptée | 2026-07-16 | Obligation bibliographique ADR-028 | Aucune |
+| [ADR-039](ADR-039-segmentation-gemma-bornee-pages-denses.md) | Segmentation Gemma bornée des pages denses | Proposée | 2026-07-16 | ADR-036 à l’acceptation | Aucune |
 
 ## ADR DDD
 
@@ -65,7 +66,7 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 ## Prochains numéros disponibles
 
 ```text
-Prochaine ADR technique: ADR-039
+Prochaine ADR technique: ADR-040
 Prochaine DDD-ADR: DDD-ADR-013
 ```
 

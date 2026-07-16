@@ -262,3 +262,4 @@ rejouée depuis le formulaire UI sur `DOC-F91FE126FBFFA374` :
 | T-004 | `e8b82bf47` | `bd27e2433` | ADR-018; ADR-019; ADR-024; ADR-031; ADR-032 | 7 tests ciblés, `uv sync --locked`, gate complète 406 nœuds, `git diff --check`, UI réelle `QUEUED` puis `SUCCEEDED` | GREEN réel UI |
 | T-005 | `ada4b6a0e`, `e62c60a2d`, `bfd5438e7` | `96be704d8` | ADR-002; ADR-003; ADR-031; ADR-032; ADR-033 | 17 tests ciblés, migration 013, UI native/Granite/OCR réelle, absence de publication partielle, gate complète 406 nœuds | GREEN |
 | T-006 | `65577c74f` | `572bc89c2` | ADR-032; ADR-033 | Gouvernance ADR, allowlist historique fermée, erreur OCR → Granite terminale, scope gouvernance 23 nœuds | GREEN documentaire |
+| T-010 | À produire | À produire | ADR-039 (Proposée) | Mapping de troncature, segmentation bornée, conversion et projection réelles de `DOC-7A3001E2DE57C3E0` | EN COURS |
