@@ -263,8 +263,8 @@ def test_ocrmypdf_manifest_refuses_an_unpinned_image_and_no_network_command(tmp_
 def test_every_non_native_route_calls_granite_and_ocr_is_never_global() -> None:
     # Given chaque route M-003 est déjà publiée.
     # When ConvertRoutedPages délègue la page.
-    # Then SCAN_GRANITE, BAD_OCR_TO_GRANITE, MIXED_PAGEWISE et TARGETED_ENRICHMENT
-    #      n'acceptent que GRANITE_DOCLING, et seul PREPROCESS_GRANITE passe d'abord par OCRmyPDF.
+    # Then SCAN_GRANITE, BAD_OCR_TO_GRANITE et MIXED_PAGEWISE n'acceptent que
+    #      GRANITE_DOCLING, tandis que seul PREPROCESS_GRANITE passe d'abord par OCRmyPDF.
     handler = ConvertRoutedPagesHandler(
         native_converter=_NativeOnly(),
         granite_converter=_GraniteOnly(),
@@ -274,7 +274,6 @@ def test_every_non_native_route_calls_granite_and_ocr_is_never_global() -> None:
         PageRouteName.SCAN_GRANITE,
         PageRouteName.BAD_OCR_TO_GRANITE,
         PageRouteName.MIXED_PAGEWISE,
-        PageRouteName.TARGETED_ENRICHMENT,
     ):
         output = handler._granite_converter.convert_page(_request(route_name))
         assert output.tool_name is ConversionToolName.GRANITE_DOCLING

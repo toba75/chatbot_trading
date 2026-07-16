@@ -31,7 +31,6 @@ _GRANITE_ROUTE_NAMES = frozenset(
         PageRouteName.SCAN_GRANITE,
         PageRouteName.BAD_OCR_TO_GRANITE,
         PageRouteName.MIXED_PAGEWISE,
-        PageRouteName.TARGETED_ENRICHMENT,
     }
 )
 
@@ -161,6 +160,7 @@ class ConvertRoutedPagesHandler:
         native_converter: PageConverter,
         granite_converter: PageConverter,
         ocrmypdf_preprocessor: PagePreprocessor,
+        targeted_enrichment_converter: PageConverter | None = None,
         max_parallel_pages: int = 1,
     ) -> None:
         if not callable(getattr(native_converter, "convert_page", None)):
@@ -172,6 +172,11 @@ class ConvertRoutedPagesHandler:
         self._native_converter = native_converter
         self._granite_converter = granite_converter
         self._ocrmypdf_preprocessor = ocrmypdf_preprocessor
+        if targeted_enrichment_converter is not None and not callable(
+            getattr(targeted_enrichment_converter, "convert_page", None)
+        ):
+            raise ValueError("targeted_enrichment_converter invalide")
+        self._targeted_enrichment_converter = targeted_enrichment_converter
         self._max_parallel_pages = _ensure_max_parallel_pages(max_parallel_pages)
 
     def handle(
@@ -326,6 +331,34 @@ class ConvertRoutedPagesHandler:
             return _PageConversionOrchestrationResult(
                 page_output=page_output,
                 preprocessed_artifact=preprocessed_artifact,
+            )
+
+        if page_route.route_name is PageRouteName.TARGETED_ENRICHMENT:
+            if self._targeted_enrichment_converter is None:
+                raise ValueError("convertisseur TARGETED_ENRICHMENT absent")
+            request = _conversion_request(
+                source_document=source_document,
+                processing_run=processing_run,
+                page_route=page_route,
+                source_artifact_ref=source_document.original_storage_ref.value,
+            )
+            page_output = self._targeted_enrichment_converter.convert_page(request)
+            _ensure_conversion_output(
+                page_output=page_output,
+                page_route=page_route,
+                expected_tool_names=frozenset(
+                    (
+                        ConversionToolName.DOCLING_STANDARD,
+                        ConversionToolName.GRANITE_DOCLING,
+                    )
+                ),
+                expected_artifact_ref=request.expected_output_artifact_ref,
+            )
+            if page_output.adjudication_trace is None:
+                raise ValueError("trace d'adjudication TARGETED_ENRICHMENT absente")
+            return _PageConversionOrchestrationResult(
+                page_output=page_output,
+                preprocessed_artifact=None,
             )
 
         if page_route.route_name in _GRANITE_ROUTE_NAMES:

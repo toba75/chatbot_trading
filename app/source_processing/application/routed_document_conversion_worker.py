@@ -54,6 +54,9 @@ from app.source_processing.application.granite_gemma_recovery import (
     GraniteConversionFailure,
     GraniteThenGemmaPageConverter,
 )
+from app.source_processing.application.targeted_enrichment import (
+    TargetedEnrichmentPageConverter,
+)
 from app.source_processing.application.native_document_conversion_worker import (
     NativeCanonicalPublication,
 )
@@ -442,16 +445,18 @@ class RoutedDocumentConversionWorker:
                 return original_path
 
         try:
+            native_page_converter = _NativePageConverter(
+                converter=self._native_converter,
+                resolve_source_path=resolve_source_path,
+            )
+            raw_granite_page_converter = _GranitePageConverter(
+                converter=self._granite_converter,
+                resolve_source_path=resolve_source_path,
+            )
             handler = ConvertRoutedPagesHandler(
-                native_converter=_NativePageConverter(
-                    converter=self._native_converter,
-                    resolve_source_path=resolve_source_path,
-                ),
+                native_converter=native_page_converter,
                 granite_converter=GraniteThenGemmaPageConverter(
-                    granite_converter=_GranitePageConverter(
-                        converter=self._granite_converter,
-                        resolve_source_path=resolve_source_path,
-                    ),
+                    granite_converter=raw_granite_page_converter,
                     gemma_converter=_GemmaVisionFallbackPageConverter(
                         converter=self._gemma_converter,
                         resolve_source_path=resolve_source_path,
@@ -460,6 +465,11 @@ class RoutedDocumentConversionWorker:
                         gateway_max_output_tokens=self._llm_gateway_max_output_tokens,
                         expected_model_id=self._expected_gemma_model_id,
                     ),
+                ),
+                targeted_enrichment_converter=TargetedEnrichmentPageConverter(
+                    native_converter=native_page_converter,
+                    granite_converter=raw_granite_page_converter,
+                    policy_version="targeted-enrichment-v1",
                 ),
                 ocrmypdf_preprocessor=preprocessor,
                 max_parallel_pages=self._max_parallel_pages,

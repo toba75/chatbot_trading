@@ -36,6 +36,7 @@ _GEMMA_RECOVERY_GRANITE_ERROR_CODES = frozenset(
         "GRANITE_DOCLING_UNAVAILABLE",
     }
 )
+_TARGETED_ENRICHMENT_GRANITE_ERROR_CODES = _GEMMA_RECOVERY_GRANITE_ERROR_CODES
 _ARTIFACT_REF_PATTERN = re.compile(
     r"^artifact:source_processing\.[a-z0-9_]+/[A-Za-z0-9_.@/-]+$"
 )
@@ -231,6 +232,81 @@ class PageConversionFallbackTrace:
 
 
 @dataclass(frozen=True)
+class TargetedEnrichmentAdjudicationTrace:
+    """Décision auditée entre les candidats Docling et Granite d'une page."""
+
+    policy_version: str
+    selected_tool_name: ConversionToolName
+    native_candidate_artifact_hash: str
+    native_candidate_artifact_ref: str
+    granite_candidate_artifact_hash: str | None
+    granite_candidate_artifact_ref: str | None
+    granite_error_code: str | None
+    justification: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "policy_version",
+            _ensure_text(self.policy_version, "version d'adjudication invalide"),
+        )
+        selected_tool_name = ConversionToolName.from_value(self.selected_tool_name)
+        if selected_tool_name not in {
+            ConversionToolName.DOCLING_STANDARD,
+            ConversionToolName.GRANITE_DOCLING,
+        }:
+            raise ValueError("outil d'adjudication ciblée invalide")
+        object.__setattr__(self, "selected_tool_name", selected_tool_name)
+        object.__setattr__(
+            self,
+            "native_candidate_artifact_hash",
+            _ensure_artifact_hash(self.native_candidate_artifact_hash),
+        )
+        object.__setattr__(
+            self,
+            "native_candidate_artifact_ref",
+            _ensure_artifact_ref(self.native_candidate_artifact_ref),
+        )
+        if selected_tool_name is ConversionToolName.GRANITE_DOCLING:
+            if self.granite_candidate_artifact_hash is None or self.granite_candidate_artifact_ref is None:
+                raise ValueError("candidat Granite d'adjudication absent")
+            object.__setattr__(
+                self,
+                "granite_candidate_artifact_hash",
+                _ensure_artifact_hash(self.granite_candidate_artifact_hash),
+            )
+            object.__setattr__(
+                self,
+                "granite_candidate_artifact_ref",
+                _ensure_artifact_ref(self.granite_candidate_artifact_ref),
+            )
+            if self.granite_error_code is not None:
+                raise ValueError("erreur Granite interdite après succès")
+        else:
+            if self.granite_candidate_artifact_hash is not None or self.granite_candidate_artifact_ref is not None:
+                raise ValueError("candidat Granite incohérent après échec")
+            if self.granite_error_code not in _TARGETED_ENRICHMENT_GRANITE_ERROR_CODES:
+                raise ValueError("erreur Granite d'adjudication non autorisée")
+        object.__setattr__(
+            self,
+            "justification",
+            _ensure_text(self.justification, "justification d'adjudication absente"),
+        )
+
+    def to_payload(self) -> dict[str, str | None]:
+        return {
+            "policy_version": self.policy_version,
+            "selected_tool_name": self.selected_tool_name.value,
+            "native_candidate_artifact_hash": self.native_candidate_artifact_hash,
+            "native_candidate_artifact_ref": self.native_candidate_artifact_ref,
+            "granite_candidate_artifact_hash": self.granite_candidate_artifact_hash,
+            "granite_candidate_artifact_ref": self.granite_candidate_artifact_ref,
+            "granite_error_code": self.granite_error_code,
+            "justification": self.justification,
+        }
+
+
+@dataclass(frozen=True)
 class PageConversionArtifact:
     """Sortie auditable d'une page convertie par sa route explicite."""
 
@@ -242,6 +318,7 @@ class PageConversionArtifact:
     audit_artifact_ref: str
     items: tuple[PageConversionItem, ...]
     fallback_trace: PageConversionFallbackTrace | None = None
+    adjudication_trace: TargetedEnrichmentAdjudicationTrace | None = None
 
     def __post_init__(self) -> None:
         _ensure_page_number(self.page_number)
@@ -273,6 +350,17 @@ class PageConversionArtifact:
             raise ValueError("trace de récupération Gemma obligatoire")
         if self.tool_name is not ConversionToolName.GEMMA_VISION and fallback_trace is not None:
             raise ValueError("trace de récupération Gemma interdite")
+        adjudication_trace = self.adjudication_trace
+        if adjudication_trace is not None and not isinstance(
+            adjudication_trace,
+            TargetedEnrichmentAdjudicationTrace,
+        ):
+            raise ValueError("trace d'adjudication ciblée invalide")
+        if adjudication_trace is not None:
+            if self.route_name is not PageRouteName.TARGETED_ENRICHMENT:
+                raise ValueError("trace d'adjudication ciblée hors route")
+            if adjudication_trace.selected_tool_name is not self.tool_name:
+                raise ValueError("autorité d'adjudication ciblée incohérente")
 
 
 class TextAuthoritySelectionError(ValueError):
@@ -319,6 +407,11 @@ class PageConversionCandidate:
                 None
                 if self.page_output.fallback_trace is None
                 else self.page_output.fallback_trace.to_payload()
+            ),
+            "adjudication_trace": (
+                None
+                if self.page_output.adjudication_trace is None
+                else self.page_output.adjudication_trace.to_payload()
             ),
             "content_hashes": tuple(item.content_hash for item in self.page_output.items),
         }
@@ -1142,6 +1235,7 @@ class CanonicalDocumentPage:
     conversion_tool_version: str
     conversion_audit_artifact_ref: str
     fallback_trace: PageConversionFallbackTrace | None
+    adjudication_trace: TargetedEnrichmentAdjudicationTrace | None
     items: tuple[CanonicalDocumentItem, ...]
 
     def __post_init__(self) -> None:
@@ -1176,6 +1270,16 @@ class CanonicalDocumentPage:
             raise ValueError("trace de récupération Gemma obligatoire")
         if self.conversion_tool_name is not ConversionToolName.GEMMA_VISION and self.fallback_trace is not None:
             raise ValueError("trace de récupération Gemma interdite")
+        if self.adjudication_trace is not None and not isinstance(
+            self.adjudication_trace,
+            TargetedEnrichmentAdjudicationTrace,
+        ):
+            raise ValueError("trace d'adjudication ciblée invalide")
+        if self.adjudication_trace is not None:
+            if self.route_name is not PageRouteName.TARGETED_ENRICHMENT:
+                raise ValueError("trace d'adjudication ciblée hors route")
+            if self.adjudication_trace.selected_tool_name is not self.conversion_tool_name:
+                raise ValueError("autorité d'adjudication ciblée incohérente")
         items = _ensure_canonical_items(self.items)
         for item in items:
             if item.provenance.page_pdf != self.page_number.value:
@@ -1192,6 +1296,11 @@ class CanonicalDocumentPage:
             "conversion_audit_artifact_ref": self.conversion_audit_artifact_ref,
             "fallback_trace": (
                 None if self.fallback_trace is None else self.fallback_trace.to_payload()
+            ),
+            "adjudication_trace": (
+                None
+                if self.adjudication_trace is None
+                else self.adjudication_trace.to_payload()
             ),
             "items": tuple(item.to_payload() for item in self.items),
         }
@@ -1332,6 +1441,7 @@ def _canonical_page_from_output(
         conversion_tool_version=page_output.tool_version,
         conversion_audit_artifact_ref=page_output.audit_artifact_ref,
         fallback_trace=page_output.fallback_trace,
+        adjudication_trace=page_output.adjudication_trace,
         items=items,
     )
 
@@ -2123,4 +2233,5 @@ __all__ = [
     "TextAuthorityPageDecision",
     "TextAuthoritySelectionError",
     "TextAuthoritySelectionPolicy",
+    "TargetedEnrichmentAdjudicationTrace",
 ]
