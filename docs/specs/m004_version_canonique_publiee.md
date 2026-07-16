@@ -5,7 +5,7 @@
 - Milestone: M-004 - Version canonique publiée.
 - Source canonique: `docs/specs/plan_implementation_milestones_workstreams.md`, section `M-004 - Version canonique publiée`.
 - Spécification normative: `docs/specs/specification_unifiee_ddd_technique_chatbot_trading_v4_1.md`, sections 5, 12, 14, 17, 19, 20 et 21.
-- ADR consultées: ADR-001, ADR-002, ADR-003, ADR-004, ADR-010, ADR-031, ADR-032, ADR-034, ADR-035, DDD-ADR-003, DDD-ADR-006, DDD-ADR-008, DDD-ADR-010.
+- ADR consultées: ADR-001, ADR-002, ADR-003, ADR-004, ADR-010, ADR-031, ADR-032, ADR-034, ADR-035, ADR-040, DDD-ADR-003, DDD-ADR-006, DDD-ADR-008, DDD-ADR-010.
 - Contrats amont: `docs/specs/m003_source_enregistree_diagnostiquee_routee.md`, `docs/specs/m001_frontieres_ddd_contrats_publies.md`.
 - ADR : ADR-039 proposée remplace ADR-036 à son acceptation pour borner la
   récupération Gemma des pages denses après `DOCLING_PROVENANCE_MISSING` ou
@@ -102,8 +102,8 @@ La QA post-conversion contrôle le nombre de pages, le JSON valide, les identifi
 ## Exécution réelle et disponibilité des convertisseurs
 
 ADR-039 proposée remplace ADR-036 à son acceptation pour l'exécution réelle des ports M-004. `NATIVE_STANDARD` appelle
-Docling standard; `SCAN_GRANITE`, `BAD_OCR_TO_GRANITE`, `MIXED_PAGEWISE` et
-`TARGETED_ENRICHMENT` appellent Granite-Docling; `PREPROCESS_GRANITE` appelle
+Docling standard; `SCAN_GRANITE`, `BAD_OCR_TO_GRANITE` et `MIXED_PAGEWISE`
+appellent Granite-Docling; `PREPROCESS_GRANITE` appelle
 d'abord OCRmyPDF puis Granite-Docling. Après une tentative Granite réellement
 terminée, `DOCLING_PROVENANCE_MISSING` ou `GRANITE_DOCLING_UNAVAILABLE`
 autorisent chacun une unique récupération Gemma 4 via `llm-gateway`; tout autre
@@ -116,6 +116,15 @@ worker traite exactement seize bandes horizontales non chevauchantes de la
 page source. Dans le rendu à 90 degrés, il les découpe de droite à gauche,
 réexprime leurs coordonnées dans la page source et les fusionne dans l'ordre
 haut-bas.
+
+Conformément à ADR-040 proposée et à la spécification unifiée,
+`TARGETED_ENRICHMENT` exécute séparément Docling standard et Granite-Docling,
+puis adjudique une unique autorité. Granite est retenu lorsqu’il réussit. Pour
+les seuls codes `DOCLING_PROVENANCE_MISSING` et
+`GRANITE_DOCLING_UNAVAILABLE`, le candidat Docling valide est retenu avec une
+trace structurée de la tentative Granite. Tout autre échec reste terminal.
+Gemma n’est jamais appelée pour cette route, car un candidat Docling standard
+y est contractuellement produit.
 Chaque appel conserve un budget de 2 048 jetons et un identifiant distinct. Le
 délai client couvre toutes les tentatives avant premier token configurées par
 le gateway, plus 30 secondes de rendu, transport local et validation. Toute

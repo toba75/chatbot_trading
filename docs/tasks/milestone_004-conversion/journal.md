@@ -14,6 +14,7 @@ frontières UI/API d'ADR-018 et ADR-031.
 4. T-004 - Exposer la conversion et sa progression publique dans l'UI.
 5. T-005 - Traiter explicitement les routes non natives et prouver le pipeline.
 6. T-006 - Accepter les décisions de conversion effectivement livrées.
+7. T-011 - Adjuger explicitement l’enrichissement ciblé Docling et Granite.
 
 ## État initial
 
@@ -263,3 +264,18 @@ rejouée depuis le formulaire UI sur `DOC-F91FE126FBFFA374` :
 | T-005 | `ada4b6a0e`, `e62c60a2d`, `bfd5438e7` | `96be704d8` | ADR-002; ADR-003; ADR-031; ADR-032; ADR-033 | 17 tests ciblés, migration 013, UI native/Granite/OCR réelle, absence de publication partielle, gate complète 406 nœuds | GREEN |
 | T-006 | `65577c74f` | `572bc89c2` | ADR-032; ADR-033 | Gouvernance ADR, allowlist historique fermée, erreur OCR → Granite terminale, scope gouvernance 23 nœuds | GREEN documentaire |
 | T-010 | À produire | À produire | ADR-039 (Proposée) | Mapping de troncature, segmentation bornée, conversion et projection réelles de `DOC-7A3001E2DE57C3E0` | EN COURS |
+| T-011 | À produire | À produire | ADR-040 (Proposée) | Adjudication Docling + Granite, absence de Gemma sur `TARGETED_ENRICHMENT`, conversion et projection réelles | EN COURS |
+
+## Exécution T-011
+
+- BDD : Given une page `TARGETED_ENRICHMENT` possède un candidat Docling
+  valide et Granite termine avec une indisponibilité autorisée, When le worker
+  exécute l’adjudication, Then il sélectionne explicitement Docling, conserve
+  les deux preuves, n’appelle pas Gemma et poursuit le document.
+- GREEN initial : le scope M-004 est GREEN avant le RED, mais le parcours réel
+  reste terminalement `FAILED 5/36` ; ce résultat réel n’est pas présenté
+  comme un GREEN produit.
+- Preuve de diagnostic : Docling standard 2.111.0 a extrait réellement la page
+  19 de `DOC-7A3001E2DE57C3E0` en 1 386 items et 4 923 caractères, dont la
+  table mensuelle. Le défaut est l’orchestration Granite exclusive de
+  `TARGETED_ENRICHMENT`, contraire à la spécification unifiée.
