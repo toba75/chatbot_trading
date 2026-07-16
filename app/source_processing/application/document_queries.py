@@ -17,11 +17,16 @@ from app.source_processing.application.document_commands import (
     DocumentConversionState,
     SourceNotFoundError,
 )
+from app.source_processing.application.routing_policy import (
+    build_document_routing_configuration,
+)
 from app.source_processing.domain.document_processing_run import (
     DocumentProcessingRun,
     DocumentProcessingRunStatus,
     PageDecision,
     PageRoute,
+    PageRouteName,
+    PageRoutingPolicy,
 )
 from app.source_processing.domain.source_document import DocumentId, SourceDocument
 
@@ -138,6 +143,8 @@ class PageDiagnosticView:
     has_formula: bool
     diagnostic_version: str
     justification: str
+    manual_review_required: bool
+    manual_review_resolution: dict[str, str | None] | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -236,6 +243,8 @@ class DocumentConversionView:
     conversion_status: str
     qa_rejection_error_code: str | None
     canonical_version_id: str | None
+    converted_page_count: int
+    skipped_empty_page_count: int
 
 
 class DocumentQueryService:
@@ -339,11 +348,25 @@ class DocumentQueryService:
         if snapshot.conversion is None:
             raise ConversionNotRequestedError(parsed_document_id.value)
         parsed_conversion = _ensure_conversion_state(snapshot.conversion)
+        if snapshot.processing_run is None:
+            raise ValueError("conversion sans tentative de traitement")
+        processing_run = _ensure_processing_run(snapshot.processing_run)
+        if processing_run.route_plan is None:
+            raise ValueError("conversion sans plan de routes")
+        skipped_empty_page_count = sum(
+            route.route_name is PageRouteName.SKIP_EMPTY
+            for route in processing_run.route_plan.page_routes
+        )
         return DocumentConversionView(
             document_id=parsed_conversion.document_id.value,
             conversion_status=parsed_conversion.conversion_status.value,
             qa_rejection_error_code=parsed_conversion.rejection_error_code,
             canonical_version_id=parsed_conversion.canonical_version_id,
+            converted_page_count=max(
+                0,
+                parsed_conversion.completed_units - skipped_empty_page_count,
+            ),
+            skipped_empty_page_count=skipped_empty_page_count,
         )
 
     def _require_snapshot(self, document_id: DocumentId) -> DocumentStateSnapshot:
@@ -398,6 +421,8 @@ class DocumentQueryService:
 
 
 def _diagnostic_view(processing_run: DocumentProcessingRun) -> DocumentDiagnosticView:
+    routing_configuration = build_document_routing_configuration()
+    routing_policy = PageRoutingPolicy()
     decisions = {
         decision.page_number.value: decision for decision in processing_run.page_decisions
     }
@@ -426,7 +451,18 @@ def _diagnostic_view(processing_run: DocumentProcessingRun) -> DocumentDiagnosti
         DiagnosticPageView(
             page_number=entry.page_number.value,
             manifest_status=entry.state.value,
-            diagnostic=_page_diagnostic_view(decisions.get(entry.page_number.value)),
+            diagnostic=_page_diagnostic_view(
+                decisions.get(entry.page_number.value),
+                manual_review_required=(
+                    processing_run.status is DocumentProcessingRunStatus.MANUAL_REVIEW
+                    and decisions.get(entry.page_number.value) is not None
+                    and routing_policy.manual_review_reason_for(
+                        decisions[entry.page_number.value],
+                        routing_configuration,
+                    )
+                    is not None
+                ),
+            ),
             route=_page_route_view(routes.get(entry.page_number.value)),
         )
         for entry in ordered_manifest_entries
@@ -516,10 +552,15 @@ def _conversion_action_available(
     return len(routes) == processing_run.page_manifest.source_page_count
 
 
-def _page_diagnostic_view(decision: PageDecision | None) -> PageDiagnosticView | None:
+def _page_diagnostic_view(
+    decision: PageDecision | None,
+    *,
+    manual_review_required: bool,
+) -> PageDiagnosticView | None:
     if decision is None:
         return None
     signals = decision.signals
+    resolution = decision.manual_review_resolution
     return PageDiagnosticView(
         page_state=decision.page_state.value,
         native_text_state=signals.native_text_state.value,
@@ -532,6 +573,19 @@ def _page_diagnostic_view(decision: PageDecision | None) -> PageDiagnosticView |
         has_formula=signals.has_formula,
         diagnostic_version=decision.diagnostic_version.value,
         justification=decision.justification,
+        manual_review_required=manual_review_required,
+        manual_review_resolution=(
+            None
+            if resolution is None
+            else {
+                "decision": resolution.decision.value,
+                "route_name": (
+                    None if resolution.route_name is None else resolution.route_name.value
+                ),
+                "reviewer_id": resolution.reviewer_id,
+                "reason": resolution.reason,
+            }
+        ),
     )
 
 

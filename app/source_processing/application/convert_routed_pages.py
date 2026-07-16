@@ -139,6 +139,7 @@ class DocumentConversionResult:
     page_outputs: tuple[PageConversionArtifact, ...]
     preprocessed_artifacts: tuple[PreprocessedPageArtifact, ...]
     docling_document: PagewiseDoclingDocument
+    skipped_page_numbers: tuple[PageNumber, ...] = ()
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "page_outputs", _ensure_page_outputs(self.page_outputs))
@@ -146,6 +147,11 @@ class DocumentConversionResult:
             self,
             "preprocessed_artifacts",
             _ensure_preprocessed_artifacts(self.preprocessed_artifacts),
+        )
+        object.__setattr__(
+            self,
+            "skipped_page_numbers",
+            _ensure_skipped_page_numbers(self.skipped_page_numbers),
         )
         if not isinstance(self.docling_document, PagewiseDoclingDocument):
             raise ValueError("DoclingDocument fusionné invalide")
@@ -198,10 +204,22 @@ class ConvertRoutedPagesHandler:
         if route_plan is None:
             raise ValueError("plan de routage absent")
 
+        skipped_page_numbers = tuple(
+            route.page_number
+            for route in route_plan.page_routes
+            if route.route_name is PageRouteName.SKIP_EMPTY
+        )
+        conversion_routes = tuple(
+            route
+            for route in route_plan.page_routes
+            if route.route_name is not PageRouteName.SKIP_EMPTY
+        )
+        if len(conversion_routes) == 0:
+            raise ValueError("aucune page convertible")
         conversion_results = self._convert_page_routes(
             source_document=command.source_document,
             processing_run=command.processing_run,
-            page_routes=tuple(route_plan.page_routes),
+            page_routes=conversion_routes,
             on_page_converted=on_page_converted,
         )
         page_outputs = tuple(result.page_output for result in conversion_results)
@@ -218,11 +236,13 @@ class ConvertRoutedPagesHandler:
             original_storage_ref=command.source_document.original_storage_ref,
             page_manifest=command.processing_run.page_manifest,
             page_outputs=page_outputs,
+            skipped_page_numbers=skipped_page_numbers,
         )
         return DocumentConversionResult(
             page_outputs=page_outputs,
             preprocessed_artifacts=preprocessed_artifacts,
             docling_document=docling_document,
+            skipped_page_numbers=skipped_page_numbers,
         )
 
     def _convert_page_routes(
@@ -560,6 +580,20 @@ def _ensure_preprocessed_artifacts(
         if not isinstance(artifact, PreprocessedPageArtifact):
             raise ValueError("artefact de prétraitement invalide")
     return artifacts
+
+
+def _ensure_skipped_page_numbers(
+    value: Sequence[PageNumber],
+) -> tuple[PageNumber, ...]:
+    if value is None or isinstance(value, (str, bytes)) or not isinstance(value, Sequence):
+        raise ValueError("pages ignorées invalides")
+    pages = tuple(value)
+    for page in pages:
+        _ensure_page_number(page)
+    values = tuple(page.value for page in pages)
+    if values != tuple(sorted(set(values))):
+        raise ValueError("pages ignorées incohérentes")
+    return pages
 
 
 def _ensure_processing_run_id(value: ProcessingRunId) -> ProcessingRunId:

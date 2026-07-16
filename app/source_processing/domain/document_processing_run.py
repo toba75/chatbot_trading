@@ -81,6 +81,7 @@ class PageRouteName(str, Enum):
     BAD_OCR_TO_GRANITE = "BAD_OCR_TO_GRANITE"
     MIXED_PAGEWISE = "MIXED_PAGEWISE"
     TARGETED_ENRICHMENT = "TARGETED_ENRICHMENT"
+    SKIP_EMPTY = "SKIP_EMPTY"
 
     @classmethod
     def from_value(cls, value: "PageRouteName | str") -> "PageRouteName":
@@ -99,6 +100,7 @@ class RouteDecisionMode(str, Enum):
 
     AUTO = "AUTO"
     BENCHMARK = "BENCHMARK"
+    MANUAL = "MANUAL"
     MANUAL_REVIEW = "MANUAL_REVIEW"
 
     @classmethod
@@ -139,6 +141,28 @@ class RoutePlanningOutcome(str, Enum):
 
     ROUTE_PLANNED = "ROUTE_PLANNED"
     MANUAL_REVIEW = "MANUAL_REVIEW"
+
+
+class ManualReviewDecisionType(str, Enum):
+    """Décision humaine publique qui résout ou termine une revue."""
+
+    CONFIRM_EMPTY = "CONFIRM_EMPTY"
+    ASSIGN_ROUTE = "ASSIGN_ROUTE"
+    REJECT_DOCUMENT = "REJECT_DOCUMENT"
+
+    @classmethod
+    def from_value(
+        cls,
+        value: "ManualReviewDecisionType | str",
+    ) -> "ManualReviewDecisionType":
+        if isinstance(value, cls):
+            return value
+        if not isinstance(value, str):
+            raise ValueError("décision de revue manuelle inconnue")
+        try:
+            return cls(value)
+        except ValueError as exc:
+            raise ValueError("décision de revue manuelle inconnue") from exc
 
 
 class NativeTextSignal(str, Enum):
@@ -405,6 +429,35 @@ class PageDiagnosticSignals:
 
 
 @dataclass(frozen=True)
+class ManualReviewResolution:
+    """Résolution humaine persistée sur la page diagnostiquée."""
+
+    decision: ManualReviewDecisionType
+    route_name: PageRouteName | None
+    reviewer_id: str
+    reason: str
+
+    def __post_init__(self) -> None:
+        parsed_decision = ManualReviewDecisionType.from_value(self.decision)
+        if parsed_decision is ManualReviewDecisionType.REJECT_DOCUMENT:
+            raise ValueError("rejet document interdit comme résolution de page")
+        parsed_route = None if self.route_name is None else PageRouteName.from_value(self.route_name)
+        if parsed_decision is ManualReviewDecisionType.CONFIRM_EMPTY:
+            if parsed_route is not None:
+                raise ValueError("route interdite pour une page confirmée vide")
+        elif parsed_route is None or parsed_route is PageRouteName.SKIP_EMPTY:
+            raise ValueError("route manuelle de conversion invalide")
+        object.__setattr__(self, "decision", parsed_decision)
+        object.__setattr__(self, "route_name", parsed_route)
+        object.__setattr__(
+            self,
+            "reviewer_id",
+            _ensure_manual_review_actor(self.reviewer_id),
+        )
+        object.__setattr__(self, "reason", _ensure_manual_review_reason(self.reason))
+
+
+@dataclass(frozen=True)
 class PageDecision:
     """Décision diagnostique explicite pour une page source."""
 
@@ -413,6 +466,7 @@ class PageDecision:
     signals: PageDiagnosticSignals
     diagnostic_version: DiagnosticVersion
     justification: str
+    manual_review_resolution: ManualReviewResolution | None = None
 
     def __post_init__(self) -> None:
         _ensure_page_number(self.page_number)
@@ -427,6 +481,28 @@ class PageDecision:
             self,
             "justification",
             _ensure_diagnostic_justification(self.justification),
+        )
+        if self.manual_review_resolution is not None and not isinstance(
+            self.manual_review_resolution,
+            ManualReviewResolution,
+        ):
+            raise ValueError("résolution de revue manuelle invalide")
+
+    def resolve_manual_review(
+        self,
+        resolution: ManualReviewResolution,
+    ) -> "PageDecision":
+        if not isinstance(resolution, ManualReviewResolution):
+            raise ValueError("résolution de revue manuelle invalide")
+        if self.manual_review_resolution is not None:
+            raise ValueError("page déjà résolue manuellement")
+        return PageDecision(
+            page_number=self.page_number,
+            page_state=self.page_state,
+            signals=self.signals,
+            diagnostic_version=self.diagnostic_version,
+            justification=self.justification,
+            manual_review_resolution=resolution,
         )
 
 
@@ -615,6 +691,15 @@ class PageDiagnosticPolicy:
 class PageRoutingPolicy:
     """Politique pure de choix d'une route documentaire à partir des diagnostics."""
 
+    def manual_review_reason_for(
+        self,
+        page_decision: PageDecision,
+        routing_configuration: PageRoutingConfiguration,
+    ) -> str | None:
+        return _manual_review_reason_for_page(
+            page_decision=page_decision,
+            routing_configuration=routing_configuration,
+        )
     def decide_page_route(
         self,
         page_decision: PageDecision,
@@ -629,14 +714,24 @@ class PageRoutingPolicy:
         if manual_review_reason is not None:
             raise ValueError(manual_review_reason)
 
-        route_name, confidence_score, preprocessing_action, requires_benchmark = (
-            _routing_profile_for_state(parsed_page_decision.page_state)
-        )
-        decision_mode = _route_decision_mode(
-            confidence_score=confidence_score,
-            requires_benchmark=requires_benchmark,
-            routing_configuration=parsed_configuration,
-        )
+        resolution = parsed_page_decision.manual_review_resolution
+        if resolution is not None:
+            if resolution.decision is ManualReviewDecisionType.CONFIRM_EMPTY:
+                route_name = PageRouteName.SKIP_EMPTY
+            else:
+                route_name = PageRouteName.from_value(resolution.route_name)
+            confidence_score = 1.0
+            preprocessing_action = _preprocessing_for_route(route_name)
+            decision_mode = RouteDecisionMode.MANUAL
+        else:
+            route_name, confidence_score, preprocessing_action, requires_benchmark = (
+                _routing_profile_for_state(parsed_page_decision.page_state)
+            )
+            decision_mode = _route_decision_mode(
+                confidence_score=confidence_score,
+                requires_benchmark=requires_benchmark,
+                routing_configuration=parsed_configuration,
+            )
 
         return PageRoute(
             page_number=parsed_page_decision.page_number,
@@ -789,6 +884,23 @@ class ManualReviewRequested:
 
 
 @dataclass(frozen=True)
+class ManualReviewResolved:
+    """Événement produit quand un réviseur résout explicitement une page."""
+
+    processing_run_id: ProcessingRunId
+    document_id: DocumentId
+    page_number: PageNumber
+    resolution: ManualReviewResolution
+
+    def __post_init__(self) -> None:
+        _ensure_processing_run_id(self.processing_run_id)
+        _ensure_document_id(self.document_id)
+        _ensure_page_number(self.page_number)
+        if not isinstance(self.resolution, ManualReviewResolution):
+            raise ValueError("résolution de revue manuelle invalide")
+
+
+@dataclass(frozen=True)
 class ProcessingRunQuarantined:
     """Événement produit quand une tentative est isolée avant publication aval."""
 
@@ -852,6 +964,7 @@ class DocumentProcessingRun:
         | PageDiagnosticRecorded
         | PageRouteDecided
         | ManualReviewRequested
+        | ManualReviewResolved
         | ProcessingRunQuarantined
         | ProcessingRunRejected
         | ProcessingRunFailed,
@@ -1010,6 +1123,92 @@ class DocumentProcessingRun:
             events=self.events + route_events,
         )
 
+    def resolve_manual_review(
+        self,
+        *,
+        page_number: PageNumber,
+        resolution: ManualReviewResolution,
+        routing_configuration: PageRoutingConfiguration,
+    ) -> "DocumentProcessingRun":
+        if self.status is not DocumentProcessingRunStatus.MANUAL_REVIEW:
+            raise ValueError("transition de résolution manuelle interdite")
+        parsed_page_number = _ensure_page_number(page_number)
+        if not isinstance(resolution, ManualReviewResolution):
+            raise ValueError("résolution de revue manuelle invalide")
+        parsed_configuration = _ensure_routing_configuration(routing_configuration)
+        if self.blocking_policy_version != parsed_configuration.routing_policy_version:
+            raise ValueError("version de politique de revue incohérente")
+
+        matching = tuple(
+            decision
+            for decision in self.page_decisions
+            if decision.page_number == parsed_page_number
+        )
+        if len(matching) != 1:
+            raise ValueError("page de revue manuelle absente")
+        current = matching[0]
+        if _manual_review_reason_for_page(current, parsed_configuration) is None:
+            raise ValueError("page sans revue manuelle en attente")
+        resolved_decision = current.resolve_manual_review(resolution)
+        decisions = tuple(
+            resolved_decision if decision.page_number == parsed_page_number else decision
+            for decision in self.page_decisions
+        )
+        resolved_event = ManualReviewResolved(
+            processing_run_id=self.processing_run_id,
+            document_id=self.document_id,
+            page_number=parsed_page_number,
+            resolution=resolution,
+        )
+        planning = PageRoutingPolicy().plan_routes(
+            page_decisions=decisions,
+            routing_configuration=parsed_configuration,
+        )
+        if planning.outcome is RoutePlanningOutcome.MANUAL_REVIEW:
+            requested_event = ManualReviewRequested(
+                processing_run_id=self.processing_run_id,
+                document_id=self.document_id,
+                routing_policy_version=planning.routing_policy_version,
+                reason=_ensure_manual_review_reason(planning.manual_review_reason),
+            )
+            return DocumentProcessingRun(
+                processing_run_id=self.processing_run_id,
+                document_id=self.document_id,
+                page_manifest=self.page_manifest,
+                page_decisions=decisions,
+                route_plan=None,
+                manual_review_reason=requested_event.reason,
+                blocking_policy_version=requested_event.routing_policy_version,
+                status=DocumentProcessingRunStatus.MANUAL_REVIEW,
+                aggregate_version=self.aggregate_version + 1,
+                events=self.events + (resolved_event, requested_event),
+            )
+
+        route_plan = _ensure_route_plan(planning.route_plan)
+        route_events = tuple(
+            PageRouteDecided(
+                processing_run_id=self.processing_run_id,
+                document_id=self.document_id,
+                page_number=page_route.page_number,
+                route_name=page_route.route_name,
+                decision_mode=page_route.decision_mode,
+                routing_policy_version=page_route.routing_policy_version,
+            )
+            for page_route in route_plan.page_routes
+        )
+        return DocumentProcessingRun(
+            processing_run_id=self.processing_run_id,
+            document_id=self.document_id,
+            page_manifest=self.page_manifest,
+            page_decisions=decisions,
+            route_plan=route_plan,
+            manual_review_reason=None,
+            blocking_policy_version=None,
+            status=DocumentProcessingRunStatus.ROUTE_PLANNED,
+            aggregate_version=self.aggregate_version + 1,
+            events=self.events + (resolved_event,) + route_events,
+        )
+
     def quarantine(
         self,
         routing_policy_version: RoutingPolicyVersion,
@@ -1149,6 +1348,7 @@ class DocumentProcessingRun:
                     PageDiagnosticRecorded,
                     PageRouteDecided,
                     ManualReviewRequested,
+                    ManualReviewResolved,
                     ProcessingRunQuarantined,
                     ProcessingRunRejected,
                     ProcessingRunFailed,
@@ -1305,6 +1505,14 @@ def _ensure_manual_review_reason(value: Any) -> str:
         raise ValueError("raison de revue manuelle invalide")
     if value != value.strip():
         raise ValueError("raison de revue manuelle invalide")
+    return value
+
+
+def _ensure_manual_review_actor(value: Any) -> str:
+    if not isinstance(value, str) or value.strip() == "" or value != value.strip():
+        raise ValueError("réviseur de revue manuelle invalide")
+    if len(value) > 128:
+        raise ValueError("réviseur de revue manuelle invalide")
     return value
 
 
@@ -1477,6 +1685,13 @@ def _ensure_page_route_preprocessing(
             raise ValueError("prétraitement OCRmyPDF requis")
 
 
+def _preprocessing_for_route(route_name: PageRouteName) -> PagePreprocessingAction:
+    parsed_route = PageRouteName.from_value(route_name)
+    if parsed_route is PageRouteName.PREPROCESS_GRANITE:
+        return PagePreprocessingAction.OCR_PHYSICAL_PREPROCESSING
+    return PagePreprocessingAction.NONE
+
+
 def _routing_profile_for_state(
     page_state: PageDecisionState,
 ) -> tuple[PageRouteName, float, PagePreprocessingAction, bool]:
@@ -1530,6 +1745,13 @@ def _routing_profile_for_state(
             PagePreprocessingAction.NONE,
             True,
         )
+    if parsed_page_state is PageDecisionState.EMPTY:
+        return (
+            PageRouteName.SKIP_EMPTY,
+            1.0,
+            PagePreprocessingAction.NONE,
+            False,
+        )
     raise ValueError("page sans route documentaire admissible")
 
 
@@ -1540,10 +1762,10 @@ def _manual_review_reason_for_page(
     parsed_page_decision = _ensure_page_decision(page_decision)
     parsed_configuration = _ensure_routing_configuration(routing_configuration)
 
-    if parsed_page_decision.page_state in (
-        PageDecisionState.EMPTY,
-        PageDecisionState.UNSUPPORTED_OR_CORRUPT,
-    ):
+    if parsed_page_decision.manual_review_resolution is not None:
+        return None
+
+    if parsed_page_decision.page_state is PageDecisionState.UNSUPPORTED_OR_CORRUPT:
         return (
             f"page {parsed_page_decision.page_number.value} "
             "sans route documentaire admissible"
@@ -1592,6 +1814,12 @@ def _route_justification(
         preprocessing_action
     )
     _ensure_route_confidence_score(confidence_score)
+    resolution = parsed_page_decision.manual_review_resolution
+    if resolution is not None:
+        return (
+            f"{resolution.decision.value} -> {parsed_route_name.value} "
+            f"par {resolution.reviewer_id}; motif: {resolution.reason}"
+        )
     if parsed_preprocessing_action is PagePreprocessingAction.OCR_PHYSICAL_PREPROCESSING:
         preprocessing_label = "prétraitement OCRmyPDF conditionnel"
     else:
@@ -1607,7 +1835,12 @@ def _dominant_route_name(page_routes: tuple[PageRoute, ...]) -> PageRouteName | 
     parsed_page_routes = _ensure_page_routes(page_routes)
     route_counts: dict[PageRouteName, int] = {}
     for page_route in parsed_page_routes:
+        if page_route.route_name is PageRouteName.SKIP_EMPTY:
+            continue
         route_counts[page_route.route_name] = route_counts.get(page_route.route_name, 0) + 1
+
+    if len(route_counts) == 0:
+        return None
 
     highest_count = max(route_counts.values())
     dominant_candidates = tuple(
@@ -1713,7 +1946,10 @@ __all__ = [
     "DocumentProcessingStarted",
     "ExistingOcrSignal",
     "LayoutComplexitySignal",
+    "ManualReviewDecisionType",
     "ManualReviewRequested",
+    "ManualReviewResolution",
+    "ManualReviewResolved",
     "NativeTextSignal",
     "PagePreprocessingAction",
     "PageCorruptionSignal",

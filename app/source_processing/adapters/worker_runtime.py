@@ -40,12 +40,12 @@ from app.source_processing.domain.document_processing_run import (
 from app.source_processing.application.routed_document_conversion_worker import (
     build_routed_document_conversion_worker,
 )
+from app.source_processing.application.routing_policy import (
+    build_document_routing_configuration,
+)
 
 
 MAX_TRANSIENT_ATTEMPTS = 3
-DOCUMENT_ROUTING_POLICY_VERSION = "routing-v1"
-DOCUMENT_ROUTING_AUTO_CONFIDENCE_MIN = 0.90
-DOCUMENT_ROUTING_BENCHMARK_CONFIDENCE_MIN = 0.85
 GEMMA_GATEWAY_LOCAL_SUPERVISION_OVERHEAD_SECONDS = 30
 
 
@@ -215,13 +215,7 @@ def _run_worker(
             original_source_store=persistence.original_source_store,
             inspector=build_m13_isolated_pdf_inspector(),
         ),
-        routing_configuration=PageRoutingConfiguration(
-            routing_policy_version=RoutingPolicyVersion.from_value(
-                DOCUMENT_ROUTING_POLICY_VERSION
-            ),
-            auto_confidence_min=DOCUMENT_ROUTING_AUTO_CONFIDENCE_MIN,
-            benchmark_confidence_min=DOCUMENT_ROUTING_BENCHMARK_CONFIDENCE_MIN,
-        ),
+        routing_configuration=build_document_routing_configuration(),
     )
     routed_conversion_worker = build_routed_document_conversion_worker(
         source_document_repository=persistence.source_document_repository,

@@ -38,6 +38,8 @@ from app.source_processing.domain.document_processing_run import (
     DocumentProcessingStarted,
     ExistingOcrSignal,
     LayoutComplexitySignal,
+    ManualReviewDecisionType,
+    ManualReviewResolution,
     NativeTextSignal,
     PageCorruptionSignal,
     PageDecision,
@@ -120,6 +122,10 @@ class _DecisionRow(NamedTuple):
     has_formula: bool
     diagnostic_version: str
     justification: str
+    manual_review_decision: str | None
+    manual_route_name: str | None
+    manual_reviewer_id: str | None
+    manual_review_reason: str | None
 
 
 class _DecisionDatabaseRow(NamedTuple):
@@ -136,6 +142,10 @@ class _DecisionDatabaseRow(NamedTuple):
     has_formula: bool
     diagnostic_version: str
     justification: str
+    manual_review_decision: str | None
+    manual_route_name: str | None
+    manual_reviewer_id: str | None
+    manual_review_reason: str | None
 
     @classmethod
     def from_database(cls, row: Any) -> _DecisionDatabaseRow:
@@ -1207,20 +1217,26 @@ class PostgresDocumentPersistence:
                     processing_run_id, page_number, page_state,
                     native_text_state, image_state, existing_ocr_state,
                     layout_complexity, corruption_state, mixed_content_detected,
-                    has_table, has_formula, diagnostic_version, justification
+                    has_table, has_formula, diagnostic_version, justification,
+                    manual_review_decision, manual_route_name,
+                    manual_reviewer_id, manual_review_reason
                 )
                 SELECT %s, batch.page_number, batch.page_state,
                        batch.native_text_state, batch.image_state,
                        batch.existing_ocr_state, batch.layout_complexity,
                        batch.corruption_state, batch.mixed_content_detected,
                        batch.has_table, batch.has_formula,
-                       batch.diagnostic_version, batch.justification
+                       batch.diagnostic_version, batch.justification,
+                       batch.manual_review_decision, batch.manual_route_name,
+                       batch.manual_reviewer_id, batch.manual_review_reason
                   FROM jsonb_to_recordset(%s::jsonb) AS batch(
                     page_number integer, page_state text, native_text_state text,
                     image_state text, existing_ocr_state text, layout_complexity text,
                     corruption_state text, mixed_content_detected boolean,
                     has_table boolean, has_formula boolean,
-                    diagnostic_version text, justification text
+                    diagnostic_version text, justification text,
+                    manual_review_decision text, manual_route_name text,
+                    manual_reviewer_id text, manual_review_reason text
                   )
                 """,
                 (
@@ -1240,6 +1256,27 @@ class PostgresDocumentPersistence:
                                 "has_formula": decision.signals.has_formula,
                                 "diagnostic_version": decision.diagnostic_version.value,
                                 "justification": decision.justification,
+                                "manual_review_decision": (
+                                    None
+                                    if decision.manual_review_resolution is None
+                                    else decision.manual_review_resolution.decision.value
+                                ),
+                                "manual_route_name": (
+                                    None
+                                    if decision.manual_review_resolution is None
+                                    or decision.manual_review_resolution.route_name is None
+                                    else decision.manual_review_resolution.route_name.value
+                                ),
+                                "manual_reviewer_id": (
+                                    None
+                                    if decision.manual_review_resolution is None
+                                    else decision.manual_review_resolution.reviewer_id
+                                ),
+                                "manual_review_reason": (
+                                    None
+                                    if decision.manual_review_resolution is None
+                                    else decision.manual_review_resolution.reason
+                                ),
                             }
                             for decision in processing_run.page_decisions
                         ],
@@ -1627,6 +1664,20 @@ def _source_from_row(row: Any) -> SourceDocument:
 
 
 def _decision_from_row(row: _DecisionRow) -> PageDecision:
+    resolution = (
+        None
+        if row.manual_review_decision is None
+        else ManualReviewResolution(
+            decision=ManualReviewDecisionType.from_value(row.manual_review_decision),
+            route_name=(
+                None
+                if row.manual_route_name is None
+                else PageRouteName.from_value(row.manual_route_name)
+            ),
+            reviewer_id=row.manual_reviewer_id,
+            reason=row.manual_review_reason,
+        )
+    )
     return PageDecision(
         page_number=PageNumber.from_value(row.page_number),
         page_state=PageDecisionState(row.page_state),
@@ -1642,6 +1693,7 @@ def _decision_from_row(row: _DecisionRow) -> PageDecision:
         ),
         diagnostic_version=DiagnosticVersion.from_value(row.diagnostic_version),
         justification=row.justification,
+        manual_review_resolution=resolution,
     )
 
 

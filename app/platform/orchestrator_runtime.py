@@ -86,6 +86,12 @@ from app.source_processing.application.document_queries import (
     DocumentQueryService,
 )
 from app.source_processing.application.original_queries import OriginalPdfQueryService
+from app.source_processing.application.resolve_manual_review import (
+    ResolveManualReviewHandler,
+)
+from app.source_processing.application.routing_policy import (
+    build_document_routing_configuration,
+)
 from app.research_answering.application.live_documentary_answer import (
     LiveDocumentaryAnswerService,
 )
@@ -416,6 +422,10 @@ def build_orchestrator_composition_root(
             document_http_adapter=SourceProcessingHttpAdapter(document_commands),
             document_conversion_http_adapter=SourceProcessingConversionHttpAdapter(
                 document_conversion_commands
+            ),
+            manual_review_handler=ResolveManualReviewHandler(
+                processing_run_repository=persistence.processing_run_repository,
+                routing_configuration=build_document_routing_configuration(),
             ),
             max_pdf_bytes=MAX_PDF_BYTES,
         )

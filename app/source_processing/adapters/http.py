@@ -20,7 +20,13 @@ from app.platform.orchestrator_api_models import (
     DocumentDuplicateResponse,
     DocumentRegisteredResponse,
     DOCUMENT_MULTIPART_OPENAPI,
+    ManualReviewDecisionRequest,
+    ManualReviewDecisionResponse,
     PUBLIC_ERROR_RESPONSES,
+)
+from app.source_processing.application.resolve_manual_review import (
+    ManualReviewConflictError,
+    ManualReviewSourceNotFoundError,
 )
 
 
@@ -46,10 +52,26 @@ class DocumentConversionHttpAdapter(Protocol):
         """Traite uniquement POST /v1/documents/{id}/convert."""
 
 
+class DocumentManualReviewHandler(Protocol):
+    """Port synchrone vers la décision humaine persistée."""
+
+    def resolve_manual_review(
+        self,
+        *,
+        document_id: str,
+        decision: str,
+        page_number: int | None,
+        route_name: str | None,
+        reviewer_id: str,
+        reason: str,
+    ) -> Mapping[str, Any]: ...
+
+
 def build_document_command_router(
     *,
     document_http_adapter: DocumentHttpAdapter,
     document_conversion_http_adapter: DocumentConversionHttpAdapter,
+    manual_review_handler: DocumentManualReviewHandler | None = None,
     max_pdf_bytes: int,
 ) -> APIRouter:
     """Construit les deux commandes documentaires et injecte leur adaptateur SP."""
@@ -59,6 +81,9 @@ def build_document_command_router(
         document_conversion_http_adapter
     )
     parsed_max_pdf_bytes = _ensure_max_pdf_bytes(max_pdf_bytes)
+    parsed_manual_review_handler = _ensure_manual_review_handler_or_none(
+        manual_review_handler
+    )
     router = APIRouter()
 
     @router.post(
@@ -123,6 +148,43 @@ def build_document_command_router(
             )
         )
         return _json_response(response)
+
+    if parsed_manual_review_handler is not None:
+
+        @router.post(
+            "/v1/documents/{document_id}/manual-review",
+            response_model=ManualReviewDecisionResponse,
+            status_code=200,
+            responses=PUBLIC_ERROR_RESPONSES,
+        )
+        def resolve_manual_review(
+            document_id: str,
+            payload: ManualReviewDecisionRequest,
+        ) -> JSONResponse:
+            try:
+                response = parsed_manual_review_handler.resolve_manual_review(
+                    document_id=document_id,
+                    decision=payload.decision,
+                    page_number=payload.page_number,
+                    route_name=payload.route_name,
+                    reviewer_id=payload.reviewer_id,
+                    reason=payload.reason,
+                )
+            except ManualReviewSourceNotFoundError:
+                return JSONResponse(
+                    status_code=404,
+                    content={"error_code": "SOURCE_NOT_FOUND", "document_id": document_id},
+                )
+            except ManualReviewConflictError as exc:
+                return JSONResponse(
+                    status_code=409,
+                    content={
+                        "error_code": "MANUAL_REVIEW_DECISION_REJECTED",
+                        "document_id": document_id,
+                        "reason": str(exc),
+                    },
+                )
+            return JSONResponse(status_code=200, content=dict(response))
 
     return router
 
@@ -216,6 +278,16 @@ def _ensure_document_conversion_http_adapter(value: Any) -> DocumentConversionHt
     return value
 
 
+def _ensure_manual_review_handler_or_none(
+    value: Any,
+) -> DocumentManualReviewHandler | None:
+    if value is None:
+        return None
+    if not callable(getattr(value, "resolve_manual_review", None)):
+        raise ValueError("manual_review_handler invalide")
+    return value
+
+
 def _ensure_max_pdf_bytes(value: Any) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or value < 1:
         raise ValueError("max_pdf_bytes invalide")
@@ -225,5 +297,6 @@ def _ensure_max_pdf_bytes(value: Any) -> int:
 __all__ = [
     "DocumentConversionHttpAdapter",
     "DocumentHttpAdapter",
+    "DocumentManualReviewHandler",
     "build_document_command_router",
 ]

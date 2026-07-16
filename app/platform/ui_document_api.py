@@ -21,6 +21,7 @@ from app.platform.orchestrator_api_models import (
     DocumentCorpusResponse,
     DocumentDiagnosticResponse,
     IndexAcceptedResponse,
+    ManualReviewDecisionResponse,
     ProjectionResponse,
 )
 from app.platform.orchestrator_asgi import MAX_REQUEST_BODY_BYTES
@@ -48,8 +49,11 @@ _CONVERT_PATH_PATTERN = re.compile(
 _INDEX_PATH_PATTERN = re.compile(
     rf"^/v1/documents/(?P<document_id>{_DOCUMENT_ID_PATTERN})/index$"
 )
+_MANUAL_REVIEW_PATH_PATTERN = re.compile(
+    rf"^/v1/documents/(?P<document_id>{_DOCUMENT_ID_PATTERN})/manual-review$"
+)
 _PUBLIC_DOCUMENT_PATH_PATTERN = re.compile(
-    r"^/v1/documents(?:/[^/]+(?:/(?:diagnose|convert|index|diagnostic/progress|diagnostic|conversion/progress|conversion|projection/progress|projection|original))?)?$"
+    r"^/v1/documents(?:/[^/]+(?:/(?:diagnose|convert|index|manual-review|diagnostic/progress|diagnostic|conversion/progress|conversion|projection/progress|projection|original))?)?$"
 )
 _PUBLIC_CONVERSATION_PATH_PATTERN = re.compile(
     r"^/v1/conversations(?:/CONV-[A-Za-z0-9-]+(?:/(?:messages|turns))?)?$"
@@ -454,6 +458,8 @@ class UiDocumentApiClient:
                         "conversion_status",
                         "qa_rejection_error_code",
                         "canonical_version_id",
+                        "converted_page_count",
+                        "skipped_empty_page_count",
                     )
                 ),
                 "conversion",
@@ -546,6 +552,8 @@ class UiDocumentApiClient:
                 _validate_diagnosis_response(response)
             elif _INDEX_PATH_PATTERN.fullmatch(parsed_path) is not None:
                 _validate_projection_command_response(response)
+            elif _MANUAL_REVIEW_PATH_PATTERN.fullmatch(parsed_path) is not None:
+                _validate_manual_review_response(response)
             else:
                 _validate_conversion_command_response(response)
         return response
@@ -862,6 +870,15 @@ def _validate_conversion_command_response(response: UiDocumentJsonResponse) -> N
         ConversionAcceptedResponse.model_validate(response.payload)
     except ValidationError as exc:
         raise ValueError("commande conversion publique incompatible") from exc
+
+
+def _validate_manual_review_response(response: UiDocumentJsonResponse) -> None:
+    if response.status_code != 200:
+        raise ValueError("statut revue manuelle public invalide")
+    try:
+        ManualReviewDecisionResponse.model_validate(response.payload)
+    except ValidationError as exc:
+        raise ValueError("commande de revue manuelle incompatible") from exc
 
 
 def _validate_projection_command_response(response: UiDocumentJsonResponse) -> None:

@@ -554,21 +554,76 @@ class TextAuthorityPageDecision:
         }
 
 
+class SkippedEmptyPageSource(str, Enum):
+    """Origine explicite de la décision de ne pas convertir une page vide."""
+
+    DIAGNOSTIC_EMPTY = "DIAGNOSTIC_EMPTY"
+    MANUAL_CONFIRMED_EMPTY = "MANUAL_CONFIRMED_EMPTY"
+
+
+@dataclass(frozen=True)
+class SkippedEmptyPage:
+    """Page sans autorité textuelle parce qu'elle est explicitement vide."""
+
+    page_number: PageNumber
+    source: SkippedEmptyPageSource
+    policy_version: str
+    justification: str
+    reviewer_id: str | None = None
+
+    def __post_init__(self) -> None:
+        _ensure_page_number(self.page_number)
+        if not isinstance(self.source, SkippedEmptyPageSource):
+            raise ValueError("origine de page vide ignorée invalide")
+        object.__setattr__(
+            self,
+            "policy_version",
+            _ensure_text(self.policy_version, "politique de page vide absente"),
+        )
+        object.__setattr__(
+            self,
+            "justification",
+            _ensure_text(self.justification, "justification de page vide absente"),
+        )
+        if self.source is SkippedEmptyPageSource.DIAGNOSTIC_EMPTY:
+            if self.reviewer_id is not None:
+                raise ValueError("réviseur interdit pour un diagnostic EMPTY")
+        else:
+            object.__setattr__(
+                self,
+                "reviewer_id",
+                _ensure_text(self.reviewer_id, "réviseur de page vide absent"),
+            )
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "page_pdf": self.page_number.value,
+            "source": self.source.value,
+            "policy_version": self.policy_version,
+            "justification": self.justification,
+            "reviewer_id": self.reviewer_id,
+        }
+
+
 @dataclass(frozen=True)
 class TextAuthorityManifest:
     """Manifeste d'autorité textuelle couvrant exactement les pages publiables."""
 
     page_manifest: PageManifest
     page_decisions: tuple[TextAuthorityPageDecision, ...]
+    skipped_empty_pages: tuple[SkippedEmptyPage, ...] = ()
 
     def __post_init__(self) -> None:
         parsed_page_manifest = _ensure_page_manifest(self.page_manifest)
         decisions = _ensure_text_authority_page_decisions(self.page_decisions)
+        skipped_pages = _ensure_skipped_empty_pages(self.skipped_empty_pages)
         _ensure_text_authority_manifest_covers_page_manifest(
             page_manifest=parsed_page_manifest,
             page_decisions=decisions,
+            skipped_empty_pages=skipped_pages,
         )
         object.__setattr__(self, "page_decisions", decisions)
+        object.__setattr__(self, "skipped_empty_pages", skipped_pages)
 
     @classmethod
     def from_page_decisions(
@@ -576,10 +631,12 @@ class TextAuthorityManifest:
         *,
         page_manifest: PageManifest,
         page_decisions: Sequence[TextAuthorityPageDecision],
+        skipped_empty_pages: Sequence[SkippedEmptyPage] = (),
     ) -> "TextAuthorityManifest":
         return cls(
             page_manifest=page_manifest,
             page_decisions=tuple(page_decisions),
+            skipped_empty_pages=tuple(skipped_empty_pages),
         )
 
     @property
@@ -602,6 +659,9 @@ class TextAuthorityManifest:
     def to_payload(self) -> dict[str, Any]:
         return {
             "entries": tuple(decision.to_payload() for decision in self.page_decisions),
+            "skipped_empty_pages": tuple(
+                page.to_payload() for page in self.skipped_empty_pages
+            ),
         }
 
 
@@ -1032,6 +1092,7 @@ class CanonicalAcceptancePolicy:
         _ensure_text_authority_manifest_covers_page_manifest(
             page_manifest=parsed_page_manifest,
             page_decisions=parsed_text_authority_manifest.page_decisions,
+            skipped_empty_pages=parsed_text_authority_manifest.skipped_empty_pages,
         )
         parsed_findings = _ensure_post_conversion_findings(findings)
         generated_findings = _post_conversion_integrity_findings(
@@ -1073,6 +1134,7 @@ class CanonicalAcceptancePolicy:
         _ensure_text_authority_manifest_covers_page_manifest(
             page_manifest=parsed_page_manifest,
             page_decisions=parsed_text_authority_manifest.page_decisions,
+            skipped_empty_pages=parsed_text_authority_manifest.skipped_empty_pages,
         )
 
         findings = parsed_post_report.findings
@@ -1365,6 +1427,7 @@ class PagewiseDoclingFusionService:
         _ensure_text_authority_manifest_covers_page_manifest(
             page_manifest=parsed_page_manifest,
             page_decisions=parsed_text_authority_manifest.page_decisions,
+            skipped_empty_pages=parsed_text_authority_manifest.skipped_empty_pages,
         )
         return self.merge(
             document_id=document_id,
@@ -1373,6 +1436,10 @@ class PagewiseDoclingFusionService:
             original_storage_ref=original_storage_ref,
             page_manifest=parsed_page_manifest,
             page_outputs=parsed_text_authority_manifest.selected_page_outputs(),
+            skipped_page_numbers=tuple(
+                page.page_number
+                for page in parsed_text_authority_manifest.skipped_empty_pages
+            ),
         )
 
     def merge(
@@ -1384,6 +1451,7 @@ class PagewiseDoclingFusionService:
         original_storage_ref: OriginalStorageRef,
         page_manifest: PageManifest,
         page_outputs: Sequence[PageConversionArtifact],
+        skipped_page_numbers: Sequence[PageNumber] = (),
     ) -> PagewiseDoclingDocument:
         parsed_document_id = _ensure_document_id(document_id)
         parsed_canonical_version_id = _ensure_domain_identifier(
@@ -1395,9 +1463,11 @@ class PagewiseDoclingFusionService:
         parsed_original_storage_ref = _ensure_original_storage_ref(original_storage_ref)
         parsed_manifest = _ensure_page_manifest(page_manifest)
         parsed_outputs = _ensure_page_outputs(page_outputs)
+        parsed_skipped_pages = _ensure_skipped_page_numbers(skipped_page_numbers)
         _ensure_page_outputs_cover_manifest(
             page_manifest=parsed_manifest,
             page_outputs=parsed_outputs,
+            skipped_page_numbers=parsed_skipped_pages,
         )
 
         pages = tuple(
@@ -1712,6 +1782,7 @@ def _text_authority_document_findings(
     _ensure_text_authority_manifest_covers_page_manifest(
         page_manifest=page_manifest,
         page_decisions=parsed_text_authority_manifest.page_decisions,
+        skipped_empty_pages=parsed_text_authority_manifest.skipped_empty_pages,
     )
     authorized_pages = {
         page_output.page_number.value: _canonical_page_signature(
@@ -1935,24 +2006,49 @@ def _ensure_text_authority_manifest(
     return value
 
 
+def _ensure_skipped_empty_pages(
+    value: Sequence[SkippedEmptyPage],
+) -> tuple[SkippedEmptyPage, ...]:
+    if value is None or isinstance(value, (str, bytes)) or not isinstance(value, Sequence):
+        raise ValueError("pages vides ignorées invalides")
+    pages = tuple(value)
+    for page in pages:
+        if not isinstance(page, SkippedEmptyPage):
+            raise ValueError("page vide ignorée invalide")
+    page_numbers = tuple(page.page_number.value for page in pages)
+    if page_numbers != tuple(sorted(set(page_numbers))):
+        raise ValueError("pages vides ignorées incohérentes")
+    return pages
+
+
 def _ensure_text_authority_manifest_covers_page_manifest(
     *,
     page_manifest: PageManifest,
     page_decisions: tuple[TextAuthorityPageDecision, ...],
+    skipped_empty_pages: tuple[SkippedEmptyPage, ...] = (),
 ) -> None:
-    expected_pages = tuple(entry.page_number.value for entry in page_manifest.entries)
+    expected_pages = tuple(
+        entry.page_number.value
+        for entry in page_manifest.entries
+    )
     actual_pages = tuple(decision.page_number.value for decision in page_decisions)
+    skipped_pages = tuple(page.page_number.value for page in skipped_empty_pages)
     if len(actual_pages) != len(set(actual_pages)):
         raise TextAuthoritySelectionError(
             _PAGE_AUTHORITY_AMBIGUOUS,
             "plusieurs autorités textuelles pour une page",
         )
-    if set(actual_pages) != set(expected_pages):
+    if set(actual_pages).intersection(skipped_pages):
+        raise TextAuthoritySelectionError(
+            _PAGE_AUTHORITY_AMBIGUOUS,
+            "page convertie et ignorée simultanément",
+        )
+    if set(actual_pages).union(skipped_pages) != set(expected_pages):
         raise TextAuthoritySelectionError(
             _PAGE_AUTHORITY_MISSING,
             "autorité textuelle absente pour une page publiée",
         )
-    if actual_pages != expected_pages:
+    if tuple(sorted(actual_pages + skipped_pages)) != expected_pages:
         raise TextAuthoritySelectionError(
             _PAGE_AUTHORITY_AMBIGUOUS,
             "ordre des autorités textuelles ambigu",
@@ -2139,9 +2235,9 @@ def _ensure_document_pages(
 
 
 def _ensure_document_page_order(pages: tuple[CanonicalDocumentPage, ...]) -> None:
-    for expected_page_number, page in enumerate(pages, start=1):
-        if page.page_number.value != expected_page_number:
-            raise ValueError("ordre strict des pages invalide")
+    page_numbers = tuple(page.page_number.value for page in pages)
+    if page_numbers != tuple(sorted(set(page_numbers))):
+        raise ValueError("ordre strict des pages invalide")
 
 
 def _ensure_unique_item_ids(pages: tuple[CanonicalDocumentPage, ...]) -> None:
@@ -2176,13 +2272,31 @@ def _ensure_page_outputs_cover_manifest(
     *,
     page_manifest: PageManifest,
     page_outputs: tuple[PageConversionArtifact, ...],
+    skipped_page_numbers: tuple[PageNumber, ...] = (),
 ) -> None:
     expected_pages = tuple(entry.page_number.value for entry in page_manifest.entries)
     actual_pages = tuple(output.page_number.value for output in page_outputs)
-    if set(actual_pages) != set(expected_pages):
+    skipped_pages = tuple(page.value for page in skipped_page_numbers)
+    if set(actual_pages).intersection(skipped_pages):
+        raise ValueError("page convertie et ignorée")
+    if set(actual_pages).union(skipped_pages) != set(expected_pages):
         raise ValueError("page de conversion manquante")
-    if actual_pages != expected_pages:
+    if tuple(sorted(actual_pages + skipped_pages)) != expected_pages:
         raise ValueError("ordre strict des pages invalide")
+
+
+def _ensure_skipped_page_numbers(
+    value: Sequence[PageNumber],
+) -> tuple[PageNumber, ...]:
+    if value is None or isinstance(value, (str, bytes)) or not isinstance(value, Sequence):
+        raise ValueError("pages ignorées invalides")
+    pages = tuple(value)
+    for page in pages:
+        _ensure_page_number(page)
+    values = tuple(page.value for page in pages)
+    if values != tuple(sorted(set(values))):
+        raise ValueError("pages ignorées incohérentes")
+    return pages
 
 
 def _ensure_document_id(value: Any) -> DocumentId:
@@ -2228,6 +2342,8 @@ __all__ = [
     "PreprocessedPageArtifact",
     "QualityDecisionStatus",
     "QualityFindingCode",
+    "SkippedEmptyPage",
+    "SkippedEmptyPageSource",
     "TextAuthority",
     "TextAuthorityManifest",
     "TextAuthorityPageDecision",

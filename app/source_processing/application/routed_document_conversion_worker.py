@@ -69,7 +69,12 @@ from app.source_processing.application.publish_canonical_source import (
     PublishCanonicalSourceHandler,
 )
 from app.source_processing.domain.canonical_source import canonical_source_id_for
-from app.source_processing.domain.document_processing_run import PageNumber, PageRouteName
+from app.source_processing.domain.document_processing_run import (
+    ManualReviewDecisionType,
+    PageDecisionState,
+    PageNumber,
+    PageRouteName,
+)
 from app.source_processing.domain.page_conversion import (
     CanonicalAcceptancePolicy,
     ConversionToolName,
@@ -83,6 +88,8 @@ from app.source_processing.domain.page_conversion import (
     PreConversionQualityReport,
     PreConversionRouteComparison,
     QualityDecisionStatus,
+    SkippedEmptyPage,
+    SkippedEmptyPageSource,
     TextAuthorityManifest,
     TextAuthoritySelectionPolicy,
 )
@@ -489,7 +496,16 @@ class RoutedDocumentConversionWorker:
                 max_parallel_pages=self._max_parallel_pages,
             )
             completed_lock = threading.Lock()
-            completed_units = 0
+            completed_units = sum(
+                1
+                for route in processing_run.route_plan.page_routes
+                if route.route_name is PageRouteName.SKIP_EMPTY
+            )
+            if completed_units > 0:
+                self._conversion_repository.record_conversion_progress(
+                    document_id=document_id,
+                    completed_units=completed_units,
+                )
 
             def record_completed_page(page_output: PageConversionArtifact) -> None:
                 del page_output
@@ -523,7 +539,10 @@ class RoutedDocumentConversionWorker:
         except ValueError as error:
             raise WorkerProcessingError("DOCLING_PAGE_MANIFEST_MISMATCH", retryable=False) from error
 
-        authority_manifest = _authority_manifest(page_manifest=processing_run.page_manifest, page_outputs=result.page_outputs)
+        authority_manifest = _authority_manifest(
+            processing_run=processing_run,
+            page_outputs=result.page_outputs,
+        )
         canonical_version_id = _canonical_version_id(source_sha256)
         docling_document = result.docling_document
         quality_policy = CanonicalAcceptancePolicy(policy_version="m004-routed-docling-v1")
@@ -755,10 +774,47 @@ def _gemma_page_output(
     )
 
 
-def _authority_manifest(*, page_manifest: Any, page_outputs: Sequence[PageConversionArtifact]) -> TextAuthorityManifest:
+def _authority_manifest(
+    *,
+    processing_run: Any,
+    page_outputs: Sequence[PageConversionArtifact],
+) -> TextAuthorityManifest:
     policy = TextAuthoritySelectionPolicy(policy_version="m004-routed-docling-v1")
+    skipped_pages: list[SkippedEmptyPage] = []
+    for route in processing_run.route_plan.page_routes:
+        if route.route_name is not PageRouteName.SKIP_EMPTY:
+            continue
+        decision = next(
+            candidate
+            for candidate in processing_run.page_decisions
+            if candidate.page_number == route.page_number
+        )
+        resolution = decision.manual_review_resolution
+        if resolution is None:
+            if decision.page_state is not PageDecisionState.EMPTY:
+                raise ValueError("SKIP_EMPTY sans diagnostic EMPTY")
+            skipped_pages.append(
+                SkippedEmptyPage(
+                    page_number=route.page_number,
+                    source=SkippedEmptyPageSource.DIAGNOSTIC_EMPTY,
+                    policy_version=route.routing_policy_version.value,
+                    justification=decision.justification,
+                )
+            )
+        else:
+            if resolution.decision is not ManualReviewDecisionType.CONFIRM_EMPTY:
+                raise ValueError("SKIP_EMPTY sans confirmation manuelle")
+            skipped_pages.append(
+                SkippedEmptyPage(
+                    page_number=route.page_number,
+                    source=SkippedEmptyPageSource.MANUAL_CONFIRMED_EMPTY,
+                    policy_version=route.routing_policy_version.value,
+                    justification=resolution.reason,
+                    reviewer_id=resolution.reviewer_id,
+                )
+            )
     return TextAuthorityManifest.from_page_decisions(
-        page_manifest=page_manifest,
+        page_manifest=processing_run.page_manifest,
         page_decisions=tuple(
             policy.select(
                 page_number=output.page_number,
@@ -768,6 +824,7 @@ def _authority_manifest(*, page_manifest: Any, page_outputs: Sequence[PageConver
             )
             for output in page_outputs
         ),
+        skipped_empty_pages=tuple(skipped_pages),
     )
 
 

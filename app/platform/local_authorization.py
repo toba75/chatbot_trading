@@ -71,6 +71,7 @@ def _is_persistent_document_mutation(path: Any) -> bool:
             and (
                 path.endswith("/diagnose")
                 or path.endswith("/convert")
+                or path.endswith("/manual-review")
             )
         )
     )

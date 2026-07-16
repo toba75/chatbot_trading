@@ -93,6 +93,9 @@ from app.platform.ui_conversation_api import (
 )
 _DIAGNOSE_PATH_PATTERN = re.compile(r"^/v1/documents/(?P<document_id>[^/]+)/diagnose$")
 _CONVERT_PATH_PATTERN = re.compile(r"^/v1/documents/(?P<document_id>[^/]+)/convert$")
+_MANUAL_REVIEW_PATH_PATTERN = re.compile(
+    r"^/v1/documents/(?P<document_id>[^/]+)/manual-review$"
+)
 _INDEX_PATH_PATTERN = re.compile(r"^/v1/documents/(?P<document_id>[^/]+)/index$")
 _UI_CONVERSATION_PATH_PATTERN = re.compile(r"^/ui/conversations/(?P<conversation_id>CONV-[^/]+)$")
 _UI_CONVERSATION_MESSAGE_PATH_PATTERN = re.compile(
@@ -526,7 +529,46 @@ def _serve_http(
                             ui_execution_context
                         ),
                     )
-                    if _INDEX_PATH_PATTERN.fullmatch(self.path) is not None:
+                    manual_review_match = _MANUAL_REVIEW_PATH_PATTERN.fullmatch(self.path)
+                    if manual_review_match is not None:
+                        raw_body = self.rfile.read(content_length)
+                        if content_type.split(";", 1)[0].strip().lower() != "application/x-www-form-urlencoded":
+                            raise UiDocumentCommandForbiddenError("format revue manuelle UI invalide")
+                        form = parse_qs(raw_body.decode("utf-8"), strict_parsing=True)
+                        if any(len(values) != 1 for values in form.values()):
+                            raise UiDocumentCommandForbiddenError("formulaire revue manuelle invalide")
+                        decision_values = form.get("decision")
+                        reviewer_values = form.get("reviewer_id")
+                        reason_values = form.get("reason")
+                        if decision_values is None or reviewer_values is None or reason_values is None:
+                            raise UiDocumentCommandForbiddenError("formulaire revue manuelle incomplet")
+                        decision = decision_values[0]
+                        allowed_fields = {"decision", "reviewer_id", "reason"}
+                        payload: dict[str, Any] = {
+                            "decision": decision,
+                            "reviewer_id": reviewer_values[0],
+                            "reason": reason_values[0],
+                        }
+                        if decision != "REJECT_DOCUMENT":
+                            page_values = form.get("page_number")
+                            if page_values is None or not page_values[0].isdecimal():
+                                raise UiDocumentCommandForbiddenError("page de revue manuelle invalide")
+                            payload["page_number"] = int(page_values[0])
+                            allowed_fields.add("page_number")
+                        if decision == "ASSIGN_ROUTE":
+                            route_values = form.get("route_name")
+                            if route_values is None:
+                                raise UiDocumentCommandForbiddenError("route de revue manuelle absente")
+                            payload["route_name"] = route_values[0]
+                            allowed_fields.add("route_name")
+                        if set(form) != allowed_fields:
+                            raise UiDocumentCommandForbiddenError("champs de revue manuelle interdits")
+                        response = client.forward_document_command(
+                            path=self.path,
+                            body=json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8"),
+                            content_type="application/json",
+                        )
+                    elif _INDEX_PATH_PATTERN.fullmatch(self.path) is not None:
                         raw_body = self.rfile.read(content_length)
                         if content_type.split(";", 1)[0].strip().lower() != "application/x-www-form-urlencoded":
                             raise UiDocumentCommandForbiddenError("format projection UI invalide")
@@ -596,6 +638,12 @@ def _serve_http(
                     _write_redirect_response(
                         self,
                         location=f"/ui/documents/{document_id}/conversion",
+                    )
+                elif response.status_code < 400 and _MANUAL_REVIEW_PATH_PATTERN.fullmatch(self.path):
+                    document_id = str(response.payload.get("document_id", ""))
+                    _write_redirect_response(
+                        self,
+                        location=f"/ui/documents/{document_id}/diagnostic",
                     )
                 elif response.status_code < 400 and _INDEX_PATH_PATTERN.fullmatch(self.path):
                     document_id = str(response.payload.get("document_id", ""))

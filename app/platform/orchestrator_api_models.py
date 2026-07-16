@@ -295,6 +295,45 @@ class DiagnosticAcceptedResponse(PublicApiModel):
     diagnostic_status: PublicDiagnosticStatus
 
 
+class ManualReviewDecisionRequest(PublicApiModel):
+    decision: Literal["CONFIRM_EMPTY", "ASSIGN_ROUTE", "REJECT_DOCUMENT"]
+    page_number: int | None = Field(default=None, ge=1)
+    route_name: Literal[
+        "NATIVE_STANDARD",
+        "SCAN_GRANITE",
+        "PREPROCESS_GRANITE",
+        "BAD_OCR_TO_GRANITE",
+        "MIXED_PAGEWISE",
+        "TARGETED_ENRICHMENT",
+    ] | None = None
+    reviewer_id: str = Field(min_length=1, max_length=128)
+    reason: str = Field(min_length=1, max_length=512)
+
+    @model_validator(mode="after")
+    def validate_manual_review_decision(self) -> "ManualReviewDecisionRequest":
+        if self.reviewer_id != self.reviewer_id.strip() or self.reason != self.reason.strip():
+            raise ValueError("champs de revue manuelle non normalisés")
+        if self.decision == "REJECT_DOCUMENT":
+            if self.page_number is not None or self.route_name is not None:
+                raise ValueError("page ou route interdite pour le rejet")
+        elif self.page_number is None:
+            raise ValueError("page de revue manuelle requise")
+        elif self.decision == "CONFIRM_EMPTY":
+            if self.route_name is not None:
+                raise ValueError("route interdite pour une page vide")
+        elif self.route_name is None:
+            raise ValueError("route manuelle requise")
+        return self
+
+
+class ManualReviewDecisionResponse(PublicApiModel):
+    document_id: str
+    diagnostic_status: PublicDiagnosticStatus
+    decision: Literal["CONFIRM_EMPTY", "ASSIGN_ROUTE", "REJECT_DOCUMENT"]
+    page_number: int | None = Field(default=None, ge=1)
+    route_name: str | None
+
+
 class ConversionAcceptedResponse(PublicApiModel):
     document_id: str
     conversion_status: PublicConversionStatus
@@ -400,6 +439,8 @@ class PageDiagnosticSignalsResponse(PublicApiModel):
     has_formula: bool
     diagnostic_version: str
     justification: str
+    manual_review_required: bool = False
+    manual_review_resolution: dict[str, str | None] | None = None
 
 
 class PageRouteResponse(PublicApiModel):
@@ -434,6 +475,8 @@ class DocumentConversionResponse(PublicApiModel):
     conversion_status: PublicConversionStatus
     qa_rejection_error_code: str | None
     canonical_version_id: str | None
+    converted_page_count: int = Field(ge=0)
+    skipped_empty_page_count: int = Field(ge=0)
 
     @model_validator(mode="after")
     def validate_conversion_outputs(self) -> "DocumentConversionResponse":
@@ -594,6 +637,8 @@ __all__ = [
     "DocumentRegisteredResponse",
     "DOCUMENT_MULTIPART_OPENAPI",
     "KnowledgeProjectionResponse",
+    "ManualReviewDecisionRequest",
+    "ManualReviewDecisionResponse",
     "IndexRequest",
     "IndexUnavailableResponse",
     "PageDiagnosticSignalsResponse",

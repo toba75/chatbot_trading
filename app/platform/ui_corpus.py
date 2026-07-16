@@ -486,6 +486,7 @@ def render_document_inspection(
             for page in pages
             if isinstance(page, Mapping)
         )
+        review_controls = _render_manual_review_controls(payload)
         content = "".join(
             (
                 '<section aria-labelledby="resume-diagnostic">',
@@ -493,7 +494,7 @@ def render_document_inspection(
                 progress_html,
                 f'<p>Statut : <code>{_escape(str(payload.get("diagnostic_status")))}</code></p>',
                 f'<p>Pages diagnostiquées : {_escape(str(payload.get("diagnosed_page_count")))} / {_escape(str(payload.get("source_page_count")))}</p>',
-                f"<ol>{page_items}</ol></section>",
+                f"<ol>{page_items}</ol>{review_controls}</section>",
             )
         )
     elif parsed_title.casefold() == "conversion":
@@ -519,6 +520,8 @@ def render_document_inspection(
                 '<h2 id="resume-conversion">Résumé de la conversion</h2>',
                 progress_html,
                 f'<p>Statut : <code>{_escape(str(payload.get("conversion_status")))}</code></p>',
+                f'<p>Pages converties : {_escape(str(payload.get("converted_page_count")))}</p>',
+                f'<p>Pages vides ignorées : {_escape(str(payload.get("skipped_empty_page_count")))}</p>',
                 canonical_html,
                 rejection_html,
                 "</section>",
@@ -565,6 +568,72 @@ def render_document_inspection(
             "</body>",
             "</html>",
         )
+    )
+
+
+def _render_manual_review_controls(payload: Mapping[str, Any]) -> str:
+    if payload.get("diagnostic_status") != "MANUAL_REVIEW":
+        return ""
+    document_id = _ensure_document_id(payload.get("document_id"))
+    pages = payload.get("pages")
+    if not isinstance(pages, list):
+        raise ValueError("pages de revue manuelle requises")
+    pending_pages = tuple(
+        page
+        for page in pages
+        if isinstance(page, Mapping)
+        and isinstance(page.get("diagnostic"), Mapping)
+        and page["diagnostic"].get("manual_review_required") is True
+        and page["diagnostic"].get("manual_review_resolution") is None
+    )
+    if len(pending_pages) == 0:
+        raise ValueError("revue manuelle sans page actionnable")
+    action = f"/v1/documents/{_escape(document_id)}/manual-review"
+    route_options = "".join(
+        f'<option value="{route}">{route}</option>'
+        for route in (
+            "NATIVE_STANDARD",
+            "SCAN_GRANITE",
+            "PREPROCESS_GRANITE",
+            "BAD_OCR_TO_GRANITE",
+            "MIXED_PAGEWISE",
+            "TARGETED_ENRICHMENT",
+        )
+    )
+    page_controls = "".join(
+        "".join(
+            (
+                f'<fieldset><legend>Décision pour la page {_escape(str(page["page_number"]))}</legend>',
+                f'<form method="post" action="{action}">',
+                '<input type="hidden" name="decision" value="CONFIRM_EMPTY">',
+                f'<input type="hidden" name="page_number" value="{_escape(str(page["page_number"]))}">',
+                '<label>Réviseur <input name="reviewer_id" required maxlength="128"></label>',
+                '<label>Motif <input name="reason" required maxlength="512"></label>',
+                '<button type="submit">Confirmer comme page vide</button></form>',
+                f'<form method="post" action="{action}">',
+                '<input type="hidden" name="decision" value="ASSIGN_ROUTE">',
+                f'<input type="hidden" name="page_number" value="{_escape(str(page["page_number"]))}">',
+                f'<label>Route <select name="route_name" required>{route_options}</select></label>',
+                '<label>Réviseur <input name="reviewer_id" required maxlength="128"></label>',
+                '<label>Motif <input name="reason" required maxlength="512"></label>',
+                '<button type="submit">Assigner la route</button></form></fieldset>',
+            )
+        )
+        for page in pending_pages
+    )
+    reject_control = "".join(
+        (
+            f'<form method="post" action="{action}">',
+            '<input type="hidden" name="decision" value="REJECT_DOCUMENT">',
+            '<label>Réviseur <input name="reviewer_id" required maxlength="128"></label>',
+            '<label>Motif <input name="reason" required maxlength="512"></label>',
+            '<button type="submit">Rejeter le document</button></form>',
+        )
+    )
+    return (
+        '<section aria-labelledby="revue-manuelle"><h2 id="revue-manuelle">'
+        "Revue manuelle</h2>"
+        f"{page_controls}{reject_control}</section>"
     )
 
 
@@ -703,13 +772,20 @@ def _render_diagnostic_cell(document: CorpusPdfDocument) -> str:
     if parsed_document.diagnostic_status != "DIAGNOSTIC_NOT_REQUESTED":
         reason = parsed_document.manual_review_reason or parsed_document.failure_error_code
         reason_html = "" if reason is None else f"<br><strong>Motif :</strong> {_escape(reason)}"
+        inspection_label = (
+            "Examiner la revue"
+            if parsed_document.diagnostic_status == "MANUAL_REVIEW"
+            else "Inspecter"
+        )
         return "".join(
             (
                 diagnostic_status,
                 reason_html,
                 '<br><a href="/ui/documents/',
                 _escape(parsed_document.document_id),
-                '/diagnostic">Inspecter</a>',
+                '/diagnostic">',
+                inspection_label,
+                "</a>",
             )
         )
     escaped_document_id = _escape(parsed_document.document_id)
