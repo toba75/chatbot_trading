@@ -27,6 +27,7 @@ _GATEWAY_GEMMA_OUTPUT_ERROR_CODES = frozenset(
         "LLM_RESPONSE_SCHEMA_INVALID",
     }
 )
+_GATEWAY_GEMMA_TRUNCATED_ERROR_CODES = frozenset({"LLM_PARTIAL_OUTPUT"})
 _PAGE_TRANSCRIPTION_PROMPT = (
     "Transcris uniquement le texte documentaire visible de cette page PDF. "
     "Regroupe les éléments adjacents en régions de lecture complètes. "
@@ -57,10 +58,14 @@ def _convert(payload: Mapping[str, Any]) -> dict[str, object]:
     source_sha256 = _required_text(payload, "source_sha256")
     if not source_path.is_file() or hashlib.sha256(source_path.read_bytes()).hexdigest() != source_sha256:
         raise GemmaVisionConversionError("GEMMA_VISION_SOURCE_INVALID")
+    render_rotation_degrees = _required_render_rotation_degrees(payload)
+    render_segment_index, render_segment_count = _required_render_segment(payload)
     image_bytes = _render_page_png(
         source_path=source_path,
         source_page_number=_required_positive_int(payload, "source_page_number"),
-        render_rotation_degrees=_required_render_rotation_degrees(payload),
+        render_rotation_degrees=render_rotation_degrees,
+        render_segment_index=render_segment_index,
+        render_segment_count=render_segment_count,
     )
     image = LlmInferenceImage(
         media_type="image/png",
@@ -70,22 +75,35 @@ def _convert(payload: Mapping[str, Any]) -> dict[str, object]:
     document_id = _required_text(payload, "document_id")
     processing_run_id = _required_text(payload, "processing_run_id")
     page_number = _required_positive_int(payload, "page_number")
+    identity_suffix = _request_identity_suffix(
+        render_rotation_degrees=render_rotation_degrees,
+        render_segment_index=render_segment_index,
+        render_segment_count=render_segment_count,
+    )
     request = LlmInferenceRequest(
         messages=(
             LlmInferenceImageMessage(
                 role="user",
-                content=_PAGE_TRANSCRIPTION_PROMPT,
+                content=_transcription_prompt(
+                    render_segment_index=render_segment_index,
+                    render_segment_count=render_segment_count,
+                ),
                 images=(image,),
             ),
         ),
         output_schema=_output_schema(),
         schema_name="source_processing_page_conversion",
-        schema_version="1.1",
-        trace_id=f"TRACE-M004-GEMMA-{document_id.removeprefix('DOC-')}-P{page_number:03d}",
-        request_id=f"REQ-M004-GEMMA-{processing_run_id}-P{page_number:03d}",
-        idempotency_key=f"IDEMP-M004-GEMMA-{processing_run_id}-P{page_number:03d}",
+        schema_version="1.2",
+        trace_id=(
+            f"TRACE-M004-GEMMA-{document_id.removeprefix('DOC-')}-"
+            f"P{page_number:03d}-{identity_suffix}"
+        ),
+        request_id=f"REQ-M004-GEMMA-{processing_run_id}-P{page_number:03d}-{identity_suffix}",
+        idempotency_key=(
+            f"IDEMP-M004-GEMMA-{processing_run_id}-P{page_number:03d}-{identity_suffix}"
+        ),
         prompt_id="m004-gemma-vision-page-conversion",
-        prompt_version="1.1",
+        prompt_version="1.2",
         sampling_parameters={
             "temperature": 0.0,
             "max_tokens": _required_positive_int(payload, "max_output_tokens"),
@@ -99,6 +117,8 @@ def _convert(payload: Mapping[str, Any]) -> dict[str, object]:
         gateway_error_code = response.payload.get("error_code")
         if gateway_error_code in _GATEWAY_GEMMA_OUTPUT_ERROR_CODES:
             raise GemmaVisionConversionError("GEMMA_VISION_OUTPUT_INVALID")
+        if gateway_error_code in _GATEWAY_GEMMA_TRUNCATED_ERROR_CODES:
+            raise GemmaVisionConversionError("GEMMA_VISION_OUTPUT_TRUNCATED")
         raise GemmaVisionConversionError("GEMMA_VISION_UNAVAILABLE")
     structured_output = response.payload.get("structured_output")
     provenance = response.payload.get("provenance")
@@ -109,10 +129,11 @@ def _convert(payload: Mapping[str, Any]) -> dict[str, object]:
         raise GemmaVisionConversionError("GEMMA_VISION_MODEL_MISMATCH")
     model_revision = _required_text(provenance, "model_revision")
     runtime_version = _required_text(provenance, "runtime_version")
-    render_rotation_degrees = _required_render_rotation_degrees(payload)
     items = _structured_items(
         structured_output,
         render_rotation_degrees=render_rotation_degrees,
+        render_segment_index=render_segment_index,
+        render_segment_count=render_segment_count,
     )
     return {
         "tool_version": _tool_version(
@@ -120,6 +141,8 @@ def _convert(payload: Mapping[str, Any]) -> dict[str, object]:
             model_revision=model_revision,
             runtime_version=runtime_version,
             render_rotation_degrees=render_rotation_degrees,
+            render_segment_index=render_segment_index,
+            render_segment_count=render_segment_count,
         ),
         "items": items,
     }
@@ -130,6 +153,8 @@ def _render_page_png(
     source_path: Path,
     source_page_number: int,
     render_rotation_degrees: int,
+    render_segment_index: int | None,
+    render_segment_count: int | None,
 ) -> bytes:
     try:
         import pypdfium2
@@ -140,6 +165,10 @@ def _render_page_png(
         page = document[source_page_number - 1]
         bitmap = page.render(scale=1.5, rotation=render_rotation_degrees)
         image = bitmap.to_pil()
+        if render_segment_index is not None and render_segment_count is not None:
+            top = image.height * (render_segment_index - 1) // render_segment_count
+            bottom = image.height * render_segment_index // render_segment_count
+            image = image.crop((0, top, image.width, bottom))
         buffer = io.BytesIO()
         image.save(buffer, format="PNG", optimize=True)
         rendered = buffer.getvalue()
@@ -156,6 +185,8 @@ def _structured_items(
     structured_output: Mapping[str, Any],
     *,
     render_rotation_degrees: int,
+    render_segment_index: int | None = None,
+    render_segment_count: int | None = None,
 ) -> list[dict[str, object]]:
     if set(structured_output) != {"items"} or not isinstance(structured_output["items"], list):
         raise GemmaVisionConversionError("GEMMA_VISION_OUTPUT_INVALID")
@@ -176,11 +207,16 @@ def _structured_items(
         normalized_bbox = [min(left, right), min(top, bottom), max(left, right), max(top, bottom)]
         if normalized_bbox[0] == normalized_bbox[2] or normalized_bbox[1] == normalized_bbox[3]:
             raise GemmaVisionConversionError("GEMMA_VISION_OUTPUT_INVALID")
+        bbox_dans_rendu_complet = _bbox_dans_rendu_complet(
+            normalized_bbox,
+            render_segment_index=render_segment_index,
+            render_segment_count=render_segment_count,
+        )
         items.append(
             {
                 "text": text,
                 "bbox": _bbox_dans_repere_source(
-                    normalized_bbox,
+                    bbox_dans_rendu_complet,
                     render_rotation_degrees=render_rotation_degrees,
                 ),
             }
@@ -188,6 +224,26 @@ def _structured_items(
     if len(items) == 0:
         raise GemmaVisionConversionError("GEMMA_VISION_OUTPUT_INVALID")
     return items
+
+
+def _bbox_dans_rendu_complet(
+    bbox: list[int | float],
+    *,
+    render_segment_index: int | None,
+    render_segment_count: int | None,
+) -> list[int | float]:
+    if render_segment_index is None and render_segment_count is None:
+        return list(bbox)
+    if render_segment_index not in (1, 2) or render_segment_count != 2:
+        raise GemmaVisionConversionError("GEMMA_VISION_REQUEST_INVALID")
+    left, top, right, bottom = bbox
+    segment_offset = 1000 * (render_segment_index - 1) / render_segment_count
+    return [
+        left,
+        segment_offset + top / render_segment_count,
+        right,
+        segment_offset + bottom / render_segment_count,
+    ]
 
 
 def _bbox_dans_repere_source(
@@ -209,15 +265,52 @@ def _tool_version(
     model_revision: str,
     runtime_version: str,
     render_rotation_degrees: int,
+    render_segment_index: int | None,
+    render_segment_count: int | None,
 ) -> str:
     version = (
         f"{model_revision};{runtime_version}"
         if model_revision.startswith(f"{model_id}@")
         else f"{model_id}@{model_revision};{runtime_version}"
     )
-    if render_rotation_degrees == 0:
-        return version
-    return f"{version};render-rotation-{render_rotation_degrees:03d}"
+    if render_rotation_degrees != 0:
+        version = f"{version};render-rotation-{render_rotation_degrees:03d}"
+    if render_segment_index is not None and render_segment_count is not None:
+        version = (
+            f"{version};render-segment-{render_segment_index:02d}-"
+            f"of-{render_segment_count:02d}"
+        )
+    return version
+
+
+def _request_identity_suffix(
+    *,
+    render_rotation_degrees: int,
+    render_segment_index: int | None,
+    render_segment_count: int | None,
+) -> str:
+    suffix = f"R{render_rotation_degrees:03d}"
+    if render_segment_index is None and render_segment_count is None:
+        return f"{suffix}-FULL"
+    if render_segment_index not in (1, 2) or render_segment_count != 2:
+        raise GemmaVisionConversionError("GEMMA_VISION_REQUEST_INVALID")
+    return f"{suffix}-S{render_segment_index:02d}OF{render_segment_count:02d}"
+
+
+def _transcription_prompt(
+    *,
+    render_segment_index: int | None,
+    render_segment_count: int | None,
+) -> str:
+    if render_segment_index is None and render_segment_count is None:
+        return _PAGE_TRANSCRIPTION_PROMPT
+    if render_segment_index not in (1, 2) or render_segment_count != 2:
+        raise GemmaVisionConversionError("GEMMA_VISION_REQUEST_INVALID")
+    return (
+        f"{_PAGE_TRANSCRIPTION_PROMPT} Cette image est le segment vertical "
+        f"{render_segment_index} sur {render_segment_count} de la page tournée. "
+        "Transcris uniquement ce segment et conserve son ordre de lecture."
+    )
 
 
 def _output_schema() -> dict[str, object]:
@@ -254,10 +347,12 @@ def _required_payload(payload: Any) -> Mapping[str, Any]:
         "schema_version", "document_id", "processing_run_id", "source_sha256", "source_pdf_path",
         "page_number", "source_page_number", "route_name", "routing_policy_version",
         "gateway_endpoint_url", "gateway_timeout_seconds", "max_output_tokens",
-        "expected_model_id", "render_rotation_degrees",
+        "expected_model_id", "render_rotation_degrees", "render_segment_index",
+        "render_segment_count",
     }
-    if not isinstance(payload, Mapping) or set(payload) != expected or payload["schema_version"] != "1.1":
+    if not isinstance(payload, Mapping) or set(payload) != expected or payload["schema_version"] != "1.2":
         raise GemmaVisionConversionError("GEMMA_VISION_REQUEST_INVALID")
+    _required_render_segment(payload)
     return payload
 
 
@@ -280,6 +375,22 @@ def _required_render_rotation_degrees(payload: Mapping[str, Any]) -> int:
     if value not in (0, 90) or isinstance(value, bool):
         raise GemmaVisionConversionError("GEMMA_VISION_REQUEST_INVALID")
     return value
+
+
+def _required_render_segment(payload: Mapping[str, Any]) -> tuple[int | None, int | None]:
+    segment_index = payload.get("render_segment_index")
+    segment_count = payload.get("render_segment_count")
+    if segment_index is None and segment_count is None:
+        return None, None
+    if (
+        isinstance(segment_index, bool)
+        or isinstance(segment_count, bool)
+        or segment_index not in (1, 2)
+        or segment_count != 2
+        or _required_render_rotation_degrees(payload) != 90
+    ):
+        raise GemmaVisionConversionError("GEMMA_VISION_REQUEST_INVALID")
+    return segment_index, segment_count
 
 
 def _write(payload: Mapping[str, object]) -> None:

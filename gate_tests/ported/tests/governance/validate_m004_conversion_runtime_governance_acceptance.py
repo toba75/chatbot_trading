@@ -12,6 +12,7 @@ def test_validate_m004_conversion_runtime_governance_acceptance() -> None:
     adr_path = repository_root / "docs/adr/ADR-032-execution-reelle-conversion-canonique.md"
     ocr_routing_adr_path = repository_root / "docs/adr/ADR-033-priorite-signaux-routage-ocr.md"
     recovery_adr_path = repository_root / "docs/adr/ADR-035-recuperation-gemma-explicite-apres-provenance-granite-absente.md"
+    dense_recovery_adr_path = repository_root / "docs/adr/ADR-039-segmentation-gemma-bornee-pages-denses.md"
     adr_index_path = repository_root / "docs/adr/index.md"
     specification_path = repository_root / "docs/specs/m004_version_canonique_publiee.md"
 
@@ -22,10 +23,12 @@ def test_validate_m004_conversion_runtime_governance_acceptance() -> None:
     assert adr_path.is_file(), "ADR-032 doit décider l'exécution réelle de la conversion."
     assert ocr_routing_adr_path.is_file(), "ADR-033 doit décider la priorité des signaux OCR."
     assert recovery_adr_path.is_file(), "ADR-035 doit décider la récupération Gemma explicite."
+    assert dense_recovery_adr_path.is_file(), "ADR-039 doit borner la récupération des pages denses."
     assert adr_index_path.is_file(), "L'index ADR doit tracer les décisions acceptées."
     adr = adr_path.read_text(encoding="utf-8")
     ocr_routing_adr = ocr_routing_adr_path.read_text(encoding="utf-8")
     recovery_adr = recovery_adr_path.read_text(encoding="utf-8")
+    dense_recovery_adr = dense_recovery_adr_path.read_text(encoding="utf-8")
     adr_index = adr_index_path.read_text(encoding="utf-8")
     specification = specification_path.read_text(encoding="utf-8")
 
@@ -81,6 +84,22 @@ def test_validate_m004_conversion_runtime_governance_acceptance() -> None:
     for fragment in required_recovery_adr_fragments:
         assert fragment in recovery_adr, f"ADR-035 doit imposer : {fragment}"
 
+    required_dense_recovery_adr_fragments = (
+        "**Statut :** Proposée",
+        "**Remplace :** ADR-036 à l’acceptation",
+        "GEMMA_VISION_OUTPUT_TRUNCATED",
+        "LLM_PARTIAL_OUTPUT",
+        "exactement deux segments verticaux",
+        "chevauchants",
+        "render_segment_index",
+        "render_segment_count",
+        "render-segments-02",
+        "2 048 jetons",
+        "270 secondes",
+    )
+    for fragment in required_dense_recovery_adr_fragments:
+        assert fragment in dense_recovery_adr, f"ADR-039 doit imposer : {fragment}"
+
     assert "**Statut :** Acceptée" in ocr_routing_adr
     assert "PREPROCESS_GRANITE" in ocr_routing_adr
     assert "BAD_OCR_TO_GRANITE" in ocr_routing_adr
@@ -101,9 +120,14 @@ def test_validate_m004_conversion_runtime_governance_acceptance() -> None:
         "Récupération Gemma explicite après provenance Granite absente | Acceptée | "
         "2026-07-14 | ADR-032 | Aucune |"
     ) in adr_index
+    assert (
+        "| [ADR-039](ADR-039-segmentation-gemma-bornee-pages-denses.md) | "
+        "Segmentation Gemma bornée des pages denses | Proposée | "
+        "2026-07-16 | ADR-036 à l’acceptation | Aucune |"
+    ) in adr_index
 
     assert "## Exécution réelle et disponibilité des convertisseurs" in specification
-    assert "ADR-035" in specification
+    assert "ADR-039" in specification
     assert "CONVERSION_ASSET_MANIFEST_INVALID" in specification
     assert "DOCLING_PROVENANCE_MISSING" in specification
     assert "Gemma 4" in specification

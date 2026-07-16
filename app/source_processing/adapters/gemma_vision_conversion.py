@@ -35,6 +35,8 @@ class GemmaVisionConversionRequest:
     max_output_tokens: int
     expected_model_id: str
     render_rotation_degrees: int
+    render_segment_index: int | None = None
+    render_segment_count: int | None = None
 
     def __post_init__(self) -> None:
         for field_name in (
@@ -64,12 +66,21 @@ class GemmaVisionConversionRequest:
                 raise ValueError(f"{field_name} invalide")
         if self.render_rotation_degrees not in (0, 90):
             raise ValueError("render_rotation_degrees invalide")
+        if (self.render_segment_index is None) != (self.render_segment_count is None):
+            raise ValueError("segment de rendu Gemma incomplet")
+        if self.render_segment_index is not None:
+            if (
+                self.render_rotation_degrees != 90
+                or self.render_segment_count != 2
+                or self.render_segment_index not in (1, 2)
+            ):
+                raise ValueError("segment de rendu Gemma invalide")
         if not self.gateway_endpoint_url.endswith("/v1/infer"):
             raise ValueError("gateway_endpoint_url invalide")
 
     def to_payload(self) -> dict[str, object]:
         return {
-            "schema_version": "1.1",
+            "schema_version": "1.2",
             "document_id": self.document_id,
             "processing_run_id": self.processing_run_id,
             "source_sha256": self.source_sha256,
@@ -83,6 +94,8 @@ class GemmaVisionConversionRequest:
             "max_output_tokens": self.max_output_tokens,
             "expected_model_id": self.expected_model_id,
             "render_rotation_degrees": self.render_rotation_degrees,
+            "render_segment_index": self.render_segment_index,
+            "render_segment_count": self.render_segment_count,
         }
 
 

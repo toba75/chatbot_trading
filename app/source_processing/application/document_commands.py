@@ -803,6 +803,7 @@ def _ensure_quality_rejection_error_code(value: Any) -> str:
         "DOCLING_PROVENANCE_MISSING",
         "GEMMA_VISION_UNAVAILABLE",
         "GEMMA_VISION_OUTPUT_INVALID",
+        "GEMMA_VISION_OUTPUT_TRUNCATED",
         "GEMMA_VISION_MODEL_MISMATCH",
         "GEMMA_VISION_RENDERING_FAILED",
         "GEMMA_VISION_IMAGE_TOO_LARGE",

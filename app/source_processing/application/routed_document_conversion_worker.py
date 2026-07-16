@@ -21,6 +21,7 @@ from app.source_processing.adapters.gemma_vision_conversion import (
     GemmaVisionConversionError,
     GemmaVisionConversionRequest,
     GemmaVisionConversionResponse,
+    GemmaVisionPageItem,
     IsolatedGemmaVisionPageConverter,
 )
 from app.source_processing.adapters.docling_native_conversion import (
@@ -90,6 +91,7 @@ NON_NATIVE_TERMINAL_ERROR_CODES = frozenset(
         "DOCLING_PROVENANCE_MISSING",
         "GEMMA_VISION_UNAVAILABLE",
         "GEMMA_VISION_OUTPUT_INVALID",
+        "GEMMA_VISION_OUTPUT_TRUNCATED",
         "GEMMA_VISION_MODEL_MISMATCH",
         "GEMMA_VISION_RENDERING_FAILED",
         "GEMMA_VISION_IMAGE_TOO_LARGE",
@@ -214,7 +216,13 @@ class _GemmaVisionFallbackPageConverter:
         if granite_error_code not in GEMMA_RECOVERY_GRANITE_ERROR_CODES:
             raise ValueError("récupération Gemma non autorisée")
         source_path = self._resolve_source_path(request.source_artifact_ref)
-        def gemma_request(*, render_rotation_degrees: int) -> GemmaVisionConversionRequest:
+
+        def gemma_request(
+            *,
+            render_rotation_degrees: int,
+            render_segment_index: int | None = None,
+            render_segment_count: int | None = None,
+        ) -> GemmaVisionConversionRequest:
             return GemmaVisionConversionRequest(
                 document_id=request.document_id.value,
                 processing_run_id=request.processing_run_id.value,
@@ -235,13 +243,30 @@ class _GemmaVisionFallbackPageConverter:
                 max_output_tokens=self._gateway_max_output_tokens,
                 expected_model_id=self._expected_model_id,
                 render_rotation_degrees=render_rotation_degrees,
+                render_segment_index=render_segment_index,
+                render_segment_count=render_segment_count,
             )
         try:
             response = self._converter.convert(gemma_request(render_rotation_degrees=0))
         except GemmaVisionConversionError as error:
             if error.code != "GEMMA_VISION_OUTPUT_INVALID":
                 raise
-            response = self._converter.convert(gemma_request(render_rotation_degrees=90))
+            try:
+                response = self._converter.convert(gemma_request(render_rotation_degrees=90))
+            except GemmaVisionConversionError as rotated_error:
+                if rotated_error.code != "GEMMA_VISION_OUTPUT_TRUNCATED":
+                    raise
+                segment_responses = tuple(
+                    self._converter.convert(
+                        gemma_request(
+                            render_rotation_degrees=90,
+                            render_segment_index=segment_index,
+                            render_segment_count=2,
+                        )
+                    )
+                    for segment_index in (1, 2)
+                )
+                response = _merge_gemma_segment_responses(segment_responses)
         return _gemma_page_output(
             response=response,
             page_number=request.page_number,
@@ -249,6 +274,31 @@ class _GemmaVisionFallbackPageConverter:
             expected_artifact_ref=request.expected_output_artifact_ref,
             granite_error_code=granite_error_code,
         )
+
+
+def _merge_gemma_segment_responses(
+    responses: tuple[GemmaVisionConversionResponse, ...],
+) -> GemmaVisionConversionResponse:
+    if len(responses) != 2:
+        raise GemmaVisionConversionError("GEMMA_VISION_OUTPUT_INVALID")
+    base_version: str | None = None
+    items: list[GemmaVisionPageItem] = []
+    for segment_index, response in enumerate(responses, start=1):
+        suffix = f";render-segment-{segment_index:02d}-of-02"
+        if not response.tool_version.endswith(suffix):
+            raise GemmaVisionConversionError("GEMMA_VISION_OUTPUT_INVALID")
+        response_base_version = response.tool_version.removesuffix(suffix)
+        if base_version is None:
+            base_version = response_base_version
+        elif response_base_version != base_version:
+            raise GemmaVisionConversionError("GEMMA_VISION_MODEL_MISMATCH")
+        items.extend(response.items)
+    if base_version is None:
+        raise GemmaVisionConversionError("GEMMA_VISION_OUTPUT_INVALID")
+    return GemmaVisionConversionResponse(
+        tool_version=f"{base_version};render-segments-02",
+        items=tuple(items),
+    )
 
 
 class _NoOcrPreprocessor:
