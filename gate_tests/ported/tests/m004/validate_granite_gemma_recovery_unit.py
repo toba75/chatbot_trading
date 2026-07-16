@@ -493,6 +493,32 @@ def _verifier_json_gemma_invalide_declenche_recuperation_orientation(
     assert captured.value.code == "GEMMA_VISION_OUTPUT_INVALID"
 
 
+def _verifier_budget_gemma_et_supervision_du_retry() -> None:
+    # Given le gateway autorise un retry avant premier token et une page dense peut consommer 4 096 jetons.
+    # When le worker documentaire construit le délai de son appel local au gateway.
+    # Then il couvre les deux tentatives Spark et une marge explicite, sans interrompre le retry configuré.
+    from app.platform.configuration import load_application_configuration
+    from app.source_processing.adapters.worker_runtime import (
+        _gemma_gateway_supervision_timeout_seconds,
+    )
+
+    configuration = load_application_configuration(
+        config_path=Path("config/application.yaml"),
+        environment_snapshot={},
+    )
+    example_configuration = load_application_configuration(
+        config_path=Path("config/application.example.yaml"),
+        environment_snapshot={},
+    )
+
+    assert configuration.models.llm.max_output_tokens == 4096
+    assert example_configuration.models.llm.max_output_tokens == 4096
+    assert _gemma_gateway_supervision_timeout_seconds(
+        spark_attempt_timeout_seconds=120,
+        retry_before_first_token=1,
+    ) == 270
+
+
 def test_recuperation_gemma_explicite_apres_absence_de_provenance_granite(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -507,3 +533,4 @@ def test_recuperation_gemma_explicite_apres_absence_de_provenance_granite(
     _verifier_normalisation_bbox_gemma_inversee()
     _verifier_recuperation_orientation_gemma_apres_bbox_invalide(tmp_path)
     _verifier_json_gemma_invalide_declenche_recuperation_orientation(tmp_path, monkeypatch)
+    _verifier_budget_gemma_et_supervision_du_retry()

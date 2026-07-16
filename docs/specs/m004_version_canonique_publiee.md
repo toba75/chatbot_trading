@@ -109,7 +109,10 @@ terminée, `DOCLING_PROVENANCE_MISSING` ou `GRANITE_DOCLING_UNAVAILABLE`
 autorisent chacun une unique récupération Gemma 4 via `llm-gateway`; tout autre
 échec reste terminal. La sortie Gemma doit contenir texte et coordonnées,
 conserve la trace Granite dans l'artefact canonique et devient l'unique autorité
-de la page.
+de la page. Un JSON ou un schéma Gemma invalide est une sortie invalide, pas une
+indisponibilité. La conversion dispose de 4 096 jetons et son délai client
+couvre toutes les tentatives avant premier token configurées par le gateway,
+plus 30 secondes de rendu, transport local et validation.
 
 Les adaptateurs Docling s'exécutent dans un processus isolé de l'environnement
 `uv`, sur `docling[vlm]==2.111.0` verrouillé dans `uv.lock`. Les modèles et

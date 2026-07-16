@@ -35,6 +35,15 @@ pour chaque page routée, ou publier un échec explicite de l'outil qui a aussi
   dernier appel Gemma avec le rendu tourné de 90 degrés. Les coordonnées de ce
   rendu sont réexprimées dans le repère PDF initial et la version d'outil porte
   explicitement `render-rotation-090`.
+- Un refus `LLM_RESPONSE_INVALID_JSON` ou `LLM_RESPONSE_SCHEMA_INVALID` du
+  gateway **DOIT** devenir `GEMMA_VISION_OUTPUT_INVALID`; il prouve que Gemma a
+  répondu avec une sortie contractuellement invalide et ne doit jamais être
+  publié comme une indisponibilité du service.
+- Le budget Gemma de conversion d'une page **DOIT** être de 4 096 jetons. Le
+  délai de supervision du client local **DOIT** couvrir toutes les tentatives
+  avant premier token configurées par le gateway, plus 30 secondes explicites
+  pour le rendu, le transport local et la validation. Le sous-processus ne doit
+  jamais interrompre le retry que le gateway est encore en train de superviser.
 - Cette récupération **DOIT** passer exclusivement par
   `llm-gateway/v1/infer`, avec le modèle configuré
   `google/gemma-4-26B-A4B-it`; aucun appel direct à Spark, vLLM ou un autre
@@ -89,8 +98,10 @@ pour chaque page routée, ou publier un échec explicite de l'outil qui a aussi
 
 - Modules concernés : politique de récupération Granite/Gemma, worker routé
   M-004, contrat de progression publique et UI de conversion.
-- Configuration concernée : aucune nouvelle dépendance ni configuration ; le
-  chemin `llm-gateway` existant est réemployé.
+- Configuration concernée : aucune nouvelle dépendance ni clé ; le chemin
+  `llm-gateway` existant est réemployé, `models.llm.max_output_tokens` vaut
+  4 096 et le délai client est dérivé du timeout et du nombre de retries
+  explicitement configurés.
 - Tests attendus : déclencheur `GRANITE_DOCLING_UNAVAILABLE`, absence de
   récupération pour un code hors contrat, seconde tentative 90 degrés bornée
   après bbox invalide, repère de coordonnées restauré, trace canonique,
