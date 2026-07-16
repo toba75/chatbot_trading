@@ -46,6 +46,30 @@ MAX_TRANSIENT_ATTEMPTS = 3
 DOCUMENT_ROUTING_POLICY_VERSION = "routing-v1"
 DOCUMENT_ROUTING_AUTO_CONFIDENCE_MIN = 0.90
 DOCUMENT_ROUTING_BENCHMARK_CONFIDENCE_MIN = 0.85
+GEMMA_GATEWAY_LOCAL_SUPERVISION_OVERHEAD_SECONDS = 30
+
+
+def _gemma_gateway_supervision_timeout_seconds(
+    *,
+    spark_attempt_timeout_seconds: int,
+    retry_before_first_token: int,
+) -> int:
+    if (
+        isinstance(spark_attempt_timeout_seconds, bool)
+        or not isinstance(spark_attempt_timeout_seconds, int)
+        or spark_attempt_timeout_seconds < 1
+    ):
+        raise ValueError("timeout de tentative Spark invalide")
+    if (
+        isinstance(retry_before_first_token, bool)
+        or not isinstance(retry_before_first_token, int)
+        or retry_before_first_token < 0
+    ):
+        raise ValueError("nombre de retries avant premier token invalide")
+    return (
+        spark_attempt_timeout_seconds * (retry_before_first_token + 1)
+        + GEMMA_GATEWAY_LOCAL_SUPERVISION_OVERHEAD_SECONDS
+    )
 
 
 class JobLeaseHeartbeat:
@@ -212,7 +236,14 @@ def _run_worker(
         audit_root=Path(application_configuration.paths.data_root) / "docling_audit",
         timeout_seconds=application_configuration.runtime.timeouts.request_seconds,
         llm_gateway_url=application_configuration.services.llm_gateway.url,
-        llm_gateway_timeout_seconds=application_configuration.services.llm_gateway.timeout_seconds,
+        llm_gateway_timeout_seconds=_gemma_gateway_supervision_timeout_seconds(
+            spark_attempt_timeout_seconds=(
+                application_configuration.services.llm_gateway.timeout_seconds
+            ),
+            retry_before_first_token=(
+                application_configuration.services.llm_gateway.retry_before_first_token
+            ),
+        ),
         llm_gateway_max_output_tokens=application_configuration.models.llm.max_output_tokens,
         expected_gemma_model_id=application_configuration.models.llm.reference_model,
         artifact_store=CanonicalArtifactFileStore(
