@@ -559,7 +559,7 @@ def _verifier_sortie_gemma_tronquee_est_explicite(
 def _verifier_segmentation_gemma_bornee_apres_troncature(tmp_path: Path) -> None:
     # Given le rendu complet initial est invalide et le rendu complet tourné est tronqué.
     # When la récupération ADR-039 traite la page dense.
-    # Then exactement deux segments tournés sont appelés et fusionnés dans l'ordre.
+    # Then exactement quatre bandes source sont appelées et fusionnées dans l'ordre haut-bas.
     from app.source_processing.adapters.gemma_vision_conversion import (
         GemmaVisionConversionError,
         GemmaVisionConversionResponse,
@@ -567,6 +567,7 @@ def _verifier_segmentation_gemma_bornee_apres_troncature(tmp_path: Path) -> None
     )
     from app.source_processing.adapters.gemma_vision_worker import (
         _request_identity_suffix,
+        _segment_crop_box,
         _structured_items,
     )
     from app.source_processing.application.routed_document_conversion_worker import (
@@ -664,7 +665,21 @@ def _verifier_segmentation_gemma_bornee_apres_troncature(tmp_path: Path) -> None
         render_rotation_degrees=90,
         render_segment_index=4,
         render_segment_count=4,
-    ) == [{"text": "Bas du rendu", "bbox": [750.0, 0, 1000.0, 1000]}]
+    ) == [{"text": "Bas du rendu", "bbox": [0, 750.0, 1000, 1000.0]}]
+    assert _segment_crop_box(
+        image_width=800,
+        image_height=1200,
+        render_rotation_degrees=90,
+        render_segment_index=1,
+        render_segment_count=4,
+    ) == (600, 0, 800, 1200)
+    assert _segment_crop_box(
+        image_width=800,
+        image_height=1200,
+        render_rotation_degrees=90,
+        render_segment_index=4,
+        render_segment_count=4,
+    ) == (0, 0, 200, 1200)
 
 
 def _verifier_budget_gemma_et_supervision_du_retry() -> None:
