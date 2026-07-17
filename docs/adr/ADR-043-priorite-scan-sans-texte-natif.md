@@ -1,6 +1,6 @@
 # ADR-043 - Priorité au scan sans texte natif
 
-**Statut :** Proposée
+**Statut :** Acceptée
 **Date :** 2026-07-16
 **Décideurs :** Équipe OSTrading
 **Remplace :** Pour `COMPLEX_VISUAL` sans texte natif, la priorité de classification d’ADR-033
@@ -62,8 +62,12 @@ Docling confirme `provenance absente`; la conversion devient terminale avec
 - Spécification : `docs/specs/m003_source_enregistree_diagnostiquee_routee.md`.
 - Plan d’implémentation : `docs/tasks/milestone_004-conversion/0014_router_scan_complexe_sans_texte.md`.
 - Tests d’acceptation : `gate_tests/ported/tests/m003/validate_complex_scan_routing_unit.py`.
-- Commits : à compléter.
+- Commit RED : `8b9fe93e5`.
+- Commit GREEN : `20daa39a2`.
 
 ## Notes
 
-L’ADR reste proposée jusqu’au parcours réel complet et à la gate canonique.
+Acceptée après le franchissement réel de la page PDF 166 de
+`DOC-8C536DF8808F9E19` par `SCAN_GRANITE`, puis la conversion
+`SUCCEEDED 265/265`, la projection `SEARCHABLE` et la gate verrouillée GREEN de
+436 nœuds uniques.

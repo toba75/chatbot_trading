@@ -306,3 +306,34 @@ rejouée depuis le formulaire UI sur `DOC-F91FE126FBFFA374` :
   deviennent actionnables et persistées.
 - Scénarios RED : routage/commande de revue M-003, conversion sans outil M-004,
   contrat API et rendu UI M-013-FastAPI.
+- GREEN : `EMPTY` produit `SKIP_EMPTY`; `Examiner` câble `CONFIRM_EMPTY`,
+  `ASSIGN_ROUTE` et `REJECT_DOCUMENT` via API, persistance optimiste et lecture
+  publique. RED `6333b859d`, GREEN `12d1144d9`.
+
+## 2026-07-16 - T-013 à T-015 stabilisation du parcours réel
+
+- T-013 borne à huit les pages orchestrées et partage une capacité Docling de
+  deux processus entre standard et Granite. RED `10906b600`, GREEN `10ab0ca70`.
+  La fenêtre de futures est bornée et fail-fast : RED `6924ee687`, GREEN
+  `58be120aa`.
+- T-014 route la page 166, scan complexe sans texte natif, vers `SCAN_GRANITE`.
+  RED `8b9fe93e5`, GREEN `20daa39a2`.
+- T-015 qualifie `SUSPECT` une légende native complexe de moins de 80 caractères
+  et route notamment la page 174 vers `SCAN_GRANITE`. RED `2444fc825`, GREEN
+  `8f8775306`.
+- Correctif de clôture : la QA ne transforme plus une page `SKIP_EMPTY` en
+  `PAGE_OMITTED` (RED `327f2f9aa`, GREEN `cffd38f5f`) et l'audit accepte les
+  codes terminaux publics sans provoquer de HTTP 500 (RED `c75253074`, GREEN
+  `f102b35b4`).
+- Preuve produit sur `DOC-8C536DF8808F9E19` : conversion `SUCCEEDED 265/265`,
+  264 pages dans l'artefact canonique et page PDF 2 absente explicitement;
+  192 pages Docling standard, 69 Granite et trois récupérations Gemma tracées
+  page par page. SHA-256 canonique
+  `941d0b0109fedc31319b8c9f2062489812177edfccaa47e5b9d93259528dd74f`.
+- Projection UI `SUCCEEDED 155/155`, statut `SEARCHABLE`, 154 chunks Qdrant et
+  une unité d'extraction bibliographique. Métadonnées `EXTRACTED` : titre
+  « DUAL MOMENTING INVESTING Strategy for Higher Returns with Lower Risk »,
+  auteur Gary Antonacci, année 2015, preuves pages 1 et 7.
+- Validations : scope M-004 GREEN, 45 nœuds uniques; `uv sync --locked`; gate
+  canonique `uv run --locked gate` GREEN en 130,2 s, 436 nœuds uniques, aucun
+  manquant, inattendu ou dupliqué.

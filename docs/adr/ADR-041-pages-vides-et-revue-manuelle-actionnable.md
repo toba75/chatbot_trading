@@ -1,6 +1,6 @@
 # ADR-041 - Pages vides ignorées et revue manuelle actionnable
 
-**Statut :** Proposée
+**Statut :** Acceptée
 **Date :** 2026-07-16
 **Décideurs :** Équipe OSTrading
 **Remplace :** Obligation de revue manuelle des pages `EMPTY` d'ADR-025
@@ -102,9 +102,13 @@ contradiction avec la règle « pas câblé, pas disponible ».
   `gate_tests/ported/tests/m003/validate_empty_page_and_manual_review_acceptance.py`,
   `gate_tests/ported/tests/m004/validate_empty_page_conversion_acceptance.py`,
   `gate_tests/ported/tests/m013_fastapi/validate_manual_review_ui_flow_acceptance.py`.
-- Commits: à compléter après les commits RED et GREEN.
+- Commits RED : `6333b859d`, `327f2f9aa`, `c75253074`.
+- Commits GREEN : `12d1144d9`, `cffd38f5f`, `f102b35b4`.
 
 ## Notes
 
-L'ADR reste proposée pendant le RED. Elle devient acceptée uniquement après la
-preuve du parcours réel et la gate canonique verrouillée.
+Acceptée après le parcours réel de `DOC-8C536DF8808F9E19` : conversion
+`SUCCEEDED 265/265`, 264 pages converties, page PDF 2 ignorée sans outil ni
+autorité synthétique, artefact canonique publié, projection `SUCCEEDED 155/155`
+et `SEARCHABLE`. La gate `uv run --locked gate` est GREEN avec 436 nœuds
+uniques.

@@ -1,6 +1,6 @@
 # ADR-044 - Autorité native d’une page visuelle complexe
 
-**Statut :** Proposée
+**Statut :** Acceptée
 **Date :** 2026-07-16
 **Décideurs :** Équipe OSTrading
 **Remplace :** Pour une page visuelle complexe à texte natif parcellaire, la priorité `COMPLEX_VISUAL` d’ADR-033 et l’obligation de candidat natif d’ADR-040
@@ -74,8 +74,12 @@ Docling ni une raison d’autoriser un fallback après n’importe quel échec.
 - Spécifications : `docs/specs/m003_source_enregistree_diagnostiquee_routee.md` et `docs/specs/m004_version_canonique_publiee.md`.
 - Plan d’implémentation : `docs/tasks/milestone_004-conversion/0015_qualifier_autorite_native_visuelle.md`.
 - Test d’acceptation : `gate_tests/ported/tests/m003/validate_sparse_visual_native_text_unit.py`.
-- Commits : à compléter.
+- Commit RED : `2444fc825`.
+- Commit GREEN : `8f8775306`.
 
 ## Notes
 
-L’ADR reste proposée jusqu’au parcours réel complet et à la gate canonique.
+Acceptée après le franchissement réel de la page PDF 174 de
+`DOC-8C536DF8808F9E19` par `SCAN_GRANITE`, puis la conversion
+`SUCCEEDED 265/265`, la projection `SEARCHABLE` et la gate verrouillée GREEN de
+436 nœuds uniques.

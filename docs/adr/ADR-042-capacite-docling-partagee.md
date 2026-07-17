@@ -1,6 +1,6 @@
 # ADR-042 - Capacité Docling partagée
 
-**Statut :** Proposée
+**Statut :** Acceptée
 **Date :** 2026-07-16
 **Décideurs :** Équipe OSTrading
 **Remplace :** Pour la capacité des processus Docling, complète et restreint le parallélisme d’ADR-040
@@ -71,9 +71,12 @@ ne protège pas le runtime contre la somme des processus standard et Granite.
 - Spécification : `docs/specs/m004_version_canonique_publiee.md`.
 - Plan d’implémentation : `docs/tasks/milestone_004-conversion/0013_borner_capacite_docling_partagee.md`.
 - Tests d’acceptation : `gate_tests/ported/tests/m004/validate_shared_docling_concurrency_unit.py`.
-- Commits : à compléter après RED et GREEN.
+- Commit RED : `10906b600`.
+- Commit GREEN : `10ab0ca70`.
 
 ## Notes
 
-L’ADR reste proposée jusqu’à la conversion et la projection réelles du document
-ayant révélé la saturation, puis la gate canonique complète.
+Acceptée après la conversion réelle complète de `DOC-8C536DF8808F9E19` avec
+huit pages orchestrées et deux processus Docling lourds au maximum. Le document
+a atteint `SUCCEEDED 265/265`, puis `SEARCHABLE`; la gate verrouillée est GREEN
+avec 436 nœuds uniques.
