@@ -14,7 +14,10 @@ def test_validate_m004_conversion_runtime_governance_acceptance() -> None:
     recovery_adr_path = repository_root / "docs/adr/ADR-035-recuperation-gemma-explicite-apres-provenance-granite-absente.md"
     dense_recovery_adr_path = repository_root / "docs/adr/ADR-039-segmentation-gemma-bornee-pages-denses.md"
     adjudication_adr_path = repository_root / "docs/adr/ADR-040-adjudication-enrichissement-cible-docling-granite.md"
+    empty_review_adr_path = repository_root / "docs/adr/ADR-041-pages-vides-et-revue-manuelle-actionnable.md"
     shared_capacity_adr_path = repository_root / "docs/adr/ADR-042-capacite-docling-partagee.md"
+    scan_priority_adr_path = repository_root / "docs/adr/ADR-043-priorite-scan-sans-texte-natif.md"
+    sparse_native_adr_path = repository_root / "docs/adr/ADR-044-autorite-native-page-visuelle-complexe.md"
     adr_index_path = repository_root / "docs/adr/index.md"
     specification_path = repository_root / "docs/specs/m004_version_canonique_publiee.md"
 
@@ -27,14 +30,20 @@ def test_validate_m004_conversion_runtime_governance_acceptance() -> None:
     assert recovery_adr_path.is_file(), "ADR-035 doit décider la récupération Gemma explicite."
     assert dense_recovery_adr_path.is_file(), "ADR-039 doit borner la récupération des pages denses."
     assert adjudication_adr_path.is_file(), "ADR-040 doit décider l’adjudication ciblée et la capacité Granite."
+    assert empty_review_adr_path.is_file(), "ADR-041 doit décider les pages vides et la revue manuelle."
     assert shared_capacity_adr_path.is_file(), "ADR-042 doit décider la capacité Docling partagée."
+    assert scan_priority_adr_path.is_file(), "ADR-043 doit décider la priorité des scans sans texte."
+    assert sparse_native_adr_path.is_file(), "ADR-044 doit décider l'autorité des pages visuelles parcellaires."
     assert adr_index_path.is_file(), "L'index ADR doit tracer les décisions acceptées."
     adr = adr_path.read_text(encoding="utf-8")
     ocr_routing_adr = ocr_routing_adr_path.read_text(encoding="utf-8")
     recovery_adr = recovery_adr_path.read_text(encoding="utf-8")
     dense_recovery_adr = dense_recovery_adr_path.read_text(encoding="utf-8")
     adjudication_adr = adjudication_adr_path.read_text(encoding="utf-8")
+    empty_review_adr = empty_review_adr_path.read_text(encoding="utf-8")
     shared_capacity_adr = shared_capacity_adr_path.read_text(encoding="utf-8")
+    scan_priority_adr = scan_priority_adr_path.read_text(encoding="utf-8")
+    sparse_native_adr = sparse_native_adr_path.read_text(encoding="utf-8")
     adr_index = adr_index_path.read_text(encoding="utf-8")
     specification = specification_path.read_text(encoding="utf-8")
 
@@ -124,7 +133,7 @@ def test_validate_m004_conversion_runtime_governance_acceptance() -> None:
         assert fragment in adjudication_adr, f"ADR-040 doit imposer : {fragment}"
 
     required_shared_capacity_fragments = (
-        "**Statut :** Proposée",
+        "**Statut :** Acceptée",
         "services.workers.concurrency",
         "services.workers.docling_concurrency",
         "services.workers.granite_concurrency",
@@ -134,6 +143,13 @@ def test_validate_m004_conversion_runtime_governance_acceptance() -> None:
     )
     for fragment in required_shared_capacity_fragments:
         assert fragment in shared_capacity_adr, f"ADR-042 doit imposer : {fragment}"
+
+    for closed_adr, adr_number in (
+        (empty_review_adr, "ADR-041"),
+        (scan_priority_adr, "ADR-043"),
+        (sparse_native_adr, "ADR-044"),
+    ):
+        assert "**Statut :** Acceptée" in closed_adr, f"{adr_number} doit être acceptée après la preuve réelle."
 
     assert "**Statut :** Acceptée" in ocr_routing_adr
     assert "PREPROCESS_GRANITE" in ocr_routing_adr
@@ -166,6 +182,11 @@ def test_validate_m004_conversion_runtime_governance_acceptance() -> None:
         "2026-07-16 | Clauses `TARGETED_ENRICHMENT` d’ADR-035, ADR-036 et ADR-039 "
         "et plafond unique Granite d’ADR-037 | Aucune |"
     ) in adr_index
+    for adr_number in ("041", "042", "043", "044"):
+        assert f"| [ADR-{adr_number}]" in adr_index
+        assert f"| [ADR-{adr_number}]" in adr_index and "| Acceptée | 2026-07-16 |" in next(
+            line for line in adr_index.splitlines() if line.startswith(f"| [ADR-{adr_number}]")
+        )
 
     assert "## Exécution réelle et disponibilité des convertisseurs" in specification
     assert "ADR-039" in specification
