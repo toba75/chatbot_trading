@@ -102,7 +102,7 @@ def start_local_ui_stack(launch_configuration: Any) -> Iterator[Any]:
     """Démarre PostgreSQL et l'API réels, puis fournit la configuration UI hôte."""
 
     source_config_path = _require_launch_configuration(launch_configuration)
-    repository_root = _require_repository_root(source_config_path.parents[1])
+    repository_root = _repository_root_for_source_configuration(source_config_path)
     _require_available_port(port=LOCAL_API_PORT, error_code="UI_LOCAL_API_PORT_OCCUPIED")
     _require_available_port(
         port=LOCAL_LLM_GATEWAY_PORT,
@@ -171,6 +171,21 @@ def _require_launch_configuration(value: Any) -> Path:
     if service_id != "ui" or not isinstance(config_path, str) or config_path.strip() == "":
         raise ValueError("UI_LOCAL_LAUNCH_CONFIGURATION_INVALID")
     return Path(config_path).resolve()
+
+
+def _repository_root_for_source_configuration(source_config_path: Path) -> Path:
+    if not isinstance(source_config_path, Path):
+        raise ValueError("UI_LOCAL_CONFIG_PATH_INVALID")
+    path = source_config_path.resolve()
+    if path.name == "application.yaml" and path.parent.name == "config":
+        return _require_repository_root(path.parents[1])
+    if (
+        path.name in {"development.yaml", "test.yaml", "production.yaml"}
+        and path.parent.name == "environments"
+        and path.parent.parent.name == "config"
+    ):
+        return _require_repository_root(path.parents[2])
+    raise ValueError("UI_LOCAL_CONFIG_PATH_INVALID")
 
 
 def _require_repository_root(value: Path) -> Path:

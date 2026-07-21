@@ -173,7 +173,44 @@ Preuve RED attendue:
 - les tests unitaires figent le mapping fermé, l'absence de surcharge `--config`, l'erreur de fichier absent, l'arrêt ordonné et le chemin imbriqué `config/environments/<profile>.yaml`;
 - le RED doit provenir de l'absence de `app.platform.environment_command`, sans modifier les configurations, stockages ou manifestes réservés à T-005/T-006.
 
-Commit RED prévu: `test(platform): couvrir commandes uv des environnements`.
+Commit RED:
+
+- `d5b1452be` - `test(platform): couvrir commandes uv des environnements`.
+- `uv run --locked gate --scope m013_environments` - RED utile; les deux nouveaux nœuds échouent uniquement sur `ModuleNotFoundError: app.platform.environment_command`, tandis que le contrat T-002 reste GREEN.
+
+## T-003 - Lancement strict et retour GREEN
+
+Implémentation livrée:
+
+- `pyproject.toml` publie exactement `development`, `test` et `production`, chacune reliée à une fonction dédiée du lanceur commun;
+- `app/platform/environment_command.py` contient le mapping constant vers `config/environments/<profile>.yaml`, refuse tout profil inconnu, tout argument public et tout fichier absent, sans variable d'environnement ni fallback sur `config/application.yaml`;
+- chaque lancement porte le profil dans `EnvironmentLaunchConfiguration`, publie `starting`, `ready`, `failed` ou `stopped` et propage le code terminal `2` des erreurs contractuelles;
+- `app/platform/ui_local_stack.py` accepte le chemin imbriqué fermé des trois profils et réutilise sa supervision réelle existante: PostgreSQL, Qdrant, gateway, API, workers documentaires et workers de projection reçoivent le même fichier runtime interne;
+- aucun fichier `config/environments/*.yaml`, stockage, volume, secret ou manifeste Compose n'est créé par T-003; ces réalisations restent affectées à T-005/T-006.
+
+Preuve d'absence de fallback:
+
+- `config/application.yaml` existe localement, mais `uv run --isolated --locked development`, `uv run --isolated --locked test` et `uv run --isolated --locked production` retournent chacun `2` avec `CONFIG_FILE_UNREADABLE` sur leur propre chemin absent;
+- aucune pile n'est démarrée dans ce cas et aucun chemin historique n'est essayé.
+
+Validations GREEN:
+
+- tests d'acceptation et unitaires T-003 ciblés - GREEN; 2 tests;
+- régressions commande et pile `uv run ui` - GREEN; 5 tests;
+- scope `m013_environments` - GREEN; 24 nœuds;
+- scope `m013_config` - GREEN; 36 nœuds;
+- gate complète - GREEN; 439 nœuds, y compris les parcours live existants;
+- `git diff --check` - GREEN.
+
+Contrainte Windows observée sans arrêt du processus live:
+
+- après la modification de `pyproject.toml`, la synchronisation automatique de `uv run --locked ...` ne peut pas remplacer `.venv/Scripts/ui.exe`, utilisé par la pile live préexistante;
+- les validations post-implémentation ont donc exécuté le même environnement verrouillé avec `uv run --locked --no-sync`, et la gate via `python -m ost_gate.cli`; aucun processus live n'a été interrompu;
+- une synchronisation UV normale matérialisera les trois exécutables dès que le processus `ui.exe` ne tiendra plus le fichier.
+
+ADR consultée: ADR-045. Aucune modification d'ADR n'est requise: T-003 réalise le mapping et le cycle de vie déjà décidés sans nouvelle décision structurante.
+
+Commit GREEN prévu: `feat(platform): lancer les environnements par commandes uv`.
 
 ## Validation de la planification
 

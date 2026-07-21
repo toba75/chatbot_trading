@@ -23,6 +23,9 @@ dependencies = [
 [project.scripts]
 api = "app.platform.orchestrator_command:main"
 ui = "app.platform.ui_command:main"
+development = "app.platform.environment_command:development"
+test = "app.platform.environment_command:test"
+production = "app.platform.environment_command:production"
 gate = "ost_gate.cli:main"
 backup-v1 = "ost_gate.operations.backup:main"
 restore-v1 = "ost_gate.operations.restore:main"
