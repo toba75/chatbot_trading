@@ -741,3 +741,32 @@ Commits TDD structurants de clôture :
 - `e79b94f94` / `7b0a13769` : reprise explicite de preuve ;
 - `f7f7b8994` / `abdc2b89d` : checkpoint produit avant arrêt ;
 - `bc9bacee2` / `f509a2564` : supervision réelle du premier service terminé.
+
+## T-010 - Scénario BDD et preuve RED
+
+Scénario contrôlé :
+
+- Given les ressources `test` sont créées depuis un état vide déterministe,
+  les credentials non-test ne sont pas montés et les volumes development et
+  production sont enregistrés comme sentinelles ;
+- When `uv run test` exécute deux fois le parcours PDF réel complet via API,
+  outbox, relais, workers, PostgreSQL, Qdrant et Spark, puis termine ;
+- Then les deux rapports écrits avant teardown sont GREEN, les documents sont
+  distincts, seules les ressources `ostrading-test` sont supprimées après
+  vérification d'identité et les sentinelles étrangères restent inchangées.
+
+Précondition GREEN avant modification :
+
+- `uv run --locked gate --scope m013_environments` : 36 nœuds GREEN.
+
+La preuve RED exige le module `app.platform.test_e2e`, absent avant
+implémentation. L'acceptation live refuse tout mock, fallback, accès aux
+credentials development/production ou teardown non borné. Le test unitaire
+exige exactement deux cycles ordonnés et le refus d'une cible de nettoyage
+étrangère.
+
+ADR consultée : ADR-045. Aucune nouvelle ADR n'est requise : T-010 exécute sa
+politique déjà acceptée de profil test jetable, d'identité obligatoire et de
+suppression exclusivement bornée.
+
+Commit RED prévu : `test(m13-environments): couvrir parcours reel test`.

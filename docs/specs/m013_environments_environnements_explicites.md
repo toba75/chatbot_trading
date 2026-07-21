@@ -249,3 +249,27 @@ Codes complémentaires :
   que celui propriétaire de la pile ;
 - `ADMINISTRATIVE_PREFLIGHT_INCOMPLETE` : les autorités de stockage attendues
   n'ont pas toutes confirmé la même identité.
+
+## Parcours produit réel test (T-010)
+
+`uv run test` est une qualification réelle et finie, pas un serveur local
+persistant. La commande exécute exactement deux cycles successifs et complets
+sur le PDF réel versionné
+`data/corpus/the-original-turtle-trading-rules.pdf`. Chaque cycle crée une pile
+`test` vide, traverse les contrats HTTP publics jusqu'à la conversion, la
+projection, la recherche, la réponse documentaire, la citation PDF et un appel
+Spark live, écrit son rapport sans secret avant le teardown, puis supprime
+uniquement les volumes du projet `ostrading-test` après le préflight
+d'identité PostgreSQL, Qdrant et fichiers.
+
+Les deux documents de preuve sont distincts et chaque progression publique
+aboutit à `SUCCEEDED`. Les workers documentaires conservent une limite de 8 Gio,
+4 CPU et un healthcheck de 30 secondes. Aucun conteneur test ne monte un fichier
+de configuration ou un répertoire de secrets `development` ou `production`.
+Les noms, dates de création et points de montage des volumes sentinelles de ces
+deux profils sont identiques avant et après les deux cycles.
+
+Tout échec applicatif reste RED et déclenche le même teardown contrôlé. Si le
+préflight d'identité du teardown échoue, les conteneurs s'arrêtent sans
+suppression de volume et l'erreur reste terminale. Aucun mock, faux gateway,
+worker inline, stockage mémoire ou fallback n'est admis.
