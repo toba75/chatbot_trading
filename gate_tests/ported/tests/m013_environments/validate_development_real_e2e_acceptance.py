@@ -13,7 +13,12 @@ def test_validate_development_real_e2e_acceptance() -> None:
         for parent in Path(__file__).resolve().parents
         if (parent / "pyproject.toml").is_file()
     )
-    real_pdf = repository_root / "data" / "corpus" / "trading-on-momentum.pdf"
+    real_pdf = (
+        repository_root
+        / "data"
+        / "corpus"
+        / "the-original-turtle-trading-rules.pdf"
+    )
     assert real_pdf.is_file()
 
     # Given la commande opérateur development et un PDF réel du corpus.
@@ -28,6 +33,8 @@ def test_validate_development_real_e2e_acceptance() -> None:
     # réel, la persistance et les sondes d'étanchéité sont toutes GREEN.
     assert report.environment == "development"
     assert report.deployment_id == "ostrading-development-local"
+    assert report.source_pdf_path.endswith("the-original-turtle-trading-rules.pdf")
+    assert report.source_pdf_sha256 != report.pdf_sha256
     assert report.pdf_sha256
     assert report.document_id.startswith("DOC-")
     assert report.canonical_version_id.startswith("CVER-")
@@ -38,4 +45,5 @@ def test_validate_development_real_e2e_acceptance() -> None:
     assert report.progress_phases == ("SUCCEEDED", "SUCCEEDED", "SUCCEEDED")
     assert report.restart_persistence_verified is True
     assert report.foreign_environment_probes == ("test:ABSENT", "production:ABSENT")
+    assert report.volume_sentinels_preserved is True
     assert report.report_path.is_file()
