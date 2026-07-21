@@ -134,6 +134,8 @@ def run_development_environment_e2e(
     *,
     repository_root: Path,
     pdf_path: Path,
+    resume_proof_id: str | None = None,
+    resume_document_id: str | None = None,
 ) -> DevelopmentE2EReport:
     """Traverse la chaîne development réelle puis en publie un rapport sans secret."""
 
@@ -148,17 +150,17 @@ def run_development_environment_e2e(
     _require_development_configuration(configuration)
     token_path = root / configuration.security.secrets.local_api_token_path
     token = _read_secret(token_path)
-    proof_id = uuid4().hex.upper()
     report_root = (root / configuration.paths.reports_root).resolve()
     log_root = (root / configuration.paths.logs_root).resolve()
     _require_profile_path(report_root)
     _require_profile_path(log_root)
     report_root.mkdir(parents=True, exist_ok=True)
     log_root.mkdir(parents=True, exist_ok=True)
-    selected_pdf = _prepare_reemitted_real_pdf(
+    proof_id, selected_pdf, existing_document_id = _select_development_e2e_proof(
         source_pdf=source_pdf,
-        temporary_report_root=report_root / "temp",
-        proof_id=proof_id,
+        report_root=report_root,
+        resume_proof_id=resume_proof_id,
+        resume_document_id=resume_document_id,
     )
     source_pdf_sha256 = _sha256_file(source_pdf)
     pdf_sha256 = _sha256_file(selected_pdf)
@@ -178,6 +180,7 @@ def run_development_environment_e2e(
                 pdf_sha256=pdf_sha256,
                 proof_id=proof_id,
                 repository_root=root,
+                existing_document_id=existing_document_id,
             )
 
     with _running_development_command(
@@ -387,16 +390,26 @@ def _exercise_product(
     pdf_sha256: str,
     proof_id: str,
     repository_root: Path,
+    existing_document_id: str | None,
 ) -> _ProductProof:
-    with pdf_path.open("rb") as pdf_stream:
-        response = client.post(
-            "/v1/documents",
-            files={"original_content": (pdf_path.name, pdf_stream, "application/pdf")},
+    if existing_document_id is None:
+        with pdf_path.open("rb") as pdf_stream:
+            response = client.post(
+                "/v1/documents",
+                files={"original_content": (pdf_path.name, pdf_stream, "application/pdf")},
+            )
+        if response.status_code not in {200, 201}:
+            _raise_http("DEVELOPMENT_E2E_UPLOAD_FAILED", response)
+        registration = _json_mapping(response, "registration")
+        document_id = _require_identifier(
+            registration.get("document_id"), "DOC", "document_id"
         )
-    if response.status_code not in {200, 201}:
-        _raise_http("DEVELOPMENT_E2E_UPLOAD_FAILED", response)
-    registration = _json_mapping(response, "registration")
-    document_id = _require_identifier(registration.get("document_id"), "DOC", "document_id")
+    else:
+        document_id = _require_identifier(
+            existing_document_id,
+            "DOC",
+            "resume_document_id",
+        )
 
     state = _find_document(client, document_id)
     if state.get("diagnostic_status") == "DIAGNOSTIC_NOT_REQUESTED":
@@ -1153,7 +1166,6 @@ def _prepare_reemitted_real_pdf(
     source_reader = PdfReader(str(source_pdf), strict=True)
     if len(source_reader.pages) != 38:
         raise ValueError("DEVELOPMENT_E2E_SOURCE_PAGE_COUNT_INVALID")
-    source_page_hashes = _pdf_page_content_hashes(source_reader)
     source_sha256 = _sha256_file(source_pdf)
     writer = PdfWriter()
     for page in source_reader.pages:
@@ -1172,6 +1184,64 @@ def _prepare_reemitted_real_pdf(
             writer.write(stream)
     except OSError as exc:
         raise DevelopmentE2EError("DEVELOPMENT_E2E_REEMITTED_PDF_WRITE_FAILED") from exc
+
+    return _validate_reemitted_real_pdf(
+        source_pdf=source_pdf,
+        derived_pdf=derived_pdf,
+        proof_id=proof_id,
+    )
+
+
+def _select_development_e2e_proof(
+    *,
+    source_pdf: Path,
+    report_root: Path,
+    resume_proof_id: str | None,
+    resume_document_id: str | None,
+) -> tuple[str, Path, str | None]:
+    if (resume_proof_id is None) != (resume_document_id is None):
+        raise ValueError("DEVELOPMENT_E2E_RESUME_PAIR_REQUIRED")
+    if resume_proof_id is None:
+        proof_id = uuid4().hex.upper()
+        return (
+            proof_id,
+            _prepare_reemitted_real_pdf(
+                source_pdf=source_pdf,
+                temporary_report_root=report_root / "temp",
+                proof_id=proof_id,
+            ),
+            None,
+        )
+    if re.fullmatch(r"[A-F0-9]{32}", resume_proof_id) is None:
+        raise ValueError("DEVELOPMENT_E2E_PROOF_ID_INVALID")
+    document_id = _require_identifier(
+        resume_document_id,
+        "DOC",
+        "resume_document_id",
+    )
+    derived_pdf = report_root / "temp" / f"development-e2e-{resume_proof_id}.pdf"
+    return (
+        resume_proof_id,
+        _validate_reemitted_real_pdf(
+            source_pdf=source_pdf,
+            derived_pdf=derived_pdf,
+            proof_id=resume_proof_id,
+        ),
+        document_id,
+    )
+
+
+def _validate_reemitted_real_pdf(
+    *,
+    source_pdf: Path,
+    derived_pdf: Path,
+    proof_id: str,
+) -> Path:
+    if not derived_pdf.is_file():
+        raise DevelopmentE2EError("DEVELOPMENT_E2E_REEMITTED_PDF_MISSING")
+    source_reader = PdfReader(str(source_pdf), strict=True)
+    source_page_hashes = _pdf_page_content_hashes(source_reader)
+    source_sha256 = _sha256_file(source_pdf)
 
     derived_bytes = derived_pdf.read_bytes()
     if not derived_bytes.startswith(b"%PDF-") or not derived_bytes.rstrip().endswith(b"%%EOF"):
