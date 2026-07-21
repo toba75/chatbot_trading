@@ -335,8 +335,8 @@ def _verifier_adaptateur_gemma_apres_indisponibilite_granite(tmp_path: Path) -> 
 def _verifier_contrat_gemma_compact_pour_table_dense() -> None:
     # Given une page non native contient un tableau dense et lisible.
     # When Gemma prépare sa sortie canonique après Granite.
-    # Then il regroupe explicitement les cellules en régions TSV bornées,
-    #      sans tronquer la réponse ni omettre silencieusement la table.
+    # Then il regroupe explicitement les cellules avec un séparateur JSON-sûr,
+    #      sans caractère de contrôle brut, troncature ou omission silencieuse.
     from app.source_processing.adapters.gemma_vision_worker import (
         _PAGE_TRANSCRIPTION_PROMPT,
         _output_schema,
@@ -345,7 +345,8 @@ def _verifier_contrat_gemma_compact_pour_table_dense() -> None:
     schema = _output_schema()
     assert schema["properties"]["items"]["maxItems"] == 16
     assert "tableau dense" in _PAGE_TRANSCRIPTION_PROMPT
-    assert "TSV" in _PAGE_TRANSCRIPTION_PROMPT
+    assert "espace-barre-espace ( | )" in _PAGE_TRANSCRIPTION_PROMPT
+    assert "U+0000 à U+001F" in _PAGE_TRANSCRIPTION_PROMPT
     assert "N’omets aucun texte lisible" in _PAGE_TRANSCRIPTION_PROMPT
 
 
