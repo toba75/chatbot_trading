@@ -88,6 +88,7 @@ def test_parallel_page_conversion_preserves_pdf_order_and_reports_completed_unit
 
 
 def test_resumed_conversion_replays_persisted_pages_before_advancing_progress() -> None:
+    from app.source_processing.adapters.worker_runtime import _classify_processing_error
     from app.source_processing.application.routed_document_conversion_worker import (
         _ConversionProgressRecorder,
     )
@@ -107,6 +108,9 @@ def test_resumed_conversion_replays_persisted_pages_before_advancing_progress() 
 
     recorder.record_page(object())
     assert repository.completed_units == [8]
+    assert _classify_processing_error(
+        RuntimeError("CONVERSION_PERSISTENCE_CONFLICT")
+    ) == ("CONVERSION_PERSISTENCE_CONFLICT", False)
 
 
 class _RecordingProgressRepository:
