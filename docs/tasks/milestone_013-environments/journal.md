@@ -340,3 +340,28 @@ Contrainte d'outillage:
 ADR consultée: ADR-045. Aucune nouvelle ADR ni modification de sens n'est requise.
 
 Commit GREEN prévu: `feat(platform): isoler les donnees par environnement`.
+
+## T-006 - Scénario BDD et preuve RED
+
+Scénario contrôlé:
+
+- Given les trois jeux de configuration et de secrets existent.
+- When une commande d'environnement démarre sa pile Compose et agrège la readiness de ses composants réels.
+- Then seuls les réseaux, volumes, credentials et montages nommés pour ce profil sont attachés, chaque service applicatif reçoit le même fichier et le même répertoire de secrets en lecture seule, et l'état `ready` exige API, UI, gateway, workers, PostgreSQL et Qdrant concordants.
+
+Précondition GREEN avant modification:
+
+- `uv run --locked gate --scope m013_environments` - GREEN; 28 nœuds exécutés, aucune exécution manquante, inattendue ou dupliquée;
+- la pile legacy `uv run ui` a été identifiée par sa racine PID 25592 et ses deux conteneurs labellisés `com.ostrading.managed-by=uv-run-ui`, puis arrêtée sans suppression de volume ni de donnée afin de libérer l'exécutable UV et les ports;
+- `http://192.168.1.120:8000/v1/models` répond HTTP 200 et publie le modèle réel `google/gemma-4-26B-A4B-it` sans authentification ni TLS, conformément à ADR-014.
+
+Preuve RED attendue:
+
+- le test d'acceptation exige le rendu Docker Compose effectif de trois projets complets, leurs ports loopback distincts, leurs réseaux et volumes sans collision, leurs secrets propres, le montage read-only du fichier de profil et du répertoire de secrets dans tous les services applicatifs, ainsi que le raccordement commun au Spark réel disponible;
+- le test unitaire exige un mapping fermé des trois piles et une agrégation fail-closed de la readiness de tous les services, dont `worker-projection`;
+- le RED doit provenir de l'absence de `app.platform.environment_compose` et des trois manifestes, sans introduire de fallback vers la pile hôte legacy.
+- `uv run --locked pytest -q gate_tests/ported/tests/m013_environments/validate_environment_compose_acceptance.py gate_tests/ported/tests/m013_environments/validate_environment_compose_unit.py` - RED utile; 2 tests échouent uniquement sur `ModuleNotFoundError: No module named 'app.platform.environment_compose'`.
+
+ADR consultées: ADR-045, ADR-026 et ADR-014. Aucune nouvelle ADR n'est requise: T-006 matérialise les décisions déjà acceptées.
+
+Commit RED prévu: `test(deploy): couvrir les trois piles etanches`.
