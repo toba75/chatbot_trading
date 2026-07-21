@@ -619,7 +619,7 @@ Scénario contrôlé :
 
 - Given `uv run development` a rendu la pile réelle prête avec l'identité
   `development` / `ostrading-development-local` et le PDF réel versionné
-  `data/corpus/trading-on-momentum.pdf` ;
+  `data/corpus/the-original-turtle-trading-rules.pdf` ;
 - When le validateur live utilise exclusivement les endpoints publics pour
   enregistrer, diagnostiquer, convertir, projeter, rechercher, interroger le
   Spark réel et ouvrir la citation PDF, puis redémarre la pile sans volume
@@ -653,3 +653,91 @@ n'est requise : T-009 exécute les décisions déjà acceptées sur la chaîne r
 la progression publique, les citations et l'étanchéité des profils.
 
 Commit RED prévu : `test(m13-environments): couvrir parcours reel development`.
+
+## T-009 - Retour GREEN du parcours development réel
+
+Scénario réellement exécuté :
+
+- le PDF suivi `data/corpus/the-original-turtle-trading-rules.pdf` contient 38
+  pages et porte le SHA-256
+  `073f361ebb4ac6c10765a21ba7cca42d75fde8fabadc84340e6bbfca444fbda4` ;
+- le validateur réémet toutes ses pages, vérifie les flux de contenu page par
+  page, ajoute uniquement les métadonnées de preuve puis obtient le SHA-256
+  distinct `ba58a26e6a853c3cc891e53c19db03eba42bf3e829d2579f37c02969560c24ee` ;
+- `uv run development` démarre la pile complète, attend la readiness de
+  l'exécution courante, puis les contrats publics couvrent UI, enregistrement,
+  diagnostic, conversion, projection, recherche, conversation, réponse,
+  citation, PDF original et appel Spark live ;
+- la pile est arrêtée, entièrement supprimée sans ses volumes, redémarrée et
+  relit les mêmes document, version canonique et projection ;
+- les piles test et production sont sondées sans écriture et ne voient pas le
+  document development.
+
+Corrections TDD découvertes par les exécutions réelles :
+
+- sérialisation JSON Gemma sûre pour les tableaux Docling ;
+- budget du worker documentaire porté à 8 Gio et 4 CPU, healthcheck porté à
+  30 secondes ;
+- sélection live des gates rendue explicitement opt-in par scope afin qu'un
+  gate structurel ne déclenche jamais silencieusement un parcours live ;
+- reprise de conversion rendue monotone : les callbacks déjà persistés sont
+  absorbés avant le prochain incrément et un conflit publie désormais
+  `CONVERSION_PERSISTENCE_CONFLICT` ;
+- readiness du harness bornée aux événements de cycle de vie écrits après le
+  lancement courant, afin d'ignorer une ancienne pile encore joignable ;
+- cache des dépendances de construction des images ;
+- checkpoint sans secret écrit avant le premier arrêt et reprise explicite
+  d'une preuve existante, sans nouvel upload ;
+- superviseur de services indépendant de la sémantique non portable de
+  `docker compose wait` : il observe tous les conteneurs, accepte uniquement
+  `edge-gateway` arrêtée avec le code 0 et rend terminale toute sortie worker ;
+- six décisions unitaires du parcours regroupées dans l'unique nœud pytest
+  déclaré au manifeste, conformément au contrat d'exécution atomique du gate.
+
+Les échecs réels rencontrés ont été conservés. En particulier,
+`DOC-B84311A80ECFC161` a démontré la reprise durable : son compteur public est
+resté à `37/38` pendant le recalcul, puis la tentative 3 a abouti à `38/38`,
+`CANONICAL_ACCEPTED`, sans régression de progression.
+
+Preuve finale GREEN :
+
+- rapport :
+  `data/environments/development/reports/development-e2e-20260721T224955Z-2351ED7F4FFD468596130493DA499703.json` ;
+- image : `f509a25647d417ee1fdaac6ede91785482656be0` ;
+- document : `DOC-BA58A26E6A853C3C` ;
+- version canonique : `CVER-M004-ROUTED-BA58A26E6A853C3CC891E53C` ;
+- projection :
+  `PROJ-FF2E986C45A492B10A4DD70C1CC3863FDECEDF609B1709A6F8FB839E671F89F7`,
+  55 chunks ;
+- réponse : `ANS-LIVE-0AA5A9421114598B47CC`, support
+  `PARTIALLY_SUPPORTED` ;
+- citation ouvrable :
+  `https://localhost:18443/api/v1/documents/DOC-BA58A26E6A853C3C/original#page=36` ;
+- réponse brute Spark :
+  `chatcmpl-REQ-DEVELOPMENT-E2E-SPARK-2351ED7F4FFD468596130493DA499703` ;
+- progressions diagnostic, conversion et projection : trois fois
+  `SUCCEEDED` ;
+- identités : 6 conteneurs workers vérifiés et 3 jobs development concordants ;
+- redémarrage : `restart_persistence_verified=true` ;
+- étanchéité : `test:ABSENT`, `production:ABSENT` ;
+- volumes : neuf sentinelles development inchangées, aucun conteneur
+  development, test ou production laissé actif.
+
+Validations GREEN :
+
+- reprise explicite BA58 avec le parcours complet, deux démarrages réels,
+  sondes étrangères et rapport final : code 0 en 392,8 secondes ;
+- tests ciblés du validateur, des commandes et de Compose : 3 nœuds GREEN, le
+  nœud du parcours agrégeant 6 décisions unitaires ;
+- `uv run --locked gate --scope m013_environments` : 36 nœuds GREEN en mode
+  offline, unicité du manifeste vérifiée ;
+- Ruff, `compileall` ciblé et `git diff --check` : GREEN.
+
+Commits TDD structurants de clôture :
+
+- `1f499d4c3` / `a024bcf67` : readiness de l'exécution courante ;
+- `b94564d9c` / `730581f83` : arrêt volontaire par la passerelle ;
+- `81c703ec8` / `b8caae5c0`, ensuite remplacé après preuve live ;
+- `e79b94f94` / `7b0a13769` : reprise explicite de preuve ;
+- `f7f7b8994` / `abdc2b89d` : checkpoint produit avant arrêt ;
+- `bc9bacee2` / `f509a2564` : supervision réelle du premier service terminé.

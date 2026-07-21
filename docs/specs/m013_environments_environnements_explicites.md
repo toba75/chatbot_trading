@@ -195,9 +195,12 @@ Scénario d'acceptation :
 - Given `uv run development` publie une readiness concordante pour l'API, le
   relais, les workers documentaires et de projection, PostgreSQL, Qdrant et le
   gateway LLM relié au Spark réel ;
-- When `data/corpus/trading-on-momentum.pdf` est envoyé par
-  `POST /v1/documents`, puis diagnostiqué, converti, projeté, recherché et
-  interrogé exclusivement par les contrats HTTP publics ;
+- When les 38 pages de
+  `data/corpus/the-original-turtle-trading-rules.pdf` sont réémises dans un
+  PDF de preuve unique sous `data/environments/development/reports/temp/`,
+  puis envoyées par `POST /v1/documents`, diagnostiquées, converties,
+  projetées, recherchées et interrogées exclusivement par les contrats HTTP
+  publics ;
 - Then chaque progression publique aboutit avec `phase`, `completed_units`,
   `total_units` et absence d'erreur terminale, la réponse documentaire porte
   une citation dont le PDF original est réellement ouvrable, et chaque

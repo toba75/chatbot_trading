@@ -8,7 +8,10 @@ from types import SimpleNamespace
 import pytest
 
 
-def test_environment_command_waits_for_every_compose_service(monkeypatch, tmp_path: Path) -> None:
+def _validate_environment_command_waits_for_every_compose_service(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
     import app.platform.environment_compose as compose
 
     configuration_path = tmp_path / "config" / "environments" / "development.yaml"
@@ -43,7 +46,7 @@ def test_environment_command_waits_for_every_compose_service(monkeypatch, tmp_pa
     assert calls == [(definition, {})]
 
 
-def test_development_proof_reemits_every_real_pdf_page_with_unique_metadata(
+def _validate_development_proof_reemits_every_real_pdf_page_with_unique_metadata(
     tmp_path: Path,
 ) -> None:
     from pypdf import PdfReader
@@ -78,7 +81,9 @@ def test_development_proof_reemits_every_real_pdf_page_with_unique_metadata(
     assert derived_reader.metadata["/OSTradingProofId"] == "A" * 32
 
 
-def test_development_readiness_ignores_previous_lifecycle_event(tmp_path: Path) -> None:
+def _validate_development_readiness_ignores_previous_lifecycle_event(
+    tmp_path: Path,
+) -> None:
     from app.platform.development_e2e import _environment_lifecycle_state_since
 
     log_path = tmp_path / "development.log"
@@ -109,7 +114,7 @@ def test_development_readiness_ignores_previous_lifecycle_event(tmp_path: Path) 
     ) == "ready"
 
 
-def test_development_controlled_stop_releases_wait_via_edge_gateway(
+def _validate_development_controlled_stop_releases_wait_via_edge_gateway(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -142,7 +147,7 @@ def test_development_controlled_stop_releases_wait_via_edge_gateway(
     assert calls == [("stop", "--timeout", "30", "edge-gateway")]
 
 
-def test_development_resume_reuses_explicit_existing_proof_without_reemission(
+def _validate_development_resume_reuses_explicit_existing_proof_without_reemission(
     tmp_path: Path,
 ) -> None:
     from app.platform.development_e2e import (
@@ -188,7 +193,7 @@ def test_development_resume_reuses_explicit_existing_proof_without_reemission(
         )
 
 
-def test_development_product_checkpoint_preserves_public_proof_before_stop() -> None:
+def _validate_development_product_checkpoint_preserves_public_proof_before_stop() -> None:
     from app.platform.development_e2e import (
         _ProductProof,
         _product_checkpoint_payload,
@@ -223,3 +228,21 @@ def test_development_product_checkpoint_preserves_public_proof_before_stop() -> 
     assert payload["document_id"] == product.document_id
     assert payload["answer_id"] == product.answer_id
     assert payload["spark_raw_response_id"] == product.spark_raw_response_id
+
+
+def test_development_real_e2e_unit(monkeypatch, tmp_path: Path) -> None:
+    """Agrège les décisions unitaires dans l'unique nœud déclaré au gate."""
+
+    _validate_environment_command_waits_for_every_compose_service(monkeypatch, tmp_path)
+    _validate_development_proof_reemits_every_real_pdf_page_with_unique_metadata(
+        tmp_path,
+    )
+    _validate_development_readiness_ignores_previous_lifecycle_event(tmp_path)
+    _validate_development_controlled_stop_releases_wait_via_edge_gateway(
+        monkeypatch,
+        tmp_path,
+    )
+    _validate_development_resume_reuses_explicit_existing_proof_without_reemission(
+        tmp_path,
+    )
+    _validate_development_product_checkpoint_preserves_public_proof_before_stop()

@@ -40,3 +40,20 @@
 - Commandes de validation: `uv run development`; validateur live M13-environments development; `uv run --locked gate --scope m013_fastapi`; `uv run --locked gate`.
 - Commit RED: `test(m13-environments): couvrir parcours reel development`.
 - Commit GREEN: `feat(m13-environments): valider parcours development`.
+
+## Preuve GREEN livrée
+
+- PDF source suivi : `data/corpus/the-original-turtle-trading-rules.pdf`, 38
+  pages, SHA-256
+  `073f361ebb4ac6c10765a21ba7cca42d75fde8fabadc84340e6bbfca444fbda4`.
+- PDF de preuve réémis :
+  `data/environments/development/reports/temp/development-e2e-2351ED7F4FFD468596130493DA499703.pdf`,
+  SHA-256
+  `ba58a26e6a853c3cc891e53c19db03eba42bf3e829d2579f37c02969560c24ee`.
+- Rapport sans secret :
+  `data/environments/development/reports/development-e2e-20260721T224955Z-2351ED7F4FFD468596130493DA499703.json`.
+- Résultat : les trois progressions sont `SUCCEEDED`, le document, sa version
+  canonique et sa projection sont relus après redémarrage, le chemin Spark
+  live et la citation PDF sont prouvés, les sondes répondent `test:ABSENT` et
+  `production:ABSENT`, et les sentinelles des volumes development sont
+  inchangées.
