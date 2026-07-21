@@ -36,7 +36,7 @@ def test_environment_command_waits_for_every_compose_service(monkeypatch, tmp_pa
         config_path=str(configuration_path),
     )
 
-    assert calls == [("wait", *compose.REQUIRED_SERVICE_IDS)]
+    assert calls == [("wait", "--down-project", *compose.REQUIRED_SERVICE_IDS)]
 
 
 def test_development_proof_reemits_every_real_pdf_page_with_unique_metadata(
