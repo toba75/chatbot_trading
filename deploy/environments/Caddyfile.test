@@ -20,4 +20,3 @@ localhost:8443 {
         reverse_proxy ui:8081
     }
 }
-
