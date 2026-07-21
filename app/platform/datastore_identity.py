@@ -207,7 +207,7 @@ class PostgresIdentityPreflight:
                       JOIN pg_namespace AS namespace
                         ON namespace.oid = relation.relnamespace
                      WHERE namespace.nspname NOT IN ('pg_catalog', 'information_schema')
-                       AND namespace.nspname NOT LIKE 'pg_toast%'
+                       AND namespace.nspname NOT LIKE 'pg_toast%%'
                        AND relation.relkind IN ('r', 'p', 'v', 'm', 'S', 'f')
                 )
                 +
@@ -215,7 +215,7 @@ class PostgresIdentityPreflight:
                     SELECT count(*)
                       FROM pg_namespace AS namespace
                      WHERE namespace.nspname NOT IN ('pg_catalog', 'information_schema', 'public')
-                       AND namespace.nspname NOT LIKE 'pg_toast%'
+                       AND namespace.nspname NOT LIKE 'pg_toast%%'
                 )
             """,
             (),

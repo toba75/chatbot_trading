@@ -1,0 +1,142 @@
+name: ostrading-test
+
+x-profile-volumes: &profile-volumes
+  - ../../config/environments/test.yaml:/workspace/config/application.yaml:ro
+  - ../../config/secrets/test:/workspace/config/secrets/test:ro
+
+services:
+  edge-gateway:
+    ports:
+      - "127.0.0.1:19443:8443"
+    volumes:
+      - ./Caddyfile.test:/etc/caddy/Caddyfile:ro
+
+  ui:
+    volumes: *profile-volumes
+
+  orchestrator-api:
+    expose:
+      - "8081"
+    volumes:
+      - ../../config/environments/test.yaml:/workspace/config/application.yaml:ro
+      - ../../config/secrets/test:/workspace/config/secrets/test:ro
+      - application-data:/workspace/data/environments/test
+
+  llm-gateway:
+    command:
+      - python
+      - -m
+      - app.platform.local_runtime
+      - serve-http
+      - llm-gateway
+      - "8091"
+      - --config
+      - /workspace/config/application.yaml
+    expose:
+      - "8091"
+    networks:
+      core:
+        aliases:
+          - llm-gateway-test
+      spark-egress: {}
+    volumes: *profile-volumes
+    labels:
+      org.ostrading.environment: test
+      org.ostrading.spark-endpoint: http://192.168.1.120:8000/v1
+
+  postgres:
+    networks:
+      core:
+        aliases:
+          - postgres-test
+    environment:
+      POSTGRES_DB: ostrading_test
+      POSTGRES_USER: ostrading_test
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "pg_isready -U ostrading_test -d ostrading_test"
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  qdrant:
+    networks:
+      core:
+        aliases:
+          - qdrant-test
+
+  granite-docling:
+    volumes: *profile-volumes
+
+  embedding-service:
+    volumes: *profile-volumes
+
+  reranker-service:
+    volumes: *profile-volumes
+
+  ocr-runtime:
+    volumes:
+      - application-data:/workspace/data/environments/test
+
+  worker-documents:
+    volumes:
+      - ../../config/environments/test.yaml:/workspace/config/application.yaml:ro
+      - ../../config/secrets/test:/workspace/config/secrets/test:ro
+      - application-data:/workspace/data/environments/test
+      - ../../data/docling_assets/native:/workspace/data/environments/test/docling_assets/native:ro
+      - ../../data/docling_assets/granite:/workspace/data/environments/test/docling_assets/granite:ro
+
+  worker-projection:
+    volumes:
+      - ../../config/environments/test.yaml:/workspace/config/application.yaml:ro
+      - ../../config/secrets/test:/workspace/config/secrets/test:ro
+      - application-data:/workspace/data/environments/test
+
+  worker-research:
+    volumes: *profile-volumes
+
+  worker-backtest:
+    volumes:
+      - ../../config/environments/test.yaml:/workspace/config/application.yaml:ro
+      - ../../config/secrets/test:/workspace/config/secrets/test:ro
+      - application-data:/workspace/data/environments/test
+
+  backtest-engine:
+    volumes: *profile-volumes
+
+networks:
+  edge:
+    name: ostrading-test-edge
+  core:
+    name: ostrading-test-core
+  spark-egress:
+    name: ostrading-test-spark-egress
+  ocr-control:
+    name: ostrading-test-ocr-control
+  ocr-egress:
+    name: ostrading-test-ocr-egress
+
+volumes:
+  caddy-data:
+    name: ostrading-test-caddy-data
+  caddy-config:
+    name: ostrading-test-caddy-config
+  postgres-data:
+    name: ostrading-test-postgres-data
+  qdrant-data:
+    name: ostrading-test-qdrant-data
+  application-data:
+    name: ostrading-test-application-data
+  model-cache:
+    name: ostrading-test-model-cache
+  ocr-runtime-data:
+    name: ostrading-test-ocr-runtime-data
+
+secrets:
+  postgres_password:
+    file: ../../config/secrets/test/postgres_password
+  local_api_token:
+    file: ../../config/secrets/test/local_api_token

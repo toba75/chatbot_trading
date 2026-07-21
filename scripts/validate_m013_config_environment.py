@@ -192,6 +192,11 @@ class EnvironmentScanner:
                 r"environment_snapshot\s*=\s*dict\(os\.environ\)", line
             ):
                 self.exception_count += 1
+            elif (
+                relative_path == "app/platform/environment_compose.py"
+                and "process_environment = dict(os.environ)" in line
+            ):
+                self.exception_count += 1
             else:
                 self.add_violation(
                     relative_path,

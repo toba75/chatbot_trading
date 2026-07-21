@@ -34,7 +34,7 @@ services:
     port: 5432
     database: ostrading_development
     role: ostrading_development
-    data_volume: ostrading-development-postgres-data
+    data_volume: ostrading-development-postgres-data-v2
   qdrant:
     url: http://qdrant-development:6333
     port: 6333

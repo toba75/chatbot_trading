@@ -365,3 +365,85 @@ Preuve RED attendue:
 ADR consultées: ADR-045, ADR-026 et ADR-014. Aucune nouvelle ADR n'est requise: T-006 matérialise les décisions déjà acceptées.
 
 Commit RED prévu: `test(deploy): couvrir les trois piles etanches`.
+
+Commit RED créé:
+
+- `7c33adfa2` - `test(deploy): couvrir les trois piles etanches`.
+
+## T-006 - Orchestration réelle et retour GREEN
+
+Implémentation livrée:
+
+- `uv run development`, `uv run test` et `uv run production` sélectionnent
+  chacune un projet Compose fermé et son overlay explicite, sans option
+  `--config` exposée à l'opérateur;
+- chaque pile comporte quinze services requis et dix-sept conteneurs avec deux
+  réplicas de `worker-documents` et deux de `worker-projection`;
+- les fichiers de configuration, répertoires de secrets, bases PostgreSQL,
+  instances Qdrant, volumes applicatifs, réseaux, DNS et ports loopback sont
+  propres au profil;
+- les manifestes OCRmyPDF et Docling versionnés sont copiés dans l'image du
+  worker; les actifs Docling scellés sont montés en lecture seule;
+- chaque pile possède un moteur Docker OCR interne, un réseau de contrôle et un
+  volume propres. L'image OCRmyPDF est préchargée par digest avant readiness et
+  aucun socket Docker hôte n'est exposé;
+- la readiness agrège toutes les réplicas et parse le flux NDJSON réel de
+  `docker compose ps`; un service absent, étranger, arrêté ou malsain provoque
+  un échec terminal;
+- l'arrêt des commandes détruit uniquement les conteneurs et réseaux du projet,
+  jamais ses volumes.
+
+Corrections issues des démarrages réels:
+
+- les migrations ne sont plus exécutées par `docker-entrypoint-initdb.d`, qui
+  cassait la transaction de la migration 017; l'API demeure l'autorité unique
+  du runner transactionnel;
+- les pourcentages littéraux de l'inventaire PostgreSQL sont échappés pour
+  `psycopg` (`pg_toast%%`);
+- les racines de données des trois profils sont créées et attribuées à
+  l'utilisateur non-root avant montage des volumes;
+- les workers documents reçoivent les trois manifestes, les actifs Docling
+  réels et le moteur OCR isolé exigés par leur préflight strict;
+- le harness produit M13 démarre désormais PostgreSQL et Qdrant réels sur deux
+  ports loopback distincts et isole toutes ses racines fichiers dans son
+  répertoire temporaire; le préflight d'identité ne dépend plus d'un DNS
+  Compose ni des données locales du dépôt.
+
+Preuves live simultanées:
+
+- les trois projets `ostrading-development`, `ostrading-test` et
+  `ostrading-production` démarrent simultanément sans collision et atteignent
+  tous `running/healthy` pour leurs quinze services requis;
+- `https://localhost:18443/health`, `:19443/health` et `:20443/health`
+  répondent chacun HTTP 200 avec `healthy`;
+- PostgreSQL publie respectivement `development|ostrading-development-local`,
+  `test|ostrading-test-ci` et `production|ostrading-production-primary`;
+- les marqueurs fichiers portent les mêmes identités et Qdrant ne contient que
+  la collection d'identité du profil courant;
+- les résolutions croisées `development -> postgres-test`,
+  `test -> postgres-production` et `production -> postgres-development`
+  échouent, prouvant l'absence de DNS inter-piles;
+- le Spark réel `192.168.1.120:8000` est utilisé par les trois gateways et
+  publie `google/gemma-4-26B-A4B-it`.
+
+Validations GREEN:
+
+- quatre tests ciblés Compose, commandes et identité - GREEN;
+- `uv run --locked gate --scope m013_environments` - GREEN; 30 nœuds;
+- `uv run --locked gate --scope m013_config` - GREEN; 36 nœuds;
+- `uv run --locked gate --scope m013_fastapi` - GREEN; 80 nœuds, contrôles live
+  inclus;
+- test produit M13-reality ciblé - GREEN; PostgreSQL, Qdrant, API, gateway et
+  Spark réels, 1 test en 31,62 s;
+- `uv run --locked gate` - GREEN; 445 nœuds, aucun nœud non GREEN;
+- `uv run --locked python -m compileall -q app` - GREEN;
+- `git diff --check` - GREEN, hors avertissements LF vers CRLF;
+- rendu `docker compose config` des trois profils - GREEN;
+- agrégation live de readiness des trois profils - GREEN; quinze services par
+  profil.
+
+ADR consultées: ADR-045, ADR-026, ADR-014 et ADR-032. Aucune nouvelle ADR n'est
+requise: le moteur OCR dédié matérialise l'isolation d'exécution et l'obligation
+d'un runtime réel déjà décidées.
+
+Commit GREEN prévu: `feat(deploy): orchestrer les piles par environnement`.

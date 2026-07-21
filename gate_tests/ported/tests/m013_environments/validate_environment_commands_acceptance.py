@@ -64,8 +64,8 @@ def _assert_uv_environment_entrypoints_launch_the_selected_stack(monkeypatch, tm
         served.append((service_id, port, config_path))
 
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(command, "start_local_ui_stack", supervised_stack)
-    monkeypatch.setattr(command, "serve_http_service", serve_http)
+    monkeypatch.setattr(command, "start_environment_compose_stack", supervised_stack)
+    monkeypatch.setattr(command, "wait_environment_compose_stack", serve_http)
 
     original_argv = sys.argv[:]
     try:
@@ -110,7 +110,7 @@ def _assert_uv_environment_entrypoints_propagate_terminal_errors(monkeypatch, tm
         yield launch_configuration
 
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(command, "start_local_ui_stack", failing_stack)
+    monkeypatch.setattr(command, "start_environment_compose_stack", failing_stack)
     original_argv = sys.argv[:]
     try:
         sys.argv = ["test"]

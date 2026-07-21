@@ -14,7 +14,7 @@ deployment:
       role: gemma_only
       dns_name: spark-inference.test.ostrading.internal
       endpoint_hosts:
-        - 192.168.1.121
+        - 192.168.1.120
       allowed_client_cidrs:
         - 192.168.1.21/32
   network:
@@ -56,7 +56,7 @@ services:
   llm_gateway:
     url: http://llm-gateway-test:8091
     port: 8091
-    spark_endpoint_url: http://192.168.1.121:8000/v1
+    spark_endpoint_url: http://192.168.1.120:8000/v1
     auth_mode: none
     tls_mode: disabled
     timeout_seconds: 120

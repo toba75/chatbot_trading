@@ -18,6 +18,12 @@
 /config/application.yaml
 /config/secrets/local/*
 !/config/secrets/local/.gitignore
+/config/secrets/development/*
+!/config/secrets/development/.gitignore
+/config/secrets/test/*
+!/config/secrets/test/.gitignore
+/config/secrets/production/*
+!/config/secrets/production/.gitignore
 .env
 .env.*
 !.env.example

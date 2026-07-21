@@ -1,0 +1,145 @@
+name: ostrading-production
+
+x-profile-volumes: &profile-volumes
+  - ../../config/environments/production.yaml:/workspace/config/application.yaml:ro
+  - ../../config/secrets/production:/workspace/config/secrets/production:ro
+
+services:
+  edge-gateway:
+    ports:
+      - "127.0.0.1:20443:8443"
+    volumes:
+      - ./Caddyfile.production:/etc/caddy/Caddyfile:ro
+
+  ui:
+    volumes: *profile-volumes
+
+  orchestrator-api:
+    expose:
+      - "8082"
+    volumes:
+      - ../../config/environments/production.yaml:/workspace/config/application.yaml:ro
+      - ../../config/secrets/production:/workspace/config/secrets/production:ro
+      - application-data:/workspace/data/environments/production
+
+  llm-gateway:
+    command:
+      - python
+      - -m
+      - app.platform.local_runtime
+      - serve-http
+      - llm-gateway
+      - "8092"
+      - --config
+      - /workspace/config/application.yaml
+    expose:
+      - "8092"
+    networks:
+      core:
+        aliases:
+          - llm-gateway-production
+          - llm-gateway-production.ostrading.internal
+      spark-egress: {}
+    volumes: *profile-volumes
+    labels:
+      org.ostrading.environment: production
+      org.ostrading.spark-endpoint: http://192.168.1.120:8000/v1
+
+  postgres:
+    networks:
+      core:
+        aliases:
+          - postgres-production
+          - postgres-production.ostrading.internal
+    environment:
+      POSTGRES_DB: ostrading_production
+      POSTGRES_USER: ostrading_production
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "pg_isready -U ostrading_production -d ostrading_production"
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  qdrant:
+    networks:
+      core:
+        aliases:
+          - qdrant-production
+          - qdrant-production.ostrading.internal
+
+  granite-docling:
+    volumes: *profile-volumes
+
+  embedding-service:
+    volumes: *profile-volumes
+
+  reranker-service:
+    volumes: *profile-volumes
+
+  ocr-runtime:
+    volumes:
+      - application-data:/workspace/data/environments/production
+
+  worker-documents:
+    volumes:
+      - ../../config/environments/production.yaml:/workspace/config/application.yaml:ro
+      - ../../config/secrets/production:/workspace/config/secrets/production:ro
+      - application-data:/workspace/data/environments/production
+      - ../../data/docling_assets/native:/workspace/data/environments/production/docling_assets/native:ro
+      - ../../data/docling_assets/granite:/workspace/data/environments/production/docling_assets/granite:ro
+
+  worker-projection:
+    volumes:
+      - ../../config/environments/production.yaml:/workspace/config/application.yaml:ro
+      - ../../config/secrets/production:/workspace/config/secrets/production:ro
+      - application-data:/workspace/data/environments/production
+
+  worker-research:
+    volumes: *profile-volumes
+
+  worker-backtest:
+    volumes:
+      - ../../config/environments/production.yaml:/workspace/config/application.yaml:ro
+      - ../../config/secrets/production:/workspace/config/secrets/production:ro
+      - application-data:/workspace/data/environments/production
+
+  backtest-engine:
+    volumes: *profile-volumes
+
+networks:
+  edge:
+    name: ostrading-production-edge
+  core:
+    name: ostrading-production-core
+  spark-egress:
+    name: ostrading-production-spark-egress
+  ocr-control:
+    name: ostrading-production-ocr-control
+  ocr-egress:
+    name: ostrading-production-ocr-egress
+
+volumes:
+  caddy-data:
+    name: ostrading-production-caddy-data
+  caddy-config:
+    name: ostrading-production-caddy-config
+  postgres-data:
+    name: ostrading-production-postgres-data
+  qdrant-data:
+    name: ostrading-production-qdrant-data
+  application-data:
+    name: ostrading-production-application-data
+  model-cache:
+    name: ostrading-production-model-cache
+  ocr-runtime-data:
+    name: ostrading-production-ocr-runtime-data
+
+secrets:
+  postgres_password:
+    file: ../../config/secrets/production/postgres_password
+  local_api_token:
+    file: ../../config/secrets/production/local_api_token

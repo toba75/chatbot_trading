@@ -98,9 +98,41 @@ def test_environment_compose_acceptance() -> None:
             }
         ]
 
+        ocr_runtime = document["services"]["ocr-runtime"]
+        assert ocr_runtime["privileged"] is True
+        assert ocr_runtime["image"].startswith(
+            "docker:27.5.1-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce"
+        )
+        assert set(ocr_runtime["networks"]) == {"ocr-control", "ocr-egress"}
+        assert "/var/run/docker.sock" not in {
+            mount["source"]
+            for service in document["services"].values()
+            for mount in service.get("volumes", [])
+            if mount.get("type") == "bind"
+        }
+        worker_documents = document["services"]["worker-documents"]
+        assert "ocr-control" in worker_documents["networks"]
+        assert worker_documents["depends_on"]["ocr-runtime"]["condition"] == "service_healthy"
+        worker_mounts = {mount["target"]: mount for mount in worker_documents["volumes"]}
+        for asset_kind in ("native", "granite"):
+            target = f"/workspace/data/environments/{environment}/docling_assets/{asset_kind}"
+            assert worker_mounts[target]["read_only"] is True
+            assert Path(worker_mounts[target]["source"]).resolve() == (
+                repository_root / "data" / "docling_assets" / asset_kind
+            ).resolve()
+
     spark_endpoints = {
         document["services"]["llm-gateway"]["labels"]["org.ostrading.spark-endpoint"]
         for document in rendered.values()
     }
     assert spark_endpoints == {"http://192.168.1.120:8000/v1"}
 
+    dockerfile = (repository_root / "deploy" / "local-compose" / "Dockerfile").read_text(
+        encoding="utf-8"
+    )
+    for environment in ENVIRONMENTS:
+        assert f"/workspace/data/environments/{environment}" in dockerfile
+    assert "FROM docker:27.5.1-cli@sha256:851f91d241214e7c6db86513b270d58776379aacc5eb9c4a87e5b47115e3065c AS docker-cli" in dockerfile
+    assert "config/ocrmypdf-image.json ./config/ocrmypdf-image.json" in dockerfile
+    assert "config/docling-assets.native.json ./config/docling-assets.native.json" in dockerfile
+    assert "config/docling-assets.granite.json ./config/docling-assets.granite.json" in dockerfile

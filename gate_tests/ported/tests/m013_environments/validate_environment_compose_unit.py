@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import json
 from pathlib import Path
 
 import pytest
@@ -13,6 +14,7 @@ def test_environment_compose_unit(tmp_path: Path) -> None:
         EnvironmentContainerState,
         aggregate_environment_readiness,
         environment_stack_definition,
+        _parse_compose_ps,
     )
 
     repository_root = tmp_path.resolve()
@@ -53,6 +55,19 @@ def test_environment_compose_unit(tmp_path: Path) -> None:
     assert readiness.is_ready is True
     assert readiness.ready_services == REQUIRED_SERVICE_IDS
 
+    ndjson = "\n".join(
+        json.dumps(
+            {
+                "Service": state.service,
+                "Name": state.container_name,
+                "State": state.state,
+                "Health": state.health,
+            }
+        )
+        for state in ready_states
+    )
+    assert _parse_compose_ps(ndjson) == ready_states
+
     with pytest.raises(ValueError, match="ENVIRONMENT_STACK_SERVICE_MISSING"):
         aggregate_environment_readiness(
             definition,
@@ -83,4 +98,3 @@ def test_environment_compose_unit(tmp_path: Path) -> None:
     from app.platform.environment_compose import start_environment_compose_stack
 
     assert environment_command.start_environment_compose_stack is start_environment_compose_stack
-

@@ -1,0 +1,546 @@
+services:
+  edge-gateway:
+    image: caddy@sha256:af32e97399febea808609119bb21544d0265c58a02836576e32a2d082c262c17
+    networks:
+      - edge
+      - core
+    depends_on:
+      ui:
+        condition: service_healthy
+      orchestrator-api:
+        condition: service_healthy
+    volumes:
+      - caddy-data:/data
+      - caddy-config:/config
+    tmpfs:
+      - /tmp
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "wget --spider --quiet --no-check-certificate https://localhost:8443/health"
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    restart: "no"
+    read_only: true
+
+  ui:
+    image: ostrading/ui:0.1.0-m013-environments-${OSTRADING_IMAGE_REVISION?OSTRADING_IMAGE_REVISION requis}
+    build:
+      context: ../..
+      dockerfile: deploy/local-compose/Dockerfile
+      target: generic-service
+      args:
+        OSTRADING_IMAGE_REVISION: "${OSTRADING_IMAGE_REVISION?OSTRADING_IMAGE_REVISION requis}"
+        OSTRADING_POSTGRES_SCHEMA_VERSION: "${OSTRADING_POSTGRES_SCHEMA_VERSION?OSTRADING_POSTGRES_SCHEMA_VERSION requis}"
+    command:
+      - python
+      - -m
+      - app.platform.local_runtime
+      - serve-http
+      - ui
+      - "8081"
+      - --config
+      - /workspace/config/application.yaml
+    expose:
+      - "8081"
+    networks:
+      - core
+    depends_on:
+      orchestrator-api:
+        condition: service_healthy
+    volumes:
+      - ../../config/application.schema.json:/workspace/config/application.schema.json:ro
+    secrets:
+      - local_api_token
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8081/health', timeout=5).read()\""
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    restart: "no"
+    read_only: true
+
+  orchestrator-api:
+    image: ostrading/orchestrator-api:0.1.0-m013-environments-schema-${OSTRADING_POSTGRES_SCHEMA_VERSION?OSTRADING_POSTGRES_SCHEMA_VERSION requis}-${OSTRADING_IMAGE_REVISION?OSTRADING_IMAGE_REVISION requis}
+    build:
+      context: ../..
+      dockerfile: deploy/local-compose/Dockerfile
+      target: orchestrator-api
+      args:
+        OSTRADING_IMAGE_REVISION: "${OSTRADING_IMAGE_REVISION?OSTRADING_IMAGE_REVISION requis}"
+        OSTRADING_POSTGRES_SCHEMA_VERSION: "${OSTRADING_POSTGRES_SCHEMA_VERSION?OSTRADING_POSTGRES_SCHEMA_VERSION requis}"
+    command:
+      - --config
+      - /workspace/config/application.yaml
+    networks:
+      - core
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      llm-gateway:
+        condition: service_healthy
+    volumes:
+      - ../../config/application.schema.json:/workspace/config/application.schema.json:ro
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "python -m app.platform.environment_compose check-http --service orchestrator-api --path /ready --config /workspace/config/application.yaml"
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 30s
+    stop_grace_period: 30s
+    restart: "no"
+    read_only: true
+
+  llm-gateway:
+    image: ostrading/llm-gateway:0.1.0-m013-environments-${OSTRADING_IMAGE_REVISION?OSTRADING_IMAGE_REVISION requis}
+    build:
+      context: ../..
+      dockerfile: deploy/local-compose/Dockerfile
+      target: generic-service
+      args:
+        OSTRADING_IMAGE_REVISION: "${OSTRADING_IMAGE_REVISION?OSTRADING_IMAGE_REVISION requis}"
+        OSTRADING_POSTGRES_SCHEMA_VERSION: "${OSTRADING_POSTGRES_SCHEMA_VERSION?OSTRADING_POSTGRES_SCHEMA_VERSION requis}"
+    networks:
+      - core
+      - spark-egress
+    volumes:
+      - ../../config/application.schema.json:/workspace/config/application.schema.json:ro
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "python -m app.platform.environment_compose check-http --service llm-gateway --path /health --config /workspace/config/application.yaml"
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 10s
+    restart: "no"
+    read_only: true
+
+  postgres:
+    image: postgres@sha256:7e5df973a74872482e320dcbdeb055e178d6f42de0558b083892c50cda833c96
+    expose:
+      - "5432"
+    networks:
+      - core
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    secrets:
+      - postgres_password
+    restart: "no"
+
+  qdrant:
+    image: qdrant/qdrant@sha256:318c11b72aaab96b36e9662ad244de3cabd0653a1b942d4e8191f18296c81af0
+    expose:
+      - "6333"
+    networks:
+      - core
+    volumes:
+      - qdrant-data:/qdrant/storage
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "test -d /qdrant/storage"
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
+    restart: "no"
+
+  granite-docling:
+    image: ostrading/granite-docling:0.1.0-m013-environments-${OSTRADING_IMAGE_REVISION?OSTRADING_IMAGE_REVISION requis}
+    build:
+      context: ../..
+      dockerfile: deploy/local-compose/Dockerfile
+      target: generic-service
+      args:
+        OSTRADING_IMAGE_REVISION: "${OSTRADING_IMAGE_REVISION?OSTRADING_IMAGE_REVISION requis}"
+        OSTRADING_POSTGRES_SCHEMA_VERSION: "${OSTRADING_POSTGRES_SCHEMA_VERSION?OSTRADING_POSTGRES_SCHEMA_VERSION requis}"
+    command:
+      - python
+      - -m
+      - app.platform.local_runtime
+      - serve-http
+      - granite-docling
+      - "8001"
+      - --config
+      - /workspace/config/application.yaml
+    expose:
+      - "8001"
+    networks:
+      - core
+    volumes:
+      - model-cache:/models
+      - ../../config/application.schema.json:/workspace/config/application.schema.json:ro
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health', timeout=5).read()\""
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    restart: "no"
+    read_only: true
+
+  embedding-service:
+    image: ostrading/embedding-service:0.1.0-m013-environments-${OSTRADING_IMAGE_REVISION?OSTRADING_IMAGE_REVISION requis}
+    build:
+      context: ../..
+      dockerfile: deploy/local-compose/Dockerfile
+      target: generic-service
+      args:
+        OSTRADING_IMAGE_REVISION: "${OSTRADING_IMAGE_REVISION?OSTRADING_IMAGE_REVISION requis}"
+        OSTRADING_POSTGRES_SCHEMA_VERSION: "${OSTRADING_POSTGRES_SCHEMA_VERSION?OSTRADING_POSTGRES_SCHEMA_VERSION requis}"
+    command:
+      - python
+      - -m
+      - app.platform.local_runtime
+      - serve-http
+      - embedding-service
+      - "8101"
+      - --config
+      - /workspace/config/application.yaml
+    expose:
+      - "8101"
+    networks:
+      - core
+    volumes:
+      - model-cache:/models
+      - ../../config/application.schema.json:/workspace/config/application.schema.json:ro
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8101/health', timeout=5).read()\""
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    restart: "no"
+    read_only: true
+
+  reranker-service:
+    image: ostrading/reranker-service:0.1.0-m013-environments-${OSTRADING_IMAGE_REVISION?OSTRADING_IMAGE_REVISION requis}
+    build:
+      context: ../..
+      dockerfile: deploy/local-compose/Dockerfile
+      target: generic-service
+      args:
+        OSTRADING_IMAGE_REVISION: "${OSTRADING_IMAGE_REVISION?OSTRADING_IMAGE_REVISION requis}"
+        OSTRADING_POSTGRES_SCHEMA_VERSION: "${OSTRADING_POSTGRES_SCHEMA_VERSION?OSTRADING_POSTGRES_SCHEMA_VERSION requis}"
+    command:
+      - python
+      - -m
+      - app.platform.local_runtime
+      - serve-http
+      - reranker-service
+      - "8102"
+      - --config
+      - /workspace/config/application.yaml
+    expose:
+      - "8102"
+    networks:
+      - core
+    volumes:
+      - model-cache:/models
+      - ../../config/application.schema.json:/workspace/config/application.schema.json:ro
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8102/health', timeout=5).read()\""
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    restart: "no"
+    read_only: true
+
+  ocr-runtime:
+    image: docker:27.5.1-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
+    privileged: true
+    environment:
+      DOCKER_HOST: tcp://127.0.0.1:2375
+      DOCKER_TLS_CERTDIR: ""
+    entrypoint:
+      - /bin/sh
+      - -ec
+    command:
+      - |
+        dockerd-entrypoint.sh --host=tcp://0.0.0.0:2375 --host=unix:///var/run/docker.sock &
+        daemon_pid=$!
+        trap 'kill -TERM "$$daemon_pid"; wait "$$daemon_pid"' INT TERM
+        until docker info >/dev/null 2>&1; do
+          kill -0 "$$daemon_pid"
+          sleep 1
+        done
+        docker pull jbarlow83/ocrmypdf@sha256:88d50f2ce7c054e5aacfc48794eca50dbb8af9a6ef1d2a540456dcd9a4687e42
+        docker image inspect jbarlow83/ocrmypdf@sha256:88d50f2ce7c054e5aacfc48794eca50dbb8af9a6ef1d2a540456dcd9a4687e42 >/dev/null
+        wait "$$daemon_pid"
+    networks:
+      - ocr-control
+      - ocr-egress
+    volumes:
+      - ocr-runtime-data:/var/lib/docker
+    tmpfs:
+      - /tmp:size=256m,mode=1777
+      - /var/run:size=32m,mode=0755
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "docker image inspect jbarlow83/ocrmypdf@sha256:88d50f2ce7c054e5aacfc48794eca50dbb8af9a6ef1d2a540456dcd9a4687e42 >/dev/null 2>&1"
+      interval: 10s
+      timeout: 10s
+      retries: 60
+      start_period: 20s
+    restart: "no"
+
+  worker-documents:
+    image: ostrading/worker-documents:0.1.0-m013-environments-schema-${OSTRADING_POSTGRES_SCHEMA_VERSION?OSTRADING_POSTGRES_SCHEMA_VERSION requis}-${OSTRADING_IMAGE_REVISION?OSTRADING_IMAGE_REVISION requis}
+    build:
+      context: ../..
+      dockerfile: deploy/local-compose/Dockerfile
+      target: worker-documents
+      args:
+        OSTRADING_IMAGE_REVISION: "${OSTRADING_IMAGE_REVISION?OSTRADING_IMAGE_REVISION requis}"
+        OSTRADING_POSTGRES_SCHEMA_VERSION: "${OSTRADING_POSTGRES_SCHEMA_VERSION?OSTRADING_POSTGRES_SCHEMA_VERSION requis}"
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+          pids: 256
+    command:
+      - --worker-id
+      - worker-documents
+      - --lease-seconds
+      - "120"
+      - --poll-seconds
+      - "0.5"
+      - --config
+      - /workspace/config/application.yaml
+    networks:
+      - core
+      - ocr-control
+    depends_on:
+      orchestrator-api:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      llm-gateway:
+        condition: service_healthy
+      ocr-runtime:
+        condition: service_healthy
+    volumes:
+      - ../../config/application.schema.json:/workspace/config/application.schema.json:ro
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "python -m app.platform.environment_compose check-config --config /workspace/config/application.yaml"
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+    read_only: true
+
+  worker-projection:
+    image: ostrading/worker-projection:0.1.0-m013-environments-schema-${OSTRADING_POSTGRES_SCHEMA_VERSION?OSTRADING_POSTGRES_SCHEMA_VERSION requis}-${OSTRADING_IMAGE_REVISION?OSTRADING_IMAGE_REVISION requis}
+    build:
+      context: ../..
+      dockerfile: deploy/local-compose/Dockerfile
+      target: worker-projection
+      args:
+        OSTRADING_IMAGE_REVISION: "${OSTRADING_IMAGE_REVISION?OSTRADING_IMAGE_REVISION requis}"
+        OSTRADING_POSTGRES_SCHEMA_VERSION: "${OSTRADING_POSTGRES_SCHEMA_VERSION?OSTRADING_POSTGRES_SCHEMA_VERSION requis}"
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+          pids: 256
+    command:
+      - --worker-id
+      - worker-projection
+      - --lease-seconds
+      - "120"
+      - --poll-seconds
+      - "0.5"
+      - --config
+      - /workspace/config/application.yaml
+    networks:
+      - core
+    depends_on:
+      orchestrator-api:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      llm-gateway:
+        condition: service_healthy
+    volumes:
+      - ../../config/application.schema.json:/workspace/config/application.schema.json:ro
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "python -m app.platform.environment_compose check-config --config /workspace/config/application.yaml"
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+    read_only: true
+
+  worker-research:
+    image: ostrading/worker-research:0.1.0-m013-environments-${OSTRADING_IMAGE_REVISION?OSTRADING_IMAGE_REVISION requis}
+    build:
+      context: ../..
+      dockerfile: deploy/local-compose/Dockerfile
+      target: generic-service
+      args:
+        OSTRADING_IMAGE_REVISION: "${OSTRADING_IMAGE_REVISION?OSTRADING_IMAGE_REVISION requis}"
+        OSTRADING_POSTGRES_SCHEMA_VERSION: "${OSTRADING_POSTGRES_SCHEMA_VERSION?OSTRADING_POSTGRES_SCHEMA_VERSION requis}"
+    command:
+      - python
+      - -m
+      - app.platform.local_runtime
+      - run-worker
+      - worker-research
+      - --config
+      - /workspace/config/application.yaml
+    networks:
+      - core
+    depends_on:
+      orchestrator-api:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      llm-gateway:
+        condition: service_healthy
+    volumes:
+      - ../../config/application.schema.json:/workspace/config/application.schema.json:ro
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "python -m app.platform.environment_compose check-config --config /workspace/config/application.yaml"
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+    read_only: true
+
+  worker-backtest:
+    image: ostrading/worker-backtest:0.1.0-m013-environments-${OSTRADING_IMAGE_REVISION?OSTRADING_IMAGE_REVISION requis}
+    build:
+      context: ../..
+      dockerfile: deploy/local-compose/Dockerfile
+      target: generic-service
+      args:
+        OSTRADING_IMAGE_REVISION: "${OSTRADING_IMAGE_REVISION?OSTRADING_IMAGE_REVISION requis}"
+        OSTRADING_POSTGRES_SCHEMA_VERSION: "${OSTRADING_POSTGRES_SCHEMA_VERSION?OSTRADING_POSTGRES_SCHEMA_VERSION requis}"
+    command:
+      - python
+      - -m
+      - app.platform.local_runtime
+      - run-worker
+      - worker-backtest
+      - --config
+      - /workspace/config/application.yaml
+    networks:
+      - core
+    depends_on:
+      orchestrator-api:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ../../config/application.schema.json:/workspace/config/application.schema.json:ro
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "python -m app.platform.environment_compose check-config --config /workspace/config/application.yaml"
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+    read_only: true
+
+  backtest-engine:
+    image: ostrading/backtest-engine:0.1.0-m013-environments-${OSTRADING_IMAGE_REVISION?OSTRADING_IMAGE_REVISION requis}
+    build:
+      context: ../..
+      dockerfile: deploy/local-compose/Dockerfile
+      target: generic-service
+      args:
+        OSTRADING_IMAGE_REVISION: "${OSTRADING_IMAGE_REVISION?OSTRADING_IMAGE_REVISION requis}"
+        OSTRADING_POSTGRES_SCHEMA_VERSION: "${OSTRADING_POSTGRES_SCHEMA_VERSION?OSTRADING_POSTGRES_SCHEMA_VERSION requis}"
+    command:
+      - python
+      - -m
+      - app.platform.local_runtime
+      - serve-http
+      - backtest-engine
+      - "8200"
+      - --config
+      - /workspace/config/application.yaml
+    expose:
+      - "8200"
+    networks:
+      - core
+    depends_on:
+      orchestrator-api:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ../../config/application.schema.json:/workspace/config/application.schema.json:ro
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8200/health', timeout=5).read()\""
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    restart: "no"
+    read_only: true
+
+networks:
+  edge: {}
+  core:
+    internal: true
+  spark-egress: {}
+  ocr-control:
+    internal: true
+  ocr-egress: {}
+
+volumes:
+  caddy-data: {}
+  caddy-config: {}
+  postgres-data: {}
+  qdrant-data: {}
+  application-data: {}
+  model-cache: {}
+  ocr-runtime-data: {}
+
+secrets:
+  postgres_password: {}
+  local_api_token: {}

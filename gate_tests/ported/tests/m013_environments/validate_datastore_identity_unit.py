@@ -179,6 +179,10 @@ def test_datastore_identity_unit(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
         expected.environment,
         expected.deployment_id,
     )
+    assert any(
+        "namespace.nspname NOT LIKE 'pg_toast%%'" in sql
+        for sql in empty_postgres.executed_sql
+    )
 
     postgres_without_initialization = _PostgresIdentityCursor(object_count=0)
     with pytest.raises(DatastoreEnvironmentMismatchError, match=DATASTORE_ENVIRONMENT_MISMATCH):
@@ -224,10 +228,12 @@ class _PostgresIdentityCursor:
     def __init__(self, *, object_count) -> None:
         self.object_count = object_count
         self.events = []
+        self.executed_sql = []
         self.insert_parameters = None
         self._result = None
 
     def execute(self, sql, parameters=()):
+        self.executed_sql.append(str(sql))
         normalized = " ".join(str(sql).split())
         if "pg_advisory_xact_lock" in normalized:
             self.events.append("identity:lock")

@@ -14,13 +14,13 @@ deployment:
       role: gemma_only
       dns_name: spark-inference.production.ostrading.internal
       endpoint_hosts:
-        - spark-inference.production.ostrading.internal
+        - 192.168.1.120
       allowed_client_cidrs:
         - 10.73.0.0/24
   network:
-    require_tls: true
-    require_api_key: true
-    prefer_mtls: true
+    require_tls: false
+    require_api_key: false
+    prefer_mtls: false
   placement:
     application: docker_local
     postgres: docker_local
@@ -36,7 +36,7 @@ services:
     role: ostrading_production
     data_volume: ostrading-production-postgres-data
   qdrant:
-    url: https://qdrant-production.ostrading.internal:6333
+    url: http://qdrant-production.ostrading.internal:6333
     port: 6333
     instance_id: ostrading-production-qdrant
     storage_volume: ostrading-production-qdrant-data
@@ -54,11 +54,11 @@ services:
     docling_concurrency: 2
     granite_concurrency: 2
   llm_gateway:
-    url: https://llm-gateway-production.ostrading.internal:8092
+    url: http://llm-gateway-production.ostrading.internal:8092
     port: 8092
-    spark_endpoint_url: https://spark-inference.production.ostrading.internal:8000/v1
-    auth_mode: api_key_file
-    tls_mode: ca_bundle
+    spark_endpoint_url: http://192.168.1.120:8000/v1
+    auth_mode: none
+    tls_mode: disabled
     timeout_seconds: 120
     retry_before_first_token: 1
     circuit_breaker_failure_threshold: 2

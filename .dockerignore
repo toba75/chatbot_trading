@@ -16,6 +16,10 @@ data/**
 !uv.lock
 !app/
 !app/**
+!config/
+!config/ocrmypdf-image.json
+!config/docling-assets.native.json
+!config/docling-assets.granite.json
 !deploy/
 !deploy/postgres/
 !deploy/postgres/migrations/

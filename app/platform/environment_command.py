@@ -11,8 +11,11 @@ import sys
 from types import MappingProxyType
 from typing import Any, Final, Literal, Protocol
 
-from app.platform.local_runtime import HTTP_SERVICE_PORTS, serve_http_service
-from app.platform.ui_local_stack import start_local_ui_stack
+from app.platform.environment_compose import (
+    start_environment_compose_stack,
+    wait_environment_compose_stack,
+)
+from app.platform.local_runtime import HTTP_SERVICE_PORTS
 
 
 ApplicationEnvironment = Literal["development", "test", "production"]
@@ -175,8 +178,8 @@ def _run_entrypoint(environment: ApplicationEnvironment) -> int:
             environment=environment,
             argv=tuple(sys.argv[1:]),
             repository_root=Path.cwd(),
-            serve_http=serve_http_service,
-            local_stack=start_local_ui_stack,
+            serve_http=wait_environment_compose_stack,
+            local_stack=start_environment_compose_stack,
             publish_state=_publish_state,
         )
     except ValueError as exc:

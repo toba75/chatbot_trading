@@ -1,0 +1,142 @@
+name: ostrading-development
+
+x-profile-volumes: &profile-volumes
+  - ../../config/environments/development.yaml:/workspace/config/application.yaml:ro
+  - ../../config/secrets/development:/workspace/config/secrets/development:ro
+
+services:
+  edge-gateway:
+    ports:
+      - "127.0.0.1:18443:8443"
+    volumes:
+      - ./Caddyfile.development:/etc/caddy/Caddyfile:ro
+
+  ui:
+    volumes: *profile-volumes
+
+  orchestrator-api:
+    expose:
+      - "8080"
+    volumes:
+      - ../../config/environments/development.yaml:/workspace/config/application.yaml:ro
+      - ../../config/secrets/development:/workspace/config/secrets/development:ro
+      - application-data:/workspace/data/environments/development
+
+  llm-gateway:
+    command:
+      - python
+      - -m
+      - app.platform.local_runtime
+      - serve-http
+      - llm-gateway
+      - "8090"
+      - --config
+      - /workspace/config/application.yaml
+    expose:
+      - "8090"
+    networks:
+      core:
+        aliases:
+          - llm-gateway-development
+      spark-egress: {}
+    volumes: *profile-volumes
+    labels:
+      org.ostrading.environment: development
+      org.ostrading.spark-endpoint: http://192.168.1.120:8000/v1
+
+  postgres:
+    networks:
+      core:
+        aliases:
+          - postgres-development
+    environment:
+      POSTGRES_DB: ostrading_development
+      POSTGRES_USER: ostrading_development
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "pg_isready -U ostrading_development -d ostrading_development"
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  qdrant:
+    networks:
+      core:
+        aliases:
+          - qdrant-development
+
+  granite-docling:
+    volumes: *profile-volumes
+
+  embedding-service:
+    volumes: *profile-volumes
+
+  reranker-service:
+    volumes: *profile-volumes
+
+  ocr-runtime:
+    volumes:
+      - application-data:/workspace/data/environments/development
+
+  worker-documents:
+    volumes:
+      - ../../config/environments/development.yaml:/workspace/config/application.yaml:ro
+      - ../../config/secrets/development:/workspace/config/secrets/development:ro
+      - application-data:/workspace/data/environments/development
+      - ../../data/docling_assets/native:/workspace/data/environments/development/docling_assets/native:ro
+      - ../../data/docling_assets/granite:/workspace/data/environments/development/docling_assets/granite:ro
+
+  worker-projection:
+    volumes:
+      - ../../config/environments/development.yaml:/workspace/config/application.yaml:ro
+      - ../../config/secrets/development:/workspace/config/secrets/development:ro
+      - application-data:/workspace/data/environments/development
+
+  worker-research:
+    volumes: *profile-volumes
+
+  worker-backtest:
+    volumes:
+      - ../../config/environments/development.yaml:/workspace/config/application.yaml:ro
+      - ../../config/secrets/development:/workspace/config/secrets/development:ro
+      - application-data:/workspace/data/environments/development
+
+  backtest-engine:
+    volumes: *profile-volumes
+
+networks:
+  edge:
+    name: ostrading-development-edge
+  core:
+    name: ostrading-development-core
+  spark-egress:
+    name: ostrading-development-spark-egress
+  ocr-control:
+    name: ostrading-development-ocr-control
+  ocr-egress:
+    name: ostrading-development-ocr-egress
+
+volumes:
+  caddy-data:
+    name: ostrading-development-caddy-data
+  caddy-config:
+    name: ostrading-development-caddy-config
+  postgres-data:
+    name: ostrading-development-postgres-data-v2
+  qdrant-data:
+    name: ostrading-development-qdrant-data
+  application-data:
+    name: ostrading-development-application-data-v2
+  model-cache:
+    name: ostrading-development-model-cache
+  ocr-runtime-data:
+    name: ostrading-development-ocr-runtime-data
+
+secrets:
+  postgres_password:
+    file: ../../config/secrets/development/postgres_password
+  local_api_token:
+    file: ../../config/secrets/development/local_api_token
