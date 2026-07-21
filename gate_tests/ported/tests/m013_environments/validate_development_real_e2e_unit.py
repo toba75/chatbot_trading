@@ -72,3 +72,34 @@ def test_development_proof_reemits_every_real_pdf_page_with_unique_metadata(
     assert derived_bytes.rstrip().endswith(b"%%EOF")
     assert derived_bytes != source_bytes
     assert derived_reader.metadata["/OSTradingProofId"] == "A" * 32
+
+
+def test_development_readiness_ignores_previous_lifecycle_event(tmp_path: Path) -> None:
+    from app.platform.development_e2e import _environment_lifecycle_state_since
+
+    log_path = tmp_path / "development.log"
+    log_path.write_bytes(
+        b'{"event_type":"environment_lifecycle","environment":"development",'
+        b'"state":"ready","error_code":null}\n'
+    )
+    current_run_offset = log_path.stat().st_size
+    with log_path.open("ab") as stream:
+        stream.write(
+            b'{"event_type":"environment_lifecycle","environment":"development",'
+            b'"state":"starting","error_code":null}\n'
+        )
+
+    assert _environment_lifecycle_state_since(
+        log_path=log_path,
+        start_offset=current_run_offset,
+    ) == "starting"
+
+    with log_path.open("ab") as stream:
+        stream.write(
+            b'{"event_type":"environment_lifecycle","environment":"development",'
+            b'"state":"ready","error_code":null}\n'
+        )
+    assert _environment_lifecycle_state_since(
+        log_path=log_path,
+        start_offset=current_run_offset,
+    ) == "ready"
