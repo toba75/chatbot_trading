@@ -33,3 +33,46 @@ def test_planner_orders_dependencies_once_and_serializes_selection() -> None:
         assert str(error).startswith("GATE_DEPENDENCY_CYCLE:")
     else:
         raise AssertionError("Un cycle doit être refusé.")
+
+
+def test_scoped_plan_requires_explicit_live_activation() -> None:
+    root = Path.cwd()
+    acceptance = GateNode(
+        "m013.acceptance",
+        root / "acceptance.py",
+        "test",
+        "m013_environments",
+        "tests",
+        30,
+        "parallel",
+        (),
+        False,
+    )
+    live = GateNode(
+        "m013.live",
+        root / "live.py",
+        "test",
+        "m013_environments",
+        "live",
+        30,
+        "process",
+        ("m013.acceptance",),
+        True,
+    )
+    manifest = GateManifest(root, root / "gate.toml", (acceptance, live))
+
+    standard_scope = build_plan(manifest, "m013_environments", False)
+    assert [node.identifier for node in standard_scope.nodes] == ["m013.acceptance"]
+    assert standard_scope.offline is True
+
+    live_scope = build_plan(
+        manifest,
+        "m013_environments",
+        False,
+        include_live=True,
+    )
+    assert [node.identifier for node in live_scope.nodes] == [
+        "m013.acceptance",
+        "m013.live",
+    ]
+    assert live_scope.offline is False
