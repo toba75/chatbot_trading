@@ -104,6 +104,7 @@ git ls-tree -r --name-only master -- docs/tasks docs/adr docs/specs
 | M-012 | Évaluation pilote et calibration | Mesurer le système sur corpus pilote et justifier les seuils | WS-11, tous | M-011 |
 | M-013 | Durcissement et acceptation V1 | Valider sécurité, exploitation, régression et critères V1 | WS-01, WS-03, WS-11 | M-012 |
 | M13-config | Configuration applicative sans environnement | Remplacer toute entrée de processus par variables d'environnement par un fichier de configuration unique, explicite et validé | WS-01, WS-03, WS-11 | M-012; sous-milestone de M-013 |
+| M13-environments | Environnements explicites et données étanches | Démarrer `development`, `test` ou `production` par une commande UV dédiée et garantir que données, secrets, files et workers restent liés au profil choisi | WS-01, WS-03, WS-11 | M-012, M13-config; sous-milestone de M-013 |
 | M13-FastAPI | API orchestratrice ASGI raccordée | Remplacer le routeur HTTP artisanal par une frontière ASGI structurée et raccorder les contrats documentaires aux cas d'usage réels | WS-01, WS-03, WS-04, WS-05, WS-08, WS-11 | M-012; sous-milestone de M-013 |
 
 ## 6. Milestones détaillés
@@ -497,6 +498,40 @@ git ls-tree -r --name-only master -- docs/tasks docs/adr docs/specs
   - recherche statique bloquant `os.environ`, `getenv`, `process.env` ou équivalent dans le code applicatif hors adaptateur de validation qui les refuse explicitement.
 - Sortie attendue: aucun processus applicatif n'accepte de variable d'environnement comme entrée; seules les valeurs présentes dans le fichier de configuration pilotent l'application.
 
+### M13-environments - Environnements explicites et données étanches
+
+- Source: demande utilisateur du 2026-07-21; ADR-016 à remplacer explicitement; livrables M13-config.
+- Objectif métier: permettre à l'exploitant de choisir sans ambiguïté `development`, `test` ou `production` par `uv run development`, `uv run test` ou `uv run production`, tout en rendant techniquement impossible l'accès croisé aux données et travaux asynchrones.
+- Workstreams actifs: WS-01, WS-03, WS-11.
+- Bounded contexts concernés: `platform.configuration`, API, UI, workers, jobs/outbox, PostgreSQL, Qdrant, stockage de fichiers, secrets, exploitation et gouvernance.
+- Dossier de tâches attendu si le jalon est détaillé: `docs/tasks/milestone_013-environments`.
+- Règle de gouvernance: `M13-environments` est un sous-milestone de `M-013`; sa planification ne requiert pas la clôture de `M-013` dans `master`, seulement les milestones strictement antérieurs. M13-config est une dépendance fonctionnelle déjà livrée.
+- Scénario directeur:
+  - Given les trois configurations complètes `development`, `test` et `production` et leurs ressources mutables distinctes
+  - When l'exploitant lance l'une des trois commandes UV et soumet un PDF au parcours public réel
+  - Then l'API, l'outbox, le relais, les workers, PostgreSQL, Qdrant et les fichiers utilisent exclusivement l'environnement choisi, publient la progression réelle et refusent toute incohérence d'identité avant le premier travail
+- Livrables:
+  - ADR-045 décidant les profils explicites et remplaçant ADR-016 pour le nom de fichier unique `config/application.yaml`, sans réintroduire de variable d'environnement ni de fallback;
+  - contrat strict `environment` et `deployment_id`, avec trois fichiers complets `config/environments/development.yaml`, `test.yaml` et `production.yaml` sans héritage implicite;
+  - scripts UV `development`, `test` et `production` comme seules commandes opérateur, avec mapping interne non configurable vers le fichier attendu;
+  - stockages, rôles, credentials, volumes, réseaux, chemins, artefacts, caches, files et outbox distincts par environnement;
+  - contrôle d'identité des stockages avant toute lecture, écriture, migration ou prise de job;
+  - identité d'environnement propagée aux jobs, workers, états de santé, progressions et preuves d'exécution;
+  - opérations de migration, sauvegarde, restauration, purge et nettoyage bornées à l'environnement explicitement sélectionné;
+  - parcours réel `PDF -> API -> persistance -> outbox -> relais -> worker -> projection -> lecture publique` prouvé séparément dans les trois environnements;
+  - runbooks, matrice de traçabilité et gate M13-environments rejouable.
+- Tests et gates:
+  - profil absent, inconnu, incomplet ou contradictoire refusé sans valeur par défaut;
+  - `uv run development`, `uv run test` et `uv run production` sélectionnent chacun un unique fichier et supervisent toute la chaîne attendue;
+  - aucune URL mutable, base, rôle, secret, volume, racine de fichiers, file ou outbox n'est partagé entre deux profils;
+  - un stockage portant une identité différente produit `DATASTORE_ENVIRONMENT_MISMATCH` avant toute opération métier;
+  - un worker ne réclame que les jobs de son environnement et refuse explicitement un message divergent avec `WORKER_ENVIRONMENT_MISMATCH`;
+  - l'UI n'active une action asynchrone que si sa chaîne réelle est prête et lit la progression exclusivement depuis le contrat public du profil courant;
+  - le nettoyage de `test` est impossible sur `development` ou `production`;
+  - chaque parcours bout en bout utilise un PDF réel, les adaptateurs réels et les stockages réels, sans mock, stub, fake ni fallback;
+  - `uv run --locked gate` reste GREEN après enrôlement des validations.
+- Sortie attendue: les trois commandes simples pilotent des installations complètes, observables et étanches; aucune donnée ni aucun worker d'un environnement n'est accessible depuis les deux autres.
+
 ### M13-FastAPI - API orchestratrice ASGI raccordée
 
 - Source: ADR-018, spécifications M-003 à M-005, `docs/specs/ui.md` et demande utilisateur du 2026-07-12.
@@ -543,6 +578,7 @@ Chemin critique pour la V1 complète:
 ```text
 M-008 -> M-009 -> M-010 -> M-011 -> M-012 -> M-013
 M-012 -> M13-config
+M-012 -> M13-config -> M13-environments
 M-012 -> M13-FastAPI
 ```
 
@@ -579,6 +615,7 @@ Les points suivants doivent déclencher une vérification ADR avant implémentat
 | Gemma 4 servi par vLLM sur Spark | M-002 | Oui |
 | Snapshots immuables pour stratégies et expériences | M-010 ou M-011 | Oui |
 | Configuration applicative par fichier unique sans variables d'environnement | M13-config | ADR-016 |
+| Profils `development`, `test`, `production` explicites et isolation des données/workers | M13-environments | ADR-045 à créer, remplaçant ADR-016 pour le chemin unique |
 | Framework ASGI et serveur HTTP de l'API orchestratrice | M13-FastAPI | ADR-019 à créer |
 
 Une ADR acceptée ne doit pas être réécrite pour changer son sens. Toute évolution doit créer une nouvelle ADR remplaçante.
@@ -612,10 +649,11 @@ Si un milestone amont requis n'est pas présent dans `master`, la création du d
 | Panne Spark masquée | Gateway M-002, tests de processus et absence de fallback silencieux |
 | Critère scientifique ignoré après GREEN logiciel | Évaluation M-012 séparant tests logiciels et métriques scientifiques |
 | Configuration pilotée par variable d'environnement ou valeur système | M13-config, chargeur strict, audit Compose et scan statique |
+| Donnée ou job consommé depuis un autre environnement | M13-environments, ressources distinctes, identité de stockage et refus worker avant claim |
 
 ## 12. Livrable V1 attendu
 
-À la fin de M13-config, l'utilisateur doit pouvoir:
+À la fin de M-013 et de ses sous-milestones applicables, l'utilisateur doit pouvoir:
 
 - charger un corpus personnel de PDF;
 - obtenir des versions canoniques contrôlées et traçables;
@@ -628,5 +666,5 @@ Si un milestone amont requis n'est pas présent dans `master`, la création du d
 - exécuter une expérience reproductible par code déterministe;
 - conserver les résultats positifs, négatifs et échoués;
 - auditer les décisions, modèles, versions, données et configurations;
-- démarrer chaque processus applicatif uniquement depuis le fichier `config/application.yaml`;
+- démarrer la pile complète avec `uv run development`, `uv run test` ou `uv run production`, chaque commande utilisant exclusivement sa configuration et ses données;
 - exploiter le système localement sans exposition publique.
