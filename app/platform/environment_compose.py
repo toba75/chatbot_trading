@@ -464,14 +464,12 @@ def wait_environment_compose_stack(*, service_id: str, port: int, config_path: s
     if definition.configuration_path != path:
         raise ValueError("CONFIG_ENVIRONMENT_MISMATCH: attente de pile divergente")
     technical_environment = _technical_environment_from_repository(repository_root)
-    result = _run_compose(
+    _run_compose(
         definition,
-        ("wait",),
+        ("wait", *REQUIRED_SERVICE_IDS),
         technical_environment=technical_environment,
         capture_output=False,
-        allowed_returncodes=frozenset(range(0, 256)),
     )
-    raise ValueError(f"ENVIRONMENT_STACK_STOPPED: code={result.returncode}")
 
 
 def configured_http_healthcheck(*, service: str, path: str, config_path: Path) -> None:
