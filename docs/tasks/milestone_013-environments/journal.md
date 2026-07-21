@@ -167,7 +167,7 @@ Précondition GREEN avant modification:
 - `uv run --locked gate --scope m013_config` - GREEN; 36 nœuds exécutés.
 - `uv run --locked gate` - GREEN; 437 nœuds exécutés, y compris les validations live existantes.
 
-Preuve RED attendue:
+Preuve RED observée:
 
 - les tests d'acceptation invoquent les trois entrypoints réels et contrôlent les états `starting`, `ready`, `failed`, `stopped`;
 - les tests unitaires figent le mapping fermé, l'absence de surcharge `--config`, l'erreur de fichier absent, l'arrêt ordonné et le chemin imbriqué `config/environments/<profile>.yaml`;
@@ -274,3 +274,28 @@ Commit GREEN prévu: `feat(platform): refuser les stockages hors environnement`.
 - `git diff --check` - GREEN; avertissement de normalisation LF vers CRLF uniquement, sans erreur d'espacement.
 
 Périmètre contrôlé: un fichier de plan, douze fichiers de tâches et ce journal. Aucun autre artefact n'est modifié.
+
+## T-005 - Scénario BDD et preuve RED
+
+Scénario contrôlé:
+
+- Given un identifiant sentinelle et un PDF réel sont écrits dans les racines d'un profil.
+- When les coordonnées PostgreSQL, Qdrant, files, outbox, caches, volumes, chemins et secrets des trois profils sont validées puis que les deux autres profils recherchent ces sentinelles.
+- Then chaque coordonnée et autorité mutable est propre au profil, aucune racine résolue ne se chevauche et aucune sentinelle ni référence de secret de production n'est visible depuis les deux autres profils.
+
+Précondition GREEN avant modification:
+
+- `uv run --locked --no-sync python -m ost_gate.cli --scope m013_environments` - GREEN; 26 nœuds exécutés;
+- `uv run --locked --no-sync python -m ost_gate.cli` - GREEN; 441 nœuds exécutés, parcours live inclus;
+- la pile live existante et le fichier local ignoré `config/application.yaml` sont restés actifs et inchangés pendant cette vérification.
+
+Preuve RED attendue:
+
+- le test d'acceptation exige les trois configurations complètes, inventorie tous les stockages de `app/context_registry.json` et écrit de vraies sentinelles sur les racines fichiers isolées;
+- le test unitaire exige un validateur fail-closed de la matrice et couvre collisions d'URL, base, rôle, collection, outbox, secret, chemin résolu, profil absent, alias contradictoire et URL PostgreSQL incohérente;
+- le RED doit provenir de l'absence de `app.platform.environment_resources` et des trois fichiers complets, sans démarrer ni reconfigurer les piles réservées à T-006.
+- `uv run --locked --no-sync pytest -q gate_tests/ported/tests/m013_environments/validate_environment_resource_isolation_acceptance.py gate_tests/ported/tests/m013_environments/validate_environment_resource_isolation_unit.py` - RED utile; 2 tests échouent uniquement sur `ModuleNotFoundError: No module named 'app.platform.environment_resources'`.
+
+ADR consultée: ADR-045. Aucune nouvelle ADR n'est requise: T-005 matérialise la matrice de ressources déjà décidée.
+
+Commit RED prévu: `test(platform): couvrir etancheite des ressources mutables`.
