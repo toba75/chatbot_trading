@@ -15,7 +15,7 @@ def test_environment_command_waits_for_every_compose_service(monkeypatch, tmp_pa
     configuration_path.parent.mkdir(parents=True)
     configuration_path.write_text("application:\n  environment: development\n", encoding="utf-8")
     definition = SimpleNamespace(configuration_path=configuration_path.resolve())
-    calls: list[tuple[str, ...]] = []
+    calls: list[tuple[object, dict[str, str]]] = []
 
     monkeypatch.setattr(compose, "_repository_root_from_configuration", lambda _: tmp_path)
     monkeypatch.setattr(
@@ -26,11 +26,13 @@ def test_environment_command_waits_for_every_compose_service(monkeypatch, tmp_pa
     monkeypatch.setattr(compose, "environment_stack_definition", lambda *_, **__: definition)
     monkeypatch.setattr(compose, "_technical_environment_from_repository", lambda _: {})
 
-    def record_run(_definition, arguments, **_kwargs):
-        calls.append(tuple(arguments))
-        return SimpleNamespace(returncode=0)
-
-    monkeypatch.setattr(compose, "_run_compose", record_run)
+    monkeypatch.setattr(
+        compose,
+        "_wait_for_first_environment_service_exit",
+        lambda observed_definition, *, technical_environment: calls.append(
+            (observed_definition, dict(technical_environment))
+        ),
+    )
 
     compose.wait_environment_compose_stack(
         service_id="ui",
@@ -38,7 +40,7 @@ def test_environment_command_waits_for_every_compose_service(monkeypatch, tmp_pa
         config_path=str(configuration_path),
     )
 
-    assert calls == [("wait", "--down-project", *compose.REQUIRED_SERVICE_IDS)]
+    assert calls == [(definition, {})]
 
 
 def test_development_proof_reemits_every_real_pdf_page_with_unique_metadata(
