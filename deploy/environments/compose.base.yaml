@@ -350,7 +350,7 @@ services:
         - CMD-SHELL
         - "python -m app.platform.environment_compose check-worker --worker-id worker-documents --config /workspace/config/application.yaml"
       interval: 10s
-      timeout: 10s
+      timeout: 30s
       retries: 12
       start_period: 20s
     restart: unless-stopped
