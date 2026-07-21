@@ -15,7 +15,6 @@ from uuid import uuid4
 
 DATASTORE_ENVIRONMENT_MISMATCH = "DATASTORE_ENVIRONMENT_MISMATCH"
 DATASTORE_IDENTITY_MARKER = ".ostrading-datastore-identity.json"
-QDRANT_IDENTITY_COLLECTION = "platform_datastore_identity_v1"
 QDRANT_IDENTITY_POINT_ID = "7e7aaf4e-b479-5ceb-9187-17d07e996852"
 
 _ENVIRONMENTS = frozenset(("development", "test", "production"))
@@ -121,6 +120,7 @@ class FileRootIdentityPreflight:
 class QdrantIdentityPreflight:
     client: QdrantIdentityClientPort
     expected_identity: DatastoreIdentity
+    collection_name: str
 
     def __post_init__(self) -> None:
         for method_name in ("list_collections", "read_identity", "initialize_identity"):
@@ -128,11 +128,12 @@ class QdrantIdentityPreflight:
                 raise ValueError(f"client Qdrant sans {method_name}")
         if not isinstance(self.expected_identity, DatastoreIdentity):
             raise ValueError("identité attendue Qdrant invalide")
+        _require_qdrant_collection_name(self.collection_name)
 
     def run(self, *, initialize_if_empty: bool) -> DatastoreIdentity:
         _require_initialization_choice(initialize_if_empty)
         collections = _collection_names(self.client.list_collections())
-        if QDRANT_IDENTITY_COLLECTION in collections:
+        if self.collection_name in collections:
             return self.expected_identity.require_match(
                 DatastoreIdentity.from_mapping(self.client.read_identity())
             )
@@ -144,7 +145,7 @@ class QdrantIdentityPreflight:
             raise DatastoreEnvironmentMismatchError("marqueur Qdrant absent")
         self.client.initialize_identity(self.expected_identity)
         initialized_collections = _collection_names(self.client.list_collections())
-        if QDRANT_IDENTITY_COLLECTION not in initialized_collections:
+        if self.collection_name not in initialized_collections:
             raise DatastoreEnvironmentMismatchError("initialisation Qdrant incomplète")
         return self.expected_identity.require_match(
             DatastoreIdentity.from_mapping(self.client.read_identity())
@@ -314,13 +315,15 @@ class DatastorePreflightPlan:
 class QdrantRestIdentityClient:
     """Client REST borné au marqueur d'identité de Qdrant."""
 
-    def __init__(self, *, base_url: str, timeout_seconds: int) -> None:
+    def __init__(self, *, base_url: str, timeout_seconds: int, collection_name: str) -> None:
         if not isinstance(base_url, str) or base_url.strip() == "" or base_url != base_url.strip():
             raise ValueError("URL Qdrant d'identité invalide")
         if isinstance(timeout_seconds, bool) or not isinstance(timeout_seconds, int) or timeout_seconds < 1:
             raise ValueError("timeout Qdrant d'identité invalide")
+        _require_qdrant_collection_name(collection_name)
         self._base_url = base_url.rstrip("/")
         self._timeout_seconds = timeout_seconds
+        self._collection_name = collection_name
 
     def list_collections(self) -> tuple[str, ...]:
         payload = self._json_request(method="GET", path="/collections", body=None)
@@ -339,7 +342,7 @@ class QdrantRestIdentityClient:
     def read_identity(self) -> Mapping[str, Any] | None:
         payload = self._json_request(
             method="POST",
-            path=f"/collections/{QDRANT_IDENTITY_COLLECTION}/points",
+            path=f"/collections/{self._collection_name}/points",
             body={
                 "ids": [QDRANT_IDENTITY_POINT_ID],
                 "with_payload": True,
@@ -357,12 +360,12 @@ class QdrantRestIdentityClient:
             raise ValueError("identité Qdrant à initialiser invalide")
         self._json_request(
             method="PUT",
-            path=f"/collections/{QDRANT_IDENTITY_COLLECTION}",
+            path=f"/collections/{self._collection_name}",
             body={"vectors": {"size": 1, "distance": "Cosine"}},
         )
         self._json_request(
             method="PUT",
-            path=f"/collections/{QDRANT_IDENTITY_COLLECTION}/points?wait=true",
+            path=f"/collections/{self._collection_name}/points?wait=true",
             body={
                 "points": [
                     {
@@ -440,6 +443,12 @@ def _collection_names(value: Sequence[str]) -> tuple[str, ...]:
     return names
 
 
+def _require_qdrant_collection_name(value: object) -> str:
+    if not isinstance(value, str) or re.fullmatch(r"[a-z0-9]+(?:[-_][a-z0-9]+)*", value) is None:
+        raise ValueError("nom de collection d'identité Qdrant invalide")
+    return value
+
+
 def _require_initialization_choice(value: bool) -> None:
     if not isinstance(value, bool):
         raise ValueError("choix d'initialisation du stockage invalide")
@@ -455,7 +464,6 @@ __all__ = [
     "IdentityPreflight",
     "PostgresIdentityPreflight",
     "PostgresConnectionIdentityPreflight",
-    "QDRANT_IDENTITY_COLLECTION",
     "QdrantIdentityPreflight",
     "QdrantRestIdentityClient",
 ]

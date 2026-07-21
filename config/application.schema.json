@@ -198,7 +198,10 @@
           "additionalProperties": false,
           "required": [
             "url",
-            "port"
+            "port",
+            "database",
+            "role",
+            "data_volume"
           ],
           "properties": {
             "url": {
@@ -206,6 +209,15 @@
             },
             "port": {
               "$ref": "#/$defs/tcpPort"
+            },
+            "database": {
+              "$ref": "#/$defs/environmentResourceName"
+            },
+            "role": {
+              "$ref": "#/$defs/environmentResourceName"
+            },
+            "data_volume": {
+              "$ref": "#/$defs/environmentResourceName"
             }
           }
         },
@@ -214,7 +226,10 @@
           "additionalProperties": false,
           "required": [
             "url",
-            "port"
+            "port",
+            "instance_id",
+            "storage_volume",
+            "collections"
           ],
           "properties": {
             "url": {
@@ -222,6 +237,28 @@
             },
             "port": {
               "$ref": "#/$defs/tcpPort"
+            },
+            "instance_id": {
+              "$ref": "#/$defs/environmentResourceName"
+            },
+            "storage_volume": {
+              "$ref": "#/$defs/environmentResourceName"
+            },
+            "collections": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "datastore_identity",
+                "knowledge_access"
+              ],
+              "properties": {
+                "datastore_identity": {
+                  "$ref": "#/$defs/environmentResourceName"
+                },
+                "knowledge_access": {
+                  "$ref": "#/$defs/environmentResourceName"
+                }
+              }
             }
           }
         },
@@ -246,6 +283,8 @@
           "additionalProperties": false,
           "required": [
             "queue_name",
+            "outbox_namespace",
+            "progress_namespace",
             "concurrency",
             "docling_concurrency",
             "granite_concurrency"
@@ -253,6 +292,12 @@
           "properties": {
             "queue_name": {
               "$ref": "#/$defs/nonEmptyNonPlaceholderString"
+            },
+            "outbox_namespace": {
+              "$ref": "#/$defs/environmentResourceName"
+            },
+            "progress_namespace": {
+              "$ref": "#/$defs/environmentResourceName"
             },
             "concurrency": {
               "type": "integer",
@@ -402,6 +447,7 @@
         "reports_root",
         "logs_root",
         "experiments_root",
+        "cache_root",
         "corpus_quota_bytes"
       ],
       "properties": {
@@ -427,6 +473,9 @@
           "$ref": "#/$defs/nonEmptyNonPlaceholderString"
         },
         "experiments_root": {
+          "$ref": "#/$defs/nonEmptyNonPlaceholderString"
+        },
+        "cache_root": {
           "$ref": "#/$defs/nonEmptyNonPlaceholderString"
         },
         "corpus_quota_bytes": {
@@ -459,12 +508,16 @@
           "additionalProperties": false,
           "required": [
             "postgres_password_path",
+            "qdrant_api_key_path",
             "llm_gateway_api_key_path",
             "tls_ca_certificate_path",
             "local_api_token_path"
           ],
           "properties": {
             "postgres_password_path": {
+              "$ref": "#/$defs/secretPath"
+            },
+            "qdrant_api_key_path": {
               "$ref": "#/$defs/secretPath"
             },
             "llm_gateway_api_key_path": {
@@ -712,6 +765,19 @@
     }
   },
   "$defs": {
+    "environmentResourceName": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z0-9]+(?:[-_][a-z0-9]+)*$",
+      "not": {
+        "enum": [
+          "",
+          "TO_BE_FILLED",
+          "default",
+          "shared"
+        ]
+      }
+    },
     "nonEmptyNonPlaceholderString": {
       "type": "string",
       "minLength": 1,

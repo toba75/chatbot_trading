@@ -28,6 +28,7 @@ _FILE_ROOT_NAMES: Final = frozenset(
         "reports_root",
         "logs_root",
         "experiments_root",
+        "cache_root",
     )
 )
 
@@ -81,8 +82,10 @@ def build_configured_datastore_preflight(
                 client=QdrantRestIdentityClient(
                     base_url=configuration.services.qdrant.url,
                     timeout_seconds=configuration.runtime.timeouts.startup_seconds,
+                    collection_name=configuration.services.qdrant.collections.datastore_identity,
                 ),
                 expected_identity=identity,
+                collection_name=configuration.services.qdrant.collections.datastore_identity,
             )
         )
     preflights.extend(

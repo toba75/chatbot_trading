@@ -62,6 +62,7 @@ def test_datastore_identity_unit(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
         )
 
     expected = identities["test"]
+    identity_collection = "ostrading-test-datastore-identity"
     empty_root = tmp_path / "empty"
     preflight = FileRootIdentityPreflight(root=empty_root, expected_identity=expected)
     observed = preflight.run(initialize_if_empty=True)
@@ -109,6 +110,7 @@ def test_datastore_identity_unit(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     assert QdrantIdentityPreflight(
         client=qdrant,
         expected_identity=expected,
+        collection_name=identity_collection,
     ).run(initialize_if_empty=True) == expected
     assert qdrant.initialize_calls == [expected]
 
@@ -117,17 +119,19 @@ def test_datastore_identity_unit(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
         QdrantIdentityPreflight(
             client=qdrant_without_initialization,
             expected_identity=expected,
+            collection_name=identity_collection,
         ).run(initialize_if_empty=False)
     assert qdrant_without_initialization.initialize_calls == []
 
     foreign_qdrant = _QdrantIdentityClient(
-        collections=("platform_datastore_identity_v1",),
+        collections=(identity_collection,),
         observed=identities["production"],
     )
     with pytest.raises(DatastoreEnvironmentMismatchError, match=DATASTORE_ENVIRONMENT_MISMATCH):
         QdrantIdentityPreflight(
             client=foreign_qdrant,
             expected_identity=expected,
+            collection_name=identity_collection,
         ).run(initialize_if_empty=True)
     assert foreign_qdrant.initialize_calls == []
 
@@ -136,6 +140,7 @@ def test_datastore_identity_unit(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
         QdrantIdentityPreflight(
             client=non_empty_qdrant,
             expected_identity=expected,
+            collection_name=identity_collection,
         ).run(initialize_if_empty=True)
     assert non_empty_qdrant.initialize_calls == []
 
@@ -153,8 +158,9 @@ def test_datastore_identity_unit(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     rest_client = QdrantRestIdentityClient(
         base_url="http://qdrant.test:6333",
         timeout_seconds=9,
+        collection_name=identity_collection,
     )
-    assert rest_client.list_collections() == ("platform_datastore_identity_v1",)
+    assert rest_client.list_collections() == (identity_collection,)
     assert rest_client.read_identity() == expected.to_mapping()
     rest_client.initialize_identity(expected)
     assert [call[0] for call in http_calls] == ["GET", "POST", "PUT", "PUT"]
@@ -210,7 +216,7 @@ class _QdrantIdentityClient:
 
     def initialize_identity(self, identity):
         self.initialize_calls.append(identity)
-        self.collections = ("platform_datastore_identity_v1",)
+        self.collections = ("ostrading-test-datastore-identity",)
         self.observed = identity
 
 
@@ -265,7 +271,7 @@ class _QdrantResponse:
         path = self.request.full_url
         if self.request.get_method() == "GET":
             payload = {
-                "result": {"collections": [{"name": "platform_datastore_identity_v1"}]},
+                "result": {"collections": [{"name": "ostrading-test-datastore-identity"}]},
                 "status": "ok",
             }
         elif self.request.get_method() == "POST":
@@ -279,6 +285,6 @@ class _QdrantResponse:
                 "status": "ok",
             }
         else:
-            assert "/collections/platform_datastore_identity_v1" in path
+            assert "/collections/ostrading-test-datastore-identity" in path
             payload = {"result": True, "status": "ok"}
         return json.dumps(payload).encode("utf-8")

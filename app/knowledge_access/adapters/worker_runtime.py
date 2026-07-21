@@ -65,6 +65,7 @@ def _run_worker(
         canonical_sources_root=Path(application_configuration.paths.canonical_sources_root),
         configuration_hash=application_configuration.configuration_hash,
         qdrant_url=application_configuration.services.qdrant.url,
+        qdrant_collection_name=application_configuration.services.qdrant.collections.knowledge_access,
         qdrant_timeout_seconds=application_configuration.runtime.timeouts.request_seconds,
         max_parallel_workers=application_configuration.services.workers.concurrency,
         inference_gateway=UrllibLlmInferenceGateway(

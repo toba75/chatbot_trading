@@ -9,7 +9,7 @@ import json
 from pathlib import Path
 import re
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 
 CONFIG_FILE_REQUIRED = "CONFIG_FILE_REQUIRED"
@@ -101,9 +101,27 @@ class DeploymentConfiguration:
 
 
 @dataclass(frozen=True)
-class EndpointServiceConfiguration:
+class PostgresServiceConfiguration:
     url: str
     port: int
+    database: str
+    role: str
+    data_volume: str
+
+
+@dataclass(frozen=True)
+class QdrantCollectionsConfiguration:
+    datastore_identity: str
+    knowledge_access: str
+
+
+@dataclass(frozen=True)
+class QdrantServiceConfiguration:
+    url: str
+    port: int
+    instance_id: str
+    storage_volume: str
+    collections: QdrantCollectionsConfiguration
 
 
 @dataclass(frozen=True)
@@ -115,6 +133,8 @@ class ApiServiceConfiguration:
 @dataclass(frozen=True)
 class WorkerServiceConfiguration:
     queue_name: str
+    outbox_namespace: str
+    progress_namespace: str
     concurrency: int
     docling_concurrency: int
     granite_concurrency: int
@@ -135,8 +155,8 @@ class LLMGatewayServiceConfiguration:
 
 @dataclass(frozen=True)
 class ServicesConfiguration:
-    postgres: EndpointServiceConfiguration
-    qdrant: EndpointServiceConfiguration
+    postgres: PostgresServiceConfiguration
+    qdrant: QdrantServiceConfiguration
     api: ApiServiceConfiguration
     workers: WorkerServiceConfiguration
     llm_gateway: LLMGatewayServiceConfiguration
@@ -171,12 +191,14 @@ class PathsConfiguration:
     reports_root: str
     logs_root: str
     experiments_root: str
+    cache_root: str
     corpus_quota_bytes: int
 
 
 @dataclass(frozen=True)
 class SecretPathsConfiguration:
     postgres_password_path: str
+    qdrant_api_key_path: str
     llm_gateway_api_key_path: str
     tls_ca_certificate_path: str
     local_api_token_path: str
@@ -658,6 +680,53 @@ def _validate_cross_field_invariants(payload: Mapping[str, Any], path: Path) -> 
         gateway_service["spark_endpoint_url"],
         path,
     )
+    _validate_persistent_service_invariants(payload["services"], path)
+
+
+def _validate_persistent_service_invariants(
+    services: Mapping[str, Any],
+    path: Path,
+) -> None:
+    postgres = services["postgres"]
+    parsed_postgres = urlparse(postgres["url"])
+    if parsed_postgres.scheme not in {"postgresql", "postgresql+psycopg"} or parsed_postgres.hostname is None:
+        raise ApplicationConfigurationError(
+            CONFIG_SCHEMA_INVALID,
+            "services.postgres.url doit être une URL PostgreSQL explicite",
+            str(path),
+        )
+    if parsed_postgres.password is not None:
+        raise ApplicationConfigurationError(
+            CONFIG_SECRET_INLINE_REJECTED,
+            "services.postgres.url interdit un mot de passe en clair",
+            str(path),
+        )
+    if unquote(parsed_postgres.username or "") != postgres["role"]:
+        raise ApplicationConfigurationError(
+            CONFIG_SCHEMA_INVALID,
+            "services.postgres.role doit correspondre à l'utilisateur de l'URL",
+            str(path),
+        )
+    if unquote(parsed_postgres.path.removeprefix("/")) != postgres["database"]:
+        raise ApplicationConfigurationError(
+            CONFIG_SCHEMA_INVALID,
+            "services.postgres.database doit correspondre à la base de l'URL",
+            str(path),
+        )
+
+    parsed_qdrant = urlparse(services["qdrant"]["url"])
+    if parsed_qdrant.scheme not in {"http", "https"} or parsed_qdrant.hostname is None:
+        raise ApplicationConfigurationError(
+            CONFIG_SCHEMA_INVALID,
+            "services.qdrant.url doit être une URL HTTP explicite",
+            str(path),
+        )
+    if parsed_qdrant.username is not None or parsed_qdrant.password is not None:
+        raise ApplicationConfigurationError(
+            CONFIG_SECRET_INLINE_REJECTED,
+            "services.qdrant.url interdit les credentials en clair",
+            str(path),
+        )
 
 
 def _validate_spark_endpoint_invariants(
@@ -915,13 +984,22 @@ def _build_application_configuration(
             ),
         ),
         services=ServicesConfiguration(
-            postgres=EndpointServiceConfiguration(
+            postgres=PostgresServiceConfiguration(
                 url=services["postgres"]["url"],
                 port=services["postgres"]["port"],
+                database=services["postgres"]["database"],
+                role=services["postgres"]["role"],
+                data_volume=services["postgres"]["data_volume"],
             ),
-            qdrant=EndpointServiceConfiguration(
+            qdrant=QdrantServiceConfiguration(
                 url=services["qdrant"]["url"],
                 port=services["qdrant"]["port"],
+                instance_id=services["qdrant"]["instance_id"],
+                storage_volume=services["qdrant"]["storage_volume"],
+                collections=QdrantCollectionsConfiguration(
+                    datastore_identity=services["qdrant"]["collections"]["datastore_identity"],
+                    knowledge_access=services["qdrant"]["collections"]["knowledge_access"],
+                ),
             ),
             api=ApiServiceConfiguration(
                 bind_host=services["api"]["bind_host"],
@@ -929,6 +1007,8 @@ def _build_application_configuration(
             ),
             workers=WorkerServiceConfiguration(
                 queue_name=services["workers"]["queue_name"],
+                outbox_namespace=services["workers"]["outbox_namespace"],
+                progress_namespace=services["workers"]["progress_namespace"],
                 concurrency=services["workers"]["concurrency"],
                 docling_concurrency=services["workers"]["docling_concurrency"],
                 granite_concurrency=services["workers"]["granite_concurrency"],
@@ -968,6 +1048,7 @@ def _build_application_configuration(
             reports_root=paths["reports_root"],
             logs_root=paths["logs_root"],
             experiments_root=paths["experiments_root"],
+            cache_root=paths["cache_root"],
             corpus_quota_bytes=paths["corpus_quota_bytes"],
         ),
         security=SecurityConfiguration(
@@ -975,6 +1056,7 @@ def _build_application_configuration(
             allow_public_bind=security["allow_public_bind"],
             secrets=SecretPathsConfiguration(
                 postgres_password_path=secrets["postgres_password_path"],
+                qdrant_api_key_path=secrets["qdrant_api_key_path"],
                 llm_gateway_api_key_path=secrets["llm_gateway_api_key_path"],
                 tls_ca_certificate_path=secrets["tls_ca_certificate_path"],
                 local_api_token_path=secrets["local_api_token_path"],
@@ -1058,7 +1140,9 @@ __all__ = [
     "DeploymentNetworkConfiguration",
     "DeploymentPlacementConfiguration",
     "DockerLocalHostConfiguration",
-    "EndpointServiceConfiguration",
+    "PostgresServiceConfiguration",
+    "QdrantCollectionsConfiguration",
+    "QdrantServiceConfiguration",
     "LLMGatewayServiceConfiguration",
     "LLMModelConfiguration",
     "ModelsConfiguration",

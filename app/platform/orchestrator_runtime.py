@@ -413,6 +413,7 @@ def build_orchestrator_composition_root(
         canonical_sources_root=Path(configuration.paths.canonical_sources_root),
         configuration_hash=configuration.configuration_hash,
         qdrant_url=configuration.services.qdrant.url,
+        qdrant_collection_name=configuration.services.qdrant.collections.knowledge_access,
         qdrant_timeout_seconds=configuration.runtime.timeouts.request_seconds,
         max_parallel_workers=configuration.services.workers.concurrency,
         inference_gateway=inference_gateway,
@@ -426,6 +427,7 @@ def build_orchestrator_composition_root(
         ),
         chunk_selector=QdrantSparseChunkSelector(
             qdrant_url=configuration.services.qdrant.url,
+            collection_name=configuration.services.qdrant.collections.knowledge_access,
             timeout_seconds=configuration.runtime.timeouts.request_seconds,
         ),
         result_limit=4,

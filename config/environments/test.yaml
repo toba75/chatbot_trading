@@ -1,6 +1,6 @@
 application:
-  environment: development
-  deployment_id: ostrading-development-local
+  environment: test
+  deployment_id: ostrading-test-ci
 
 deployment:
   topology: two_host_local
@@ -12,11 +12,11 @@ deployment:
       public_access: false
     spark_inference:
       role: gemma_only
-      dns_name: spark-inference.home.arpa
+      dns_name: spark-inference.test.ostrading.internal
       endpoint_hosts:
-        - 192.168.1.120
+        - 192.168.1.121
       allowed_client_cidrs:
-        - 192.168.1.20/32
+        - 192.168.1.21/32
   network:
     require_tls: false
     require_api_key: false
@@ -30,33 +30,33 @@ deployment:
 
 services:
   postgres:
-    url: postgresql+psycopg://app@postgres/app
+    url: postgresql+psycopg://ostrading_test@postgres-test/ostrading_test
     port: 5432
-    database: app
-    role: app
-    data_volume: ostrading-ui-postgres-data
+    database: ostrading_test
+    role: ostrading_test
+    data_volume: ostrading-test-postgres-data
   qdrant:
-    url: http://qdrant:6333
+    url: http://qdrant-test:6333
     port: 6333
-    instance_id: ostrading-ui-qdrant
-    storage_volume: ostrading-ui-qdrant-data
+    instance_id: ostrading-test-qdrant
+    storage_volume: ostrading-test-qdrant-data
     collections:
-      datastore_identity: platform_datastore_identity_v1
-      knowledge_access: knowledge_projection_local_v1
+      datastore_identity: ostrading-test-datastore-identity
+      knowledge_access: ostrading-test-knowledge-access
   api:
     bind_host: 0.0.0.0
-    port: 8080
+    port: 8081
   workers:
-    queue_name: ostrading-development-jobs
-    outbox_namespace: ostrading-development-outbox
-    progress_namespace: ostrading-development-progress
-    concurrency: 8
+    queue_name: ostrading-test-jobs
+    outbox_namespace: ostrading-test-outbox
+    progress_namespace: ostrading-test-progress
+    concurrency: 4
     docling_concurrency: 2
     granite_concurrency: 2
   llm_gateway:
-    url: http://llm-gateway:8090
-    port: 8090
-    spark_endpoint_url: http://192.168.1.120:8000/v1
+    url: http://llm-gateway-test:8091
+    port: 8091
+    spark_endpoint_url: http://192.168.1.121:8000/v1
     auth_mode: none
     tls_mode: disabled
     timeout_seconds: 120
@@ -78,26 +78,26 @@ models:
     temperature: 0.0
 
 paths:
-  data_root: data
-  corpus_root: data/corpus
-  canonical_sources_root: data/canonical_sources
-  qdrant_storage_root: data/qdrant
-  postgres_data_root: data/postgres
-  reports_root: docs/reports
-  logs_root: logs
-  experiments_root: data/experiments
-  cache_root: data/cache
+  data_root: data/environments/test
+  corpus_root: data/environments/test/corpus
+  canonical_sources_root: data/environments/test/canonical-sources
+  qdrant_storage_root: data/environments/test/qdrant
+  postgres_data_root: data/environments/test/postgres
+  reports_root: data/environments/test/reports
+  logs_root: data/environments/test/logs
+  experiments_root: data/environments/test/experiments
+  cache_root: data/environments/test/cache
   corpus_quota_bytes: 5368709120
 
 security:
   network_exposure: loopback_only
   allow_public_bind: false
   secrets:
-    postgres_password_path: config/secrets/local/postgres_password
-    qdrant_api_key_path: config/secrets/local/qdrant_api_key
-    llm_gateway_api_key_path: config/secrets/local/llm_gateway_api_key
-    tls_ca_certificate_path: config/secrets/local/tls_ca_certificate.pem
-    local_api_token_path: config/secrets/local/local_api_token
+    postgres_password_path: config/secrets/test/postgres_password
+    qdrant_api_key_path: config/secrets/test/qdrant_api_key
+    llm_gateway_api_key_path: config/secrets/test/llm_gateway_api_key
+    tls_ca_certificate_path: config/secrets/test/tls_ca_certificate.pem
+    local_api_token_path: config/secrets/test/local_api_token
   audit:
     configuration_hash_required: true
     log_configuration_changes: true
@@ -126,14 +126,14 @@ observability:
 runtime:
   profile: docker_local
   workers:
-    ingestion: 2
-    research: 2
+    ingestion: 1
+    research: 1
     experiments: 1
   timeouts:
     startup_seconds: 120
     request_seconds: 300
     shutdown_seconds: 30
   resource_limits:
-    cpu_count: 8
-    memory_gb: 32
+    cpu_count: 4
+    memory_gb: 16
     gpu_required: false

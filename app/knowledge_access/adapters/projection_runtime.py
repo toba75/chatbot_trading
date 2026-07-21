@@ -228,6 +228,7 @@ class ProjectionRuntimeService:
     canonical_sources_root: Path
     configuration_hash: str
     qdrant_url: str
+    qdrant_collection_name: str
     qdrant_timeout_seconds: int
     max_parallel_workers: int
     inference_gateway: LlmInferenceGateway
@@ -239,6 +240,7 @@ class ProjectionRuntimeService:
             raise ValueError("canonical_sources_root invalide")
         if not re.fullmatch(r"[a-f0-9]{64}", self.configuration_hash):
             raise ValueError("configuration_hash projection invalide")
+        _required_resource_name(self.qdrant_collection_name, "collection Qdrant projection invalide")
         _required_positive_int(self.max_parallel_workers, "parallélisme projection invalide")
         if not callable(getattr(self.inference_gateway, "infer", None)):
             raise ValueError("gateway bibliographique de projection invalide")
@@ -528,7 +530,7 @@ class ProjectionRuntimeService:
                     encoding_profile=_encoding_profile(),
                 )
             )
-            schema = _index_schema()
+            schema = _index_schema(collection_name=self.qdrant_collection_name)
             generation = index_generation_for(
                 projection=indexing,
                 encoded_projection=encoded,
@@ -750,10 +752,10 @@ def _encoding_profile() -> ProjectionEncodingProfile:
     )
 
 
-def _index_schema() -> VectorIndexSchema:
+def _index_schema(*, collection_name: str) -> VectorIndexSchema:
     return VectorIndexSchema(
         schema_version=LOCAL_PROJECTION_PROFILE.index_schema,
-        collection_name="knowledge_projection_local_v1",
+        collection_name=_required_resource_name(collection_name, "collection Qdrant projection invalide"),
         dense_dimensions=_DENSE_DIMENSIONS,
         distance="cosine",
         payload_schema_version="1",
@@ -778,6 +780,12 @@ def _error_code(value: Any) -> str:
 
 def _required_positive_int(value: Any, message: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise ValueError(message)
+    return value
+
+
+def _required_resource_name(value: Any, message: str) -> str:
+    if not isinstance(value, str) or re.fullmatch(r"[a-z0-9]+(?:[-_][a-z0-9]+)*", value) is None:
         raise ValueError(message)
     return value
 

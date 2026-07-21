@@ -299,3 +299,44 @@ Preuve RED attendue:
 ADR consultée: ADR-045. Aucune nouvelle ADR n'est requise: T-005 matérialise la matrice de ressources déjà décidée.
 
 Commit RED prévu: `test(platform): couvrir etancheite des ressources mutables`.
+
+Commit RED créé:
+
+- `a294ef510` - `test(platform): couvrir etancheite des ressources mutables`.
+
+## T-005 - Isolation des ressources et retour GREEN
+
+Implémentation livrée:
+
+- trois fichiers complets et autonomes existent sous `config/environments/`, avec les identités `ostrading-development-local`, `ostrading-test-ci` et `ostrading-production-primary`;
+- chaque profil possède une URL, une base, un rôle, un volume et un chemin de secret PostgreSQL propres;
+- chaque profil possède une URL, une instance, un volume, deux collections et un chemin de credential Qdrant propres;
+- les files, outbox, espaces de progression, racines de données, corpus, sources canoniques, Qdrant, PostgreSQL, rapports, logs, expériences, caches et cinq chemins de secrets sont liés au profil;
+- `app.platform.environment_resources` inventorie tous les stockages de `app/context_registry.json`, exige exactement les trois profils et refuse les collisions textuelles, les alias contradictoires, les incohérences URL/base/rôle et tout chevauchement parent-enfant entre chemins résolus de profils différents;
+- le chargeur typé porte les nouvelles coordonnées et refuse les credentials PostgreSQL ou Qdrant en clair dans les URLs;
+- les adaptateurs Qdrant d'identité, de projection et de recherche consomment désormais les noms de collections du profil; les noms génériques précédemment codés en dur ont été retirés du code applicatif;
+- l'exemple versionné et la configuration Compose historique portent les nouvelles clés sans contenir de secret; le fichier local ignoré `config/application.yaml` a seulement reçu les clés rendues obligatoires, en conservant ses valeurs locales et sans redémarrage de service.
+
+Preuves d'étanchéité:
+
+- le test d'acceptation initialise les neuf racines fichiers de chaque profil avec le vrai `FileRootIdentityPreflight`, écrit un PDF et des sentinelles physiques dans un répertoire temporaire, puis prouve leur invisibilité depuis les dix-huit vues étrangères;
+- la matrice compare les coordonnées PostgreSQL, Qdrant, workers, chemins et secrets deux à deux et prouve que les références de secrets de production sont absentes des configurations `development` et `test`;
+- PostgreSQL et Qdrant réels ne sont pas démarrés séparément par T-005: leurs écritures croisées réelles nécessitent les piles et secrets de T-006; aucun mock ni fallback ne se substitue à cette preuve différée.
+
+Validations GREEN:
+
+- tests ciblés chargeur, identité et étanchéité - GREEN; 5 tests;
+- `uv run --locked --no-sync python -m ost_gate.cli --scope m013_environments` - GREEN; 28 nœuds;
+- `uv run --locked --no-sync python -m ost_gate.cli --scope m013_config` - GREEN; 36 nœuds;
+- `uv run --locked --no-sync python -m ost_gate.cli --scope m013_fastapi` - GREEN; 80 nœuds, validations live incluses;
+- `uv run --locked --no-sync python -m ost_gate.cli` - GREEN; 443 nœuds, parcours live M-004 et M-013 inclus;
+- `uv run --locked --no-sync python -m compileall -q app` - GREEN;
+- `git diff --check` - GREEN, avec uniquement les avertissements de normalisation LF vers CRLF.
+
+Contrainte d'outillage:
+
+- `.venv/Scripts/ui.exe` reste utilisé par la pile live, donc les commandes conservent `--no-sync`; aucun service live n'a été interrompu ou reconfiguré.
+
+ADR consultée: ADR-045. Aucune nouvelle ADR ni modification de sens n'est requise.
+
+Commit GREEN prévu: `feat(platform): isoler les donnees par environnement`.

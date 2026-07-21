@@ -1,6 +1,6 @@
 application:
-  environment: development
-  deployment_id: ostrading-development-local
+  environment: production
+  deployment_id: ostrading-production-primary
 
 deployment:
   topology: two_host_local
@@ -12,15 +12,15 @@ deployment:
       public_access: false
     spark_inference:
       role: gemma_only
-      dns_name: spark-inference.home.arpa
+      dns_name: spark-inference.production.ostrading.internal
       endpoint_hosts:
-        - 192.168.1.120
+        - spark-inference.production.ostrading.internal
       allowed_client_cidrs:
-        - 192.168.1.20/32
+        - 10.73.0.0/24
   network:
-    require_tls: false
-    require_api_key: false
-    prefer_mtls: false
+    require_tls: true
+    require_api_key: true
+    prefer_mtls: true
   placement:
     application: docker_local
     postgres: docker_local
@@ -30,35 +30,35 @@ deployment:
 
 services:
   postgres:
-    url: postgresql+psycopg://app@postgres/app
+    url: postgresql+psycopg://ostrading_production@postgres-production.ostrading.internal/ostrading_production
     port: 5432
-    database: app
-    role: app
-    data_volume: ostrading-ui-postgres-data
+    database: ostrading_production
+    role: ostrading_production
+    data_volume: ostrading-production-postgres-data
   qdrant:
-    url: http://qdrant:6333
+    url: https://qdrant-production.ostrading.internal:6333
     port: 6333
-    instance_id: ostrading-ui-qdrant
-    storage_volume: ostrading-ui-qdrant-data
+    instance_id: ostrading-production-qdrant
+    storage_volume: ostrading-production-qdrant-data
     collections:
-      datastore_identity: platform_datastore_identity_v1
-      knowledge_access: knowledge_projection_local_v1
+      datastore_identity: ostrading-production-datastore-identity
+      knowledge_access: ostrading-production-knowledge-access
   api:
     bind_host: 0.0.0.0
-    port: 8080
+    port: 8082
   workers:
-    queue_name: ostrading-development-jobs
-    outbox_namespace: ostrading-development-outbox
-    progress_namespace: ostrading-development-progress
+    queue_name: ostrading-production-jobs
+    outbox_namespace: ostrading-production-outbox
+    progress_namespace: ostrading-production-progress
     concurrency: 8
     docling_concurrency: 2
     granite_concurrency: 2
   llm_gateway:
-    url: http://llm-gateway:8090
-    port: 8090
-    spark_endpoint_url: http://192.168.1.120:8000/v1
-    auth_mode: none
-    tls_mode: disabled
+    url: https://llm-gateway-production.ostrading.internal:8092
+    port: 8092
+    spark_endpoint_url: https://spark-inference.production.ostrading.internal:8000/v1
+    auth_mode: api_key_file
+    tls_mode: ca_bundle
     timeout_seconds: 120
     retry_before_first_token: 1
     circuit_breaker_failure_threshold: 2
@@ -78,26 +78,26 @@ models:
     temperature: 0.0
 
 paths:
-  data_root: data
-  corpus_root: data/corpus
-  canonical_sources_root: data/canonical_sources
-  qdrant_storage_root: data/qdrant
-  postgres_data_root: data/postgres
-  reports_root: docs/reports
-  logs_root: logs
-  experiments_root: data/experiments
-  cache_root: data/cache
+  data_root: data/environments/production
+  corpus_root: data/environments/production/corpus
+  canonical_sources_root: data/environments/production/canonical-sources
+  qdrant_storage_root: data/environments/production/qdrant
+  postgres_data_root: data/environments/production/postgres
+  reports_root: data/environments/production/reports
+  logs_root: data/environments/production/logs
+  experiments_root: data/environments/production/experiments
+  cache_root: data/environments/production/cache
   corpus_quota_bytes: 5368709120
 
 security:
   network_exposure: loopback_only
   allow_public_bind: false
   secrets:
-    postgres_password_path: config/secrets/local/postgres_password
-    qdrant_api_key_path: config/secrets/local/qdrant_api_key
-    llm_gateway_api_key_path: config/secrets/local/llm_gateway_api_key
-    tls_ca_certificate_path: config/secrets/local/tls_ca_certificate.pem
-    local_api_token_path: config/secrets/local/local_api_token
+    postgres_password_path: config/secrets/production/postgres_password
+    qdrant_api_key_path: config/secrets/production/qdrant_api_key
+    llm_gateway_api_key_path: config/secrets/production/llm_gateway_api_key
+    tls_ca_certificate_path: config/secrets/production/tls_ca_certificate.pem
+    local_api_token_path: config/secrets/production/local_api_token
   audit:
     configuration_hash_required: true
     log_configuration_changes: true

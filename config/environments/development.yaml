@@ -12,7 +12,7 @@ deployment:
       public_access: false
     spark_inference:
       role: gemma_only
-      dns_name: spark-inference.home.arpa
+      dns_name: spark-inference.development.ostrading.internal
       endpoint_hosts:
         - 192.168.1.120
       allowed_client_cidrs:
@@ -30,19 +30,19 @@ deployment:
 
 services:
   postgres:
-    url: postgresql+psycopg://app@postgres/app
+    url: postgresql+psycopg://ostrading_development@postgres-development/ostrading_development
     port: 5432
-    database: app
-    role: app
-    data_volume: ostrading-ui-postgres-data
+    database: ostrading_development
+    role: ostrading_development
+    data_volume: ostrading-development-postgres-data
   qdrant:
-    url: http://qdrant:6333
+    url: http://qdrant-development:6333
     port: 6333
-    instance_id: ostrading-ui-qdrant
-    storage_volume: ostrading-ui-qdrant-data
+    instance_id: ostrading-development-qdrant
+    storage_volume: ostrading-development-qdrant-data
     collections:
-      datastore_identity: platform_datastore_identity_v1
-      knowledge_access: knowledge_projection_local_v1
+      datastore_identity: ostrading-development-datastore-identity
+      knowledge_access: ostrading-development-knowledge-access
   api:
     bind_host: 0.0.0.0
     port: 8080
@@ -54,7 +54,7 @@ services:
     docling_concurrency: 2
     granite_concurrency: 2
   llm_gateway:
-    url: http://llm-gateway:8090
+    url: http://llm-gateway-development:8090
     port: 8090
     spark_endpoint_url: http://192.168.1.120:8000/v1
     auth_mode: none
@@ -78,26 +78,26 @@ models:
     temperature: 0.0
 
 paths:
-  data_root: data
-  corpus_root: data/corpus
-  canonical_sources_root: data/canonical_sources
-  qdrant_storage_root: data/qdrant
-  postgres_data_root: data/postgres
-  reports_root: docs/reports
-  logs_root: logs
-  experiments_root: data/experiments
-  cache_root: data/cache
+  data_root: data/environments/development
+  corpus_root: data/environments/development/corpus
+  canonical_sources_root: data/environments/development/canonical-sources
+  qdrant_storage_root: data/environments/development/qdrant
+  postgres_data_root: data/environments/development/postgres
+  reports_root: data/environments/development/reports
+  logs_root: data/environments/development/logs
+  experiments_root: data/environments/development/experiments
+  cache_root: data/environments/development/cache
   corpus_quota_bytes: 5368709120
 
 security:
   network_exposure: loopback_only
   allow_public_bind: false
   secrets:
-    postgres_password_path: config/secrets/local/postgres_password
-    qdrant_api_key_path: config/secrets/local/qdrant_api_key
-    llm_gateway_api_key_path: config/secrets/local/llm_gateway_api_key
-    tls_ca_certificate_path: config/secrets/local/tls_ca_certificate.pem
-    local_api_token_path: config/secrets/local/local_api_token
+    postgres_password_path: config/secrets/development/postgres_password
+    qdrant_api_key_path: config/secrets/development/qdrant_api_key
+    llm_gateway_api_key_path: config/secrets/development/llm_gateway_api_key
+    tls_ca_certificate_path: config/secrets/development/tls_ca_certificate.pem
+    local_api_token_path: config/secrets/development/local_api_token
   audit:
     configuration_hash_required: true
     log_configuration_changes: true

@@ -32,14 +32,24 @@ services:
   postgres:
     url: postgresql+psycopg://ostrading@postgres/ostrading
     port: 5432
+    database: ostrading
+    role: ostrading
+    data_volume: pgdata
   qdrant:
     url: http://qdrant:6333
     port: 6333
+    instance_id: ostrading-local-compose-qdrant
+    storage_volume: qdrant_data
+    collections:
+      datastore_identity: platform_datastore_identity_v1
+      knowledge_access: knowledge_projection_local_v1
   api:
     bind_host: 0.0.0.0
     port: 8080
   workers:
-    queue_name: default
+    queue_name: ostrading-development-jobs
+    outbox_namespace: ostrading-development-outbox
+    progress_namespace: ostrading-development-progress
     concurrency: 2
     docling_concurrency: 2
     granite_concurrency: 2
@@ -76,6 +86,7 @@ paths:
   reports_root: /workspace/docs/reports
   logs_root: /workspace/logs
   experiments_root: /workspace/data/experiments
+  cache_root: /workspace/data/cache
   corpus_quota_bytes: 5368709120
 
 security:
@@ -83,6 +94,7 @@ security:
   allow_public_bind: false
   secrets:
     postgres_password_path: /run/secrets/postgres_password
+    qdrant_api_key_path: /run/secrets/qdrant_api_key
     llm_gateway_api_key_path: /run/secrets/llm_gateway_api_key
     tls_ca_certificate_path: /run/secrets/tls_ca_certificate.pem
     local_api_token_path: /run/secrets/local_api_token

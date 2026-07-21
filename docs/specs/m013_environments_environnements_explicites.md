@@ -77,6 +77,16 @@ Les évolutions attendues de `config/application.schema.json` sont :
 
 `deployment_id` respecte le format `^[a-z0-9]+(?:-[a-z0-9]+)*$`. Les trois valeurs sont distinctes. Le chargeur vérifie en plus que l'`environment` déclaré correspond au fichier sélectionné et que le `deployment_id` attendu correspond aux identités observées; le schéma JSON seul ne suffit pas à ces invariants croisés.
 
+Chaque profil nomme aussi explicitement ses coordonnées mutables dans le même fichier complet:
+
+- PostgreSQL déclare `url`, `database`, `role` et `data_volume`; l'URL ne contient aucun mot de passe et son utilisateur et sa base correspondent aux champs typés;
+- Qdrant déclare `url`, `instance_id`, `storage_volume` et les collections `datastore_identity` et `knowledge_access`;
+- les workers déclarent `queue_name`, `outbox_namespace` et `progress_namespace`;
+- les secrets ajoutent `qdrant_api_key_path` aux références déjà requises;
+- les chemins ajoutent `cache_root` aux racines persistantes déjà requises.
+
+Tous ces identifiants sont liés textuellement à leur profil et le validateur de matrice compare les trois configurations complètes avant qualification. Les noms génériques `default` et `shared` sont interdits pour les identifiants de ressources.
+
 Une configuration partielle est invalide. Il n'existe aucune fusion, aucun héritage, aucune inclusion, aucune surcouche, aucun template et aucune clé de fusion YAML `<<`. Les ancres et alias YAML sont interdits. Toute clé obligatoire doit être répétée explicitement dans chaque fichier.
 
 ## Sources de configuration interdites
@@ -109,7 +119,7 @@ Deux profils ne partagent aucune coordonnée, autorité d'écriture ou identité
 | Runtime | volumes, réseaux, noms de projet Compose, logs et caches mutables |
 | Sécurité | secrets, certificats, tokens locaux, rôles et chemins montés en lecture seule |
 
-Les racines détaillées de M13-config — `data_root`, `corpus_root`, `canonical_sources_root`, `qdrant_storage_root`, `postgres_data_root`, `reports_root`, `logs_root` et `experiments_root` — doivent être disjointes entre les profils. Une racine parente commune qui permettrait une traversée ou une suppression croisée est interdite.
+Les racines détaillées de M13-config — `data_root`, `corpus_root`, `canonical_sources_root`, `qdrant_storage_root`, `postgres_data_root`, `reports_root`, `logs_root`, `experiments_root` et `cache_root` — doivent être disjointes entre les profils. Une racine parente commune qui permettrait une traversée ou une suppression croisée est interdite.
 
 Une simple différence de préfixe de table, collection ou clé dans un stockage partagé ne prouve pas l'étanchéité. `production` utilise une infrastructure et des autorités distinctes de `development` et `test`. La CI de `test` ne reçoit aucun endpoint, rôle, credential ou secret de `production`.
 
