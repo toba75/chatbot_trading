@@ -318,7 +318,7 @@ services:
       resources:
         limits:
           cpus: "2.0"
-          memory: 2G
+          memory: 8G
           pids: 256
     command:
       - --worker-id
