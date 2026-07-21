@@ -8,12 +8,21 @@ from ost_gate.errors import PlanError
 from ost_gate.models import GateManifest, GateNode, GatePlan
 
 
-def build_plan(manifest: GateManifest, scope: str | None, offline: bool) -> GatePlan:
+def build_plan(
+    manifest: GateManifest,
+    scope: str | None,
+    offline: bool,
+    *,
+    include_live: bool = False,
+) -> GatePlan:
     """Construit un plan DAG complet ou explicitement partiel."""
 
+    if offline and include_live:
+        raise PlanError("GATE_LIVE_ACTIVATION_CONFLICT")
+    effective_offline = offline or (scope is not None and not include_live)
     nodes_by_id = {node.identifier: node for node in manifest.nodes}
     _assert_acyclic(nodes_by_id)
-    selected = _select_nodes(nodes_by_id, scope, offline)
+    selected = _select_nodes(nodes_by_id, scope, effective_offline)
     selected_ids = frozenset(selected)
     for node in selected.values():
         missing = [dependency for dependency in node.depends_on if dependency not in selected_ids]
@@ -25,9 +34,9 @@ def build_plan(manifest: GateManifest, scope: str | None, offline: bool) -> Gate
         repository_root=manifest.repository_root,
         nodes=ordered,
         levels=tuple(tuple(level) for level in levels),
-        partial=scope is not None or offline,
+        partial=scope is not None or effective_offline,
         scope=scope,
-        offline=offline,
+        offline=effective_offline,
     )
 
 

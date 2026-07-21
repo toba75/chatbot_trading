@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import sys
 import tempfile
@@ -23,7 +22,9 @@ def main(argv: list[str] | None = None) -> int:
     sys.stderr.reconfigure(encoding="utf-8", errors="backslashreplace")
     parser = argparse.ArgumentParser(prog="gate")
     parser.add_argument("--scope")
-    parser.add_argument("--offline", action="store_true")
+    activation = parser.add_mutually_exclusive_group()
+    activation.add_argument("--offline", action="store_true")
+    activation.add_argument("--live", action="store_true", dest="include_live")
     parser.add_argument("--list", action="store_true", dest="list_only")
     parser.add_argument("--manifest", type=Path, default=Path("gate.toml"))
     parser.add_argument("--report", type=Path)
@@ -31,7 +32,12 @@ def main(argv: list[str] | None = None) -> int:
     arguments = parser.parse_args(argv)
     try:
         manifest = load_manifest(arguments.manifest)
-        plan = build_plan(manifest, arguments.scope, arguments.offline)
+        plan = build_plan(
+            manifest,
+            arguments.scope,
+            arguments.offline,
+            include_live=arguments.include_live,
+        )
         if arguments.list_only:
             for node in plan.nodes:
                 print(f"{node.identifier}\t{node.scope}\t{node.phase}\t{node.path.relative_to(manifest.repository_root).as_posix()}")
