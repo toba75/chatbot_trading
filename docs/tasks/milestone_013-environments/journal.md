@@ -121,6 +121,39 @@ RED utile:
 - Le RED prouve que la succession explicite d'ADR et le contrat M13-environments demandés ne sont pas encore publiés; il ne résulte ni d'une dépendance externe indisponible, ni d'un test affaibli.
 - Le test exige également, après publication de l'ADR, la spécification des trois profils, des identités, de l'isolation de chaque ressource mutable, des workers et des quatre erreurs publiques.
 
+Commit RED:
+
+- `264a59d8994a9ff5eb13a38fc4f6bed9b1d7e56a` - `test(m13-environments): couvrir contrat des profils explicites`.
+
+## T-002 - Décision et retour GREEN
+
+Décision publiée:
+
+- ADR-045 accepte l'ensemble fermé `development`, `test`, `production` et remplace explicitement ADR-016 pour la règle du chemin unique `config/application.yaml`.
+- ADR-016 conserve son texte décisionnel historique; seuls son statut et son lien `Remplacée par` sont mis à jour.
+- La spécification `docs/specs/m013_environments_environnements_explicites.md` définit les trois fichiers complets sans fusion ni héritage, `ApplicationEnvironment`, `environment`, `deployment_id`, la matrice de ressources mutables et les identités attendues des stockages, jobs et workers.
+- Les codes `CONFIG_ENVIRONMENT_UNKNOWN`, `CONFIG_ENVIRONMENT_MISMATCH`, `DATASTORE_ENVIRONMENT_MISMATCH` et `WORKER_ENVIRONMENT_MISMATCH` ont une condition et un moment de refus explicites.
+- Les interdictions M13-config restent normatives: aucune valeur par défaut, aucun fallback, aucune variable d'environnement applicative et aucun secret en clair.
+
+Périmètre respecté:
+
+- Aucun changement de schéma, chargeur, lanceur UV, fichier YAML, Compose, stockage, message, worker ou service.
+- Aucun service actif n'a été démarré, arrêté ou reconfiguré par T-002.
+- L'empreinte de `docs/adr/index.md` a été réconciliée par l'outil canonique sans modifier le catalogue historique fermé.
+
+Preuves GREEN:
+
+- test d'acceptation ciblé - GREEN; 1 test exécuté;
+- `uv run --locked gate --scope m013_environments` - GREEN; 22 nœuds exécutés, dont le nouveau contrat;
+- `uv run --locked gate --scope governance` - GREEN; 25 nœuds exécutés;
+- `uv run --locked gate` - GREEN; 437 nœuds exécutés, y compris les validations live existantes, sans exécution manquante, inattendue ou dupliquée.
+
+Commit GREEN prévu:
+
+- `docs(m13-environments): decider isolation des environnements`.
+
+Statut final de T-002: GREEN documentaire. Les réalisations runtime restent explicitement affectées à T-003 et suivantes.
+
 ## Validation de la planification
 
 - `uv run --locked gate --scope governance` - GREEN après création des tâches; 25 nœuds, aucune exécution manquante, inattendue ou dupliquée.

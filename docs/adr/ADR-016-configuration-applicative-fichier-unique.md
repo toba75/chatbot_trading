@@ -1,10 +1,10 @@
 # ADR-016 - Configuration applicative par fichier unique
 
-**Statut :** Acceptée
+**Statut :** Remplacée
 **Date :** 2026-07-10
 **Décideurs :** Propriétaire du projet
 **Remplace :** Aucun
-**Remplacée par :** Aucune
+**Remplacée par :** ADR-045
 **Source :** Demande utilisateur du 2026-07-10; `docs/specs/specification_unifiee_ddd_technique_chatbot_trading_v4_1.md`; `docs/specs/plan_implementation_milestones_workstreams.md`
 
 ## Contexte

@@ -21,7 +21,7 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 | [ADR-013](ADR-013-contrat-manifeste-sauvegarde-restauration.md) | Contrat de manifeste de sauvegarde et restauration | Acceptée | 2026-07-08 | Aucun | Aucune |
 | [ADR-014](ADR-014-spark-docker-externe-sans-cle-api.md) | Endpoint Docker Spark externe sans clé API | Acceptée | 2026-07-08 | ADR-007; ADR-008 | Aucune |
 | [ADR-015](ADR-015-provenance-llm-declaree-gateway.md) | Provenance LLM déclarée par le gateway | Acceptée | 2026-07-09 | Aucun | Aucune |
-| [ADR-016](ADR-016-configuration-applicative-fichier-unique.md) | Configuration applicative par fichier unique | Acceptée | 2026-07-10 | Aucun | Aucune |
+| [ADR-016](ADR-016-configuration-applicative-fichier-unique.md) | Configuration applicative par fichier unique | Remplacée | 2026-07-10 | Aucun | ADR-045 |
 | [ADR-017](ADR-017-pdf-sources-suivis-par-git-lfs.md) | PDF sources suivis par Git LFS | Acceptée | 2026-07-11 | Aucun | Aucune |
 | [ADR-018](ADR-018-ui-exclusivement-via-api-orchestratrice.md) | UI exclusivement via l'API orchestratrice | Acceptée | 2026-07-11 | Aucun | Aucune |
 | [ADR-019](ADR-019-api-orchestratrice-fastapi-uvicorn.md) | API orchestratrice FastAPI et Uvicorn | Acceptée | 2026-07-12 | Aucun | Aucune |
@@ -50,6 +50,7 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 | [ADR-042](ADR-042-capacite-docling-partagee.md) | Capacité Docling partagée | Acceptée | 2026-07-16 | Capacité des processus Docling d’ADR-040 | Aucune |
 | [ADR-043](ADR-043-priorite-scan-sans-texte-natif.md) | Priorité au scan sans texte natif | Acceptée | 2026-07-16 | `COMPLEX_VISUAL` sans texte natif d’ADR-033 | Aucune |
 | [ADR-044](ADR-044-autorite-native-page-visuelle-complexe.md) | Autorité native d’une page visuelle complexe | Acceptée | 2026-07-16 | Priorité ADR-033 et candidat natif ADR-040 pour texte parcellaire | Aucune |
+| [ADR-045](ADR-045-profils-execution-explicites-donnees-etanches.md) | Profils d'exécution explicites et données étanches | Acceptée | 2026-07-21 | ADR-016 | Aucune |
 
 ## ADR DDD
 
@@ -71,7 +72,7 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 ## Prochains numéros disponibles
 
 ```text
-Prochaine ADR technique: ADR-045
+Prochaine ADR technique: ADR-046
 Prochaine DDD-ADR: DDD-ADR-013
 ```
 

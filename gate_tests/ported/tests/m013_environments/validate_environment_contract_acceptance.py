@@ -55,7 +55,6 @@ def _assert_adr_045_replaces_adr_016_explicitly() -> None:
     assert "**Statut :** Acceptée" in adr_045
     assert "**Remplace :** ADR-016" in adr_045
     assert "ADR-045-profils-execution-explicites-donnees-etanches.md" in adr_index
-    assert "| ADR-045 |" not in adr_index
     assert "| [ADR-045]" in adr_index
     assert "Prochaine ADR technique: ADR-046" in adr_index
 
