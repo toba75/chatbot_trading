@@ -184,3 +184,40 @@ def test_development_resume_reuses_explicit_existing_proof_without_reemission(
             resume_proof_id=proof_id,
             resume_document_id=None,
         )
+
+
+def test_development_product_checkpoint_preserves_public_proof_before_stop() -> None:
+    from app.platform.development_e2e import (
+        _ProductProof,
+        _product_checkpoint_payload,
+    )
+
+    product = _ProductProof(
+        document_id="DOC-BA58A26E6A853C3C",
+        canonical_version_id="CVER-M004-ROUTED-BA58A26E6A853C3CC891E53C",
+        projection_id="PROJ-FF2E986C45A492B10A4DD70C1CC3863F",
+        answer_id="ANS-DEVELOPMENT-CHECKPOINT-001",
+        citation_url=(
+            "https://localhost:18443/api/v1/documents/"
+            "DOC-BA58A26E6A853C3C/original#page=1"
+        ),
+        support_status="SUPPORTED",
+        spark_raw_response_id="RAW-DEVELOPMENT-CHECKPOINT-001",
+        progress_phases=("SUCCEEDED", "SUCCEEDED", "SUCCEEDED"),
+        worker_identity_count=6,
+        environment_job_count=3,
+    )
+
+    payload = _product_checkpoint_payload(
+        product=product,
+        proof_id="B" * 32,
+        pdf_sha256="a" * 64,
+        created_at="2026-07-21T22:30:00Z",
+    )
+
+    assert payload["event_type"] == "development_e2e_product_checkpoint"
+    assert payload["proof_id"] == "B" * 32
+    assert payload["pdf_sha256"] == "a" * 64
+    assert payload["document_id"] == product.document_id
+    assert payload["answer_id"] == product.answer_id
+    assert payload["spark_raw_response_id"] == product.spark_raw_response_id
