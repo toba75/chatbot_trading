@@ -365,7 +365,7 @@ def _stop_development_command(
     technical_environment = _technical_environment_from_repository(repository_root)
     _run_compose(
         definition,
-        ("stop", "--timeout", "30"),
+        ("stop", "--timeout", "30", "edge-gateway"),
         technical_environment=technical_environment,
         capture_output=True,
     )
