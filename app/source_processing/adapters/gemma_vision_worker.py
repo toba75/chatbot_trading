@@ -34,8 +34,10 @@ _GATEWAY_GEMMA_TRUNCATED_ERROR_CODES = frozenset({"LLM_PARTIAL_OUTPUT"})
 _PAGE_TRANSCRIPTION_PROMPT = (
     "Transcris uniquement le texte documentaire visible de cette page PDF. "
     "Regroupe les éléments adjacents en régions de lecture complètes. "
-    "Pour un tableau dense, retourne toutes ses cellules dans un seul item texte TSV, "
-    "avec une bbox couvrant le tableau. N’omets aucun texte lisible. "
+    "Pour un tableau dense, retourne toutes ses cellules dans un seul item texte, "
+    "séparées par la séquence ASCII espace-barre-espace ( | ). "
+    "N'utilise aucun caractère de contrôle U+0000 à U+001F dans les valeurs "
+    "textuelles JSON. N’omets aucun texte lisible. "
     "Retourne au plus 16 items, chacun avec bbox=[left,top,right,bottom] "
     "en coordonnées entières normalisées de 0 à 1000. "
     "Ne fabrique aucun texte et ne retourne ni Markdown ni commentaire."
@@ -106,7 +108,7 @@ def _convert(payload: Mapping[str, Any]) -> dict[str, object]:
             f"IDEMP-M004-GEMMA-{processing_run_id}-P{page_number:03d}-{identity_suffix}"
         ),
         prompt_id="m004-gemma-vision-page-conversion",
-        prompt_version="1.2",
+        prompt_version="1.3",
         sampling_parameters={
             "temperature": 0.0,
             "max_tokens": _required_positive_int(payload, "max_output_tokens"),
