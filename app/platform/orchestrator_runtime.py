@@ -46,6 +46,11 @@ from app.knowledge_access.adapters.http import (
     build_projection_query_router,
 )
 from app.platform.configuration import ApplicationConfiguration
+from app.platform.configured_datastore_identity import (
+    build_configured_datastore_preflight,
+    configured_datastore_identity,
+)
+from app.platform.datastore_identity import DatastorePreflightPlan, PostgresIdentityPreflight
 from app.platform.orchestrator_composition import (
     DependencyReadiness,
     OrchestratorCompositionRoot,
@@ -303,6 +308,36 @@ class PostgresOrchestratorDependency:
         )
 
 
+@dataclass(slots=True)
+class DatastoreIdentityOrchestratorDependency:
+    """Bloque tous les adaptateurs tant que les stockages ne portent pas le profil."""
+
+    preflight: DatastorePreflightPlan
+    _opened: bool = field(init=False, default=False)
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.preflight, DatastorePreflightPlan):
+            raise ValueError("préflight d'identité orchestrateur invalide")
+
+    async def open(self) -> None:
+        if self._opened:
+            raise RuntimeError("préflight d'identité déjà ouvert")
+        await asyncio.to_thread(self.preflight.run, initialize_if_empty=True)
+        self._opened = True
+
+    async def close(self) -> None:
+        if not self._opened:
+            raise RuntimeError("préflight d'identité non ouvert")
+        self._opened = False
+
+    def readiness(self) -> DependencyReadiness:
+        return DependencyReadiness(
+            name="datastore-identity",
+            status="ready" if self._opened else "unavailable",
+            error_code=None if self._opened else "DATASTORE_ENVIRONMENT_MISMATCH",
+        )
+
+
 def build_orchestrator_composition_root(
     configuration: ApplicationConfiguration,
 ) -> OrchestratorCompositionRoot:
@@ -320,6 +355,10 @@ def build_orchestrator_composition_root(
         connection_factory=connection_factory,
         migrations_path=POSTGRES_MIGRATIONS_PATH,
         operation_timeout_seconds=configuration.runtime.timeouts.startup_seconds,
+        identity_preflight=PostgresIdentityPreflight(
+            expected_identity=configured_datastore_identity(configuration),
+        ),
+        initialize_identity_if_empty=False,
     )
     persistence = build_document_persistence(
         configuration,
@@ -447,6 +486,18 @@ def build_orchestrator_composition_root(
     return OrchestratorCompositionRoot(
         configuration=configuration,
         dependencies=(
+            DatastoreIdentityOrchestratorDependency(
+                preflight=build_configured_datastore_preflight(
+                    configuration,
+                    include_postgres=True,
+                    include_qdrant=True,
+                    file_root_names=(
+                        "data_root",
+                        "corpus_root",
+                        "canonical_sources_root",
+                    ),
+                )
+            ),
             PostgresOrchestratorDependency(
                 connection_factory=connection_factory,
                 migration_runner=migration_runner,
@@ -497,6 +548,7 @@ def compose_public_contract_services(
 
 
 __all__ = [
+    "DatastoreIdentityOrchestratorDependency",
     "MAX_PDF_BYTES",
     "POSTGRES_MIGRATIONS_PATH",
     "PostgresOrchestratorDependency",

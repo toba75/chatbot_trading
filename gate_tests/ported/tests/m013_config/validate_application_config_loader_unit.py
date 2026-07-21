@@ -15,6 +15,10 @@ def test_validate_application_config_loader_unit() -> None:
             'assert_equal(validated_configuration.services.workers.concurrency, 8, "Concurrence workers non chargée.")\nassert_equal(validated_configuration.services.workers.docling_concurrency, 2, "Concurrence Docling non chargée.")\nassert_equal(validated_configuration.services.workers.granite_concurrency, 2, "Concurrence Granite non chargée.")',
         )
         source = source.replace("concurrency: 2\\n", "concurrency: 8\\n")
+        source = source.replace(
+            '                "deployment",\n            ),',
+            '                "deployment",\n                "application",\n            ),',
+        )
         namespace = {'__name__': __name__, '__file__': str(Path(__file__))}
         exec(compile(source, str(Path(__file__)), 'exec'), namespace)
     finally:

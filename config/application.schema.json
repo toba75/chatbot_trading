@@ -5,6 +5,7 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
+    "application",
     "deployment",
     "services",
     "models",
@@ -15,6 +16,27 @@
     "runtime"
   ],
   "properties": {
+    "application": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "environment",
+        "deployment_id"
+      ],
+      "properties": {
+        "environment": {
+          "enum": [
+            "development",
+            "test",
+            "production"
+          ]
+        },
+        "deployment_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        }
+      }
+    },
     "deployment": {
       "type": "object",
       "additionalProperties": false,

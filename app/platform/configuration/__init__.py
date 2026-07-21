@@ -49,6 +49,12 @@ class ApplicationConfigurationError(ValueError):
 
 
 @dataclass(frozen=True)
+class ApplicationIdentityConfiguration:
+    environment: str
+    deployment_id: str
+
+
+@dataclass(frozen=True)
 class DockerLocalHostConfiguration:
     role: str
     bind_host: str
@@ -270,6 +276,7 @@ class RuntimeConfiguration:
 
 @dataclass(frozen=True)
 class ApplicationConfiguration:
+    application: ApplicationIdentityConfiguration
     deployment: DeploymentConfiguration
     services: ServicesConfiguration
     models: ModelsConfiguration
@@ -858,6 +865,7 @@ def _build_application_configuration(
     payload: Mapping[str, Any],
     configuration_hash: str,
 ) -> ApplicationConfiguration:
+    application = payload["application"]
     deployment = payload["deployment"]
     deployment_hosts = deployment["hosts"]
     deployment_network = deployment["network"]
@@ -873,6 +881,10 @@ def _build_application_configuration(
     runtime = payload["runtime"]
 
     return ApplicationConfiguration(
+        application=ApplicationIdentityConfiguration(
+            environment=application["environment"],
+            deployment_id=application["deployment_id"],
+        ),
         deployment=DeploymentConfiguration(
             topology=deployment["topology"],
             hosts=DeploymentHostsConfiguration(
@@ -1040,6 +1052,7 @@ __all__ = [
     "ApiServiceConfiguration",
     "ApplicationConfiguration",
     "ApplicationConfigurationError",
+    "ApplicationIdentityConfiguration",
     "DeploymentConfiguration",
     "DeploymentHostsConfiguration",
     "DeploymentNetworkConfiguration",

@@ -230,7 +230,42 @@ Preuves attendues par les tests RED:
 
 ADR consultée: ADR-045. Aucune nouvelle ADR n'est requise: T-004 réalise l'identité de stockage et le fail-closed déjà décidés.
 
-Commit RED prévu: `test(platform): couvrir identite des stockages`.
+Commit RED:
+
+- `9fe3a22e8` - `test(platform): couvrir identite des stockages`.
+- les deux nouveaux nœuds ont échoué uniquement sur `ModuleNotFoundError: app.platform.datastore_identity`; les nœuds T-002/T-003 sont restés GREEN.
+
+## T-004 - Préflights de stockage et retour GREEN
+
+Implémentation livrée:
+
+- le value object `DatastoreIdentity` compare strictement `environment` et `deployment_id`; toute absence, forme invalide, clé supplémentaire ou divergence produit `DATASTORE_ENVIRONMENT_MISMATCH`;
+- PostgreSQL porte une table singleton `platform.datastore_identity`, contrôlée sous verrou transactionnel avant le ledger et avant chaque vérification de version; seul un stockage réellement vierge peut être initialisé;
+- Qdrant porte un point singleton dans `platform_datastore_identity_v1`; la création de la collection agit comme acquisition exclusive et aucune collection existante sans marqueur n'est adoptée;
+- chaque racine fichier utilisée porte `.ostrading-datastore-identity.json`, créé par lien exclusif après écriture synchronisée; une racine non vide, un marqueur illisible, un lien symbolique ou une identité étrangère est refusé sans réécriture;
+- le schéma et l'objet `ApplicationConfiguration` portent l'identité attendue obligatoire; l'exemple et la configuration Compose locale déclarent explicitement `development/ostrading-development-local`;
+- l'API ouvre le plan de préflight avant sa dépendance de migration; les workers SP et KA exécutent leur plan avant migration, relais d'outbox et `claim_next`;
+- le préflight SP couvre `data_root`, `corpus_root` et `canonical_sources_root`; le préflight KA couvre PostgreSQL, Qdrant et `canonical_sources_root`;
+- aucun fichier `config/environments/*.yaml`, aucune ressource distincte par profil et aucun manifeste d'environnement n'a été anticipé; ces réalisations restent dans T-005/T-006.
+
+Preuves GREEN:
+
+- tests T-004 ciblés - GREEN; 2 tests couvrant matrice 3 x 3, divergence de `deployment_id`, absence et invalidité des marqueurs, initialisation explicite, adaptateur REST Qdrant, ordre PostgreSQL et absence d'appel aval;
+- scope `m013_environments` - GREEN; 26 nœuds;
+- scope `m013_config` - GREEN; 36 nœuds;
+- scope `m013_fastapi` - GREEN; 80 nœuds, validations live incluses;
+- gate complète - GREEN; 441 nœuds, dont les parcours live M-004 et M-013;
+- `git diff --check` - GREEN, avec uniquement les avertissements de normalisation LF vers CRLF.
+
+Contrainte Windows conservée:
+
+- `.venv/Scripts/ui.exe` reste utilisé par la pile live; les gates ont donc utilisé l'environnement verrouillé existant via `uv run --locked --no-sync python -m ost_gate.cli`;
+- aucun service live n'a été interrompu;
+- le fichier local ignoré `config/application.yaml` a reçu l'identité `development` exigée par le nouveau schéma afin de conserver les parcours live; aucun secret ni donnée métier n'a été modifié.
+
+ADR consultée: ADR-045. Aucune nouvelle ADR ni modification de sens n'est requise.
+
+Commit GREEN prévu: `feat(platform): refuser les stockages hors environnement`.
 
 ## Validation de la planification
 

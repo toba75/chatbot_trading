@@ -18,6 +18,7 @@ from app.knowledge_access.adapters.projection_runtime import (
     ProjectionRuntimeService,
 )
 from app.platform.configuration import ApplicationConfiguration, load_application_configuration
+from app.platform.configured_datastore_identity import build_configured_datastore_preflight
 from app.platform.job_runtime.composition import build_postgres_job_runtime
 from app.platform.postgres import PsycopgConnectionFactory
 from app.platform.postgres_migrations import build_configured_postgres_migration_runner
@@ -44,7 +45,16 @@ def _run_worker(
         raise ValueError("poll_seconds worker KA invalide")
     if max_jobs is not None and (isinstance(max_jobs, bool) or not isinstance(max_jobs, int) or max_jobs < 1):
         raise ValueError("max_jobs worker KA invalide")
-    build_configured_postgres_migration_runner(application_configuration).run()
+    build_configured_datastore_preflight(
+        application_configuration,
+        include_postgres=True,
+        include_qdrant=True,
+        file_root_names=("canonical_sources_root",),
+    ).run(initialize_if_empty=True)
+    build_configured_postgres_migration_runner(
+        application_configuration,
+        initialize_identity_if_empty=False,
+    ).run()
     connection_factory = PsycopgConnectionFactory(
         connection_url=application_configuration.services.postgres.url,
         password_path=Path(application_configuration.security.secrets.postgres_password_path),

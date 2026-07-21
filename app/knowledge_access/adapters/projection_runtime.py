@@ -237,8 +237,6 @@ class ProjectionRuntimeService:
             raise ValueError("connection_factory projection invalide")
         if not isinstance(self.canonical_sources_root, Path):
             raise ValueError("canonical_sources_root invalide")
-        if not self.canonical_sources_root.is_dir():
-            raise ValueError("CANONICAL_SOURCES_ROOT_UNAVAILABLE")
         if not re.fullmatch(r"[a-f0-9]{64}", self.configuration_hash):
             raise ValueError("configuration_hash projection invalide")
         _required_positive_int(self.max_parallel_workers, "parallélisme projection invalide")

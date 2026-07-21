@@ -14,6 +14,7 @@ from psycopg import Error as PsycopgError, IntegrityError, OperationalError
 from uuid import uuid4
 
 from app.platform.configuration import ApplicationConfiguration, load_application_configuration
+from app.platform.configured_datastore_identity import build_configured_datastore_preflight
 from app.platform.job_runtime import JobStatus
 from app.platform.job_runtime.composition import build_postgres_job_runtime
 from app.platform.job_runtime.postgres import JobLeaseConflictError
@@ -192,9 +193,17 @@ def _run_worker(
         isinstance(max_jobs, bool) or not isinstance(max_jobs, int) or max_jobs < 1
     ):
         raise ValueError("max_jobs worker invalide")
+    build_configured_datastore_preflight(
+        application_configuration,
+        include_postgres=True,
+        include_qdrant=False,
+        file_root_names=("data_root", "corpus_root", "canonical_sources_root"),
+    ).run(initialize_if_empty=True)
+    build_configured_postgres_migration_runner(
+        application_configuration,
+        initialize_identity_if_empty=False,
+    ).run()
     instance_owner_id = f"{owner_id}:{uuid4()}"
-
-    build_configured_postgres_migration_runner(application_configuration).run()
     connection_factory = PsycopgConnectionFactory(
         connection_url=application_configuration.services.postgres.url,
         password_path=Path(application_configuration.security.secrets.postgres_password_path),

@@ -6,14 +6,18 @@ from pathlib import Path
 import pytest
 
 
-def test_datastore_identity_unit(tmp_path: Path) -> None:
+def test_datastore_identity_unit(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import app.platform.datastore_identity as identity_module
     from app.platform.datastore_identity import (
         DATASTORE_ENVIRONMENT_MISMATCH,
         DatastoreEnvironmentMismatchError,
         DatastoreIdentity,
         FileRootIdentityPreflight,
+        PostgresIdentityPreflight,
         QdrantIdentityPreflight,
+        QdrantRestIdentityClient,
     )
+    from app.platform.configuration import load_application_configuration
 
     deployments = {
         "development": "ostrading-development-local",
@@ -49,6 +53,13 @@ def test_datastore_identity_unit(tmp_path: Path) -> None:
                 "force": True,
             }
         )
+    with pytest.raises(DatastoreEnvironmentMismatchError, match=DATASTORE_ENVIRONMENT_MISMATCH):
+        identities["test"].require_match(
+            DatastoreIdentity(
+                environment="test",
+                deployment_id="ostrading-test-other",
+            )
+        )
 
     expected = identities["test"]
     empty_root = tmp_path / "empty"
@@ -60,6 +71,14 @@ def test_datastore_identity_unit(tmp_path: Path) -> None:
         "environment": "test",
     }
     assert preflight.run(initialize_if_empty=False) == expected
+
+    uninitialized_root = tmp_path / "uninitialized"
+    with pytest.raises(DatastoreEnvironmentMismatchError, match=DATASTORE_ENVIRONMENT_MISMATCH):
+        FileRootIdentityPreflight(
+            root=uninitialized_root,
+            expected_identity=expected,
+        ).run(initialize_if_empty=False)
+    assert not uninitialized_root.exists()
 
     missing_non_empty = tmp_path / "missing-non-empty"
     missing_non_empty.mkdir()
@@ -93,6 +112,14 @@ def test_datastore_identity_unit(tmp_path: Path) -> None:
     ).run(initialize_if_empty=True) == expected
     assert qdrant.initialize_calls == [expected]
 
+    qdrant_without_initialization = _QdrantIdentityClient(collections=())
+    with pytest.raises(DatastoreEnvironmentMismatchError, match=DATASTORE_ENVIRONMENT_MISMATCH):
+        QdrantIdentityPreflight(
+            client=qdrant_without_initialization,
+            expected_identity=expected,
+        ).run(initialize_if_empty=False)
+    assert qdrant_without_initialization.initialize_calls == []
+
     foreign_qdrant = _QdrantIdentityClient(
         collections=("platform_datastore_identity_v1",),
         observed=identities["production"],
@@ -112,6 +139,62 @@ def test_datastore_identity_unit(tmp_path: Path) -> None:
         ).run(initialize_if_empty=True)
     assert non_empty_qdrant.initialize_calls == []
 
+    http_calls = []
+    monkeypatch.setattr(
+        identity_module.request,
+        "urlopen",
+        lambda http_request, timeout: _QdrantResponse(
+            request=http_request,
+            timeout=timeout,
+            calls=http_calls,
+            identity=expected,
+        ),
+    )
+    rest_client = QdrantRestIdentityClient(
+        base_url="http://qdrant.test:6333",
+        timeout_seconds=9,
+    )
+    assert rest_client.list_collections() == ("platform_datastore_identity_v1",)
+    assert rest_client.read_identity() == expected.to_mapping()
+    rest_client.initialize_identity(expected)
+    assert [call[0] for call in http_calls] == ["GET", "POST", "PUT", "PUT"]
+    assert all(call[2] == 9 for call in http_calls)
+
+    postgres_preflight = PostgresIdentityPreflight(expected_identity=expected)
+    empty_postgres = _PostgresIdentityCursor(object_count=0)
+    assert postgres_preflight.run(
+        empty_postgres,
+        initialize_if_empty=True,
+    ) == expected
+    assert empty_postgres.events.index("identity:presence") < empty_postgres.events.index(
+        "identity:inventory"
+    ) < empty_postgres.events.index("identity:create")
+    assert empty_postgres.insert_parameters == (
+        expected.environment,
+        expected.deployment_id,
+    )
+
+    postgres_without_initialization = _PostgresIdentityCursor(object_count=0)
+    with pytest.raises(DatastoreEnvironmentMismatchError, match=DATASTORE_ENVIRONMENT_MISMATCH):
+        postgres_preflight.run(
+            postgres_without_initialization,
+            initialize_if_empty=False,
+        )
+    assert "identity:create" not in postgres_without_initialization.events
+
+    non_empty_postgres = _PostgresIdentityCursor(object_count=1)
+    with pytest.raises(DatastoreEnvironmentMismatchError, match=DATASTORE_ENVIRONMENT_MISMATCH):
+        postgres_preflight.run(non_empty_postgres, initialize_if_empty=True)
+    assert "identity:create" not in non_empty_postgres.events
+
+    repository_root = Path(__file__).resolve().parents[4]
+    configuration = load_application_configuration(
+        config_path=repository_root / "config" / "application.example.yaml",
+        environment_snapshot={},
+    )
+    assert configuration.application.environment == "development"
+    assert configuration.application.deployment_id == "ostrading-development-local"
+
 
 class _QdrantIdentityClient:
     def __init__(self, *, collections, observed=None) -> None:
@@ -130,3 +213,72 @@ class _QdrantIdentityClient:
         self.collections = ("platform_datastore_identity_v1",)
         self.observed = identity
 
+
+class _PostgresIdentityCursor:
+    def __init__(self, *, object_count) -> None:
+        self.object_count = object_count
+        self.events = []
+        self.insert_parameters = None
+        self._result = None
+
+    def execute(self, sql, parameters=()):
+        normalized = " ".join(str(sql).split())
+        if "pg_advisory_xact_lock" in normalized:
+            self.events.append("identity:lock")
+            self._result = None
+        elif "to_regclass('platform.datastore_identity')" in normalized:
+            self.events.append("identity:presence")
+            self._result = (None,)
+        elif "FROM pg_class AS relation" in normalized:
+            self.events.append("identity:inventory")
+            self._result = (self.object_count,)
+        elif normalized.startswith("CREATE SCHEMA platform"):
+            self.events.append("identity:create")
+            self._result = None
+        elif normalized.startswith("INSERT INTO platform.datastore_identity"):
+            self.events.append("identity:insert")
+            self.insert_parameters = parameters
+            self._result = None
+        else:
+            self._result = None
+
+    def fetchone(self):
+        return self._result
+
+
+class _QdrantResponse:
+    def __init__(self, *, request, timeout, calls, identity) -> None:
+        self.request = request
+        self.timeout = timeout
+        self.calls = calls
+        self.identity = identity
+
+    def __enter__(self):
+        body = None if self.request.data is None else json.loads(self.request.data.decode("utf-8"))
+        self.calls.append((self.request.get_method(), self.request.full_url, self.timeout, body))
+        return self
+
+    def __exit__(self, exc_type, exc, traceback):
+        return False
+
+    def read(self):
+        path = self.request.full_url
+        if self.request.get_method() == "GET":
+            payload = {
+                "result": {"collections": [{"name": "platform_datastore_identity_v1"}]},
+                "status": "ok",
+            }
+        elif self.request.get_method() == "POST":
+            payload = {
+                "result": [
+                    {
+                        "id": "7e7aaf4e-b479-5ceb-9187-17d07e996852",
+                        "payload": self.identity.to_mapping(),
+                    }
+                ],
+                "status": "ok",
+            }
+        else:
+            assert "/collections/platform_datastore_identity_v1" in path
+            payload = {"result": True, "status": "ok"}
+        return json.dumps(payload).encode("utf-8")

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import inspect
 
 import pytest
 
@@ -62,6 +63,15 @@ def test_datastore_identity_acceptance(tmp_path: Path) -> None:
                 operation=operation,
             )
     assert downstream.calls == []
+
+    from app.knowledge_access.adapters import worker_runtime as ka_worker_runtime
+    from app.source_processing.adapters import worker_runtime as sp_worker_runtime
+
+    for worker_entrypoint in (ka_worker_runtime._run_worker, sp_worker_runtime._run_worker):
+        source = inspect.getsource(worker_entrypoint)
+        assert source.index("build_configured_datastore_preflight") < source.index(
+            "build_configured_postgres_migration_runner"
+        ) < source.index("claim_next")
 
 
 def _run_after_preflight(*, preflight, operation):
@@ -142,9 +152,13 @@ class _Cursor:
             self._result = ("platform.datastore_identity",)
         elif "FROM platform.datastore_identity" in normalized:
             self.events.append("identity:read")
-            self._result = (
-                self.observed_identity.environment,
-                self.observed_identity.deployment_id,
+            self._result = ([
+                {
+                    "singleton": True,
+                    "environment": self.observed_identity.environment,
+                    "deployment_id": self.observed_identity.deployment_id,
+                }
+            ],
             )
         else:
             self._result = None
@@ -154,4 +168,3 @@ class _Cursor:
 
     def fetchall(self):
         return []
-

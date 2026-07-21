@@ -9,6 +9,7 @@ import argparse
 import re
 
 from app.platform.configuration import ApplicationConfiguration, load_application_configuration
+from app.platform.datastore_identity import DatastoreIdentity, PostgresIdentityPreflight
 from app.platform.postgres import PostgresConnectionFactory
 from app.platform.postgres import PsycopgConnectionFactory
 
@@ -35,6 +36,8 @@ class PostgresMigrationRunner:
         connection_factory: PostgresConnectionFactory,
         migrations_path: Path,
         operation_timeout_seconds: int,
+        identity_preflight: PostgresIdentityPreflight,
+        initialize_identity_if_empty: bool,
     ) -> None:
         if not callable(getattr(connection_factory, "connect", None)):
             raise ValueError("connection_factory PostgreSQL invalide")
@@ -46,9 +49,15 @@ class PostgresMigrationRunner:
             or operation_timeout_seconds < 1
         ):
             raise ValueError("operation_timeout_seconds PostgreSQL invalide")
+        if not isinstance(identity_preflight, PostgresIdentityPreflight):
+            raise ValueError("identity_preflight PostgreSQL invalide")
+        if not isinstance(initialize_identity_if_empty, bool):
+            raise ValueError("initialize_identity_if_empty PostgreSQL invalide")
         self._connection_factory = connection_factory
         self._migrations = _load_migrations(migrations_path)
         self._operation_timeout_seconds = operation_timeout_seconds
+        self._identity_preflight = identity_preflight
+        self._initialize_identity_if_empty = initialize_identity_if_empty
 
     @property
     def required_schema_version(self) -> int:
@@ -65,6 +74,10 @@ class PostgresMigrationRunner:
                 cursor.execute(
                     "SELECT set_config('lock_timeout', %s, true)",
                     (timeout_milliseconds,),
+                )
+                self._identity_preflight.run(
+                    cursor,
+                    initialize_if_empty=self._initialize_identity_if_empty,
                 )
                 cursor.execute("SELECT pg_advisory_xact_lock(%s)", (_MIGRATION_LOCK_ID,))
                 _create_ledger(cursor)
@@ -85,6 +98,7 @@ class PostgresMigrationRunner:
     def is_required_schema_ready(self) -> bool:
         with self._connection_factory.connect() as connection:
             with connection.cursor() as cursor:
+                self._identity_preflight.run(cursor, initialize_if_empty=False)
                 cursor.execute("SELECT to_regclass('platform.schema_migrations')", ())
                 if cursor.fetchone() != ("platform.schema_migrations",):
                     return False
@@ -167,6 +181,8 @@ def _validate_applied_migrations(
 
 def build_configured_postgres_migration_runner(
     configuration: ApplicationConfiguration,
+    *,
+    initialize_identity_if_empty: bool,
 ) -> PostgresMigrationRunner:
     if not isinstance(configuration, ApplicationConfiguration):
         raise TypeError("configuration applicative validée obligatoire")
@@ -179,6 +195,13 @@ def build_configured_postgres_migration_runner(
         connection_factory=connection_factory,
         migrations_path=POSTGRES_MIGRATIONS_PATH,
         operation_timeout_seconds=configuration.runtime.timeouts.startup_seconds,
+        identity_preflight=PostgresIdentityPreflight(
+            expected_identity=DatastoreIdentity(
+                environment=configuration.application.environment,
+                deployment_id=configuration.application.deployment_id,
+            )
+        ),
+        initialize_identity_if_empty=initialize_identity_if_empty,
     )
 
 
@@ -190,7 +213,10 @@ def main() -> int:
         config_path=arguments.config,
         environment_snapshot={},
     )
-    runner = build_configured_postgres_migration_runner(configuration)
+    runner = build_configured_postgres_migration_runner(
+        configuration,
+        initialize_identity_if_empty=True,
+    )
     runner.run()
     print(f"POSTGRES_SCHEMA_READY:{runner.required_schema_version:03d}", flush=True)
     return 0
