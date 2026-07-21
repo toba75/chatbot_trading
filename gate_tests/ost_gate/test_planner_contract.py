@@ -34,9 +34,6 @@ def test_planner_orders_dependencies_once_and_serializes_selection() -> None:
     else:
         raise AssertionError("Un cycle doit être refusé.")
 
-
-def test_scoped_plan_requires_explicit_live_activation() -> None:
-    root = Path.cwd()
     acceptance = GateNode(
         "m013.acceptance",
         root / "acceptance.py",
