@@ -10,6 +10,7 @@ from typing import Any, Protocol
 
 from app.contracts.identity import DomainIdentifier
 from app.contracts.technical_jobs import (
+    JobEnvironmentIdentity,
     JobIdempotenceKey,
     JobPriority,
     JobRequest,
@@ -339,6 +340,8 @@ class DocumentCommandService:
         source_document_repository: SourceDocumentLookupRepository,
         document_inspector: DocumentInspector,
         processing_run_repository: ProcessingRunLookupRepository,
+        environment: str,
+        deployment_id: str,
         diagnosis_configuration_hash: str,
         code_version: str,
         model_version: str,
@@ -357,6 +360,13 @@ class DocumentCommandService:
             diagnosis_configuration_hash,
             "diagnosis_configuration_hash",
         )
+        identity = JobEnvironmentIdentity(
+            environment=environment,
+            deployment_id=deployment_id,
+            configuration_hash=self._diagnosis_configuration_hash,
+        )
+        self._environment = identity.environment
+        self._deployment_id = identity.deployment_id
         self._code_version = _ensure_text(code_version, "code_version")
         self._model_version = _ensure_text(model_version, "model_version")
         self._register_handler = RegisterSourceDocumentHandler(
@@ -466,6 +476,8 @@ class DocumentCommandService:
         )
         processing_run = self._start_handler.prepare(start_command)
         job_request = JobRequest(
+            environment=self._environment,
+            deployment_id=self._deployment_id,
             job_name="DIAGNOSE",
             priority=JobPriority.P1,
             idempotence_key=JobIdempotenceKey(
@@ -503,6 +515,8 @@ class DocumentConversionCommandService:
         source_document_repository: SourceDocumentLookupRepository,
         processing_run_repository: ProcessingRunLookupRepository,
         document_conversion_repository: DocumentConversionRepository,
+        environment: str,
+        deployment_id: str,
         conversion_configuration_hash: str,
         code_version: str,
         model_version: str,
@@ -522,6 +536,13 @@ class DocumentConversionCommandService:
             conversion_configuration_hash,
             "conversion_configuration_hash",
         )
+        identity = JobEnvironmentIdentity(
+            environment=environment,
+            deployment_id=deployment_id,
+            configuration_hash=self._conversion_configuration_hash,
+        )
+        self._environment = identity.environment
+        self._deployment_id = identity.deployment_id
         self._code_version = _ensure_text(code_version, "code_version")
         self._model_version = _ensure_text(model_version, "model_version")
         self._canonical_audit_events: list[PreCanonicalAuditEvent] = []
@@ -653,6 +674,8 @@ class DocumentConversionCommandService:
             failure_error_code=None,
         )
         job_request = JobRequest(
+            environment=self._environment,
+            deployment_id=self._deployment_id,
             job_name="CONVERT_DOCUMENT",
             priority=JobPriority.P1,
             idempotence_key=JobIdempotenceKey(

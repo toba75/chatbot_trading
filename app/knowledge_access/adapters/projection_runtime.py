@@ -16,6 +16,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from app.contracts.llm_inference import LlmInferenceGateway
+from app.contracts.technical_jobs import JobEnvironmentIdentity
 from app.contracts.source_references import (
     ACCEPTED_CANONICAL_VERSION_STATUS,
     CanonicalSourceRef,
@@ -226,6 +227,8 @@ class ProjectionRuntimeService:
 
     connection_factory: PostgresConnectionFactory
     canonical_sources_root: Path
+    environment: str
+    deployment_id: str
     configuration_hash: str
     qdrant_url: str
     qdrant_collection_name: str
@@ -240,6 +243,11 @@ class ProjectionRuntimeService:
             raise ValueError("canonical_sources_root invalide")
         if not re.fullmatch(r"[a-f0-9]{64}", self.configuration_hash):
             raise ValueError("configuration_hash projection invalide")
+        JobEnvironmentIdentity(
+            environment=self.environment,
+            deployment_id=self.deployment_id,
+            configuration_hash=self.configuration_hash,
+        )
         _required_resource_name(self.qdrant_collection_name, "collection Qdrant projection invalide")
         _required_positive_int(self.max_parallel_workers, "parallélisme projection invalide")
         if not callable(getattr(self.inference_gateway, "infer", None)):
@@ -313,11 +321,14 @@ class ProjectionRuntimeService:
                 cursor.execute(
                     """
                     INSERT INTO knowledge_access.job_outbox (
+                        environment, deployment_id,
                         job_name, priority, input_hash, configuration_hash,
                         code_version, model_version, payload, trace_id, status
-                    ) VALUES (%s, 'P1', %s, %s, %s, %s, %s::jsonb, %s, 'pending')
+                    ) VALUES (%s, %s, %s, 'P1', %s, %s, %s, %s, %s::jsonb, %s, 'pending')
                     """,
                     (
+                        self.environment,
+                        self.deployment_id,
                         PROJECT_DOCUMENT_JOB_NAME,
                         projection.build_fingerprint.value,
                         self.configuration_hash,

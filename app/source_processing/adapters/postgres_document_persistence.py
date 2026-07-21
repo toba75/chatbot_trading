@@ -1038,23 +1038,29 @@ class PostgresDocumentPersistence:
         if not isinstance(job_request, JobRequest):
             raise ValueError("job_request invalide")
         identity = job_request.idempotence_key.identity_tuple()
+        environment_identity = (
+            job_request.environment,
+            job_request.deployment_id,
+        )
         with connection.cursor() as cursor:
             cursor.execute(
                 "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
-                ("sp-outbox|" + "|".join(identity),),
+                ("sp-outbox|" + "|".join((*environment_identity, *identity)),),
             )
             cursor.execute(
                 """
                 SELECT outbox_id
-                  FROM source_processing.job_outbox
-                 WHERE job_name = %s
+                 FROM source_processing.job_outbox
+                 WHERE environment = %s
+                   AND deployment_id = %s
+                   AND job_name = %s
                    AND input_hash = %s
                    AND configuration_hash = %s
                    AND code_version = %s
                    AND model_version = %s
                  FOR UPDATE
                 """,
-                identity,
+                (*environment_identity, *identity),
             )
             existing = cursor.fetchone()
             if existing is not None:
@@ -1062,13 +1068,15 @@ class PostgresDocumentPersistence:
             cursor.execute(
                 """
                 INSERT INTO source_processing.job_outbox (
+                    environment, deployment_id,
                     job_name, priority, input_hash, configuration_hash,
                     code_version, model_version, payload, trace_id, status
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, %s, 'pending')
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, 'pending')
                 RETURNING outbox_id
                 """,
                 (
+                    *environment_identity,
                     job_request.job_name,
                     job_request.priority.value,
                     *identity[1:],

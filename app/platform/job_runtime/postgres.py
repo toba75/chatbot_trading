@@ -8,6 +8,7 @@ from typing import Any, NamedTuple
 
 from app.platform.job_runtime import (
     JobCatalog,
+    JobEnvironmentIdentity,
     JobIdempotenceKey,
     JobPriority,
     JobRecord,
@@ -19,11 +20,17 @@ from app.contracts.technical_jobs import ClaimedJob
 from app.platform.job_runtime.relay import RelayedJobMessage
 from app.platform.postgres import PostgresConnection, PostgresConnectionFactory
 from app.platform.request_context import current_trace_id
+from app.platform.worker_environment import (
+    WORKER_ENVIRONMENT_MISMATCH,
+    WorkerEnvironmentMismatchError,
+)
 
 
 class _JobRow(NamedTuple):
     sequence: int
     job_id: str
+    environment: str
+    deployment_id: str
     job_name: str
     priority: str
     input_hash: str
@@ -43,6 +50,8 @@ class _JobRow(NamedTuple):
 class _ClaimedJobRow(NamedTuple):
     sequence: int
     job_id: str
+    environment: str
+    deployment_id: str
     job_name: str
     priority: str
     input_hash: str
@@ -130,13 +139,17 @@ class PostgresJobQueue:
         *,
         connection_factory: PostgresConnectionFactory,
         catalog: JobCatalog,
+        environment_identity: JobEnvironmentIdentity,
     ) -> None:
         if not callable(getattr(connection_factory, "connect", None)):
             raise ValueError("connection_factory invalide")
         if not isinstance(catalog, JobCatalog):
             raise ValueError("catalog invalide")
+        if not isinstance(environment_identity, JobEnvironmentIdentity):
+            raise ValueError("identité environnement file invalide")
         self._connection_factory = connection_factory
         self._catalog = catalog
+        self._environment_identity = environment_identity
 
     def submit(self, request: JobRequest, *, recalculate: bool) -> JobSubmissionDecision:
         with self._connection_factory.connect() as connection:
@@ -158,9 +171,12 @@ class PostgresJobQueue:
         if not isinstance(recalculate, bool):
             raise ValueError("recalculate non booléen")
         self._catalog.require_known_job(parsed_request.job_name)
+        self._require_environment_identity(parsed_request)
 
         identity = parsed_request.idempotence_key.identity_tuple()
-        lock_key = "|".join(identity)
+        lock_key = "|".join(
+            (parsed_request.environment, parsed_request.deployment_id, *identity)
+        )
         with connection.cursor() as cursor:
             cursor.execute(
                 "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
@@ -169,8 +185,10 @@ class PostgresJobQueue:
             cursor.execute(
                 f"""
                 SELECT {_JOB_COLUMNS_SQL}
-                  FROM platform.technical_jobs
-                 WHERE job_name = %s
+                 FROM platform.technical_jobs
+                 WHERE environment = %s
+                   AND deployment_id = %s
+                   AND job_name = %s
                    AND input_hash = %s
                    AND configuration_hash = %s
                    AND code_version = %s
@@ -179,7 +197,7 @@ class PostgresJobQueue:
                  LIMIT 1
                  FOR UPDATE
                 """,
-                identity,
+                (parsed_request.environment, parsed_request.deployment_id, *identity),
             )
             existing_row = cursor.fetchone()
             if existing_row is not None:
@@ -198,16 +216,19 @@ class PostgresJobQueue:
             cursor.execute(
                 f"""
                 INSERT INTO platform.technical_jobs (
+                    environment, deployment_id,
                     job_name, priority, input_hash, configuration_hash,
                     code_version, model_version, payload, trace_id, status,
                     recalculation_number
                 )
                 VALUES (
-                    %s, %s, %s, %s, %s, %s, %s::jsonb, %s, 'pending',
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, 'pending',
                     COALESCE((
                         SELECT MAX(recalculation_number) + 1
                           FROM platform.technical_jobs
-                         WHERE job_name = %s
+                         WHERE environment = %s
+                           AND deployment_id = %s
+                           AND job_name = %s
                            AND input_hash = %s
                            AND configuration_hash = %s
                            AND code_version = %s
@@ -217,11 +238,15 @@ class PostgresJobQueue:
                 RETURNING {_JOB_COLUMNS_SQL}
                 """,
                 (
+                    parsed_request.environment,
+                    parsed_request.deployment_id,
                     parsed_request.job_name,
                     parsed_request.priority.value,
                     *identity[1:],
                     json.dumps(dict(parsed_request.payload), separators=(",", ":"), sort_keys=True),
                     current_trace_id(),
+                    parsed_request.environment,
+                    parsed_request.deployment_id,
                     *identity,
                 ),
             )
@@ -242,8 +267,14 @@ class PostgresJobQueue:
                     SELECT {_JOB_COLUMNS_SQL}
                       FROM platform.technical_jobs
                      WHERE job_id = %s
+                       AND environment = %s
+                       AND deployment_id = %s
                     """,
-                    (job_id,),
+                    (
+                        job_id,
+                        self._environment_identity.environment,
+                        self._environment_identity.deployment_id,
+                    ),
                 )
                 row = cursor.fetchone()
         if row is None:
@@ -258,8 +289,10 @@ class PostgresJobQueue:
                 cursor.execute(
                     f"""
                     SELECT {_JOB_COLUMNS_SQL}
-                      FROM platform.technical_jobs
-                     WHERE job_name = %s
+                     FROM platform.technical_jobs
+                     WHERE environment = %s
+                       AND deployment_id = %s
+                       AND job_name = %s
                        AND input_hash = %s
                        AND configuration_hash = %s
                        AND code_version = %s
@@ -267,7 +300,11 @@ class PostgresJobQueue:
                      ORDER BY recalculation_number DESC
                      LIMIT 1
                     """,
-                    key.identity_tuple(),
+                    (
+                        self._environment_identity.environment,
+                        self._environment_identity.deployment_id,
+                        *key.identity_tuple(),
+                    ),
                 )
                 row = cursor.fetchone()
         return None if row is None else _job_from_row(row)
@@ -279,6 +316,7 @@ class PostgresJobQueue:
             raise ValueError("message relais invalide")
         request = message.as_job_request()
         self._catalog.require_known_job(request.job_name)
+        self._require_environment_identity(request)
         serialized_payload = json.dumps(
             dict(request.payload),
             ensure_ascii=False,
@@ -309,8 +347,10 @@ class PostgresJobQueue:
                 cursor.execute(
                     f"""
                     SELECT {_EXISTING_RELAY_COLUMNS_SQL}
-                      FROM platform.technical_jobs
-                     WHERE job_name = %s
+                     FROM platform.technical_jobs
+                     WHERE environment = %s
+                       AND deployment_id = %s
+                       AND job_name = %s
                        AND input_hash = %s
                        AND configuration_hash = %s
                        AND code_version = %s
@@ -318,7 +358,11 @@ class PostgresJobQueue:
                        AND recalculation_number = 0
                      FOR UPDATE
                     """,
-                    request.idempotence_key.identity_tuple(),
+                    (
+                        request.environment,
+                        request.deployment_id,
+                        *request.idempotence_key.identity_tuple(),
+                    ),
                 )
                 existing = cursor.fetchone()
                 if existing is not None:
@@ -336,8 +380,15 @@ class PostgresJobQueue:
                         UPDATE platform.technical_jobs
                            SET source_message_id = %s, source_message_hash = %s
                          WHERE job_id = %s AND source_message_id IS NULL
+                           AND environment = %s AND deployment_id = %s
                         """,
-                        (message.message_id, message.content_hash, existing_row.job_id),
+                        (
+                            message.message_id,
+                            message.content_hash,
+                            existing_row.job_id,
+                            request.environment,
+                            request.deployment_id,
+                        ),
                     )
                     if cursor.rowcount != 1:
                         raise JobRelayMessageConflictError()
@@ -346,17 +397,20 @@ class PostgresJobQueue:
                 cursor.execute(
                     f"""
                     INSERT INTO platform.technical_jobs (
+                        environment, deployment_id,
                         job_name, priority, input_hash, configuration_hash,
                         code_version, model_version, payload, trace_id, status,
                         recalculation_number, source_message_id, source_message_hash
                     )
                     VALUES (
-                        %s, %s, %s, %s, %s, %s, %s::jsonb, %s, 'pending', 0,
+                        %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, 'pending', 0,
                         %s, %s
                     )
                     RETURNING {_INSERTED_JOB_COLUMNS_SQL}
                     """,
                     (
+                        request.environment,
+                        request.deployment_id,
                         request.job_name,
                         request.priority.value,
                         request.idempotence_key.input_hash,
@@ -374,6 +428,10 @@ class PostgresJobQueue:
             raise RuntimeError("JOB_RELAY_PERSISTENCE_FAILED")
         return _InsertedJobRow.from_database(inserted).job_id
 
+    def _require_environment_identity(self, request: JobRequest) -> None:
+        if request.environment_identity != self._environment_identity:
+            raise WorkerEnvironmentMismatchError()
+
     def claim_next(
         self,
         *,
@@ -388,11 +446,33 @@ class PostgresJobQueue:
             with connection.transaction():
                 with connection.cursor() as cursor:
                     cursor.execute(
+                        """
+                        UPDATE platform.technical_jobs
+                           SET status = 'failed', result = NULL,
+                               failure_reason = %s, lease_owner = NULL,
+                               lease_expires_at = NULL, claim_token = NULL
+                         WHERE job_name = ANY(%s)
+                           AND (
+                               status = 'pending'
+                               OR (status = 'running' AND lease_expires_at <= CURRENT_TIMESTAMP)
+                           )
+                           AND (environment <> %s OR deployment_id <> %s)
+                        """,
+                        (
+                            WORKER_ENVIRONMENT_MISMATCH,
+                            list(parsed_names),
+                            self._environment_identity.environment,
+                            self._environment_identity.deployment_id,
+                        ),
+                    )
+                    cursor.execute(
                         f"""
                         WITH candidate AS (
                             SELECT sequence
-                              FROM platform.technical_jobs
-                             WHERE job_name = ANY(%s)
+                             FROM platform.technical_jobs
+                             WHERE environment = %s
+                               AND deployment_id = %s
+                               AND job_name = ANY(%s)
                                AND (
                                    status = 'pending'
                                    OR (status = 'running' AND lease_expires_at <= CURRENT_TIMESTAMP)
@@ -411,7 +491,13 @@ class PostgresJobQueue:
                          WHERE job.sequence = candidate.sequence
                         RETURNING {_QUALIFIED_CLAIMED_JOB_COLUMNS_SQL}
                         """,
-                        (list(parsed_names), parsed_owner, parsed_lease),
+                        (
+                            self._environment_identity.environment,
+                            self._environment_identity.deployment_id,
+                            list(parsed_names),
+                            parsed_owner,
+                            parsed_lease,
+                        ),
                     )
                     row = cursor.fetchone()
         if row is None:
@@ -508,6 +594,7 @@ class PostgresJobQueue:
                            lease_owner = NULL, lease_expires_at = NULL,
                            claim_token = NULL
                      WHERE job_id = %s AND status = 'running'
+                       AND environment = %s AND deployment_id = %s
                        AND lease_owner = %s AND lease_expires_at > CURRENT_TIMESTAMP
                        AND claim_generation = %s AND claim_token = %s::uuid
                        AND execution_attempts < %s
@@ -515,6 +602,8 @@ class PostgresJobQueue:
                     """,
                     (
                         parsed_job_id,
+                        self._environment_identity.environment,
+                        self._environment_identity.deployment_id,
                         parsed_owner,
                         parsed_generation,
                         parsed_token,
@@ -548,11 +637,20 @@ class PostgresJobQueue:
                         UPDATE platform.technical_jobs
                            SET lease_expires_at = CURRENT_TIMESTAMP + (%s * INTERVAL '1 second')
                          WHERE job_id = %s AND status = 'running'
+                           AND environment = %s AND deployment_id = %s
                            AND lease_owner = %s AND lease_expires_at > CURRENT_TIMESTAMP
                            AND claim_generation = %s AND claim_token = %s::uuid
                         RETURNING {_CLAIMED_JOB_COLUMNS_SQL}
                         """,
-                        (parsed_lease, parsed_job_id, parsed_owner, parsed_generation, parsed_token),
+                        (
+                            parsed_lease,
+                            parsed_job_id,
+                            self._environment_identity.environment,
+                            self._environment_identity.deployment_id,
+                            parsed_owner,
+                            parsed_generation,
+                            parsed_token,
+                        ),
                     )
                     row = cursor.fetchone()
         if row is None:
@@ -593,12 +691,16 @@ class PostgresJobQueue:
                                lease_owner = NULL, lease_expires_at = NULL,
                                claim_token = NULL
                          WHERE job_id = %s AND status = 'running'
+                           AND environment = %s AND deployment_id = %s
                            AND lease_owner = %s AND lease_expires_at > CURRENT_TIMESTAMP
                            AND claim_generation = %s AND claim_token = %s::uuid
                         RETURNING {_JOB_COLUMNS_SQL}
                         """,
                         (
-                            status, result, failure_reason, parsed_job_id, parsed_owner,
+                            status, result, failure_reason, parsed_job_id,
+                            self._environment_identity.environment,
+                            self._environment_identity.deployment_id,
+                            parsed_owner,
                             parsed_generation, parsed_token,
                         ),
                     )
@@ -670,6 +772,8 @@ def _job_from_row(row: Any) -> JobRecord:
         sequence=parsed_row.sequence,
         job_id=parsed_row.job_id,
         request=JobRequest(
+            environment=parsed_row.environment,
+            deployment_id=parsed_row.deployment_id,
             job_name=parsed_row.job_name,
             priority=JobPriority(parsed_row.priority),
             idempotence_key=JobIdempotenceKey(

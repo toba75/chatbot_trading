@@ -10,6 +10,7 @@ from types import MappingProxyType
 from typing import Any
 
 from app.contracts.technical_jobs import (
+    JobEnvironmentIdentity,
     JobIdempotenceKey,
     JobPriority,
     JobRecord,
@@ -366,6 +367,7 @@ __all__ = [
     "InMemoryJobWorkerRegistry",
     "JOB_RUNTIME_CATALOG",
     "JobCatalog",
+    "JobEnvironmentIdentity",
     "JobIdempotenceKey",
     "JobPriority",
     "JobRecord",

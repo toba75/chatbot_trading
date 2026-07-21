@@ -10,11 +10,16 @@ def test_worker_environment_identity_acceptance() -> None:
         JobPriority,
         JobRequest,
     )
-    from app.platform.job_runtime.relay import RelayedJobMessage
+    from app.platform.job_runtime.relay import (
+        ClaimedRelayMessage,
+        JobOutboxRelay,
+        RelayedJobMessage,
+    )
     from app.platform.worker_environment import (
         WORKER_ENVIRONMENT_MISMATCH,
         WORKER_JOB_NAMES,
         WorkerEnvironmentBinding,
+        WorkerEnvironmentMismatchError,
         execute_environment_bound_job,
     )
 
@@ -95,6 +100,47 @@ def test_worker_environment_identity_acceptance() -> None:
         }
     ]
 
+    # Le relais refuse le message sans ACK et confie la transition terminale
+    # à l'outbox productrice, avant toute insertion dans la file technique.
+    claim = ClaimedRelayMessage(
+        message=message,
+        owner_id="development:ostrading-development-local:worker-documents:relay",
+        claim_generation=1,
+        claim_token="00000000-0000-4000-8000-000000000002",
+    )
+
+    class ForeignOutbox:
+        def __init__(self) -> None:
+            self.claimed = False
+            self.rejected: list[ClaimedRelayMessage] = []
+
+        def claim_next(self, *, owner_id: str, lease_seconds: int):
+            assert owner_id == claim.owner_id
+            assert lease_seconds == 30
+            if self.claimed:
+                return None
+            self.claimed = True
+            return claim
+
+        def acknowledge(self, claimed, *, platform_job_id: str) -> None:
+            raise AssertionError("Un message étranger ne doit jamais être ACK.")
+
+        def reject_environment_mismatch(self, claimed) -> None:
+            self.rejected.append(claimed)
+
+    class BoundConsumer:
+        def consume_relay_message(self, relayed_message):
+            assert relayed_message == message
+            raise WorkerEnvironmentMismatchError()
+
+    foreign_outbox = ForeignOutbox()
+    relayed_count = JobOutboxRelay(
+        outbox=foreign_outbox,
+        consumer=BoundConsumer(),
+    ).relay_pending(limit=1, owner_id=claim.owner_id, lease_seconds=30)
+    assert relayed_count == 0
+    assert foreign_outbox.rejected == [claim]
+
     repository_root = next(
         parent for parent in Path(__file__).resolve().parents if (parent / "pyproject.toml").is_file()
     )
@@ -112,7 +158,7 @@ def test_worker_environment_identity_acceptance() -> None:
 
     compose = (repository_root / "deploy/environments/compose.base.yaml").read_text(encoding="utf-8")
     for worker_id in WORKER_JOB_NAMES:
-        worker_section = compose.split(f"  {worker_id}:", 1)[1].split("\n  ", 1)[0]
-        assert "check-worker" in worker_section
-        assert f"--worker-id {worker_id}" in worker_section
-        assert "--config /workspace/config/application.yaml" in worker_section
+        assert (
+            "python -m app.platform.environment_compose check-worker "
+            f"--worker-id {worker_id} --config /workspace/config/application.yaml"
+        ) in compose

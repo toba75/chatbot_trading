@@ -211,6 +211,8 @@ def _source_and_run(source_path: Path) -> tuple[SourceDocument, DocumentProcessi
 
 def _claimed_job(source: SourceDocument, run: DocumentProcessingRun) -> ClaimedJob:
     request = JobRequest(
+        environment="development",
+        deployment_id="ostrading-development-local",
         job_name="CONVERT_DOCUMENT",
         priority=JobPriority.P1,
         idempotence_key=JobIdempotenceKey(

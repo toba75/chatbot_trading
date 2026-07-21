@@ -13,15 +13,13 @@ import re
 import secrets
 import shutil
 import subprocess
-import sys
 from types import MappingProxyType
 from typing import Any, Final, Literal
 from urllib.request import urlopen
 
-from app.platform.configuration import (
-    ApplicationConfiguration,
-    load_application_configuration,
-)
+from app.platform.configuration import load_application_configuration
+from app.platform.configured_datastore_identity import build_configured_datastore_preflight
+from app.platform.worker_environment import build_worker_environment_binding
 
 
 ApplicationEnvironment = Literal["development", "test", "production"]
@@ -365,6 +363,31 @@ def configured_http_healthcheck(*, service: str, path: str, config_path: Path) -
             raise ValueError("ENVIRONMENT_HEALTHCHECK_HTTP_FAILED")
 
 
+def configured_worker_healthcheck(*, worker_id: str, config_path: Path) -> Mapping[str, str]:
+    configuration = load_application_configuration(config_path=config_path, environment_snapshot={})
+    binding = build_worker_environment_binding(configuration, worker_id=worker_id)
+    if worker_id == "worker-documents":
+        include_qdrant = False
+        file_root_names = ("data_root", "corpus_root", "canonical_sources_root")
+    elif worker_id == "worker-projection":
+        include_qdrant = True
+        file_root_names = ("canonical_sources_root",)
+    elif worker_id in {"worker-research", "worker-backtest"}:
+        include_qdrant = False
+        file_root_names = ()
+    else:
+        raise ValueError("worker_id invalide")
+    build_configured_datastore_preflight(
+        configuration,
+        include_postgres=True,
+        include_qdrant=include_qdrant,
+        file_root_names=file_root_names,
+    ).run(initialize_if_empty=False)
+    health = binding.health_snapshot().to_mapping()
+    print(json.dumps(health, ensure_ascii=False, sort_keys=True), flush=True)
+    return health
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Healthchecks des piles d'environnement.")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -374,9 +397,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     http_parser.add_argument("--service", required=True)
     http_parser.add_argument("--path", required=True)
     http_parser.add_argument("--config", required=True)
+    worker_parser = subparsers.add_parser("check-worker")
+    worker_parser.add_argument("--worker-id", required=True)
+    worker_parser.add_argument("--config", required=True)
     arguments = parser.parse_args(argv)
     if arguments.command == "check-config":
         load_application_configuration(config_path=arguments.config, environment_snapshot={})
+        return 0
+    if arguments.command == "check-worker":
+        configured_worker_healthcheck(
+            worker_id=arguments.worker_id,
+            config_path=Path(arguments.config),
+        )
         return 0
     configured_http_healthcheck(
         service=arguments.service,
@@ -738,6 +770,7 @@ __all__ = [
     "EnvironmentStackReadiness",
     "aggregate_environment_readiness",
     "configured_http_healthcheck",
+    "configured_worker_healthcheck",
     "environment_stack_definition",
     "inspect_environment_readiness",
     "render_environment_compose",

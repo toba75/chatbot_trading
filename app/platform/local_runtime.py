@@ -21,6 +21,7 @@ from app.platform.configuration import (
     CONFIG_FILE_REQUIRED,
     load_application_configuration,
 )
+from app.platform.configured_datastore_identity import build_configured_datastore_preflight
 from app.platform.llm_gateway import (
     GatewayCircuitBreaker,
     GatewayCircuitBreakerPolicy,
@@ -39,6 +40,7 @@ from app.platform.llm_gateway import (
 )
 from app.platform.observability import GatewayObservation, InMemoryObservabilityCollector
 from app.platform.orchestrator_asgi import MAX_REQUEST_BODY_BYTES
+from app.platform.worker_environment import build_worker_environment_binding
 from app.platform.ui_corpus import (
     CorpusPdfScreenState,
     build_unavailable_corpus_pdf_state,
@@ -1349,7 +1351,24 @@ def _run_worker(
     _require_worker_service(service_id)
     if service_id == "worker-documents":
         raise RuntimeError("DOCUMENT_WORKER_COMMAND_REQUIRED")
-    del owner_id, lease_seconds, poll_seconds, max_jobs
+    if owner_id != service_id:
+        raise ValueError("WORKER_IDENTITY_INVALID")
+    if lease_seconds is not None or poll_seconds is not None or max_jobs is not None:
+        raise ValueError("WORKER_ARGUMENTS_UNSUPPORTED")
+    build_configured_datastore_preflight(
+        application_configuration,
+        include_postgres=True,
+        include_qdrant=False,
+        file_root_names=(),
+    ).run(initialize_if_empty=False)
+    binding = build_worker_environment_binding(
+        application_configuration,
+        worker_id=service_id,
+    )
+    print(
+        json.dumps(binding.health_snapshot().to_mapping(), sort_keys=True),
+        flush=True,
+    )
     threading.Event().wait()
 
 

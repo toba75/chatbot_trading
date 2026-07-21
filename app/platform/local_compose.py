@@ -117,8 +117,12 @@ EXPECTED_SERVICE_COMMANDS = {
         "0.5",
         *APPLICATION_CONFIG_ARGUMENTS,
     ),
-    "worker-research": _runtime_command("run-worker", "worker-research"),
-    "worker-backtest": _runtime_command("run-worker", "worker-backtest"),
+    "worker-research": _runtime_command(
+        "run-worker", "worker-research", "--worker-id", "worker-research"
+    ),
+    "worker-backtest": _runtime_command(
+        "run-worker", "worker-backtest", "--worker-id", "worker-backtest"
+    ),
     "backtest-engine": _runtime_command("serve-http", "backtest-engine", "8200"),
 }
 APPLICATION_SERVICE_IDS = frozenset(EXPECTED_SERVICE_COMMANDS)

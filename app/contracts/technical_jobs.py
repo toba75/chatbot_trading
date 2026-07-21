@@ -15,6 +15,8 @@ from uuid import UUID
 
 _HASH_PATTERN = re.compile(r"^[a-f0-9]{64}$")
 _JOB_ID_PATTERN = re.compile(r"^JOB-M002-[0-9]{6}$")
+_DEPLOYMENT_ID_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+_APPLICATION_ENVIRONMENTS = frozenset(("development", "test", "production"))
 
 
 class JobPriority(str, Enum):
@@ -41,6 +43,30 @@ class JobStatus(str, Enum):
     FAILED = "failed"
 
 
+@dataclass(frozen=True, slots=True)
+class JobEnvironmentIdentity:
+    """Identité immutable de l'installation qui produit ou exécute un job."""
+
+    environment: str
+    deployment_id: str
+    configuration_hash: str
+
+    def __post_init__(self) -> None:
+        if self.environment not in _APPLICATION_ENVIRONMENTS:
+            raise ValueError("environment invalide")
+        deployment_id = _ensure_text(self.deployment_id, "deployment_id")
+        if _DEPLOYMENT_ID_PATTERN.fullmatch(deployment_id) is None:
+            raise ValueError("deployment_id invalide")
+        _ensure_hash(self.configuration_hash, "configuration_hash")
+
+    def to_mapping(self) -> dict[str, str]:
+        return {
+            "environment": self.environment,
+            "deployment_id": self.deployment_id,
+            "configuration_hash": self.configuration_hash,
+        }
+
+
 @dataclass(frozen=True)
 class JobIdempotenceKey:
     job_name: str
@@ -62,6 +88,8 @@ class JobIdempotenceKey:
 
 @dataclass(frozen=True)
 class JobRequest:
+    environment: str
+    deployment_id: str
     job_name: str
     priority: JobPriority
     idempotence_key: JobIdempotenceKey
@@ -73,9 +101,22 @@ class JobRequest:
             raise ValueError("priority invalide")
         if not isinstance(self.idempotence_key, JobIdempotenceKey):
             raise ValueError("idempotence_key invalide")
+        JobEnvironmentIdentity(
+            environment=self.environment,
+            deployment_id=self.deployment_id,
+            configuration_hash=self.idempotence_key.configuration_hash,
+        )
         if self.idempotence_key.job_name != job_name:
             raise ValueError("idempotence_key incohérente avec job_name")
         object.__setattr__(self, "payload", _freeze_mapping(self.payload, "payload"))
+
+    @property
+    def environment_identity(self) -> JobEnvironmentIdentity:
+        return JobEnvironmentIdentity(
+            environment=self.environment,
+            deployment_id=self.deployment_id,
+            configuration_hash=self.idempotence_key.configuration_hash,
+        )
 
 
 @dataclass(frozen=True)
@@ -200,4 +241,13 @@ def _freeze_payload_value(value: Any, field_name: str) -> Any:
     raise ValueError(f"{field_name} invalide")
 
 
-__all__ = ["ClaimedJob", "JobIdempotenceKey", "JobPriority", "JobRecord", "JobRequest", "JobStatus", "JobSubmissionDecision"]
+__all__ = [
+    "ClaimedJob",
+    "JobEnvironmentIdentity",
+    "JobIdempotenceKey",
+    "JobPriority",
+    "JobRecord",
+    "JobRequest",
+    "JobStatus",
+    "JobSubmissionDecision",
+]

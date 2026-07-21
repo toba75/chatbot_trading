@@ -50,6 +50,11 @@ services:
       - "8081"
     networks:
       - core
+    depends_on:
+      orchestrator-api:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
     volumes:
       - ./application.compose.yaml:/workspace/config/application.yaml:ro
       - ../../config/application.schema.json:/workspace/config/application.schema.json:ro
@@ -347,6 +352,8 @@ services:
       - app.platform.local_runtime
       - run-worker
       - worker-research
+      - --worker-id
+      - worker-research
       - --config
       - /workspace/config/application.yaml
     networks:
@@ -376,10 +383,17 @@ services:
       - app.platform.local_runtime
       - run-worker
       - worker-backtest
+      - --worker-id
+      - worker-backtest
       - --config
       - /workspace/config/application.yaml
     networks:
       - core
+    depends_on:
+      orchestrator-api:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
     volumes:
       - experiment-data:/workspace/data/experiments
       - ./application.compose.yaml:/workspace/config/application.yaml:ro

@@ -129,6 +129,8 @@ def _source_and_run() -> tuple[SourceDocument, DocumentProcessingRun]:
 
 def _claimed_diagnosis_job(source: SourceDocument, run: DocumentProcessingRun) -> ClaimedJob:
     request = JobRequest(
+        environment="development",
+        deployment_id="ostrading-development-local",
         job_name="DIAGNOSE",
         priority=JobPriority.P1,
         idempotence_key=JobIdempotenceKey(

@@ -21,6 +21,7 @@ from app.platform.job_runtime.postgres import JobLeaseConflictError
 from app.platform.postgres import PsycopgConnectionFactory
 from app.platform.postgres_migrations import build_configured_postgres_migration_runner
 from app.platform.request_context import bind_trace_id, reset_trace_id
+from app.platform.worker_environment import build_worker_environment_binding
 from app.source_processing.adapters.postgres_document_persistence import build_document_persistence
 from app.source_processing.adapters.docling_native_conversion import (
     CanonicalArtifactFileStore,
@@ -203,7 +204,15 @@ def _run_worker(
         application_configuration,
         initialize_identity_if_empty=False,
     ).run()
-    instance_owner_id = f"{owner_id}:{uuid4()}"
+    worker_binding = build_worker_environment_binding(
+        application_configuration,
+        worker_id=owner_id,
+    )
+    instance_owner_id = worker_binding.instance_owner_id(str(uuid4()))
+    print(
+        json.dumps(worker_binding.health_snapshot().to_mapping(), sort_keys=True),
+        flush=True,
+    )
     connection_factory = PsycopgConnectionFactory(
         connection_url=application_configuration.services.postgres.url,
         password_path=Path(application_configuration.security.secrets.postgres_password_path),
@@ -216,6 +225,7 @@ def _run_worker(
     job_runtime = build_postgres_job_runtime(
         connection_factory=connection_factory,
         outbox=PostgresJobOutbox(connection_factory=connection_factory),
+        application_configuration=application_configuration,
     )
     worker = DocumentDiagnosticWorker(
         source_document_repository=persistence.source_document_repository,
@@ -282,6 +292,8 @@ def _run_worker(
                 return
             time.sleep(poll_seconds)
             continue
+
+        worker_binding.require_job_request(claimed.job.request)
 
         started_ns = time.perf_counter_ns()
         trace_token = bind_trace_id(claimed.trace_id)
@@ -432,6 +444,9 @@ def _log_job_result(
         "duration_ms": round(duration_ms, 3),
         "processed_volume": 1,
         "tracing_enabled": application_configuration.observability.tracing.enabled,
+        "environment": application_configuration.application.environment,
+        "deployment_id": application_configuration.application.deployment_id,
+        "configuration_hash": application_configuration.configuration_hash,
     }
     if error_code is not None:
         payload["error_code"] = error_code

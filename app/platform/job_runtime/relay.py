@@ -12,6 +12,7 @@ from typing import Any, Protocol
 from uuid import UUID
 
 from app.platform.job_runtime import JobIdempotenceKey, JobPriority, JobRequest
+from app.platform.worker_environment import WorkerEnvironmentMismatchError
 
 
 @dataclass(frozen=True, slots=True)
@@ -19,6 +20,8 @@ class RelayedJobMessage:
     """Message technique immutable publié par un contexte propriétaire."""
 
     message_id: str
+    environment: str
+    deployment_id: str
     job_name: str
     priority: str
     input_hash: str
@@ -34,12 +37,38 @@ class RelayedJobMessage:
         request = self.as_job_request()
         object.__setattr__(self, "payload", request.payload)
 
+    @classmethod
+    def from_job_request(
+        cls,
+        *,
+        message_id: str,
+        request: JobRequest,
+        trace_id: str,
+    ) -> "RelayedJobMessage":
+        if not isinstance(request, JobRequest):
+            raise ValueError("request relais invalide")
+        return cls(
+            message_id=message_id,
+            environment=request.environment,
+            deployment_id=request.deployment_id,
+            job_name=request.job_name,
+            priority=request.priority.value,
+            input_hash=request.idempotence_key.input_hash,
+            configuration_hash=request.idempotence_key.configuration_hash,
+            code_version=request.idempotence_key.code_version,
+            model_version=request.idempotence_key.model_version,
+            payload=request.payload,
+            trace_id=trace_id,
+        )
+
     def as_job_request(self) -> JobRequest:
         try:
             priority = JobPriority(self.priority)
         except (TypeError, ValueError) as exc:
             raise ValueError("priority relais invalide") from exc
         return JobRequest(
+            environment=self.environment,
+            deployment_id=self.deployment_id,
             job_name=self.job_name,
             priority=priority,
             idempotence_key=JobIdempotenceKey(
@@ -56,6 +85,8 @@ class RelayedJobMessage:
     def content_hash(self) -> str:
         canonical = {
             "configuration_hash": self.configuration_hash,
+            "deployment_id": self.deployment_id,
+            "environment": self.environment,
             "input_hash": self.input_hash,
             "job_name": self.job_name,
             "message_id": self.message_id,
@@ -156,6 +187,19 @@ class JobOutboxRelay:
             try:
                 platform_job_id = self._consumer.consume_relay_message(claim.message)
                 self._outbox.acknowledge(claim, platform_job_id=platform_job_id)
+            except WorkerEnvironmentMismatchError:
+                reject = getattr(self._outbox, "reject_environment_mismatch", None)
+                if not callable(reject):
+                    raise ValueError("outbox sans refus environnement")
+                reject(claim)
+                _print_relay_observation(
+                    claim=claim,
+                    relayed_count=relayed,
+                    started_ns=started_ns,
+                    error_code=WorkerEnvironmentMismatchError.code,
+                    succeeded=False,
+                )
+                continue
             except Exception as exception:
                 _print_relay_observation(
                     claim=claim,

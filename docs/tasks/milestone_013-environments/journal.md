@@ -39,6 +39,77 @@ Preuve RED obtenue:
 
 - `uv run --locked pytest -q gate_tests/ported/tests/m013_environments/validate_worker_environment_identity_acceptance.py gate_tests/ported/tests/m013_environments/validate_worker_environment_identity_unit.py` - RED utile; 2 tests échouent uniquement parce que `JobEnvironmentIdentity` n'existe pas encore.
 
+## T-007 - Implémentation et preuve GREEN
+
+Date d'exécution: 2026-07-21.
+
+Implémentation:
+
+- `JobRequest`, les outbox SP/KA, le relais et `platform.technical_jobs`
+  portent obligatoirement `environment` et `deployment_id` en plus du
+  `configuration_hash`;
+- la migration additive `020_job_environment_identity.sql` complète les
+  lignes existantes depuis `platform.datastore_identity`, rend les deux
+  colonnes obligatoires et ajoute le refus terminal
+  `WORKER_ENVIRONMENT_MISMATCH`;
+- les workers documents, projection, recherche et backtest construisent une
+  identité depuis la configuration validée, contrôlent PostgreSQL avant usage
+  et publient `environment`, `deployment_id` et `configuration_hash` dans leur
+  healthcheck;
+- la file refuse les demandes étrangères avant insertion ou claim; le relais
+  laisse l'outbox productrice persister atomiquement son échec et celui de la
+  progression publique réelle.
+
+Preuves automatisées ciblées:
+
+- les tests unitaires et d'acceptation T-007 sont GREEN: identité immutable,
+  registre fermé des quatre workers, propagation du message, refus sans
+  callback métier, absence d'ACK et transition terminale confiée à l'outbox;
+- les régressions jobs/outbox/commandes/workers M-002, M-003, M-004 et
+  M13-fastapi sont GREEN après adaptation explicite des fixtures, sans valeur
+  par défaut ni fallback.
+- `uv run --locked gate --scope m002`, `--scope m013_config`,
+  `--scope m013_environments` et `--scope m013_fastapi` sont GREEN;
+- `uv run --locked gate` est GREEN: 447 nœuds, phases live incluses,
+  `missing=[]`, `unexpected=[]`, `non_unique=[]`;
+- `compileall`, le contrôle Ruff des erreurs de syntaxe et de noms, et
+  `git diff --check` sont GREEN.
+
+Preuve live sur les volumes T-006 conservés:
+
+- les piles ont été démarrées puis arrêtées séquentiellement avec Compose,
+  sans `down -v` et sans suppression de secret;
+- dans `development`, `test` et `production`, la ledger contient
+  `019_sparse_native_visual_authority.sql` puis
+  `020_job_environment_identity.sql`;
+- les trois tables jobs/outbox ont zéro ligne sans `environment` ou
+  `deployment_id` après migration;
+- chaque pile a atteint 17 conteneurs sains; les quatre catégories de workers
+  publient l'identité exacte du profil et un hash commun au profil, distinct
+  de ceux des deux autres profils.
+
+Preuve live du refus public terminal:
+
+- les workers documentaires `production` ont été arrêtés avant de produire,
+  via l'API réelle, un diagnostic dont l'enveloppe a ensuite été étiquetée
+  `test / ostrading-test-ci`;
+- après redémarrage d'un worker `production`, l'outbox est passée à `failed`
+  avec `WORKER_ENVIRONMENT_MISMATCH`, aucune ligne n'a été créée dans
+  `platform.technical_jobs` et aucun callback métier n'a été exécuté;
+- `GET /v1/documents/{id}/diagnostic/progress` a renvoyé HTTP 200 avec
+  `phase=FAILED`, `completed_units=0`, `total_units=1` et
+  `failure_error_code=WORKER_ENVIRONMENT_MISMATCH`;
+- le document, le run, l'outbox et le PDF créés uniquement pour cette preuve
+  ont ensuite été supprimés exactement; les trois comptes de contrôle sont
+  revenus à zéro, puis `production` a de nouveau atteint 17/17 conteneurs
+  sains avant l'arrêt propre sans suppression de volume.
+
+ADR consultées: ADR-045 et ADR-024. Aucune nouvelle ADR: la mise en œuvre ne
+change ni la décision d'identité d'installation ni la frontière
+transactionnelle locale des outbox.
+
+Commit GREEN prévu: `feat(platform): lier workers et jobs au profil courant`.
+
 ## Planification
 
 - Sous-milestone: `M13-environments`, matérialisé dans `docs/tasks/milestone_013-environments`.

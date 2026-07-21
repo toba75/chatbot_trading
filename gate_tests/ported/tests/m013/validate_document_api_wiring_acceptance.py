@@ -125,6 +125,8 @@ def test_validate_document_api_wiring_acceptance() -> None:
                 inspector=build_m13_isolated_pdf_inspector(),
             ),
             processing_run_repository=ProcessingRuns(persistence),
+            environment="development",
+            deployment_id="ostrading-development-local",
             diagnosis_configuration_hash="a" * 64,
             code_version="acceptance-test",
             model_version="document-diagnostic-v1",

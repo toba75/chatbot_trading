@@ -348,7 +348,7 @@ services:
     healthcheck:
       test:
         - CMD-SHELL
-        - "python -m app.platform.environment_compose check-config --config /workspace/config/application.yaml"
+        - "python -m app.platform.environment_compose check-worker --worker-id worker-documents --config /workspace/config/application.yaml"
       interval: 10s
       timeout: 10s
       retries: 12
@@ -399,7 +399,7 @@ services:
     healthcheck:
       test:
         - CMD-SHELL
-        - "python -m app.platform.environment_compose check-config --config /workspace/config/application.yaml"
+        - "python -m app.platform.environment_compose check-worker --worker-id worker-projection --config /workspace/config/application.yaml"
       interval: 10s
       timeout: 10s
       retries: 12
@@ -422,6 +422,8 @@ services:
       - app.platform.local_runtime
       - run-worker
       - worker-research
+      - --worker-id
+      - worker-research
       - --config
       - /workspace/config/application.yaml
     networks:
@@ -438,7 +440,7 @@ services:
     healthcheck:
       test:
         - CMD-SHELL
-        - "python -m app.platform.environment_compose check-config --config /workspace/config/application.yaml"
+        - "python -m app.platform.environment_compose check-worker --worker-id worker-research --config /workspace/config/application.yaml"
       interval: 10s
       timeout: 10s
       retries: 12
@@ -461,6 +463,8 @@ services:
       - app.platform.local_runtime
       - run-worker
       - worker-backtest
+      - --worker-id
+      - worker-backtest
       - --config
       - /workspace/config/application.yaml
     networks:
@@ -475,7 +479,7 @@ services:
     healthcheck:
       test:
         - CMD-SHELL
-        - "python -m app.platform.environment_compose check-config --config /workspace/config/application.yaml"
+        - "python -m app.platform.environment_compose check-worker --worker-id worker-backtest --config /workspace/config/application.yaml"
       interval: 10s
       timeout: 10s
       retries: 12

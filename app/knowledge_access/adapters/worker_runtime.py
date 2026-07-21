@@ -24,6 +24,7 @@ from app.platform.postgres import PsycopgConnectionFactory
 from app.platform.postgres_migrations import build_configured_postgres_migration_runner
 from app.platform.llm_gateway.orchestrator_http import UrllibLlmInferenceGateway
 from app.platform.request_context import bind_trace_id, reset_trace_id
+from app.platform.worker_environment import build_worker_environment_binding
 from app.source_processing.adapters.postgres_job_outbox import PostgresJobOutbox
 
 
@@ -63,6 +64,8 @@ def _run_worker(
     runtime = ProjectionRuntimeService(
         connection_factory=connection_factory,
         canonical_sources_root=Path(application_configuration.paths.canonical_sources_root),
+        environment=application_configuration.application.environment,
+        deployment_id=application_configuration.application.deployment_id,
         configuration_hash=application_configuration.configuration_hash,
         qdrant_url=application_configuration.services.qdrant.url,
         qdrant_collection_name=application_configuration.services.qdrant.collections.knowledge_access,
@@ -79,8 +82,17 @@ def _run_worker(
             connection_factory=connection_factory,
             table_name="knowledge_access.job_outbox",
         ),
+        application_configuration=application_configuration,
     )
-    instance_owner_id = f"{owner_id}:{uuid4()}"
+    worker_binding = build_worker_environment_binding(
+        application_configuration,
+        worker_id=owner_id,
+    )
+    instance_owner_id = worker_binding.instance_owner_id(str(uuid4()))
+    print(
+        json.dumps(worker_binding.health_snapshot().to_mapping(), sort_keys=True),
+        flush=True,
+    )
     processed = 0
     while max_jobs is None or processed < max_jobs:
         try:
@@ -103,6 +115,7 @@ def _run_worker(
                 return
             time.sleep(poll_seconds)
             continue
+        worker_binding.require_job_request(claimed.job.request)
         trace_token = bind_trace_id(claimed.trace_id)
         started = time.perf_counter_ns()
         try:
