@@ -612,3 +612,44 @@ Validations GREEN :
 La preuve destructive du `down --volumes` test est différée au parcours T-010,
 qui possède explicitement la création et la destruction de ses données. T-008
 n'a supprimé, recréé ni modifié aucun volume existant pendant ses validations.
+
+## T-009 - Scénario BDD et preuve RED
+
+Scénario contrôlé :
+
+- Given `uv run development` a rendu la pile réelle prête avec l'identité
+  `development` / `ostrading-development-local` et le PDF réel versionné
+  `data/corpus/trading-on-momentum.pdf` ;
+- When le validateur live utilise exclusivement les endpoints publics pour
+  enregistrer, diagnostiquer, convertir, projeter, rechercher, interroger le
+  Spark réel et ouvrir la citation PDF, puis redémarre la pile sans volume
+  supprimé ;
+- Then les progressions publiques réussissent, les mêmes objets documentaires
+  sont relus après redémarrage et les profils `test` et `production` ne voient
+  aucun de leurs identifiants.
+
+Précondition GREEN avant modification :
+
+- `uv run --locked gate --scope m013_environments` : GREEN, 34 nœuds ;
+- `uv run --locked gate --scope m013_config` : GREEN, 36 nœuds ;
+- `uv run --locked gate --scope m013` : GREEN, 68 nœuds ;
+- `uv run --locked gate --scope m013_fastapi` : GREEN, 80 nœuds ;
+- `uv run --locked gate` : GREEN, 449 nœuds en 282 secondes.
+
+Preuve RED attendue :
+
+- le test d'acceptation live appelle
+  `app.platform.development_e2e.run_development_environment_e2e` avec le PDF
+  réel du corpus ;
+- le rapport exigé porte les identifiants document, version canonique,
+  projection et réponse, l'URL de citation ouvrable, l'identifiant brut Spark,
+  les trois progressions réussies, la relecture après redémarrage et les deux
+  sondes négatives ;
+- le RED doit provenir de l'absence du validateur live, sans mock, stub, fake,
+  accès direct aux repositories ou affaiblissement du parcours.
+
+ADR consultées : ADR-031, ADR-032, ADR-038 et ADR-045. Aucune nouvelle ADR
+n'est requise : T-009 exécute les décisions déjà acceptées sur la chaîne réelle,
+la progression publique, les citations et l'étanchéité des profils.
+
+Commit RED prévu : `test(m13-environments): couvrir parcours reel development`.

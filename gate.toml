@@ -3774,6 +3774,17 @@ depends_on = ["precondition.m013_config"]
 live = false
 
 [[nodes]]
+id = "test.m013-environments.validate-development-real-e2e-acceptance"
+path = "gate_tests/ported/tests/m013_environments/validate_development_real_e2e_acceptance.py"
+kind = "test"
+scope = "m013_environments"
+phase = "live"
+timeout_seconds = 7200
+serial_group = "process"
+depends_on = ["precondition.m013_config"]
+live = true
+
+[[nodes]]
 id = "test.m013.validate-m013-specification-acceptance"
 path = "gate_tests/ported/tests/m013/validate_m013_specification_acceptance.py"
 kind = "test"

@@ -188,6 +188,35 @@ Ces exclusions ne sont pas des alternatives autorisées. Elles séquencent la li
 - `uv run --locked gate`;
 - `git diff --check`.
 
+## Parcours produit réel development (T-009)
+
+Scénario d'acceptation :
+
+- Given `uv run development` publie une readiness concordante pour l'API, le
+  relais, les workers documentaires et de projection, PostgreSQL, Qdrant et le
+  gateway LLM relié au Spark réel ;
+- When `data/corpus/trading-on-momentum.pdf` est envoyé par
+  `POST /v1/documents`, puis diagnostiqué, converti, projeté, recherché et
+  interrogé exclusivement par les contrats HTTP publics ;
+- Then chaque progression publique aboutit avec `phase`, `completed_units`,
+  `total_units` et absence d'erreur terminale, la réponse documentaire porte
+  une citation dont le PDF original est réellement ouvrable, et chaque
+  participant conserve l'identité `development` / `ostrading-development-local`.
+
+La preuve redémarre ensuite la même commande sans supprimer ses volumes et
+relit les mêmes identifiants publics de document, version canonique et
+projection. Les sondes `test` et `production` cherchent ces identifiants via
+leurs propres contrats publics et doivent répondre qu'ils sont absents, sans
+écriture ni nettoyage dans les deux profils étrangers. Le rapport horodaté ne
+contient aucun secret, token ou contenu complet du PDF.
+
+Le validateur n'accède à aucun repository applicatif pour déclencher ou faire
+avancer le parcours. Un worker attendu absent, une progression incohérente, un
+appel Spark sans provenance réelle, une citation non ouvrable, une relecture
+perdue après redémarrage ou un identifiant visible dans un profil étranger rend
+la preuve RED. Aucun mock, stub, fake, stockage mémoire substitutif ou réponse
+LLM de secours n'est autorisé.
+
 ## Opérations administratives bornées (T-008)
 
 Une migration, une sauvegarde, une restauration, une purge ou un nettoyage de
