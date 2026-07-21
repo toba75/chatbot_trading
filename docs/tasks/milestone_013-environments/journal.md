@@ -102,6 +102,25 @@ Rétablissement et preuves GREEN:
 
 Statut final de T-001: GREEN. La dette antérieure et les indisponibilités live observées sont séparées des futures régressions de M13-environments; T-002 peut commencer sur cette baseline qualifiée.
 
+## T-002 - Scénario BDD et preuve RED
+
+Scénario contractuel:
+
+- Given un opérateur choisit un profil parmi `development`, `test` et `production`.
+- When le contrat de configuration du profil est validé.
+- Then l'identité est complète, appartient à l'ensemble fermé, décrit toutes ses ressources mutables et ne dépend d'aucune valeur implicite ou variable système.
+
+Précondition observée avant le test:
+
+- `uv run --locked gate --scope governance` - GREEN; 25 nœuds exécutés.
+- Aucun fichier applicatif, service, stockage ou processus actif n'a été modifié pendant cette vérification.
+
+RED utile:
+
+- `uv run --locked gate --scope m013_environments` - RED attendu; le nœud contractuel échoue avec `ADR_045_REQUIRED:docs/adr/ADR-045-profils-execution-explicites-donnees-etanches.md`.
+- Le RED prouve que la succession explicite d'ADR et le contrat M13-environments demandés ne sont pas encore publiés; il ne résulte ni d'une dépendance externe indisponible, ni d'un test affaibli.
+- Le test exige également, après publication de l'ADR, la spécification des trois profils, des identités, de l'isolation de chaque ressource mutable, des workers et des quatre erreurs publiques.
+
 ## Validation de la planification
 
 - `uv run --locked gate --scope governance` - GREEN après création des tâches; 25 nœuds, aucune exécution manquante, inattendue ou dupliquée.
