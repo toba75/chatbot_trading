@@ -67,7 +67,40 @@ Commandes exécutées:
 - Compose utilise encore un unique jeu de volumes et un unique fichier monté pour tous les services.
 - Les workers consomment `configuration_hash`, mais aucun contrat d'environnement ne bloque encore un job cross-environment.
 
-Statut de T-001 pour la planification: GREEN documentaire. La baseline complète et les prérequis live devront être rejoués au début de l'implémentation, sans mock ni fallback.
+Statut de T-001 pour la planification: GREEN documentaire.
+
+## T-001 - Précondition GREEN d'implémentation
+
+Date d'exécution: 2026-07-21.
+
+Scénario contrôlé:
+
+- Given M13-environments est demandé sur `codex/m13-environments`, issue de `master`.
+- When les prérequis Git, la gate canonique et les parcours live disponibles sont contrôlés sans mock ni fallback.
+- Then chaque RED de disponibilité est conservé, puis la baseline n'est qualifiée GREEN qu'après réussite du scope live M-013 et de la gate complète.
+
+Références Git vérifiées avant la modification documentaire:
+
+- `HEAD`: `64d9caa09`, commit de planification M13-environments.
+- `master`: `9edeab957`; `origin/master`: `35fb5a4f8` après `git fetch origin --prune`.
+- `master` et `origin/master` sont ancêtres de `HEAD`.
+- Le commit utilisateur `781469359`, qui ajoute le rapport DOCX, est resté intact.
+- `git ls-tree -r --name-only master -- docs/tasks/milestone_000 ... docs/tasks/milestone_012` confirme la présence de M-000 à M-012 dans `master`.
+
+RED de disponibilité réellement observés, sans modification du code:
+
+- La première tentative de gate complète a signalé Docker indisponible.
+- Après démarrage de Docker Desktop `29.1.5`, la validation live a signalé `orchestrator-api` indisponible.
+- Aucun mock, stub ou fallback n'a remplacé ces dépendances réelles; aucun commit RED artificiel n'a été créé.
+
+Rétablissement et preuves GREEN:
+
+- `uv run ui` a démarré et supervisé la pile réelle requise par les validations live.
+- `uv run --locked gate --scope m013` - GREEN; 68 nœuds exécutés, dont le parcours M13 reality live.
+- `uv run --locked gate` - GREEN; 436 nœuds exécutés sans erreur terminale.
+- Ces démarrages précèdent cette modification documentaire; T-001 n'a ensuite démarré, arrêté ou reconfiguré aucun service et n'a altéré aucune donnée.
+
+Statut final de T-001: GREEN. La dette antérieure et les indisponibilités live observées sont séparées des futures régressions de M13-environments; T-002 peut commencer sur cette baseline qualifiée.
 
 ## Validation de la planification
 
