@@ -116,6 +116,7 @@ def test_environment_compose_acceptance() -> None:
         assert worker_documents["deploy"]["resources"]["limits"]["memory"] == str(
             8 * 1024**3
         )
+        assert worker_documents["deploy"]["resources"]["limits"]["cpus"] == 4
         assert worker_documents["healthcheck"]["timeout"] == "30s"
         worker_mounts = {mount["target"]: mount for mount in worker_documents["volumes"]}
         for asset_kind in ("native", "granite"):
