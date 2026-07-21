@@ -249,24 +249,80 @@ def _running_development_command(
     uv_executable = shutil.which("uv")
     if uv_executable is None:
         raise DevelopmentE2EError("DEVELOPMENT_E2E_UV_UNAVAILABLE")
-    with log_path.open("a", encoding="utf-8", newline="\n") as log_stream:
+    with log_path.open("ab") as log_stream:
+        current_run_offset = log_stream.tell()
         process = subprocess.Popen(
             (uv_executable, "run", "development"),
             cwd=repository_root,
             stdout=log_stream,
             stderr=subprocess.STDOUT,
-            text=True,
-            encoding="utf-8",
         )
         try:
-            _wait_public_readiness(process=process, token=token)
+            _wait_public_readiness(
+                process=process,
+                token=token,
+                log_path=log_path,
+                start_offset=current_run_offset,
+            )
             yield
         finally:
             _stop_development_command(repository_root=repository_root, process=process)
 
 
-def _wait_public_readiness(*, process: subprocess.Popen[str], token: str) -> None:
+def _environment_lifecycle_state_since(*, log_path: Path, start_offset: int) -> str | None:
+    if not isinstance(log_path, Path):
+        raise DevelopmentE2EError("DEVELOPMENT_E2E_LOG_PATH_INVALID")
+    if not isinstance(start_offset, int) or isinstance(start_offset, bool) or start_offset < 0:
+        raise DevelopmentE2EError("DEVELOPMENT_E2E_LOG_OFFSET_INVALID")
+    with log_path.open("rb") as stream:
+        stream.seek(start_offset)
+        current_run_log = stream.read().decode("utf-8")
+    lifecycle_state: str | None = None
+    for line in current_run_log.splitlines():
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(event, Mapping):
+            continue
+        if event.get("event_type") != "environment_lifecycle":
+            continue
+        if event.get("environment") != _ENVIRONMENT:
+            continue
+        state = event.get("state")
+        if state not in {"starting", "ready", "failed", "stopped"}:
+            raise DevelopmentE2EError("DEVELOPMENT_E2E_LIFECYCLE_STATE_INVALID")
+        lifecycle_state = state
+    return lifecycle_state
+
+
+def _wait_public_readiness(
+    *,
+    process: subprocess.Popen[bytes],
+    token: str,
+    log_path: Path,
+    start_offset: int,
+) -> None:
     deadline = time.monotonic() + 900
+    while time.monotonic() < deadline:
+        if process.poll() is not None:
+            raise DevelopmentE2EError(
+                f"DEVELOPMENT_E2E_COMMAND_EXITED_BEFORE_READY: code={process.returncode}"
+            )
+        lifecycle_state = _environment_lifecycle_state_since(
+            log_path=log_path,
+            start_offset=start_offset,
+        )
+        if lifecycle_state == "ready":
+            break
+        if lifecycle_state in {"failed", "stopped"}:
+            raise DevelopmentE2EError(
+                f"DEVELOPMENT_E2E_LIFECYCLE_TERMINAL_BEFORE_READY: {lifecycle_state}"
+            )
+        time.sleep(1)
+    else:
+        raise DevelopmentE2EError("DEVELOPMENT_E2E_LIFECYCLE_READY_TIMEOUT")
+
     with _public_client(token=token, timeout_seconds=8) as client:
         while time.monotonic() < deadline:
             if process.poll() is not None:
@@ -294,7 +350,7 @@ def _wait_public_readiness(*, process: subprocess.Popen[str], token: str) -> Non
 def _stop_development_command(
     *,
     repository_root: Path,
-    process: subprocess.Popen[str],
+    process: subprocess.Popen[bytes],
 ) -> None:
     if process.poll() is not None:
         if process.returncode != 0:
