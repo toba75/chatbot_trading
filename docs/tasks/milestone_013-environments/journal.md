@@ -1,5 +1,44 @@
 # Journal M13-environments
 
+## T-007 - Scénario BDD et preuve RED
+
+Scénario contrôlé:
+
+- Given un worker `development` est raccordé à ses stockages et reçoit un
+  message explicitement produit par `test`;
+- When le relais ou le worker compare le couple `environment` / `deployment_id`
+  avant tout claim ou callback métier;
+- Then le travail n'est jamais exécuté, l'erreur terminale stable
+  `WORKER_ENVIRONMENT_MISMATCH` est persistable dans la progression publique du
+  producteur, et l'état de santé du worker publie son identité et son
+  `configuration_hash`.
+
+Précondition GREEN avant modification:
+
+- `uv run --locked gate --scope m013_environments` - GREEN; 30 nœuds, aucune
+  exécution manquante, inattendue ou dupliquée.
+
+Preuve RED attendue:
+
+- le test unitaire exige le value object immutable d'identité, le registre
+  fermé des quatre workers, leur nom d'instance lié au profil et le refus d'un
+  job dont seul le hash coïncide;
+- le test d'acceptation exige la propagation job-outbox-relais, l'absence de
+  callback métier sur divergence, la progression terminale persistable, la
+  migration ascendante des trois tables et les healthchecks liés au profil;
+- le RED doit provenir de l'absence des contrats et du module de liaison, sans
+  affaiblir les invariants existants.
+
+ADR consultées: ADR-045 et ADR-024. Aucune nouvelle ADR n'est requise: T-007
+matérialise l'identité et le refus déjà décidés sans modifier les frontières
+transactionnelles locales du relais.
+
+Commit RED prévu: `test(platform): couvrir appartenance environnement des jobs`.
+
+Preuve RED obtenue:
+
+- `uv run --locked pytest -q gate_tests/ported/tests/m013_environments/validate_worker_environment_identity_acceptance.py gate_tests/ported/tests/m013_environments/validate_worker_environment_identity_unit.py` - RED utile; 2 tests échouent uniquement parce que `JobEnvironmentIdentity` n'existe pas encore.
+
 ## Planification
 
 - Sous-milestone: `M13-environments`, matérialisé dans `docs/tasks/milestone_013-environments`.
