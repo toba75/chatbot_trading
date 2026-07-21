@@ -154,6 +154,27 @@ Commit GREEN prévu:
 
 Statut final de T-002: GREEN documentaire. Les réalisations runtime restent explicitement affectées à T-003 et suivantes.
 
+## T-003 - Scénario BDD et preuve RED
+
+Scénario contrôlé:
+
+- Given les trois fichiers complets existent et chaque commande UV est dédiée à un profil.
+- When l'opérateur invoque `uv run development`, `uv run test` ou `uv run production`.
+- Then le lanceur supervise la pile réelle avec l'unique fichier mappé, propage le profil à la pile et publie un arrêt terminal si le fichier ou la readiness manque.
+
+Précondition GREEN avant modification:
+
+- `uv run --locked gate --scope m013_config` - GREEN; 36 nœuds exécutés.
+- `uv run --locked gate` - GREEN; 437 nœuds exécutés, y compris les validations live existantes.
+
+Preuve RED attendue:
+
+- les tests d'acceptation invoquent les trois entrypoints réels et contrôlent les états `starting`, `ready`, `failed`, `stopped`;
+- les tests unitaires figent le mapping fermé, l'absence de surcharge `--config`, l'erreur de fichier absent, l'arrêt ordonné et le chemin imbriqué `config/environments/<profile>.yaml`;
+- le RED doit provenir de l'absence de `app.platform.environment_command`, sans modifier les configurations, stockages ou manifestes réservés à T-005/T-006.
+
+Commit RED prévu: `test(platform): couvrir commandes uv des environnements`.
+
 ## Validation de la planification
 
 - `uv run --locked gate --scope governance` - GREEN après création des tâches; 25 nœuds, aucune exécution manquante, inattendue ou dupliquée.
