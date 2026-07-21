@@ -838,6 +838,7 @@ def _ensure_quality_rejection_error_code(value: Any) -> str:
         "POSTGRES_TRANSIENT_FAILURE",
         "POSTGRES_INTEGRITY_FAILURE",
         "POSTGRES_PERMANENT_FAILURE",
+        "CONVERSION_PERSISTENCE_CONFLICT",
         "WORKER_UNEXPECTED_ERROR",
     }:
         raise ValueError("rejection_error_code invalide")

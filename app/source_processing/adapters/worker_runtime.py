@@ -35,10 +35,6 @@ from app.source_processing.application.document_worker import (
     DocumentDiagnosticWorker,
     WorkerProcessingError,
 )
-from app.source_processing.domain.document_processing_run import (
-    PageRoutingConfiguration,
-    RoutingPolicyVersion,
-)
 from app.source_processing.application.routed_document_conversion_worker import (
     build_routed_document_conversion_worker,
 )
@@ -363,6 +359,8 @@ def _classify_processing_error(error: Exception) -> tuple[str, bool]:
         return "POSTGRES_INTEGRITY_FAILURE", False
     if isinstance(error, PsycopgError):
         return "POSTGRES_PERMANENT_FAILURE", False
+    if isinstance(error, RuntimeError) and str(error) == "CONVERSION_PERSISTENCE_CONFLICT":
+        return "CONVERSION_PERSISTENCE_CONFLICT", False
     return "WORKER_UNEXPECTED_ERROR", False
 
 
