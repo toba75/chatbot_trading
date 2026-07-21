@@ -14,6 +14,7 @@ def test_environment_compose_unit(tmp_path: Path) -> None:
         EnvironmentContainerState,
         aggregate_environment_readiness,
         environment_stack_definition,
+        _first_environment_service_has_stopped,
         _parse_compose_ps,
     )
 
@@ -67,6 +68,33 @@ def test_environment_compose_unit(tmp_path: Path) -> None:
         for state in ready_states
     )
     assert _parse_compose_ps(ndjson) == ready_states
+    supervised_rows = [json.loads(line) | {"ExitCode": 0} for line in ndjson.splitlines()]
+    supervised_document = "\n".join(json.dumps(row) for row in supervised_rows)
+    assert not _first_environment_service_has_stopped(
+        supervised_document,
+        project_name=definition.project_name,
+    )
+    stopped_edge_rows = [
+        row | {"State": "exited", "Health": "", "ExitCode": 0}
+        if row["Service"] == "edge-gateway"
+        else row
+        for row in supervised_rows
+    ]
+    assert _first_environment_service_has_stopped(
+        "\n".join(json.dumps(row) for row in stopped_edge_rows),
+        project_name=definition.project_name,
+    )
+    stopped_worker_rows = [
+        row | {"State": "exited", "Health": "", "ExitCode": 0}
+        if row["Service"] == "worker-documents"
+        else row
+        for row in supervised_rows
+    ]
+    with pytest.raises(ValueError, match="ENVIRONMENT_STACK_SERVICE_EXITED.*worker-documents"):
+        _first_environment_service_has_stopped(
+            "\n".join(json.dumps(row) for row in stopped_worker_rows),
+            project_name=definition.project_name,
+        )
 
     with pytest.raises(ValueError, match="ENVIRONMENT_STACK_SERVICE_MISSING"):
         aggregate_environment_readiness(

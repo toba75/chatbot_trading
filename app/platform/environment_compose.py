@@ -13,6 +13,7 @@ import re
 import secrets
 import shutil
 import subprocess
+import time
 from types import MappingProxyType
 from typing import Any, Final, Literal
 from urllib.request import urlopen
@@ -464,12 +465,79 @@ def wait_environment_compose_stack(*, service_id: str, port: int, config_path: s
     if definition.configuration_path != path:
         raise ValueError("CONFIG_ENVIRONMENT_MISMATCH: attente de pile divergente")
     technical_environment = _technical_environment_from_repository(repository_root)
-    _run_compose(
+    _wait_for_first_environment_service_exit(
         definition,
-        ("wait", "--down-project", *REQUIRED_SERVICE_IDS),
         technical_environment=technical_environment,
-        capture_output=False,
     )
+
+
+def _wait_for_first_environment_service_exit(
+    definition: EnvironmentStackDefinition,
+    *,
+    technical_environment: Mapping[str, str],
+) -> None:
+    while True:
+        result = _run_compose(
+            definition,
+            ("ps", "--all", "--format", "json"),
+            technical_environment=technical_environment,
+            capture_output=True,
+        )
+        if _first_environment_service_has_stopped(
+            result.stdout,
+            project_name=definition.project_name,
+        ):
+            return
+        time.sleep(1)
+
+
+def _first_environment_service_has_stopped(document: str, *, project_name: str) -> bool:
+    if not isinstance(document, str) or document.strip() == "":
+        raise ValueError("ENVIRONMENT_COMPOSE_PS_INVALID")
+    if not isinstance(project_name, str) or project_name.strip() == "":
+        raise ValueError("ENVIRONMENT_COMPOSE_PROJECT_INVALID")
+    rows_by_service: dict[str, list[Mapping[str, Any]]] = {
+        service_id: [] for service_id in REQUIRED_SERVICE_IDS
+    }
+    for line in document.splitlines():
+        if line.strip() == "":
+            continue
+        try:
+            row = _required_mapping_value(json.loads(line), "supervision conteneur")
+        except json.JSONDecodeError as exc:
+            raise ValueError("ENVIRONMENT_COMPOSE_PS_INVALID") from exc
+        service = _required_text(row, "Service", "supervision conteneur")
+        name = _required_text(row, "Name", "supervision conteneur")
+        if service not in rows_by_service:
+            raise ValueError(f"ENVIRONMENT_STACK_SERVICE_UNEXPECTED: {service}")
+        if not name.startswith(f"{project_name}-"):
+            raise ValueError(f"ENVIRONMENT_STACK_CONTAINER_MISMATCH: {name}")
+        rows_by_service[service].append(row)
+    missing = tuple(
+        service_id for service_id, rows in rows_by_service.items() if len(rows) == 0
+    )
+    if missing:
+        raise ValueError(f"ENVIRONMENT_STACK_SERVICE_MISSING: {','.join(missing)}")
+    for service_id in REQUIRED_SERVICE_IDS:
+        for row in rows_by_service[service_id]:
+            state = _required_text(row, "State", "supervision conteneur").lower()
+            health_value = row.get("Health")
+            health = health_value.lower() if isinstance(health_value, str) else ""
+            if state == "running" and health == "healthy":
+                continue
+            exit_code = row.get("ExitCode")
+            if state == "exited" and service_id == "edge-gateway" and exit_code == 0:
+                return True
+            if state == "exited":
+                raise ValueError(
+                    "ENVIRONMENT_STACK_SERVICE_EXITED: "
+                    f"{service_id}: code={exit_code!r}"
+                )
+            raise ValueError(
+                "ENVIRONMENT_STACK_NOT_READY: "
+                f"{service_id}: state={state}, health={health}"
+            )
+    return False
 
 
 def configured_http_healthcheck(*, service: str, path: str, config_path: Path) -> None:
