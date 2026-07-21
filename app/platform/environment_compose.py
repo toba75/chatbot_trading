@@ -16,9 +16,19 @@ import subprocess
 from types import MappingProxyType
 from typing import Any, Final, Literal
 from urllib.request import urlopen
+from uuid import uuid4
 
-from app.platform.configuration import load_application_configuration
-from app.platform.configured_datastore_identity import build_configured_datastore_preflight
+from app.platform.administrative_operations import (
+    AdministrativeOperationEvidence,
+    AdministrativeOperationRequest,
+    execute_administrative_operation,
+)
+from app.platform.configuration import ApplicationConfiguration, load_application_configuration
+from app.platform.configured_datastore_identity import (
+    build_configured_datastore_preflight,
+    configured_datastore_identity,
+)
+from app.platform.datastore_identity import DatastoreIdentity
 from app.platform.worker_environment import build_worker_environment_binding
 
 
@@ -291,6 +301,10 @@ def start_environment_compose_stack(launch_configuration: Any) -> Iterator[Any]:
     )
     if configuration_path != definition.configuration_path:
         raise ValueError("CONFIG_ENVIRONMENT_MISMATCH: fichier de pile divergent")
+    configuration = load_application_configuration(
+        config_path=configuration_path,
+        environment_snapshot={},
+    )
     _provision_environment_secrets(definition)
     technical_environment = _technical_environment_from_repository(repository_root)
     document = render_environment_compose(
@@ -299,6 +313,7 @@ def start_environment_compose_stack(launch_configuration: Any) -> Iterator[Any]:
     )
     _validate_environment_compose_document(document, definition=definition)
     started = False
+    lifecycle_id = str(uuid4())
     try:
         started = True
         _run_compose(
@@ -314,13 +329,124 @@ def start_environment_compose_stack(launch_configuration: Any) -> Iterator[Any]:
         yield launch_configuration
     finally:
         if started:
-            _run_compose(
-                definition,
-                ("down", "--remove-orphans"),
+            if definition.environment == "test":
+                _finalize_test_environment_stack(
+                    definition=definition,
+                    configuration=configuration,
+                    technical_environment=technical_environment,
+                    lifecycle_id=lifecycle_id,
+                )
+            else:
+                _stop_environment_stack(
+                    definition=definition,
+                    technical_environment=technical_environment,
+                )
+
+
+def _finalize_test_environment_stack(
+    *,
+    definition: EnvironmentStackDefinition,
+    configuration: ApplicationConfiguration,
+    technical_environment: Mapping[str, str],
+    lifecycle_id: str,
+) -> None:
+    cleanup_completed = False
+    try:
+        _cleanup_test_environment_stack(
+            definition=definition,
+            configuration=configuration,
+            technical_environment=technical_environment,
+            lifecycle_id=lifecycle_id,
+        )
+        cleanup_completed = True
+    finally:
+        if not cleanup_completed:
+            _stop_environment_stack(
+                definition=definition,
                 technical_environment=technical_environment,
-                capture_output=False,
-                allowed_returncodes=frozenset({0, 1}),
             )
+
+
+def _cleanup_test_environment_stack(
+    *,
+    definition: EnvironmentStackDefinition,
+    configuration: ApplicationConfiguration,
+    technical_environment: Mapping[str, str],
+    lifecycle_id: str,
+) -> None:
+    """Supprime uniquement les ressources test après préflight d'identité."""
+
+    if definition.environment != "test":
+        raise ValueError("ADMINISTRATIVE_OPERATION_FORBIDDEN")
+    expected_identity = configured_datastore_identity(configuration)
+    execute_administrative_operation(
+        request=AdministrativeOperationRequest(
+            operation="test_cleanup",
+            target_identity=expected_identity,
+            automatic=True,
+            lifecycle_id=lifecycle_id,
+            lifecycle_owner_id=lifecycle_id,
+            backup_manifest=None,
+        ),
+        observe_identity=lambda: _observed_stack_identity(
+            definition=definition,
+            technical_environment=technical_environment,
+        ),
+        mutate=lambda: _run_compose(
+            definition,
+            ("down", "--volumes", "--remove-orphans"),
+            technical_environment=technical_environment,
+            capture_output=False,
+            allowed_returncodes=frozenset({0, 1}),
+        ),
+        record_audit=_publish_administrative_evidence,
+    )
+
+
+def _stop_environment_stack(
+    *,
+    definition: EnvironmentStackDefinition,
+    technical_environment: Mapping[str, str],
+) -> None:
+    _run_compose(
+        definition,
+        ("down", "--remove-orphans"),
+        technical_environment=technical_environment,
+        capture_output=False,
+        allowed_returncodes=frozenset({0, 1}),
+    )
+
+
+def _observed_stack_identity(
+    *,
+    definition: EnvironmentStackDefinition,
+    technical_environment: Mapping[str, str],
+) -> DatastoreIdentity:
+    result = _run_compose(
+        definition,
+        (
+            "exec",
+            "--no-TTY",
+            "orchestrator-api",
+            "python",
+            "-m",
+            "app.platform.environment_compose",
+            "check-administrative-identity",
+            "--config",
+            _CONFIG_CONTAINER_PATH,
+        ),
+        technical_environment=technical_environment,
+        capture_output=True,
+    )
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        raise ValueError("ADMINISTRATIVE_IDENTITY_OUTPUT_INVALID") from exc
+    return DatastoreIdentity.from_mapping(payload)
+
+
+def _publish_administrative_evidence(evidence: AdministrativeOperationEvidence) -> None:
+    print(json.dumps(evidence.to_mapping(), ensure_ascii=False, sort_keys=True), flush=True)
 
 
 def wait_environment_compose_stack(*, service_id: str, port: int, config_path: str) -> None:
@@ -388,6 +514,27 @@ def configured_worker_healthcheck(*, worker_id: str, config_path: Path) -> Mappi
     return health
 
 
+def configured_administrative_identity(config_path: Path) -> Mapping[str, str]:
+    """Observe les autorités de stockage avant un nettoyage de test."""
+
+    configuration = load_application_configuration(
+        config_path=config_path,
+        environment_snapshot={},
+    )
+    expected = configured_datastore_identity(configuration)
+    observed = build_configured_datastore_preflight(
+        configuration,
+        include_postgres=True,
+        include_qdrant=True,
+        file_root_names=("data_root",),
+    ).run(initialize_if_empty=False)
+    if len(observed) != 3 or any(identity != expected for identity in observed):
+        raise ValueError("ADMINISTRATIVE_PREFLIGHT_INCOMPLETE")
+    payload = expected.to_mapping()
+    print(json.dumps(payload, ensure_ascii=False, sort_keys=True), flush=True)
+    return payload
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Healthchecks des piles d'environnement.")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -400,6 +547,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     worker_parser = subparsers.add_parser("check-worker")
     worker_parser.add_argument("--worker-id", required=True)
     worker_parser.add_argument("--config", required=True)
+    administrative_parser = subparsers.add_parser("check-administrative-identity")
+    administrative_parser.add_argument("--config", required=True)
     arguments = parser.parse_args(argv)
     if arguments.command == "check-config":
         load_application_configuration(config_path=arguments.config, environment_snapshot={})
@@ -409,6 +558,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             worker_id=arguments.worker_id,
             config_path=Path(arguments.config),
         )
+        return 0
+    if arguments.command == "check-administrative-identity":
+        configured_administrative_identity(Path(arguments.config))
         return 0
     configured_http_healthcheck(
         service=arguments.service,
@@ -770,6 +922,7 @@ __all__ = [
     "EnvironmentStackReadiness",
     "aggregate_environment_readiness",
     "configured_http_healthcheck",
+    "configured_administrative_identity",
     "configured_worker_healthcheck",
     "environment_stack_definition",
     "inspect_environment_readiness",

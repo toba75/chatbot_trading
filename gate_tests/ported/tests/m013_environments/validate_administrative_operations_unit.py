@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 from dataclasses import FrozenInstanceError
+from pathlib import Path
 
 import pytest
 
 
-def test_administrative_operations_unit() -> None:
+def test_administrative_operations_unit(tmp_path: Path) -> None:
     from app.platform.administrative_operations import (
         AdministrativeBackupManifest,
         AdministrativeOperationRequest,
+        require_profile_scoped_path,
     )
     from app.platform.datastore_identity import DatastoreIdentity
 
@@ -52,7 +54,7 @@ def test_administrative_operations_unit() -> None:
         with pytest.raises(ValueError, match="ADMINISTRATIVE_BACKUP_MANIFEST_INVALID"):
             AdministrativeBackupManifest.from_mapping(invalid)
 
-    for operation in ("migration", "backup", "purge"):
+    for operation in ("migration", "purge"):
         request = AdministrativeOperationRequest(
             operation=operation,
             target_identity=identity,
@@ -62,6 +64,17 @@ def test_administrative_operations_unit() -> None:
             backup_manifest=None,
         )
         assert request.operation == operation
+
+    for operation in ("backup", "restore"):
+        request = AdministrativeOperationRequest(
+            operation=operation,
+            target_identity=identity,
+            automatic=False,
+            lifecycle_id=None,
+            lifecycle_owner_id=None,
+            backup_manifest=manifest,
+        )
+        assert request.backup_manifest == manifest
 
     with pytest.raises(ValueError, match="ADMINISTRATIVE_OPERATION_UNKNOWN"):
         AdministrativeOperationRequest(
@@ -75,6 +88,15 @@ def test_administrative_operations_unit() -> None:
     with pytest.raises(ValueError, match="ADMINISTRATIVE_RESTORE_MANIFEST_REQUIRED"):
         AdministrativeOperationRequest(
             operation="restore",
+            target_identity=identity,
+            automatic=False,
+            lifecycle_id=None,
+            lifecycle_owner_id=None,
+            backup_manifest=None,
+        )
+    with pytest.raises(ValueError, match="ADMINISTRATIVE_BACKUP_MANIFEST_REQUIRED"):
+        AdministrativeOperationRequest(
+            operation="backup",
             target_identity=identity,
             automatic=False,
             lifecycle_id=None,
@@ -103,3 +125,17 @@ def test_administrative_operations_unit() -> None:
             backup_manifest=None,
         )
 
+    profile_root = tmp_path / "data" / "environments" / "test" / "reports"
+    profile_root.mkdir(parents=True)
+    restore_target = profile_root / "restore-drills" / "drill-unit"
+    assert require_profile_scoped_path(
+        target=restore_target,
+        profile_root=profile_root,
+    ) == restore_target.resolve()
+    with pytest.raises(ValueError, match="ADMINISTRATIVE_TARGET_PATH_MISMATCH"):
+        require_profile_scoped_path(
+            target=tmp_path / "data" / "environments" / "production" / "reports" / "drill",
+            profile_root=profile_root,
+        )
+    with pytest.raises(ValueError, match="ADMINISTRATIVE_TARGET_PATH_MISMATCH"):
+        require_profile_scoped_path(target=profile_root, profile_root=profile_root)

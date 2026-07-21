@@ -7,7 +7,7 @@
 - Contrat: `M013-BackupManifest-1.0`
 - Tâche: `docs/tasks/milestone_013/0010_publier_runbooks_documentation_utilisateur.md`
 - Preuve source: `docs/governance/m013_backup_restore_drill.md`
-- ADR applicables: ADR-009, ADR-013, DDD-ADR-004, DDD-ADR-010
+- ADR applicables: ADR-009, ADR-013, ADR-021, ADR-045, DDD-ADR-004, DDD-ADR-010
 - ADR: non requise; ce runbook documente le drill T-007 sans créer une nouvelle politique de sauvegarde.
 
 ## Scénario BDD
@@ -22,12 +22,13 @@
 - Commande vérifiée:
 
 ```console
-uv run --locked gate
-uv run --locked gate
+uv run --locked backup-v1 --manifest <manifest.json> --config config/environments/<profil>.yaml
 ```
 
 - Résultat attendu: `uv run backup-v1` vérifie le manifeste de sauvegarde, la preuve `ciphertext_sha256`, les paires contexte/catégorie, les hashes non placeholders et l'absence de secret.
-- Erreur explicite: si `uv run --locked gate` ou `uv run --locked gate` échoue, conserver la sortie RED et ne pas déclarer la sauvegarde exploitable.
+- Erreur explicite: si le manifeste, la configuration ou l'identité d'un
+  stockage divergent, conserver la sortie RED et ne pas déclarer la sauvegarde
+  exploitable.
 - Preuve à conserver: sortie du contrôle de manifeste, sortie du validateur, `docs/governance/m013_backup_restore_drill.md`, identifiant `restore_test_result` et preuve `ciphertext_sha256` sans clé versionnée.
 
 ## Restauration
@@ -36,8 +37,7 @@ uv run --locked gate
 - Commande vérifiée:
 
 ```console
-uv run --locked gate
-uv run --locked gate
+uv run --locked restore-v1 --manifest <manifest.json> --target data/environments/<profil>/reports/restore-drills/<drill> --config config/environments/<profil>.yaml
 ```
 
 - Résultat attendu: `uv run restore-v1` matérialise `restore-proof.json`, `restore_test_result` reste GREEN, les identifiants stables sont préservés, les artefacts immuables ne sont pas réécrits et les résultats négatifs ou supersédés restent consultables.
@@ -52,3 +52,7 @@ uv run --locked gate
 - Qdrant reste une projection régénérable, pas une autorité métier.
 - Fallback silencieux: interdit.
 - Aucune commande de purge ou de suppression physique n'appartient à ce runbook.
+- Le manifeste porte obligatoirement `environment` et `deployment_id`; ils
+  doivent correspondre à la configuration et aux stockages observés.
+- Le préflight PostgreSQL, Qdrant et fichiers s'exécute avant toute
+  matérialisation de restauration.

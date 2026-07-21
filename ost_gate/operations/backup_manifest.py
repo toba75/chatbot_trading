@@ -31,6 +31,8 @@ _PLACEHOLDER = re.compile(r"^([0-9a-f])\1{63}$")
 class BackupManifest:
     path: Path
     manifest_id: str
+    environment: str
+    deployment_id: str
     entries: tuple[dict[str, Any], ...]
 
 
@@ -47,6 +49,8 @@ def read_backup_manifest(path: Path, label: str) -> BackupManifest:
         raise ValueError(f"MANIFEST_{label.upper()}_OBJECT_REQUIRED")
     _equal(_text(document, "contract_version"), "M013-BackupManifest-1.0", "MANIFEST_CONTRACT_VERSION_INVALID")
     manifest_id = _text(document, "manifest_id")
+    environment = _text(document, "environment")
+    deployment_id = _text(document, "deployment_id")
     _text(document, "backup_command")
     _text(document, "restore_command")
     _equal(_text(document, "restore_target"), "local_isolated", "MANIFEST_RESTORE_TARGET_INVALID")
@@ -65,7 +69,13 @@ def read_backup_manifest(path: Path, label: str) -> BackupManifest:
         raise ValueError("MANIFEST_ENTRIES_REQUIRED")
     entries = tuple(_entry(raw_entry) for raw_entry in raw_entries)
     _validate_entry_set(entries)
-    return BackupManifest(path=path.resolve(), manifest_id=manifest_id, entries=entries)
+    return BackupManifest(
+        path=path.resolve(),
+        manifest_id=manifest_id,
+        environment=environment,
+        deployment_id=deployment_id,
+        entries=entries,
+    )
 
 
 def _entry(raw_entry: object) -> dict[str, Any]:

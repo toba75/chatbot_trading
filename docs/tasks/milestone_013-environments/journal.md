@@ -557,3 +557,58 @@ requise: le moteur OCR dédié matérialise l'isolation d'exécution et l'obliga
 d'un runtime réel déjà décidées.
 
 Commit GREEN prévu: `feat(deploy): orchestrer les piles par environnement`.
+
+## T-008 - Opérations administratives bornées
+
+Scénario BDD livré :
+
+- Given un nettoyage `test` reçoit un stockage marqué `production` ;
+- When le préflight compare la cible et l'identité observée ;
+- Then `DATASTORE_ENVIRONMENT_MISMATCH` est audité, aucune mutation n'est
+  appelée et les données étrangères restent intactes.
+
+Implémentation :
+
+- `AdministrativeOperationRequest` rend obligatoires l'opération, le couple
+  `environment`/`deployment_id`, le caractère automatique et, pour le
+  nettoyage de test, les identifiants de cycle et de propriétaire ;
+- migration, sauvegarde, restauration, purge et nettoyage passent tous par le
+  même garde-fou avant le callback de mutation ;
+- le manifeste `M013-BackupManifest-1.0` porte désormais l'identité de
+  l'installation et une restauration croisée est refusée ;
+- `backup-v1` et `restore-v1` exigent une configuration explicite, contrôlent
+  les stockages réels puis publient une preuve d'autorisation ou de refus ;
+- `uv run test` est l'unique propriétaire du `down --volumes` de
+  `ostrading-test`, après contrôle de PostgreSQL, Qdrant et de la racine de
+  données ; `development` et `production` arrêtent leurs conteneurs sans
+  supprimer leurs volumes ;
+- si le contrôle du nettoyage test échoue, les conteneurs sont arrêtés, les
+  volumes sont conservés et l'erreur n'est pas masquée.
+
+ADR consultées : ADR-013, ADR-021 et ADR-045. Aucune nouvelle ADR n'est
+requise : T-008 matérialise leurs décisions de manifeste, migration et bornage
+des opérations destructives sans introduire une nouvelle politique.
+
+Commit RED : `f0ef9f32b` - `test(operations): couvrir bornage par environnement`.
+
+Commit GREEN prévu : `feat(operations): proteger les operations par profil`.
+
+Validations GREEN :
+
+- tests d'acceptation et unitaires administratifs : 2 tests ;
+- tests ciblés commandes, Compose et opérations : 6 tests ;
+- `uv run --locked gate --scope m013_environments` : 34 nœuds ;
+- `uv run --locked gate --scope m013_config` : 36 nœuds ;
+- `uv run --locked gate --scope m013` : 68 nœuds, parcours produit réel
+  inclus ;
+- `uv run --locked gate --scope m013_fastapi` : 80 nœuds, migrations et
+  opérations runtime incluses ;
+- `uv run --locked gate` : 449 nœuds, tous GREEN ;
+- `uv run --locked python -m compileall -q app ost_gate` : GREEN ;
+- `git diff --check` : GREEN hors avertissements de conversion LF/CRLF ;
+- sentinelles Docker avant/après : noms, dates de création et points de
+  montage des volumes development, test et production strictement inchangés.
+
+La preuve destructive du `down --volumes` test est différée au parcours T-010,
+qui possède explicitement la création et la destruction de ses données. T-008
+n'a supprimé, recréé ni modifié aucun volume existant pendant ses validations.

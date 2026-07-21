@@ -187,3 +187,33 @@ Ces exclusions ne sont pas des alternatives autorisées. Elles séquencent la li
 - `uv run --locked gate --scope m013_environments`;
 - `uv run --locked gate`;
 - `git diff --check`.
+
+## Opérations administratives bornées (T-008)
+
+Une migration, une sauvegarde, une restauration, une purge ou un nettoyage de
+test porte obligatoirement `environment` et `deployment_id`. Le préflight
+compare cette cible avec l'identité observée avant le premier callback de
+mutation. Une divergence produit `DATASTORE_ENVIRONMENT_MISMATCH`, publie une
+preuve de refus et n'appelle aucune opération destructive.
+
+Le manifeste `M013-BackupManifest-1.0` porte lui aussi `environment` et
+`deployment_id`. Sauvegarde et restauration refusent tout manifeste étranger à
+l'installation sélectionnée. Il n'existe ni option `force`, ni cible par
+défaut, ni restauration croisée.
+
+Une purge n'est jamais automatique. Un nettoyage automatique n'est autorisé
+que pour `test`, depuis le cycle `uv run test` qui a créé et exécuté la pile.
+Ce cycle vérifie PostgreSQL, Qdrant et la racine de données avant d'appeler
+`docker compose down --volumes` sur le seul projet `ostrading-test`. En cas de
+préflight impossible ou divergent, les conteneurs sont arrêtés, les volumes
+sont conservés et l'erreur reste terminale. `development` et `production`
+n'exécutent jamais de suppression automatique de volume.
+
+Codes complémentaires :
+
+- `ADMINISTRATIVE_OPERATION_FORBIDDEN` : purge automatique ou nettoyage hors
+  de `test` ;
+- `TEST_LIFECYCLE_OWNERSHIP_MISMATCH` : nettoyage demandé par un autre cycle
+  que celui propriétaire de la pile ;
+- `ADMINISTRATIVE_PREFLIGHT_INCOMPLETE` : les autorités de stockage attendues
+  n'ont pas toutes confirmé la même identité.
