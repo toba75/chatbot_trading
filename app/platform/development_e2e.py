@@ -182,6 +182,17 @@ def run_development_environment_e2e(
                 repository_root=root,
                 existing_document_id=existing_document_id,
             )
+            _write_secret_free_payload(
+                payload=_product_checkpoint_payload(
+                    product=product,
+                    proof_id=proof_id,
+                    pdf_sha256=pdf_sha256,
+                    created_at=_utc_now(),
+                ),
+                output_path=report_root / f"development-e2e-checkpoint-{proof_id}.json",
+                configuration=configuration,
+                repository_root=root,
+            )
 
     with _running_development_command(
         repository_root=root,
@@ -1106,7 +1117,48 @@ def _write_secret_free_report(
 ) -> None:
     payload = asdict(report)
     payload["report_path"] = str(report.report_path)
-    serialized = json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    _write_secret_free_payload(
+        payload=payload,
+        output_path=report.report_path,
+        configuration=configuration,
+        repository_root=repository_root,
+    )
+
+
+def _product_checkpoint_payload(
+    *,
+    product: _ProductProof,
+    proof_id: str,
+    pdf_sha256: str,
+    created_at: str,
+) -> dict[str, Any]:
+    if not isinstance(product, _ProductProof):
+        raise ValueError("DEVELOPMENT_E2E_PRODUCT_PROOF_INVALID")
+    if re.fullmatch(r"[A-F0-9]{32}", proof_id) is None:
+        raise ValueError("DEVELOPMENT_E2E_PROOF_ID_INVALID")
+    _require_sha256(pdf_sha256, "pdf_sha256")
+    _require_utc(created_at, "created_at")
+    return {
+        "event_type": "development_e2e_product_checkpoint",
+        "proof_id": proof_id,
+        "pdf_sha256": pdf_sha256,
+        "created_at": created_at,
+        **asdict(product),
+    }
+
+
+def _write_secret_free_payload(
+    *,
+    payload: Mapping[str, Any],
+    output_path: Path,
+    configuration: ApplicationConfiguration,
+    repository_root: Path,
+) -> None:
+    if not isinstance(payload, Mapping):
+        raise ValueError("DEVELOPMENT_E2E_REPORT_PAYLOAD_INVALID")
+    if not isinstance(output_path, Path):
+        raise ValueError("DEVELOPMENT_E2E_REPORT_PATH_INVALID")
+    serialized = json.dumps(dict(payload), ensure_ascii=False, indent=2, sort_keys=True) + "\n"
     secret_paths = (
         configuration.security.secrets.postgres_password_path,
         configuration.security.secrets.qdrant_api_key_path,
@@ -1117,7 +1169,7 @@ def _write_secret_free_report(
     for secret_path in secret_paths:
         if _read_secret(repository_root / secret_path) in serialized:
             raise DevelopmentE2EError("DEVELOPMENT_E2E_REPORT_SECRET_LEAK")
-    report.report_path.write_text(serialized, encoding="utf-8", newline="\n")
+    output_path.write_text(serialized, encoding="utf-8", newline="\n")
 
 
 def _require_real_versioned_pdf(repository_root: Path, pdf_path: Path) -> Path:
