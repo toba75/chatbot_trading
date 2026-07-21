@@ -6,7 +6,6 @@ import hashlib
 import json
 import threading
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Protocol
@@ -69,7 +68,6 @@ from app.source_processing.application.publish_canonical_source import (
     PublishCanonicalSourceCommand,
     PublishCanonicalSourceHandler,
 )
-from app.source_processing.domain.canonical_source import canonical_source_id_for
 from app.source_processing.domain.document_processing_run import (
     ManualReviewDecisionType,
     PageDecisionState,
@@ -134,6 +132,55 @@ class RoutedConversionRepository(Protocol):
 
     def reject_native_conversion(self, *, document_id: DocumentId, error_code: str) -> None:
         """Persiste un échec terminal sans route de secours."""
+
+
+class _ConversionProgressRecorder:
+    """Rejoue une reprise sans faire régresser le compteur public persistant."""
+
+    def __init__(
+        self,
+        *,
+        conversion_repository: RoutedConversionRepository,
+        document_id: DocumentId,
+        persisted_completed_units: int,
+        skipped_empty_page_count: int,
+    ) -> None:
+        if not isinstance(document_id, DocumentId):
+            raise ValueError("document_id invalide")
+        for value, error_message in (
+            (persisted_completed_units, "progression persistée invalide"),
+            (skipped_empty_page_count, "pages vides ignorées invalides"),
+        ):
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                raise ValueError(error_message)
+        if persisted_completed_units != 0 and persisted_completed_units < skipped_empty_page_count:
+            raise ValueError("progression persistée antérieure aux pages vides")
+        self._conversion_repository = conversion_repository
+        self._document_id = document_id
+        self._lock = threading.Lock()
+        self._completed_units = persisted_completed_units
+        self._replayed_page_count = max(
+            0,
+            persisted_completed_units - skipped_empty_page_count,
+        )
+        if persisted_completed_units == 0 and skipped_empty_page_count > 0:
+            self._completed_units = skipped_empty_page_count
+            self._conversion_repository.record_conversion_progress(
+                document_id=self._document_id,
+                completed_units=skipped_empty_page_count,
+            )
+
+    def record_page(self, page_output: object) -> None:
+        del page_output
+        with self._lock:
+            if self._replayed_page_count > 0:
+                self._replayed_page_count -= 1
+                return
+            self._completed_units += 1
+            self._conversion_repository.record_conversion_progress(
+                document_id=self._document_id,
+                completed_units=self._completed_units,
+            )
 
 
 class _NativePageConverter:
@@ -513,28 +560,17 @@ class RoutedDocumentConversionWorker:
                 ocrmypdf_preprocessor=preprocessor,
                 max_parallel_pages=self._max_parallel_pages,
             )
-            completed_lock = threading.Lock()
-            completed_units = sum(
+            skipped_empty_page_count = sum(
                 1
                 for route in processing_run.route_plan.page_routes
                 if route.route_name is PageRouteName.SKIP_EMPTY
             )
-            if completed_units > 0:
-                self._conversion_repository.record_conversion_progress(
-                    document_id=document_id,
-                    completed_units=completed_units,
-                )
-
-            def record_completed_page(page_output: PageConversionArtifact) -> None:
-                del page_output
-                nonlocal completed_units
-                with completed_lock:
-                    completed_units += 1
-                    completed = completed_units
-                self._conversion_repository.record_conversion_progress(
-                    document_id=document_id,
-                    completed_units=completed,
-                )
+            progress_recorder = _ConversionProgressRecorder(
+                conversion_repository=self._conversion_repository,
+                document_id=document_id,
+                persisted_completed_units=conversion.completed_units,
+                skipped_empty_page_count=skipped_empty_page_count,
+            )
 
             result = handler.handle(
                 ConvertRoutedPagesCommand(
@@ -542,7 +578,7 @@ class RoutedDocumentConversionWorker:
                     processing_run=processing_run,
                     canonical_version_id=_canonical_version_id(source_sha256),
                 ),
-                on_page_converted=record_completed_page,
+                on_page_converted=progress_recorder.record_page,
             )
         except (DoclingAssetManifestError, OcrmyPdfImageManifestError) as error:
             raise WorkerProcessingError("CONVERSION_ASSET_MANIFEST_INVALID", retryable=False) from error
@@ -561,7 +597,6 @@ class RoutedDocumentConversionWorker:
             processing_run=processing_run,
             page_outputs=result.page_outputs,
         )
-        canonical_version_id = _canonical_version_id(source_sha256)
         docling_document = result.docling_document
         quality_policy = CanonicalAcceptancePolicy(policy_version="m004-routed-docling-v1")
         pre_report = _pre_conversion_report(processing_run=processing_run, policy_version=quality_policy.policy_version)
