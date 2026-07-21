@@ -103,3 +103,36 @@ def test_development_readiness_ignores_previous_lifecycle_event(tmp_path: Path) 
         log_path=log_path,
         start_offset=current_run_offset,
     ) == "ready"
+
+
+def test_development_controlled_stop_releases_wait_via_edge_gateway(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    import app.platform.development_e2e as development_e2e
+
+    calls: list[tuple[str, ...]] = []
+    process = SimpleNamespace(poll=lambda: None, wait=lambda **_: 0)
+    monkeypatch.setattr(
+        development_e2e,
+        "environment_stack_definition",
+        lambda *_, **__: SimpleNamespace(),
+    )
+    monkeypatch.setattr(
+        development_e2e,
+        "_technical_environment_from_repository",
+        lambda _: {},
+    )
+
+    def record_run(_definition, arguments, **_kwargs):
+        calls.append(tuple(arguments))
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(development_e2e, "_run_compose", record_run)
+
+    development_e2e._stop_development_command(
+        repository_root=tmp_path,
+        process=process,
+    )
+
+    assert calls == [("stop", "--timeout", "30", "edge-gateway")]
