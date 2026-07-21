@@ -113,6 +113,9 @@ def test_environment_compose_acceptance() -> None:
         worker_documents = document["services"]["worker-documents"]
         assert "ocr-control" in worker_documents["networks"]
         assert worker_documents["depends_on"]["ocr-runtime"]["condition"] == "service_healthy"
+        assert worker_documents["deploy"]["resources"]["limits"]["memory"] == str(
+            8 * 1024**3
+        )
         worker_mounts = {mount["target"]: mount for mount in worker_documents["volumes"]}
         for asset_kind in ("native", "granite"):
             target = f"/workspace/data/environments/{environment}/docling_assets/{asset_kind}"
