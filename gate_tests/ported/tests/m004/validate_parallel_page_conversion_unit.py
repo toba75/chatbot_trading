@@ -87,6 +87,37 @@ def test_parallel_page_conversion_preserves_pdf_order_and_reports_completed_unit
     assert sorted(completed_pages) == [1, 2, 3, 4]
 
 
+def test_resumed_conversion_replays_persisted_pages_before_advancing_progress() -> None:
+    from app.source_processing.application.routed_document_conversion_worker import (
+        _ConversionProgressRecorder,
+    )
+
+    repository = _RecordingProgressRepository()
+    document_id = _registered_source().document_id
+    recorder = _ConversionProgressRecorder(
+        conversion_repository=repository,
+        document_id=document_id,
+        persisted_completed_units=7,
+        skipped_empty_page_count=0,
+    )
+
+    for _ in range(7):
+        recorder.record_page(object())
+    assert repository.completed_units == []
+
+    recorder.record_page(object())
+    assert repository.completed_units == [8]
+
+
+class _RecordingProgressRepository:
+    def __init__(self) -> None:
+        self.completed_units: list[int] = []
+
+    def record_conversion_progress(self, *, document_id, completed_units: int) -> None:
+        del document_id
+        self.completed_units.append(completed_units)
+
+
 class _BlockingNativeConverter:
     def __init__(self) -> None:
         self._lock = threading.Lock()
