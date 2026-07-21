@@ -466,7 +466,7 @@ def wait_environment_compose_stack(*, service_id: str, port: int, config_path: s
     technical_environment = _technical_environment_from_repository(repository_root)
     _run_compose(
         definition,
-        ("wait", *REQUIRED_SERVICE_IDS),
+        ("wait", "--down-project", *REQUIRED_SERVICE_IDS),
         technical_environment=technical_environment,
         capture_output=False,
     )
