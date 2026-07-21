@@ -212,6 +212,26 @@ ADR consultée: ADR-045. Aucune modification d'ADR n'est requise: T-003 réalise
 
 Commit GREEN prévu: `feat(platform): lancer les environnements par commandes uv`.
 
+## T-004 - Scénario BDD et preuve RED
+
+Scénario contrôlé:
+
+- Given un processus `test` reçoit un stockage portant l'identité `production`.
+- When le processus exécute le préflight d'identité avant migration, lecture, écriture, accès Qdrant ou claim d'un job.
+- Then il termine avec `DATASTORE_ENVIRONMENT_MISMATCH`, ne crée ni ledger ni donnée métier, ne migre rien et n'appelle aucune opération aval.
+
+Preuves attendues par les tests RED:
+
+- matrice croisée `development`, `test`, `production` sur `environment` et `deployment_id`;
+- marqueur strict de racine fichier, initialisé explicitement seulement sur une racine vide et jamais réécrit;
+- marqueur Qdrant initialisé explicitement seulement sans collection préexistante;
+- préflight PostgreSQL exécuté dans la transaction avant la création du ledger et toute migration;
+- absence d'appel aval pour les lectures, écritures, opérations Qdrant et claims après divergence.
+
+ADR consultée: ADR-045. Aucune nouvelle ADR n'est requise: T-004 réalise l'identité de stockage et le fail-closed déjà décidés.
+
+Commit RED prévu: `test(platform): couvrir identite des stockages`.
+
 ## Validation de la planification
 
 - `uv run --locked gate --scope governance` - GREEN après création des tâches; 25 nœuds, aucune exécution manquante, inattendue ou dupliquée.
