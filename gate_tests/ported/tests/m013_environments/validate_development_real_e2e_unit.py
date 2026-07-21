@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 
 def test_environment_command_waits_for_every_compose_service(monkeypatch, tmp_path: Path) -> None:
     import app.platform.environment_compose as compose
@@ -136,3 +138,49 @@ def test_development_controlled_stop_releases_wait_via_edge_gateway(
     )
 
     assert calls == [("stop", "--timeout", "30", "edge-gateway")]
+
+
+def test_development_resume_reuses_explicit_existing_proof_without_reemission(
+    tmp_path: Path,
+) -> None:
+    from app.platform.development_e2e import (
+        _prepare_reemitted_real_pdf,
+        _select_development_e2e_proof,
+    )
+
+    repository_root = next(
+        parent
+        for parent in Path(__file__).resolve().parents
+        if (parent / "pyproject.toml").is_file()
+    )
+    source_pdf = (
+        repository_root
+        / "data"
+        / "corpus"
+        / "the-original-turtle-trading-rules.pdf"
+    )
+    report_root = tmp_path / "reports"
+    proof_id = "B" * 32
+    derived_pdf = _prepare_reemitted_real_pdf(
+        source_pdf=source_pdf,
+        temporary_report_root=report_root / "temp",
+        proof_id=proof_id,
+    )
+    before = derived_pdf.read_bytes()
+
+    selected = _select_development_e2e_proof(
+        source_pdf=source_pdf,
+        report_root=report_root,
+        resume_proof_id=proof_id,
+        resume_document_id="DOC-BA58A26E6A853C3C",
+    )
+
+    assert selected == (proof_id, derived_pdf, "DOC-BA58A26E6A853C3C")
+    assert derived_pdf.read_bytes() == before
+    with pytest.raises(ValueError, match="DEVELOPMENT_E2E_RESUME_PAIR_REQUIRED"):
+        _select_development_e2e_proof(
+            source_pdf=source_pdf,
+            report_root=report_root,
+            resume_proof_id=proof_id,
+            resume_document_id=None,
+        )
