@@ -43,6 +43,7 @@ _DEPLOYMENT_ID: Final = "ostrading-development-local"
 _EDGE_BASE_URL: Final = "https://localhost:18443"
 _API_BASE_URL: Final = f"{_EDGE_BASE_URL}/api"
 _EXPECTED_CONTAINER_COUNT: Final = 14
+_WINDOWS_CONTROL_C_EXIT: Final = 0xC000013A
 _WORKER_IDS: Final = frozenset(
     {"worker-documents", "worker-projection"}
 )
@@ -531,7 +532,7 @@ def _stop_development_command(
         return_code = process.wait(timeout=180)
     except subprocess.TimeoutExpired as exc:
         raise DevelopmentE2EError("DEVELOPMENT_E2E_COMMAND_STOP_TIMEOUT") from exc
-    if return_code != 0:
+    if return_code not in {0, _WINDOWS_CONTROL_C_EXIT}:
         raise DevelopmentE2EError(
             f"DEVELOPMENT_E2E_COMMAND_STOP_FAILED: code={return_code}"
         )
