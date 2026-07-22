@@ -43,9 +43,9 @@ _PAGE_SOURCES = (
         fixture_page_number=1,
         source_path="data/corpus/the-original-turtle-trading-rules.pdf",
         source_sha256="073f361ebb4ac6c10765a21ba7cca42d75fde8fabadc84340e6bbfca444fbda4",
-        source_page_number=3,
+        source_page_number=9,
         source_page_content_sha256=(
-            "4fa9c162f0766c8b1ce17e74a90137ac94876a7d67db3140f4619fa90f5754b7"
+            "bb796aca274e468d8fbc6e1b3f711b4e07a56d2a00d9dcaa6f43a4e5a7789c6a"
         ),
         expected_page_state="NATIVE_OK",
         expected_route_name="NATIVE_STANDARD",
