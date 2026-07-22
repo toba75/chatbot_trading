@@ -770,3 +770,78 @@ politique déjà acceptée de profil test jetable, d'identité obligatoire et de
 suppression exclusivement bornée.
 
 Commit RED prévu : `test(m13-environments): couvrir parcours reel test`.
+
+## T-010 - Retour GREEN des deux parcours test réels
+
+Implémentation :
+
+- `uv run test` n'est plus un serveur persistant : il qualifie deux
+  installations test successives, finies et entièrement neuves ;
+- une phase initiale reprend une éventuelle installation test existante,
+  vérifie son identité réelle puis la supprime avant le premier cycle ;
+- chaque cycle réémet les 38 pages du PDF suivi avec un identifiant de preuve
+  distinct, exige un corpus public initial vide et traverse UI, API,
+  PostgreSQL, outbox, relais, workers, conversion, Qdrant, recherche, chat,
+  citation PDF et Spark réel ;
+- le validateur rend explicites l'URL, l'environnement, le deployment, le
+  conteneur PostgreSQL et les credentials du seul profil courant ;
+- le rendu Compose et les 17 conteneurs sont inspectés pour refuser tout
+  chemin development/production ;
+- les deux workers documentaires sont inspectés à l'exécution : limite de
+  8 Gio, 4 CPU et healthcheck de 30 secondes ;
+- le rapport de chaque cycle est écrit avant la sortie du contexte ; en cas
+  d'échec produit il porte `status=RED`, l'erreur reste terminale et la sortie
+  du contexte exécute le teardown contrôlé ;
+- le rapport agrégé est écrit après preuve de disparition de toute ressource
+  test et égalité exacte des sentinelles development/production avant/après.
+
+Preuve live finale :
+
+- `uv run test` : code 0 en `8093,1 s` ;
+- rapport :
+  `data/environments/test/reports/test-e2e-20260722T012720Z.json` ;
+- exécution 1 : `DOC-EE140CC90ADADCD5`,
+  `CVER-M004-ROUTED-EE140CC90ADADCD5E089C53A`, projection `PROJ-69572…`,
+  réponse `ANS-LIVE-DC524D9BD92D465A3C99` et Spark live ;
+- exécution 2 : `DOC-D20D052ED84E8A50`,
+  `CVER-M004-ROUTED-D20D052ED84E8A50B3F6602B`, projection `PROJ-CFB61…`,
+  réponse `ANS-LIVE-35657C78A8CCA1AD211F` et Spark live ;
+- trois progressions `SUCCEEDED` par cycle, citation PDF page 36 ouvrable,
+  six workers et trois jobs d'identité test par cycle ;
+- `non_test_credentials_inaccessible=true`,
+  `foreign_volume_sentinels_preserved=true`,
+  `test_resources_removed=true` ;
+- état final : zéro conteneur, volume ou réseau `ostrading-test-*`.
+
+Preuve du chemin RED : le test unitaire force `PRODUCT_RED` dans la chaîne
+réelle du superviseur et observe strictement `enter`, écriture du rapport
+`RED`, puis `exit`; l'entrypoint propage ensuite `QUALIFICATION_RED` avec le
+code 1. Un cleanup visant production reste refusé par
+`ADMINISTRATIVE_OPERATION_FORBIDDEN`.
+
+ADR consultée : ADR-045. Aucune nouvelle ADR n'est requise.
+
+Commit RED : `684a8124c` -
+`test(m13-environments): couvrir parcours reel test`.
+
+Commit GREEN prévu :
+`feat(m13-environments): isoler et executer le profil test`.
+
+Validations GREEN finales :
+
+- test unitaire T-010, acceptation des commandes et non-régression T-009 :
+  3 nœuds ;
+- `uv run --locked gate --scope m013_environments` : 37 nœuds ;
+- `uv run --locked gate --scope m013_config` : GREEN ;
+- `uv run --locked gate --scope m013` : GREEN ;
+- `uv run --locked gate --scope m013_fastapi` : GREEN ;
+- scope M-004 après correction du contrat atomique : 44 nœuds GREEN ;
+- `uv run --locked gate --offline` : 439/439 nœuds GREEN, zéro RED,
+  zéro `NOT_RUN` et manifeste unique.
+
+Le premier gate global a exposé `GATE_TEST_RESULT_REQUIRED` sur
+`validate_parallel_page_conversion_unit.py` : T-009 y avait ajouté un second
+test public alors que chaque fichier du manifeste représente un nœud pytest
+atomique. Les deux comportements étaient GREEN seuls. Ils sont conservés sans
+affaiblissement sous deux fonctions de validation privées appelées par un
+unique test public ; le scope M-004 puis le gate complet sont redevenus GREEN.

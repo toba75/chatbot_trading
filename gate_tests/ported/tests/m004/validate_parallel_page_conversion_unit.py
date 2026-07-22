@@ -37,7 +37,7 @@ from app.source_processing.domain.source_document import (
 )
 
 
-def test_parallel_page_conversion_preserves_pdf_order_and_reports_completed_units() -> None:
+def _validate_parallel_page_conversion_preserves_pdf_order_and_reports_completed_units() -> None:
     # Given un PDF route sur quatre pages natives lentes.
     source_document = _registered_source()
     processing_run = _planned_native_run(source_document, page_count=4)
@@ -87,7 +87,7 @@ def test_parallel_page_conversion_preserves_pdf_order_and_reports_completed_unit
     assert sorted(completed_pages) == [1, 2, 3, 4]
 
 
-def test_resumed_conversion_replays_persisted_pages_before_advancing_progress() -> None:
+def _validate_resumed_conversion_replays_persisted_pages_before_advancing_progress() -> None:
     from app.source_processing.adapters.worker_runtime import _classify_processing_error
     from app.source_processing.application.routed_document_conversion_worker import (
         _ConversionProgressRecorder,
@@ -111,6 +111,13 @@ def test_resumed_conversion_replays_persisted_pages_before_advancing_progress() 
     assert _classify_processing_error(
         RuntimeError("CONVERSION_PERSISTENCE_CONFLICT")
     ) == ("CONVERSION_PERSISTENCE_CONFLICT", False)
+
+
+def test_parallel_page_conversion_unit() -> None:
+    """Agrège les décisions du nœud atomique déclaré dans le gate."""
+
+    _validate_parallel_page_conversion_preserves_pdf_order_and_reports_completed_units()
+    _validate_resumed_conversion_replays_persisted_pages_before_advancing_progress()
 
 
 class _RecordingProgressRepository:

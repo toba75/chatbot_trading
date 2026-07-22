@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
 
-def test_test_real_e2e_unit(monkeypatch, tmp_path: Path) -> None:
+def test_test_real_e2e_unit(monkeypatch, tmp_path: Path, capsys) -> None:
     from app.platform.test_e2e import (
         TestEnvironmentCycle,
         _run_two_test_cycles,
@@ -49,3 +50,95 @@ def test_test_real_e2e_unit(monkeypatch, tmp_path: Path) -> None:
             )
         )
 
+    from app.platform.environment_command import _run_test_qualification
+
+    published: list[object] = []
+    expected_report = SimpleNamespace(environment="test")
+
+    assert (
+        _run_test_qualification(
+            argv=(),
+            repository_root=tmp_path,
+            pdf_path=tmp_path / "fixture.pdf",
+            runner=lambda **_kwargs: expected_report,
+            publish_report=published.append,
+        )
+        == 0
+    )
+    assert published == [expected_report]
+    with pytest.raises(ValueError, match="UV_ENVIRONMENT_ARGUMENTS_FORBIDDEN"):
+        _run_test_qualification(
+            argv=("--config",),
+            repository_root=tmp_path,
+            pdf_path=tmp_path / "fixture.pdf",
+            runner=lambda **_kwargs: expected_report,
+            publish_report=published.append,
+        )
+
+    import app.platform.test_e2e as test_e2e
+    from app.platform.development_e2e import DevelopmentE2EError
+
+    teardown_events: list[str] = []
+
+    @contextmanager
+    def supervised_stack(_launch_configuration):
+        teardown_events.append("enter")
+        try:
+            yield
+        finally:
+            teardown_events.append("exit")
+
+    @contextmanager
+    def public_client(**_kwargs):
+        yield object()
+
+    monkeypatch.setattr(test_e2e, "start_environment_compose_stack", supervised_stack)
+    monkeypatch.setattr(
+        test_e2e,
+        "_prepare_test_reemitted_pdf",
+        lambda **_: tmp_path / "test-e2e.pdf",
+    )
+    monkeypatch.setattr(test_e2e, "_sha256_file", lambda _: "a" * 64)
+    monkeypatch.setattr(test_e2e, "_read_secret", lambda _: "s" * 32)
+    monkeypatch.setattr(test_e2e, "_verify_runtime_excludes_non_test_credentials", lambda **_: None)
+    monkeypatch.setattr(test_e2e, "_public_client", public_client)
+    monkeypatch.setattr(test_e2e, "_verify_public_ui", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(test_e2e, "_all_public_document_ids", lambda _: ())
+    monkeypatch.setattr(
+        test_e2e,
+        "_exercise_product",
+        lambda **_: (_ for _ in ()).throw(DevelopmentE2EError("PRODUCT_RED")),
+    )
+    monkeypatch.setattr(
+        test_e2e,
+        "_write_secret_free_payload",
+        lambda **arguments: teardown_events.append(
+            f"report:{arguments['payload']['status']}"
+        ),
+    )
+    configuration = SimpleNamespace(
+        security=SimpleNamespace(
+            secrets=SimpleNamespace(local_api_token_path="config/secrets/test/token")
+        )
+    )
+
+    with pytest.raises(test_e2e.TestE2EError, match="TEST_E2E_PRODUCT_FAILED"):
+        test_e2e._run_single_test_cycle(
+            run_number=1,
+            repository_root=tmp_path,
+            pdf_path=tmp_path / "fixture.pdf",
+            configuration=configuration,
+            report_root=tmp_path / "reports",
+        )
+    assert teardown_events == ["enter", "report:RED", "exit"]
+
+    import app.platform.environment_command as command
+
+    monkeypatch.setattr(
+        command,
+        "run_test_environment_e2e",
+        lambda **_: (_ for _ in ()).throw(test_e2e.TestE2EError("QUALIFICATION_RED")),
+    )
+    monkeypatch.setattr(command.sys, "argv", ["test"])
+    assert command.test() == 1
+    assert "QUALIFICATION_RED" in capsys.readouterr().err

@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import sys
 import tomllib
+from types import SimpleNamespace
 
 
 def test_validate_environment_commands_acceptance(monkeypatch, tmp_path, capsys) -> None:
@@ -51,6 +52,7 @@ def _assert_uv_environment_entrypoints_launch_the_selected_stack(monkeypatch, tm
 
     prepared = []
     served = []
+    qualified = []
 
     @contextmanager
     def supervised_stack(launch_configuration):
@@ -66,6 +68,12 @@ def _assert_uv_environment_entrypoints_launch_the_selected_stack(monkeypatch, tm
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(command, "start_environment_compose_stack", supervised_stack)
     monkeypatch.setattr(command, "wait_environment_compose_stack", serve_http)
+    monkeypatch.setattr(
+        command,
+        "run_test_environment_e2e",
+        lambda **arguments: qualified.append(arguments)
+        or SimpleNamespace(to_mapping=lambda: {"environment": "test", "runs": [1, 2]}),
+    )
 
     original_argv = sys.argv[:]
     try:
@@ -75,21 +83,27 @@ def _assert_uv_environment_entrypoints_launch_the_selected_stack(monkeypatch, tm
     finally:
         sys.argv = original_argv
 
-    assert [launch.environment for launch in prepared] == list(expected_entrypoints)
+    assert [launch.environment for launch in prepared] == ["development", "production"]
     assert [Path(launch.config_path) for launch in prepared] == [
         environments_root / "development.yaml",
-        environments_root / "test.yaml",
         environments_root / "production.yaml",
     ]
     assert served == [
         ("ui", 8081, str(tmp_path / ".tmp" / "development.yaml")),
-        ("ui", 8081, str(tmp_path / ".tmp" / "test.yaml")),
         ("ui", 8081, str(tmp_path / ".tmp" / "production.yaml")),
     ]
-    events = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+    assert qualified == [
+        {
+            "repository_root": tmp_path,
+            "pdf_path": tmp_path / "data/corpus/the-original-turtle-trading-rules.pdf",
+        }
+    ]
+    output = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+    assert {"environment": "test", "runs": [1, 2]} in output
+    events = [event for event in output if event.get("event_type") == "environment_lifecycle"]
     assert [(event["environment"], event["state"]) for event in events] == [
         (profile, state)
-        for profile in expected_entrypoints
+        for profile in ("development", "production")
         for state in ("starting", "ready", "stopped")
     ]
     assert all(event["event_type"] == "environment_lifecycle" for event in events)
@@ -111,6 +125,11 @@ def _assert_uv_environment_entrypoints_propagate_terminal_errors(monkeypatch, tm
 
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(command, "start_environment_compose_stack", failing_stack)
+    monkeypatch.setattr(
+        command,
+        "run_test_environment_e2e",
+        lambda **_: (_ for _ in ()).throw(ValueError("CONFIG_FILE_UNREADABLE")),
+    )
     original_argv = sys.argv[:]
     try:
         sys.argv = ["test"]

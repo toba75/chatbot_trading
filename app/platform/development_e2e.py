@@ -130,6 +130,36 @@ class _ProductProof:
     environment_job_count: int
 
 
+@dataclass(frozen=True, slots=True)
+class _ProofContext:
+    environment: str
+    deployment_id: str
+    edge_base_url: str
+
+    def __post_init__(self) -> None:
+        if self.environment not in {"development", "test", "production"}:
+            raise ValueError("ENVIRONMENT_E2E_ENVIRONMENT_INVALID")
+        if (
+            not isinstance(self.deployment_id, str)
+            or self.deployment_id.strip() == ""
+            or self.deployment_id != self.deployment_id.strip()
+        ):
+            raise ValueError("ENVIRONMENT_E2E_DEPLOYMENT_ID_INVALID")
+        if not self.edge_base_url.startswith("https://localhost:"):
+            raise ValueError("ENVIRONMENT_E2E_EDGE_URL_INVALID")
+
+    @property
+    def api_base_url(self) -> str:
+        return f"{self.edge_base_url}/api"
+
+
+_DEVELOPMENT_PROOF_CONTEXT: Final = _ProofContext(
+    environment=_ENVIRONMENT,
+    deployment_id=_DEPLOYMENT_ID,
+    edge_base_url=_EDGE_BASE_URL,
+)
+
+
 def run_development_environment_e2e(
     *,
     repository_root: Path,
@@ -171,8 +201,12 @@ def run_development_environment_e2e(
         token=token,
         log_path=log_path,
     ):
-        with _public_client(token=token, timeout_seconds=900) as client:
-            _verify_public_ui(client)
+        with _public_client(
+            token=token,
+            timeout_seconds=900,
+            base_url=_DEVELOPMENT_PROOF_CONTEXT.api_base_url,
+        ) as client:
+            _verify_public_ui(client, proof_context=_DEVELOPMENT_PROOF_CONTEXT)
             product = _exercise_product(
                 client=client,
                 configuration=configuration,
@@ -181,6 +215,7 @@ def run_development_environment_e2e(
                 proof_id=proof_id,
                 repository_root=root,
                 existing_document_id=existing_document_id,
+                proof_context=_DEVELOPMENT_PROOF_CONTEXT,
             )
             _write_secret_free_payload(
                 payload=_product_checkpoint_payload(
@@ -199,13 +234,18 @@ def run_development_environment_e2e(
         token=token,
         log_path=log_path,
     ):
-        with _public_client(token=token, timeout_seconds=900) as client:
-            _verify_public_ui(client)
+        with _public_client(
+            token=token,
+            timeout_seconds=900,
+            base_url=_DEVELOPMENT_PROOF_CONTEXT.api_base_url,
+        ) as client:
+            _verify_public_ui(client, proof_context=_DEVELOPMENT_PROOF_CONTEXT)
             _verify_persistence_after_restart(
                 client=client,
                 product=product,
                 pdf_sha256=pdf_sha256,
                 proof_id=proof_id,
+                proof_context=_DEVELOPMENT_PROOF_CONTEXT,
             )
 
     foreign_probes = tuple(
@@ -337,7 +377,11 @@ def _wait_public_readiness(
     else:
         raise DevelopmentE2EError("DEVELOPMENT_E2E_LIFECYCLE_READY_TIMEOUT")
 
-    with _public_client(token=token, timeout_seconds=8) as client:
+    with _public_client(
+        token=token,
+        timeout_seconds=8,
+        base_url=_DEVELOPMENT_PROOF_CONTEXT.api_base_url,
+    ) as client:
         while time.monotonic() < deadline:
             if process.poll() is not None:
                 raise DevelopmentE2EError(
@@ -402,6 +446,7 @@ def _exercise_product(
     proof_id: str,
     repository_root: Path,
     existing_document_id: str | None,
+    proof_context: _ProofContext,
 ) -> _ProductProof:
     if existing_document_id is None:
         with pdf_path.open("rb") as pdf_stream:
@@ -487,8 +532,13 @@ def _exercise_product(
         document_id=document_id,
         canonical_version_id=canonical_version_id,
         proof_id=proof_id,
+        proof_context=proof_context,
     )
-    citation_url = _citation_url(answer=answer, document_id=document_id)
+    citation_url = _citation_url(
+        answer=answer,
+        document_id=document_id,
+        proof_context=proof_context,
+    )
     _verify_original_pdf(
         client=client,
         path=f"/v1/documents/{document_id}/original",
@@ -498,14 +548,18 @@ def _exercise_product(
         client=client,
         configuration=configuration,
         proof_id=proof_id,
+        proof_context=proof_context,
     )
     worker_identity_count = _verify_worker_identities(
         repository_root=repository_root,
         configuration=configuration,
+        proof_context=proof_context,
     )
     environment_job_count = _verify_job_identities(
         repository_root=repository_root,
         document_id=document_id,
+        configuration=configuration,
+        proof_context=proof_context,
     )
     return _ProductProof(
         document_id=document_id,
@@ -525,8 +579,8 @@ def _exercise_product(
     )
 
 
-def _verify_public_ui(client: httpx.Client) -> None:
-    response = client.get(f"{_EDGE_BASE_URL}/")
+def _verify_public_ui(client: httpx.Client, *, proof_context: _ProofContext) -> None:
+    response = client.get(f"{proof_context.edge_base_url}/")
     if response.status_code != 200:
         _raise_http("DEVELOPMENT_E2E_UI_UNAVAILABLE", response)
     if not response.headers.get("content-type", "").startswith("text/html"):
@@ -538,7 +592,7 @@ def _verify_public_ui(client: httpx.Client) -> None:
     )
     if any(fragment not in response.text for fragment in required_fragments):
         raise DevelopmentE2EError("DEVELOPMENT_E2E_UI_CONTRACT_INCOMPLETE")
-    chat_response = client.get(f"{_EDGE_BASE_URL}/ui/chat")
+    chat_response = client.get(f"{proof_context.edge_base_url}/ui/chat")
     if chat_response.status_code != 200:
         _raise_http("DEVELOPMENT_E2E_CHAT_UI_UNAVAILABLE", chat_response)
     if "<title>Nouvelle conversation documentaire</title>" not in chat_response.text:
@@ -551,12 +605,13 @@ def _ask_documentary_question(
     document_id: str,
     canonical_version_id: str,
     proof_id: str,
+    proof_context: _ProofContext,
 ) -> Mapping[str, Any]:
     occurred_at = _utc_now()
     response = client.post(
         "/v1/conversations",
         json={
-            "title": f"Preuve development {proof_id}",
+            "title": f"Preuve {proof_context.environment} {proof_id}",
             "default_mandate": {"objective": "Répondre uniquement depuis le PDF sélectionné."},
             "presentation_preferences": {"language": "fr"},
             "occurred_at": occurred_at,
@@ -575,7 +630,9 @@ def _ask_documentary_question(
                 "Selon le document sélectionné, quelles règles de gestion du risque "
                 "et de suivi de tendance sont décrites ?"
             ),
-            "idempotency_key": f"IDEMP-DEVELOPMENT-E2E-{proof_id}",
+            "idempotency_key": (
+                f"IDEMP-{proof_context.environment.upper()}-E2E-{proof_id}"
+            ),
             "occurred_at": _utc_now(),
             "requested_mode": "CHAT_DOCUMENTAIRE",
             "selected_documents": [document_id],
@@ -611,19 +668,31 @@ def _prove_real_spark(
     client: httpx.Client,
     configuration: ApplicationConfiguration,
     proof_id: str,
+    proof_context: _ProofContext,
 ) -> str:
     response = client.post(
         "/v1/chat/completions",
         json={
             "model": configuration.models.llm.served_model_name,
-            "conversation_id": f"CONV-DEVELOPMENT-E2E-SPARK-{proof_id}",
-            "trace_id": f"TRACE-DEVELOPMENT-E2E-SPARK-{proof_id}",
-            "request_id": f"REQ-DEVELOPMENT-E2E-SPARK-{proof_id}",
-            "idempotency_key": f"IDEMP-DEVELOPMENT-E2E-SPARK-{proof_id}",
+            "conversation_id": (
+                f"CONV-{proof_context.environment.upper()}-E2E-SPARK-{proof_id}"
+            ),
+            "trace_id": (
+                f"TRACE-{proof_context.environment.upper()}-E2E-SPARK-{proof_id}"
+            ),
+            "request_id": (
+                f"REQ-{proof_context.environment.upper()}-E2E-SPARK-{proof_id}"
+            ),
+            "idempotency_key": (
+                f"IDEMP-{proof_context.environment.upper()}-E2E-SPARK-{proof_id}"
+            ),
             "messages": [
                 {
                     "role": "user",
-                    "content": "Réponds en français en une phrase : chemin Spark development vérifié.",
+                    "content": (
+                        "Réponds en français en une phrase : chemin Spark "
+                        f"{proof_context.environment} vérifié."
+                    ),
                 }
             ],
             "sampling_parameters": {"max_tokens": 96, "temperature": 0},
@@ -650,7 +719,12 @@ def _prove_real_spark(
     return _require_text(product.get("raw_response_id"), "spark_raw_response_id")
 
 
-def _citation_url(*, answer: Mapping[str, Any], document_id: str) -> str:
+def _citation_url(
+    *,
+    answer: Mapping[str, Any],
+    document_id: str,
+    proof_context: _ProofContext,
+) -> str:
     citations = answer.get("citations")
     if not isinstance(citations, list) or len(citations) == 0:
         raise DevelopmentE2EError("DEVELOPMENT_E2E_CITATION_MISSING")
@@ -660,7 +734,7 @@ def _citation_url(*, answer: Mapping[str, Any], document_id: str) -> str:
     if isinstance(page_pdf, bool) or not isinstance(page_pdf, int) or page_pdf < 1:
         raise DevelopmentE2EError("DEVELOPMENT_E2E_CITATION_PAGE_INVALID")
     return (
-        f"{_EDGE_BASE_URL}/api/v1/documents/{quote(document_id)}/original"
+        f"{proof_context.edge_base_url}/api/v1/documents/{quote(document_id)}/original"
         f"#page={page_pdf}"
     )
 
@@ -671,6 +745,7 @@ def _verify_persistence_after_restart(
     product: _ProductProof,
     pdf_sha256: str,
     proof_id: str,
+    proof_context: _ProofContext,
 ) -> None:
     document = _find_document(client, product.document_id)
     if document.get("canonical_version_id") != product.canonical_version_id:
@@ -694,6 +769,7 @@ def _verify_persistence_after_restart(
         document_id=product.document_id,
         canonical_version_id=product.canonical_version_id,
         proof_id=f"{proof_id}-RESTART",
+        proof_context=proof_context,
     )
 
 
@@ -749,8 +825,12 @@ def _verify_worker_identities(
     *,
     repository_root: Path,
     configuration: ApplicationConfiguration,
+    proof_context: _ProofContext,
 ) -> int:
-    definition = environment_stack_definition(_ENVIRONMENT, repository_root=repository_root)
+    definition = environment_stack_definition(
+        proof_context.environment,
+        repository_root=repository_root,
+    )
     technical_environment = _technical_environment_from_repository(repository_root)
     ps_result = _run_compose(
         definition,
@@ -799,6 +879,28 @@ def _verify_worker_identities(
                 raise DevelopmentE2EError(
                     "DEVELOPMENT_E2E_WORKER_DOCUMENTS_MEMORY_LIMIT_INVALID"
                 )
+            resource_result = subprocess.run(
+                (
+                    docker_executable,
+                    "inspect",
+                    "--format",
+                    "{{.HostConfig.NanoCpus}}|{{.Config.Healthcheck.Timeout}}",
+                    container_name,
+                ),
+                cwd=repository_root,
+                check=False,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+            )
+            if (
+                resource_result.returncode != 0
+                or resource_result.stdout.strip() != "4000000000|30000000000"
+            ):
+                raise DevelopmentE2EError(
+                    "DEVELOPMENT_E2E_WORKER_DOCUMENTS_RESOURCES_INVALID"
+                )
         result = subprocess.run(
             (
                 docker_executable,
@@ -829,8 +931,8 @@ def _verify_worker_identities(
             raise DevelopmentE2EError("DEVELOPMENT_E2E_WORKER_HEALTH_INVALID")
         health = _require_mapping(json.loads(lines[0]), "worker_health")
         expected = {
-            "environment": _ENVIRONMENT,
-            "deployment_id": _DEPLOYMENT_ID,
+            "environment": proof_context.environment,
+            "deployment_id": proof_context.deployment_id,
             "configuration_hash": configuration.configuration_hash,
             "service": worker_id,
         }
@@ -841,13 +943,20 @@ def _verify_worker_identities(
     return len(worker_containers)
 
 
-def _verify_job_identities(*, repository_root: Path, document_id: str) -> int:
+def _verify_job_identities(
+    *,
+    repository_root: Path,
+    document_id: str,
+    configuration: ApplicationConfiguration,
+    proof_context: _ProofContext,
+) -> int:
     docker_executable = shutil.which("docker")
     if docker_executable is None:
         raise DevelopmentE2EError("DEVELOPMENT_E2E_DOCKER_UNAVAILABLE")
     sql = (
-        "SELECT count(*), count(*) FILTER (WHERE environment='development' "
-        "AND deployment_id='ostrading-development-local') "
+        "SELECT count(*), count(*) FILTER (WHERE environment="
+        f"'{proof_context.environment}' AND deployment_id="
+        f"'{proof_context.deployment_id}') "
         "FROM platform.technical_jobs WHERE payload->>'document_id'="
         f"'{document_id}';"
     )
@@ -855,12 +964,12 @@ def _verify_job_identities(*, repository_root: Path, document_id: str) -> int:
         (
             docker_executable,
             "exec",
-            "ostrading-development-postgres-1",
+            f"ostrading-{proof_context.environment}-postgres-1",
             "psql",
             "-U",
-            "ostrading_development",
+            configuration.services.postgres.role,
             "-d",
-            "ostrading_development",
+            configuration.services.postgres.database,
             "-Atc",
             sql,
         ),
@@ -1097,7 +1206,7 @@ def _public_client(
     *,
     token: str,
     timeout_seconds: int,
-    base_url: str = _API_BASE_URL,
+    base_url: str,
 ) -> Iterator[httpx.Client]:
     with httpx.Client(
         base_url=base_url,
