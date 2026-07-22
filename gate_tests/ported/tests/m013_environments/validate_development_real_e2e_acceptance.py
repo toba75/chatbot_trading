@@ -1,56 +1,21 @@
-"""Preuve live du parcours produit complet dans le profil development."""
+"""Contrat non mutateur de la commande persistante development."""
 
 from __future__ import annotations
 
-from pathlib import Path
+import sys
 
-from app.platform.development_e2e import run_development_environment_e2e
+import app.platform.environment_command as command
 
 
-def test_validate_development_real_e2e_acceptance() -> None:
-    repository_root = next(
-        parent
-        for parent in Path(__file__).resolve().parents
-        if (parent / "pyproject.toml").is_file()
-    )
-    real_pdf = (
-        repository_root
-        / "data"
-        / "corpus"
-        / "ostrading-environment-qualification-5-pages.pdf"
-    )
-    assert real_pdf.is_file()
+def test_validate_development_real_e2e_acceptance(monkeypatch) -> None:
+    # Given development est un environnement de travail persistant.
+    calls: list[str] = []
+    monkeypatch.setattr(command, "_run_entrypoint", lambda profile: calls.append(profile) or 0)
+    monkeypatch.setattr(sys, "argv", ["development"])
 
-    # Given la commande opérateur development et un PDF réel du corpus.
-    # When le validateur traverse uniquement les contrats publics jusqu'à la
-    # réponse documentaire et redémarre la pile sans supprimer ses volumes.
-    report = run_development_environment_e2e(
-        repository_root=repository_root,
-        pdf_path=real_pdf,
-    )
+    # When l'opérateur démarre development.
+    assert command.development() == 0
 
-    # Then les preuves publiques, les identités des participants, le Spark
-    # réel, la persistance et les sondes d'étanchéité sont toutes GREEN.
-    assert report.environment == "development"
-    assert report.deployment_id == "ostrading-development-local"
-    assert report.source_pdf_path.endswith("ostrading-environment-qualification-5-pages.pdf")
-    assert report.source_pdf_sha256 != report.pdf_sha256
-    assert report.pdf_sha256
-    assert report.document_id.startswith("DOC-")
-    assert report.canonical_version_id.startswith("CVER-")
-    assert report.projection_id.startswith("PROJ-")
-    assert report.answer_id.startswith("ANS-")
-    assert report.citation_url.startswith("https://localhost:18443/")
-    assert report.spark_raw_response_id
-    assert report.qualification_routes == (
-        "NATIVE_STANDARD",
-        "MIXED_PAGEWISE",
-        "PREPROCESS_GRANITE",
-        "TARGETED_ENRICHMENT",
-        "SKIP_EMPTY",
-    )
-    assert report.progress_phases == ("SUCCEEDED", "SUCCEEDED", "SUCCEEDED")
-    assert report.restart_persistence_verified is True
-    assert report.foreign_environment_probes == ("test:ABSENT", "production:ABSENT")
-    assert report.volume_sentinels_preserved is True
-    assert report.report_path.is_file()
+    # Then seule la pile development est supervisée : aucune qualification PDF
+    # ni injection de fixture n'appartient à cette commande.
+    assert calls == ["development"]

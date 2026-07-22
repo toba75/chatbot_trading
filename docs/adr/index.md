@@ -51,9 +51,10 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 | [ADR-043](ADR-043-priorite-scan-sans-texte-natif.md) | Priorité au scan sans texte natif | Acceptée | 2026-07-16 | `COMPLEX_VISUAL` sans texte natif d’ADR-033 | Aucune |
 | [ADR-044](ADR-044-autorite-native-page-visuelle-complexe.md) | Autorité native d’une page visuelle complexe | Acceptée | 2026-07-16 | Priorité ADR-033 et candidat natif ADR-040 pour texte parcellaire | Aucune |
 | [ADR-045](ADR-045-profils-execution-explicites-donnees-etanches.md) | Profils d'exécution explicites et données étanches | Remplacée | 2026-07-21 | ADR-016 | ADR-046 |
-| [ADR-046](ADR-046-profils-locaux-etanches-sur-autorite-docker-explicite.md) | Profils locaux étanches sur une autorité Docker explicite | Acceptée | 2026-07-22 | ADR-045 ; point d'entrée opérateur local d'ADR-030 | Aucune |
+| [ADR-046](ADR-046-profils-locaux-etanches-sur-autorite-docker-explicite.md) | Profils locaux étanches sur une autorité Docker explicite | Acceptée | 2026-07-22 | ADR-045 ; point d'entrée opérateur local d'ADR-030 | ADR-049 pour la sémantique de qualification des commandes |
 | [ADR-047](ADR-047-archive-chiffree-verifiee-avant-preuve-restauration.md) | Archive chiffrée vérifiée avant preuve de restauration | Acceptée | 2026-07-22 | ADR-013 | Aucune |
 | [ADR-048](ADR-048-progression-et-parallelisme-dans-profils-explicites.md) | Progression et parallélisme dans les profils explicites | Acceptée | 2026-07-22 | ADR-031 ; ADR-037 | Aucune |
+| [ADR-049](ADR-049-qualification-complete-reservee-au-profil-test.md) | Qualification complète réservée au profil test | Acceptée | 2026-07-23 | Sémantique de qualification des commandes d'ADR-046 | Aucune |
 
 ## ADR DDD
 
@@ -75,7 +76,7 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 ## Prochains numéros disponibles
 
 ```text
-Prochaine ADR technique: ADR-049
+Prochaine ADR technique: ADR-050
 Prochaine DDD-ADR: DDD-ADR-013
 ```
 

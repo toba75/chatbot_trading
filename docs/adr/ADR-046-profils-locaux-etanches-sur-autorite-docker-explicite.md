@@ -4,7 +4,7 @@
 **Date :** 2026-07-22
 **Décideurs :** Propriétaire du projet
 **Remplace :** ADR-045 ; point d'entrée opérateur local d'ADR-030
-**Remplacée par :** Aucune
+**Remplacée par :** ADR-049 pour la sémantique de qualification des commandes
 **Source :** Demande utilisateur du 2026-07-21 ; revue M13-environments ; ADR-014 ; ADR-030 ; ADR-045
 
 ## Contexte

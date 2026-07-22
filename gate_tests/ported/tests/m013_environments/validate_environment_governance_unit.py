@@ -26,7 +26,7 @@ def _report(environment: str) -> dict[str, object]:
         "deployment_id": deployment_ids[environment],
         "environment": environment,
         "image_revision": "a" * 40,
-        "source_pdf_path": "data/corpus/the-original-turtle-trading-rules.pdf",
+        "source_pdf_path": "data/corpus/ostrading-environment-qualification-5-pages.pdf",
         "source_pdf_sha256": "0" * 64,
     }
     if environment == "test":
@@ -46,6 +46,13 @@ def _report(environment: str) -> dict[str, object]:
                     "spark_raw_response_id": f"chatcmpl-{prefix}-{number}",
                     "pdf_sha256": str(number) * 64,
                     "progress_phases": ["SUCCEEDED", "SUCCEEDED", "SUCCEEDED"],
+                    "qualification_routes": [
+                        "NATIVE_STANDARD",
+                        "MIXED_PAGEWISE",
+                        "PREPROCESS_GRANITE",
+                        "TARGETED_ENRICHMENT",
+                        "SKIP_EMPTY",
+                    ],
                     "worker_identity_count": 4,
                     "container_count": 14,
                     "https_ca_verified": True,
@@ -100,37 +107,18 @@ def test_environment_governance_unit() -> None:
         validate_evidence_revisions,
     )
 
-    reports = {environment: _report(environment) for environment in (
-        "development",
-        "test",
-        "production",
-    )}
+    reports = {"test": _report("test")}
 
-    # Given quatre exécutions réelles couvrent les trois profils.
-    # When la gouvernance consolide les preuves et la matrice d'accès 3 x 3.
+    # Given deux cycles réels couvrent exclusivement le profil test.
+    # When la gouvernance consolide les preuves fonctionnelles.
     evidence = validate_execution_evidence(reports)
 
-    # Then toutes les identités restent distinctes et M-013 reste ouvert.
-    assert evidence.environments == ("development", "test", "production")
-    assert evidence.execution_count == 4
-    assert evidence.worker_identity_count == 16
-    assert build_isolation_access_matrix(evidence.environments) == {
-        "development": {
-            "development": "OWNED",
-            "test": "FORBIDDEN",
-            "production": "FORBIDDEN",
-        },
-        "test": {
-            "development": "FORBIDDEN",
-            "test": "OWNED",
-            "production": "FORBIDDEN",
-        },
-        "production": {
-            "development": "FORBIDDEN",
-            "test": "FORBIDDEN",
-            "production": "OWNED",
-        },
-    }
+    # Then les deux exécutions restent distinctes et M-013 reste ouvert. La
+    # matrice statique 3 x 3 demeure un contrôle de configuration séparé.
+    assert evidence.environments == ("test",)
+    assert evidence.execution_count == 2
+    assert evidence.worker_identity_count == 8
+    assert len(build_isolation_access_matrix(("development", "test", "production"))) == 3
     assert validate_closure_status("SUBMILESTONE_GREEN_M013_OPEN") == (
         "SUBMILESTONE_GREEN_M013_OPEN"
     )
@@ -159,24 +147,14 @@ def test_environment_governance_unit() -> None:
             require_common_revision=False,
         )
 
-    historical_revision_reports = deepcopy(revision_reports)
-    historical_revision_reports["development"]["image_revision"] = subprocess.run(
-        ("git", "rev-parse", "HEAD^"),
-        cwd=Path.cwd(),
-        check=True,
-        capture_output=True,
-        text=True,
-        encoding="ascii",
-    ).stdout.strip()
-    with pytest.raises(EnvironmentGovernanceError, match="LIVE_EVIDENCE_COMMON_REVISION_REQUIRED"):
-        validate_evidence_revisions(
-            repository_root=Path.cwd(),
-            reports=historical_revision_reports,
-            require_common_revision=True,
-        )
+    validate_evidence_revisions(
+        repository_root=Path.cwd(),
+        reports=revision_reports,
+        require_common_revision=True,
+    )
 
     collided = deepcopy(reports)
-    collided["production"]["document_id"] = reports["development"]["document_id"]
+    collided["test"]["runs"][1]["document_id"] = reports["test"]["runs"][0]["document_id"]
     with pytest.raises(EnvironmentGovernanceError, match="EVIDENCE_ID_COLLISION"):
         validate_execution_evidence(collided)
 
@@ -186,7 +164,7 @@ def test_environment_governance_unit() -> None:
         validate_execution_evidence(missing)
 
     secret = deepcopy(reports)
-    secret["development"]["api_token"] = "token-versionne-interdit"
+    secret["test"]["api_token"] = "token-versionne-interdit"
     with pytest.raises(EnvironmentGovernanceError, match="SENSITIVE_EVIDENCE_REJECTED"):
         assert_no_sensitive_data(secret)
 

@@ -1,4 +1,4 @@
-"""Consolidation live après les trois vrais parcours environnementaux."""
+"""Consolidation live après les deux cycles réels du profil test."""
 
 from __future__ import annotations
 
@@ -14,14 +14,14 @@ def test_environment_governance_live() -> None:
         if (parent / "pyproject.toml").is_file()
     )
 
-    # Les dépendances de ce nœud démarrent les trois piles réelles. Cette étape
-    # refuse donc une preuve absente, collisionnée ou sensible sans les rejouer.
+    # La dépendance de ce nœud qualifie uniquement la pile test. Cette étape
+    # refuse donc une preuve absente, collisionnée ou sensible sans la rejouer.
     evidence = validate_repository_environment_governance(
         repository_root=repository_root,
         require_live_sources=True,
     )
     assert evidence.source == "latest-live-reports"
-    assert evidence.execution_count == 4
+    assert evidence.execution_count == 2
     assert evidence.worker_replica_count == 4
     assert evidence.matrix_cell_count == 9
     assert evidence.closure_status == "SUBMILESTONE_GREEN_M013_OPEN"

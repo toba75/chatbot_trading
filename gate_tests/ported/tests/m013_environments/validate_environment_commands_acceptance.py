@@ -29,7 +29,8 @@ def test_validate_environment_commands_acceptance(monkeypatch, tmp_path, capsys)
 def _assert_uv_environment_entrypoints_launch_the_selected_stack(monkeypatch, tmp_path, capsys) -> None:
     # Given les trois fichiers complets existent et chaque commande UV est dédiée à un profil.
     # When l'opérateur invoque successivement les trois vrais entrypoints Python publiés.
-    # Then chacun supervise la pile avec son unique fichier et publie la même identité.
+    # Then development et production supervisent leur pile persistante tandis que
+    # test est le seul profil à exécuter la qualification fonctionnelle.
     import app.platform.environment_command as command
 
     scripts = tomllib.loads(
@@ -88,14 +89,9 @@ def _assert_uv_environment_entrypoints_launch_the_selected_stack(monkeypatch, tm
         command,
         "run_production_environment_e2e",
         lambda **arguments: qualified.append(("production", arguments))
-        or SimpleNamespace(
-            to_mapping=lambda: {
-                "environment": "production",
-                "restart_persistence_verified": True,
-            }
-        ),
+        or SimpleNamespace(to_mapping=lambda: {"environment": "production"}),
+        raising=False,
     )
-
     original_argv = sys.argv[:]
     try:
         for profile in expected_entrypoints:
@@ -104,12 +100,16 @@ def _assert_uv_environment_entrypoints_launch_the_selected_stack(monkeypatch, tm
     finally:
         sys.argv = original_argv
 
-    assert [launch.environment for launch in prepared] == ["development"]
+    assert not hasattr(command, "_run_production_qualification")
+    assert not hasattr(command, "run_production_environment_e2e")
+    assert [launch.environment for launch in prepared] == ["development", "production"]
     assert [Path(launch.config_path) for launch in prepared] == [
         environments_root / "development.yaml",
+        environments_root / "production.yaml",
     ]
     assert served == [
         ("ui", 8081, str(tmp_path / ".tmp" / "development.yaml")),
+        ("ui", 8081, str(tmp_path / ".tmp" / "production.yaml")),
     ]
     assert qualified == [
         (
@@ -122,18 +122,14 @@ def _assert_uv_environment_entrypoints_launch_the_selected_stack(monkeypatch, tm
                 ),
             },
         )
-        for profile in ("test", "production")
+        for profile in ("test",)
     ]
     output = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
     assert {"environment": "test", "runs": [1, 2]} in output
-    assert {
-        "environment": "production",
-        "restart_persistence_verified": True,
-    } in output
     events = [event for event in output if event.get("event_type") == "environment_lifecycle"]
     assert [(event["environment"], event["state"]) for event in events] == [
         (profile, state)
-        for profile in ("development",)
+        for profile in ("development", "production")
         for state in ("starting", "ready", "stopped")
     ]
     assert all(event["event_type"] == "environment_lifecycle" for event in events)
