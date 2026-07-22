@@ -200,6 +200,48 @@ def _validate_development_controlled_stop_interrupts_the_console_group(
     assert wait_timeouts == [180]
 
 
+def _validate_development_controlled_stop_accepts_only_its_windows_break_exit(
+    tmp_path: Path,
+) -> None:
+    import app.platform.development_e2e as development_e2e
+
+    windows_control_c_exit = 0xC000013A
+    signals: list[object] = []
+
+    class Process:
+        returncode = None
+
+        def __init__(self, return_code: int) -> None:
+            self._return_code = return_code
+
+        @staticmethod
+        def poll():
+            return None
+
+        def send_signal(self, event) -> None:
+            signals.append(event)
+
+        def wait(self, *, timeout: int) -> int:
+            assert timeout == 180
+            return self._return_code
+
+    with pytest.raises(
+        development_e2e.DevelopmentE2EError,
+        match="DEVELOPMENT_E2E_COMMAND_STOP_FAILED: code=1",
+    ):
+        development_e2e._stop_development_command(
+            repository_root=tmp_path,
+            process=Process(return_code=1),
+        )
+
+    development_e2e._stop_development_command(
+        repository_root=tmp_path,
+        process=Process(return_code=windows_control_c_exit),
+    )
+
+    assert signals == [signal.CTRL_BREAK_EVENT, signal.CTRL_BREAK_EVENT]
+
+
 def _validate_development_entrypoint_maps_console_break_to_keyboard_interrupt(
     monkeypatch,
 ) -> None:
@@ -317,6 +359,9 @@ def test_development_real_e2e_unit(monkeypatch, tmp_path: Path) -> None:
     _validate_development_process_owns_a_windows_console_group(monkeypatch, tmp_path)
     _validate_development_controlled_stop_interrupts_the_console_group(
         monkeypatch,
+        tmp_path,
+    )
+    _validate_development_controlled_stop_accepts_only_its_windows_break_exit(
         tmp_path,
     )
     _validate_development_entrypoint_maps_console_break_to_keyboard_interrupt(monkeypatch)
