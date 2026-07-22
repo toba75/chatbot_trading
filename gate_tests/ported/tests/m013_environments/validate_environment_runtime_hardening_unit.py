@@ -7,7 +7,10 @@ from pathlib import Path
 import pytest
 
 
-def test_environment_runtime_hardening_unit(tmp_path: Path) -> None:
+def test_environment_runtime_hardening_unit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Given trois profils, When un participant agit, Then son identité précède tout effet."""
 
     from app.platform.configuration import load_application_configuration
@@ -141,6 +144,53 @@ def test_environment_runtime_hardening_unit(tmp_path: Path) -> None:
     assert "ignore_errors=True" not in restore_source
     assert "RESTORE_COMPENSATION_FAILED" in restore_source
 
+    # La clé Qdrant du profil est transmise à tous les appels REST ; aucun client
+    # d'identité, d'écriture, de recherche ou de readiness ne reste anonyme.
+    from app.knowledge_access.adapters import live_documentary_retrieval, projection_runtime
+    from app.knowledge_access.adapters.live_documentary_retrieval import QdrantSparseChunkSelector
+    from app.knowledge_access.adapters.projection_runtime import QdrantHttpClient
+
+    qdrant_calls = []
+    monkeypatch.setattr(
+        projection_runtime,
+        "urlopen",
+        lambda request, timeout: _QdrantJsonResponse(
+            request=request,
+            timeout=timeout,
+            calls=qdrant_calls,
+            payload={"result": {"status": "green"}, "status": "ok"},
+        ),
+    )
+    QdrantHttpClient(
+        base_url="http://qdrant-development:6333",
+        timeout_seconds=5,
+        dense_dimensions=8,
+        api_key="development-qdrant-key-00000001",
+    ).ensure_collection(collection_name="ostrading-development-knowledge-access")
+
+    monkeypatch.setattr(
+        live_documentary_retrieval,
+        "urlopen",
+        lambda request, timeout: _QdrantJsonResponse(
+            request=request,
+            timeout=timeout,
+            calls=qdrant_calls,
+            payload={"result": {"points": []}, "status": "ok"},
+        ),
+    )
+    assert QdrantSparseChunkSelector(
+        qdrant_url="http://qdrant-development:6333",
+        collection_name="ostrading-development-knowledge-access",
+        timeout_seconds=5,
+        api_key="development-qdrant-key-00000001",
+    ).select_chunk_ids(
+        projection_id="PROJ-" + "A" * 64,
+        question="Quelle preuve ?",
+        limit=4,
+    ) == ()
+    assert len(qdrant_calls) == 2
+    assert all(call["headers"].get("api-key") == "development-qdrant-key-00000001" for call in qdrant_calls)
+
 
 class _FailingQdrantIdentityClient:
     def __init__(self, collection_name: str) -> None:
@@ -167,3 +217,27 @@ class _FailingQdrantIdentityClient:
         self.compensations += 1
         self.collections = ()
         self.observed = None
+
+
+class _QdrantJsonResponse:
+    def __init__(self, *, request, timeout, calls, payload) -> None:
+        self.request = request
+        self.timeout = timeout
+        self.calls = calls
+        self.payload = payload
+
+    def __enter__(self):
+        self.calls.append(
+            {
+                "headers": {key.lower(): value for key, value in self.request.header_items()},
+                "timeout": self.timeout,
+                "url": self.request.full_url,
+            }
+        )
+        return self
+
+    def __exit__(self, exc_type, exc, traceback):
+        return False
+
+    def read(self):
+        return json.dumps(self.payload).encode("utf-8")

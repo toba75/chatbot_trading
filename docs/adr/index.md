@@ -35,7 +35,7 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 | [ADR-027](ADR-027-composition-http-et-observation-flux.md) | Composition HTTP précoce et observation complète des flux | Acceptée | 2026-07-13 | Aucun | Aucune |
 | [ADR-028](ADR-028-admission-documentaire-locale-authentifiee.md) | Admission documentaire locale authentifiée et bornée | Acceptée | 2026-07-13 | Aucun | Aucune |
 | [ADR-029](ADR-029-gate-python-uv-manifeste-unique.md) | Gate Python uv à manifeste unique | Acceptée | 2026-07-13 | ADR-010 | Aucune |
-| [ADR-030](ADR-030-bootstrap-local-ui-api.md) | Bootstrap local de l’UI via l’API réelle | Acceptée | 2026-07-13 | Aucun | Aucune |
+| [ADR-030](ADR-030-bootstrap-local-ui-api.md) | Bootstrap local de l’UI via l’API réelle | Acceptée | 2026-07-13 | Aucun | ADR-046 pour le point d'entrée opérateur local |
 | [ADR-031](ADR-031-actions-ui-execution-et-progression-publique.md) | Actions UI exécutables et progression publique | Acceptée | 2026-07-13 | Aucun | Aucune |
 | [ADR-032](ADR-032-execution-reelle-conversion-canonique.md) | Exécution réelle et reproductible de la conversion canonique | Remplacée | 2026-07-13 | Aucun | ADR-035 |
 | [ADR-033](ADR-033-priorite-signaux-routage-ocr.md) | Priorité des signaux pour les routes OCR atteignables | Acceptée | 2026-07-14 | Aucun | Aucune |
@@ -50,7 +50,8 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 | [ADR-042](ADR-042-capacite-docling-partagee.md) | Capacité Docling partagée | Acceptée | 2026-07-16 | Capacité des processus Docling d’ADR-040 | Aucune |
 | [ADR-043](ADR-043-priorite-scan-sans-texte-natif.md) | Priorité au scan sans texte natif | Acceptée | 2026-07-16 | `COMPLEX_VISUAL` sans texte natif d’ADR-033 | Aucune |
 | [ADR-044](ADR-044-autorite-native-page-visuelle-complexe.md) | Autorité native d’une page visuelle complexe | Acceptée | 2026-07-16 | Priorité ADR-033 et candidat natif ADR-040 pour texte parcellaire | Aucune |
-| [ADR-045](ADR-045-profils-execution-explicites-donnees-etanches.md) | Profils d'exécution explicites et données étanches | Acceptée | 2026-07-21 | ADR-016 | Aucune |
+| [ADR-045](ADR-045-profils-execution-explicites-donnees-etanches.md) | Profils d'exécution explicites et données étanches | Remplacée | 2026-07-21 | ADR-016 | ADR-046 |
+| [ADR-046](ADR-046-profils-locaux-etanches-sur-autorite-docker-explicite.md) | Profils locaux étanches sur une autorité Docker explicite | Acceptée | 2026-07-22 | ADR-045 ; point d'entrée opérateur local d'ADR-030 | Aucune |
 
 ## ADR DDD
 
@@ -72,7 +73,7 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 ## Prochains numéros disponibles
 
 ```text
-Prochaine ADR technique: ADR-046
+Prochaine ADR technique: ADR-047
 Prochaine DDD-ADR: DDD-ADR-013
 ```
 

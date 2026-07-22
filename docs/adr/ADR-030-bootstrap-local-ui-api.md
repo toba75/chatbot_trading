@@ -4,7 +4,7 @@
 **Date :** 2026-07-13
 **Décideurs :** Propriétaire du projet
 **Remplace :** Aucun
-**Remplacée par :** Aucune
+**Remplacée par :** ADR-046 pour le point d'entrée opérateur local
 **Source :** Demande utilisateur du 2026-07-13 ; `docs/specs/ui.md` ; ADR-018 ; ADR-026 ; ADR-028
 
 ## Contexte

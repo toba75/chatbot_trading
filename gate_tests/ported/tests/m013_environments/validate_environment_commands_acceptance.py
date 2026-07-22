@@ -41,6 +41,16 @@ def _assert_uv_environment_entrypoints_launch_the_selected_stack(monkeypatch, tm
         "production": "app.platform.environment_command:production",
     }
     assert {profile: scripts.get(profile) for profile in expected_entrypoints} == expected_entrypoints
+    assert "ui" not in scripts
+
+    repository_root = Path(__file__).resolve().parents[4]
+    for active_document in (
+        "docs/runbooks/exploitation_locale.md",
+        "docs/runbooks/ingestion_pdf.md",
+        "docs/specs/m004_version_canonique_publiee.md",
+        "docs/specs/ui.md",
+    ):
+        assert "uv run ui" not in (repository_root / active_document).read_text(encoding="utf-8")
 
     environments_root = tmp_path / "config" / "environments"
     environments_root.mkdir(parents=True)

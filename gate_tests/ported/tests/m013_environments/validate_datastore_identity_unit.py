@@ -159,12 +159,14 @@ def test_datastore_identity_unit(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
         base_url="http://qdrant.test:6333",
         timeout_seconds=9,
         collection_name=identity_collection,
+        api_key="test-qdrant-key-identity-00000001",
     )
     assert rest_client.list_collections() == (identity_collection,)
     assert rest_client.read_identity() == expected.to_mapping()
     rest_client.initialize_identity(expected)
     assert [call[0] for call in http_calls] == ["GET", "POST", "PUT", "PUT"]
     assert all(call[2] == 9 for call in http_calls)
+    assert all(call[4].get("api-key") == "test-qdrant-key-identity-00000001" for call in http_calls)
 
     postgres_preflight = PostgresIdentityPreflight(expected_identity=expected)
     empty_postgres = _PostgresIdentityCursor(object_count=0)
@@ -282,7 +284,8 @@ class _QdrantResponse:
 
     def __enter__(self):
         body = None if self.request.data is None else json.loads(self.request.data.decode("utf-8"))
-        self.calls.append((self.request.get_method(), self.request.full_url, self.timeout, body))
+        headers = {key.lower(): value for key, value in self.request.header_items()}
+        self.calls.append((self.request.get_method(), self.request.full_url, self.timeout, body, headers))
         return self
 
     def __exit__(self, exc_type, exc, traceback):

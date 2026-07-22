@@ -1,10 +1,10 @@
 # ADR-045 - Profils d'exécution explicites et données étanches
 
-**Statut :** Acceptée
+**Statut :** Remplacée
 **Date :** 2026-07-21
 **Décideurs :** Propriétaire du projet
 **Remplace :** ADR-016
-**Remplacée par :** Aucune
+**Remplacée par :** ADR-046
 **Source :** Demande utilisateur du 2026-07-21; ADR-016; `docs/specs/m013_config_configuration_applicative.md`; `docs/specs/plan_implementation_milestones_workstreams.md`
 
 ## Contexte

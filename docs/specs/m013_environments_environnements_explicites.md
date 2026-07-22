@@ -6,8 +6,8 @@
 - Milestone : `M13-environments - Environnements explicites et données étanches`.
 - Domaine : plateforme d'exécution et exploitation.
 - Bounded context propriétaire : `platform.configuration`.
-- ADR applicable : ADR-045 - Profils d'exécution explicites et données étanches.
-- ADR remplacée : ADR-016 pour la règle du chemin unique `config/application.yaml`; ses interdictions de variables d'environnement, de fallback et de secrets en clair sont conservées par ADR-045.
+- ADR applicable : ADR-046 - Profils locaux étanches sur une autorité Docker explicite.
+- ADR remplacée : ADR-045, qui remplaçait ADR-016. Les interdictions de variables d'environnement, de fallback et de secrets en clair restent applicables.
 
 Cette spécification fixe le contrat cible avant sa réalisation. T-002 ne modifie ni `config/application.schema.json`, ni le chargeur, ni les stockages, ni les workers. Les fichiers de profils et leurs comportements exécutables sont livrés par les tâches suivantes.
 
@@ -54,7 +54,7 @@ uv run production
 
 Le mapping interne cible exactement le fichier de la ligne correspondante dans la table précédente. Il est codé dans le lanceur et n'est configurable ni par argument générique, ni par fichier annexe, ni par variable système.
 
-Le chemin `--config` demeure un détail d'appel interne des processus qui le requièrent pendant la migration. Il n'est ni une quatrième commande opérateur ni un mécanisme permettant de choisir une configuration contradictoire. Aucun fichier historique `config/application.yaml` n'est utilisé comme fallback.
+Le chemin `--config` demeure un détail d'appel interne des processus qui le requièrent pendant la migration. Il n'est ni une quatrième commande opérateur ni un mécanisme permettant de choisir une configuration contradictoire. Le script projet historique `ui` est retiré : l'UI est un service interne de la pile sélectionnée. Aucun fichier historique `config/application.yaml` n'est utilisé comme fallback.
 
 ## Forme cible du schéma
 
@@ -121,7 +121,9 @@ Deux profils ne partagent aucune coordonnée, autorité d'écriture ou identité
 
 Les racines détaillées de M13-config — `data_root`, `corpus_root`, `canonical_sources_root`, `qdrant_storage_root`, `postgres_data_root`, `reports_root`, `logs_root`, `experiments_root` et `cache_root` — doivent être disjointes entre les profils. Une racine parente commune qui permettrait une traversée ou une suppression croisée est interdite.
 
-Une simple différence de préfixe de table, collection ou clé dans un stockage partagé ne prouve pas l'étanchéité. `production` utilise une infrastructure et des autorités distinctes de `development` et `test`. La CI de `test` ne reçoit aucun endpoint, rôle, credential ou secret de `production`.
+Une simple différence de préfixe de table, collection ou clé dans un stockage partagé ne prouve pas l'étanchéité. Sur la station de qualification locale, les trois profils peuvent utiliser le même daemon Docker, mais jamais la même autorité de données : projets Compose, réseaux, volumes, bases, rôles, credentials, clés Qdrant, collections, files, identités et racines restent distincts. Le profil local `production` qualifie le comportement de production sans certifier un hébergement physique dédié. Un déploiement de production distant fournit sa propre autorité d'orchestration et ses propres secrets. La CI de `test` ne reçoit aucun endpoint, rôle, credential ou secret de `production`.
+
+Qdrant refuse les appels anonymes. Son serveur lit la clé propre au profil et tous les appels d'identité, de readiness, d'écriture, de lecture et de recherche transmettent l'en-tête `api-key`. Chaque service reçoit uniquement les secrets qu'il consomme. Le moteur OCR DinD n'écoute pas sur TCP 2375 : le worker documentaire le pilote par un socket Unix contenu dans un volume propre au profil, sans montage du socket Docker hôte.
 
 Un secret en clair est interdit dans les fichiers versionnés. Chaque fichier référence seulement ses propres chemins de secrets. Un chemin identique entre deux profils constitue une collision, même si le contenu présent sur deux machines pourrait différer.
 
@@ -179,7 +181,7 @@ Les erreurs M13-config restent applicables. Une clé `application.environment` o
 - Aucun contrat de job, worker ou état de santé n'est encore modifié.
 - Aucun service n'est démarré, arrêté ou reconfiguré.
 
-Ces exclusions ne sont pas des alternatives autorisées. Elles séquencent la livraison : ADR-045 et ce contrat gouvernent obligatoirement T-003 à T-012.
+Ces exclusions ne sont pas des alternatives autorisées. Elles séquencent la livraison : ADR-046 et ce contrat gouvernent obligatoirement T-003 à T-012.
 
 ## Validation de T-002
 
