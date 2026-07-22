@@ -3730,6 +3730,17 @@ depends_on = ["precondition.m013_config"]
 live = false
 
 [[nodes]]
+id = "test.m013-environments.validate-worker-healthcheck-serialization-unit"
+path = "gate_tests/ported/tests/m013_environments/validate_worker_healthcheck_serialization_unit.py"
+kind = "test"
+scope = "m013_environments"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m013_config"]
+live = false
+
+[[nodes]]
 id = "test.m013-environments.validate-worker-environment-identity-acceptance"
 path = "gate_tests/ported/tests/m013_environments/validate_worker_environment_identity_acceptance.py"
 kind = "test"
