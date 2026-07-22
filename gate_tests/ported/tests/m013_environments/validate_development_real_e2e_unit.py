@@ -81,7 +81,14 @@ def _validate_development_proof_reemits_five_qualification_pages_with_unique_met
 
     source_bytes = source_pdf.read_bytes()
     derived_bytes = derived_pdf.read_bytes()
-    assert len(PdfReader(str(source_pdf), strict=True).pages) == 5
+    source_reader = PdfReader(str(source_pdf), strict=True)
+    assert len(source_reader.pages) == 5
+    bibliographic_evidence = " ".join(
+        " ".join((page.extract_text() or "").split())
+        for page in source_reader.pages
+    )
+    assert "The Original Turtle Trading Rules" in bibliographic_evidence
+    assert "Curtis Faith, an Original Turtle" in bibliographic_evidence
     assert _qualification_route_names(source_pdf) == _EXPECTED_QUALIFICATION_ROUTES
     manifest = json.loads(
         (
