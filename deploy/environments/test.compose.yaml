@@ -2,7 +2,6 @@ name: ostrading-test
 
 x-profile-volumes: &profile-volumes
   - ../../config/environments/test.yaml:/workspace/config/application.yaml:ro
-  - ../../config/secrets/test:/workspace/config/secrets/test:ro
 
 services:
   edge-gateway:
@@ -13,14 +12,23 @@ services:
 
   ui:
     volumes: *profile-volumes
+    secrets:
+      - source: local_api_token
+        target: /workspace/config/secrets/test/local_api_token
 
   orchestrator-api:
     expose:
       - "8081"
     volumes:
       - ../../config/environments/test.yaml:/workspace/config/application.yaml:ro
-      - ../../config/secrets/test:/workspace/config/secrets/test:ro
       - application-data:/workspace/data/environments/test
+    secrets:
+      - source: postgres_password
+        target: /workspace/config/secrets/test/postgres_password
+      - source: qdrant_api_key
+        target: /workspace/config/secrets/test/qdrant_api_key
+      - source: local_api_token
+        target: /workspace/config/secrets/test/local_api_token
 
   llm-gateway:
     command:
@@ -84,16 +92,22 @@ services:
   worker-documents:
     volumes:
       - ../../config/environments/test.yaml:/workspace/config/application.yaml:ro
-      - ../../config/secrets/test:/workspace/config/secrets/test:ro
       - application-data:/workspace/data/environments/test
       - ../../data/docling_assets/native:/workspace/data/environments/test/docling_assets/native:ro
       - ../../data/docling_assets/granite:/workspace/data/environments/test/docling_assets/granite:ro
+    secrets:
+      - source: postgres_password
+        target: /workspace/config/secrets/test/postgres_password
 
   worker-projection:
     volumes:
       - ../../config/environments/test.yaml:/workspace/config/application.yaml:ro
-      - ../../config/secrets/test:/workspace/config/secrets/test:ro
       - application-data:/workspace/data/environments/test
+    secrets:
+      - source: postgres_password
+        target: /workspace/config/secrets/test/postgres_password
+      - source: qdrant_api_key
+        target: /workspace/config/secrets/test/qdrant_api_key
 
 networks:
   edge:
@@ -102,8 +116,6 @@ networks:
     name: ostrading-test-core
   spark-egress:
     name: ostrading-test-spark-egress
-  ocr-control:
-    name: ostrading-test-ocr-control
   ocr-egress:
     name: ostrading-test-ocr-egress
 
@@ -122,9 +134,13 @@ volumes:
     name: ostrading-test-model-cache
   ocr-runtime-data:
     name: ostrading-test-ocr-runtime-data
+  ocr-runtime-socket:
+    name: ostrading-test-ocr-runtime-socket
 
 secrets:
   postgres_password:
     file: ../../config/secrets/test/postgres_password
   local_api_token:
     file: ../../config/secrets/test/local_api_token
+  qdrant_api_key:
+    file: ../../config/secrets/test/qdrant_api_key

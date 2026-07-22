@@ -31,7 +31,7 @@ ENV PATH="/workspace/.venv/bin:${PATH}"
 
 WORKDIR /workspace
 
-RUN groupadd --system ostrading \
+RUN groupadd --system --gid 31000 ostrading \
     && useradd --system --gid ostrading --home-dir /workspace ostrading \
     && mkdir -p \
         /workspace/data/corpus \
@@ -39,6 +39,9 @@ RUN groupadd --system ostrading \
         /workspace/data/environments/development \
         /workspace/data/environments/test \
         /workspace/data/environments/production \
+        /workspace/config/secrets/development \
+        /workspace/config/secrets/test \
+        /workspace/config/secrets/production \
     && chown -R ostrading:ostrading /workspace/data
 
 COPY --from=builder --chown=ostrading:ostrading /workspace/.venv /workspace/.venv
@@ -58,7 +61,7 @@ ENTRYPOINT ["api"]
 
 FROM runtime AS worker-documents
 
-ENV DOCKER_HOST="tcp://ocr-runtime:2375"
+ENV DOCKER_HOST="unix:///var/run/ocr-docker/docker.sock"
 
 COPY --from=docker-cli /usr/local/bin/docker /usr/local/bin/docker
 COPY --chown=ostrading:ostrading config/ocrmypdf-image.json ./config/ocrmypdf-image.json

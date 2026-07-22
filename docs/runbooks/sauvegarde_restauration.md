@@ -7,7 +7,7 @@
 - Contrat: `M013-BackupManifest-1.0`
 - Tâche: `docs/tasks/milestone_013/0010_publier_runbooks_documentation_utilisateur.md`
 - Preuve source: `docs/governance/m013_backup_restore_drill.md`
-- ADR applicables: ADR-009, ADR-013, ADR-021, ADR-045, DDD-ADR-004, DDD-ADR-010
+- ADR applicables: ADR-009, ADR-013, ADR-021, ADR-046, DDD-ADR-004, DDD-ADR-010
 - ADR: non requise; ce runbook documente le drill T-007 sans créer une nouvelle politique de sauvegarde.
 
 ## Scénario BDD

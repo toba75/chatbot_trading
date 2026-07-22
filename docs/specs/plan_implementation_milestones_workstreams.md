@@ -511,7 +511,7 @@ git ls-tree -r --name-only master -- docs/tasks docs/adr docs/specs
   - When l'exploitant lance l'une des trois commandes UV et soumet un PDF au parcours public réel
   - Then l'API, l'outbox, le relais, les workers, PostgreSQL, Qdrant et les fichiers utilisent exclusivement l'environnement choisi, publient la progression réelle et refusent toute incohérence d'identité avant le premier travail
 - Livrables:
-  - ADR-045 décidant les profils explicites et remplaçant ADR-016 pour le nom de fichier unique `config/application.yaml`, sans réintroduire de variable d'environnement ni de fallback;
+  - ADR-046 remplaçant ADR-045, décidant les profils locaux explicites sur une autorité Docker honnêtement déclarée et retirant le point d'entrée `ui`, sans réintroduire de variable d'environnement ni de fallback;
   - contrat strict `environment` et `deployment_id`, avec trois fichiers complets `config/environments/development.yaml`, `test.yaml` et `production.yaml` sans héritage implicite;
   - scripts UV `development`, `test` et `production` comme seules commandes opérateur, avec mapping interne non configurable vers le fichier attendu;
   - stockages, rôles, credentials, volumes, réseaux, chemins, artefacts, caches, files et outbox distincts par environnement;
@@ -615,7 +615,7 @@ Les points suivants doivent déclencher une vérification ADR avant implémentat
 | Gemma 4 servi par vLLM sur Spark | M-002 | Oui |
 | Snapshots immuables pour stratégies et expériences | M-010 ou M-011 | Oui |
 | Configuration applicative par fichier unique sans variables d'environnement | M13-config | ADR-016 |
-| Profils `development`, `test`, `production` explicites et isolation des données/workers | M13-environments | ADR-045 à créer, remplaçant ADR-016 pour le chemin unique |
+| Profils `development`, `test`, `production` explicites et isolation des données/workers | M13-environments | ADR-046, remplaçant ADR-045 qui remplaçait ADR-016 |
 | Framework ASGI et serveur HTTP de l'API orchestratrice | M13-FastAPI | ADR-019 à créer |
 
 Une ADR acceptée ne doit pas être réécrite pour changer son sens. Toute évolution doit créer une nouvelle ADR remplaçante.

@@ -2,7 +2,6 @@ name: ostrading-development
 
 x-profile-volumes: &profile-volumes
   - ../../config/environments/development.yaml:/workspace/config/application.yaml:ro
-  - ../../config/secrets/development:/workspace/config/secrets/development:ro
 
 services:
   edge-gateway:
@@ -13,14 +12,23 @@ services:
 
   ui:
     volumes: *profile-volumes
+    secrets:
+      - source: local_api_token
+        target: /workspace/config/secrets/development/local_api_token
 
   orchestrator-api:
     expose:
       - "8080"
     volumes:
       - ../../config/environments/development.yaml:/workspace/config/application.yaml:ro
-      - ../../config/secrets/development:/workspace/config/secrets/development:ro
       - application-data:/workspace/data/environments/development
+    secrets:
+      - source: postgres_password
+        target: /workspace/config/secrets/development/postgres_password
+      - source: qdrant_api_key
+        target: /workspace/config/secrets/development/qdrant_api_key
+      - source: local_api_token
+        target: /workspace/config/secrets/development/local_api_token
 
   llm-gateway:
     command:
@@ -84,16 +92,22 @@ services:
   worker-documents:
     volumes:
       - ../../config/environments/development.yaml:/workspace/config/application.yaml:ro
-      - ../../config/secrets/development:/workspace/config/secrets/development:ro
       - application-data:/workspace/data/environments/development
       - ../../data/docling_assets/native:/workspace/data/environments/development/docling_assets/native:ro
       - ../../data/docling_assets/granite:/workspace/data/environments/development/docling_assets/granite:ro
+    secrets:
+      - source: postgres_password
+        target: /workspace/config/secrets/development/postgres_password
 
   worker-projection:
     volumes:
       - ../../config/environments/development.yaml:/workspace/config/application.yaml:ro
-      - ../../config/secrets/development:/workspace/config/secrets/development:ro
       - application-data:/workspace/data/environments/development
+    secrets:
+      - source: postgres_password
+        target: /workspace/config/secrets/development/postgres_password
+      - source: qdrant_api_key
+        target: /workspace/config/secrets/development/qdrant_api_key
 
 networks:
   edge:
@@ -102,8 +116,6 @@ networks:
     name: ostrading-development-core
   spark-egress:
     name: ostrading-development-spark-egress
-  ocr-control:
-    name: ostrading-development-ocr-control
   ocr-egress:
     name: ostrading-development-ocr-egress
 
@@ -122,9 +134,13 @@ volumes:
     name: ostrading-development-model-cache
   ocr-runtime-data:
     name: ostrading-development-ocr-runtime-data
+  ocr-runtime-socket:
+    name: ostrading-development-ocr-runtime-socket
 
 secrets:
   postgres_password:
     file: ../../config/secrets/development/postgres_password
   local_api_token:
     file: ../../config/secrets/development/local_api_token
+  qdrant_api_key:
+    file: ../../config/secrets/development/qdrant_api_key

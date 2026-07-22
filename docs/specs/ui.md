@@ -30,7 +30,7 @@ La cible ergonomique est un outil de travail sobre, pas une landing page. Le pre
 Scénario BDD :
 
 - Given un utilisateur local possède le dépôt et Docker mais n’a pas démarré manuellement PostgreSQL ni `orchestrator-api`.
-- When il exécute `uv run ui`.
+- When il exécute `uv run development`.
 - Then le bootstrap local prépare les dépendances réelles, sert l’UI sur son port publié et conserve le trajet UI vers `orchestrator-api` ; une dépendance indisponible produit une erreur explicite sans backend de substitution.
 
 Ce bootstrap est un parcours de développement local. Il ne remplace pas le déploiement Compose reproductible d’ADR-026 et ne prétend pas lever les limites métier explicitement non livrées.
@@ -303,7 +303,7 @@ Si ces lectures n'existent pas encore, l'UI doit être considérée non impléme
 | UI-015 - Frontière API orchestratrice obligatoire | Toute capacité UI passe par un contrat `orchestrator-api` câblé au cas d'usage réel; un contrat absent, non câblé ou indisponible laisse la fonction UI explicitement non opérationnelle sans mock, stub, fake ni fallback. | Given une action UI dépend d'un contrat applicatif; When ce contrat est absent, non câblé ou indisponible; Then l'UI affiche le blocage et n'exécute aucun comportement de substitution. |
 | UI-016 - Contrats documentaires stricts | Les statuts SP publics sont partagés avec le client; un diagnostic exige le même `document_id`, un manifeste et des pages complètes, uniques et ordonnées, ainsi que des compteurs et nullabilités cohérents. | Given l'API retourne un diagnostic ou une conversion; When le client UI parse le DTO; Then toute divergence d'identité, page, compteur, statut ou nullabilité est refusée explicitement. |
 | UI-017 - Navigation HTML accessible | Un POST UI réussi suit `POST-Redirect-GET`; une erreur reste une page française actionnable avec `role=alert`, lien de réessai et aucun JSON brut. | Given l'utilisateur ajoute ou diagnostique un PDF; When l'orchestrateur répond; Then le navigateur rejoint le corpus en succès ou affiche une erreur sémantique accessible. |
-| UI-018 - Origine orchestratrice explicite | `uv run ui` vise l'adresse loopback configurée depuis l'hôte; le service Compose vise le DNS `orchestrator-api`; un contexte inconnu est refusé sans fallback. | Given l'UI démarre sur l'hôte ou dans Compose; When son client HTTP est construit; Then une seule origine validée est sélectionnée explicitement pour ce contexte. |
+| UI-018 - Origine orchestratrice explicite | L'UI est un service interne de la pile sélectionnée par `uv run development`, `uv run test` ou `uv run production`; elle vise uniquement le DNS `orchestrator-api` de cette pile et un contexte inconnu est refusé sans fallback. | Given l'UI démarre dans un profil explicite; When son client HTTP est construit; Then une seule origine validée est sélectionnée pour ce profil. |
 | UI-019 - Action réellement exécutable et observable | Une action asynchrone disponible exige toute la chaîne réelle `API -> outbox -> relais -> worker -> état public`; elle publie une phase générique, des unités réalisées et le total, puis l’UI les rend et se rafraîchit tant que l’action n’est pas terminale. | Given un diagnostic est demandé depuis l’UI; When l’outbox est relayée et le worker traite le PDF; Then l’UI affiche `QUEUED` ou `RUNNING` avec une progression persistée, puis `SUCCEEDED` ou `FAILED`, sans état synthétique ni fallback. |
 
 ## Exclusions

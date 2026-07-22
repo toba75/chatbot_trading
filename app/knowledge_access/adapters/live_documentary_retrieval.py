@@ -216,16 +216,26 @@ class CanonicalProjectionChunkReader:
 class QdrantSparseChunkSelector:
     """Interroge la projection Qdrant réelle avec le profil sparse publié."""
 
-    def __init__(self, *, qdrant_url: str, collection_name: str, timeout_seconds: int) -> None:
+    def __init__(
+        self,
+        *,
+        qdrant_url: str,
+        collection_name: str,
+        timeout_seconds: int,
+        api_key: str,
+    ) -> None:
         if not isinstance(qdrant_url, str) or qdrant_url.strip() == "" or qdrant_url != qdrant_url.strip():
             raise ValueError("qdrant_url invalide")
         if isinstance(timeout_seconds, bool) or not isinstance(timeout_seconds, int) or timeout_seconds < 1:
             raise ValueError("qdrant_timeout invalide")
         if not isinstance(collection_name, str) or re.fullmatch(r"[a-z0-9]+(?:[-_][a-z0-9]+)*", collection_name) is None:
             raise ValueError("qdrant_collection_name invalide")
+        if not isinstance(api_key, str) or len(api_key.encode("utf-8")) < 32:
+            raise ValueError("qdrant_api_key invalide")
         self._qdrant_url = qdrant_url.rstrip("/")
         self._collection_name = collection_name
         self._timeout_seconds = timeout_seconds
+        self._api_key = api_key
 
     def select_chunk_ids(self, *, projection_id: str, question: str, limit: int) -> tuple[str, ...]:
         parsed_projection_id = _identifier(projection_id, "PROJ", "projection_id")
@@ -250,7 +260,7 @@ class QdrantSparseChunkSelector:
         request = Request(
             f"{self._qdrant_url}/collections/{self._collection_name}/points/query",
             data=json.dumps(payload, separators=(",", ":")).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
+            headers={"api-key": self._api_key, "Content-Type": "application/json"},
             method="POST",
         )
         try:

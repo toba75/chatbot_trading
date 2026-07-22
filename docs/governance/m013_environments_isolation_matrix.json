@@ -61,21 +61,18 @@
       "development": [
         "ostrading-development-core",
         "ostrading-development-edge",
-        "ostrading-development-ocr-control",
         "ostrading-development-ocr-egress",
         "ostrading-development-spark-egress"
       ],
       "test": [
         "ostrading-test-core",
         "ostrading-test-edge",
-        "ostrading-test-ocr-control",
         "ostrading-test-ocr-egress",
         "ostrading-test-spark-egress"
       ],
       "production": [
         "ostrading-production-core",
         "ostrading-production-edge",
-        "ostrading-production-ocr-control",
         "ostrading-production-ocr-egress",
         "ostrading-production-spark-egress"
       ]
@@ -87,6 +84,7 @@
         "ostrading-development-caddy-data",
         "ostrading-development-model-cache",
         "ostrading-development-ocr-runtime-data",
+        "ostrading-development-ocr-runtime-socket",
         "ostrading-development-postgres-data-v2",
         "ostrading-development-qdrant-data"
       ],
@@ -96,6 +94,7 @@
         "ostrading-test-caddy-data",
         "ostrading-test-model-cache",
         "ostrading-test-ocr-runtime-data",
+        "ostrading-test-ocr-runtime-socket",
         "ostrading-test-postgres-data",
         "ostrading-test-qdrant-data"
       ],
@@ -105,6 +104,7 @@
         "ostrading-production-caddy-data",
         "ostrading-production-model-cache",
         "ostrading-production-ocr-runtime-data",
+        "ostrading-production-ocr-runtime-socket",
         "ostrading-production-postgres-data",
         "ostrading-production-qdrant-data"
       ]
@@ -112,15 +112,18 @@
     "compose_secrets": {
       "development": [
         "../../config/secrets/development/local_api_token",
-        "../../config/secrets/development/postgres_password"
+        "../../config/secrets/development/postgres_password",
+        "../../config/secrets/development/qdrant_api_key"
       ],
       "test": [
         "../../config/secrets/test/local_api_token",
-        "../../config/secrets/test/postgres_password"
+        "../../config/secrets/test/postgres_password",
+        "../../config/secrets/test/qdrant_api_key"
       ],
       "production": [
         "../../config/secrets/production/local_api_token",
-        "../../config/secrets/production/postgres_password"
+        "../../config/secrets/production/postgres_password",
+        "../../config/secrets/production/qdrant_api_key"
       ]
     }
   },

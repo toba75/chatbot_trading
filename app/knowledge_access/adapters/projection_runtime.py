@@ -102,16 +102,26 @@ class ProjectionRuntimeError(RuntimeError):
 class QdrantHttpClient:
     """Client REST minimal de Qdrant, sans client en mémoire alternatif."""
 
-    def __init__(self, *, base_url: str, timeout_seconds: int, dense_dimensions: int) -> None:
+    def __init__(
+        self,
+        *,
+        base_url: str,
+        timeout_seconds: int,
+        dense_dimensions: int,
+        api_key: str,
+    ) -> None:
         if not isinstance(base_url, str) or base_url.strip() == "":
             raise ValueError("qdrant_url invalide")
         if isinstance(timeout_seconds, bool) or not isinstance(timeout_seconds, int) or timeout_seconds < 1:
             raise ValueError("qdrant_timeout invalide")
         if isinstance(dense_dimensions, bool) or not isinstance(dense_dimensions, int) or dense_dimensions < 1:
             raise ValueError("qdrant_dimensions invalides")
+        if not isinstance(api_key, str) or len(api_key.encode("utf-8")) < 32:
+            raise ValueError("qdrant_api_key invalide")
         self._base_url = base_url.rstrip("/")
         self._timeout_seconds = timeout_seconds
         self._dense_dimensions = dense_dimensions
+        self._api_key = api_key
 
     def ensure_collection(self, *, collection_name: str) -> None:
         response = self._request("GET", f"/collections/{collection_name}", None, allow_not_found=True)
@@ -170,7 +180,11 @@ class QdrantHttpClient:
             f"{self._base_url}{path}",
             data=data,
             method=method,
-            headers={} if data is None else {"Content-Type": "application/json"},
+            headers=(
+                {"api-key": self._api_key}
+                if data is None
+                else {"api-key": self._api_key, "Content-Type": "application/json"}
+            ),
         )
         try:
             with urlopen(request, timeout=self._timeout_seconds) as response:
@@ -233,6 +247,7 @@ class ProjectionRuntimeService:
     qdrant_url: str
     qdrant_collection_name: str
     qdrant_timeout_seconds: int
+    qdrant_api_key: str
     max_parallel_workers: int
     inference_gateway: LlmInferenceGateway
 
@@ -249,6 +264,8 @@ class ProjectionRuntimeService:
             configuration_hash=self.configuration_hash,
         )
         _required_resource_name(self.qdrant_collection_name, "collection Qdrant projection invalide")
+        if not isinstance(self.qdrant_api_key, str) or len(self.qdrant_api_key.encode("utf-8")) < 32:
+            raise ValueError("clé API Qdrant projection invalide")
         _required_positive_int(self.max_parallel_workers, "parallélisme projection invalide")
         if not callable(getattr(self.inference_gateway, "infer", None)):
             raise ValueError("gateway bibliographique de projection invalide")
@@ -565,6 +582,7 @@ class ProjectionRuntimeService:
                 base_url=self.qdrant_url,
                 timeout_seconds=self.qdrant_timeout_seconds,
                 dense_dimensions=_DENSE_DIMENSIONS,
+                api_key=self.qdrant_api_key,
             )
             client.ensure_collection(collection_name=schema.collection_name)
             publication = QdrantVectorIndex(client=client).publish_generation(

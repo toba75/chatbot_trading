@@ -3,7 +3,7 @@
 ## Décision
 
 Le sous-milestone « environnements explicites et données étanches » est GREEN
-au regard d'ADR-045 et des preuves listées ci-dessous. Son statut machine est
+au regard d'ADR-046 et des preuves listées ci-dessous. Son statut machine est
 `SUBMILESTONE_GREEN_M013_OPEN` : cette livraison ne déclare pas le milestone
 M-013 global clôturé.
 
@@ -11,9 +11,9 @@ M-013 global clôturé.
 
 | Profil | Parcours | Issue | Isolation démontrée |
 |---|---:|---|---|
-| development | 1 parcours réel, redémarrage inclus | 3 progressions `SUCCEEDED`, 6 workers, 3 jobs | document absent de test et production, volumes conservés |
-| test | 2 parcours réels depuis des piles vides | 6 progressions `SUCCEEDED`, 6 workers et 3 jobs par cycle | credentials étrangers inaccessibles, seules les ressources test supprimées |
-| production | 1 parcours réel, redémarrage inclus | 3 progressions `SUCCEEDED`, 6 workers, 3 jobs | document absent de development et test, volumes conservés |
+| development | 1 parcours réel, redémarrage inclus | 3 progressions `SUCCEEDED`, 4 workers, 3 jobs | document absent de test et production, volumes conservés |
+| test | 2 parcours réels depuis des piles vides | 6 progressions `SUCCEEDED`, 4 workers et 3 jobs par cycle | credentials étrangers inaccessibles, seules les ressources test supprimées |
+| production | 1 parcours réel, redémarrage inclus | 3 progressions `SUCCEEDED`, 4 workers, 3 jobs | document absent de development et test, volumes conservés |
 
 Les quatre exécutions utilisent le PDF réel de 38 pages, les contrats HTTP
 publics, PostgreSQL, Qdrant, l'outbox, les relais, les workers et le Spark réel.
@@ -43,6 +43,6 @@ secret, token, mot de passe ou contenu complet du PDF n'est copié.
 
 La preuve est RED si un profil manque, si deux exécutions réutilisent un
 identifiant borné, si une ressource mutable ou un worker n'est pas inventorié,
-si une donnée sensible apparaît ou si une trace ne relie plus ADR-045, la
+si une donnée sensible apparaît ou si une trace ne relie plus ADR-046, la
 spécification, le code, les tests, les rapports et le runbook. Aucun écart
 n'est accepté implicitement.

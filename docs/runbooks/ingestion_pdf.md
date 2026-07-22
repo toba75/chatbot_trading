@@ -5,7 +5,7 @@
 - Identifiant : `M013-Runbook-PdfIngestion-1.1`.
 - Contextes : UI locale, SP et plateforme.
 - Sources : `docs/specs/m003_source_enregistree_diagnostiquee_routee.md`, `docs/specs/m013_fastapi_api_orchestratrice.md` et `docs/specs/ui.md`.
-- ADR applicables : ADR-018, ADR-020, ADR-021, ADR-025, ADR-028, ADR-030 et ADR-031.
+- ADR applicables : ADR-018, ADR-020, ADR-021, ADR-025, ADR-028, ADR-031 et ADR-046.
 - Limite : la conversion canonique M-004 et l'indexation KA ne sont pas livrées par M13-FastAPI.
 
 ## Scénario BDD
@@ -16,15 +16,15 @@
 
 ## Préconditions
 
-1. Exécuter `uv run ui` depuis la racine du dépôt. Cette commande vérifie Docker, prépare PostgreSQL local, le gateway LLM, l'API orchestratrice réelle, le worker documentaire réel et les secrets locaux absents hors Git.
-2. Attendre l'ouverture de l'UI sur `http://127.0.0.1:8081/ui/corpus-pdf`.
+1. Fournir hors Git les cinq secrets `config/secrets/development/*`, puis exécuter `uv run development` depuis la racine du dépôt. La commande vérifie Docker et démarre PostgreSQL, Qdrant authentifié, le gateway LLM, l'API orchestratrice et les workers réels du seul profil `development`.
+2. Attendre l'ouverture de l'UI sur `https://localhost:18443/ui/corpus-pdf`.
 3. Si un port requis, Docker, le gateway, l'API ou le worker est indisponible, corriger l'erreur publique affichée ; aucun service, worker ou secret de substitution n'est utilisé.
 
 L'UI et l'API utilisent le même secret local. Le navigateur ne reçoit jamais le token : le serveur UI l'ajoute uniquement à l'appel backend.
 
 ## Ajouter un PDF
 
-1. Ouvrir `http://127.0.0.1:8081/ui/corpus-pdf`.
+1. Ouvrir `https://localhost:18443/ui/corpus-pdf`.
 2. Choisir un fichier `application/pdf` de 50 Mio maximum.
 3. Saisir explicitement le titre, un ou plusieurs auteurs, l'année de publication et l'édition. Le nom du fichier n'est jamais une métadonnée.
 4. Envoyer le formulaire. Une réponse nominale produit une redirection `303` vers le corpus avec `document_id` et le marqueur de doublon.
@@ -70,7 +70,7 @@ Les termes historiques `SourceDocumentId`, `SourceLocator`, quarantaine, route e
 uv run --locked gate
 ```
 
-La gate valide les contrats et l’absence de fallback. La preuve opératoire locale s’exécute séparément avec `uv run ui`, qui démarre les participants réels et rend l’avancement public observable.
+La gate valide les contrats et l’absence de fallback. La preuve opératoire locale s’exécute avec `uv run development`, qui démarre les participants réels du profil et rend l’avancement public observable.
 
 ## Garde-fous
 

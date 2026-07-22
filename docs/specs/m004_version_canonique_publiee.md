@@ -148,7 +148,7 @@ Les adaptateurs Docling s'exécutent dans un processus isolé de l'environnement
 `uv`, sur `docling[vlm]==2.111.0` verrouillé dans `uv.lock`. Les modèles et
 l'image OCRmyPDF sont décrits par révision et SHA-256 dans un manifeste
 d'actifs; ils sont préchargés par une commande explicite. Pendant la conversion
-ou `uv run ui`, tout actif absent, altéré ou non vérifiable produit
+ou `uv run development`, tout actif absent, altéré ou non vérifiable produit
 `CONVERSION_ASSET_MANIFEST_INVALID`; aucun téléchargement silencieux n'est
 autorisé.
 

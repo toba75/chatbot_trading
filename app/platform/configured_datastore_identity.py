@@ -16,6 +16,7 @@ from app.platform.datastore_identity import (
     QdrantRestIdentityClient,
 )
 from app.platform.postgres import PsycopgConnectionFactory
+from app.platform.secret_file import read_required_secret
 
 
 _FILE_ROOT_NAMES: Final = frozenset(
@@ -94,6 +95,10 @@ def build_configured_datastore_preflight(
                     base_url=configuration.services.qdrant.url,
                     timeout_seconds=configuration.runtime.timeouts.startup_seconds,
                     collection_name=configuration.services.qdrant.collections.datastore_identity,
+                    api_key=read_required_secret(
+                        path=Path(configuration.security.secrets.qdrant_api_key_path),
+                        error_code="QDRANT_SECRET_UNREADABLE",
+                    ),
                 ),
                 expected_identity=identity,
                 collection_name=configuration.services.qdrant.collections.datastore_identity,

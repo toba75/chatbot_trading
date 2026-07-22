@@ -25,6 +25,7 @@ from app.platform.postgres import PsycopgConnectionFactory
 from app.platform.postgres_migrations import build_configured_postgres_migration_runner
 from app.platform.llm_gateway.orchestrator_http import UrllibLlmInferenceGateway
 from app.platform.request_context import bind_trace_id, reset_trace_id
+from app.platform.secret_file import read_required_secret
 from app.platform.worker_environment import (
     WorkerHealthFilePublisher,
     build_worker_environment_binding,
@@ -77,6 +78,10 @@ def _run_worker(
         qdrant_url=application_configuration.services.qdrant.url,
         qdrant_collection_name=application_configuration.services.qdrant.collections.knowledge_access,
         qdrant_timeout_seconds=application_configuration.runtime.timeouts.request_seconds,
+        qdrant_api_key=read_required_secret(
+            path=Path(application_configuration.security.secrets.qdrant_api_key_path),
+            error_code="QDRANT_SECRET_UNREADABLE",
+        ),
         max_parallel_workers=application_configuration.services.workers.concurrency,
         inference_gateway=UrllibLlmInferenceGateway(
             endpoint_url=f"{application_configuration.services.llm_gateway.url.rstrip('/')}/v1/infer",

@@ -62,6 +62,7 @@ from app.platform.orchestrator_public_services import PublicContractServices
 from app.platform.llm_gateway.orchestrator_health import HttpHealthOrchestratorDependency
 from app.platform.llm_gateway.orchestrator_http import UrllibLlmInferenceGateway
 from app.platform.postgres import PsycopgConnectionFactory
+from app.platform.secret_file import read_required_secret
 from app.platform.postgres_migrations import (
     POSTGRES_MIGRATIONS_PATH,
     PostgresMigrationRunner,
@@ -419,6 +420,10 @@ def build_orchestrator_composition_root(
         endpoint_url=f"{configuration.services.llm_gateway.url.rstrip('/')}/v1/infer",
         timeout_seconds=configuration.services.llm_gateway.timeout_seconds,
     )
+    qdrant_api_key = read_required_secret(
+        path=Path(configuration.security.secrets.qdrant_api_key_path),
+        error_code="QDRANT_SECRET_UNREADABLE",
+    )
     projection_runtime = ProjectionRuntimeService(
         connection_factory=connection_factory,
         canonical_sources_root=Path(configuration.paths.canonical_sources_root),
@@ -428,6 +433,7 @@ def build_orchestrator_composition_root(
         qdrant_url=configuration.services.qdrant.url,
         qdrant_collection_name=configuration.services.qdrant.collections.knowledge_access,
         qdrant_timeout_seconds=configuration.runtime.timeouts.request_seconds,
+        qdrant_api_key=qdrant_api_key,
         max_parallel_workers=configuration.services.workers.concurrency,
         inference_gateway=inference_gateway,
     )
@@ -442,6 +448,7 @@ def build_orchestrator_composition_root(
             qdrant_url=configuration.services.qdrant.url,
             collection_name=configuration.services.qdrant.collections.knowledge_access,
             timeout_seconds=configuration.runtime.timeouts.request_seconds,
+            api_key=qdrant_api_key,
         ),
         result_limit=4,
     )
@@ -522,12 +529,14 @@ def build_orchestrator_composition_root(
                 health_url=f"{configuration.services.llm_gateway.url}/health",
                 timeout_seconds=configuration.services.llm_gateway.timeout_seconds,
                 not_ready_error_code="LLM_GATEWAY_NOT_READY",
+                api_key=None,
             ),
             HttpHealthOrchestratorDependency(
                 name="qdrant",
                 health_url=f"{configuration.services.qdrant.url.rstrip('/')}/healthz",
                 timeout_seconds=configuration.runtime.timeouts.request_seconds,
                 not_ready_error_code="QDRANT_NOT_READY",
+                api_key=qdrant_api_key,
             ),
         ),
         document_command_router=document_router,

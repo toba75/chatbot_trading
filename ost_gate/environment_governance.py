@@ -532,7 +532,7 @@ def _parse_compose_inventory(path: Path, *, environment: str) -> _ComposeInvento
             _root_section(document, "secrets"),
         )
     )
-    if environment not in project or not networks or not volumes or len(secrets) != 2:
+    if environment not in project or not networks or not volumes or len(secrets) != 3:
         raise EnvironmentGovernanceError("COMPOSE_PROFILE_INVENTORY_INVALID")
     for coordinate in (project, *networks, *volumes, *secrets):
         if environment not in coordinate:
@@ -682,7 +682,7 @@ def _validate_traceability_document(root: Path) -> None:
         )
         if current["status"] != "GREEN":
             raise EnvironmentGovernanceError("TRACEABILITY_REQUIREMENT_RED")
-        if current["adr"] != "docs/adr/ADR-045-profils-execution-explicites-donnees-etanches.md":
+        if current["adr"] != "docs/adr/ADR-046-profils-locaux-etanches-sur-autorite-docker-explicite.md":
             raise EnvironmentGovernanceError("TRACEABILITY_ADR_MISMATCH")
         for key in ("source_task", "specification", "adr"):
             _require_repository_file(root, current[key])
@@ -730,7 +730,7 @@ def _validate_documentation(root: Path) -> None:
     if any(token not in runbook for token in required_runbook_tokens):
         raise EnvironmentGovernanceError("ENVIRONMENT_RUNBOOK_INCOMPLETE")
     for document in (specification, closure, isolation):
-        if "ADR-045" not in document or CLOSURE_STATUS not in document:
+        if "ADR-046" not in document or CLOSURE_STATUS not in document:
             raise EnvironmentGovernanceError("ENVIRONMENT_DOCUMENTATION_INCOMPLETE")
     if any(requirement_id not in traceability for requirement_id in _EXPECTED_TRACEABILITY_IDS):
         raise EnvironmentGovernanceError("TRACEABILITY_MATRIX_INCOMPLETE")

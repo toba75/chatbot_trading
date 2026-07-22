@@ -1,4 +1,4 @@
-"""Bootstrap local explicite des dépendances réelles de ``uv run ui``."""
+"""Bootstrap local historique des dépendances réelles de l'interface."""
 
 from __future__ import annotations
 

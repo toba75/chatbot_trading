@@ -376,15 +376,25 @@ class DatastorePreflightPlan:
 class QdrantRestIdentityClient:
     """Client REST borné au marqueur d'identité de Qdrant."""
 
-    def __init__(self, *, base_url: str, timeout_seconds: int, collection_name: str) -> None:
+    def __init__(
+        self,
+        *,
+        base_url: str,
+        timeout_seconds: int,
+        collection_name: str,
+        api_key: str,
+    ) -> None:
         if not isinstance(base_url, str) or base_url.strip() == "" or base_url != base_url.strip():
             raise ValueError("URL Qdrant d'identité invalide")
         if isinstance(timeout_seconds, bool) or not isinstance(timeout_seconds, int) or timeout_seconds < 1:
             raise ValueError("timeout Qdrant d'identité invalide")
         _require_qdrant_collection_name(collection_name)
+        if not isinstance(api_key, str) or len(api_key.encode("utf-8")) < 32:
+            raise ValueError("clé API Qdrant d'identité invalide")
         self._base_url = base_url.rstrip("/")
         self._timeout_seconds = timeout_seconds
         self._collection_name = collection_name
+        self._api_key = api_key
 
     def list_collections(self) -> tuple[str, ...]:
         payload = self._json_request(method="GET", path="/collections", body=None)
@@ -455,7 +465,9 @@ class QdrantRestIdentityClient:
         body: Mapping[str, Any] | None,
     ) -> Mapping[str, Any]:
         encoded = None if body is None else json.dumps(body, separators=(",", ":")).encode("utf-8")
-        headers = {} if encoded is None else {"Content-Type": "application/json"}
+        headers = {"api-key": self._api_key}
+        if encoded is not None:
+            headers["Content-Type"] = "application/json"
         http_request = request.Request(
             f"{self._base_url}{path}",
             data=encoded,

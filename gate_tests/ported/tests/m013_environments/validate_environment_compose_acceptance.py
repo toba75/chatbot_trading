@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 
@@ -128,6 +129,8 @@ def test_environment_compose_acceptance() -> None:
         )
         assert set(ocr_runtime["networks"]) == {"ocr-egress"}
         assert "2375" not in json.dumps(ocr_runtime, sort_keys=True)
+        assert "addgroup -S -g 31000 ostrading-socket" in ocr_runtime["command"][0]
+        assert "--group=ostrading-socket" in ocr_runtime["command"][0]
         assert "/var/run/docker.sock" not in {
             mount["source"]
             for service in document["services"].values()
@@ -170,4 +173,5 @@ def test_environment_compose_acceptance() -> None:
     assert "config/docling-assets.native.json ./config/docling-assets.native.json" in dockerfile
     assert "config/docling-assets.granite.json ./config/docling-assets.granite.json" in dockerfile
     assert "DOCKER_HOST=\"unix:///var/run/ocr-docker/docker.sock\"" in dockerfile
+    assert "groupadd --system --gid 31000 ostrading" in dockerfile
     assert "tcp://ocr-runtime:2375" not in dockerfile

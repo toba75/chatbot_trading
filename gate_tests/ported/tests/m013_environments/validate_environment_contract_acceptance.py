@@ -31,6 +31,12 @@ _ADR_045_PATH = (
     / "adr"
     / "ADR-045-profils-execution-explicites-donnees-etanches.md"
 )
+_ADR_046_PATH = (
+    _REPOSITORY_ROOT
+    / "docs"
+    / "adr"
+    / "ADR-046-profils-locaux-etanches-sur-autorite-docker-explicite.md"
+)
 _ADR_INDEX_PATH = _REPOSITORY_ROOT / "docs" / "adr" / "index.md"
 
 
@@ -40,23 +46,29 @@ def _read_required(path: Path, error_code: str) -> str:
 
 
 def test_validate_environment_contract_acceptance() -> None:
-    _assert_adr_045_replaces_adr_016_explicitly()
+    _assert_adr_046_replaces_adr_045_explicitly()
     _assert_contract_closes_profiles_identity_and_configuration_sources()
     _assert_contract_isolates_every_mutable_resource_and_worker()
 
 
-def _assert_adr_045_replaces_adr_016_explicitly() -> None:
+def _assert_adr_046_replaces_adr_045_explicitly() -> None:
     adr_016 = _read_required(_ADR_016_PATH, "ADR_016_REQUIRED")
     adr_045 = _read_required(_ADR_045_PATH, "ADR_045_REQUIRED")
+    adr_046 = _read_required(_ADR_046_PATH, "ADR_046_REQUIRED")
     adr_index = _read_required(_ADR_INDEX_PATH, "ADR_INDEX_REQUIRED")
 
     assert "**Statut :** Remplacée" in adr_016
     assert "**Remplacée par :** ADR-045" in adr_016
-    assert "**Statut :** Acceptée" in adr_045
+    assert "**Statut :** Remplacée" in adr_045
     assert "**Remplace :** ADR-016" in adr_045
+    assert "**Remplacée par :** ADR-046" in adr_045
+    assert "**Statut :** Acceptée" in adr_046
+    assert "**Remplace :** ADR-045" in adr_046
     assert "ADR-045-profils-execution-explicites-donnees-etanches.md" in adr_index
     assert "| [ADR-045]" in adr_index
-    assert "Prochaine ADR technique: ADR-046" in adr_index
+    assert "ADR-046-profils-locaux-etanches-sur-autorite-docker-explicite.md" in adr_index
+    assert "| [ADR-046]" in adr_index
+    assert "Prochaine ADR technique: ADR-047" in adr_index
 
 
 def _assert_contract_closes_profiles_identity_and_configuration_sources() -> None:

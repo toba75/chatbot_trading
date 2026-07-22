@@ -2,7 +2,7 @@
 
 ## Statut
 
-- Décision : ADR-045.
+- Décision : ADR-046.
 - Source machine : `docs/governance/m013_environments_isolation_matrix.json`.
 - Statut : `SUBMILESTONE_GREEN_M013_OPEN`.
 
@@ -28,9 +28,9 @@ La source machine inventorie exhaustivement :
   PostgreSQL, Qdrant, files, outbox, progression, neuf racines de fichiers et
   cinq chemins de secrets ;
 - le nom de projet Compose de chaque profil ;
-- les cinq réseaux nommés de chaque profil ;
-- les sept volumes nommés de chaque profil ;
-- les deux montages de secrets Compose de chaque profil.
+- les quatre réseaux nommés de chaque profil ;
+- les huit volumes nommés de chaque profil, dont le socket Unix OCR ;
+- les trois sources de secrets Compose de chaque profil et leur portée minimale par service.
 
 Les identifiants sont distincts entre les trois profils. Les racines résolues
 ne se chevauchent pas. Les chemins de secrets sont des références ; leur

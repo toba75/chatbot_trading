@@ -72,6 +72,24 @@ _SECRET_FILE_NAMES: Final = (
     "tls_ca_certificate.pem",
     "local_api_token",
 )
+_EXPECTED_SERVICE_SECRETS: Final = MappingProxyType(
+    {
+        "edge-gateway": frozenset(),
+        "ui": frozenset(("local_api_token",)),
+        "orchestrator-api": frozenset(
+            ("postgres_password", "qdrant_api_key", "local_api_token")
+        ),
+        "llm-gateway": frozenset(),
+        "postgres": frozenset(("postgres_password",)),
+        "qdrant": frozenset(("qdrant_api_key",)),
+        "granite-docling": frozenset(),
+        "embedding-service": frozenset(),
+        "reranker-service": frozenset(),
+        "ocr-runtime": frozenset(),
+        "worker-documents": frozenset(("postgres_password",)),
+        "worker-projection": frozenset(("postgres_password", "qdrant_api_key")),
+    }
+)
 _STACK_COORDINATES: Final = MappingProxyType(
     {
         "development": (18443, 8080, 8090),
@@ -790,7 +808,6 @@ def _validate_environment_compose_document(
         raise ValueError("ENVIRONMENT_COMPOSE_SERVICE_MATRIX_MISMATCH")
     expected_config = definition.configuration_path.resolve()
     expected_schema = (definition.repository_root / "config" / "application.schema.json").resolve()
-    expected_secrets = definition.secrets_path.resolve()
     for service_id in APPLICATION_SERVICE_IDS:
         service = _required_mapping_value(services[service_id], f"service {service_id}")
         if "environment" in service or "env_file" in service:
@@ -804,12 +821,8 @@ def _validate_environment_compose_document(
         mounts = _mounts_by_target(service, service_id=service_id)
         _require_read_only_bind(mounts, _CONFIG_CONTAINER_PATH, expected_config, service_id)
         _require_read_only_bind(mounts, _SCHEMA_CONTAINER_PATH, expected_schema, service_id)
-        _require_read_only_bind(
-            mounts,
-            f"/workspace/config/secrets/{definition.environment}",
-            expected_secrets,
-            service_id,
-        )
+        if any(target.startswith("/workspace/config/secrets/") for target in mounts):
+            raise ValueError(f"ENVIRONMENT_COMPOSE_SECRET_DIRECTORY_FORBIDDEN: {service_id}")
     postgres = _required_mapping_value(services["postgres"], "service postgres")
     postgres_environment = _required_mapping(postgres, "environment")
     if set(postgres_environment) != {
@@ -827,6 +840,17 @@ def _validate_environment_compose_document(
         healthcheck = service.get("healthcheck")
         if not isinstance(healthcheck, Mapping) or not healthcheck.get("test"):
             raise ValueError(f"ENVIRONMENT_COMPOSE_HEALTHCHECK_MISSING: {service_id}")
+        mounted_secrets = _service_secret_targets(service, service_id=service_id)
+        if frozenset(mounted_secrets) != _EXPECTED_SERVICE_SECRETS[service_id]:
+            raise ValueError(f"ENVIRONMENT_COMPOSE_SECRET_SCOPE_INVALID: {service_id}")
+        for secret_id, target in mounted_secrets.items():
+            expected_target = (
+                f"/run/secrets/{secret_id}"
+                if service_id in {"postgres", "qdrant"}
+                else f"/workspace/config/secrets/{definition.environment}/{secret_id}"
+            )
+            if target != expected_target:
+                raise ValueError(f"ENVIRONMENT_COMPOSE_SECRET_TARGET_INVALID: {service_id}")
     edge = _required_mapping_value(services["edge-gateway"], "service edge-gateway")
     ports = edge.get("ports")
     if not isinstance(ports, list) or len(ports) != 1:
@@ -839,12 +863,36 @@ def _validate_environment_compose_document(
     ):
         raise ValueError("ENVIRONMENT_COMPOSE_EDGE_PORT_INVALID")
     secrets_payload = _required_mapping(document, "secrets")
-    if set(secrets_payload) != {"postgres_password", "local_api_token"}:
+    if set(secrets_payload) != {"postgres_password", "qdrant_api_key", "local_api_token"}:
         raise ValueError("ENVIRONMENT_COMPOSE_SECRETS_INVALID")
     for secret_id, secret_payload in secrets_payload.items():
         secret = _required_mapping_value(secret_payload, f"secret {secret_id}")
         secret_file = Path(_required_text(secret, "file", f"secret {secret_id}")).resolve()
         _require_path_under(secret_file, root=definition.secrets_path)
+    qdrant_service = _required_mapping_value(services["qdrant"], "service qdrant")
+    qdrant_command = qdrant_service.get("command")
+    if (
+        not isinstance(qdrant_command, list)
+        or len(qdrant_command) != 1
+        or "QDRANT__SERVICE__API_KEY" not in qdrant_command[0]
+        or "/run/secrets/qdrant_api_key" not in qdrant_command[0]
+    ):
+        raise ValueError("ENVIRONMENT_COMPOSE_QDRANT_AUTH_MISSING")
+    ocr_runtime = _required_mapping_value(services["ocr-runtime"], "service ocr-runtime")
+    if "2375" in json.dumps(ocr_runtime, sort_keys=True):
+        raise ValueError("ENVIRONMENT_COMPOSE_OCR_TCP_FORBIDDEN")
+    ocr_environment = _required_mapping(ocr_runtime, "environment")
+    if ocr_environment != {
+        "DOCKER_HOST": "unix:///var/run/ocr-docker/docker.sock"
+    }:
+        raise ValueError("ENVIRONMENT_COMPOSE_OCR_SOCKET_INVALID")
+    for service_id in ("ocr-runtime", "worker-documents"):
+        socket_mount = _mounts_by_target(
+            _required_mapping_value(services[service_id], f"service {service_id}"),
+            service_id=service_id,
+        ).get("/var/run/ocr-docker")
+        if socket_mount is None or socket_mount.get("source") != "ocr-runtime-socket":
+            raise ValueError(f"ENVIRONMENT_COMPOSE_OCR_SOCKET_INVALID: {service_id}")
     gateway = _required_mapping_value(services["llm-gateway"], "service llm-gateway")
     labels = _required_mapping(gateway, "labels")
     if labels.get("org.ostrading.environment") != definition.environment:
@@ -884,6 +932,25 @@ def _mounts_by_target(service: Mapping[str, Any], *, service_id: str) -> Mapping
             raise ValueError(f"ENVIRONMENT_COMPOSE_VOLUME_TARGET_DUPLICATE: {service_id}: {target}")
         mounts[target] = mount
     return MappingProxyType(mounts)
+
+
+def _service_secret_targets(
+    service: Mapping[str, Any],
+    *,
+    service_id: str,
+) -> Mapping[str, str]:
+    raw_secrets = service.get("secrets", [])
+    if not isinstance(raw_secrets, list):
+        raise ValueError(f"ENVIRONMENT_COMPOSE_SECRETS_INVALID: {service_id}")
+    mounted: dict[str, str] = {}
+    for raw_secret in raw_secrets:
+        secret = _required_mapping_value(raw_secret, f"secret service {service_id}")
+        source = _required_text(secret, "source", f"secret service {service_id}")
+        target = _required_text(secret, "target", f"secret service {service_id}")
+        if source in mounted:
+            raise ValueError(f"ENVIRONMENT_COMPOSE_SECRET_DUPLICATE: {service_id}")
+        mounted[source] = target
+    return MappingProxyType(mounted)
 
 
 def _require_read_only_bind(

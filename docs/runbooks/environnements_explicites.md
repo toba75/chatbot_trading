@@ -3,7 +3,7 @@
 ## Contrat d'exploitation
 
 - Identifiant : `M13-Environments-Runbook-1.0`.
-- Décision : ADR-045.
+- Décision : ADR-046.
 - Profils fermés : `development`, `test`, `production`.
 - Statut de livraison : `SUBMILESTONE_GREEN_M013_OPEN` ; ce runbook ne clôt
   pas le milestone M-013 global.
@@ -15,6 +15,13 @@
   avant le lancement les cinq fichiers du profil, tous valides et hors Git.
 - Une preuve réelle exige un worktree Git propre. Le commit annoncé dans le
   rapport est celui injecté dans les images et contient le runner qualifié.
+- Les trois profils peuvent utiliser le même daemon Docker local, mais leurs
+  autorités de données, projets, réseaux, volumes, credentials, clés Qdrant et
+  racines restent distincts. Le profil local `production` ne certifie pas un
+  hébergement physique dédié.
+- Chaque service reçoit uniquement les fichiers secrets qu'il consomme. Qdrant
+  refuse les appels anonymes. Le contrôle OCR utilise un socket Unix propre au
+  profil, jamais TCP 2375 ni le socket Docker hôte.
 
 ## Commandes principales
 

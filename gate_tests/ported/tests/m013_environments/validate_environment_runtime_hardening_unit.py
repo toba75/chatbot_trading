@@ -165,7 +165,7 @@ def test_environment_runtime_hardening_unit(
         base_url="http://qdrant-development:6333",
         timeout_seconds=5,
         dense_dimensions=8,
-        api_key="development-qdrant-key-00000001",
+        api_key="development-qdrant-key-000000000001",
     ).ensure_collection(collection_name="ostrading-development-knowledge-access")
 
     monkeypatch.setattr(
@@ -182,14 +182,41 @@ def test_environment_runtime_hardening_unit(
         qdrant_url="http://qdrant-development:6333",
         collection_name="ostrading-development-knowledge-access",
         timeout_seconds=5,
-        api_key="development-qdrant-key-00000001",
+        api_key="development-qdrant-key-000000000001",
     ).select_chunk_ids(
         projection_id="PROJ-" + "A" * 64,
         question="Quelle preuve ?",
         limit=4,
     ) == ()
     assert len(qdrant_calls) == 2
-    assert all(call["headers"].get("api-key") == "development-qdrant-key-00000001" for call in qdrant_calls)
+    assert all(
+        call["headers"].get("api-key") == "development-qdrant-key-000000000001"
+        for call in qdrant_calls
+    )
+
+    from app.platform.llm_gateway import orchestrator_health
+    from app.platform.llm_gateway.orchestrator_health import HttpHealthOrchestratorDependency
+
+    monkeypatch.setattr(
+        orchestrator_health,
+        "urlopen",
+        lambda request, timeout: _QdrantJsonResponse(
+            request=request,
+            timeout=timeout,
+            calls=qdrant_calls,
+            payload={"status": "ok"},
+        ),
+    )
+    assert HttpHealthOrchestratorDependency(
+        name="qdrant",
+        health_url="http://qdrant-development:6333/healthz",
+        timeout_seconds=5,
+        not_ready_error_code="QDRANT_NOT_READY",
+        api_key="development-qdrant-key-000000000001",
+    )._is_ready()
+    assert qdrant_calls[-1]["headers"].get("api-key") == (
+        "development-qdrant-key-000000000001"
+    )
 
 
 class _FailingQdrantIdentityClient:
@@ -225,6 +252,7 @@ class _QdrantJsonResponse:
         self.timeout = timeout
         self.calls = calls
         self.payload = payload
+        self.status = 200
 
     def __enter__(self):
         self.calls.append(

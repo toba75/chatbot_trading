@@ -19,6 +19,7 @@ class HttpHealthOrchestratorDependency:
     health_url: str
     timeout_seconds: int
     not_ready_error_code: str
+    api_key: str | None
     _opened: bool = field(init=False, default=False)
 
     def __post_init__(self) -> None:
@@ -34,6 +35,11 @@ class HttpHealthOrchestratorDependency:
             raise ValueError("timeout health HTTP invalide")
         if self.not_ready_error_code not in {"LLM_GATEWAY_NOT_READY", "QDRANT_NOT_READY"}:
             raise ValueError("code readiness HTTP non supporté")
+        if self.name == "qdrant":
+            if not isinstance(self.api_key, str) or len(self.api_key.encode("utf-8")) < 32:
+                raise ValueError("clé API readiness Qdrant invalide")
+        elif self.api_key is not None:
+            raise ValueError("clé API interdite pour la readiness LLM locale")
 
     async def open(self) -> None:
         if self._opened:
@@ -56,10 +62,13 @@ class HttpHealthOrchestratorDependency:
         )
 
     def _is_ready(self) -> bool:
+        headers = {"Accept": "application/json"}
+        if self.api_key is not None:
+            headers["api-key"] = self.api_key
         request = Request(
             self.health_url,
             method="GET",
-            headers={"Accept": "application/json"},
+            headers=headers,
         )
         try:
             with urlopen(request, timeout=self.timeout_seconds) as response:

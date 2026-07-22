@@ -52,8 +52,6 @@ services:
         condition: service_healthy
     volumes:
       - ../../config/application.schema.json:/workspace/config/application.schema.json:ro
-    secrets:
-      - local_api_token
     healthcheck:
       test:
         - CMD-SHELL
@@ -147,10 +145,20 @@ services:
       - core
     volumes:
       - qdrant-data:/qdrant/storage
+    secrets:
+      - qdrant_api_key
+    entrypoint:
+      - /usr/bin/bash
+      - -euc
+    command:
+      - |
+        QDRANT__SERVICE__API_KEY="$$(</run/secrets/qdrant_api_key)"
+        export QDRANT__SERVICE__API_KEY
+        exec /qdrant/entrypoint.sh
     healthcheck:
       test:
         - CMD-SHELL
-        - "test -d /qdrant/storage"
+        - "bash -ec 'exec 3<>/dev/tcp/127.0.0.1/6333'"
       interval: 10s
       timeout: 5s
       retries: 12
@@ -269,14 +277,14 @@ services:
     image: docker:27.5.1-dind@sha256:aa3df78ecf320f5fafdce71c659f1629e96e9de0968305fe1de670e0ca9176ce
     privileged: true
     environment:
-      DOCKER_HOST: tcp://127.0.0.1:2375
-      DOCKER_TLS_CERTDIR: ""
+      DOCKER_HOST: unix:///var/run/ocr-docker/docker.sock
     entrypoint:
       - /bin/sh
       - -ec
     command:
       - |
-        dockerd-entrypoint.sh --host=tcp://0.0.0.0:2375 --host=unix:///var/run/docker.sock &
+        addgroup -S -g 31000 ostrading-socket
+        dockerd-entrypoint.sh --host=unix:///var/run/ocr-docker/docker.sock --group=ostrading-socket &
         daemon_pid=$!
         trap 'kill -TERM "$$daemon_pid"; wait "$$daemon_pid"' INT TERM
         until docker info >/dev/null 2>&1; do
@@ -287,10 +295,10 @@ services:
         docker image inspect jbarlow83/ocrmypdf@sha256:88d50f2ce7c054e5aacfc48794eca50dbb8af9a6ef1d2a540456dcd9a4687e42 >/dev/null
         wait "$$daemon_pid"
     networks:
-      - ocr-control
       - ocr-egress
     volumes:
       - ocr-runtime-data:/var/lib/docker
+      - ocr-runtime-socket:/var/run/ocr-docker
     tmpfs:
       - /tmp:size=256m,mode=1777
       - /var/run:size=32m,mode=0755
@@ -335,7 +343,6 @@ services:
       - "5"
     networks:
       - core
-      - ocr-control
     depends_on:
       orchestrator-api:
         condition: service_healthy
@@ -347,6 +354,7 @@ services:
         condition: service_healthy
     volumes:
       - ../../config/application.schema.json:/workspace/config/application.schema.json:ro
+      - ocr-runtime-socket:/var/run/ocr-docker
     tmpfs:
       - /tmp:size=128m,mode=1777
     healthcheck:
@@ -420,8 +428,6 @@ networks:
   core:
     internal: true
   spark-egress: {}
-  ocr-control:
-    internal: true
   ocr-egress: {}
 
 volumes:
@@ -432,7 +438,9 @@ volumes:
   application-data: {}
   model-cache: {}
   ocr-runtime-data: {}
+  ocr-runtime-socket: {}
 
 secrets:
   postgres_password: {}
+  qdrant_api_key: {}
   local_api_token: {}
