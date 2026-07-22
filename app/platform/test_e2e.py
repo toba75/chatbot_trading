@@ -468,7 +468,7 @@ def _run_single_test_cycle(
                 if isinstance(exc, httpx.TransportError)
                 else "TEST_E2E_PRODUCT_FAILED"
             )
-            raise TestE2EError(f"{error_prefix}: {_error_code(exc)}") from exc
+            raise TestE2EError(f"{error_prefix}: {exc}") from exc
 
         completed_at = _utc_now()
         run_report = TestE2ERunReport(
