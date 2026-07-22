@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from pathlib import Path
+import subprocess
 
 import pytest
 
@@ -89,6 +91,7 @@ def test_environment_governance_unit() -> None:
         build_isolation_access_matrix,
         validate_closure_status,
         validate_execution_evidence,
+        validate_evidence_revisions,
     )
 
     reports = {environment: _report(environment) for environment in (
@@ -125,6 +128,22 @@ def test_environment_governance_unit() -> None:
     assert validate_closure_status("SUBMILESTONE_GREEN_M013_OPEN") == (
         "SUBMILESTONE_GREEN_M013_OPEN"
     )
+    current_revision = subprocess.run(
+        ("git", "rev-parse", "HEAD"),
+        cwd=Path.cwd(),
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="ascii",
+    ).stdout.strip()
+    revision_reports = deepcopy(reports)
+    for report in revision_reports.values():
+        report["image_revision"] = current_revision
+    validate_evidence_revisions(
+        repository_root=Path.cwd(),
+        reports=revision_reports,
+        require_common_revision=False,
+    )
 
     collided = deepcopy(reports)
     collided["production"]["document_id"] = reports["development"]["document_id"]
@@ -143,4 +162,3 @@ def test_environment_governance_unit() -> None:
 
     with pytest.raises(EnvironmentGovernanceError, match="M013_GLOBAL_CLOSURE_FORBIDDEN"):
         validate_closure_status("M013_CLOSED")
-

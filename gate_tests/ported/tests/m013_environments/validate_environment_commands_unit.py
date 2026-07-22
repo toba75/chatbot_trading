@@ -111,6 +111,23 @@ def _assert_environment_launcher_stops_the_supervised_stack_after_failure(tmp_pa
     assert all(event.environment == "test" for event in states)
     assert [event[0] for event in events] == ["enter", "exit"]
 
+    states.clear()
+    events.clear()
+
+    def interrupted_server(**_):
+        raise KeyboardInterrupt
+
+    assert run_environment_command(
+        environment="test",
+        argv=(),
+        repository_root=tmp_path,
+        serve_http=interrupted_server,
+        local_stack=supervised_stack,
+        publish_state=states.append,
+    ) == 0
+    assert [event.state for event in states] == ["starting", "ready", "stopped"]
+    assert [event[0] for event in events] == ["enter", "exit"]
+
 
 def _assert_local_stack_accepts_the_explicit_environment_configuration_path(monkeypatch, tmp_path) -> None:
     import app.platform.ui_local_stack as local_stack

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import FrozenInstanceError
+import inspect
 
 import pytest
 
@@ -97,3 +98,11 @@ def test_worker_environment_identity_unit() -> None:
         binding.require_job_request(foreign)
     assert mismatch.value.code == WORKER_ENVIRONMENT_MISMATCH
     assert str(mismatch.value) == WORKER_ENVIRONMENT_MISMATCH
+
+    from app.platform.job_runtime.postgres import PostgresJobQueue
+    from app.platform.job_runtime.relay import RelayOutbox
+
+    claim_source = inspect.getsource(PostgresJobQueue.claim_next)
+    assert "configuration_hash <> %s" in claim_source
+    assert "configuration_hash = %s" in claim_source
+    assert "reject_environment_mismatch" in RelayOutbox.__dict__

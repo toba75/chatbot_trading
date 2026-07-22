@@ -246,3 +246,16 @@ def test_development_real_e2e_unit(monkeypatch, tmp_path: Path) -> None:
         tmp_path,
     )
     _validate_development_product_checkpoint_preserves_public_proof_before_stop()
+
+    import app.platform.development_e2e as development_e2e
+
+    monkeypatch.setattr(
+        development_e2e.subprocess,
+        "run",
+        lambda *args, **kwargs: SimpleNamespace(
+            returncode=0,
+            stdout=" M tracked.py\n",
+        ),
+    )
+    with pytest.raises(ValueError, match="DEVELOPMENT_E2E_WORKTREE_DIRTY"):
+        development_e2e._git_revision(tmp_path)

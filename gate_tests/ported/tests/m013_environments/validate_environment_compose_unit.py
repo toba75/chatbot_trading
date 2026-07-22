@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -16,6 +17,9 @@ def test_environment_compose_unit(tmp_path: Path) -> None:
         environment_stack_definition,
         _first_environment_service_has_stopped,
         _parse_compose_ps,
+        _provision_environment_secrets,
+        _require_launch_profile_identity,
+        _stop_environment_stack,
     )
 
     repository_root = tmp_path.resolve()
@@ -36,6 +40,61 @@ def test_environment_compose_unit(tmp_path: Path) -> None:
     for unknown in ("", "local", "Development", None):
         with pytest.raises(ValueError, match="CONFIG_ENVIRONMENT_UNKNOWN"):
             environment_stack_definition(unknown, repository_root=repository_root)  # type: ignore[arg-type]
+
+    # Given les neuf permutations commande/fichier des trois profils.
+    # When leur identité est contrôlée avant tout effet.
+    # Then seuls les trois couples diagonaux sont acceptés.
+    for command_environment in ENVIRONMENTS:
+        for file_environment in ENVIRONMENTS:
+            selected_definition = definitions[command_environment]
+            selected_path = definitions[file_environment].configuration_path
+            configuration = SimpleNamespace(
+                application=SimpleNamespace(environment=file_environment)
+            )
+            if command_environment == file_environment:
+                assert _require_launch_profile_identity(
+                    environment=command_environment,
+                    configuration_path=selected_path,
+                    definition=selected_definition,
+                    configuration=configuration,
+                ) is configuration
+            else:
+                with pytest.raises(ValueError, match="CONFIG_ENVIRONMENT_MISMATCH"):
+                    _require_launch_profile_identity(
+                        environment=command_environment,
+                        configuration_path=selected_path,
+                        definition=selected_definition,
+                        configuration=configuration,
+                    )
+
+    # Un secret absent est une erreur sans création de répertoire ni fichier.
+    secret_definition = definitions["test"]
+    with pytest.raises(ValueError, match="ENVIRONMENT_SECRET_UNREADABLE"):
+        _provision_environment_secrets(secret_definition)
+    assert not secret_definition.secrets_path.exists()
+
+    # Un arrêt Compose code 1 est terminal : aucune réussite n'est présumée.
+    compose_calls = []
+
+    def strict_compose(*args, **kwargs):
+        compose_calls.append((args, kwargs))
+        assert kwargs.get("allowed_returncodes", frozenset({0})) == frozenset({0})
+
+    import app.platform.environment_compose as environment_compose
+
+    original_run_compose = environment_compose._run_compose
+    environment_compose._run_compose = strict_compose
+    try:
+        _stop_environment_stack(
+            definition=definitions["development"],
+            technical_environment={
+                "OSTRADING_IMAGE_REVISION": "a" * 40,
+                "OSTRADING_POSTGRES_SCHEMA_VERSION": "020",
+            },
+        )
+    finally:
+        environment_compose._run_compose = original_run_compose
+    assert len(compose_calls) == 1
 
     definition = definitions["development"]
     ready_states = tuple(

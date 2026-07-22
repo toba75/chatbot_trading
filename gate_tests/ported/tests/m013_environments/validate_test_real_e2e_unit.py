@@ -6,12 +6,17 @@ from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
 
+import httpx
 import pytest
 
 
 def test_test_real_e2e_unit(monkeypatch, tmp_path: Path, capsys) -> None:
+    import app.platform.test_e2e as test_e2e
+
     from app.platform.test_e2e import (
         TestEnvironmentCycle,
+        _exclusive_test_qualification,
+        _require_persistent_lifecycle_owner,
         _run_two_test_cycles,
         _verify_test_cleanup_target,
     )
@@ -50,6 +55,16 @@ def test_test_real_e2e_unit(monkeypatch, tmp_path: Path, capsys) -> None:
             )
         )
 
+    assert _require_persistent_lifecycle_owner(valid, valid.lifecycle_id) == valid.lifecycle_id
+    with pytest.raises(ValueError, match="TEST_LIFECYCLE_OWNERSHIP_MISMATCH"):
+        _require_persistent_lifecycle_owner(valid, "33333333-3333-4333-8333-333333333333")
+
+    lock_path = tmp_path / "test-e2e.lock"
+    with _exclusive_test_qualification(lock_path):
+        with pytest.raises(test_e2e.TestE2EError, match="TEST_E2E_ALREADY_RUNNING"):
+            with _exclusive_test_qualification(lock_path):
+                pass
+
     from app.platform.environment_command import _run_test_qualification
 
     published: list[object] = []
@@ -75,7 +90,6 @@ def test_test_real_e2e_unit(monkeypatch, tmp_path: Path, capsys) -> None:
             publish_report=published.append,
         )
 
-    import app.platform.test_e2e as test_e2e
     from app.platform.development_e2e import DevelopmentE2EError
 
     teardown_events: list[str] = []
@@ -107,7 +121,7 @@ def test_test_real_e2e_unit(monkeypatch, tmp_path: Path, capsys) -> None:
     monkeypatch.setattr(
         test_e2e,
         "_exercise_product",
-        lambda **_: (_ for _ in ()).throw(DevelopmentE2EError("PRODUCT_RED")),
+        lambda **_: (_ for _ in ()).throw(httpx.ConnectError("network red")),
     )
     monkeypatch.setattr(
         test_e2e,
@@ -122,7 +136,7 @@ def test_test_real_e2e_unit(monkeypatch, tmp_path: Path, capsys) -> None:
         )
     )
 
-    with pytest.raises(test_e2e.TestE2EError, match="TEST_E2E_PRODUCT_FAILED"):
+    with pytest.raises(test_e2e.TestE2EError, match="TEST_E2E_NETWORK_FAILED"):
         test_e2e._run_single_test_cycle(
             run_number=1,
             repository_root=tmp_path,

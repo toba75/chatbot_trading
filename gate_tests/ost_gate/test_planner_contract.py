@@ -17,7 +17,14 @@ def test_planner_orders_dependencies_once_and_serializes_selection() -> None:
     assert [node.identifier for node in scoped_plan.nodes] == ["governance", "m008.case"]
     assert scoped_plan.partial is True
     full_plan = build_plan(manifest, None, False)
-    assert [node.identifier for node in full_plan.nodes] == ["governance", "m008.case", "m013.live"]
+    assert [node.identifier for node in full_plan.nodes] == ["governance", "m008.case"]
+    assert full_plan.offline is True
+    activated_full_plan = build_plan(manifest, None, False, include_live=True)
+    assert [node.identifier for node in activated_full_plan.nodes] == [
+        "governance",
+        "m008.case",
+        "m013.live",
+    ]
     assert len({node.identifier for node in full_plan.nodes}) == len(full_plan.nodes)
     cyclic = GateManifest(
         root,
