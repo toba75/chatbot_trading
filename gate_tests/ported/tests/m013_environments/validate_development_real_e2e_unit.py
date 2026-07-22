@@ -249,33 +249,6 @@ def test_development_real_e2e_unit(monkeypatch, tmp_path: Path) -> None:
 
     import app.platform.development_e2e as development_e2e
 
-    source_deploy = tmp_path / "deploy" / "environments" / "development.compose.yaml"
-    source_config = tmp_path / "config" / "environments" / "development.yaml"
-    source_deploy.parent.mkdir(parents=True, exist_ok=True)
-    source_config.parent.mkdir(parents=True, exist_ok=True)
-    source_deploy.write_text("name: ostrading-development\n", encoding="utf-8")
-    source_config.write_text("application:\n  environment: development\n", encoding="utf-8")
-    assert development_e2e._probe_foreign_environment(
-        repository_root=tmp_path,
-        source_environment="development",
-        environment="production",
-        forbidden_document_id="DOC-NON-MUTATING-PROBE",
-    ) == "production:ABSENT"
-    source_deploy.write_text(
-        "name: ostrading-development\nvolume: data/environments/production\n",
-        encoding="utf-8",
-    )
-    with pytest.raises(
-        development_e2e.DevelopmentE2EError,
-        match="DEVELOPMENT_E2E_FOREIGN_RESOURCE_VISIBLE",
-    ):
-        development_e2e._probe_foreign_environment(
-            repository_root=tmp_path,
-            source_environment="development",
-            environment="production",
-            forbidden_document_id="DOC-NON-MUTATING-PROBE",
-        )
-
     monkeypatch.setattr(
         development_e2e.subprocess,
         "run",

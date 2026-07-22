@@ -110,13 +110,18 @@ def test_environment_runtime_hardening_unit(
         source = inspect.getsource(module)
         assert "environment_snapshot=dict(os.environ)" in source
 
-    migration_sql = (repository_root / "deploy/postgres/migrations/020_job_environment_identity.sql").read_text(
-        encoding="utf-8"
+    import hashlib
+
+    migration_020 = repository_root / "deploy/postgres/migrations/020_job_environment_identity.sql"
+    assert hashlib.sha256(migration_020.read_bytes()).hexdigest() == (
+        "852b330c874d1727680f0b9a36bf95a04eb8022775ac5fab398cd993f86e273a"
     )
-    assert "IF NOT EXISTS" in migration_sql
-    assert "MIGRATION_020_LEGACY_ADOPTION_REQUIRED" in migration_sql
-    assert "NOT VALID" in migration_sql
-    assert "VALIDATE CONSTRAINT" in migration_sql
+    migration_021_sql = (
+        repository_root / "deploy/postgres/migrations/021_job_environment_identity_hardening.sql"
+    ).read_text(encoding="utf-8")
+    assert "IF NOT EXISTS" in migration_021_sql
+    assert "NOT VALID" in migration_021_sql
+    assert "VALIDATE CONSTRAINT" in migration_021_sql
 
     # Les neuf racines déclarées sont contrôlées avant toute création de rapport.
     for module_name in (

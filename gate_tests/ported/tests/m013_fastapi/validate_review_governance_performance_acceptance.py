@@ -16,13 +16,21 @@ from app.source_processing.adapters.postgres_document_persistence import (
 )
 
 
-def test_validate_review_governance_performance_acceptance() -> None:
+def test_validate_review_governance_performance_acceptance(monkeypatch) -> None:
     repository_root = next(
         parent for parent in Path(__file__).resolve().parents if (parent / "pyproject.toml").is_file()
     )
     configuration = load_application_configuration(
         config_path=repository_root / "config" / "application.example.yaml",
         environment_snapshot={},
+    )
+    monkeypatch.setattr(
+        "app.platform.orchestrator_runtime.read_required_secret",
+        lambda *, path, error_code: "fixture-secret-explicite-00000001",
+    )
+    monkeypatch.setattr(
+        "app.platform.configured_datastore_identity.read_required_secret",
+        lambda *, path, error_code: "fixture-secret-explicite-00000001",
     )
     root = build_orchestrator_composition_root(configuration)
     application = FastAPI()
