@@ -197,16 +197,29 @@ Scénario d'acceptation :
 - Given `uv run development` publie une readiness concordante pour l'API, le
   relais, les workers documentaires et de projection, PostgreSQL, Qdrant et le
   gateway LLM relié au Spark réel ;
-- When les 38 pages de
-  `data/corpus/the-original-turtle-trading-rules.pdf` sont réémises dans un
-  PDF de preuve unique sous `data/environments/development/reports/temp/`,
+- When les cinq pages de
+  `data/corpus/ostrading-environment-qualification-5-pages.pdf` sont réémises
+  dans un PDF de preuve unique sous
+  `data/environments/development/reports/temp/`,
   puis envoyées par `POST /v1/documents`, diagnostiquées, converties,
   projetées, recherchées et interrogées exclusivement par les contrats HTTP
   publics ;
-- Then chaque progression publique aboutit avec `phase`, `completed_units`,
+- Then le diagnostic public expose, dans l'ordre et exactement une fois,
+  `NATIVE_STANDARD`, `MIXED_PAGEWISE`, `PREPROCESS_GRANITE`,
+  `TARGETED_ENRICHMENT` et `SKIP_EMPTY`, chaque progression publique aboutit
+  avec `phase`, `completed_units`,
   `total_units` et absence d'erreur terminale, la réponse documentaire porte
   une citation dont le PDF original est réellement ouvrable, et chaque
   participant conserve l'identité `development` / `ostrading-development-local`.
+
+La fixture est construite exclusivement à partir de pages réelles et
+versionnées du corpus. Son manifeste de provenance fixe, pour chacune des cinq
+pages, le PDF source, son empreinte SHA-256, le numéro de page source,
+l'empreinte du flux de contenu et la route attendue. La cinquième page est
+réellement vide : elle doit compter dans la progression mais ne déclencher
+aucun convertisseur. Une page absente, supplémentaire, réordonnée, altérée ou
+routée différemment rend la preuve RED ; aucune substitution de page ou de
+route n'est autorisée.
 
 La preuve redémarre ensuite la même commande sans supprimer ses volumes et
 relit les mêmes identifiants publics de document, version canonique et
@@ -272,8 +285,9 @@ Codes complémentaires :
 `uv run test` est une qualification réelle et finie, pas un serveur local
 persistant. La commande exécute exactement deux cycles successifs et complets
 sur le PDF réel versionné
-`data/corpus/the-original-turtle-trading-rules.pdf`. Chaque cycle crée une pile
-`test` vide, traverse les contrats HTTP publics jusqu'à la conversion, la
+`data/corpus/ostrading-environment-qualification-5-pages.pdf`. Chaque cycle
+crée une pile `test` vide, vérifie les cinq routes attendues par les contrats
+HTTP publics, puis poursuit jusqu'à la conversion, la
 projection, la recherche, la réponse documentaire, la citation PDF et un appel
 Spark live, écrit son rapport sans secret avant le teardown, puis supprime
 uniquement les volumes du projet `ostrading-test` après le préflight
@@ -294,8 +308,10 @@ worker inline, stockage mémoire ou fallback n'est admis.
 ## Parcours produit réel production (T-011)
 
 `uv run production` exécute une preuve d'exploitation réelle, finie et non
-destructive avec les seules ressources `production`. La commande réémet les 38
-pages du PDF réel versionné dans `data/environments/production/reports/temp/`,
+destructive avec les seules ressources `production`. La commande réémet les
+cinq pages du PDF réel versionné, vérifie les cinq routes attendues dans le
+diagnostic public, puis écrit la preuve dans
+`data/environments/production/reports/temp/`,
 traverse les contrats HTTP publics jusqu'au diagnostic, à la conversion, à la
 projection, à la recherche, à la réponse documentaire, à la citation PDF et au
 Spark live, puis redémarre la même installation et relit ses identifiants.

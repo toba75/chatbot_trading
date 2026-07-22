@@ -48,12 +48,16 @@ def _validate_environment_command_waits_for_every_compose_service(
     assert calls == [(definition, {})]
 
 
-def _validate_development_proof_reemits_every_real_pdf_page_with_unique_metadata(
+def _validate_development_proof_reemits_five_qualification_pages_with_unique_metadata(
     tmp_path: Path,
 ) -> None:
     from pypdf import PdfReader
 
-    from app.platform.development_e2e import _prepare_reemitted_real_pdf
+    from app.platform.development_e2e import (
+        _EXPECTED_QUALIFICATION_ROUTES,
+        _prepare_reemitted_real_pdf,
+        _qualification_route_names,
+    )
 
     repository_root = next(
         parent
@@ -64,7 +68,7 @@ def _validate_development_proof_reemits_every_real_pdf_page_with_unique_metadata
         repository_root
         / "data"
         / "corpus"
-        / "the-original-turtle-trading-rules.pdf"
+        / "ostrading-environment-qualification-5-pages.pdf"
     )
     derived_pdf = _prepare_reemitted_real_pdf(
         source_pdf=source_pdf,
@@ -74,9 +78,10 @@ def _validate_development_proof_reemits_every_real_pdf_page_with_unique_metadata
 
     source_bytes = source_pdf.read_bytes()
     derived_bytes = derived_pdf.read_bytes()
-    assert len(PdfReader(str(source_pdf), strict=True).pages) == 38
+    assert len(PdfReader(str(source_pdf), strict=True).pages) == 5
+    assert _qualification_route_names(source_pdf) == _EXPECTED_QUALIFICATION_ROUTES
     derived_reader = PdfReader(str(derived_pdf), strict=True)
-    assert len(derived_reader.pages) == 38
+    assert len(derived_reader.pages) == 5
     assert derived_bytes.startswith(b"%PDF-")
     assert derived_bytes.rstrip().endswith(b"%%EOF")
     assert derived_bytes != source_bytes
@@ -281,7 +286,7 @@ def _validate_development_resume_reuses_explicit_existing_proof_without_reemissi
         repository_root
         / "data"
         / "corpus"
-        / "the-original-turtle-trading-rules.pdf"
+        / "ostrading-environment-qualification-5-pages.pdf"
     )
     report_root = tmp_path / "reports"
     proof_id = "B" * 32
@@ -352,7 +357,7 @@ def test_development_real_e2e_unit(monkeypatch, tmp_path: Path) -> None:
     """Agrège les décisions unitaires dans l'unique nœud déclaré au gate."""
 
     _validate_environment_command_waits_for_every_compose_service(monkeypatch, tmp_path)
-    _validate_development_proof_reemits_every_real_pdf_page_with_unique_metadata(
+    _validate_development_proof_reemits_five_qualification_pages_with_unique_metadata(
         tmp_path,
     )
     _validate_development_readiness_ignores_previous_lifecycle_event(tmp_path)
