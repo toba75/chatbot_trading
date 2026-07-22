@@ -1,10 +1,10 @@
 # ADR-031 - Actions UI exécutables et progression publique
 
-**Statut :** Acceptée
+**Statut :** Remplacée
 **Date :** 2026-07-13
 **Décideurs :** Équipe OSTrading
 **Remplace :** Aucun
-**Remplacée par :** Aucune
+**Remplacée par :** ADR-048
 **Source :** UI-019, incident de diagnostic local M13-FastAPI
 
 ## Contexte

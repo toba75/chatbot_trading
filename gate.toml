@@ -3928,6 +3928,17 @@ depends_on = ["precondition.m013_config"]
 live = false
 
 [[nodes]]
+id = "test.m013-environments.validate-review3-governance-remediation-unit"
+path = "gate_tests/ported/tests/m013_environments/validate_review3_governance_remediation_unit.py"
+kind = "test"
+scope = "m013_environments"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "git"
+depends_on = ["precondition.m013_config"]
+live = false
+
+[[nodes]]
 id = "test.m013-environments.validate-environment-governance-live"
 path = "gate_tests/ported/tests/m013_environments/validate_environment_governance_live.py"
 kind = "test"

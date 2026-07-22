@@ -36,13 +36,13 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 | [ADR-028](ADR-028-admission-documentaire-locale-authentifiee.md) | Admission documentaire locale authentifiée et bornée | Acceptée | 2026-07-13 | Aucun | Aucune |
 | [ADR-029](ADR-029-gate-python-uv-manifeste-unique.md) | Gate Python uv à manifeste unique | Acceptée | 2026-07-13 | ADR-010 | Aucune |
 | [ADR-030](ADR-030-bootstrap-local-ui-api.md) | Bootstrap local de l’UI via l’API réelle | Acceptée | 2026-07-13 | Aucun | ADR-046 pour le point d'entrée opérateur local |
-| [ADR-031](ADR-031-actions-ui-execution-et-progression-publique.md) | Actions UI exécutables et progression publique | Acceptée | 2026-07-13 | Aucun | Aucune |
+| [ADR-031](ADR-031-actions-ui-execution-et-progression-publique.md) | Actions UI exécutables et progression publique | Remplacée | 2026-07-13 | Aucun | ADR-048 |
 | [ADR-032](ADR-032-execution-reelle-conversion-canonique.md) | Exécution réelle et reproductible de la conversion canonique | Remplacée | 2026-07-13 | Aucun | ADR-035 |
 | [ADR-033](ADR-033-priorite-signaux-routage-ocr.md) | Priorité des signaux pour les routes OCR atteignables | Acceptée | 2026-07-14 | Aucun | Aucune |
 | [ADR-034](ADR-034-gateway-llm-multimodal-borne.md) | Gateway LLM multimodal borné | Acceptée | 2026-07-14 | Aucun | Aucune |
 | [ADR-035](ADR-035-recuperation-gemma-explicite-apres-provenance-granite-absente.md) | Récupération Gemma explicite après provenance Granite absente | Acceptée | 2026-07-14 | ADR-032 | ADR-040 pour `TARGETED_ENRICHMENT` seulement |
 | [ADR-036](ADR-036-recuperation-gemma-apres-echec-terminal-granite.md) | Récupération Gemma explicite après échec terminal Granite | Proposée | 2026-07-14 | ADR-035 | ADR-040 pour `TARGETED_ENRICHMENT` seulement |
-| [ADR-037](ADR-037-parallelisme-documentaire-projection.md) | Parallélisme documentaire et projection par lots | Acceptée | 2026-07-15 | Aucun | ADR-040 pour le plafond de concurrence Granite seulement |
+| [ADR-037](ADR-037-parallelisme-documentaire-projection.md) | Parallélisme documentaire et projection par lots | Remplacée | 2026-07-15 | Aucun | ADR-048 ; ADR-040 reste applicable au plafond de concurrence Granite |
 | [ADR-038](ADR-038-metadonnees-bibliographiques-apres-projection.md) | Métadonnées bibliographiques dérivées après projection | Acceptée | 2026-07-16 | Obligation bibliographique ADR-028 | Aucune |
 | [ADR-039](ADR-039-segmentation-gemma-bornee-pages-denses.md) | Segmentation Gemma bornée des pages denses | Proposée | 2026-07-16 | ADR-036 à l’acceptation | ADR-040 pour `TARGETED_ENRICHMENT` seulement |
 | [ADR-040](ADR-040-adjudication-enrichissement-cible-docling-granite.md) | Adjudication explicite de l’enrichissement ciblé Docling et Granite | Acceptée | 2026-07-16 | Clauses `TARGETED_ENRICHMENT` d’ADR-035, ADR-036 et ADR-039 et plafond unique Granite d’ADR-037 | Aucune |
@@ -53,6 +53,7 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 | [ADR-045](ADR-045-profils-execution-explicites-donnees-etanches.md) | Profils d'exécution explicites et données étanches | Remplacée | 2026-07-21 | ADR-016 | ADR-046 |
 | [ADR-046](ADR-046-profils-locaux-etanches-sur-autorite-docker-explicite.md) | Profils locaux étanches sur une autorité Docker explicite | Acceptée | 2026-07-22 | ADR-045 ; point d'entrée opérateur local d'ADR-030 | Aucune |
 | [ADR-047](ADR-047-archive-chiffree-verifiee-avant-preuve-restauration.md) | Archive chiffrée vérifiée avant preuve de restauration | Acceptée | 2026-07-22 | ADR-013 | Aucune |
+| [ADR-048](ADR-048-progression-et-parallelisme-dans-profils-explicites.md) | Progression et parallélisme dans les profils explicites | Acceptée | 2026-07-22 | ADR-031 ; ADR-037 | Aucune |
 
 ## ADR DDD
 

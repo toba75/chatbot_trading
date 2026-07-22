@@ -1,10 +1,10 @@
 # ADR-037 - Parallélisme documentaire et projection par lots
 
-**Statut :** Acceptée
+**Statut :** Remplacée
 **Date :** 2026-07-15
 **Décideurs :** Équipe OSTrading
 **Remplace :** Aucun
-**Remplacée par :** ADR-040 pour le plafond de concurrence Granite seulement
+**Remplacée par :** ADR-048 ; ADR-040 reste applicable au plafond de concurrence Granite
 **Source :** Demande utilisateur du 2026-07-15 sur l'accélération d'un PDF unique ; ADR-031 ; ADR-036 ; `docs/specs/m004_version_canonique_publiee.md` ; `docs/specs/m005_projection_connaissance_recherchable.md`.
 
 ## Contexte
