@@ -7,7 +7,7 @@ import json
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Mapping
+from typing import Callable, Mapping
 
 from app.source_processing.application.convert_routed_pages import PagePreprocessingRequest
 from app.source_processing.domain.page_conversion import (
@@ -197,10 +197,19 @@ def build_ocrmypdf_container_command(
     output = output_path.resolve()
     if source.parent == output.parent:
         raise ValueError("montages OCRmyPDF incohérents")
+    try:
+        output_directory_stat = output.parent.stat()
+    except OSError as error:
+        raise OcrmyPdfContainerError() from error
+    output_user_identity = (
+        f"{output_directory_stat.st_uid}:{output_directory_stat.st_gid}"
+    )
     return (
         "docker",
         "run",
         "--rm",
+        "--user",
+        output_user_identity,
         "--network",
         "none",
         "--read-only",
