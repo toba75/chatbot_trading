@@ -18,7 +18,7 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 | [ADR-010](ADR-010-gates-gouvernance-powershell.md) | Gates de gouvernance PowerShell | Remplacée | 2026-06-21 | Aucun | ADR-029 |
 | [ADR-011](ADR-011-python-outille-pour-validateurs-architecture.md) | Python outillé pour les validateurs d'architecture | Acceptée | 2026-06-25 | Aucun | Aucune |
 | [ADR-012](ADR-012-python-outille-pour-validateurs-plateforme.md) | Python outillé pour les validateurs de plateforme | Acceptée | 2026-06-25 | Aucun | Aucune |
-| [ADR-013](ADR-013-contrat-manifeste-sauvegarde-restauration.md) | Contrat de manifeste de sauvegarde et restauration | Acceptée | 2026-07-08 | Aucun | Aucune |
+| [ADR-013](ADR-013-contrat-manifeste-sauvegarde-restauration.md) | Contrat de manifeste de sauvegarde et restauration | Remplacée | 2026-07-08 | Aucun | ADR-047 |
 | [ADR-014](ADR-014-spark-docker-externe-sans-cle-api.md) | Endpoint Docker Spark externe sans clé API | Acceptée | 2026-07-08 | ADR-007; ADR-008 | Aucune |
 | [ADR-015](ADR-015-provenance-llm-declaree-gateway.md) | Provenance LLM déclarée par le gateway | Acceptée | 2026-07-09 | Aucun | Aucune |
 | [ADR-016](ADR-016-configuration-applicative-fichier-unique.md) | Configuration applicative par fichier unique | Remplacée | 2026-07-10 | Aucun | ADR-045 |
@@ -52,6 +52,7 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 | [ADR-044](ADR-044-autorite-native-page-visuelle-complexe.md) | Autorité native d’une page visuelle complexe | Acceptée | 2026-07-16 | Priorité ADR-033 et candidat natif ADR-040 pour texte parcellaire | Aucune |
 | [ADR-045](ADR-045-profils-execution-explicites-donnees-etanches.md) | Profils d'exécution explicites et données étanches | Remplacée | 2026-07-21 | ADR-016 | ADR-046 |
 | [ADR-046](ADR-046-profils-locaux-etanches-sur-autorite-docker-explicite.md) | Profils locaux étanches sur une autorité Docker explicite | Acceptée | 2026-07-22 | ADR-045 ; point d'entrée opérateur local d'ADR-030 | Aucune |
+| [ADR-047](ADR-047-archive-chiffree-verifiee-avant-preuve-restauration.md) | Archive chiffrée vérifiée avant preuve de restauration | Acceptée | 2026-07-22 | ADR-013 | Aucune |
 
 ## ADR DDD
 
@@ -73,7 +74,7 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 ## Prochains numéros disponibles
 
 ```text
-Prochaine ADR technique: ADR-047
+Prochaine ADR technique: ADR-048
 Prochaine DDD-ADR: DDD-ADR-013
 ```
 

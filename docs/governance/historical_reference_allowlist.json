@@ -19,7 +19,7 @@
                           },
                           {
                               "path":  "docs/adr/ADR-013-contrat-manifeste-sauvegarde-restauration.md",
-                              "sha256":  "7984b0456d5ebec71022fcb2fbe37f22d195b00479b01b6648d144f111c79c65",
+                              "sha256":  "0ccdaa10e8fe46d35fad67efb8f53dadd6f195c902a5ce6ba67388f7fac93209",
                               "reason":  "ADR historical or transition decision"
                           },
                           {
@@ -109,7 +109,7 @@
                           },
                           {
                               "path":  "docs/adr/index.md",
-                              "sha256":  "06769da6f6c5f2a440ad53c8343fb648669f8943d9dea746f5a4a22462087588",
+                              "sha256":  "e77fa1ca2a1b8472f67691f64f79bbbb6d15dc29712d0eb8d81dbce365fc7278",
                               "reason":  "ADR historical or transition decision"
                           },
                           {

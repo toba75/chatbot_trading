@@ -230,10 +230,25 @@ compare cette cible avec l'identité observée avant le premier callback de
 mutation. Une divergence produit `DATASTORE_ENVIRONMENT_MISMATCH`, publie une
 preuve de refus et n'appelle aucune opération destructive.
 
-Le manifeste `M013-BackupManifest-1.0` porte lui aussi `environment` et
+Le manifeste `M013-BackupManifest-1.1` porte lui aussi `environment` et
 `deployment_id`. Sauvegarde et restauration refusent tout manifeste étranger à
 l'installation sélectionnée. Il n'existe ni option `force`, ni cible par
 défaut, ni restauration croisée.
+
+Conformément à ADR-047, `backup-v1` vérifie une archive AES-256-GCM déjà
+produite : le manifeste seul n'est jamais une preuve de sauvegarde. Le
+manifeste, l'archive chiffrée et la clé brute de 32 octets sont tous
+obligatoires. La clé reste hors dépôt et traverse la frontière Compose dans un
+flux binaire cadré et borné, jamais dans les arguments, les variables
+d'environnement ou les logs. Le hash du ciphertext est vérifié avant
+déchiffrement; les hashes, identifiants stables et propriétés de conservation
+de chaque entrée sont ensuite vérifiés sur les octets réellement extraits.
+
+`restore-v1` écrit dans un staging isolé et ne publie
+`restore_test_result=GREEN` qu'après ces contrôles. Archive absente ou altérée,
+clé incorrecte, entrée absente, supplémentaire ou divergente rendent le drill
+RED. Les racines fichiers du volume `application-data` sont distinguées des
+autorités PostgreSQL et Qdrant, contrôlées par leurs préflights natifs.
 
 Une purge n'est jamais automatique. Un nettoyage automatique n'est autorisé
 que pour `test`, depuis le cycle `uv run test` qui a créé et exécuté la pile.

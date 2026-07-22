@@ -92,7 +92,7 @@ def test_administrative_operations_acceptance() -> None:
     # Sauvegarde et restauration restent dans l'identité portée par le manifeste.
     audit.clear()
     test_manifest = AdministrativeBackupManifest(
-        contract_version="M013-BackupManifest-1.0",
+        contract_version="M013-BackupManifest-1.1",
         manifest_id="M013-BACKUP-TEST-ACCEPTANCE",
         environment="test",
         deployment_id="ostrading-test-ci",
@@ -117,7 +117,7 @@ def test_administrative_operations_acceptance() -> None:
     # Une restauration refuse un manifeste d'un autre environnement avant mutation.
     audit.clear()
     foreign_manifest = AdministrativeBackupManifest(
-        contract_version="M013-BackupManifest-1.0",
+        contract_version="M013-BackupManifest-1.1",
         manifest_id="M013-BACKUP-PRODUCTION-ACCEPTANCE",
         environment="production",
         deployment_id="ostrading-production-primary",

@@ -20,7 +20,7 @@ def test_administrative_operations_unit(tmp_path: Path) -> None:
     )
     manifest = AdministrativeBackupManifest.from_mapping(
         {
-            "contract_version": "M013-BackupManifest-1.0",
+            "contract_version": "M013-BackupManifest-1.1",
             "manifest_id": "M013-BACKUP-DEVELOPMENT-UNIT",
             "environment": "development",
             "deployment_id": "ostrading-development-local",
@@ -28,7 +28,7 @@ def test_administrative_operations_unit(tmp_path: Path) -> None:
     )
     assert manifest.identity == identity
     assert manifest.to_mapping() == {
-        "contract_version": "M013-BackupManifest-1.0",
+        "contract_version": "M013-BackupManifest-1.1",
         "manifest_id": "M013-BACKUP-DEVELOPMENT-UNIT",
         "environment": "development",
         "deployment_id": "ostrading-development-local",
@@ -39,12 +39,12 @@ def test_administrative_operations_unit(tmp_path: Path) -> None:
     for invalid in (
         {},
         {
-            "contract_version": "M013-BackupManifest-1.0",
+            "contract_version": "M013-BackupManifest-1.1",
             "manifest_id": "M013-BACKUP-DEVELOPMENT-UNIT",
             "environment": "development",
         },
         {
-            "contract_version": "M013-BackupManifest-1.0",
+            "contract_version": "M013-BackupManifest-1.1",
             "manifest_id": "M013-BACKUP-DEVELOPMENT-UNIT",
             "environment": "development",
             "deployment_id": "ostrading-development-local",

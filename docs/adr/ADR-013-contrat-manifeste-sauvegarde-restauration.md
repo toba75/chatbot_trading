@@ -1,10 +1,10 @@
 # ADR-013 - Contrat de manifeste de sauvegarde et restauration
 
-**Statut :** Acceptée
+**Statut :** Remplacée
 **Date :** 2026-07-08
 **Décideurs :** Propriétaire du projet
 **Remplace :** Aucun
-**Remplacée par :** Aucune
+**Remplacée par :** ADR-047
 **Source :** `docs/tasks/milestone_013/0007_valider_sauvegardes_chiffrees_restauration.md`
 
 ## Contexte
