@@ -48,6 +48,7 @@ from app.knowledge_access.adapters.http import (
 )
 from app.platform.configuration import ApplicationConfiguration
 from app.platform.configured_datastore_identity import (
+    APPLICATION_FILE_ROOT_NAMES,
     build_configured_datastore_preflight,
     configured_datastore_identity,
 )
@@ -513,11 +514,7 @@ def build_orchestrator_composition_root(
                     configuration,
                     include_postgres=True,
                     include_qdrant=True,
-                    file_root_names=(
-                        "data_root",
-                        "corpus_root",
-                        "canonical_sources_root",
-                    ),
+                    file_root_names=APPLICATION_FILE_ROOT_NAMES,
                 )
             ),
             PostgresOrchestratorDependency(

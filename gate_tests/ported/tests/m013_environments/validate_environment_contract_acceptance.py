@@ -68,7 +68,7 @@ def _assert_adr_046_replaces_adr_045_explicitly() -> None:
     assert "| [ADR-045]" in adr_index
     assert "ADR-046-profils-locaux-etanches-sur-autorite-docker-explicite.md" in adr_index
     assert "| [ADR-046]" in adr_index
-    assert "Prochaine ADR technique: ADR-047" in adr_index
+    assert "Prochaine ADR technique: ADR-048" in adr_index
 
 
 def _assert_contract_closes_profiles_identity_and_configuration_sources() -> None:

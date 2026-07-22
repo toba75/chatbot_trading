@@ -26,7 +26,7 @@ AdministrativeDecision = Literal["authorized", "refused"]
 
 ADMINISTRATIVE_OPERATION_FORBIDDEN: Final = "ADMINISTRATIVE_OPERATION_FORBIDDEN"
 TEST_LIFECYCLE_OWNERSHIP_MISMATCH: Final = "TEST_LIFECYCLE_OWNERSHIP_MISMATCH"
-_BACKUP_CONTRACT_VERSION: Final = "M013-BackupManifest-1.0"
+_BACKUP_CONTRACT_VERSION: Final = "M013-BackupManifest-1.1"
 _OPERATIONS: Final = frozenset(
     ("migration", "backup", "restore", "purge", "test_cleanup")
 )

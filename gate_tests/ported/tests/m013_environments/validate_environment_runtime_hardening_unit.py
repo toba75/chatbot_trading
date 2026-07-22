@@ -138,14 +138,14 @@ def test_environment_runtime_hardening_unit(
     # administratif Compose du profil au lieu d'appeler les DNS internes depuis l'hôte.
     assert "docker" in inspect.getsource(backup.execute_compose_storage_command)
     assert "orchestrator-api" in inspect.getsource(backup.execute_compose_storage_command)
-    assert "input=manifest_document" in inspect.getsource(
+    assert "input=payload" in inspect.getsource(
         backup.execute_compose_storage_command
     )
     dockerfile = (repository_root / "deploy/local-compose/Dockerfile").read_text(
         encoding="utf-8"
     )
     assert "COPY --chown=ostrading:ostrading ost_gate ./ost_gate" in dockerfile
-    restore_source = inspect.getsource(restore._restore_manifest)
+    restore_source = inspect.getsource(restore.restore_verified_archive)
     assert "ignore_errors=True" not in restore_source
     assert "RESTORE_COMPENSATION_FAILED" in restore_source
 

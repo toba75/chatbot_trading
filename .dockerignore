@@ -16,6 +16,8 @@ data/**
 !uv.lock
 !app/
 !app/**
+!ost_gate/
+!ost_gate/**
 !config/
 !config/ocrmypdf-image.json
 !config/docling-assets.native.json

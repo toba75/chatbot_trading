@@ -25,6 +25,7 @@ from app.platform.administrative_operations import (
 )
 from app.platform.configuration import ApplicationConfiguration, load_application_configuration
 from app.platform.configured_datastore_identity import (
+    APPLICATION_FILE_ROOT_NAMES,
     build_configured_datastore_preflight,
     configured_datastore_identity,
 )
@@ -696,9 +697,11 @@ def configured_administrative_identity(config_path: Path) -> Mapping[str, str]:
         configuration,
         include_postgres=True,
         include_qdrant=True,
-        file_root_names=("data_root",),
+        file_root_names=APPLICATION_FILE_ROOT_NAMES,
     ).run(initialize_if_empty=False)
-    if len(observed) != 3 or any(identity != expected for identity in observed):
+    if len(observed) != 2 + len(APPLICATION_FILE_ROOT_NAMES) or any(
+        identity != expected for identity in observed
+    ):
         raise ValueError("ADMINISTRATIVE_PREFLIGHT_INCOMPLETE")
     payload = expected.to_mapping()
     print(json.dumps(payload, ensure_ascii=False, sort_keys=True), flush=True)

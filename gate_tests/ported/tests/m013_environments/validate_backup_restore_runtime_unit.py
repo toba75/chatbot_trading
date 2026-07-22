@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from hashlib import sha256
+from io import BytesIO
 import inspect
 import json
 from pathlib import Path
@@ -28,6 +29,10 @@ def test_backup_restore_runtime_unit(tmp_path: Path) -> None:
     from app.platform.configured_datastore_identity import APPLICATION_FILE_ROOT_NAMES
     from ost_gate.operations import backup
     from ost_gate.operations.backup_manifest import read_backup_manifest
+    from ost_gate.operations.compose_transport import (
+        decode_compose_payload,
+        encode_compose_payload,
+    )
     from ost_gate.operations.encrypted_archive import (
         BackupArchiveEntry,
         archive_entry_sha256,
@@ -89,6 +94,18 @@ def test_backup_restore_runtime_unit(tmp_path: Path) -> None:
 
     manifest = read_backup_manifest(manifest_path, "backup")
     material = load_archive_material(archive_path=archive_path, key_path=key_path)
+    transport = encode_compose_payload(
+        manifest=manifest_path.read_bytes(),
+        archive=archive,
+        key=key,
+    )
+    assert decode_compose_payload(BytesIO(transport)) == (
+        manifest_path.read_bytes(),
+        archive,
+        key,
+    )
+    with pytest.raises(ValueError, match="ADMINISTRATIVE_TRANSPORT_TRAILING_BYTES"):
+        decode_compose_payload(BytesIO(transport + b"x"))
     verified = verify_encrypted_archive(manifest=manifest, material=material)
     assert tuple(item.stable_identifier for item in verified.entries) == tuple(
         item.stable_identifier for item in entries
@@ -107,6 +124,19 @@ def test_backup_restore_runtime_unit(tmp_path: Path) -> None:
     assert proof["immutable_artifacts_preserved"] is True
     assert proof["negative_and_superseded_available"] is True
     assert len(tuple((target / "entries").glob("*.json"))) == len(entries)
+
+    divergent_document = json.loads(manifest_path.read_text(encoding="utf-8"))
+    divergent_document["entries"][0]["stable_identifier"] = "SRC-ARCHIVE-DIVERGENT"
+    divergent_manifest_path = tmp_path / "manifest-divergent.json"
+    divergent_manifest_path.write_text(
+        json.dumps(divergent_document, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="ARCHIVE_STABLE_IDENTIFIER_MISMATCH"):
+        verify_encrypted_archive(
+            manifest=read_backup_manifest(divergent_manifest_path, "backup"),
+            material=material,
+        )
 
     altered_path = tmp_path / "altered.aesgcm"
     altered = bytearray(archive)
@@ -148,6 +178,8 @@ def _write_manifest(
     archive: bytes,
     entries: tuple[object, ...],
 ) -> Path:
+    from ost_gate.operations.encrypted_archive import archive_entry_sha256
+
     document = {
         "contract_version": "M013-BackupManifest-1.1",
         "manifest_id": "M013-BACKUP-ARCHIVE-UNIT",

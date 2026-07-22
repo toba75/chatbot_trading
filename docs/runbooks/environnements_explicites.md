@@ -68,7 +68,7 @@ Le manifeste doit porter le même `environment` et le même `deployment_id` que
 la configuration et les trois familles de stockage observées.
 
 ```console
-uv run --locked backup-v1 --manifest <manifest.json> --config config/environments/<profil>.yaml
+uv run --locked backup-v1 --manifest <manifest.json> --archive <backup.m013.aesgcm> --key-file <cle-binaire-hors-depot> --config config/environments/<profil>.yaml
 ```
 
 La commande hôte sélectionne le projet Compose `ostrading-<profil>` et exécute le
@@ -86,7 +86,7 @@ La cible doit être neuve, vide et strictement sous le répertoire de drill du
 profil sélectionné.
 
 ```console
-uv run --locked restore-v1 --manifest <manifest.json> --target data/environments/<profil>/reports/restore-drills/<drill> --config config/environments/<profil>.yaml
+uv run --locked restore-v1 --manifest <manifest.json> --archive <backup.m013.aesgcm> --key-file <cle-binaire-hors-depot> --target data/environments/<profil>/reports/restore-drills/<drill> --config config/environments/<profil>.yaml
 ```
 
 La cible est refusée avant l'appel Compose si elle sort de

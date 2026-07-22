@@ -24,20 +24,16 @@ _FILE_ROOT_NAMES: Final = frozenset(
         "data_root",
         "corpus_root",
         "canonical_sources_root",
-        "qdrant_storage_root",
-        "postgres_data_root",
         "reports_root",
         "logs_root",
         "experiments_root",
         "cache_root",
     )
 )
-ALL_MUTABLE_FILE_ROOT_NAMES: Final = (
+APPLICATION_FILE_ROOT_NAMES: Final = (
     "data_root",
     "corpus_root",
     "canonical_sources_root",
-    "qdrant_storage_root",
-    "postgres_data_root",
     "reports_root",
     "logs_root",
     "experiments_root",
@@ -125,11 +121,12 @@ def preflight_all_mutable_roots(
         configuration,
         include_postgres=False,
         include_qdrant=False,
-        file_root_names=ALL_MUTABLE_FILE_ROOT_NAMES,
+        file_root_names=APPLICATION_FILE_ROOT_NAMES,
     ).run(initialize_if_empty=initialize_if_empty)
 
 
 __all__ = [
+    "APPLICATION_FILE_ROOT_NAMES",
     "build_configured_datastore_preflight",
     "configured_datastore_identity",
     "preflight_all_mutable_roots",
