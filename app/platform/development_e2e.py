@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import signal
 import socket
 import subprocess
 from tempfile import TemporaryDirectory
@@ -398,6 +399,7 @@ def _running_development_command(
             cwd=repository_root,
             stdout=log_stream,
             stderr=subprocess.STDOUT,
+            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
         )
         try:
             _wait_public_readiness(
@@ -524,17 +526,7 @@ def _stop_development_command(
                 f"DEVELOPMENT_E2E_COMMAND_EXITED: code={process.returncode}"
             )
         return
-    definition = environment_stack_definition(
-        _ENVIRONMENT,
-        repository_root=repository_root,
-    )
-    technical_environment = _technical_environment_from_repository(repository_root)
-    _run_compose(
-        definition,
-        ("stop", "--timeout", "30", "edge-gateway"),
-        technical_environment=technical_environment,
-        capture_output=True,
-    )
+    process.send_signal(signal.CTRL_BREAK_EVENT)
     try:
         return_code = process.wait(timeout=180)
     except subprocess.TimeoutExpired as exc:

@@ -66,7 +66,7 @@ services:
     healthcheck:
       test:
         - CMD-SHELL
-        - "pg_isready -U ostrading_production -d ostrading_production"
+        - "test \"$$(cat /proc/1/comm)\" = \"postgres\" && test \"$$(psql -U ostrading_production -d ostrading_production -Atqc 'SELECT 1')\" = \"1\""
       interval: 10s
       timeout: 5s
       retries: 12

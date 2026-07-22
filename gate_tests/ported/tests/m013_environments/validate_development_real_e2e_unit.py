@@ -130,14 +130,6 @@ def _validate_development_process_owns_a_windows_console_group(
         popen_calls.append(kwargs)
         return process
 
-    monkeypatch.setattr(development_e2e.shutil, "which", lambda _: "uv.exe")
-    monkeypatch.setattr(development_e2e.subprocess, "Popen", record_popen)
-    monkeypatch.setattr(development_e2e, "_wait_public_readiness", lambda **_: None)
-    monkeypatch.setattr(
-        development_e2e,
-        "_stop_development_command",
-        lambda **kwargs: stop_calls.append(kwargs["process"]),
-    )
     configuration = SimpleNamespace(
         application=SimpleNamespace(
             environment="development",
@@ -146,14 +138,23 @@ def _validate_development_process_owns_a_windows_console_group(
         configuration_hash="a" * 64,
     )
 
-    with development_e2e._running_development_command(
-        repository_root=tmp_path,
-        token="token-development",
-        log_path=tmp_path / "development.log",
-        configuration=configuration,
-        ca_bundle_path=tmp_path / "caddy-ca.pem",
-    ):
-        pass
+    with monkeypatch.context() as isolated:
+        isolated.setattr(development_e2e.shutil, "which", lambda _: "uv.exe")
+        isolated.setattr(development_e2e.subprocess, "Popen", record_popen)
+        isolated.setattr(development_e2e, "_wait_public_readiness", lambda **_: None)
+        isolated.setattr(
+            development_e2e,
+            "_stop_development_command",
+            lambda **kwargs: stop_calls.append(kwargs["process"]),
+        )
+        with development_e2e._running_development_command(
+            repository_root=tmp_path,
+            token="token-development",
+            log_path=tmp_path / "development.log",
+            configuration=configuration,
+            ca_bundle_path=tmp_path / "caddy-ca.pem",
+        ):
+            pass
 
     assert len(popen_calls) == 1
     assert popen_calls[0]["creationflags"] == subprocess.CREATE_NEW_PROCESS_GROUP

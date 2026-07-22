@@ -7,6 +7,7 @@ from contextlib import AbstractContextManager
 from dataclasses import dataclass
 import json
 from pathlib import Path
+import signal
 import sys
 from types import MappingProxyType
 from typing import Any, Final, Literal, Protocol
@@ -169,7 +170,11 @@ def run_environment_command(
 
 
 def development() -> int:
-    return _run_entrypoint("development")
+    previous_handler = signal.signal(signal.SIGBREAK, signal.default_int_handler)
+    try:
+        return _run_entrypoint("development")
+    finally:
+        signal.signal(signal.SIGBREAK, previous_handler)
 
 
 def test() -> int:
