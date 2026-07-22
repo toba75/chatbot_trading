@@ -17,7 +17,7 @@ def test_validate_development_real_e2e_acceptance() -> None:
         repository_root
         / "data"
         / "corpus"
-        / "the-original-turtle-trading-rules.pdf"
+        / "ostrading-environment-qualification-5-pages.pdf"
     )
     assert real_pdf.is_file()
 
@@ -33,7 +33,7 @@ def test_validate_development_real_e2e_acceptance() -> None:
     # réel, la persistance et les sondes d'étanchéité sont toutes GREEN.
     assert report.environment == "development"
     assert report.deployment_id == "ostrading-development-local"
-    assert report.source_pdf_path.endswith("the-original-turtle-trading-rules.pdf")
+    assert report.source_pdf_path.endswith("ostrading-environment-qualification-5-pages.pdf")
     assert report.source_pdf_sha256 != report.pdf_sha256
     assert report.pdf_sha256
     assert report.document_id.startswith("DOC-")
@@ -42,6 +42,13 @@ def test_validate_development_real_e2e_acceptance() -> None:
     assert report.answer_id.startswith("ANS-")
     assert report.citation_url.startswith("https://localhost:18443/")
     assert report.spark_raw_response_id
+    assert report.qualification_routes == (
+        "NATIVE_STANDARD",
+        "MIXED_PAGEWISE",
+        "PREPROCESS_GRANITE",
+        "TARGETED_ENRICHMENT",
+        "SKIP_EMPTY",
+    )
     assert report.progress_phases == ("SUCCEEDED", "SUCCEEDED", "SUCCEEDED")
     assert report.restart_persistence_verified is True
     assert report.foreign_environment_probes == ("test:ABSENT", "production:ABSENT")

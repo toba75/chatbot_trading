@@ -215,11 +215,14 @@ Scénario d'acceptation :
 La fixture est construite exclusivement à partir de pages réelles et
 versionnées du corpus. Son manifeste de provenance fixe, pour chacune des cinq
 pages, le PDF source, son empreinte SHA-256, le numéro de page source,
-l'empreinte du flux de contenu et la route attendue. La cinquième page est
-réellement vide : elle doit compter dans la progression mais ne déclencher
-aucun convertisseur. Une page absente, supplémentaire, réordonnée, altérée ou
-routée différemment rend la preuve RED ; aucune substitution de page ou de
-route n'est autorisée.
+l'empreinte du flux de contenu, la route attendue, l'outil final attendu et la
+trace de récupération attendue. La page `PREPROCESS_GRANITE` exerce la
+récupération Gemma explicite d'ADR-036 après `DOCLING_PROVENANCE_MISSING`. La
+cinquième page est réellement vide : elle doit compter dans la progression
+mais ne déclencher aucun convertisseur. Une page absente, supplémentaire,
+réordonnée, altérée, routée différemment ou produite par une chaîne d'outils
+différente rend la preuve RED ; aucune substitution de page, de route ou
+d'outil n'est autorisée.
 
 La preuve redémarre ensuite la même commande sans supprimer ses volumes et
 relit les mêmes identifiants publics de document, version canonique et

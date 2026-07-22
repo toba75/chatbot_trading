@@ -36,6 +36,19 @@ from app.platform.environment_compose import (
     export_environment_caddy_ca,
 )
 from app.platform.configured_datastore_identity import preflight_all_mutable_roots
+from app.source_processing.adapters.pdf_inspection_process import (
+    build_m13_isolated_pdf_inspector,
+)
+from app.source_processing.application.routing_policy import (
+    build_document_routing_configuration,
+)
+from app.source_processing.domain.document_processing_run import (
+    DiagnosticVersion,
+    PageDiagnosticPolicy,
+    PageDiagnosticSignals,
+    PageNumber,
+    PageRoutingPolicy,
+)
 
 
 _ENVIRONMENT: Final = "development"
@@ -43,6 +56,14 @@ _DEPLOYMENT_ID: Final = "ostrading-development-local"
 _EDGE_BASE_URL: Final = "https://localhost:18443"
 _API_BASE_URL: Final = f"{_EDGE_BASE_URL}/api"
 _EXPECTED_CONTAINER_COUNT: Final = 14
+_EXPECTED_QUALIFICATION_ROUTES: Final = (
+    "NATIVE_STANDARD",
+    "MIXED_PAGEWISE",
+    "PREPROCESS_GRANITE",
+    "TARGETED_ENRICHMENT",
+    "SKIP_EMPTY",
+)
+_EXPECTED_QUALIFICATION_PAGE_COUNT: Final = len(_EXPECTED_QUALIFICATION_ROUTES)
 _WINDOWS_CONTROL_C_EXIT: Final = 0xC000013A
 _WORKER_IDS: Final = frozenset(
     {"worker-documents", "worker-projection"}
@@ -79,6 +100,7 @@ class DevelopmentE2EReport:
     citation_url: str
     spark_raw_response_id: str
     support_status: str
+    qualification_routes: tuple[str, str, str, str, str]
     progress_phases: tuple[str, str, str]
     worker_identity_count: int
     container_count: int
@@ -109,6 +131,8 @@ class DevelopmentE2EReport:
         _require_text(self.spark_raw_response_id, "spark_raw_response_id")
         if self.support_status not in {"SUPPORTED", "PARTIALLY_SUPPORTED"}:
             raise ValueError("DEVELOPMENT_E2E_SUPPORT_STATUS_INVALID")
+        if self.qualification_routes != _EXPECTED_QUALIFICATION_ROUTES:
+            raise ValueError("DEVELOPMENT_E2E_QUALIFICATION_ROUTES_INVALID")
         if self.progress_phases != ("SUCCEEDED", "SUCCEEDED", "SUCCEEDED"):
             raise ValueError("DEVELOPMENT_E2E_PROGRESS_INVALID")
         if self.worker_identity_count != 4:
@@ -147,6 +171,7 @@ class _ProductProof:
     citation_url: str
     support_status: str
     spark_raw_response_id: str
+    qualification_routes: tuple[str, str, str, str, str]
     progress_phases: tuple[str, str, str]
     worker_identity_count: int
     container_count: int
@@ -328,6 +353,7 @@ def run_development_environment_e2e(
         citation_url=product.citation_url,
         spark_raw_response_id=product.spark_raw_response_id,
         support_status=product.support_status,
+        qualification_routes=product.qualification_routes,
         progress_phases=product.progress_phases,
         worker_identity_count=product.worker_identity_count,
         container_count=product.container_count,
@@ -582,6 +608,7 @@ def _exercise_product(
         raise DevelopmentE2EError(
             f"DEVELOPMENT_E2E_DIAGNOSTIC_NOT_ROUTED: {diagnostic.get('diagnostic_status')!r}"
         )
+    qualification_routes = _public_qualification_route_names(diagnostic)
 
     state = _find_document(client, document_id)
     if state.get("conversion_status") == "CONVERSION_NOT_REQUESTED":
@@ -670,6 +697,7 @@ def _exercise_product(
         citation_url=citation_url,
         support_status=_require_text(answer.get("support_status"), "support_status"),
         spark_raw_response_id=spark_raw_response_id,
+        qualification_routes=qualification_routes,
         progress_phases=(
             _require_text(diagnostic_progress.get("phase"), "diagnostic_phase"),
             _require_text(conversion_progress.get("phase"), "conversion_phase"),
@@ -1553,7 +1581,7 @@ def _prepare_reemitted_real_pdf(
         raise ValueError("DEVELOPMENT_E2E_PROOF_ID_INVALID")
 
     source_reader = PdfReader(str(source_pdf), strict=True)
-    if len(source_reader.pages) != 38:
+    if len(source_reader.pages) != _EXPECTED_QUALIFICATION_PAGE_COUNT:
         raise ValueError("DEVELOPMENT_E2E_SOURCE_PAGE_COUNT_INVALID")
     source_sha256 = _sha256_file(source_pdf)
     writer = PdfWriter()
@@ -1636,7 +1664,7 @@ def _validate_reemitted_real_pdf(
     if not derived_bytes.startswith(b"%PDF-") or not derived_bytes.rstrip().endswith(b"%%EOF"):
         raise DevelopmentE2EError("DEVELOPMENT_E2E_REEMITTED_PDF_ENVELOPE_INVALID")
     derived_reader = PdfReader(str(derived_pdf), strict=True)
-    if len(derived_reader.pages) != 38:
+    if len(derived_reader.pages) != _EXPECTED_QUALIFICATION_PAGE_COUNT:
         raise DevelopmentE2EError("DEVELOPMENT_E2E_REEMITTED_PAGE_COUNT_INVALID")
     if _pdf_page_content_hashes(derived_reader) != source_page_hashes:
         raise DevelopmentE2EError("DEVELOPMENT_E2E_REEMITTED_PAGE_CONTENT_MISMATCH")
@@ -1654,6 +1682,64 @@ def _pdf_page_content_hashes(reader: PdfReader) -> tuple[str, ...]:
         content_bytes = b"" if contents is None else contents.get_data()
         hashes.append(hashlib.sha256(content_bytes).hexdigest())
     return tuple(hashes)
+
+
+def _qualification_route_names(source_pdf: Path) -> tuple[str, ...]:
+    if not isinstance(source_pdf, Path) or not source_pdf.is_file():
+        raise ValueError("DEVELOPMENT_E2E_REAL_PDF_REQUIRED")
+    report = build_m13_isolated_pdf_inspector().inspect_path(source_pdf)
+    diagnostic_policy = PageDiagnosticPolicy()
+    routing_policy = PageRoutingPolicy()
+    routing_configuration = build_document_routing_configuration()
+    routes: list[str] = []
+    for page in report.pages:
+        signals = PageDiagnosticSignals(
+            native_text_state=page.native_text_state,
+            image_state=page.image_state,
+            existing_ocr_state=page.existing_ocr_state,
+            layout_complexity=page.layout_complexity,
+            corruption_state=page.corruption_state,
+            mixed_content_detected=page.mixed_content_detected,
+            has_table=page.has_table,
+            has_formula=page.has_formula,
+        )
+        decision = diagnostic_policy.classify(
+            page_number=PageNumber.from_value(page.page_number),
+            signals=signals,
+            diagnostic_version=DiagnosticVersion.from_value("pypdf-isolated-v4"),
+            justification=(
+                "Qualification de la fixture réelle de cinq pages par "
+                "l'inspecteur pypdf isolé."
+            ),
+        )
+        route = routing_policy.decide_page_route(decision, routing_configuration)
+        routes.append(route.route_name.value)
+    return tuple(routes)
+
+
+def _public_qualification_route_names(
+    diagnostic: Mapping[str, Any],
+) -> tuple[str, str, str, str, str]:
+    if diagnostic.get("source_page_count") != _EXPECTED_QUALIFICATION_PAGE_COUNT:
+        raise DevelopmentE2EError("DEVELOPMENT_E2E_QUALIFICATION_PAGE_COUNT_INVALID")
+    pages = diagnostic.get("pages")
+    if not isinstance(pages, list) or len(pages) != _EXPECTED_QUALIFICATION_PAGE_COUNT:
+        raise DevelopmentE2EError("DEVELOPMENT_E2E_QUALIFICATION_PAGES_INVALID")
+    observed: list[str] = []
+    for expected_page_number, page in enumerate(pages, start=1):
+        if not isinstance(page, Mapping) or page.get("page_number") != expected_page_number:
+            raise DevelopmentE2EError("DEVELOPMENT_E2E_QUALIFICATION_PAGE_ORDER_INVALID")
+        route = page.get("route")
+        if not isinstance(route, Mapping):
+            raise DevelopmentE2EError("DEVELOPMENT_E2E_QUALIFICATION_ROUTE_MISSING")
+        observed.append(_require_text(route.get("route_name"), "route_name"))
+    route_names = tuple(observed)
+    if route_names != _EXPECTED_QUALIFICATION_ROUTES:
+        raise DevelopmentE2EError(
+            "DEVELOPMENT_E2E_QUALIFICATION_ROUTES_INVALID: "
+            + ",".join(route_names)
+        )
+    return _EXPECTED_QUALIFICATION_ROUTES
 
 
 def _require_development_configuration(configuration: ApplicationConfiguration) -> None:

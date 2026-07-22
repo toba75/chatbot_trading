@@ -186,7 +186,7 @@ def test() -> int:
                 Path.cwd()
                 / "data"
                 / "corpus"
-                / "the-original-turtle-trading-rules.pdf"
+                / "ostrading-environment-qualification-5-pages.pdf"
             ),
             runner=run_test_environment_e2e,
             publish_report=_publish_test_report,
@@ -208,7 +208,7 @@ def production() -> int:
                 Path.cwd()
                 / "data"
                 / "corpus"
-                / "the-original-turtle-trading-rules.pdf"
+                / "ostrading-environment-qualification-5-pages.pdf"
             ),
             runner=run_production_environment_e2e,
             publish_report=_publish_production_report,

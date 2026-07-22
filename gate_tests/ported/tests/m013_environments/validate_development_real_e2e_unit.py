@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from pathlib import Path
 import signal
 import subprocess
@@ -56,6 +58,7 @@ def _validate_development_proof_reemits_five_qualification_pages_with_unique_met
     from app.platform.development_e2e import (
         _EXPECTED_QUALIFICATION_ROUTES,
         _prepare_reemitted_real_pdf,
+        _public_qualification_route_names,
         _qualification_route_names,
     )
 
@@ -80,6 +83,49 @@ def _validate_development_proof_reemits_five_qualification_pages_with_unique_met
     derived_bytes = derived_pdf.read_bytes()
     assert len(PdfReader(str(source_pdf), strict=True).pages) == 5
     assert _qualification_route_names(source_pdf) == _EXPECTED_QUALIFICATION_ROUTES
+    manifest = json.loads(
+        (
+            repository_root
+            / "docs"
+            / "governance"
+            / "m013_environment_qualification_fixture.json"
+        ).read_text(encoding="utf-8")
+    )
+    assert manifest["fixture_sha256"] == hashlib.sha256(source_bytes).hexdigest()
+    assert [page["fixture_page_number"] for page in manifest["pages"]] == [1, 2, 3, 4, 5]
+    assert [page["expected_route_name"] for page in manifest["pages"]] == list(
+        _EXPECTED_QUALIFICATION_ROUTES
+    )
+    assert [page["expected_conversion_tool_name"] for page in manifest["pages"]] == [
+        "DOCLING_STANDARD",
+        "GRANITE_DOCLING",
+        "GEMMA_VISION",
+        "DOCLING_STANDARD",
+        None,
+    ]
+    assert manifest["pages"][2]["expected_fallback_triggering_error_code"] == (
+        "DOCLING_PROVENANCE_MISSING"
+    )
+    public_diagnostic = {
+        "source_page_count": 5,
+        "pages": [
+            {"page_number": page_number, "route": {"route_name": route_name}}
+            for page_number, route_name in enumerate(
+                _EXPECTED_QUALIFICATION_ROUTES,
+                start=1,
+            )
+        ],
+    }
+    assert (
+        _public_qualification_route_names(public_diagnostic)
+        == _EXPECTED_QUALIFICATION_ROUTES
+    )
+    public_diagnostic["pages"][1]["route"]["route_name"] = "SCAN_GRANITE"
+    with pytest.raises(
+        RuntimeError,
+        match="DEVELOPMENT_E2E_QUALIFICATION_ROUTES_INVALID",
+    ):
+        _public_qualification_route_names(public_diagnostic)
     derived_reader = PdfReader(str(derived_pdf), strict=True)
     assert len(derived_reader.pages) == 5
     assert derived_bytes.startswith(b"%PDF-")
@@ -332,6 +378,13 @@ def _validate_development_product_checkpoint_preserves_public_proof_before_stop(
         ),
         support_status="SUPPORTED",
         spark_raw_response_id="RAW-DEVELOPMENT-CHECKPOINT-001",
+        qualification_routes=(
+            "NATIVE_STANDARD",
+            "MIXED_PAGEWISE",
+            "PREPROCESS_GRANITE",
+            "TARGETED_ENRICHMENT",
+            "SKIP_EMPTY",
+        ),
         progress_phases=("SUCCEEDED", "SUCCEEDED", "SUCCEEDED"),
         worker_identity_count=4,
         container_count=14,

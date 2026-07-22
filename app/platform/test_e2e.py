@@ -23,6 +23,7 @@ from app.platform.configuration import (
 )
 from app.platform.development_e2e import (
     DevelopmentE2EError,
+    _EXPECTED_QUALIFICATION_ROUTES,
     _ProofContext,
     _all_public_document_ids,
     _exercise_product,
@@ -95,6 +96,7 @@ class TestE2ERunReport:
     citation_url: str
     spark_raw_response_id: str
     support_status: str
+    qualification_routes: tuple[str, str, str, str, str]
     progress_phases: tuple[str, str, str]
     worker_identity_count: int
     container_count: int
@@ -128,6 +130,8 @@ class TestE2ERunReport:
             raise ValueError("TEST_E2E_SPARK_RESPONSE_ID_INVALID")
         if self.support_status not in {"SUPPORTED", "PARTIALLY_SUPPORTED"}:
             raise ValueError("TEST_E2E_SUPPORT_STATUS_INVALID")
+        if self.qualification_routes != _EXPECTED_QUALIFICATION_ROUTES:
+            raise ValueError("TEST_E2E_QUALIFICATION_ROUTES_INVALID")
         if self.progress_phases != ("SUCCEEDED", "SUCCEEDED", "SUCCEEDED"):
             raise ValueError("TEST_E2E_PROGRESS_INVALID")
         if (
@@ -478,6 +482,7 @@ def _run_single_test_cycle(
             citation_url=product.citation_url,
             spark_raw_response_id=product.spark_raw_response_id,
             support_status=product.support_status,
+            qualification_routes=product.qualification_routes,
             progress_phases=product.progress_phases,
             worker_identity_count=product.worker_identity_count,
             container_count=product.container_count,

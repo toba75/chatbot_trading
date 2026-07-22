@@ -116,7 +116,10 @@ def _assert_uv_environment_entrypoints_launch_the_selected_stack(monkeypatch, tm
             profile,
             {
                 "repository_root": tmp_path,
-                "pdf_path": tmp_path / "data/corpus/the-original-turtle-trading-rules.pdf",
+                "pdf_path": (
+                    tmp_path
+                    / "data/corpus/ostrading-environment-qualification-5-pages.pdf"
+                ),
             },
         )
         for profile in ("test", "production")

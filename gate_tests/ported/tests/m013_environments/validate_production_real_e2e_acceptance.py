@@ -17,7 +17,7 @@ def test_validate_production_real_e2e_acceptance() -> None:
         repository_root
         / "data"
         / "corpus"
-        / "the-original-turtle-trading-rules.pdf"
+        / "ostrading-environment-qualification-5-pages.pdf"
     )
 
     # Given la pile production porte son identité et tous ses workers sont prêts.
@@ -32,7 +32,7 @@ def test_validate_production_real_e2e_acceptance() -> None:
     # depuis development et test.
     assert report.environment == "production"
     assert report.deployment_id == "ostrading-production-primary"
-    assert report.source_pdf_path.endswith("the-original-turtle-trading-rules.pdf")
+    assert report.source_pdf_path.endswith("ostrading-environment-qualification-5-pages.pdf")
     assert report.source_pdf_sha256 != report.pdf_sha256
     assert report.document_id.startswith("DOC-")
     assert report.canonical_version_id.startswith("CVER-")
@@ -40,6 +40,13 @@ def test_validate_production_real_e2e_acceptance() -> None:
     assert report.answer_id.startswith("ANS-")
     assert report.citation_url.startswith("https://localhost:20443/")
     assert report.spark_raw_response_id
+    assert report.qualification_routes == (
+        "NATIVE_STANDARD",
+        "MIXED_PAGEWISE",
+        "PREPROCESS_GRANITE",
+        "TARGETED_ENRICHMENT",
+        "SKIP_EMPTY",
+    )
     assert report.progress_phases == ("SUCCEEDED", "SUCCEEDED", "SUCCEEDED")
     assert report.worker_identity_count == 4
     assert report.environment_job_count >= 3
