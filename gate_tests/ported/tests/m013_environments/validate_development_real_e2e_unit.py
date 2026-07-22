@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from pathlib import Path
+import signal
+import subprocess
 from types import SimpleNamespace
 
 import pytest
@@ -114,37 +116,109 @@ def _validate_development_readiness_ignores_previous_lifecycle_event(
     ) == "ready"
 
 
-def _validate_development_controlled_stop_releases_wait_via_edge_gateway(
+def _validate_development_process_owns_a_windows_console_group(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
     import app.platform.development_e2e as development_e2e
 
-    calls: list[tuple[str, ...]] = []
-    process = SimpleNamespace(poll=lambda: None, wait=lambda **_: 0)
+    popen_calls: list[dict[str, object]] = []
+    stop_calls: list[object] = []
+    process = SimpleNamespace()
+
+    def record_popen(*_args, **kwargs):
+        popen_calls.append(kwargs)
+        return process
+
+    monkeypatch.setattr(development_e2e.shutil, "which", lambda _: "uv.exe")
+    monkeypatch.setattr(development_e2e.subprocess, "Popen", record_popen)
+    monkeypatch.setattr(development_e2e, "_wait_public_readiness", lambda **_: None)
     monkeypatch.setattr(
         development_e2e,
-        "environment_stack_definition",
-        lambda *_, **__: SimpleNamespace(),
+        "_stop_development_command",
+        lambda **kwargs: stop_calls.append(kwargs["process"]),
     )
+    configuration = SimpleNamespace(
+        application=SimpleNamespace(
+            environment="development",
+            deployment_id="ostrading-development-local",
+        ),
+        configuration_hash="a" * 64,
+    )
+
+    with development_e2e._running_development_command(
+        repository_root=tmp_path,
+        token="token-development",
+        log_path=tmp_path / "development.log",
+        configuration=configuration,
+        ca_bundle_path=tmp_path / "caddy-ca.pem",
+    ):
+        pass
+
+    assert len(popen_calls) == 1
+    assert popen_calls[0]["creationflags"] == subprocess.CREATE_NEW_PROCESS_GROUP
+    assert stop_calls == [process]
+
+
+def _validate_development_controlled_stop_interrupts_the_console_group(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    import app.platform.development_e2e as development_e2e
+
+    signals: list[object] = []
+    wait_timeouts: list[int] = []
+
+    class Process:
+        returncode = None
+
+        @staticmethod
+        def poll():
+            return None
+
+        def send_signal(self, event) -> None:
+            signals.append(event)
+
+        @staticmethod
+        def wait(*, timeout: int) -> int:
+            wait_timeouts.append(timeout)
+            return 0
+
     monkeypatch.setattr(
         development_e2e,
-        "_technical_environment_from_repository",
-        lambda _: {},
+        "_run_compose",
+        lambda *_args, **_kwargs: pytest.fail("Compose ne doit pas servir de signal d'arrêt."),
     )
-
-    def record_run(_definition, arguments, **_kwargs):
-        calls.append(tuple(arguments))
-        return SimpleNamespace(returncode=0)
-
-    monkeypatch.setattr(development_e2e, "_run_compose", record_run)
 
     development_e2e._stop_development_command(
         repository_root=tmp_path,
-        process=process,
+        process=Process(),
     )
 
-    assert calls == [("stop", "--timeout", "30", "edge-gateway")]
+    assert signals == [signal.CTRL_BREAK_EVENT]
+    assert wait_timeouts == [180]
+
+
+def _validate_development_entrypoint_maps_console_break_to_keyboard_interrupt(
+    monkeypatch,
+) -> None:
+    import app.platform.environment_command as environment_command
+
+    previous_handler = object()
+    registrations: list[tuple[object, object]] = []
+
+    def record_signal(signum, handler):
+        registrations.append((signum, handler))
+        return previous_handler
+
+    monkeypatch.setattr(environment_command.signal, "signal", record_signal)
+    monkeypatch.setattr(environment_command, "_run_entrypoint", lambda _: 0)
+
+    assert environment_command.development() == 0
+    assert registrations == [
+        (signal.SIGBREAK, signal.default_int_handler),
+        (signal.SIGBREAK, previous_handler),
+    ]
 
 
 def _validate_development_resume_reuses_explicit_existing_proof_without_reemission(
@@ -239,10 +313,12 @@ def test_development_real_e2e_unit(monkeypatch, tmp_path: Path) -> None:
         tmp_path,
     )
     _validate_development_readiness_ignores_previous_lifecycle_event(tmp_path)
-    _validate_development_controlled_stop_releases_wait_via_edge_gateway(
+    _validate_development_process_owns_a_windows_console_group(monkeypatch, tmp_path)
+    _validate_development_controlled_stop_interrupts_the_console_group(
         monkeypatch,
         tmp_path,
     )
+    _validate_development_entrypoint_maps_console_break_to_keyboard_interrupt(monkeypatch)
     _validate_development_resume_reuses_explicit_existing_proof_without_reemission(
         tmp_path,
     )

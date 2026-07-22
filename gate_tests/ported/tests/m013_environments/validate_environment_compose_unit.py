@@ -195,3 +195,32 @@ def test_environment_compose_unit(tmp_path: Path) -> None:
     from app.platform.environment_compose import start_environment_compose_stack
 
     assert environment_command.start_environment_compose_stack is start_environment_compose_stack
+
+    # Given le serveur PostgreSQL temporaire puis le serveur final de docker-entrypoint.
+    # When Compose qualifie la disponibilité de chaque profil avant les migrations.
+    # Then seul PID 1 postgres répondant réellement à SELECT 1 est déclaré sain.
+    import yaml
+
+    actual_repository_root = next(
+        parent
+        for parent in Path(__file__).resolve().parents
+        if (parent / "pyproject.toml").is_file()
+    )
+    expected_databases = {
+        "development": "ostrading_development",
+        "test": "ostrading_test",
+        "production": "ostrading_production",
+    }
+    for environment, database in expected_databases.items():
+        compose_document = yaml.safe_load(
+            (actual_repository_root / "deploy" / "environments" / f"{environment}.compose.yaml")
+            .read_text(encoding="utf-8")
+        )
+        postgres_healthcheck = compose_document["services"]["postgres"]["healthcheck"]["test"]
+        assert postgres_healthcheck == [
+            "CMD-SHELL",
+            (
+                'test "$$(cat /proc/1/comm)" = "postgres" '
+                f'&& test "$$(psql -U {database} -d {database} -Atqc \'SELECT 1\')" = "1"'
+            ),
+        ]
