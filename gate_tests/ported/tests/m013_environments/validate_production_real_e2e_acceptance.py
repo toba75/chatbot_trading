@@ -12,13 +12,13 @@ def test_validate_production_real_e2e_acceptance(monkeypatch) -> None:
     # Given production est un environnement persistant sans données de test.
     calls: list[str] = []
     monkeypatch.setattr(command, "_run_entrypoint", lambda profile: calls.append(profile) or 0)
-    monkeypatch.setattr(
-        command,
-        "run_production_environment_e2e",
-        lambda **_: SimpleNamespace(to_mapping=lambda: {"environment": "production"}),
-        raising=False,
-    )
-    monkeypatch.setattr(command, "_publish_production_report", lambda _: None, raising=False)
+    if hasattr(command, "run_production_environment_e2e"):
+        monkeypatch.setattr(
+            command,
+            "run_production_environment_e2e",
+            lambda **_: SimpleNamespace(to_mapping=lambda: {"environment": "production"}),
+        )
+        monkeypatch.setattr(command, "_publish_production_report", lambda _: None)
     monkeypatch.setattr(sys, "argv", ["production"])
 
     # When l'opérateur démarre production.

@@ -85,13 +85,13 @@ def _assert_uv_environment_entrypoints_launch_the_selected_stack(monkeypatch, tm
         lambda **arguments: qualified.append(("test", arguments))
         or SimpleNamespace(to_mapping=lambda: {"environment": "test", "runs": [1, 2]}),
     )
-    monkeypatch.setattr(
-        command,
-        "run_production_environment_e2e",
-        lambda **arguments: qualified.append(("production", arguments))
-        or SimpleNamespace(to_mapping=lambda: {"environment": "production"}),
-        raising=False,
-    )
+    if hasattr(command, "run_production_environment_e2e"):
+        monkeypatch.setattr(
+            command,
+            "run_production_environment_e2e",
+            lambda **arguments: qualified.append(("production", arguments))
+            or SimpleNamespace(to_mapping=lambda: {"environment": "production"}),
+        )
     original_argv = sys.argv[:]
     try:
         for profile in expected_entrypoints:

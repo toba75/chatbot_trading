@@ -3,7 +3,8 @@
 ## Contrat d'exploitation
 
 - Identifiant : `M13-Environments-Runbook-1.0`.
-- Décision : ADR-046.
+- Décisions : ADR-046 pour l'étanchéité et ADR-049 pour la qualification
+  réservée à `test`.
 - Profils fermés : `development`, `test`, `production`.
 - Statut de livraison : `SUBMILESTONE_GREEN_M013_OPEN` ; ce runbook ne clôt
   pas le milestone M-013 global.
@@ -13,8 +14,9 @@
   absente arrête la commande ; aucun secret ni profil n'est déduit.
 - Les commandes ne créent ni répertoire ni valeur secrète. L'opérateur fournit
   avant le lancement les cinq fichiers du profil, tous valides et hors Git.
-- Une preuve réelle exige un worktree Git propre. Le commit annoncé dans le
-  rapport est celui injecté dans les images et contient le runner qualifié.
+- La qualification réelle `test` exige un worktree Git propre. Le commit
+  annoncé dans le rapport est celui injecté dans les images et contient le
+  runner qualifié.
 - Les trois profils peuvent utiliser le même daemon Docker local, mais leurs
   autorités de données, projets, réseaux, volumes, credentials, clés Qdrant et
   racines restent distincts. Le profil local `production` ne certifie pas un
@@ -29,7 +31,7 @@
 |---|---|---:|---|
 | development | `uv run development` | `https://localhost:18443` | volumes conservés |
 | test | `uv run test` | `https://localhost:19443` pendant chaque cycle | seuls les volumes test sont supprimés après préflight |
-| production | `uv run production` | `https://localhost:20443` pendant la qualification | volumes conservés |
+| production | `uv run production` | `https://localhost:20443` | volumes conservés |
 
 ## Export explicite de la CA Caddy et contrôle HTTPS
 
@@ -100,9 +102,10 @@ son identifiant de cycle dans le volume applicatif ; le teardown compare ce
 propriétaire persistant avant `down --volumes`. Un verrou orphelin ou une pile
 test préexistante est terminal et n'est jamais réinitialisé automatiquement.
 
-`uv run production` exécute une qualification réelle finie, redémarre la même
-installation pour relire ses données et sort par `down --remove-orphans`. La
-commande n'exécute jamais `down --volumes`, purge ou restauration.
+`uv run production` démarre les 14 conteneurs, vérifie leur readiness et leur
+identité `production`, puis reste actif jusqu'à `Ctrl+C`. Il ne charge aucune
+fixture et ne crée aucune donnée de qualification. L'arrêt exécute
+`down --remove-orphans` sans `down --volumes`, purge ou restauration.
 
 ## Migration bornée
 
@@ -154,15 +157,17 @@ ni restauration croisée, ni cible par défaut.
 ## Gates statique et live
 
 La gate statique contrôle les artefacts versionnés, la matrice 3 × 3, les
-coordonnées mutables, les quatre réplicas workers et la copie normalisée des
-rapports réels :
+coordonnées mutables, les quatre réplicas workers et l'archive `STALE` des
+anciens rapports, sans les présenter comme une preuve courante :
 
 ```console
 uv run --locked gate --scope m013_environments
 ```
 
-La gate live rejoue les trois vraies piles, sans mock, puis consolide leurs
-nouveaux rapports. Elle est volontairement explicite et coûteuse :
+La gate live exécute exclusivement les deux cycles de la vraie pile `test`,
+sans mock, puis consolide son nouveau rapport. `development` et `production`
+restent couverts par les contrôles statiques et les sondes de readiness non
+mutatrices. La qualification live est volontairement explicite et coûteuse :
 
 Les seules boucles asynchrones publiées par ces piles sont les deux réplicas
 documentaires (`DIAGNOSE`, `CONVERT_DOCUMENT`) et les deux réplicas de
@@ -175,11 +180,11 @@ uv run --locked gate --scope m013_environments --live
 ```
 
 Sans `--live`, même une gate sans `--scope` exclut les nœuds live. Le parcours
-live repart d'un Docker propre : aucun volume étranger n'est un prérequis. Les
-sondes croisées relisent uniquement les artefacts versionnés du profil qualifié
-et ne lisent aucun secret, stockage ou autorité d'un autre profil.
+live repart d'une pile `test` vide : aucun volume étranger n'est un prérequis.
+Les sondes croisées relisent uniquement les artefacts versionnés du profil
+qualifié et ne lisent aucun secret, stockage ou autorité d'un autre profil.
 
-Une preuve `development`, `test` ou `production` absente, une collision
+Une preuve `test` absente, une route de qualification manquante, une collision
 d'identifiant, un worker manquant ou une donnée sensible rend la gate RED. Une
 gate structurelle GREEN ne remplace jamais la gate live.
 
@@ -189,11 +194,10 @@ gate structurelle GREEN ne remplace jamais la gate live.
   action.
 - Ne jamais copier une configuration ou un secret d'un autre profil pour faire
   repartir une pile.
-- Pour development, interrompre la commande au premier plan et vérifier que
-  les conteneurs sont arrêtés sans suppression de volume.
-- Test et production sont des qualifications finies : un échec est propagé et
-  leur superviseur applique respectivement le teardown test contrôlé ou
-  l'arrêt production non destructif.
+- Pour development et production, interrompre la commande au premier plan et
+  vérifier que les conteneurs sont arrêtés sans suppression de volume.
+- Test est la seule qualification finie : un échec est propagé et son
+  superviseur applique le teardown contrôlé.
 - Ne jamais déclarer un écart accepté implicitement. Le statut reste
   `SUBMILESTONE_GREEN_M013_OPEN` tant que la décision globale M-013 n'a pas été
   prise par sa propre gouvernance.

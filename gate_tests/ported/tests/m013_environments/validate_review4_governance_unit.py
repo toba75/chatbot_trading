@@ -9,7 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[4]
 
 
-def _assert_traceabilite_attend_preuves_live_et_relit_adr_047_048() -> None:
+def _assert_traceabilite_attend_preuve_test_et_relit_adr_047_048_049() -> None:
     """Given des rapports STALE, When offline valide, Then aucun statut GREEN n'est publié."""
 
     from ost_gate.environment_governance import validate_repository_environment_governance
@@ -28,15 +28,22 @@ def _assert_traceabilite_attend_preuves_live_et_relit_adr_047_048() -> None:
     assert all(record["status"] != "GREEN" for record in records.values())
     adr_047 = "docs/adr/ADR-047-archive-chiffree-verifiee-avant-preuve-restauration.md"
     adr_048 = "docs/adr/ADR-048-progression-et-parallelisme-dans-profils-explicites.md"
+    adr_049 = "docs/adr/ADR-049-qualification-complete-reservee-au-profil-test.md"
     assert adr_047 in records["REQ-M013-ENV-008"]["adrs"]
     for requirement_id in (
         "REQ-M013-ENV-007",
+        "REQ-M013-ENV-010",
+        "REQ-M013-ENV-012",
+    ):
+        assert adr_048 in records[requirement_id]["adrs"]
+    for requirement_id in (
+        "REQ-M013-ENV-003",
         "REQ-M013-ENV-009",
         "REQ-M013-ENV-010",
         "REQ-M013-ENV-011",
         "REQ-M013-ENV-012",
     ):
-        assert adr_048 in records[requirement_id]["adrs"]
+        assert adr_049 in records[requirement_id]["adrs"]
     evidence = validate_repository_environment_governance(
         repository_root=ROOT,
         require_live_sources=False,
@@ -81,12 +88,12 @@ def _assert_index_documentation_reference_contrat_backup_1_1_reel() -> None:
     assert "m013_backup_restore_drill.md" not in backup_row
 
 
-def _assert_prochaine_adr_est_049() -> None:
-    """Given ADR-048 présente, When l'index réserve le suivant, Then il annonce ADR-049."""
+def _assert_prochaine_adr_est_050() -> None:
+    """Given ADR-049 présente, When l'index réserve le suivant, Then il annonce ADR-050."""
 
     index = (ROOT / "docs/adr/index.md").read_text(encoding="utf-8")
-    assert "Prochaine ADR technique: ADR-049" in index
-    assert "Prochaine ADR technique: ADR-048" not in index
+    assert "Prochaine ADR technique: ADR-050" in index
+    assert "Prochaine ADR technique: ADR-049" not in index
 
 
 def _assert_runbook_documente_import_ca_windows_explicite_et_reversible() -> None:
@@ -120,9 +127,9 @@ def _assert_tests_revue4_sont_enroles_dans_la_gate() -> None:
 def test_gouvernance_de_la_revue4() -> None:
     """Given les findings revue 4, When la gouvernance est lue, Then ils sont fermés."""
 
-    _assert_traceabilite_attend_preuves_live_et_relit_adr_047_048()
+    _assert_traceabilite_attend_preuve_test_et_relit_adr_047_048_049()
     _assert_readme_compose_historique_est_deprecie_et_gouverne()
     _assert_index_documentation_reference_contrat_backup_1_1_reel()
-    _assert_prochaine_adr_est_049()
+    _assert_prochaine_adr_est_050()
     _assert_runbook_documente_import_ca_windows_explicite_et_reversible()
     _assert_tests_revue4_sont_enroles_dans_la_gate()

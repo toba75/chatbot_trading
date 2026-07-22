@@ -500,7 +500,7 @@ git ls-tree -r --name-only master -- docs/tasks docs/adr docs/specs
 
 ### M13-environments - Environnements explicites et données étanches
 
-- Source: demande utilisateur du 2026-07-21; ADR-016 à remplacer explicitement; livrables M13-config.
+- Source: demandes utilisateur des 2026-07-21 et 2026-07-23; ADR-046 et ADR-049; livrables M13-config.
 - Objectif métier: permettre à l'exploitant de choisir sans ambiguïté `development`, `test` ou `production` par `uv run development`, `uv run test` ou `uv run production`, tout en rendant techniquement impossible l'accès croisé aux données et travaux asynchrones.
 - Workstreams actifs: WS-01, WS-03, WS-11.
 - Bounded contexts concernés: `platform.configuration`, API, UI, workers, jobs/outbox, PostgreSQL, Qdrant, stockage de fichiers, secrets, exploitation et gouvernance.
@@ -508,27 +508,28 @@ git ls-tree -r --name-only master -- docs/tasks docs/adr docs/specs
 - Règle de gouvernance: `M13-environments` est un sous-milestone de `M-013`; sa planification ne requiert pas la clôture de `M-013` dans `master`, seulement les milestones strictement antérieurs. M13-config est une dépendance fonctionnelle déjà livrée.
 - Scénario directeur:
   - Given les trois configurations complètes `development`, `test` et `production` et leurs ressources mutables distinctes
-  - When l'exploitant lance l'une des trois commandes UV et soumet un PDF au parcours public réel
-  - Then l'API, l'outbox, le relais, les workers, PostgreSQL, Qdrant et les fichiers utilisent exclusivement l'environnement choisi, publient la progression réelle et refusent toute incohérence d'identité avant le premier travail
+  - When l'exploitant lance `development` ou `production`, ou que la qualification lance `test` avec la fixture PDF contrôlée
+  - Then chaque pile utilise exclusivement son environnement; seules les deux exécutions `test` créent des données de qualification et publient la progression du parcours réel
 - Livrables:
-  - ADR-046 remplaçant ADR-045, décidant les profils locaux explicites sur une autorité Docker honnêtement déclarée et retirant le point d'entrée `ui`, sans réintroduire de variable d'environnement ni de fallback;
+  - ADR-046 remplaçant ADR-045 pour les profils locaux explicites et ADR-049 réservant la qualification fonctionnelle complète au profil `test`;
   - contrat strict `environment` et `deployment_id`, avec trois fichiers complets `config/environments/development.yaml`, `test.yaml` et `production.yaml` sans héritage implicite;
   - scripts UV `development`, `test` et `production` comme seules commandes opérateur, avec mapping interne non configurable vers le fichier attendu;
   - stockages, rôles, credentials, volumes, réseaux, chemins, artefacts, caches, files et outbox distincts par environnement;
   - contrôle d'identité des stockages avant toute lecture, écriture, migration ou prise de job;
   - identité d'environnement propagée aux jobs, workers, états de santé, progressions et preuves d'exécution;
   - opérations de migration, sauvegarde, restauration, purge et nettoyage bornées à l'environnement explicitement sélectionné;
-  - parcours réel `PDF -> API -> persistance -> outbox -> relais -> worker -> projection -> lecture publique` prouvé séparément dans les trois environnements;
+  - parcours réel `PDF -> API -> persistance -> outbox -> relais -> worker -> projection -> lecture publique` prouvé dans le seul profil `test`, sur deux piles vides successives;
+  - commandes `development` et `production` persistantes, sans fixture ni création automatique de données de qualification;
   - runbooks, matrice de traçabilité et gate M13-environments rejouable.
 - Tests et gates:
   - profil absent, inconnu, incomplet ou contradictoire refusé sans valeur par défaut;
-  - `uv run development`, `uv run test` et `uv run production` sélectionnent chacun un unique fichier et supervisent toute la chaîne attendue;
+  - `uv run development`, `uv run test` et `uv run production` sélectionnent chacun un unique fichier; `development` et `production` supervisent leur pile, `test` exécute la qualification finie;
   - aucune URL mutable, base, rôle, secret, volume, racine de fichiers, file ou outbox n'est partagé entre deux profils;
   - un stockage portant une identité différente produit `DATASTORE_ENVIRONMENT_MISMATCH` avant toute opération métier;
   - un worker ne réclame que les jobs de son environnement et refuse explicitement un message divergent avec `WORKER_ENVIRONMENT_MISMATCH`;
   - l'UI n'active une action asynchrone que si sa chaîne réelle est prête et lit la progression exclusivement depuis le contrat public du profil courant;
   - le nettoyage de `test` est impossible sur `development` ou `production`;
-  - chaque parcours bout en bout utilise un PDF réel, les adaptateurs réels et les stockages réels, sans mock, stub, fake ni fallback;
+  - chacun des deux parcours `test` utilise la fixture PDF réelle cinq pages, les adaptateurs réels et les stockages réels, sans mock, stub, fake ni fallback;
   - `uv run --locked gate` reste GREEN après enrôlement des validations.
 - Sortie attendue: les trois commandes simples pilotent des installations complètes, observables et étanches; aucune donnée ni aucun worker d'un environnement n'est accessible depuis les deux autres.
 

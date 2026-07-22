@@ -10,7 +10,7 @@ import pytest
 import httpx
 
 
-def test_production_real_e2e_unit(monkeypatch, tmp_path: Path, capsys) -> None:
+def test_production_real_e2e_unit(monkeypatch, tmp_path: Path) -> None:
     from app.platform.production_e2e import (
         ProductionE2EError,
         _production_red_report_guard,
@@ -104,33 +104,13 @@ def test_production_real_e2e_unit(monkeypatch, tmp_path: Path, capsys) -> None:
 
     import app.platform.environment_command as command
 
-    published: list[object] = []
-    expected_report = SimpleNamespace(environment="production")
-    assert (
-        command._run_production_qualification(
-            argv=(),
-            repository_root=tmp_path,
-            pdf_path=tmp_path / "fixture.pdf",
-            runner=lambda **_kwargs: expected_report,
-            publish_report=published.append,
-        )
-        == 0
-    )
-    assert published == [expected_report]
-    with pytest.raises(ValueError, match="UV_ENVIRONMENT_ARGUMENTS_FORBIDDEN"):
-        command._run_production_qualification(
-            argv=("--config",),
-            repository_root=tmp_path,
-            pdf_path=tmp_path / "fixture.pdf",
-            runner=lambda **_kwargs: expected_report,
-            publish_report=published.append,
-        )
-
+    launched: list[str] = []
     monkeypatch.setattr(
         command,
-        "run_production_environment_e2e",
-        lambda **_: (_ for _ in ()).throw(ProductionE2EError("PRODUCTION_RED")),
+        "_run_entrypoint",
+        lambda environment: launched.append(environment) or 0,
     )
     monkeypatch.setattr(command.sys, "argv", ["production"])
-    assert command.production() == 1
-    assert "PRODUCTION_RED" in capsys.readouterr().err
+    assert command.production() == 0
+    assert launched == ["production"]
+    assert not hasattr(command, "_run_production_qualification")

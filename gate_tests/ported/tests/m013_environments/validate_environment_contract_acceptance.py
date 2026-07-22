@@ -37,6 +37,12 @@ _ADR_046_PATH = (
     / "adr"
     / "ADR-046-profils-locaux-etanches-sur-autorite-docker-explicite.md"
 )
+_ADR_049_PATH = (
+    _REPOSITORY_ROOT
+    / "docs"
+    / "adr"
+    / "ADR-049-qualification-complete-reservee-au-profil-test.md"
+)
 _ADR_INDEX_PATH = _REPOSITORY_ROOT / "docs" / "adr" / "index.md"
 
 
@@ -55,6 +61,7 @@ def _assert_adr_046_replaces_adr_045_explicitly() -> None:
     adr_016 = _read_required(_ADR_016_PATH, "ADR_016_REQUIRED")
     adr_045 = _read_required(_ADR_045_PATH, "ADR_045_REQUIRED")
     adr_046 = _read_required(_ADR_046_PATH, "ADR_046_REQUIRED")
+    adr_049 = _read_required(_ADR_049_PATH, "ADR_049_REQUIRED")
     adr_index = _read_required(_ADR_INDEX_PATH, "ADR_INDEX_REQUIRED")
 
     assert "**Statut :** Remplacée" in adr_016
@@ -64,11 +71,16 @@ def _assert_adr_046_replaces_adr_045_explicitly() -> None:
     assert "**Remplacée par :** ADR-046" in adr_045
     assert "**Statut :** Acceptée" in adr_046
     assert "**Remplace :** ADR-045" in adr_046
+    assert "**Remplacée par :** ADR-049 pour la sémantique de qualification" in adr_046
+    assert "**Statut :** Acceptée" in adr_049
+    assert "**Remplace :** Sémantique de qualification des commandes d'ADR-046" in adr_049
     assert "ADR-045-profils-execution-explicites-donnees-etanches.md" in adr_index
     assert "| [ADR-045]" in adr_index
     assert "ADR-046-profils-locaux-etanches-sur-autorite-docker-explicite.md" in adr_index
     assert "| [ADR-046]" in adr_index
-    assert "Prochaine ADR technique: ADR-049" in adr_index
+    assert "ADR-049-qualification-complete-reservee-au-profil-test.md" in adr_index
+    assert "| [ADR-049]" in adr_index
+    assert "Prochaine ADR technique: ADR-050" in adr_index
 
 
 def _assert_contract_closes_profiles_identity_and_configuration_sources() -> None:

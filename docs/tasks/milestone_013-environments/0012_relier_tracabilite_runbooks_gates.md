@@ -1,5 +1,9 @@
 # T-012 - Relier environnements, runbooks et gates
 
+> **Requalification du 2026-07-23 — ADR-049.** La gate live courante dépend
+> uniquement des deux cycles T-010 du profil `test`. Les profils `development`
+> et `production` sont contrôlés sans mutation par la gate statique.
+
 ## Milestone
 
 - Nom: M13-environments - Environnements explicites et données étanches.

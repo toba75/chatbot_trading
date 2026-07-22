@@ -58,22 +58,24 @@ def test_review3_governance_remediation_unit(monkeypatch, tmp_path: Path) -> Non
     assert "reports" not in evidence
     assert set(evidence["historical_reports"]) == {"development", "test", "production"}
 
-    reports = deepcopy(evidence["historical_reports"])
-    reports["development"]["worker_identity_count"] = 4
-    reports["development"]["container_count"] = 14
-    reports["development"]["https_ca_verified"] = True
-    reports["development"]["caddy_ca_sha256"] = "a" * 64
-    reports["production"]["worker_identity_count"] = 4
-    reports["production"]["container_count"] = 14
-    reports["production"]["https_ca_verified"] = True
-    reports["production"]["caddy_ca_sha256"] = "b" * 64
+    reports = {"test": deepcopy(evidence["historical_reports"]["test"])}
+    reports["test"]["source_pdf_path"] = (
+        "data/corpus/ostrading-environment-qualification-5-pages.pdf"
+    )
     for run in reports["test"]["runs"]:
         run["worker_identity_count"] = 4
         run["container_count"] = 14
         run["https_ca_verified"] = True
         run["caddy_ca_sha256"] = "c" * 64
+        run["qualification_routes"] = [
+            "NATIVE_STANDARD",
+            "MIXED_PAGEWISE",
+            "PREPROCESS_GRANITE",
+            "TARGETED_ENRICHMENT",
+            "SKIP_EMPTY",
+        ]
     validate_execution_evidence(reports)
-    reports["production"]["container_count"] = 13
+    reports["test"]["runs"][0]["container_count"] = 13
     with pytest.raises(ValueError, match="LIVE_EVIDENCE_CONTAINERS_INCOMPLETE"):
         validate_execution_evidence(reports)
 

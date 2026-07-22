@@ -17,9 +17,17 @@ from ost_gate.manifest import load_manifest
 
 
 ENVIRONMENTS: Final = ("development", "test", "production")
+LIVE_QUALIFICATION_ENVIRONMENTS: Final = ("test",)
 CLOSURE_STATUS: Final = "SUBMILESTONE_GREEN_M013_OPEN"
 EXPECTED_LIVE_WORKER_IDENTITY_COUNT: Final = 4
 EXPECTED_LIVE_CONTAINER_COUNT: Final = 14
+EXPECTED_QUALIFICATION_ROUTES: Final = (
+    "NATIVE_STANDARD",
+    "MIXED_PAGEWISE",
+    "PREPROCESS_GRANITE",
+    "TARGETED_ENRICHMENT",
+    "SKIP_EMPTY",
+)
 
 _DEPLOYMENTS: Final = {
     "development": "ostrading-development-local",
@@ -41,14 +49,20 @@ _EXPECTED_TRACEABILITY_IDS: Final = tuple(
 _ADR_046: Final = "docs/adr/ADR-046-profils-locaux-etanches-sur-autorite-docker-explicite.md"
 _ADR_047: Final = "docs/adr/ADR-047-archive-chiffree-verifiee-avant-preuve-restauration.md"
 _ADR_048: Final = "docs/adr/ADR-048-progression-et-parallelisme-dans-profils-explicites.md"
+_ADR_049: Final = "docs/adr/ADR-049-qualification-complete-reservee-au-profil-test.md"
 _EXPECTED_TRACEABILITY_ADRS: Final = {
-    **{requirement_id: (_ADR_046,) for requirement_id in _EXPECTED_TRACEABILITY_IDS[:6]},
+    "REQ-M013-ENV-001": (_ADR_046,),
+    "REQ-M013-ENV-002": (_ADR_046,),
+    "REQ-M013-ENV-003": (_ADR_046, _ADR_049),
+    "REQ-M013-ENV-004": (_ADR_046,),
+    "REQ-M013-ENV-005": (_ADR_046,),
+    "REQ-M013-ENV-006": (_ADR_046,),
     "REQ-M013-ENV-007": (_ADR_046, _ADR_048),
     "REQ-M013-ENV-008": (_ADR_046, _ADR_047),
-    "REQ-M013-ENV-009": (_ADR_046, _ADR_048),
-    "REQ-M013-ENV-010": (_ADR_046, _ADR_048),
-    "REQ-M013-ENV-011": (_ADR_046, _ADR_048),
-    "REQ-M013-ENV-012": (_ADR_046, _ADR_047, _ADR_048),
+    "REQ-M013-ENV-009": (_ADR_046, _ADR_049),
+    "REQ-M013-ENV-010": (_ADR_046, _ADR_048, _ADR_049),
+    "REQ-M013-ENV-011": (_ADR_046, _ADR_049),
+    "REQ-M013-ENV-012": (_ADR_046, _ADR_047, _ADR_048, _ADR_049),
 }
 _SHA256: Final = re.compile(r"^[0-9a-f]{64}$")
 _REVISION: Final = re.compile(r"^[0-9a-f]{7,64}$")
@@ -156,62 +170,38 @@ def assert_no_sensitive_data(value: object) -> None:
 def validate_execution_evidence(
     reports: Mapping[str, object],
 ) -> EnvironmentExecutionEvidence:
-    """Valide les quatre exécutions réelles et leurs invariants croisés."""
+    """Valide les deux cycles de qualification réels du seul profil test."""
 
     if not isinstance(reports, Mapping):
         raise EnvironmentGovernanceError("LIVE_EVIDENCE_DOCUMENT_INVALID")
-    missing = [environment for environment in ENVIRONMENTS if environment not in reports]
+    missing = [
+        environment
+        for environment in LIVE_QUALIFICATION_ENVIRONMENTS
+        if environment not in reports
+    ]
     if missing:
         raise EnvironmentGovernanceError(f"LIVE_EVIDENCE_MISSING:{missing[0]}")
-    if frozenset(reports) != frozenset(ENVIRONMENTS):
+    if frozenset(reports) != frozenset(LIVE_QUALIFICATION_ENVIRONMENTS):
         raise EnvironmentGovernanceError("LIVE_EVIDENCE_ENVIRONMENTS_INVALID")
     assert_no_sensitive_data(reports)
 
-    flattened: list[tuple[str, Mapping[str, object]]] = []
-    configuration_hashes: list[str] = []
-    source_hashes: list[str] = []
-    for environment in ENVIRONMENTS:
-        report = _require_mapping(reports[environment], "LIVE_EVIDENCE_REPORT_INVALID")
-        _validate_report_header(report, environment=environment)
-        configuration_hashes.append(
-            _required_hash(report, "configuration_hash", "LIVE_EVIDENCE_HASH_INVALID")
-        )
-        source_hashes.append(
-            _required_hash(report, "source_pdf_sha256", "LIVE_EVIDENCE_HASH_INVALID")
-        )
-        if environment == "test":
-            _require_true(report, "foreign_volume_sentinels_preserved")
-            _require_true(report, "non_test_credentials_inaccessible")
-            _require_true(report, "test_resources_removed")
-            runs = report.get("runs")
-            if not isinstance(runs, list) or len(runs) != 2:
-                raise EnvironmentGovernanceError("LIVE_EVIDENCE_TEST_RUNS_INVALID")
-            if tuple(run.get("run_number") for run in runs if isinstance(run, Mapping)) != (
-                1,
-                2,
-            ):
-                raise EnvironmentGovernanceError("LIVE_EVIDENCE_TEST_RUNS_INVALID")
-            for run in runs:
-                flattened.append((environment, _require_mapping(run, "LIVE_EVIDENCE_RUN_INVALID")))
-        else:
-            _require_true(report, "restart_persistence_verified")
-            probes = report.get("foreign_environment_probes")
-            observed_probes = tuple(probes) if isinstance(probes, list) else ()
-            if observed_probes != _EXPECTED_PROBES[environment]:
-                raise EnvironmentGovernanceError("LIVE_EVIDENCE_FOREIGN_PROBE_INVALID")
-            if environment == "development":
-                _require_true(report, "volume_sentinels_preserved")
-            else:
-                _require_true(report, "production_resources_preserved")
-                _require_true(report, "non_production_credentials_inaccessible")
-                if report.get("automatic_cleanup_performed") is not False:
-                    raise EnvironmentGovernanceError("LIVE_EVIDENCE_PRODUCTION_CLEANUP_INVALID")
-            flattened.append((environment, report))
-
-    if len(set(configuration_hashes)) != len(ENVIRONMENTS):
-        raise EnvironmentGovernanceError("EVIDENCE_CONFIGURATION_COLLISION")
-    if len(set(source_hashes)) != 1:
-        raise EnvironmentGovernanceError("EVIDENCE_SOURCE_PDF_DIVERGENCE")
+    environment = "test"
+    report = _require_mapping(reports[environment], "LIVE_EVIDENCE_REPORT_INVALID")
+    _validate_report_header(report, environment=environment)
+    _required_hash(report, "configuration_hash", "LIVE_EVIDENCE_HASH_INVALID")
+    _required_hash(report, "source_pdf_sha256", "LIVE_EVIDENCE_HASH_INVALID")
+    _require_true(report, "foreign_volume_sentinels_preserved")
+    _require_true(report, "non_test_credentials_inaccessible")
+    _require_true(report, "test_resources_removed")
+    runs = report.get("runs")
+    if not isinstance(runs, list) or len(runs) != 2:
+        raise EnvironmentGovernanceError("LIVE_EVIDENCE_TEST_RUNS_INVALID")
+    if tuple(run.get("run_number") for run in runs if isinstance(run, Mapping)) != (1, 2):
+        raise EnvironmentGovernanceError("LIVE_EVIDENCE_TEST_RUNS_INVALID")
+    flattened = [
+        (environment, _require_mapping(run, "LIVE_EVIDENCE_RUN_INVALID"))
+        for run in runs
+    ]
 
     identifier_fields = (
         "document_id",
@@ -226,6 +216,8 @@ def validate_execution_evidence(
     for environment, execution in flattened:
         if execution.get("progress_phases") != ["SUCCEEDED", "SUCCEEDED", "SUCCEEDED"]:
             raise EnvironmentGovernanceError("LIVE_EVIDENCE_PROGRESS_INVALID")
+        if tuple(execution.get("qualification_routes", ())) != EXPECTED_QUALIFICATION_ROUTES:
+            raise EnvironmentGovernanceError("LIVE_EVIDENCE_QUALIFICATION_ROUTES_INVALID")
         if execution.get("worker_identity_count") != EXPECTED_LIVE_WORKER_IDENTITY_COUNT:
             raise EnvironmentGovernanceError("LIVE_EVIDENCE_WORKERS_INCOMPLETE")
         if execution.get("container_count") != EXPECTED_LIVE_CONTAINER_COUNT:
@@ -252,7 +244,7 @@ def validate_execution_evidence(
             identifiers[value] = environment
 
     return EnvironmentExecutionEvidence(
-        environments=ENVIRONMENTS,
+        environments=LIVE_QUALIFICATION_ENVIRONMENTS,
         execution_count=len(flattened),
         worker_identity_count=worker_identity_count,
     )
@@ -441,7 +433,7 @@ def validate_evidence_revisions(
     root = repository_root.resolve()
     current_revision = _git_output(root, ("rev-parse", "HEAD"), "LIVE_EVIDENCE_REVISION_INVALID")
     revisions: list[str] = []
-    for environment in ENVIRONMENTS:
+    for environment in LIVE_QUALIFICATION_ENVIRONMENTS:
         report = _require_mapping(
             reports.get(environment),
             f"LIVE_EVIDENCE_MISSING:{environment}",
@@ -485,11 +477,7 @@ def validate_evidence_revisions(
     if require_common_revision:
         if len(set(revisions)) != 1 or revisions[0] != current_revision:
             raise EnvironmentGovernanceError("LIVE_EVIDENCE_COMMON_REVISION_REQUIRED")
-        for runner in (
-            "app/platform/development_e2e.py",
-            "app/platform/test_e2e.py",
-            "app/platform/production_e2e.py",
-        ):
+        for runner in ("app/platform/test_e2e.py",):
             _git_success(
                 root,
                 ("cat-file", "-e", f"{current_revision}:{runner}"),
@@ -532,7 +520,7 @@ def _validate_report_header(report: Mapping[str, object], *, environment: str) -
     if _REVISION.fullmatch(revision) is None:
         raise EnvironmentGovernanceError("LIVE_EVIDENCE_REVISION_INVALID")
     if report.get("source_pdf_path") != (
-        "data/corpus/the-original-turtle-trading-rules.pdf"
+        "data/corpus/ostrading-environment-qualification-5-pages.pdf"
     ):
         raise EnvironmentGovernanceError("LIVE_EVIDENCE_SOURCE_PDF_INVALID")
 
@@ -565,13 +553,9 @@ def _validate_source_report_references(root: Path, value: object) -> None:
 
 
 def _load_latest_live_reports(root: Path) -> dict[str, object]:
-    patterns = {
-        "development": "development-e2e-20*.json",
-        "test": "test-e2e-20*.json",
-        "production": "production-e2e-20*.json",
-    }
+    patterns = {"test": "test-e2e-20*.json"}
     reports: dict[str, object] = {}
-    for environment in ENVIRONMENTS:
+    for environment in LIVE_QUALIFICATION_ENVIRONMENTS:
         report_root = root / "data" / "environments" / environment / "reports"
         candidates = tuple(sorted(report_root.glob(patterns[environment])))
         if not candidates:
@@ -763,9 +747,9 @@ def _validate_traceability_document(root: Path) -> None:
         )
         requirement_id = current["requirement_id"]
         expected_status = (
-            "COVERED_OFFLINE"
-            if requirement_id in _EXPECTED_TRACEABILITY_IDS[:8]
-            else "AWAITING_LIVE_EVIDENCE"
+            "AWAITING_LIVE_EVIDENCE"
+            if requirement_id in {"REQ-M013-ENV-010", "REQ-M013-ENV-012"}
+            else "COVERED_OFFLINE"
         )
         if current["status"] != expected_status:
             raise EnvironmentGovernanceError("TRACEABILITY_REQUIREMENT_RED")
@@ -870,9 +854,12 @@ def _validate_documentation(root: Path) -> None:
 def _validate_gate_enrollment(root: Path) -> None:
     manifest = load_manifest(root / "gate.toml")
     expected = {
-        "gate_tests/ported/tests/m013_environments/validate_environment_governance_acceptance.py": False,
-        "gate_tests/ported/tests/m013_environments/validate_environment_governance_unit.py": False,
-        "gate_tests/ported/tests/m013_environments/validate_environment_governance_live.py": True,
+        "gate_tests/ported/tests/m013_environments/validate_development_real_e2e_acceptance.py": (False, "tests"),
+        "gate_tests/ported/tests/m013_environments/validate_test_real_e2e_acceptance.py": (True, "live"),
+        "gate_tests/ported/tests/m013_environments/validate_production_real_e2e_acceptance.py": (False, "tests"),
+        "gate_tests/ported/tests/m013_environments/validate_environment_governance_acceptance.py": (False, "tests"),
+        "gate_tests/ported/tests/m013_environments/validate_environment_governance_unit.py": (False, "tests"),
+        "gate_tests/ported/tests/m013_environments/validate_environment_governance_live.py": (True, "live"),
     }
     enrolled: dict[str, object] = {}
     for node in manifest.nodes:
@@ -883,19 +870,19 @@ def _validate_gate_enrollment(root: Path) -> None:
             enrolled[relative_path] = node
     if frozenset(enrolled) != frozenset(expected):
         raise EnvironmentGovernanceError("GATE_ENROLLMENT_MISSING")
-    for path, expected_live in expected.items():
+    for path, (expected_live, expected_phase) in expected.items():
         node = enrolled[path]
-        if node.scope != "m013_environments" or node.live is not expected_live:
+        if (
+            node.scope != "m013_environments"
+            or node.live is not expected_live
+            or node.phase != expected_phase
+        ):
             raise EnvironmentGovernanceError("GATE_ENROLLMENT_CLASSIFICATION_INVALID")
     live_node = enrolled[
         "gate_tests/ported/tests/m013_environments/validate_environment_governance_live.py"
     ]
     if frozenset(live_node.depends_on) != frozenset(
-        {
-            "test.m013-environments.validate-development-real-e2e-acceptance",
-            "test.m013-environments.validate-test-real-e2e-acceptance",
-            "test.m013-environments.validate-production-real-e2e-acceptance",
-        }
+        {"test.m013-environments.validate-test-real-e2e-acceptance"}
     ):
         raise EnvironmentGovernanceError("GATE_LIVE_DEPENDENCIES_INVALID")
 

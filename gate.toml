@@ -3866,11 +3866,11 @@ id = "test.m013-environments.validate-development-real-e2e-acceptance"
 path = "gate_tests/ported/tests/m013_environments/validate_development_real_e2e_acceptance.py"
 kind = "test"
 scope = "m013_environments"
-phase = "live"
-timeout_seconds = 7200
-serial_group = "process"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
 depends_on = ["precondition.m013_config"]
-live = true
+live = false
 
 [[nodes]]
 id = "test.m013-environments.validate-development-real-e2e-unit"
@@ -3921,11 +3921,11 @@ id = "test.m013-environments.validate-production-real-e2e-acceptance"
 path = "gate_tests/ported/tests/m013_environments/validate_production_real_e2e_acceptance.py"
 kind = "test"
 scope = "m013_environments"
-phase = "live"
-timeout_seconds = 14400
-serial_group = "process"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
 depends_on = ["precondition.m013_config"]
-live = true
+live = false
 
 [[nodes]]
 id = "test.m013-environments.validate-production-real-e2e-unit"
@@ -3980,9 +3980,7 @@ phase = "live"
 timeout_seconds = 120
 serial_group = "git"
 depends_on = [
-    "test.m013-environments.validate-development-real-e2e-acceptance",
     "test.m013-environments.validate-test-real-e2e-acceptance",
-    "test.m013-environments.validate-production-real-e2e-acceptance",
 ]
 live = true
 

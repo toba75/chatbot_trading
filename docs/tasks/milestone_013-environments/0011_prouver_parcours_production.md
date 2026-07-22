@@ -1,5 +1,10 @@
 # T-011 - Prouver le parcours réel en production
 
+> **Requalification du 2026-07-23 — ADR-049.** Cette tâche est conservée comme
+> historique de livraison. Le contrat courant ne rejoue plus le parcours PDF en
+> `production` : il vérifie une commande persistante, étanche et sans injection
+> automatique de fixture. La qualification fonctionnelle appartient à T-010.
+
 ## Milestone
 
 - Nom: M13-environments - Environnements explicites et données étanches.

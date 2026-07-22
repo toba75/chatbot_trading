@@ -9,9 +9,9 @@ uv run production
 ```
 
 Chaque commande sélectionne un overlay fermé et attend la readiness agrégée.
-`development` reste attaché jusqu'à `Ctrl+C`; `test` exécute deux cycles puis
-supprime ses seuls volumes après préflight; `production` exécute une qualification
-finie et arrête ses conteneurs sans supprimer ses volumes.
+`development` et `production` restent attachés jusqu'à `Ctrl+C`, sans injecter
+de données de test; `test` exécute deux cycles de qualification puis supprime
+ses seuls volumes après préflight.
 
 | Profil | Projet Compose | Entrée HTTPS locale | Configuration |
 |---|---|---:|---|
@@ -66,8 +66,9 @@ endpoint alternatif n'est utilisé.
 
 Qdrant exige la clé API propre au profil sur chaque appel d'identité, de
 readiness, d'écriture et de recherche. Un même daemon Docker local peut héberger
-les trois qualifications conformément à ADR-046, mais les autorités de données
-restent distinctes. Le profil local `production` ne certifie pas un hébergement
+les trois piles conformément à ADR-046, mais les autorités de données restent
+distinctes. Conformément à ADR-049, seule la pile `test` exécute la qualification
+fonctionnelle. Le profil local `production` ne certifie pas un hébergement
 physique dédié.
 
 Seul le cycle `test` propriétaire peut exécuter `down --volumes`, après lecture

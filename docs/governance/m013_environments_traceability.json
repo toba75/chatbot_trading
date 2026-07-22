@@ -30,7 +30,10 @@
       "status": "COVERED_OFFLINE",
       "source_task": "docs/tasks/milestone_013-environments/0003_lancer_environnement_par_commande_uv.md",
       "specification": "docs/specs/m013_environments_environnements_explicites.md",
-      "adrs": ["docs/adr/ADR-046-profils-locaux-etanches-sur-autorite-docker-explicite.md"],
+      "adrs": [
+        "docs/adr/ADR-046-profils-locaux-etanches-sur-autorite-docker-explicite.md",
+        "docs/adr/ADR-049-qualification-complete-reservee-au-profil-test.md"
+      ],
       "code": ["app/platform/environment_command.py"],
       "tests": ["gate_tests/ported/tests/m013_environments/validate_environment_commands_acceptance.py"],
       "reports": ["docs/governance/m013_environments_execution_evidence.json"],
@@ -99,16 +102,16 @@
     },
     {
       "requirement_id": "REQ-M013-ENV-009",
-      "status": "AWAITING_LIVE_EVIDENCE",
+      "status": "COVERED_OFFLINE",
       "source_task": "docs/tasks/milestone_013-environments/0009_prouver_parcours_development.md",
       "specification": "docs/specs/m013_environments_environnements_explicites.md",
       "adrs": [
         "docs/adr/ADR-046-profils-locaux-etanches-sur-autorite-docker-explicite.md",
-        "docs/adr/ADR-048-progression-et-parallelisme-dans-profils-explicites.md"
+        "docs/adr/ADR-049-qualification-complete-reservee-au-profil-test.md"
       ],
-      "code": ["app/platform/development_e2e.py"],
+      "code": ["app/platform/environment_command.py"],
       "tests": ["gate_tests/ported/tests/m013_environments/validate_development_real_e2e_acceptance.py"],
-      "reports": ["docs/governance/m013_environments_execution_evidence.json"],
+      "reports": ["docs/governance/m013_environments_isolation_matrix.json"],
       "runbooks": ["docs/runbooks/environnements_explicites.md"]
     },
     {
@@ -118,7 +121,8 @@
       "specification": "docs/specs/m013_environments_environnements_explicites.md",
       "adrs": [
         "docs/adr/ADR-046-profils-locaux-etanches-sur-autorite-docker-explicite.md",
-        "docs/adr/ADR-048-progression-et-parallelisme-dans-profils-explicites.md"
+        "docs/adr/ADR-048-progression-et-parallelisme-dans-profils-explicites.md",
+        "docs/adr/ADR-049-qualification-complete-reservee-au-profil-test.md"
       ],
       "code": ["app/platform/test_e2e.py"],
       "tests": ["gate_tests/ported/tests/m013_environments/validate_test_real_e2e_acceptance.py"],
@@ -127,16 +131,16 @@
     },
     {
       "requirement_id": "REQ-M013-ENV-011",
-      "status": "AWAITING_LIVE_EVIDENCE",
+      "status": "COVERED_OFFLINE",
       "source_task": "docs/tasks/milestone_013-environments/0011_prouver_parcours_production.md",
       "specification": "docs/specs/m013_environments_environnements_explicites.md",
       "adrs": [
         "docs/adr/ADR-046-profils-locaux-etanches-sur-autorite-docker-explicite.md",
-        "docs/adr/ADR-048-progression-et-parallelisme-dans-profils-explicites.md"
+        "docs/adr/ADR-049-qualification-complete-reservee-au-profil-test.md"
       ],
-      "code": ["app/platform/production_e2e.py"],
+      "code": ["app/platform/environment_command.py"],
       "tests": ["gate_tests/ported/tests/m013_environments/validate_production_real_e2e_acceptance.py"],
-      "reports": ["docs/governance/m013_environments_execution_evidence.json"],
+      "reports": ["docs/governance/m013_environments_isolation_matrix.json"],
       "runbooks": ["docs/runbooks/environnements_explicites.md"]
     },
     {
@@ -147,7 +151,8 @@
       "adrs": [
         "docs/adr/ADR-046-profils-locaux-etanches-sur-autorite-docker-explicite.md",
         "docs/adr/ADR-047-archive-chiffree-verifiee-avant-preuve-restauration.md",
-        "docs/adr/ADR-048-progression-et-parallelisme-dans-profils-explicites.md"
+        "docs/adr/ADR-048-progression-et-parallelisme-dans-profils-explicites.md",
+        "docs/adr/ADR-049-qualification-complete-reservee-au-profil-test.md"
       ],
       "code": ["ost_gate/environment_governance.py"],
       "tests": [

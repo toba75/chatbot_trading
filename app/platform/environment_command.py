@@ -17,10 +17,6 @@ from app.platform.environment_compose import (
     wait_environment_compose_stack,
 )
 from app.platform.local_runtime import HTTP_SERVICE_PORTS
-from app.platform.production_e2e import (
-    ProductionE2EError,
-    run_production_environment_e2e,
-)
 from app.platform.test_e2e import TestE2EError, run_test_environment_e2e
 
 
@@ -200,25 +196,11 @@ def test() -> int:
 
 
 def production() -> int:
+    previous_handler = signal.signal(signal.SIGBREAK, signal.default_int_handler)
     try:
-        return _run_production_qualification(
-            argv=tuple(sys.argv[1:]),
-            repository_root=Path.cwd(),
-            pdf_path=(
-                Path.cwd()
-                / "data"
-                / "corpus"
-                / "ostrading-environment-qualification-5-pages.pdf"
-            ),
-            runner=run_production_environment_e2e,
-            publish_report=_publish_production_report,
-        )
-    except ProductionE2EError as exc:
-        print(str(exc), file=sys.stderr)
-        return 1
-    except ValueError as exc:
-        print(str(exc), file=sys.stderr)
-        return 2
+        return _run_entrypoint("production")
+    finally:
+        signal.signal(signal.SIGBREAK, previous_handler)
 
 
 def _run_test_qualification(
@@ -249,37 +231,6 @@ def _publish_test_report(report: Any) -> None:
     payload = to_mapping()
     if not isinstance(payload, Mapping):
         raise ValueError("TEST_E2E_REPORT_INVALID")
-    print(json.dumps(payload, ensure_ascii=False, sort_keys=True), flush=True)
-
-
-def _run_production_qualification(
-    *,
-    argv: Sequence[str],
-    repository_root: Path,
-    pdf_path: Path,
-    runner: Callable[..., Any],
-    publish_report: Callable[[Any], None],
-) -> int:
-    if isinstance(argv, (str, bytes)) or not isinstance(argv, Sequence):
-        raise ValueError(f"{_ARGUMENTS_FORBIDDEN}: arguments invalides")
-    if tuple(argv) != ():
-        raise ValueError(
-            f"{_ARGUMENTS_FORBIDDEN}: uv run production ne prend aucun argument"
-        )
-    if not callable(runner) or not callable(publish_report):
-        raise ValueError("PRODUCTION_E2E_RUNNER_INVALID")
-    report = runner(repository_root=repository_root, pdf_path=pdf_path)
-    publish_report(report)
-    return 0
-
-
-def _publish_production_report(report: Any) -> None:
-    to_mapping = getattr(report, "to_mapping", None)
-    if not callable(to_mapping):
-        raise ValueError("PRODUCTION_E2E_REPORT_INVALID")
-    payload = to_mapping()
-    if not isinstance(payload, Mapping):
-        raise ValueError("PRODUCTION_E2E_REPORT_INVALID")
     print(json.dumps(payload, ensure_ascii=False, sort_keys=True), flush=True)
 
 

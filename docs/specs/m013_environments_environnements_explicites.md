@@ -190,53 +190,23 @@ Ces exclusions ne sont pas des alternatives autorisées. Elles séquencent la li
 - `uv run --locked gate`;
 - `git diff --check`.
 
-## Parcours produit réel development (T-009)
+## Environnement de travail development (T-009 requalifiée par ADR-049)
 
-Scénario d'acceptation :
+`uv run development` démarre et supervise la pile persistante `development`
+jusqu'à l'interruption explicite de l'opérateur. La readiness de l'API, du
+relais, des workers documentaires et de projection, de PostgreSQL, de Qdrant et
+du gateway LLM doit être concordante avant la publication de l'état `ready`.
 
-- Given `uv run development` publie une readiness concordante pour l'API, le
-  relais, les workers documentaires et de projection, PostgreSQL, Qdrant et le
-  gateway LLM relié au Spark réel ;
-- When les cinq pages de
-  `data/corpus/ostrading-environment-qualification-5-pages.pdf` sont réémises
-  dans un PDF de preuve unique sous
-  `data/environments/development/reports/temp/`,
-  puis envoyées par `POST /v1/documents`, diagnostiquées, converties,
-  projetées, recherchées et interrogées exclusivement par les contrats HTTP
-  publics ;
-- Then le diagnostic public expose, dans l'ordre et exactement une fois,
-  `NATIVE_STANDARD`, `MIXED_PAGEWISE`, `PREPROCESS_GRANITE`,
-  `TARGETED_ENRICHMENT` et `SKIP_EMPTY`, chaque progression publique aboutit
-  avec `phase`, `completed_units`,
-  `total_units` et absence d'erreur terminale, la réponse documentaire porte
-  une citation dont le PDF original est réellement ouvrable, et chaque
-  participant conserve l'identité `development` / `ostrading-development-local`.
+Cette commande n'est pas un test. Elle ne charge aucune fixture, ne soumet
+aucun PDF automatiquement et ne crée aucune donnée métier de qualification.
+Son arrêt exécute `down --remove-orphans` sans `--volumes` et conserve donc les
+données de travail de l'utilisateur.
 
-La fixture est construite exclusivement à partir de pages réelles et
-versionnées du corpus. Son manifeste de provenance fixe, pour chacune des cinq
-pages, le PDF source, son empreinte SHA-256, le numéro de page source,
-l'empreinte du flux de contenu, la route attendue, l'outil final attendu et la
-trace de récupération attendue. La page `PREPROCESS_GRANITE` exerce la
-récupération Gemma explicite d'ADR-036 après `DOCLING_PROVENANCE_MISSING`. La
-cinquième page est réellement vide : elle doit compter dans la progression
-mais ne déclencher aucun convertisseur. Une page absente, supplémentaire,
-réordonnée, altérée, routée différemment ou produite par une chaîne d'outils
-différente rend la preuve RED ; aucune substitution de page, de route ou
-d'outil n'est autorisée.
-
-La preuve redémarre ensuite la même commande sans supprimer ses volumes et
-relit les mêmes identifiants publics de document, version canonique et
-projection. Les sondes `test` et `production` cherchent ces identifiants via
-leurs propres contrats publics et doivent répondre qu'ils sont absents, sans
-écriture ni nettoyage dans les deux profils étrangers. Le rapport horodaté ne
-contient aucun secret, token ou contenu complet du PDF.
-
-Le validateur n'accède à aucun repository applicatif pour déclencher ou faire
-avancer le parcours. Un worker attendu absent, une progression incohérente, un
-appel Spark sans provenance réelle, une citation non ouvrable, une relecture
-perdue après redémarrage ou un identifiant visible dans un profil étranger rend
-la preuve RED. Aucun mock, stub, fake, stockage mémoire substitutif ou réponse
-LLM de secours n'est autorisé.
+La gate vérifie son contrat de commande, son fichier explicite, l'identité de
+ses ressources, l'étanchéité de sa composition et l'absence d'appel à un
+qualificateur. Une vérification sur pile déployée peut lire la readiness et
+l'identité publique sans mutation, mais le parcours PDF fonctionnel appartient
+exclusivement au profil `test`.
 
 ## Opérations administratives bornées (T-008)
 
@@ -296,6 +266,19 @@ Spark live, écrit son rapport sans secret avant le teardown, puis supprime
 uniquement les volumes du projet `ostrading-test` après le préflight
 d'identité PostgreSQL, Qdrant et fichiers.
 
+La fixture est construite exclusivement à partir de pages réelles et
+versionnées du corpus. Son manifeste de provenance fixe, pour chacune des cinq
+pages, le PDF source, son empreinte SHA-256, le numéro de page source,
+l'empreinte du flux de contenu, la route attendue, l'outil final attendu et la
+trace de récupération attendue. Les routes attendues sont exactement
+`NATIVE_STANDARD`, `MIXED_PAGEWISE`, `PREPROCESS_GRANITE`,
+`TARGETED_ENRICHMENT` et `SKIP_EMPTY`. La page `MIXED_PAGEWISE` prouve une
+réponse Granite directe. La page `PREPROCESS_GRANITE` exerce la récupération
+Gemma explicite d'ADR-036 après `DOCLING_PROVENANCE_MISSING`. La cinquième page
+est réellement vide : elle compte dans la progression sans déclencher de
+convertisseur. Toute page absente, supplémentaire, réordonnée ou altérée, et
+toute route ou chaîne d'outils divergente, rend la preuve RED.
+
 Les deux documents de preuve sont distincts et chaque progression publique
 aboutit à `SUCCEEDED`. Les workers documentaires conservent une limite de 8 Gio,
 4 CPU et un healthcheck de 30 secondes. Aucun conteneur test ne monte un fichier
@@ -308,22 +291,22 @@ préflight d'identité du teardown échoue, les conteneurs s'arrêtent sans
 suppression de volume et l'erreur reste terminale. Aucun mock, faux gateway,
 worker inline, stockage mémoire ou fallback n'est admis.
 
-## Parcours produit réel production (T-011)
+## Environnement d'exploitation production (T-011 requalifiée par ADR-049)
 
-`uv run production` exécute une preuve d'exploitation réelle, finie et non
-destructive avec les seules ressources `production`. La commande réémet les
-cinq pages du PDF réel versionné, vérifie les cinq routes attendues dans le
-diagnostic public, puis écrit la preuve dans
-`data/environments/production/reports/temp/`,
-traverse les contrats HTTP publics jusqu'au diagnostic, à la conversion, à la
-projection, à la recherche, à la réponse documentaire, à la citation PDF et au
-Spark live, puis redémarre la même installation et relit ses identifiants.
+`uv run production` démarre et supervise la pile persistante `production`
+jusqu'à l'interruption explicite de l'opérateur. Les 14 conteneurs et les quatre
+réplicas workers doivent publier l'identité `production` /
+`ostrading-production-primary` et le même hash de configuration. Le rendu
+Compose et les conteneurs refusent tout chemin, secret ou donnée `development`
+ou `test`. Les workers documentaires conservent 8 Gio, 4 CPU et un healthcheck
+de 30 secondes.
 
-Les 14 conteneurs et les quatre réplicas workers doivent publier l'identité
-`production` / `ostrading-production-primary` et le même hash de configuration.
-Le rendu Compose et les conteneurs refusent tout chemin, secret ou donnée
-`development` ou `test`. Les workers documentaires conservent 8 Gio, 4 CPU et
-un healthcheck de 30 secondes.
+Cette commande ne charge aucune fixture, ne lance aucun parcours PDF et ne crée
+aucune donnée de qualification. Les contrôles automatisés de production sont
+non mutateurs : configuration rendue, étanchéité, périmètre des secrets,
+migrations, readiness et identité publique. La qualification fonctionnelle du
+code est fournie par la pile `test`; elle ne remplace pas le contrôle de
+déploiement d'une production distante.
 
 Les actions `DEEP_RESEARCH`, `VERIFY_RESPONSE` et `BACKTEST` ne font pas partie
 du catalogue asynchrone des profils tant qu'elles ne disposent pas d'une chaîne
@@ -333,12 +316,9 @@ pour simuler cette disponibilité.
 
 La sortie de la commande arrête les conteneurs avec `down --remove-orphans`,
 sans jamais employer `--volumes`, purge, cleanup automatique ou cible par
-défaut. Les volumes, le document, la version canonique, la projection et le
-rapport sans secret sont conservés. Les sondes `development` et `test` relisent
-leurs propres contrats publics et doivent confirmer l'absence de l'identifiant
-production sans mutation. Toute readiness incomplète, identité divergente,
-ressource non-production, perte après redémarrage ou fuite de secret rend la
-preuve terminalement RED, sans fallback.
+défaut. Les volumes et les données d'exploitation sont conservés. Toute
+readiness incomplète, identité divergente, ressource non-production ou fuite de
+secret rend le démarrage terminalement RED, sans fallback.
 
 ## Gouvernance, runbooks et gates (T-012)
 
@@ -354,16 +334,17 @@ réseaux, volumes et chemins de secrets Compose, ainsi que chaque service
 `worker-*` et son nombre de réplicas. L'ajout d'une ressource ou d'un worker
 sans mise à jour de cette matrice rend la gate RED.
 
-La gate statique lit une preuve versionnée dérivée des rapports réels T-009 à
-T-011. Cette preuve conserve les identifiants, issues, hashes et garde-fous
-d'exécution ; seuls les chemins absolus propres au poste sont normalisés. Une
-preuve absente, une collision d'identifiant ou une donnée sensible rend la
-gate RED.
+La gate statique conserve l'archive versionnée des anciens rapports T-009 à
+T-011 avec le statut `STALE`; elle ne les présente jamais comme une preuve live
+du contrat courant. Elle contrôle aussi les trois configurations, la matrice
+3 x 3, les commandes persistantes `development` et `production` et l'absence de
+donnée sensible.
 
-La gate live est distincte et explicitement activée. Elle dépend des trois
-validateurs qui démarrent les vraies piles et consolide leurs rapports les plus
-récents. Elle n'accepte ni rapport synthétique, ni mock, ni substitution du
-Spark réel. Une gate statique GREEN ne remplace pas cette qualification.
+La gate live est distincte et explicitement activée. Elle dépend uniquement du
+validateur `test`, démarre deux fois la vraie pile jetable et consolide son
+rapport le plus récent. Elle n'accepte ni rapport synthétique, ni mock, ni
+substitution du Spark réel. Une gate statique GREEN ne remplace pas cette
+qualification.
 
 Le runbook documente les trois commandes principales et les opérations
 d'arrêt, migration, sauvegarde et restauration bornées. Toute opération

@@ -1,5 +1,11 @@
 # Journal M13-environments
 
+> **Note de requalification du 2026-07-23.** ADR-049 réserve désormais la
+> qualification fonctionnelle complète au profil `test`. Les récits T-009 et
+> T-011 ci-dessous restent des preuves historiques de l'ancien contrat ; les
+> commandes `development` et `production` sont maintenant persistantes et
+> n'injectent aucune donnée de test.
+
 > **Note de requalification du 2026-07-22.** Les mentions antérieures de six
 > workers ou dix-sept conteneurs décrivent le runtime historique désormais
 > `STALE`. Le contrat courant exact est de quatre instances workers et quatorze
