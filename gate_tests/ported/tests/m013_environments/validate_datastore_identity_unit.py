@@ -235,6 +235,7 @@ class _QdrantIdentityClient:
         self.initialize_calls.append(identity)
         self.collections = ("ostrading-test-datastore-identity",)
         self.observed = identity
+        return True
 
     def compensate_failed_initialization(self):
         self.collections = ()

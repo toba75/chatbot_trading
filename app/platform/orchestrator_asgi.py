@@ -405,6 +405,9 @@ def create_orchestrator_app(
             content={
                 "service": "orchestrator-api",
                 "status": "ready" if is_ready else "not_ready",
+                "environment": configuration.application.environment,
+                "deployment_id": configuration.application.deployment_id,
+                "configuration_hash": configuration.configuration_hash,
                 "dependencies": [
                     {
                         key: value

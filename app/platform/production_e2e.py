@@ -34,6 +34,7 @@ from app.platform.development_e2e import (
     _sha256_file,
     verify_worker_documents_runtime_limits,
     _verify_persistence_after_restart,
+    _verify_public_readiness,
     _verify_public_ui,
     _write_secret_free_payload,
 )
@@ -136,9 +137,13 @@ class ProductionE2EReport:
             raise ValueError("PRODUCTION_E2E_ENVIRONMENT_IDENTITY_INCOMPLETE")
         if self.restart_persistence_verified is not True:
             raise ValueError("PRODUCTION_E2E_RESTART_NOT_PROVEN")
-        if self.foreign_environment_probes != (
-            "development:ABSENT",
-            "test:ABSENT",
+        if any(
+            observed not in {f"{environment}:ABSENT", f"{environment}:ISOLATED"}
+            for environment, observed in zip(
+                ("development", "test"),
+                self.foreign_environment_probes,
+                strict=True,
+            )
         ):
             raise ValueError("PRODUCTION_E2E_FOREIGN_PROBES_INVALID")
         if self.production_resources_preserved is not True:
@@ -226,6 +231,12 @@ def run_production_environment_e2e(
                 timeout_seconds=900,
                 base_url=_PRODUCTION_PROOF_CONTEXT.api_base_url,
             ) as client:
+                _verify_public_readiness(
+                    client,
+                    expected_environment=configuration.application.environment,
+                    expected_deployment_id=configuration.application.deployment_id,
+                    expected_configuration_hash=configuration.configuration_hash,
+                )
                 _verify_public_ui(client, proof_context=_PRODUCTION_PROOF_CONTEXT)
                 if phase == "product":
                     try:

@@ -21,6 +21,8 @@ from app.knowledge_access.adapters.projection_runtime import (
 from app.platform.configuration import ApplicationConfiguration, load_application_configuration
 from app.platform.configured_datastore_identity import build_configured_datastore_preflight
 from app.platform.job_runtime.composition import build_postgres_job_runtime
+from app.platform.job_runtime.heartbeat import JobLeaseHeartbeat
+from app.platform.job_runtime.postgres import JobLeaseConflictError
 from app.platform.postgres import PsycopgConnectionFactory
 from app.platform.postgres_migrations import build_configured_postgres_migration_runner
 from app.platform.llm_gateway.orchestrator_http import UrllibLlmInferenceGateway
@@ -139,45 +141,64 @@ def _run_worker(
         worker_binding.require_job_request(claimed.job.request)
         trace_token = bind_trace_id(claimed.trace_id)
         started = time.perf_counter_ns()
+        heartbeat = JobLeaseHeartbeat(
+            job_queue=job_runtime.queue,
+            job_id=claimed.job.job_id,
+            owner_id=instance_owner_id,
+            claim_generation=claimed.claim_generation,
+            claim_token=claimed.claim_token,
+            lease_seconds=lease_seconds,
+            heartbeat_seconds=max(0.05, lease_seconds / 3),
+        )
+        heartbeat.start()
+        status = "failed"
+        error_code: str | None = None
         try:
-            payload = claimed.job.request.payload
-            projection_id = payload.get("projection_id") if isinstance(payload, Mapping) else None
-            if not isinstance(projection_id, str):
-                raise ProjectionRuntimeError("PROJECTION_JOB_PAYLOAD_INVALID")
-            result = runtime.execute_projection(projection_id=projection_id)
-        except Exception as exc:
-            error_code = exc.error_code if isinstance(exc, ProjectionRuntimeError) else "PROJECTION_WORKER_UNEXPECTED_ERROR"
-            job_runtime.queue.mark_failed(
-                job_id=claimed.job.job_id,
-                owner_id=instance_owner_id,
-                claim_generation=claimed.claim_generation,
-                claim_token=claimed.claim_token,
-                failure_reason=error_code,
-            )
-            _log(
-                application_configuration=application_configuration,
-                claimed=claimed,
-                status="failed",
-                error_code=error_code,
-                started=started,
-            )
-        else:
-            job_runtime.queue.mark_succeeded(
-                job_id=claimed.job.job_id,
-                owner_id=instance_owner_id,
-                claim_generation=claimed.claim_generation,
-                claim_token=claimed.claim_token,
-                result=result,
-            )
-            _log(
-                application_configuration=application_configuration,
-                claimed=claimed,
-                status="succeeded",
-                error_code=None,
-                started=started,
-            )
+            try:
+                payload = claimed.job.request.payload
+                projection_id = payload.get("projection_id") if isinstance(payload, Mapping) else None
+                if not isinstance(projection_id, str):
+                    raise ProjectionRuntimeError("PROJECTION_JOB_PAYLOAD_INVALID")
+                result = runtime.execute_projection(projection_id=projection_id)
+            except Exception as exc:
+                error_code = (
+                    exc.error_code
+                    if isinstance(exc, ProjectionRuntimeError)
+                    else "PROJECTION_WORKER_UNEXPECTED_ERROR"
+                )
+                heartbeat.finalize(
+                    lambda: job_runtime.queue.mark_failed(
+                        job_id=claimed.job.job_id,
+                        owner_id=instance_owner_id,
+                        claim_generation=claimed.claim_generation,
+                        claim_token=claimed.claim_token,
+                        failure_reason=error_code,
+                    )
+                )
+            else:
+                heartbeat.finalize(
+                    lambda: job_runtime.queue.mark_succeeded(
+                        job_id=claimed.job.job_id,
+                        owner_id=instance_owner_id,
+                        claim_generation=claimed.claim_generation,
+                        claim_token=claimed.claim_token,
+                        result=result,
+                    )
+                )
+                status = "succeeded"
+        except JobLeaseConflictError:
+            status = "lease_lost"
+            error_code = "JOB_LEASE_LOST"
         finally:
+            heartbeat.stop()
             reset_trace_id(trace_token)
+        _log(
+            application_configuration=application_configuration,
+            claimed=claimed,
+            status=status,
+            error_code=error_code,
+            started=started,
+        )
         processed += 1
 
 

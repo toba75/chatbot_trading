@@ -114,6 +114,7 @@ def test_test_real_e2e_unit(monkeypatch, tmp_path: Path, capsys) -> None:
     monkeypatch.setattr(test_e2e, "_read_secret", lambda _: "s" * 32)
     monkeypatch.setattr(test_e2e, "_verify_runtime_excludes_non_test_credentials", lambda **_: None)
     monkeypatch.setattr(test_e2e, "_public_client", public_client)
+    monkeypatch.setattr(test_e2e, "_verify_public_readiness", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(test_e2e, "_verify_public_ui", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(test_e2e, "_all_public_document_ids", lambda _: ())
     monkeypatch.setattr(
@@ -129,6 +130,11 @@ def test_test_real_e2e_unit(monkeypatch, tmp_path: Path, capsys) -> None:
         ),
     )
     configuration = SimpleNamespace(
+        application=SimpleNamespace(
+            environment="test",
+            deployment_id="ostrading-test-ci",
+        ),
+        configuration_hash="a" * 64,
         security=SimpleNamespace(
             secrets=SimpleNamespace(local_api_token_path="config/secrets/test/token")
         )

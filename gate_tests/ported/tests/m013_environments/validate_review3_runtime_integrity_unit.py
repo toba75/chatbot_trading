@@ -53,7 +53,7 @@ class _Factory:
         return self._connection
 
 
-def test_claim_vide_ne_reconcilie_jamais_un_autre_hash() -> None:
+def _assert_claim_vide_ne_reconcilie_jamais_un_autre_hash() -> None:
     """Given deux hashes, When un worker poll, Then il ne mute aucun job étranger."""
 
     from app.contracts.technical_jobs import JobEnvironmentIdentity
@@ -81,6 +81,25 @@ def test_claim_vide_ne_reconcilie_jamais_un_autre_hash() -> None:
     assert "configuration_hash <> %s" not in claim_sql
     assert "SET status = 'failed'" not in claim_sql
 
+    newer_cursor = _Cursor()
+    newer_queue = PostgresJobQueue(
+        connection_factory=_Factory(newer_cursor),
+        catalog=JOB_RUNTIME_CATALOG,
+        environment_identity=JobEnvironmentIdentity(
+            environment="development",
+            deployment_id="ostrading-development-local",
+            configuration_hash="b" * 64,
+        ),
+    )
+    assert newer_queue.claim_next(
+        owner_id="worker-newer",
+        lease_seconds=30,
+        job_names=("PROJECT_DOCUMENT",),
+    ) is None
+    assert len(newer_cursor.calls) == 1
+    assert newer_cursor.calls[0][1][2] == "b" * 64
+    assert cursor.calls[0][1][2] == "a" * 64
+
 
 class _LeaseQueue:
     def __init__(self) -> None:
@@ -104,7 +123,7 @@ class _LeaseQueue:
         return True
 
 
-def test_heartbeat_ka_protege_un_traitement_plus_long_que_la_lease() -> None:
+def _assert_heartbeat_ka_protege_un_traitement_plus_long_que_la_lease() -> None:
     """Given un traitement KA long, When B tente après une lease, Then A la détient encore."""
 
     from app.platform.job_runtime.heartbeat import JobLeaseHeartbeat
@@ -152,7 +171,7 @@ class _JsonResponse:
         return self._body
 
 
-def test_conflit_qdrant_relit_identite_concurrente_sans_delete(monkeypatch) -> None:
+def _assert_conflit_qdrant_relit_identite_concurrente_sans_delete(monkeypatch) -> None:
     """Given A crée le marqueur, When B reçoit 409, Then B relit sans supprimer A."""
 
     import app.platform.datastore_identity as identity_module
@@ -168,9 +187,10 @@ def test_conflit_qdrant_relit_identite_concurrente_sans_delete(monkeypatch) -> N
     )
     calls: list[tuple[str, str]] = []
     list_count = 0
+    read_count = 0
 
     def urlopen(http_request, timeout):
-        nonlocal list_count
+        nonlocal list_count, read_count
         del timeout
         method = http_request.get_method()
         url = http_request.full_url
@@ -184,6 +204,9 @@ def test_conflit_qdrant_relit_identite_concurrente_sans_delete(monkeypatch) -> N
         if method == "PUT" and not url.endswith("/points?wait=true"):
             raise HTTPError(url, 409, "Conflict", {}, None)
         if method == "POST":
+            read_count += 1
+            if read_count == 1:
+                return _JsonResponse({"result": [], "status": "ok"})
             return _JsonResponse(
                 {
                     "result": [{"payload": expected.to_mapping()}],
@@ -206,6 +229,7 @@ def test_conflit_qdrant_relit_identite_concurrente_sans_delete(monkeypatch) -> N
         expected_identity=expected,
         collection_name="ostrading-test-datastore-identity",
     ).run(initialize_if_empty=True) == expected
+    assert read_count == 2
     assert all(method != "DELETE" for method, _url in calls)
 
 
@@ -242,7 +266,7 @@ class _ForeignPublicClient:
         raise AssertionError(path)
 
 
-def test_sonde_etrangere_lit_uniquement_le_contrat_public(monkeypatch) -> None:
+def _assert_sonde_etrangere_lit_uniquement_le_contrat_public(monkeypatch) -> None:
     """Given test joignable, When development sonde, Then seule une lecture publique est faite."""
 
     import app.platform.development_e2e as development_e2e
@@ -297,8 +321,31 @@ def test_sonde_etrangere_lit_uniquement_le_contrat_public(monkeypatch) -> None:
             forbidden_document_id="DOC-SOURCE-ONLY",
         )
 
+    import httpx
 
-def test_readiness_publie_identite_exacte_du_profil() -> None:
+    class AbsentClient:
+        def get(self, path):
+            raise httpx.ConnectError(f"absent: {path}")
+
+    @contextmanager
+    def absent_public_client(*, base_url, timeout_seconds):
+        del base_url, timeout_seconds
+        yield AbsentClient()
+
+    monkeypatch.setattr(
+        development_e2e,
+        "_foreign_public_client",
+        absent_public_client,
+    )
+    assert development_e2e._probe_foreign_environment(
+        repository_root=repository_root,
+        source_environment="development",
+        environment="test",
+        forbidden_document_id="DOC-SOURCE-ONLY",
+    ) == "test:ABSENT"
+
+
+def _assert_readiness_publie_identite_exacte_du_profil() -> None:
     """Given production, When /ready répond, Then son identité publique est exacte."""
 
     from fastapi import APIRouter
@@ -342,3 +389,13 @@ def test_readiness_publie_identite_exacte_du_profil() -> None:
     assert payload["environment"] == "production"
     assert payload["deployment_id"] == "ostrading-production-primary"
     assert payload["configuration_hash"] == configuration.configuration_hash
+
+
+def test_integrite_runtime_des_profils_explicites(monkeypatch) -> None:
+    """Given trois profils, When leurs runtimes opèrent, Then leur identité reste étanche."""
+
+    _assert_claim_vide_ne_reconcilie_jamais_un_autre_hash()
+    _assert_heartbeat_ka_protege_un_traitement_plus_long_que_la_lease()
+    _assert_conflit_qdrant_relit_identite_concurrente_sans_delete(monkeypatch)
+    _assert_sonde_etrangere_lit_uniquement_le_contrat_public(monkeypatch)
+    _assert_readiness_publie_identite_exacte_du_profil()

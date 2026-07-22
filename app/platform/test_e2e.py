@@ -34,6 +34,7 @@ from app.platform.development_e2e import (
     _sha256_file,
     verify_worker_documents_runtime_limits,
     _verify_public_ui,
+    _verify_public_readiness,
     _write_secret_free_payload,
 )
 from app.platform.environment_compose import (
@@ -392,6 +393,12 @@ def _run_single_test_cycle(
                 timeout_seconds=900,
                 base_url=_TEST_PROOF_CONTEXT.api_base_url,
             ) as client:
+                _verify_public_readiness(
+                    client,
+                    expected_environment=configuration.application.environment,
+                    expected_deployment_id=configuration.application.deployment_id,
+                    expected_configuration_hash=configuration.configuration_hash,
+                )
                 _verify_public_ui(client, proof_context=_TEST_PROOF_CONTEXT)
                 initial_document_ids = _all_public_document_ids(client)
                 if initial_document_ids != ():

@@ -244,6 +244,7 @@ class _FailingQdrantIdentityClient:
             self.failures_remaining -= 1
             raise RuntimeError("QDRANT_POINT_WRITE_FAILED")
         self.observed = identity
+        return True
 
     def compensate_failed_initialization(self):
         self.compensations += 1

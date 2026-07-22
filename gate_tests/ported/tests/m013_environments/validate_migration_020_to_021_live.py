@@ -40,47 +40,71 @@ def test_upgrade_ancien_020_vers_021_est_rejouable() -> None:
     try:
         deadline = time.monotonic() + 60
         while time.monotonic() < deadline:
-            readiness = _docker("exec", container, "pg_isready", "-U", "postgres")
-            if readiness.returncode == 0:
+            readiness = _docker(
+                "exec",
+                container,
+                "psql",
+                "-U",
+                "postgres",
+                "-At",
+                "-c",
+                "SELECT 1",
+            )
+            if readiness.returncode == 0 and readiness.stdout.strip() == "1":
                 break
             time.sleep(0.5)
         else:
             raise AssertionError("PostgreSQL éphémère non prêt")
 
-        for path in sorted(migrations.glob("0*.sql")):
-            if path.name.startswith("021_"):
-                continue
-            if path.name.startswith("020_"):
-                identity = _docker(
-                    "exec",
-                    "-i",
-                    container,
-                    "psql",
-                    "-U",
-                    "postgres",
-                    "-v",
-                    "ON_ERROR_STOP=1",
-                    input_text=(
-                        "CREATE TABLE platform.datastore_identity ("
-                        "singleton boolean PRIMARY KEY DEFAULT true CHECK(singleton),"
-                        "environment text NOT NULL, deployment_id text NOT NULL);"
-                        "INSERT INTO platform.datastore_identity(environment,deployment_id) "
-                        "VALUES ('development','ostrading-development-local');"
-                    ),
-                )
-                assert identity.returncode == 0, identity.stderr
-            applied = _docker(
-                "exec",
-                "-i",
-                container,
-                "psql",
-                "-U",
-                "postgres",
-                "-v",
-                "ON_ERROR_STOP=1",
-                input_text=path.read_text(encoding="utf-8"),
-            )
-            assert applied.returncode == 0, f"{path.name}: {applied.stderr}"
+        historical_sql = "\n".join(
+            path.read_text(encoding="utf-8")
+            for path in sorted(migrations.glob("0*.sql"))
+            if int(path.name[:3]) <= 19
+        )
+        historical = _docker(
+            "exec",
+            "-i",
+            container,
+            "psql",
+            "-U",
+            "postgres",
+            "-v",
+            "ON_ERROR_STOP=1",
+            input_text=f"BEGIN;\n{historical_sql}\nCOMMIT;\n",
+        )
+        assert historical.returncode == 0, historical.stderr
+        identity = _docker(
+            "exec",
+            "-i",
+            container,
+            "psql",
+            "-U",
+            "postgres",
+            "-v",
+            "ON_ERROR_STOP=1",
+            input_text=(
+                "CREATE TABLE platform.datastore_identity ("
+                "singleton boolean PRIMARY KEY DEFAULT true CHECK(singleton),"
+                "environment text NOT NULL, deployment_id text NOT NULL);"
+                "INSERT INTO platform.datastore_identity(environment,deployment_id) "
+                "VALUES ('development','ostrading-development-local');"
+            ),
+        )
+        assert identity.returncode == 0, identity.stderr
+        migration_020 = _docker(
+            "exec",
+            "-i",
+            container,
+            "psql",
+            "-U",
+            "postgres",
+            "-v",
+            "ON_ERROR_STOP=1",
+            input_text=(migrations / "020_job_environment_identity.sql").read_text(
+                encoding="utf-8"
+            ),
+        )
+        assert migration_020.returncode == 0, migration_020.stderr
 
         migration_021 = migrations / "021_job_environment_identity_hardening.sql"
         sql_021 = migration_021.read_text(encoding="utf-8")

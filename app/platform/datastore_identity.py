@@ -8,8 +8,10 @@ import json
 import os
 from pathlib import Path
 import re
+import time
 from typing import Any, Protocol
 from urllib import request
+from urllib.error import HTTPError
 from uuid import uuid4
 
 
@@ -21,6 +23,8 @@ _ENVIRONMENTS = frozenset(("development", "test", "production"))
 _DEPLOYMENT_ID = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 _IDENTITY_KEYS = frozenset(("environment", "deployment_id"))
 _POSTGRES_IDENTITY_LOCK_ID = 4_602_113_020
+_QDRANT_CONCURRENT_IDENTITY_READ_ATTEMPTS = 20
+_QDRANT_CONCURRENT_IDENTITY_READ_INTERVAL_SECONDS = 0.05
 
 
 class DatastoreEnvironmentMismatchError(RuntimeError):
@@ -82,7 +86,7 @@ class IdentityPreflight(Protocol):
 class QdrantIdentityClientPort(Protocol):
     def list_collections(self) -> Sequence[str]: ...
     def read_identity(self) -> Mapping[str, Any] | None: ...
-    def initialize_identity(self, identity: DatastoreIdentity) -> None: ...
+    def initialize_identity(self, identity: DatastoreIdentity) -> bool: ...
     def compensate_failed_initialization(self) -> None: ...
 
 
@@ -150,7 +154,7 @@ class QdrantIdentityPreflight:
         if not initialize_if_empty:
             raise DatastoreEnvironmentMismatchError("marqueur Qdrant absent")
         try:
-            self.client.initialize_identity(self.expected_identity)
+            initialization_owned = self.client.initialize_identity(self.expected_identity)
         except Exception:
             try:
                 self.client.compensate_failed_initialization()
@@ -159,11 +163,39 @@ class QdrantIdentityPreflight:
                     "compensation de l'initialisation Qdrant échouée"
                 ) from compensation_error
             raise
+        if not isinstance(initialization_owned, bool):
+            raise DatastoreEnvironmentMismatchError(
+                "résultat d'initialisation Qdrant invalide"
+            )
+        if not initialization_owned:
+            return self._wait_for_concurrent_identity()
         initialized_collections = _collection_names(self.client.list_collections())
         if self.collection_name not in initialized_collections:
             raise DatastoreEnvironmentMismatchError("initialisation Qdrant incomplète")
         return self.expected_identity.require_match(
             DatastoreIdentity.from_mapping(self.client.read_identity())
+        )
+
+    def _wait_for_concurrent_identity(self) -> DatastoreIdentity:
+        for attempt in range(_QDRANT_CONCURRENT_IDENTITY_READ_ATTEMPTS):
+            collections = _collection_names(self.client.list_collections())
+            foreign_collections = tuple(
+                name for name in collections if name != self.collection_name
+            )
+            if foreign_collections:
+                raise DatastoreEnvironmentMismatchError(
+                    "stockage Qdrant concurrent non vierge"
+                )
+            if self.collection_name in collections:
+                observed = self.client.read_identity()
+                if observed is not None:
+                    return self.expected_identity.require_match(
+                        DatastoreIdentity.from_mapping(observed)
+                    )
+            if attempt + 1 < _QDRANT_CONCURRENT_IDENTITY_READ_ATTEMPTS:
+                time.sleep(_QDRANT_CONCURRENT_IDENTITY_READ_INTERVAL_SECONDS)
+        raise DatastoreEnvironmentMismatchError(
+            "initialisation Qdrant concurrente incomplète"
         )
 
 
@@ -395,6 +427,7 @@ class QdrantRestIdentityClient:
         self._timeout_seconds = timeout_seconds
         self._collection_name = collection_name
         self._api_key = api_key
+        self._initialization_owned = False
 
     def list_collections(self) -> tuple[str, ...]:
         payload = self._json_request(method="GET", path="/collections", body=None)
@@ -426,14 +459,20 @@ class QdrantRestIdentityClient:
         point_payload = result[0].get("payload") if isinstance(result[0], Mapping) else None
         return point_payload if isinstance(point_payload, Mapping) else None
 
-    def initialize_identity(self, identity: DatastoreIdentity) -> None:
+    def initialize_identity(self, identity: DatastoreIdentity) -> bool:
         if not isinstance(identity, DatastoreIdentity):
             raise ValueError("identité Qdrant à initialiser invalide")
-        self._json_request(
-            method="PUT",
-            path=f"/collections/{self._collection_name}",
-            body={"vectors": {"size": 1, "distance": "Cosine"}},
-        )
+        try:
+            self._json_request(
+                method="PUT",
+                path=f"/collections/{self._collection_name}",
+                body={"vectors": {"size": 1, "distance": "Cosine"}},
+            )
+        except HTTPError as exc:
+            if exc.code != 409:
+                raise
+            return False
+        self._initialization_owned = True
         self._json_request(
             method="PUT",
             path=f"/collections/{self._collection_name}/points?wait=true",
@@ -447,15 +486,22 @@ class QdrantRestIdentityClient:
                 ]
             },
         )
+        self._initialization_owned = False
+        return True
 
     def compensate_failed_initialization(self) -> None:
         """Supprime uniquement la collection d'identité créée par cette tentative."""
 
+        if not self._initialization_owned:
+            raise DatastoreEnvironmentMismatchError(
+                "compensation Qdrant sans propriété certaine"
+            )
         self._json_request(
             method="DELETE",
             path=f"/collections/{self._collection_name}",
             body=None,
         )
+        self._initialization_owned = False
 
     def _json_request(
         self,

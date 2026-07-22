@@ -108,7 +108,14 @@ class DevelopmentE2EReport:
             raise ValueError("DEVELOPMENT_E2E_JOB_IDENTITY_INCOMPLETE")
         if self.restart_persistence_verified is not True:
             raise ValueError("DEVELOPMENT_E2E_RESTART_NOT_PROVEN")
-        if self.foreign_environment_probes != ("test:ABSENT", "production:ABSENT"):
+        if any(
+            observed not in {f"{environment}:ABSENT", f"{environment}:ISOLATED"}
+            for environment, observed in zip(
+                ("test", "production"),
+                self.foreign_environment_probes,
+                strict=True,
+            )
+        ):
             raise ValueError("DEVELOPMENT_E2E_FOREIGN_PROBES_INVALID")
         if self.volume_sentinels_preserved is not True:
             raise ValueError("DEVELOPMENT_E2E_VOLUME_SENTINELS_NOT_PRESERVED")
@@ -203,6 +210,7 @@ def run_development_environment_e2e(
         repository_root=root,
         token=token,
         log_path=log_path,
+        configuration=configuration,
     ):
         with _development_red_report_guard(
             proof_id=proof_id,
@@ -243,6 +251,7 @@ def run_development_environment_e2e(
         repository_root=root,
         token=token,
         log_path=log_path,
+        configuration=configuration,
     ):
         with _development_red_report_guard(
             proof_id=proof_id,
@@ -354,6 +363,7 @@ def _running_development_command(
     repository_root: Path,
     token: str,
     log_path: Path,
+    configuration: ApplicationConfiguration,
 ) -> Iterator[None]:
     uv_executable = shutil.which("uv")
     if uv_executable is None:
@@ -372,6 +382,9 @@ def _running_development_command(
                 token=token,
                 log_path=log_path,
                 start_offset=current_run_offset,
+                expected_environment=configuration.application.environment,
+                expected_deployment_id=configuration.application.deployment_id,
+                expected_configuration_hash=configuration.configuration_hash,
             )
             yield
         finally:
@@ -411,6 +424,9 @@ def _wait_public_readiness(
     token: str,
     log_path: Path,
     start_offset: int,
+    expected_environment: str,
+    expected_deployment_id: str,
+    expected_configuration_hash: str,
 ) -> None:
     deadline = time.monotonic() + 900
     while time.monotonic() < deadline:
@@ -448,9 +464,12 @@ def _wait_public_readiness(
                 time.sleep(1)
                 continue
             if response.status_code == 200:
-                payload = _json_mapping(response, "readiness")
-                if payload.get("status") != "ready":
-                    raise DevelopmentE2EError("DEVELOPMENT_E2E_READINESS_INVALID")
+                _verify_public_readiness_response(
+                    response,
+                    expected_environment=expected_environment,
+                    expected_deployment_id=expected_deployment_id,
+                    expected_configuration_hash=expected_configuration_hash,
+                )
                 return
             if response.status_code != 503:
                 raise DevelopmentE2EError(
@@ -842,26 +861,71 @@ def _probe_foreign_environment(
         raise ValueError("DEVELOPMENT_E2E_FOREIGN_PROFILE_INVALID")
     if not isinstance(forbidden_document_id, str) or forbidden_document_id == "":
         raise ValueError("DEVELOPMENT_E2E_FOREIGN_DOCUMENT_INVALID")
-    source_documents = (
-        repository_root / "deploy" / "environments" / f"{source_environment}.compose.yaml",
-        repository_root / "config" / "environments" / f"{source_environment}.yaml",
+    definition = environment_stack_definition(
+        environment,
+        repository_root=repository_root,
     )
-    try:
-        serialized = "\n".join(path.read_text(encoding="utf-8") for path in source_documents)
-    except OSError as exc:
-        raise DevelopmentE2EError("DEVELOPMENT_E2E_SOURCE_PROFILE_UNREADABLE") from exc
-    forbidden_markers = (
-        f"ostrading-{environment}-",
-        f"config/secrets/{environment}",
-        f"data/environments/{environment}",
-        f"config/environments/{environment}.yaml",
+    configuration = load_application_configuration(
+        config_path=definition.configuration_path,
+        environment_snapshot={},
     )
-    collision = next((marker for marker in forbidden_markers if marker in serialized), None)
-    if collision is not None:
-        raise DevelopmentE2EError(
-            f"DEVELOPMENT_E2E_FOREIGN_RESOURCE_VISIBLE: {environment}:{collision}"
+    with _foreign_public_client(
+        base_url=f"https://localhost:{definition.edge_port}/api",
+        timeout_seconds=8,
+    ) as client:
+        try:
+            readiness_response = client.get("/ready")
+        except httpx.TransportError:
+            return f"{environment}:ABSENT"
+        _verify_public_readiness_response(
+            readiness_response,
+            expected_environment=configuration.application.environment,
+            expected_deployment_id=configuration.application.deployment_id,
+            expected_configuration_hash=configuration.configuration_hash,
         )
-    return f"{environment}:ABSENT"
+        document_ids = _all_public_document_ids(client)
+    if forbidden_document_id in document_ids:
+        raise DevelopmentE2EError(
+            f"DEVELOPMENT_E2E_FOREIGN_DOCUMENT_VISIBLE: {environment}:{forbidden_document_id}"
+        )
+    return f"{environment}:ISOLATED"
+
+
+def _verify_public_readiness(
+    client: httpx.Client,
+    *,
+    expected_environment: str,
+    expected_deployment_id: str,
+    expected_configuration_hash: str,
+) -> None:
+    _verify_public_readiness_response(
+        client.get("/ready"),
+        expected_environment=expected_environment,
+        expected_deployment_id=expected_deployment_id,
+        expected_configuration_hash=expected_configuration_hash,
+    )
+
+
+def _verify_public_readiness_response(
+    response: Any,
+    *,
+    expected_environment: str,
+    expected_deployment_id: str,
+    expected_configuration_hash: str,
+) -> None:
+    if response.status_code != 200:
+        raise DevelopmentE2EError(
+            f"DEVELOPMENT_E2E_READINESS_HTTP_INVALID: {response.status_code}"
+        )
+    payload = _json_mapping(response, "readiness")
+    expected_identity = {
+        "status": "ready",
+        "environment": expected_environment,
+        "deployment_id": expected_deployment_id,
+        "configuration_hash": expected_configuration_hash,
+    }
+    if any(payload.get(key) != value for key, value in expected_identity.items()):
+        raise DevelopmentE2EError("DEVELOPMENT_E2E_READINESS_IDENTITY_MISMATCH")
 
 
 def _verify_worker_identities(
@@ -1284,6 +1348,21 @@ def _public_client(
     with httpx.Client(
         base_url=base_url,
         headers={"Authorization": f"Bearer {token}"},
+        verify=False,
+        timeout=timeout_seconds,
+        trust_env=False,
+    ) as client:
+        yield client
+
+
+@contextmanager
+def _foreign_public_client(
+    *,
+    timeout_seconds: int,
+    base_url: str,
+) -> Iterator[httpx.Client]:
+    with httpx.Client(
+        base_url=base_url,
         verify=False,
         timeout=timeout_seconds,
         trust_env=False,

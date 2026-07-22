@@ -20,10 +20,7 @@ from app.contracts.technical_jobs import ClaimedJob
 from app.platform.job_runtime.relay import RelayedJobMessage
 from app.platform.postgres import PostgresConnection, PostgresConnectionFactory
 from app.platform.request_context import current_trace_id
-from app.platform.worker_environment import (
-    WORKER_ENVIRONMENT_MISMATCH,
-    WorkerEnvironmentMismatchError,
-)
+from app.platform.worker_environment import WorkerEnvironmentMismatchError
 
 
 class _JobRow(NamedTuple):
@@ -445,31 +442,6 @@ class PostgresJobQueue:
         with self._connection_factory.connect() as connection:
             with connection.transaction():
                 with connection.cursor() as cursor:
-                    cursor.execute(
-                        """
-                        UPDATE platform.technical_jobs
-                           SET status = 'failed', result = NULL,
-                               failure_reason = %s, lease_owner = NULL,
-                               lease_expires_at = NULL, claim_token = NULL
-                         WHERE job_name = ANY(%s)
-                           AND (
-                               status = 'pending'
-                               OR (status = 'running' AND lease_expires_at <= CURRENT_TIMESTAMP)
-                           )
-                           AND (
-                               environment <> %s
-                               OR deployment_id <> %s
-                               OR configuration_hash <> %s
-                           )
-                        """,
-                        (
-                            WORKER_ENVIRONMENT_MISMATCH,
-                            list(parsed_names),
-                            self._environment_identity.environment,
-                            self._environment_identity.deployment_id,
-                            self._environment_identity.configuration_hash,
-                        ),
-                    )
                     cursor.execute(
                         f"""
                         WITH candidate AS (
