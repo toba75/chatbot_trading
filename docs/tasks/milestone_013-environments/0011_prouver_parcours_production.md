@@ -40,3 +40,38 @@
 - Commandes de validation: `uv run production`; validateur live M13-environments production; contrôle de relecture après redémarrage; `uv run --locked gate`.
 - Commit RED: `test(m13-environments): couvrir parcours reel production`.
 - Commit GREEN: `feat(m13-environments): valider parcours production`.
+
+## Preuve GREEN livrée
+
+- Commande opérateur : `uv run production`, code `0`, durée `4 348 s`.
+- PDF source réel : `data/corpus/the-original-turtle-trading-rules.pdf`, 38
+  pages, SHA-256
+  `073f361ebb4ac6c10765a21ba7cca42d75fde8fabadc84340e6bbfca444fbda4`.
+- PDF réémis sans modifier le corpus :
+  `data/environments/production/reports/temp/production-e2e-7FC7E3A32E8E433AA03412FA6A1620D0.pdf`,
+  SHA-256
+  `abfed3329d1bf463502202974c4056fac796e174ed0eb413baba31a50896fcd9`.
+- Rapport final sans secret :
+  `data/environments/production/reports/production-e2e-20260722T030253Z-7FC7E3A32E8E433AA03412FA6A1620D0.json`.
+- Document `DOC-ABFED3329D1BF463`, version canonique
+  `CVER-M004-ROUTED-ABFED3329D1BF46350220297`, projection
+  `PROJ-903E37A59A7030A4CEAA8D37036609135CE4F2CB807B2D076433DE964170A84D`
+  et réponse `ANS-LIVE-DE287349F91D99AB351B`.
+- Citation PDF ouvrable page 34 et réponse Spark live
+  `chatcmpl-REQ-PRODUCTION-E2E-SPARK-7FC7E3A32E8E433AA03412FA6A1620D0`.
+- Diagnostic, conversion `38/38` et projection publient tous `SUCCEEDED` ;
+  six conteneurs workers et trois jobs portent l'identité `production` /
+  `ostrading-production-primary` et le hash de configuration concordant.
+- Après arrêt puis redémarrage de la pile, les contrats publics relisent le même
+  document, la même version canonique, la même projection et le PDF original.
+- Les sondes renvoient `development:ABSENT` et `test:ABSENT`. Le rendu et les
+  17 conteneurs inspectés ne montent aucun chemin, secret ou donnée non-production.
+- Les deux workers documentaires portent effectivement 8 Gio, 4 CPU et un
+  healthcheck de 30 secondes ; aucun OOM n'a été observé.
+- État final : zéro conteneur des trois profils, sept volumes production
+  conservés avec leurs sentinelles, zéro volume test et
+  `automatic_cleanup_performed=false`.
+- Validations : 4 tests ciblés GREEN, Ruff et `compileall` GREEN, scan du
+  rapport sans secret GREEN, scopes `m013_environments` (38 nœuds),
+  `m013_config` (36 nœuds), `m013` et `m013_fastapi` (70 nœuds) GREEN, puis
+  gate global offline 440/440 GREEN avec manifeste unique.

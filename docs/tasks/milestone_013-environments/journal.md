@@ -872,3 +872,70 @@ politique déjà acceptée de profil production protégé, persistant et stricte
 identifié.
 
 Commit RED prévu : `test(m13-environments): couvrir parcours reel production`.
+
+## T-011 - Retour GREEN du parcours production réel
+
+Implémentation :
+
+- `uv run production` devient une qualification réelle, finie, persistante et
+  non destructive avec le seul profil production ;
+- le superviseur réémet les 38 pages du PDF suivi sous le répertoire temporaire
+  de rapports production, puis traverse UI, API, PostgreSQL, outbox, relais,
+  workers, Docling, Qdrant, recherche, chat, citation PDF et Spark live ;
+- le rendu Compose et les 17 conteneurs sont inspectés afin de refuser tout
+  chemin de configuration, secret ou donnée development/test ;
+- les six réplicas workers publient l'identité et le hash production ; les
+  workers documentaires sont inspectés à 8 Gio, 4 CPU et 30 secondes de
+  healthcheck ;
+- un checkpoint produit sans secret est écrit avant le premier arrêt ;
+- la pile est arrêtée sans `--volumes`, redémarrée et relit les mêmes document,
+  version canonique, projection et PDF original ;
+- development est sondé par son contrat public sans mutation et l'absence
+  complète de stockage test est exigée, sans créer ni nettoyer test depuis la
+  commande production ;
+- la sortie finale exige la disparition des conteneurs production, la présence
+  exacte des sept volumes attendus et la conservation bit à bit des sentinelles
+  déjà présentes.
+
+Preuve live finale :
+
+- `uv run production` : code 0 en `4 348 s` ;
+- rapport :
+  `data/environments/production/reports/production-e2e-20260722T030253Z-7FC7E3A32E8E433AA03412FA6A1620D0.json` ;
+- document `DOC-ABFED3329D1BF463` ;
+- version canonique `CVER-M004-ROUTED-ABFED3329D1BF46350220297` ;
+- projection
+  `PROJ-903E37A59A7030A4CEAA8D37036609135CE4F2CB807B2D076433DE964170A84D` ;
+- réponse `ANS-LIVE-DE287349F91D99AB351B`, support
+  `PARTIALLY_SUPPORTED` ;
+- citation PDF page 34 et réponse brute Spark
+  `chatcmpl-REQ-PRODUCTION-E2E-SPARK-7FC7E3A32E8E433AA03412FA6A1620D0` ;
+- trois progressions `SUCCEEDED`, conversion `38/38`, six workers et trois jobs
+  d'identité production ;
+- `restart_persistence_verified=true`, sondes `development:ABSENT` et
+  `test:ABSENT`, `production_resources_preserved=true`,
+  `non_production_credentials_inaccessible=true` et
+  `automatic_cleanup_performed=false` ;
+- état final : zéro conteneur development/test/production, sept volumes
+  production conservés et zéro volume test.
+
+ADR consultée : ADR-045. Aucune nouvelle ADR n'est requise.
+
+Commit RED : `cff8197b7` -
+`test(m13-environments): couvrir parcours reel production`.
+
+Commit GREEN prévu :
+`feat(m13-environments): valider parcours production`.
+
+Validations GREEN finales :
+
+- test unitaire production, commandes et non-régressions development/test :
+  4 tests GREEN ;
+- Ruff, `compileall`, `git diff --check` et scan indépendant du rapport contre
+  les cinq secrets production : GREEN ;
+- `uv run --locked gate --scope m013_environments` : 38 nœuds GREEN ;
+- `uv run --locked gate --scope m013_config` : 36 nœuds GREEN ;
+- `uv run --locked gate --scope m013` : GREEN ;
+- `uv run --locked gate --scope m013_fastapi` : 70 nœuds GREEN ;
+- `uv run --locked gate --offline` : 440/440 nœuds GREEN, zéro RED, zéro
+  `NOT_RUN`, manifeste unique.

@@ -71,8 +71,19 @@ def _assert_uv_environment_entrypoints_launch_the_selected_stack(monkeypatch, tm
     monkeypatch.setattr(
         command,
         "run_test_environment_e2e",
-        lambda **arguments: qualified.append(arguments)
+        lambda **arguments: qualified.append(("test", arguments))
         or SimpleNamespace(to_mapping=lambda: {"environment": "test", "runs": [1, 2]}),
+    )
+    monkeypatch.setattr(
+        command,
+        "run_production_environment_e2e",
+        lambda **arguments: qualified.append(("production", arguments))
+        or SimpleNamespace(
+            to_mapping=lambda: {
+                "environment": "production",
+                "restart_persistence_verified": True,
+            }
+        ),
     )
 
     original_argv = sys.argv[:]
@@ -83,27 +94,33 @@ def _assert_uv_environment_entrypoints_launch_the_selected_stack(monkeypatch, tm
     finally:
         sys.argv = original_argv
 
-    assert [launch.environment for launch in prepared] == ["development", "production"]
+    assert [launch.environment for launch in prepared] == ["development"]
     assert [Path(launch.config_path) for launch in prepared] == [
         environments_root / "development.yaml",
-        environments_root / "production.yaml",
     ]
     assert served == [
         ("ui", 8081, str(tmp_path / ".tmp" / "development.yaml")),
-        ("ui", 8081, str(tmp_path / ".tmp" / "production.yaml")),
     ]
     assert qualified == [
-        {
-            "repository_root": tmp_path,
-            "pdf_path": tmp_path / "data/corpus/the-original-turtle-trading-rules.pdf",
-        }
+        (
+            profile,
+            {
+                "repository_root": tmp_path,
+                "pdf_path": tmp_path / "data/corpus/the-original-turtle-trading-rules.pdf",
+            },
+        )
+        for profile in ("test", "production")
     ]
     output = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
     assert {"environment": "test", "runs": [1, 2]} in output
+    assert {
+        "environment": "production",
+        "restart_persistence_verified": True,
+    } in output
     events = [event for event in output if event.get("event_type") == "environment_lifecycle"]
     assert [(event["environment"], event["state"]) for event in events] == [
         (profile, state)
-        for profile in ("development", "production")
+        for profile in ("development",)
         for state in ("starting", "ready", "stopped")
     ]
     assert all(event["event_type"] == "environment_lifecycle" for event in events)
