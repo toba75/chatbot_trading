@@ -11,6 +11,10 @@
 - Prérequis : Docker opérationnel, dépendances UV verrouillées, Spark réel
   joignable et fichiers de secrets locaux du seul profil présent. Une valeur
   absente arrête la commande ; aucun secret ni profil n'est déduit.
+- Les commandes ne créent ni répertoire ni valeur secrète. L'opérateur fournit
+  avant le lancement les cinq fichiers du profil, tous valides et hors Git.
+- Une preuve réelle exige un worktree Git propre. Le commit annoncé dans le
+  rapport est celui injecté dans les images et contient le runner qualifié.
 
 ## Commandes principales
 
@@ -30,6 +34,10 @@ parcours écrit sa preuve avant l'arrêt. La seule occurrence autorisée de
 et fichiers avec l'identité `test` / `ostrading-test-ci`. Une identité
 divergente produit `DATASTORE_ENVIRONMENT_MISMATCH`, arrête les conteneurs et
 conserve les volumes.
+Un verrou interprocessus couvre les deux cycles. Chaque installation inscrit
+son identifiant de cycle dans le volume applicatif ; le teardown compare ce
+propriétaire persistant avant `down --volumes`. Un verrou orphelin ou une pile
+test préexistante est terminal et n'est jamais réinitialisé automatiquement.
 
 `uv run production` exécute une qualification réelle finie, redémarre la même
 installation pour relire ses données et sort par `down --remove-orphans`. La
@@ -89,6 +97,11 @@ nouveaux rapports. Elle est volontairement explicite et coûteuse :
 ```console
 uv run --locked gate --scope m013_environments --live
 ```
+
+Sans `--live`, même une gate sans `--scope` exclut les nœuds live. Le parcours
+live repart d'un Docker propre : aucun volume étranger n'est un prérequis. Les
+sondes croisées relisent uniquement les artefacts versionnés du profil qualifié
+et ne lisent aucun secret, stockage ou autorité d'un autre profil.
 
 Une preuve `development`, `test` ou `production` absente, une collision
 d'identifiant, un worker manquant ou une donnée sensible rend la gate RED. Une

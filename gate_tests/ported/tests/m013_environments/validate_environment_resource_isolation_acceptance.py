@@ -103,4 +103,3 @@ def test_environment_resource_isolation_acceptance(tmp_path: Path) -> None:
     for environment in ("development", "test"):
         non_production_text = configuration_paths[environment].read_text(encoding="utf-8-sig")
         assert all(secret_path not in non_production_text for secret_path in production_secret_paths)
-

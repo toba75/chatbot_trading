@@ -2,15 +2,18 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+import httpx
 
 
 def test_production_real_e2e_unit(monkeypatch, tmp_path: Path, capsys) -> None:
     from app.platform.production_e2e import (
         ProductionE2EError,
+        _production_red_report_guard,
         _run_production_stack_twice,
         _verify_production_compose_document,
     )
@@ -69,6 +72,36 @@ def test_production_real_e2e_unit(monkeypatch, tmp_path: Path, capsys) -> None:
     with pytest.raises(ProductionE2EError, match="NON_PRODUCTION_RESOURCE_VISIBLE"):
         _verify_production_compose_document(contaminated)
 
+    import app.platform.production_e2e as production_e2e
+
+    teardown_events: list[str] = []
+
+    @contextmanager
+    def stack():
+        teardown_events.append("enter")
+        try:
+            yield
+        finally:
+            teardown_events.append("exit")
+
+    monkeypatch.setattr(
+        production_e2e,
+        "_write_secret_free_payload",
+        lambda **arguments: teardown_events.append(
+            f"report:{arguments['payload']['status']}"
+        ),
+    )
+    with pytest.raises(ProductionE2EError, match="PRODUCTION_E2E_NETWORK_FAILED"):
+        with stack(), _production_red_report_guard(
+            proof_id="A" * 32,
+            phase="product",
+            checkpoint_path=tmp_path / "production-red.json",
+            configuration=SimpleNamespace(),
+            repository_root=tmp_path,
+        ):
+            raise httpx.ConnectError("network red")
+    assert teardown_events == ["enter", "report:RED", "exit"]
+
     import app.platform.environment_command as command
 
     published: list[object] = []
@@ -101,4 +134,3 @@ def test_production_real_e2e_unit(monkeypatch, tmp_path: Path, capsys) -> None:
     monkeypatch.setattr(command.sys, "argv", ["production"])
     assert command.production() == 1
     assert "PRODUCTION_RED" in capsys.readouterr().err
-

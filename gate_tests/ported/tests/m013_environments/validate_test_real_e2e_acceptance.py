@@ -49,4 +49,3 @@ def test_validate_test_real_e2e_acceptance() -> None:
     assert report.foreign_volume_sentinels_preserved is True
     assert report.test_resources_removed is True
     assert report.report_path.is_file()
-

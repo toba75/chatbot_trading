@@ -161,6 +161,9 @@ def run_environment_command(
             )
         )
         raise
+    except KeyboardInterrupt:
+        publish_state(_lifecycle_event(active_configuration, state="stopped"))
+        return 0
     publish_state(_lifecycle_event(active_configuration, state="stopped"))
     return 0
 

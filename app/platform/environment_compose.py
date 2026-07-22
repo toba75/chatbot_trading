@@ -10,14 +10,13 @@ import json
 import os
 from pathlib import Path
 import re
-import secrets
 import shutil
 import subprocess
 import time
 from types import MappingProxyType
 from typing import Any, Final, Literal
 from urllib.request import urlopen
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from app.platform.administrative_operations import (
     AdministrativeOperationEvidence,
@@ -306,6 +305,12 @@ def start_environment_compose_stack(launch_configuration: Any) -> Iterator[Any]:
         config_path=configuration_path,
         environment_snapshot={},
     )
+    _require_launch_profile_identity(
+        environment=environment,
+        configuration_path=configuration_path,
+        definition=definition,
+        configuration=configuration,
+    )
     _provision_environment_secrets(definition)
     technical_environment = _technical_environment_from_repository(repository_root)
     document = render_environment_compose(
@@ -314,6 +319,7 @@ def start_environment_compose_stack(launch_configuration: Any) -> Iterator[Any]:
     )
     _validate_environment_compose_document(document, definition=definition)
     started = False
+    lifecycle_owner_recorded = False
     lifecycle_id = str(uuid4())
     try:
         started = True
@@ -327,10 +333,17 @@ def start_environment_compose_stack(launch_configuration: Any) -> Iterator[Any]:
             definition,
             technical_environment=technical_environment,
         )
+        if definition.environment == "test":
+            _record_test_lifecycle_owner(
+                definition=definition,
+                technical_environment=technical_environment,
+                lifecycle_id=lifecycle_id,
+            )
+            lifecycle_owner_recorded = True
         yield launch_configuration
     finally:
         if started:
-            if definition.environment == "test":
+            if definition.environment == "test" and lifecycle_owner_recorded:
                 _finalize_test_environment_stack(
                     definition=definition,
                     configuration=configuration,
@@ -380,13 +393,17 @@ def _cleanup_test_environment_stack(
     if definition.environment != "test":
         raise ValueError("ADMINISTRATIVE_OPERATION_FORBIDDEN")
     expected_identity = configured_datastore_identity(configuration)
+    persistent_owner_id = _observed_test_lifecycle_owner(
+        definition=definition,
+        technical_environment=technical_environment,
+    )
     execute_administrative_operation(
         request=AdministrativeOperationRequest(
             operation="test_cleanup",
             target_identity=expected_identity,
             automatic=True,
             lifecycle_id=lifecycle_id,
-            lifecycle_owner_id=lifecycle_id,
+            lifecycle_owner_id=persistent_owner_id,
             backup_manifest=None,
         ),
         observe_identity=lambda: _observed_stack_identity(
@@ -398,7 +415,6 @@ def _cleanup_test_environment_stack(
             ("down", "--volumes", "--remove-orphans"),
             technical_environment=technical_environment,
             capture_output=False,
-            allowed_returncodes=frozenset({0, 1}),
         ),
         record_audit=_publish_administrative_evidence,
     )
@@ -414,8 +430,64 @@ def _stop_environment_stack(
         ("down", "--remove-orphans"),
         technical_environment=technical_environment,
         capture_output=False,
-        allowed_returncodes=frozenset({0, 1}),
     )
+
+
+def _record_test_lifecycle_owner(
+    *,
+    definition: EnvironmentStackDefinition,
+    technical_environment: Mapping[str, str],
+    lifecycle_id: str,
+) -> None:
+    _run_compose(
+        definition,
+        (
+            "exec",
+            "--no-TTY",
+            "orchestrator-api",
+            "python",
+            "-m",
+            "app.platform.environment_compose",
+            "record-test-lifecycle-owner",
+            "--config",
+            _CONFIG_CONTAINER_PATH,
+            "--lifecycle-id",
+            lifecycle_id,
+        ),
+        technical_environment=technical_environment,
+        capture_output=True,
+    )
+
+
+def _observed_test_lifecycle_owner(
+    *,
+    definition: EnvironmentStackDefinition,
+    technical_environment: Mapping[str, str],
+) -> str:
+    result = _run_compose(
+        definition,
+        (
+            "exec",
+            "--no-TTY",
+            "orchestrator-api",
+            "python",
+            "-m",
+            "app.platform.environment_compose",
+            "read-test-lifecycle-owner",
+            "--config",
+            _CONFIG_CONTAINER_PATH,
+        ),
+        technical_environment=technical_environment,
+        capture_output=True,
+    )
+    owner_id = result.stdout.strip()
+    try:
+        parsed = UUID(owner_id)
+    except ValueError as exc:
+        raise ValueError("TEST_LIFECYCLE_OWNER_INVALID") from exc
+    if parsed.version != 4:
+        raise ValueError("TEST_LIFECYCLE_OWNER_INVALID")
+    return owner_id
 
 
 def _observed_stack_identity(
@@ -601,6 +673,46 @@ def configured_administrative_identity(config_path: Path) -> Mapping[str, str]:
     return payload
 
 
+def record_test_lifecycle_owner(config_path: Path, lifecycle_id: str) -> str:
+    configuration = load_application_configuration(
+        config_path=config_path,
+        environment_snapshot={},
+    )
+    if configuration.application.environment != "test":
+        raise ValueError("ADMINISTRATIVE_OPERATION_FORBIDDEN")
+    try:
+        owner = UUID(lifecycle_id)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("TEST_LIFECYCLE_OWNER_INVALID") from exc
+    if owner.version != 4:
+        raise ValueError("TEST_LIFECYCLE_OWNER_INVALID")
+    owner_path = Path(configuration.paths.data_root) / ".test-lifecycle-owner"
+    owner_path.parent.mkdir(parents=True, exist_ok=True)
+    with owner_path.open("x", encoding="ascii", newline="\n") as stream:
+        stream.write(str(owner))
+    print(str(owner), flush=True)
+    return str(owner)
+
+
+def read_test_lifecycle_owner(config_path: Path) -> str:
+    configuration = load_application_configuration(
+        config_path=config_path,
+        environment_snapshot={},
+    )
+    if configuration.application.environment != "test":
+        raise ValueError("ADMINISTRATIVE_OPERATION_FORBIDDEN")
+    owner_path = Path(configuration.paths.data_root) / ".test-lifecycle-owner"
+    try:
+        owner_text = owner_path.read_text(encoding="ascii").strip()
+        owner = UUID(owner_text)
+    except (OSError, ValueError) as exc:
+        raise ValueError("TEST_LIFECYCLE_OWNER_INVALID") from exc
+    if owner.version != 4:
+        raise ValueError("TEST_LIFECYCLE_OWNER_INVALID")
+    print(str(owner), flush=True)
+    return str(owner)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Healthchecks des piles d'environnement.")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -615,6 +727,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     worker_parser.add_argument("--config", required=True)
     administrative_parser = subparsers.add_parser("check-administrative-identity")
     administrative_parser.add_argument("--config", required=True)
+    owner_record_parser = subparsers.add_parser("record-test-lifecycle-owner")
+    owner_record_parser.add_argument("--config", required=True)
+    owner_record_parser.add_argument("--lifecycle-id", required=True)
+    owner_read_parser = subparsers.add_parser("read-test-lifecycle-owner")
+    owner_read_parser.add_argument("--config", required=True)
     arguments = parser.parse_args(argv)
     if arguments.command == "check-config":
         load_application_configuration(config_path=arguments.config, environment_snapshot={})
@@ -627,6 +744,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
     if arguments.command == "check-administrative-identity":
         configured_administrative_identity(Path(arguments.config))
+        return 0
+    if arguments.command == "record-test-lifecycle-owner":
+        record_test_lifecycle_owner(Path(arguments.config), arguments.lifecycle_id)
+        return 0
+    if arguments.command == "read-test-lifecycle-owner":
+        read_test_lifecycle_owner(Path(arguments.config))
         return 0
     configured_http_healthcheck(
         service=arguments.service,
@@ -786,22 +909,29 @@ def _parse_compose_ps(document: str) -> tuple[EnvironmentContainerState, ...]:
 
 
 def _provision_environment_secrets(definition: EnvironmentStackDefinition) -> None:
-    definition.secrets_path.mkdir(parents=True, exist_ok=True)
-    for file_name in _SECRET_FILE_NAMES:
-        path = (definition.secrets_path / file_name).resolve()
-        _require_path_under(path, root=definition.secrets_path)
-        if path.exists():
-            _require_secret_file(path)
-            continue
-        value = secrets.token_urlsafe(48)
-        try:
-            with path.open("x", encoding="ascii", newline="\n") as stream:
-                stream.write(value)
-        except FileExistsError:
-            _require_secret_file(path)
-            continue
-        print(f"ENVIRONMENT_SECRET_PROVISIONED: {path}", flush=True)
+    """Valide les secrets fournis explicitement, sans jamais les créer."""
+
     _require_definition_files(definition, require_secrets=True)
+
+
+def _require_launch_profile_identity(
+    *,
+    environment: str,
+    configuration_path: Path,
+    definition: EnvironmentStackDefinition,
+    configuration: Any,
+) -> Any:
+    selected = _require_environment(environment)
+    application = getattr(configuration, "application", None)
+    if application is None:
+        raise ValueError("ENVIRONMENT_LAUNCH_CONFIGURATION_INVALID")
+    if (
+        definition.environment != selected
+        or configuration_path != definition.configuration_path
+        or getattr(application, "environment", None) != selected
+    ):
+        raise ValueError("CONFIG_ENVIRONMENT_MISMATCH: commande/fichier/profil")
+    return configuration
 
 
 def _require_secret_file(path: Path) -> None:

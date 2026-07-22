@@ -289,6 +289,11 @@ def validate_repository_environment_governance(
         )
         source = "versioned-live-evidence"
     execution_evidence = validate_execution_evidence(reports)
+    validate_evidence_revisions(
+        repository_root=root,
+        reports=reports,
+        require_common_revision=require_live_sources,
+    )
 
     configurations = {
         environment: load_application_configuration(
@@ -333,6 +338,100 @@ def validate_repository_environment_governance(
         closure_status=closure_status,
         source=source,
     )
+
+
+def validate_evidence_revisions(
+    *,
+    repository_root: Path,
+    reports: Mapping[str, object],
+    require_common_revision: bool,
+) -> None:
+    """Lie chaque preuve à un commit qualifiable et à son runner versionné."""
+
+    if not isinstance(require_common_revision, bool):
+        raise EnvironmentGovernanceError("LIVE_EVIDENCE_REVISION_POLICY_INVALID")
+    root = repository_root.resolve()
+    current_revision = _git_output(root, ("rev-parse", "HEAD"), "LIVE_EVIDENCE_REVISION_INVALID")
+    revisions: list[str] = []
+    for environment in ENVIRONMENTS:
+        report = _require_mapping(
+            reports.get(environment),
+            f"LIVE_EVIDENCE_MISSING:{environment}",
+        )
+        revision = _required_text(
+            report,
+            "image_revision",
+            "LIVE_EVIDENCE_REVISION_INVALID",
+        )
+        _git_success(
+            root,
+            ("cat-file", "-e", f"{revision}^{{commit}}"),
+            "LIVE_EVIDENCE_REVISION_UNKNOWN",
+        )
+        _git_success(
+            root,
+            ("merge-base", "--is-ancestor", revision, current_revision),
+            "LIVE_EVIDENCE_REVISION_INCOMPATIBLE",
+        )
+        runner = (
+            "gate_tests/ported/tests/m013_environments/"
+            f"validate_{environment}_real_e2e_acceptance.py"
+        )
+        _git_success(
+            root,
+            ("cat-file", "-e", f"{revision}:{runner}"),
+            "LIVE_EVIDENCE_RUNNER_MISSING",
+        )
+        revisions.append(revision)
+    for left, right in zip(revisions, revisions[1:]):
+        left_precedes = _git_completed(
+            root,
+            ("merge-base", "--is-ancestor", left, right),
+        ).returncode == 0
+        right_precedes = _git_completed(
+            root,
+            ("merge-base", "--is-ancestor", right, left),
+        ).returncode == 0
+        if not left_precedes and not right_precedes:
+            raise EnvironmentGovernanceError("LIVE_EVIDENCE_REVISIONS_DIVERGED")
+    if require_common_revision:
+        if len(set(revisions)) != 1 or revisions[0] != current_revision:
+            raise EnvironmentGovernanceError("LIVE_EVIDENCE_COMMON_REVISION_REQUIRED")
+        for runner in (
+            "app/platform/development_e2e.py",
+            "app/platform/test_e2e.py",
+            "app/platform/production_e2e.py",
+        ):
+            _git_success(
+                root,
+                ("cat-file", "-e", f"{current_revision}:{runner}"),
+                "LIVE_EVIDENCE_RUNNER_MISSING",
+            )
+
+
+def _git_completed(root: Path, arguments: tuple[str, ...]) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ("git", *arguments),
+        cwd=root,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="strict",
+        check=False,
+    )
+
+
+def _git_success(root: Path, arguments: tuple[str, ...], code: str) -> None:
+    if _git_completed(root, arguments).returncode != 0:
+        raise EnvironmentGovernanceError(code)
+
+
+def _git_output(root: Path, arguments: tuple[str, ...], code: str) -> str:
+    completed = _git_completed(root, arguments)
+    output = completed.stdout.strip()
+    if completed.returncode != 0 or output == "":
+        raise EnvironmentGovernanceError(code)
+    return output
 
 
 def _validate_report_header(report: Mapping[str, object], *, environment: str) -> None:
@@ -759,5 +858,6 @@ __all__ = [
     "build_isolation_access_matrix",
     "validate_closure_status",
     "validate_execution_evidence",
+    "validate_evidence_revisions",
     "validate_repository_environment_governance",
 ]

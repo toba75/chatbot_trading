@@ -25,4 +25,3 @@ def test_environment_governance_live() -> None:
     assert evidence.worker_replica_count == 6
     assert evidence.matrix_cell_count == 9
     assert evidence.closure_status == "SUBMILESTONE_GREEN_M013_OPEN"
-

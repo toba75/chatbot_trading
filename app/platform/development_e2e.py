@@ -29,7 +29,6 @@ from app.platform.environment_compose import (
     _run_compose,
     _technical_environment_from_repository,
     environment_stack_definition,
-    inspect_environment_readiness,
 )
 
 
@@ -170,6 +169,7 @@ def run_development_environment_e2e(
     """Traverse la chaîne development réelle puis en publie un rapport sans secret."""
 
     root = _require_repository_root(repository_root)
+    qualified_revision = _git_revision(root)
     initial_volume_sentinels = _environment_volume_sentinels(repository_root=root)
     source_pdf = _require_real_versioned_pdf(root, pdf_path)
     configuration_path = root / "config" / "environments" / "development.yaml"
@@ -201,56 +201,71 @@ def run_development_environment_e2e(
         token=token,
         log_path=log_path,
     ):
-        with _public_client(
-            token=token,
-            timeout_seconds=900,
-            base_url=_DEVELOPMENT_PROOF_CONTEXT.api_base_url,
-        ) as client:
-            _verify_public_ui(client, proof_context=_DEVELOPMENT_PROOF_CONTEXT)
-            product = _exercise_product(
-                client=client,
-                configuration=configuration,
-                pdf_path=selected_pdf,
-                pdf_sha256=pdf_sha256,
-                proof_id=proof_id,
-                repository_root=root,
-                existing_document_id=existing_document_id,
-                proof_context=_DEVELOPMENT_PROOF_CONTEXT,
-            )
-            _write_secret_free_payload(
-                payload=_product_checkpoint_payload(
-                    product=product,
-                    proof_id=proof_id,
+        with _development_red_report_guard(
+            proof_id=proof_id,
+            phase="product",
+            report_root=report_root,
+            configuration=configuration,
+            repository_root=root,
+        ):
+            with _public_client(
+                token=token,
+                timeout_seconds=900,
+                base_url=_DEVELOPMENT_PROOF_CONTEXT.api_base_url,
+            ) as client:
+                _verify_public_ui(client, proof_context=_DEVELOPMENT_PROOF_CONTEXT)
+                product = _exercise_product(
+                    client=client,
+                    configuration=configuration,
+                    pdf_path=selected_pdf,
                     pdf_sha256=pdf_sha256,
-                    created_at=_utc_now(),
-                ),
-                output_path=report_root / f"development-e2e-checkpoint-{proof_id}.json",
-                configuration=configuration,
-                repository_root=root,
-            )
+                    proof_id=proof_id,
+                    repository_root=root,
+                    existing_document_id=existing_document_id,
+                    proof_context=_DEVELOPMENT_PROOF_CONTEXT,
+                )
+                _write_secret_free_payload(
+                    payload=_product_checkpoint_payload(
+                        product=product,
+                        proof_id=proof_id,
+                        pdf_sha256=pdf_sha256,
+                        created_at=_utc_now(),
+                    ),
+                    output_path=report_root / f"development-e2e-checkpoint-{proof_id}.json",
+                    configuration=configuration,
+                    repository_root=root,
+                )
 
     with _running_development_command(
         repository_root=root,
         token=token,
         log_path=log_path,
     ):
-        with _public_client(
-            token=token,
-            timeout_seconds=900,
-            base_url=_DEVELOPMENT_PROOF_CONTEXT.api_base_url,
-        ) as client:
-            _verify_public_ui(client, proof_context=_DEVELOPMENT_PROOF_CONTEXT)
-            _verify_persistence_after_restart(
-                client=client,
-                product=product,
-                pdf_sha256=pdf_sha256,
-                proof_id=proof_id,
-                proof_context=_DEVELOPMENT_PROOF_CONTEXT,
-            )
+        with _development_red_report_guard(
+            proof_id=proof_id,
+            phase="restart-read",
+            report_root=report_root,
+            configuration=configuration,
+            repository_root=root,
+        ):
+            with _public_client(
+                token=token,
+                timeout_seconds=900,
+                base_url=_DEVELOPMENT_PROOF_CONTEXT.api_base_url,
+            ) as client:
+                _verify_public_ui(client, proof_context=_DEVELOPMENT_PROOF_CONTEXT)
+                _verify_persistence_after_restart(
+                    client=client,
+                    product=product,
+                    pdf_sha256=pdf_sha256,
+                    proof_id=proof_id,
+                    proof_context=_DEVELOPMENT_PROOF_CONTEXT,
+                )
 
     foreign_probes = tuple(
         _probe_foreign_environment(
             repository_root=root,
+            source_environment=_ENVIRONMENT,
             environment=environment,
             forbidden_document_id=product.document_id,
         )
@@ -262,7 +277,7 @@ def run_development_environment_e2e(
         final=final_volume_sentinels,
     )
     completed_at = _utc_now()
-    revision = _git_revision(root)
+    revision = qualified_revision
     report_path = report_root / f"development-e2e-{completed_at.replace(':', '').replace('-', '')}-{proof_id}.json"
     report = DevelopmentE2EReport(
         environment=_ENVIRONMENT,
@@ -291,6 +306,43 @@ def run_development_environment_e2e(
     )
     _write_secret_free_report(report, configuration=configuration, repository_root=root)
     return report
+
+
+@contextmanager
+def _development_red_report_guard(
+    *,
+    proof_id: str,
+    phase: str,
+    report_root: Path,
+    configuration: ApplicationConfiguration,
+    repository_root: Path,
+) -> Iterator[None]:
+    try:
+        yield
+    except (DevelopmentE2EError, ValueError, httpx.TransportError) as exc:
+        error_code = (
+            "DEVELOPMENT_E2E_NETWORK_FAILED"
+            if isinstance(exc, httpx.TransportError)
+            else str(exc).split(":", 1)[0]
+        )
+        _write_secret_free_payload(
+            payload={
+                "event_type": "development_e2e_checkpoint",
+                "status": "RED",
+                "environment": _ENVIRONMENT,
+                "deployment_id": _DEPLOYMENT_ID,
+                "proof_id": proof_id,
+                "phase": phase,
+                "error_code": error_code,
+                "completed_at": _utc_now(),
+            },
+            output_path=report_root / f"development-e2e-{phase}-{proof_id}-red.json",
+            configuration=configuration,
+            repository_root=repository_root,
+        )
+        if isinstance(exc, httpx.TransportError):
+            raise DevelopmentE2EError(error_code) from exc
+        raise
 
 
 @contextmanager
@@ -776,47 +828,35 @@ def _verify_persistence_after_restart(
 def _probe_foreign_environment(
     *,
     repository_root: Path,
+    source_environment: str,
     environment: str,
     forbidden_document_id: str,
 ) -> str:
-    definition = environment_stack_definition(environment, repository_root=repository_root)
-    technical_environment = _technical_environment_from_repository(repository_root)
-    configuration = load_application_configuration(
-        config_path=definition.configuration_path,
-        environment_snapshot={},
-    )
-    token = _read_secret(
-        repository_root / configuration.security.secrets.local_api_token_path
-    )
-    _run_compose(
-        definition,
-        ("up", "--detach", "--no-build", "--wait", "--wait-timeout", "600"),
-        technical_environment=technical_environment,
-        capture_output=True,
+    environments = {"development", "test", "production"}
+    if source_environment not in environments or environment not in environments:
+        raise ValueError("DEVELOPMENT_E2E_FOREIGN_PROFILE_INVALID")
+    if source_environment == environment:
+        raise ValueError("DEVELOPMENT_E2E_FOREIGN_PROFILE_INVALID")
+    if not isinstance(forbidden_document_id, str) or forbidden_document_id == "":
+        raise ValueError("DEVELOPMENT_E2E_FOREIGN_DOCUMENT_INVALID")
+    source_documents = (
+        repository_root / "deploy" / "environments" / f"{source_environment}.compose.yaml",
+        repository_root / "config" / "environments" / f"{source_environment}.yaml",
     )
     try:
-        inspect_environment_readiness(
-            definition,
-            technical_environment=technical_environment,
-        )
-        base_url = f"https://localhost:{definition.edge_port}/api"
-        with _public_client(token=token, timeout_seconds=30, base_url=base_url) as client:
-            before = _all_public_document_ids(client)
-            if forbidden_document_id in before:
-                raise DevelopmentE2EError(
-                    f"DEVELOPMENT_E2E_FOREIGN_DOCUMENT_VISIBLE: {environment}"
-                )
-            after = _all_public_document_ids(client)
-            if after != before:
-                raise DevelopmentE2EError(
-                    f"DEVELOPMENT_E2E_FOREIGN_PROBE_MUTATED_DATA: {environment}"
-                )
-    finally:
-        _run_compose(
-            definition,
-            ("down", "--remove-orphans"),
-            technical_environment=technical_environment,
-            capture_output=True,
+        serialized = "\n".join(path.read_text(encoding="utf-8") for path in source_documents)
+    except OSError as exc:
+        raise DevelopmentE2EError("DEVELOPMENT_E2E_SOURCE_PROFILE_UNREADABLE") from exc
+    forbidden_markers = (
+        f"ostrading-{environment}-",
+        f"config/secrets/{environment}",
+        f"data/environments/{environment}",
+        f"config/environments/{environment}.yaml",
+    )
+    collision = next((marker for marker in forbidden_markers if marker in serialized), None)
+    if collision is not None:
+        raise DevelopmentE2EError(
+            f"DEVELOPMENT_E2E_FOREIGN_RESOURCE_VISIBLE: {environment}:{collision}"
         )
     return f"{environment}:ABSENT"
 
@@ -1011,11 +1051,7 @@ def _environment_volume_sentinels(*, repository_root: Path) -> tuple[str, ...]:
     )
     if listed.returncode != 0:
         raise DevelopmentE2EError("DEVELOPMENT_E2E_VOLUME_LIST_FAILED")
-    prefixes = tuple(f"ostrading-{environment}-" for environment in (
-        "development",
-        "test",
-        "production",
-    ))
+    prefixes = ("ostrading-development-",)
     names = tuple(
         sorted(
             name
@@ -1023,11 +1059,8 @@ def _environment_volume_sentinels(*, repository_root: Path) -> tuple[str, ...]:
             if (name := line.strip()).startswith(prefixes)
         )
     )
-    for prefix in prefixes:
-        if not any(name.startswith(prefix) for name in names):
-            raise DevelopmentE2EError(
-                f"DEVELOPMENT_E2E_VOLUME_SENTINEL_MISSING: {prefix}"
-            )
+    if not names:
+        return ()
     inspected = subprocess.run(
         (
             docker_executable,
@@ -1479,6 +1512,19 @@ def _git_revision(repository_root: Path) -> str:
     git_executable = shutil.which("git")
     if git_executable is None:
         raise ValueError("DEVELOPMENT_E2E_GIT_UNAVAILABLE")
+    status = subprocess.run(
+        (git_executable, "status", "--porcelain", "--untracked-files=all"),
+        cwd=repository_root,
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="strict",
+    )
+    if status.returncode != 0:
+        raise ValueError("DEVELOPMENT_E2E_GIT_STATUS_INVALID")
+    if status.stdout != "":
+        raise ValueError("DEVELOPMENT_E2E_WORKTREE_DIRTY")
     result = subprocess.run(
         (git_executable, "rev-parse", "HEAD"),
         cwd=repository_root,

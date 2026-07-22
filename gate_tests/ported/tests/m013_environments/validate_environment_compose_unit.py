@@ -69,6 +69,14 @@ def test_environment_compose_unit(tmp_path: Path) -> None:
 
     # Un secret absent est une erreur sans création de répertoire ni fichier.
     secret_definition = definitions["test"]
+    for required_path in (
+        secret_definition.base_compose_path,
+        secret_definition.compose_path,
+        secret_definition.configuration_path,
+        secret_definition.caddyfile_path,
+    ):
+        required_path.parent.mkdir(parents=True, exist_ok=True)
+        required_path.write_text("versionné\n", encoding="utf-8")
     with pytest.raises(ValueError, match="ENVIRONMENT_SECRET_UNREADABLE"):
         _provision_environment_secrets(secret_definition)
     assert not secret_definition.secrets_path.exists()

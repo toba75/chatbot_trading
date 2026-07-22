@@ -132,4 +132,3 @@ def test_environment_resource_isolation_unit() -> None:
     )
     with pytest.raises(EnvironmentResourceIsolationError, match=RESOURCE_ISOLATION_VIOLATION):
         validate_environment_resource_matrix(malformed_postgres_url, repository_root=repository_root)
-

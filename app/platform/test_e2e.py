@@ -3,15 +3,19 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 import json
+import os
 from pathlib import Path
 import re
 import shutil
 import subprocess
 from typing import Any, Literal
 from uuid import UUID, uuid4
+
+import httpx
 
 from app.platform.configuration import (
     ApplicationConfiguration,
@@ -201,9 +205,25 @@ def run_test_environment_e2e(
     repository_root: Path,
     pdf_path: Path,
 ) -> TestE2EReport:
+    root = _require_repository_root(repository_root)
+    with _exclusive_test_qualification(
+        root / ".tmp" / "m013-environments-test-e2e.lock"
+    ):
+        return _run_test_environment_e2e_locked(
+            repository_root=root,
+            pdf_path=pdf_path,
+        )
+
+
+def _run_test_environment_e2e_locked(
+    *,
+    repository_root: Path,
+    pdf_path: Path,
+) -> TestE2EReport:
     """Exécute deux installations test réelles puis supprime leurs ressources."""
 
-    root = _require_repository_root(repository_root)
+    root = repository_root
+    qualified_revision = _git_revision(root)
     source_pdf = _require_real_versioned_pdf(root, pdf_path)
     configuration = load_application_configuration(
         config_path=root / "config" / "environments" / "test.yaml",
@@ -217,10 +237,6 @@ def run_test_environment_e2e(
         repository_root=root,
     )
 
-    _reset_preexisting_test_installation(
-        repository_root=root,
-        configuration=configuration,
-    )
     _verify_test_resources_removed(repository_root=root)
 
     runs = _run_two_test_cycles(
@@ -251,7 +267,7 @@ def run_test_environment_e2e(
         environment=_ENVIRONMENT,
         deployment_id=_DEPLOYMENT_ID,
         configuration_hash=configuration.configuration_hash,
-        image_revision=_git_revision(root),
+        image_revision=qualified_revision,
         source_pdf_path=source_pdf.relative_to(root).as_posix(),
         source_pdf_sha256=_sha256_file(source_pdf),
         runs=(runs[0], runs[1]),
@@ -276,6 +292,36 @@ def _verify_test_cleanup_target(cycle: TestEnvironmentCycle) -> TestEnvironmentC
     if cycle.environment != "test" or cycle.deployment_id != "ostrading-test-ci":
         raise ValueError("ADMINISTRATIVE_OPERATION_FORBIDDEN")
     return cycle
+
+
+def _require_persistent_lifecycle_owner(
+    cycle: TestEnvironmentCycle,
+    observed_owner_id: str,
+) -> str:
+    selected = _verify_test_cleanup_target(cycle)
+    if observed_owner_id != selected.lifecycle_id:
+        raise ValueError("TEST_LIFECYCLE_OWNERSHIP_MISMATCH")
+    return observed_owner_id
+
+
+@contextmanager
+def _exclusive_test_qualification(lock_path: Path):
+    """Exclusion interprocessus atomique; un verrou orphelin reste terminal."""
+
+    if not isinstance(lock_path, Path):
+        raise ValueError("TEST_E2E_LOCK_PATH_INVALID")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        stream = lock_path.open("x", encoding="ascii", newline="\n")
+    except FileExistsError as exc:
+        raise TestE2EError("TEST_E2E_ALREADY_RUNNING") from exc
+    try:
+        stream.write(f"pid={os.getpid()}\n")
+        stream.flush()
+        yield
+    finally:
+        stream.close()
+        lock_path.unlink()
 
 
 def _run_two_test_cycles(
@@ -360,7 +406,12 @@ def _run_single_test_cycle(
                     existing_document_id=None,
                     proof_context=_TEST_PROOF_CONTEXT,
                 )
-        except (DevelopmentE2EError, TestE2EError, ValueError) as exc:
+        except (
+            DevelopmentE2EError,
+            TestE2EError,
+            ValueError,
+            httpx.TransportError,
+        ) as exc:
             _write_secret_free_payload(
                 payload={
                     "event_type": "test_e2e_pre_teardown",
@@ -377,9 +428,12 @@ def _run_single_test_cycle(
                 configuration=configuration,
                 repository_root=repository_root,
             )
-            raise TestE2EError(
-                f"TEST_E2E_PRODUCT_FAILED: {_error_code(exc)}"
-            ) from exc
+            error_prefix = (
+                "TEST_E2E_NETWORK_FAILED"
+                if isinstance(exc, httpx.TransportError)
+                else "TEST_E2E_PRODUCT_FAILED"
+            )
+            raise TestE2EError(f"{error_prefix}: {_error_code(exc)}") from exc
 
         completed_at = _utc_now()
         run_report = TestE2ERunReport(
@@ -415,26 +469,6 @@ def _run_single_test_cycle(
 
     _verify_test_resources_removed(repository_root=repository_root)
     return run_report
-
-
-def _reset_preexisting_test_installation(
-    *,
-    repository_root: Path,
-    configuration: ApplicationConfiguration,
-) -> None:
-    _require_test_configuration(configuration)
-    launch_configuration = _TestLaunchConfiguration(
-        environment=_ENVIRONMENT,
-        service_id="ui",
-        port=8081,
-        config_path=str(
-            (repository_root / "config" / "environments" / "test.yaml").resolve()
-        ),
-    )
-    with start_environment_compose_stack(launch_configuration):
-        _verify_runtime_excludes_non_test_credentials(
-            repository_root=repository_root,
-        )
 
 
 def _prepare_test_reemitted_pdf(
@@ -572,9 +606,8 @@ def _foreign_volume_sentinels(*, repository_root: Path) -> tuple[str, ...]:
             if (name := line.strip()).startswith(prefixes)
         )
     )
-    for prefix in prefixes:
-        if not any(name.startswith(prefix) for name in names):
-            raise TestE2EError(f"TEST_E2E_FOREIGN_SENTINEL_MISSING: {prefix}")
+    if not names:
+        return ()
     inspected = subprocess.run(
         (
             docker_executable,

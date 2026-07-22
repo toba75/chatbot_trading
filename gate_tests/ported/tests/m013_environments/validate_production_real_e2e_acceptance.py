@@ -48,4 +48,3 @@ def test_validate_production_real_e2e_acceptance() -> None:
     assert report.production_resources_preserved is True
     assert report.non_production_credentials_inaccessible is True
     assert report.report_path.is_file()
-

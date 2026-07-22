@@ -90,8 +90,6 @@ def test_test_real_e2e_unit(monkeypatch, tmp_path: Path, capsys) -> None:
             publish_report=published.append,
         )
 
-    from app.platform.development_e2e import DevelopmentE2EError
-
     teardown_events: list[str] = []
 
     @contextmanager

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 import json
@@ -12,6 +13,8 @@ import shutil
 import subprocess
 from typing import Any, Final
 from uuid import uuid4
+
+import httpx
 
 from app.platform.configuration import (
     ApplicationConfiguration,
@@ -167,6 +170,7 @@ def run_production_environment_e2e(
     """Traverse production, redémarre et conserve toutes les preuves."""
 
     root = _require_repository_root(repository_root)
+    qualified_revision = _git_revision(root)
     source_pdf = _require_real_versioned_pdf(root, pdf_path)
     configuration = load_application_configuration(
         config_path=root / "config" / "environments" / "production.yaml",
@@ -203,7 +207,15 @@ def run_production_environment_e2e(
                 (root / "config" / "environments" / "production.yaml").resolve()
             ),
         )
-        with start_environment_compose_stack(launch_configuration):
+        with start_environment_compose_stack(
+            launch_configuration
+        ), _production_red_report_guard(
+            proof_id=proof_id,
+            phase=phase,
+            checkpoint_path=checkpoint_path,
+            configuration=configuration,
+            repository_root=root,
+        ):
             _verify_runtime_excludes_non_production_credentials(repository_root=root)
             with _public_client(
                 token=token,
@@ -223,7 +235,7 @@ def run_production_environment_e2e(
                             existing_document_id=None,
                             proof_context=_PRODUCTION_PROOF_CONTEXT,
                         )
-                    except DevelopmentE2EError as exc:
+                    except (DevelopmentE2EError, ValueError, httpx.TransportError) as exc:
                         raise ProductionE2EError(
                             f"PRODUCTION_E2E_PRODUCT_FAILED: {_error_code(exc)}"
                         ) from exc
@@ -253,7 +265,7 @@ def run_production_environment_e2e(
                             proof_id=proof_id,
                             proof_context=_PRODUCTION_PROOF_CONTEXT,
                         )
-                    except DevelopmentE2EError as exc:
+                    except (DevelopmentE2EError, ValueError, httpx.TransportError) as exc:
                         raise ProductionE2EError(
                             f"PRODUCTION_E2E_RESTART_READ_FAILED: {_error_code(exc)}"
                         ) from exc
@@ -286,7 +298,7 @@ def run_production_environment_e2e(
         environment=_ENVIRONMENT,
         deployment_id=_DEPLOYMENT_ID,
         configuration_hash=configuration.configuration_hash,
-        image_revision=_git_revision(root),
+        image_revision=qualified_revision,
         source_pdf_path=source_pdf.relative_to(root).as_posix(),
         source_pdf_sha256=_sha256_file(source_pdf),
         pdf_path=selected_pdf.relative_to(root).as_posix(),
@@ -316,6 +328,49 @@ def run_production_environment_e2e(
         repository_root=root,
     )
     return report
+
+
+@contextmanager
+def _production_red_report_guard(
+    *,
+    proof_id: str,
+    phase: str,
+    checkpoint_path: Path,
+    configuration: ApplicationConfiguration,
+    repository_root: Path,
+):
+    try:
+        yield
+    except (
+        ProductionE2EError,
+        DevelopmentE2EError,
+        ValueError,
+        httpx.TransportError,
+    ) as exc:
+        if isinstance(exc, httpx.TransportError):
+            error_code = "PRODUCTION_E2E_NETWORK_FAILED"
+        elif isinstance(exc, DevelopmentE2EError):
+            error_code = "PRODUCTION_E2E_SHARED_FAILURE"
+        else:
+            error_code = _error_code(exc)
+        _write_secret_free_payload(
+            payload={
+                "event_type": "production_e2e_checkpoint",
+                "status": "RED",
+                "environment": _ENVIRONMENT,
+                "deployment_id": _DEPLOYMENT_ID,
+                "proof_id": proof_id,
+                "phase": phase,
+                "error_code": error_code,
+                "completed_at": _utc_now(),
+            },
+            output_path=checkpoint_path,
+            configuration=configuration,
+            repository_root=repository_root,
+        )
+        if isinstance(exc, ProductionE2EError):
+            raise
+        raise ProductionE2EError(error_code) from exc
 
 
 def _run_production_stack_twice(
@@ -457,6 +512,7 @@ def _probe_development_absence(
     try:
         return _probe_foreign_environment(
             repository_root=repository_root,
+            source_environment=_ENVIRONMENT,
             environment="development",
             forbidden_document_id=forbidden_document_id,
         )
@@ -467,34 +523,17 @@ def _probe_development_absence(
 
 
 def _probe_test_storage_absence(*, repository_root: Path) -> str:
-    commands = (
-        ("ps", "--all", "--format", "{{.Names}}"),
-        ("volume", "ls", "--format", "{{.Name}}"),
-        ("network", "ls", "--format", "{{.Name}}"),
-    )
-    remaining: list[str] = []
-    for arguments in commands:
-        result = subprocess.run(
-            (_docker_executable(), *arguments),
-            cwd=repository_root,
-            check=False,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
+    try:
+        return _probe_foreign_environment(
+            repository_root=repository_root,
+            source_environment=_ENVIRONMENT,
+            environment="test",
+            forbidden_document_id="STRUCTURAL-ISOLATION-PROBE",
         )
-        if result.returncode != 0:
-            raise ProductionE2EError("PRODUCTION_E2E_TEST_RESOURCE_LIST_FAILED")
-        remaining.extend(
-            name
-            for line in result.stdout.splitlines()
-            if (name := line.strip()).startswith("ostrading-test-")
-        )
-    if remaining:
+    except DevelopmentE2EError as exc:
         raise ProductionE2EError(
-            "PRODUCTION_E2E_TEST_STORAGE_NOT_ABSENT: " + ",".join(sorted(remaining))
-        )
-    return "test:ABSENT"
+            f"PRODUCTION_E2E_TEST_PROBE_FAILED: {_error_code(exc)}"
+        ) from exc
 
 
 def _production_volume_sentinels(*, repository_root: Path) -> tuple[str, ...]:

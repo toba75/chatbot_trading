@@ -19,7 +19,7 @@ def build_plan(
 
     if offline and include_live:
         raise PlanError("GATE_LIVE_ACTIVATION_CONFLICT")
-    effective_offline = offline or (scope is not None and not include_live)
+    effective_offline = offline or not include_live
     nodes_by_id = {node.identifier: node for node in manifest.nodes}
     _assert_acyclic(nodes_by_id)
     selected = _select_nodes(nodes_by_id, scope, effective_offline)

@@ -144,6 +144,30 @@ def test_environment_governance_unit() -> None:
         reports=revision_reports,
         require_common_revision=False,
     )
+    unknown_revision_reports = deepcopy(revision_reports)
+    unknown_revision_reports["test"]["image_revision"] = "f" * 40
+    with pytest.raises(EnvironmentGovernanceError, match="LIVE_EVIDENCE_REVISION_UNKNOWN"):
+        validate_evidence_revisions(
+            repository_root=Path.cwd(),
+            reports=unknown_revision_reports,
+            require_common_revision=False,
+        )
+
+    historical_revision_reports = deepcopy(revision_reports)
+    historical_revision_reports["development"]["image_revision"] = subprocess.run(
+        ("git", "rev-parse", "HEAD^"),
+        cwd=Path.cwd(),
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="ascii",
+    ).stdout.strip()
+    with pytest.raises(EnvironmentGovernanceError, match="LIVE_EVIDENCE_COMMON_REVISION_REQUIRED"):
+        validate_evidence_revisions(
+            repository_root=Path.cwd(),
+            reports=historical_revision_reports,
+            require_common_revision=True,
+        )
 
     collided = deepcopy(reports)
     collided["production"]["document_id"] = reports["development"]["document_id"]

@@ -147,6 +147,11 @@ class RelayOutbox(Protocol):
         platform_job_id: str,
     ) -> None: ...
 
+    def reject_environment_mismatch(
+        self,
+        claim: ClaimedRelayMessage,
+    ) -> None: ...
+
 
 class RelayConsumer(Protocol):
     def consume_relay_message(self, message: RelayedJobMessage) -> str: ...

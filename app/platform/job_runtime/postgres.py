@@ -456,13 +456,18 @@ class PostgresJobQueue:
                                status = 'pending'
                                OR (status = 'running' AND lease_expires_at <= CURRENT_TIMESTAMP)
                            )
-                           AND (environment <> %s OR deployment_id <> %s)
+                           AND (
+                               environment <> %s
+                               OR deployment_id <> %s
+                               OR configuration_hash <> %s
+                           )
                         """,
                         (
                             WORKER_ENVIRONMENT_MISMATCH,
                             list(parsed_names),
                             self._environment_identity.environment,
                             self._environment_identity.deployment_id,
+                            self._environment_identity.configuration_hash,
                         ),
                     )
                     cursor.execute(
@@ -470,9 +475,10 @@ class PostgresJobQueue:
                         WITH candidate AS (
                             SELECT sequence
                              FROM platform.technical_jobs
-                             WHERE environment = %s
-                               AND deployment_id = %s
-                               AND job_name = ANY(%s)
+                              WHERE environment = %s
+                                AND deployment_id = %s
+                                AND configuration_hash = %s
+                                AND job_name = ANY(%s)
                                AND (
                                    status = 'pending'
                                    OR (status = 'running' AND lease_expires_at <= CURRENT_TIMESTAMP)
@@ -494,6 +500,7 @@ class PostgresJobQueue:
                         (
                             self._environment_identity.environment,
                             self._environment_identity.deployment_id,
+                            self._environment_identity.configuration_hash,
                             list(parsed_names),
                             parsed_owner,
                             parsed_lease,
