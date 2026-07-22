@@ -152,6 +152,38 @@ def test_test_real_e2e_unit(monkeypatch, tmp_path: Path, capsys) -> None:
         )
     assert teardown_events == ["enter", "report:RED", "exit"]
 
+    monkeypatch.setattr(
+        test_e2e,
+        "_exercise_product",
+        lambda **_: (_ for _ in ()).throw(
+            test_e2e.DevelopmentE2EError(
+                "DEVELOPMENT_E2E_ACTION_FAILED: CONVERT_DOCUMENT: 'PAGE_FAILED'"
+            )
+        ),
+    )
+    with pytest.raises(
+        test_e2e.TestE2EError,
+        match=(
+            "TEST_E2E_PRODUCT_FAILED: DEVELOPMENT_E2E_ACTION_FAILED: "
+            "CONVERT_DOCUMENT: 'PAGE_FAILED'"
+        ),
+    ):
+        test_e2e._run_single_test_cycle(
+            run_number=1,
+            repository_root=tmp_path,
+            pdf_path=tmp_path / "fixture.pdf",
+            configuration=configuration,
+            report_root=tmp_path / "reports",
+        )
+    assert teardown_events == [
+        "enter",
+        "report:RED",
+        "exit",
+        "enter",
+        "report:RED",
+        "exit",
+    ]
+
     import app.platform.environment_command as command
 
     monkeypatch.setattr(
