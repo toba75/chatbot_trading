@@ -297,3 +297,33 @@ leurs propres contrats publics et doivent confirmer l'absence de l'identifiant
 production sans mutation. Toute readiness incomplète, identité divergente,
 ressource non-production, perte après redémarrage ou fuite de secret rend la
 preuve terminalement RED, sans fallback.
+
+## Gouvernance, runbooks et gates (T-012)
+
+La livraison M13-environments porte le statut fermé
+`SUBMILESTONE_GREEN_M013_OPEN`. Il signifie que le sous-milestone est qualifié
+sans déclarer le milestone M-013 global clôturé. Toute autre formulation de
+clôture globale est refusée par la gate.
+
+La matrice d'étanchéité contient exactement neuf cellules : chaque profil
+possède ses ressources et se voit interdire celles des deux autres profils.
+Elle inventorie toutes les coordonnées de configuration mutables, les projets,
+réseaux, volumes et chemins de secrets Compose, ainsi que chaque service
+`worker-*` et son nombre de réplicas. L'ajout d'une ressource ou d'un worker
+sans mise à jour de cette matrice rend la gate RED.
+
+La gate statique lit une preuve versionnée dérivée des rapports réels T-009 à
+T-011. Cette preuve conserve les identifiants, issues, hashes et garde-fous
+d'exécution ; seuls les chemins absolus propres au poste sont normalisés. Une
+preuve absente, une collision d'identifiant ou une donnée sensible rend la
+gate RED.
+
+La gate live est distincte et explicitement activée. Elle dépend des trois
+validateurs qui démarrent les vraies piles et consolide leurs rapports les plus
+récents. Elle n'accepte ni rapport synthétique, ni mock, ni substitution du
+Spark réel. Une gate statique GREEN ne remplace pas cette qualification.
+
+Le runbook documente les trois commandes principales et les opérations
+d'arrêt, migration, sauvegarde et restauration bornées. Toute opération
+administrative vérifie l'identité du profil avant mutation et ne possède ni
+cible implicite, ni option de contournement.

@@ -1,0 +1,150 @@
+{
+  "schema_version": 1,
+  "evidence_kind": "REAL_STACK_EXECUTION",
+  "closure_status": "SUBMILESTONE_GREEN_M013_OPEN",
+  "normalizations": [
+    "report_path:repository-relative",
+    "runs.pre_teardown_report_path:repository-relative"
+  ],
+  "source_reports": {
+    "development": {
+      "path": "data/environments/development/reports/development-e2e-20260721T224955Z-2351ED7F4FFD468596130493DA499703.json",
+      "sha256": "2031d90517ae605f1bde0ee64f97332adf6f1116691267a83c5ccdbacd0524ee"
+    },
+    "test": {
+      "path": "data/environments/test/reports/test-e2e-20260722T012720Z.json",
+      "sha256": "3480d945055dbc0b5e9ba724301b5ac4eadfa7152a86a5599d631990afaa58a4"
+    },
+    "production": {
+      "path": "data/environments/production/reports/production-e2e-20260722T030253Z-7FC7E3A32E8E433AA03412FA6A1620D0.json",
+      "sha256": "d889c531418d20495ae444459bd0d47323fa83046dcbd318a40b60f6b31dd630"
+    }
+  },
+  "reports": {
+    "development": {
+      "answer_id": "ANS-LIVE-0AA5A9421114598B47CC",
+      "canonical_version_id": "CVER-M004-ROUTED-BA58A26E6A853C3CC891E53C",
+      "citation_url": "https://localhost:18443/api/v1/documents/DOC-BA58A26E6A853C3C/original#page=36",
+      "completed_at": "2026-07-21T22:49:55Z",
+      "configuration_hash": "3e0bbde7294de7346e9b684fd4262d6d48430544f958318aecf40d22d2d44dc0",
+      "deployment_id": "ostrading-development-local",
+      "document_id": "DOC-BA58A26E6A853C3C",
+      "environment": "development",
+      "environment_job_count": 3,
+      "foreign_environment_probes": [
+        "test:ABSENT",
+        "production:ABSENT"
+      ],
+      "image_revision": "f509a25647d417ee1fdaac6ede91785482656be0",
+      "pdf_path": "data/environments/development/reports/temp/development-e2e-2351ED7F4FFD468596130493DA499703.pdf",
+      "pdf_sha256": "ba58a26e6a853c3cc891e53c19db03eba42bf3e829d2579f37c02969560c24ee",
+      "progress_phases": [
+        "SUCCEEDED",
+        "SUCCEEDED",
+        "SUCCEEDED"
+      ],
+      "projection_id": "PROJ-FF2E986C45A492B10A4DD70C1CC3863FDECEDF609B1709A6F8FB839E671F89F7",
+      "report_path": "data/environments/development/reports/development-e2e-20260721T224955Z-2351ED7F4FFD468596130493DA499703.json",
+      "restart_persistence_verified": true,
+      "source_pdf_path": "data/corpus/the-original-turtle-trading-rules.pdf",
+      "source_pdf_sha256": "073f361ebb4ac6c10765a21ba7cca42d75fde8fabadc84340e6bbfca444fbda4",
+      "spark_raw_response_id": "chatcmpl-REQ-DEVELOPMENT-E2E-SPARK-2351ED7F4FFD468596130493DA499703",
+      "support_status": "PARTIALLY_SUPPORTED",
+      "volume_sentinels_preserved": true,
+      "worker_identity_count": 6
+    },
+    "test": {
+      "completed_at": "2026-07-22T01:27:20Z",
+      "configuration_hash": "9ea478b5814a7abe5876740645dbf70be699051ecf93769109ac091649124b42",
+      "deployment_id": "ostrading-test-ci",
+      "environment": "test",
+      "foreign_volume_sentinels_preserved": true,
+      "image_revision": "684a8124c4a35a6e947373d03d82871e283d7e2b",
+      "non_test_credentials_inaccessible": true,
+      "report_path": "data/environments/test/reports/test-e2e-20260722T012720Z.json",
+      "runs": [
+        {
+          "answer_id": "ANS-LIVE-DC524D9BD92D465A3C99",
+          "canonical_version_id": "CVER-M004-ROUTED-EE140CC90ADADCD5E089C53A",
+          "citation_url": "https://localhost:19443/api/v1/documents/DOC-EE140CC90ADADCD5/original#page=36",
+          "completed_at": "2026-07-22T00:25:50Z",
+          "document_id": "DOC-EE140CC90ADADCD5",
+          "environment_job_count": 3,
+          "non_test_credentials_inaccessible": true,
+          "pdf_sha256": "ee140cc90adadcd5e089c53a76ded17ea17a865c08be36085eed4c3757f48f8a",
+          "pre_teardown_report_path": "data/environments/test/reports/test-e2e-run-1-AEEEFD757965494FAB67B2254CFE3ADA-pre-teardown.json",
+          "progress_phases": [
+            "SUCCEEDED",
+            "SUCCEEDED",
+            "SUCCEEDED"
+          ],
+          "projection_id": "PROJ-69572CA6B4F68FBC3E724EB9C7524A6DA9D511473243E46C2114B23EB321D885",
+          "proof_id": "AEEEFD757965494FAB67B2254CFE3ADA",
+          "run_number": 1,
+          "spark_raw_response_id": "chatcmpl-REQ-TEST-E2E-SPARK-AEEEFD757965494FAB67B2254CFE3ADA",
+          "support_status": "PARTIALLY_SUPPORTED",
+          "worker_identity_count": 6
+        },
+        {
+          "answer_id": "ANS-LIVE-35657C78A8CCA1AD211F",
+          "canonical_version_id": "CVER-M004-ROUTED-D20D052ED84E8A50B3F6602B",
+          "citation_url": "https://localhost:19443/api/v1/documents/DOC-D20D052ED84E8A50/original#page=36",
+          "completed_at": "2026-07-22T01:27:12Z",
+          "document_id": "DOC-D20D052ED84E8A50",
+          "environment_job_count": 3,
+          "non_test_credentials_inaccessible": true,
+          "pdf_sha256": "d20d052ed84e8a50b3f6602bfa7e30ad14b2fec67129763d40a54899bdff622a",
+          "pre_teardown_report_path": "data/environments/test/reports/test-e2e-run-2-1FE3E742F824496F8F541A3C0EDE7422-pre-teardown.json",
+          "progress_phases": [
+            "SUCCEEDED",
+            "SUCCEEDED",
+            "SUCCEEDED"
+          ],
+          "projection_id": "PROJ-CFB61CBF72B7CEF429E013DA159FAF60FE4712CF5C2B8076A9CA0A551BBD39A9",
+          "proof_id": "1FE3E742F824496F8F541A3C0EDE7422",
+          "run_number": 2,
+          "spark_raw_response_id": "chatcmpl-REQ-TEST-E2E-SPARK-1FE3E742F824496F8F541A3C0EDE7422",
+          "support_status": "PARTIALLY_SUPPORTED",
+          "worker_identity_count": 6
+        }
+      ],
+      "source_pdf_path": "data/corpus/the-original-turtle-trading-rules.pdf",
+      "source_pdf_sha256": "073f361ebb4ac6c10765a21ba7cca42d75fde8fabadc84340e6bbfca444fbda4",
+      "test_resources_removed": true
+    },
+    "production": {
+      "answer_id": "ANS-LIVE-DE287349F91D99AB351B",
+      "automatic_cleanup_performed": false,
+      "canonical_version_id": "CVER-M004-ROUTED-ABFED3329D1BF46350220297",
+      "citation_url": "https://localhost:20443/api/v1/documents/DOC-ABFED3329D1BF463/original#page=34",
+      "completed_at": "2026-07-22T03:02:53Z",
+      "configuration_hash": "f765b56fee36cea68c20c4cef8f5572e9cbdbe11b6556b4311d9b309e53aa06e",
+      "deployment_id": "ostrading-production-primary",
+      "document_id": "DOC-ABFED3329D1BF463",
+      "environment": "production",
+      "environment_job_count": 3,
+      "foreign_environment_probes": [
+        "development:ABSENT",
+        "test:ABSENT"
+      ],
+      "image_revision": "cff8197b7a11aec737564164a65adc3a30285897",
+      "non_production_credentials_inaccessible": true,
+      "pdf_path": "data/environments/production/reports/temp/production-e2e-7FC7E3A32E8E433AA03412FA6A1620D0.pdf",
+      "pdf_sha256": "abfed3329d1bf463502202974c4056fac796e174ed0eb413baba31a50896fcd9",
+      "production_resources_preserved": true,
+      "progress_phases": [
+        "SUCCEEDED",
+        "SUCCEEDED",
+        "SUCCEEDED"
+      ],
+      "projection_id": "PROJ-903E37A59A7030A4CEAA8D37036609135CE4F2CB807B2D076433DE964170A84D",
+      "report_path": "data/environments/production/reports/production-e2e-20260722T030253Z-7FC7E3A32E8E433AA03412FA6A1620D0.json",
+      "restart_persistence_verified": true,
+      "source_pdf_path": "data/corpus/the-original-turtle-trading-rules.pdf",
+      "source_pdf_sha256": "073f361ebb4ac6c10765a21ba7cca42d75fde8fabadc84340e6bbfca444fbda4",
+      "spark_raw_response_id": "chatcmpl-REQ-PRODUCTION-E2E-SPARK-7FC7E3A32E8E433AA03412FA6A1620D0",
+      "support_status": "PARTIALLY_SUPPORTED",
+      "worker_identity_count": 6
+    }
+  }
+}

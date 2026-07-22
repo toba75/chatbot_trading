@@ -1,0 +1,146 @@
+{
+  "schema_version": 1,
+  "submilestone_status": "GREEN",
+  "m013_global_status": "OPEN",
+  "records": [
+    {
+      "requirement_id": "REQ-M013-ENV-001",
+      "status": "GREEN",
+      "source_task": "docs/tasks/milestone_013-environments/0001_verifier_precondition_green.md",
+      "specification": "docs/specs/m013_environments_environnements_explicites.md",
+      "adr": "docs/adr/ADR-045-profils-execution-explicites-donnees-etanches.md",
+      "code": ["gate.toml"],
+      "tests": ["gate_tests/ported/tests/m013_environments/validate_environment_contract_acceptance.py"],
+      "reports": ["docs/governance/m013_environments_execution_evidence.json"],
+      "runbooks": ["docs/runbooks/environnements_explicites.md"]
+    },
+    {
+      "requirement_id": "REQ-M013-ENV-002",
+      "status": "GREEN",
+      "source_task": "docs/tasks/milestone_013-environments/0002_decider_contrat_environnements_explicites.md",
+      "specification": "docs/specs/m013_environments_environnements_explicites.md",
+      "adr": "docs/adr/ADR-045-profils-execution-explicites-donnees-etanches.md",
+      "code": ["config/application.schema.json"],
+      "tests": ["gate_tests/ported/tests/m013_environments/validate_environment_contract_acceptance.py"],
+      "reports": ["docs/governance/m013_environments_execution_evidence.json"],
+      "runbooks": ["docs/runbooks/environnements_explicites.md"]
+    },
+    {
+      "requirement_id": "REQ-M013-ENV-003",
+      "status": "GREEN",
+      "source_task": "docs/tasks/milestone_013-environments/0003_lancer_environnement_par_commande_uv.md",
+      "specification": "docs/specs/m013_environments_environnements_explicites.md",
+      "adr": "docs/adr/ADR-045-profils-execution-explicites-donnees-etanches.md",
+      "code": ["app/platform/environment_command.py"],
+      "tests": ["gate_tests/ported/tests/m013_environments/validate_environment_commands_acceptance.py"],
+      "reports": ["docs/governance/m013_environments_execution_evidence.json"],
+      "runbooks": ["docs/runbooks/environnements_explicites.md"]
+    },
+    {
+      "requirement_id": "REQ-M013-ENV-004",
+      "status": "GREEN",
+      "source_task": "docs/tasks/milestone_013-environments/0004_verifier_identite_stockages.md",
+      "specification": "docs/specs/m013_environments_environnements_explicites.md",
+      "adr": "docs/adr/ADR-045-profils-execution-explicites-donnees-etanches.md",
+      "code": ["app/platform/datastore_identity.py"],
+      "tests": ["gate_tests/ported/tests/m013_environments/validate_datastore_identity_acceptance.py"],
+      "reports": ["docs/governance/m013_environments_execution_evidence.json"],
+      "runbooks": ["docs/runbooks/environnements_explicites.md"]
+    },
+    {
+      "requirement_id": "REQ-M013-ENV-005",
+      "status": "GREEN",
+      "source_task": "docs/tasks/milestone_013-environments/0005_isoler_ressources_mutables.md",
+      "specification": "docs/specs/m013_environments_environnements_explicites.md",
+      "adr": "docs/adr/ADR-045-profils-execution-explicites-donnees-etanches.md",
+      "code": ["app/platform/environment_resources.py"],
+      "tests": ["gate_tests/ported/tests/m013_environments/validate_environment_resource_isolation_acceptance.py"],
+      "reports": ["docs/governance/m013_environments_isolation_matrix.json"],
+      "runbooks": ["docs/runbooks/environnements_explicites.md"]
+    },
+    {
+      "requirement_id": "REQ-M013-ENV-006",
+      "status": "GREEN",
+      "source_task": "docs/tasks/milestone_013-environments/0006_orchestrer_piles_et_secrets_distincts.md",
+      "specification": "docs/specs/m013_environments_environnements_explicites.md",
+      "adr": "docs/adr/ADR-045-profils-execution-explicites-donnees-etanches.md",
+      "code": ["app/platform/environment_compose.py"],
+      "tests": ["gate_tests/ported/tests/m013_environments/validate_environment_compose_acceptance.py"],
+      "reports": ["docs/governance/m013_environments_isolation_matrix.json"],
+      "runbooks": ["docs/runbooks/environnements_explicites.md"]
+    },
+    {
+      "requirement_id": "REQ-M013-ENV-007",
+      "status": "GREEN",
+      "source_task": "docs/tasks/milestone_013-environments/0007_lier_workers_jobs_environnement.md",
+      "specification": "docs/specs/m013_environments_environnements_explicites.md",
+      "adr": "docs/adr/ADR-045-profils-execution-explicites-donnees-etanches.md",
+      "code": ["app/platform/worker_environment.py"],
+      "tests": ["gate_tests/ported/tests/m013_environments/validate_worker_environment_identity_acceptance.py"],
+      "reports": ["docs/governance/m013_environments_isolation_matrix.json"],
+      "runbooks": ["docs/runbooks/environnements_explicites.md"]
+    },
+    {
+      "requirement_id": "REQ-M013-ENV-008",
+      "status": "GREEN",
+      "source_task": "docs/tasks/milestone_013-environments/0008_borner_operations_administratives.md",
+      "specification": "docs/specs/m013_environments_environnements_explicites.md",
+      "adr": "docs/adr/ADR-045-profils-execution-explicites-donnees-etanches.md",
+      "code": ["app/platform/administrative_operations.py"],
+      "tests": ["gate_tests/ported/tests/m013_environments/validate_administrative_operations_acceptance.py"],
+      "reports": ["docs/governance/m013_environments_execution_evidence.json"],
+      "runbooks": ["docs/runbooks/environnements_explicites.md"]
+    },
+    {
+      "requirement_id": "REQ-M013-ENV-009",
+      "status": "GREEN",
+      "source_task": "docs/tasks/milestone_013-environments/0009_prouver_parcours_development.md",
+      "specification": "docs/specs/m013_environments_environnements_explicites.md",
+      "adr": "docs/adr/ADR-045-profils-execution-explicites-donnees-etanches.md",
+      "code": ["app/platform/development_e2e.py"],
+      "tests": ["gate_tests/ported/tests/m013_environments/validate_development_real_e2e_acceptance.py"],
+      "reports": ["docs/governance/m013_environments_execution_evidence.json"],
+      "runbooks": ["docs/runbooks/environnements_explicites.md"]
+    },
+    {
+      "requirement_id": "REQ-M013-ENV-010",
+      "status": "GREEN",
+      "source_task": "docs/tasks/milestone_013-environments/0010_prouver_parcours_test.md",
+      "specification": "docs/specs/m013_environments_environnements_explicites.md",
+      "adr": "docs/adr/ADR-045-profils-execution-explicites-donnees-etanches.md",
+      "code": ["app/platform/test_e2e.py"],
+      "tests": ["gate_tests/ported/tests/m013_environments/validate_test_real_e2e_acceptance.py"],
+      "reports": ["docs/governance/m013_environments_execution_evidence.json"],
+      "runbooks": ["docs/runbooks/environnements_explicites.md"]
+    },
+    {
+      "requirement_id": "REQ-M013-ENV-011",
+      "status": "GREEN",
+      "source_task": "docs/tasks/milestone_013-environments/0011_prouver_parcours_production.md",
+      "specification": "docs/specs/m013_environments_environnements_explicites.md",
+      "adr": "docs/adr/ADR-045-profils-execution-explicites-donnees-etanches.md",
+      "code": ["app/platform/production_e2e.py"],
+      "tests": ["gate_tests/ported/tests/m013_environments/validate_production_real_e2e_acceptance.py"],
+      "reports": ["docs/governance/m013_environments_execution_evidence.json"],
+      "runbooks": ["docs/runbooks/environnements_explicites.md"]
+    },
+    {
+      "requirement_id": "REQ-M013-ENV-012",
+      "status": "GREEN",
+      "source_task": "docs/tasks/milestone_013-environments/0012_relier_tracabilite_runbooks_gates.md",
+      "specification": "docs/specs/m013_environments_environnements_explicites.md",
+      "adr": "docs/adr/ADR-045-profils-execution-explicites-donnees-etanches.md",
+      "code": ["ost_gate/environment_governance.py"],
+      "tests": [
+        "gate_tests/ported/tests/m013_environments/validate_environment_governance_acceptance.py",
+        "gate_tests/ported/tests/m013_environments/validate_environment_governance_unit.py",
+        "gate_tests/ported/tests/m013_environments/validate_environment_governance_live.py"
+      ],
+      "reports": [
+        "docs/governance/m013_environments_execution_evidence.json",
+        "docs/governance/m013_environments_isolation_matrix.json"
+      ],
+      "runbooks": ["docs/runbooks/environnements_explicites.md"]
+    }
+  ]
+}

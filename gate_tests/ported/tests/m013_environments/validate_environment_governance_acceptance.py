@@ -2,11 +2,20 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
+import json
 from pathlib import Path
+
+import pytest
 
 
 def test_environment_governance_acceptance() -> None:
-    from ost_gate.environment_governance import validate_repository_environment_governance
+    from ost_gate.environment_governance import (
+        EnvironmentGovernanceError,
+        assert_no_sensitive_data,
+        validate_execution_evidence,
+        validate_repository_environment_governance,
+    )
 
     repository_root = next(
         parent
@@ -38,3 +47,23 @@ def test_environment_governance_acceptance() -> None:
     assert evidence.closure_status == "SUBMILESTONE_GREEN_M013_OPEN"
     assert evidence.source == "versioned-live-evidence"
 
+    versioned = json.loads(
+        (
+            repository_root
+            / "docs"
+            / "governance"
+            / "m013_environments_execution_evidence.json"
+        ).read_text(encoding="utf-8")
+    )["reports"]
+    missing = deepcopy(versioned)
+    del missing["production"]
+    with pytest.raises(EnvironmentGovernanceError, match="LIVE_EVIDENCE_MISSING:production"):
+        validate_execution_evidence(missing)
+    collision = deepcopy(versioned)
+    collision["production"]["answer_id"] = versioned["development"]["answer_id"]
+    with pytest.raises(EnvironmentGovernanceError, match="EVIDENCE_ID_COLLISION"):
+        validate_execution_evidence(collision)
+    sensitive = deepcopy(versioned)
+    sensitive["test"]["password"] = "interdit"
+    with pytest.raises(EnvironmentGovernanceError, match="SENSITIVE_EVIDENCE_REJECTED"):
+        assert_no_sensitive_data(sensitive)

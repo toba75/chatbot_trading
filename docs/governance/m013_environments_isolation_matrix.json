@@ -1,0 +1,133 @@
+{
+  "schema_version": 1,
+  "environments": [
+    "development",
+    "test",
+    "production"
+  ],
+  "access_matrix": {
+    "development": {
+      "development": "OWNED",
+      "test": "FORBIDDEN",
+      "production": "FORBIDDEN"
+    },
+    "test": {
+      "development": "FORBIDDEN",
+      "test": "OWNED",
+      "production": "FORBIDDEN"
+    },
+    "production": {
+      "development": "FORBIDDEN",
+      "test": "FORBIDDEN",
+      "production": "OWNED"
+    }
+  },
+  "mutable_resources": {
+    "configuration_coordinates": [
+      "application.deployment_id",
+      "paths.cache_root",
+      "paths.canonical_sources_root",
+      "paths.corpus_root",
+      "paths.data_root",
+      "paths.experiments_root",
+      "paths.logs_root",
+      "paths.postgres_data_root",
+      "paths.qdrant_storage_root",
+      "paths.reports_root",
+      "security.secrets.llm_gateway_api_key_path",
+      "security.secrets.local_api_token_path",
+      "security.secrets.postgres_password_path",
+      "security.secrets.qdrant_api_key_path",
+      "security.secrets.tls_ca_certificate_path",
+      "services.postgres.data_volume",
+      "services.postgres.database",
+      "services.postgres.role",
+      "services.postgres.url",
+      "services.qdrant.collections.datastore_identity",
+      "services.qdrant.collections.knowledge_access",
+      "services.qdrant.instance_id",
+      "services.qdrant.storage_volume",
+      "services.qdrant.url",
+      "services.workers.outbox_namespace",
+      "services.workers.progress_namespace",
+      "services.workers.queue_name"
+    ],
+    "compose_projects": {
+      "development": "ostrading-development",
+      "test": "ostrading-test",
+      "production": "ostrading-production"
+    },
+    "compose_networks": {
+      "development": [
+        "ostrading-development-core",
+        "ostrading-development-edge",
+        "ostrading-development-ocr-control",
+        "ostrading-development-ocr-egress",
+        "ostrading-development-spark-egress"
+      ],
+      "test": [
+        "ostrading-test-core",
+        "ostrading-test-edge",
+        "ostrading-test-ocr-control",
+        "ostrading-test-ocr-egress",
+        "ostrading-test-spark-egress"
+      ],
+      "production": [
+        "ostrading-production-core",
+        "ostrading-production-edge",
+        "ostrading-production-ocr-control",
+        "ostrading-production-ocr-egress",
+        "ostrading-production-spark-egress"
+      ]
+    },
+    "compose_volumes": {
+      "development": [
+        "ostrading-development-application-data-v2",
+        "ostrading-development-caddy-config",
+        "ostrading-development-caddy-data",
+        "ostrading-development-model-cache",
+        "ostrading-development-ocr-runtime-data",
+        "ostrading-development-postgres-data-v2",
+        "ostrading-development-qdrant-data"
+      ],
+      "test": [
+        "ostrading-test-application-data",
+        "ostrading-test-caddy-config",
+        "ostrading-test-caddy-data",
+        "ostrading-test-model-cache",
+        "ostrading-test-ocr-runtime-data",
+        "ostrading-test-postgres-data",
+        "ostrading-test-qdrant-data"
+      ],
+      "production": [
+        "ostrading-production-application-data",
+        "ostrading-production-caddy-config",
+        "ostrading-production-caddy-data",
+        "ostrading-production-model-cache",
+        "ostrading-production-ocr-runtime-data",
+        "ostrading-production-postgres-data",
+        "ostrading-production-qdrant-data"
+      ]
+    },
+    "compose_secrets": {
+      "development": [
+        "../../config/secrets/development/local_api_token",
+        "../../config/secrets/development/postgres_password"
+      ],
+      "test": [
+        "../../config/secrets/test/local_api_token",
+        "../../config/secrets/test/postgres_password"
+      ],
+      "production": [
+        "../../config/secrets/production/local_api_token",
+        "../../config/secrets/production/postgres_password"
+      ]
+    }
+  },
+  "workers": {
+    "worker-documents": 2,
+    "worker-projection": 2,
+    "worker-research": 1,
+    "worker-backtest": 1
+  }
+}

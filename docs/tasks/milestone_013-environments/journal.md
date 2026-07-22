@@ -939,3 +939,76 @@ Validations GREEN finales :
 - `uv run --locked gate --scope m013_fastapi` : 70 nœuds GREEN ;
 - `uv run --locked gate --offline` : 440/440 nœuds GREEN, zéro RED, zéro
   `NOT_RUN`, manifeste unique.
+
+## T-012 - Scénario BDD et preuve RED
+
+Scénario contrôlé :
+
+- Given les rapports réels development, test et production existent et la
+  matrice couvre toutes les ressources mutables et tous les workers ;
+- When les gates statique et live M13-environments relient ADR-045,
+  spécification, code, tests, runbooks et preuves ;
+- Then une preuve absente, une collision, un secret ou une couverture
+  incomplète rend la qualification RED et le sous-milestone ne clôt pas M-013
+  globalement.
+
+Précondition GREEN avant modification :
+
+- `uv run --locked gate --scope m013_environments` : 38 nœuds GREEN, aucune
+  exécution manquante, inattendue ou dupliquée.
+
+Preuve RED utile :
+
+- tests ciblés de gouvernance : 2 échecs strictement causés par
+  `ModuleNotFoundError: No module named 'ost_gate.environment_governance'` ;
+- commit RED : `9bd76938c` -
+  `test(governance): couvrir tracabilite m13 environments`.
+
+ADR consultée : ADR-045. Aucune nouvelle ADR n'est requise : T-012 matérialise
+la gouvernance, l'exploitation et les preuves prévues par la décision acceptée
+sans la modifier ni la remplacer.
+
+## T-012 - Retour GREEN de la gouvernance environnementale
+
+Implémentation :
+
+- preuve versionnée normalisée de quatre exécutions réelles, reliée par
+  SHA-256 aux trois rapports sources et refusant toute donnée sensible ;
+- parser strict des rapports development, des deux cycles test et de
+  production, avec refus des collisions d'identifiants, hashes de
+  configuration partagés, progressions incomplètes, workers absents et
+  garde-fous d'isolation manquants ;
+- matrice d'accès 3 × 3, inventaire des coordonnées de configuration, projets,
+  réseaux, volumes, chemins de secrets et des quatre services workers pour six
+  réplicas par profil ;
+- runbook unique autour de `uv run development`, `uv run test` et
+  `uv run production`, avec arrêt, migration, sauvegarde et restauration
+  bornés ;
+- traçabilité machine des douze tâches vers ADR-045, spécification, code,
+  tests, rapports et runbook ;
+- gate statique distincte d'une gate live consolidée dépendant des trois vrais
+  parcours E2E ;
+- statut fermé `SUBMILESTONE_GREEN_M013_OPEN`, qui interdit toute clôture
+  implicite du milestone M-013 global.
+
+Commit GREEN : ce commit -
+`docs(governance): relier environnements aux preuves`.
+
+Validations GREEN finales :
+
+- tests de gouvernance unitaire et statique : 2 tests GREEN ;
+- consolidation ciblée des trois rapports live existants : 1 test GREEN, sans
+  redémarrer les piles coûteuses ;
+- `uv run --locked gate --scope m013_environments` : 40 nœuds GREEN, zéro
+  exécution manquante, inattendue ou dupliquée ;
+- `uv run --locked gate --scope governance` : 25 nœuds GREEN ;
+- `uv run --locked gate --offline` : 442/442 nœuds GREEN, zéro RED, zéro
+  `NOT_RUN`, manifeste unique ;
+- le plan statique enrôle seulement l'acceptation et l'unitaire T-012 ; le plan
+  `--live` ajoute les trois vrais E2E puis la consolidation live ;
+- Ruff et `compileall` : GREEN.
+
+Les parcours live n'ont pas été rejoués pendant T-012 : leurs rapports réels,
+leurs SHA-256 et leurs données d'exécution ont alimenté la gate statique. La
+commande live explicite et rejouable reste
+`uv run --locked gate --scope m013_environments --live`.
