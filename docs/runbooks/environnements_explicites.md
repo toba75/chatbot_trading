@@ -24,7 +24,7 @@
 | test | `uv run test` | `https://localhost:19443` pendant chaque cycle | seuls les volumes test sont supprimés après préflight |
 | production | `uv run production` | `https://localhost:20443` pendant la qualification | volumes conservés |
 
-`uv run development` démarre les 17 conteneurs, vérifie la readiness de tous
+`uv run development` démarre les 14 conteneurs, vérifie la readiness de tous
 les participants, puis reste actif. L'arrêt normal est `Ctrl+C`; le contexte
 exécute `down --remove-orphans`, sans `--volumes`.
 
@@ -64,6 +64,11 @@ la configuration et les trois familles de stockage observées.
 uv run --locked backup-v1 --manifest <manifest.json> --config config/environments/<profil>.yaml
 ```
 
+La commande hôte sélectionne le projet Compose `ostrading-<profil>` et exécute le
+préflight depuis `orchestrator-api`. PostgreSQL, Qdrant et `application-data` sont
+donc contrôlés dans leur réseau et leurs volumes réels, pas depuis des chemins ou
+DNS reconstruits sur l'hôte.
+
 Conserver la sortie d'audit et le manifeste hors des données d'un autre
 profil. Une preuve incomplète, un hash invalide ou une identité divergente est
 terminale. Les clés de chiffrement et valeurs de secrets restent hors Git.
@@ -77,6 +82,10 @@ profil sélectionné.
 uv run --locked restore-v1 --manifest <manifest.json> --target data/environments/<profil>/reports/restore-drills/<drill> --config config/environments/<profil>.yaml
 ```
 
+La cible est refusée avant l'appel Compose si elle sort de
+`reports/restore-drills`; le staging et le manifeste temporaire sont compensés
+explicitement en cas d'échec.
+
 Le manifeste, la configuration, PostgreSQL, Qdrant et les fichiers doivent
 publier la même identité avant matérialisation. Il n'existe ni option `force`,
 ni restauration croisée, ni cible par défaut.
@@ -84,7 +93,7 @@ ni restauration croisée, ni cible par défaut.
 ## Gates statique et live
 
 La gate statique contrôle les artefacts versionnés, la matrice 3 × 3, les
-coordonnées mutables, les six réplicas workers et la copie normalisée des
+coordonnées mutables, les quatre réplicas workers et la copie normalisée des
 rapports réels :
 
 ```console
@@ -93,6 +102,12 @@ uv run --locked gate --scope m013_environments
 
 La gate live rejoue les trois vraies piles, sans mock, puis consolide leurs
 nouveaux rapports. Elle est volontairement explicite et coûteuse :
+
+Les seules boucles asynchrones publiées par ces piles sont les deux réplicas
+documentaires (`DIAGNOSE`, `CONVERT_DOCUMENT`) et les deux réplicas de
+projection (`PROJECT_DOCUMENT`). `DEEP_RESEARCH`, `VERIFY_RESPONSE` et
+`BACKTEST` restent indisponibles tant que leur chaîne API, outbox, relais,
+worker, progression et lecture publique n'est pas complète.
 
 ```console
 uv run --locked gate --scope m013_environments --live

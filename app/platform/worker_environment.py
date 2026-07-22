@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+import json
+from pathlib import Path
+import threading
+import time
 from types import MappingProxyType
 from typing import Any, Final
 from uuid import UUID
@@ -17,8 +21,6 @@ WORKER_JOB_NAMES: Final = MappingProxyType(
     {
         "worker-documents": ("DIAGNOSE", "CONVERT_DOCUMENT"),
         "worker-projection": ("PROJECT_DOCUMENT",),
-        "worker-research": ("DEEP_RESEARCH", "VERIFY_RESPONSE"),
-        "worker-backtest": ("BACKTEST",),
     }
 )
 
@@ -98,6 +100,111 @@ class WorkerEnvironmentBinding:
             status="ready",
             identity=self.identity,
         )
+
+
+class WorkerHealthFilePublisher:
+    """Publie la santé du processus worker long-vivant dans son propre conteneur."""
+
+    def __init__(
+        self,
+        *,
+        binding: WorkerEnvironmentBinding,
+        path: Path,
+        heartbeat_interval_seconds: float,
+    ) -> None:
+        if not isinstance(binding, WorkerEnvironmentBinding):
+            raise ValueError("binding de santé worker invalide")
+        if not isinstance(path, Path) or not path.is_absolute():
+            raise ValueError("chemin de santé worker invalide")
+        if (
+            isinstance(heartbeat_interval_seconds, bool)
+            or not isinstance(heartbeat_interval_seconds, (int, float))
+            or heartbeat_interval_seconds <= 0
+        ):
+            raise ValueError("intervalle de santé worker invalide")
+        self.binding = binding
+        self._path = path
+        self._heartbeat_interval_seconds = float(heartbeat_interval_seconds)
+        self._thread = threading.Thread(
+            target=self._publish_forever,
+            name=f"health-{binding.worker_id}",
+            daemon=True,
+        )
+
+    def publish_once(self) -> None:
+        payload: dict[str, object] = {
+            **self.binding.health_snapshot().to_mapping(),
+            "updated_at_epoch": time.time(),
+        }
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+        temporary_path = self._path.with_name(f".{self._path.name}.tmp")
+        with temporary_path.open("w", encoding="utf-8", newline="\n") as stream:
+            json.dump(payload, stream, ensure_ascii=False, sort_keys=True)
+            stream.write("\n")
+        temporary_path.replace(self._path)
+
+    def start(self) -> None:
+        self.publish_once()
+        self._thread.start()
+
+    def _publish_forever(self) -> None:
+        while True:
+            time.sleep(self._heartbeat_interval_seconds)
+            self.publish_once()
+
+
+def read_worker_health_file(
+    *,
+    path: Path,
+    expected_identity: JobEnvironmentIdentity,
+    expected_worker_id: str,
+    maximum_age_seconds: float,
+) -> Mapping[str, object]:
+    """Valide la preuve produite par le participant, sans reconstruire sa santé."""
+
+    if not isinstance(path, Path) or not path.is_absolute() or path.is_symlink():
+        raise ValueError("chemin de santé worker invalide")
+    if not isinstance(expected_identity, JobEnvironmentIdentity):
+        raise ValueError("identité de santé worker invalide")
+    if expected_worker_id not in WORKER_JOB_NAMES:
+        raise ValueError("worker_id invalide")
+    if (
+        isinstance(maximum_age_seconds, bool)
+        or not isinstance(maximum_age_seconds, (int, float))
+        or maximum_age_seconds <= 0
+    ):
+        raise ValueError("ancienneté de santé worker invalide")
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError("WORKER_HEALTH_UNAVAILABLE") from exc
+    if not isinstance(payload, Mapping) or frozenset(payload) != {
+        "service",
+        "status",
+        "environment",
+        "deployment_id",
+        "configuration_hash",
+        "updated_at_epoch",
+    }:
+        raise ValueError("WORKER_HEALTH_INVALID")
+    observed_identity = JobEnvironmentIdentity(
+        environment=payload["environment"],
+        deployment_id=payload["deployment_id"],
+        configuration_hash=payload["configuration_hash"],
+    )
+    if (
+        payload["service"] != expected_worker_id
+        or payload["status"] != "ready"
+        or observed_identity != expected_identity
+    ):
+        raise WorkerEnvironmentMismatchError()
+    updated_at = payload["updated_at_epoch"]
+    if isinstance(updated_at, bool) or not isinstance(updated_at, (int, float)):
+        raise ValueError("WORKER_HEALTH_INVALID")
+    age_seconds = time.time() - float(updated_at)
+    if age_seconds < 0 or age_seconds > maximum_age_seconds:
+        raise ValueError("WORKER_HEALTH_STALE")
+    return MappingProxyType(dict(payload))
 
 
 @dataclass(frozen=True, slots=True)
@@ -182,7 +289,9 @@ __all__ = [
     "WorkerEnvironmentBinding",
     "WorkerEnvironmentMismatchError",
     "WorkerHealthSnapshot",
+    "WorkerHealthFilePublisher",
     "build_worker_environment_binding",
     "execute_environment_bound_job",
     "job_environment_identity_from_configuration",
+    "read_worker_health_file",
 ]

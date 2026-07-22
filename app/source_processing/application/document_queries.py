@@ -17,6 +17,7 @@ from app.source_processing.application.document_commands import (
     DocumentConversionState,
     SourceNotFoundError,
 )
+from app.contracts.technical_jobs import JobEnvironmentIdentity
 from app.source_processing.application.routing_policy import (
     build_document_routing_configuration,
 )
@@ -192,10 +193,18 @@ class DocumentActionProgressView:
     completed_units: int
     total_units: int | None
     failure_error_code: str | None
+    environment: str
+    deployment_id: str
+    configuration_hash: str
 
     def __post_init__(self) -> None:
         if self.action_name not in {"DIAGNOSE", "CONVERT_DOCUMENT"}:
             raise ValueError("action publique inconnue")
+        JobEnvironmentIdentity(
+            environment=self.environment,
+            deployment_id=self.deployment_id,
+            configuration_hash=self.configuration_hash,
+        )
         object.__setattr__(self, "phase", PublicActionPhase.from_value(self.phase))
         if isinstance(self.completed_units, bool) or not isinstance(self.completed_units, int):
             raise ValueError("unités réalisées invalides")
@@ -224,15 +233,25 @@ class DocumentActionProgressView:
     def from_processing_run(
         cls,
         processing_run: DocumentProcessingRun | None,
+        *,
+        environment_identity: JobEnvironmentIdentity,
     ) -> "DocumentActionProgressView":
-        return _document_action_progress(processing_run)
+        return _document_action_progress(
+            processing_run,
+            environment_identity=environment_identity,
+        )
 
     @classmethod
     def from_conversion(
         cls,
         conversion: DocumentConversionState | None,
+        *,
+        environment_identity: JobEnvironmentIdentity,
     ) -> "DocumentActionProgressView":
-        return _conversion_action_progress(conversion)
+        return _conversion_action_progress(
+            conversion,
+            environment_identity=environment_identity,
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -255,6 +274,7 @@ class DocumentQueryService:
         *,
         document_snapshot_repository: DocumentSnapshotRepository,
         document_corpus_status_repository: DocumentCorpusStatusRepository,
+        environment_identity: JobEnvironmentIdentity,
     ) -> None:
         if not callable(getattr(document_snapshot_repository, "find_document_snapshot", None)):
             raise ValueError("document_snapshot_repository sans lecture")
@@ -262,6 +282,9 @@ class DocumentQueryService:
             raise ValueError("document_corpus_status_repository sans projection légère")
         self._document_snapshot_repository = document_snapshot_repository
         self._document_corpus_status_repository = document_corpus_status_repository
+        if not isinstance(environment_identity, JobEnvironmentIdentity):
+            raise ValueError("identité d'environnement des lectures invalide")
+        self._environment_identity = environment_identity
 
     def list_documents(
         self,
@@ -337,9 +360,15 @@ class DocumentQueryService:
         parsed_document_id = DocumentId.from_value(document_id)
         snapshot = self._require_snapshot(parsed_document_id)
         if action_name == "DIAGNOSE":
-            return DocumentActionProgressView.from_processing_run(snapshot.processing_run)
+            return DocumentActionProgressView.from_processing_run(
+                snapshot.processing_run,
+                environment_identity=self._environment_identity,
+            )
         if action_name == "CONVERT_DOCUMENT":
-            return DocumentActionProgressView.from_conversion(snapshot.conversion)
+            return DocumentActionProgressView.from_conversion(
+                snapshot.conversion,
+                environment_identity=self._environment_identity,
+            )
         raise ValueError("action publique inconnue")
 
     def read_conversion(self, document_id: str) -> DocumentConversionView:
@@ -481,6 +510,8 @@ def _diagnostic_view(processing_run: DocumentProcessingRun) -> DocumentDiagnosti
 
 def _document_action_progress(
     processing_run: DocumentProcessingRun | None,
+    *,
+    environment_identity: JobEnvironmentIdentity,
 ) -> DocumentActionProgressView:
     if processing_run is None:
         return DocumentActionProgressView(
@@ -489,6 +520,7 @@ def _document_action_progress(
             completed_units=0,
             total_units=None,
             failure_error_code=None,
+            **environment_identity.to_mapping(),
         )
     source_page_count = processing_run.page_manifest.source_page_count
     completed_units = len(processing_run.page_decisions)
@@ -507,11 +539,14 @@ def _document_action_progress(
         completed_units=completed_units,
         total_units=source_page_count,
         failure_error_code=processing_run.failure_error_code,
+        **environment_identity.to_mapping(),
     )
 
 
 def _conversion_action_progress(
     conversion: DocumentConversionState | None,
+    *,
+    environment_identity: JobEnvironmentIdentity,
 ) -> DocumentActionProgressView:
     if conversion is None:
         return DocumentActionProgressView(
@@ -520,6 +555,7 @@ def _conversion_action_progress(
             completed_units=0,
             total_units=None,
             failure_error_code=None,
+            **environment_identity.to_mapping(),
         )
     parsed_conversion = _ensure_conversion_state(conversion)
     phase_by_execution_phase = {
@@ -534,6 +570,7 @@ def _conversion_action_progress(
         completed_units=parsed_conversion.completed_units,
         total_units=parsed_conversion.total_units,
         failure_error_code=parsed_conversion.failure_error_code,
+        **environment_identity.to_mapping(),
     )
 
 

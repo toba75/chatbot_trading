@@ -95,18 +95,6 @@ services:
       - ../../config/secrets/test:/workspace/config/secrets/test:ro
       - application-data:/workspace/data/environments/test
 
-  worker-research:
-    volumes: *profile-volumes
-
-  worker-backtest:
-    volumes:
-      - ../../config/environments/test.yaml:/workspace/config/application.yaml:ro
-      - ../../config/secrets/test:/workspace/config/secrets/test:ro
-      - application-data:/workspace/data/environments/test
-
-  backtest-engine:
-    volumes: *profile-volumes
-
 networks:
   edge:
     name: ostrading-test-edge

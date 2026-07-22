@@ -31,16 +31,14 @@ def test_environment_governance_acceptance() -> None:
         require_live_sources=False,
     )
 
-    # Then la matrice 3 x 3 et les six workers sont couverts, sans prétendre
+    # Then la matrice 3 x 3 et les quatre workers réels sont couverts, sans prétendre
     # clore le milestone M-013 global.
     assert evidence.environments == ("development", "test", "production")
     assert evidence.worker_names == (
-        "worker-backtest",
         "worker-documents",
         "worker-projection",
-        "worker-research",
     )
-    assert evidence.worker_replica_count == 6
+    assert evidence.worker_replica_count == 4
     assert evidence.matrix_cell_count == 9
     assert evidence.mutable_resource_count >= 30
     assert evidence.execution_count == 4
@@ -58,11 +56,11 @@ def test_environment_governance_acceptance() -> None:
     missing = deepcopy(versioned)
     del missing["production"]
     with pytest.raises(EnvironmentGovernanceError, match="LIVE_EVIDENCE_MISSING:production"):
-        validate_execution_evidence(missing)
+        validate_execution_evidence(missing, expected_worker_identity_count=6)
     collision = deepcopy(versioned)
     collision["production"]["answer_id"] = versioned["development"]["answer_id"]
     with pytest.raises(EnvironmentGovernanceError, match="EVIDENCE_ID_COLLISION"):
-        validate_execution_evidence(collision)
+        validate_execution_evidence(collision, expected_worker_identity_count=6)
     sensitive = deepcopy(versioned)
     sensitive["test"]["password"] = "interdit"
     with pytest.raises(EnvironmentGovernanceError, match="SENSITIVE_EVIDENCE_REJECTED"):

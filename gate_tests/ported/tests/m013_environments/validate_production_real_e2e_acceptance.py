@@ -41,7 +41,7 @@ def test_validate_production_real_e2e_acceptance() -> None:
     assert report.citation_url.startswith("https://localhost:20443/")
     assert report.spark_raw_response_id
     assert report.progress_phases == ("SUCCEEDED", "SUCCEEDED", "SUCCEEDED")
-    assert report.worker_identity_count >= 6
+    assert report.worker_identity_count == 4
     assert report.environment_job_count >= 3
     assert report.restart_persistence_verified is True
     assert report.foreign_environment_probes == ("development:ABSENT", "test:ABSENT")

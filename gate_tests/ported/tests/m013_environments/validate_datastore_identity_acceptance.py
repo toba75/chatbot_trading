@@ -39,6 +39,7 @@ def test_datastore_identity_acceptance(tmp_path: Path) -> None:
         operation_timeout_seconds=10,
         identity_preflight=PostgresIdentityPreflight(expected_identity=expected),
         initialize_identity_if_empty=True,
+        adopt_legacy_if_unidentified=False,
     )
 
     with pytest.raises(DatastoreEnvironmentMismatchError, match=DATASTORE_ENVIRONMENT_MISMATCH):

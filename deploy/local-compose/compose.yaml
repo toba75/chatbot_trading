@@ -157,7 +157,6 @@ services:
       - core
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      - ../postgres/migrations:/docker-entrypoint-initdb.d:ro
     environment:
       POSTGRES_DB: "ostrading"
       POSTGRES_USER: "ostrading"

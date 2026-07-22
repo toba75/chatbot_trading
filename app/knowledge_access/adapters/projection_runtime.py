@@ -491,6 +491,9 @@ class ProjectionRuntimeService:
                 "completed_units": 0,
                 "total_units": None,
                 "failure_error_code": None,
+                "environment": self.environment,
+                "deployment_id": self.deployment_id,
+                "configuration_hash": self.configuration_hash,
             }
         return {
             "action_name": "PROJECT_DOCUMENT",
@@ -498,6 +501,9 @@ class ProjectionRuntimeService:
             "completed_units": row[1],
             "total_units": row[2],
             "failure_error_code": row[3],
+            "environment": self.environment,
+            "deployment_id": self.deployment_id,
+            "configuration_hash": self.configuration_hash,
         }
 
     def execute_projection(self, *, projection_id: str) -> Mapping[str, Any]:

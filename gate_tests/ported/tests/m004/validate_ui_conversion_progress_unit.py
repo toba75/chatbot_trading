@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from app.contracts.document_public_statuses import PublicActionPhase
+from app.contracts.technical_jobs import JobEnvironmentIdentity
 from app.platform.orchestrator_api_models import (
     ConversionAcceptedResponse,
     DocumentActionProgressResponse,
@@ -18,6 +19,13 @@ from app.platform.ui_document_api import (
     UiDocumentApiResponse,
 )
 from app.source_processing.application.document_queries import DocumentActionProgressView
+
+
+_ENVIRONMENT_IDENTITY = JobEnvironmentIdentity(
+    environment="development",
+    deployment_id="ostrading-development-local",
+    configuration_hash="a" * 64,
+)
 
 
 class _Transport:
@@ -38,7 +46,11 @@ class _Transport:
                 content_type="application/json",
                 body=(
                     b'{"action_name":"CONVERT_DOCUMENT","phase":"RUNNING",'
-                    b'"completed_units":0,"total_units":2,"failure_error_code":null}'
+                    b'"completed_units":0,"total_units":2,"failure_error_code":null,'
+                    b'"environment":"development",'
+                    b'"deployment_id":"ostrading-development-local",'
+                    b'"configuration_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+                    b'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}'
                 ),
             ),
         ]
@@ -66,6 +78,7 @@ def _verifier_contrat_pydantic_de_progression() -> None:
             "completed_units": 0,
             "total_units": 2,
             "failure_error_code": None,
+            **_ENVIRONMENT_IDENTITY.to_mapping(),
         }
     )
 
@@ -152,6 +165,7 @@ def _verifier_inspection_conversion_en_cours() -> None:
         completed_units=0,
         total_units=2,
         failure_error_code=None,
+        **_ENVIRONMENT_IDENTITY.to_mapping(),
     )
     html = render_document_inspection(
         title="Conversion",
@@ -191,6 +205,7 @@ def _verifier_inspection_conversion_terminee() -> None:
         completed_units=1,
         total_units=1,
         failure_error_code=None,
+        **_ENVIRONMENT_IDENTITY.to_mapping(),
     )
     html = render_document_inspection(
         title="Conversion",

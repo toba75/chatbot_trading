@@ -55,13 +55,9 @@ def test_worker_environment_identity_unit() -> None:
     assert tuple(WORKER_JOB_NAMES) == (
         "worker-documents",
         "worker-projection",
-        "worker-research",
-        "worker-backtest",
     )
     assert WORKER_JOB_NAMES["worker-documents"] == ("DIAGNOSE", "CONVERT_DOCUMENT")
     assert WORKER_JOB_NAMES["worker-projection"] == ("PROJECT_DOCUMENT",)
-    assert "DEEP_RESEARCH" in WORKER_JOB_NAMES["worker-research"]
-    assert WORKER_JOB_NAMES["worker-backtest"] == ("BACKTEST",)
 
     binding = WorkerEnvironmentBinding(
         worker_id="worker-documents",

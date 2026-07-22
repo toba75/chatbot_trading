@@ -16,6 +16,7 @@ COPY uv.lock ./uv.lock
 RUN uv sync --frozen --no-dev --no-install-project
 
 COPY app ./app
+COPY ost_gate ./ost_gate
 COPY deploy/postgres/migrations ./deploy/postgres/migrations
 RUN uv sync --frozen --no-dev --offline --no-build-isolation
 
@@ -42,6 +43,7 @@ RUN groupadd --system ostrading \
 
 COPY --from=builder --chown=ostrading:ostrading /workspace/.venv /workspace/.venv
 COPY --chown=ostrading:ostrading app ./app
+COPY --chown=ostrading:ostrading ost_gate ./ost_gate
 COPY --chown=ostrading:ostrading deploy/postgres/migrations ./deploy/postgres/migrations
 
 LABEL org.opencontainers.image.version="0.1.0-m013-fastapi-schema-${OSTRADING_POSTGRES_SCHEMA_VERSION}"

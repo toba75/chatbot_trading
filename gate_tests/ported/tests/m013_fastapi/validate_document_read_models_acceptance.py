@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from app.contracts.technical_jobs import JobEnvironmentIdentity
 from app.source_processing.adapters.query_http import build_document_query_router
 from app.source_processing.application.document_queries import DocumentQueryService
 
@@ -55,6 +56,11 @@ def test_validate_document_read_models_acceptance() -> None:
     service = DocumentQueryService(
         document_snapshot_repository=SnapshotRepository(),
         document_corpus_status_repository=CorpusRepository(),
+        environment_identity=JobEnvironmentIdentity(
+            environment="development",
+            deployment_id="ostrading-development-local",
+            configuration_hash="a" * 64,
+        ),
     )
     application = FastAPI()
     application.include_router(build_document_query_router(document_queries=service))

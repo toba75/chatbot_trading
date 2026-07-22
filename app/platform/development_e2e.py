@@ -8,6 +8,7 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import shutil
@@ -30,6 +31,7 @@ from app.platform.environment_compose import (
     _technical_environment_from_repository,
     environment_stack_definition,
 )
+from app.platform.configured_datastore_identity import preflight_all_mutable_roots
 
 
 _ENVIRONMENT: Final = "development"
@@ -37,7 +39,7 @@ _DEPLOYMENT_ID: Final = "ostrading-development-local"
 _EDGE_BASE_URL: Final = "https://localhost:18443"
 _API_BASE_URL: Final = f"{_EDGE_BASE_URL}/api"
 _WORKER_IDS: Final = frozenset(
-    {"worker-documents", "worker-projection", "worker-research", "worker-backtest"}
+    {"worker-documents", "worker-projection"}
 )
 _PROJECTION_PROFILE: Final = MappingProxyType(
     {
@@ -100,7 +102,7 @@ class DevelopmentE2EReport:
             raise ValueError("DEVELOPMENT_E2E_SUPPORT_STATUS_INVALID")
         if self.progress_phases != ("SUCCEEDED", "SUCCEEDED", "SUCCEEDED"):
             raise ValueError("DEVELOPMENT_E2E_PROGRESS_INVALID")
-        if self.worker_identity_count < 6:
+        if self.worker_identity_count != 4:
             raise ValueError("DEVELOPMENT_E2E_WORKER_IDENTITY_INCOMPLETE")
         if self.environment_job_count < 3:
             raise ValueError("DEVELOPMENT_E2E_JOB_IDENTITY_INCOMPLETE")
@@ -175,9 +177,10 @@ def run_development_environment_e2e(
     configuration_path = root / "config" / "environments" / "development.yaml"
     configuration = load_application_configuration(
         config_path=configuration_path,
-        environment_snapshot={},
+        environment_snapshot=dict(os.environ),
     )
     _require_development_configuration(configuration)
+    preflight_all_mutable_roots(configuration, initialize_if_empty=True)
     token_path = root / configuration.security.secrets.local_api_token_path
     token = _read_secret(token_path)
     report_root = (root / configuration.paths.reports_root).resolve()
@@ -888,7 +891,7 @@ def _verify_worker_identities(
         for row in containers
         if row.get("Service") in _WORKER_IDS
     )
-    if len(worker_containers) < 6:
+    if len(worker_containers) != 4:
         raise DevelopmentE2EError("DEVELOPMENT_E2E_WORKERS_MISSING")
     docker_executable = shutil.which("docker")
     if docker_executable is None:
@@ -954,6 +957,8 @@ def _verify_worker_identities(
                 worker_id,
                 "--config",
                 "/workspace/config/application.yaml",
+                "--health-path",
+                "/tmp/worker-health.json",
             ),
             cwd=repository_root,
             check=False,
@@ -981,6 +986,41 @@ def _verify_worker_identities(
                 f"DEVELOPMENT_E2E_WORKER_IDENTITY_MISMATCH: {worker_id}"
             )
     return len(worker_containers)
+
+
+def verify_worker_documents_runtime_limits(
+    serialized_inspection: str,
+    *,
+    environment: str,
+) -> None:
+    """Contrôle les limites réellement appliquées aux deux workers documentaires."""
+
+    try:
+        inspections = json.loads(serialized_inspection)
+    except json.JSONDecodeError as exc:
+        raise DevelopmentE2EError("ENVIRONMENT_E2E_CONTAINER_INSPECTION_INVALID") from exc
+    if not isinstance(inspections, list):
+        raise DevelopmentE2EError("ENVIRONMENT_E2E_CONTAINER_INSPECTION_INVALID")
+    prefix = f"/ostrading-{environment}-worker-documents-"
+    workers = tuple(
+        inspection
+        for inspection in inspections
+        if isinstance(inspection, Mapping)
+        and isinstance(inspection.get("Name"), str)
+        and inspection["Name"].startswith(prefix)
+    )
+    if len(workers) != 2:
+        raise DevelopmentE2EError("ENVIRONMENT_E2E_WORKER_DOCUMENTS_REPLICAS_INVALID")
+    for worker in workers:
+        host_config = _require_mapping(worker.get("HostConfig"), "worker_host_config")
+        container_config = _require_mapping(worker.get("Config"), "worker_config")
+        healthcheck = _require_mapping(container_config.get("Healthcheck"), "worker_healthcheck")
+        if (
+            host_config.get("Memory") != 8 * 1024**3
+            or host_config.get("NanoCpus") != 4_000_000_000
+            or healthcheck.get("Timeout") != 30_000_000_000
+        ):
+            raise DevelopmentE2EError("ENVIRONMENT_E2E_WORKER_DOCUMENTS_RESOURCES_INVALID")
 
 
 def _verify_job_identities(

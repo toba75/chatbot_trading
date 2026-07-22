@@ -83,6 +83,7 @@ class QdrantIdentityClientPort(Protocol):
     def list_collections(self) -> Sequence[str]: ...
     def read_identity(self) -> Mapping[str, Any] | None: ...
     def initialize_identity(self, identity: DatastoreIdentity) -> None: ...
+    def compensate_failed_initialization(self) -> None: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -123,7 +124,12 @@ class QdrantIdentityPreflight:
     collection_name: str
 
     def __post_init__(self) -> None:
-        for method_name in ("list_collections", "read_identity", "initialize_identity"):
+        for method_name in (
+            "list_collections",
+            "read_identity",
+            "initialize_identity",
+            "compensate_failed_initialization",
+        ):
             if not callable(getattr(self.client, method_name, None)):
                 raise ValueError(f"client Qdrant sans {method_name}")
         if not isinstance(self.expected_identity, DatastoreIdentity):
@@ -143,7 +149,16 @@ class QdrantIdentityPreflight:
             )
         if not initialize_if_empty:
             raise DatastoreEnvironmentMismatchError("marqueur Qdrant absent")
-        self.client.initialize_identity(self.expected_identity)
+        try:
+            self.client.initialize_identity(self.expected_identity)
+        except Exception:
+            try:
+                self.client.compensate_failed_initialization()
+            except Exception as compensation_error:
+                raise DatastoreEnvironmentMismatchError(
+                    "compensation de l'initialisation Qdrant échouée"
+                ) from compensation_error
+            raise
         initialized_collections = _collection_names(self.client.list_collections())
         if self.collection_name not in initialized_collections:
             raise DatastoreEnvironmentMismatchError("initialisation Qdrant incomplète")
@@ -253,6 +268,52 @@ class PostgresIdentityPreflight:
                 self.expected_identity.environment,
                 self.expected_identity.deployment_id,
             ),
+        )
+        return self.expected_identity
+
+    def adopt_legacy(self, cursor: object) -> DatastoreIdentity:
+        """Marque explicitement une base historique non vide avant sa migration."""
+
+        if not callable(getattr(cursor, "execute", None)):
+            raise ValueError("curseur PostgreSQL de préflight invalide")
+        cursor.execute("SELECT pg_advisory_xact_lock(%s)", (_POSTGRES_IDENTITY_LOCK_ID,))
+        cursor.execute("SELECT to_regclass('platform.datastore_identity')", ())
+        if cursor.fetchone() != (None,):
+            raise DatastoreEnvironmentMismatchError("adoption PostgreSQL déjà matérialisée")
+        cursor.execute(
+            """
+            SELECT count(*)
+              FROM pg_class AS relation
+              JOIN pg_namespace AS namespace ON namespace.oid = relation.relnamespace
+             WHERE namespace.nspname NOT IN ('pg_catalog', 'information_schema')
+               AND namespace.nspname NOT LIKE 'pg_toast%%'
+               AND relation.relkind IN ('r', 'p', 'v', 'm', 'S', 'f')
+            """,
+            (),
+        )
+        row = cursor.fetchone()
+        if not isinstance(row, tuple) or len(row) != 1 or not isinstance(row[0], int):
+            raise DatastoreEnvironmentMismatchError("inventaire PostgreSQL invalide")
+        if row[0] < 1:
+            raise DatastoreEnvironmentMismatchError("base historique PostgreSQL vide")
+        cursor.execute("CREATE SCHEMA IF NOT EXISTS platform")
+        cursor.execute(
+            """
+            CREATE TABLE platform.datastore_identity (
+                singleton boolean PRIMARY KEY CHECK (singleton),
+                environment text NOT NULL
+                    CHECK (environment IN ('development', 'test', 'production')),
+                deployment_id text NOT NULL
+                    CHECK (deployment_id ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$')
+            )
+            """
+        )
+        cursor.execute(
+            """
+            INSERT INTO platform.datastore_identity(singleton, environment, deployment_id)
+            VALUES (true, %s, %s)
+            """,
+            (self.expected_identity.environment, self.expected_identity.deployment_id),
         )
         return self.expected_identity
 
@@ -375,6 +436,15 @@ class QdrantRestIdentityClient:
                     }
                 ]
             },
+        )
+
+    def compensate_failed_initialization(self) -> None:
+        """Supprime uniquement la collection d'identité créée par cette tentative."""
+
+        self._json_request(
+            method="DELETE",
+            path=f"/collections/{self._collection_name}",
+            body=None,
         )
 
     def _json_request(

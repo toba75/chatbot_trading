@@ -16,11 +16,18 @@ def test_validate_ui_action_execution_progress_acceptance() -> None:
     sys.path.insert(0, str(repository_root))
 
     from app.contracts.document_public_statuses import PublicActionPhase
+    from app.contracts.technical_jobs import JobEnvironmentIdentity
     from app.platform.configuration import load_application_configuration
     from app.platform.orchestrator_asgi import create_orchestrator_app
     from app.platform.orchestrator_composition import DependencyReadiness, OrchestratorCompositionRoot
     from app.source_processing.adapters.query_http import build_document_query_router
     from app.source_processing.application.document_queries import DocumentActionProgressView
+
+    environment_identity = JobEnvironmentIdentity(
+        environment="development",
+        deployment_id="ostrading-development-local",
+        configuration_hash="a" * 64,
+    )
 
     class Queries:
         def list_documents(self, *, limit: int, cursor: str | None):
@@ -41,6 +48,7 @@ def test_validate_ui_action_execution_progress_acceptance() -> None:
                 completed_units=0,
                 total_units=38,
                 failure_error_code=None,
+                **environment_identity.to_mapping(),
             )
 
     class ReadyDependency:
@@ -119,6 +127,7 @@ def test_validate_ui_action_execution_progress_acceptance() -> None:
             "completed_units": 0,
             "total_units": 38,
             "failure_error_code": None,
+            **environment_identity.to_mapping(),
         }
 
     asyncio.run(scenario())

@@ -283,11 +283,17 @@ traverse les contrats HTTP publics jusqu'au diagnostic, à la conversion, à la
 projection, à la recherche, à la réponse documentaire, à la citation PDF et au
 Spark live, puis redémarre la même installation et relit ses identifiants.
 
-Les 17 conteneurs et les six réplicas workers doivent publier l'identité
+Les 14 conteneurs et les quatre réplicas workers doivent publier l'identité
 `production` / `ostrading-production-primary` et le même hash de configuration.
 Le rendu Compose et les conteneurs refusent tout chemin, secret ou donnée
 `development` ou `test`. Les workers documentaires conservent 8 Gio, 4 CPU et
 un healthcheck de 30 secondes.
+
+Les actions `DEEP_RESEARCH`, `VERIFY_RESPONSE` et `BACKTEST` ne font pas partie
+du catalogue asynchrone des profils tant qu'elles ne disposent pas d'une chaîne
+réelle complète et d'une progression publique. Les services d'attente
+`worker-research`, `worker-backtest` et `backtest-engine` ne sont pas démarrés
+pour simuler cette disponibilité.
 
 La sortie de la commande arrête les conteneurs avec `down --remove-orphans`,
 sans jamais employer `--volumes`, purge, cleanup automatique ou cible par

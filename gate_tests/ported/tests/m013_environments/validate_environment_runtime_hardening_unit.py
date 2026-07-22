@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+import json
 from pathlib import Path
 
 import pytest
@@ -64,6 +65,16 @@ def test_environment_runtime_hardening_unit(tmp_path: Path) -> None:
     assert observed["environment"] == "development"
     assert observed["deployment_id"] == "ostrading-development-local"
     assert observed["configuration_hash"] == configuration.configuration_hash
+    stale_payload = dict(observed)
+    stale_payload["updated_at_epoch"] = 0.0
+    health_path.write_text(json.dumps(stale_payload), encoding="utf-8")
+    with pytest.raises(ValueError, match="WORKER_HEALTH_STALE"):
+        read_worker_health_file(
+            path=health_path,
+            expected_identity=publisher.binding.identity,
+            expected_worker_id="worker-documents",
+            maximum_age_seconds=1.0,
+        )
 
     # Une panne après création de la collection d'identité est compensée. Le retry
     # repart de zéro et ne peut donc pas adopter une collection étrangère.
@@ -119,6 +130,13 @@ def test_environment_runtime_hardening_unit(tmp_path: Path) -> None:
     # administratif Compose du profil au lieu d'appeler les DNS internes depuis l'hôte.
     assert "docker" in inspect.getsource(backup.execute_compose_storage_command)
     assert "orchestrator-api" in inspect.getsource(backup.execute_compose_storage_command)
+    assert "input=manifest_document" in inspect.getsource(
+        backup.execute_compose_storage_command
+    )
+    dockerfile = (repository_root / "deploy/local-compose/Dockerfile").read_text(
+        encoding="utf-8"
+    )
+    assert "COPY --chown=ostrading:ostrading ost_gate ./ost_gate" in dockerfile
     restore_source = inspect.getsource(restore._restore_manifest)
     assert "ignore_errors=True" not in restore_source
     assert "RESTORE_COMPENSATION_FAILED" in restore_source

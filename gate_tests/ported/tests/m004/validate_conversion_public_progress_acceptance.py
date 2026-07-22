@@ -6,6 +6,7 @@ import asyncio
 import json
 
 from app.contracts.document_public_statuses import PublicActionPhase
+from app.contracts.technical_jobs import JobEnvironmentIdentity
 from app.platform.orchestrator_asgi import create_orchestrator_app
 from app.platform.orchestrator_composition import (
     DependencyReadiness,
@@ -14,6 +15,13 @@ from app.platform.orchestrator_composition import (
 from app.platform.configuration import load_application_configuration
 from app.source_processing.adapters.query_http import build_document_query_router
 from app.source_processing.application.document_queries import DocumentActionProgressView
+
+
+_ENVIRONMENT_IDENTITY = JobEnvironmentIdentity(
+    environment="development",
+    deployment_id="ostrading-development-local",
+    configuration_hash="a" * 64,
+)
 
 
 def _verifier_echec_gemma_relisible_publiquement() -> None:
@@ -37,7 +45,10 @@ def _verifier_echec_gemma_relisible_publiquement() -> None:
         total_units=289,
         failure_error_code="GEMMA_VISION_UNAVAILABLE",
     )
-    progress = DocumentActionProgressView.from_conversion(conversion)
+    progress = DocumentActionProgressView.from_conversion(
+        conversion,
+        environment_identity=_ENVIRONMENT_IDENTITY,
+    )
 
     assert progress.phase is PublicActionPhase.FAILED
     assert progress.completed_units == 4
@@ -68,6 +79,7 @@ class _Queries:
             completed_units=0,
             total_units=2,
             failure_error_code=None,
+            **_ENVIRONMENT_IDENTITY.to_mapping(),
         )
 
 
@@ -165,6 +177,7 @@ def test_la_progression_de_conversion_traverse_la_lecture_publique() -> None:
             "completed_units": 0,
             "total_units": 2,
             "failure_error_code": None,
+            **_ENVIRONMENT_IDENTITY.to_mapping(),
         }
 
     _verifier_echec_gemma_relisible_publiquement()

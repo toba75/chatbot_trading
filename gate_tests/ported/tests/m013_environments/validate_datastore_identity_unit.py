@@ -197,6 +197,17 @@ def test_datastore_identity_unit(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
         postgres_preflight.run(non_empty_postgres, initialize_if_empty=True)
     assert "identity:create" not in non_empty_postgres.events
 
+    legacy_postgres = _PostgresIdentityCursor(object_count=3)
+    assert postgres_preflight.adopt_legacy(legacy_postgres) == expected
+    assert legacy_postgres.insert_parameters == (
+        expected.environment,
+        expected.deployment_id,
+    )
+    empty_legacy_postgres = _PostgresIdentityCursor(object_count=0)
+    with pytest.raises(DatastoreEnvironmentMismatchError, match=DATASTORE_ENVIRONMENT_MISMATCH):
+        postgres_preflight.adopt_legacy(empty_legacy_postgres)
+    assert empty_legacy_postgres.insert_parameters is None
+
     repository_root = Path(__file__).resolve().parents[4]
     configuration = load_application_configuration(
         config_path=repository_root / "config" / "application.example.yaml",
@@ -222,6 +233,10 @@ class _QdrantIdentityClient:
         self.initialize_calls.append(identity)
         self.collections = ("ostrading-test-datastore-identity",)
         self.observed = identity
+
+    def compensate_failed_initialization(self):
+        self.collections = ()
+        self.observed = None
 
 
 class _PostgresIdentityCursor:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import uuid
 from pathlib import Path
@@ -21,8 +22,11 @@ from app.platform.configured_datastore_identity import (
     build_configured_datastore_preflight,
     configured_datastore_identity,
 )
-from app.platform.datastore_identity import DatastoreIdentity
-from ost_gate.operations.backup import _FILE_ROOTS, _single_observed_identity
+from ost_gate.operations.backup import (
+    _FILE_ROOTS,
+    _single_observed_identity,
+    execute_compose_storage_command,
+)
 from ost_gate.operations.backup_manifest import BackupManifest, read_backup_manifest
 
 
@@ -31,14 +35,22 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--target", type=Path, required=True)
     parser.add_argument("--config", type=Path, required=True)
+    parser.add_argument("--inside-compose", action="store_true", help=argparse.SUPPRESS)
     arguments = parser.parse_args(argv)
+    if not arguments.inside_compose:
+        return execute_compose_storage_command(
+            operation="restore",
+            config_path=arguments.config,
+            manifest_path=arguments.manifest,
+            target_path=arguments.target,
+        )
     target = arguments.target.resolve(strict=False)
     if target.is_file() or (target.is_dir() and any(target.iterdir())):
         raise ValueError(f"RESTORE_TARGET_INVALID:{target}")
     manifest = read_backup_manifest(arguments.manifest, "restore")
     configuration = load_application_configuration(
         config_path=arguments.config,
-        environment_snapshot={},
+        environment_snapshot=dict(os.environ),
     )
     target = require_profile_scoped_path(
         target=target,
@@ -124,7 +136,11 @@ def _restore_manifest(*, manifest: BackupManifest, target: Path) -> None:
             target.rmdir()
         staging.replace(target)
     except BaseException:
-        shutil.rmtree(staging, ignore_errors=True)
+        try:
+            if staging.exists():
+                shutil.rmtree(staging)
+        except OSError as compensation_error:
+            raise RuntimeError("RESTORE_COMPENSATION_FAILED") from compensation_error
         raise
 
 

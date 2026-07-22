@@ -329,6 +329,10 @@ services:
       - "0.5"
       - --config
       - /workspace/config/application.yaml
+      - --health-path
+      - /tmp/worker-health.json
+      - --health-interval-seconds
+      - "5"
     networks:
       - core
       - ocr-control
@@ -348,7 +352,7 @@ services:
     healthcheck:
       test:
         - CMD-SHELL
-        - "python -m app.platform.environment_compose check-worker --worker-id worker-documents --config /workspace/config/application.yaml"
+        - "python -m app.platform.environment_compose check-worker --worker-id worker-documents --config /workspace/config/application.yaml --health-path /tmp/worker-health.json"
       interval: 10s
       timeout: 30s
       retries: 12
@@ -381,6 +385,10 @@ services:
       - "0.5"
       - --config
       - /workspace/config/application.yaml
+      - --health-path
+      - /tmp/worker-health.json
+      - --health-interval-seconds
+      - "5"
     networks:
       - core
     depends_on:
@@ -399,136 +407,12 @@ services:
     healthcheck:
       test:
         - CMD-SHELL
-        - "python -m app.platform.environment_compose check-worker --worker-id worker-projection --config /workspace/config/application.yaml"
+        - "python -m app.platform.environment_compose check-worker --worker-id worker-projection --config /workspace/config/application.yaml --health-path /tmp/worker-health.json"
       interval: 10s
-      timeout: 10s
+      timeout: 30s
       retries: 12
       start_period: 20s
     restart: unless-stopped
-    read_only: true
-
-  worker-research:
-    image: ostrading/worker-research:0.1.0-m013-environments-${OSTRADING_IMAGE_REVISION?OSTRADING_IMAGE_REVISION requis}
-    build:
-      context: ../..
-      dockerfile: deploy/local-compose/Dockerfile
-      target: generic-service
-      args:
-        OSTRADING_IMAGE_REVISION: "${OSTRADING_IMAGE_REVISION?OSTRADING_IMAGE_REVISION requis}"
-        OSTRADING_POSTGRES_SCHEMA_VERSION: "${OSTRADING_POSTGRES_SCHEMA_VERSION?OSTRADING_POSTGRES_SCHEMA_VERSION requis}"
-    deploy:
-      replicas: 1
-    command:
-      - python
-      - -m
-      - app.platform.local_runtime
-      - run-worker
-      - worker-research
-      - --worker-id
-      - worker-research
-      - --config
-      - /workspace/config/application.yaml
-    networks:
-      - core
-    depends_on:
-      orchestrator-api:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
-      llm-gateway:
-        condition: service_healthy
-    volumes:
-      - ../../config/application.schema.json:/workspace/config/application.schema.json:ro
-    healthcheck:
-      test:
-        - CMD-SHELL
-        - "python -m app.platform.environment_compose check-worker --worker-id worker-research --config /workspace/config/application.yaml"
-      interval: 10s
-      timeout: 10s
-      retries: 12
-      start_period: 10s
-    restart: unless-stopped
-    read_only: true
-
-  worker-backtest:
-    image: ostrading/worker-backtest:0.1.0-m013-environments-${OSTRADING_IMAGE_REVISION?OSTRADING_IMAGE_REVISION requis}
-    build:
-      context: ../..
-      dockerfile: deploy/local-compose/Dockerfile
-      target: generic-service
-      args:
-        OSTRADING_IMAGE_REVISION: "${OSTRADING_IMAGE_REVISION?OSTRADING_IMAGE_REVISION requis}"
-        OSTRADING_POSTGRES_SCHEMA_VERSION: "${OSTRADING_POSTGRES_SCHEMA_VERSION?OSTRADING_POSTGRES_SCHEMA_VERSION requis}"
-    deploy:
-      replicas: 1
-    command:
-      - python
-      - -m
-      - app.platform.local_runtime
-      - run-worker
-      - worker-backtest
-      - --worker-id
-      - worker-backtest
-      - --config
-      - /workspace/config/application.yaml
-    networks:
-      - core
-    depends_on:
-      orchestrator-api:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
-    volumes:
-      - ../../config/application.schema.json:/workspace/config/application.schema.json:ro
-    healthcheck:
-      test:
-        - CMD-SHELL
-        - "python -m app.platform.environment_compose check-worker --worker-id worker-backtest --config /workspace/config/application.yaml"
-      interval: 10s
-      timeout: 10s
-      retries: 12
-      start_period: 10s
-    restart: unless-stopped
-    read_only: true
-
-  backtest-engine:
-    image: ostrading/backtest-engine:0.1.0-m013-environments-${OSTRADING_IMAGE_REVISION?OSTRADING_IMAGE_REVISION requis}
-    build:
-      context: ../..
-      dockerfile: deploy/local-compose/Dockerfile
-      target: generic-service
-      args:
-        OSTRADING_IMAGE_REVISION: "${OSTRADING_IMAGE_REVISION?OSTRADING_IMAGE_REVISION requis}"
-        OSTRADING_POSTGRES_SCHEMA_VERSION: "${OSTRADING_POSTGRES_SCHEMA_VERSION?OSTRADING_POSTGRES_SCHEMA_VERSION requis}"
-    command:
-      - python
-      - -m
-      - app.platform.local_runtime
-      - serve-http
-      - backtest-engine
-      - "8200"
-      - --config
-      - /workspace/config/application.yaml
-    expose:
-      - "8200"
-    networks:
-      - core
-    depends_on:
-      orchestrator-api:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
-    volumes:
-      - ../../config/application.schema.json:/workspace/config/application.schema.json:ro
-    healthcheck:
-      test:
-        - CMD-SHELL
-        - "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8200/health', timeout=5).read()\""
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 10s
-    restart: "no"
     read_only: true
 
 networks:

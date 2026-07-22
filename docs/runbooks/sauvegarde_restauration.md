@@ -25,7 +25,13 @@
 uv run --locked backup-v1 --manifest <manifest.json> --config config/environments/<profil>.yaml
 ```
 
-- Résultat attendu: `uv run backup-v1` vérifie le manifeste de sauvegarde, la preuve `ciphertext_sha256`, les paires contexte/catégorie, les hashes non placeholders et l'absence de secret.
+- Résultat attendu: `uv run backup-v1` transmet le manifeste par l'entrée standard au
+  conteneur `orchestrator-api` déjà démarré par le projet Compose du profil. Le
+  préflight vérifie ainsi PostgreSQL par son DNS interne, Qdrant par son DNS interne
+  et les neuf racines du volume `application-data`, puis contrôle la preuve
+  `ciphertext_sha256`, les paires contexte/catégorie, les hashes non placeholders et
+  l'absence de secret. Le fichier temporaire du manifeste est supprimé dans un bloc
+  de compensation explicite.
 - Erreur explicite: si le manifeste, la configuration ou l'identité d'un
   stockage divergent, conserver la sortie RED et ne pas déclarer la sauvegarde
   exploitable.
@@ -40,7 +46,14 @@ uv run --locked backup-v1 --manifest <manifest.json> --config config/environment
 uv run --locked restore-v1 --manifest <manifest.json> --target data/environments/<profil>/reports/restore-drills/<drill> --config config/environments/<profil>.yaml
 ```
 
-- Résultat attendu: `uv run restore-v1` matérialise `restore-proof.json`, `restore_test_result` reste GREEN, les identifiants stables sont préservés, les artefacts immuables ne sont pas réécrits et les résultats négatifs ou supersédés restent consultables.
+- Résultat attendu: `uv run restore-v1` exécute le même préflight depuis
+  `orchestrator-api`, puis matérialise `restore-proof.json` exclusivement sous le
+  volume `application-data`, dans
+  `data/environments/<profil>/reports/restore-drills/<drill>`. En cas d'échec, le
+  staging est supprimé; un échec de cette compensation produit
+  `RESTORE_COMPENSATION_FAILED`. `restore_test_result` reste GREEN, les identifiants
+  stables sont préservés, les artefacts immuables ne sont pas réécrits et les
+  résultats négatifs ou supersédés restent consultables.
 - Erreur explicite: si un hash restauré diverge, si une clé est suivie par Git ou si Spark devient requis pour restaurer les données métier, la restauration V1 est refusée.
 - Preuve à conserver: sortie GREEN du validateur, liste des identifiants stables restaurés et mention de la cible isolée.
 

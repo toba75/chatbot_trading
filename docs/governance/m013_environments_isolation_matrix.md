@@ -42,9 +42,12 @@ contenu n'est ni lu par cette matrice, ni versionné.
 |---|---:|---|
 | `worker-documents` | 2 | environnement, déploiement, hash de configuration |
 | `worker-projection` | 2 | environnement, déploiement, hash de configuration |
-| `worker-research` | 1 | environnement, déploiement, hash de configuration |
-| `worker-backtest` | 1 | environnement, déploiement, hash de configuration |
 
-Les six réplicas sont présents dans chacun des rapports réels. Un service
+Les quatre réplicas sont présents dans chacun des rapports réels. Un service
 `worker-*` ajouté au Compose sans ajout simultané à la source machine rend la
 gate statique RED.
+
+`DEEP_RESEARCH`, `VERIFY_RESPONSE` et `BACKTEST` ne sont pas annoncés comme
+actions asynchrones dans ces piles : aucune chaîne publique complète et
+supervisée n'est encore câblée pour ces traitements. Les anciens conteneurs
+d'attente sont absents plutôt que déclarés prêts sans consommation réelle.

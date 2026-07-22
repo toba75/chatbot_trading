@@ -22,6 +22,7 @@ from app.contracts.document_public_statuses import (
     PublicSourceStatus,
 )
 from app.contracts.identity import DomainIdentifier
+from app.contracts.technical_jobs import JobEnvironmentIdentity
 
 
 class PublicApiModel(BaseModel):
@@ -358,9 +359,17 @@ class DocumentActionProgressResponse(PublicApiModel):
     completed_units: int = Field(ge=0)
     total_units: int | None = Field(default=None, ge=1)
     failure_error_code: str | None
+    environment: str
+    deployment_id: str
+    configuration_hash: str
 
     @model_validator(mode="after")
     def validate_progress(self) -> "DocumentActionProgressResponse":
+        JobEnvironmentIdentity(
+            environment=self.environment,
+            deployment_id=self.deployment_id,
+            configuration_hash=self.configuration_hash,
+        )
         if self.phase is PublicActionPhase.NOT_REQUESTED:
             if (
                 self.completed_units != 0

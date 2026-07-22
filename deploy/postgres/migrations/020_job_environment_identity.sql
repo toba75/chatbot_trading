@@ -19,6 +19,9 @@ DO $$
 DECLARE
     identity_count integer;
 BEGIN
+    IF to_regclass('platform.datastore_identity') IS NULL THEN
+        RAISE EXCEPTION 'MIGRATION_020_LEGACY_ADOPTION_REQUIRED';
+    END IF;
     SELECT COUNT(*) INTO identity_count FROM platform.datastore_identity;
     IF identity_count <> 1 THEN
         RAISE EXCEPTION 'DATASTORE_ENVIRONMENT_MISMATCH';
@@ -53,23 +56,75 @@ ALTER TABLE knowledge_access.job_outbox
     ALTER COLUMN environment SET NOT NULL,
     ALTER COLUMN deployment_id SET NOT NULL;
 
+-- Expand/backfill/contract : les contraintes sont ajoutées NOT VALID pour
+-- coexister avec le déploiement historique, puis validées après le backfill.
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+         WHERE conrelid = 'platform.technical_jobs'::regclass
+           AND conname = 'technical_jobs_environment_check'
+    ) THEN
+        ALTER TABLE platform.technical_jobs
+            ADD CONSTRAINT technical_jobs_environment_check
+            CHECK (environment IN ('development', 'test', 'production')) NOT VALID;
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+         WHERE conrelid = 'platform.technical_jobs'::regclass
+           AND conname = 'technical_jobs_deployment_id_check'
+    ) THEN
+        ALTER TABLE platform.technical_jobs
+            ADD CONSTRAINT technical_jobs_deployment_id_check
+            CHECK (deployment_id ~ '^[a-z0-9]+(-[a-z0-9]+)*$') NOT VALID;
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+         WHERE conrelid = 'source_processing.job_outbox'::regclass
+           AND conname = 'source_processing_job_outbox_environment_check'
+    ) THEN
+        ALTER TABLE source_processing.job_outbox
+            ADD CONSTRAINT source_processing_job_outbox_environment_check
+            CHECK (environment IN ('development', 'test', 'production')) NOT VALID;
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+         WHERE conrelid = 'source_processing.job_outbox'::regclass
+           AND conname = 'source_processing_job_outbox_deployment_id_check'
+    ) THEN
+        ALTER TABLE source_processing.job_outbox
+            ADD CONSTRAINT source_processing_job_outbox_deployment_id_check
+            CHECK (deployment_id ~ '^[a-z0-9]+(-[a-z0-9]+)*$') NOT VALID;
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+         WHERE conrelid = 'knowledge_access.job_outbox'::regclass
+           AND conname = 'knowledge_access_job_outbox_environment_check'
+    ) THEN
+        ALTER TABLE knowledge_access.job_outbox
+            ADD CONSTRAINT knowledge_access_job_outbox_environment_check
+            CHECK (environment IN ('development', 'test', 'production')) NOT VALID;
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+         WHERE conrelid = 'knowledge_access.job_outbox'::regclass
+           AND conname = 'knowledge_access_job_outbox_deployment_id_check'
+    ) THEN
+        ALTER TABLE knowledge_access.job_outbox
+            ADD CONSTRAINT knowledge_access_job_outbox_deployment_id_check
+            CHECK (deployment_id ~ '^[a-z0-9]+(-[a-z0-9]+)*$') NOT VALID;
+    END IF;
+END $$;
+
 ALTER TABLE platform.technical_jobs
-    ADD CONSTRAINT technical_jobs_environment_check
-        CHECK (environment IN ('development', 'test', 'production')),
-    ADD CONSTRAINT technical_jobs_deployment_id_check
-        CHECK (deployment_id ~ '^[a-z0-9]+(-[a-z0-9]+)*$');
-
+    VALIDATE CONSTRAINT technical_jobs_environment_check,
+    VALIDATE CONSTRAINT technical_jobs_deployment_id_check;
 ALTER TABLE source_processing.job_outbox
-    ADD CONSTRAINT source_processing_job_outbox_environment_check
-        CHECK (environment IN ('development', 'test', 'production')),
-    ADD CONSTRAINT source_processing_job_outbox_deployment_id_check
-        CHECK (deployment_id ~ '^[a-z0-9]+(-[a-z0-9]+)*$');
-
+    VALIDATE CONSTRAINT source_processing_job_outbox_environment_check,
+    VALIDATE CONSTRAINT source_processing_job_outbox_deployment_id_check;
 ALTER TABLE knowledge_access.job_outbox
-    ADD CONSTRAINT knowledge_access_job_outbox_environment_check
-        CHECK (environment IN ('development', 'test', 'production')),
-    ADD CONSTRAINT knowledge_access_job_outbox_deployment_id_check
-        CHECK (deployment_id ~ '^[a-z0-9]+(-[a-z0-9]+)*$');
+    VALIDATE CONSTRAINT knowledge_access_job_outbox_environment_check,
+    VALIDATE CONSTRAINT knowledge_access_job_outbox_deployment_id_check;
 
 ALTER TABLE source_processing.job_outbox
     DROP CONSTRAINT IF EXISTS job_outbox_status_check,

@@ -11,6 +11,7 @@ import pytest
 def test_environment_compose_unit(tmp_path: Path) -> None:
     from app.platform.environment_compose import (
         ENVIRONMENTS,
+        EXPECTED_SERVICE_REPLICAS,
         REQUIRED_SERVICE_IDS,
         EnvironmentContainerState,
         aggregate_environment_readiness,
@@ -108,11 +109,12 @@ def test_environment_compose_unit(tmp_path: Path) -> None:
     ready_states = tuple(
         EnvironmentContainerState(
             service=service_id,
-            container_name=f"{definition.project_name}-{service_id}-1",
+            container_name=f"{definition.project_name}-{service_id}-{replica}",
             state="running",
             health="healthy",
         )
         for service_id in REQUIRED_SERVICE_IDS
+        for replica in range(1, EXPECTED_SERVICE_REPLICAS[service_id] + 1)
     )
     readiness = aggregate_environment_readiness(
         definition,
@@ -163,7 +165,7 @@ def test_environment_compose_unit(tmp_path: Path) -> None:
             project_name=definition.project_name,
         )
 
-    with pytest.raises(ValueError, match="ENVIRONMENT_STACK_SERVICE_MISSING"):
+    with pytest.raises(ValueError, match="ENVIRONMENT_STACK_REPLICA_COUNT_INVALID"):
         aggregate_environment_readiness(
             definition,
             container_states=ready_states[:-1],

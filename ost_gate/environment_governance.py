@@ -141,11 +141,15 @@ def assert_no_sensitive_data(value: object) -> None:
 
 def validate_execution_evidence(
     reports: Mapping[str, object],
+    *,
+    expected_worker_identity_count: int = 4,
 ) -> EnvironmentExecutionEvidence:
     """Valide les quatre exécutions réelles et leurs invariants croisés."""
 
     if not isinstance(reports, Mapping):
         raise EnvironmentGovernanceError("LIVE_EVIDENCE_DOCUMENT_INVALID")
+    if expected_worker_identity_count <= 0:
+        raise EnvironmentGovernanceError("LIVE_EVIDENCE_WORKER_COUNT_INVALID")
     missing = [environment for environment in ENVIRONMENTS if environment not in reports]
     if missing:
         raise EnvironmentGovernanceError(f"LIVE_EVIDENCE_MISSING:{missing[0]}")
@@ -212,11 +216,11 @@ def validate_execution_evidence(
     for environment, execution in flattened:
         if execution.get("progress_phases") != ["SUCCEEDED", "SUCCEEDED", "SUCCEEDED"]:
             raise EnvironmentGovernanceError("LIVE_EVIDENCE_PROGRESS_INVALID")
-        if execution.get("worker_identity_count") != 6:
+        if execution.get("worker_identity_count") != expected_worker_identity_count:
             raise EnvironmentGovernanceError("LIVE_EVIDENCE_WORKERS_INCOMPLETE")
         if execution.get("environment_job_count") != 3:
             raise EnvironmentGovernanceError("LIVE_EVIDENCE_JOBS_INCOMPLETE")
-        worker_identity_count += 6
+        worker_identity_count += expected_worker_identity_count
         citation = _required_text(execution, "citation_url", "LIVE_EVIDENCE_CITATION_INVALID")
         if not citation.startswith(f"https://localhost:{_EXPECTED_PORTS[environment]}/"):
             raise EnvironmentGovernanceError("LIVE_EVIDENCE_CITATION_INVALID")
@@ -288,7 +292,10 @@ def validate_repository_environment_governance(
             evidence_document["reports"], "VERSIONED_EVIDENCE_REPORTS_INVALID"
         )
         source = "versioned-live-evidence"
-    execution_evidence = validate_execution_evidence(reports)
+    execution_evidence = validate_execution_evidence(
+        reports,
+        expected_worker_identity_count=4 if require_live_sources else 6,
+    )
     validate_evidence_revisions(
         repository_root=root,
         reports=reports,

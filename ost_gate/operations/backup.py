@@ -4,13 +4,18 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
+import shutil
+import subprocess
+import uuid
 
 from app.platform.administrative_operations import (
     AdministrativeBackupManifest,
     AdministrativeOperationEvidence,
     AdministrativeOperationRequest,
     execute_administrative_operation,
+    require_profile_scoped_path,
 )
 from app.platform.configuration import load_application_configuration
 from app.platform.configured_datastore_identity import (
@@ -38,11 +43,19 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="backup-v1")
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--config", type=Path, required=True)
+    parser.add_argument("--inside-compose", action="store_true", help=argparse.SUPPRESS)
     arguments = parser.parse_args(argv)
+    if not arguments.inside_compose:
+        return execute_compose_storage_command(
+            operation="backup",
+            config_path=arguments.config,
+            manifest_path=arguments.manifest,
+            target_path=None,
+        )
     manifest = read_backup_manifest(arguments.manifest, "backup")
     configuration = load_application_configuration(
         config_path=arguments.config,
-        environment_snapshot={},
+        environment_snapshot=dict(os.environ),
     )
     identity = configured_datastore_identity(configuration)
     preflight = build_configured_datastore_preflight(
@@ -76,6 +89,107 @@ def main(argv: list[str] | None = None) -> int:
         f"({len(manifest.entries)} entrée(s) restaurable(s))"
     )
     return 0
+
+
+def execute_compose_storage_command(
+    *,
+    operation: str,
+    config_path: Path,
+    manifest_path: Path,
+    target_path: Path | None,
+) -> int:
+    """Exécute l'opération dans orchestrator-api, sur les DNS et volumes du profil."""
+
+    if operation not in {"backup", "restore"}:
+        raise ValueError("ADMINISTRATIVE_OPERATION_UNKNOWN")
+    selected_config = config_path.resolve(strict=True)
+    repository_root = selected_config.parents[2]
+    configuration = load_application_configuration(
+        config_path=selected_config,
+        environment_snapshot=dict(os.environ),
+    )
+    environment = configuration.application.environment
+    expected_config = repository_root / "config" / "environments" / f"{environment}.yaml"
+    if selected_config != expected_config.resolve(strict=True):
+        raise ValueError("CONFIG_ENVIRONMENT_MISMATCH")
+    docker = shutil.which("docker")
+    if docker is None:
+        raise RuntimeError("DOCKER_UNAVAILABLE")
+    base = repository_root / "deploy/environments/compose.base.yaml"
+    overlay = repository_root / f"deploy/environments/{environment}.compose.yaml"
+    manifest_document = manifest_path.resolve(strict=True).read_bytes()
+    temporary_manifest = f"/tmp/ostrading-{operation}-{uuid.uuid4().hex}.json"
+    module = f"ost_gate.operations.{operation}"
+    inner_arguments = [
+        "--manifest",
+        temporary_manifest,
+        "--config",
+        "/workspace/config/application.yaml",
+        "--inside-compose",
+    ]
+    if operation == "restore":
+        if target_path is None:
+            raise ValueError("RESTORE_TARGET_REQUIRED")
+        selected_target = require_profile_scoped_path(
+            target=target_path,
+            profile_root=(
+                repository_root
+                / configuration.paths.reports_root
+                / "restore-drills"
+            ),
+        )
+        inner_arguments.extend(
+            ("--target", _container_workspace_path(selected_target, repository_root))
+        )
+    elif target_path is not None:
+        raise ValueError("BACKUP_TARGET_FORBIDDEN")
+    bootstrap = "\n".join(
+        (
+            "from pathlib import Path",
+            "import importlib, sys",
+            f"manifest_path = Path({temporary_manifest!r})",
+            "manifest_path.write_bytes(sys.stdin.buffer.read())",
+            "try:",
+            f"    result = importlib.import_module({module!r}).main({inner_arguments!r})",
+            "finally:",
+            "    manifest_path.unlink()",
+            "raise SystemExit(result)",
+        )
+    )
+    command = [
+        docker,
+        "compose",
+        "--project-name",
+        f"ostrading-{environment}",
+        "--file",
+        str(base),
+        "--file",
+        str(overlay),
+        "exec",
+        "--no-TTY",
+        "orchestrator-api",
+        "python",
+        "-c",
+        bootstrap,
+    ]
+    completed = subprocess.run(
+        command,
+        cwd=repository_root,
+        input=manifest_document,
+        check=False,
+    )
+    if completed.returncode != 0:
+        raise RuntimeError(f"{operation.upper()}_COMPOSE_FAILED:{completed.returncode}")
+    return 0
+
+
+def _container_workspace_path(path: Path, repository_root: Path) -> str:
+    selected = path.resolve(strict=False)
+    try:
+        relative = selected.relative_to(repository_root)
+    except ValueError as exc:
+        raise ValueError("ADMINISTRATIVE_PATH_OUTSIDE_PROFILE") from exc
+    return f"/workspace/{relative.as_posix()}"
 
 
 def _single_observed_identity(

@@ -42,7 +42,7 @@ def test_validate_test_real_e2e_acceptance() -> None:
     )
     assert all(run.citation_url.startswith("https://localhost:19443/") for run in report.runs)
     assert all(run.spark_raw_response_id for run in report.runs)
-    assert all(run.worker_identity_count >= 6 for run in report.runs)
+    assert all(run.worker_identity_count == 4 for run in report.runs)
     assert all(run.environment_job_count >= 3 for run in report.runs)
     assert all(run.pre_teardown_report_path.is_file() for run in report.runs)
     assert report.non_test_credentials_inaccessible is True

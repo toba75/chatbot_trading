@@ -237,6 +237,8 @@ def _print_relay_observation(
         json.dumps(
             {
                 "configuration_hash": claim.message.configuration_hash,
+                "deployment_id": claim.message.deployment_id,
+                "environment": claim.message.environment,
                 "duration_ms": round(
                     (time.perf_counter_ns() - started_ns) / 1_000_000,
                     3,

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import time
 from collections.abc import Mapping
 from pathlib import Path
@@ -24,7 +25,10 @@ from app.platform.postgres import PsycopgConnectionFactory
 from app.platform.postgres_migrations import build_configured_postgres_migration_runner
 from app.platform.llm_gateway.orchestrator_http import UrllibLlmInferenceGateway
 from app.platform.request_context import bind_trace_id, reset_trace_id
-from app.platform.worker_environment import build_worker_environment_binding
+from app.platform.worker_environment import (
+    WorkerHealthFilePublisher,
+    build_worker_environment_binding,
+)
 from app.source_processing.adapters.postgres_job_outbox import PostgresJobOutbox
 
 
@@ -35,6 +39,8 @@ def _run_worker(
     lease_seconds: int,
     poll_seconds: float,
     max_jobs: int | None,
+    health_path: Path,
+    health_interval_seconds: float,
 ) -> None:
     if not isinstance(application_configuration, ApplicationConfiguration):
         raise ValueError("configuration worker KA invalide")
@@ -55,6 +61,7 @@ def _run_worker(
     build_configured_postgres_migration_runner(
         application_configuration,
         initialize_identity_if_empty=False,
+        adopt_legacy_if_unidentified=False,
     ).run()
     connection_factory = PsycopgConnectionFactory(
         connection_url=application_configuration.services.postgres.url,
@@ -88,6 +95,11 @@ def _run_worker(
         application_configuration,
         worker_id=owner_id,
     )
+    WorkerHealthFilePublisher(
+        binding=worker_binding,
+        path=health_path,
+        heartbeat_interval_seconds=health_interval_seconds,
+    ).start()
     instance_owner_id = worker_binding.instance_owner_id(str(uuid4()))
     print(
         json.dumps(worker_binding.health_snapshot().to_mapping(), sort_keys=True),
@@ -107,7 +119,11 @@ def _run_worker(
                 job_names=(PROJECT_DOCUMENT_JOB_NAME,),
             )
         except OperationalError:
-            _log_runtime_error(owner_id=instance_owner_id, error_code="POSTGRES_TRANSIENT_FAILURE")
+            _log_runtime_error(
+                application_configuration=application_configuration,
+                owner_id=instance_owner_id,
+                error_code="POSTGRES_TRANSIENT_FAILURE",
+            )
             time.sleep(poll_seconds)
             continue
         if claimed is None:
@@ -133,7 +149,13 @@ def _run_worker(
                 claim_token=claimed.claim_token,
                 failure_reason=error_code,
             )
-            _log(claimed=claimed, status="failed", error_code=error_code, started=started)
+            _log(
+                application_configuration=application_configuration,
+                claimed=claimed,
+                status="failed",
+                error_code=error_code,
+                started=started,
+            )
         else:
             job_runtime.queue.mark_succeeded(
                 job_id=claimed.job.job_id,
@@ -142,17 +164,31 @@ def _run_worker(
                 claim_token=claimed.claim_token,
                 result=result,
             )
-            _log(claimed=claimed, status="succeeded", error_code=None, started=started)
+            _log(
+                application_configuration=application_configuration,
+                claimed=claimed,
+                status="succeeded",
+                error_code=None,
+                started=started,
+            )
         finally:
             reset_trace_id(trace_token)
         processed += 1
 
 
-def _log_runtime_error(*, owner_id: str, error_code: str) -> None:
+def _log_runtime_error(
+    *,
+    application_configuration: ApplicationConfiguration,
+    owner_id: str,
+    error_code: str,
+) -> None:
     print(
         json.dumps(
             {
                 "error_code": error_code,
+                "environment": application_configuration.application.environment,
+                "deployment_id": application_configuration.application.deployment_id,
+                "configuration_hash": application_configuration.configuration_hash,
                 "event_type": "knowledge_projection_worker_runtime_error",
                 "owner_id": owner_id,
                 "status": "retrying",
@@ -164,7 +200,14 @@ def _log_runtime_error(*, owner_id: str, error_code: str) -> None:
     )
 
 
-def _log(*, claimed: Any, status: str, error_code: str | None, started: int) -> None:
+def _log(
+    *,
+    application_configuration: ApplicationConfiguration,
+    claimed: Any,
+    status: str,
+    error_code: str | None,
+    started: int,
+) -> None:
     payload: dict[str, object] = {
         "event_type": "knowledge_projection_worker_job",
         "job_id": claimed.job.job_id,
@@ -173,6 +216,9 @@ def _log(*, claimed: Any, status: str, error_code: str | None, started: int) -> 
         "duration_ms": round((time.perf_counter_ns() - started) / 1_000_000, 3),
         "success_count": 1 if status == "succeeded" else 0,
         "error_count": 0 if status == "succeeded" else 1,
+        "environment": application_configuration.application.environment,
+        "deployment_id": application_configuration.application.deployment_id,
+        "configuration_hash": application_configuration.configuration_hash,
     }
     if error_code is not None:
         payload["error_code"] = error_code
@@ -186,10 +232,12 @@ def main() -> int:
     parser.add_argument("--lease-seconds", required=True, type=int)
     parser.add_argument("--poll-seconds", required=True, type=float)
     parser.add_argument("--max-jobs", type=int)
+    parser.add_argument("--health-path", required=True, type=Path)
+    parser.add_argument("--health-interval-seconds", required=True, type=float)
     arguments = parser.parse_args()
     configuration = load_application_configuration(
         config_path=Path(arguments.config),
-        environment_snapshot={},
+        environment_snapshot=dict(os.environ),
     )
     _run_worker(
         application_configuration=configuration,
@@ -197,6 +245,8 @@ def main() -> int:
         lease_seconds=arguments.lease_seconds,
         poll_seconds=arguments.poll_seconds,
         max_jobs=arguments.max_jobs,
+        health_path=arguments.health_path,
+        health_interval_seconds=arguments.health_interval_seconds,
     )
     return 0
 

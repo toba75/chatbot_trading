@@ -6,7 +6,15 @@ from types import SimpleNamespace
 
 import pytest
 
+from app.contracts.technical_jobs import JobEnvironmentIdentity
 from app.source_processing.application.document_queries import DocumentQueryService
+
+
+_ENVIRONMENT_IDENTITY = JobEnvironmentIdentity(
+    environment="development",
+    deployment_id="ostrading-development-local",
+    configuration_hash="a" * 64,
+)
 
 
 class StatusRows:
@@ -60,6 +68,7 @@ def test_validate_document_queries_unit() -> None:
     service = DocumentQueryService(
         document_snapshot_repository=Snapshots(),
         document_corpus_status_repository=rows,
+        environment_identity=_ENVIRONMENT_IDENTITY,
     )
     page = service.list_documents(limit=2, cursor=None)
     assert rows.calls == [(3, None)]
@@ -77,6 +86,7 @@ def test_validate_document_queries_unit() -> None:
     invalid_service = DocumentQueryService(
         document_snapshot_repository=Snapshots(),
         document_corpus_status_repository=invalid_rows,
+        environment_identity=_ENVIRONMENT_IDENTITY,
     )
     with pytest.raises(TypeError, match="projection légère de corpus invalide"):
         invalid_service.list_documents(limit=1, cursor=None)

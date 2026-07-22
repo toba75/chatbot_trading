@@ -6,10 +6,15 @@ from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
 import argparse
+import os
 import re
 
 from app.platform.configuration import ApplicationConfiguration, load_application_configuration
-from app.platform.datastore_identity import DatastoreIdentity, PostgresIdentityPreflight
+from app.platform.datastore_identity import (
+    DatastoreEnvironmentMismatchError,
+    DatastoreIdentity,
+    PostgresIdentityPreflight,
+)
 from app.platform.postgres import PostgresConnectionFactory
 from app.platform.postgres import PsycopgConnectionFactory
 
@@ -38,6 +43,7 @@ class PostgresMigrationRunner:
         operation_timeout_seconds: int,
         identity_preflight: PostgresIdentityPreflight,
         initialize_identity_if_empty: bool,
+        adopt_legacy_if_unidentified: bool,
     ) -> None:
         if not callable(getattr(connection_factory, "connect", None)):
             raise ValueError("connection_factory PostgreSQL invalide")
@@ -53,11 +59,14 @@ class PostgresMigrationRunner:
             raise ValueError("identity_preflight PostgreSQL invalide")
         if not isinstance(initialize_identity_if_empty, bool):
             raise ValueError("initialize_identity_if_empty PostgreSQL invalide")
+        if not isinstance(adopt_legacy_if_unidentified, bool):
+            raise ValueError("adopt_legacy_if_unidentified PostgreSQL invalide")
         self._connection_factory = connection_factory
         self._migrations = _load_migrations(migrations_path)
         self._operation_timeout_seconds = operation_timeout_seconds
         self._identity_preflight = identity_preflight
         self._initialize_identity_if_empty = initialize_identity_if_empty
+        self._adopt_legacy_if_unidentified = adopt_legacy_if_unidentified
 
     @property
     def required_schema_version(self) -> int:
@@ -75,10 +84,15 @@ class PostgresMigrationRunner:
                     "SELECT set_config('lock_timeout', %s, true)",
                     (timeout_milliseconds,),
                 )
-                self._identity_preflight.run(
-                    cursor,
-                    initialize_if_empty=self._initialize_identity_if_empty,
-                )
+                try:
+                    self._identity_preflight.run(
+                        cursor,
+                        initialize_if_empty=self._initialize_identity_if_empty,
+                    )
+                except DatastoreEnvironmentMismatchError:
+                    if not self._adopt_legacy_if_unidentified:
+                        raise
+                    self._identity_preflight.adopt_legacy(cursor)
                 cursor.execute("SELECT pg_advisory_xact_lock(%s)", (_MIGRATION_LOCK_ID,))
                 _create_ledger(cursor)
                 applied = _read_ledger(cursor)
@@ -183,6 +197,7 @@ def build_configured_postgres_migration_runner(
     configuration: ApplicationConfiguration,
     *,
     initialize_identity_if_empty: bool,
+    adopt_legacy_if_unidentified: bool,
 ) -> PostgresMigrationRunner:
     if not isinstance(configuration, ApplicationConfiguration):
         raise TypeError("configuration applicative validée obligatoire")
@@ -202,20 +217,23 @@ def build_configured_postgres_migration_runner(
             )
         ),
         initialize_identity_if_empty=initialize_identity_if_empty,
+        adopt_legacy_if_unidentified=adopt_legacy_if_unidentified,
     )
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Runner de migrations PostgreSQL OSTrading.")
     parser.add_argument("--config", required=True)
+    parser.add_argument("--adopt-legacy-datastore", action="store_true")
     arguments = parser.parse_args()
     configuration = load_application_configuration(
         config_path=arguments.config,
-        environment_snapshot={},
+        environment_snapshot=dict(os.environ),
     )
     runner = build_configured_postgres_migration_runner(
         configuration,
         initialize_identity_if_empty=True,
+        adopt_legacy_if_unidentified=arguments.adopt_legacy_datastore,
     )
     runner.run()
     print(f"POSTGRES_SCHEMA_READY:{runner.required_schema_version:03d}", flush=True)

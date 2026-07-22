@@ -98,18 +98,6 @@ services:
       - ../../config/secrets/production:/workspace/config/secrets/production:ro
       - application-data:/workspace/data/environments/production
 
-  worker-research:
-    volumes: *profile-volumes
-
-  worker-backtest:
-    volumes:
-      - ../../config/environments/production.yaml:/workspace/config/application.yaml:ro
-      - ../../config/secrets/production:/workspace/config/secrets/production:ro
-      - application-data:/workspace/data/environments/production
-
-  backtest-engine:
-    volumes: *profile-volumes
-
 networks:
   edge:
     name: ostrading-production-edge

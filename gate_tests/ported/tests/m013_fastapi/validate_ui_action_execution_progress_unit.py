@@ -14,6 +14,7 @@ def test_validate_ui_action_execution_progress_unit() -> None:
     sys.path.insert(0, str(repository_root))
 
     from app.contracts.document_public_statuses import PublicActionPhase
+    from app.contracts.technical_jobs import JobEnvironmentIdentity
     from app.platform.ui_corpus import render_document_inspection
     import app.platform.ui_local_stack as ui_local_stack
     from app.source_processing.application.document_queries import DocumentActionProgressView
@@ -68,7 +69,14 @@ def test_validate_ui_action_execution_progress_unit() -> None:
     # QUEUED à RUNNING sans simuler des pages diagnostiquées.
     running = queued.begin_diagnosis()
     assert running.status is DocumentProcessingRunStatus.DIAGNOSING
-    progress = DocumentActionProgressView.from_processing_run(running)
+    progress = DocumentActionProgressView.from_processing_run(
+        running,
+        environment_identity=JobEnvironmentIdentity(
+            environment="development",
+            deployment_id="ostrading-development-local",
+            configuration_hash="a" * 64,
+        ),
+    )
     assert progress.phase is PublicActionPhase.RUNNING
     assert (progress.completed_units, progress.total_units) == (0, 2)
     assert callable(ui_local_stack._start_local_document_worker)

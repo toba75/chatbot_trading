@@ -32,6 +32,7 @@ from app.platform.development_e2e import (
     _read_secret,
     _require_real_versioned_pdf,
     _sha256_file,
+    verify_worker_documents_runtime_limits,
     _verify_public_ui,
     _write_secret_free_payload,
 )
@@ -42,6 +43,7 @@ from app.platform.environment_compose import (
     render_environment_compose,
     start_environment_compose_stack,
 )
+from app.platform.configured_datastore_identity import preflight_all_mutable_roots
 
 
 _ENVIRONMENT = "test"
@@ -123,7 +125,7 @@ class TestE2ERunReport:
             raise ValueError("TEST_E2E_SUPPORT_STATUS_INVALID")
         if self.progress_phases != ("SUCCEEDED", "SUCCEEDED", "SUCCEEDED"):
             raise ValueError("TEST_E2E_PROGRESS_INVALID")
-        if self.worker_identity_count < 6 or self.environment_job_count < 3:
+        if self.worker_identity_count != 4 or self.environment_job_count < 3:
             raise ValueError("TEST_E2E_ENVIRONMENT_IDENTITY_INCOMPLETE")
         if self.non_test_credentials_inaccessible is not True:
             raise ValueError("TEST_E2E_NON_TEST_CREDENTIALS_ACCESSIBLE")
@@ -227,9 +229,10 @@ def _run_test_environment_e2e_locked(
     source_pdf = _require_real_versioned_pdf(root, pdf_path)
     configuration = load_application_configuration(
         config_path=root / "config" / "environments" / "test.yaml",
-        environment_snapshot={},
+        environment_snapshot=dict(os.environ),
     )
     _require_test_configuration(configuration)
+    preflight_all_mutable_roots(configuration, initialize_if_empty=True)
     report_root = (root / configuration.paths.reports_root).resolve()
     report_root.mkdir(parents=True, exist_ok=True)
     foreign_sentinels = _foreign_volume_sentinels(repository_root=root)
@@ -551,7 +554,7 @@ def _verify_runtime_excludes_non_test_credentials(
         if not isinstance(name, str) or name == "":
             raise TestE2EError("TEST_E2E_CONTAINER_NAME_INVALID")
         container_names.append(name)
-    if len(container_names) != 17:
+    if len(container_names) != 14:
         raise TestE2EError("TEST_E2E_CONTAINER_COUNT_INVALID")
     docker_executable = _docker_executable()
     inspected = subprocess.run(
@@ -565,6 +568,7 @@ def _verify_runtime_excludes_non_test_credentials(
     )
     if inspected.returncode != 0:
         raise TestE2EError("TEST_E2E_CONTAINER_INSPECTION_FAILED")
+    verify_worker_documents_runtime_limits(inspected.stdout, environment="test")
     _reject_non_test_paths(inspected.stdout)
 
 

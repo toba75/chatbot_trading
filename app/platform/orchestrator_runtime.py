@@ -12,6 +12,7 @@ from uuid import uuid4
 from fastapi import APIRouter
 
 from app.contracts.llm_inference import LlmInferenceGateway
+from app.contracts.technical_jobs import JobEnvironmentIdentity
 from app.conversation.application.public_chat import ProductConversationHandler
 from app.conversation.adapters.in_memory_conversation_repository import (
     InMemoryConversationRepository,
@@ -359,6 +360,7 @@ def build_orchestrator_composition_root(
             expected_identity=configured_datastore_identity(configuration),
         ),
         initialize_identity_if_empty=False,
+        adopt_legacy_if_unidentified=False,
     )
     persistence = build_document_persistence(
         configuration,
@@ -390,6 +392,11 @@ def build_orchestrator_composition_root(
     document_queries = DocumentQueryService(
         document_snapshot_repository=persistence.source_document_repository,
         document_corpus_status_repository=persistence.source_document_repository,
+        environment_identity=JobEnvironmentIdentity(
+            environment=configuration.application.environment,
+            deployment_id=configuration.application.deployment_id,
+            configuration_hash=configuration.configuration_hash,
+        ),
     )
     original_queries = OriginalPdfQueryService(
         source_document_repository=persistence.source_document_repository,

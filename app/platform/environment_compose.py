@@ -29,7 +29,10 @@ from app.platform.configured_datastore_identity import (
     configured_datastore_identity,
 )
 from app.platform.datastore_identity import DatastoreIdentity
-from app.platform.worker_environment import build_worker_environment_binding
+from app.platform.worker_environment import (
+    build_worker_environment_binding,
+    read_worker_health_file,
+)
 
 
 ApplicationEnvironment = Literal["development", "test", "production"]
@@ -47,9 +50,12 @@ REQUIRED_SERVICE_IDS: Final = (
     "ocr-runtime",
     "worker-documents",
     "worker-projection",
-    "worker-research",
-    "worker-backtest",
-    "backtest-engine",
+)
+EXPECTED_SERVICE_REPLICAS: Final = MappingProxyType(
+    {
+        service_id: (2 if service_id in {"worker-documents", "worker-projection"} else 1)
+        for service_id in REQUIRED_SERVICE_IDS
+    }
 )
 APPLICATION_SERVICE_IDS: Final = tuple(
     service_id
@@ -256,6 +262,12 @@ def aggregate_environment_readiness(
     if missing:
         raise ValueError(f"ENVIRONMENT_STACK_SERVICE_MISSING: {','.join(missing)}")
     for service_id in REQUIRED_SERVICE_IDS:
+        expected_replicas = EXPECTED_SERVICE_REPLICAS[service_id]
+        if len(by_service[service_id]) != expected_replicas:
+            raise ValueError(
+                "ENVIRONMENT_STACK_REPLICA_COUNT_INVALID: "
+                f"{service_id}: expected={expected_replicas}, observed={len(by_service[service_id])}"
+            )
         for state in by_service[service_id]:
             if state.state != "running" or state.health != "healthy":
                 raise ValueError(
@@ -303,7 +315,7 @@ def start_environment_compose_stack(launch_configuration: Any) -> Iterator[Any]:
         raise ValueError("CONFIG_ENVIRONMENT_MISMATCH: fichier de pile divergent")
     configuration = load_application_configuration(
         config_path=configuration_path,
-        environment_snapshot={},
+        environment_snapshot=dict(os.environ),
     )
     _require_launch_profile_identity(
         environment=environment,
@@ -529,7 +541,10 @@ def wait_environment_compose_stack(*, service_id: str, port: int, config_path: s
         raise ValueError("ENVIRONMENT_STACK_WAIT_TARGET_INVALID")
     path = Path(config_path).resolve()
     repository_root = _repository_root_from_configuration(path)
-    configuration = load_application_configuration(config_path=path, environment_snapshot={})
+    configuration = load_application_configuration(
+        config_path=path,
+        environment_snapshot=dict(os.environ),
+    )
     definition = environment_stack_definition(
         configuration.application.environment,
         repository_root=repository_root,
@@ -613,7 +628,10 @@ def _first_environment_service_has_stopped(document: str, *, project_name: str) 
 
 
 def configured_http_healthcheck(*, service: str, path: str, config_path: Path) -> None:
-    configuration = load_application_configuration(config_path=config_path, environment_snapshot={})
+    configuration = load_application_configuration(
+        config_path=config_path,
+        environment_snapshot=dict(os.environ),
+    )
     if service == "orchestrator-api":
         port = configuration.services.api.port
     elif service == "llm-gateway":
@@ -627,27 +645,23 @@ def configured_http_healthcheck(*, service: str, path: str, config_path: Path) -
             raise ValueError("ENVIRONMENT_HEALTHCHECK_HTTP_FAILED")
 
 
-def configured_worker_healthcheck(*, worker_id: str, config_path: Path) -> Mapping[str, str]:
-    configuration = load_application_configuration(config_path=config_path, environment_snapshot={})
+def configured_worker_healthcheck(
+    *,
+    worker_id: str,
+    config_path: Path,
+    health_path: Path,
+) -> Mapping[str, object]:
+    configuration = load_application_configuration(
+        config_path=config_path,
+        environment_snapshot=dict(os.environ),
+    )
     binding = build_worker_environment_binding(configuration, worker_id=worker_id)
-    if worker_id == "worker-documents":
-        include_qdrant = False
-        file_root_names = ("data_root", "corpus_root", "canonical_sources_root")
-    elif worker_id == "worker-projection":
-        include_qdrant = True
-        file_root_names = ("canonical_sources_root",)
-    elif worker_id in {"worker-research", "worker-backtest"}:
-        include_qdrant = False
-        file_root_names = ()
-    else:
-        raise ValueError("worker_id invalide")
-    build_configured_datastore_preflight(
-        configuration,
-        include_postgres=True,
-        include_qdrant=include_qdrant,
-        file_root_names=file_root_names,
-    ).run(initialize_if_empty=False)
-    health = binding.health_snapshot().to_mapping()
+    health = read_worker_health_file(
+        path=health_path,
+        expected_identity=binding.identity,
+        expected_worker_id=worker_id,
+        maximum_age_seconds=30.0,
+    )
     print(json.dumps(health, ensure_ascii=False, sort_keys=True), flush=True)
     return health
 
@@ -657,7 +671,7 @@ def configured_administrative_identity(config_path: Path) -> Mapping[str, str]:
 
     configuration = load_application_configuration(
         config_path=config_path,
-        environment_snapshot={},
+        environment_snapshot=dict(os.environ),
     )
     expected = configured_datastore_identity(configuration)
     observed = build_configured_datastore_preflight(
@@ -676,7 +690,7 @@ def configured_administrative_identity(config_path: Path) -> Mapping[str, str]:
 def record_test_lifecycle_owner(config_path: Path, lifecycle_id: str) -> str:
     configuration = load_application_configuration(
         config_path=config_path,
-        environment_snapshot={},
+        environment_snapshot=dict(os.environ),
     )
     if configuration.application.environment != "test":
         raise ValueError("ADMINISTRATIVE_OPERATION_FORBIDDEN")
@@ -697,7 +711,7 @@ def record_test_lifecycle_owner(config_path: Path, lifecycle_id: str) -> str:
 def read_test_lifecycle_owner(config_path: Path) -> str:
     configuration = load_application_configuration(
         config_path=config_path,
-        environment_snapshot={},
+        environment_snapshot=dict(os.environ),
     )
     if configuration.application.environment != "test":
         raise ValueError("ADMINISTRATIVE_OPERATION_FORBIDDEN")
@@ -725,6 +739,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     worker_parser = subparsers.add_parser("check-worker")
     worker_parser.add_argument("--worker-id", required=True)
     worker_parser.add_argument("--config", required=True)
+    worker_parser.add_argument("--health-path", required=True, type=Path)
     administrative_parser = subparsers.add_parser("check-administrative-identity")
     administrative_parser.add_argument("--config", required=True)
     owner_record_parser = subparsers.add_parser("record-test-lifecycle-owner")
@@ -734,12 +749,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     owner_read_parser.add_argument("--config", required=True)
     arguments = parser.parse_args(argv)
     if arguments.command == "check-config":
-        load_application_configuration(config_path=arguments.config, environment_snapshot={})
+        load_application_configuration(
+            config_path=arguments.config,
+            environment_snapshot=dict(os.environ),
+        )
         return 0
     if arguments.command == "check-worker":
         configured_worker_healthcheck(
             worker_id=arguments.worker_id,
             config_path=Path(arguments.config),
+            health_path=arguments.health_path,
         )
         return 0
     if arguments.command == "check-administrative-identity":
@@ -834,7 +853,7 @@ def _validate_environment_compose_document(
         raise ValueError("ENVIRONMENT_COMPOSE_SPARK_ENDPOINT_MISMATCH")
     configuration = load_application_configuration(
         config_path=definition.configuration_path,
-        environment_snapshot={},
+        environment_snapshot=dict(os.environ),
     )
     if configuration.application.environment != definition.environment:
         raise ValueError("CONFIG_ENVIRONMENT_MISMATCH: pile/configuration")

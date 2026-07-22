@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 import json
+import os
 from pathlib import Path
 import re
 import shutil
@@ -31,6 +32,7 @@ from app.platform.development_e2e import (
     _read_secret,
     _require_real_versioned_pdf,
     _sha256_file,
+    verify_worker_documents_runtime_limits,
     _verify_persistence_after_restart,
     _verify_public_ui,
     _write_secret_free_payload,
@@ -42,6 +44,7 @@ from app.platform.environment_compose import (
     render_environment_compose,
     start_environment_compose_stack,
 )
+from app.platform.configured_datastore_identity import preflight_all_mutable_roots
 
 
 _ENVIRONMENT: Final = "production"
@@ -129,7 +132,7 @@ class ProductionE2EReport:
             raise ValueError("PRODUCTION_E2E_SUPPORT_STATUS_INVALID")
         if self.progress_phases != ("SUCCEEDED", "SUCCEEDED", "SUCCEEDED"):
             raise ValueError("PRODUCTION_E2E_PROGRESS_INVALID")
-        if self.worker_identity_count < 6 or self.environment_job_count < 3:
+        if self.worker_identity_count != 4 or self.environment_job_count < 3:
             raise ValueError("PRODUCTION_E2E_ENVIRONMENT_IDENTITY_INCOMPLETE")
         if self.restart_persistence_verified is not True:
             raise ValueError("PRODUCTION_E2E_RESTART_NOT_PROVEN")
@@ -174,9 +177,10 @@ def run_production_environment_e2e(
     source_pdf = _require_real_versioned_pdf(root, pdf_path)
     configuration = load_application_configuration(
         config_path=root / "config" / "environments" / "production.yaml",
-        environment_snapshot={},
+        environment_snapshot=dict(os.environ),
     )
     _require_production_configuration(configuration)
+    preflight_all_mutable_roots(configuration, initialize_if_empty=True)
     report_root = (root / configuration.paths.reports_root).resolve()
     _require_production_path(report_root)
     report_root.mkdir(parents=True, exist_ok=True)
@@ -460,7 +464,7 @@ def _verify_runtime_excludes_non_production_credentials(
         if not isinstance(name, str) or not name.startswith("ostrading-production-"):
             raise ProductionE2EError("PRODUCTION_E2E_CONTAINER_IDENTITY_INVALID")
         container_names.append(name)
-    if len(container_names) != 17:
+    if len(container_names) != 14:
         raise ProductionE2EError("PRODUCTION_E2E_CONTAINER_COUNT_INVALID")
     inspected = subprocess.run(
         (_docker_executable(), "inspect", *container_names),
@@ -473,6 +477,7 @@ def _verify_runtime_excludes_non_production_credentials(
     )
     if inspected.returncode != 0:
         raise ProductionE2EError("PRODUCTION_E2E_CONTAINER_INSPECTION_FAILED")
+    verify_worker_documents_runtime_limits(inspected.stdout, environment="production")
     normalized = inspected.stdout.replace("\\\\", "/").replace("\\", "/").lower()
     for forbidden in (
         "config/secrets/development",

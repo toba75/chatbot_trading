@@ -46,7 +46,7 @@ def _report(environment: str) -> dict[str, object]:
                     "spark_raw_response_id": f"chatcmpl-{prefix}-{number}",
                     "pdf_sha256": str(number) * 64,
                     "progress_phases": ["SUCCEEDED", "SUCCEEDED", "SUCCEEDED"],
-                    "worker_identity_count": 6,
+                    "worker_identity_count": 4,
                     "environment_job_count": 3,
                     "citation_url": "https://localhost:19443/api/v1/documents/x/original#page=1",
                     "non_test_credentials_inaccessible": True,
@@ -63,7 +63,7 @@ def _report(environment: str) -> dict[str, object]:
         "spark_raw_response_id": f"chatcmpl-{prefix}",
         "pdf_sha256": {"development": "4" * 64, "production": "5" * 64}[environment],
         "progress_phases": ["SUCCEEDED", "SUCCEEDED", "SUCCEEDED"],
-        "worker_identity_count": 6,
+        "worker_identity_count": 4,
         "environment_job_count": 3,
         "restart_persistence_verified": True,
     }
@@ -107,7 +107,7 @@ def test_environment_governance_unit() -> None:
     # Then toutes les identités restent distinctes et M-013 reste ouvert.
     assert evidence.environments == ("development", "test", "production")
     assert evidence.execution_count == 4
-    assert evidence.worker_identity_count == 24
+    assert evidence.worker_identity_count == 16
     assert build_isolation_access_matrix(evidence.environments) == {
         "development": {
             "development": "OWNED",

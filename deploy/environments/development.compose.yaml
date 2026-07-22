@@ -95,18 +95,6 @@ services:
       - ../../config/secrets/development:/workspace/config/secrets/development:ro
       - application-data:/workspace/data/environments/development
 
-  worker-research:
-    volumes: *profile-volumes
-
-  worker-backtest:
-    volumes:
-      - ../../config/environments/development.yaml:/workspace/config/application.yaml:ro
-      - ../../config/secrets/development:/workspace/config/secrets/development:ro
-      - application-data:/workspace/data/environments/development
-
-  backtest-engine:
-    volumes: *profile-volumes
-
 networks:
   edge:
     name: ostrading-development-edge

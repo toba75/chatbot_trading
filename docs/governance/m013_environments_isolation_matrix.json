@@ -126,8 +126,6 @@
   },
   "workers": {
     "worker-documents": 2,
-    "worker-projection": 2,
-    "worker-research": 1,
-    "worker-backtest": 1
+    "worker-projection": 2
   }
 }
