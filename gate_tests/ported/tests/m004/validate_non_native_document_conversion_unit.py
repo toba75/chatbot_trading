@@ -248,15 +248,20 @@ def test_ocrmypdf_manifest_refuses_an_unpinned_image_and_no_network_command(tmp_
         manifest_path=manifest_path,
         require_local_image=False,
     )
+    output_directory = tmp_path / "output"
+    output_directory.mkdir()
     command = runtime.build_ocrmypdf_container_command(
         image_reference=manifest.image_reference,
         source_path=tmp_path / "source.pdf",
-        output_path=tmp_path / "output" / "preprocessed.pdf",
+        output_path=output_directory / "preprocessed.pdf",
         page_number=1,
     )
     assert "--network" in command
     assert command[command.index("--network") + 1] == "none"
     assert "--read-only" in command
+    assert "--user" in command
+    output_identity = f"{output_directory.stat().st_uid}:{output_directory.stat().st_gid}"
+    assert command[command.index("--user") + 1] == output_identity
     assert image_reference in command
 
 
