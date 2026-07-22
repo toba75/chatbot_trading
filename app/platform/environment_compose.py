@@ -683,7 +683,15 @@ def configured_worker_healthcheck(
         expected_worker_id=worker_id,
         maximum_age_seconds=30.0,
     )
-    print(json.dumps(health, ensure_ascii=False, sort_keys=True), flush=True)
+    serialized_health = {
+        "service": health["service"],
+        "status": health["status"],
+        "environment": health["environment"],
+        "deployment_id": health["deployment_id"],
+        "configuration_hash": health["configuration_hash"],
+        "updated_at_epoch": health["updated_at_epoch"],
+    }
+    print(json.dumps(serialized_health, ensure_ascii=False, sort_keys=True), flush=True)
     return health
 
 
