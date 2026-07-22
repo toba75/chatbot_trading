@@ -42,7 +42,7 @@ def test_environment_governance_acceptance() -> None:
     assert evidence.mutable_resource_count >= 30
     assert evidence.execution_count == 0
     assert evidence.closure_status == "SUBMILESTONE_GREEN_M013_OPEN"
-    assert evidence.source == "historical-stale-evidence"
+    assert evidence.source == "offline-awaiting-live-evidence"
 
     versioned = json.loads(
         (

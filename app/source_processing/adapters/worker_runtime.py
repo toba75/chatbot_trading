@@ -18,12 +18,14 @@ from app.platform.job_runtime import JobStatus
 from app.platform.job_runtime.composition import build_postgres_job_runtime
 from app.platform.job_runtime.heartbeat import JobLeaseHeartbeat
 from app.platform.job_runtime.postgres import JobLeaseConflictError
+from app.platform.job_runtime.reconciliation import reconcile_stale_configuration_jobs
 from app.platform.postgres import PsycopgConnectionFactory
 from app.platform.postgres_migrations import build_configured_postgres_migration_runner
 from app.platform.request_context import bind_trace_id, reset_trace_id
 from app.platform.worker_environment import (
     WorkerHealthFilePublisher,
     build_worker_environment_binding,
+    job_environment_identity_from_configuration,
 )
 from app.source_processing.adapters.postgres_document_persistence import build_document_persistence
 from app.source_processing.adapters.docling_native_conversion import (
@@ -47,6 +49,7 @@ from app.source_processing.application.routing_policy import (
 
 
 MAX_TRANSIENT_ATTEMPTS = 3
+MAX_STARTUP_ENVIRONMENT_RECONCILIATIONS = 256
 GEMMA_GATEWAY_LOCAL_SUPERVISION_OVERHEAD_SECONDS = 30
 
 
@@ -110,16 +113,7 @@ def _run_worker(
         application_configuration,
         worker_id=owner_id,
     )
-    WorkerHealthFilePublisher(
-        binding=worker_binding,
-        path=health_path,
-        heartbeat_interval_seconds=health_interval_seconds,
-    ).start()
     instance_owner_id = worker_binding.instance_owner_id(str(uuid4()))
-    print(
-        json.dumps(worker_binding.health_snapshot().to_mapping(), sort_keys=True),
-        flush=True,
-    )
     connection_factory = PsycopgConnectionFactory(
         connection_url=application_configuration.services.postgres.url,
         password_path=Path(application_configuration.security.secrets.postgres_password_path),
@@ -129,10 +123,34 @@ def _run_worker(
         application_configuration,
         connection_factory=connection_factory,
     )
+    environment_identity = job_environment_identity_from_configuration(
+        application_configuration
+    )
+    outbox = PostgresJobOutbox(
+        connection_factory=connection_factory,
+        environment_identity=environment_identity,
+    )
     job_runtime = build_postgres_job_runtime(
         connection_factory=connection_factory,
-        outbox=PostgresJobOutbox(connection_factory=connection_factory),
+        outbox=outbox,
         application_configuration=application_configuration,
+    )
+    reconcile_stale_configuration_jobs(
+        job_queue=job_runtime.queue,
+        job_names=("DIAGNOSE", "CONVERT_DOCUMENT"),
+        owner_id=f"{instance_owner_id}-RECONCILE",
+        lease_seconds=lease_seconds,
+        maximum_jobs=MAX_STARTUP_ENVIRONMENT_RECONCILIATIONS,
+        persist_public_failure=outbox.persist_environment_failure,
+    )
+    WorkerHealthFilePublisher(
+        binding=worker_binding,
+        path=health_path,
+        heartbeat_interval_seconds=health_interval_seconds,
+    ).start()
+    print(
+        json.dumps(worker_binding.health_snapshot().to_mapping(), sort_keys=True),
+        flush=True,
     )
     worker = DocumentDiagnosticWorker(
         source_document_repository=persistence.source_document_repository,

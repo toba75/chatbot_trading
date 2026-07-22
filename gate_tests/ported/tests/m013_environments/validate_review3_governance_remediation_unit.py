@@ -41,7 +41,7 @@ def test_review3_governance_remediation_unit(monkeypatch, tmp_path: Path) -> Non
         require_live_sources=False,
     )
     assert offline.execution_count == 0
-    assert offline.source == "historical-stale-evidence"
+    assert offline.source == "offline-awaiting-live-evidence"
 
     evidence = json.loads(
         (root / "docs/governance/m013_environments_execution_evidence.json").read_text(

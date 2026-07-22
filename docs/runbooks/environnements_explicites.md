@@ -56,6 +56,35 @@ conteneur Caddy inaccessible ou un certificat PEM invalide. Il ne modifie
 jamais le trust store. Les parcours E2E exportent cette même CA et la passent à
 leur client HTTP; toute désactivation de validation TLS est interdite.
 
+### Confiance navigateur Windows, explicite et révocable
+
+Les navigateurs Windows fondés sur Chromium consultent le magasin de
+certificats de l'utilisateur. L'import reste une décision opérateur : le
+lanceur ne l'effectue jamais automatiquement et aucune installation silencieuse
+n'est autorisée. Après avoir exporté la CA du profil voulu, l'importer seulement
+dans `Cert:\CurrentUser\Root`, conserver son `Thumbprint`, puis vérifier qu'il
+correspond au certificat exporté :
+
+```console
+$importedCa = Import-Certificate -FilePath $caPath -CertStoreLocation Cert:\CurrentUser\Root
+$caddyCaThumbprint = $importedCa.Thumbprint
+Get-Item -LiteralPath "Cert:\CurrentUser\Root\$caddyCaThumbprint"
+```
+
+La révocation est tout aussi explicite. Dès que la session navigateur ou la
+qualification est terminée, retirer uniquement ce certificat grâce au
+`Thumbprint` capturé, puis confirmer son absence :
+
+```console
+Remove-Item -LiteralPath "Cert:\CurrentUser\Root\$caddyCaThumbprint"
+if (Test-Path -LiteralPath "Cert:\CurrentUser\Root\$caddyCaThumbprint") {
+    throw "ENVIRONMENT_CADDY_CA_REVOCATION_FAILED"
+}
+```
+
+Cette procédure ne modifie ni le magasin machine, ni un autre profil, ni le
+magasin propre d'un navigateur qui n'utilise pas celui de Windows.
+
 `uv run development` démarre les 14 conteneurs, vérifie la readiness de tous
 les participants, puis reste actif. L'arrêt normal est `Ctrl+C`; le contexte
 exécute `down --remove-orphans`, sans `--volumes`.

@@ -8,6 +8,7 @@ import json
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from app.contracts.technical_jobs import JobEnvironmentIdentity
 from app.platform.orchestrator_composition import DependencyReadiness
 
 
@@ -20,6 +21,7 @@ class HttpHealthOrchestratorDependency:
     timeout_seconds: int
     not_ready_error_code: str
     api_key: str | None
+    expected_identity: JobEnvironmentIdentity | None
     _opened: bool = field(init=False, default=False)
 
     def __post_init__(self) -> None:
@@ -38,8 +40,12 @@ class HttpHealthOrchestratorDependency:
         if self.name == "qdrant":
             if not isinstance(self.api_key, str) or len(self.api_key.encode("utf-8")) < 32:
                 raise ValueError("clé API readiness Qdrant invalide")
+            if self.expected_identity is not None:
+                raise ValueError("identité applicative interdite pour Qdrant")
         elif self.api_key is not None:
             raise ValueError("clé API interdite pour la readiness LLM locale")
+        elif not isinstance(self.expected_identity, JobEnvironmentIdentity):
+            raise ValueError("identité applicative LLM invalide")
 
     async def open(self) -> None:
         if self._opened:
@@ -81,12 +87,11 @@ class HttpHealthOrchestratorDependency:
             return False
         if not isinstance(payload, dict):
             return False
-        configuration_hash = payload.get("configuration_hash")
         return payload == {
             "service": "llm-gateway",
             "status": "ready",
-            "configuration_hash": configuration_hash,
-        } and isinstance(configuration_hash, str) and len(configuration_hash) == 64
+            **self.expected_identity.to_mapping(),
+        }
 
 
 __all__ = ["HttpHealthOrchestratorDependency"]

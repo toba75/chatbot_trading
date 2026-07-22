@@ -146,6 +146,7 @@ class LocalMutationAuthorizationMiddleware:
                 and (
                     path.endswith("/diagnose")
                     or path.endswith("/convert")
+                    or path.endswith("/manual-review")
                 )
             )
         ):

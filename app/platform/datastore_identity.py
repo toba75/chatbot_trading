@@ -155,14 +155,24 @@ class QdrantIdentityPreflight:
             raise DatastoreEnvironmentMismatchError("marqueur Qdrant absent")
         try:
             initialization_owned = self.client.initialize_identity(self.expected_identity)
-        except Exception:
+        except Exception as initialization_error:
+            try:
+                observed = self.client.read_identity()
+            except Exception as read_error:
+                raise DatastoreEnvironmentMismatchError(
+                    "état Qdrant ambigu après l'initialisation"
+                ) from read_error
+            if observed is not None:
+                return self.expected_identity.require_match(
+                    DatastoreIdentity.from_mapping(observed)
+                )
             try:
                 self.client.compensate_failed_initialization()
             except Exception as compensation_error:
                 raise DatastoreEnvironmentMismatchError(
                     "compensation de l'initialisation Qdrant échouée"
                 ) from compensation_error
-            raise
+            raise initialization_error
         if not isinstance(initialization_owned, bool):
             raise DatastoreEnvironmentMismatchError(
                 "résultat d'initialisation Qdrant invalide"
@@ -454,10 +464,22 @@ class QdrantRestIdentityClient:
             },
         )
         result = payload.get("result")
-        if not isinstance(result, list) or len(result) != 1:
+        if not isinstance(result, list):
+            raise DatastoreEnvironmentMismatchError(
+                "réponse du marqueur Qdrant invalide"
+            )
+        if len(result) == 0:
             return None
-        point_payload = result[0].get("payload") if isinstance(result[0], Mapping) else None
-        return point_payload if isinstance(point_payload, Mapping) else None
+        if len(result) != 1 or not isinstance(result[0], Mapping):
+            raise DatastoreEnvironmentMismatchError(
+                "réponse du marqueur Qdrant invalide"
+            )
+        point_payload = result[0].get("payload")
+        if not isinstance(point_payload, Mapping):
+            raise DatastoreEnvironmentMismatchError(
+                "payload du marqueur Qdrant invalide"
+            )
+        return point_payload
 
     def initialize_identity(self, identity: DatastoreIdentity) -> bool:
         if not isinstance(identity, DatastoreIdentity):

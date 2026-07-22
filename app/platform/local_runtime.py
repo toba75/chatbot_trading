@@ -740,6 +740,8 @@ def _llm_gateway_readiness_response(
     return 200, {
         "service": "llm-gateway",
         "status": "ready",
+        "environment": application_configuration.application.environment,
+        "deployment_id": application_configuration.application.deployment_id,
         "configuration_hash": application_configuration.configuration_hash,
     }
 

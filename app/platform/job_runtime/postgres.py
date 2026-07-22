@@ -492,6 +492,106 @@ class PostgresJobQueue:
             execution_attempts=claimed_row.execution_attempts,
         )
 
+    def claim_next_environment_mismatch(
+        self,
+        *,
+        owner_id: str,
+        lease_seconds: int,
+        job_names: tuple[str, ...],
+    ) -> ClaimedJob | None:
+        """Réclame un seul job actif portant un ancien hash du même déploiement."""
+
+        parsed_owner = _ensure_text(owner_id, "owner_id")
+        parsed_lease = _ensure_positive_integer(lease_seconds, "lease_seconds")
+        parsed_names = _ensure_job_names(job_names, self._catalog)
+        with self._connection_factory.connect() as connection:
+            with connection.transaction(), connection.cursor() as cursor:
+                cursor.execute(
+                    f"""
+                    WITH candidate AS (
+                        SELECT sequence
+                          FROM platform.technical_jobs
+                         WHERE environment = %s
+                           AND deployment_id = %s
+                           AND configuration_hash <> %s
+                           AND job_name = ANY(%s)
+                           AND (
+                               status = 'pending'
+                               OR (status = 'running'
+                                   AND lease_expires_at <= CURRENT_TIMESTAMP)
+                           )
+                         ORDER BY priority, sequence
+                         FOR UPDATE SKIP LOCKED
+                         LIMIT 1
+                    )
+                    UPDATE platform.technical_jobs AS job
+                       SET status = 'running', lease_owner = %s,
+                           lease_expires_at =
+                               CURRENT_TIMESTAMP + (%s * INTERVAL '1 second'),
+                           execution_attempts = execution_attempts + 1,
+                           claim_generation = claim_generation + 1,
+                           claim_token = gen_random_uuid()
+                      FROM candidate
+                     WHERE job.sequence = candidate.sequence
+                    RETURNING {_QUALIFIED_CLAIMED_JOB_COLUMNS_SQL}
+                    """,
+                    (
+                        self._environment_identity.environment,
+                        self._environment_identity.deployment_id,
+                        self._environment_identity.configuration_hash,
+                        list(parsed_names),
+                        parsed_owner,
+                        parsed_lease,
+                    ),
+                )
+                row = cursor.fetchone()
+        if row is None:
+            return None
+        claimed_row = _ClaimedJobRow.from_database(row)
+        return ClaimedJob(
+            job=_job_from_row(claimed_row.job_row()),
+            trace_id=claimed_row.trace_id,
+            lease_owner=claimed_row.lease_owner,
+            lease_expires_at=claimed_row.lease_expires_at,
+            claim_generation=claimed_row.claim_generation,
+            claim_token=str(claimed_row.claim_token),
+            execution_attempts=claimed_row.execution_attempts,
+        )
+
+    def has_environment_mismatch(self, *, job_names: tuple[str, ...]) -> bool:
+        """Indique si la réconciliation bornée a encore du travail éligible."""
+
+        parsed_names = _ensure_job_names(job_names, self._catalog)
+        with self._connection_factory.connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT EXISTS (
+                        SELECT 1
+                          FROM platform.technical_jobs
+                         WHERE environment = %s
+                           AND deployment_id = %s
+                           AND configuration_hash <> %s
+                           AND job_name = ANY(%s)
+                           AND (
+                               status = 'pending'
+                               OR (status = 'running'
+                                   AND lease_expires_at <= CURRENT_TIMESTAMP)
+                           )
+                    )
+                    """,
+                    (
+                        self._environment_identity.environment,
+                        self._environment_identity.deployment_id,
+                        self._environment_identity.configuration_hash,
+                        list(parsed_names),
+                    ),
+                )
+                row = cursor.fetchone()
+        if not isinstance(row, tuple) or len(row) != 1 or not isinstance(row[0], bool):
+            raise RuntimeError("JOB_ENVIRONMENT_RECONCILIATION_INVENTORY_INVALID")
+        return row[0]
+
     def renew_lease(
         self,
         *,

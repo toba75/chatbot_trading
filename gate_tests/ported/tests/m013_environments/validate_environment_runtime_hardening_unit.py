@@ -218,6 +218,7 @@ def test_environment_runtime_hardening_unit(
         timeout_seconds=5,
         not_ready_error_code="QDRANT_NOT_READY",
         api_key="development-qdrant-key-000000000001",
+        expected_identity=None,
     )._is_ready()
     assert qdrant_calls[-1]["headers"].get("api-key") == (
         "development-qdrant-key-000000000001"

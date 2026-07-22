@@ -318,7 +318,10 @@ def run_production_environment_e2e(
         repository_root=root,
         forbidden_document_id=product.document_id,
     )
-    test_probe = _probe_test_storage_absence(repository_root=root)
+    test_probe = _probe_test_storage_absence(
+        repository_root=root,
+        forbidden_document_id=product.document_id,
+    )
     final_sentinels = _production_volume_sentinels(repository_root=root)
     _verify_production_sentinels_preserved(
         initial=initial_sentinels,
@@ -564,13 +567,17 @@ def _probe_development_absence(
         ) from exc
 
 
-def _probe_test_storage_absence(*, repository_root: Path) -> str:
+def _probe_test_storage_absence(
+    *,
+    repository_root: Path,
+    forbidden_document_id: str,
+) -> str:
     try:
         return _probe_foreign_environment(
             repository_root=repository_root,
             source_environment=_ENVIRONMENT,
             environment="test",
-            forbidden_document_id="STRUCTURAL-ISOLATION-PROBE",
+            forbidden_document_id=forbidden_document_id,
         )
     except DevelopmentE2EError as exc:
         raise ProductionE2EError(

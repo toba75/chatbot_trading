@@ -23,6 +23,7 @@ from app.platform.configured_datastore_identity import build_configured_datastor
 from app.platform.job_runtime.composition import build_postgres_job_runtime
 from app.platform.job_runtime.heartbeat import JobLeaseHeartbeat
 from app.platform.job_runtime.postgres import JobLeaseConflictError
+from app.platform.job_runtime.reconciliation import reconcile_stale_configuration_jobs
 from app.platform.postgres import PsycopgConnectionFactory
 from app.platform.postgres_migrations import build_configured_postgres_migration_runner
 from app.platform.llm_gateway.orchestrator_http import UrllibLlmInferenceGateway
@@ -31,8 +32,12 @@ from app.platform.secret_file import read_required_secret
 from app.platform.worker_environment import (
     WorkerHealthFilePublisher,
     build_worker_environment_binding,
+    job_environment_identity_from_configuration,
 )
 from app.source_processing.adapters.postgres_job_outbox import PostgresJobOutbox
+
+
+MAX_STARTUP_ENVIRONMENT_RECONCILIATIONS = 256
 
 
 def _run_worker(
@@ -90,24 +95,37 @@ def _run_worker(
             timeout_seconds=application_configuration.services.llm_gateway.timeout_seconds,
         ),
     )
+    environment_identity = job_environment_identity_from_configuration(
+        application_configuration
+    )
+    outbox = PostgresJobOutbox(
+        connection_factory=connection_factory,
+        environment_identity=environment_identity,
+        table_name="knowledge_access.job_outbox",
+    )
     job_runtime = build_postgres_job_runtime(
         connection_factory=connection_factory,
-        outbox=PostgresJobOutbox(
-            connection_factory=connection_factory,
-            table_name="knowledge_access.job_outbox",
-        ),
+        outbox=outbox,
         application_configuration=application_configuration,
     )
     worker_binding = build_worker_environment_binding(
         application_configuration,
         worker_id=owner_id,
     )
+    instance_owner_id = worker_binding.instance_owner_id(str(uuid4()))
+    reconcile_stale_configuration_jobs(
+        job_queue=job_runtime.queue,
+        job_names=(PROJECT_DOCUMENT_JOB_NAME,),
+        owner_id=f"{instance_owner_id}-RECONCILE",
+        lease_seconds=lease_seconds,
+        maximum_jobs=MAX_STARTUP_ENVIRONMENT_RECONCILIATIONS,
+        persist_public_failure=outbox.persist_environment_failure,
+    )
     WorkerHealthFilePublisher(
         binding=worker_binding,
         path=health_path,
         heartbeat_interval_seconds=health_interval_seconds,
     ).start()
-    instance_owner_id = worker_binding.instance_owner_id(str(uuid4()))
     print(
         json.dumps(worker_binding.health_snapshot().to_mapping(), sort_keys=True),
         flush=True,

@@ -55,7 +55,7 @@ class _Factory:
         return self._connection
 
 
-def test_sonde_etrangere_valide_la_ca_et_refuse_une_erreur_tls(monkeypatch, tmp_path) -> None:
+def _assert_sonde_etrangere_valide_la_ca_et_refuse_une_erreur_tls(monkeypatch, tmp_path) -> None:
     """Given une pile étrangère active, When TLS échoue, Then la preuve est RED."""
 
     import app.platform.development_e2e as module
@@ -109,7 +109,7 @@ def test_sonde_etrangere_valide_la_ca_et_refuse_une_erreur_tls(monkeypatch, tmp_
     assert exported == ["production"]
 
 
-def test_sonde_etrangere_accepte_uniquement_un_refus_explicite(monkeypatch) -> None:
+def _assert_sonde_etrangere_accepte_uniquement_un_refus_explicite(monkeypatch) -> None:
     """Given aucun listener étranger, When TCP refuse, Then seulement ce cas vaut ABSENT."""
 
     import app.platform.development_e2e as module
@@ -133,7 +133,7 @@ def test_sonde_etrangere_accepte_uniquement_un_refus_explicite(monkeypatch) -> N
     ) == "test:ABSENT"
 
 
-def test_production_sonde_test_avec_le_document_production(monkeypatch) -> None:
+def _assert_production_sonde_test_avec_le_document_production(monkeypatch) -> None:
     """Given un document production, When test est sondé, Then son identifiant est recherché."""
 
     import app.platform.production_e2e as module
@@ -152,7 +152,7 @@ def test_production_sonde_test_avec_le_document_production(monkeypatch) -> None:
     assert observed == ["DOC-PRODUCTION-ONLY"]
 
 
-def test_outbox_filtre_identite_complete_avant_la_lease() -> None:
+def _assert_outbox_filtre_identite_complete_avant_la_lease() -> None:
     """Given une outbox, When elle claim, Then l'identité filtre le candidat atomiquement."""
 
     from app.contracts.technical_jobs import JobEnvironmentIdentity
@@ -183,7 +183,7 @@ def test_outbox_filtre_identite_complete_avant_la_lease() -> None:
     )
 
 
-def test_jobs_ancien_hash_sont_claims_un_par_un_et_terminalises() -> None:
+def _assert_jobs_ancien_hash_sont_claims_un_par_un_et_terminalises() -> None:
     """Given un ancien hash du même déploiement, When le worker démarre, Then il devient FAILED."""
 
     from app.platform.job_runtime.reconciliation import reconcile_stale_configuration_jobs
@@ -222,7 +222,7 @@ def test_jobs_ancien_hash_sont_claims_un_par_un_et_terminalises() -> None:
     assert queue.failed == [("JOB-OLD-HASH", "WORKER_ENVIRONMENT_MISMATCH")]
 
 
-def test_readiness_llm_compare_identite_complete(monkeypatch) -> None:
+def _assert_readiness_llm_compare_identite_complete(monkeypatch) -> None:
     """Given un gateway d'un autre profil, When readiness le lit, Then il reste indisponible."""
 
     import app.platform.llm_gateway.orchestrator_health as module
@@ -268,7 +268,7 @@ def test_readiness_llm_compare_identite_complete(monkeypatch) -> None:
     assert dependency._is_ready() is True
 
 
-def test_gateway_publie_identite_complete_du_fichier() -> None:
+def _assert_gateway_publie_identite_complete_du_fichier() -> None:
     """Given production, When le gateway publie health, Then les trois champs concordent."""
 
     from app.platform.configuration import load_application_configuration
@@ -287,7 +287,7 @@ def test_gateway_publie_identite_complete_du_fichier() -> None:
     assert payload["configuration_hash"] == configuration.configuration_hash
 
 
-def test_qdrant_relit_identite_apres_perte_de_reponse_sans_supprimer() -> None:
+def _assert_qdrant_relit_identite_apres_perte_de_reponse_sans_supprimer() -> None:
     """Given le PUT point commité, When sa réponse est perdue, Then l'identité est relue."""
 
     from app.platform.datastore_identity import (
@@ -325,7 +325,7 @@ def test_qdrant_relit_identite_apres_perte_de_reponse_sans_supprimer() -> None:
     assert client.compensated is False
 
 
-def test_manual_review_est_protegee_par_le_middleware(tmp_path) -> None:
+def _assert_manual_review_est_protegee_par_le_middleware(tmp_path) -> None:
     """Given aucun Bearer, When manual-review est appelée, Then le handler ne s'exécute pas."""
 
     from app.platform.orchestrator_asgi import LocalMutationAuthorizationMiddleware
@@ -364,3 +364,17 @@ def test_manual_review_est_protegee_par_le_middleware(tmp_path) -> None:
     assert sent[0]["status"] == 401
     payload = json.loads(sent[1]["body"])
     assert payload == {"error_code": "LOCAL_API_TOKEN_REQUIRED"}
+
+
+def test_integrite_runtime_de_la_revue4(monkeypatch, tmp_path) -> None:
+    """Given les findings revue 4, When le runtime est vérifié, Then ils sont fermés."""
+
+    _assert_sonde_etrangere_valide_la_ca_et_refuse_une_erreur_tls(monkeypatch, tmp_path)
+    _assert_sonde_etrangere_accepte_uniquement_un_refus_explicite(monkeypatch)
+    _assert_production_sonde_test_avec_le_document_production(monkeypatch)
+    _assert_outbox_filtre_identite_complete_avant_la_lease()
+    _assert_jobs_ancien_hash_sont_claims_un_par_un_et_terminalises()
+    _assert_readiness_llm_compare_identite_complete(monkeypatch)
+    _assert_gateway_publie_identite_complete_du_fichier()
+    _assert_qdrant_relit_identite_apres_perte_de_reponse_sans_supprimer()
+    _assert_manual_review_est_protegee_par_le_middleware(tmp_path)

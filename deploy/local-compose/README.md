@@ -1,4 +1,21 @@
-# Stack locale M13-FastAPI
+# DÉPRÉCIÉ — ancienne stack locale M13-FastAPI
+
+Ce répertoire n'est plus un point d'entrée opératoire. Ne lancez aucune des
+commandes historiques documentées ci-dessous et ne réutilisez pas sa
+configuration comme profil implicite.
+
+Les seuls points d'entrée supportés sont désormais :
+
+- `uv run development`
+- `uv run test`
+- `uv run production`
+
+Le contrat actif, l'export explicite de la CA et les procédures d'arrêt sont
+décrits dans `docs/runbooks/environnements_explicites.md`. Le contenu restant
+est conservé uniquement pour expliquer l'ancienne composition et faciliter sa
+suppression ultérieure ; il ne constitue plus une procédure valide.
+
+## Archive historique non opératoire
 
 ## Préconditions
 

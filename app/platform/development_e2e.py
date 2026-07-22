@@ -12,7 +12,9 @@ import os
 from pathlib import Path
 import re
 import shutil
+import socket
 import subprocess
+from tempfile import TemporaryDirectory
 import time
 from types import MappingProxyType
 from typing import Any, Final
@@ -902,26 +904,66 @@ def _probe_foreign_environment(
         config_path=definition.configuration_path,
         environment_snapshot={},
     )
-    with _foreign_public_client(
-        base_url=f"https://localhost:{definition.edge_port}/api",
+    if _foreign_edge_connection_refused(
+        host="localhost",
+        port=definition.edge_port,
         timeout_seconds=8,
-    ) as client:
+    ):
+        return f"{environment}:ABSENT"
+    with TemporaryDirectory(prefix=f"ost_{environment}_foreign_ca_") as directory:
+        ca_bundle_path = Path(directory) / "caddy-root.crt"
         try:
-            readiness_response = client.get("/ready")
-        except httpx.TransportError:
-            return f"{environment}:ABSENT"
-        _verify_public_readiness_response(
-            readiness_response,
-            expected_environment=configuration.application.environment,
-            expected_deployment_id=configuration.application.deployment_id,
-            expected_configuration_hash=configuration.configuration_hash,
-        )
-        document_ids = _all_public_document_ids(client)
+            export_environment_caddy_ca(
+                environment=environment,
+                repository_root=repository_root,
+                destination_path=ca_bundle_path,
+                technical_environment=_technical_environment_from_repository(repository_root),
+            )
+        except (OSError, ValueError) as exc:
+            raise DevelopmentE2EError(
+                "DEVELOPMENT_E2E_FOREIGN_CA_EXPORT_FAILED"
+            ) from exc
+        try:
+            with _foreign_public_client(
+                base_url=f"https://localhost:{definition.edge_port}/api",
+                timeout_seconds=8,
+                ca_bundle_path=ca_bundle_path,
+            ) as client:
+                _verify_public_readiness_response(
+                    client.get("/ready"),
+                    expected_environment=configuration.application.environment,
+                    expected_deployment_id=configuration.application.deployment_id,
+                    expected_configuration_hash=configuration.configuration_hash,
+                )
+                document_ids = _all_public_document_ids(client)
+        except httpx.TransportError as exc:
+            raise DevelopmentE2EError(
+                "DEVELOPMENT_E2E_FOREIGN_TRANSPORT_FAILED"
+            ) from exc
     if forbidden_document_id in document_ids:
         raise DevelopmentE2EError(
             f"DEVELOPMENT_E2E_FOREIGN_DOCUMENT_VISIBLE: {environment}:{forbidden_document_id}"
         )
     return f"{environment}:ISOLATED"
+
+
+def _foreign_edge_connection_refused(
+    *,
+    host: str,
+    port: int,
+    timeout_seconds: int,
+) -> bool:
+    """Distingue exclusivement un refus TCP d'une panne de preuve étrangère."""
+
+    try:
+        with socket.create_connection((host, port), timeout=timeout_seconds):
+            return False
+    except ConnectionRefusedError:
+        return True
+    except OSError as exc:
+        raise DevelopmentE2EError(
+            "DEVELOPMENT_E2E_FOREIGN_CONNECTIVITY_FAILED"
+        ) from exc
 
 
 def _verify_public_readiness(
@@ -1398,10 +1440,13 @@ def _foreign_public_client(
     *,
     timeout_seconds: int,
     base_url: str,
+    ca_bundle_path: Path,
 ) -> Iterator[httpx.Client]:
+    if not isinstance(ca_bundle_path, Path) or not ca_bundle_path.is_file():
+        raise DevelopmentE2EError("DEVELOPMENT_E2E_FOREIGN_CA_UNREADABLE")
     with httpx.Client(
         base_url=base_url,
-        verify=True,
+        verify=str(ca_bundle_path),
         timeout=timeout_seconds,
         trust_env=False,
     ) as client:

@@ -75,7 +75,7 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 ## Prochains numéros disponibles
 
 ```text
-Prochaine ADR technique: ADR-048
+Prochaine ADR technique: ADR-049
 Prochaine DDD-ADR: DDD-ADR-013
 ```
 

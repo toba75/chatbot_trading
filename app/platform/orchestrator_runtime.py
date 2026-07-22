@@ -527,6 +527,11 @@ def build_orchestrator_composition_root(
                 timeout_seconds=configuration.services.llm_gateway.timeout_seconds,
                 not_ready_error_code="LLM_GATEWAY_NOT_READY",
                 api_key=None,
+                expected_identity=JobEnvironmentIdentity(
+                    environment=configuration.application.environment,
+                    deployment_id=configuration.application.deployment_id,
+                    configuration_hash=configuration.configuration_hash,
+                ),
             ),
             HttpHealthOrchestratorDependency(
                 name="qdrant",
@@ -534,6 +539,7 @@ def build_orchestrator_composition_root(
                 timeout_seconds=configuration.runtime.timeouts.request_seconds,
                 not_ready_error_code="QDRANT_NOT_READY",
                 api_key=qdrant_api_key,
+                expected_identity=None,
             ),
         ),
         document_command_router=document_router,

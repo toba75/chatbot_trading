@@ -38,6 +38,18 @@ _EXPECTED_PORTS: Final = {
 _EXPECTED_TRACEABILITY_IDS: Final = tuple(
     f"REQ-M013-ENV-{number:03d}" for number in range(1, 13)
 )
+_ADR_046: Final = "docs/adr/ADR-046-profils-locaux-etanches-sur-autorite-docker-explicite.md"
+_ADR_047: Final = "docs/adr/ADR-047-archive-chiffree-verifiee-avant-preuve-restauration.md"
+_ADR_048: Final = "docs/adr/ADR-048-progression-et-parallelisme-dans-profils-explicites.md"
+_EXPECTED_TRACEABILITY_ADRS: Final = {
+    **{requirement_id: (_ADR_046,) for requirement_id in _EXPECTED_TRACEABILITY_IDS[:6]},
+    "REQ-M013-ENV-007": (_ADR_046, _ADR_048),
+    "REQ-M013-ENV-008": (_ADR_046, _ADR_047),
+    "REQ-M013-ENV-009": (_ADR_046, _ADR_048),
+    "REQ-M013-ENV-010": (_ADR_046, _ADR_048),
+    "REQ-M013-ENV-011": (_ADR_046, _ADR_048),
+    "REQ-M013-ENV-012": (_ADR_046, _ADR_047, _ADR_048),
+}
 _SHA256: Final = re.compile(r"^[0-9a-f]{64}$")
 _REVISION: Final = re.compile(r"^[0-9a-f]{7,64}$")
 _SENSITIVE_KEYS: Final = frozenset(
@@ -318,7 +330,7 @@ def validate_repository_environment_governance(
             execution_count=0,
             worker_identity_count=0,
         )
-        source = "historical-stale-evidence"
+        source = "offline-awaiting-live-evidence"
 
     configurations = {
         environment: load_application_configuration(
@@ -721,9 +733,9 @@ def _validate_traceability_document(root: Path) -> None:
         {"schema_version", "submilestone_status", "m013_global_status", "records"},
         "TRACEABILITY_SCHEMA_INVALID",
     )
-    if document["schema_version"] != 1:
+    if document["schema_version"] != 2:
         raise EnvironmentGovernanceError("TRACEABILITY_SCHEMA_INVALID")
-    if document["submilestone_status"] != "GREEN":
+    if document["submilestone_status"] != "AWAITING_LIVE_EVIDENCE":
         raise EnvironmentGovernanceError("TRACEABILITY_SUBMILESTONE_RED")
     if document["m013_global_status"] != "OPEN":
         raise EnvironmentGovernanceError("M013_GLOBAL_CLOSURE_FORBIDDEN")
@@ -741,7 +753,7 @@ def _validate_traceability_document(root: Path) -> None:
                 "status",
                 "source_task",
                 "specification",
-                "adr",
+                "adrs",
                 "code",
                 "tests",
                 "reports",
@@ -749,12 +761,21 @@ def _validate_traceability_document(root: Path) -> None:
             },
             "TRACEABILITY_RECORD_INVALID",
         )
-        if current["status"] != "GREEN":
+        requirement_id = current["requirement_id"]
+        expected_status = (
+            "COVERED_OFFLINE"
+            if requirement_id in _EXPECTED_TRACEABILITY_IDS[:8]
+            else "AWAITING_LIVE_EVIDENCE"
+        )
+        if current["status"] != expected_status:
             raise EnvironmentGovernanceError("TRACEABILITY_REQUIREMENT_RED")
-        if current["adr"] != "docs/adr/ADR-046-profils-locaux-etanches-sur-autorite-docker-explicite.md":
+        adrs = current["adrs"]
+        if not isinstance(adrs, list) or tuple(adrs) != _EXPECTED_TRACEABILITY_ADRS[requirement_id]:
             raise EnvironmentGovernanceError("TRACEABILITY_ADR_MISMATCH")
-        for key in ("source_task", "specification", "adr"):
+        for key in ("source_task", "specification"):
             _require_repository_file(root, current[key])
+        for adr in adrs:
+            _require_repository_file(root, adr)
         for key in ("code", "tests", "reports", "runbooks"):
             paths = current[key]
             if not isinstance(paths, list) or not paths:
@@ -784,6 +805,10 @@ def _validate_documentation(root: Path) -> None:
         root / "docs" / "traceability" / "matrix.md",
         "TRACEABILITY_MATRIX_REQUIRED",
     )
+    legacy_compose = _read_text(
+        root / "deploy/local-compose/README.md",
+        "LEGACY_COMPOSE_DOCUMENTATION_REQUIRED",
+    )
     required_runbook_tokens = (
         "uv run development",
         "uv run test",
@@ -801,6 +826,17 @@ def _validate_documentation(root: Path) -> None:
     )
     if any(token not in runbook for token in required_runbook_tokens):
         raise EnvironmentGovernanceError("ENVIRONMENT_RUNBOOK_INCOMPLETE")
+    if any(
+        token not in legacy_compose
+        for token in (
+            "DÉPRÉCIÉ",
+            "uv run development",
+            "uv run test",
+            "uv run production",
+            "docs/runbooks/environnements_explicites.md",
+        )
+    ):
+        raise EnvironmentGovernanceError("LEGACY_COMPOSE_DOCUMENTATION_INVALID")
     for document in (specification, closure, isolation):
         if "ADR-046" not in document or CLOSURE_STATUS not in document:
             raise EnvironmentGovernanceError("ENVIRONMENT_DOCUMENTATION_INCOMPLETE")

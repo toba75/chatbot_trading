@@ -9,7 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[4]
 
 
-def test_traceabilite_attend_preuves_live_et_relit_adr_047_048() -> None:
+def _assert_traceabilite_attend_preuves_live_et_relit_adr_047_048() -> None:
     """Given des rapports STALE, When offline valide, Then aucun statut GREEN n'est publié."""
 
     from ost_gate.environment_governance import validate_repository_environment_governance
@@ -45,7 +45,7 @@ def test_traceabilite_attend_preuves_live_et_relit_adr_047_048() -> None:
     assert evidence.execution_count == 0
 
 
-def test_readme_compose_historique_est_deprecie_et_gouverne() -> None:
+def _assert_readme_compose_historique_est_deprecie_et_gouverne() -> None:
     """Given l'ancien Compose, When sa documentation est lue, Then elle redirige sans ambiguïté."""
 
     readme = (ROOT / "deploy/local-compose/README.md").read_text(encoding="utf-8")
@@ -58,7 +58,7 @@ def test_readme_compose_historique_est_deprecie_et_gouverne() -> None:
     assert "deploy/local-compose/README.md" in governance
 
 
-def test_index_documentation_reference_contrat_backup_1_1_reel() -> None:
+def _assert_index_documentation_reference_contrat_backup_1_1_reel() -> None:
     """Given ADR-047, When l'index est lu, Then les vraies commandes et tests sont indexés."""
 
     index = (ROOT / "docs/governance/m013_documentation_index.md").read_text(
@@ -77,11 +77,11 @@ def test_index_documentation_reference_contrat_backup_1_1_reel() -> None:
         "validate_backup_restore_compose_live.py",
     ):
         assert token in backup_row
-    assert "scripts\\backup_v1.ps1" not in backup_row
+    assert "scripts\\backup_v1" not in backup_row
     assert "m013_backup_restore_drill.md" not in backup_row
 
 
-def test_prochaine_adr_est_049() -> None:
+def _assert_prochaine_adr_est_049() -> None:
     """Given ADR-048 présente, When l'index réserve le suivant, Then il annonce ADR-049."""
 
     index = (ROOT / "docs/adr/index.md").read_text(encoding="utf-8")
@@ -89,7 +89,7 @@ def test_prochaine_adr_est_049() -> None:
     assert "Prochaine ADR technique: ADR-048" not in index
 
 
-def test_runbook_documente_import_ca_windows_explicite_et_reversible() -> None:
+def _assert_runbook_documente_import_ca_windows_explicite_et_reversible() -> None:
     """Given une CA Caddy exportée, When Windows lui fait confiance, Then le retrait est documenté."""
 
     runbook = (ROOT / "docs/runbooks/environnements_explicites.md").read_text(
@@ -106,7 +106,7 @@ def test_runbook_documente_import_ca_windows_explicite_et_reversible() -> None:
         assert token in runbook
 
 
-def test_tests_revue4_sont_enroles_dans_la_gate() -> None:
+def _assert_tests_revue4_sont_enroles_dans_la_gate() -> None:
     """Given les garde-fous revue 4, When la gate est lue, Then ils sont obligatoires offline."""
 
     manifest = (ROOT / "gate.toml").read_text(encoding="utf-8")
@@ -116,3 +116,13 @@ def test_tests_revue4_sont_enroles_dans_la_gate() -> None:
     ):
         assert manifest.count(f'path = "{path}"') == 1
 
+
+def test_gouvernance_de_la_revue4() -> None:
+    """Given les findings revue 4, When la gouvernance est lue, Then ils sont fermés."""
+
+    _assert_traceabilite_attend_preuves_live_et_relit_adr_047_048()
+    _assert_readme_compose_historique_est_deprecie_et_gouverne()
+    _assert_index_documentation_reference_contrat_backup_1_1_reel()
+    _assert_prochaine_adr_est_049()
+    _assert_runbook_documente_import_ca_windows_explicite_et_reversible()
+    _assert_tests_revue4_sont_enroles_dans_la_gate()

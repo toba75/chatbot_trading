@@ -289,10 +289,25 @@ def _assert_sonde_etrangere_lit_uniquement_le_contrat_public(monkeypatch) -> Non
         document_ids=("DOC-FOREIGN-SAFE",),
     )
 
+    monkeypatch.setattr(
+        development_e2e,
+        "_foreign_edge_connection_refused",
+        lambda **_arguments: False,
+    )
+
+    def export_ca(*, destination_path, **_arguments):
+        destination_path.write_text(
+            "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n",
+            encoding="ascii",
+        )
+
+    monkeypatch.setattr(development_e2e, "export_environment_caddy_ca", export_ca)
+
     @contextmanager
-    def public_client(*, base_url, timeout_seconds):
+    def public_client(*, base_url, timeout_seconds, ca_bundle_path):
         assert base_url == "https://localhost:19443/api"
         assert timeout_seconds == 8
+        assert ca_bundle_path.is_file()
         yield client
 
     monkeypatch.setattr(
@@ -321,21 +336,10 @@ def _assert_sonde_etrangere_lit_uniquement_le_contrat_public(monkeypatch) -> Non
             forbidden_document_id="DOC-SOURCE-ONLY",
         )
 
-    import httpx
-
-    class AbsentClient:
-        def get(self, path):
-            raise httpx.ConnectError(f"absent: {path}")
-
-    @contextmanager
-    def absent_public_client(*, base_url, timeout_seconds):
-        del base_url, timeout_seconds
-        yield AbsentClient()
-
     monkeypatch.setattr(
         development_e2e,
-        "_foreign_public_client",
-        absent_public_client,
+        "_foreign_edge_connection_refused",
+        lambda **_arguments: True,
     )
     assert development_e2e._probe_foreign_environment(
         repository_root=repository_root,

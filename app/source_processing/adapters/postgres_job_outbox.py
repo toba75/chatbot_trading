@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
+from app.contracts.technical_jobs import JobEnvironmentIdentity, JobRequest
 from app.platform.job_runtime.relay import ClaimedRelayMessage, RelayedJobMessage
 from app.platform.postgres import PostgresConnectionFactory
 from app.platform.worker_environment import WORKER_ENVIRONMENT_MISMATCH
@@ -28,14 +29,18 @@ class PostgresJobOutbox:
         self,
         *,
         connection_factory: PostgresConnectionFactory,
+        environment_identity: JobEnvironmentIdentity,
         table_name: str = "source_processing.job_outbox",
     ) -> None:
         if not callable(getattr(connection_factory, "connect", None)):
             raise ValueError("connection_factory outbox invalide")
         if table_name not in self._ALLOWED_TABLE_NAMES:
             raise ValueError("table outbox invalide")
+        if not isinstance(environment_identity, JobEnvironmentIdentity):
+            raise ValueError("identité environnement outbox invalide")
         self._connection_factory = connection_factory
         self._table_name = table_name
+        self._environment_identity = environment_identity
 
     def claim_next(
         self,
@@ -52,9 +57,14 @@ class PostgresJobOutbox:
                     WITH candidate AS (
                         SELECT sequence
                           FROM {self._table_name}
-                         WHERE status = 'pending'
-                            OR (status = 'relaying'
-                                AND relay_lease_expires_at <= CURRENT_TIMESTAMP)
+                         WHERE environment = %s
+                           AND deployment_id = %s
+                           AND configuration_hash = %s
+                           AND (
+                               status = 'pending'
+                               OR (status = 'relaying'
+                                   AND relay_lease_expires_at <= CURRENT_TIMESTAMP)
+                           )
                          ORDER BY sequence
                          FOR UPDATE SKIP LOCKED
                          LIMIT 1
@@ -76,7 +86,13 @@ class PostgresJobOutbox:
                               message.relay_claim_generation,
                               message.relay_claim_token
                     """,
-                    (parsed_owner, parsed_lease),
+                    (
+                        self._environment_identity.environment,
+                        self._environment_identity.deployment_id,
+                        self._environment_identity.configuration_hash,
+                        parsed_owner,
+                        parsed_lease,
+                    ),
                 )
                 row = cursor.fetchone()
         if row is None:
@@ -170,6 +186,26 @@ class PostgresJobOutbox:
                     cursor=cursor,
                     job_name=row[0],
                     payload=row[1],
+                )
+
+    def persist_environment_failure(self, request: JobRequest) -> None:
+        """Publie l'échec terminal d'un job historique du même déploiement."""
+
+        if not isinstance(request, JobRequest):
+            raise ValueError("request de réconciliation invalide")
+        if (
+            request.environment != self._environment_identity.environment
+            or request.deployment_id != self._environment_identity.deployment_id
+            or request.idempotence_key.configuration_hash
+            == self._environment_identity.configuration_hash
+        ):
+            raise ValueError("identité de réconciliation invalide")
+        with self._connection_factory.connect() as connection:
+            with connection.transaction(), connection.cursor() as cursor:
+                self._persist_public_environment_failure(
+                    cursor=cursor,
+                    job_name=request.job_name,
+                    payload=request.payload,
                 )
 
     def _persist_public_environment_failure(

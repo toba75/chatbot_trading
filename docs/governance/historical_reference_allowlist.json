@@ -109,7 +109,7 @@
                           },
                           {
                               "path":  "docs/adr/index.md",
-                              "sha256":  "3c1c0b03dffb16c5accc0513d828a85612784268a0ab98559895e5703a3f60a8",
+                              "sha256":  "f9eb3e1b06e05d0185149612cbc308aef405e595faff6309e6eeede8432157cb",
                               "reason":  "ADR historical or transition decision"
                           },
                           {
@@ -204,7 +204,7 @@
                           },
                           {
                               "path":  "docs/governance/m013_documentation_index.md",
-                              "sha256":  "4e61fb82c2e63571713b4e4d7e3ad5ae9460a7f15a85b328ce2eb45684f3edf0",
+                              "sha256":  "a31b8f37777335c07160b0757a7b7a7dff9ce919abb82a0e87d23cee10a715ac",
                               "reason":  "published historical governance evidence"
                           },
                           {
