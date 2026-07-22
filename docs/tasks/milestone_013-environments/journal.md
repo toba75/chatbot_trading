@@ -845,3 +845,30 @@ test public alors que chaque fichier du manifeste représente un nœud pytest
 atomique. Les deux comportements étaient GREEN seuls. Ils sont conservés sans
 affaiblissement sous deux fonctions de validation privées appelées par un
 unique test public ; le scope M-004 puis le gate complet sont redevenus GREEN.
+
+## T-011 - Scénario BDD et preuve RED
+
+Scénario contrôlé :
+
+- Given `uv run production` a validé l'identité de PostgreSQL, Qdrant, fichiers
+  et de chacun de ses workers, sans monter de ressource non-production ;
+- When le PDF réel de 38 pages traverse les contrats publics jusqu'à une
+  réponse vérifiée, puis la pile redémarre et relit la preuve ;
+- Then document, version canonique, projection, réponse, citation et rapport
+  restent persistants, les volumes ne sont jamais supprimés et development/test
+  ne peuvent lire aucun identifiant production.
+
+Précondition GREEN avant modification :
+
+- `uv run --locked gate --scope m013_environments` : 37 nœuds GREEN.
+
+La preuve RED exige le module `app.platform.production_e2e`, absent avant
+implémentation. L'acceptation live refuse tout mock, fallback, cleanup ou
+credential non-production. Le test unitaire exige deux phases ordonnées,
+l'entrypoint de qualification et le refus structurel d'un montage test.
+
+ADR consultée : ADR-045. Aucune nouvelle ADR n'est requise : T-011 exécute sa
+politique déjà acceptée de profil production protégé, persistant et strictement
+identifié.
+
+Commit RED prévu : `test(m13-environments): couvrir parcours reel production`.

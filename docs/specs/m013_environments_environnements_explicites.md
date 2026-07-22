@@ -273,3 +273,27 @@ Tout échec applicatif reste RED et déclenche le même teardown contrôlé. Si 
 préflight d'identité du teardown échoue, les conteneurs s'arrêtent sans
 suppression de volume et l'erreur reste terminale. Aucun mock, faux gateway,
 worker inline, stockage mémoire ou fallback n'est admis.
+
+## Parcours produit réel production (T-011)
+
+`uv run production` exécute une preuve d'exploitation réelle, finie et non
+destructive avec les seules ressources `production`. La commande réémet les 38
+pages du PDF réel versionné dans `data/environments/production/reports/temp/`,
+traverse les contrats HTTP publics jusqu'au diagnostic, à la conversion, à la
+projection, à la recherche, à la réponse documentaire, à la citation PDF et au
+Spark live, puis redémarre la même installation et relit ses identifiants.
+
+Les 17 conteneurs et les six réplicas workers doivent publier l'identité
+`production` / `ostrading-production-primary` et le même hash de configuration.
+Le rendu Compose et les conteneurs refusent tout chemin, secret ou donnée
+`development` ou `test`. Les workers documentaires conservent 8 Gio, 4 CPU et
+un healthcheck de 30 secondes.
+
+La sortie de la commande arrête les conteneurs avec `down --remove-orphans`,
+sans jamais employer `--volumes`, purge, cleanup automatique ou cible par
+défaut. Les volumes, le document, la version canonique, la projection et le
+rapport sans secret sont conservés. Les sondes `development` et `test` relisent
+leurs propres contrats publics et doivent confirmer l'absence de l'identifiant
+production sans mutation. Toute readiness incomplète, identité divergente,
+ressource non-production, perte après redémarrage ou fuite de secret rend la
+preuve terminalement RED, sans fallback.
