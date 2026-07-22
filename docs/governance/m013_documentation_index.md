@@ -5,8 +5,8 @@
 - Identifiant: `M013-DocumentationIndex-1.0`
 - Tâche: `docs/tasks/milestone_013/0010_publier_runbooks_documentation_utilisateur.md`
 - Politique appliquée: `RunbookPolicy` et `UserDocumentationPolicy` de `docs/specs/m013_durcissement_acceptation_v1.md`.
-- ADR applicables: ADR-010
-- ADR: non requise; l'index publie les documents T-010 sans nouvelle topologie, nouvelle politique d'exécution ou nouveau contrat durable.
+- ADR applicables: ADR-010, ADR-046 et ADR-048.
+- ADR: ADR-048 remplace formellement les anciens points d'entrée tout en conservant progression et parallélisme.
 
 ## Scénario BDD
 
@@ -18,7 +18,10 @@
 
 | Document | Rôle | Commandes vérifiées | Preuve source |
 |---|---|---|---|
-| docs/runbooks/exploitation_locale.md | Démarrage local et arrêt local. | `scripts\validate_local_compose.ps1`; `scripts\validate_network_boundary.ps1` | `deploy/local-compose/compose.yaml` |
+| docs/runbooks/environnements_explicites.md | Chemin opérateur unique development, test et production; export de la CA Caddy; opérations bornées. | `uv run --locked gate --scope m013_environments --offline`; `uv run --locked gate --scope m013_environments --live` | `deploy/environments/compose.base.yaml`; `deploy/environments/*.compose.yaml` |
+| docs/runbooks/exploitation_locale.md | Document historique déprécié; redirige vers les environnements explicites. | `uv run --locked gate --scope m013_environments --offline` | `docs/runbooks/environnements_explicites.md` |
+| docs/runbooks/configuration_applicative.md | Document M13-config déprécié; aucun chemin opératoire actif. | `uv run --locked gate --scope m013_environments --offline` | ADR-046 |
+| docs/runbooks/api_orchestratrice.md | Document M13-FastAPI déprécié; l'API est interne au profil sélectionné. | `uv run --locked gate --scope m013_environments --offline` | ADR-046 ; ADR-048 |
 | docs/runbooks/sauvegarde_restauration.md | Sauvegarde, restauration et `restore_test_result`. | `scripts\backup_v1.ps1`; `scripts\restore_v1.ps1`; `scripts\validate_m013_backup_restore.ps1` | `docs/governance/m013_backup_restore_drill.md` |
 | docs/runbooks/spark_reseau_incidents.md | Audit réseau, panne Spark et statuts publics. | `scripts\validate_m013_security.ps1`; `scripts\validate_m013_spark_failures.ps1` | `docs/governance/m013_security_audit.md`; `docs/governance/m013_spark_failure_drill.md` |
 | docs/runbooks/certificats_spark.md | Validation de certificat, rotation certificat et refus TLS/authentification. | `scripts\validate_m013_security.ps1`; `scripts\validate_network_boundary.ps1` | `docs/governance/m013_security_audit.md` |

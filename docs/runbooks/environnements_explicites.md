@@ -31,6 +31,31 @@
 | test | `uv run test` | `https://localhost:19443` pendant chaque cycle | seuls les volumes test sont supprimés après préflight |
 | production | `uv run production` | `https://localhost:20443` pendant la qualification | volumes conservés |
 
+## Export explicite de la CA Caddy et contrôle HTTPS
+
+Caddy génère une autorité locale distincte dans le volume du profil. Le
+lanceur n'installe jamais cette CA dans le magasin de confiance de Windows, du
+navigateur ou de Python. Après que la pile ciblée a publié sa readiness, créer
+explicitement le répertoire de preuve, exporter le certificat puis l'utiliser
+pour le contrôle HTTPS :
+
+```console
+$profile = "development"
+$port = 18443
+$caPath = "data/environments/$profile/certificates/caddy-root.crt"
+New-Item -ItemType Directory -Force -Path (Split-Path -Parent $caPath) | Out-Null
+uv run python -m app.platform.environment_compose export-ca --environment $profile --output $caPath
+if ($LASTEXITCODE -ne 0) { throw "ENVIRONMENT_CADDY_CA_EXPORT_FAILED" }
+curl.exe --fail --cacert $caPath "https://localhost:$port/health"
+if ($LASTEXITCODE -ne 0) { throw "ENVIRONMENT_CADDY_HTTPS_VERIFICATION_FAILED" }
+```
+
+Pour `test`, utiliser le port `19443`; pour `production`, le port `20443`.
+L'export refuse un profil inconnu, un parent de destination absent, un
+conteneur Caddy inaccessible ou un certificat PEM invalide. Il ne modifie
+jamais le trust store. Les parcours E2E exportent cette même CA et la passent à
+leur client HTTP; toute désactivation de validation TLS est interdite.
+
 `uv run development` démarre les 14 conteneurs, vérifie la readiness de tous
 les participants, puis reste actif. L'arrêt normal est `Ctrl+C`; le contexte
 exécute `down --remove-orphans`, sans `--volumes`.

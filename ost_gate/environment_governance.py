@@ -18,6 +18,8 @@ from ost_gate.manifest import load_manifest
 
 ENVIRONMENTS: Final = ("development", "test", "production")
 CLOSURE_STATUS: Final = "SUBMILESTONE_GREEN_M013_OPEN"
+EXPECTED_LIVE_WORKER_IDENTITY_COUNT: Final = 4
+EXPECTED_LIVE_CONTAINER_COUNT: Final = 14
 
 _DEPLOYMENTS: Final = {
     "development": "ostrading-development-local",
@@ -141,15 +143,11 @@ def assert_no_sensitive_data(value: object) -> None:
 
 def validate_execution_evidence(
     reports: Mapping[str, object],
-    *,
-    expected_worker_identity_count: int = 4,
 ) -> EnvironmentExecutionEvidence:
     """Valide les quatre exécutions réelles et leurs invariants croisés."""
 
     if not isinstance(reports, Mapping):
         raise EnvironmentGovernanceError("LIVE_EVIDENCE_DOCUMENT_INVALID")
-    if expected_worker_identity_count <= 0:
-        raise EnvironmentGovernanceError("LIVE_EVIDENCE_WORKER_COUNT_INVALID")
     missing = [environment for environment in ENVIRONMENTS if environment not in reports]
     if missing:
         raise EnvironmentGovernanceError(f"LIVE_EVIDENCE_MISSING:{missing[0]}")
@@ -216,11 +214,15 @@ def validate_execution_evidence(
     for environment, execution in flattened:
         if execution.get("progress_phases") != ["SUCCEEDED", "SUCCEEDED", "SUCCEEDED"]:
             raise EnvironmentGovernanceError("LIVE_EVIDENCE_PROGRESS_INVALID")
-        if execution.get("worker_identity_count") != expected_worker_identity_count:
+        if execution.get("worker_identity_count") != EXPECTED_LIVE_WORKER_IDENTITY_COUNT:
             raise EnvironmentGovernanceError("LIVE_EVIDENCE_WORKERS_INCOMPLETE")
+        if execution.get("container_count") != EXPECTED_LIVE_CONTAINER_COUNT:
+            raise EnvironmentGovernanceError("LIVE_EVIDENCE_CONTAINERS_INCOMPLETE")
+        _require_true(execution, "https_ca_verified")
+        _required_hash(execution, "caddy_ca_sha256", "LIVE_EVIDENCE_CADDY_CA_INVALID")
         if execution.get("environment_job_count") != 3:
             raise EnvironmentGovernanceError("LIVE_EVIDENCE_JOBS_INCOMPLETE")
-        worker_identity_count += expected_worker_identity_count
+        worker_identity_count += EXPECTED_LIVE_WORKER_IDENTITY_COUNT
         citation = _required_text(execution, "citation_url", "LIVE_EVIDENCE_CITATION_INVALID")
         if not citation.startswith(f"https://localhost:{_EXPECTED_PORTS[environment]}/"):
             raise EnvironmentGovernanceError("LIVE_EVIDENCE_CITATION_INVALID")
@@ -265,17 +267,26 @@ def validate_repository_environment_governance(
         {
             "schema_version",
             "evidence_kind",
+            "evidence_status",
             "closure_status",
+            "current_runtime",
             "normalizations",
             "source_reports",
-            "reports",
+            "historical_reports",
         },
         "VERSIONED_EVIDENCE_SCHEMA_INVALID",
     )
-    if evidence_document["schema_version"] != 1:
+    if evidence_document["schema_version"] != 2:
         raise EnvironmentGovernanceError("VERSIONED_EVIDENCE_SCHEMA_INVALID")
-    if evidence_document["evidence_kind"] != "REAL_STACK_EXECUTION":
+    if evidence_document["evidence_kind"] != "HISTORICAL_STACK_EXECUTION":
         raise EnvironmentGovernanceError("VERSIONED_EVIDENCE_KIND_INVALID")
+    if evidence_document["evidence_status"] != "STALE":
+        raise EnvironmentGovernanceError("VERSIONED_EVIDENCE_STATUS_INVALID")
+    if evidence_document["current_runtime"] != {
+        "worker_identity_count": EXPECTED_LIVE_WORKER_IDENTITY_COUNT,
+        "container_count": EXPECTED_LIVE_CONTAINER_COUNT,
+    }:
+        raise EnvironmentGovernanceError("VERSIONED_EVIDENCE_RUNTIME_INVALID")
     if evidence_document["normalizations"] != [
         "report_path:repository-relative",
         "runs.pre_teardown_report_path:repository-relative",
@@ -284,23 +295,30 @@ def validate_repository_environment_governance(
     closure_status = validate_closure_status(evidence_document["closure_status"])
     _validate_source_report_references(root, evidence_document["source_reports"])
 
+    historical_reports = _require_mapping(
+        evidence_document["historical_reports"],
+        "VERSIONED_EVIDENCE_REPORTS_INVALID",
+    )
+    if frozenset(historical_reports) != frozenset(ENVIRONMENTS):
+        raise EnvironmentGovernanceError("VERSIONED_EVIDENCE_REPORTS_INVALID")
+    assert_no_sensitive_data(historical_reports)
+
     if require_live_sources:
         reports = _load_latest_live_reports(root)
         source = "latest-live-reports"
-    else:
-        reports = _require_mapping(
-            evidence_document["reports"], "VERSIONED_EVIDENCE_REPORTS_INVALID"
+        execution_evidence = validate_execution_evidence(reports)
+        validate_evidence_revisions(
+            repository_root=root,
+            reports=reports,
+            require_common_revision=True,
         )
-        source = "versioned-live-evidence"
-    execution_evidence = validate_execution_evidence(
-        reports,
-        expected_worker_identity_count=4 if require_live_sources else 6,
-    )
-    validate_evidence_revisions(
-        repository_root=root,
-        reports=reports,
-        require_common_revision=require_live_sources,
-    )
+    else:
+        execution_evidence = EnvironmentExecutionEvidence(
+            environments=ENVIRONMENTS,
+            execution_count=0,
+            worker_identity_count=0,
+        )
+        source = "historical-stale-evidence"
 
     configurations = {
         environment: load_application_configuration(
@@ -345,6 +363,57 @@ def validate_repository_environment_governance(
         closure_status=closure_status,
         source=source,
     )
+
+
+def assert_no_active_environment_entrypoint_contradictions(
+    documents: Mapping[str, str],
+) -> None:
+    """Refuse les anciens points d'entrée dans les prescriptions encore actives."""
+
+    if not isinstance(documents, Mapping) or not documents:
+        raise EnvironmentGovernanceError("ACTIVE_ENVIRONMENT_DOCUMENTS_INVALID")
+    forbidden_runbook_markers = (
+        "uv run ui",
+        "config/application.yaml",
+        "config/secrets/local",
+        "deploy/local-compose",
+    )
+    for name, content in documents.items():
+        if (
+            not isinstance(name, str)
+            or name.strip() == ""
+            or not isinstance(content, str)
+            or content.strip() == ""
+        ):
+            raise EnvironmentGovernanceError("ACTIVE_ENVIRONMENT_DOCUMENTS_INVALID")
+        normalized_name = name.replace("\\", "/")
+        if "/runbooks/" in f"/{normalized_name}":
+            if any(marker in content for marker in forbidden_runbook_markers):
+                raise EnvironmentGovernanceError(
+                    f"ACTIVE_ENVIRONMENT_ENTRYPOINT_CONTRADICTION:{normalized_name}"
+                )
+            continue
+        if "/adr/ADR-" not in f"/{normalized_name}":
+            continue
+        status_match = re.search(r"(?m)^\*\*Statut :\*\* ([^\r\n]+)$", content)
+        if status_match is None or status_match.group(1) != "Acceptée":
+            continue
+        replacement_match = re.search(
+            r"(?m)^\*\*Remplacée par :\*\* ([^\r\n]+)$",
+            content,
+        )
+        has_partial_replacement = (
+            replacement_match is not None
+            and replacement_match.group(1) != "Aucune"
+        )
+        normative_old_entrypoint = re.search(
+            r"(?i)`uv run ui`[^\r\n]{0,80}\*\*DOIT\*\*",
+            content,
+        )
+        if normative_old_entrypoint is not None and not has_partial_replacement:
+            raise EnvironmentGovernanceError(
+                f"ACTIVE_ENVIRONMENT_ENTRYPOINT_CONTRADICTION:{normalized_name}"
+            )
 
 
 def validate_evidence_revisions(
@@ -726,12 +795,38 @@ def _validate_documentation(root: Path) -> None:
         "uv run --locked gate --scope m013_environments --live",
         "down --volumes",
         "DATASTORE_ENVIRONMENT_MISMATCH",
+        "export-ca --environment $profile --output $caPath",
+        "curl.exe --fail --cacert",
+        "n'installe jamais cette CA",
     )
     if any(token not in runbook for token in required_runbook_tokens):
         raise EnvironmentGovernanceError("ENVIRONMENT_RUNBOOK_INCOMPLETE")
     for document in (specification, closure, isolation):
         if "ADR-046" not in document or CLOSURE_STATUS not in document:
             raise EnvironmentGovernanceError("ENVIRONMENT_DOCUMENTATION_INCOMPLETE")
+    if (
+        "`STALE`" not in closure
+        or "4 workers, 14 conteneurs" not in closure
+        or "https_ca_verified=true" not in closure
+    ):
+        raise EnvironmentGovernanceError("ENVIRONMENT_CLOSURE_EVIDENCE_INVALID")
+    active_documents = {
+        path.relative_to(root).as_posix(): _read_text(
+            path,
+            "ACTIVE_ENVIRONMENT_DOCUMENT_REQUIRED",
+        )
+        for path in (
+            root / "docs" / "runbooks" / "configuration_applicative.md",
+            root / "docs" / "runbooks" / "api_orchestratrice.md",
+            root / "docs" / "runbooks" / "environnements_explicites.md",
+            root / "docs" / "governance" / "m013_documentation_index.md",
+            root / "docs" / "adr" / "ADR-031-actions-ui-execution-et-progression-publique.md",
+            root / "docs" / "adr" / "ADR-037-parallelisme-documentaire-projection.md",
+            root / "docs" / "adr" / "ADR-048-progression-et-parallelisme-dans-profils-explicites.md",
+            root / "docs" / "adr" / "index.md",
+        )
+    }
+    assert_no_active_environment_entrypoint_contradictions(active_documents)
     if any(requirement_id not in traceability for requirement_id in _EXPECTED_TRACEABILITY_IDS):
         raise EnvironmentGovernanceError("TRACEABILITY_MATRIX_INCOMPLETE")
 

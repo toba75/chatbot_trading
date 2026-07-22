@@ -1,5 +1,11 @@
 # Journal M13-environments
 
+> **Note de requalification du 2026-07-22.** Les mentions antérieures de six
+> workers ou dix-sept conteneurs décrivent le runtime historique désormais
+> `STALE`. Le contrat courant exact est de quatre instances workers et quatorze
+> conteneurs. Seuls de nouveaux rapports à la révision courante peuvent servir
+> de preuve live GREEN ; les entrées historiques ci-dessous ne sont pas réécrites.
+
 ## T-007 - Scénario BDD et preuve RED
 
 Scénario contrôlé:

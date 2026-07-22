@@ -70,5 +70,6 @@ les trois qualifications conformément à ADR-046, mais les autorités de donné
 restent distinctes. Le profil local `production` ne certifie pas un hébergement
 physique dédié.
 
-L'arrêt standard ne passe jamais `--volumes`. Toute suppression de volume reste
-une opération destructive distincte, hors de ces commandes.
+Seul le cycle `test` propriétaire peut exécuter `down --volumes`, après lecture
+et égalité stricte de son identifiant de cycle persistant. Les profils
+`development` et `production` conservent leurs volumes lors de chaque arrêt.

@@ -30,6 +30,7 @@ from app.platform.environment_compose import (
     _run_compose,
     _technical_environment_from_repository,
     environment_stack_definition,
+    export_environment_caddy_ca,
 )
 from app.platform.configured_datastore_identity import preflight_all_mutable_roots
 
@@ -38,6 +39,7 @@ _ENVIRONMENT: Final = "development"
 _DEPLOYMENT_ID: Final = "ostrading-development-local"
 _EDGE_BASE_URL: Final = "https://localhost:18443"
 _API_BASE_URL: Final = f"{_EDGE_BASE_URL}/api"
+_EXPECTED_CONTAINER_COUNT: Final = 14
 _WORKER_IDS: Final = frozenset(
     {"worker-documents", "worker-projection"}
 )
@@ -75,7 +77,10 @@ class DevelopmentE2EReport:
     support_status: str
     progress_phases: tuple[str, str, str]
     worker_identity_count: int
+    container_count: int
     environment_job_count: int
+    https_ca_verified: bool
+    caddy_ca_sha256: str
     restart_persistence_verified: bool
     foreign_environment_probes: tuple[str, str]
     volume_sentinels_preserved: bool
@@ -104,8 +109,13 @@ class DevelopmentE2EReport:
             raise ValueError("DEVELOPMENT_E2E_PROGRESS_INVALID")
         if self.worker_identity_count != 4:
             raise ValueError("DEVELOPMENT_E2E_WORKER_IDENTITY_INCOMPLETE")
+        if self.container_count != _EXPECTED_CONTAINER_COUNT:
+            raise ValueError("DEVELOPMENT_E2E_CONTAINER_COUNT_INCOMPLETE")
         if self.environment_job_count < 3:
             raise ValueError("DEVELOPMENT_E2E_JOB_IDENTITY_INCOMPLETE")
+        if self.https_ca_verified is not True:
+            raise ValueError("DEVELOPMENT_E2E_HTTPS_CA_NOT_VERIFIED")
+        _require_sha256(self.caddy_ca_sha256, "caddy_ca_sha256")
         if self.restart_persistence_verified is not True:
             raise ValueError("DEVELOPMENT_E2E_RESTART_NOT_PROVEN")
         if any(
@@ -135,6 +145,7 @@ class _ProductProof:
     spark_raw_response_id: str
     progress_phases: tuple[str, str, str]
     worker_identity_count: int
+    container_count: int
     environment_job_count: int
 
 
@@ -196,6 +207,8 @@ def run_development_environment_e2e(
     _require_profile_path(log_root)
     report_root.mkdir(parents=True, exist_ok=True)
     log_root.mkdir(parents=True, exist_ok=True)
+    ca_bundle_path = report_root / "certificates" / "caddy-root.crt"
+    ca_bundle_path.parent.mkdir(parents=True, exist_ok=True)
     proof_id, selected_pdf, existing_document_id = _select_development_e2e_proof(
         source_pdf=source_pdf,
         report_root=report_root,
@@ -211,6 +224,7 @@ def run_development_environment_e2e(
         token=token,
         log_path=log_path,
         configuration=configuration,
+        ca_bundle_path=ca_bundle_path,
     ):
         with _development_red_report_guard(
             proof_id=proof_id,
@@ -223,6 +237,7 @@ def run_development_environment_e2e(
                 token=token,
                 timeout_seconds=900,
                 base_url=_DEVELOPMENT_PROOF_CONTEXT.api_base_url,
+                ca_bundle_path=ca_bundle_path,
             ) as client:
                 _verify_public_ui(client, proof_context=_DEVELOPMENT_PROOF_CONTEXT)
                 product = _exercise_product(
@@ -252,6 +267,7 @@ def run_development_environment_e2e(
         token=token,
         log_path=log_path,
         configuration=configuration,
+        ca_bundle_path=ca_bundle_path,
     ):
         with _development_red_report_guard(
             proof_id=proof_id,
@@ -264,6 +280,7 @@ def run_development_environment_e2e(
                 token=token,
                 timeout_seconds=900,
                 base_url=_DEVELOPMENT_PROOF_CONTEXT.api_base_url,
+                ca_bundle_path=ca_bundle_path,
             ) as client:
                 _verify_public_ui(client, proof_context=_DEVELOPMENT_PROOF_CONTEXT)
                 _verify_persistence_after_restart(
@@ -309,7 +326,10 @@ def run_development_environment_e2e(
         support_status=product.support_status,
         progress_phases=product.progress_phases,
         worker_identity_count=product.worker_identity_count,
+        container_count=product.container_count,
         environment_job_count=product.environment_job_count,
+        https_ca_verified=True,
+        caddy_ca_sha256=_sha256_file(ca_bundle_path),
         restart_persistence_verified=True,
         foreign_environment_probes=(foreign_probes[0], foreign_probes[1]),
         volume_sentinels_preserved=True,
@@ -364,6 +384,7 @@ def _running_development_command(
     token: str,
     log_path: Path,
     configuration: ApplicationConfiguration,
+    ca_bundle_path: Path,
 ) -> Iterator[None]:
     uv_executable = shutil.which("uv")
     if uv_executable is None:
@@ -385,6 +406,8 @@ def _running_development_command(
                 expected_environment=configuration.application.environment,
                 expected_deployment_id=configuration.application.deployment_id,
                 expected_configuration_hash=configuration.configuration_hash,
+                repository_root=repository_root,
+                ca_bundle_path=ca_bundle_path,
             )
             yield
         finally:
@@ -427,6 +450,8 @@ def _wait_public_readiness(
     expected_environment: str,
     expected_deployment_id: str,
     expected_configuration_hash: str,
+    repository_root: Path,
+    ca_bundle_path: Path,
 ) -> None:
     deadline = time.monotonic() + 900
     while time.monotonic() < deadline:
@@ -448,10 +473,17 @@ def _wait_public_readiness(
     else:
         raise DevelopmentE2EError("DEVELOPMENT_E2E_LIFECYCLE_READY_TIMEOUT")
 
+    export_environment_caddy_ca(
+        environment=_ENVIRONMENT,
+        repository_root=repository_root,
+        destination_path=ca_bundle_path,
+        technical_environment=_technical_environment_from_repository(repository_root),
+    )
     with _public_client(
         token=token,
         timeout_seconds=8,
         base_url=_DEVELOPMENT_PROOF_CONTEXT.api_base_url,
+        ca_bundle_path=ca_bundle_path,
     ) as client:
         while time.monotonic() < deadline:
             if process.poll() is not None:
@@ -624,7 +656,7 @@ def _exercise_product(
         proof_id=proof_id,
         proof_context=proof_context,
     )
-    worker_identity_count = _verify_worker_identities(
+    worker_identity_count, container_count = _verify_worker_identities(
         repository_root=repository_root,
         configuration=configuration,
         proof_context=proof_context,
@@ -649,6 +681,7 @@ def _exercise_product(
             _require_text(projection_progress.get("phase"), "projection_phase"),
         ),
         worker_identity_count=worker_identity_count,
+        container_count=container_count,
         environment_job_count=environment_job_count,
     )
 
@@ -933,7 +966,7 @@ def _verify_worker_identities(
     repository_root: Path,
     configuration: ApplicationConfiguration,
     proof_context: _ProofContext,
-) -> int:
+) -> tuple[int, int]:
     definition = environment_stack_definition(
         proof_context.environment,
         repository_root=repository_root,
@@ -950,6 +983,8 @@ def _verify_worker_identities(
         for line in ps_result.stdout.splitlines()
         if line.strip()
     )
+    if len(containers) != _EXPECTED_CONTAINER_COUNT:
+        raise DevelopmentE2EError("DEVELOPMENT_E2E_CONTAINERS_MISSING")
     worker_containers = tuple(
         row
         for row in containers
@@ -1049,7 +1084,7 @@ def _verify_worker_identities(
             raise DevelopmentE2EError(
                 f"DEVELOPMENT_E2E_WORKER_IDENTITY_MISMATCH: {worker_id}"
             )
-    return len(worker_containers)
+    return len(worker_containers), len(containers)
 
 
 def verify_worker_documents_runtime_limits(
@@ -1344,11 +1379,14 @@ def _public_client(
     token: str,
     timeout_seconds: int,
     base_url: str,
+    ca_bundle_path: Path,
 ) -> Iterator[httpx.Client]:
+    if not isinstance(ca_bundle_path, Path) or not ca_bundle_path.is_file():
+        raise DevelopmentE2EError("ENVIRONMENT_E2E_CADDY_CA_UNREADABLE")
     with httpx.Client(
         base_url=base_url,
         headers={"Authorization": f"Bearer {token}"},
-        verify=False,
+        verify=str(ca_bundle_path),
         timeout=timeout_seconds,
         trust_env=False,
     ) as client:
@@ -1363,7 +1401,7 @@ def _foreign_public_client(
 ) -> Iterator[httpx.Client]:
     with httpx.Client(
         base_url=base_url,
-        verify=False,
+        verify=True,
         timeout=timeout_seconds,
         trust_env=False,
     ) as client:

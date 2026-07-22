@@ -60,13 +60,13 @@
   réponse `ANS-LIVE-35657C78A8CCA1AD211F`, citation PDF page 36 et réponse
   Spark brute `chatcmpl-REQ-TEST-E2E-SPARK-1FE3E742F824496F8F541A3C0EDE7422`.
 - Les deux cycles publient `SUCCEEDED` pour diagnostic, conversion et
-  projection, vérifient six conteneurs workers et trois jobs portant
+  projection, vérifient quatre conteneurs workers et trois jobs portant
   l'identité `test` / `ostrading-test-ci`.
 - Chaque rapport de cycle est écrit avant son teardown contrôlé. Après chaque
   préflight PostgreSQL, Qdrant et fichiers, seuls les conteneurs, réseaux et
   volumes `ostrading-test-*` sont supprimés.
 - État final : zéro conteneur, réseau ou volume `ostrading-test-*`; sentinelles
   development et production inchangées; aucun chemin de configuration, secret
-  ou donnée non-test visible dans le rendu ni dans les 17 conteneurs inspectés.
+  ou donnée non-test visible dans le rendu ni dans les 14 conteneurs inspectés.
 - Ressources : Docker dispose d'environ 31 Gio et chaque worker documentaire
   conserve exactement 8 Gio, 4 CPU et un healthcheck de 30 secondes.

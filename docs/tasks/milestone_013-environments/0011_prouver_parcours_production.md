@@ -60,12 +60,12 @@
 - Citation PDF ouvrable page 34 et réponse Spark live
   `chatcmpl-REQ-PRODUCTION-E2E-SPARK-7FC7E3A32E8E433AA03412FA6A1620D0`.
 - Diagnostic, conversion `38/38` et projection publient tous `SUCCEEDED` ;
-  six conteneurs workers et trois jobs portent l'identité `production` /
+  quatre conteneurs workers et trois jobs portent l'identité `production` /
   `ostrading-production-primary` et le hash de configuration concordant.
 - Après arrêt puis redémarrage de la pile, les contrats publics relisent le même
   document, la même version canonique, la même projection et le PDF original.
 - Les sondes renvoient `development:ABSENT` et `test:ABSENT`. Le rendu et les
-  17 conteneurs inspectés ne montent aucun chemin, secret ou donnée non-production.
+  14 conteneurs inspectés ne montent aucun chemin, secret ou donnée non-production.
 - Les deux workers documentaires portent effectivement 8 Gio, 4 CPU et un
   healthcheck de 30 secondes ; aucun OOM n'a été observé.
 - État final : zéro conteneur des trois profils, sept volumes production

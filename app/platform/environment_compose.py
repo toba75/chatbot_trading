@@ -18,6 +18,8 @@ from typing import Any, Final, Literal
 from urllib.request import urlopen
 from uuid import UUID, uuid4
 
+from cryptography import x509
+
 from app.platform.administrative_operations import (
     AdministrativeOperationEvidence,
     AdministrativeOperationRequest,
@@ -748,6 +750,40 @@ def read_test_lifecycle_owner(config_path: Path) -> str:
     return str(owner)
 
 
+def export_environment_caddy_ca(
+    *,
+    environment: str,
+    repository_root: Path,
+    destination_path: Path,
+    technical_environment: Mapping[str, str],
+) -> Path:
+    """Exporte la CA Caddy du profil sans modifier le magasin de confiance hôte."""
+
+    root = _require_repository_root(repository_root)
+    definition = environment_stack_definition(environment, repository_root=root)
+    if not isinstance(destination_path, Path):
+        raise ValueError("ENVIRONMENT_CADDY_CA_DESTINATION_INVALID")
+    destination = destination_path.resolve()
+    if not destination.parent.is_dir():
+        raise ValueError("ENVIRONMENT_CADDY_CA_DESTINATION_PARENT_MISSING")
+    _run_compose(
+        definition,
+        (
+            "cp",
+            "edge-gateway:/data/caddy/pki/authorities/local/root.crt",
+            str(destination),
+        ),
+        technical_environment=technical_environment,
+        capture_output=True,
+    )
+    try:
+        certificate_bytes = destination.read_bytes()
+        x509.load_pem_x509_certificate(certificate_bytes)
+    except (OSError, ValueError) as exc:
+        raise ValueError("ENVIRONMENT_CADDY_CA_INVALID") from exc
+    return destination
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Healthchecks des piles d'environnement.")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -768,6 +804,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     owner_record_parser.add_argument("--lifecycle-id", required=True)
     owner_read_parser = subparsers.add_parser("read-test-lifecycle-owner")
     owner_read_parser.add_argument("--config", required=True)
+    export_ca_parser = subparsers.add_parser("export-ca")
+    export_ca_parser.add_argument("--environment", required=True, choices=ENVIRONMENTS)
+    export_ca_parser.add_argument("--output", required=True, type=Path)
     arguments = parser.parse_args(argv)
     if arguments.command == "check-config":
         load_application_configuration(
@@ -790,6 +829,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
     if arguments.command == "read-test-lifecycle-owner":
         read_test_lifecycle_owner(Path(arguments.config))
+        return 0
+    if arguments.command == "export-ca":
+        root = _require_repository_root(Path.cwd())
+        export_environment_caddy_ca(
+            environment=arguments.environment,
+            repository_root=root,
+            destination_path=arguments.output,
+            technical_environment=_technical_environment_from_repository(root),
+        )
         return 0
     configured_http_healthcheck(
         service=arguments.service,
@@ -1210,6 +1258,7 @@ __all__ = [
     "configured_administrative_identity",
     "configured_worker_healthcheck",
     "environment_stack_definition",
+    "export_environment_caddy_ca",
     "inspect_environment_readiness",
     "render_environment_compose",
     "start_environment_compose_stack",

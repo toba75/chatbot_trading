@@ -212,6 +212,7 @@ def _validate_development_product_checkpoint_preserves_public_proof_before_stop(
         spark_raw_response_id="RAW-DEVELOPMENT-CHECKPOINT-001",
         progress_phases=("SUCCEEDED", "SUCCEEDED", "SUCCEEDED"),
         worker_identity_count=4,
+        container_count=14,
         environment_job_count=3,
     )
 

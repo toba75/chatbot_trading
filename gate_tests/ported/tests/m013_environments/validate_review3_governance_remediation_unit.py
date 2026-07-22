@@ -61,11 +61,17 @@ def test_review3_governance_remediation_unit(monkeypatch, tmp_path: Path) -> Non
     reports = deepcopy(evidence["historical_reports"])
     reports["development"]["worker_identity_count"] = 4
     reports["development"]["container_count"] = 14
+    reports["development"]["https_ca_verified"] = True
+    reports["development"]["caddy_ca_sha256"] = "a" * 64
     reports["production"]["worker_identity_count"] = 4
     reports["production"]["container_count"] = 14
+    reports["production"]["https_ca_verified"] = True
+    reports["production"]["caddy_ca_sha256"] = "b" * 64
     for run in reports["test"]["runs"]:
         run["worker_identity_count"] = 4
         run["container_count"] = 14
+        run["https_ca_verified"] = True
+        run["caddy_ca_sha256"] = "c" * 64
     validate_execution_evidence(reports)
     reports["production"]["container_count"] = 13
     with pytest.raises(ValueError, match="LIVE_EVIDENCE_CONTAINERS_INCOMPLETE"):
@@ -108,6 +114,11 @@ def test_review3_governance_remediation_unit(monkeypatch, tmp_path: Path) -> Non
         return SimpleNamespace(returncode=0, stdout="", stderr="")
 
     monkeypatch.setattr(environment_compose, "_run_compose", compose_copy)
+    monkeypatch.setattr(
+        environment_compose.x509,
+        "load_pem_x509_certificate",
+        lambda _content: object(),
+    )
     exported = environment_compose.export_environment_caddy_ca(
         environment="development",
         repository_root=root,
@@ -131,5 +142,5 @@ def test_review3_governance_remediation_unit(monkeypatch, tmp_path: Path) -> Non
     assert "ca_bundle_path" in inspect.signature(_public_client).parameters
 
     deploy_readme = (root / "deploy/environments/README.md").read_text(encoding="utf-8")
-    assert "seul le cycle `test` propriétaire" in deploy_readme
-    assert "development` et `production` conservent" in deploy_readme
+    assert "seul le cycle `test` propriétaire" in deploy_readme.casefold()
+    assert "`development` et `production` conservent" in deploy_readme

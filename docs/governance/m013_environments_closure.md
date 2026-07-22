@@ -1,48 +1,49 @@
-# Rapport de livraison M13-environments
+# État de livraison M13-environments
 
 ## Décision
 
-Le sous-milestone « environnements explicites et données étanches » est GREEN
-au regard d'ADR-046 et des preuves listées ci-dessous. Son statut machine est
-`SUBMILESTONE_GREEN_M013_OPEN` : cette livraison ne déclare pas le milestone
-M-013 global clôturé.
+L'implémentation statique des environnements explicites est GREEN au regard
+d'ADR-046 et ADR-048. Son statut machine reste
+`SUBMILESTONE_GREEN_M013_OPEN` : ce sous-milestone ne clôt pas M-013.
 
-## Preuves d'exécution
+Les rapports versionnés produits avant la réduction du runtime sont
+explicitement `STALE`. Ils prouvaient une ancienne pile à six workers et
+dix-sept conteneurs ; ils ne constituent plus une preuve GREEN du runtime
+courant et ne sont jamais consommés par la gate offline.
 
-| Profil | Parcours | Issue | Isolation démontrée |
+## Contrat live courant à requalifier
+
+| Profil | Parcours exigé | Cardinalité exigée | Isolation exigée |
 |---|---:|---|---|
-| development | 1 parcours réel, redémarrage inclus | 3 progressions `SUCCEEDED`, 4 workers, 3 jobs | document absent de test et production, volumes conservés |
-| test | 2 parcours réels depuis des piles vides | 6 progressions `SUCCEEDED`, 4 workers et 3 jobs par cycle | credentials étrangers inaccessibles, seules les ressources test supprimées |
-| production | 1 parcours réel, redémarrage inclus | 3 progressions `SUCCEEDED`, 4 workers, 3 jobs | document absent de development et test, volumes conservés |
+| development | 1 parcours réel, redémarrage inclus | 3 progressions `SUCCEEDED`, 4 workers, 14 conteneurs, 3 jobs | document étranger absent, volumes conservés, HTTPS validé par CA |
+| test | 2 parcours réels depuis des piles vides | par cycle : 3 progressions `SUCCEEDED`, 4 workers, 14 conteneurs, 3 jobs | credentials étrangers inaccessibles, seuls les volumes test propriétaires supprimés, HTTPS validé par CA |
+| production | 1 parcours réel, redémarrage inclus | 3 progressions `SUCCEEDED`, 4 workers, 14 conteneurs, 3 jobs | document étranger absent, volumes conservés, HTTPS validé par CA |
 
-Les quatre exécutions utilisent le PDF réel de 38 pages, les contrats HTTP
-publics, PostgreSQL, Qdrant, l'outbox, les relais, les workers et le Spark réel.
-Les identifiants de documents, versions, projections, réponses, appels Spark,
-PDF réémis, déploiements et hashes de configuration sont distincts quand ils
-doivent l'être.
+Seule `uv run --locked gate --scope m013_environments --live` peut qualifier ce
+tableau. Elle exige les nouveaux rapports à une révision commune égale à HEAD,
+le hash de la CA Caddy exportée et `https_ca_verified=true`. L'option offline
+valide le contrat, la matrice, la documentation et la traçabilité, avec zéro
+exécution live déclarée.
 
-La preuve machine versionnée est
-`docs/governance/m013_environments_execution_evidence.json`. Elle conserve les
-données d'exécution et les SHA-256 des trois rapports sources. Seuls les
-chemins absolus propres au poste ont été normalisés en chemins relatifs. Aucun
-secret, token, mot de passe ou contenu complet du PDF n'est copié.
+## Preuves et couverture
 
-## Couverture
-
-- Matrice d'étanchéité :
+- Archive historique marquée `STALE` :
+  `docs/governance/m013_environments_execution_evidence.json`.
+- Matrice d'étanchéité courante :
   `docs/governance/m013_environments_isolation_matrix.json` et sa lecture
   humaine Markdown.
-- Traçabilité ADR/spec/code/tests/rapports/runbooks :
+- Traçabilité ADR/spec/code/tests/runbooks :
   `docs/governance/m013_environments_traceability.json`.
 - Exploitation : `docs/runbooks/environnements_explicites.md`.
-- Gate statique : `uv run --locked gate --scope m013_environments`.
+- Gate statique : `uv run --locked gate --scope m013_environments --offline`.
 - Gate live réelle :
   `uv run --locked gate --scope m013_environments --live`.
 
 ## Politique RED
 
-La preuve est RED si un profil manque, si deux exécutions réutilisent un
-identifiant borné, si une ressource mutable ou un worker n'est pas inventorié,
-si une donnée sensible apparaît ou si une trace ne relie plus ADR-046, la
-spécification, le code, les tests, les rapports et le runbook. Aucun écart
-n'est accepté implicitement.
+La preuve live est RED si un profil manque, si une exécution ne porte pas
+exactement quatre identités workers et quatorze conteneurs, si les appels HTTPS
+ne valident pas la CA exportée, si deux exécutions réutilisent un identifiant
+borné, si la révision diffère de HEAD, si une ressource mutable n'est pas
+inventoriée ou si une donnée sensible apparaît. Aucun écart n'est accepté
+implicitement.

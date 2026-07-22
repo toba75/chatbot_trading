@@ -112,6 +112,8 @@ def test_test_real_e2e_unit(monkeypatch, tmp_path: Path, capsys) -> None:
     )
     monkeypatch.setattr(test_e2e, "_sha256_file", lambda _: "a" * 64)
     monkeypatch.setattr(test_e2e, "_read_secret", lambda _: "s" * 32)
+    monkeypatch.setattr(test_e2e, "_technical_environment_from_repository", lambda _: {})
+    monkeypatch.setattr(test_e2e, "export_environment_caddy_ca", lambda **_: tmp_path / "ca.crt")
     monkeypatch.setattr(test_e2e, "_verify_runtime_excludes_non_test_credentials", lambda **_: None)
     monkeypatch.setattr(test_e2e, "_public_client", public_client)
     monkeypatch.setattr(test_e2e, "_verify_public_readiness", lambda *_args, **_kwargs: None)

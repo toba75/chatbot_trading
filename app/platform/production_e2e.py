@@ -42,6 +42,7 @@ from app.platform.environment_compose import (
     _run_compose,
     _technical_environment_from_repository,
     environment_stack_definition,
+    export_environment_caddy_ca,
     render_environment_compose,
     start_environment_compose_stack,
 )
@@ -92,7 +93,10 @@ class ProductionE2EReport:
     support_status: str
     progress_phases: tuple[str, str, str]
     worker_identity_count: int
+    container_count: int
     environment_job_count: int
+    https_ca_verified: bool
+    caddy_ca_sha256: str
     restart_persistence_verified: bool
     foreign_environment_probes: tuple[str, str]
     production_resources_preserved: bool
@@ -133,8 +137,16 @@ class ProductionE2EReport:
             raise ValueError("PRODUCTION_E2E_SUPPORT_STATUS_INVALID")
         if self.progress_phases != ("SUCCEEDED", "SUCCEEDED", "SUCCEEDED"):
             raise ValueError("PRODUCTION_E2E_PROGRESS_INVALID")
-        if self.worker_identity_count != 4 or self.environment_job_count < 3:
+        if (
+            self.worker_identity_count != 4
+            or self.container_count != 14
+            or self.environment_job_count < 3
+        ):
             raise ValueError("PRODUCTION_E2E_ENVIRONMENT_IDENTITY_INCOMPLETE")
+        if self.https_ca_verified is not True:
+            raise ValueError("PRODUCTION_E2E_HTTPS_CA_NOT_VERIFIED")
+        if re.fullmatch(r"[0-9a-f]{64}", self.caddy_ca_sha256) is None:
+            raise ValueError("PRODUCTION_E2E_CADDY_CA_HASH_INVALID")
         if self.restart_persistence_verified is not True:
             raise ValueError("PRODUCTION_E2E_RESTART_NOT_PROVEN")
         if any(
@@ -208,6 +220,8 @@ def run_production_environment_e2e(
     product_holder: list[Any] = []
 
     def run_stack(*, phase: str) -> str:
+        ca_bundle_path = report_root / "certificates" / f"production-{phase}-caddy-root.crt"
+        ca_bundle_path.parent.mkdir(parents=True, exist_ok=True)
         launch_configuration = _ProductionLaunchConfiguration(
             environment=_ENVIRONMENT,
             service_id="ui",
@@ -225,11 +239,18 @@ def run_production_environment_e2e(
             configuration=configuration,
             repository_root=root,
         ):
+            export_environment_caddy_ca(
+                environment=_ENVIRONMENT,
+                repository_root=root,
+                destination_path=ca_bundle_path,
+                technical_environment=_technical_environment_from_repository(root),
+            )
             _verify_runtime_excludes_non_production_credentials(repository_root=root)
             with _public_client(
                 token=token,
                 timeout_seconds=900,
                 base_url=_PRODUCTION_PROOF_CONTEXT.api_base_url,
+                ca_bundle_path=ca_bundle_path,
             ) as client:
                 _verify_public_readiness(
                     client,
@@ -327,7 +348,12 @@ def run_production_environment_e2e(
         support_status=product.support_status,
         progress_phases=product.progress_phases,
         worker_identity_count=product.worker_identity_count,
+        container_count=product.container_count,
         environment_job_count=product.environment_job_count,
+        https_ca_verified=True,
+        caddy_ca_sha256=_sha256_file(
+            report_root / "certificates" / "production-restart-read-caddy-root.crt"
+        ),
         restart_persistence_verified=True,
         foreign_environment_probes=(development_probe, test_probe),
         production_resources_preserved=True,

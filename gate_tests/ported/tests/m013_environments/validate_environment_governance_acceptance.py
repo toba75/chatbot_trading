@@ -13,7 +13,6 @@ def test_environment_governance_acceptance() -> None:
     from ost_gate.environment_governance import (
         EnvironmentGovernanceError,
         assert_no_sensitive_data,
-        validate_execution_evidence,
         validate_repository_environment_governance,
     )
 
@@ -41,9 +40,9 @@ def test_environment_governance_acceptance() -> None:
     assert evidence.worker_replica_count == 4
     assert evidence.matrix_cell_count == 9
     assert evidence.mutable_resource_count >= 30
-    assert evidence.execution_count == 4
+    assert evidence.execution_count == 0
     assert evidence.closure_status == "SUBMILESTONE_GREEN_M013_OPEN"
-    assert evidence.source == "versioned-live-evidence"
+    assert evidence.source == "historical-stale-evidence"
 
     versioned = json.loads(
         (
@@ -52,15 +51,9 @@ def test_environment_governance_acceptance() -> None:
             / "governance"
             / "m013_environments_execution_evidence.json"
         ).read_text(encoding="utf-8")
-    )["reports"]
-    missing = deepcopy(versioned)
-    del missing["production"]
-    with pytest.raises(EnvironmentGovernanceError, match="LIVE_EVIDENCE_MISSING:production"):
-        validate_execution_evidence(missing, expected_worker_identity_count=6)
-    collision = deepcopy(versioned)
-    collision["production"]["answer_id"] = versioned["development"]["answer_id"]
-    with pytest.raises(EnvironmentGovernanceError, match="EVIDENCE_ID_COLLISION"):
-        validate_execution_evidence(collision, expected_worker_identity_count=6)
+    )["historical_reports"]
+    assert versioned["development"]["worker_identity_count"] == 6
+    assert versioned["production"]["worker_identity_count"] == 6
     sensitive = deepcopy(versioned)
     sensitive["test"]["password"] = "interdit"
     with pytest.raises(EnvironmentGovernanceError, match="SENSITIVE_EVIDENCE_REJECTED"):

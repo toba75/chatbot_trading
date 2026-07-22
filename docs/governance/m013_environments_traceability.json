@@ -134,6 +134,7 @@
       "tests": [
         "gate_tests/ported/tests/m013_environments/validate_environment_governance_acceptance.py",
         "gate_tests/ported/tests/m013_environments/validate_environment_governance_unit.py",
+        "gate_tests/ported/tests/m013_environments/validate_review3_governance_remediation_unit.py",
         "gate_tests/ported/tests/m013_environments/validate_environment_governance_live.py"
       ],
       "reports": [

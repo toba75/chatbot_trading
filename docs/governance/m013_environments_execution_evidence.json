@@ -1,7 +1,12 @@
 {
-  "schema_version": 1,
-  "evidence_kind": "REAL_STACK_EXECUTION",
+  "schema_version": 2,
+  "evidence_kind": "HISTORICAL_STACK_EXECUTION",
+  "evidence_status": "STALE",
   "closure_status": "SUBMILESTONE_GREEN_M013_OPEN",
+  "current_runtime": {
+    "worker_identity_count": 4,
+    "container_count": 14
+  },
   "normalizations": [
     "report_path:repository-relative",
     "runs.pre_teardown_report_path:repository-relative"
@@ -20,7 +25,7 @@
       "sha256": "d889c531418d20495ae444459bd0d47323fa83046dcbd318a40b60f6b31dd630"
     }
   },
-  "reports": {
+  "historical_reports": {
     "development": {
       "answer_id": "ANS-LIVE-0AA5A9421114598B47CC",
       "canonical_version_id": "CVER-M004-ROUTED-BA58A26E6A853C3CC891E53C",

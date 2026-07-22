@@ -7,7 +7,7 @@
 - Politique réseau: `M013-SecurityAuditReport-1.0`
 - Drill incident: `M013-SPARK-FAILURE-DRILL-0001`
 - ADR applicables: ADR-007, ADR-008, ADR-009, ADR-014, ADR-016, DDD-ADR-006
-- ADR: ADR-014 et ADR-016; ce runbook applique la frontière réseau, l'endpoint Docker Spark externe sans clé API, la configuration par `config/application.yaml` et les statuts de panne existants.
+- ADR: ADR-014 et ADR-046; ce runbook applique la frontière réseau, l'endpoint Docker Spark externe sans clé API, la configuration complète du profil sélectionné et les statuts de panne existants.
 
 ## Scénario BDD
 
@@ -25,7 +25,7 @@ uv run --locked gate
 uv run --locked gate
 ```
 
-- Résultat attendu: seul `llm-gateway -> spark-inference` est autorisé, `services.llm_gateway.auth_mode=none`, `services.llm_gateway.tls_mode=disabled`, `services.llm_gateway.spark_endpoint_url`, `models.llm.model_revision` et `models.llm.runtime_version` sont explicites dans `config/application.yaml`, PostgreSQL, Qdrant, workers et Spark ne sont pas publiés.
+- Résultat attendu: seul `llm-gateway -> spark-inference` est autorisé, `services.llm_gateway.auth_mode=none`, `services.llm_gateway.tls_mode=disabled`, `services.llm_gateway.spark_endpoint_url`, `models.llm.model_revision` et `models.llm.runtime_version` sont explicites dans `config/environments/<profil>.yaml`, PostgreSQL, Qdrant, workers et Spark ne sont pas publiés.
 - Erreur explicite: toute exposition interne, tout accès navigateur direct ou tout secret Spark côté interface rend l'audit RED.
 - Preuve à conserver: sortie des validateurs, `docs/governance/m013_security_audit.md`, `configuration_hash` du fichier chargé et horodatage de l'audit.
 

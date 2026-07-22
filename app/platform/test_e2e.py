@@ -41,6 +41,7 @@ from app.platform.environment_compose import (
     _run_compose,
     _technical_environment_from_repository,
     environment_stack_definition,
+    export_environment_caddy_ca,
     render_environment_compose,
     start_environment_compose_stack,
 )
@@ -96,7 +97,10 @@ class TestE2ERunReport:
     support_status: str
     progress_phases: tuple[str, str, str]
     worker_identity_count: int
+    container_count: int
     environment_job_count: int
+    https_ca_verified: bool
+    caddy_ca_sha256: str
     non_test_credentials_inaccessible: bool
     completed_at: str
     pre_teardown_report_path: Path
@@ -126,8 +130,16 @@ class TestE2ERunReport:
             raise ValueError("TEST_E2E_SUPPORT_STATUS_INVALID")
         if self.progress_phases != ("SUCCEEDED", "SUCCEEDED", "SUCCEEDED"):
             raise ValueError("TEST_E2E_PROGRESS_INVALID")
-        if self.worker_identity_count != 4 or self.environment_job_count < 3:
+        if (
+            self.worker_identity_count != 4
+            or self.container_count != 14
+            or self.environment_job_count < 3
+        ):
             raise ValueError("TEST_E2E_ENVIRONMENT_IDENTITY_INCOMPLETE")
+        if self.https_ca_verified is not True:
+            raise ValueError("TEST_E2E_HTTPS_CA_NOT_VERIFIED")
+        if re.fullmatch(r"[0-9a-f]{64}", self.caddy_ca_sha256) is None:
+            raise ValueError("TEST_E2E_CADDY_CA_HASH_INVALID")
         if self.non_test_credentials_inaccessible is not True:
             raise ValueError("TEST_E2E_NON_TEST_CREDENTIALS_ACCESSIBLE")
         _require_utc(self.completed_at)
@@ -374,6 +386,8 @@ def _run_single_test_cycle(
     pre_teardown_report_path = report_root / (
         f"test-e2e-run-{run_number}-{proof_id}-pre-teardown.json"
     )
+    ca_bundle_path = report_root / "certificates" / f"test-run-{run_number}-caddy-root.crt"
+    ca_bundle_path.parent.mkdir(parents=True, exist_ok=True)
     launch_configuration = _TestLaunchConfiguration(
         environment=_ENVIRONMENT,
         service_id="ui",
@@ -385,6 +399,12 @@ def _run_single_test_cycle(
 
     with start_environment_compose_stack(launch_configuration):
         try:
+            export_environment_caddy_ca(
+                environment=_ENVIRONMENT,
+                repository_root=repository_root,
+                destination_path=ca_bundle_path,
+                technical_environment=_technical_environment_from_repository(repository_root),
+            )
             _verify_runtime_excludes_non_test_credentials(
                 repository_root=repository_root,
             )
@@ -392,6 +412,7 @@ def _run_single_test_cycle(
                 token=token,
                 timeout_seconds=900,
                 base_url=_TEST_PROOF_CONTEXT.api_base_url,
+                ca_bundle_path=ca_bundle_path,
             ) as client:
                 _verify_public_readiness(
                     client,
@@ -459,7 +480,10 @@ def _run_single_test_cycle(
             support_status=product.support_status,
             progress_phases=product.progress_phases,
             worker_identity_count=product.worker_identity_count,
+            container_count=product.container_count,
             environment_job_count=product.environment_job_count,
+            https_ca_verified=True,
+            caddy_ca_sha256=_sha256_file(ca_bundle_path),
             non_test_credentials_inaccessible=True,
             completed_at=completed_at,
             pre_teardown_report_path=pre_teardown_report_path,
