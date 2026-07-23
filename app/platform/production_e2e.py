@@ -465,7 +465,7 @@ def _verify_production_compose_document(
     limits = resources.get("limits") if isinstance(resources, Mapping) else None
     if not isinstance(limits, Mapping):
         raise ProductionE2EError("PRODUCTION_E2E_WORKER_DOCUMENTS_RESOURCES_INVALID")
-    if limits.get("memory") != str(8 * 1024**3) or limits.get("cpus") != 4:
+    if limits.get("memory") != str(2 * 1024**3) or limits.get("cpus") != 4:
         raise ProductionE2EError("PRODUCTION_E2E_WORKER_DOCUMENTS_RESOURCES_INVALID")
     healthcheck = worker.get("healthcheck")
     if not isinstance(healthcheck, Mapping) or healthcheck.get("timeout") != "30s":

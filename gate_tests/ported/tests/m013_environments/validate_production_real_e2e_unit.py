@@ -44,7 +44,7 @@ def test_production_real_e2e_unit(monkeypatch, tmp_path: Path) -> None:
                 ],
                 "deploy": {
                     "resources": {
-                        "limits": {"memory": str(8 * 1024**3), "cpus": 4}
+                        "limits": {"memory": str(2 * 1024**3), "cpus": 4}
                     }
                 },
                 "healthcheck": {"timeout": "30s"},
