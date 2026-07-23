@@ -1,10 +1,23 @@
 from __future__ import annotations
 
 import inspect
+import hashlib
 import json
 from pathlib import Path
 
 import pytest
+
+
+def test_migration_fingerprint_ignores_checkout_line_endings() -> None:
+    """Given un même SQL en LF ou CRLF, When il est contrôlé, Then son empreinte Git est identique."""
+
+    lf_content = b"SELECT 1;\nSELECT 2;\n"
+    crlf_content = b"SELECT 1;\r\nSELECT 2;\r\n"
+    expected = hashlib.sha256(lf_content).hexdigest()
+
+    assert _sha256_normalized_lf(lf_content) == expected
+    assert _sha256_normalized_lf(crlf_content) == expected
+    assert _sha256_normalized_lf(lf_content + b"SELECT 3;\n") != expected
 
 
 def test_environment_runtime_hardening_unit(
