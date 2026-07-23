@@ -10,7 +10,10 @@ import tempfile
 import time
 from uuid import UUID, uuid4
 
+import psycopg
 import pytest
+
+from app.platform.postgres import PostgresConnectionFactory
 
 
 def _docker(*arguments: str) -> subprocess.CompletedProcess[str]:
@@ -24,22 +27,56 @@ def _docker(*arguments: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-def _wait_postgres(container: str) -> None:
-    deadline = time.monotonic() + 60
-    while time.monotonic() < deadline:
-        readiness = _docker(
-            "exec",
+def _wait_postgres(
+    *,
+    container: str,
+    connection_factory: PostgresConnectionFactory,
+    timeout_seconds: float,
+    poll_seconds: float,
+) -> None:
+    deadline = time.monotonic() + timeout_seconds
+    last_connection_error: psycopg.OperationalError | None = None
+    while True:
+        state = _docker(
+            "inspect",
+            "--format",
+            "{{.State.Running}}|{{.State.Status}}|{{.State.ExitCode}}",
             container,
-            "pg_isready",
-            "-U",
-            "postgres",
-            "-d",
-            "postgres",
         )
-        if readiness.returncode == 0:
+        if state.returncode != 0:
+            raise AssertionError(
+                "Inspection du conteneur PostgreSQL T-004 impossible: "
+                f"{state.stderr.strip()}"
+            )
+        running, status, exit_code = state.stdout.strip().split("|", 2)
+        if running != "true" or status != "running":
+            raise AssertionError(
+                "Conteneur PostgreSQL T-004 arrêté avant readiness: "
+                f"status={status}, exit_code={exit_code}"
+            )
+
+        try:
+            with connection_factory.connect() as connection, connection.cursor() as cursor:
+                cursor.execute("SELECT 1", ())
+                response = cursor.fetchone()
+        except psycopg.OperationalError as error:
+            if error.sqlstate is not None:
+                raise
+            last_connection_error = error
+        else:
+            if response != (1,):
+                raise AssertionError(
+                    "Réponse PostgreSQL T-004 invalide sur le port publié: "
+                    f"{response!r}"
+                )
             return
-        time.sleep(0.5)
-    raise AssertionError("PostgreSQL T-004 éphémère non prêt")
+
+        if time.monotonic() >= deadline:
+            raise AssertionError(
+                "PostgreSQL T-004 non prêt sur son port TCP publié "
+                f"après {timeout_seconds} secondes"
+            ) from last_connection_error
+        time.sleep(poll_seconds)
 
 
 def _published_port(container: str) -> int:
@@ -155,7 +192,6 @@ def test_quota_granite_postgresql_concurrence_reprise_et_ledger() -> None:
     )
     assert started.returncode == 0, started.stderr
     try:
-        _wait_postgres(container)
         port = _published_port(container)
         with tempfile.TemporaryDirectory(prefix="ostrading-m014-quota-") as temporary:
             temporary_path = Path(temporary)
@@ -165,6 +201,12 @@ def test_quota_granite_postgresql_concurrence_reprise_et_ledger() -> None:
                 connection_url=f"postgresql://postgres@127.0.0.1:{port}/postgres",
                 password_path=password_path,
                 connect_timeout_seconds=10,
+            )
+            _wait_postgres(
+                container=container,
+                connection_factory=factory,
+                timeout_seconds=60,
+                poll_seconds=0.5,
             )
             datastore_identity = DatastoreIdentity(
                 environment="test",
