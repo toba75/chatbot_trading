@@ -151,3 +151,55 @@
   aucune absence, surprise ou duplication, `PARTIAL GREEN: offline`.
 - Lint ciblée : Ruff GREEN sur le validateur, les tests et la précondition.
 - Commit GREEN : `fd30fcdebd2f8c554615fed2d91535d1c630c343`.
+
+## 2026-07-23 - T-002 décision locale et quota Granite fenced
+
+- Précondition GREEN : `uv run --locked gate` a exécuté 455 nœuds exactement
+  une fois avant toute modification T-002 et terminé avec le code 0, aucune
+  absence, surprise ou duplication, `PARTIAL GREEN: offline`.
+- Scénario BDD : deux workers généralistes du même environnement détiennent les
+  deux slots ; un troisième job Granite reste `pending` sans claim, modèle,
+  changement de route ni CPU ; après expiration, une nouvelle attribution
+  renouvelle générations et tokens et refuse l’ancien détenteur.
+- RED utile : les tests d’acceptation et unitaires ont refusé la collecte parce
+  que `validate_distribution_decision` et `DistributionDecisionError` étaient
+  absents. Commit RED
+  `2d65f687a264b44317584eb6b2e66bd7314b05fb`.
+- ADR-052 proposée : `platform` possède deux lignes
+  `platform.granite_slots` par identité explicite d’environnement et de
+  déploiement, avec `slot_ordinal IN (1, 2)`, un détenteur unique par worker,
+  une génération monotone et un UUID v4 neuf par attribution.
+- Acquisition : le claim de job compatible et le slot sont sélectionnés avec
+  `FOR UPDATE SKIP LOCKED` puis attribués dans une seule transaction
+  PostgreSQL ; les deux leases partagent la même échéance explicite.
+- Cycle de vie : heartbeat claim-slot atomique, expiration sur l’horloge
+  PostgreSQL, drainage sans nouvelle acquisition, libération sous double
+  fencing et reprise uniquement après libération ou expiration.
+- Frontières DDD : Source Processing conserve manifeste, résultats,
+  progression et publication canonique ; `platform` conserve jobs, claims,
+  slots et enveloppes de complétion. Les résultats passent par des relais
+  idempotents et des transactions locales, sans transaction forte
+  intercontextes.
+- Topologie : exactement deux replicas généralistes sur la station locale,
+  aucune file ou route spécialisée, aucun Redis, Taskiq, Celery, broker, SSH,
+  Kamal, Colima, `arm64`, worker distant, stockage réseau, détection matérielle
+  implicite ou fallback CPU.
+- ADR-051 n’a pas été modifiée ; son SHA-256 reste
+  `a3043a8710536c25277e6b555237fced538b17e2595ea08494bac409b241e87e`.
+  ADR-052 remplace seulement, pour M-014, ses mentions contextuelles devenues
+  obsolètes de flotte CPU multiarchitecture ou distante et conserve son
+  autorité `cuda:0` stricte.
+- Fichiers principaux :
+  `docs/adr/ADR-052-distribution-locale-pages-quota-granite-fenced.md`,
+  `docs/adr/index.md`, `ost_gate/m014_distribution_core.py`, `gate.toml`, les
+  deux tests `validate_distribution_decision_*`, l’allowlist historique et les
+  attentes M13-environments sur le prochain numéro ADR.
+- Validations GREEN : Pytest ciblé 2/2 ; Ruff ciblé ; scope
+  `m014_distribution_core` 28 nœuds ; scope `governance` 25 nœuds ; toutes les
+  exécutions sont uniques et sans absence ni surprise.
+- Gate canonique finale : 457 nœuds exécutés exactement une fois, code 0,
+  aucune absence, surprise ou duplication, `PARTIAL GREEN: offline`.
+- Commit GREEN : `356972ec1593c0fb4590aeb8168224524753d222`.
+- Risques résiduels : ADR-052 reste proposée jusqu’aux preuves PostgreSQL
+  réelles de T-004 et aux preuves live de M14-local-qualification ; T-002 ne
+  crée encore ni migration, ni contrat runtime, ni slot actif.
