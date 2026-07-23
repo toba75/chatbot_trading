@@ -56,7 +56,10 @@ def _wait_postgres(
             )
 
         try:
-            with connection_factory.connect() as connection, connection.cursor() as cursor:
+            with (
+                connection_factory.connect() as connection,
+                connection.cursor() as cursor,
+            ):
                 cursor.execute("SELECT 1", ())
                 response = cursor.fetchone()
         except psycopg.OperationalError as error:
@@ -127,8 +130,7 @@ def _contract(identity, page_number: int):
         expected_result_artifact=LocalArtifactIdentity(
             environment="test",
             artifact_ref=(
-                "artifact:source_processing.local/test/"
-                f"results/page-{page_number}.json"
+                f"artifact:source_processing.local/test/results/page-{page_number}.json"
             ),
             relative_path=f"results/page-{page_number}.json",
         ),
@@ -158,8 +160,15 @@ def _contract(identity, page_number: int):
 def test_quota_granite_postgresql_concurrence_reprise_et_ledger() -> None:
     """Deux slots réussissent, le troisième attend, puis reprend sous nouveau fencing."""
 
-    from app.contracts.technical_jobs import JobEnvironmentIdentity, JobPriority, JobStatus
-    from app.platform.datastore_identity import DatastoreIdentity, PostgresIdentityPreflight
+    from app.contracts.technical_jobs import (
+        JobEnvironmentIdentity,
+        JobPriority,
+        JobStatus,
+    )
+    from app.platform.datastore_identity import (
+        DatastoreIdentity,
+        PostgresIdentityPreflight,
+    )
     from app.platform.job_runtime import JobCatalog
     from app.platform.job_runtime.granite_capacity import (
         GraniteCapacityController,
@@ -257,9 +266,7 @@ def test_quota_granite_postgresql_concurrence_reprise_et_ledger() -> None:
                     """,
                     (),
                 )
-                assert cursor.fetchall() == [
-                    ("test", "ostrading-test-local", [1, 2])
-                ]
+                assert cursor.fetchall() == [("test", "ostrading-test-local", [1, 2])]
 
             environment_identity = JobEnvironmentIdentity(
                 environment="test",
@@ -351,11 +358,14 @@ def test_quota_granite_postgresql_concurrence_reprise_et_ledger() -> None:
                 state=GraniteWorkerState.DRAINING,
                 capabilities=frozenset(("DOCUMENT_STANDARD", "GRANITE_CUDA")),
             )
-            assert quota.claim_compatible_job(
-                worker=draining_worker,
-                lease_seconds=30,
-                job_names=("CONVERT_PAGE",),
-            ) is None
+            assert (
+                quota.claim_compatible_job(
+                    worker=draining_worker,
+                    lease_seconds=30,
+                    job_names=("CONVERT_PAGE",),
+                )
+                is None
+            )
 
             same_worker = quota.claim_compatible_job(
                 worker=worker(2), lease_seconds=30, job_names=("CONVERT_PAGE",)
@@ -414,13 +424,18 @@ def test_quota_granite_postgresql_concurrence_reprise_et_ledger() -> None:
             production_quota = PostgresGraniteSlotRepository(
                 connection_factory=factory,
                 catalog=catalog,
-                environment_identity=worker(9, environment="production").environment_identity,
+                environment_identity=worker(
+                    9, environment="production"
+                ).environment_identity,
             )
-            assert production_quota.claim_compatible_job(
-                worker=worker(9, environment="production"),
-                lease_seconds=30,
-                job_names=("CONVERT_PAGE",),
-            ) is None
+            assert (
+                production_quota.claim_compatible_job(
+                    worker=worker(9, environment="production"),
+                    lease_seconds=30,
+                    job_names=("CONVERT_PAGE",),
+                )
+                is None
+            )
 
             quota.release(renewed_2)
             quota.release(resumed)
