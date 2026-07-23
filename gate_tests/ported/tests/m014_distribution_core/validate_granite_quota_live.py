@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import shutil
 import subprocess
@@ -124,12 +125,14 @@ def test_quota_granite_postgresql_concurrence_reprise_et_ledger() -> None:
     from app.platform.datastore_identity import DatastoreIdentity, PostgresIdentityPreflight
     from app.platform.job_runtime import JobCatalog
     from app.platform.job_runtime.granite_capacity import (
+        GraniteCapacityController,
         GraniteSlotLeaseLostError,
         GraniteWorker,
         GraniteWorkerState,
         PostgresGraniteSlotRepository,
     )
     from app.platform.job_runtime.postgres import PostgresJobQueue
+    from app.platform.job_runtime.postgres import JobLeaseConflictError
     from app.platform.postgres import PsycopgConnectionFactory
     from app.platform.postgres_migrations import PostgresMigrationRunner
     from app.platform.request_context import bind_trace_id, reset_trace_id
@@ -266,23 +269,51 @@ def test_quota_granite_postgresql_concurrence_reprise_et_ledger() -> None:
                 catalog=catalog,
                 environment_identity=environment_identity,
             )
-            lease_1 = quota.claim_compatible_job(
-                worker=worker(1), lease_seconds=30, job_names=("CONVERT_PAGE",)
-            )
-            lease_2 = quota.claim_compatible_job(
-                worker=worker(2), lease_seconds=30, job_names=("CONVERT_PAGE",)
-            )
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                acquisition_1 = executor.submit(
+                    quota.claim_compatible_job,
+                    worker=worker(1),
+                    lease_seconds=30,
+                    job_names=("CONVERT_PAGE",),
+                )
+                acquisition_2 = executor.submit(
+                    quota.claim_compatible_job,
+                    worker=worker(2),
+                    lease_seconds=30,
+                    job_names=("CONVERT_PAGE",),
+                )
+                lease_1 = acquisition_1.result()
+                lease_2 = acquisition_2.result()
             assert lease_1 is not None
             assert lease_2 is not None
             assert {lease_1.slot_ordinal, lease_2.slot_ordinal} == {1, 2}
             assert UUID(lease_1.slot_token).version == 4
             assert UUID(lease_2.slot_token).version == 4
 
-            waiting = quota.claim_compatible_job(
-                worker=worker(3), lease_seconds=30, job_names=("CONVERT_PAGE",)
+            model_calls = []
+            waiting = GraniteCapacityController(repository=quota).execute_next(
+                worker=worker(3),
+                lease_seconds=30,
+                heartbeat_seconds=5,
+                job_names=("CONVERT_PAGE",),
+                execute_model=lambda lease: model_calls.append(lease),
             )
             assert waiting is None
+            assert model_calls == []
             assert queue.job_for(submitted[2].job_id).status is JobStatus.PENDING
+
+            draining_worker = GraniteWorker(
+                worker_instance_id="worker-documents-4",
+                environment_identity=environment_identity,
+                storage_environment="test",
+                state=GraniteWorkerState.DRAINING,
+                capabilities=frozenset(("DOCUMENT_STANDARD", "GRANITE_CUDA")),
+            )
+            assert quota.claim_compatible_job(
+                worker=draining_worker,
+                lease_seconds=30,
+                job_names=("CONVERT_PAGE",),
+            ) is None
 
             same_worker = quota.claim_compatible_job(
                 worker=worker(2), lease_seconds=30, job_names=("CONVERT_PAGE",)
@@ -329,6 +360,14 @@ def test_quota_granite_postgresql_concurrence_reprise_et_ledger() -> None:
                 quota.heartbeat(lease_1, lease_seconds=30)
             with pytest.raises(GraniteSlotLeaseLostError, match="JOB_LEASE_LOST"):
                 quota.release(lease_1)
+            with pytest.raises(JobLeaseConflictError, match="JOB_LEASE_LOST"):
+                queue.mark_succeeded(
+                    job_id=lease_1.claimed_job.job.job_id,
+                    owner_id=lease_1.claimed_job.lease_owner,
+                    claim_generation=lease_1.claimed_job.claim_generation,
+                    claim_token=lease_1.claimed_job.claim_token,
+                    result={"status": "obsolete"},
+                )
 
             production_quota = PostgresGraniteSlotRepository(
                 connection_factory=factory,
@@ -379,4 +418,3 @@ def test_quota_granite_postgresql_concurrence_reprise_et_ledger() -> None:
                 assert "Index" in explain
     finally:
         _docker("rm", "--force", container)
-

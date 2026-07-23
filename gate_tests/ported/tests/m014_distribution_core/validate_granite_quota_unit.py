@@ -57,7 +57,7 @@ def _claimed_job() -> ClaimedJob:
     )
 
 
-def test_identite_slot_exige_ordinal_generation_uuid4_et_echeance_commune() -> None:
+def _identite_slot_exige_ordinal_generation_uuid4_et_echeance_commune() -> None:
     from app.platform.job_runtime.granite_capacity import GraniteSlotLease
 
     claimed = _claimed_job()
@@ -97,7 +97,7 @@ def test_identite_slot_exige_ordinal_generation_uuid4_et_echeance_commune() -> N
         )
 
 
-def test_worker_generaliste_refuse_stockage_etranger_et_capacite_partielle() -> None:
+def _worker_generaliste_refuse_stockage_etranger_et_capacite_partielle() -> None:
     from app.platform.job_runtime.granite_capacity import (
         GraniteCapacityConfigurationError,
         GraniteWorker,
@@ -143,7 +143,7 @@ def test_worker_generaliste_refuse_stockage_etranger_et_capacite_partielle() -> 
         )
 
 
-def test_duree_invalide_et_perte_de_double_fencing_sont_explicites() -> None:
+def _duree_invalide_et_perte_de_double_fencing_sont_explicites() -> None:
     from app.platform.job_runtime.granite_capacity import (
         GraniteCapacityConfigurationError,
         GraniteCapacityController,
@@ -177,3 +177,8 @@ def test_duree_invalide_et_perte_de_double_fencing_sont_explicites() -> None:
     assert conflict.code == "JOB_LEASE_LOST"
     assert str(conflict) == "JOB_LEASE_LOST"
 
+
+def test_quota_granite_fenced_unit() -> None:
+    _identite_slot_exige_ordinal_generation_uuid4_et_echeance_commune()
+    _worker_generaliste_refuse_stockage_etranger_et_capacite_partielle()
+    _duree_invalide_et_perte_de_double_fencing_sont_explicites()

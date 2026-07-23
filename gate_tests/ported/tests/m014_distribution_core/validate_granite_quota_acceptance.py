@@ -112,7 +112,7 @@ def _ready_worker():
     )
 
 
-def test_troisieme_claim_attend_sans_appel_modele() -> None:
+def _troisieme_claim_attend_sans_appel_modele() -> None:
     """Given aucun slot, When un claim tente Granite, Then le modèle n'est pas appelé."""
 
     from app.platform.job_runtime.granite_capacity import GraniteCapacityController
@@ -135,7 +135,7 @@ def test_troisieme_claim_attend_sans_appel_modele() -> None:
     assert repository.releases == []
 
 
-def test_controleur_unique_libere_sous_la_meme_identite_fenced() -> None:
+def _controleur_unique_libere_sous_la_meme_identite_fenced() -> None:
     """Given un slot acquis, When Granite finit, Then le contrôleur libère ce slot."""
 
     from app.platform.job_runtime.granite_capacity import GraniteCapacityController
@@ -158,7 +158,7 @@ def test_controleur_unique_libere_sous_la_meme_identite_fenced() -> None:
     assert repository.releases == [lease]
 
 
-def test_echec_explicite_libere_sans_fallback() -> None:
+def _echec_explicite_libere_sans_fallback() -> None:
     """Given Granite échoue, When l'erreur remonte, Then le slot est libéré et l'erreur propagée."""
 
     from app.platform.job_runtime.granite_capacity import GraniteCapacityController
@@ -182,7 +182,7 @@ def test_echec_explicite_libere_sans_fallback() -> None:
     assert repository.releases == [lease]
 
 
-def test_migration_022_est_ascendante_et_prepare_les_deux_proprietaires() -> None:
+def _migration_022_est_ascendante_et_prepare_les_deux_proprietaires() -> None:
     """Given le ledger finit en 021, When T-004 arrive, Then seule 022 est ajoutée."""
 
     migration = (
@@ -212,7 +212,7 @@ def test_migration_022_est_ascendante_et_prepare_les_deux_proprietaires() -> Non
     assert versions == tuple(range(1, 23))
 
 
-def test_adaptateur_documente_ordre_de_verrouillage_et_skip_locked() -> None:
+def _adaptateur_documente_ordre_de_verrouillage_et_skip_locked() -> None:
     """L'acquisition verrouille d'abord le job, puis le slot, sans attente de verrou."""
 
     source = (
@@ -228,3 +228,10 @@ def test_adaptateur_documente_ordre_de_verrouillage_et_skip_locked() -> None:
     assert "BoundedSemaphore" not in source
     assert "threading.Semaphore" not in source
 
+
+def test_quota_granite_fenced_acceptance() -> None:
+    _troisieme_claim_attend_sans_appel_modele()
+    _controleur_unique_libere_sous_la_meme_identite_fenced()
+    _echec_explicite_libere_sans_fallback()
+    _migration_022_est_ascendante_et_prepare_les_deux_proprietaires()
+    _adaptateur_documente_ordre_de_verrouillage_et_skip_locked()

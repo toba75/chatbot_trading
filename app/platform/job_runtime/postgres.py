@@ -240,7 +240,7 @@ class PostgresJobQueue:
                     parsed_request.job_name,
                     parsed_request.priority.value,
                     *identity[1:],
-                    json.dumps(dict(parsed_request.payload), separators=(",", ":"), sort_keys=True),
+                    _json_dumps(parsed_request.payload),
                     current_trace_id(),
                     parsed_request.environment,
                     parsed_request.deployment_id,
@@ -314,12 +314,7 @@ class PostgresJobQueue:
         request = message.as_job_request()
         self._catalog.require_known_job(request.job_name)
         self._require_environment_identity(request)
-        serialized_payload = json.dumps(
-            dict(request.payload),
-            ensure_ascii=False,
-            separators=(",", ":"),
-            sort_keys=True,
-        )
+        serialized_payload = _json_dumps(request.payload)
         with self._connection_factory.connect() as connection:
             with connection.transaction(), connection.cursor() as cursor:
                 cursor.execute(
@@ -625,7 +620,7 @@ class PostgresJobQueue:
             claim_generation=claim_generation,
             claim_token=claim_token,
             status="succeeded",
-            result=json.dumps(dict(parsed_result), separators=(",", ":"), sort_keys=True),
+            result=_json_dumps(parsed_result),
             failure_reason=None,
         )
 
@@ -829,6 +824,25 @@ def _mapping(value: Any, field_name: str) -> Mapping[str, Any] | None:
     if not isinstance(decoded, Mapping):
         raise RuntimeError(f"{field_name} PostgreSQL invalide")
     return decoded
+
+
+def _json_dumps(value: Mapping[str, Any]) -> str:
+    """Sérialise récursivement les contrats immutables sans les affaiblir."""
+
+    return json.dumps(
+        _json_compatible(value),
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+
+
+def _json_compatible(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {key: _json_compatible(item) for key, item in value.items()}
+    if isinstance(value, tuple):
+        return [_json_compatible(item) for item in value]
+    return value
 
 
 def _database_row_values(row: Any, expected_length: int, row_name: str) -> tuple[Any, ...]:
