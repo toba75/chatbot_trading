@@ -88,12 +88,13 @@ def _assert_index_documentation_reference_contrat_backup_1_1_reel() -> None:
     assert "m013_backup_restore_drill.md" not in backup_row
 
 
-def _assert_prochaine_adr_est_052() -> None:
-    """Given ADR-051 présente, When l'index réserve le suivant, Then il annonce ADR-052."""
+def _assert_prochaine_adr_est_053() -> None:
+    """Given ADR-052 présente, When l'index réserve le suivant, Then il annonce ADR-053."""
 
     index = (ROOT / "docs/adr/index.md").read_text(encoding="utf-8")
     assert "ADR-051-execution-granite-cuda-stricte.md" in index
-    assert "Prochaine ADR technique: ADR-052" in index
+    assert "ADR-052-distribution-locale-pages-quota-granite-fenced.md" in index
+    assert "Prochaine ADR technique: ADR-053" in index
     assert "Prochaine ADR technique: ADR-050" not in index
 
 
@@ -131,6 +132,6 @@ def test_gouvernance_de_la_revue4() -> None:
     _assert_traceabilite_attend_preuve_test_et_relit_adr_047_048_050()
     _assert_readme_compose_historique_est_deprecie_et_gouverne()
     _assert_index_documentation_reference_contrat_backup_1_1_reel()
-    _assert_prochaine_adr_est_052()
+    _assert_prochaine_adr_est_053()
     _assert_runbook_documente_import_ca_windows_explicite_et_reversible()
     _assert_tests_revue4_sont_enroles_dans_la_gate()

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from hashlib import sha256
 from pathlib import PurePosixPath
 import re
 from typing import Any, Mapping, Sequence
@@ -415,4 +416,249 @@ def _is_sha256(value: Any) -> bool:
     return isinstance(value, str) and _SHA256_PATTERN.fullmatch(value) is not None
 
 
-__all__ = ["DistributionBaselineError", "validate_distribution_baseline"]
+_ADR_051_SHA256 = "a3043a8710536c25277e6b555237fced538b17e2595ea08494bac409b241e87e"
+_ADR_052_INDEX_ROW = (
+    "| [ADR-052](ADR-052-distribution-locale-pages-quota-granite-fenced.md) "
+    "| Distribution locale à la page et quota Granite fenced | Proposée "
+    "| 2026-07-23 | Pour M-014 uniquement, mentions de flotte CPU "
+    "multiarchitecture ou distante d’ADR-051 | Aucune |"
+)
+
+
+class DistributionDecisionError(ValueError):
+    """Signale une décision ADR-052 absente, ambiguë ou non bornée."""
+
+
+def validate_distribution_decision(
+    *,
+    adr_text: str,
+    index_text: str,
+    adr_051_bytes: bytes,
+) -> None:
+    """Valide la décision locale, son index et l'immuabilité d'ADR-051."""
+
+    if (
+        not isinstance(adr_text, str)
+        or not adr_text.strip()
+        or not isinstance(index_text, str)
+        or not index_text.strip()
+        or not isinstance(adr_051_bytes, bytes)
+        or not adr_051_bytes
+    ):
+        raise DistributionDecisionError("M014_DISTRIBUTION_DOCUMENT_INVALID")
+
+    if sha256(adr_051_bytes).hexdigest() != _ADR_051_SHA256:
+        raise DistributionDecisionError("M014_DISTRIBUTION_ADR_051_CHANGED")
+
+    normalized_adr = _normalized_markdown(adr_text)
+    normalized_index = _normalized_markdown(index_text)
+    _require_markers(
+        normalized_adr,
+        (
+            "# ADR-052 - Distribution locale à la page et quota Granite fenced",
+            "**Statut :** Proposée",
+            "**Date :** 2026-07-23",
+            "**Remplace :** Pour M-014 uniquement, les mentions d’une flotte CPU "
+            "multiarchitecture ou distante d’ADR-051",
+            "**Remplacée par :** Aucune",
+        ),
+        "M014_DISTRIBUTION_ADR_METADATA_INVALID",
+    )
+    if (
+        _normalized_markdown(_ADR_052_INDEX_ROW) not in normalized_index
+        or "Prochaine ADR technique: ADR-053" not in normalized_index
+    ):
+        raise DistributionDecisionError("M014_DISTRIBUTION_INDEX_INVALID")
+
+    _require_markers(
+        normalized_adr,
+        (
+            "## Options considérées",
+            "| Deux lignes `platform.granite_slots`, leases et double fencing "
+            "| Retenue |",
+            "## Conséquences",
+            "### Positives",
+            "### Négatives ou coûts",
+            "### Risques et contrôles",
+            "## Migration et rollback",
+            "Un rollback **DOIT** arrêter explicitement la création de nouveaux "
+            "jobs de pages",
+            "Le rollback **NE DOIT PAS** supprimer les tables ou colonnes",
+        ),
+        "M014_DISTRIBUTION_CONSEQUENCES_ROLLBACK_REQUIRED",
+    )
+
+    decision = _markdown_section(
+        adr_text,
+        start="## Décision",
+        end="## Options considérées",
+    )
+    normalized_decision = _normalized_markdown(decision)
+
+    _require_markers(
+        normalized_adr,
+        (
+            "**Given** deux workers documentaires généralistes",
+            "**When** un troisième job Granite tente d’acquérir la capacité",
+            "**Then** le troisième job reste en attente dans la file PostgreSQL",
+            "DIST-001, DIST-002 et DIST-003",
+            "0004_migrer_quota_granite_fenced.md",
+        ),
+        "M014_DISTRIBUTION_TRACEABILITY_REQUIRED",
+    )
+    _require_markers(
+        normalized_decision,
+        (
+            "Source Processing **DOIT** rester propriétaire de "
+            "`DocumentProcessingRun`",
+            "L’orchestration `CONVERT_DOCUMENT` **DOIT** produire idempotemment "
+            "un job `CONVERT_PAGE` par page non vide",
+            "`platform` **DOIT** rester propriétaire de "
+            "`platform.technical_jobs`",
+            "Une transaction forte **NE DOIT PAS** lire ou écrire à la fois un "
+            "agrégat Source Processing et une table `platform`",
+        ),
+        "M014_DISTRIBUTION_OWNERSHIP_FANOUT_REQUIRED",
+    )
+    _require_markers(
+        normalized_decision,
+        (
+            "`platform.granite_slots` **DOIT** contenir exactement deux lignes",
+            "`slot_ordinal IN (1, 2)`",
+            "la clé primaire **DOIT** interdire tout troisième slot",
+            "au plus un slot par `worker_instance_id`",
+        ),
+        "M014_DISTRIBUTION_QUOTA_BOUNDS_REQUIRED",
+    )
+    _require_markers(
+        normalized_decision,
+        (
+            "PostgreSQL **DOIT** constituer l’unique autorité du quota.",
+            "Un compteur, un sémaphore en mémoire, un verrou de fichier ou "
+            "l’état Docker **NE DOIT PAS** autoriser une conversion Granite.",
+        ),
+        "M014_DISTRIBUTION_POSTGRES_AUTHORITY_REQUIRED",
+    )
+    _require_markers(
+        normalized_decision,
+        (
+            "`claim_generation`, `claim_token`, `slot_generation`, `slot_token`",
+            "`slot_generation` **DOIT** croître monotonement",
+            "`slot_token` **DOIT** être un UUID v4 neuf à chaque attribution",
+            "une nouvelle génération et un nouveau token de claim ainsi qu’une "
+            "nouvelle génération et un nouveau token de slot",
+        ),
+        "M014_DISTRIBUTION_FENCING_INCOMPLETE",
+    )
+    _require_markers(
+        normalized_decision,
+        (
+            "Le port `ClaimCompatibleTechnicalJob` de `platform` **DOIT** "
+            "sélectionner le job compatible",
+            "avec `FOR UPDATE SKIP LOCKED`",
+            "attribuer le claim et le slot dans la même transaction PostgreSQL",
+            "La lease du claim et celle du slot **DOIVENT** recevoir la même "
+            "échéance explicite.",
+        ),
+        "M014_DISTRIBUTION_ATOMIC_ACQUISITION_REQUIRED",
+    )
+    _require_markers(
+        normalized_decision,
+        (
+            "l’identité complète `environment`, `deployment_id`, "
+            "`configuration_hash`, l’identité de stockage",
+            "le troisième job Granite **DOIT** rester dans l’état non terminal "
+            "existant `pending`, sans claim attribué",
+            "L’attente **N’EST** ni un succès, ni une erreur terminale",
+            "Après libération ou expiration, un job Granite en attente **PEUT** "
+            "acquérir la ligne admissible.",
+        ),
+        "M014_DISTRIBUTION_WAITING_IDENTITY_REQUIRED",
+    )
+    _require_markers(
+        normalized_decision,
+        (
+            "Le port `HeartbeatClaimAndGraniteSlot` **DOIT** renouveler le claim "
+            "et le slot dans une transaction `platform` unique.",
+            "L’expiration **DOIT** être évaluée avec l’horloge PostgreSQL.",
+            "Le drainage d’un worker **DOIT** interdire tout nouveau claim.",
+            "la reprise **DOIT** attendre l’expiration PostgreSQL.",
+        ),
+        "M014_DISTRIBUTION_LEASE_LIFECYCLE_REQUIRED",
+    )
+    _require_markers(
+        normalized_decision,
+        (
+            "Le port `ReleaseGraniteSlot` **DOIT** comparer le même tuple "
+            "fenced complet",
+            "une libération provenant d’un détenteur expiré **DOIT** échouer "
+            "sans mutation.",
+        ),
+        "M014_DISTRIBUTION_RELEASE_FENCING_REQUIRED",
+    )
+    _require_markers(
+        normalized_decision,
+        (
+            "Un worker **NE DOIT PAS** écrire directement un résultat de page "
+            "dans Source Processing.",
+            "Le port `CompletePageExecution` **DOIT**",
+            "le résultat de page et l’unique incrément de progression "
+            "**DOIVENT** être persistés atomiquement",
+            "La redélivrance d’une enveloppe identique **DOIT** être idempotente.",
+            "Un ancien détenteur",
+            "**NE DOIT** ni renouveler, ni libérer, ni créer une enveloppe, ni "
+            "publier un résultat.",
+        ),
+        "M014_DISTRIBUTION_IDEMPOTENCE_PUBLICATION_REQUIRED",
+    )
+    _require_markers(
+        normalized_decision,
+        (
+            "Les deux replicas `worker-documents` **DOIVENT** exécuter le même "
+            "code et publier les mêmes capacités généralistes.",
+            "Aucun worker spécialisé Granite, aucune route spécialisée",
+        ),
+        "M014_DISTRIBUTION_GENERALIST_WORKERS_REQUIRED",
+    )
+    _require_markers(
+        normalized_decision,
+        ("aucune file supplémentaire **NE DOIVENT** être créés.",),
+        "M014_DISTRIBUTION_SINGLE_QUEUE_REQUIRED",
+    )
+    _require_markers(
+        normalized_decision,
+        (
+            "Redis, Taskiq, Celery, un broker, SSH, Kamal, Colima, `arm64`, un "
+            "worker distant et un stockage d’objets réseau **SONT INTERDITS**",
+            "Granite **DOIT** rester sur `cuda:0` selon ADR-051.",
+            "**NE DOIT** déclencher ni CPU, ni sélection `auto`, ni détection "
+            "matérielle implicite, ni changement de route.",
+        ),
+        "M014_DISTRIBUTION_LOCAL_ONLY_REQUIRED",
+    )
+
+
+def _normalized_markdown(value: str) -> str:
+    return " ".join(value.split())
+
+
+def _markdown_section(value: str, *, start: str, end: str) -> str:
+    if start not in value or end not in value:
+        raise DistributionDecisionError("M014_DISTRIBUTION_ADR_STRUCTURE_INVALID")
+    section = value.split(start, maxsplit=1)[1].split(end, maxsplit=1)[0]
+    if not section.strip():
+        raise DistributionDecisionError("M014_DISTRIBUTION_ADR_STRUCTURE_INVALID")
+    return section
+
+
+def _require_markers(value: str, markers: Sequence[str], code: str) -> None:
+    if any(_normalized_markdown(marker) not in value for marker in markers):
+        raise DistributionDecisionError(code)
+
+
+__all__ = [
+    "DistributionBaselineError",
+    "DistributionDecisionError",
+    "validate_distribution_baseline",
+    "validate_distribution_decision",
+]
