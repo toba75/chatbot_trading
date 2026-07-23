@@ -103,3 +103,52 @@
 - Les mentions historiques de flotte CPU multiarchitecture dans ADR-051 ne
   doivent pas être modifiées silencieusement ; ADR-052 doit les superséder de
   façon bornée pour M-014 tout en conservant la décision CUDA stricte.
+
+## 2026-07-23 - T-001 baseline locale reproductible
+
+- Précondition GREEN : `uv run --locked gate` a exécuté 452 nœuds exactement
+  une fois et terminé avec le code 0, `PARTIAL GREEN: offline`, avant toute
+  modification T-001.
+- Scénario BDD et portée de gate ajoutés sous
+  `gate_tests/ported/tests/m014_distribution_core/`, avec la précondition
+  `gate_tests/preconditions/test_m014_distribution_core.py` et le scope
+  `m014_distribution_core` enregistré dans `gate.toml`.
+- RED utile : le scope a terminé `PARTIAL RED` et Pytest a refusé la collecte
+  avec `ModuleNotFoundError: ost_gate.m014_distribution_core`. Commit RED
+  `c0a136bcfb5c5f51c0d9b31f627e0a96ff13ee35`.
+- Validateur strict : `ost_gate/m014_distribution_core.py` refuse preuve
+  synthétique, champ ou commit absent, durée non positive, hash invalide,
+  sorties divergentes, limite autre que 2 Gio, preuve CUDA absente et capacité
+  `ssh`, Kamal, Colima, `arm64` ou worker distant active.
+- Preuve structurée :
+  `docs/evaluation/m014/distribution_core_baseline.json` ; compte rendu :
+  `docs/governance/m014_distribution_core_baseline.md`.
+- Charge mesurée : page 2 de la fixture M-013, route `MIXED_PAGEWISE`, image
+  scellée `sha256:2af4bfdfd1b7c6f4c43896fb2767cfe2e87646dcab84b5569f5fd4e3c84f7bfd`,
+  actifs Granite au manifeste
+  `575eb811c47bb48a6401006bdde1084605ab4f6e158901651f9dbfcbc659e368`.
+- Un worker : 24,955 s, pic RAM 1 872 605 741 octets, pic VRAM 1 396 Mio,
+  pic GPU 34 %, deux items `granite_docling`.
+- Deux workers : 25,539 s pour deux pages concurrentes, pics RAM
+  1 871 531 999 et 1 464 583 848 octets, pic VRAM total 2 719 Mio, pic GPU
+  8 %, deux items par réponse.
+- Les trois sorties possèdent le même SHA-256
+  `21eb4e0b719b644bca4e193546cfc53b6be7666f732200ec9da0e44d921a2977`.
+  Le débit dérivé du lot atteint `1,954x` par rapport à deux durées unitaires.
+- Résultats négatifs conservés : deux courses du collecteur `docker stats`
+  sans preuve retenue ; une conversion réussie en 24,601 s rejetée parce que
+  son SHA-256 de réponse était absent.
+- Inventaire observé : contrats `app/contracts/technical_jobs.py`, runtime
+  `app/platform/job_runtime`, worker SP, tables de jobs, outbox, runs,
+  progression et routes, migrations `003`, `008`, `012`, `014`, `020`, `021`,
+  configurations et volumes du profil `test`.
+- ADR consultées : ADR-025, ADR-040, ADR-042, ADR-046 et ADR-051. ADR nouvelle :
+  non requise ; ADR-052 demeure réservée à T-002.
+- Validations GREEN : Pytest ciblé 2/2 ; scope `m014_distribution_core` 26
+  nœuds ; `governance` 25 nœuds ; `m004` 45 nœuds ; `m013_environments` 49
+  nœuds ; aucune absence, surprise ou duplication.
+- Gate canonique finale : 455 nœuds exécutés exactement une fois, code 0,
+  aucune absence, surprise ou duplication, `PARTIAL GREEN: offline`.
+- Lint ciblée : Ruff GREEN sur le validateur, les tests et la précondition.
+- Commit GREEN : présent commit ; le hash exact sera ajouté après sa création
+  sans modifier le comportement livré.

@@ -9,8 +9,12 @@ from ost_gate.m014_distribution_core import validate_distribution_baseline
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
-EVIDENCE_PATH = REPOSITORY_ROOT / "docs" / "evaluation" / "m014" / "distribution_core_baseline.json"
-REPORT_PATH = REPOSITORY_ROOT / "docs" / "governance" / "m014_distribution_core_baseline.md"
+EVIDENCE_PATH = (
+    REPOSITORY_ROOT / "docs" / "evaluation" / "m014" / "distribution_core_baseline.json"
+)
+REPORT_PATH = (
+    REPOSITORY_ROOT / "docs" / "governance" / "m014_distribution_core_baseline.md"
+)
 
 
 def test_baseline_locale_reproductible_est_publiee() -> None:

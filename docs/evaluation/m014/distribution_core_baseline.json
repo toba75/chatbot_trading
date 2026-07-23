@@ -1,0 +1,171 @@
+{
+  "schema_version": "1.0",
+  "evidence_id": "M014-DISTRIBUTION-CORE-BASELINE-20260723",
+  "evidence_kind": "M014_DISTRIBUTION_CORE_LOCAL_BASELINE",
+  "evidence_status": "MEASURED_LIVE",
+  "synthetic": false,
+  "measurement_origin": "LIVE_DOCKER_TEST_PROFILE",
+  "measured_at": "2026-07-23T21:22:35+02:00",
+  "git_references": {
+    "master": "c67e8aebb425a6dc58d47af40fb2a316b0c3106b",
+    "baseline_branch": "c0a136bcfb5c5f51c0d9b31f627e0a96ff13ee35",
+    "granite_cuda": "89a73a0754c97de6d13c3ed6f7d164ee9e747f29",
+    "worker_memory_limit": "975a12c277d13ded4ad95509261250ee6cf014ce"
+  },
+  "environment": {
+    "profile": "test",
+    "deployment_id": "ostrading-test-ci",
+    "configuration_hash": "a2cfb20ced11ca0f49845c31d67740db95c5d0b9fa34b901d640e5ef3a73a6bc"
+  },
+  "workload": {
+    "fixture_path": "data/corpus/ostrading-environment-qualification-5-pages.pdf",
+    "fixture_sha256": "8b67cc7428a569f15bc256247a5b8aa04b32311e7ad05da82cf6e4c75e64cb7b",
+    "page_number": 2,
+    "source_page_number": 2,
+    "route_name": "MIXED_PAGEWISE"
+  },
+  "runtime_identity": {
+    "image_reference": "ostrading/worker-documents@sha256:2af4bfdfd1b7c6f4c43896fb2767cfe2e87646dcab84b5569f5fd4e3c84f7bfd",
+    "image_digest": "sha256:2af4bfdfd1b7c6f4c43896fb2767cfe2e87646dcab84b5569f5fd4e3c84f7bfd",
+    "image_revision": "89a73a0754c97de6d13c3ed6f7d164ee9e747f29",
+    "asset_manifest_path": "config/docling-assets.granite.json",
+    "asset_manifest_sha256": "575eb811c47bb48a6401006bdde1084605ab4f6e158901651f9dbfcbc659e368",
+    "model_repository": "ibm-granite/granite-docling-258M",
+    "model_revision": "982fe3b40f2fa73c365bdb1bcacf6c81b7184bfe",
+    "docling_version": "2.111.0",
+    "torch_version": "2.13.0+cu130",
+    "cuda_version": "13.0",
+    "gpu_name": "NVIDIA GeForce RTX 4090 Laptop GPU",
+    "gpu_driver": "610.62",
+    "docker_server_version": "29.1.5"
+  },
+  "measurements": {
+    "single_worker": {
+      "workers": 1,
+      "worker_ids": [
+        "m014-baseline-single"
+      ],
+      "duration_seconds": 24.955,
+      "memory_limit_bytes": 2147483648,
+      "peak_ram_bytes_by_worker": {
+        "m014-baseline-single": 1872605741
+      },
+      "peak_vram_mib": 1396,
+      "peak_gpu_utilization_percent": 34,
+      "cuda_device": "cuda:0",
+      "cuda_activity_observed": true,
+      "outputs": [
+        {
+          "worker_id": "m014-baseline-single",
+          "response_sha256": "21eb4e0b719b644bca4e193546cfc53b6be7666f732200ec9da0e44d921a2977",
+          "item_count": 2,
+          "provenances": [
+            "granite_docling"
+          ]
+        }
+      ]
+    },
+    "two_workers": {
+      "workers": 2,
+      "worker_ids": [
+        "m014-baseline-two-1",
+        "m014-baseline-two-2"
+      ],
+      "duration_seconds": 25.539,
+      "memory_limit_bytes": 2147483648,
+      "peak_ram_bytes_by_worker": {
+        "m014-baseline-two-1": 1871531999,
+        "m014-baseline-two-2": 1464583848
+      },
+      "peak_vram_mib": 2719,
+      "peak_gpu_utilization_percent": 8,
+      "cuda_device": "cuda:0",
+      "cuda_activity_observed": true,
+      "outputs": [
+        {
+          "worker_id": "m014-baseline-two-1",
+          "response_sha256": "21eb4e0b719b644bca4e193546cfc53b6be7666f732200ec9da0e44d921a2977",
+          "item_count": 2,
+          "provenances": [
+            "granite_docling"
+          ]
+        },
+        {
+          "worker_id": "m014-baseline-two-2",
+          "response_sha256": "21eb4e0b719b644bca4e193546cfc53b6be7666f732200ec9da0e44d921a2977",
+          "item_count": 2,
+          "provenances": [
+            "granite_docling"
+          ]
+        }
+      ]
+    }
+  },
+  "inventory": {
+    "modules": [
+      "app/contracts/technical_jobs.py",
+      "app/platform/job_runtime/postgres.py",
+      "app/platform/job_runtime/heartbeat.py",
+      "app/source_processing/adapters/worker_runtime.py",
+      "app/source_processing/application/routed_document_conversion_worker.py"
+    ],
+    "tables": [
+      "platform.technical_jobs",
+      "source_processing.job_outbox",
+      "source_processing.document_processing_runs",
+      "source_processing.document_conversion_requests",
+      "source_processing.page_manifest_entries",
+      "source_processing.page_routes"
+    ],
+    "migrations": [
+      "deploy/postgres/migrations/003_document_worker_runtime.sql",
+      "deploy/postgres/migrations/008_claim_fencing_and_projection_replay.sql",
+      "deploy/postgres/migrations/012_document_conversion_public_progress.sql",
+      "deploy/postgres/migrations/014_document_conversion_incremental_progress.sql",
+      "deploy/postgres/migrations/020_job_environment_identity.sql",
+      "deploy/postgres/migrations/021_job_environment_identity_hardening.sql"
+    ],
+    "configurations": [
+      "config/docling-assets.granite.json",
+      "config/environments/test.yaml",
+      "deploy/environments/compose.base.yaml",
+      "deploy/environments/test.compose.yaml"
+    ],
+    "mechanisms": [
+      "POSTGRESQL_JOB_QUEUE",
+      "FOR_UPDATE_SKIP_LOCKED",
+      "LEASE",
+      "CLAIM_GENERATION",
+      "CLAIM_TOKEN",
+      "FENCED_MUTATIONS",
+      "PERSISTED_PUBLIC_PROGRESS",
+      "SHARED_DOCLING_LIMITER",
+      "GRANITE_CUDA_STRICT",
+      "LOCAL_PROFILE_VOLUMES",
+      "TWO_DOCUMENT_WORKER_REPLICAS"
+    ]
+  },
+  "network_scope": {
+    "physical_hosts": [
+      "local-station-amd64"
+    ],
+    "locality": "LOCAL_ONLY",
+    "enabled_capabilities": [
+      "docker_local",
+      "postgresql_local",
+      "cuda_local"
+    ],
+    "excluded_capabilities": [
+      "ssh",
+      "kamal",
+      "colima",
+      "arm64",
+      "remote_worker"
+    ]
+  },
+  "historical_context": {
+    "source": "docs/specs/plan_distribution.md",
+    "reused_as_live_measurement": false,
+    "plan_measurements_status": "HISTORICAL_NOT_REUSED"
+  }
+}
