@@ -253,3 +253,70 @@
   ou activation runtime n’est ajoutée. Le quota PostgreSQL réel et la
   saturation restent à prouver en T-004 ; le branchement runtime demeure la
   responsabilité de T-005.
+
+## 2026-07-23 - T-004 quota Granite PostgreSQL double-fenced
+
+- Précondition GREEN : `uv run --locked gate --scope
+  m014_distribution_core` a exécuté 30 nœuds exactement une fois avant toute
+  modification T-004 et terminé avec le code 0, sans absence, surprise ni
+  duplication.
+- Scénario BDD : deux workers généralistes `READY` du même environnement
+  réclament concurremment les deux slots Granite ; le troisième job reste
+  `pending` sans appel modèle ; après expiration PostgreSQL, il récupère le
+  slot avec une génération et un UUID v4 nouveaux, tandis que l’ancien
+  heartbeat, l’ancienne libération et l’ancien succès sont refusés avec
+  `JOB_LEASE_LOST`.
+- RED utile : les tests d’acceptation, unitaires et PostgreSQL live exigeaient
+  le module `app.platform.job_runtime.granite_capacity` et la migration
+  `022_granite_quota_and_page_results.sql`, tous deux absents. Commit RED
+  `25ce8893cd2af91df61547cbf4023fbd044f2b3c`.
+- Migration ascendante :
+  `deploy/postgres/migrations/022_granite_quota_and_page_results.sql` crée
+  `platform.granite_slots`, initialise exactement les ordinaux 1 et 2 depuis
+  l’unique `platform.datastore_identity`, interdit un troisième ordinal et
+  impose un détenteur unique par worker. Elle prépare séparément
+  `platform.page_completion_outbox` et
+  `source_processing.page_execution_results`, sans clé étrangère ni
+  transaction forte intercontextes, sans suppression et sans activer le
+  fan-out, les jobs de pages ou l’assemblage.
+- Adaptateur platform : `PostgresGraniteSlotRepository` sélectionne le job puis
+  le slot avec deux `FOR UPDATE SKIP LOCKED`, dans cet ordre documenté, et les
+  attribue dans une transaction unique. Il vérifie environnement, déploiement,
+  hash de configuration, identité de stockage, capacité `GRANITE_CUDA`,
+  `cuda:0`, état non drainant et généralité du worker.
+- Cycle de vie : la lease du claim et celle du slot partagent l’échéance
+  PostgreSQL ; heartbeat et libération comparent worker, job, environnement,
+  les deux générations, les deux tokens et une échéance future. Le contrôleur
+  unique renouvelle pendant l’appel modèle et libère sous le même fencing sur
+  succès ou erreur explicite, sans fallback.
+- Correctif d’intégration T-003 : `PostgresJobQueue` sérialise désormais
+  récursivement les mappings immutables des contrats ; la preuve live avait
+  détecté le refus JSON d’un `mappingproxy` imbriqué avant tout claim.
+- Preuve PostgreSQL réelle : départ d’un ledger 001 à 021, migration vers 022,
+  second passage du runner sans drift, ledger final de 22 lignes, exactement
+  deux slots, deux acquisitions concurrentes, troisième attente sans appel
+  modèle, un slot maximum par worker, heartbeat, drainage sans claim,
+  expiration forcée sur l’horloge PostgreSQL, reprise monotone, refus de
+  l’ancien détenteur, libération répétée refusée, profil `production` incapable
+  de voir les slots `test` et index du chemin chaud observé par `EXPLAIN`.
+- Tests ajoutés :
+  `validate_granite_quota_acceptance.py`,
+  `validate_granite_quota_unit.py` et
+  `validate_granite_quota_live.py`, enrôlés dans `gate.toml` ; le test live
+  démarre un PostgreSQL 16 éphémère avec un port local aléatoire et le supprime
+  systématiquement.
+- Validations GREEN avant commit : Pytest ciblé 3/3 ; Ruff ciblé ; scope
+  `m014_distribution_core --live` 33 nœuds ; scope `m004` 45 nœuds ; scope
+  `m013_environments` 49 nœuds. Toutes les exécutions sont uniques, sans
+  absence ni surprise ; aucun conteneur `ostrading-m014-quota-*` ne subsiste.
+- Gate canonique finale : 461 nœuds exécutés exactement une fois, tous GREEN,
+  aucune absence, surprise ou duplication, `PARTIAL GREEN: offline` ; rapport
+  local `.tmp/m014-t004-global-gate.json` ignoré par Git.
+- Commit GREEN : `fa878d5241139aba024757e9808743aea0ad626d`.
+- ADR consultées : ADR-021, ADR-024, ADR-025 et ADR-052. ADR nouvelle : non
+  requise, car T-004 matérialise sans la modifier la décision structurante
+  d’ADR-052. ADR-052 reste proposée jusqu’à la qualification live du pipeline
+  local prévue dans le sous-milestone ultérieur.
+- Périmètre respecté : aucun worker spécialisé, aucune nouvelle route ou file,
+  aucun CPU de repli, aucun résultat de page écrit et aucune activation de
+  M14-local-pipeline.
