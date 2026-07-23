@@ -1064,8 +1064,15 @@ def _validate_local_document_distribution(
         raise ValueError("ENVIRONMENT_COMPOSE_DOCUMENT_MEMORY_MISMATCH")
     if limits.get("cpus") != distribution.cpus:
         raise ValueError("ENVIRONMENT_COMPOSE_DOCUMENT_CPUS_MISMATCH")
-    if worker.get("gpus") != [{"count": -1}]:
-        raise ValueError("ENVIRONMENT_COMPOSE_DOCUMENT_GPU_MISSING")
+    reservations = _required_mapping(resources, "reservations")
+    if reservations.get("devices") != [
+        {
+            "capabilities": ["gpu"],
+            "device_ids": ["0"],
+            "driver": "nvidia",
+        }
+    ]:
+        raise ValueError("ENVIRONMENT_COMPOSE_DOCUMENT_GPU_ZERO_REQUIRED")
     if (
         distribution.granite_device != "cuda:0"
         or distribution.granite_slots_global != 2

@@ -299,14 +299,20 @@ services:
       args:
         OSTRADING_IMAGE_REVISION: "${OSTRADING_IMAGE_REVISION?OSTRADING_IMAGE_REVISION requis}"
         OSTRADING_POSTGRES_SCHEMA_VERSION: "${OSTRADING_POSTGRES_SCHEMA_VERSION?OSTRADING_POSTGRES_SCHEMA_VERSION requis}"
-    gpus: all
     deploy:
       replicas: 2
       resources:
         limits:
-          cpus: "2.0"
+          cpus: "4.0"
           memory: 2G
           pids: 256
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids:
+                - "0"
+              capabilities:
+                - gpu
     command:
       - --worker-id
       - worker-documents

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -364,6 +365,115 @@ class GraniteSlotExecutionIdentity:
 
 
 @dataclass(frozen=True, slots=True)
+class PageGpuMetrics:
+    """Pics GPU techniques mesurés pendant une conversion Granite."""
+
+    peak_vram_bytes: int
+    peak_utilization_percent: float
+    peak_power_watts: float
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "peak_vram_bytes",
+            _non_negative_integer(
+                self.peak_vram_bytes,
+                "PAGE_RESULT_GPU_METRICS_INVALID",
+            ),
+        )
+        utilization = _finite_number(
+            self.peak_utilization_percent,
+            "PAGE_RESULT_GPU_METRICS_INVALID",
+        )
+        if not 0 <= utilization <= 100:
+            raise DistributionContractError("PAGE_RESULT_GPU_METRICS_INVALID")
+        power = _finite_number(
+            self.peak_power_watts,
+            "PAGE_RESULT_GPU_METRICS_INVALID",
+        )
+        if power < 0:
+            raise DistributionContractError("PAGE_RESULT_GPU_METRICS_INVALID")
+        object.__setattr__(self, "peak_utilization_percent", utilization)
+        object.__setattr__(self, "peak_power_watts", power)
+
+    @classmethod
+    def from_mapping(cls, value: Any) -> "PageGpuMetrics":
+        payload = _mapping(
+            value,
+            {
+                "peak_vram_bytes",
+                "peak_utilization_percent",
+                "peak_power_watts",
+            },
+            "CONTRACT_FIELDS_INVALID",
+        )
+        return cls(
+            peak_vram_bytes=payload["peak_vram_bytes"],
+            peak_utilization_percent=payload["peak_utilization_percent"],
+            peak_power_watts=payload["peak_power_watts"],
+        )
+
+    def to_mapping(self) -> dict[str, int | float]:
+        return {
+            "peak_vram_bytes": self.peak_vram_bytes,
+            "peak_utilization_percent": self.peak_utilization_percent,
+            "peak_power_watts": self.peak_power_watts,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class PageTechnicalMetrics:
+    """Durée, pic RAM et mesures GPU d'une exécution de page."""
+
+    duration_seconds: float
+    peak_ram_bytes: int
+    gpu: PageGpuMetrics | None
+
+    def __post_init__(self) -> None:
+        duration = _finite_number(
+            self.duration_seconds,
+            "PAGE_RESULT_METRICS_INVALID",
+        )
+        if duration <= 0:
+            raise DistributionContractError("PAGE_RESULT_METRICS_INVALID")
+        if self.gpu is not None and not isinstance(self.gpu, PageGpuMetrics):
+            raise DistributionContractError("PAGE_RESULT_GPU_METRICS_INVALID")
+        object.__setattr__(self, "duration_seconds", duration)
+        object.__setattr__(
+            self,
+            "peak_ram_bytes",
+            _positive_integer(
+                self.peak_ram_bytes,
+                "PAGE_RESULT_METRICS_INVALID",
+            ),
+        )
+
+    @classmethod
+    def from_mapping(cls, value: Any) -> "PageTechnicalMetrics":
+        payload = _mapping(
+            value,
+            {"duration_seconds", "peak_ram_bytes", "gpu"},
+            "CONTRACT_FIELDS_INVALID",
+        )
+        return cls(
+            duration_seconds=payload["duration_seconds"],
+            peak_ram_bytes=payload["peak_ram_bytes"],
+            gpu=(
+                None
+                if payload["gpu"] is None
+                else PageGpuMetrics.from_mapping(payload["gpu"])
+            ),
+        )
+
+    def to_mapping(self) -> dict[str, Any]:
+        return {
+            "duration_seconds": self.duration_seconds,
+            "peak_ram_bytes": self.peak_ram_bytes,
+            "gpu": None if self.gpu is None else self.gpu.to_mapping(),
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class ConvertPageContract:
     """Payload SP fermé du job technique neutre ``CONVERT_PAGE``."""
 
@@ -574,6 +684,7 @@ class PageResultContract:
     tool_name: str | None
     tool_version: str | None
     error_code: PageResultErrorCode | str | None
+    technical_metrics: PageTechnicalMetrics | None
 
     def __post_init__(self) -> None:
         _contract_version(self.contract_version, PAGE_RESULT_CONTRACT_VERSION)
@@ -616,6 +727,7 @@ class PageResultContract:
             tool_name=self.tool_name,
             tool_version=self.tool_version,
             error_code=error_code,
+            technical_metrics=self.technical_metrics,
         )
         object.__setattr__(self, "document_id", document_id)
         object.__setattr__(self, "processing_run_id", processing_run_id)
@@ -645,6 +757,7 @@ class PageResultContract:
                 "tool_name",
                 "tool_version",
                 "error_code",
+                "technical_metrics",
             },
             "CONTRACT_FIELDS_INVALID",
         )
@@ -680,6 +793,11 @@ class PageResultContract:
             tool_name=payload["tool_name"],
             tool_version=payload["tool_version"],
             error_code=payload["error_code"],
+            technical_metrics=(
+                None
+                if payload["technical_metrics"] is None
+                else PageTechnicalMetrics.from_mapping(payload["technical_metrics"])
+            ),
         )
 
     @classmethod
@@ -713,6 +831,11 @@ class PageResultContract:
             "tool_name": self.tool_name,
             "tool_version": self.tool_version,
             "error_code": None if self.error_code is None else self.error_code.value,
+            "technical_metrics": (
+                None
+                if self.technical_metrics is None
+                else self.technical_metrics.to_mapping()
+            ),
         }
 
     def to_json(self) -> str:
@@ -940,32 +1063,120 @@ def _validate_page_result_variant(
     tool_name: str | None,
     tool_version: str | None,
     error_code: PageResultErrorCode | None,
+    technical_metrics: PageTechnicalMetrics | None,
 ) -> None:
     if status is PageResultStatus.SKIP_EMPTY:
-        if route_name is not PageRouteName.SKIP_EMPTY:
-            raise DistributionContractError("SKIP_EMPTY_ROUTE_REQUIRED")
-        if any(
-            value is not None
-            for value in (
-                execution,
-                granite_slot_execution,
-                result_artifact,
-                tool_name,
-                tool_version,
-                error_code,
-            )
-        ):
-            raise DistributionContractError("SKIP_EMPTY_CONVERTER_FORBIDDEN")
+        _validate_skipped_page_result(
+            route_name=route_name,
+            execution=execution,
+            granite_slot_execution=granite_slot_execution,
+            result_artifact=result_artifact,
+            tool_name=tool_name,
+            tool_version=tool_version,
+            error_code=error_code,
+            technical_metrics=technical_metrics,
+        )
         return
+    _validate_executed_page_result(
+        route_name=route_name,
+        execution=execution,
+        granite_slot_execution=granite_slot_execution,
+        status=status,
+        result_artifact=result_artifact,
+        tool_name=tool_name,
+        tool_version=tool_version,
+        error_code=error_code,
+        technical_metrics=technical_metrics,
+    )
+
+
+def _validate_skipped_page_result(
+    *,
+    route_name: PageRouteName,
+    execution: PageExecutionIdentity | None,
+    granite_slot_execution: GraniteSlotExecutionIdentity | None,
+    result_artifact: LocalArtifactDescriptor | None,
+    tool_name: str | None,
+    tool_version: str | None,
+    error_code: PageResultErrorCode | None,
+    technical_metrics: PageTechnicalMetrics | None,
+) -> None:
+    if route_name is not PageRouteName.SKIP_EMPTY:
+        raise DistributionContractError("SKIP_EMPTY_ROUTE_REQUIRED")
+    if technical_metrics is not None:
+        raise DistributionContractError("SKIP_EMPTY_METRICS_FORBIDDEN")
+    if any(
+        value is not None
+        for value in (
+            execution,
+            granite_slot_execution,
+            result_artifact,
+            tool_name,
+            tool_version,
+            error_code,
+        )
+    ):
+        raise DistributionContractError("SKIP_EMPTY_CONVERTER_FORBIDDEN")
+
+
+def _validate_executed_page_result(
+    *,
+    route_name: PageRouteName,
+    execution: PageExecutionIdentity | None,
+    granite_slot_execution: GraniteSlotExecutionIdentity | None,
+    status: PageResultStatus,
+    result_artifact: LocalArtifactDescriptor | None,
+    tool_name: str | None,
+    tool_version: str | None,
+    error_code: PageResultErrorCode | None,
+    technical_metrics: PageTechnicalMetrics | None,
+) -> None:
     if route_name is PageRouteName.SKIP_EMPTY:
         raise DistributionContractError("SKIP_EMPTY_STATUS_REQUIRED")
     if not isinstance(execution, PageExecutionIdentity):
         raise DistributionContractError("PAGE_EXECUTION_IDENTITY_REQUIRED")
+    _validate_page_result_route_resources(
+        route_name=route_name,
+        granite_slot_execution=granite_slot_execution,
+        technical_metrics=technical_metrics,
+    )
+    _validate_page_result_outcome(
+        status=status,
+        result_artifact=result_artifact,
+        tool_name=tool_name,
+        tool_version=tool_version,
+        error_code=error_code,
+    )
+
+
+def _validate_page_result_route_resources(
+    *,
+    route_name: PageRouteName,
+    granite_slot_execution: GraniteSlotExecutionIdentity | None,
+    technical_metrics: PageTechnicalMetrics | None,
+) -> None:
+    if not isinstance(technical_metrics, PageTechnicalMetrics):
+        raise DistributionContractError("PAGE_RESULT_METRICS_REQUIRED")
     if route_name in _GRANITE_ROUTES:
         if not isinstance(granite_slot_execution, GraniteSlotExecutionIdentity):
             raise DistributionContractError("GRANITE_SLOT_IDENTITY_REQUIRED")
-    elif granite_slot_execution is not None:
+        if technical_metrics.gpu is None:
+            raise DistributionContractError("PAGE_RESULT_GPU_METRICS_REQUIRED")
+        return
+    if granite_slot_execution is not None:
         raise DistributionContractError("GRANITE_SLOT_IDENTITY_FORBIDDEN")
+    if technical_metrics.gpu is not None:
+        raise DistributionContractError("PAGE_RESULT_GPU_METRICS_FORBIDDEN")
+
+
+def _validate_page_result_outcome(
+    *,
+    status: PageResultStatus,
+    result_artifact: LocalArtifactDescriptor | None,
+    tool_name: str | None,
+    tool_version: str | None,
+    error_code: PageResultErrorCode | None,
+) -> None:
     if status is PageResultStatus.SUCCEEDED:
         if (
             not isinstance(result_artifact, LocalArtifactDescriptor)
@@ -1104,6 +1315,21 @@ def _positive_integer(value: Any, code: str) -> int:
     return value
 
 
+def _non_negative_integer(value: Any, code: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise DistributionContractError(code)
+    return value
+
+
+def _finite_number(value: Any, code: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise DistributionContractError(code)
+    parsed = float(value)
+    if not math.isfinite(parsed):
+        raise DistributionContractError(code)
+    return parsed
+
+
 def _uuid4(value: Any, code: str) -> str:
     text = _text(value, code)
     try:
@@ -1184,9 +1410,11 @@ __all__ = [
     "LocalArtifactIdentity",
     "LockedAssetVersion",
     "PageExecutionIdentity",
+    "PageGpuMetrics",
     "PageResultContract",
     "PageResultErrorCode",
     "PageResultStatus",
+    "PageTechnicalMetrics",
     "assemble_canonical_document_idempotence_key",
     "convert_page_idempotence_key",
 ]

@@ -660,18 +660,6 @@ def _validate_cross_field_invariants(payload: Mapping[str, Any], path: Path) -> 
             str(path),
         )
 
-    local_distribution = workers["local_distribution"]
-    if (
-        local_distribution["granite_slots_global"]
-        != local_distribution["replicas"]
-        * local_distribution["granite_slots_per_worker"]
-    ):
-        raise ApplicationConfigurationError(
-            CONFIG_SCHEMA_INVALID,
-            "la capacité Granite globale doit être le produit des replicas par la capacité par worker",
-            str(path),
-        )
-
     docker_host = deployment_hosts["docker_local"]
     host_bind = docker_host["bind_host"]
     public_bindings = {"", "0.0.0.0", "::", "[::]", "*"}
@@ -1127,9 +1115,9 @@ def _build_application_configuration(
                     granite_slots_global=services["workers"]["local_distribution"][
                         "granite_slots_global"
                     ],
-                    granite_slots_per_worker=services["workers"][
-                        "local_distribution"
-                    ]["granite_slots_per_worker"],
+                    granite_slots_per_worker=services["workers"]["local_distribution"][
+                        "granite_slots_per_worker"
+                    ],
                 ),
             ),
             llm_gateway=LLMGatewayServiceConfiguration(

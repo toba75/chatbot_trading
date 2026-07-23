@@ -130,6 +130,7 @@ def test_value_objects_et_serialisation_fermee(tmp_path: Path) -> None:
         tool_name=None,
         tool_version=None,
         error_code=None,
+        technical_metrics=None,
     )
     assert PageResultContract.from_json(skipped.to_json()) == skipped
 

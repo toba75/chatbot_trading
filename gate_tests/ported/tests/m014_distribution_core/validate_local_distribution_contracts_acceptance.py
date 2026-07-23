@@ -36,6 +36,8 @@ def test_contrats_locaux_versionnes_et_refusables() -> None:
         PageResultContract,
         PageResultErrorCode,
         PageResultStatus,
+        PageGpuMetrics,
+        PageTechnicalMetrics,
         assemble_canonical_document_idempotence_key,
         convert_page_idempotence_key,
     )
@@ -159,6 +161,15 @@ def test_contrats_locaux_versionnes_et_refusables() -> None:
         tool_name="GRANITE_DOCLING",
         tool_version="2.111.0",
         error_code=None,
+        technical_metrics=PageTechnicalMetrics(
+            duration_seconds=20.582,
+            peak_ram_bytes=1_610_612_736,
+            gpu=PageGpuMetrics(
+                peak_vram_bytes=1_426_063_360,
+                peak_utilization_percent=93.0,
+                peak_power_watts=41.5,
+            ),
+        ),
     )
     assert PageResultContract.from_json(page_result.to_json()) == page_result
     assert PageResultContract.from_json(

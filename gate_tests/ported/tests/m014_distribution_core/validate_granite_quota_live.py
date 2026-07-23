@@ -14,6 +14,7 @@ import psycopg
 import pytest
 
 from app.platform.postgres import PostgresConnectionFactory
+from app.platform.ui_local_stack import LOCAL_POSTGRES_IMAGE
 
 
 def _docker(*arguments: str) -> subprocess.CompletedProcess[str]:
@@ -197,7 +198,7 @@ def test_quota_granite_postgresql_concurrence_reprise_et_ledger() -> None:
         "127.0.0.1::5432",
         "--env",
         f"POSTGRES_PASSWORD={password}",
-        "postgres:16-alpine",
+        LOCAL_POSTGRES_IMAGE,
     )
     assert started.returncode == 0, started.stderr
     try:

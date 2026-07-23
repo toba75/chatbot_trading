@@ -10,13 +10,18 @@ from types import SimpleNamespace
 import pytest
 import yaml
 
-from app.platform.local_compose import parse_local_compose_document, validate_local_compose
+from app.platform.local_compose import (
+    parse_local_compose_document,
+    validate_local_compose,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 
 
-def _torch_runtime(*, built: bool, available: bool, device_count: int) -> SimpleNamespace:
+def _torch_runtime(
+    *, built: bool, available: bool, device_count: int
+) -> SimpleNamespace:
     return SimpleNamespace(
         backends=SimpleNamespace(cuda=SimpleNamespace(is_built=lambda: built)),
         cuda=SimpleNamespace(
@@ -58,9 +63,7 @@ def test_granite_exige_cuda_zero_sans_fallback_cpu(
         compose = yaml.safe_load((REPO_ROOT / compose_path).read_text(encoding="utf-8"))
         document_worker = compose["services"]["worker-documents"]
         assert "gpus" not in document_worker
-        assert document_worker["deploy"]["resources"]["reservations"][
-            "devices"
-        ] == [
+        assert document_worker["deploy"]["resources"]["reservations"]["devices"] == [
             {
                 "driver": "nvidia",
                 "device_ids": ["0"],
@@ -82,12 +85,14 @@ def test_granite_exige_cuda_zero_sans_fallback_cpu(
     worker_dockerfile = (REPO_ROOT / "deploy/local-compose/Dockerfile").read_text(
         encoding="utf-8"
     )
-    worker_stage = worker_dockerfile.split("FROM runtime AS worker-documents", maxsplit=1)[1].split(
-        "FROM runtime AS worker-projection", maxsplit=1
-    )[0]
+    worker_stage = worker_dockerfile.split(
+        "FROM runtime AS worker-documents", maxsplit=1
+    )[1].split("FROM runtime AS worker-projection", maxsplit=1)[0]
     assert 'ENV TRITON_CACHE_DIR="/triton-cache"' in worker_stage
     assert "snapshot.debian.org/archive/debian/20250203T000000Z" in worker_stage
-    assert "snapshot.debian.org/archive/debian-security/20250203T000000Z" in worker_stage
+    assert (
+        "snapshot.debian.org/archive/debian-security/20250203T000000Z" in worker_stage
+    )
     assert "gcc=4:12.2.0-3" in worker_stage
     assert "libc6-dev=2.36-9+deb12u9" in worker_stage
     assert worker_stage.index("USER root") < worker_stage.index("USER ostrading")

@@ -107,27 +107,27 @@ def test_metriques_resultat_page_strictes_par_route() -> None:
     assert PageResultContract.from_json(granite.to_json()) == granite
     assert PageResultContract.from_json(standard.to_json()) == standard
 
-    for invalid_metrics in (
-        replace(granite_metrics, duration_seconds=0),
-        replace(granite_metrics, duration_seconds=float("inf")),
-        replace(granite_metrics, peak_ram_bytes=0),
+    for field, value in (
+        ("duration_seconds", 0),
+        ("duration_seconds", float("inf")),
+        ("peak_ram_bytes", 0),
     ):
         with pytest.raises(
             DistributionContractError,
             match="PAGE_RESULT_METRICS_INVALID",
         ):
-            replace(granite, technical_metrics=invalid_metrics)
+            replace(granite_metrics, **{field: value})
 
-    for invalid_gpu in (
-        replace(gpu, peak_vram_bytes=-1),
-        replace(gpu, peak_utilization_percent=100.1),
-        replace(gpu, peak_power_watts=-0.1),
+    for field, value in (
+        ("peak_vram_bytes", -1),
+        ("peak_utilization_percent", 100.1),
+        ("peak_power_watts", -0.1),
     ):
         with pytest.raises(
             DistributionContractError,
             match="PAGE_RESULT_GPU_METRICS_INVALID",
         ):
-            replace(granite_metrics, gpu=invalid_gpu)
+            replace(gpu, **{field: value})
 
     with pytest.raises(
         DistributionContractError,
