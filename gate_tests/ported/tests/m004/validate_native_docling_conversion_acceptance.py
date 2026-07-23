@@ -65,7 +65,9 @@ class _RunRepository:
     def __init__(self, run: DocumentProcessingRun) -> None:
         self._run = run
 
-    def find_by_document_id(self, document_id: DocumentId) -> DocumentProcessingRun | None:
+    def find_by_document_id(
+        self, document_id: DocumentId
+    ) -> DocumentProcessingRun | None:
         return self._run if document_id == self._run.document_id else None
 
 
@@ -83,7 +85,9 @@ class _ConversionRepository:
         )
         self.publication = None
 
-    def find_conversion_by_document_id(self, document_id: DocumentId) -> DocumentConversionState | None:
+    def find_conversion_by_document_id(
+        self, document_id: DocumentId
+    ) -> DocumentConversionState | None:
         return self.state if document_id == self.state.document_id else None
 
     def complete_native_conversion(self, publication) -> None:
@@ -112,7 +116,9 @@ class _ConversionRepository:
             failure_error_code=None,
         )
 
-    def reject_native_conversion(self, *, document_id: DocumentId, error_code: str) -> None:
+    def reject_native_conversion(
+        self, *, document_id: DocumentId, error_code: str
+    ) -> None:
         self.state = DocumentConversionState(
             document_id=document_id,
             conversion_status=DocumentConversionStatus.QA_REJECTED,
@@ -145,10 +151,16 @@ def _write_native_pdf(path: Path) -> None:
         }
     )
     page[NameObject("/Resources")] = DictionaryObject(
-        {NameObject("/Font"): DictionaryObject({NameObject("/F1"): writer._add_object(font)})}
+        {
+            NameObject("/Font"): DictionaryObject(
+                {NameObject("/F1"): writer._add_object(font)}
+            )
+        }
     )
     contents = DecodedStreamObject()
-    contents.set_data(b"BT /F1 16 Tf 72 720 Td (Conversion native Docling reelle) Tj ET")
+    contents.set_data(
+        b"BT /F1 16 Tf 72 720 Td (Conversion native Docling reelle) Tj ET"
+    )
     page[NameObject("/Contents")] = writer._add_object(contents)
     with path.open("wb") as stream:
         writer.write(stream)
@@ -174,36 +186,42 @@ def _source_and_run(source_path: Path) -> tuple[SourceDocument, DocumentProcessi
     )
     manifest = PageManifest.from_entries(
         source_page_count=1,
-        entries=(PageManifestEntry(PageNumber.from_value(1), PageManifestEntryState.PRESENT),),
+        entries=(
+            PageManifestEntry(PageNumber.from_value(1), PageManifestEntryState.PRESENT),
+        ),
     )
-    run = DocumentProcessingRun.start(
-        processing_run_id=ProcessingRunId.from_value("RUN-M004-T003-ACCEPTANCE"),
-        source_document=source,
-        page_manifest=manifest,
-    ).record_page_diagnostics(
-        (
-            PageDecision(
-                page_number=PageNumber.from_value(1),
-                page_state=PageDecisionState.NATIVE_OK,
-                signals=PageDiagnosticSignals(
-                    native_text_state="RELIABLE",
-                    image_state="NONE",
-                    existing_ocr_state="NONE",
-                    layout_complexity="SIMPLE",
-                    corruption_state="NONE",
-                    mixed_content_detected=False,
-                    has_table=False,
-                    has_formula=False,
-                ),
-                diagnostic_version=DiagnosticVersion.from_value("diag-v1"),
-                justification="Couche texte native fiable.",
-            ),
+    run = (
+        DocumentProcessingRun.start(
+            processing_run_id=ProcessingRunId.from_value("RUN-M004-T003-ACCEPTANCE"),
+            source_document=source,
+            page_manifest=manifest,
         )
-    ).decide_route_plan(
-        PageRoutingConfiguration(
-            routing_policy_version=RoutingPolicyVersion.from_value("routing-v1"),
-            auto_confidence_min=0.9,
-            benchmark_confidence_min=0.85,
+        .record_page_diagnostics(
+            (
+                PageDecision(
+                    page_number=PageNumber.from_value(1),
+                    page_state=PageDecisionState.NATIVE_OK,
+                    signals=PageDiagnosticSignals(
+                        native_text_state="RELIABLE",
+                        image_state="NONE",
+                        existing_ocr_state="NONE",
+                        layout_complexity="SIMPLE",
+                        corruption_state="NONE",
+                        mixed_content_detected=False,
+                        has_table=False,
+                        has_formula=False,
+                    ),
+                    diagnostic_version=DiagnosticVersion.from_value("diag-v1"),
+                    justification="Couche texte native fiable.",
+                ),
+            )
+        )
+        .decide_route_plan(
+            PageRoutingConfiguration(
+                routing_policy_version=RoutingPolicyVersion.from_value("routing-v1"),
+                auto_confidence_min=0.9,
+                benchmark_confidence_min=0.85,
+            )
         )
     )
     return source, run
@@ -222,6 +240,7 @@ def _claimed_job(source: SourceDocument, run: DocumentProcessingRun) -> ClaimedJ
             code_version="m004-native-acceptance",
             model_version="docling-2.111.0",
         ),
+        execution_requirements=None,
         payload={
             "document_id": source.document_id.value,
             "processing_run_id": run.processing_run_id.value,
@@ -241,7 +260,9 @@ def _claimed_job(source: SourceDocument, run: DocumentProcessingRun) -> ClaimedJ
     )
 
 
-def test_native_pdf_is_converted_and_published_by_the_real_uv_isolated_worker(tmp_path: Path) -> None:
+def test_native_pdf_is_converted_and_published_by_the_real_uv_isolated_worker(
+    tmp_path: Path,
+) -> None:
     # Given un PDF natif réel et les actifs Docling préchargés, hachés et scellés.
     # When le worker CONVERT_DOCUMENT appelle le runner isolé du même environnement uv.
     # Then son artefact immuable est haché et l'état durable devient CANONICAL_ACCEPTED.
@@ -252,8 +273,12 @@ def test_native_pdf_is_converted_and_published_by_the_real_uv_isolated_worker(tm
     )
     manifest_path = repository_root / "config" / "docling-assets.native.json"
     assets_root = repository_root / "data" / "docling_assets" / "native"
-    assert manifest_path.is_file(), "CONVERSION_ASSET_MANIFEST_INVALID: manifeste Docling natif absent."
-    assert assets_root.is_dir(), "CONVERSION_ASSET_MANIFEST_INVALID: actifs Docling natifs absents."
+    assert manifest_path.is_file(), (
+        "CONVERSION_ASSET_MANIFEST_INVALID: manifeste Docling natif absent."
+    )
+    assert assets_root.is_dir(), (
+        "CONVERSION_ASSET_MANIFEST_INVALID: actifs Docling natifs absents."
+    )
 
     source_path = tmp_path / "native.pdf"
     _write_native_pdf(source_path)
@@ -275,7 +300,10 @@ def test_native_pdf_is_converted_and_published_by_the_real_uv_isolated_worker(tm
     result = worker.execute(_claimed_job(source, run))
 
     assert result["conversion_status"] == "CANONICAL_ACCEPTED"
-    assert conversion_repository.state.conversion_status is DocumentConversionStatus.CANONICAL_ACCEPTED
+    assert (
+        conversion_repository.state.conversion_status
+        is DocumentConversionStatus.CANONICAL_ACCEPTED
+    )
     assert conversion_repository.publication is not None
     artifact_path = (
         tmp_path
@@ -285,4 +313,7 @@ def test_native_pdf_is_converted_and_published_by_the_real_uv_isolated_worker(tm
         / "docling.json"
     )
     assert artifact_path.is_file()
-    assert hashlib.sha256(artifact_path.read_bytes()).hexdigest() == result["canonical_artifact_sha256"]
+    assert (
+        hashlib.sha256(artifact_path.read_bytes()).hexdigest()
+        == result["canonical_artifact_sha256"]
+    )

@@ -14,6 +14,118 @@ BEGIN
     END IF;
 END $$;
 
+ALTER TABLE platform.technical_jobs
+    ADD COLUMN execution_contract_name text,
+    ADD COLUMN execution_contract_version text,
+    ADD COLUMN capacity_capability text,
+    ADD COLUMN capacity_slots smallint,
+    ADD COLUMN capacity_device text,
+    ADD COLUMN storage_environment text,
+    ADD COLUMN source_artifact_ref text,
+    ADD COLUMN result_artifact_ref text,
+    ADD COLUMN execution_route_name text,
+    ADD CONSTRAINT technical_jobs_execution_requirements_coherence CHECK (
+        (
+            execution_contract_name IS NULL
+            AND execution_contract_version IS NULL
+            AND capacity_capability IS NULL
+            AND capacity_slots IS NULL
+            AND capacity_device IS NULL
+            AND storage_environment IS NULL
+            AND source_artifact_ref IS NULL
+            AND result_artifact_ref IS NULL
+            AND execution_route_name IS NULL
+        )
+        OR (
+            btrim(execution_contract_name) <> ''
+            AND execution_contract_name = btrim(execution_contract_name)
+            AND btrim(execution_contract_version) <> ''
+            AND execution_contract_version = btrim(execution_contract_version)
+            AND btrim(capacity_capability) <> ''
+            AND capacity_capability = btrim(capacity_capability)
+            AND capacity_slots >= 0
+            AND (
+                (capacity_slots = 0 AND capacity_device IS NULL)
+                OR (
+                    capacity_slots > 0
+                    AND btrim(capacity_device) <> ''
+                    AND capacity_device = btrim(capacity_device)
+                )
+            )
+            AND storage_environment IN ('development', 'test', 'production')
+            AND btrim(source_artifact_ref) <> ''
+            AND source_artifact_ref = btrim(source_artifact_ref)
+            AND btrim(result_artifact_ref) <> ''
+            AND result_artifact_ref = btrim(result_artifact_ref)
+            AND btrim(execution_route_name) <> ''
+            AND execution_route_name = btrim(execution_route_name)
+        )
+    ),
+    ADD CONSTRAINT technical_jobs_convert_page_requirements CHECK (
+        (
+            job_name = 'CONVERT_PAGE'
+            AND execution_contract_name = 'CONVERT_PAGE'
+            AND execution_contract_version = '1.0'
+        )
+        OR (
+            job_name <> 'CONVERT_PAGE'
+            AND execution_contract_name IS NULL
+            AND execution_contract_version IS NULL
+            AND capacity_capability IS NULL
+            AND capacity_slots IS NULL
+            AND capacity_device IS NULL
+            AND storage_environment IS NULL
+            AND source_artifact_ref IS NULL
+            AND result_artifact_ref IS NULL
+            AND execution_route_name IS NULL
+        )
+    );
+
+CREATE INDEX technical_jobs_granite_claim_idx
+    ON platform.technical_jobs (
+        environment,
+        deployment_id,
+        configuration_hash,
+        execution_contract_name,
+        execution_contract_version,
+        capacity_capability,
+        capacity_slots,
+        capacity_device,
+        storage_environment,
+        priority,
+        sequence
+    )
+    WHERE status IN ('pending', 'running')
+      AND execution_contract_name IS NOT NULL;
+
+CREATE TABLE platform.document_workers (
+    environment text NOT NULL
+        CHECK (environment IN ('development', 'test', 'production')),
+    deployment_id text NOT NULL
+        CHECK (deployment_id ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
+    worker_instance_id text NOT NULL
+        CHECK (
+            btrim(worker_instance_id) <> ''
+            AND worker_instance_id = btrim(worker_instance_id)
+        ),
+    configuration_hash char(64) NOT NULL
+        CHECK (configuration_hash ~ '^[0-9a-f]{64}$'),
+    storage_environment text NOT NULL
+        CHECK (storage_environment IN ('development', 'test', 'production')),
+    state text NOT NULL CHECK (state IN ('READY', 'DRAINING')),
+    capabilities text[] NOT NULL,
+    drain_deadline timestamptz,
+    registered_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (environment, deployment_id, worker_instance_id),
+    CHECK (storage_environment = environment),
+    CHECK (capabilities = ARRAY['DOCUMENT_STANDARD', 'GRANITE_CUDA']::text[]),
+    CHECK (
+        (state = 'READY' AND drain_deadline IS NULL)
+        OR (state = 'DRAINING' AND drain_deadline IS NOT NULL)
+    )
+);
+
 CREATE TABLE platform.granite_slots (
     environment text NOT NULL
         CHECK (environment IN ('development', 'test', 'production')),
@@ -95,10 +207,10 @@ CREATE TABLE source_processing.page_execution_results (
     processing_run_id text NOT NULL,
     page_number integer NOT NULL CHECK (page_number > 0),
     completion_id text NOT NULL UNIQUE,
-    job_id text NOT NULL,
-    claim_generation bigint NOT NULL CHECK (claim_generation > 0),
-    claim_token uuid NOT NULL,
-    worker_instance_id text NOT NULL
+    job_id text,
+    claim_generation bigint CHECK (claim_generation > 0),
+    claim_token uuid,
+    worker_instance_id text
         CHECK (
             btrim(worker_instance_id) <> ''
             AND worker_instance_id = btrim(worker_instance_id)
@@ -131,6 +243,53 @@ CREATE TABLE source_processing.page_execution_results (
             AND slot_generation > 0
             AND slot_token IS NOT NULL
         )
+    ),
+    CHECK (
+        (
+            result_status = 'SKIP_EMPTY'
+            AND route_name = 'SKIP_EMPTY'
+            AND job_id IS NULL
+            AND claim_generation IS NULL
+            AND claim_token IS NULL
+            AND worker_instance_id IS NULL
+            AND slot_ordinal IS NULL
+            AND slot_generation IS NULL
+            AND slot_token IS NULL
+        )
+        OR (
+            result_status <> 'SKIP_EMPTY'
+            AND route_name <> 'SKIP_EMPTY'
+            AND job_id IS NOT NULL
+            AND claim_generation IS NOT NULL
+            AND claim_token IS NOT NULL
+            AND worker_instance_id IS NOT NULL
+            AND (
+                (
+                    route_name IN (
+                        'SCAN_GRANITE',
+                        'PREPROCESS_GRANITE',
+                        'BAD_OCR_TO_GRANITE',
+                        'MIXED_PAGEWISE',
+                        'TARGETED_ENRICHMENT'
+                    )
+                    AND slot_ordinal IS NOT NULL
+                    AND slot_generation IS NOT NULL
+                    AND slot_token IS NOT NULL
+                )
+                OR (
+                    route_name NOT IN (
+                        'SCAN_GRANITE',
+                        'PREPROCESS_GRANITE',
+                        'BAD_OCR_TO_GRANITE',
+                        'MIXED_PAGEWISE',
+                        'TARGETED_ENRICHMENT'
+                    )
+                    AND slot_ordinal IS NULL
+                    AND slot_generation IS NULL
+                    AND slot_token IS NULL
+                )
+            )
+        )
     )
 );
 
@@ -162,6 +321,9 @@ CREATE TABLE platform.page_completion_outbox (
     payload jsonb NOT NULL,
     payload_fingerprint char(64) NOT NULL
         CHECK (payload_fingerprint ~ '^[0-9a-f]{64}$'),
+    terminal_status text NOT NULL
+        CHECK (terminal_status IN ('succeeded', 'failed', 'abandoned')),
+    failure_reason text,
     status text NOT NULL CHECK (status IN ('pending', 'relaying', 'relayed')),
     relay_owner text,
     relay_lease_until timestamptz,
@@ -169,6 +331,14 @@ CREATE TABLE platform.page_completion_outbox (
     relay_token uuid,
     created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
     relayed_at timestamptz,
+    CHECK (
+        (terminal_status = 'succeeded' AND failure_reason IS NULL)
+        OR (
+            terminal_status IN ('failed', 'abandoned')
+            AND btrim(failure_reason) <> ''
+            AND failure_reason = btrim(failure_reason)
+        )
+    ),
     CHECK (
         (
             slot_ordinal IS NULL

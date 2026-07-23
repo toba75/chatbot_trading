@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 import shutil
 import subprocess
@@ -177,6 +178,7 @@ def test_quota_granite_postgresql_concurrence_reprise_et_ledger() -> None:
         GraniteWorker,
         GraniteWorkerState,
         PostgresGraniteSlotRepository,
+        PostgresGraniteWorkerRegistry,
     )
     from app.platform.job_runtime.postgres import PostgresJobQueue
     from app.platform.job_runtime.postgres import JobLeaseConflictError
@@ -319,6 +321,12 @@ def test_quota_granite_postgresql_concurrence_reprise_et_ledger() -> None:
                 catalog=catalog,
                 environment_identity=environment_identity,
             )
+            registry = PostgresGraniteWorkerRegistry(
+                connection_factory=factory,
+                environment_identity=environment_identity,
+            )
+            for worker_number in range(1, 5):
+                registry.register(worker(worker_number))
             with ThreadPoolExecutor(max_workers=2) as executor:
                 acquisition_1 = executor.submit(
                     quota.claim_compatible_job,
@@ -346,7 +354,10 @@ def test_quota_granite_postgresql_concurrence_reprise_et_ledger() -> None:
                 lease_seconds=30,
                 heartbeat_seconds=5,
                 job_names=("CONVERT_PAGE",),
-                execute_model=lambda lease: model_calls.append(lease),
+                execution_requirements=(submitted[2].request.execution_requirements),
+                start_model=lambda lease: model_calls.append(lease),
+                success_envelope=lambda lease, result: None,
+                failure_envelope=lambda lease, error: None,
             )
             assert waiting is None
             assert model_calls == []
@@ -358,6 +369,10 @@ def test_quota_granite_postgresql_concurrence_reprise_et_ledger() -> None:
                 storage_environment="test",
                 state=GraniteWorkerState.DRAINING,
                 capabilities=frozenset(("DOCUMENT_STANDARD", "GRANITE_CUDA")),
+            )
+            registry.begin_draining(
+                worker_instance_id=draining_worker.worker_instance_id,
+                drain_deadline=datetime.now(UTC) + timedelta(seconds=30),
             )
             assert (
                 quota.claim_compatible_job(

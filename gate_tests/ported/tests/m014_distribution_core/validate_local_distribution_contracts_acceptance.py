@@ -122,6 +122,7 @@ def test_contrats_locaux_versionnes_et_refusables() -> None:
         job_name="CONVERT_PAGE",
         priority=JobPriority.P2,
         idempotence_key=technical_job.idempotence_key,
+        execution_requirements=technical_job.execution_requirements,
         payload=parsed_request.to_mapping(),
     )
     with pytest.raises(

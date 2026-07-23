@@ -16,7 +16,9 @@ from app.contracts.technical_jobs import (
     JobRequest,
     JobSubmissionDecision,
 )
-from app.source_processing.application.canonical_audit_signals import PreCanonicalAuditEvent
+from app.source_processing.application.canonical_audit_signals import (
+    PreCanonicalAuditEvent,
+)
 from app.source_processing.application.register_source_document import (
     OriginalSourceStore,
     RegisterSourceDocumentCommand,
@@ -142,7 +144,9 @@ class CanonicalQualityRejectedError(DocumentCommandError):
     def __init__(self, document_id: str, error_code: str) -> None:
         self.document_id = _ensure_text(document_id, "document_id")
         self.error_code = _ensure_quality_rejection_error_code(error_code)
-        super().__init__(f"version canonique refusée: {self.document_id}; {self.error_code}")
+        super().__init__(
+            f"version canonique refusée: {self.document_id}; {self.error_code}"
+        )
 
 
 class DocumentConversionStatus(str, Enum):
@@ -266,7 +270,9 @@ class DocumentConversionAcceptance:
     canonical_version_id: str | None
 
     @classmethod
-    def from_state(cls, state: DocumentConversionState) -> "DocumentConversionAcceptance":
+    def from_state(
+        cls, state: DocumentConversionState
+    ) -> "DocumentConversionAcceptance":
         parsed_state = _ensure_document_conversion_state(state)
         if parsed_state.conversion_status is DocumentConversionStatus.QA_REJECTED:
             raise ValueError("statut de conversion non publiable")
@@ -312,7 +318,10 @@ class RegisterDocumentAcceptance:
             raise ValueError("document_status invalide")
         if not isinstance(self.duplicate, bool):
             raise ValueError("duplicate invalide")
-        if self.document_status == SourceDocumentStatus.REGISTERED.value and self.duplicate:
+        if (
+            self.document_status == SourceDocumentStatus.REGISTERED.value
+            and self.duplicate
+        ):
             raise ValueError("duplicate interdit pour enregistrement")
         if self.document_status == "DUPLICATE_SOURCE" and not self.duplicate:
             raise ValueError("duplicate requis pour doublon")
@@ -346,13 +355,19 @@ class DocumentCommandService:
         code_version: str,
         model_version: str,
     ) -> None:
-        if not callable(getattr(source_document_repository, "find_by_document_id", None)):
+        if not callable(
+            getattr(source_document_repository, "find_by_document_id", None)
+        ):
             raise ValueError("source_document_repository sans lecture par document_id")
         if not callable(getattr(document_inspector, "inspect_content", None)):
             raise ValueError("document_inspector sans validation d'enregistrement")
-        if not callable(getattr(processing_run_repository, "find_by_document_id", None)):
+        if not callable(
+            getattr(processing_run_repository, "find_by_document_id", None)
+        ):
             raise ValueError("processing_run_repository sans lecture par document_id")
-        if not callable(getattr(processing_run_repository, "submit_processing_run", None)):
+        if not callable(
+            getattr(processing_run_repository, "submit_processing_run", None)
+        ):
             raise ValueError("processing_run_repository sans soumission atomique")
         self._source_document_repository = source_document_repository
         self._processing_run_repository = processing_run_repository
@@ -397,7 +412,9 @@ class DocumentCommandService:
             bibliographic_metadata=bibliographic_metadata,
         )
         if result.decision == "REVIEW_REQUIRED":
-            raise SourceUnreadableError(reason=_ensure_text(result.review_reason, "reason"))
+            raise SourceUnreadableError(
+                reason=_ensure_text(result.review_reason, "reason")
+            )
         if result.decision == "BINARY_DUPLICATE":
             return RegisterDocumentAcceptance(
                 document_id=_ensure_document_id(result.duplicate_document_id),
@@ -429,7 +446,9 @@ class DocumentCommandService:
         )
 
         if result.decision == "REVIEW_REQUIRED":
-            raise SourceUnreadableError(reason=_ensure_text(result.review_reason, "reason"))
+            raise SourceUnreadableError(
+                reason=_ensure_text(result.review_reason, "reason")
+            )
 
         if result.decision == "BINARY_DUPLICATE":
             return RegisterDocumentAcceptance(
@@ -446,9 +465,13 @@ class DocumentCommandService:
                 duplicate=False,
             )
 
-        raise ValueError(f"décision RegisterSourceDocument non exposée: {result.decision}")
+        raise ValueError(
+            f"décision RegisterSourceDocument non exposée: {result.decision}"
+        )
 
-    def start_document_processing(self, *, document_id: str) -> DocumentDiagnosisAcceptance:
+    def start_document_processing(
+        self, *, document_id: str
+    ) -> DocumentDiagnosisAcceptance:
         parsed_document_id = DocumentId.from_value(document_id)
         existing_run = self._processing_run_repository.find_by_document_id(
             parsed_document_id
@@ -487,6 +510,7 @@ class DocumentCommandService:
                 code_version=self._code_version,
                 model_version=self._model_version,
             ),
+            execution_requirements=None,
             payload={
                 "document_id": parsed_document_id.value,
                 "processing_run_id": processing_run.processing_run_id.value,
@@ -521,14 +545,28 @@ class DocumentConversionCommandService:
         code_version: str,
         model_version: str,
     ) -> None:
-        if not callable(getattr(source_document_repository, "find_by_document_id", None)):
+        if not callable(
+            getattr(source_document_repository, "find_by_document_id", None)
+        ):
             raise ValueError("source_document_repository sans lecture par document_id")
-        if not callable(getattr(processing_run_repository, "find_by_document_id", None)):
+        if not callable(
+            getattr(processing_run_repository, "find_by_document_id", None)
+        ):
             raise ValueError("processing_run_repository sans lecture par document_id")
-        if not callable(getattr(document_conversion_repository, "find_conversion_by_document_id", None)):
-            raise ValueError("document_conversion_repository sans lecture de conversion")
-        if not callable(getattr(document_conversion_repository, "submit_conversion_request", None)):
-            raise ValueError("document_conversion_repository sans soumission de conversion")
+        if not callable(
+            getattr(
+                document_conversion_repository, "find_conversion_by_document_id", None
+            )
+        ):
+            raise ValueError(
+                "document_conversion_repository sans lecture de conversion"
+            )
+        if not callable(
+            getattr(document_conversion_repository, "submit_conversion_request", None)
+        ):
+            raise ValueError(
+                "document_conversion_repository sans soumission de conversion"
+            )
         self._source_document_repository = source_document_repository
         self._processing_run_repository = processing_run_repository
         self._document_conversion_repository = document_conversion_repository
@@ -622,14 +660,19 @@ class DocumentConversionCommandService:
                 status=parsed_processing_run.status.value,
             ) from exc
 
-        existing_conversion = self._document_conversion_repository.find_conversion_by_document_id(
-            parsed_document_id
+        existing_conversion = (
+            self._document_conversion_repository.find_conversion_by_document_id(
+                parsed_document_id
+            )
         )
         if existing_conversion is not None:
             parsed_existing_conversion = _ensure_document_conversion_state(
                 existing_conversion
             )
-            if parsed_existing_conversion.conversion_status is DocumentConversionStatus.QA_REJECTED:
+            if (
+                parsed_existing_conversion.conversion_status
+                is DocumentConversionStatus.QA_REJECTED
+            ):
                 self._record_conversion_audit_event(
                     document_id=parsed_document_id,
                     status="REJECTED",
@@ -640,8 +683,13 @@ class DocumentConversionCommandService:
                     document_id=parsed_document_id.value,
                     error_code=parsed_existing_conversion.rejection_error_code,
                 )
-            if parsed_existing_conversion.conversion_status is DocumentConversionStatus.CANONICAL_ACCEPTED:
-                return DocumentConversionAcceptance.from_state(parsed_existing_conversion)
+            if (
+                parsed_existing_conversion.conversion_status
+                is DocumentConversionStatus.CANONICAL_ACCEPTED
+            ):
+                return DocumentConversionAcceptance.from_state(
+                    parsed_existing_conversion
+                )
             self._record_conversion_audit_event(
                 document_id=parsed_document_id,
                 status="REJECTED",
@@ -685,6 +733,7 @@ class DocumentConversionCommandService:
                 code_version=self._code_version,
                 model_version=self._model_version,
             ),
+            execution_requirements=None,
             payload={
                 "document_id": parsed_document_id.value,
                 "processing_run_id": parsed_processing_run.processing_run_id.value,
@@ -873,9 +922,8 @@ def _ensure_conversion_failure_error_code(
         }:
             raise ValueError("phase de conversion demandée invalide")
         if (
-            (phase is DocumentConversionExecutionPhase.QUEUED and completed_units != 0)
-            or failure_error_code is not None
-        ):
+            phase is DocumentConversionExecutionPhase.QUEUED and completed_units != 0
+        ) or failure_error_code is not None:
             raise ValueError("progression de conversion demandée invalide")
         return None
     if status is DocumentConversionStatus.CANONICAL_ACCEPTED:

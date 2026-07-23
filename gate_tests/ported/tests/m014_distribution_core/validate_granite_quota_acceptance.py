@@ -11,6 +11,7 @@ import pytest
 from app.contracts.technical_jobs import (
     ClaimedJob,
     JobEnvironmentIdentity,
+    JobExecutionRequirements,
     JobIdempotenceKey,
     JobPriority,
     JobRecord,
@@ -40,6 +41,17 @@ def _claimed_job(*, owner: str = "worker-documents-1") -> ClaimedJob:
             configuration_hash=identity.configuration_hash,
             code_version="m014-red",
             model_version="granite-locked",
+        ),
+        execution_requirements=JobExecutionRequirements(
+            contract_name="CONVERT_PAGE",
+            contract_version="1.0",
+            capacity_capability="GRANITE_CUDA",
+            capacity_slots=1,
+            capacity_device="cuda:0",
+            storage_environment="test",
+            source_artifact_ref="artifact:source_processing.local/test/source.pdf",
+            result_artifact_ref="artifact:source_processing.local/test/page-1.json",
+            route_name="SCAN_GRANITE",
         ),
         payload={"required_capacity": "GRANITE_CUDA"},
     )
@@ -79,9 +91,16 @@ class _CapacityRepository:
         self.lease = lease
         self.claims = 0
         self.heartbeats = 0
-        self.releases = []
+        self.terminals = []
 
-    def claim_compatible_job(self, *, worker, lease_seconds, job_names):
+    def claim_compatible_job(
+        self,
+        *,
+        worker,
+        lease_seconds,
+        job_names,
+        execution_requirements,
+    ):
         self.claims += 1
         return self.lease
 
@@ -89,8 +108,38 @@ class _CapacityRepository:
         self.heartbeats += 1
         return lease
 
-    def release(self, lease):
-        self.releases.append(lease)
+    def complete_page_execution(self, lease, envelope):
+        self.terminals.append((lease, envelope))
+        return lease.claimed_job.job
+
+
+class _ModelProcess:
+    def __init__(self, outcome):
+        self._outcome = outcome
+
+    def wait(self, *, timeout_seconds):
+        if isinstance(self._outcome, Exception):
+            raise self._outcome
+        return self._outcome
+
+    def terminate(self):
+        raise AssertionError("annulation inattendue")
+
+
+def _terminal(lease, status, payload):
+    from app.platform.job_runtime.granite_capacity import (
+        GranitePageTerminalEnvelope,
+        GranitePageTerminalStatus,
+    )
+
+    return GranitePageTerminalEnvelope.from_payload(
+        completion_id=f"COMPLETE-{lease.claimed_job.job.job_id}-{status.value}",
+        status=status,
+        payload=payload,
+        failure_reason=(
+            None if status is GranitePageTerminalStatus.SUCCEEDED else "MODEL_FAILED"
+        ),
+    )
 
 
 def _ready_worker():
@@ -126,13 +175,16 @@ def _troisieme_claim_attend_sans_appel_modele() -> None:
         lease_seconds=30,
         heartbeat_seconds=5,
         job_names=("CONVERT_PAGE",),
-        execute_model=lambda lease: model_calls.append(lease),
+        execution_requirements=_claimed_job().job.request.execution_requirements,
+        start_model=lambda lease: model_calls.append(lease),
+        success_envelope=lambda lease, result: _terminal(lease, result, {}),
+        failure_envelope=lambda lease, error: _terminal(lease, error, {}),
     )
 
     assert execution is None
     assert repository.claims == 1
     assert model_calls == []
-    assert repository.releases == []
+    assert repository.terminals == []
 
 
 def _controleur_unique_libere_sous_la_meme_identite_fenced() -> None:
@@ -144,18 +196,31 @@ def _controleur_unique_libere_sous_la_meme_identite_fenced() -> None:
     repository = _CapacityRepository(lease=lease)
     controller = GraniteCapacityController(repository=repository)
 
+    from app.platform.job_runtime.granite_capacity import GranitePageTerminalStatus
+
     execution = controller.execute_next(
         worker=_ready_worker(),
         lease_seconds=30,
         heartbeat_seconds=5,
         job_names=("CONVERT_PAGE",),
-        execute_model=lambda acquired: {"slot": acquired.slot_ordinal},
+        execution_requirements=lease.claimed_job.job.request.execution_requirements,
+        start_model=lambda acquired: _ModelProcess({"slot": acquired.slot_ordinal}),
+        success_envelope=lambda acquired, result: _terminal(
+            acquired,
+            GranitePageTerminalStatus.SUCCEEDED,
+            result,
+        ),
+        failure_envelope=lambda acquired, _error: _terminal(
+            acquired,
+            GranitePageTerminalStatus.FAILED,
+            {"error_code": "MODEL_FAILED"},
+        ),
     )
 
     assert execution is not None
     assert execution.lease == lease
     assert execution.model_result == {"slot": 1}
-    assert repository.releases == [lease]
+    assert repository.terminals[0][0] == lease
 
 
 def _echec_explicite_libere_sans_fallback() -> None:
@@ -167,8 +232,7 @@ def _echec_explicite_libere_sans_fallback() -> None:
     repository = _CapacityRepository(lease=lease)
     controller = GraniteCapacityController(repository=repository)
 
-    def fail(_lease):
-        raise RuntimeError("GRANITE_CUDA_UNAVAILABLE")
+    from app.platform.job_runtime.granite_capacity import GranitePageTerminalStatus
 
     with pytest.raises(RuntimeError, match="GRANITE_CUDA_UNAVAILABLE"):
         controller.execute_next(
@@ -176,10 +240,23 @@ def _echec_explicite_libere_sans_fallback() -> None:
             lease_seconds=30,
             heartbeat_seconds=5,
             job_names=("CONVERT_PAGE",),
-            execute_model=fail,
+            execution_requirements=lease.claimed_job.job.request.execution_requirements,
+            start_model=lambda _lease: _ModelProcess(
+                RuntimeError("GRANITE_CUDA_UNAVAILABLE")
+            ),
+            success_envelope=lambda acquired, result: _terminal(
+                acquired,
+                GranitePageTerminalStatus.SUCCEEDED,
+                result,
+            ),
+            failure_envelope=lambda acquired, _error: _terminal(
+                acquired,
+                GranitePageTerminalStatus.FAILED,
+                {"error_code": "GRANITE_CUDA_UNAVAILABLE"},
+            ),
         )
 
-    assert repository.releases == [lease]
+    assert repository.terminals[0][0] == lease
 
 
 def _migration_022_est_ascendante_et_prepare_les_deux_proprietaires() -> None:
@@ -203,28 +280,26 @@ def _migration_022_est_ascendante_et_prepare_les_deux_proprietaires() -> None:
     assert "drop table" not in normalized
     assert "drop column" not in normalized
     assert "insert into platform.granite_slots" in normalized
-    assert "on conflict (environment, deployment_id, slot_ordinal) do nothing" in normalized
+    assert (
+        "on conflict (environment, deployment_id, slot_ordinal) do nothing"
+        in normalized
+    )
 
     versions = tuple(
-        int(path.name[:3])
-        for path in sorted((migration.parent).glob("*.sql"))
+        int(path.name[:3]) for path in sorted((migration.parent).glob("*.sql"))
     )
     assert versions == tuple(range(1, 23))
 
 
 def _adaptateur_documente_ordre_de_verrouillage_et_skip_locked() -> None:
-    """L'acquisition verrouille d'abord le job, puis le slot, sans attente de verrou."""
+    """L'acquisition verrouille worker, job puis slot, sans attente de verrou."""
 
     source = (
-        REPOSITORY_ROOT
-        / "app"
-        / "platform"
-        / "job_runtime"
-        / "granite_capacity.py"
+        REPOSITORY_ROOT / "app" / "platform" / "job_runtime" / "granite_capacity.py"
     ).read_text(encoding="utf-8")
 
-    assert "LOCK_ORDER: technical_job -> granite_slot" in source
-    assert source.count("FOR UPDATE SKIP LOCKED") >= 2
+    assert "LOCK_ORDER: document_worker -> technical_job -> granite_slot" in source
+    assert source.count("SKIP LOCKED") >= 2
     assert "BoundedSemaphore" not in source
     assert "threading.Semaphore" not in source
 

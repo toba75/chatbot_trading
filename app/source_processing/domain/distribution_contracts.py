@@ -15,6 +15,7 @@ from uuid import UUID
 
 from app.contracts.technical_jobs import (
     JobEnvironmentIdentity,
+    JobExecutionRequirements,
     JobIdempotenceKey,
     JobPriority,
     JobRequest,
@@ -661,6 +662,17 @@ class ConvertPageContract:
                 code_version=code_version,
                 model_version=model_version,
             ),
+            execution_requirements=JobExecutionRequirements(
+                contract_name=CONVERT_PAGE_JOB_NAME,
+                contract_version=self.contract_version,
+                capacity_capability=self.required_capacity.capability.value,
+                capacity_slots=self.required_capacity.slots,
+                capacity_device=self.required_capacity.device,
+                storage_environment=self.environment_identity.environment,
+                source_artifact_ref=self.source_artifact.identity.artifact_ref,
+                result_artifact_ref=self.expected_result_artifact.artifact_ref,
+                route_name=self.route_name.value,
+            ),
             payload=self.to_mapping(),
         )
 
@@ -984,6 +996,7 @@ class AssembleCanonicalDocumentContract:
                 code_version=code_version,
                 model_version=model_version,
             ),
+            execution_requirements=None,
             payload=self.to_mapping(),
         )
 

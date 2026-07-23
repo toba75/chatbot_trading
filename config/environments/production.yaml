@@ -52,7 +52,7 @@ services:
     progress_namespace: ostrading-production-progress
     concurrency: 8
     docling_concurrency: 2
-    granite_concurrency: 2
+    granite_concurrency: 1
     local_distribution:
       replicas: 2
       memory_bytes: 2147483648

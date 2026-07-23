@@ -10,6 +10,7 @@ import pytest
 from app.contracts.technical_jobs import (
     ClaimedJob,
     JobEnvironmentIdentity,
+    JobExecutionRequirements,
     JobIdempotenceKey,
     JobPriority,
     JobRecord,
@@ -35,6 +36,17 @@ def _claimed_job() -> ClaimedJob:
             configuration_hash=identity.configuration_hash,
             code_version="m014-red",
             model_version="granite-locked",
+        ),
+        execution_requirements=JobExecutionRequirements(
+            contract_name="CONVERT_PAGE",
+            contract_version="1.0",
+            capacity_capability="GRANITE_CUDA",
+            capacity_slots=1,
+            capacity_device="cuda:0",
+            storage_environment="test",
+            source_artifact_ref="artifact:source_processing.local/test/source.pdf",
+            result_artifact_ref="artifact:source_processing.local/test/page-1.json",
+            route_name="SCAN_GRANITE",
         ),
         payload={"required_capacity": "GRANITE_CUDA"},
     )
@@ -157,8 +169,8 @@ def _duree_invalide_et_perte_de_double_fencing_sont_explicites() -> None:
         def heartbeat(self, *_args, **_kwargs):
             raise AssertionError("heartbeat inattendu")
 
-        def release(self, *_args, **_kwargs):
-            raise AssertionError("release inattendue")
+        def complete_page_execution(self, *_args, **_kwargs):
+            raise AssertionError("terminal inattendu")
 
     controller = GraniteCapacityController(repository=Repository())
     with pytest.raises(
@@ -170,7 +182,10 @@ def _duree_invalide_et_perte_de_double_fencing_sont_explicites() -> None:
             lease_seconds=0,
             heartbeat_seconds=1,
             job_names=("CONVERT_PAGE",),
-            execute_model=lambda _lease: None,
+            execution_requirements=_claimed_job().job.request.execution_requirements,
+            start_model=lambda _lease: None,
+            success_envelope=lambda _lease, _result: None,
+            failure_envelope=lambda _lease, _error: None,
         )
 
     conflict = GraniteSlotLeaseLostError()

@@ -43,6 +43,10 @@ class JobStatus(str, Enum):
     FAILED = "failed"
 
 
+class GraniteModelStillRunning(TimeoutError):
+    """Le sous-processus Granite reste actif à l'échéance d'un heartbeat."""
+
+
 @dataclass(frozen=True, slots=True)
 class JobEnvironmentIdentity:
     """Identité immutable de l'installation qui produit ou exécute un job."""
@@ -83,7 +87,53 @@ class JobIdempotenceKey:
         _ensure_text(self.model_version, "model_version")
 
     def identity_tuple(self) -> tuple[str, str, str, str, str]:
-        return (self.job_name, self.input_hash, self.configuration_hash, self.code_version, self.model_version)
+        return (
+            self.job_name,
+            self.input_hash,
+            self.configuration_hash,
+            self.code_version,
+            self.model_version,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class JobExecutionRequirements:
+    """Discriminants techniques neutres matérialisés pour le claim platform."""
+
+    contract_name: str
+    contract_version: str
+    capacity_capability: str
+    capacity_slots: int
+    capacity_device: str | None
+    storage_environment: str
+    source_artifact_ref: str
+    result_artifact_ref: str
+    route_name: str
+
+    def __post_init__(self) -> None:
+        for field_name in (
+            "contract_name",
+            "contract_version",
+            "capacity_capability",
+            "storage_environment",
+            "source_artifact_ref",
+            "result_artifact_ref",
+            "route_name",
+        ):
+            _ensure_text(getattr(self, field_name), field_name)
+        if self.storage_environment not in _APPLICATION_ENVIRONMENTS:
+            raise ValueError("storage_environment invalide")
+        if (
+            isinstance(self.capacity_slots, bool)
+            or not isinstance(self.capacity_slots, int)
+            or self.capacity_slots < 0
+        ):
+            raise ValueError("capacity_slots invalide")
+        if self.capacity_slots == 0:
+            if self.capacity_device is not None:
+                raise ValueError("capacity_device interdit sans slot")
+        else:
+            _ensure_text(self.capacity_device, "capacity_device")
 
 
 @dataclass(frozen=True)
@@ -93,6 +143,7 @@ class JobRequest:
     job_name: str
     priority: JobPriority
     idempotence_key: JobIdempotenceKey
+    execution_requirements: JobExecutionRequirements | None
     payload: Mapping[str, Any]
 
     def __post_init__(self) -> None:
@@ -108,6 +159,21 @@ class JobRequest:
         )
         if self.idempotence_key.job_name != job_name:
             raise ValueError("idempotence_key incohérente avec job_name")
+        if self.execution_requirements is not None and not isinstance(
+            self.execution_requirements,
+            JobExecutionRequirements,
+        ):
+            raise ValueError("execution_requirements invalides")
+        if job_name == "CONVERT_PAGE":
+            if self.execution_requirements is None:
+                raise ValueError("execution_requirements CONVERT_PAGE absentes")
+            if (
+                self.execution_requirements.contract_name != "CONVERT_PAGE"
+                or self.execution_requirements.contract_version != "1.0"
+            ):
+                raise ValueError("contrat CONVERT_PAGE inconnu")
+        elif self.execution_requirements is not None:
+            raise ValueError("execution_requirements interdites pour ce job")
         object.__setattr__(self, "payload", _freeze_mapping(self.payload, "payload"))
 
     @property
@@ -156,7 +222,9 @@ class JobSubmissionDecision:
     def __post_init__(self) -> None:
         if not isinstance(self.job, JobRecord):
             raise ValueError("job invalide")
-        if not isinstance(self.created, bool) or not isinstance(self.recalculation_refused, bool):
+        if not isinstance(self.created, bool) or not isinstance(
+            self.recalculation_refused, bool
+        ):
             raise ValueError("décision de soumission invalide")
         if self.created and self.recalculation_refused:
             raise ValueError("décision de soumission incohérente")
@@ -175,11 +243,17 @@ class ClaimedJob:
     execution_attempts: int
 
     def __post_init__(self) -> None:
-        if not isinstance(self.job, JobRecord) or self.job.status is not JobStatus.RUNNING:
+        if (
+            not isinstance(self.job, JobRecord)
+            or self.job.status is not JobStatus.RUNNING
+        ):
             raise ValueError("job running requis")
         _ensure_text(self.trace_id, "trace_id")
         _ensure_text(self.lease_owner, "lease_owner")
-        if not isinstance(self.lease_expires_at, datetime) or self.lease_expires_at.tzinfo is None:
+        if (
+            not isinstance(self.lease_expires_at, datetime)
+            or self.lease_expires_at.tzinfo is None
+        ):
             raise ValueError("lease_expires_at invalide")
         _ensure_positive_integer(self.claim_generation, "claim_generation")
         _ensure_positive_integer(self.execution_attempts, "execution_attempts")
@@ -222,7 +296,14 @@ def _ensure_positive_integer(value: Any, field_name: str) -> int:
 def _freeze_mapping(value: Any, field_name: str) -> Mapping[str, Any]:
     if not isinstance(value, Mapping) or len(value) == 0:
         raise ValueError(f"{field_name} invalide")
-    return MappingProxyType({_ensure_text(key, f"{field_name}.clé"): _freeze_payload_value(item, f"{field_name}.{key}") for key, item in value.items()})
+    return MappingProxyType(
+        {
+            _ensure_text(key, f"{field_name}.clé"): _freeze_payload_value(
+                item, f"{field_name}.{key}"
+            )
+            for key, item in value.items()
+        }
+    )
 
 
 def _freeze_payload_value(value: Any, field_name: str) -> Any:
@@ -243,7 +324,9 @@ def _freeze_payload_value(value: Any, field_name: str) -> Any:
 
 __all__ = [
     "ClaimedJob",
+    "GraniteModelStillRunning",
     "JobEnvironmentIdentity",
+    "JobExecutionRequirements",
     "JobIdempotenceKey",
     "JobPriority",
     "JobRecord",

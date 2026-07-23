@@ -9,6 +9,7 @@ from typing import Any, NamedTuple
 from app.platform.job_runtime import (
     JobCatalog,
     JobEnvironmentIdentity,
+    JobExecutionRequirements,
     JobIdempotenceKey,
     JobPriority,
     JobRecord,
@@ -34,6 +35,15 @@ class _JobRow(NamedTuple):
     configuration_hash: str
     code_version: str
     model_version: str
+    execution_contract_name: str | None
+    execution_contract_version: str | None
+    capacity_capability: str | None
+    capacity_slots: int | None
+    capacity_device: str | None
+    storage_environment: str | None
+    source_artifact_ref: str | None
+    result_artifact_ref: str | None
+    execution_route_name: str | None
     payload: Any
     status: str
     result: Any
@@ -55,6 +65,15 @@ class _ClaimedJobRow(NamedTuple):
     configuration_hash: str
     code_version: str
     model_version: str
+    execution_contract_name: str | None
+    execution_contract_version: str | None
+    capacity_capability: str | None
+    capacity_slots: int | None
+    capacity_device: str | None
+    storage_environment: str | None
+    source_artifact_ref: str | None
+    result_artifact_ref: str | None
+    execution_route_name: str | None
     payload: Any
     status: str
     result: Any
@@ -148,7 +167,9 @@ class PostgresJobQueue:
         self._catalog = catalog
         self._environment_identity = environment_identity
 
-    def submit(self, request: JobRequest, *, recalculate: bool) -> JobSubmissionDecision:
+    def submit(
+        self, request: JobRequest, *, recalculate: bool
+    ) -> JobSubmissionDecision:
         with self._connection_factory.connect() as connection:
             with connection.transaction():
                 return self.submit_in_transaction(
@@ -215,37 +236,53 @@ class PostgresJobQueue:
                 INSERT INTO platform.technical_jobs (
                     environment, deployment_id,
                     job_name, priority, input_hash, configuration_hash,
-                    code_version, model_version, payload, trace_id, status,
+                    code_version, model_version,
+                    execution_contract_name, execution_contract_version,
+                    capacity_capability, capacity_slots, capacity_device,
+                    storage_environment, source_artifact_ref,
+                    result_artifact_ref, execution_route_name,
+                    payload, trace_id, status,
                     recalculation_number
                 )
                 VALUES (
-                    %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, 'pending',
+                    %(environment)s, %(deployment_id)s, %(job_name)s,
+                    %(priority)s, %(input_hash)s, %(configuration_hash)s,
+                    %(code_version)s, %(model_version)s,
+                    %(execution_contract_name)s, %(execution_contract_version)s,
+                    %(capacity_capability)s, %(capacity_slots)s,
+                    %(capacity_device)s, %(storage_environment)s,
+                    %(source_artifact_ref)s, %(result_artifact_ref)s,
+                    %(execution_route_name)s,
+                    %(payload)s::jsonb, %(trace_id)s, 'pending',
                     COALESCE((
                         SELECT MAX(recalculation_number) + 1
                           FROM platform.technical_jobs
-                         WHERE environment = %s
-                           AND deployment_id = %s
-                           AND job_name = %s
-                           AND input_hash = %s
-                           AND configuration_hash = %s
-                           AND code_version = %s
-                           AND model_version = %s
+                         WHERE environment = %(environment)s
+                           AND deployment_id = %(deployment_id)s
+                           AND job_name = %(job_name)s
+                           AND input_hash = %(input_hash)s
+                           AND configuration_hash = %(configuration_hash)s
+                           AND code_version = %(code_version)s
+                           AND model_version = %(model_version)s
                     ), 0)
                 )
                 RETURNING {_JOB_COLUMNS_SQL}
                 """,
-                (
-                    parsed_request.environment,
-                    parsed_request.deployment_id,
-                    parsed_request.job_name,
-                    parsed_request.priority.value,
-                    *identity[1:],
-                    _json_dumps(parsed_request.payload),
-                    current_trace_id(),
-                    parsed_request.environment,
-                    parsed_request.deployment_id,
-                    *identity,
-                ),
+                {
+                    "environment": parsed_request.environment,
+                    "deployment_id": parsed_request.deployment_id,
+                    "job_name": parsed_request.job_name,
+                    "priority": parsed_request.priority.value,
+                    "input_hash": parsed_request.idempotence_key.input_hash,
+                    "configuration_hash": (
+                        parsed_request.idempotence_key.configuration_hash
+                    ),
+                    "code_version": parsed_request.idempotence_key.code_version,
+                    "model_version": parsed_request.idempotence_key.model_version,
+                    **_execution_requirement_mapping(parsed_request),
+                    "payload": _json_dumps(parsed_request.payload),
+                    "trace_id": current_trace_id(),
+                },
             )
             created_row = cursor.fetchone()
         if created_row is None:
@@ -391,29 +428,46 @@ class PostgresJobQueue:
                     INSERT INTO platform.technical_jobs (
                         environment, deployment_id,
                         job_name, priority, input_hash, configuration_hash,
-                        code_version, model_version, payload, trace_id, status,
+                        code_version, model_version,
+                        execution_contract_name, execution_contract_version,
+                        capacity_capability, capacity_slots, capacity_device,
+                        storage_environment, source_artifact_ref,
+                        result_artifact_ref, execution_route_name,
+                        payload, trace_id, status,
                         recalculation_number, source_message_id, source_message_hash
                     )
                     VALUES (
-                        %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, 'pending', 0,
-                        %s, %s
+                        %(environment)s, %(deployment_id)s, %(job_name)s,
+                        %(priority)s, %(input_hash)s, %(configuration_hash)s,
+                        %(code_version)s, %(model_version)s,
+                        %(execution_contract_name)s,
+                        %(execution_contract_version)s,
+                        %(capacity_capability)s, %(capacity_slots)s,
+                        %(capacity_device)s, %(storage_environment)s,
+                        %(source_artifact_ref)s, %(result_artifact_ref)s,
+                        %(execution_route_name)s,
+                        %(payload)s::jsonb, %(trace_id)s, 'pending', 0,
+                        %(source_message_id)s, %(source_message_hash)s
                     )
                     RETURNING {_INSERTED_JOB_COLUMNS_SQL}
                     """,
-                    (
-                        request.environment,
-                        request.deployment_id,
-                        request.job_name,
-                        request.priority.value,
-                        request.idempotence_key.input_hash,
-                        request.idempotence_key.configuration_hash,
-                        request.idempotence_key.code_version,
-                        request.idempotence_key.model_version,
-                        serialized_payload,
-                        message.trace_id,
-                        message.message_id,
-                        message.content_hash,
-                    ),
+                    {
+                        "environment": request.environment,
+                        "deployment_id": request.deployment_id,
+                        "job_name": request.job_name,
+                        "priority": request.priority.value,
+                        "input_hash": request.idempotence_key.input_hash,
+                        "configuration_hash": (
+                            request.idempotence_key.configuration_hash
+                        ),
+                        "code_version": request.idempotence_key.code_version,
+                        "model_version": request.idempotence_key.model_version,
+                        **_execution_requirement_mapping(request),
+                        "payload": serialized_payload,
+                        "trace_id": message.trace_id,
+                        "source_message_id": message.message_id,
+                        "source_message_hash": message.content_hash,
+                    },
                 )
                 inserted = cursor.fetchone()
         if inserted is None:
@@ -656,7 +710,9 @@ class PostgresJobQueue:
 
         parsed_job_id = _ensure_text(job_id, "job_id")
         parsed_owner = _ensure_text(owner_id, "owner_id")
-        parsed_generation = _ensure_positive_integer(claim_generation, "claim_generation")
+        parsed_generation = _ensure_positive_integer(
+            claim_generation, "claim_generation"
+        )
         parsed_token = _ensure_text(claim_token, "claim_token")
         parsed_max_attempts = _ensure_positive_integer(max_attempts, "max_attempts")
         with self._connection_factory.connect() as connection:
@@ -700,7 +756,9 @@ class PostgresJobQueue:
     ) -> ClaimedJob:
         parsed_job_id = _ensure_text(job_id, "job_id")
         parsed_owner = _ensure_text(owner_id, "owner_id")
-        parsed_generation = _ensure_positive_integer(claim_generation, "claim_generation")
+        parsed_generation = _ensure_positive_integer(
+            claim_generation, "claim_generation"
+        )
         parsed_token = _ensure_text(claim_token, "claim_token")
         parsed_lease = _ensure_positive_integer(lease_seconds, "lease_seconds")
         with self._connection_factory.connect() as connection:
@@ -753,7 +811,9 @@ class PostgresJobQueue:
     ) -> JobRecord:
         parsed_job_id = _ensure_text(job_id, "job_id")
         parsed_owner = _ensure_text(owner_id, "owner_id")
-        parsed_generation = _ensure_positive_integer(claim_generation, "claim_generation")
+        parsed_generation = _ensure_positive_integer(
+            claim_generation, "claim_generation"
+        )
         parsed_token = _ensure_text(claim_token, "claim_token")
         with self._connection_factory.connect() as connection:
             with connection.transaction():
@@ -771,11 +831,15 @@ class PostgresJobQueue:
                         RETURNING {_JOB_COLUMNS_SQL}
                         """,
                         (
-                            status, result, failure_reason, parsed_job_id,
+                            status,
+                            result,
+                            failure_reason,
+                            parsed_job_id,
                             self._environment_identity.environment,
                             self._environment_identity.deployment_id,
                             parsed_owner,
-                            parsed_generation, parsed_token,
+                            parsed_generation,
+                            parsed_token,
                         ),
                     )
                     row = cursor.fetchone()
@@ -845,7 +909,9 @@ def _json_compatible(value: Any) -> Any:
     return value
 
 
-def _database_row_values(row: Any, expected_length: int, row_name: str) -> tuple[Any, ...]:
+def _database_row_values(
+    row: Any, expected_length: int, row_name: str
+) -> tuple[Any, ...]:
     if not isinstance(row, (tuple, list)) or len(row) != expected_length:
         actual_length = len(row) if isinstance(row, (tuple, list)) else "non-sequence"
         raise RuntimeError(
@@ -876,11 +942,70 @@ def _job_from_row(row: Any) -> JobRecord:
                 code_version=parsed_row.code_version,
                 model_version=parsed_row.model_version,
             ),
+            execution_requirements=_execution_requirements_from_row(parsed_row),
             payload=payload,
         ),
         status=status,
         result=result,
         failure_reason=parsed_row.failure_reason,
+    )
+
+
+def _execution_requirement_mapping(request: JobRequest) -> dict[str, Any]:
+    requirements = request.execution_requirements
+    if requirements is None:
+        return {
+            "execution_contract_name": None,
+            "execution_contract_version": None,
+            "capacity_capability": None,
+            "capacity_slots": None,
+            "capacity_device": None,
+            "storage_environment": None,
+            "source_artifact_ref": None,
+            "result_artifact_ref": None,
+            "execution_route_name": None,
+        }
+    return {
+        "execution_contract_name": requirements.contract_name,
+        "execution_contract_version": requirements.contract_version,
+        "capacity_capability": requirements.capacity_capability,
+        "capacity_slots": requirements.capacity_slots,
+        "capacity_device": requirements.capacity_device,
+        "storage_environment": requirements.storage_environment,
+        "source_artifact_ref": requirements.source_artifact_ref,
+        "result_artifact_ref": requirements.result_artifact_ref,
+        "execution_route_name": requirements.route_name,
+    }
+
+
+def _execution_requirements_from_row(
+    row: _JobRow,
+) -> JobExecutionRequirements | None:
+    values = (
+        row.execution_contract_name,
+        row.execution_contract_version,
+        row.capacity_capability,
+        row.capacity_slots,
+        row.capacity_device,
+        row.storage_environment,
+        row.source_artifact_ref,
+        row.result_artifact_ref,
+        row.execution_route_name,
+    )
+    if all(value is None for value in values):
+        return None
+    if any(value is None for index, value in enumerate(values) if index != 4):
+        raise RuntimeError("JOB_EXECUTION_REQUIREMENTS_INCOMPLETE")
+    return JobExecutionRequirements(
+        contract_name=row.execution_contract_name,
+        contract_version=row.execution_contract_version,
+        capacity_capability=row.capacity_capability,
+        capacity_slots=row.capacity_slots,
+        capacity_device=row.capacity_device,
+        storage_environment=row.storage_environment,
+        source_artifact_ref=row.source_artifact_ref,
+        result_artifact_ref=row.result_artifact_ref,
+        route_name=row.execution_route_name,
     )
 
 

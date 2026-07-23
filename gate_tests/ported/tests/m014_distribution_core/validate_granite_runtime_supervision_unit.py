@@ -146,6 +146,8 @@ class _Repository:
         self.terminals: list[GranitePageTerminalEnvelope] = []
         self.claim_enabled = True
         self.terminal_failure: Exception | None = None
+        self.legacy_acquisitions: list[GraniteSlotLease | None] = []
+        self.releases: list[GraniteSlotLease] = []
 
     def claim_compatible_job(self, **_arguments):
         return self.lease if self.claim_enabled else None
@@ -164,6 +166,15 @@ class _Repository:
         self.terminals.append(envelope)
         return lease.claimed_job.job
 
+    def acquire_for_claimed_job(self, *, worker, claimed_job):
+        assert claimed_job == self.lease.claimed_job
+        if self.legacy_acquisitions:
+            return self.legacy_acquisitions.pop(0)
+        return self.lease
+
+    def release(self, lease):
+        self.releases.append(lease)
+
 
 def test_runtime_granite_supervise_heartbeat_annulation_et_terminal_atomique() -> None:
     """Given un job Granite leased, When il bloque ou perd sa lease, Then le processus reste supervisé."""
@@ -177,6 +188,7 @@ def test_runtime_granite_supervise_heartbeat_annulation_et_terminal_atomique() -
         lease_seconds=30,
         heartbeat_seconds=0.01,
         job_names=("CONVERT_PAGE",),
+        execution_requirements=_requirements(),
         start_model=lambda _lease: process,
         success_envelope=lambda lease, result: _terminal(
             lease,
@@ -204,6 +216,7 @@ def test_runtime_granite_supervise_heartbeat_annulation_et_terminal_atomique() -
             lease_seconds=30,
             heartbeat_seconds=0.01,
             job_names=("CONVERT_PAGE",),
+            execution_requirements=_requirements(),
             start_model=lambda _lease: blocked_process,
             success_envelope=lambda lease, result: _terminal(
                 lease, GranitePageTerminalStatus.SUCCEEDED, result
@@ -227,6 +240,7 @@ def test_runtime_granite_supervise_heartbeat_annulation_et_terminal_atomique() -
             lease_seconds=30,
             heartbeat_seconds=0.01,
             job_names=("CONVERT_PAGE",),
+            execution_requirements=_requirements(),
             start_model=lambda _lease: _Process([primary]),
             success_envelope=lambda lease, result: _terminal(
                 lease, GranitePageTerminalStatus.SUCCEEDED, result
@@ -248,6 +262,7 @@ def test_runtime_granite_supervise_heartbeat_annulation_et_terminal_atomique() -
             lease_seconds=30,
             heartbeat_seconds=0.01,
             job_names=("CONVERT_PAGE",),
+            execution_requirements=_requirements(),
             start_model=lambda lease: model_started.append(lease),
             success_envelope=lambda lease, result: _terminal(
                 lease, GranitePageTerminalStatus.SUCCEEDED, result
@@ -261,6 +276,24 @@ def test_runtime_granite_supervise_heartbeat_annulation_et_terminal_atomique() -
         is None
     )
     assert model_started == []
+
+    legacy_repository = _Repository()
+    legacy_repository.legacy_acquisitions = [None, legacy_repository.lease]
+    legacy_model_starts: list[GraniteSlotLease] = []
+    legacy_execution = GraniteCapacityController(
+        repository=legacy_repository
+    ).execute_claimed_job(
+        worker=_worker(),
+        claimed_job=legacy_repository.lease.claimed_job,
+        lease_seconds=30,
+        heartbeat_seconds=0.01,
+        start_model=lambda lease: (
+            legacy_model_starts.append(lease) or _Process([{"legacy": "ok"}])
+        ),
+    )
+    assert legacy_execution.model_result == {"legacy": "ok"}
+    assert legacy_model_starts == [legacy_repository.lease]
+    assert legacy_repository.releases == [legacy_repository.lease]
 
     parameter = inspect.signature(JobRequest).parameters["execution_requirements"]
     assert parameter.default is inspect.Parameter.empty

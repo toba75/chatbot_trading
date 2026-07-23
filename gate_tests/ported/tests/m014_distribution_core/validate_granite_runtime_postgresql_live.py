@@ -284,9 +284,10 @@ def test_runtime_postgresql_workers_terminal_union_et_chemin_chaud() -> None:
                     None,
                 )
 
+            drain_deadline = datetime.now(timezone.utc) + timedelta(seconds=5)
             registry.begin_draining(
                 worker_instance_id=workers[0].worker_instance_id,
-                drain_deadline=datetime.now(timezone.utc) + timedelta(milliseconds=100),
+                drain_deadline=drain_deadline,
             )
             assert (
                 quota.claim_compatible_job(
@@ -296,6 +297,8 @@ def test_runtime_postgresql_workers_terminal_union_et_chemin_chaud() -> None:
                 )
                 is None
             )
+            draining_lease = quota.heartbeat(lease_1, lease_seconds=30)
+            assert draining_lease.lease_until <= drain_deadline
             with (
                 factory.connect() as connection,
                 connection.transaction(),

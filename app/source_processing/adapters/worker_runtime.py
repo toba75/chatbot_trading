@@ -6,16 +6,26 @@ import argparse
 import json
 import os
 import time
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 from psycopg import Error as PsycopgError, IntegrityError, OperationalError
 from uuid import uuid4
 
-from app.platform.configuration import ApplicationConfiguration, load_application_configuration
-from app.platform.configured_datastore_identity import build_configured_datastore_preflight
+from app.platform.configuration import (
+    ApplicationConfiguration,
+    load_application_configuration,
+)
+from app.platform.configured_datastore_identity import (
+    build_configured_datastore_preflight,
+)
 from app.platform.job_runtime import JobStatus
 from app.platform.job_runtime.composition import build_postgres_job_runtime
+from app.platform.job_runtime.granite_capacity import (
+    GraniteWorker,
+    GraniteWorkerState,
+)
 from app.platform.job_runtime.heartbeat import JobLeaseHeartbeat
 from app.platform.job_runtime.postgres import JobLeaseConflictError
 from app.platform.job_runtime.reconciliation import reconcile_stale_configuration_jobs
@@ -27,7 +37,9 @@ from app.platform.worker_environment import (
     build_worker_environment_binding,
     job_environment_identity_from_configuration,
 )
-from app.source_processing.adapters.postgres_document_persistence import build_document_persistence
+from app.source_processing.adapters.postgres_document_persistence import (
+    build_document_persistence,
+)
 from app.source_processing.adapters.docling_native_conversion import (
     CanonicalArtifactFileStore,
 )
@@ -35,7 +47,9 @@ from app.source_processing.adapters.postgres_job_outbox import PostgresJobOutbox
 from app.source_processing.adapters.pypdf_diagnostic_inspector import (
     PdfDiagnosticInspector,
 )
-from app.source_processing.adapters.pdf_inspection_process import build_m13_isolated_pdf_inspector
+from app.source_processing.adapters.pdf_inspection_process import (
+    build_m13_isolated_pdf_inspector,
+)
 from app.source_processing.application.document_worker import (
     DocumentDiagnosticWorker,
     WorkerProcessingError,
@@ -88,11 +102,23 @@ def _run_worker(
 ) -> None:
     if not isinstance(application_configuration, ApplicationConfiguration):
         raise ValueError("application_configuration worker invalide")
-    if not isinstance(owner_id, str) or owner_id.strip() == "" or owner_id != owner_id.strip():
+    if (
+        not isinstance(owner_id, str)
+        or owner_id.strip() == ""
+        or owner_id != owner_id.strip()
+    ):
         raise ValueError("owner_id worker invalide")
-    if isinstance(lease_seconds, bool) or not isinstance(lease_seconds, int) or lease_seconds < 1:
+    if (
+        isinstance(lease_seconds, bool)
+        or not isinstance(lease_seconds, int)
+        or lease_seconds < 1
+    ):
         raise ValueError("lease_seconds worker invalide")
-    if isinstance(poll_seconds, bool) or not isinstance(poll_seconds, (int, float)) or poll_seconds <= 0:
+    if (
+        isinstance(poll_seconds, bool)
+        or not isinstance(poll_seconds, (int, float))
+        or poll_seconds <= 0
+    ):
         raise ValueError("poll_seconds worker invalide")
     if max_jobs is not None and (
         isinstance(max_jobs, bool) or not isinstance(max_jobs, int) or max_jobs < 1
@@ -116,7 +142,9 @@ def _run_worker(
     instance_owner_id = worker_binding.instance_owner_id(str(uuid4()))
     connection_factory = PsycopgConnectionFactory(
         connection_url=application_configuration.services.postgres.url,
-        password_path=Path(application_configuration.security.secrets.postgres_password_path),
+        password_path=Path(
+            application_configuration.security.secrets.postgres_password_path
+        ),
         connect_timeout_seconds=application_configuration.runtime.timeouts.startup_seconds,
     )
     persistence = build_document_persistence(
@@ -135,6 +163,14 @@ def _run_worker(
         outbox=outbox,
         application_configuration=application_configuration,
     )
+    granite_worker = GraniteWorker(
+        worker_instance_id=instance_owner_id,
+        environment_identity=environment_identity,
+        storage_environment=environment_identity.environment,
+        state=GraniteWorkerState.READY,
+        capabilities=frozenset(("DOCUMENT_STANDARD", "GRANITE_CUDA")),
+    )
+    job_runtime.granite_worker_registry.register(granite_worker)
     reconcile_stale_configuration_jobs(
         job_queue=job_runtime.queue,
         job_names=("DIAGNOSE", "CONVERT_DOCUMENT"),
@@ -167,9 +203,13 @@ def _run_worker(
         conversion_repository=persistence.document_conversion_repository,
         original_source_store=persistence.original_source_store,
         native_asset_manifest_path=Path("config/docling-assets.native.json"),
-        native_assets_root=Path(application_configuration.paths.data_root) / "docling_assets" / "native",
+        native_assets_root=Path(application_configuration.paths.data_root)
+        / "docling_assets"
+        / "native",
         granite_asset_manifest_path=Path("config/docling-assets.granite.json"),
-        granite_assets_root=Path(application_configuration.paths.data_root) / "docling_assets" / "granite",
+        granite_assets_root=Path(application_configuration.paths.data_root)
+        / "docling_assets"
+        / "granite",
         ocrmypdf_manifest_path=Path("config/ocrmypdf-image.json"),
         audit_root=Path(application_configuration.paths.data_root) / "docling_audit",
         timeout_seconds=application_configuration.runtime.timeouts.request_seconds,
@@ -190,6 +230,10 @@ def _run_worker(
         max_parallel_pages=application_configuration.services.workers.concurrency,
         docling_max_concurrency=application_configuration.services.workers.docling_concurrency,
         granite_max_concurrency=application_configuration.services.workers.granite_concurrency,
+        granite_capacity_controller=job_runtime.granite_capacity_controller,
+        granite_worker=granite_worker,
+        granite_lease_seconds=lease_seconds,
+        granite_heartbeat_seconds=lease_seconds / 3.0,
     )
     workers = {
         "DIAGNOSE": worker,
@@ -218,6 +262,10 @@ def _run_worker(
             continue
         if claimed is None:
             if max_jobs is not None:
+                job_runtime.granite_worker_registry.begin_draining(
+                    worker_instance_id=granite_worker.worker_instance_id,
+                    drain_deadline=datetime.now(UTC) + timedelta(seconds=lease_seconds),
+                )
                 return
             time.sleep(poll_seconds)
             continue
@@ -281,6 +329,10 @@ def _run_worker(
             duration_ms=duration_ms,
         )
         processed += 1
+    job_runtime.granite_worker_registry.begin_draining(
+        worker_instance_id=granite_worker.worker_instance_id,
+        drain_deadline=datetime.now(UTC) + timedelta(seconds=lease_seconds),
+    )
 
 
 def _classify_processing_error(error: Exception) -> tuple[str, bool]:
@@ -292,7 +344,10 @@ def _classify_processing_error(error: Exception) -> tuple[str, bool]:
         return "POSTGRES_INTEGRITY_FAILURE", False
     if isinstance(error, PsycopgError):
         return "POSTGRES_PERMANENT_FAILURE", False
-    if isinstance(error, RuntimeError) and str(error) == "CONVERSION_PERSISTENCE_CONFLICT":
+    if (
+        isinstance(error, RuntimeError)
+        and str(error) == "CONVERSION_PERSISTENCE_CONFLICT"
+    ):
         return "CONVERSION_PERSISTENCE_CONFLICT", False
     return "WORKER_UNEXPECTED_ERROR", False
 

@@ -35,7 +35,9 @@ def _response(source: str) -> bytes:
 
 
 def _native_converter(tmp_path: Path):
-    runtime = importlib.import_module("app.source_processing.adapters.docling_native_conversion")
+    runtime = importlib.import_module(
+        "app.source_processing.adapters.docling_native_conversion"
+    )
     assets_root = tmp_path / "native-assets"
     model_path = assets_root / "models" / "layout.bin"
     model_path.parent.mkdir(parents=True)
@@ -67,15 +69,23 @@ def _native_converter(tmp_path: Path):
         expected_page_numbers=(1,),
         routing_policy_version="routing-v1",
     )
-    return runtime, runtime.IsolatedNativeDoclingConverter(
-        asset_manifest_path=manifest_path,
-        assets_root=assets_root,
-        timeout_seconds=1.0,
-    ), request, "DOCLING_STANDARD_UNAVAILABLE", "docling"
+    return (
+        runtime,
+        runtime.IsolatedNativeDoclingConverter(
+            asset_manifest_path=manifest_path,
+            assets_root=assets_root,
+            timeout_seconds=1.0,
+        ),
+        request,
+        "DOCLING_STANDARD_UNAVAILABLE",
+        "docling",
+    )
 
 
 def _granite_converter(tmp_path: Path):
-    runtime = importlib.import_module("app.source_processing.adapters.docling_granite_conversion")
+    runtime = importlib.import_module(
+        "app.source_processing.adapters.docling_granite_conversion"
+    )
     assets_root = tmp_path / "granite-assets"
     model_path = assets_root / "ibm-granite--granite-docling-258M" / "config.json"
     model_path.parent.mkdir(parents=True)
@@ -111,14 +121,27 @@ def _granite_converter(tmp_path: Path):
         route_name="TARGETED_ENRICHMENT",
         routing_policy_version="routing-v1",
     )
-    return runtime, runtime.IsolatedGraniteDoclingConverter(
-        asset_manifest_path=manifest_path,
-        assets_root=assets_root,
-        timeout_seconds=1.0,
-    ), request, "GRANITE_DOCLING_UNAVAILABLE", "granite_docling"
+    return (
+        runtime,
+        runtime.IsolatedGraniteDoclingConverter(
+            asset_manifest_path=manifest_path,
+            assets_root=assets_root,
+            timeout_seconds=1.0,
+        ),
+        request,
+        "GRANITE_DOCLING_UNAVAILABLE",
+        "granite_docling",
+    )
 
 
-def _assert_parent_protocol(runtime, converter, request, error_code: str, source: str, monkeypatch: pytest.MonkeyPatch) -> None:
+def _assert_parent_protocol(
+    runtime,
+    converter,
+    request,
+    error_code: str,
+    source: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     def valid_run(*args, **kwargs):
         assert isinstance(kwargs["input"], bytes)
         assert "text" not in kwargs
@@ -130,27 +153,65 @@ def _assert_parent_protocol(runtime, converter, request, error_code: str, source
             stderr=b"\xa9",
         )
 
-    monkeypatch.setattr(runtime.subprocess, "run", valid_run)
-    converted = converter.convert(request)
+    if hasattr(converter, "start"):
+
+        class _Popen:
+            returncode = 0
+
+            def communicate(self, *, input, timeout):
+                completed = valid_run(input=input)
+                return completed.stdout, completed.stderr
+
+            def poll(self):
+                return 0
+
+        monkeypatch.setattr(runtime, "GraniteSlotLease", object)
+        monkeypatch.setattr(
+            runtime.subprocess, "Popen", lambda *args, **kwargs: _Popen()
+        )
+        converted = converter.start(request, lease=object()).wait(timeout_seconds=1)
+    else:
+        monkeypatch.setattr(runtime.subprocess, "run", valid_run)
+        converted = converter.convert(request)
     assert converted.pages[0].items[0].text == "Droit ©"
 
-    monkeypatch.setattr(
-        runtime.subprocess,
-        "run",
-        lambda *args, **kwargs: subprocess.CompletedProcess(
-            args=args,
-            returncode=0,
-            stdout=b"\xa9",
-            stderr=b"",
-        ),
-    )
+    if hasattr(converter, "start"):
+
+        class _InvalidPopen:
+            returncode = 0
+
+            def communicate(self, *, input, timeout):
+                return b"\xa9", b""
+
+            def poll(self):
+                return 0
+
+        monkeypatch.setattr(
+            runtime.subprocess,
+            "Popen",
+            lambda *args, **kwargs: _InvalidPopen(),
+        )
+    else:
+        monkeypatch.setattr(
+            runtime.subprocess,
+            "run",
+            lambda *args, **kwargs: subprocess.CompletedProcess(
+                args=args,
+                returncode=0,
+                stdout=b"\xa9",
+                stderr=b"",
+            ),
+        )
     error_type = (
         runtime.DoclingNativeConversionError
         if error_code == "DOCLING_STANDARD_UNAVAILABLE"
         else runtime.GraniteDoclingConversionError
     )
     with pytest.raises(error_type, match=error_code):
-        converter.convert(request)
+        if hasattr(converter, "start"):
+            converter.start(request, lease=object()).wait(timeout_seconds=1)
+        else:
+            converter.convert(request)
 
 
 def _assert_worker_protocol(module_name: str, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -174,14 +235,20 @@ def _assert_worker_protocol(module_name: str, monkeypatch: pytest.MonkeyPatch) -
     assert payload["pages"][0]["items"][0]["text"] == "Droit ©"
 
 
-def test_validate_docling_isolated_protocol_unit(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_validate_docling_isolated_protocol_unit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     # Given une page native ou TARGETED_ENRICHMENT contient © et l'hôte Windows utilise CP-1252.
     # When les processus Docling isolés publient leur réponse et que le parent la consomme.
     # Then le protocole est UTF-8, les flux invalides deviennent des erreurs stables et aucun état générique n'est requis.
     native = _native_converter(tmp_path / "native")
     _assert_parent_protocol(*native, monkeypatch=monkeypatch)
-    _assert_worker_protocol("app.source_processing.adapters.docling_native_worker", monkeypatch)
+    _assert_worker_protocol(
+        "app.source_processing.adapters.docling_native_worker", monkeypatch
+    )
 
     granite = _granite_converter(tmp_path / "granite")
     _assert_parent_protocol(*granite, monkeypatch=monkeypatch)
-    _assert_worker_protocol("app.source_processing.adapters.docling_granite_worker", monkeypatch)
+    _assert_worker_protocol(
+        "app.source_processing.adapters.docling_granite_worker", monkeypatch
+    )

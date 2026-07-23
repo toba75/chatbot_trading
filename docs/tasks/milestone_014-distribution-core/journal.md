@@ -401,3 +401,57 @@
 - Périmètre respecté : aucun raccordement worker au job de page, aucune
   acquisition supplémentaire, aucune requête SQL de quota et aucune migration
   ne sont ajoutés. Le runtime et le quota PostgreSQL de T-004 restent inchangés.
+
+## 2026-07-24 - Corrections runtime et atomicité T-004
+
+- Précondition GREEN : `uv run --locked gate --scope
+  m014_distribution_core --live` exécutait 36 nœuds, dont les preuves
+  PostgreSQL existantes, avant la correction. Le cadrage ADR-052 reste
+  suffisant ; aucune nouvelle décision structurante n’est introduite.
+- RED utile : `validate_granite_runtime_supervision_unit.py` et
+  `validate_granite_runtime_postgresql_live.py` ont d’abord échoué sur les
+  contrats runtime, le registre durable et le terminal atomique absents.
+  Commit RED : `fcf1c579d`.
+- `JobRequest` transporte désormais des discriminants techniques neutres et
+  obligatoires pour `CONVERT_PAGE` : contrat/version, capacité, device,
+  environnement de stockage, références d’artefacts et route. La plateforme
+  les matérialise sans lire le payload Source Processing et refuse en amont
+  tout contrat ou version inconnu. Les insertions concernées utilisent des
+  paramètres psycopg nommés.
+- La migration 022 ajoute les colonnes techniques, l’index partiel du claim,
+  le registre `platform.document_workers` et l’union discriminée des résultats
+  de page. `SKIP_EMPTY` interdit toute identité d’exécution ; une route Granite
+  exige le slot complet et une route standard l’interdit.
+- `PostgresGraniteWorkerRegistry` rend durables l’identité, les capacités,
+  `READY`, `DRAINING` et la deadline. L’acquisition verrouille dans l’ordre
+  worker, job, slot ; le heartbeat en drainage ne dépasse jamais la deadline.
+- `CompletePageExecution` vérifie le claim et le slot actifs, écrit l’outbox
+  immutable, rend le job terminal et libère le slot dans une transaction
+  `platform`. Un ancien détenteur ne peut ni réussir, ni échouer, ni abandonner.
+  Une erreur modèle et une erreur de compensation restent toutes deux visibles
+  dans un `ExceptionGroup` sans altérer l’erreur primaire.
+- Les processus Granite et Gemma sont lancés par `subprocess.Popen` et
+  n’exposent plus d’appel `convert()` direct. Ils exigent une lease, publient
+  `wait/terminate`, renouvellent automatiquement pendant le blocage et sont
+  terminés immédiatement à la perte de lease.
+- Le runtime réel enregistre chaque replica, injecte le contrôleur durable et
+  passe le worker en drainage aux sorties bornées. Avant le fan-out T-005, le
+  parcours M-004 conserve explicitement son claim `CONVERT_DOCUMENT` : un pont
+  transactionnel lui réserve un slot sous le même fencing, attend sans lancer
+  le modèle si les deux slots sont pris, puis libère le slot sans terminaliser
+  prématurément le document. Aucun job `CONVERT_PAGE` n’est créé par T-004.
+- La configuration fixe `granite_concurrency: 1` par worker dans les trois
+  profils, l’exemple et Compose ; PostgreSQL reste l’autorité du plafond global
+  de deux.
+- Preuves GREEN : scope `m002` 34 nœuds, `m004` 45 nœuds,
+  `m013_config` 36 nœuds, `m013_environments` 49 nœuds,
+  `m013_fastapi` 70 nœuds, `governance` 25 nœuds et
+  `m014_distribution_core` offline 36 nœuds et live 38 nœuds. La preuve
+  live couvre deux replicas, trois jobs Granite,
+  attente du troisième sans modèle, drainage, deadline, annulation fenced,
+  terminal/outbox atomique, quatre variantes de résultat et `EXPLAIN
+  (ANALYZE, BUFFERS)` sur plus de cinq mille jobs mixtes.
+- Gate canonique finale : 465 nœuds exécutés exactement une fois, code 0,
+  aucune absence, surprise ou duplication, `PARTIAL GREEN: offline`.
+- Périmètre respecté : aucun fan-out, aucun producteur de job page, aucun
+  assemblage, aucune projection, aucun fallback CPU et aucune ADR nouvelle.
