@@ -48,7 +48,7 @@ def test_granite_exige_cuda_zero_sans_fallback_cpu(
         device=device,
     )
 
-    # Then Granite cible CUDA 0 et le conteneur worker reçoit explicitement le GPU.
+    # Then Granite cible CUDA 0 et le conteneur worker ne reçoit que le GPU 0.
     assert device == "cuda:0"
     assert pipeline_options.accelerator_options.device == "cuda:0"
     for compose_path in (
@@ -57,7 +57,16 @@ def test_granite_exige_cuda_zero_sans_fallback_cpu(
     ):
         compose = yaml.safe_load((REPO_ROOT / compose_path).read_text(encoding="utf-8"))
         document_worker = compose["services"]["worker-documents"]
-        assert document_worker["gpus"] == "all"
+        assert "gpus" not in document_worker
+        assert document_worker["deploy"]["resources"]["reservations"][
+            "devices"
+        ] == [
+            {
+                "driver": "nvidia",
+                "device_ids": ["0"],
+                "capabilities": ["gpu"],
+            }
+        ]
         assert "environment" not in document_worker
         assert (
             "/triton-cache:rw,exec,nosuid,nodev,size=128m,mode=0770,gid=31000"
@@ -77,7 +86,10 @@ def test_granite_exige_cuda_zero_sans_fallback_cpu(
         "FROM runtime AS worker-projection", maxsplit=1
     )[0]
     assert 'ENV TRITON_CACHE_DIR="/triton-cache"' in worker_stage
-    assert "apt-get install -y --no-install-recommends gcc libc6-dev" in worker_stage
+    assert "snapshot.debian.org/archive/debian/20250203T000000Z" in worker_stage
+    assert "snapshot.debian.org/archive/debian-security/20250203T000000Z" in worker_stage
+    assert "gcc=4:12.2.0-3" in worker_stage
+    assert "libc6-dev=2.36-9+deb12u9" in worker_stage
     assert worker_stage.index("USER root") < worker_stage.index("USER ostrading")
 
     # Then l'absence de CUDA est terminale et ne sélectionne jamais le CPU.

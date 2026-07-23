@@ -5239,6 +5239,26 @@ depends_on = ["precondition.m014-distribution-core"]
 live = false
 
 [[nodes]]
+id = "test.m014-distribution-core.validate-page-result-metrics-unit"
+path = "gate_tests/ported/tests/m014_distribution_core/validate_page_result_metrics_unit.py"
+kind = "test"
+scope = "m014_distribution_core"
+phase = "tests"
+runner = "pytest"
+args = []
+live = false
+
+[[nodes]]
+id = "test.m014-distribution-core.validate-distribution-operations-acceptance"
+path = "gate_tests/ported/tests/m014_distribution_core/validate_distribution_operations_acceptance.py"
+kind = "test"
+scope = "m014_distribution_core"
+phase = "tests"
+runner = "pytest"
+args = []
+live = false
+
+[[nodes]]
 id = "test.m014-distribution-core.validate-granite-quota-acceptance"
 path = "gate_tests/ported/tests/m014_distribution_core/validate_granite_quota_acceptance.py"
 kind = "test"
