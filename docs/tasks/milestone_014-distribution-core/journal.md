@@ -320,3 +320,26 @@
 - Périmètre respecté : aucun worker spécialisé, aucune nouvelle route ou file,
   aucun CPU de repli, aucun résultat de page écrit et aucune activation de
   M14-local-pipeline.
+
+### Stabilisation de la readiness PostgreSQL publiée
+
+- RED reproduit lors de la revalidation : `pg_isready` réussissait sur le
+  socket interne du conteneur pendant que la première connexion des migrations
+  au port TCP publié échouait encore avec `psycopg.OperationalError: server
+  closed the connection unexpectedly`.
+- Test de harnais ajouté avant le correctif : une rupture réseau de démarrage
+  sans SQLSTATE est attendue dans une fenêtre bornée ; un conteneur arrêté
+  échoue immédiatement ; une erreur PostgreSQL structurée avec SQLSTATE reste
+  terminale. Commit RED : `f9b0b0c66`.
+- Correctif : `_wait_postgres` sonde désormais `SELECT 1` avec la même
+  `PsycopgConnectionFactory`, le même secret et le même port TCP publié que les
+  migrations. L’état Docker est contrôlé à chaque tentative ; aucune panne
+  serveur, erreur d’authentification ou indisponibilité persistante n’est
+  masquée. Commit GREEN : `f3713ad69`.
+- Validations GREEN : test de harnais 1/1 ; harnais et preuve live 2/2 ; preuve
+  PostgreSQL live ciblée réussie dix fois consécutivement ; scope
+  `m014_distribution_core --live` à 34 nœuds, tous exécutés exactement une fois,
+  sans absence, surprise ni duplication.
+- Les assertions de quota global, concurrence, attente sans appel modèle,
+  reprise monotone et double fencing restent inchangées. Aucun élément de T-005
+  n’est introduit et aucune ADR supplémentaire n’est requise.
