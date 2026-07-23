@@ -150,5 +150,4 @@
 - Gate canonique finale : 455 nœuds exécutés exactement une fois, code 0,
   aucune absence, surprise ou duplication, `PARTIAL GREEN: offline`.
 - Lint ciblée : Ruff GREEN sur le validateur, les tests et la précondition.
-- Commit GREEN : présent commit ; le hash exact sera ajouté après sa création
-  sans modifier le comportement livré.
+- Commit GREEN : `fd30fcdebd2f8c554615fed2d91535d1c630c343`.
