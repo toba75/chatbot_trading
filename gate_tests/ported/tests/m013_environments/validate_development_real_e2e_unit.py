@@ -413,6 +413,70 @@ def _validate_development_product_checkpoint_preserves_public_proof_before_stop(
     assert payload["spark_raw_response_id"] == product.spark_raw_response_id
 
 
+def _validate_documentary_question_targets_fixture_evidence() -> None:
+    from app.platform.development_e2e import _ProofContext, _ask_documentary_question
+
+    quoted_span = "The backtests do not include commissions and slippage."
+    requests: list[tuple[str, dict[str, object]]] = []
+
+    class _Response:
+        def __init__(self, *, status_code: int, payload: dict[str, object]) -> None:
+            self.status_code = status_code
+            self._payload = payload
+            self.text = ""
+
+        def json(self) -> dict[str, object]:
+            return self._payload
+
+    class _Client:
+        def post(self, path: str, *, json: dict[str, object]) -> _Response:
+            requests.append((path, json))
+            if path == "/v1/conversations":
+                return _Response(
+                    status_code=201,
+                    payload={"conversation_id": "CONV-TEST-E2E-QUESTION"},
+                )
+            return _Response(
+                status_code=200,
+                payload={
+                    "answer_id": "ANS-TEST-E2E-QUESTION",
+                    "support_status": "SUPPORTED",
+                    "citations": [
+                        {
+                            "source_locator": {
+                                "document_id": "DOC-TEST-E2E-QUESTION",
+                                "canonical_version_id": "CVER-TEST-E2E-QUESTION",
+                                "page_pdf": 4,
+                                "content_hash": "a" * 64,
+                            },
+                            "quoted_span": quoted_span,
+                            "quoted_span_hash": hashlib.sha256(
+                                quoted_span.encode("utf-8")
+                            ).hexdigest(),
+                        }
+                    ],
+                },
+            )
+
+    _ask_documentary_question(
+        client=_Client(),
+        document_id="DOC-TEST-E2E-QUESTION",
+        canonical_version_id="CVER-TEST-E2E-QUESTION",
+        proof_id="A" * 32,
+        proof_context=_ProofContext(
+            environment="test",
+            deployment_id="ostrading-test-ci",
+            edge_base_url="https://localhost:19443",
+        ),
+    )
+
+    assert requests[1][1]["message"] == (
+        "Selon le document sélectionné, de quelle période à quelle période "
+        "s’étendent les rendements mensuels du portefeuille Timing Industry, "
+        "et quels coûts le backtest exclut-il ?"
+    )
+
+
 def test_development_real_e2e_unit(monkeypatch, tmp_path: Path) -> None:
     """Agrège les décisions unitaires dans l'unique nœud déclaré au gate."""
 
@@ -434,6 +498,7 @@ def test_development_real_e2e_unit(monkeypatch, tmp_path: Path) -> None:
         tmp_path,
     )
     _validate_development_product_checkpoint_preserves_public_proof_before_stop()
+    _validate_documentary_question_targets_fixture_evidence()
 
     import app.platform.development_e2e as development_e2e
 
