@@ -203,3 +203,53 @@
 - Risques résiduels : ADR-052 reste proposée jusqu’aux preuves PostgreSQL
   réelles de T-004 et aux preuves live de M14-local-qualification ; T-002 ne
   crée encore ni migration, ni contrat runtime, ni slot actif.
+
+## 2026-07-23 - T-003 contrats stricts de distribution locale
+
+- Précondition GREEN : le scope `m014_distribution_core` a exécuté 28 nœuds
+  exactement une fois avant toute modification T-003, sans absence, surprise
+  ni duplication.
+- Scénarios BDD et tests ATDD/TDD ajoutés pour les contrats versionnés
+  `CONVERT_PAGE`, résultat de page et `ASSEMBLE_CANONICAL_DOCUMENT`, leur
+  sérialisation JSON fermée, leurs clés d’idempotence et leur transport dans
+  l’enveloppe technique générique `JobRequest`.
+- RED utile : les quatre tests ciblés initiaux ont échoué parce que le module
+  de contrats Source Processing et la configuration locale explicite
+  n’existaient pas. Commit RED
+  `f7549941548438cd2239806a4cf72de1ee9edd74`.
+- Contrats publiés dans
+  `app/source_processing/domain/distribution_contracts.py` : identités
+  d’artefacts locaux bornées au profil et à l’environnement, empreinte et
+  taille obligatoires, versions d’actifs et de modèle verrouillées, exigences
+  de capacité explicites, fencing des claims et des slots Granite, répétition
+  strictement compatible et erreurs stables sans fallback.
+- `SKIP_EMPTY` est un résultat explicite sans convertisseur, exécution ni slot.
+  Les routes document standard interdisent un slot Granite ; les routes
+  Granite exigent `cuda:0`, un slot fenced et les actifs verrouillés.
+- Configuration publiée sous `services.workers.local_distribution` dans le
+  schéma, les profils `development`, `test`, `production`, l’exemple et le
+  profil Compose : deux replicas, 2 Gio et 4 CPU par worker, `cuda:0`, deux
+  slots globaux et un slot par worker. Le rendu Compose vérifie ces valeurs
+  sans détection implicite ni valeur de repli.
+- Le contrat de capacité utilise les noms explicites `granite_slots_global` et
+  `granite_slots_per_worker`, distincts du paramètre historique de concurrence
+  intra-processus M-004.
+- Fichiers de validation : les deux tests
+  `validate_local_distribution_contracts_*` et leurs nœuds dans `gate.toml`.
+  Les tests couvrent notamment champs inconnus ou absents, versions, chemins,
+  empreintes, enveloppes divergentes, répétitions incompatibles, fencing,
+  limites de ressources et rendu des trois profils.
+- ADR consultées : ADR-025, ADR-040, ADR-042, ADR-046, ADR-051 et ADR-052.
+  ADR nouvelle : non requise, car T-003 matérialise la décision structurante
+  déjà portée par ADR-052 sans en changer le sens.
+- Validations GREEN : tests ciblés 2/2 ; Ruff ciblé ; scopes `m004` 45 nœuds,
+  `m013_config` 4 nœuds, `m013_environments` 49 nœuds et
+  `m014_distribution_core` 30 nœuds ; aucune absence, surprise ou
+  duplication.
+- Gate canonique finale : 459 nœuds exécutés exactement une fois, code 0,
+  aucune absence, surprise ou duplication, `PARTIAL GREEN: offline`.
+- Commit GREEN : `f5c4bdaade2a211c9f1c9ef368bb8e40dfd8a0f7`.
+- Périmètre respecté : aucune migration, table, boucle d’exécution, fan-out
+  ou activation runtime n’est ajoutée. Le quota PostgreSQL réel et la
+  saturation restent à prouver en T-004 ; le branchement runtime demeure la
+  responsabilité de T-005.
