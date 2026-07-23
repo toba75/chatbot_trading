@@ -32,6 +32,7 @@ def _report(environment: str) -> dict[str, object]:
     if environment == "test":
         return {
             **common,
+            "qualification_mode": "ISOLATION",
             "foreign_volume_sentinels_preserved": True,
             "non_test_credentials_inaccessible": True,
             "test_resources_removed": True,
@@ -157,6 +158,15 @@ def test_environment_governance_unit() -> None:
     collided["test"]["runs"][1]["document_id"] = reports["test"]["runs"][0]["document_id"]
     with pytest.raises(EnvironmentGovernanceError, match="EVIDENCE_ID_COLLISION"):
         validate_execution_evidence(collided)
+
+    functional = deepcopy(reports)
+    functional["test"]["qualification_mode"] = "FUNCTIONAL"
+    functional["test"]["runs"] = functional["test"]["runs"][:1]
+    with pytest.raises(
+        EnvironmentGovernanceError,
+        match="LIVE_EVIDENCE_QUALIFICATION_MODE_INVALID",
+    ):
+        validate_execution_evidence(functional)
 
     missing = deepcopy(reports)
     del missing["test"]

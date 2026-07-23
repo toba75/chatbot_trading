@@ -17,27 +17,50 @@ def test_test_real_e2e_unit(monkeypatch, tmp_path: Path, capsys) -> None:
         TestEnvironmentCycle,
         _exclusive_test_qualification,
         _require_persistent_lifecycle_owner,
-        _run_two_test_cycles,
+        _run_test_cycles,
         _verify_test_cleanup_target,
     )
 
-    # Given un lanceur test possédant exactement deux cycles isolés.
+    # Given une qualification fonctionnelle à un cycle et une qualification
+    # d'isolation à deux cycles, choisies explicitement par leur commande.
     calls: list[int] = []
 
     def cycle_runner(*, run_number: int, **_kwargs):
         calls.append(run_number)
         return SimpleNamespace(run_number=run_number)
 
-    # When le superviseur exécute la qualification.
-    results = _run_two_test_cycles(
+    # When le superviseur exécute la qualification fonctionnelle.
+    functional_results = _run_test_cycles(
+        cycle_count=1,
         repository_root=tmp_path,
         pdf_path=tmp_path / "fixture.pdf",
         cycle_runner=cycle_runner,
     )
 
-    # Then les deux cycles sont obligatoires, ordonnés et sans fallback.
+    # Then un seul cycle complet est lancé.
+    assert calls == [1]
+    assert tuple(result.run_number for result in functional_results) == (1,)
+
+    calls.clear()
+    isolation_results = _run_test_cycles(
+        cycle_count=2,
+        repository_root=tmp_path,
+        pdf_path=tmp_path / "fixture.pdf",
+        cycle_runner=cycle_runner,
+    )
+
+    # Et la qualification d'isolation conserve deux cycles ordonnés, sans
+    # valeur par défaut ni troisième mode implicite.
     assert calls == [1, 2]
-    assert tuple(result.run_number for result in results) == (1, 2)
+    assert tuple(result.run_number for result in isolation_results) == (1, 2)
+    for invalid_cycle_count in (0, 3, True, None):
+        with pytest.raises(ValueError, match="TEST_E2E_CYCLE_COUNT_INVALID"):
+            _run_test_cycles(
+                cycle_count=invalid_cycle_count,
+                repository_root=tmp_path,
+                pdf_path=tmp_path / "fixture.pdf",
+                cycle_runner=cycle_runner,
+            )
 
     # Et une cible de teardown étrangère est refusée avant tout effet.
     valid = TestEnvironmentCycle(
@@ -194,3 +217,12 @@ def test_test_real_e2e_unit(monkeypatch, tmp_path: Path, capsys) -> None:
     monkeypatch.setattr(command.sys, "argv", ["test"])
     assert command.test() == 1
     assert "QUALIFICATION_RED" in capsys.readouterr().err
+
+    monkeypatch.setattr(
+        command,
+        "run_test_environment_isolation_e2e",
+        lambda **_: (_ for _ in ()).throw(test_e2e.TestE2EError("ISOLATION_RED")),
+    )
+    monkeypatch.setattr(command.sys, "argv", ["test-isolation"])
+    assert command.test_isolation() == 1
+    assert "ISOLATION_RED" in capsys.readouterr().err

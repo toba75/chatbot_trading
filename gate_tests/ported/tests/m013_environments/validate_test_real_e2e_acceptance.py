@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from app.platform.test_e2e import run_test_environment_e2e
+from app.platform.test_e2e import run_test_environment_isolation_e2e
 
 
 def test_validate_test_real_e2e_acceptance() -> None:
@@ -24,7 +24,7 @@ def test_validate_test_real_e2e_acceptance() -> None:
     # déterministe et les sentinelles development/production existent.
     # When deux cycles réels traversent les contrats publics puis exécutent le
     # teardown contrôlé, y compris la supervision des workers et du Spark réel.
-    report = run_test_environment_e2e(
+    report = run_test_environment_isolation_e2e(
         repository_root=repository_root,
         pdf_path=real_pdf,
     )
@@ -33,6 +33,7 @@ def test_validate_test_real_e2e_acceptance() -> None:
     # supprimées portent l'identité test.
     assert report.environment == "test"
     assert report.deployment_id == "ostrading-test-ci"
+    assert report.qualification_mode == "ISOLATION"
     assert len(report.runs) == 2
     assert tuple(run.run_number for run in report.runs) == (1, 2)
     assert len({run.document_id for run in report.runs}) == 2

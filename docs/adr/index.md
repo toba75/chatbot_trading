@@ -54,7 +54,8 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 | [ADR-046](ADR-046-profils-locaux-etanches-sur-autorite-docker-explicite.md) | Profils locaux étanches sur une autorité Docker explicite | Acceptée | 2026-07-22 | ADR-045 ; point d'entrée opérateur local d'ADR-030 | ADR-049 pour la sémantique de qualification des commandes |
 | [ADR-047](ADR-047-archive-chiffree-verifiee-avant-preuve-restauration.md) | Archive chiffrée vérifiée avant preuve de restauration | Acceptée | 2026-07-22 | ADR-013 | Aucune |
 | [ADR-048](ADR-048-progression-et-parallelisme-dans-profils-explicites.md) | Progression et parallélisme dans les profils explicites | Acceptée | 2026-07-22 | ADR-031 ; ADR-037 | Aucune |
-| [ADR-049](ADR-049-qualification-complete-reservee-au-profil-test.md) | Qualification complète réservée au profil test | Acceptée | 2026-07-23 | Sémantique de qualification des commandes d'ADR-046 | Aucune |
+| [ADR-049](ADR-049-qualification-complete-reservee-au-profil-test.md) | Qualification complète réservée au profil test | Remplacée | 2026-07-23 | Sémantique de qualification des commandes d'ADR-046 | ADR-050 |
+| [ADR-050](ADR-050-separer-qualification-fonctionnelle-et-isolation.md) | Séparer qualification fonctionnelle et qualification d’isolation | Acceptée | 2026-07-23 | ADR-049 | Aucune |
 
 ## ADR DDD
 
@@ -76,7 +77,7 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 ## Prochains numéros disponibles
 
 ```text
-Prochaine ADR technique: ADR-050
+Prochaine ADR technique: ADR-051
 Prochaine DDD-ADR: DDD-ADR-013
 ```
 

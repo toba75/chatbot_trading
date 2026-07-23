@@ -1,4 +1,4 @@
-"""Consolidation live après les deux cycles réels du profil test."""
+"""Consolidation live après la qualification d’isolation du profil test."""
 
 from __future__ import annotations
 
@@ -14,8 +14,8 @@ def test_environment_governance_live() -> None:
         if (parent / "pyproject.toml").is_file()
     )
 
-    # La dépendance de ce nœud qualifie uniquement la pile test. Cette étape
-    # refuse donc une preuve absente, collisionnée ou sensible sans la rejouer.
+    # La dépendance de ce nœud exécute test-isolation. Cette étape refuse donc
+    # un rapport fonctionnel à un cycle, absent, collisionné ou sensible.
     evidence = validate_repository_environment_governance(
         repository_root=repository_root,
         require_live_sources=True,

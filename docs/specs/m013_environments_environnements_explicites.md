@@ -49,6 +49,7 @@ Les seules commandes opérateur sont :
 ```text
 uv run development
 uv run test
+uv run test-isolation
 uv run production
 ```
 
@@ -190,7 +191,7 @@ Ces exclusions ne sont pas des alternatives autorisées. Elles séquencent la li
 - `uv run --locked gate`;
 - `git diff --check`.
 
-## Environnement de travail development (T-009 requalifiée par ADR-049)
+## Environnement de travail development (T-009 requalifiée par ADR-050)
 
 `uv run development` démarre et supervise la pile persistante `development`
 jusqu'à l'interruption explicite de l'opérateur. La readiness de l'API, du
@@ -237,7 +238,8 @@ RED. Les racines fichiers du volume `application-data` sont distinguées des
 autorités PostgreSQL et Qdrant, contrôlées par leurs préflights natifs.
 
 Une purge n'est jamais automatique. Un nettoyage automatique n'est autorisé
-que pour `test`, depuis le cycle `uv run test` qui a créé et exécuté la pile.
+que pour `test`, depuis le cycle `uv run test` ou `uv run test-isolation` qui a
+créé et exécuté la pile.
 Ce cycle vérifie PostgreSQL, Qdrant et la racine de données avant d'appeler
 `docker compose down --volumes` sur le seul projet `ostrading-test`. En cas de
 préflight impossible ou divergent, les conteneurs sont arrêtés, les volumes
@@ -255,9 +257,12 @@ Codes complémentaires :
 
 ## Parcours produit réel test (T-010)
 
-`uv run test` est une qualification réelle et finie, pas un serveur local
-persistant. La commande exécute exactement deux cycles successifs et complets
-sur le PDF réel versionné
+Les commandes `uv run test` et `uv run test-isolation` sont des qualifications
+réelles et finies, pas des serveurs locaux persistants. `uv run test` exécute
+exactement un cycle fonctionnel complet. `uv run test-isolation` exécute
+exactement deux cycles successifs afin de prouver en plus l'absence de
+dépendance aux données du premier cycle. Les deux commandes utilisent le PDF
+réel versionné
 `data/corpus/ostrading-environment-qualification-5-pages.pdf`. Chaque cycle
 crée une pile `test` vide, vérifie les cinq routes attendues par les contrats
 HTTP publics, puis poursuit jusqu'à la conversion, la
@@ -279,19 +284,26 @@ est réellement vide : elle compte dans la progression sans déclencher de
 convertisseur. Toute page absente, supplémentaire, réordonnée ou altérée, et
 toute route ou chaîne d'outils divergente, rend la preuve RED.
 
-Les deux documents de preuve sont distincts et chaque progression publique
-aboutit à `SUCCEEDED`. Les workers documentaires conservent une limite de 8 Gio,
+Le rapport fonctionnel porte le discriminant `FUNCTIONAL` et exactement une
+exécution numérotée `1`. Le rapport d'isolation porte le discriminant
+`ISOLATION`, deux exécutions numérotées `1` et `2`, et deux documents de preuve
+distincts. Chaque progression publique aboutit à `SUCCEEDED`. Les workers
+documentaires conservent une limite de 8 Gio,
 4 CPU et un healthcheck de 30 secondes. Aucun conteneur test ne monte un fichier
 de configuration ou un répertoire de secrets `development` ou `production`.
 Les noms, dates de création et points de montage des volumes sentinelles de ces
-deux profils sont identiques avant et après les deux cycles.
+deux profils sont identiques avant et après chaque campagne.
+
+Les deux commandes partagent le même verrou interprocessus. La gate live et la
+procédure de release consomment exclusivement un rapport `ISOLATION`; un rapport
+`FUNCTIONAL` plus récent ne peut pas masquer la preuve renforcée.
 
 Tout échec applicatif reste RED et déclenche le même teardown contrôlé. Si le
 préflight d'identité du teardown échoue, les conteneurs s'arrêtent sans
 suppression de volume et l'erreur reste terminale. Aucun mock, faux gateway,
 worker inline, stockage mémoire ou fallback n'est admis.
 
-## Environnement d'exploitation production (T-011 requalifiée par ADR-049)
+## Environnement d'exploitation production (T-011 requalifiée par ADR-050)
 
 `uv run production` démarre et supervise la pile persistante `production`
 jusqu'à l'interruption explicite de l'opérateur. Les 14 conteneurs et les quatre

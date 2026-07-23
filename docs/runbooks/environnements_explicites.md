@@ -3,8 +3,8 @@
 ## Contrat d'exploitation
 
 - Identifiant : `M13-Environments-Runbook-1.0`.
-- Décisions : ADR-046 pour l'étanchéité et ADR-049 pour la qualification
-  réservée à `test`.
+- Décisions : ADR-046 pour l'étanchéité et ADR-050 pour les qualifications
+  fonctionnelle et d'isolation réservées à `test`.
 - Profils fermés : `development`, `test`, `production`.
 - Statut de livraison : `SUBMILESTONE_GREEN_M013_OPEN` ; ce runbook ne clôt
   pas le milestone M-013 global.
@@ -30,7 +30,8 @@
 | Profil | Commande unique | Port public | Persistance à la sortie |
 |---|---|---:|---|
 | development | `uv run development` | `https://localhost:18443` | volumes conservés |
-| test | `uv run test` | `https://localhost:19443` pendant chaque cycle | seuls les volumes test sont supprimés après préflight |
+| test fonctionnel | `uv run test` | `https://localhost:19443` pendant le cycle unique | seuls les volumes test sont supprimés après préflight |
+| test d'isolation | `uv run test-isolation` | `https://localhost:19443` pendant chacun des deux cycles | seuls les volumes test sont supprimés après chaque préflight |
 | production | `uv run production` | `https://localhost:20443` | volumes conservés |
 
 ## Export explicite de la CA Caddy et contrôle HTTPS
@@ -91,13 +92,16 @@ magasin propre d'un navigateur qui n'utilise pas celui de Windows.
 les participants, puis reste actif. L'arrêt normal est `Ctrl+C`; le contexte
 exécute `down --remove-orphans`, sans `--volumes`.
 
-`uv run test` exécute exactement deux parcours réels sur une pile vide. Chaque
-parcours écrit sa preuve avant l'arrêt. La seule occurrence autorisée de
+`uv run test` exécute exactement un parcours réel sur une pile vide et publie
+un rapport `FUNCTIONAL`. `uv run test-isolation` exécute exactement deux
+parcours réels successifs et publie un rapport `ISOLATION` qui impose deux
+documents distincts. Chaque parcours écrit sa preuve avant l'arrêt. La seule
+occurrence autorisée de
 `down --volumes` appartient à ce cycle et suit le préflight PostgreSQL, Qdrant
 et fichiers avec l'identité `test` / `ostrading-test-ci`. Une identité
 divergente produit `DATASTORE_ENVIRONMENT_MISMATCH`, arrête les conteneurs et
 conserve les volumes.
-Un verrou interprocessus couvre les deux cycles. Chaque installation inscrit
+Un verrou interprocessus commun couvre les deux commandes. Chaque installation inscrit
 son identifiant de cycle dans le volume applicatif ; le teardown compare ce
 propriétaire persistant avant `down --volumes`. Un verrou orphelin ou une pile
 test préexistante est terminal et n'est jamais réinitialisé automatiquement.
@@ -164,8 +168,10 @@ anciens rapports, sans les présenter comme une preuve courante :
 uv run --locked gate --scope m013_environments
 ```
 
-La gate live exécute exclusivement les deux cycles de la vraie pile `test`,
-sans mock, puis consolide son nouveau rapport. `development` et `production`
+La gate live exécute exclusivement `uv run test-isolation` sur la vraie pile
+`test`, sans mock, puis consolide son nouveau rapport `ISOLATION`. Un rapport
+`FUNCTIONAL` produit par `uv run test` n'est pas une preuve live suffisante.
+`development` et `production`
 restent couverts par les contrôles statiques et les sondes de readiness non
 mutatrices. La qualification live est volontairement explicite et coûteuse :
 

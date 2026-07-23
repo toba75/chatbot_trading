@@ -1,10 +1,10 @@
 # ADR-049 - Qualification complète réservée au profil test
 
-**Statut :** Acceptée
+**Statut :** Remplacée
 **Date :** 2026-07-23
 **Décideurs :** Propriétaire du projet
 **Remplace :** Sémantique de qualification des commandes d'ADR-046
-**Remplacée par :** Aucune
+**Remplacée par :** ADR-050
 **Source :** Demande utilisateur du 2026-07-23 ; ADR-046 ; spécification M13-environments
 
 ## Contexte

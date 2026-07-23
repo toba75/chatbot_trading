@@ -27,10 +27,11 @@ def test_validate_environment_commands_acceptance(monkeypatch, tmp_path, capsys)
 
 
 def _assert_uv_environment_entrypoints_launch_the_selected_stack(monkeypatch, tmp_path, capsys) -> None:
-    # Given les trois fichiers complets existent et chaque commande UV est dédiée à un profil.
-    # When l'opérateur invoque successivement les trois vrais entrypoints Python publiés.
+    # Given les trois fichiers complets existent et chaque commande UV possède
+    # une responsabilité explicite.
+    # When l'opérateur invoque successivement les quatre entrypoints publiés.
     # Then development et production supervisent leur pile persistante tandis que
-    # test est le seul profil à exécuter la qualification fonctionnelle.
+    # test exécute un cycle et test-isolation en exécute deux.
     import app.platform.environment_command as command
 
     scripts = tomllib.loads(
@@ -39,6 +40,7 @@ def _assert_uv_environment_entrypoints_launch_the_selected_stack(monkeypatch, tm
     expected_entrypoints = {
         "development": "app.platform.environment_command:development",
         "test": "app.platform.environment_command:test",
+        "test-isolation": "app.platform.environment_command:test_isolation",
         "production": "app.platform.environment_command:production",
     }
     assert {profile: scripts.get(profile) for profile in expected_entrypoints} == expected_entrypoints
@@ -55,7 +57,7 @@ def _assert_uv_environment_entrypoints_launch_the_selected_stack(monkeypatch, tm
 
     environments_root = tmp_path / "config" / "environments"
     environments_root.mkdir(parents=True)
-    for profile in expected_entrypoints:
+    for profile in ("development", "test", "production"):
         (environments_root / f"{profile}.yaml").write_text(
             f"application:\n  environment: {profile}\n",
             encoding="utf-8",
@@ -83,7 +85,25 @@ def _assert_uv_environment_entrypoints_launch_the_selected_stack(monkeypatch, tm
         command,
         "run_test_environment_e2e",
         lambda **arguments: qualified.append(("test", arguments))
-        or SimpleNamespace(to_mapping=lambda: {"environment": "test", "runs": [1, 2]}),
+        or SimpleNamespace(
+            to_mapping=lambda: {
+                "environment": "test",
+                "qualification_mode": "FUNCTIONAL",
+                "runs": [1],
+            }
+        ),
+    )
+    monkeypatch.setattr(
+        command,
+        "run_test_environment_isolation_e2e",
+        lambda **arguments: qualified.append(("test-isolation", arguments))
+        or SimpleNamespace(
+            to_mapping=lambda: {
+                "environment": "test",
+                "qualification_mode": "ISOLATION",
+                "runs": [1, 2],
+            }
+        ),
     )
     if hasattr(command, "run_production_environment_e2e"):
         monkeypatch.setattr(
@@ -96,7 +116,7 @@ def _assert_uv_environment_entrypoints_launch_the_selected_stack(monkeypatch, tm
     try:
         for profile in expected_entrypoints:
             sys.argv = [profile]
-            assert getattr(command, profile)() == 0
+            assert getattr(command, profile.replace("-", "_"))() == 0
     finally:
         sys.argv = original_argv
 
@@ -122,10 +142,19 @@ def _assert_uv_environment_entrypoints_launch_the_selected_stack(monkeypatch, tm
                 ),
             },
         )
-        for profile in ("test",)
+        for profile in ("test", "test-isolation")
     ]
     output = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
-    assert {"environment": "test", "runs": [1, 2]} in output
+    assert {
+        "environment": "test",
+        "qualification_mode": "FUNCTIONAL",
+        "runs": [1],
+    } in output
+    assert {
+        "environment": "test",
+        "qualification_mode": "ISOLATION",
+        "runs": [1, 2],
+    } in output
     events = [event for event in output if event.get("event_type") == "environment_lifecycle"]
     assert [(event["environment"], event["state"]) for event in events] == [
         (profile, state)
@@ -156,10 +185,20 @@ def _assert_uv_environment_entrypoints_propagate_terminal_errors(monkeypatch, tm
         "run_test_environment_e2e",
         lambda **_: (_ for _ in ()).throw(ValueError("CONFIG_FILE_UNREADABLE")),
     )
+    monkeypatch.setattr(
+        command,
+        "run_test_environment_isolation_e2e",
+        lambda **_: (_ for _ in ()).throw(ValueError("CONFIG_FILE_UNREADABLE")),
+    )
     original_argv = sys.argv[:]
     try:
         sys.argv = ["test"]
         assert command.test() == 2
+        assert "CONFIG_FILE_UNREADABLE" in capsys.readouterr().err
+        assert calls == []
+
+        sys.argv = ["test-isolation"]
+        assert command.test_isolation() == 2
         assert "CONFIG_FILE_UNREADABLE" in capsys.readouterr().err
         assert calls == []
 
