@@ -8,16 +8,10 @@ from pathlib import Path
 import pytest
 
 
-def test_migration_fingerprint_ignores_checkout_line_endings() -> None:
-    """Given un même SQL en LF ou CRLF, When il est contrôlé, Then son empreinte Git est identique."""
-
-    lf_content = b"SELECT 1;\nSELECT 2;\n"
-    crlf_content = b"SELECT 1;\r\nSELECT 2;\r\n"
-    expected = hashlib.sha256(lf_content).hexdigest()
-
-    assert _sha256_normalized_lf(lf_content) == expected
-    assert _sha256_normalized_lf(crlf_content) == expected
-    assert _sha256_normalized_lf(lf_content + b"SELECT 3;\n") != expected
+def _sha256_normalized_lf(content: bytes) -> str:
+    if not isinstance(content, bytes):
+        raise ValueError("MIGRATION_FINGERPRINT_CONTENT_INVALID")
+    return hashlib.sha256(content.replace(b"\r\n", b"\n")).hexdigest()
 
 
 def test_environment_runtime_hardening_unit(
@@ -123,10 +117,19 @@ def test_environment_runtime_hardening_unit(
         source = inspect.getsource(module)
         assert "environment_snapshot=dict(os.environ)" in source
 
-    import hashlib
+    # Given un même SQL matérialisé en LF ou CRLF, When son empreinte Git est
+    # contrôlée, Then les fins de ligne du checkout ne changent pas le résultat.
+    lf_content = b"SELECT 1;\nSELECT 2;\n"
+    crlf_content = b"SELECT 1;\r\nSELECT 2;\r\n"
+    expected_fingerprint = hashlib.sha256(lf_content).hexdigest()
+    assert _sha256_normalized_lf(lf_content) == expected_fingerprint
+    assert _sha256_normalized_lf(crlf_content) == expected_fingerprint
+    assert _sha256_normalized_lf(lf_content + b"SELECT 3;\n") != expected_fingerprint
 
-    migration_020 = repository_root / "deploy/postgres/migrations/020_job_environment_identity.sql"
-    assert hashlib.sha256(migration_020.read_bytes()).hexdigest() == (
+    migration_020 = (
+        repository_root / "deploy/postgres/migrations/020_job_environment_identity.sql"
+    )
+    assert _sha256_normalized_lf(migration_020.read_bytes()) == (
         "852b330c874d1727680f0b9a36bf95a04eb8022775ac5fab398cd993f86e273a"
     )
     migration_021_sql = (
