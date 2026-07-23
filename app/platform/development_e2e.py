@@ -757,8 +757,9 @@ def _ask_documentary_question(
         f"/v1/conversations/{conversation_id}/messages",
         json={
             "message": (
-                "Selon le document sélectionné, quelles règles de gestion du risque "
-                "et de suivi de tendance sont décrites ?"
+                "Selon le document sélectionné, de quelle période à quelle période "
+                "s’étendent les rendements mensuels du portefeuille Timing Industry, "
+                "et quels coûts le backtest exclut-il ?"
             ),
             "idempotency_key": (
                 f"IDEMP-{proof_context.environment.upper()}-E2E-{proof_id}"
