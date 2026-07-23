@@ -6,7 +6,7 @@ Date de création: 21 juin 2026.
 
 Statut: plan initial d'implémentation.
 
-Ce document repart de zéro depuis la spécification v4.1. Il ne reprend pas un plan antérieur comme source. Toute modification structurante ultérieure devra être documentée par ADR dans `docs/adr/` et reportée dans `docs/adr/index.md`.
+Ce document repart de zéro depuis la spécification v4.1. Il ne reprend pas un plan antérieur comme source. M-014 constitue une extension post-V1 explicitement planifiée par `docs/specs/plan_distribution.md`; sa décision structurante reste soumise à ADR-051. Toute modification structurante ultérieure devra être documentée par ADR dans `docs/adr/` et reportée dans `docs/adr/index.md`.
 
 ## 1. Intention métier
 
@@ -106,6 +106,11 @@ git ls-tree -r --name-only master -- docs/tasks docs/adr docs/specs
 | M13-config | Configuration applicative sans environnement | Remplacer toute entrée de processus par variables d'environnement par un fichier de configuration unique, explicite et validé | WS-01, WS-03, WS-11 | M-012; sous-milestone de M-013 |
 | M13-environments | Environnements explicites et données étanches | Démarrer `development`, `test` ou `production` par une commande UV dédiée et garantir que données, secrets, files et workers restent liés au profil choisi | WS-01, WS-03, WS-11 | M-012, M13-config; sous-milestone de M-013 |
 | M13-FastAPI | API orchestratrice ASGI raccordée | Remplacer le routeur HTTP artisanal par une frontière ASGI structurée et raccorder les contrats documentaires aux cas d'usage réels | WS-01, WS-03, WS-04, WS-05, WS-08, WS-11 | M-012; sous-milestone de M-013 |
+| M-014 | Distribution CPU des workers sur le réseau local | Distribuer les conversions de pages et les projections entre plusieurs machines CPU sans perdre l'idempotence, la progression publique ni l'étanchéité des environnements | WS-01, WS-03, WS-04, WS-05, WS-11 | M-013 |
+| M14-distribution-core | Socle de distribution durable | Décider la topologie, publier les contrats, migrer les autorités et rendre les artefacts portables entre les nœuds | WS-01, WS-02, WS-03, WS-04, WS-11 | M-013; sous-milestone de M-014 |
+| M14-worker-fleet | Flotte CPU multiarchitecture | Construire, déployer localement, enregistrer et faire réclamer des jobs compatibles aux workers `arm64` et `amd64` | WS-01, WS-03, WS-11 | M14-distribution-core; sous-milestone de M-014 |
+| M14-distributed-pipeline | Pipeline documentaire distribué | Exécuter les conversions à la page, assembler une version canonique unique et projeter depuis un nœud réseau | WS-03, WS-04, WS-05, WS-11 | M14-worker-fleet; sous-milestone de M-014 |
+| M14-deployment | Déploiement et qualification multi-nœuds | Exploiter, qualifier et déployer progressivement la distribution par Kamal et SSH sur Mac et PC | WS-01, WS-03, WS-11 | M14-distributed-pipeline; sous-milestone de M-014 |
 
 ## 6. Milestones détaillés
 
@@ -500,7 +505,7 @@ git ls-tree -r --name-only master -- docs/tasks docs/adr docs/specs
 
 ### M13-environments - Environnements explicites et données étanches
 
-- Source: demandes utilisateur des 2026-07-21 et 2026-07-23; ADR-046 et ADR-049; livrables M13-config.
+- Source: demandes utilisateur des 2026-07-21 et 2026-07-23; ADR-046 et ADR-050 remplaçant ADR-049; livrables M13-config.
 - Objectif métier: permettre à l'exploitant de choisir sans ambiguïté `development`, `test` ou `production` par `uv run development`, `uv run test` ou `uv run production`, tout en rendant techniquement impossible l'accès croisé aux données et travaux asynchrones.
 - Workstreams actifs: WS-01, WS-03, WS-11.
 - Bounded contexts concernés: `platform.configuration`, API, UI, workers, jobs/outbox, PostgreSQL, Qdrant, stockage de fichiers, secrets, exploitation et gouvernance.
@@ -508,28 +513,28 @@ git ls-tree -r --name-only master -- docs/tasks docs/adr docs/specs
 - Règle de gouvernance: `M13-environments` est un sous-milestone de `M-013`; sa planification ne requiert pas la clôture de `M-013` dans `master`, seulement les milestones strictement antérieurs. M13-config est une dépendance fonctionnelle déjà livrée.
 - Scénario directeur:
   - Given les trois configurations complètes `development`, `test` et `production` et leurs ressources mutables distinctes
-  - When l'exploitant lance `development` ou `production`, ou que la qualification lance `test` avec la fixture PDF contrôlée
-  - Then chaque pile utilise exclusivement son environnement; seules les deux exécutions `test` créent des données de qualification et publient la progression du parcours réel
+  - When l'exploitant lance `development` ou `production`, que la qualification fonctionnelle lance `test` ou que la preuve d'étanchéité lance `test-isolation` avec la fixture PDF contrôlée
+  - Then chaque pile utilise exclusivement son environnement; `test` exécute un cycle réel et `test-isolation` deux cycles réels étanches avec une progression publique issue du contrat
 - Livrables:
-  - ADR-046 remplaçant ADR-045 pour les profils locaux explicites et ADR-049 réservant la qualification fonctionnelle complète au profil `test`;
+  - ADR-046 remplaçant ADR-045 pour les profils locaux explicites et ADR-050 séparant la qualification fonctionnelle à un cycle de la preuve d'isolation à deux cycles;
   - contrat strict `environment` et `deployment_id`, avec trois fichiers complets `config/environments/development.yaml`, `test.yaml` et `production.yaml` sans héritage implicite;
   - scripts UV `development`, `test` et `production` comme seules commandes opérateur, avec mapping interne non configurable vers le fichier attendu;
   - stockages, rôles, credentials, volumes, réseaux, chemins, artefacts, caches, files et outbox distincts par environnement;
   - contrôle d'identité des stockages avant toute lecture, écriture, migration ou prise de job;
   - identité d'environnement propagée aux jobs, workers, états de santé, progressions et preuves d'exécution;
   - opérations de migration, sauvegarde, restauration, purge et nettoyage bornées à l'environnement explicitement sélectionné;
-  - parcours réel `PDF -> API -> persistance -> outbox -> relais -> worker -> projection -> lecture publique` prouvé dans le seul profil `test`, sur deux piles vides successives;
+  - parcours réel `PDF -> API -> persistance -> outbox -> relais -> worker -> projection -> lecture publique` prouvé dans le seul profil `test`, une fois pour la qualification fonctionnelle et sur deux piles vides successives pour l'isolation;
   - commandes `development` et `production` persistantes, sans fixture ni création automatique de données de qualification;
   - runbooks, matrice de traçabilité et gate M13-environments rejouable.
 - Tests et gates:
   - profil absent, inconnu, incomplet ou contradictoire refusé sans valeur par défaut;
-  - `uv run development`, `uv run test` et `uv run production` sélectionnent chacun un unique fichier; `development` et `production` supervisent leur pile, `test` exécute la qualification finie;
+  - `uv run development`, `uv run test`, `uv run test-isolation` et `uv run production` sélectionnent chacun un unique fichier; `development` et `production` supervisent leur pile, `test` exécute un cycle et `test-isolation` deux cycles;
   - aucune URL mutable, base, rôle, secret, volume, racine de fichiers, file ou outbox n'est partagé entre deux profils;
   - un stockage portant une identité différente produit `DATASTORE_ENVIRONMENT_MISMATCH` avant toute opération métier;
   - un worker ne réclame que les jobs de son environnement et refuse explicitement un message divergent avec `WORKER_ENVIRONMENT_MISMATCH`;
   - l'UI n'active une action asynchrone que si sa chaîne réelle est prête et lit la progression exclusivement depuis le contrat public du profil courant;
   - le nettoyage de `test` est impossible sur `development` ou `production`;
-  - chacun des deux parcours `test` utilise la fixture PDF réelle cinq pages, les adaptateurs réels et les stockages réels, sans mock, stub, fake ni fallback;
+  - le parcours `test` et chacun des deux parcours `test-isolation` utilisent la fixture PDF réelle cinq pages, les adaptateurs réels et les stockages réels, sans mock, stub, fake ni fallback;
   - `uv run --locked gate` reste GREEN après enrôlement des validations.
 - Sortie attendue: les trois commandes simples pilotent des installations complètes, observables et étanches; aucune donnée ni aucun worker d'un environnement n'est accessible depuis les deux autres.
 
@@ -566,6 +571,85 @@ git ls-tree -r --name-only master -- docs/tasks docs/adr docs/specs
   - test HTTP réel et test OpenAPI sur l'application ASGI.
 - Sortie attendue: `orchestrator-api` est une façade HTTP ASGI mince et opérationnelle; l'UI observe et déclenche le pipeline documentaire uniquement par ses contrats publics raccordés.
 
+### M-014 - Distribution CPU des workers sur le réseau local
+
+- Source: `docs/specs/plan_distribution.md`; M-002, M-004, M13-environments et M13-FastAPI; ADR-024, ADR-025, ADR-040, ADR-042, ADR-046 et ADR-048.
+- Objectif métier: traiter un backlog important de PDF sur plusieurs machines CPU du réseau local, au niveau page, sans perdre la fidélité documentaire, l'idempotence, la progression publique ni l'étanchéité des environnements.
+- Workstreams actifs: WS-01, WS-03, WS-04, WS-05, WS-11.
+- Bounded contexts concernés: `platform`, Source Processing, Knowledge Access, API orchestratrice, stockage d'objets, déploiement et gouvernance.
+- Dépendance: M-013 et ses sous-milestones applicables doivent être présents et GREEN dans `master` avant la création des tâches M-014.
+- Scénario directeur:
+  - Given un backlog de PDF dans un environnement explicite, un Mac `arm64` et un PC `amd64` enregistrés `READY`
+  - When les pages sont distribuées par la file PostgreSQL puis traitées sur les deux nœuds
+  - Then chaque résultat est écrit une seule fois sous claim fenced, le document canonique reste unique et la progression publique reflète exclusivement l'état persistant
+- Livrables:
+  - ADR-051 à créer pour la topologie distribuée et le déploiement SSH;
+  - file de jobs enrichie des capacités et identités de workers;
+  - stockage d'objets partagé et artefacts portables entre nœuds;
+  - images CPU `arm64` et `amd64`, commandes worker-only et registre de flotte;
+  - conversion distribuée à la page, assemblage canonique et projection réseau;
+  - déploiement Kamal par SSH, observabilité, runbooks et rapport de charge multi-nœuds.
+- Tests et gates:
+  - tests rapides ciblés et gate canonique hors charge pour chaque tranche;
+  - tests PostgreSQL live pour claims, leases, fencing, migrations et idempotence;
+  - matrice multiarchitecture pour les images et dépendances;
+  - parcours live sur Mac et PC physiques avec perte d'un worker et reprise;
+  - qualification planifiée de cent PDF hors gate répétée de chaque PR.
+- Sortie attendue: plusieurs nœuds CPU traitent réellement le même backlog plus vite qu'un nœud seul, sans doublon, publication partielle, fuite entre environnements ni fallback.
+
+### M14-distribution-core - Socle de distribution durable
+
+- Source: tâches T-001 à T-005 de `docs/specs/plan_distribution.md`.
+- Objectif métier: rendre le travail et les artefacts distribuables avant d'ajouter des machines au pool.
+- Dossier de tâches attendu: `docs/tasks/milestone_014-distribution-core`.
+- Dépendance: M-013; sous-milestone de M-014.
+- Livrables:
+  - baseline mono-worker et inventaire des hôtes;
+  - ADR-051 proposée, indexée et revue;
+  - contrats de jobs, capacités, identités de workers et artefacts;
+  - migrations ascendantes depuis la version 021;
+  - port et adaptateur de stockage partagé avec TLS, empreintes et isolation.
+- Gate de sortie: les contrats, migrations et artefacts partagés sont GREEN sur PostgreSQL et stockage réels, sans modifier une migration déjà appliquée.
+
+### M14-worker-fleet - Flotte CPU multiarchitecture
+
+- Source: tâches T-006 à T-009 de `docs/specs/plan_distribution.md`.
+- Objectif métier: rendre des workers Mac et PC interchangeables dans un même pool CPU tout en conservant leur identité et leurs capacités explicites.
+- Dossier de tâches attendu: `docs/tasks/milestone_014-worker-fleet`.
+- Dépendance: M14-distribution-core; sous-milestone de M-014.
+- Livrables:
+  - images worker documents et projection `linux/arm64` et `linux/amd64` par digest;
+  - commandes `development-worker`, `test-worker` et `production-worker`;
+  - paquet worker-only avec runtime OCR local et sans service central embarqué;
+  - registre, heartbeat, drainage, révocation et claim par capacité.
+- Gate de sortie: un Mac et un PC atteignent `READY`, réclament uniquement des jobs compatibles du bon environnement et refusent toute identité divergente.
+
+### M14-distributed-pipeline - Pipeline documentaire distribué
+
+- Source: tâches T-010 à T-013 de `docs/specs/plan_distribution.md`.
+- Objectif métier: remplacer l'orchestration locale d'un document par des résultats de pages distribués puis publier une seule version canonique recherchable.
+- Dossier de tâches attendu: `docs/tasks/milestone_014-distributed-pipeline`.
+- Dépendance: M14-worker-fleet; sous-milestone de M-014.
+- Livrables:
+  - fan-out transactionnel en jobs `CONVERT_PAGE`;
+  - exécution et résultat de page persistés sous fencing;
+  - job idempotent `ASSEMBLE_CANONICAL_DOCUMENT` et publication atomique;
+  - projection `PROJECT_DOCUMENT` exécutable depuis un nœud réseau.
+- Gate de sortie: deux nœuds traitent des pages distinctes d'un même document, un crash est repris et le document canonique puis sa projection restent uniques et complets.
+
+### M14-deployment - Déploiement et qualification multi-nœuds
+
+- Source: tâches T-014 à T-016 de `docs/specs/plan_distribution.md`.
+- Objectif métier: exploiter et livrer progressivement la distribution sur le réseau local sans redémarrer les hôtes ni masquer une dépendance indisponible.
+- Dossier de tâches attendu: `docs/tasks/milestone_014-deployment`.
+- Dépendance: M14-distributed-pipeline; sous-milestone de M-014.
+- Livrables:
+  - observabilité de flotte et opérations d'enrôlement, drainage et révocation;
+  - destinations Kamal étanches par environnement et préflights SSH/Colima/Docker;
+  - qualification live Mac/PC, panne et reprise, comparaison cross-architecture;
+  - rapport de charge sur cent PDF et bascule progressive canari.
+- Gate de sortie: la livraison du même digest sur Mac et PC est reproductible, le débit distribué dépasse le baseline mono-worker et ADR-051 peut être acceptée avec ses preuves.
+
 ## 7. Chemin critique
 
 Chemin critique pour obtenir un chatbot documentaire cité:
@@ -581,6 +665,17 @@ M-008 -> M-009 -> M-010 -> M-011 -> M-012 -> M-013
 M-012 -> M13-config
 M-012 -> M13-config -> M13-environments
 M-012 -> M13-FastAPI
+```
+
+Chemin critique post-V1 pour la distribution CPU:
+
+```text
+M-013
+  -> M14-distribution-core
+  -> M14-worker-fleet
+  -> M14-distributed-pipeline
+  -> M14-deployment
+  -> M-014 clôturé
 ```
 
 La plateforme M-002 peut avancer en parallèle des premières spécifications détaillées de M-003 uniquement si M-001 est accepté et présent dans `master`.
@@ -618,6 +713,7 @@ Les points suivants doivent déclencher une vérification ADR avant implémentat
 | Configuration applicative par fichier unique sans variables d'environnement | M13-config | ADR-016 |
 | Profils `development`, `test`, `production` explicites et isolation des données/workers | M13-environments | ADR-046, remplaçant ADR-045 qui remplaçait ADR-016 |
 | Framework ASGI et serveur HTTP de l'API orchestratrice | M13-FastAPI | ADR-019 à créer |
+| Distribution CPU multi-nœuds, stockage partagé et déploiement Kamal par SSH | M14-distribution-core avant toute implémentation | ADR-051 à créer; remplacement borné des clauses concernées d'ADR-014 et ADR-048 après preuves live |
 
 Une ADR acceptée ne doit pas être réécrite pour changer son sens. Toute évolution doit créer une nouvelle ADR remplaçante.
 
@@ -651,6 +747,7 @@ Si un milestone amont requis n'est pas présent dans `master`, la création du d
 | Critère scientifique ignoré après GREEN logiciel | Évaluation M-012 séparant tests logiciels et métriques scientifiques |
 | Configuration pilotée par variable d'environnement ou valeur système | M13-config, chargeur strict, audit Compose et scan statique |
 | Donnée ou job consommé depuis un autre environnement | M13-environments, ressources distinctes, identité de stockage et refus worker avant claim |
+| Distribution plus lente ou divergente entre `arm64` et `amd64` | M-014, baseline mono-worker, digests communs, comparaison d'artefacts et qualification multi-nœuds |
 
 ## 12. Livrable V1 attendu
 
@@ -669,3 +766,18 @@ Si un milestone amont requis n'est pas présent dans `master`, la création du d
 - auditer les décisions, modèles, versions, données et configurations;
 - démarrer la pile complète avec `uv run development`, `uv run test` ou `uv run production`, chaque commande utilisant exclusivement sa configuration et ses données;
 - exploiter le système localement sans exposition publique.
+
+## 13. Livrable post-V1 M-014 attendu
+
+À la fin de M-014 et de ses quatre sous-milestones, l'utilisateur doit pouvoir:
+
+- déployer par Kamal et SSH le même digest CPU sur un Mac Colima `arm64` et un PC Docker `amd64` sans redémarrer les machines;
+- enregistrer, drainer, remplacer et révoquer un worker avec une identité explicite propre à son environnement;
+- soumettre un backlog de PDF dont les pages sont réellement distribuées entre plusieurs nœuds compatibles;
+- perdre un worker pendant une conversion puis observer la reprise fenced sur un autre nœud sans doublon;
+- conserver les PDF et artefacts dans un stockage partagé immuable, identifié et vérifié par SHA-256;
+- publier une seule version canonique complète puis reconstruire sa projection depuis un nœud réseau;
+- observer la progression métier par le contrat public et l'état technique de la flotte par un contrat d'administration distinct;
+- comparer le débit distribué au baseline mono-worker sur un corpus contrôlé;
+- qualifier séparément la charge de cent PDF sans imposer cette exécution longue à chaque PR;
+- démontrer l'absence de fuite entre `development`, `test` et `production`, de port entrant de contrôle sur les workers et de fallback local en cas de panne réseau.
