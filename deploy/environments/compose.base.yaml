@@ -321,6 +321,7 @@ services:
       args:
         OSTRADING_IMAGE_REVISION: "${OSTRADING_IMAGE_REVISION?OSTRADING_IMAGE_REVISION requis}"
         OSTRADING_POSTGRES_SCHEMA_VERSION: "${OSTRADING_POSTGRES_SCHEMA_VERSION?OSTRADING_POSTGRES_SCHEMA_VERSION requis}"
+    gpus: all
     deploy:
       replicas: 2
       resources:
@@ -357,6 +358,7 @@ services:
       - ocr-runtime-socket:/var/run/ocr-docker
     tmpfs:
       - /tmp:size=128m,mode=1777
+      - /triton-cache:rw,exec,nosuid,nodev,size=128m,mode=0770,gid=31000
     healthcheck:
       test:
         - CMD-SHELL

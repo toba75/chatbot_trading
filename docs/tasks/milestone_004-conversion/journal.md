@@ -337,3 +337,20 @@ rejouée depuis le formulaire UI sur `DOC-F91FE126FBFFA374` :
 - Validations : scope M-004 GREEN, 45 nœuds uniques; `uv sync --locked`; gate
   canonique `uv run --locked gate` GREEN en 130,2 s, 436 nœuds uniques, aucun
   manquant, inattendu ou dupliqué.
+
+## 2026-07-23 - T-016 Granite CUDA strict
+
+- GREEN initial : scope M-004 GREEN avec 44 nœuds uniques.
+- RED `436c682e9` : le worker Granite ne possède aucune exigence CUDA et laisse
+  Docling sélectionner implicitement le périphérique `auto`.
+- Décision : ADR-051 impose `cuda:0`, interdit le fallback CPU et réserve le
+  GPU au conteneur documentaire courant.
+- Correctifs live : cache Triton déplacé hors du filesystem en lecture seule,
+  `tmpfs` exécutable dédié de 128 MiB, et toolchain C limitée à la cible
+  `worker-documents`.
+- Preuve positive : la page 2 du PDF de qualification suit
+  `MIXED_PAGEWISE`, utilise jusqu'à 42 % de la RTX 4090 et 1 360 MiB de VRAM,
+  puis termine avec le code 0 en 21,315 secondes, deux items et la provenance
+  `granite_docling`.
+- Preuve négative : le même payload sans GPU termine avec le code 1 et
+  `GRANITE_CUDA_UNAVAILABLE`, sans sélection CPU.

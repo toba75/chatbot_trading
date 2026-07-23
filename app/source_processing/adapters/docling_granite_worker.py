@@ -96,26 +96,15 @@ def _convert(payload: Any) -> dict[str, object]:
     if hashlib.sha256(source_pdf_path.read_bytes()).hexdigest() != _required_text(payload, "source_sha256"):
         raise ValueError("hash source divergent")
 
+    device = _required_cuda_device()
+
     from docling.datamodel.base_models import InputFormat
-    from docling.datamodel.pipeline_options import VlmConvertOptions, VlmPipelineOptions
     from docling.document_converter import DocumentConverter, PdfFormatOption
     from docling.pipeline.vlm_pipeline import VlmPipeline
 
-    vlm_options = VlmConvertOptions.from_preset("granite_docling")
-    model_spec = vlm_options.model_spec.model_copy(
-        update={"revision": GRANITE_DOCLING_MODEL_REVISION}
-    )
-    vlm_options = vlm_options.model_copy(
-        update={"model_spec": model_spec, "force_backend_text": False}
-    )
-    pipeline_options = VlmPipelineOptions(
-        artifacts_path=assets_root,
-        document_timeout=110.0,
-        enable_remote_services=False,
-        allow_external_plugins=False,
-        generate_page_images=True,
-        force_backend_text=False,
-        vlm_options=vlm_options,
+    pipeline_options = _build_pipeline_options(
+        assets_root=assets_root,
+        device=device,
     )
     converter = DocumentConverter(
         allowed_formats=[InputFormat.PDF],
@@ -142,6 +131,44 @@ def _convert(payload: Any) -> dict[str, object]:
             )
         ],
     }
+
+
+def _required_cuda_device() -> str:
+    import torch
+
+    if (
+        not torch.backends.cuda.is_built()
+        or not torch.cuda.is_available()
+        or torch.cuda.device_count() < 1
+    ):
+        raise GraniteDoclingWorkerError("GRANITE_CUDA_UNAVAILABLE")
+    return "cuda:0"
+
+
+def _build_pipeline_options(*, assets_root: Path, device: str):
+    if not isinstance(assets_root, Path) or device != "cuda:0":
+        raise ValueError("configuration CUDA Granite invalide")
+
+    from docling.datamodel.accelerator_options import AcceleratorOptions
+    from docling.datamodel.pipeline_options import VlmConvertOptions, VlmPipelineOptions
+
+    vlm_options = VlmConvertOptions.from_preset("granite_docling")
+    model_spec = vlm_options.model_spec.model_copy(
+        update={"revision": GRANITE_DOCLING_MODEL_REVISION}
+    )
+    vlm_options = vlm_options.model_copy(
+        update={"model_spec": model_spec, "force_backend_text": False}
+    )
+    return VlmPipelineOptions(
+        accelerator_options=AcceleratorOptions(device=device),
+        artifacts_path=assets_root,
+        document_timeout=110.0,
+        enable_remote_services=False,
+        allow_external_plugins=False,
+        generate_page_images=True,
+        force_backend_text=False,
+        vlm_options=vlm_options,
+    )
 
 
 def _page_payload(

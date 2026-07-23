@@ -359,7 +359,14 @@ def _validate_service_tmpfs(service: ComposeService) -> None:
         return
 
     if service.id == "worker-documents":
-        if service.tmpfs not in ((), ("/tmp:size=128m,mode=1777",)):
+        if service.tmpfs not in (
+            (),
+            ("/tmp:size=128m,mode=1777",),
+            (
+                "/tmp:size=128m,mode=1777",
+                "/triton-cache:rw,exec,nosuid,nodev,size=128m,mode=0770,gid=31000",
+            ),
+        ):
             raise ValueError("tmpfs /tmp worker-documents invalide")
         return
 

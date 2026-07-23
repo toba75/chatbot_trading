@@ -1,6 +1,6 @@
 # ADR-051 - Exécution Granite-Docling CUDA stricte
 
-**Statut :** Proposée
+**Statut :** Acceptée
 **Date :** 2026-07-23
 **Décideurs :** Équipe OSTrading
 **Remplace :** Pour le périphérique Granite du worker documentaire local, la sélection automatique implicite de Docling
@@ -33,6 +33,14 @@ recevoir implicitement une exigence NVIDIA.
   `cuda:0` au moyen des options d'accélération Docling.
 - Le worker **DOIT** vérifier avant le chargement du modèle que PyTorch a été
   compilé avec CUDA, que CUDA est disponible et que le périphérique zéro existe.
+- Le cache de compilation Triton **DOIT** être écrit dans un `tmpfs` dédié,
+  exécutable, borné à 128 MiB, sans `suid` ni périphérique et accessible
+  uniquement à `root` et au groupe stable `31000` du worker ; le filesystem
+  applicatif reste en lecture seule et le `tmpfs` général `/tmp` reste non
+  exécutable.
+- L'image du worker documentaire **DOIT** fournir le compilateur et les en-têtes
+  de la bibliothèque C requis par Triton, sans les ajouter aux images de l'API
+  ou des autres workers.
 - Si l'une de ces conditions manque, Granite **DOIT** terminer avec le code
   stable `GRANITE_CUDA_UNAVAILABLE`.
 - Granite **NE DOIT PAS** continuer sur CPU, sélectionner `auto`, ni changer de
@@ -75,6 +83,10 @@ recevoir implicitement une exigence NVIDIA.
 
 - Risque de GPU visible mais non utilisé : options Docling fixées à `cuda:0` et
   preuve live d'activité GPU pendant une conversion réelle.
+- Risque d'échec de compilation Triton sur le filesystem en lecture seule :
+  `TRITON_CACHE_DIR=/triton-cache` dans un `tmpfs` exécutable dédié et borné.
+- Risque d'image inutilement élargie : `gcc` et `libc6-dev` sont installés dans
+  la seule cible Docker `worker-documents`.
 - Risque de fallback CPU : interdiction de `auto` et erreur
   `GRANITE_CUDA_UNAVAILABLE` testée.
 - Risque de contention entre deux processus Granite : les plafonds d'ADR-040
@@ -98,10 +110,21 @@ recevoir implicitement une exigence NVIDIA.
   `docs/tasks/milestone_004-conversion/0016_executer_granite_sur_gpu_nvidia.md`.
 - Tests d'acceptation :
   `gate_tests/ported/tests/m004/validate_granite_cuda_runtime_acceptance.py`.
-- Commits : RED à produire ; GREEN à produire.
+- Commits : RED `436c682e9` ; GREEN présent commit.
 
 ## Notes
 
 L'ADR ne promet pas à elle seule un gain de performance. La décision rend le
 périphérique certain ; le gain doit être mesuré sur une page Granite réelle.
 
+La preuve d'acceptation exécute la page 2 du PDF de qualification M-013, route
+`MIXED_PAGEWISE`, dans l'image Linux du worker. PyTorch 2.13.0+cu130 identifie
+la NVIDIA GeForce RTX 4090 Laptop GPU. Pendant l'inférence, la mesure atteint
+42 % d'utilisation, 1 360 MiB de VRAM et environ 41 W. La conversion termine
+avec le code 0 en 21,315 secondes, publie deux items pour la page 2 et conserve
+uniquement la provenance `granite_docling`. Le même payload sans GPU termine
+avec `GRANITE_CUDA_UNAVAILABLE` et le code 1.
+
+Une seconde exécution sur l'image finale, sans injection manuelle de
+`TRITON_CACHE_DIR`, termine avec le code 0 en 19,266 secondes et confirme
+`TRITON_CACHE_DIR=/triton-cache` dans la configuration de l'image.

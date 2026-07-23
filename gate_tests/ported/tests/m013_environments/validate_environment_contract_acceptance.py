@@ -92,7 +92,9 @@ def _assert_adr_046_replaces_adr_045_explicitly() -> None:
     assert "| [ADR-049]" in adr_index
     assert "ADR-050-separer-qualification-fonctionnelle-et-isolation.md" in adr_index
     assert "| [ADR-050]" in adr_index
-    assert "Prochaine ADR technique: ADR-051" in adr_index
+    assert "ADR-051-execution-granite-cuda-stricte.md" in adr_index
+    assert "| [ADR-051]" in adr_index
+    assert "Prochaine ADR technique: ADR-052" in adr_index
 
 
 def _assert_contract_closes_profiles_identity_and_configuration_sources() -> None:

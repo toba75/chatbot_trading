@@ -189,6 +189,7 @@ rend jamais `Convertir` disponible avant que toute la chaîne réelle soit prêt
 | SP-015 - Événement CanonicalSourcePublished | SP est l'unique producteur de CanonicalSourcePublished. | Given une CanonicalSource publiée; When l'outbox publie l'événement; Then KA et EG reçoivent une référence idempotente. | T-008 | ADR-001; DDD-ADR-003; DDD-ADR-006; DDD-ADR-008 | uv run --locked gate
 | SP-016 - Contrat HTTP de conversion | Le client ne voit que les statuts publics et erreurs stables. | Given un client appelle POST /v1/documents/{id}/convert; When la commande est acceptée ou refusée; Then la réponse ne divulgue pas d'identifiant interne. | T-009 | ADR-010; DDD-ADR-003; DDD-ADR-006; DDD-ADR-008 | uv run --locked gate
 | SP-017 - Traçabilité et gates M-004 | Aucun GREEN n'est implicite. | Given les preuves M-004; When les gates s'exécutent; Then test, lint et uv run --locked gate sont enrôlés. | T-010 | ADR-001; ADR-004; ADR-010; DDD-ADR-003; DDD-ADR-006; DDD-ADR-008 | uv run --locked gate
+| SP-018 - Granite CUDA strict | Le worker Granite local sélectionne `cuda:0` ou échoue explicitement, sans CPU implicite. | Given une page Granite et la RTX 4090 exposée à Docker; When le sous-processus démarre; Then CUDA 0 exécute la page et son absence produit `GRANITE_CUDA_UNAVAILABLE`. | T-016 | ADR-051 | uv run --locked gate --scope m004
 
 ## Contrat HTTP M-004
 

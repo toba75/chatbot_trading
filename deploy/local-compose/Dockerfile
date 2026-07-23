@@ -62,11 +62,20 @@ ENTRYPOINT ["api"]
 FROM runtime AS worker-documents
 
 ENV DOCKER_HOST="unix:///var/run/ocr-docker/docker.sock"
+ENV TRITON_CACHE_DIR="/triton-cache"
+
+USER root
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends gcc libc6-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY --from=docker-cli /usr/local/bin/docker /usr/local/bin/docker
 COPY --chown=ostrading:ostrading config/ocrmypdf-image.json ./config/ocrmypdf-image.json
 COPY --chown=ostrading:ostrading config/docling-assets.native.json ./config/docling-assets.native.json
 COPY --chown=ostrading:ostrading config/docling-assets.granite.json ./config/docling-assets.granite.json
+
+USER ostrading
 
 ENTRYPOINT ["python", "-m", "app.source_processing.adapters.worker_runtime"]
 

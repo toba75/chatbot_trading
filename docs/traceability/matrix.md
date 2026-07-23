@@ -78,6 +78,7 @@
 | REQ-M004-008 | docs/tasks/milestone_004/0008_publier_evenement_canonical_source_published.md | Couvert | gate_tests/ported/tests/m004/validate_canonical_publication_event_acceptance.py | uv run --locked gate
 | REQ-M004-009 | docs/tasks/milestone_004/0009_exposer_commande_conversion_documentaire.md | Couvert | gate_tests/ported/tests/m004/validate_document_conversion_command_acceptance.py | uv run --locked gate
 | REQ-M004-010 | docs/tasks/milestone_004/0010_relier_m004_tracabilite_gates.md | Couvert | gate_tests/ported/tests/m004/validate_m004_traceability_acceptance.py | uv run --locked gate
+| REQ-M004-016 | docs/tasks/milestone_004-conversion/0016_executer_granite_sur_gpu_nvidia.md | Couvert | gate_tests/ported/tests/m004/validate_granite_cuda_runtime_acceptance.py | uv run --locked gate --scope m004
 | REQ-M005-001 | docs/tasks/milestone_005/0001_verifier_precondition_green.md | Couvert | gate_tests/ported/tests/m005/validate_m005_precondition_acceptance.py | uv run --locked gate
 | REQ-M005-002 | docs/tasks/milestone_005/0002_publier_specification_projection_connaissance.md | Couvert | gate_tests/ported/tests/m005/validate_m005_specification_acceptance.py | uv run --locked gate
 | REQ-M005-003 | docs/tasks/milestone_005/0003_creer_projection_depuis_version_canonique.md | Couvert | gate_tests/ported/tests/m005/validate_knowledge_projection_acceptance.py | uv run --locked gate
