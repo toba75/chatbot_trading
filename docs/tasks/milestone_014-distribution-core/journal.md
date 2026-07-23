@@ -343,3 +343,61 @@
 - Les assertions de quota global, concurrence, attente sans appel modèle,
   reprise monotone et double fencing restent inchangées. Aucun élément de T-005
   n’est introduit et aucune ADR supplémentaire n’est requise.
+
+## 2026-07-23 - Corrections contrats, Compose et exploitation locale
+
+- Précondition GREEN : la gate canonique a exécuté 462 nœuds exactement une
+  fois avant les corrections, sans absence, surprise ni duplication, et a
+  terminé `PARTIAL GREEN: offline`.
+- Scénarios BDD : un résultat Granite publié porte durée, pic RAM, pic VRAM,
+  utilisation et puissance GPU mesurés ; une route standard interdit les
+  mesures GPU ; `SKIP_EMPTY` interdit toute mesure d’exécution. Deux workers
+  rendus par Compose reçoivent chacun 2 Gio, 4 CPU et uniquement le
+  périphérique NVIDIA 0.
+- RED utile : les trois tests ciblés ont échoué pour les raisons attendues :
+  value objects de métriques absents, réservation GPU 0 absente et
+  `gpus: all` encore actif. Commit RED :
+  `b51c6e11bf01bc5a79ab0efd15b5c6a9b94024c2`.
+- `PageResultContract` v1 exige désormais `PageTechnicalMetrics` pour toute
+  exécution réelle et sérialise `PageGpuMetrics` seulement pour une route
+  Granite. Durée non positive ou non finie, RAM non positive, VRAM négative,
+  utilisation hors `0..100`, puissance négative, champ absent ou inconnu sont
+  refusés par des erreurs stables. La validation terminale est décomposée par
+  variante et satisfait Ruff C901.
+- Les Compose local et multi-profils publient deux replicas, 2 Gio, 4 CPU et
+  une réservation NVIDIA fermée `device_ids: ["0"]`. Le validateur de rendu
+  multi-profils et le test du rendu local `docker compose config` refusent
+  toute autre réservation. Le parseur YAML statique accepte désormais les
+  mappings de réservation dans une séquence sans relâcher ses contrôles.
+- La validation Python morte du produit des constantes
+  `granite_slots_global`, `replicas` et `granite_slots_per_worker` est retirée ;
+  le schéma JSON fermé reste l’unique autorité de ces valeurs fixes.
+- Le runbook `docs/runbooks/distribution_locale.md` publie la sonde NVIDIA,
+  l’obligation `cuda:0`, l’absence de fallback et l’upgrade bloquant : arrêt
+  des admissions, drainage sous l’ancien `configuration_hash`, contrôle de
+  zéro job `pending` ou `running`, puis seulement bascule du profil. Il
+  documente les prérequis de la gate PostgreSQL T-004 `--live`.
+- La spécification M13 aligne ses deux limites historiques de 8 Gio sur les
+  2 Gio de M14-distribution-core. La matrice publie exactement quatre exigences
+  `REQ-M014-CORE-001` à `004`, les preuves, le runbook et le lien cohérent
+  ADR-051/ADR-052.
+- La preuve live T-004 réutilise `LOCAL_POSTGRES_IMAGE`, référence digérée
+  centrale existante. L’étage `worker-documents` remplace les index Debian
+  mutables par les snapshots du 2025-02-03 et épingle
+  `gcc=4:12.2.0-3` ainsi que `libc6-dev=2.36-9+deb12u9`.
+- Preuve de construction : l’étage Docker `worker-documents` a été construit
+  avec succès, puis `dpkg-query` a retourné exactement les deux versions
+  épinglées.
+- Validations GREEN : tests ciblés 5/5 puis 3/3 ; Ruff ciblé ; `m004` 45
+  nœuds ; `m013_config` 36 nœuds ; `m013_environments` 49 nœuds ;
+  `governance` 25 nœuds ; `m014_distribution_core` offline 35 nœuds et live
+  36 nœuds. Chaque exécution est unique, sans absence ni surprise.
+- Gate canonique finale : 464 nœuds exécutés exactement une fois, code 0,
+  aucune absence, surprise ou duplication, `PARTIAL GREEN: offline`.
+- Commit GREEN : `7a873ebbd541e8492f258d3efa7347d13bf203a8`.
+- ADR consultées : ADR-025, ADR-040, ADR-042, ADR-046, ADR-051 et ADR-052.
+  ADR nouvelle : non requise ; les corrections précisent leurs conséquences
+  sans modifier une décision structurante.
+- Périmètre respecté : aucun raccordement worker au job de page, aucune
+  acquisition supplémentaire, aucune requête SQL de quota et aucune migration
+  ne sont ajoutés. Le runtime et le quota PostgreSQL de T-004 restent inchangés.
