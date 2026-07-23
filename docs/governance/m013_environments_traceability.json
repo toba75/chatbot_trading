@@ -32,7 +32,7 @@
       "specification": "docs/specs/m013_environments_environnements_explicites.md",
       "adrs": [
         "docs/adr/ADR-046-profils-locaux-etanches-sur-autorite-docker-explicite.md",
-        "docs/adr/ADR-049-qualification-complete-reservee-au-profil-test.md"
+        "docs/adr/ADR-050-separer-qualification-fonctionnelle-et-isolation.md"
       ],
       "code": ["app/platform/environment_command.py"],
       "tests": ["gate_tests/ported/tests/m013_environments/validate_environment_commands_acceptance.py"],
@@ -107,7 +107,7 @@
       "specification": "docs/specs/m013_environments_environnements_explicites.md",
       "adrs": [
         "docs/adr/ADR-046-profils-locaux-etanches-sur-autorite-docker-explicite.md",
-        "docs/adr/ADR-049-qualification-complete-reservee-au-profil-test.md"
+        "docs/adr/ADR-050-separer-qualification-fonctionnelle-et-isolation.md"
       ],
       "code": ["app/platform/environment_command.py"],
       "tests": ["gate_tests/ported/tests/m013_environments/validate_development_real_e2e_acceptance.py"],
@@ -122,7 +122,7 @@
       "adrs": [
         "docs/adr/ADR-046-profils-locaux-etanches-sur-autorite-docker-explicite.md",
         "docs/adr/ADR-048-progression-et-parallelisme-dans-profils-explicites.md",
-        "docs/adr/ADR-049-qualification-complete-reservee-au-profil-test.md"
+        "docs/adr/ADR-050-separer-qualification-fonctionnelle-et-isolation.md"
       ],
       "code": ["app/platform/test_e2e.py"],
       "tests": ["gate_tests/ported/tests/m013_environments/validate_test_real_e2e_acceptance.py"],
@@ -136,7 +136,7 @@
       "specification": "docs/specs/m013_environments_environnements_explicites.md",
       "adrs": [
         "docs/adr/ADR-046-profils-locaux-etanches-sur-autorite-docker-explicite.md",
-        "docs/adr/ADR-049-qualification-complete-reservee-au-profil-test.md"
+        "docs/adr/ADR-050-separer-qualification-fonctionnelle-et-isolation.md"
       ],
       "code": ["app/platform/environment_command.py"],
       "tests": ["gate_tests/ported/tests/m013_environments/validate_production_real_e2e_acceptance.py"],
@@ -152,7 +152,7 @@
         "docs/adr/ADR-046-profils-locaux-etanches-sur-autorite-docker-explicite.md",
         "docs/adr/ADR-047-archive-chiffree-verifiee-avant-preuve-restauration.md",
         "docs/adr/ADR-048-progression-et-parallelisme-dans-profils-explicites.md",
-        "docs/adr/ADR-049-qualification-complete-reservee-au-profil-test.md"
+        "docs/adr/ADR-050-separer-qualification-fonctionnelle-et-isolation.md"
       ],
       "code": ["ost_gate/environment_governance.py"],
       "tests": [

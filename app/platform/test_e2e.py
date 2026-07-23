@@ -52,6 +52,9 @@ from app.platform.configured_datastore_identity import preflight_all_mutable_roo
 _ENVIRONMENT = "test"
 _DEPLOYMENT_ID = "ostrading-test-ci"
 _EDGE_BASE_URL = "https://localhost:19443"
+_FUNCTIONAL_QUALIFICATION_MODE = "FUNCTIONAL"
+_ISOLATION_QUALIFICATION_MODE = "ISOLATION"
+TestQualificationMode = Literal["FUNCTIONAL", "ISOLATION"]
 _TEST_PROOF_CONTEXT = _ProofContext(
     environment=_ENVIRONMENT,
     deployment_id=_DEPLOYMENT_ID,
@@ -160,11 +163,12 @@ class TestE2ERunReport:
 class TestE2EReport:
     environment: str
     deployment_id: str
+    qualification_mode: TestQualificationMode
     configuration_hash: str
     image_revision: str
     source_pdf_path: str
     source_pdf_sha256: str
-    runs: tuple[TestE2ERunReport, TestE2ERunReport]
+    runs: tuple[TestE2ERunReport, ...]
     non_test_credentials_inaccessible: bool
     foreign_volume_sentinels_preserved: bool
     test_resources_removed: bool
@@ -174,15 +178,24 @@ class TestE2EReport:
     def __post_init__(self) -> None:
         if self.environment != _ENVIRONMENT or self.deployment_id != _DEPLOYMENT_ID:
             raise ValueError("TEST_E2E_IDENTITY_INVALID")
+        expected_run_numbers = {
+            _FUNCTIONAL_QUALIFICATION_MODE: (1,),
+            _ISOLATION_QUALIFICATION_MODE: (1, 2),
+        }.get(self.qualification_mode)
+        if expected_run_numbers is None:
+            raise ValueError("TEST_E2E_QUALIFICATION_MODE_INVALID")
         if re.fullmatch(r"[0-9a-f]{64}", self.configuration_hash) is None:
             raise ValueError("TEST_E2E_CONFIGURATION_HASH_INVALID")
         if re.fullmatch(r"[0-9a-f]{40}", self.image_revision) is None:
             raise ValueError("TEST_E2E_IMAGE_REVISION_INVALID")
         if re.fullmatch(r"[0-9a-f]{64}", self.source_pdf_sha256) is None:
             raise ValueError("TEST_E2E_SOURCE_HASH_INVALID")
-        if tuple(run.run_number for run in self.runs) != (1, 2):
-            raise ValueError("TEST_E2E_TWO_RUNS_REQUIRED")
-        if self.runs[0].document_id == self.runs[1].document_id:
+        if tuple(run.run_number for run in self.runs) != expected_run_numbers:
+            raise ValueError("TEST_E2E_RUNS_INVALID")
+        if (
+            self.qualification_mode == _ISOLATION_QUALIFICATION_MODE
+            and self.runs[0].document_id == self.runs[1].document_id
+        ):
             raise ValueError("TEST_E2E_DISTINCT_DOCUMENTS_REQUIRED")
         if self.non_test_credentials_inaccessible is not True:
             raise ValueError("TEST_E2E_NON_TEST_CREDENTIALS_ACCESSIBLE")
@@ -198,6 +211,7 @@ class TestE2EReport:
         return {
             "environment": self.environment,
             "deployment_id": self.deployment_id,
+            "qualification_mode": self.qualification_mode,
             "configuration_hash": self.configuration_hash,
             "image_revision": self.image_revision,
             "source_pdf_path": self.source_pdf_path,
@@ -224,6 +238,31 @@ def run_test_environment_e2e(
     repository_root: Path,
     pdf_path: Path,
 ) -> TestE2EReport:
+    return _run_exclusive_test_qualification(
+        repository_root=repository_root,
+        pdf_path=pdf_path,
+        qualification_mode=_FUNCTIONAL_QUALIFICATION_MODE,
+    )
+
+
+def run_test_environment_isolation_e2e(
+    *,
+    repository_root: Path,
+    pdf_path: Path,
+) -> TestE2EReport:
+    return _run_exclusive_test_qualification(
+        repository_root=repository_root,
+        pdf_path=pdf_path,
+        qualification_mode=_ISOLATION_QUALIFICATION_MODE,
+    )
+
+
+def _run_exclusive_test_qualification(
+    *,
+    repository_root: Path,
+    pdf_path: Path,
+    qualification_mode: TestQualificationMode,
+) -> TestE2EReport:
     root = _require_repository_root(repository_root)
     with _exclusive_test_qualification(
         root / ".tmp" / "m013-environments-test-e2e.lock"
@@ -231,6 +270,7 @@ def run_test_environment_e2e(
         return _run_test_environment_e2e_locked(
             repository_root=root,
             pdf_path=pdf_path,
+            qualification_mode=qualification_mode,
         )
 
 
@@ -238,10 +278,12 @@ def _run_test_environment_e2e_locked(
     *,
     repository_root: Path,
     pdf_path: Path,
+    qualification_mode: TestQualificationMode,
 ) -> TestE2EReport:
-    """Exécute deux installations test réelles puis supprime leurs ressources."""
+    """Exécute la campagne test explicite puis supprime ses ressources."""
 
     root = repository_root
+    cycle_count = _cycle_count_for_qualification_mode(qualification_mode)
     qualified_revision = _git_revision(root)
     source_pdf = _require_real_versioned_pdf(root, pdf_path)
     configuration = load_application_configuration(
@@ -259,7 +301,8 @@ def _run_test_environment_e2e_locked(
 
     _verify_test_resources_removed(repository_root=root)
 
-    runs = _run_two_test_cycles(
+    runs = _run_test_cycles(
+        cycle_count=cycle_count,
         repository_root=root,
         pdf_path=source_pdf,
         cycle_runner=lambda **arguments: _run_single_test_cycle(
@@ -268,11 +311,12 @@ def _run_test_environment_e2e_locked(
             **arguments,
         ),
     )
-    if not isinstance(runs[0], TestE2ERunReport) or not isinstance(
-        runs[1], TestE2ERunReport
-    ):
+    if any(not isinstance(run, TestE2ERunReport) for run in runs):
         raise TestE2EError("TEST_E2E_RUN_REPORT_INVALID")
-    if runs[0].document_id == runs[1].document_id:
+    if (
+        qualification_mode == _ISOLATION_QUALIFICATION_MODE
+        and runs[0].document_id == runs[1].document_id
+    ):
         raise TestE2EError("TEST_E2E_DISTINCT_DOCUMENTS_REQUIRED")
     _verify_test_resources_removed(repository_root=root)
     final_foreign_sentinels = _foreign_volume_sentinels(repository_root=root)
@@ -280,17 +324,23 @@ def _run_test_environment_e2e_locked(
         raise TestE2EError("TEST_E2E_FOREIGN_VOLUME_SENTINELS_CHANGED")
 
     completed_at = _utc_now()
+    report_prefix = (
+        "test-e2e"
+        if qualification_mode == _FUNCTIONAL_QUALIFICATION_MODE
+        else "test-isolation-e2e"
+    )
     report_path = report_root / (
-        f"test-e2e-{completed_at.replace(':', '').replace('-', '')}.json"
+        f"{report_prefix}-{completed_at.replace(':', '').replace('-', '')}.json"
     )
     report = TestE2EReport(
         environment=_ENVIRONMENT,
         deployment_id=_DEPLOYMENT_ID,
+        qualification_mode=qualification_mode,
         configuration_hash=configuration.configuration_hash,
         image_revision=qualified_revision,
         source_pdf_path=source_pdf.relative_to(root).as_posix(),
         source_pdf_sha256=_sha256_file(source_pdf),
-        runs=(runs[0], runs[1]),
+        runs=runs,
         non_test_credentials_inaccessible=True,
         foreign_volume_sentinels_preserved=True,
         test_resources_removed=True,
@@ -344,29 +394,43 @@ def _exclusive_test_qualification(lock_path: Path):
         lock_path.unlink()
 
 
-def _run_two_test_cycles(
+def _cycle_count_for_qualification_mode(
+    qualification_mode: TestQualificationMode,
+) -> int:
+    if qualification_mode == _FUNCTIONAL_QUALIFICATION_MODE:
+        return 1
+    if qualification_mode == _ISOLATION_QUALIFICATION_MODE:
+        return 2
+    raise ValueError("TEST_E2E_QUALIFICATION_MODE_INVALID")
+
+
+def _run_test_cycles(
     *,
+    cycle_count: int,
     repository_root: Path,
     pdf_path: Path,
     cycle_runner: Callable[..., Any],
-) -> tuple[Any, Any]:
+) -> tuple[Any, ...]:
+    if (
+        isinstance(cycle_count, bool)
+        or not isinstance(cycle_count, int)
+        or cycle_count not in {1, 2}
+    ):
+        raise ValueError("TEST_E2E_CYCLE_COUNT_INVALID")
     if not isinstance(repository_root, Path):
         raise ValueError("TEST_E2E_REPOSITORY_ROOT_INVALID")
     if not isinstance(pdf_path, Path):
         raise ValueError("TEST_E2E_PDF_PATH_INVALID")
     if not callable(cycle_runner):
         raise ValueError("TEST_E2E_CYCLE_RUNNER_INVALID")
-    first = cycle_runner(
-        run_number=1,
-        repository_root=repository_root,
-        pdf_path=pdf_path,
+    return tuple(
+        cycle_runner(
+            run_number=run_number,
+            repository_root=repository_root,
+            pdf_path=pdf_path,
+        )
+        for run_number in range(1, cycle_count + 1)
     )
-    second = cycle_runner(
-        run_number=2,
-        repository_root=repository_root,
-        pdf_path=pdf_path,
-    )
-    return first, second
 
 
 def _run_single_test_cycle(
@@ -759,5 +823,7 @@ __all__ = [
     "TestE2EReport",
     "TestE2ERunReport",
     "TestEnvironmentCycle",
+    "TestQualificationMode",
     "run_test_environment_e2e",
+    "run_test_environment_isolation_e2e",
 ]

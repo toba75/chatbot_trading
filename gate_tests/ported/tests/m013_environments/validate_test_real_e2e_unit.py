@@ -95,6 +95,7 @@ def test_test_real_e2e_unit(monkeypatch, tmp_path: Path, capsys) -> None:
 
     assert (
         _run_test_qualification(
+            command_name="test",
             argv=(),
             repository_root=tmp_path,
             pdf_path=tmp_path / "fixture.pdf",
@@ -106,6 +107,7 @@ def test_test_real_e2e_unit(monkeypatch, tmp_path: Path, capsys) -> None:
     assert published == [expected_report]
     with pytest.raises(ValueError, match="UV_ENVIRONMENT_ARGUMENTS_FORBIDDEN"):
         _run_test_qualification(
+            command_name="test",
             argv=("--config",),
             repository_root=tmp_path,
             pdf_path=tmp_path / "fixture.pdf",

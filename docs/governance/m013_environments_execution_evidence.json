@@ -66,6 +66,7 @@
       "foreign_volume_sentinels_preserved": true,
       "image_revision": "684a8124c4a35a6e947373d03d82871e283d7e2b",
       "non_test_credentials_inaccessible": true,
+      "qualification_mode": "ISOLATION",
       "report_path": "data/environments/test/reports/test-e2e-20260722T012720Z.json",
       "runs": [
         {

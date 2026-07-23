@@ -49,20 +49,20 @@ _EXPECTED_TRACEABILITY_IDS: Final = tuple(
 _ADR_046: Final = "docs/adr/ADR-046-profils-locaux-etanches-sur-autorite-docker-explicite.md"
 _ADR_047: Final = "docs/adr/ADR-047-archive-chiffree-verifiee-avant-preuve-restauration.md"
 _ADR_048: Final = "docs/adr/ADR-048-progression-et-parallelisme-dans-profils-explicites.md"
-_ADR_049: Final = "docs/adr/ADR-049-qualification-complete-reservee-au-profil-test.md"
+_ADR_050: Final = "docs/adr/ADR-050-separer-qualification-fonctionnelle-et-isolation.md"
 _EXPECTED_TRACEABILITY_ADRS: Final = {
     "REQ-M013-ENV-001": (_ADR_046,),
     "REQ-M013-ENV-002": (_ADR_046,),
-    "REQ-M013-ENV-003": (_ADR_046, _ADR_049),
+    "REQ-M013-ENV-003": (_ADR_046, _ADR_050),
     "REQ-M013-ENV-004": (_ADR_046,),
     "REQ-M013-ENV-005": (_ADR_046,),
     "REQ-M013-ENV-006": (_ADR_046,),
     "REQ-M013-ENV-007": (_ADR_046, _ADR_048),
     "REQ-M013-ENV-008": (_ADR_046, _ADR_047),
-    "REQ-M013-ENV-009": (_ADR_046, _ADR_049),
-    "REQ-M013-ENV-010": (_ADR_046, _ADR_048, _ADR_049),
-    "REQ-M013-ENV-011": (_ADR_046, _ADR_049),
-    "REQ-M013-ENV-012": (_ADR_046, _ADR_047, _ADR_048, _ADR_049),
+    "REQ-M013-ENV-009": (_ADR_046, _ADR_050),
+    "REQ-M013-ENV-010": (_ADR_046, _ADR_048, _ADR_050),
+    "REQ-M013-ENV-011": (_ADR_046, _ADR_050),
+    "REQ-M013-ENV-012": (_ADR_046, _ADR_047, _ADR_048, _ADR_050),
 }
 _SHA256: Final = re.compile(r"^[0-9a-f]{64}$")
 _REVISION: Final = re.compile(r"^[0-9a-f]{7,64}$")
@@ -170,7 +170,7 @@ def assert_no_sensitive_data(value: object) -> None:
 def validate_execution_evidence(
     reports: Mapping[str, object],
 ) -> EnvironmentExecutionEvidence:
-    """Valide les deux cycles de qualification réels du seul profil test."""
+    """Valide la preuve d'isolation à deux cycles du seul profil test."""
 
     if not isinstance(reports, Mapping):
         raise EnvironmentGovernanceError("LIVE_EVIDENCE_DOCUMENT_INVALID")
@@ -188,6 +188,8 @@ def validate_execution_evidence(
     environment = "test"
     report = _require_mapping(reports[environment], "LIVE_EVIDENCE_REPORT_INVALID")
     _validate_report_header(report, environment=environment)
+    if report.get("qualification_mode") != "ISOLATION":
+        raise EnvironmentGovernanceError("LIVE_EVIDENCE_QUALIFICATION_MODE_INVALID")
     _required_hash(report, "configuration_hash", "LIVE_EVIDENCE_HASH_INVALID")
     _required_hash(report, "source_pdf_sha256", "LIVE_EVIDENCE_HASH_INVALID")
     _require_true(report, "foreign_volume_sentinels_preserved")
@@ -553,7 +555,7 @@ def _validate_source_report_references(root: Path, value: object) -> None:
 
 
 def _load_latest_live_reports(root: Path) -> dict[str, object]:
-    patterns = {"test": "test-e2e-20*.json"}
+    patterns = {"test": "test-isolation-e2e-20*.json"}
     reports: dict[str, object] = {}
     for environment in LIVE_QUALIFICATION_ENVIRONMENTS:
         report_root = root / "data" / "environments" / environment / "reports"

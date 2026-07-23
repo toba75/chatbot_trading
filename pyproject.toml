@@ -25,6 +25,7 @@ dependencies = [
 api = "app.platform.orchestrator_command:main"
 development = "app.platform.environment_command:development"
 test = "app.platform.environment_command:test"
+test-isolation = "app.platform.environment_command:test_isolation"
 production = "app.platform.environment_command:production"
 gate = "ost_gate.cli:main"
 backup-v1 = "ost_gate.operations.backup:main"

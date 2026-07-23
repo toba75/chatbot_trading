@@ -17,7 +17,11 @@ from app.platform.environment_compose import (
     wait_environment_compose_stack,
 )
 from app.platform.local_runtime import HTTP_SERVICE_PORTS
-from app.platform.test_e2e import TestE2EError, run_test_environment_e2e
+from app.platform.test_e2e import (
+    TestE2EError,
+    run_test_environment_e2e,
+    run_test_environment_isolation_e2e,
+)
 
 
 ApplicationEnvironment = Literal["development", "test", "production"]
@@ -174,8 +178,27 @@ def development() -> int:
 
 
 def test() -> int:
+    return _run_test_entrypoint(
+        command_name="test",
+        runner=run_test_environment_e2e,
+    )
+
+
+def test_isolation() -> int:
+    return _run_test_entrypoint(
+        command_name="test-isolation",
+        runner=run_test_environment_isolation_e2e,
+    )
+
+
+def _run_test_entrypoint(
+    *,
+    command_name: Literal["test", "test-isolation"],
+    runner: Callable[..., Any],
+) -> int:
     try:
         return _run_test_qualification(
+            command_name=command_name,
             argv=tuple(sys.argv[1:]),
             repository_root=Path.cwd(),
             pdf_path=(
@@ -184,7 +207,7 @@ def test() -> int:
                 / "corpus"
                 / "ostrading-environment-qualification-5-pages.pdf"
             ),
-            runner=run_test_environment_e2e,
+            runner=runner,
             publish_report=_publish_test_report,
         )
     except TestE2EError as exc:
@@ -205,17 +228,20 @@ def production() -> int:
 
 def _run_test_qualification(
     *,
+    command_name: Literal["test", "test-isolation"],
     argv: Sequence[str],
     repository_root: Path,
     pdf_path: Path,
     runner: Callable[..., Any],
     publish_report: Callable[[Any], None],
 ) -> int:
+    if command_name not in {"test", "test-isolation"}:
+        raise ValueError("TEST_E2E_COMMAND_INVALID")
     if isinstance(argv, (str, bytes)) or not isinstance(argv, Sequence):
         raise ValueError(f"{_ARGUMENTS_FORBIDDEN}: arguments invalides")
     if tuple(argv) != ():
         raise ValueError(
-            f"{_ARGUMENTS_FORBIDDEN}: uv run test ne prend aucun argument"
+            f"{_ARGUMENTS_FORBIDDEN}: uv run {command_name} ne prend aucun argument"
         )
     if not callable(runner) or not callable(publish_report):
         raise ValueError("TEST_E2E_RUNNER_INVALID")
