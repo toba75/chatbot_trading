@@ -15,7 +15,11 @@ CLAIM_TOKEN = "7af3de41-8ce4-4f89-9bbb-bd8f0014cc95"
 
 
 def test_contrats_locaux_versionnes_et_refusables() -> None:
-    from app.contracts.technical_jobs import JobEnvironmentIdentity, JobPriority, JobRequest
+    from app.contracts.technical_jobs import (
+        JobEnvironmentIdentity,
+        JobPriority,
+        JobRequest,
+    )
     from app.source_processing.domain.distribution_contracts import (
         CONVERT_PAGE_CONTRACT_VERSION,
         PAGE_RESULT_CONTRACT_VERSION,
@@ -28,6 +32,7 @@ def test_contrats_locaux_versionnes_et_refusables() -> None:
         LocalArtifactIdentity,
         LockedAssetVersion,
         PageExecutionIdentity,
+        GraniteSlotExecutionIdentity,
         PageResultContract,
         PageResultErrorCode,
         PageResultStatus,
@@ -109,11 +114,30 @@ def test_contrats_locaux_versionnes_et_refusables() -> None:
     assert parsed_request.to_json() == serialized_request
     assert parsed_request.required_capacity == capacity
 
+    incompatible_envelope = JobRequest(
+        environment="test",
+        deployment_id="ostrading-test-rogue",
+        job_name="CONVERT_PAGE",
+        priority=JobPriority.P2,
+        idempotence_key=technical_job.idempotence_key,
+        payload=parsed_request.to_mapping(),
+    )
+    with pytest.raises(
+        DistributionContractError,
+        match="JOB_ENVELOPE_IDENTITY_MISMATCH",
+    ):
+        ConvertPageContract.from_job_request(incompatible_envelope)
+
     execution = PageExecutionIdentity(
         job_id="JOB-M002-000314",
         claim_generation=2,
         claim_token=CLAIM_TOKEN,
         worker_instance_id="worker-documents-test-2",
+    )
+    slot_execution = GraniteSlotExecutionIdentity(
+        slot_ordinal=2,
+        slot_generation=4,
+        slot_token="87847b5b-8343-49c6-bd62-9651a69d2d0b",
     )
     page_result = PageResultContract(
         contract_version=PAGE_RESULT_CONTRACT_VERSION,
@@ -125,6 +149,7 @@ def test_contrats_locaux_versionnes_et_refusables() -> None:
         routing_policy_version="routing-v1",
         request_idempotence_key=request_key,
         execution=execution,
+        granite_slot_execution=slot_execution,
         status=PageResultStatus.SUCCEEDED,
         result_artifact=LocalArtifactDescriptor(
             identity=result_identity,
@@ -136,13 +161,20 @@ def test_contrats_locaux_versionnes_et_refusables() -> None:
         error_code=None,
     )
     assert PageResultContract.from_json(page_result.to_json()) == page_result
-    page_result.assert_replay_compatible(PageResultContract.from_json(page_result.to_json()))
+    assert PageResultContract.from_json(
+        page_result.to_json()
+    ).granite_slot_execution == (slot_execution)
+    page_result.assert_replay_compatible(
+        PageResultContract.from_json(page_result.to_json())
+    )
 
     divergent_replay = replace(
         page_result,
         result_artifact=replace(page_result.result_artifact, sha256=SHA_B),
     )
-    with pytest.raises(DistributionContractError, match="PAGE_RESULT_REPLAY_DIVERGENCE"):
+    with pytest.raises(
+        DistributionContractError, match="PAGE_RESULT_REPLAY_DIVERGENCE"
+    ):
         page_result.assert_replay_compatible(divergent_replay)
 
     assembly_key = assemble_canonical_document_idempotence_key(
@@ -167,16 +199,21 @@ def test_contrats_locaux_versionnes_et_refusables() -> None:
         idempotence_key=assembly_key,
     )
     assert AssembleCanonicalDocumentContract.from_json(assembly.to_json()) == assembly
-    assert assembly.to_job_request(
-        priority=JobPriority.P2,
-        code_version="m014-contracts-v1",
-        model_version="document-authority-m004",
-    ).job_name == "ASSEMBLE_CANONICAL_DOCUMENT"
+    assert (
+        assembly.to_job_request(
+            priority=JobPriority.P2,
+            code_version="m014-contracts-v1",
+            model_version="document-authority-m004",
+        ).job_name
+        == "ASSEMBLE_CANONICAL_DOCUMENT"
+    )
 
     # Toute divergence est refusée avant le premier accès au modèle.
     mismatched_environment = contract.to_mapping()
     mismatched_environment["source_artifact"]["identity"]["environment"] = "production"
-    with pytest.raises(DistributionContractError, match="CONTRACT_ENVIRONMENT_MISMATCH"):
+    with pytest.raises(
+        DistributionContractError, match="CONTRACT_ENVIRONMENT_MISMATCH"
+    ):
         ConvertPageContract.from_mapping(mismatched_environment)
 
     unknown_field = contract.to_mapping()
@@ -199,7 +236,7 @@ def test_contrats_locaux_versionnes_et_refusables() -> None:
         contract.source_artifact.verify_content(b"contenu divergent")
 
     for error_code in (
-        PageResultErrorCode.GRANITE_CAPACITY_UNAVAILABLE,
+        PageResultErrorCode.GRANITE_CAPACITY_CONFIGURATION_INVALID,
         PageResultErrorCode.GRANITE_CUDA_UNAVAILABLE,
         PageResultErrorCode.WORKER_MEMORY_LIMIT_EXCEEDED,
         PageResultErrorCode.ARTIFACT_NOT_FOUND,
@@ -214,10 +251,15 @@ def test_contrats_locaux_versionnes_et_refusables() -> None:
             tool_version=None,
             error_code=error_code,
         )
-        assert PageResultContract.from_json(failed_result.to_json()).error_code is error_code
+        assert (
+            PageResultContract.from_json(failed_result.to_json()).error_code
+            is error_code
+        )
+
+    _assert_configuration_locale_des_trois_profils()
 
 
-def test_configuration_locale_des_trois_profils() -> None:
+def _assert_configuration_locale_des_trois_profils() -> None:
     from app.platform.configuration import load_application_configuration
     from app.platform.environment_compose import (
         ENVIRONMENTS,
@@ -256,8 +298,8 @@ def test_configuration_locale_des_trois_profils() -> None:
         assert distribution.memory_bytes == 2 * 1024**3
         assert distribution.cpus == 4
         assert distribution.granite_device == "cuda:0"
-        assert distribution.granite_global_concurrency == 2
-        assert distribution.granite_concurrency_per_worker == 1
+        assert distribution.granite_slots_global == 2
+        assert distribution.granite_slots_per_worker == 1
 
         worker = rendered[environment]["services"]["worker-documents"]
         assert worker["deploy"]["replicas"] == distribution.replicas
@@ -266,4 +308,3 @@ def test_configuration_locale_des_trois_profils() -> None:
         )
         assert worker["deploy"]["resources"]["limits"]["cpus"] == distribution.cpus
         assert "environment" not in worker and "env_file" not in worker
-

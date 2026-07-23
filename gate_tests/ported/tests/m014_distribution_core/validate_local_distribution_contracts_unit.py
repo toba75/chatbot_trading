@@ -13,7 +13,7 @@ SHA_A = "a" * 64
 SHA_B = "b" * 64
 
 
-def test_value_objects_et_serialisation_fermee() -> None:
+def test_value_objects_et_serialisation_fermee(tmp_path: Path) -> None:
     from app.contracts.technical_jobs import JobEnvironmentIdentity
     from app.source_processing.domain.distribution_contracts import (
         CONVERT_PAGE_CONTRACT_VERSION,
@@ -67,20 +67,34 @@ def test_value_objects_et_serialisation_fermee() -> None:
             slots=0,
             device=None,
         ),
-        locked_assets=(
-            LockedAssetVersion("docling", "2.111.0", SHA_A),
-        ),
+        locked_assets=(LockedAssetVersion("docling", "2.111.0", SHA_A),),
         idempotence_key=key,
     )
     assert ConvertPageContract.from_mapping(contract.to_mapping()) == contract
     assert json.loads(contract.to_json())["contract_version"] == "1.0"
 
     mutations = (
-        ({key: value for key, value in contract.to_mapping().items() if key != "route_name"}, "CONTRACT_FIELDS_INVALID"),
-        (contract.to_mapping() | {"route_name": "SKIP_EMPTY"}, "CONVERT_PAGE_ROUTE_INVALID"),
+        (
+            {
+                key: value
+                for key, value in contract.to_mapping().items()
+                if key != "route_name"
+            },
+            "CONTRACT_FIELDS_INVALID",
+        ),
+        (
+            contract.to_mapping() | {"route_name": "SKIP_EMPTY"},
+            "CONVERT_PAGE_ROUTE_INVALID",
+        ),
         (contract.to_mapping() | {"page_number": 0}, "PAGE_NUMBER_INVALID"),
-        (contract.to_mapping() | {"contract_version": "2.0"}, "CONTRACT_VERSION_UNSUPPORTED"),
-        (contract.to_mapping() | {"idempotence_key": SHA_B}, "IDEMPOTENCE_KEY_DIVERGENT"),
+        (
+            contract.to_mapping() | {"contract_version": "2.0"},
+            "CONTRACT_VERSION_UNSUPPORTED",
+        ),
+        (
+            contract.to_mapping() | {"idempotence_key": SHA_B},
+            "IDEMPOTENCE_KEY_DIVERGENT",
+        ),
     )
     for payload, code in mutations:
         with pytest.raises(DistributionContractError, match=code):
@@ -110,6 +124,7 @@ def test_value_objects_et_serialisation_fermee() -> None:
             contract_version=CONVERT_PAGE_CONTRACT_VERSION,
         ),
         execution=None,
+        granite_slot_execution=None,
         status=PageResultStatus.SKIP_EMPTY,
         result_artifact=None,
         tool_name=None,
@@ -120,11 +135,15 @@ def test_value_objects_et_serialisation_fermee() -> None:
 
     invalid_skipped = skipped.to_mapping()
     invalid_skipped["tool_name"] = "GRANITE_DOCLING"
-    with pytest.raises(DistributionContractError, match="SKIP_EMPTY_CONVERTER_FORBIDDEN"):
+    with pytest.raises(
+        DistributionContractError, match="SKIP_EMPTY_CONVERTER_FORBIDDEN"
+    ):
         PageResultContract.from_mapping(invalid_skipped)
 
+    _assert_schema_de_configuration_refuse_toute_derive(tmp_path)
 
-def test_schema_de_configuration_refuse_toute_derive(tmp_path: Path) -> None:
+
+def _assert_schema_de_configuration_refuse_toute_derive(tmp_path: Path) -> None:
     from app.platform.configuration import (
         ApplicationConfigurationError,
         load_application_configuration,
@@ -148,25 +167,27 @@ def test_schema_de_configuration_refuse_toute_derive(tmp_path: Path) -> None:
         "device_auto": ("      granite_device: cuda:0", "      granite_device: auto"),
         "device_cpu": ("      granite_device: cuda:0", "      granite_device: cpu"),
         "global_3": (
-            "      granite_global_concurrency: 2",
-            "      granite_global_concurrency: 3",
+            "      granite_slots_global: 2",
+            "      granite_slots_global: 3",
         ),
         "per_worker_2": (
-            "      granite_concurrency_per_worker: 1",
-            "      granite_concurrency_per_worker: 2",
+            "      granite_slots_per_worker: 1",
+            "      granite_slots_per_worker: 2",
         ),
     }
     for name, (old, new) in mutations.items():
         assert old in source
         path = tmp_path / f"{name}.yaml"
         path.write_text(source.replace(old, new, 1), encoding="utf-8")
-        with pytest.raises(ApplicationConfigurationError, match="CONFIG_SCHEMA_INVALID"):
+        with pytest.raises(
+            ApplicationConfigurationError, match="CONFIG_SCHEMA_INVALID"
+        ):
             load_application_configuration(config_path=path, environment_snapshot={})
 
     missing = tmp_path / "missing.yaml"
     missing.write_text(
         source.replace(
-            "      granite_concurrency_per_worker: 1\n",
+            "      granite_slots_per_worker: 1\n",
             "",
             1,
         ),
@@ -178,12 +199,11 @@ def test_schema_de_configuration_refuse_toute_derive(tmp_path: Path) -> None:
     unknown = tmp_path / "unknown.yaml"
     unknown.write_text(
         source.replace(
-            "      granite_concurrency_per_worker: 1\n",
-            "      granite_concurrency_per_worker: 1\n      fallback_device: cpu\n",
+            "      granite_slots_per_worker: 1\n",
+            "      granite_slots_per_worker: 1\n      fallback_device: cpu\n",
             1,
         ),
         encoding="utf-8",
     )
     with pytest.raises(ApplicationConfigurationError, match="CONFIG_SCHEMA_INVALID"):
         load_application_configuration(config_path=unknown, environment_snapshot={})
-
