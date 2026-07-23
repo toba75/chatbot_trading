@@ -56,6 +56,7 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 | [ADR-048](ADR-048-progression-et-parallelisme-dans-profils-explicites.md) | Progression et parallélisme dans les profils explicites | Acceptée | 2026-07-22 | ADR-031 ; ADR-037 | Aucune |
 | [ADR-049](ADR-049-qualification-complete-reservee-au-profil-test.md) | Qualification complète réservée au profil test | Remplacée | 2026-07-23 | Sémantique de qualification des commandes d'ADR-046 | ADR-050 |
 | [ADR-050](ADR-050-separer-qualification-fonctionnelle-et-isolation.md) | Séparer qualification fonctionnelle et qualification d’isolation | Acceptée | 2026-07-23 | ADR-049 | Aucune |
+| [ADR-051](ADR-051-execution-granite-cuda-stricte.md) | Exécution Granite-Docling CUDA stricte | Proposée | 2026-07-23 | Sélection automatique du périphérique Granite local | Aucune |
 
 ## ADR DDD
 
@@ -77,7 +78,7 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 ## Prochains numéros disponibles
 
 ```text
-Prochaine ADR technique: ADR-051
+Prochaine ADR technique: ADR-052
 Prochaine DDD-ADR: DDD-ADR-013
 ```
 

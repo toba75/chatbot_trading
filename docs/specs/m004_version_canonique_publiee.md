@@ -152,6 +152,13 @@ ou `uv run development`, tout actif absent, altéré ou non vérifiable produit
 `CONVERSION_ASSET_MANIFEST_INVALID`; aucun téléchargement silencieux n'est
 autorisé.
 
+Conformément à ADR-051, le sous-processus Granite du worker documentaire local
+sélectionne explicitement `cuda:0`. Le conteneur reçoit le GPU NVIDIA et Granite
+refuse de démarrer avec `GRANITE_CUDA_UNAVAILABLE` si PyTorch n'a pas CUDA, si
+le runtime NVIDIA est absent ou si le périphérique zéro n'existe pas. Il ne
+bascule jamais sur CPU et n'utilise jamais `auto`. Cette décision ne déplace ni
+Docling standard ni Gemma sur le GPU.
+
 Chaque conversion conserve la route, l'outil, sa version, les hashes des
 artefacts pagewise, la trace de récupération éventuelle et le SHA-256 de
 l'artefact canonique immuable. L'absence de Docling standard, Granite-Docling,

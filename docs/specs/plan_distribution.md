@@ -14,7 +14,8 @@
   tâches ne sont créés qu'après validation des préconditions de leur
   sous-milestone.
 - Cible matérielle initiale : Mac Apple Silicon `arm64` et PC `amd64`, exécutant
-  tous les traitements documentaires sur CPU.
+  les workers réseau M-014 sur CPU. Le worker Granite local courant de la
+  station RTX 4090 reste un profil CUDA distinct gouverné par ADR-051.
 - Environnements concernés : `development`, `test` et `production`, sans partage
   de données, de secrets, de files ni de workers entre deux environnements.
 - Mécanisme de distribution : file PostgreSQL existante, sans Taskiq, Celery,
@@ -45,11 +46,11 @@ distribution est réussie si des pages d'un même lot sont réellement réclamé
 par plusieurs machines, si la perte d'une machine est reprise sans écriture
 obsolète et si le document canonique final reste identique au contrat M-004.
 
-## Décision de cadrage CPU-first
+## Décision de cadrage CPU-first pour la flotte réseau
 
-La première livraison doit rester homogène et observable :
+La première flotte réseau doit rester homogène et observable :
 
-- les workers documentaires utilisent uniquement le CPU ;
+- les workers documentaires distribués M-014 utilisent uniquement le CPU ;
 - les images Linux sont produites pour `linux/arm64` et `linux/amd64` ;
 - les deux architectures exécutent le même code métier et les mêmes versions
   verrouillées des outils ;
@@ -61,9 +62,12 @@ La première livraison doit rester homogène et observable :
 - l'architecture, le digest de l'image, les versions d'outils et l'identité du
   worker sont conservés dans la provenance technique.
 
-L'utilisation ultérieure de CUDA sur les PC ou de MPS sur les Mac nécessitera
-une décision, des images et des preuves distinctes. Elle ne doit pas être
-préparée par un fallback caché dans la livraison CPU.
+ADR-051 impose séparément `cuda:0` au Granite du worker local courant, avec un
+refus explicite si CUDA est absent. Ce profil GPU sert de baseline de mesure et
+n'est pas embarqué silencieusement dans les images CPU M-014. Une utilisation
+ultérieure de CUDA sur les PC distribués ou de MPS sur les Mac nécessitera une
+décision, des images et des preuves distinctes. Elle ne doit pas être préparée
+par un fallback caché dans la livraison CPU.
 
 ## État initial et écarts à fermer
 
@@ -261,7 +265,7 @@ montés en lecture seule et restent distincts par environnement.
 Sur PC `amd64`, le même contrat s'applique : la session SSH non interactive doit
 accéder au moteur Docker qualifié, annoncer `x86_64`, tirer le digest attendu et
 atteindre les seuls services centraux autorisés. Le système d'exploitation et
-le mode d'exposition de Docker sont inventoriés en T-001 et figés par ADR-051.
+le mode d'exposition de Docker sont inventoriés en T-001 et figés par ADR-052.
 
 L'identité d'un worker provient d'un manifeste explicite propre à l'hôte,
 monté en lecture seule. Elle n'est inférée ni du nom d'hôte, ni d'une variable
@@ -621,7 +625,7 @@ qu'aucune tâche n'ait besoin d'un livrable aval pour devenir GREEN.
 
 | Sous-milestone | Tâches | Responsabilité | Dépendance | Gate de sortie |
 |---|---|---|---|---|
-| `M14-distribution-core` | T-001 à T-005 | Baseline, ADR-051, contrats, migrations et stockage partagé | M-013 GREEN | Les jobs et artefacts sont portables, versionnés et isolés sur PostgreSQL et stockage réels |
+| `M14-distribution-core` | T-001 à T-005 | Baseline, ADR-052, contrats, migrations et stockage partagé | M-013 GREEN | Les jobs et artefacts sont portables, versionnés et isolés sur PostgreSQL et stockage réels |
 | `M14-worker-fleet` | T-006 à T-009 | Images multiarchitectures, commandes worker-only, registre et claim compatible | `M14-distribution-core` | Un Mac et un PC `READY` réclament uniquement les jobs compatibles de leur environnement |
 | `M14-distributed-pipeline` | T-010 à T-013 | Conversion à la page, résultat fenced, assemblage canonique et projection réseau | `M14-worker-fleet` | Deux nœuds traitent un même document sans doublon et publient une projection complète |
 | `M14-deployment` | T-014 à T-016 | Observabilité, Kamal/SSH, qualification multi-nœuds et bascule progressive | `M14-distributed-pipeline` | Le digest qualifié est déployé et repris réellement sur Mac et PC, avec rapport de charge |
@@ -635,7 +639,7 @@ Chaque sous-milestone possède son propre dossier de tâches :
 
 Un sous-milestone peut être livré par plusieurs PR bornées, mais il n'est GREEN
 que lorsque sa gate de sortie est prouvée. M-014 n'est clôturé qu'après
-`M14-deployment`, l'acceptation d'ADR-051 et la consolidation des preuves des
+`M14-deployment`, l'acceptation d'ADR-052 et la consolidation des preuves des
 quatre sous-milestones.
 
 ## Tranches d'implémentation
@@ -665,9 +669,9 @@ documentaire publique.
 - Bloquer la suite si le baseline n'est pas reproductible ou si une dépendance
   obligatoire n'existe pas sur l'une des architectures cibles.
 
-#### T-002 - Décider la topologie distribuée dans ADR-051
+#### T-002 - Décider la topologie distribuée dans ADR-052
 
-- Créer ADR-051 depuis `docs/adr/TEMPLATE.md`.
+- Créer ADR-052 depuis `docs/adr/TEMPLATE.md`.
 - Remplacer explicitement dans ADR-048 la cardinalité locale fixe des workers,
   tout en réaffirmant la progression publique, les leases et le fencing.
 - Remplacer explicitement dans ADR-014 la seule clause qui impose les workers à
@@ -680,13 +684,13 @@ documentaire publique.
 - Décider Kamal comme autorité de déploiement SSH, Colima comme runtime Docker
   des Mac et le moteur Docker qualifié des PC, sans attribuer à Kamal de
   responsabilité d'ordonnancement métier.
-- Fixer dans ADR-051 la cible SSH de chaque plateforme, les préflights
+- Fixer dans ADR-052 la cible SSH de chaque plateforme, les préflights
   bloquants, la stratégie de drainage et l'interdiction d'un déploiement sans
   destination explicite.
 - Mettre à jour `docs/adr/index.md`, M-002, M-004, M13-environments et le plan
   canonique des milestones.
-- Conserver ADR-014 et ADR-048 actives tant qu'ADR-051 reste proposée, puis
-  renseigner leur remplacement borné au moment de l'acceptation d'ADR-051.
+- Conserver ADR-014 et ADR-048 actives tant qu'ADR-052 reste proposée, puis
+  renseigner leur remplacement borné au moment de l'acceptation d'ADR-052.
 - Créer ensuite le dossier de tâches détaillées du milestone retenu.
 
 #### T-003 - Publier les contrats techniques distribués
@@ -714,7 +718,7 @@ documentaire publique.
 #### T-005 - Implémenter le stockage d'objets partagé
 
 - Écrire le port minimal dans Source Processing.
-- Implémenter l'adaptateur retenu par ADR-051 avec TLS et credentials bornés.
+- Implémenter l'adaptateur retenu par ADR-052 avec TLS et credentials bornés.
 - Migrer les nouvelles références de pages et résultats vers des identifiants
   d'artefacts sans exposer de chemin interne dans les contrats publics.
 - Prouver immutabilité, contrôle SHA-256, conflit divergent, coupure réseau et
@@ -865,7 +869,7 @@ validations rapides de PR.
   inclus dans ce parcours.
 - Refuser tout mélange de versions de schéma, configuration ou catalogue de jobs.
 - Rejouer les parcours publics, la restauration et le rapport de charge.
-- Accepter ADR-051 seulement après les preuves requises et mettre à jour sa
+- Accepter ADR-052 seulement après les preuves requises et mettre à jour sa
   traçabilité avec les commits RED/GREEN.
 
 ## Séquence et dépendances
@@ -1041,7 +1045,7 @@ sont prouvées :
 
 - les quatre sous-milestones sont présents dans le plan canonique, leurs gates
   de sortie sont GREEN et leurs preuves sont consolidées sans statut synthétique ;
-- ADR-051 est acceptée et l'index ADR est cohérent ;
+- ADR-052 est acceptée et l'index ADR est cohérent ;
 - les spécifications et le plan canonique ne prescrivent plus une cardinalité
   locale fixe contradictoire ;
 - les images CPU `arm64` et `amd64` sont construites, scellées et inspectées ;
@@ -1074,7 +1078,7 @@ sont prouvées :
 
 ## Livrables attendus
 
-- ADR-051 et index mis à jour ;
+- ADR-052 et index mis à jour ;
 - spécifications M-002, M-004 et M13-environments alignées ;
 - M-014 et ses quatre sous-milestones ajoutés au plan d'implémentation canonique ;
 - dossiers de tâches `milestone_014-distribution-core`,
@@ -1114,6 +1118,7 @@ sont prouvées :
 - `docs/adr/ADR-026-deploiement-compose-reproductible.md` ;
 - `docs/adr/ADR-040-adjudication-enrichissement-cible-docling-granite.md` ;
 - `docs/adr/ADR-042-capacite-docling-partagee.md` ;
+- `docs/adr/ADR-051-execution-granite-cuda-stricte.md` ;
 - `docs/adr/ADR-046-profils-locaux-etanches-sur-autorite-docker-explicite.md` ;
 - `docs/adr/ADR-048-progression-et-parallelisme-dans-profils-explicites.md` ;
 - `docs/specs/m002_plateforme_locale_sure.md` ;

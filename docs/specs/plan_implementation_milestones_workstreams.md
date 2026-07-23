@@ -6,7 +6,7 @@ Date de création: 21 juin 2026.
 
 Statut: plan initial d'implémentation.
 
-Ce document repart de zéro depuis la spécification v4.1. Il ne reprend pas un plan antérieur comme source. M-014 constitue une extension post-V1 explicitement planifiée par `docs/specs/plan_distribution.md`; sa décision structurante reste soumise à ADR-051. Toute modification structurante ultérieure devra être documentée par ADR dans `docs/adr/` et reportée dans `docs/adr/index.md`.
+Ce document repart de zéro depuis la spécification v4.1. Il ne reprend pas un plan antérieur comme source. M-014 constitue une extension post-V1 explicitement planifiée par `docs/specs/plan_distribution.md`; sa décision structurante reste soumise à ADR-052. ADR-051 gouverne séparément l'exécution Granite CUDA stricte du worker local courant. Toute modification structurante ultérieure devra être documentée par ADR dans `docs/adr/` et reportée dans `docs/adr/index.md`.
 
 ## 1. Intention métier
 
@@ -583,7 +583,7 @@ git ls-tree -r --name-only master -- docs/tasks docs/adr docs/specs
   - When les pages sont distribuées par la file PostgreSQL puis traitées sur les deux nœuds
   - Then chaque résultat est écrit une seule fois sous claim fenced, le document canonique reste unique et la progression publique reflète exclusivement l'état persistant
 - Livrables:
-  - ADR-051 à créer pour la topologie distribuée et le déploiement SSH;
+  - ADR-052 à créer pour la topologie distribuée et le déploiement SSH;
   - file de jobs enrichie des capacités et identités de workers;
   - stockage d'objets partagé et artefacts portables entre nœuds;
   - images CPU `arm64` et `amd64`, commandes worker-only et registre de flotte;
@@ -605,7 +605,7 @@ git ls-tree -r --name-only master -- docs/tasks docs/adr docs/specs
 - Dépendance: M-013; sous-milestone de M-014.
 - Livrables:
   - baseline mono-worker et inventaire des hôtes;
-  - ADR-051 proposée, indexée et revue;
+  - ADR-052 proposée, indexée et revue;
   - contrats de jobs, capacités, identités de workers et artefacts;
   - migrations ascendantes depuis la version 021;
   - port et adaptateur de stockage partagé avec TLS, empreintes et isolation.
@@ -648,7 +648,7 @@ git ls-tree -r --name-only master -- docs/tasks docs/adr docs/specs
   - destinations Kamal étanches par environnement et préflights SSH/Colima/Docker;
   - qualification live Mac/PC, panne et reprise, comparaison cross-architecture;
   - rapport de charge sur cent PDF et bascule progressive canari.
-- Gate de sortie: la livraison du même digest sur Mac et PC est reproductible, le débit distribué dépasse le baseline mono-worker et ADR-051 peut être acceptée avec ses preuves.
+- Gate de sortie: la livraison du même digest sur Mac et PC est reproductible, le débit distribué dépasse le baseline mono-worker et ADR-052 peut être acceptée avec ses preuves.
 
 ## 7. Chemin critique
 
@@ -713,7 +713,7 @@ Les points suivants doivent déclencher une vérification ADR avant implémentat
 | Configuration applicative par fichier unique sans variables d'environnement | M13-config | ADR-016 |
 | Profils `development`, `test`, `production` explicites et isolation des données/workers | M13-environments | ADR-046, remplaçant ADR-045 qui remplaçait ADR-016 |
 | Framework ASGI et serveur HTTP de l'API orchestratrice | M13-FastAPI | ADR-019 à créer |
-| Distribution CPU multi-nœuds, stockage partagé et déploiement Kamal par SSH | M14-distribution-core avant toute implémentation | ADR-051 à créer; remplacement borné des clauses concernées d'ADR-014 et ADR-048 après preuves live |
+| Distribution CPU multi-nœuds, stockage partagé et déploiement Kamal par SSH | M14-distribution-core avant toute implémentation | ADR-052 à créer; remplacement borné des clauses concernées d'ADR-014 et ADR-048 après preuves live |
 
 Une ADR acceptée ne doit pas être réécrite pour changer son sens. Toute évolution doit créer une nouvelle ADR remplaçante.
 
