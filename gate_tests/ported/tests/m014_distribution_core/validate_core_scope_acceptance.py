@@ -11,7 +11,13 @@ import yaml
 REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
 
 
-def test_m014_core_ne_publie_aucune_operation_reservee_a_t009() -> None:
+def test_perimetre_m014_core_reste_borne_a_t001_t004() -> None:
+    _assert_aucune_operation_reservee_a_t009()
+    _assert_runbook_sans_cli_t009()
+    _assert_gpu_requis_par_compose()
+
+
+def _assert_aucune_operation_reservee_a_t009() -> None:
     # Given M14-distribution-core couvre uniquement T-001 à T-004.
     operations_module = REPOSITORY_ROOT / "app/platform/distribution_operations.py"
     pyproject = tomllib.loads(
@@ -42,7 +48,7 @@ def test_m014_core_ne_publie_aucune_operation_reservee_a_t009() -> None:
         ).exists()
 
 
-def test_runbook_reste_un_protocole_m14_core_sans_cli_t009() -> None:
+def _assert_runbook_sans_cli_t009() -> None:
     # Given les opérations publiques appartiennent à M14-local-qualification T-009.
     runbook = (REPOSITORY_ROOT / "docs/runbooks/distribution_locale.md").read_text(
         encoding="utf-8"
@@ -60,7 +66,7 @@ def test_runbook_reste_un_protocole_m14_core_sans_cli_t009() -> None:
     assert "uv run --locked gate --scope m013_config" in runbook
 
 
-def test_configuration_compose_locale_exige_le_gpu() -> None:
+def _assert_gpu_requis_par_compose() -> None:
     # Given la pile locale exécute Granite exclusivement sur cuda:0.
     configuration = yaml.safe_load(
         (
