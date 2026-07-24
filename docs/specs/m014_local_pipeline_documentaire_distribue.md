@@ -2,7 +2,8 @@
 
 ## Statut et portée
 
-- Statut : implémentée pour T-005 à T-008, avant qualification T-009 à T-011.
+- Statut : implémenté et activable explicitement pour T-005 à T-008 ; la
+  qualification opératoire et capacitaire T-009 à T-011 reste à réaliser.
 - Milestone : `M14-local-pipeline - Pipeline documentaire local distribué`.
 - Domaine : traitement des sources documentaires et accès aux connaissances.
 - Bounded contexts : Source Processing (SP), `platform` et Knowledge Access (KA).
@@ -11,7 +12,12 @@
 - Contrats amont : M-004, M-005, M13-environments et M14-distribution-core.
 - ADR nouvelle : non requise ; ce contrat applique les décisions existantes sans en changer le sens.
 
-Cette spécification fixe les responsabilités, l’ordre causal et les critères de sortie du pipeline à la page. Elle ne crée aucun code de production, ne rend aucun comportement distribué disponible et ne constitue pas une preuve live.
+Cette spécification décrit le code de production livré par T-005 à T-008 et
+ses preuves unitaires, d’acceptation et live. Le pipeline est sélectionné
+uniquement par `orchestration_version: m014-page-fanout-v1` dans la
+configuration complète ; aucune présence de schéma ou de GPU ne l’active.
+Elle ne vaut pas qualification opératoire T-009, reprise réelle T-010 ni
+campagne capacitaire T-011.
 
 ## Scénario BDD directeur
 
@@ -198,8 +204,10 @@ La projection vérifie la version, le hash canonique, le profil de projection, `
 | `PAGE_MANIFEST_INCOMPLETE` | SP | Page attendue absente ou disposition non terminale. |
 | `PAGE_RESULT_TERMINAL_FAILURE` | SP | Au moins une page a échoué terminalement. |
 | `CANONICAL_ASSEMBLY_REPLAY_DIVERGENCE` | SP | Même identité d’assemblage avec résultat canonique divergent. |
+| `CANONICAL_ARTIFACT_REF_MISMATCH` | SP | L’artefact publié ne correspond pas à la référence canonique attendue par la commande d’assemblage. |
 | `CANONICAL_SOURCE_NOT_PUBLISHED` | KA | Projection demandée avant publication canonique complète. |
-| `ARTIFACT_HASH_MISMATCH` | SP ou KA | Contenu lu différent du SHA-256 publié. |
+| `ARTIFACT_HASH_MISMATCH` | SP | Artefact source ou résultat de page différent du SHA-256 publié. |
+| `CANONICAL_ARTIFACT_HASH_MISMATCH` | KA | Artefact canonique lu différent du SHA-256 porté par la publication. |
 
 La saturation des deux slots Granite laisse le job `pending` ; elle n’est pas une erreur terminale. Aucun de ces codes ne déclenche une valeur par défaut, un changement de route, un autre environnement ou une technologie alternative.
 
@@ -249,16 +257,21 @@ d’artefact, de collection ou d’environnement échoue avant mutation.
 
 ## Migration, activation et rollback explicites
 
-P-002 n’ajoute aucune migration. Les migrations ascendantes du socle restent présentes mais leur simple déploiement n’active pas le fan-out. L’activation future de T-005 doit être versionnée, explicite, réservée aux nouveaux traitements et incompatible avec une sélection automatique par matériel, nombre de workers ou présence de tables.
+Le pipeline livré applique les migrations 023 à 028 après le socle 022 : fan-out
+et version d’orchestration (023), publication canonique (024), projection KA
+(025), identité complète des complétions (026), durcissement du relais et des
+rejeux (027), puis coexistence bornée M004/M014 et correction de l’attente
+d’artefact canonique (028). Leur simple déploiement n’active jamais le fan-out.
 
 Le discriminateur fermé du job parent est `orchestration_version`. La valeur
 `m004-inline-v1` conserve le parcours documentaire antérieur et la valeur
 `m014-page-fanout-v1` sélectionne le fan-out T-005. Le champ est obligatoire
 dès la création de la demande, persiste avec le traitement et ne peut plus être
 modifié après son démarrage. Une valeur absente ou inconnue est refusée ; elle
-ne sélectionne jamais silencieusement l’un des deux parcours. Tant que T-006 à
-T-008 ne ferment pas la chaîne réelle complète, l’action publique existante
-continue de créer explicitement `m004-inline-v1`.
+ne sélectionne jamais silencieusement l’un des deux parcours. La migration 028
+reconnaît transitoirement un ancien writer M004 seulement lorsque son message
+outbox prouve l’absence historique du discriminateur ; elle ne définit aucun
+défaut SQL. Le writer courant fournit toujours la valeur explicitement.
 
 Le rollback arrête explicitement la création de nouveaux jobs de pages, draine les workers, laisse terminer ou expirer les claims et slots actifs, et conserve les résultats déjà persistés. Les traitements commencés restent liés à leur version d’orchestration ; seuls de nouveaux documents peuvent reprendre le parcours antérieur, par une configuration explicite.
 
@@ -274,9 +287,10 @@ Le rollback ne supprime ni table ni colonne, ne réécrit aucun résultat, ne mo
 | LP-004 - Publication atomique | Aucun assemblage incomplet ; une version et un événement par identité. | `docs/tasks/milestone_014-local-pipeline/0005_assembler_publier_document_canonique.md` |
 | LP-005 - Projection publiée locale | KA lit uniquement `canonical_publication_inbox`, crée atomiquement projection et outbox, puis publie et rejoue une seule génération dans le Qdrant configuré du même environnement. | `docs/tasks/milestone_014-local-pipeline/0006_projeter_document_publie_localement.md` |
 
-## Exclusions P-002 et M14-local-qualification
+## Différence entre implémentation et qualification M14-local-qualification
 
-- Aucun fan-out, worker, consommateur, assemblage ou projecteur de production n’est implémenté par P-002.
+- P-002 seule était documentaire ; T-005 à T-008 livrent désormais le fan-out,
+  le worker de page, l’assemblage, les relais et la projection de production.
 - T-009, ses métriques d’administration et ses opérations d’inspection, drainage et redémarrage restent dans `M14-local-qualification`.
 - T-010, la preuve live à deux workers et la reprise réelle restent dans `M14-local-qualification`.
 - T-011, la campagne de cent PDF, le rapport de capacité et la décision finale sur ADR-052 restent dans `M14-local-qualification`.
@@ -290,5 +304,12 @@ Ces exclusions séquencent la livraison ; elles n’autorisent aucun mock, stub,
 uv run --locked pytest -q gate_tests/ported/tests/m014_local_pipeline/validate_local_pipeline_specification_acceptance.py gate_tests/ported/tests/m014_local_pipeline/validate_local_pipeline_specification_unit.py
 uv run --locked gate --scope governance
 uv run --locked gate --scope m014_local_pipeline
-uv run --locked gate
 ```
+
+Les sous-agents exécutent seulement les tests et scopes ciblés. Une preuve
+globale GREEN précédente est réutilisable tant que `HEAD` et le worktree n’ont
+pas changé. L’orchestrateur exécute exactement une gate globale de clôture par
+itération ou milestone avec un timeout de 3 600 000 ms ; après un yield, il
+attend le même cell ID et ne relance jamais la commande à cause d’une fenêtre
+d’affichage courte. Un vrai RED se diagnostique avec les scopes ciblés, puis
+l’orchestrateur produit une unique preuve globale post-correctif.

@@ -19,9 +19,12 @@ from app.source_processing.domain.distribution_contracts import (
     PAGE_RESULT_CONTRACT_VERSION,
     AssembleCanonicalDocumentContract,
     DistributionContractError,
-    LocalArtifactIdentity,
     PageResultContract,
     assemble_canonical_document_idempotence_key,
+)
+from app.source_processing.domain.canonical_source import (
+    canonical_artifact_ref_for,
+    canonical_source_id_for,
 )
 from app.source_processing.domain.source_document import DocumentId
 
@@ -80,7 +83,6 @@ def enqueue_canonical_assembly_if_complete(
         page_result_contract_version=PAGE_RESULT_CONTRACT_VERSION,
         contract_version=ASSEMBLE_CANONICAL_DOCUMENT_CONTRACT_VERSION,
     )
-    relative_path = f"canonical_candidates/{run_id}/docling.json"
     contract = AssembleCanonicalDocumentContract(
         contract_version=ASSEMBLE_CANONICAL_DOCUMENT_CONTRACT_VERSION,
         environment_identity=_job_environment_identity(
@@ -93,10 +95,9 @@ def enqueue_canonical_assembly_if_complete(
         page_count=total,
         page_manifest_sha256=row[4],
         page_result_contract_version=PAGE_RESULT_CONTRACT_VERSION,
-        expected_canonical_artifact=LocalArtifactIdentity(
-            environment=row[1],
-            artifact_ref=f"artifact:source_processing.local/{row[1]}/{relative_path}",
-            relative_path=relative_path,
+        expected_canonical_artifact=canonical_artifact_ref_for(
+            canonical_source_id=canonical_source_id_for(DocumentId.from_value(row[0])),
+            canonical_version_id=f"CVER-M014-{assembly_key[:24].upper()}",
         ),
         idempotence_key=assembly_key,
     )

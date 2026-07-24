@@ -213,8 +213,8 @@ def validate_local_pipeline_specification(specification_text: str) -> None:
             "`m004-inline-v1`",
             "`m014-page-fanout-v1`",
             "Une valeur absente ou inconnue est refusée",
-            "l’action publique existante continue de créer explicitement "
-            "`m004-inline-v1`",
+            "Le writer courant fournit toujours la valeur explicitement.",
+            "ancien writer M004 seulement lorsque son message outbox prouve",
         ),
         "M014_LOCAL_PIPELINE_ORCHESTRATION_VERSION_REQUIRED",
     )

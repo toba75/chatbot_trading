@@ -81,7 +81,8 @@
 - Commandes de validation : tests unitaires d'assemblage, autorité et QA ; tests
   PostgreSQL live de complétude, concurrence, crash et publication atomique ;
   `uv run --locked gate --scope m004` ;
-  `uv run --locked gate --scope m014_local_pipeline --live` ;
-  `uv run --locked gate`.
+  `uv run --locked gate --scope m014_local_pipeline --live`. Le sous-agent
+  exécute uniquement les tests et scopes ciblés. La gate globale de clôture
+  appartient à l’orchestrateur selon la politique unique du journal.
 - Commit RED : `test(m014-pipeline): couvrir assemblage canonique atomique`.
 - Commit GREEN : `feat(m014-pipeline): publier document canonique complet`.

@@ -203,10 +203,9 @@ def test_contrats_locaux_versionnes_et_refusables() -> None:
         page_count=2,
         page_manifest_sha256=SHA_B,
         page_result_contract_version=PAGE_RESULT_CONTRACT_VERSION,
-        expected_canonical_artifact=LocalArtifactIdentity(
-            environment="test",
-            artifact_ref="artifact:source_processing.local/test/canonical/DOC-A-v1.json",
-            relative_path="canonical/DOC-A-v1.json",
+        expected_canonical_artifact=(
+            "artifact:source_processing.canonical_sources/CSRC-A/"
+            f"CVER-M014-{assembly_key[:24].upper()}/docling.json"
         ),
         idempotence_key=assembly_key,
     )

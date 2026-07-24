@@ -2,11 +2,11 @@
 
 ## Périmètre
 
-Ce document couvre exclusivement `M14-distribution-core`, donc T-001 à T-004.
-Il décrit les prérequis, les invariants de configuration, la migration 022 et
-les règles de drainage et de rollback que les opérations futures devront
-respecter. Il ne publie aucune commande d’inspection, de drainage, de
-redémarrage ciblé, de préparation, d’activation ou de rollback.
+Ce document couvre `M14-distribution-core` T-001 à T-004 et le pipeline livré
+`M14-local-pipeline` T-005 à T-008. Il décrit les prérequis, les invariants de
+configuration, les migrations 022 à 028, l’activation explicite et le rollback.
+Il ne publie pas encore les commandes d’inspection, de drainage ou de
+redémarrage ciblé réservées à T-009.
 
 Ces opérations appartiennent à T-009 de `M14-local-qualification`, après
 `M14-local-pipeline` T-005 à T-008. Tant que T-009 n’est pas livré, aucune
@@ -33,6 +33,11 @@ ADR-051 reste l’autorité de l’exécution Granite stricte sur `cuda:0` et de
 `GRANITE_CUDA_UNAVAILABLE`. ADR-052 gouverne le quota PostgreSQL fenced pour
 M-014. Le CPU, `auto`, `gpus: all`, un worker spécialisé ou distant et une
 seconde autorité de quota sont interdits.
+
+Avant toute activation Granite, l’opérateur exécute `nvidia-smi` sur l’hôte et
+vérifie le GPU 0 dans le conteneur worker qualifié. Une commande absente, un
+pilote incompatible ou `cuda:0` invisible bloque l’activation ; aucune alternative silencieuse,
+aucun CPU et aucun autre périphérique ne sont admis.
 
 ## Validation de configuration et du GPU
 
@@ -92,6 +97,32 @@ automatique à cette révision, ni réouverture de la surface publique. Le choix
 et l’automatisation d’une cible compatible seront livrés par T-009 après la
 chaîne M14-local-pipeline.
 
+## Déploiement et activation T-005 à T-008
+
+L’ordre est strict : migrer 023 à 028, démarrer les relais, puis les deux
+`worker-documents` annonçant `CONVERT_PAGE` et
+`ASSEMBLE_CANONICAL_DOCUMENT`, enfin les workers KA annonçant
+`PROJECT_DOCUMENT`. Vérifier l’identité `environment`, `deployment_id` et
+`configuration_hash` de PostgreSQL, des artefacts et de Qdrant avant tout
+nouveau traitement.
+
+L’activation concerne uniquement de nouveaux traitements et exige la valeur
+`m014-page-fanout-v1` dans la configuration complète. `m004-inline-v1` reste
+une sélection explicite de rollback ; la présence des migrations, des workers
+ou de `nvidia-smi` ne choisit jamais le parcours. Les migrations 023 à 027
+installent les tables, contraintes, relais et index. La migration 028 ouvre une
+coexistence bornée avec un ancien writer M004 prouvé par son outbox et corrige
+les attentes d’artefacts d’assemblage en attente ; elle n’installe aucun
+`DEFAULT` métier silencieux.
+
+Le rollback ferme d’abord les nouvelles admissions M14, draine les jobs de
+page et d’assemblage, puis laisse les publications et projections déjà
+committées converger. Il bascule uniquement les nouveaux traitements vers
+`m004-inline-v1`, sans réécrire les traitements M14, supprimer les migrations,
+changer de route ou acquitter un relais avant le commit de son consommateur.
+Le trigger transitoire de la migration 028 ne sera supprimé que par une future
+étape contract après preuve qu’aucun ancien writer M004 n’est déployable.
+
 ## Gates de validation
 
 ```console
@@ -103,7 +134,14 @@ uv run --locked gate --scope m013_fastapi
 uv run --locked gate --scope governance
 uv run --locked gate --scope m014_distribution_core
 uv run --locked gate --scope m014_distribution_core --live
+uv run --locked gate --scope m014_local_pipeline
+uv run --locked gate --scope m014_local_pipeline --live
 ```
 
 La gate live utilise un PostgreSQL éphémère réel. Elle ne publie aucune surface
 d’exploitation T-009 et ne remplace pas la qualification Granite réelle T-010.
+Les sous-agents restent sur ces commandes ciblées. L’orchestrateur exécute
+exactement une gate globale de clôture avec un timeout de 3 600 000 ms, attend
+le même cell ID après yield et ne la relance jamais à cause d’une fenêtre
+courte. Tant que `HEAD` et le worktree sont inchangés, la preuve globale GREEN
+précédente reste la précondition réutilisable.

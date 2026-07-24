@@ -86,7 +86,8 @@
   `uv run --locked gate --scope m005` ;
   `uv run --locked gate --scope m013_environments` ;
   `uv run --locked gate --scope m014_local_pipeline` ;
-  `uv run --locked gate --scope m014_local_pipeline --live` ;
-  `uv run --locked gate`.
+  `uv run --locked gate --scope m014_local_pipeline --live`. Le sous-agent
+  exécute uniquement les tests et scopes ciblés. La gate globale de clôture
+  appartient à l’orchestrateur selon la politique unique du journal.
 - Commit RED : `test(m014-pipeline): couvrir projection locale idempotente`.
 - Commit GREEN : `feat(m014-pipeline): projeter version canonique locale`.

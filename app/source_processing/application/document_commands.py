@@ -548,7 +548,7 @@ class DocumentConversionCommandService:
         conversion_configuration_hash: str,
         code_version: str,
         model_version: str,
-        orchestration_version: str = LEGACY_INLINE_ORCHESTRATION_VERSION,
+        orchestration_version: str,
     ) -> None:
         if not callable(
             getattr(source_document_repository, "find_by_document_id", None)

@@ -162,7 +162,7 @@ def test_fan_out_postgresql_rollback_rejeu_relais_et_refus_divergent() -> None:
             )
             runner.run()
             runner.run()
-            assert runner.required_schema_version == 27
+            assert runner.required_schema_version == 28
             assert runner.is_required_schema_ready()
 
             source = _source()
@@ -173,16 +173,44 @@ def test_fan_out_postgresql_rollback_rejeu_relais_et_refus_divergent() -> None:
             with factory.connect() as connection, connection.transaction(), connection.cursor() as cursor:
                 cursor.execute(
                     """
+                    INSERT INTO source_processing.job_outbox (
+                        environment, deployment_id, job_name, priority,
+                        input_hash, configuration_hash,
+                        code_version, model_version, payload, trace_id, status
+                    )
+                    VALUES (
+                        'test', 'ostrading-test-local',
+                        'CONVERT_DOCUMENT', 'P1', %s, %s,
+                        'm004-rollback-writer-v1', 'docling-m004-v1',
+                        %s::jsonb, 'TRACE-M004-ROLLBACK-WRITER', 'pending'
+                    )
+                    RETURNING outbox_id
+                    """,
+                    (
+                        source.fingerprint.value,
+                        "c" * 64,
+                        '{"document_id":"' + source.document_id.value + '"}',
+                    ),
+                )
+                legacy_submission_id = cursor.fetchone()[0]
+                cursor.execute(
+                    """
                     INSERT INTO source_processing.document_conversion_requests (
                         document_id, conversion_status, canonical_version_id,
                         rejection_error_code, submission_id, job_id,
                         execution_phase, completed_units, total_units,
-                        failure_error_code, orchestration_version
+                        failure_error_code
                     )
                     VALUES (%s, 'CONVERSION_REQUESTED', NULL, NULL, %s, NULL,
-                            'QUEUED', 0, 4, NULL, 'm004-inline-v1')
+                            'QUEUED', 0, 4, NULL)
+                    RETURNING orchestration_version
                     """,
-                    (source.document_id.value, "OUTBOX-SP-M014-FANOUT-PARENT"),
+                    (source.document_id.value, legacy_submission_id),
+                )
+                assert cursor.fetchone() == ("m004-inline-v1",)
+                cursor.execute(
+                    "DELETE FROM source_processing.job_outbox WHERE outbox_id = %s",
+                    (legacy_submission_id,),
                 )
 
             repository = PostgresDocumentConversionRepository(persistence)

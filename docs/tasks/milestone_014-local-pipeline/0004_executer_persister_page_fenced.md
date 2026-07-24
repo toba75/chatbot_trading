@@ -86,7 +86,8 @@
   `uv run --locked gate --scope m004` ;
   `uv run --locked gate --scope m013_environments` ;
   `uv run --locked gate --scope m014_distribution_core --live` ;
-  `uv run --locked gate --scope m014_local_pipeline --live` ;
-  `uv run --locked gate`.
+  `uv run --locked gate --scope m014_local_pipeline --live`. Le sous-agent
+  exécute uniquement les tests et scopes ciblés. La gate globale de clôture
+  appartient à l’orchestrateur selon la politique unique du journal.
 - Commit RED : `test(m014-pipeline): couvrir resultat de page fenced`.
 - Commit GREEN : `feat(m014-pipeline): persister resultats de pages sous fencing`.

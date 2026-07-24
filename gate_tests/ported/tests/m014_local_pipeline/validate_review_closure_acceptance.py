@@ -25,7 +25,7 @@ def _read(relative_path: str) -> str:
     return (ROOT / relative_path).read_text(encoding="utf-8")
 
 
-def test_les_taches_ne_demandent_plus_de_gate_globale_aux_sous_agents() -> None:
+def _assert_les_taches_ne_demandent_plus_de_gate_globale_aux_sous_agents() -> None:
     for task_name in (
         "0003_eclater_conversion_en_jobs_pages.md",
         "0004_executer_persister_page_fenced.md",
@@ -46,7 +46,7 @@ def test_les_taches_ne_demandent_plus_de_gate_globale_aux_sous_agents() -> None:
         assert "HEAD" in document and "worktree" in document
 
 
-def test_la_specification_et_la_matrice_decrivent_le_pipeline_livre() -> None:
+def _assert_la_specification_et_la_matrice_decrivent_le_pipeline_livre() -> None:
     specification = _read("docs/specs/m014_local_pipeline_documentaire_distribue.md")
     for marker in (
         "Statut : implémenté et activable explicitement",
@@ -77,7 +77,7 @@ def test_la_specification_et_la_matrice_decrivent_le_pipeline_livre() -> None:
         assert migration in matrix
 
 
-def test_les_runbooks_exposent_activation_rollback_gpu_et_gates_bornees() -> None:
+def _assert_les_runbooks_exposent_activation_rollback_gpu_et_gates_bornees() -> None:
     distribution = _read("docs/runbooks/distribution_locale.md")
     environments = _read("docs/runbooks/environnements_explicites.md")
     for marker in (
@@ -94,7 +94,7 @@ def test_les_runbooks_exposent_activation_rollback_gpu_et_gates_bornees() -> Non
     assert "exactement une gate globale de clôture" in environments
 
 
-def test_la_migration_de_coexistence_classe_seulement_un_writer_m004_prouve() -> None:
+def _assert_la_migration_classe_seulement_un_writer_m004_prouve() -> None:
     migration = _read("deploy/postgres/migrations/028_m014_local_pipeline_compatibility.sql")
     assert "classify_m004_inline_orchestration" in migration
     assert "payload ? 'orchestration_version'" in migration
@@ -103,15 +103,24 @@ def test_la_migration_de_coexistence_classe_seulement_un_writer_m004_prouve() ->
     assert "DEFAULT 'm004-inline-v1'" not in migration
 
 
-def test_aucun_defaut_python_ne_choisit_le_parcours_de_conversion() -> None:
+def _assert_aucun_defaut_python_ne_choisit_le_parcours_de_conversion() -> None:
     parameter = inspect.signature(DocumentConversionCommandService.__init__).parameters[
         "orchestration_version"
     ]
     assert parameter.default is inspect.Parameter.empty
 
 
-def test_l_artefact_attendu_est_compare_a_l_artefact_canonique_publie() -> None:
+def _assert_l_artefact_attendu_est_compare_a_l_artefact_canonique_publie() -> None:
     assembly = _read("app/source_processing/application/assemble_canonical_document.py")
-    assert "CANONICAL_ARTIFACT_HASH_MISMATCH" in assembly
+    assert "CANONICAL_ARTIFACT_REF_MISMATCH" in assembly
     assert "contract.expected_canonical_artifact" in assembly
     assert "published.stored_artifact_ref" in assembly
+
+
+def test_cloture_revue_m014_local_pipeline() -> None:
+    _assert_les_taches_ne_demandent_plus_de_gate_globale_aux_sous_agents()
+    _assert_la_specification_et_la_matrice_decrivent_le_pipeline_livre()
+    _assert_les_runbooks_exposent_activation_rollback_gpu_et_gates_bornees()
+    _assert_la_migration_classe_seulement_un_writer_m004_prouve()
+    _assert_aucun_defaut_python_ne_choisit_le_parcours_de_conversion()
+    _assert_l_artefact_attendu_est_compare_a_l_artefact_canonique_publie()

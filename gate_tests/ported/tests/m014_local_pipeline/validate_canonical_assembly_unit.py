@@ -54,13 +54,17 @@ def _contract(page_count: int = 3) -> AssembleCanonicalDocumentContract:
         page_count=page_count,
         page_manifest_sha256=manifest_hash,
         page_result_contract_version=PAGE_RESULT_CONTRACT_VERSION,
-        expected_canonical_artifact=LocalArtifactIdentity(
-            environment="test",
-            artifact_ref=(
-                "artifact:source_processing.local/test/"
-                "canonical/RUN-M014-ASSEMBLY-UNIT/docling.json"
-            ),
-            relative_path="canonical/RUN-M014-ASSEMBLY-UNIT/docling.json",
+        expected_canonical_artifact=(
+            "artifact:source_processing.canonical_sources/"
+            "CSRC-M014-ASSEMBLY-UNIT/"
+            "CVER-M014-"
+            + assemble_canonical_document_idempotence_key(
+                processing_run_id="RUN-M014-ASSEMBLY-UNIT",
+                page_manifest_sha256=manifest_hash,
+                page_result_contract_version=PAGE_RESULT_CONTRACT_VERSION,
+                contract_version=ASSEMBLE_CANONICAL_DOCUMENT_CONTRACT_VERSION,
+            )[:24].upper()
+            + "/docling.json"
         ),
         idempotence_key=assemble_canonical_document_idempotence_key(
             processing_run_id="RUN-M014-ASSEMBLY-UNIT",

@@ -3,8 +3,8 @@
 ## Statut de planification
 
 - Date : 2026-07-24.
-- Statut : P-001 et P-002 GREEN ; T-005 peut commencer, sans comportement
-  T-005 à T-008 encore implémenté.
+- Statut : P-001, P-002 et T-005 à T-008 implémentés ; clôture de revue en
+  cours avant la gate globale unique de l’orchestrateur.
 - Branche d'implémentation : `codex/m14-local-pipeline` ; le cycle RED/GREEN de
   P-002 est documenté ci-dessous.
 - Source canonique : `docs/specs/plan_distribution.md`, T-005 à T-008, et
@@ -416,3 +416,60 @@ P-001 précondition GREEN
   `feat(m014-pipeline): projeter version canonique locale`. Après ce commit et
   sur arbre propre, une seule gate globale finale sera lancée avec un délai de
   3 600 secondes et son processus sera attendu jusqu’au verdict terminal.
+
+## 2026-07-24 - Politique corrective des gates et clôture de revue
+
+- Règle issue du blocage opérateur : chaque sous-agent exécute uniquement ses
+  tests et scopes ciblés. Une preuve globale GREEN précédente est réutilisable
+  tant que `HEAD` et le worktree n’ont pas changé. L’orchestrateur exécute
+  exactement une gate globale de clôture par itération ou milestone avec un
+  timeout de 3 600 000 ms. Après un yield, il attend le même cell ID ; une
+  fenêtre d’affichage courte ne justifie jamais une relance. Un vrai RED est
+  d’abord diagnostiqué par scopes ciblés, puis suivi d’une unique preuve
+  globale post-correctif produite par l’orchestrateur.
+- Commits fonctionnels réels : P-001 `5433a1ab1`; P-002 RED `303eed36a` et
+  GREEN `f90cfe505`; T-005 RED `2a4cce8b4` et GREEN `8336dd92e`; T-006 RED
+  `73b99c530`, GREEN `a57c8d5a6` et correction `9683d3b0e`; T-007 RED
+  `fa4d9e6ff` et GREEN `7a6c84bf5`; T-008 RED `c30adf2ea` et GREEN
+  `425c9d68f`.
+- Lots de revue réels : source processing RED `3646a0035` et GREEN
+  `0bd835572`; projection/migrations RED `a2658e763` et GREEN `da615a0e3`;
+  clôture documentaire et compatibilité RED `6734b0483`, puis commit GREEN
+  `docs(m014-pipeline): cloturer revue et tracabilite` portant cette entrée.
+- Le RED externe `m013_environments --live` n’est pas un défaut M14 : le build
+  Docker interne a dépassé sa limite de 600 s et le worktree était encore
+  modifié avant commit. Cette exécution n’a pas été relancée par le sous-agent ;
+  le scope `m013_environments --offline` reste la preuve bornée demandée ici.
+- La migration 028 maintient une coexistence bornée : seul un ancien writer
+  M004 relié à son outbox sans discriminateur est classé
+  `m004-inline-v1`; toute autre absence échoue. Elle transforme aussi les jobs
+  d’assemblage non exécutés afin que `expected_canonical_artifact` désigne
+  l’artefact publié réel. Aucun défaut Python ou SQL métier n’est conservé.
+- Performance vérifiée : la source PDF est matérialisée une fois par worker et
+  les pages lisent cette copie, le fan-out est écrit en lot dans une transaction,
+  l’inbox de publication possède son index de dernière publication et
+  l’assemblage charge les résultats en une requête ordonnée, soit O(P).
+- Refactors vérifiés : `PROJECT_DOCUMENT` utilise le contrat central ; les
+  variantes de claim/lease sont explicites et les ports de page sont réduits à
+  leurs responsabilités distinctes. `_run_validated_worker_and_claim_next`
+  reste volontairement une racine de composition linéaire sans règle métier ;
+  la découper dans ce lot augmenterait le risque sans réduire de duplication.
+  Le relais KA demeure long mais conserve une unique transaction KA protégée
+  par ses tests de concurrence et rollback ; aucun refactor transactionnel
+  risqué n’est introduit pendant cette clôture.
+- Produit : `CONVERT_DOCUMENT` sélectionne M14 uniquement par
+  `m014-page-fanout-v1`; les jobs internes publient une progression persistée
+  avec phase, unités, total et erreur terminale. Aucune action publique
+  « Projeter » n’est exposée par T-005 à T-008.
+- Validations de clôture avant commit GREEN : validateur documentaire 1/1
+  GREEN ; migration/coexistence PostgreSQL 1/1 GREEN ; scopes `governance`,
+  `m004`, `m005`, `m013_config`, `m013_fastapi` et `m013_environments
+  --offline` GREEN ; `m014_distribution_core` 36/36 GREEN après réalignement
+  de son fixture de contrat ; `m014_local_pipeline --offline` 38/38 GREEN et
+  `m014_local_pipeline --live` 42/42 GREEN. Les quatre preuves live T-005 à
+  T-008 sont GREEN, y compris la recherche Qdrant réelle. Ruff est GREEN sur
+  les onze fichiers Python modifiés et `git diff --check 6734b0483` est GREEN.
+  Aucune gate globale n’a été exécutée dans ce lot.
+- ADR consultées : ADR-005, ADR-010, ADR-024, ADR-025, ADR-052,
+  DDD-ADR-004 et DDD-ADR-008. ADR créée ou modifiée : aucune, car la revue
+  applique les décisions existantes sans nouvelle décision structurante.

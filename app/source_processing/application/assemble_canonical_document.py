@@ -268,6 +268,8 @@ class AssembleCanonicalDocumentHandler:
                 existing_canonical_source=None,
             )
         )
+        if published.stored_artifact_ref != contract.expected_canonical_artifact:
+            raise DistributionContractError("CANONICAL_ARTIFACT_REF_MISMATCH")
         _text(trace_id, "CANONICAL_ASSEMBLY_TRACE_INVALID")
         event = build_canonical_source_published_event(
             canonical_ref=published.canonical_ref,

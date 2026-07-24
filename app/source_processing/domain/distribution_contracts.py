@@ -42,6 +42,10 @@ _ARTIFACT_REF_PATTERN = re.compile(
     r"^artifact:source_processing\.local/(development|test|production)/"
     r"[A-Za-z0-9_.@/-]+$"
 )
+_CANONICAL_ARTIFACT_REF_PATTERN = re.compile(
+    r"^artifact:source_processing\.canonical_sources/"
+    r"CSRC-[A-Z0-9-]+/CVER-[A-Z0-9-]+/docling\.json$"
+)
 _ASSET_NAME_PATTERN = re.compile(r"^[a-z0-9]+(?:[._-][a-z0-9]+)*$")
 _JOB_ID_PATTERN = re.compile(r"^JOB-M002-[0-9]{6}$")
 _WORKER_INSTANCE_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
@@ -884,7 +888,7 @@ class AssembleCanonicalDocumentContract:
     page_count: int
     page_manifest_sha256: str
     page_result_contract_version: str
-    expected_canonical_artifact: LocalArtifactIdentity
+    expected_canonical_artifact: str
     idempotence_key: str
 
     def __post_init__(self) -> None:
@@ -892,7 +896,7 @@ class AssembleCanonicalDocumentContract:
             self.contract_version,
             ASSEMBLE_CANONICAL_DOCUMENT_CONTRACT_VERSION,
         )
-        identity = _environment_identity(self.environment_identity)
+        _environment_identity(self.environment_identity)
         document_id = _document_id(self.document_id)
         processing_run_id = _processing_run_id(self.processing_run_id)
         page_count = _positive_integer(self.page_count, "PAGE_COUNT_INVALID")
@@ -901,10 +905,12 @@ class AssembleCanonicalDocumentContract:
             self.page_result_contract_version,
             PAGE_RESULT_CONTRACT_VERSION,
         )
-        if not isinstance(self.expected_canonical_artifact, LocalArtifactIdentity):
-            raise ArtifactContractError("ARTIFACT_IDENTITY_INVALID")
-        if self.expected_canonical_artifact.environment != identity.environment:
-            raise DistributionContractError("CONTRACT_ENVIRONMENT_MISMATCH")
+        expected_artifact = _text(
+            self.expected_canonical_artifact,
+            "CANONICAL_ARTIFACT_REF_INVALID",
+        )
+        if _CANONICAL_ARTIFACT_REF_PATTERN.fullmatch(expected_artifact) is None:
+            raise ArtifactContractError("CANONICAL_ARTIFACT_REF_INVALID")
         expected_key = assemble_canonical_document_idempotence_key(
             processing_run_id=processing_run_id,
             page_manifest_sha256=manifest_hash,
@@ -917,6 +923,7 @@ class AssembleCanonicalDocumentContract:
         object.__setattr__(self, "processing_run_id", processing_run_id)
         object.__setattr__(self, "page_count", page_count)
         object.__setattr__(self, "page_manifest_sha256", manifest_hash)
+        object.__setattr__(self, "expected_canonical_artifact", expected_artifact)
 
     @classmethod
     def from_mapping(cls, value: Any) -> "AssembleCanonicalDocumentContract":
@@ -945,9 +952,7 @@ class AssembleCanonicalDocumentContract:
             page_count=payload["page_count"],
             page_manifest_sha256=payload["page_manifest_sha256"],
             page_result_contract_version=payload["page_result_contract_version"],
-            expected_canonical_artifact=LocalArtifactIdentity.from_mapping(
-                payload["expected_canonical_artifact"]
-            ),
+            expected_canonical_artifact=payload["expected_canonical_artifact"],
             idempotence_key=payload["idempotence_key"],
         )
 
@@ -981,7 +986,7 @@ class AssembleCanonicalDocumentContract:
             "page_count": self.page_count,
             "page_manifest_sha256": self.page_manifest_sha256,
             "page_result_contract_version": self.page_result_contract_version,
-            "expected_canonical_artifact": self.expected_canonical_artifact.to_mapping(),
+            "expected_canonical_artifact": self.expected_canonical_artifact,
             "idempotence_key": self.idempotence_key,
         }
 
