@@ -243,3 +243,58 @@ P-001 précondition GREEN
   `feat(m014-pipeline): eclater conversion en jobs de pages`. La gate globale
   finale sera exécutée une seule fois après ce commit avec un délai d'une heure ;
   toute sortie différée sera attendue sur la même exécution, sans relance.
+
+## 2026-07-24 - T-006 exécution et résultat de page sous fencing
+
+- Sous-agent : `/root/m14_t006_page_fenced`, chargé exclusivement de T-006 par
+  l’orchestrateur du milestone.
+- Baseline initiale réutilisée sans relance : commit T-005 `8336dd92e`, arbre
+  propre, gate canonique 470/470 GREEN, code 0. Cette preuve constitue la
+  précondition T-006 ; aucune gate globale n’a été démarrée avant le commit
+  GREEN.
+- Scénario BDD : deux workers réclament une page standard et une page Granite ;
+  après expiration du premier claim Granite, le second reprend la page, produit
+  l’unique enveloppe admissible et les redélivrances n’incrémentent jamais deux
+  fois la progression SP.
+- RED utile : les preuves unitaires et d’acceptation échouaient à la collecte
+  sur l’absence de `execute_document_page` et du relais de complétion.
+  Commit RED : `73b99c530` —
+  `test(m014-pipeline): couvrir resultat de page fenced`.
+- Exécution : `CONVERT_PAGE` est une capacité explicite des deux replicas
+  généralistes `worker-documents`. La boucle réclame séparément le contrat
+  standard sans slot et le contrat Granite avec acquisition atomique du claim
+  et du slot. Les convertisseurs M-004 existants restent l’unique autorité des
+  routes ; Granite est supervisé sous le couple claim-slot actif et aucun
+  changement de route ou fallback CPU n’est introduit.
+- Artefacts et contrats : la source locale est résolue sous la racine du profil,
+  lue immuablement et vérifiée par SHA-256 avant tout convertisseur. Le résultat
+  porte le claim, le worker, le slot seulement pour Granite, l’outil, les
+  métriques et soit un artefact immutable, soit une erreur terminale fermée.
+- Frontières transactionnelles : `platform` crée d’abord l’enveloppe immutable
+  et terminalise le job sous fencing. Le relais claim cette enveloppe dans une
+  transaction `platform`, appelle ensuite SP, où résultat et progression sont
+  persistés dans une seule transaction, puis acquitte l’enveloppe dans une
+  transaction `platform` séparée. Il ne marque jamais `relayed` avant le commit
+  SP.
+- Preuve PostgreSQL réelle : deux claims concurrents standard/Granite, ancienne
+  lease et ancien slot expirés, reprise avec génération 2, ancien détenteur
+  refusé avec `JOB_LEASE_LOST`, route standard sans slot, résultat Granite avec
+  slot, échec stable `ARTIFACT_HASH_MISMATCH`, crash après commit SP avant ACK,
+  redélivrance idempotente et progression finale 4/4 sans double comptage.
+- Compatibilité M-013 : les deux preuves qui fermaient historiquement les jobs
+  de `worker-documents` à `DIAGNOSE` et `CONVERT_DOCUMENT` attendent désormais
+  aussi `CONVERT_PAGE`, puisque la chaîne réelle est composée et supervisée.
+- Validations avant commit GREEN : tests ciblés T-006 3/3 GREEN, dont PostgreSQL
+  réel ; preuve de métriques M14-core GREEN ; Ruff ciblé GREEN ;
+  `git diff --check` GREEN ; scope `m004` 45/45 GREEN ; scope
+  `m013_environments` 49/49 GREEN ; scope `m014_distribution_core --live`
+  38/38 GREEN ; scope `m014_local_pipeline --live` 33/33 GREEN. Chaque scope
+  est sans nœud absent, inattendu ou dupliqué.
+- ADR consultées : ADR-024, ADR-025, ADR-040, ADR-042, ADR-051 et ADR-052. ADR
+  créée ou modifiée : aucune ; T-006 applique les frontières, le double fencing
+  et la CUDA stricte déjà décidés sans nouvelle décision structurante.
+- Commit GREEN prévu :
+  `feat(m014-pipeline): persister resultats de pages sous fencing`. Après ce
+  commit et sur arbre propre, la gate globale sera lancée exactement une fois
+  avec un délai d’une heure et toute sortie différée sera attendue sur la même
+  exécution.

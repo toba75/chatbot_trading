@@ -551,6 +551,87 @@ class PostgresJobQueue:
             execution_attempts=claimed_row.execution_attempts,
         )
 
+    def claim_next_compatible(
+        self,
+        *,
+        owner_id: str,
+        lease_seconds: int,
+        job_names: tuple[str, ...],
+        execution_requirements: JobExecutionRequirements,
+    ) -> ClaimedJob | None:
+        """Réclame seulement un contrat d'exécution exactement compatible."""
+
+        parsed_owner = _ensure_text(owner_id, "owner_id")
+        parsed_lease = _ensure_positive_integer(lease_seconds, "lease_seconds")
+        parsed_names = _ensure_job_names(job_names, self._catalog)
+        if not isinstance(execution_requirements, JobExecutionRequirements):
+            raise ValueError("execution_requirements invalides")
+        with self._connection_factory.connect() as connection:
+            with connection.transaction(), connection.cursor() as cursor:
+                cursor.execute(
+                    f"""
+                    WITH candidate AS (
+                        SELECT sequence
+                          FROM platform.technical_jobs
+                         WHERE environment = %s
+                           AND deployment_id = %s
+                           AND configuration_hash = %s
+                           AND job_name = ANY(%s)
+                           AND execution_contract_name = %s
+                           AND execution_contract_version = %s
+                           AND capacity_capability = %s
+                           AND capacity_slots = %s
+                           AND capacity_device IS NOT DISTINCT FROM %s
+                           AND storage_environment = %s
+                           AND (
+                               status = 'pending'
+                               OR (status = 'running'
+                                   AND lease_expires_at <= CURRENT_TIMESTAMP)
+                           )
+                         ORDER BY priority, sequence
+                         FOR UPDATE SKIP LOCKED
+                         LIMIT 1
+                    )
+                    UPDATE platform.technical_jobs AS job
+                       SET status = 'running', lease_owner = %s,
+                           lease_expires_at =
+                               CURRENT_TIMESTAMP + (%s * INTERVAL '1 second'),
+                           execution_attempts = execution_attempts + 1,
+                           claim_generation = claim_generation + 1,
+                           claim_token = gen_random_uuid()
+                      FROM candidate
+                     WHERE job.sequence = candidate.sequence
+                    RETURNING {_QUALIFIED_CLAIMED_JOB_COLUMNS_SQL}
+                    """,
+                    (
+                        self._environment_identity.environment,
+                        self._environment_identity.deployment_id,
+                        self._environment_identity.configuration_hash,
+                        list(parsed_names),
+                        execution_requirements.contract_name,
+                        execution_requirements.contract_version,
+                        execution_requirements.capacity_capability,
+                        execution_requirements.capacity_slots,
+                        execution_requirements.capacity_device,
+                        execution_requirements.storage_environment,
+                        parsed_owner,
+                        parsed_lease,
+                    ),
+                )
+                row = cursor.fetchone()
+        if row is None:
+            return None
+        claimed_row = _ClaimedJobRow.from_database(row)
+        return ClaimedJob(
+            job=_job_from_row(claimed_row.job_row()),
+            trace_id=claimed_row.trace_id,
+            lease_owner=claimed_row.lease_owner,
+            lease_expires_at=claimed_row.lease_expires_at,
+            claim_generation=claimed_row.claim_generation,
+            claim_token=str(claimed_row.claim_token),
+            execution_attempts=claimed_row.execution_attempts,
+        )
+
     def claim_next_environment_mismatch(
         self,
         *,

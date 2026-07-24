@@ -81,6 +81,8 @@ class PageResultStatus(str, Enum):
 
 
 class PageResultErrorCode(str, Enum):
+    DOCLING_STANDARD_UNAVAILABLE = "DOCLING_STANDARD_UNAVAILABLE"
+    OCRMYPDF_UNAVAILABLE = "OCRMYPDF_UNAVAILABLE"
     GRANITE_CAPACITY_CONFIGURATION_INVALID = "GRANITE_CAPACITY_CONFIGURATION_INVALID"
     GRANITE_CUDA_UNAVAILABLE = "GRANITE_CUDA_UNAVAILABLE"
     GRANITE_DOCLING_TIMEOUT = "GRANITE_DOCLING_TIMEOUT"
@@ -1224,6 +1226,8 @@ def _validate_executed_page_result(
         route_name=route_name,
         granite_slot_execution=granite_slot_execution,
         technical_metrics=technical_metrics,
+        status=status,
+        error_code=error_code,
     )
     _validate_page_result_outcome(
         status=status,
@@ -1239,13 +1243,28 @@ def _validate_page_result_route_resources(
     route_name: PageRouteName,
     granite_slot_execution: GraniteSlotExecutionIdentity | None,
     technical_metrics: PageTechnicalMetrics | None,
+    status: PageResultStatus,
+    error_code: PageResultErrorCode | None,
 ) -> None:
     if not isinstance(technical_metrics, PageTechnicalMetrics):
         raise DistributionContractError("PAGE_RESULT_METRICS_REQUIRED")
     if route_name in _GRANITE_ROUTES:
         if not isinstance(granite_slot_execution, GraniteSlotExecutionIdentity):
             raise DistributionContractError("GRANITE_SLOT_IDENTITY_REQUIRED")
-        if technical_metrics.gpu is None:
+        gpu_absence_is_terminal_fact = (
+            status is PageResultStatus.FAILED
+            and error_code
+            in {
+                PageResultErrorCode.GRANITE_CAPACITY_CONFIGURATION_INVALID,
+                PageResultErrorCode.GRANITE_CUDA_UNAVAILABLE,
+                PageResultErrorCode.JOB_LEASE_LOST,
+                PageResultErrorCode.ARTIFACT_NOT_FOUND,
+                PageResultErrorCode.ARTIFACT_OUTSIDE_PROFILE_ROOT,
+                PageResultErrorCode.ARTIFACT_HASH_MISMATCH,
+                PageResultErrorCode.WORKER_MEMORY_LIMIT_EXCEEDED,
+            }
+        )
+        if technical_metrics.gpu is None and not gpu_absence_is_terminal_fact:
             raise DistributionContractError("PAGE_RESULT_GPU_METRICS_REQUIRED")
         return
     if granite_slot_execution is not None:

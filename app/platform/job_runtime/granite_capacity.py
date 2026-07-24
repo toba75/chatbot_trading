@@ -1345,6 +1345,43 @@ class GraniteCapacityController:
         self._repository.release(lease)
         return GraniteExecution(lease=lease, model_result=result)
 
+    def execute_acquired_page_job(
+        self,
+        *,
+        lease: GraniteSlotLease,
+        lease_seconds: int,
+        heartbeat_seconds: float,
+        start_model: Callable[
+            [GraniteExecutionCapability], SupervisedGraniteProcess[ModelResultT]
+        ],
+    ) -> GraniteExecution[ModelResultT]:
+        """Supervise un job page dont claim et slot ont été acquis atomiquement."""
+
+        parsed_lease = _require_lease(lease)
+        parsed_lease_seconds = _positive_integer(lease_seconds)
+        parsed_heartbeat_seconds = _heartbeat_seconds(
+            heartbeat_seconds,
+            lease_seconds=parsed_lease_seconds,
+        )
+        if not callable(start_model):
+            raise GraniteCapacityConfigurationError("MODEL_CALLBACK_INVALID")
+        self._require_admissions_open()
+
+        def propagate_model_error(
+            _active_lease: GraniteSlotLease,
+            model_error: Exception,
+        ) -> None:
+            raise model_error
+
+        active_lease, result = self._execute_supervised(
+            lease=parsed_lease,
+            lease_seconds=parsed_lease_seconds,
+            heartbeat_seconds=parsed_heartbeat_seconds,
+            start_model=start_model,
+            on_model_error=propagate_model_error,
+        )
+        return GraniteExecution(lease=active_lease, model_result=result)
+
     def begin_draining(self) -> None:
         """Interdit les admissions sans interrompre le couple actif."""
 

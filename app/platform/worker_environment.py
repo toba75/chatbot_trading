@@ -19,7 +19,7 @@ from app.platform.configuration import ApplicationConfiguration
 WORKER_ENVIRONMENT_MISMATCH: Final = "WORKER_ENVIRONMENT_MISMATCH"
 WORKER_JOB_NAMES: Final = MappingProxyType(
     {
-        "worker-documents": ("DIAGNOSE", "CONVERT_DOCUMENT"),
+        "worker-documents": ("DIAGNOSE", "CONVERT_DOCUMENT", "CONVERT_PAGE"),
         "worker-projection": ("PROJECT_DOCUMENT",),
     }
 )

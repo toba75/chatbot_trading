@@ -38,7 +38,7 @@ def test_environment_runtime_hardening_unit(
     # Les actions sans chaîne API -> outbox -> relais -> worker -> lecture publique
     # ne sont pas annoncées par une boucle factice qui attend indéfiniment.
     assert WORKER_JOB_NAMES == {
-        "worker-documents": ("DIAGNOSE", "CONVERT_DOCUMENT"),
+        "worker-documents": ("DIAGNOSE", "CONVERT_DOCUMENT", "CONVERT_PAGE"),
         "worker-projection": ("PROJECT_DOCUMENT",),
     }
     assert "worker-research" not in REQUIRED_SERVICE_IDS

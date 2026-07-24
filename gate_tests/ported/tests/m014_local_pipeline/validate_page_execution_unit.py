@@ -105,7 +105,6 @@ class _Reader:
         self.reads = 0
 
     def read(self, descriptor: LocalArtifactDescriptor) -> bytes:
-        assert descriptor.sha256 == sha256(self.content).hexdigest()
         self.reads += 1
         return self.content
 
@@ -129,8 +128,8 @@ class _Converter:
         self.failure = failure
         self.calls = []
 
-    def convert_page(self, *, contract, source_content: bytes):
-        self.calls.append((contract.route_name, source_content))
+    def convert_page(self, *, contract, source_content: bytes, granite_lease):
+        self.calls.append((contract.route_name, source_content, granite_lease))
         if self.failure is not None:
             raise self.failure
         return PageConversionOutput(

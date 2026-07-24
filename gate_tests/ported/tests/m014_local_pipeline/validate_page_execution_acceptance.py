@@ -15,6 +15,7 @@ from app.source_processing.application.record_page_completion import (
     InMemoryPageResultRepository,
     RecordPageCompletionHandler,
 )
+from app.source_processing.domain.distribution_contracts import DistributionContractError
 from validate_page_execution_unit import (
     _claimed,
     _granite_lease,
@@ -68,7 +69,7 @@ def test_deux_workers_reprise_et_redelivrance_ne_comptent_qu_une_fois() -> None:
     # détenteur ou une divergence ne peut ajouter aucun effet.
     assert repository.completed_units == 3
     assert repository.result_count == 2
-    with pytest.raises(RuntimeError, match="PAGE_RESULT_REPLAY_DIVERGENCE"):
+    with pytest.raises(DistributionContractError, match="PAGE_RESULT_REPLAY_DIVERGENCE"):
         relay.relay_claim(
             outbox.divergent_replay(
                 granite_outcome.envelope.completion_id,
