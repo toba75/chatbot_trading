@@ -191,6 +191,7 @@ class PostgresKnowledgeProjectionRepository:
         chunk_count: int,
         chunks: Sequence[KnowledgeChunk],
         state_observed_at: str,
+        index_generation: str | None = None,
     ) -> None:
         if not isinstance(projection, KnowledgeProjection):
             raise ValueError("KnowledgeProjection invalide")
@@ -205,14 +206,25 @@ class PostgresKnowledgeProjectionRepository:
             raise ValueError("échantillons KA au-delà de la limite de stockage")
         observed_at = ensure_utc_instant(state_observed_at, "state_observed_at")
         if projection.status is ProjectionStatus.SEARCHABLE and (
-            chunk_count < 1 or len(samples) < 1
+            chunk_count < 1
+            or len(samples) < 1
+            or not isinstance(index_generation, str)
+            or index_generation.strip() == ""
+            or index_generation != index_generation.strip()
         ):
             raise ValueError("KA_SEARCHABLE_OUTPUTS_INCOMPLETE")
+        if index_generation is not None and (
+            not isinstance(index_generation, str)
+            or index_generation.strip() == ""
+            or index_generation != index_generation.strip()
+        ):
+            raise ValueError("index_generation KA invalide")
         outputs_fingerprint = _outputs_fingerprint(
             projection=projection,
             chunk_count=chunk_count,
             samples=samples,
             state_observed_at=observed_at,
+            index_generation=index_generation,
         )
         profile = projection.projection_profile
         with self._connection_factory.connect() as connection:
@@ -241,16 +253,18 @@ class PostgresKnowledgeProjectionRepository:
                         projection_profile_id, chunking_profile, embedding_model,
                         sparse_profile, index_schema, build_fingerprint, status,
                         chunk_count, state_observed_at, aggregate_version,
-                        outputs_fingerprint, execution_phase, completed_units,
+                        outputs_fingerprint, index_generation,
+                        execution_phase, completed_units,
                         total_units, failure_error_code
                     )
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'SUCCEEDED', %s, %s, NULL)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'SUCCEEDED', %s, %s, NULL)
                     ON CONFLICT (projection_id) DO UPDATE SET
                         status = EXCLUDED.status,
                         chunk_count = EXCLUDED.chunk_count,
                         state_observed_at = EXCLUDED.state_observed_at,
                         aggregate_version = EXCLUDED.aggregate_version,
                         outputs_fingerprint = EXCLUDED.outputs_fingerprint,
+                        index_generation = EXCLUDED.index_generation,
                         execution_phase = EXCLUDED.execution_phase,
                         completed_units = EXCLUDED.completed_units,
                         total_units = EXCLUDED.total_units,
@@ -271,6 +285,7 @@ class PostgresKnowledgeProjectionRepository:
                         observed_at,
                         projection.aggregate_version,
                         outputs_fingerprint,
+                        index_generation,
                         chunk_count + 1,
                         chunk_count + 1,
                     ),
@@ -648,11 +663,13 @@ def _outputs_fingerprint(
     chunk_count: int,
     samples: tuple[KnowledgeChunk, ...],
     state_observed_at: str,
+    index_generation: str | None,
 ) -> str:
     payload = {
         "aggregate_version": projection.aggregate_version,
         "build_fingerprint": projection.build_fingerprint.value,
         "chunk_count": chunk_count,
+        "index_generation": index_generation,
         "profile": projection.projection_profile.to_fingerprint_payload(),
         "projection_id": projection.projection_id,
         "samples": [

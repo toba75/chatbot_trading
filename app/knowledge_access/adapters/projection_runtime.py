@@ -15,8 +15,9 @@ from typing import Any, Mapping, Sequence
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from app.contracts.event_envelope import EventEnvelope
 from app.contracts.llm_inference import LlmInferenceGateway
-from app.contracts.technical_jobs import JobEnvironmentIdentity
+from app.contracts.technical_jobs import JobEnvironmentIdentity, JobRequest
 from app.contracts.source_references import (
     ACCEPTED_CANONICAL_VERSION_STATUS,
     CanonicalSourceRef,
@@ -58,6 +59,7 @@ from app.knowledge_access.domain.chunking import (
 from app.knowledge_access.domain.knowledge_projection import (
     KnowledgeProjection,
     ProjectionProfile,
+    ProjectionStatus,
 )
 from app.knowledge_access.domain.projection_encoding import (
     DenseEncodingProfile,
@@ -287,10 +289,23 @@ class ProjectionRuntimeService:
             projection_profile=command.projection_profile,
         )
         trace_id = f"TRACE-KA-{projection.projection_id}"
+        publication = self._publication_for_version_id(projection.canonical_version_id)
         payload = {
+            "contract_version": "1.0",
             "projection_id": projection.projection_id,
             "document_id": projection.document_id,
             "canonical_version_id": projection.canonical_version_id,
+            "canonical_artifact_ref": publication[1],
+            "canonical_artifact_sha256": canonical_ref.canonical_artifact_sha256,
+            "build_fingerprint": projection.build_fingerprint.value,
+            "projection_profile": projection.projection_profile.to_fingerprint_payload(),
+            "qdrant_collection_name": self.qdrant_collection_name,
+            "environment_identity": JobEnvironmentIdentity(
+                environment=self.environment,
+                deployment_id=self.deployment_id,
+                configuration_hash=self.configuration_hash,
+            ).to_mapping(),
+            "causation_event_id": publication[0],
         }
         try:
             code_version = version("chatbot-trading")
@@ -317,10 +332,13 @@ class ProjectionRuntimeService:
                         projection_profile_id, chunking_profile, embedding_model,
                         sparse_profile, index_schema, build_fingerprint, status,
                         chunk_count, state_observed_at, aggregate_version,
-                        execution_phase, completed_units, total_units, failure_error_code
+                        execution_phase, completed_units, total_units, failure_error_code,
+                        environment, deployment_id, configuration_hash,
+                        qdrant_collection_name
                     ) VALUES (
                         %s, %s, %s, %s, %s, %s, %s, %s, %s, 'REQUESTED',
-                        0, CURRENT_TIMESTAMP, 0, 'QUEUED', 0, 1, NULL
+                        0, CURRENT_TIMESTAMP, 0, 'QUEUED', 0, 1, NULL,
+                        %s, %s, %s, %s
                     )
                     """,
                     (
@@ -333,6 +351,10 @@ class ProjectionRuntimeService:
                         profile.sparse_profile,
                         profile.index_schema,
                         projection.build_fingerprint.value,
+                        self.environment,
+                        self.deployment_id,
+                        self.configuration_hash,
+                        self.qdrant_collection_name,
                     ),
                 )
                 cursor.execute(
@@ -365,54 +387,28 @@ class ProjectionRuntimeService:
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
-                    SELECT document.status, document.quarantine_reason, document.fingerprint,
-                           version.canonical_source_id, version.canonical_version_id,
-                           version.canonical_artifact_ref, version.canonical_artifact_sha256,
-                           version.accepted_at, run.source_page_count
-                      FROM source_processing.source_documents AS document
-                      LEFT JOIN LATERAL (
-                          SELECT * FROM source_processing.canonical_source_versions
-                           WHERE document_id = document.document_id
-                           ORDER BY accepted_at DESC
-                           LIMIT 1
-                      ) AS version ON TRUE
-                      LEFT JOIN source_processing.document_processing_runs AS run
-                        ON run.document_id = document.document_id
-                     WHERE document.document_id = %s
+                    SELECT event_payload
+                      FROM knowledge_access.canonical_publication_inbox
+                     WHERE document_id = %s
+                       AND environment = %s
+                       AND deployment_id = %s
+                       AND configuration_hash = %s
+                     ORDER BY received_at DESC, event_id DESC
+                     LIMIT 1
                     """,
-                    (document_id,),
+                    (
+                        document_id,
+                        self.environment,
+                        self.deployment_id,
+                        self.configuration_hash,
+                    ),
                 )
                 row = cursor.fetchone()
         if row is None:
             return None
-        status, reason, source_sha, source_id, version_id, artifact_ref, artifact_sha, accepted_at, page_count = row
-        if status == "QUARANTINED":
-            return CanonicalSourceForProjection(
-                document_id=document_id,
-                canonical_ref=None,
-                canonical_status="QUARANTINED",
-                quarantine_reason=reason,
-            )
-        if version_id is None:
-            return CanonicalSourceForProjection(
-                document_id=document_id,
-                canonical_ref=None,
-                canonical_status="REJECTED",
-                quarantine_reason=None,
-            )
-        if not callable(getattr(accepted_at, "isoformat", None)) or not isinstance(page_count, int):
+        canonical_ref = CanonicalSourceRef.from_payload(_event_payload(row[0]))
+        if canonical_ref.document_id != document_id:
             raise ProjectionRuntimeError("CANONICAL_SOURCE_RECORD_INVALID")
-        canonical_ref = CanonicalSourceRef(
-            schema_version="1.0",
-            canonical_source_id=source_id,
-            document_id=document_id,
-            canonical_version_id=version_id,
-            source_sha256=source_sha,
-            canonical_artifact_sha256=artifact_sha,
-            page_count=page_count,
-            accepted_at=_utc_second(accepted_at),
-            quality_policy_version=_QUALITY_POLICY_VERSION,
-        )
         return CanonicalSourceForProjection(
             document_id=document_id,
             canonical_ref=canonical_ref,
@@ -425,42 +421,31 @@ class ProjectionRuntimeService:
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
-                    SELECT document.fingerprint, version.canonical_source_id, version.document_id,
-                           version.canonical_version_id, version.canonical_artifact_ref,
-                           version.canonical_artifact_sha256, version.accepted_at,
-                           run.source_page_count
-                      FROM source_processing.canonical_source_versions AS version
-                      JOIN source_processing.source_documents AS document
-                        ON document.document_id = version.document_id
-                      JOIN source_processing.document_processing_runs AS run
-                        ON run.document_id = version.document_id
-                     WHERE version.canonical_version_id = %s
+                    SELECT event_payload, canonical_artifact_ref
+                      FROM knowledge_access.canonical_publication_inbox
+                     WHERE canonical_version_id = %s
+                       AND environment = %s
+                       AND deployment_id = %s
+                       AND configuration_hash = %s
                     """,
-                    (canonical_version_id,),
+                    (
+                        canonical_version_id,
+                        self.environment,
+                        self.deployment_id,
+                        self.configuration_hash,
+                    ),
                 )
                 row = cursor.fetchone()
         if row is None:
             return None
-        source_sha, source_id, document_id, version_id, artifact_ref, artifact_sha, accepted_at, page_count = row
-        if not callable(getattr(accepted_at, "isoformat", None)) or not isinstance(page_count, int):
-            raise ProjectionRuntimeError("CANONICAL_SOURCE_RECORD_INVALID")
-        canonical_ref = CanonicalSourceRef(
-            schema_version="1.0",
-            canonical_source_id=source_id,
-            document_id=document_id,
-            canonical_version_id=version_id,
-            source_sha256=source_sha,
-            canonical_artifact_sha256=artifact_sha,
-            page_count=page_count,
-            accepted_at=_utc_second(accepted_at),
-            quality_policy_version=_QUALITY_POLICY_VERSION,
-        )
+        canonical_ref = CanonicalSourceRef.from_payload(_event_payload(row[0]))
+        artifact_ref = row[1]
         artifact_path = _artifact_path(root=self.canonical_sources_root, artifact_ref=artifact_ref)
         try:
             artifact_bytes = artifact_path.read_bytes()
         except OSError as exc:
             raise ProjectionRuntimeError("CANONICAL_ARTIFACT_UNREADABLE") from exc
-        if hashlib.sha256(artifact_bytes).hexdigest() != artifact_sha:
+        if hashlib.sha256(artifact_bytes).hexdigest() != canonical_ref.canonical_artifact_sha256:
             raise ProjectionRuntimeError("CANONICAL_ARTIFACT_HASH_MISMATCH")
         try:
             artifact = json.loads(artifact_bytes.decode("utf-8"))
@@ -468,10 +453,12 @@ class ProjectionRuntimeService:
             raise ProjectionRuntimeError("CANONICAL_ARTIFACT_INVALID") from exc
         items = _canonical_items_payload(artifact=artifact, canonical_ref=canonical_ref)
         policy = SourceLocatorValidationPolicy(
-            canonical_sources_by_version_id={version_id: canonical_ref},
-            version_statuses_by_version_id={version_id: ACCEPTED_CANONICAL_VERSION_STATUS},
+            canonical_sources_by_version_id={canonical_ref.canonical_version_id: canonical_ref},
+            version_statuses_by_version_id={
+                canonical_ref.canonical_version_id: ACCEPTED_CANONICAL_VERSION_STATUS
+            },
             resolvable_item_ids_by_version_id={
-                version_id: {
+                canonical_ref.canonical_version_id: {
                     item["source_locator"]["item_id"]: item["source_locator"]["content_hash"]
                     for item in items
                 }
@@ -523,12 +510,32 @@ class ProjectionRuntimeService:
             "configuration_hash": self.configuration_hash,
         }
 
-    def execute_projection(self, *, projection_id: str) -> Mapping[str, Any]:
+    def execute_projection(self, *, request: JobRequest) -> Mapping[str, Any]:
+        projection_id = self._validated_projection_id(request)
         repository = PostgresKnowledgeProjectionRepository(
             connection_factory=self.connection_factory,
             sample_storage_limit=3,
         )
         projection = repository.projection_for_id(projection_id)
+        payload = dict(request.payload)
+        if (
+            payload["document_id"] != projection.document_id
+            or payload["canonical_version_id"] != projection.canonical_version_id
+            or payload["build_fingerprint"] != projection.build_fingerprint.value
+            or payload["projection_profile"]
+            != projection.projection_profile.to_fingerprint_payload()
+            or request.idempotence_key.input_hash != projection.build_fingerprint.value
+        ):
+            raise ProjectionRuntimeError("PROJECTION_JOB_REPLAY_DIVERGENCE")
+        publication = self._publication_for_version_id(projection.canonical_version_id)
+        if (
+            payload["causation_event_id"] != publication[0]
+            or payload["canonical_artifact_ref"] != publication[1]
+            or payload["canonical_artifact_sha256"] != publication[2]
+        ):
+            raise ProjectionRuntimeError("PROJECTION_JOB_REPLAY_DIVERGENCE")
+        if projection.status is ProjectionStatus.SEARCHABLE:
+            return self._replay_searchable_projection(projection=projection)
         try:
             building = repository.save_transition(projection.start_build())
             chunk_projection = ProjectCanonicalChunksHandler(
@@ -633,6 +640,7 @@ class ProjectionRuntimeService:
                 chunk_count=len(chunk_projection.chunks),
                 chunks=chunk_projection.chunks[:3],
                 state_observed_at=_now(),
+                index_generation=generation,
             )
             self._mark_succeeded(
                 projection_id=searchable.projection_id,
@@ -650,6 +658,127 @@ class ProjectionRuntimeService:
             error_code = _projection_error_code(exc)
             self._mark_failed_if_possible(projection_id=projection_id, error_code=error_code)
             raise ProjectionRuntimeError(error_code) from exc
+
+    def _validated_projection_id(self, request: JobRequest) -> str:
+        if not isinstance(request, JobRequest) or request.job_name != PROJECT_DOCUMENT_JOB_NAME:
+            raise ProjectionRuntimeError("PROJECTION_JOB_PAYLOAD_INVALID")
+        expected_identity = JobEnvironmentIdentity(
+            environment=self.environment,
+            deployment_id=self.deployment_id,
+            configuration_hash=self.configuration_hash,
+        )
+        if request.environment_identity != expected_identity:
+            raise ProjectionRuntimeError("PROJECTION_ENVIRONMENT_MISMATCH")
+        payload = dict(request.payload)
+        if set(payload) != {
+            "contract_version",
+            "projection_id",
+            "document_id",
+            "canonical_version_id",
+            "canonical_artifact_ref",
+            "canonical_artifact_sha256",
+            "build_fingerprint",
+            "projection_profile",
+            "qdrant_collection_name",
+            "environment_identity",
+            "causation_event_id",
+        }:
+            raise ProjectionRuntimeError("PROJECTION_JOB_PAYLOAD_INVALID")
+        if payload["contract_version"] != "1.0":
+            raise ProjectionRuntimeError("PROJECTION_JOB_PAYLOAD_INVALID")
+        if payload["environment_identity"] != expected_identity.to_mapping():
+            raise ProjectionRuntimeError("PROJECTION_ENVIRONMENT_MISMATCH")
+        if payload["qdrant_collection_name"] != self.qdrant_collection_name:
+            raise ProjectionRuntimeError("PROJECTION_COLLECTION_MISMATCH")
+        projection_id = payload["projection_id"]
+        if not isinstance(projection_id, str):
+            raise ProjectionRuntimeError("PROJECTION_JOB_PAYLOAD_INVALID")
+        return projection_id
+
+    def _publication_for_version_id(self, canonical_version_id: str) -> tuple[str, str, str]:
+        with self.connection_factory.connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT event_id, canonical_artifact_ref,
+                           canonical_artifact_sha256
+                      FROM knowledge_access.canonical_publication_inbox
+                     WHERE canonical_version_id = %s
+                       AND environment = %s
+                       AND deployment_id = %s
+                       AND configuration_hash = %s
+                    """,
+                    (
+                        canonical_version_id,
+                        self.environment,
+                        self.deployment_id,
+                        self.configuration_hash,
+                    ),
+                )
+                row = cursor.fetchone()
+        if row is None:
+            raise ProjectionRuntimeError("CANONICAL_SOURCE_NOT_FOUND")
+        return str(row[0]), str(row[1]), str(row[2])
+
+    def _replay_searchable_projection(
+        self,
+        *,
+        projection: KnowledgeProjection,
+    ) -> Mapping[str, Any]:
+        with self.connection_factory.connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT chunk_count, index_generation, execution_phase,
+                           completed_units, total_units, qdrant_collection_name
+                      FROM knowledge_access.knowledge_projections
+                     WHERE projection_id = %s
+                       AND environment = %s
+                       AND deployment_id = %s
+                       AND configuration_hash = %s
+                    """,
+                    (
+                        projection.projection_id,
+                        self.environment,
+                        self.deployment_id,
+                        self.configuration_hash,
+                    ),
+                )
+                row = cursor.fetchone()
+        if (
+            row is None
+            or not isinstance(row[0], int)
+            or row[0] < 1
+            or not isinstance(row[1], str)
+            or row[2] != "SUCCEEDED"
+            or row[3] != row[4]
+            or row[5] != self.qdrant_collection_name
+        ):
+            raise ProjectionRuntimeError("PROJECTION_REPLAY_INCOMPLETE")
+        client = QdrantHttpClient(
+            base_url=self.qdrant_url,
+            timeout_seconds=self.qdrant_timeout_seconds,
+            dense_dimensions=_DENSE_DIMENSIONS,
+            api_key=self.qdrant_api_key,
+        )
+        indexed = client.count(
+            collection_name=self.qdrant_collection_name,
+            count_filter={
+                "must": [
+                    {"key": "index_generation", "match": {"value": row[1]}},
+                ]
+            },
+            exact=True,
+        )
+        if indexed != row[0]:
+            raise ProjectionRuntimeError("PROJECTION_REPLAY_INCOMPLETE")
+        return {
+            "projection_id": projection.projection_id,
+            "chunk_count": row[0],
+            "index_generation": row[1],
+            "published_point_count": indexed,
+            "bibliographic_metadata_status": "EXTRACTED",
+        }
 
     def _set_running_progress(self, *, projection_id: str, completed_units: int, total_units: int) -> None:
         if total_units < 1 or completed_units < 0 or completed_units > total_units:
@@ -747,6 +876,20 @@ def _bibliographic_text_evidences(items: Sequence[Any]) -> tuple[ProjectedTextEv
     if len(evidences) == 0:
         raise ProjectionRuntimeError("BIBLIOGRAPHIC_METADATA_EVIDENCE_MISSING")
     return tuple(evidences)
+
+
+def _event_payload(value: Any) -> Mapping[str, Any]:
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except json.JSONDecodeError as exc:
+            raise ProjectionRuntimeError("CANONICAL_SOURCE_RECORD_INVALID") from exc
+    if not isinstance(value, Mapping):
+        raise ProjectionRuntimeError("CANONICAL_SOURCE_RECORD_INVALID")
+    event = EventEnvelope.from_payload(dict(value))
+    if event.event_type != "CanonicalSourcePublished" or event.producer_context != "SP":
+        raise ProjectionRuntimeError("CANONICAL_SOURCE_RECORD_INVALID")
+    return dict(event.payload)
 
 
 def _artifact_path(*, root: Path, artifact_ref: Any) -> Path:

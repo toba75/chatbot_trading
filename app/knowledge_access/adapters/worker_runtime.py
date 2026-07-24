@@ -6,7 +6,6 @@ import argparse
 import json
 import os
 import time
-from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -14,9 +13,13 @@ from uuid import uuid4
 from psycopg import OperationalError
 
 from app.knowledge_access.adapters.projection_runtime import (
+    LOCAL_PROJECTION_PROFILE,
     PROJECT_DOCUMENT_JOB_NAME,
     ProjectionRuntimeError,
     ProjectionRuntimeService,
+)
+from app.knowledge_access.adapters.postgres_canonical_publication_relay import (
+    PostgresCanonicalPublicationRelay,
 )
 from app.platform.configuration import ApplicationConfiguration, load_application_configuration
 from app.platform.configured_datastore_identity import build_configured_datastore_preflight
@@ -103,6 +106,14 @@ def _run_worker(
         environment_identity=environment_identity,
         table_name="knowledge_access.job_outbox",
     )
+    publication_relay = PostgresCanonicalPublicationRelay(
+        connection_factory=connection_factory,
+        environment_identity=environment_identity,
+        projection_profile=LOCAL_PROJECTION_PROFILE,
+        configured_collection_name=(
+            application_configuration.services.qdrant.collections.knowledge_access
+        ),
+    )
     job_runtime = build_postgres_job_runtime(
         connection_factory=connection_factory,
         outbox=outbox,
@@ -133,6 +144,11 @@ def _run_worker(
     processed = 0
     while max_jobs is None or processed < max_jobs:
         try:
+            publication_relay.relay_pending(
+                limit=16,
+                owner_id=f"{instance_owner_id}-PUBLICATION",
+                lease_seconds=lease_seconds,
+            )
             job_runtime.outbox_relay.relay_pending(
                 limit=16,
                 owner_id=f"{instance_owner_id}-OUTBOX",
@@ -173,11 +189,7 @@ def _run_worker(
         error_code: str | None = None
         try:
             try:
-                payload = claimed.job.request.payload
-                projection_id = payload.get("projection_id") if isinstance(payload, Mapping) else None
-                if not isinstance(projection_id, str):
-                    raise ProjectionRuntimeError("PROJECTION_JOB_PAYLOAD_INVALID")
-                result = runtime.execute_projection(projection_id=projection_id)
+                result = runtime.execute_projection(request=claimed.job.request)
             except Exception as exc:
                 error_code = (
                     exc.error_code

@@ -361,3 +361,58 @@ P-001 précondition GREEN
   un arbre propre, la gate globale finale sera lancée exactement une fois avec
   un délai de 3 600 secondes ; toute exécution différée sera attendue jusqu'à
   son verdict terminal sans relance.
+
+## 2026-07-24 - T-008 projection locale de la publication canonique
+
+- Sous-agent : `/root/m14_t008_projection`, chargé exclusivement de T-008 par
+  l’orchestrateur du milestone.
+- Baseline initiale réutilisée sans relance : commit T-007 `7a6c84bf5`, arbre
+  propre, gate canonique 474/474 GREEN, code 0, sortie terminale
+  `PARTIAL GREEN: offline`. Aucune gate globale n’a été lancée au démarrage ni
+  pendant les validations ciblées.
+- Scénario BDD : la même publication canonique `test` est redélivrée, KA crée
+  une seule projection et un seul job `PROJECT_DOCUMENT`, le worker publie une
+  génération Qdrant complète puis son rejeu retrouve strictement cette même
+  génération et la progression persistée.
+- RED utile : les tests d’acceptation et unitaires échouaient à la collecte sur
+  l’absence du contrat `project_published_canonical` et du relais PostgreSQL.
+  Commit RED : `c30adf2ea` —
+  `test(m014-pipeline): couvrir projection locale idempotente`.
+- Frontières transactionnelles : le relais claim l’outbox
+  `CanonicalSourcePublished` dans une transaction SP, persiste dans une
+  transaction KA l’inbox publique, le registre d’événements, la
+  `KnowledgeProjection REQUESTED` et l’outbox `PROJECT_DOCUMENT`, puis acquitte
+  SP dans une troisième transaction. Le worker KA ne lit plus les tables
+  privées SP ; il relit exclusivement `canonical_publication_inbox`.
+- Identité et rejeu : l’empreinte de build couvre la référence canonique et le
+  profil ; le job porte explicitement l’artefact, son SHA-256, la collection
+  Qdrant configurée et `environment`, `deployment_id`, `configuration_hash`.
+  Une identité étrangère, une collection différente, un événement ou un build
+  divergent sont refusés. Une projection déjà `SEARCHABLE` vérifie le nombre
+  de points de sa génération Qdrant réelle et ne réécrit ni état ni progression.
+- Persistance : la migration ascendante 025 ajoute l’inbox KA, le registre de
+  reçus, l’identité d’environnement de la projection et sa génération Qdrant.
+  La génération n’est rendue `SEARCHABLE` qu’après publication complète ; un
+  échec conserve `FAILED` et ne choisit aucun index de secours.
+- Preuve live PostgreSQL et Qdrant : migration complète, publication SP,
+  redélivrance identique comptée deux fois dans le registre mais une seule
+  projection et un seul job, relais vers la file plateforme, artefact local
+  vérifié, génération Qdrant complète, métadonnées et progression persistées,
+  rejeu exact et mêmes `SourceLocator` persistés que le document canonique.
+  Test direct : 1/1 GREEN. Le premier lancement RED a isolé une fixture bbox
+  non normalisée ; après correction, le même parcours réel est GREEN.
+- Validations ciblées : tests ATDD/unitaires 2/2 GREEN ; Ruff des fichiers
+  modifiés GREEN ; scope `m014_local_pipeline` 35/35 GREEN ; scope `m005`
+  36/36 GREEN ; scope `m013_environments` 49/49 GREEN. Le premier scope live a
+  prouvé T-008, T-007 et T-006 GREEN mais a révélé une attente historique de
+  version de migration 24 dans T-005 ; cette preuve a été réalignée sur la
+  version ascendante 25 et son test PostgreSQL ciblé est 1/1 GREEN. Le scope
+  live consolidé après correction est 39/39 GREEN, code 0, sans nœud absent,
+  inattendu ou dupliqué ; les quatre preuves live T-005 à T-008 sont GREEN.
+- ADR consultées : ADR-005, ADR-010, ADR-024, DDD-ADR-004 et DDD-ADR-008. ADR
+  créée ou modifiée : aucune ; T-008 applique les décisions existantes sans en
+  changer le sens.
+- Commit GREEN prévu :
+  `feat(m014-pipeline): projeter version canonique locale`. Après ce commit et
+  sur arbre propre, une seule gate globale finale sera lancée avec un délai de
+  3 600 secondes et son processus sera attendu jusqu’au verdict terminal.

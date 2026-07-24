@@ -2,7 +2,7 @@
 
 ## Statut et portée
 
-- Statut : publiée pour P-002, avant toute implémentation T-005 à T-008.
+- Statut : implémentée pour T-005 à T-008, avant qualification T-009 à T-011.
 - Milestone : `M14-local-pipeline - Pipeline documentaire local distribué`.
 - Domaine : traitement des sources documentaires et accès aux connaissances.
 - Bounded contexts : Source Processing (SP), `platform` et Knowledge Access (KA).
@@ -189,6 +189,10 @@ La projection vérifie la version, le hash canonique, le profil de projection, `
 | `CONTRACT_ENVIRONMENT_MISMATCH` | SP | Contrat de page ou artefact étranger au traitement. |
 | `WORKER_ENVIRONMENT_MISMATCH` | `platform` | Worker, stockage ou job divergent avant claim ou exécution. |
 | `PROJECTION_ENVIRONMENT_MISMATCH` | KA | Référence canonique ou Qdrant d’un autre environnement. |
+| `PROJECTION_EVENT_REPLAY_DIVERGENCE` | KA | Même événement ou même version canonique avec contenu public divergent. |
+| `PROJECTION_BUILD_REPLAY_DIVERGENCE` | KA | Même empreinte de build avec projection ou identité technique divergente. |
+| `PROJECTION_COLLECTION_MISMATCH` | KA | Le job cible une collection différente de la configuration complète active. |
+| `PROJECTION_REPLAY_INCOMPLETE` | KA | Le rejeu ne retrouve pas la génération Qdrant complète déjà publiée. |
 | `JOB_LEASE_LOST` | `platform` | Claim, génération, token ou lease ne permet plus la mutation. |
 | `PAGE_RESULT_REPLAY_DIVERGENCE` | SP | Même identité de résultat avec contenu divergent. |
 | `PAGE_MANIFEST_INCOMPLETE` | SP | Page attendue absente ou disposition non terminale. |
@@ -223,6 +227,26 @@ L’environnement n’est jamais déduit du nom de file, du hostname, du chemin,
 
 KA demeure sans projection tant que l’événement complet n’existe pas. Après sa consommation, un rejeu de `PROJECT_DOCUMENT` conserve une seule projection de la version dans le même environnement.
 
+## DIST-006 - Projection locale idempotente
+
+- Given une publication canonique SP complète est livrée deux fois dans
+  l’environnement `test`.
+- When le relais la claim chez SP, la consomme atomiquement chez KA puis
+  acquitte SP, et que le worker rejoue `PROJECT_DOCUMENT`.
+- Then un registre d’événements, une `KnowledgeProjection`, un message outbox
+  et une génération Qdrant existent ; la projection devient `SEARCHABLE` avec
+  une progression persistée complète, et le rejeu vérifie la génération sans
+  réécrire la progression.
+
+La transaction SP de claim ne contient aucune écriture KA. La transaction KA
+persiste l’événement reçu, son reçu idempotent, la projection `REQUESTED` et
+l’outbox `PROJECT_DOCUMENT`. L’ACK SP intervient seulement après le commit KA.
+KA lit ensuite l’artefact exclusivement depuis son contrat public persistant
+`canonical_publication_inbox` ; il ne lit aucune table privée SP. Le job porte
+la version, le hash, le profil, la collection issue de la configuration et
+l’identité d’environnement complète. Une divergence d’événement, de build,
+d’artefact, de collection ou d’environnement échoue avant mutation.
+
 ## Migration, activation et rollback explicites
 
 P-002 n’ajoute aucune migration. Les migrations ascendantes du socle restent présentes mais leur simple déploiement n’active pas le fan-out. L’activation future de T-005 doit être versionnée, explicite, réservée aux nouveaux traitements et incompatible avec une sélection automatique par matériel, nombre de workers ou présence de tables.
@@ -248,7 +272,7 @@ Le rollback ne supprime ni table ni colonne, ne réécrit aucun résultat, ne mo
 | LP-002 - Fan-out et total figé | Une identité de page non vide produit un seul message ; `SKIP_EMPTY` compte sans job. | `docs/tasks/milestone_014-local-pipeline/0003_eclater_conversion_en_jobs_pages.md` |
 | LP-003 - Complétion fenced | Le worker produit une enveloppe et SP persiste résultat et progression une seule fois. | `docs/tasks/milestone_014-local-pipeline/0004_executer_persister_page_fenced.md` |
 | LP-004 - Publication atomique | Aucun assemblage incomplet ; une version et un événement par identité. | `docs/tasks/milestone_014-local-pipeline/0005_assembler_publier_document_canonique.md` |
-| LP-005 - Projection publiée locale | KA lit uniquement la version publiée et publie une seule génération dans le bon Qdrant. | `docs/tasks/milestone_014-local-pipeline/0006_projeter_document_publie_localement.md` |
+| LP-005 - Projection publiée locale | KA lit uniquement `canonical_publication_inbox`, crée atomiquement projection et outbox, puis publie et rejoue une seule génération dans le Qdrant configuré du même environnement. | `docs/tasks/milestone_014-local-pipeline/0006_projeter_document_publie_localement.md` |
 
 ## Exclusions P-002 et M14-local-qualification
 

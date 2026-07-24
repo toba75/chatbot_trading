@@ -17,9 +17,6 @@ def test_given_publication_relivree_when_ka_la_consomme_then_une_projection_et_u
     assert CanonicalPublicationMessage.__name__ == "CanonicalPublicationMessage"
     assert PublishedCanonicalProjectionRequest.__name__ == "PublishedCanonicalProjectionRequest"
     assert PostgresCanonicalPublicationRelay.__name__ == "PostgresCanonicalPublicationRelay"
-
-
-def test_frontieres_et_persistance_du_parcours_sont_explicites() -> None:
     root = next(parent for parent in Path(__file__).resolve().parents if (parent / "pyproject.toml").is_file())
     migration = (root / "deploy/postgres/migrations/025_local_canonical_projection.sql").read_text(encoding="utf-8")
     adapter = (root / "app/knowledge_access/adapters/postgres_canonical_publication_relay.py").read_text(encoding="utf-8")

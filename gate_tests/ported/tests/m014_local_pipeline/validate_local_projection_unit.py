@@ -84,9 +84,6 @@ def test_empreinte_build_et_contrat_job_sont_deterministes() -> None:
     assert first.job_request.payload["environment_identity"] == IDENTITY.to_mapping()
     assert first.job_request.payload["qdrant_collection_name"] == "ostrading-test-knowledge-access"
     assert first.job_request.payload["canonical_artifact_ref"].endswith("/docling.json")
-
-
-def test_identite_etrangere_et_hash_divergent_sont_refuses() -> None:
     foreign = JobEnvironmentIdentity(
         environment="production",
         deployment_id="ostrading-production-local",
