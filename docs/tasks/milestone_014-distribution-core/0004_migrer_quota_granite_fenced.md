@@ -89,6 +89,7 @@
   `uv run --locked gate --scope m004` ;
   `uv run --locked gate --scope m013_environments` ;
   `uv run --locked gate --scope m014_distribution_core` ;
+  `uv run --locked gate --scope m014_distribution_core --live` ;
   `uv run --locked gate`.
 - Commit RED : `test(m014-core): couvrir quota Granite fenced PostgreSQL`.
 - Commit GREEN : `feat(m014-core): persister deux slots Granite fenced`.

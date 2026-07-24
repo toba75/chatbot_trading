@@ -3,102 +3,161 @@
 ## Contrat
 
 Ce runbook couvre le socle `M14-distribution-core` sur une seule station
-`amd64`. Les profils fermés restent `development`, `test` et `production`.
-Chaque profil utilise exactement deux replicas `worker-documents`, limités à
-2 Gio et 4 CPU chacun, avec deux slots Granite PostgreSQL globaux et un slot
-maximum par worker.
+`amd64`. Un profil parmi `development`, `test` ou `production` est choisi
+explicitement. Il exécute exactement deux replicas `worker-documents`, chacun
+limité à 2 Gio et 4 CPU, sur le seul périphérique `cuda:0`. PostgreSQL reste
+l’autorité des deux slots Granite globaux et du slot maximal par worker.
 
-ADR-051 reste l'autorité de l'exécution Granite stricte sur `cuda:0` et de
-l'erreur `GRANITE_CUDA_UNAVAILABLE`. ADR-052 remplace uniquement ses mentions
-historiques de flotte CPU multiarchitecture ou distante pour M-014 : les deux
-workers restent locaux et généralistes. Il n'existe aucun fallback CPU, aucune
-sélection `auto`, aucune autre route et aucun autre worker lorsque CUDA est
-indisponible.
+ADR-051 reste l’autorité de CUDA stricte et de l’erreur
+`GRANITE_CUDA_UNAVAILABLE`. ADR-052 remplace uniquement, pour M-014, les
+anciennes mentions de flotte CPU multiarchitecture ou distante. Il n’existe
+aucun fallback CPU, aucune sélection `auto`, aucune route de secours et aucun
+worker spécialisé Granite.
+
+Toutes les commandes ci-dessous sont copiables dans le terminal Windows depuis la
+racine du dépôt. Elles calculent et injectent elles-mêmes
+`OSTRADING_IMAGE_REVISION` depuis `git rev-parse HEAD` et
+`OSTRADING_POSTGRES_SCHEMA_VERSION` depuis la dernière migration canonique.
+L’exploitant ne doit pas définir ces variables à la main.
+
+## Identifier la release locale
+
+L’identité calculée doit afficher un commit Git complet, le schéma `022` et le
+`configuration_hash` du profil :
+
+```console
+uv run --locked distribution-core identity --environment test
+```
+
+Un dépôt sans commit complet, un schéma différent de `022`, une configuration
+illisible ou `runtime.resource_limits.gpu_required: false` arrête la commande.
 
 ## Préflight NVIDIA et `cuda:0`
 
-Prérequis : Docker Engine et Docker Compose opérationnels, pilote NVIDIA et
-NVIDIA Container Toolkit installés, image `worker-documents` construite depuis
-le commit à qualifier, configuration complète et secrets hors Git du seul
-profil choisi. Une absence est terminale ; elle ne déclenche aucun fallback.
-
-La sonde hôte doit identifier explicitement le périphérique d'indice zéro :
+Docker Engine, le plugin Compose, le pilote NVIDIA et NVIDIA Container Toolkit
+doivent être disponibles. La configuration impose `gpu_required: true`,
+`granite_device: cuda:0` et Compose réserve uniquement `device_ids: ["0"]`.
 
 ```console
 nvidia-smi --query-gpu=index,name --format=csv,noheader
+uv run --locked distribution-core gpu-preflight --environment test
 ```
 
-Le rendu Compose doit réserver seulement `device_ids: ["0"]`. Contrôler ensuite
-PyTorch depuis l'image réelle du worker du profil, sans démarrer la pile :
+La seconde commande construit l’identité technique canonique, lance la sonde
+PyTorch dans l’image réelle `worker-documents` et vérifie que le périphérique
+zéro existe. Une sortie non nulle bloque la suite avec le port public fermé ;
+il est interdit de contourner l’échec avec `gpus: all`, `auto` ou le CPU.
+
+## Upgrade bloquant en deux phases
+
+La bascule porte sur un seul profil. Conserver auparavant l’ancien
+`configuration_hash`, le profil, son `deployment_id`, le commit et la sortie de
+la commande `identity`.
+
+### Phase 1 — fermer, drainer, migrer et préparer l’interne
 
 ```console
-docker compose --project-name ostrading-<profil> --file deploy/environments/compose.base.yaml --file deploy/environments/<profil>.compose.yaml run --rm --no-deps --entrypoint python worker-documents -c "import torch; assert torch.backends.cuda.is_built(); assert torch.cuda.is_available(); assert torch.cuda.device_count() >= 1; print(torch.cuda.get_device_name(0))"
+$oldConfigurationHash = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+uv run --locked distribution-core prepare `
+  --environment test `
+  --previous-configuration-hash $oldConfigurationHash `
+  --timeout-seconds 600 `
+  --poll-seconds 2
 ```
 
-Une commande non nulle, un nom de GPU absent ou l'impossibilité d'ouvrir
-`cuda:0` bloque le démarrage. Ne pas modifier Compose vers `gpus: all`, `auto`
-ou CPU pour contourner la panne ; le résultat attendu reste
-`GRANITE_CUDA_UNAVAILABLE`.
+`prepare` exécute obligatoirement cet ordre :
 
-## Upgrade bloquant d'un `configuration_hash`
+1. arrêter les admissions en arrêtant `ui` et `edge-gateway`, donc fermer le port
+   public, sans arrêter PostgreSQL ni les anciens workers ;
+2. lire dans un même snapshot SQL l’inventaire de l’ancien hash : jobs
+   `platform.technical_jobs` `pending` ou `running`, messages
+   `source_processing.job_outbox` et `knowledge_access.job_outbox` `pending` ou
+   `relaying` ; un message non relayé sans job est donc compté ;
+3. attendre que les trois compteurs atteignent strictement zéro, sans option
+   `force`, suppression, réécriture ni terminaison manuelle ;
+4. démarrer et attendre PostgreSQL, les migrations, les services internes et
+   les workers, sans `ui` ni `edge-gateway` ; l’orchestrateur applique la
+   migration ascendante `022` avant de devenir READY ;
+5. exiger exactement deux présences `platform.document_workers` à l’état
+   `READY`, avec le nouveau `configuration_hash`, une
+   `presence_lease_until` strictement future et aucune échéance de drainage.
 
-Le protocole empêche qu'un worker démarré avec le nouveau
-`configuration_hash` réclame un job de l'ancien hash et le termine en
-`WORKER_ENVIRONMENT_MISMATCH`. Il s'applique à un seul profil à la fois. Avant
-toute modification, conserver l'ancien `configuration_hash`, l'environnement,
-le `deployment_id`, le commit et la sortie des contrôles suivants.
+Le prédicat SQL des jobs est exactement `status IN ('pending', 'running')`.
+La phase suivante exige zéro job et zéro message de l’ancien hash. Elle évite
+qu’un nouveau worker termine un ancien job en `WORKER_ENVIRONMENT_MISMATCH`.
 
-1. Commencer par arrêter les admissions en stoppant `edge-gateway` et `ui`, sans arrêter
-   `orchestrator-api`, PostgreSQL ni les anciens workers. L'API ne possède aucun
-   port hôte public ; le relais et les workers peuvent donc finir le travail
-   déjà admis.
+Un timeout d’inventaire, un échec de migration, un worker arrêté ou un nombre
+de présences différent de deux échoue terminalement. La commande referme alors
+explicitement `ui` et `edge-gateway` : le port public reste fermé.
 
-   ```console
-   docker compose --project-name ostrading-<profil> --file deploy/environments/compose.base.yaml --file deploy/environments/<profil>.compose.yaml stop edge-gateway ui
-   ```
-
-2. Drainer les jobs de l'ancien hash. Interroger le PostgreSQL du profil avec
-   son rôle, sa base, son environnement, son `deployment_id` et la valeur
-   conservée de `$oldConfigurationHash` :
-
-   ```console
-   docker compose --project-name ostrading-<profil> --file deploy/environments/compose.base.yaml --file deploy/environments/<profil>.compose.yaml exec -T postgres psql -U <role> -d <database> -v old_hash="$oldConfigurationHash" -v environment="<profil>" -v deployment_id="<deployment_id>" -Atc "SELECT count(*) FROM platform.technical_jobs WHERE environment = :'environment' AND deployment_id = :'deployment_id' AND configuration_hash = :'old_hash' AND status IN ('pending', 'running');"
-   ```
-
-3. Attendre strictement `0`. La bascule exige zéro job `pending` ou `running`
-   pour l'ancien hash. Une valeur non nulle bloque l'upgrade ; ne pas supprimer,
-   réécrire, reconfigurer ou marquer terminalement ces jobs à la main.
-
-4. Une fois seulement le résultat à zéro, arrêter les anciens workers et
-   `orchestrator-api`, appliquer le fichier complet du même profil, reconstruire
-   les images au commit prévu, puis redémarrer la commande UV canonique du
-   profil. Vérifier que les deux workers publient le nouveau hash avant de
-   redémarrer `ui` et `edge-gateway`.
-
-Ce protocole ne propose aucune option `force`. Un job ancien encore actif, une
-identité de profil divergente ou un worker publiant un autre hash est un arrêt
-opératoire, jamais une autorisation de fallback.
-
-## Validation statique et preuve PostgreSQL T-004
-
-Les contrôles statiques exigent les contrats, les trois rendus Compose, les
-limites et la réservation exclusive du GPU 0 :
+### Phase 2 — activer la surface publique
 
 ```console
-uv run --locked gate --scope m004
+uv run --locked distribution-core activate --environment test
+```
+
+`activate` referme d’abord la surface publique, relit la preuve des exactement
+deux workers READY du hash courant, puis seulement démarre `ui` et
+`edge-gateway`. Une panne d’un worker entre les deux phases interdit
+l’activation et le port public reste fermé.
+
+## Arrêt borné d’un worker
+
+L’arrêt Compose transmet `SIGTERM`. Le worker passe durablement à l’état
+`DRAINING`, refuse tout nouveau claim, continue le heartbeat du job et du slot
+courants, puis termine avant sa deadline. `drain_deadline` et
+`presence_lease_until` sont bornées ensemble. Après l’échéance, le processus ne
+libère rien hors fencing : PostgreSQL autorise uniquement la reprise après
+expiration des leases.
+
+Les logs, un compteur local et l’état du conteneur ne constituent jamais une
+preuve de présence ou de drainage. Les tables publiques `platform` sont la
+seule autorité opérationnelle.
+
+## Rollback M14-core conservateur
+
+Le fichier de configuration précédent doit rester présent pendant toute la
+vie de la pile restaurée. Il doit appartenir au même environnement et au même
+`deployment_id`; son hash doit être celui annoncé à la commande. L’image de
+l’ancien commit, étiquetée avec le schéma `022`, doit déjà exister localement :
+le rollback n’effectue aucune reconstruction ambiguë.
+
+```console
+$previousRevision = "0123456789abcdef0123456789abcdef01234567"
+$previousConfigurationHash = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
+$previousConfig = (Resolve-Path ".\ops\test-previous.yaml").Path
+uv run --locked distribution-core rollback `
+  --environment test `
+  --previous-revision $previousRevision `
+  --previous-configuration-hash $previousConfigurationHash `
+  --previous-config $previousConfig `
+  --drain-deadline-seconds 120 `
+  --timeout-seconds 180 `
+  --poll-seconds 2
+```
+
+La commande ferme d’abord les admissions. Elle passe atomiquement les deux
+workers courants en `DRAINING`, borne la présence, les claims et les slots,
+puis attend leur terminaison ou leur expiration fenced. Elle vérifie ensuite
+que la migration `022` et ses trois tables sont conservées, arrête les services
+internes sauf PostgreSQL, reprend les images de l’ancien commit et le fichier
+de l’ancien hash, attend exactement deux workers READY, vérifie les identités
+d’image et ne rouvre `ui` puis `edge-gateway` qu’après ces preuves.
+
+Le rollback ne supprime ni migration, ni table, ni colonne, ni résultat de
+page. Il ne réécrit pas une route et ne transfère pas un job. Tout écart laisse
+le port public fermé, sans fallback silencieux.
+
+## Gates de validation
+
+```console
+uv run --locked gate --scope config
 uv run --locked gate --scope m013_environments
+uv run --locked gate --scope governance
 uv run --locked gate --scope m014_distribution_core
-```
-
-La preuve T-004 live exige Docker disponible, le client Docker accessible,
-les dépendances UV verrouillées, un port loopback libre et l'image PostgreSQL
-centrale référencée par digest. Le harnais crée puis supprime son conteneur
-éphémère ; aucun PostgreSQL de profil et aucun secret opérateur ne sont
-réutilisés :
-
-```console
 uv run --locked gate --scope m014_distribution_core --live
 ```
 
-Cette commande prouve le quota PostgreSQL et le fencing ; elle ne remplace pas
-la sonde NVIDIA ni une future conversion Granite réelle de qualification.
+Le gate live utilise un PostgreSQL éphémère réel et prouve le quota, les
+présences, le drainage, les deadlines et le fencing. Il ne remplace pas le
+préflight NVIDIA ni la qualification Granite réelle.

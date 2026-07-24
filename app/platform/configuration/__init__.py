@@ -638,6 +638,14 @@ def _validate_cross_field_invariants(payload: Mapping[str, Any], path: Path) -> 
     gateway_service = payload["services"]["llm_gateway"]
     security = payload["security"]
     workers = payload["services"]["workers"]
+    runtime_resource_limits = payload["runtime"]["resource_limits"]
+
+    if runtime_resource_limits["gpu_required"] is not True:
+        raise ApplicationConfigurationError(
+            CONFIG_SCHEMA_INVALID,
+            "runtime.resource_limits.gpu_required doit être true pour cuda:0",
+            str(path),
+        )
 
     if workers["docling_concurrency"] > workers["concurrency"]:
         raise ApplicationConfigurationError(

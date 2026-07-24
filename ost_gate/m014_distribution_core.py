@@ -416,7 +416,7 @@ def _is_sha256(value: Any) -> bool:
     return isinstance(value, str) and _SHA256_PATTERN.fullmatch(value) is not None
 
 
-_ADR_051_SHA256 = "a3043a8710536c25277e6b555237fced538b17e2595ea08494bac409b241e87e"
+_ADR_051_SHA256 = "70d219179c703b36b44b877cace124e6aa671364e857a06f411c05c89d18183d"
 _ADR_052_INDEX_ROW = (
     "| [ADR-052](ADR-052-distribution-locale-pages-quota-granite-fenced.md) "
     "| Distribution locale à la page et quota Granite fenced | Proposée "
@@ -435,7 +435,7 @@ def validate_distribution_decision(
     index_text: str,
     adr_051_bytes: bytes,
 ) -> None:
-    """Valide la décision locale, son index et l'immuabilité d'ADR-051."""
+    """Valide la décision locale et la réciprocité bornée avec ADR-051."""
 
     if (
         not isinstance(adr_text, str)

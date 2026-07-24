@@ -42,7 +42,9 @@ class _Operations:
     def close_public(self) -> None:
         self.calls.append("close_public")
 
-    def read_drain_inventory(self, configuration_hash: str) -> DistributionDrainInventory:
+    def read_drain_inventory(
+        self, configuration_hash: str
+    ) -> DistributionDrainInventory:
         self.calls.append(("read_drain_inventory", configuration_hash))
         return self.drain_inventories.popleft()
 
@@ -59,7 +61,9 @@ class _Operations:
     def begin_draining(self, configuration_hash: str, deadline_seconds: int) -> None:
         self.calls.append(("begin_draining", configuration_hash, deadline_seconds))
 
-    def read_rollback_inventory(self, configuration_hash: str) -> DistributionRollbackInventory:
+    def read_rollback_inventory(
+        self, configuration_hash: str
+    ) -> DistributionRollbackInventory:
         self.calls.append(("read_rollback_inventory", configuration_hash))
         return self.rollback_inventories.popleft()
 

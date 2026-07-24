@@ -143,4 +143,4 @@ runtime:
   resource_limits:
     cpu_count: 4
     memory_gb: 16
-    gpu_required: false
+    gpu_required: true

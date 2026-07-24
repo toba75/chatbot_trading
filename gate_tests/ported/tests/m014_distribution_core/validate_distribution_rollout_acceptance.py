@@ -19,7 +19,9 @@ from app.platform.configuration import (
 REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
 
 
-def test_configuration_cli_runbook_et_gouvernance_sont_coherents(tmp_path: Path) -> None:
+def test_configuration_cli_runbook_et_gouvernance_sont_coherents(
+    tmp_path: Path,
+) -> None:
     # Given les quatre configurations distribuées, CUDA est obligatoire partout.
     configuration_paths = (
         "config/application.example.yaml",
@@ -32,14 +34,13 @@ def test_configuration_cli_runbook_et_gouvernance_sont_coherents(tmp_path: Path)
             (REPOSITORY_ROOT / relative_path).read_text(encoding="utf-8")
         )
         assert payload["runtime"]["resource_limits"]["gpu_required"] is True
-        assert payload["services"]["workers"]["local_distribution"][
-            "granite_device"
-        ] == "cuda:0"
+        assert (
+            payload["services"]["workers"]["local_distribution"]["granite_device"]
+            == "cuda:0"
+        )
 
     invalid_payload = yaml.safe_load(
-        (REPOSITORY_ROOT / "config/environments/test.yaml").read_text(
-            encoding="utf-8"
-        )
+        (REPOSITORY_ROOT / "config/environments/test.yaml").read_text(encoding="utf-8")
     )
     invalid_payload["runtime"]["resource_limits"]["gpu_required"] = False
     invalid_path = tmp_path / "test-gpu-false.yaml"
@@ -75,16 +76,19 @@ def test_configuration_cli_runbook_et_gouvernance_sont_coherents(tmp_path: Path)
     assert process.returncode == 0, process.stderr
     identity = json.loads(process.stdout)
     assert identity["schema_version"] == "022"
-    assert identity["configuration_hash"] == load_application_configuration(
-        REPOSITORY_ROOT / "config/environments/test.yaml", {}
-    ).configuration_hash
+    assert (
+        identity["configuration_hash"]
+        == load_application_configuration(
+            REPOSITORY_ROOT / "config/environments/test.yaml", {}
+        ).configuration_hash
+    )
     assert len(identity["revision"]) == 40
 
     # Then le code matérialise bien deux phases, un inventaire SQL atomique des
     # trois autorités et le rollback conservateur de la migration 022.
-    source = (
-        REPOSITORY_ROOT / "app/platform/distribution_operations.py"
-    ).read_text(encoding="utf-8")
+    source = (REPOSITORY_ROOT / "app/platform/distribution_operations.py").read_text(
+        encoding="utf-8"
+    )
     for required in (
         "INTERNAL_SERVICE_IDS",
         'PUBLIC_SERVICE_IDS = ("ui", "edge-gateway")',

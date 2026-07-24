@@ -4,7 +4,7 @@
 **Date :** 2026-07-23
 **Décideurs :** Équipe OSTrading
 **Remplace :** Pour le périphérique Granite du worker documentaire local, la sélection automatique implicite de Docling
-**Remplacée par :** Aucune
+**Remplacée par :** Partiellement par ADR-052 pour M-014 uniquement ; les exigences `cuda:0`, `GRANITE_CUDA_UNAVAILABLE` et sans fallback restent applicables
 **Source :** Demande utilisateur du 2026-07-23 d'exécuter le worker Granite actuel sur la RTX 4090
 
 ## Contexte
@@ -113,6 +113,11 @@ recevoir implicitement une exigence NVIDIA.
 - Commits : RED `436c682e9` ; GREEN présent commit.
 
 ## Notes
+
+Cette ADR est partiellement remplacée par ADR-052 pour M-014 uniquement sur
+les mentions historiques d’une flotte CPU multiarchitecture ou distante. Ce
+lien réciproque est conditionnel au périmètre M-014 et ne change aucune
+exigence d’exécution Granite CUDA stricte de la présente ADR.
 
 L'ADR ne promet pas à elle seule un gain de performance. La décision rend le
 périphérique certain ; le gain doit être mesuré sur une page Granite réelle.

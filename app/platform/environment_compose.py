@@ -1233,6 +1233,33 @@ def _technical_environment_from_repository(repository_root: Path) -> Mapping[str
     )
 
 
+def technical_environment_from_repository(
+    repository_root: Path,
+) -> Mapping[str, str]:
+    """Calcule l'identité d'image canonique sans dépendre du shell appelant."""
+
+    return _technical_environment_from_repository(repository_root)
+
+
+def run_environment_compose_command(
+    definition: EnvironmentStackDefinition,
+    arguments: Sequence[str],
+    *,
+    technical_environment: Mapping[str, str],
+    capture_output: bool,
+    additional_compose_paths: Sequence[Path] = (),
+) -> subprocess.CompletedProcess[str]:
+    """Exécute Compose avec l'identité technique injectée explicitement."""
+
+    return _run_compose(
+        definition,
+        arguments,
+        technical_environment=technical_environment,
+        capture_output=capture_output,
+        additional_compose_paths=additional_compose_paths,
+    )
+
+
 def _run_compose(
     definition: EnvironmentStackDefinition,
     arguments: Sequence[str],
@@ -1240,11 +1267,18 @@ def _run_compose(
     technical_environment: Mapping[str, str],
     capture_output: bool,
     allowed_returncodes: frozenset[int] = frozenset({0}),
+    additional_compose_paths: Sequence[Path] = (),
 ) -> subprocess.CompletedProcess[str]:
     environment = _compose_process_environment(technical_environment)
     docker_executable = shutil.which("docker")
     if docker_executable is None:
         raise ValueError("ENVIRONMENT_DOCKER_UNAVAILABLE")
+    additional_files: list[str] = []
+    for path in additional_compose_paths:
+        if not isinstance(path, Path) or not path.is_file():
+            raise ValueError("ENVIRONMENT_COMPOSE_OVERRIDE_INVALID")
+        _require_path_under(path, root=definition.repository_root)
+        additional_files.extend(("--file", str(path.resolve())))
     command = (
         docker_executable,
         "compose",
@@ -1254,6 +1288,7 @@ def _run_compose(
         str(definition.base_compose_path),
         "--file",
         str(definition.compose_path),
+        *additional_files,
         *arguments,
     )
     result = subprocess.run(
@@ -1385,7 +1420,9 @@ __all__ = [
     "export_environment_caddy_ca",
     "inspect_environment_readiness",
     "render_environment_compose",
+    "run_environment_compose_command",
     "start_environment_compose_stack",
+    "technical_environment_from_repository",
     "validate_environment_compose_matrix",
     "wait_environment_compose_stack",
 ]
