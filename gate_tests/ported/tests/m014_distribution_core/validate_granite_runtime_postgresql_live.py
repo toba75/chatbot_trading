@@ -222,6 +222,13 @@ def test_runtime_postgresql_workers_terminal_union_et_chemin_chaud() -> None:
                     ),
                     recalculate=False,
                 )
+            with pytest.raises(
+                JobSubmissionConflictError, match="JOB_SUBMISSION_CONFLICT"
+            ):
+                queue.submit(
+                    replace(jobs[0].request, priority=JobPriority.P2),
+                    recalculate=False,
+                )
             with factory.connect() as connection:
                 with pytest.raises(psycopg.errors.CheckViolation):
                     with connection.transaction(), connection.cursor() as cursor:
@@ -241,6 +248,27 @@ def test_runtime_postgresql_workers_terminal_union_et_chemin_chaud() -> None:
                             )
                             """,
                             ("9" * 64, "a" * 64),
+                        )
+                with pytest.raises(psycopg.errors.CheckViolation):
+                    with connection.transaction(), connection.cursor() as cursor:
+                        cursor.execute(
+                            """
+                            INSERT INTO platform.technical_jobs (
+                                environment, deployment_id, job_name, priority,
+                                input_hash, configuration_hash, code_version,
+                                model_version, execution_contract_name,
+                                execution_contract_version, capacity_capability,
+                                capacity_slots, capacity_device, storage_environment,
+                                payload, trace_id, status, recalculation_number
+                            ) VALUES (
+                                'test', 'ostrading-test-local', 'CONVERT_PAGE', 'P1',
+                                %s, %s, 'm014-cycle3-storage', 'granite-locked',
+                                'CONVERT_PAGE', '1.0', 'GRANITE_CUDA', 1,
+                                'cuda:0', 'development', '{}'::jsonb,
+                                'TRACE-M014-CYCLE3-STORAGE', 'pending', 0
+                            )
+                            """,
+                            ("5" * 64, "a" * 64),
                         )
             assert jobs[2].request.execution_requirements is not None
             divergent_relay_request = replace(

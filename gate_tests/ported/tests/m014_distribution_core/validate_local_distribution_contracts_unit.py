@@ -106,8 +106,42 @@ def test_value_objects_et_serialisation_fermee(tmp_path: Path) -> None:
     assert not hasattr(request.execution_requirements, "source_artifact_ref")
     assert not hasattr(request.execution_requirements, "result_artifact_ref")
 
+    neutral_request = JobRequest(
+        environment="test",
+        deployment_id="ostrading-test-ci",
+        job_name="GENERIC_TECHNICAL_JOB",
+        priority=JobPriority.P2,
+        idempotence_key=replace(
+            request.idempotence_key,
+            job_name="GENERIC_TECHNICAL_JOB",
+        ),
+        execution_requirements=JobExecutionRequirements(
+            contract_name="GENERIC_TECHNICAL_CONTRACT",
+            contract_version="7.3",
+            capacity_capability="GENERIC_CAPABILITY",
+            capacity_slots=0,
+            capacity_device=None,
+            storage_environment="test",
+        ),
+        payload={"contract_version": "7.3"},
+    )
+    assert neutral_request.execution_requirements.contract_version == "7.3"
+
+    with pytest.raises(ValueError, match="storage_environment incohérent"):
+        JobRequest(
+            environment=request.environment,
+            deployment_id=request.deployment_id,
+            job_name=request.job_name,
+            priority=request.priority,
+            idempotence_key=request.idempotence_key,
+            execution_requirements=replace(
+                request.execution_requirements,
+                storage_environment="development",
+            ),
+            payload=request.payload,
+        )
+
     for divergent_fields in (
-        {"storage_environment": "development"},
         {"capacity_capability": "GRANITE_CUDA"},
         {"capacity_slots": 1, "capacity_device": "cuda:0"},
         {"capacity_slots": 1, "capacity_device": "cpu"},
@@ -199,6 +233,34 @@ def test_value_objects_et_serialisation_fermee(tmp_path: Path) -> None:
         PageResultContract.from_mapping(invalid_skipped)
 
     _assert_schema_de_configuration_refuse_toute_derive(tmp_path)
+    _assert_codes_terminaux_relis_publiquement()
+
+
+def _assert_codes_terminaux_relis_publiquement() -> None:
+    from app.source_processing.application.document_commands import (
+        DocumentConversionExecutionPhase,
+        DocumentConversionState,
+        DocumentConversionStatus,
+    )
+    from app.source_processing.domain.source_document import DocumentId
+
+    for code in (
+        "GRANITE_DOCLING_TIMEOUT",
+        "GEMMA_VISION_TIMEOUT",
+        "JOB_LEASE_LOST",
+        "GRANITE_CAPACITY_CONFIGURATION_INVALID",
+    ):
+        state = DocumentConversionState(
+            document_id=DocumentId.from_value("DOC-AAAAAAAAAAAAAAAA"),
+            conversion_status=DocumentConversionStatus.QA_REJECTED,
+            canonical_version_id=None,
+            rejection_error_code=code,
+            execution_phase=DocumentConversionExecutionPhase.FAILED,
+            completed_units=0,
+            total_units=1,
+            failure_error_code=code,
+        )
+        assert state.failure_error_code == code
 
 
 def _assert_schema_de_configuration_refuse_toute_derive(tmp_path: Path) -> None:
@@ -231,6 +293,10 @@ def _assert_schema_de_configuration_refuse_toute_derive(tmp_path: Path) -> None:
         "per_worker_2": (
             "      granite_slots_per_worker: 1",
             "      granite_slots_per_worker: 2",
+        ),
+        "granite_concurrency_2": (
+            "    granite_concurrency: 1",
+            "    granite_concurrency: 2",
         ),
     }
     for name, (old, new) in mutations.items():

@@ -250,6 +250,9 @@ def test_contrats_locaux_versionnes_et_refusables() -> None:
     for error_code in (
         PageResultErrorCode.GRANITE_CAPACITY_CONFIGURATION_INVALID,
         PageResultErrorCode.GRANITE_CUDA_UNAVAILABLE,
+        PageResultErrorCode.GRANITE_DOCLING_TIMEOUT,
+        PageResultErrorCode.GEMMA_VISION_TIMEOUT,
+        PageResultErrorCode.JOB_LEASE_LOST,
         PageResultErrorCode.WORKER_MEMORY_LIMIT_EXCEEDED,
         PageResultErrorCode.ARTIFACT_NOT_FOUND,
         PageResultErrorCode.ARTIFACT_OUTSIDE_PROFILE_ROOT,
