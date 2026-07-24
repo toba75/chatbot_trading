@@ -82,7 +82,9 @@
   PostgreSQL live de complétude, concurrence, crash et publication atomique ;
   `uv run --locked gate --scope m004` ;
   `uv run --locked gate --scope m014_local_pipeline --live`. Le sous-agent
-  exécute uniquement les tests et scopes ciblés. La gate globale de clôture
-  appartient à l’orchestrateur selon la politique unique du journal.
+  exécute uniquement les tests et scopes ciblés. L'orchestrateur exécute
+  exactement une gate globale de clôture avec un timeout de 3 600 000 ms, attend
+  le même cell ID après tout yield ou timeout d'affichage et ne la considère
+  jamais relancée.
 - Commit RED : `test(m014-pipeline): couvrir assemblage canonique atomique`.
 - Commit GREEN : `feat(m014-pipeline): publier document canonique complet`.

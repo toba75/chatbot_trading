@@ -273,11 +273,15 @@ les publications par l’outbox du contexte propriétaire.
   outbox locales et les projections convergent de nouveau vers `SEARCHABLE`
   sans DML transactionnel croisant SP et KA.
 
-Le pipeline livré applique les migrations 023 à 028 après le socle 022 : fan-out
+Le pipeline livré applique les migrations 023 à 029 après le socle 022 : fan-out
 et version d’orchestration (023), publication canonique (024), projection KA
 (025), identité complète des complétions (026), durcissement du relais et des
 rejeux (027), puis coexistence bornée M004/M014 et correction de l’attente
-d’artefact canonique (028). Leur simple déploiement n’active jamais le fan-out.
+d’artefact canonique (028). La migration 029 réalise la phase expand : elle
+qualifie les anciens contrats depuis leurs preuves propriétaires, révoque leurs
+claims, reconstruit les publications historiques dans l'outbox SP et remet les
+projections qualifiées sur un chemin de rejeu. Leur simple déploiement n’active
+jamais le fan-out ; la phase contract attend une preuve de drainage distincte.
 
 Le discriminateur fermé du job parent est `orchestration_version`. La valeur
 `m004-inline-v1` conserve le parcours documentaire antérieur et la valeur

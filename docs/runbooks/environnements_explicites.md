@@ -179,7 +179,7 @@ Les seules boucles asynchrones publiées par ces piles sont les deux réplicas
 documentaires (`DIAGNOSE`, `CONVERT_DOCUMENT`, `CONVERT_PAGE`,
 `ASSEMBLE_CANONICAL_DOCUMENT`) et les deux réplicas de projection
 (`PROJECT_DOCUMENT`). La sélection `m014-page-fanout-v1` doit être explicite et
-les migrations 023 à 028 doivent précéder l’activation. Avant une route Granite,
+les migrations 023 à 029 doivent précéder l’activation. Avant une route Granite,
 `nvidia-smi` doit prouver `cuda:0`; aucune alternative silencieuse n’est
 admise. `DEEP_RESEARCH`, `VERIFY_RESPONSE` et
 `BACKTEST` restent indisponibles tant que leur chaîne API, outbox, relais,

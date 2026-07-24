@@ -28,8 +28,9 @@
 
 ## Blocages Ou Préconditions
 
-- État GREEN/RED connu : P-001 doit avoir fermé les deux RED de prévol et publié
-  une gate globale GREEN avant le test RED de cette tâche.
+- État GREEN/RED connu : P-001 doit avoir fermé les deux RED de prévol. La preuve
+  globale GREEN antérieure est réutilisée lorsque `HEAD` et le worktree sont
+  inchangés ; le sous-agent ne la relance pas avant le test RED de cette tâche.
 - Présence des milestones amont dans master : M14-distribution-core et ses
   contrats `CONVERT_PAGE`, résultat de page,
   `ASSEMBLE_CANONICAL_DOCUMENT`, quota et outbox de complétion sont présents.
@@ -78,7 +79,9 @@
   ADR-025, ADR-052 et DDD-ADR-008.
 - Commandes de validation : tests ciblés du validateur de spécification ;
   `uv run --locked gate --scope governance` ;
-  `uv run --locked gate --scope m014_local_pipeline` ;
-  `uv run --locked gate`.
+  `uv run --locked gate --scope m014_local_pipeline`. Le sous-agent exécute
+  uniquement les tests et scopes ciblés. L'orchestrateur exécute exactement une
+  gate globale de clôture avec un timeout de 3 600 000 ms, attend le même cell ID
+  après tout yield ou timeout d'affichage et ne la considère jamais relancée.
 - Commit RED : `test(m014-pipeline): exiger specification pipeline local distribue`.
 - Commit GREEN : `docs(m014-pipeline): publier specification pipeline local distribue`.

@@ -4,7 +4,7 @@
 
 Ce document couvre `M14-distribution-core` T-001 à T-004 et le pipeline livré
 `M14-local-pipeline` T-005 à T-008. Il décrit les prérequis, les invariants de
-configuration, les migrations 022 à 028, l’activation explicite et le rollback.
+configuration, les migrations 022 à 029, l’activation explicite et le rollback.
 Il ne publie pas encore les commandes d’inspection, de drainage ou de
 redémarrage ciblé réservées à T-009.
 
@@ -99,7 +99,7 @@ chaîne M14-local-pipeline.
 
 ## Déploiement et activation T-005 à T-008
 
-L’ordre est strict : migrer 023 à 028, démarrer les relais, puis les deux
+L’ordre est strict : migrer 023 à 029, démarrer les relais, puis les deux
 `worker-documents` annonçant `CONVERT_PAGE` et
 `ASSEMBLE_CANONICAL_DOCUMENT`, enfin les workers KA annonçant
 `PROJECT_DOCUMENT`. Vérifier l’identité `environment`, `deployment_id` et
@@ -113,14 +113,24 @@ ou de `nvidia-smi` ne choisit jamais le parcours. Les migrations 023 à 027
 installent les tables, contraintes, relais et index. La migration 028 ouvre une
 coexistence bornée avec un ancien writer M004 prouvé par son outbox et corrige
 les attentes d’artefacts d’assemblage en attente ; elle n’installe aucun
-`DEFAULT` métier silencieux.
+`DEFAULT` métier silencieux. La migration 029 termine la phase expand : elle
+enrichit les contrats historiques depuis des preuves durables, révoque leurs
+claims, reconstruit l'outbox canonique SP et remet les projections qualifiées en
+rejeu. La phase contract reste différée jusqu'à la preuve de drainage.
+
+Chaque replica `worker-documents` relaie d'abord l'outbox SP vers la file
+plateforme et les complétions plateforme vers SP, puis réclame ses jobs. Le
+worker KA relaie d'abord `CanonicalSourcePublished` dans une transaction KA,
+relaie ensuite `PROJECT_DOCUMENT` vers la file plateforme, puis réclame le job.
+Un acquittement suit toujours le commit du contexte consommateur ; il ne le
+précède jamais.
 
 Le rollback ferme d’abord les nouvelles admissions M14, draine les jobs de
 page et d’assemblage, puis laisse les publications et projections déjà
 committées converger. Il bascule uniquement les nouveaux traitements vers
 `m004-inline-v1`, sans réécrire les traitements M14, supprimer les migrations,
 changer de route ou acquitter un relais avant le commit de son consommateur.
-Le trigger transitoire de la migration 028 ne sera supprimé que par une future
+Les triggers transitoires des migrations 028 et 029 ne seront supprimés que par une future
 étape contract après preuve qu’aucun ancien writer M004 n’est déployable.
 
 ## Gates de validation

@@ -1,6 +1,6 @@
 # ADR-053 - Migrations M-014 par expand/contract et rejeu local
 
-**Statut :** Proposée
+**Statut :** Acceptée
 **Date :** 2026-07-24
 **Décideurs :** Équipe OSTrading
 **Remplace :** Aucun
@@ -67,6 +67,12 @@ bloquer ces données durables. Un DML direct entre `source_processing` et
 
 - Modules concernés : migrations PostgreSQL, relais SP/KA, workers M-004/M-005,
   projection KA et Qdrant.
+- Migration 027 : contraintes locales KA, cohérence de génération, index de
+  lecture et durcissement du relais sans DML croisant SP et KA.
+- Migration 028 : coexistence bornée des writers M-004/M-014, correction des
+  contrats d'assemblage en attente et révocation des claims de relais réécrits.
+- Migration 029 : phase expand des contrats historiques, reconstruction des
+  outbox canoniques SP et remise en rejeu des projections qualifiées.
 - Configuration concernée : identité locale explicite seulement.
 - Tests attendus : upgrade PostgreSQL réel, anciens jobs relayés, rejeu des
   publications/projections, fencing des claims et Qdrant exact.
@@ -78,7 +84,8 @@ bloquer ces données durables. Un DML direct entre `source_processing` et
 - Plan d'implémentation : `docs/tasks/milestone_014-local-pipeline/`.
 - Tests d'acceptation :
   `gate_tests/ported/tests/m014_local_pipeline/validate_runtime_migration_final_regressions_unit.py`.
-- Commits : RED et GREEN du lot « reprise et compatibilité finale ».
+- Commits : RED `c8b529f67` et GREEN `6b160e799` du lot « reprise et
+  compatibilité finale ».
 
 ## Notes
 

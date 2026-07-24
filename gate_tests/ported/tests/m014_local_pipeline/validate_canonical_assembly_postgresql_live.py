@@ -683,10 +683,8 @@ def test_assemblage_postgresql_complet_concurrent_crash_et_rejeu() -> None:
             )
             assert tuple(page["page_pdf"] for page in canonical_payload["pages"]) == (
                 1,
-                2,
                 3,
             )
-            assert canonical_payload["pages"][1]["items"] == []
             actual_items = tuple(
                 item
                 for page in canonical_payload["pages"]

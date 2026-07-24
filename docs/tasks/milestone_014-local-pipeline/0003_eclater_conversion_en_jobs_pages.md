@@ -84,7 +84,8 @@
   `uv run --locked gate --scope m013_environments` ;
   `uv run --locked gate --scope m014_distribution_core` ;
   `uv run --locked gate --scope m014_local_pipeline`. Le sous-agent exécute
-  uniquement les tests et scopes ciblés. La gate globale de clôture appartient
-  à l’orchestrateur selon la politique unique du journal.
+  uniquement les tests et scopes ciblés. L'orchestrateur exécute exactement une
+  gate globale de clôture avec un timeout de 3 600 000 ms, attend le même cell ID
+  après tout yield ou timeout d'affichage et ne la considère jamais relancée.
 - Commit RED : `test(m014-pipeline): couvrir fan-out transactionnel des pages`.
 - Commit GREEN : `feat(m014-pipeline): eclater conversion en jobs de pages`.

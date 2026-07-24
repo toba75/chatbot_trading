@@ -23,8 +23,8 @@
   concurrence Granite égale à un ; aucune implémentation T-005 à T-008 ne
   commence sur une gate RED.
 - Garde-fous : aucun RED n'est masqué, aucun fichier local ignoré n'est commité,
-  aucune empreinte de document n'est changée sans test et aucune validation
-  ciblée GREEN ne remplace la gate globale.
+  aucune empreinte de document n'est changée sans test ; le sous-agent reste
+  sur les tests et scopes ciblés et transmet ses preuves à l'orchestrateur.
 
 ## Blocages Ou Préconditions
 
@@ -64,11 +64,12 @@
     de configuration explicitement choisi et les ADR-051/ADR-052 réciproques.
   - When la configuration locale est réalignée sur un slot Granite par worker,
     puis le validateur ADR-051 et les gates amont sont exécutés.
-  - Then la gate globale et le scope `m014_distribution_core` sont GREEN, le
-    fichier ignoré reste non versionné et aucune ADR acceptée n'a changé de sens.
+  - Then le scope `m014_distribution_core` est GREEN, le fichier ignoré reste
+    non versionné et aucune ADR acceptée n'a changé de sens ; l'orchestrateur
+    conserve seul la responsabilité de la preuve globale finale.
 - Tests d'acceptation à écrire : aucun test fonctionnel du pipeline ; conserver
-  les deux RED observés comme preuves, puis vérifier le scope M14-core et la
-  gate globale après correction. Si le validateur d'ADR ne couvre pas le lien
+  les deux RED observés comme preuves, puis vérifier le scope M14-core après
+  correction. Si le validateur d'ADR ne couvre pas le lien
   réciproque accepté, ajouter un test ciblé qui exige les métadonnées et notes
   actuelles d'ADR-051 sans figer un contenu étranger à la décision.
 - Tests unitaires à écrire : mettre à jour ou compléter le test du validateur
@@ -92,8 +93,10 @@
   `git check-ignore -v config/application.yaml` ;
   `uv run --locked gate --scope governance` ;
   `uv run --locked gate --scope m004` ;
-  `uv run --locked gate --scope m014_distribution_core` ;
-  `uv run --locked gate`.
+  `uv run --locked gate --scope m014_distribution_core`. Le sous-agent exécute
+  uniquement les tests et scopes ciblés. L'orchestrateur exécute exactement une
+  gate globale de clôture avec un timeout de 3 600 000 ms, attend le même cell ID
+  après tout yield ou timeout d'affichage et ne la considère jamais relancée.
 - Commit RED : aucun commit RED artificiel ; les deux échecs de prévol sont les
   RED existants à fermer avant le TDD du pipeline.
 - Commit GREEN : `fix(m014-core): realigner preuve reciproque ADR-051` ; la

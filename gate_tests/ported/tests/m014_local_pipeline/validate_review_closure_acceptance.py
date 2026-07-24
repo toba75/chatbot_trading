@@ -35,12 +35,13 @@ def _assert_les_taches_ne_demandent_plus_de_gate_globale_aux_sous_agents() -> No
         "0006_projeter_document_publie_localement.md",
     ):
         task = (TASKS / task_name).read_text(encoding="utf-8")
-        assert "tests et scopes ciblés" in task
-        assert "orchestrateur" in task
-        assert "exactement une gate globale de clôture" in task
-        assert "3 600 000 ms" in task
-        assert "même cell ID" in task
-        assert "jamais relancée" in task
+        normalized_task = " ".join(task.split())
+        assert "tests et scopes ciblés" in normalized_task
+        assert "orchestrateur" in normalized_task
+        assert "exactement une gate globale de clôture" in normalized_task
+        assert "3 600 000 ms" in normalized_task
+        assert "même cell ID" in normalized_task
+        assert "jamais relancée" in normalized_task
 
         validation_commands = task.split("- Commandes de validation :", 1)[1].split(
             "- Commit RED", 1
@@ -136,9 +137,10 @@ def _assert_expand_replay_est_documente_sans_adr_fictive() -> None:
     distribution = _read("docs/runbooks/distribution_locale.md")
     journal = _read("docs/tasks/milestone_014-local-pipeline/journal.md")
     for document in (adr, specification, distribution, journal):
-        assert "migration 029" in document
-        assert "expand" in document
-        assert "rejeu" in document
+        normalized_document = document.lower()
+        assert "migration 029" in normalized_document
+        assert "expand" in normalized_document
+        assert "rejeu" in normalized_document
     assert "ADR-053" in adr_index
     assert "Prochaine ADR technique: ADR-054" in adr_index
     assert "ADR-054" not in "\n".join((specification, distribution, journal))

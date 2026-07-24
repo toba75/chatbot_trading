@@ -473,3 +473,46 @@ P-001 précondition GREEN
 - ADR consultées : ADR-005, ADR-010, ADR-024, ADR-025, ADR-052,
   DDD-ADR-004 et DDD-ADR-008. ADR créée ou modifiée : aucune, car la revue
   applique les décisions existantes sans nouvelle décision structurante.
+
+## 2026-07-24 - Reprise historique et preuves finales de clôture
+
+- Le lot de reprise et compatibilité est porté par les commits RED `c8b529f67`
+  et GREEN `6b160e799`. ADR-053 formalise désormais la stratégie durable
+  `expand -> rejeu/requalification -> contract` et son statut accepté est
+  synchronisé dans l'index ADR.
+- La migration 027 durcit les contraintes KA, la cohérence de génération et les
+  index sans DML de réconciliation entre SP et KA. La migration 028 borne la
+  coexistence M004/M014 et révoque les claims de relais qu'elle réécrit. La
+  migration 029 enrichit les anciens contrats depuis leurs preuves durables,
+  révoque les anciens claims, reconstruit les publications dans l'outbox SP et
+  remet les projections qualifiées dans un chemin de rejeu explicite.
+- Les effets observables attendus sont fermés : un ancien détenteur ne peut plus
+  acquitter un message réécrit ; une publication historique devient un message
+  SP `pending` consommé ensuite par KA ; une projection historique qualifiée
+  repart de `REQUESTED` et ne redevient `SEARCHABLE` qu'après vérification de
+  sa génération Qdrant exacte.
+- La preuve PostgreSQL d'assemblage injecte maintenant l'échec dans la vraie
+  transaction de `publish_atomic` et vérifie qu'aucune version, outbox ou
+  progression canonique n'est visible après rollback. Elle contrôle aussi le
+  contenu JSON publié, l'ordre PDF, les textes, hashes et provenances réels.
+- La preuve PostgreSQL/Qdrant part du statut automatique `REQUESTED`, sans
+  `/index` manuel. Elle supprime ensuite un point d'une projection
+  `SEARCHABLE`, exige `PROJECTION_REPLAY_INCOMPLETE` sans mutation du succès,
+  puis prouve la réparation explicite depuis `INDEXING`.
+- Les six tâches 0001 à 0006 imposent désormais les tests et scopes ciblés aux
+  sous-agents. L'orchestrateur seul lance exactement une gate globale de clôture
+  avec 3 600 000 ms, attend le même cell ID et ne la relance jamais après un
+  yield ou un timeout d'affichage.
+- Les refactors de grande ampleur du worker et des relais restent non bloquants
+  et hors de ce lot final : les modifier avec les transactions déjà prouvées
+  augmenterait le risque. Aucun changement de nom Granite, de route manuelle ou
+  de collecte GPU n'est effectué sans nouveau RED ciblé démontrant un défaut.
+- Validations finales ciblées : clôture documentaire 1/1 GREEN ; publication
+  PostgreSQL réelle 1/1 GREEN après correction d'une attente de fixture sur la
+  page `SKIP_EMPTY` ; projection PostgreSQL/Qdrant réelle 1/1 GREEN ; quinze
+  preuves proches M14, ADR, traçabilité et runbook 15/15 GREEN ; Ruff ciblé,
+  `compileall` ciblé et `git diff --check` GREEN. Aucun scope M13 complet, aucun
+  scope M14 complet et aucune gate globale n'ont été lancés dans ce lot.
+- Commit RED du présent lot : `dc3ed1df2` —
+  `test(m014-pipeline): couvrir cloture finale de revue`. Commit GREEN : commit
+  portant cette entrée. Aucune gate globale n'est exécutée par ce sous-agent.
