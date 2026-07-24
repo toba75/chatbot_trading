@@ -5,12 +5,13 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, NamedTuple
 from uuid import uuid4
 
-from app.contracts.technical_jobs import JobRequest
+from app.contracts.technical_jobs import JobEnvironmentIdentity, JobRequest
 from app.platform.configuration import ApplicationConfiguration
 from app.platform.postgres import (
     PostgresConnection,
@@ -23,6 +24,8 @@ from app.source_processing.application.document_commands import (
     DocumentConversionState,
     DocumentConversionStatus,
 )
+from app.source_processing.application.fan_out_document_pages import PageFanOutPlan
+from app.source_processing.domain.distribution_contracts import DistributionContractError
 from app.source_processing.application.document_queries import DocumentStateSnapshot
 from app.source_processing.application.native_document_conversion_worker import (
     NativeCanonicalPublication,
@@ -652,7 +655,9 @@ class PostgresDocumentPersistence:
                         """
                         SELECT document_id, conversion_status, canonical_version_id,
                                rejection_error_code, execution_phase, completed_units,
-                               total_units, failure_error_code
+                               total_units, failure_error_code,
+                               producer_environment, producer_deployment_id,
+                               producer_configuration_hash
                           FROM source_processing.document_conversion_requests
                          WHERE document_id = ANY(%s)
                         """,
@@ -661,6 +666,11 @@ class PostgresDocumentPersistence:
                     conversions = {
                         row[0]: DocumentConversionState(
                             document_id=DocumentId.from_value(row[0]),
+                            producer_environment_identity=JobEnvironmentIdentity(
+                                environment=row[8],
+                                deployment_id=row[9],
+                                configuration_hash=row[10],
+                            ),
                             conversion_status=DocumentConversionStatus.from_value(row[1]),
                             canonical_version_id=row[2],
                             rejection_error_code=row[3],
@@ -859,6 +869,7 @@ class PostgresDocumentPersistence:
     ) -> OutboxSubmissionDecision:
         if not isinstance(conversion_state, DocumentConversionState):
             raise ValueError("conversion_state invalide")
+        orchestration_version = _conversion_orchestration_version(job_request)
         with self._connection_factory.connect() as connection:
             with connection.transaction():
                 submission = self._enqueue_job_outbox(
@@ -873,9 +884,14 @@ class PostgresDocumentPersistence:
                             INSERT INTO source_processing.document_conversion_requests (
                                 document_id, conversion_status, canonical_version_id,
                                 rejection_error_code, execution_phase, completed_units,
-                                total_units, failure_error_code, submission_id, job_id
+                                total_units, failure_error_code, submission_id, job_id,
+                                orchestration_version, producer_environment,
+                                producer_deployment_id, producer_configuration_hash
                             )
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NULL)
+                            VALUES (
+                                %s, %s, %s, %s, %s, %s, %s, %s, %s, NULL, %s,
+                                %s, %s, %s
+                            )
                             ON CONFLICT (document_id) DO NOTHING
                             RETURNING document_id
                             """,
@@ -889,11 +905,209 @@ class PostgresDocumentPersistence:
                                 conversion_state.total_units,
                                 conversion_state.failure_error_code,
                                 submission.outbox_id,
+                                orchestration_version,
+                                conversion_state.producer_environment_identity.environment,
+                                conversion_state.producer_environment_identity.deployment_id,
+                                conversion_state.producer_environment_identity.configuration_hash,
                             ),
                         )
                         if cursor.fetchone() is None:
                             raise RuntimeError("CONVERSION_PERSISTENCE_CONFLICT")
                 return submission
+
+    def persist_page_fan_out(
+        self,
+        plan: PageFanOutPlan,
+        *,
+        trace_id: str,
+    ) -> bool:
+        """Écrit état, SKIP_EMPTY et jobs de pages dans une transaction SP."""
+
+        if not isinstance(plan, PageFanOutPlan):
+            raise ValueError("plan fan-out invalide")
+        if not isinstance(trace_id, str) or trace_id.strip() == "" or trace_id != trace_id.strip():
+            raise ValueError("trace_id fan-out invalide")
+        plan_payload = _json_compatible(plan.to_mapping())
+        with self._connection_factory.connect() as connection:
+            with connection.transaction(), connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                    (f"sp-page-fan-out|{plan.processing_run_id.value}",),
+                )
+                cursor.execute(
+                    """
+                    SELECT conversion_status, execution_phase, completed_units,
+                           total_units, orchestration_version
+                      FROM source_processing.document_conversion_requests
+                     WHERE document_id = %s
+                     FOR UPDATE
+                    """,
+                    (plan.document_id.value,),
+                )
+                conversion = cursor.fetchone()
+                if conversion is None:
+                    raise DistributionContractError(
+                        "PAGE_FAN_OUT_CONVERSION_REQUEST_NOT_FOUND"
+                    )
+                if conversion[4] != plan.orchestration_version:
+                    raise DistributionContractError(
+                        "PAGE_FAN_OUT_ORCHESTRATION_VERSION_CONFLICT"
+                    )
+                cursor.execute(
+                    """
+                    SELECT fan_out_fingerprint
+                      FROM source_processing.document_page_fanouts
+                     WHERE processing_run_id = %s
+                    """,
+                    (plan.processing_run_id.value,),
+                )
+                existing = cursor.fetchone()
+                if existing is not None:
+                    if existing[0] != plan.fingerprint:
+                        raise DistributionContractError(
+                            "PAGE_FAN_OUT_REPLAY_DIVERGENCE"
+                        )
+                    return False
+                if conversion[:4] != (
+                    "CONVERSION_REQUESTED",
+                    "QUEUED",
+                    0,
+                    plan.total_units,
+                ):
+                    raise DistributionContractError(
+                        "PAGE_FAN_OUT_CONVERSION_STATE_INVALID"
+                    )
+                cursor.execute(
+                    """
+                    INSERT INTO source_processing.document_page_fanouts (
+                        processing_run_id, document_id, orchestration_version,
+                        environment, deployment_id, configuration_hash,
+                        page_manifest_sha256, total_units,
+                        fan_out_payload, fan_out_fingerprint
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s)
+                    """,
+                    (
+                        plan.processing_run_id.value,
+                        plan.document_id.value,
+                        plan.orchestration_version,
+                        plan.environment_identity.environment,
+                        plan.environment_identity.deployment_id,
+                        plan.environment_identity.configuration_hash,
+                        plan.page_manifest_sha256,
+                        plan.total_units,
+                        json.dumps(plan_payload, ensure_ascii=False, separators=(",", ":"), sort_keys=True),
+                        plan.fingerprint,
+                    ),
+                )
+                skipped_rows = []
+                for skipped in plan.skipped_results:
+                    result_payload = skipped.result.to_mapping()
+                    serialized_result = json.dumps(
+                        result_payload,
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                        sort_keys=True,
+                    )
+                    skipped_rows.append(
+                        (
+                            plan.processing_run_id.value,
+                            skipped.result.page_number,
+                            skipped.completion_id,
+                            skipped.result.contract_version,
+                            skipped.result.route_name.value,
+                            skipped.result.status.value,
+                            serialized_result,
+                            hashlib.sha256(serialized_result.encode("utf-8")).hexdigest(),
+                        )
+                    )
+                if skipped_rows:
+                    cursor.executemany(
+                        """
+                        INSERT INTO source_processing.page_execution_results (
+                            processing_run_id, page_number, completion_id,
+                            job_id, claim_generation, claim_token,
+                            worker_instance_id, slot_ordinal, slot_generation,
+                            slot_token, result_contract_version, route_name,
+                            result_status, result_payload, result_fingerprint
+                        )
+                        VALUES (%s, %s, %s, NULL, NULL, NULL, NULL, NULL, NULL,
+                                NULL, %s, %s, %s, %s::jsonb, %s)
+                        """,
+                        skipped_rows,
+                    )
+                page_job_rows = tuple(
+                    (
+                        page_job.environment,
+                        page_job.deployment_id,
+                        page_job.job_name,
+                        page_job.priority.value,
+                        page_job.idempotence_key.input_hash,
+                        page_job.idempotence_key.configuration_hash,
+                        page_job.idempotence_key.code_version,
+                        page_job.idempotence_key.model_version,
+                        json.dumps(
+                            _json_compatible(page_job.payload),
+                            separators=(",", ":"),
+                            sort_keys=True,
+                        ),
+                        trace_id,
+                    )
+                    for page_job in plan.page_jobs
+                )
+                if page_job_rows:
+                    cursor.executemany(
+                        """
+                        INSERT INTO source_processing.job_outbox (
+                            environment, deployment_id, job_name, priority,
+                            input_hash, configuration_hash, code_version,
+                            model_version, payload, trace_id, status
+                        )
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s,
+                                %s::jsonb, %s, 'pending')
+                        ON CONFLICT (
+                            job_name, input_hash, configuration_hash,
+                            code_version, model_version
+                        ) DO NOTHING
+                        """,
+                        page_job_rows,
+                    )
+                    if cursor.rowcount != len(page_job_rows):
+                        raise DistributionContractError(
+                            "PAGE_FAN_OUT_OUTBOX_CONFLICT"
+                        )
+                cursor.execute(
+                    """
+                    UPDATE source_processing.document_conversion_requests
+                       SET execution_phase = 'RUNNING', completed_units = %s
+                     WHERE document_id = %s
+                       AND conversion_status = 'CONVERSION_REQUESTED'
+                       AND execution_phase = 'QUEUED'
+                       AND completed_units = 0
+                       AND total_units = %s
+                       AND orchestration_version = %s
+                    """,
+                    (
+                        len(plan.skipped_results),
+                        plan.document_id.value,
+                        plan.total_units,
+                        plan.orchestration_version,
+                    ),
+                )
+                if cursor.rowcount != 1:
+                    raise DistributionContractError(
+                        "PAGE_FAN_OUT_CONVERSION_STATE_INVALID"
+                    )
+                if len(plan.skipped_results) == plan.total_units:
+                    from app.source_processing.adapters.postgres_canonical_assembly import (
+                        enqueue_canonical_assembly_if_complete,
+                    )
+
+                    enqueue_canonical_assembly_if_complete(
+                        cursor=cursor,
+                        processing_run_id=plan.processing_run_id.value,
+                    )
+        return True
 
     def complete_native_conversion(self, publication: NativeCanonicalPublication) -> None:
         if not isinstance(publication, NativeCanonicalPublication):
@@ -1081,7 +1295,9 @@ class PostgresDocumentPersistence:
                     job_request.priority.value,
                     *identity[1:],
                     json.dumps(
-                        dict(job_request.payload), separators=(",", ":"), sort_keys=True
+                        _json_compatible(job_request.payload),
+                        separators=(",", ":"),
+                        sort_keys=True,
                     ),
                     trace_id,
                 ),
@@ -1127,7 +1343,9 @@ class PostgresDocumentPersistence:
                 """
                 SELECT document_id, conversion_status, canonical_version_id,
                        rejection_error_code, execution_phase, completed_units,
-                       total_units, failure_error_code
+                       total_units, failure_error_code,
+                       producer_environment, producer_deployment_id,
+                       producer_configuration_hash
                   FROM source_processing.document_conversion_requests
                  WHERE document_id = %s
                 """,
@@ -1138,6 +1356,11 @@ class PostgresDocumentPersistence:
             return None
         return DocumentConversionState(
             document_id=DocumentId.from_value(row[0]),
+            producer_environment_identity=JobEnvironmentIdentity(
+                environment=row[8],
+                deployment_id=row[9],
+                configuration_hash=row[10],
+            ),
             conversion_status=DocumentConversionStatus.from_value(row[1]),
             canonical_version_id=row[2],
             rejection_error_code=row[3],
@@ -1557,6 +1780,14 @@ class PostgresDocumentConversionRepository:
     ) -> OutboxSubmissionDecision:
         return self._persistence.submit_conversion_request(conversion_state, job_request)
 
+    def persist_page_fan_out(
+        self,
+        plan: PageFanOutPlan,
+        *,
+        trace_id: str,
+    ) -> bool:
+        return self._persistence.persist_page_fan_out(plan, trace_id=trace_id)
+
     def complete_native_conversion(self, publication: NativeCanonicalPublication) -> None:
         self._persistence.complete_native_conversion(publication)
 
@@ -1620,6 +1851,23 @@ def _verify_file_hash(path: Path, expected_hash: str) -> None:
         raise RuntimeError("ORIGINAL_UNREADABLE") from exc
     if actual != expected_hash:
         raise OriginalHashMismatchError()
+
+
+def _conversion_orchestration_version(job_request: JobRequest) -> str:
+    if not isinstance(job_request, JobRequest) or job_request.job_name != "CONVERT_DOCUMENT":
+        raise ValueError("job_request conversion invalide")
+    value = job_request.payload.get("orchestration_version")
+    if value not in {"m004-inline-v1", "m014-page-fanout-v1"}:
+        raise ValueError("orchestration_version conversion invalide")
+    return value
+
+
+def _json_compatible(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {str(key): _json_compatible(item) for key, item in value.items()}
+    if isinstance(value, Sequence) and not isinstance(value, str | bytes):
+        return [_json_compatible(item) for item in value]
+    return value
 
 
 def _source_parameters(source: SourceDocument) -> tuple[Any, ...]:

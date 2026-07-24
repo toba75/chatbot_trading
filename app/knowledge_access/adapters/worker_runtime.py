@@ -6,7 +6,6 @@ import argparse
 import json
 import os
 import time
-from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -14,9 +13,14 @@ from uuid import uuid4
 from psycopg import OperationalError
 
 from app.knowledge_access.adapters.projection_runtime import (
+    LOCAL_PROJECTION_PROFILE,
     PROJECT_DOCUMENT_JOB_NAME,
+    ProjectionRetryableError,
     ProjectionRuntimeError,
     ProjectionRuntimeService,
+)
+from app.knowledge_access.adapters.postgres_canonical_publication_relay import (
+    PostgresCanonicalPublicationRelay,
 )
 from app.platform.configuration import ApplicationConfiguration, load_application_configuration
 from app.platform.configured_datastore_identity import build_configured_datastore_preflight
@@ -38,6 +42,7 @@ from app.source_processing.adapters.postgres_job_outbox import PostgresJobOutbox
 
 
 MAX_STARTUP_ENVIRONMENT_RECONCILIATIONS = 256
+MAX_PROJECTION_ATTEMPTS = 3
 
 
 def _run_worker(
@@ -103,6 +108,15 @@ def _run_worker(
         environment_identity=environment_identity,
         table_name="knowledge_access.job_outbox",
     )
+    publication_relay = PostgresCanonicalPublicationRelay(
+        connection_factory=connection_factory,
+        environment_identity=environment_identity,
+        projection_profile=LOCAL_PROJECTION_PROFILE,
+        configured_collection_name=(
+            application_configuration.services.qdrant.collections.knowledge_access
+        ),
+        observation_sink=_emit_publication_relay_observation,
+    )
     job_runtime = build_postgres_job_runtime(
         connection_factory=connection_factory,
         outbox=outbox,
@@ -133,6 +147,11 @@ def _run_worker(
     processed = 0
     while max_jobs is None or processed < max_jobs:
         try:
+            publication_relay.relay_pending(
+                limit=16,
+                owner_id=f"{instance_owner_id}-PUBLICATION",
+                lease_seconds=lease_seconds,
+            )
             job_runtime.outbox_relay.relay_pending(
                 limit=16,
                 owner_id=f"{instance_owner_id}-OUTBOX",
@@ -173,11 +192,37 @@ def _run_worker(
         error_code: str | None = None
         try:
             try:
-                payload = claimed.job.request.payload
-                projection_id = payload.get("projection_id") if isinstance(payload, Mapping) else None
-                if not isinstance(projection_id, str):
-                    raise ProjectionRuntimeError("PROJECTION_JOB_PAYLOAD_INVALID")
-                result = runtime.execute_projection(projection_id=projection_id)
+                result = runtime.execute_projection(claimed_job=claimed)
+            except ProjectionRetryableError as exc:
+                error_code = exc.error_code
+                if claimed.execution_attempts < MAX_PROJECTION_ATTEMPTS:
+                    heartbeat.finalize(
+                        lambda: job_runtime.queue.schedule_retry(
+                            job_id=claimed.job.job_id,
+                            owner_id=instance_owner_id,
+                            claim_generation=claimed.claim_generation,
+                            claim_token=claimed.claim_token,
+                            max_attempts=MAX_PROJECTION_ATTEMPTS,
+                        )
+                    )
+                    status = "retry_scheduled"
+                else:
+                    def terminalize_retry() -> Any:
+                        if error_code != "PROJECTION_LEASE_CONFLICT":
+                            runtime.terminalize_retry_exhausted(
+                                claimed_job=claimed,
+                                error_code=error_code,
+                            )
+                        return job_runtime.queue.mark_failed(
+                            job_id=claimed.job.job_id,
+                            owner_id=instance_owner_id,
+                            claim_generation=claimed.claim_generation,
+                            claim_token=claimed.claim_token,
+                            failure_reason=error_code,
+                        )
+
+                    heartbeat.finalize(terminalize_retry)
+                    status = "failed"
             except Exception as exc:
                 error_code = (
                     exc.error_code
@@ -242,6 +287,14 @@ def _log_runtime_error(
         ),
         flush=True,
     )
+
+
+def _emit_publication_relay_observation(
+    observation: dict[str, object] | Any,
+) -> None:
+    if not isinstance(observation, dict):
+        observation = dict(observation)
+    print(json.dumps(observation, ensure_ascii=False, sort_keys=True), flush=True)
 
 
 def _log(

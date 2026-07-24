@@ -8,6 +8,7 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 from app.contracts.source_references import SourceLocator
+from app.contracts.technical_jobs import ClaimedJob, JobEnvironmentIdentity
 from app.knowledge_access.application.extract_projected_bibliographic_metadata import (
     ProjectedBibliographicMetadata,
 )
@@ -136,9 +137,30 @@ class PostgresKnowledgeProjectionRepository:
         self,
         projection: KnowledgeProjection,
     ) -> KnowledgeProjection:
+        return self._save_transition(projection=projection, claimed_job=None)
+
+    def save_transition_fenced(
+        self,
+        projection: KnowledgeProjection,
+        *,
+        claimed_job: ClaimedJob,
+    ) -> KnowledgeProjection:
+        return self._save_transition(
+            projection=projection,
+            claimed_job=_ensure_claimed_job(claimed_job),
+        )
+
+    def _save_transition(
+        self,
+        *,
+        projection: KnowledgeProjection,
+        claimed_job: ClaimedJob | None,
+    ) -> KnowledgeProjection:
         parsed_projection = _ensure_projection(projection)
         with self._connection_factory.connect() as connection:
             with connection.transaction(), connection.cursor() as cursor:
+                if claimed_job is not None:
+                    _lock_active_projection_claim(cursor, claimed_job)
                 cursor.execute(
                     """
                     UPDATE knowledge_access.knowledge_projections
@@ -191,6 +213,45 @@ class PostgresKnowledgeProjectionRepository:
         chunk_count: int,
         chunks: Sequence[KnowledgeChunk],
         state_observed_at: str,
+        index_generation: str | None,
+    ) -> None:
+        self._save_projection_outputs(
+            projection=projection,
+            chunk_count=chunk_count,
+            chunks=chunks,
+            state_observed_at=state_observed_at,
+            index_generation=index_generation,
+            claimed_job=None,
+        )
+
+    def save_projection_outputs_fenced(
+        self,
+        *,
+        projection: KnowledgeProjection,
+        chunk_count: int,
+        chunks: Sequence[KnowledgeChunk],
+        state_observed_at: str,
+        index_generation: str | None,
+        claimed_job: ClaimedJob,
+    ) -> None:
+        self._save_projection_outputs(
+            projection=projection,
+            chunk_count=chunk_count,
+            chunks=chunks,
+            state_observed_at=state_observed_at,
+            index_generation=index_generation,
+            claimed_job=_ensure_claimed_job(claimed_job),
+        )
+
+    def _save_projection_outputs(
+        self,
+        *,
+        projection: KnowledgeProjection,
+        chunk_count: int,
+        chunks: Sequence[KnowledgeChunk],
+        state_observed_at: str,
+        index_generation: str | None,
+        claimed_job: ClaimedJob | None,
     ) -> None:
         if not isinstance(projection, KnowledgeProjection):
             raise ValueError("KnowledgeProjection invalide")
@@ -205,18 +266,31 @@ class PostgresKnowledgeProjectionRepository:
             raise ValueError("échantillons KA au-delà de la limite de stockage")
         observed_at = ensure_utc_instant(state_observed_at, "state_observed_at")
         if projection.status is ProjectionStatus.SEARCHABLE and (
-            chunk_count < 1 or len(samples) < 1
+            chunk_count < 1
+            or len(samples) < 1
+            or not isinstance(index_generation, str)
+            or index_generation.strip() == ""
+            or index_generation != index_generation.strip()
         ):
             raise ValueError("KA_SEARCHABLE_OUTPUTS_INCOMPLETE")
+        if index_generation is not None and (
+            not isinstance(index_generation, str)
+            or index_generation.strip() == ""
+            or index_generation != index_generation.strip()
+        ):
+            raise ValueError("index_generation KA invalide")
         outputs_fingerprint = _outputs_fingerprint(
             projection=projection,
             chunk_count=chunk_count,
             samples=samples,
             state_observed_at=observed_at,
+            index_generation=index_generation,
         )
         profile = projection.projection_profile
         with self._connection_factory.connect() as connection:
             with connection.transaction(), connection.cursor() as cursor:
+                if claimed_job is not None:
+                    _lock_active_projection_claim(cursor, claimed_job)
                 cursor.execute(
                     """
                     SELECT aggregate_version, outputs_fingerprint
@@ -241,16 +315,18 @@ class PostgresKnowledgeProjectionRepository:
                         projection_profile_id, chunking_profile, embedding_model,
                         sparse_profile, index_schema, build_fingerprint, status,
                         chunk_count, state_observed_at, aggregate_version,
-                        outputs_fingerprint, execution_phase, completed_units,
+                        outputs_fingerprint, index_generation,
+                        execution_phase, completed_units,
                         total_units, failure_error_code
                     )
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'SUCCEEDED', %s, %s, NULL)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'SUCCEEDED', %s, %s, NULL)
                     ON CONFLICT (projection_id) DO UPDATE SET
                         status = EXCLUDED.status,
                         chunk_count = EXCLUDED.chunk_count,
                         state_observed_at = EXCLUDED.state_observed_at,
                         aggregate_version = EXCLUDED.aggregate_version,
                         outputs_fingerprint = EXCLUDED.outputs_fingerprint,
+                        index_generation = EXCLUDED.index_generation,
                         execution_phase = EXCLUDED.execution_phase,
                         completed_units = EXCLUDED.completed_units,
                         total_units = EXCLUDED.total_units,
@@ -271,6 +347,7 @@ class PostgresKnowledgeProjectionRepository:
                         observed_at,
                         projection.aggregate_version,
                         outputs_fingerprint,
+                        index_generation,
                         chunk_count + 1,
                         chunk_count + 1,
                     ),
@@ -316,6 +393,32 @@ class PostgresKnowledgeProjectionRepository:
         projection_id: str,
         metadata: ProjectedBibliographicMetadata,
     ) -> None:
+        self._save_bibliographic_metadata(
+            projection_id=projection_id,
+            metadata=metadata,
+            claimed_job=None,
+        )
+
+    def save_bibliographic_metadata_fenced(
+        self,
+        *,
+        projection_id: str,
+        metadata: ProjectedBibliographicMetadata,
+        claimed_job: ClaimedJob,
+    ) -> None:
+        self._save_bibliographic_metadata(
+            projection_id=projection_id,
+            metadata=metadata,
+            claimed_job=_ensure_claimed_job(claimed_job),
+        )
+
+    def _save_bibliographic_metadata(
+        self,
+        *,
+        projection_id: str,
+        metadata: ProjectedBibliographicMetadata,
+        claimed_job: ClaimedJob | None,
+    ) -> None:
         if not isinstance(projection_id, str) or not projection_id.startswith("PROJ-"):
             raise ValueError("projection_id bibliographique invalide")
         if not isinstance(metadata, ProjectedBibliographicMetadata):
@@ -330,6 +433,8 @@ class PostgresKnowledgeProjectionRepository:
         ]
         with self._connection_factory.connect() as connection:
             with connection.transaction(), connection.cursor() as cursor:
+                if claimed_job is not None:
+                    _lock_active_projection_claim(cursor, claimed_job)
                 cursor.execute(
                     """
                     UPDATE knowledge_access.knowledge_projections
@@ -390,10 +495,18 @@ class PostgresKnowledgeProjectionRepository:
 class PostgresProjectionReadRepository:
     """Lit l'agrégat KA courant sans déduire son état depuis Qdrant."""
 
-    def __init__(self, *, connection_factory: PostgresConnectionFactory) -> None:
+    def __init__(
+        self,
+        *,
+        connection_factory: PostgresConnectionFactory,
+        environment_identity: JobEnvironmentIdentity,
+    ) -> None:
         if not callable(getattr(connection_factory, "connect", None)):
             raise ValueError("connection_factory invalide")
+        if not isinstance(environment_identity, JobEnvironmentIdentity):
+            raise ValueError("environment_identity invalide")
         self._connection_factory = connection_factory
+        self._identity = environment_identity
 
     def current_projection_statuses_for_document_ids(
         self,
@@ -418,9 +531,17 @@ class PostgresProjectionReadRepository:
                     SELECT DISTINCT ON (document_id) document_id, status
                       FROM knowledge_access.knowledge_projections
                      WHERE document_id = ANY(%s)
+                       AND environment = %s
+                       AND deployment_id = %s
+                       AND configuration_hash = %s
                      ORDER BY document_id, state_observed_at DESC, projection_id DESC
                     """,
-                    (list(parsed_ids),),
+                    (
+                        list(parsed_ids),
+                        self._identity.environment,
+                        self._identity.deployment_id,
+                        self._identity.configuration_hash,
+                    ),
                 )
                 rows = cursor.fetchall()
         return {str(document_id): str(status) for document_id, status in rows}
@@ -450,9 +571,17 @@ class PostgresProjectionReadRepository:
                            bibliographic_publication_year, bibliographic_edition
                       FROM knowledge_access.knowledge_projections
                      WHERE document_id = ANY(%s)
+                       AND environment = %s
+                       AND deployment_id = %s
+                       AND configuration_hash = %s
                      ORDER BY document_id, state_observed_at DESC, projection_id DESC
                     """,
-                    (list(parsed_ids),),
+                    (
+                        list(parsed_ids),
+                        self._identity.environment,
+                        self._identity.deployment_id,
+                        self._identity.configuration_hash,
+                    ),
                 )
                 rows = cursor.fetchall()
         return {
@@ -492,10 +621,18 @@ class PostgresProjectionReadRepository:
                            aggregate_version, chunk_count, state_observed_at
                       FROM knowledge_access.knowledge_projections
                      WHERE document_id = %s
+                       AND environment = %s
+                       AND deployment_id = %s
+                       AND configuration_hash = %s
                      ORDER BY state_observed_at DESC, projection_id DESC
                      LIMIT 1
                     """,
-                    (document_id,),
+                    (
+                        document_id,
+                        self._identity.environment,
+                        self._identity.deployment_id,
+                        self._identity.configuration_hash,
+                    ),
                 )
                 row = cursor.fetchone()
                 if row is None:
@@ -648,11 +785,13 @@ def _outputs_fingerprint(
     chunk_count: int,
     samples: tuple[KnowledgeChunk, ...],
     state_observed_at: str,
+    index_generation: str | None,
 ) -> str:
     payload = {
         "aggregate_version": projection.aggregate_version,
         "build_fingerprint": projection.build_fingerprint.value,
         "chunk_count": chunk_count,
+        "index_generation": index_generation,
         "profile": projection.projection_profile.to_fingerprint_payload(),
         "projection_id": projection.projection_id,
         "samples": [
@@ -673,6 +812,46 @@ def _outputs_fingerprint(
     }
     serialized = json.dumps(payload, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
     return sha256(serialized.encode("utf-8")).hexdigest()
+
+
+def _ensure_claimed_job(value: ClaimedJob) -> ClaimedJob:
+    if not isinstance(value, ClaimedJob):
+        raise ValueError("claimed_job projection invalide")
+    return value
+
+
+def _lock_active_projection_claim(cursor: Any, claimed_job: ClaimedJob) -> None:
+    """Verrouille le claim Platform dans la transaction de mutation KA."""
+
+    claimed = _ensure_claimed_job(claimed_job)
+    request = claimed.job.request
+    cursor.execute(
+        """
+        SELECT job_id
+          FROM platform.technical_jobs
+         WHERE job_id = %(job_id)s
+           AND environment = %(environment)s
+           AND deployment_id = %(deployment_id)s
+           AND configuration_hash = %(configuration_hash)s
+           AND status = 'running'
+           AND lease_owner = %(lease_owner)s
+           AND claim_generation = %(claim_generation)s
+           AND claim_token = %(claim_token)s::uuid
+           AND lease_expires_at > CURRENT_TIMESTAMP
+         FOR UPDATE
+        """,
+        {
+            "job_id": claimed.job.job_id,
+            "environment": request.environment,
+            "deployment_id": request.deployment_id,
+            "configuration_hash": request.idempotence_key.configuration_hash,
+            "lease_owner": claimed.lease_owner,
+            "claim_generation": claimed.claim_generation,
+            "claim_token": claimed.claim_token,
+        },
+    )
+    if cursor.fetchone() is None:
+        raise KnowledgeProjectionVersionConflictError()
 
 
 def _ensure_projection(value: KnowledgeProjection) -> KnowledgeProjection:

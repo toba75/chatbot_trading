@@ -69,6 +69,7 @@ def _request(route_name: PageRouteName) -> PageConversionRequest:
             "artifact:source_processing.original_sources/"
             "DOC-0000000000000001/original.pdf"
         ),
+        source_sha256="a" * 64,
         expected_output_artifact_ref=(
             "artifact:source_processing.page_conversion/"
             "RUN-M004-T005-UNIT/page-001-route.json"

@@ -38,7 +38,12 @@ def test_environment_runtime_hardening_unit(
     # Les actions sans chaîne API -> outbox -> relais -> worker -> lecture publique
     # ne sont pas annoncées par une boucle factice qui attend indéfiniment.
     assert WORKER_JOB_NAMES == {
-        "worker-documents": ("DIAGNOSE", "CONVERT_DOCUMENT"),
+        "worker-documents": (
+            "DIAGNOSE",
+            "CONVERT_DOCUMENT",
+            "CONVERT_PAGE",
+            "ASSEMBLE_CANONICAL_DOCUMENT",
+        ),
         "worker-projection": ("PROJECT_DOCUMENT",),
     }
     assert "worker-research" not in REQUIRED_SERVICE_IDS
@@ -170,6 +175,7 @@ def test_environment_runtime_hardening_unit(
     from app.knowledge_access.adapters import live_documentary_retrieval, projection_runtime
     from app.knowledge_access.adapters.live_documentary_retrieval import QdrantSparseChunkSelector
     from app.knowledge_access.adapters.projection_runtime import QdrantHttpClient
+    from app.contracts.technical_jobs import JobEnvironmentIdentity
 
     qdrant_calls = []
     monkeypatch.setattr(
@@ -179,7 +185,19 @@ def test_environment_runtime_hardening_unit(
             request=request,
             timeout=timeout,
             calls=qdrant_calls,
-            payload={"result": {"status": "green"}, "status": "ok"},
+            payload={
+                "result": {
+                    "config": {
+                        "params": {
+                            "vectors": {
+                                "dense": {"size": 8, "distance": "Cosine"}
+                            },
+                            "sparse_vectors": {"sparse": {}},
+                        }
+                    }
+                },
+                "status": "ok",
+            },
         ),
     )
     QdrantHttpClient(
@@ -204,6 +222,11 @@ def test_environment_runtime_hardening_unit(
         collection_name="ostrading-development-knowledge-access",
         timeout_seconds=5,
         api_key="development-qdrant-key-000000000001",
+        environment_identity=JobEnvironmentIdentity(
+            environment="development",
+            deployment_id="ostrading-development-local",
+            configuration_hash="c" * 64,
+        ),
     ).select_chunk_ids(
         projection_id="PROJ-" + "A" * 64,
         question="Quelle preuve ?",

@@ -687,6 +687,7 @@ def _assert_transition_heartbeat(
         route_name=PageRouteName.SCAN_GRANITE,
         routing_policy_version=RoutingPolicyVersion.from_value("routing-cycle3-v1"),
         source_artifact_ref="artifact:source_processing.original/cycle3.pdf",
+        source_sha256="a" * 64,
         expected_output_artifact_ref=(
             "artifact:source_processing.page_conversion/"
             "RUN-M014-CYCLE3/page-001-scan_granite.json"
@@ -737,6 +738,11 @@ class _BuiltConversionRepository:
     def __init__(self, source: SourceDocument) -> None:
         self.state = DocumentConversionState(
             document_id=source.document_id,
+            producer_environment_identity=JobEnvironmentIdentity(
+                environment="test",
+                deployment_id="ostrading-test-local",
+                configuration_hash="c" * 64,
+            ),
             conversion_status=DocumentConversionStatus.CONVERSION_REQUESTED,
             canonical_version_id=None,
             rejection_error_code=None,

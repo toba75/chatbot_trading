@@ -19,6 +19,10 @@ from app.contracts.technical_jobs import (
 from app.source_processing.application.canonical_audit_signals import (
     PreCanonicalAuditEvent,
 )
+from app.source_processing.application.fan_out_document_pages import (
+    DISTRIBUTED_PAGE_FAN_OUT_VERSION,
+    LEGACY_INLINE_ORCHESTRATION_VERSION,
+)
 from app.source_processing.application.register_source_document import (
     OriginalSourceStore,
     RegisterSourceDocumentCommand,
@@ -199,6 +203,7 @@ class DocumentConversionState:
     """État applicatif strict d'une demande de conversion documentaire."""
 
     document_id: DocumentId
+    producer_environment_identity: JobEnvironmentIdentity
     conversion_status: DocumentConversionStatus
     canonical_version_id: str | None
     rejection_error_code: str | None
@@ -209,6 +214,8 @@ class DocumentConversionState:
 
     def __post_init__(self) -> None:
         _ensure_document_id(self.document_id)
+        if not isinstance(self.producer_environment_identity, JobEnvironmentIdentity):
+            raise ValueError("identite productrice de conversion invalide")
         object.__setattr__(
             self,
             "conversion_status",
@@ -544,6 +551,7 @@ class DocumentConversionCommandService:
         conversion_configuration_hash: str,
         code_version: str,
         model_version: str,
+        orchestration_version: str,
     ) -> None:
         if not callable(
             getattr(source_document_repository, "find_by_document_id", None)
@@ -583,6 +591,9 @@ class DocumentConversionCommandService:
         self._deployment_id = identity.deployment_id
         self._code_version = _ensure_text(code_version, "code_version")
         self._model_version = _ensure_text(model_version, "model_version")
+        self._orchestration_version = _ensure_conversion_orchestration_version(
+            orchestration_version
+        )
         self._canonical_audit_events: list[PreCanonicalAuditEvent] = []
 
     def canonical_audit_events(self) -> tuple[PreCanonicalAuditEvent, ...]:
@@ -713,6 +724,11 @@ class DocumentConversionCommandService:
 
         conversion_state = DocumentConversionState(
             document_id=parsed_document_id,
+            producer_environment_identity=JobEnvironmentIdentity(
+                environment=self._environment,
+                deployment_id=self._deployment_id,
+                configuration_hash=self._conversion_configuration_hash,
+            ),
             conversion_status=DocumentConversionStatus.CONVERSION_REQUESTED,
             canonical_version_id=None,
             rejection_error_code=None,
@@ -740,6 +756,7 @@ class DocumentConversionCommandService:
                 "source_sha256": parsed_source_document.fingerprint.value,
                 "routing_policy_version": route_plan.routing_policy_version.value,
                 "route_count": len(route_plan.page_routes),
+                "orchestration_version": self._orchestration_version,
             },
         )
         submission = self._document_conversion_repository.submit_conversion_request(
@@ -790,6 +807,16 @@ def _ensure_text(value: Any, field_name: str) -> str:
     if value != value.strip():
         raise ValueError(f"{field_name} non normalisé")
     return value
+
+
+def _ensure_conversion_orchestration_version(value: Any) -> str:
+    version = _ensure_text(value, "orchestration_version")
+    if version not in {
+        LEGACY_INLINE_ORCHESTRATION_VERSION,
+        DISTRIBUTED_PAGE_FAN_OUT_VERSION,
+    }:
+        raise ValueError("orchestration_version invalide")
+    return version
 
 
 def _ensure_sha256(value: Any, field_name: str) -> str:
@@ -865,6 +892,11 @@ def _ensure_quality_rejection_error_code(value: Any) -> str:
         "GEMMA_VISION_TIMEOUT",
         "JOB_LEASE_LOST",
         "GRANITE_CAPACITY_CONFIGURATION_INVALID",
+        "GRANITE_CUDA_UNAVAILABLE",
+        "WORKER_MEMORY_LIMIT_EXCEEDED",
+        "ARTIFACT_NOT_FOUND",
+        "ARTIFACT_OUTSIDE_PROFILE_ROOT",
+        "ARTIFACT_HASH_MISMATCH",
         "OCRMYPDF_UNAVAILABLE",
         "CONVERSION_ASSET_MANIFEST_INVALID",
         "CANONICAL_ARTIFACT_STORE_UNAVAILABLE",
@@ -893,6 +925,11 @@ def _ensure_quality_rejection_error_code(value: Any) -> str:
         "POSTGRES_PERMANENT_FAILURE",
         "CONVERSION_PERSISTENCE_CONFLICT",
         "WORKER_UNEXPECTED_ERROR",
+        "PAGE_MANIFEST_INCOMPLETE",
+        "PAGE_RESULT_TERMINAL_FAILURE",
+        "CANONICAL_ASSEMBLY_REPLAY_DIVERGENCE",
+        "PAGE_RESULT_REPLAY_DIVERGENCE",
+        "PAGE_PROGRESS_PERSISTENCE_FAILED",
     }:
         raise ValueError("rejection_error_code invalide")
     return text

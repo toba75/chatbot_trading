@@ -1,80 +1,130 @@
-# Runbook ingestion PDF V1 M-013
+# Runbook d'ingestion PDF locale M-014
 
 ## Statut
 
-- Identifiant : `M013-Runbook-PdfIngestion-1.1`.
-- Contextes : UI locale, SP et plateforme.
-- Sources : `docs/specs/m003_source_enregistree_diagnostiquee_routee.md`, `docs/specs/m013_fastapi_api_orchestratrice.md` et `docs/specs/ui.md`.
-- ADR applicables : ADR-018, ADR-020, ADR-021, ADR-025, ADR-028, ADR-031 et ADR-046.
-- Limite : la conversion canonique M-004 et l'indexation KA ne sont pas livrées par M13-FastAPI.
+- Identifiant : `M014-Runbook-PdfIngestion-2.0`.
+- Contextes : UI locale, Source Processing (SP), plateforme et Knowledge Access
+  (KA).
+- Sources : spécifications M-003, M-004, M-005, M13-FastAPI et
+  `docs/specs/m014_local_pipeline_documentaire_distribue.md`.
+- ADR applicables : ADR-018, ADR-020, ADR-021, ADR-024, ADR-025, ADR-046,
+  ADR-052 et ADR-053.
+- Portée livrée : enregistrement du PDF réel, diagnostic, conversion distribuée
+  locale, publication `CanonicalSourcePublished` et projection automatique dans
+  le Qdrant du même environnement.
 
 ## Scénario BDD
 
-- Given la stack locale est prête et le secret backend local est provisionné hors Git.
-- When l'utilisateur ajoute un PDF par `/ui/corpus-pdf`, demande son diagnostic et ouvre l'original.
-- Then l'UI enregistre le PDF réel via l'API, conserve l'identifiant après redirection, affiche les statuts et motifs persistés, puis restitue l'original bit à bit sans exposer son chemin interne.
+- **Given** la stack locale et ses secrets sont prêts, les migrations 023 à 029
+  sont appliquées et les workers déclarent la même identité d'environnement ;
+- **When** l'utilisateur ajoute un PDF, le diagnostique puis demande sa
+  conversion sous `m014-page-fanout-v1` ;
+- **Then** SP distribue les pages, publie une version canonique complète et KA
+  crée automatiquement une projection `REQUESTED`, l'exécute puis la rend
+  `SEARCHABLE` sans appel manuel à `/index`.
 
-## Préconditions
+## Préconditions et démarrage
 
-1. Fournir hors Git les cinq secrets `config/secrets/development/*`, puis exécuter `uv run development` depuis la racine du dépôt. La commande vérifie Docker et démarre PostgreSQL, Qdrant authentifié, le gateway LLM, l'API orchestratrice et les workers réels du seul profil `development`.
-2. Attendre l'ouverture de l'UI sur `https://localhost:18443/ui/corpus-pdf`.
-3. Si un port requis, Docker, le gateway, l'API ou le worker est indisponible, corriger l'erreur publique affichée ; aucun service, worker ou secret de substitution n'est utilisé.
+1. Fournir hors Git les secrets `config/secrets/development/*`.
+2. Exécuter `uv run development` depuis la racine du dépôt. La composition
+   vérifie Docker et démarre PostgreSQL, Qdrant authentifié, le gateway LLM,
+   l'API, deux replicas `worker-documents` et le worker KA réel.
+3. Le worker documentaire relaie ses outbox de pages et de complétions avant de
+   réclamer `CONVERT_PAGE` ou `ASSEMBLE_CANONICAL_DOCUMENT`. Le worker KA relaie
+   `CanonicalSourcePublished`, puis son outbox `PROJECT_DOCUMENT`, avant de
+   réclamer la projection.
+4. Attendre l'ouverture de l'UI sur
+   `https://localhost:18443/ui/corpus-pdf`.
 
-L'UI et l'API utilisent le même secret local. Le navigateur ne reçoit jamais le token : le serveur UI l'ajoute uniquement à l'appel backend.
+Si un service, un secret, CUDA, Qdrant, PostgreSQL ou un worker est indisponible,
+corriger l'erreur explicite. Aucun service, parseur, périphérique ou secret de
+substitution n'est sélectionné silencieusement.
 
-## Ajouter un PDF
+## Ajouter et diagnostiquer un PDF
 
-1. Ouvrir `https://localhost:18443/ui/corpus-pdf`.
-2. Choisir un fichier `application/pdf` de 50 Mio maximum.
-3. Saisir explicitement le titre, un ou plusieurs auteurs, l'année de publication et l'édition. Le nom du fichier n'est jamais une métadonnée.
-4. Envoyer le formulaire. Une réponse nominale produit une redirection `303` vers le corpus avec `document_id` et le marqueur de doublon.
+1. Ouvrir le corpus PDF et choisir un fichier `application/pdf` de 50 Mio au
+   maximum.
+2. Fournir uniquement le PDF original. Le titre, les auteurs, l'année et
+   l'édition sont extraits automatiquement après la projection ; le nom du
+   fichier n'est jamais utilisé comme métadonnée.
+3. Envoyer le formulaire. La redirection `303` conserve le `document_id` et le
+   marqueur de doublon éventuel.
+4. Demander le diagnostic. L'UI lit uniquement la progression publique
+   persistée : phase, unités réalisées, total et erreur terminale.
+5. Un statut `DIAGNOSED` prouve le diagnostic, pas encore la conversion.
+   `MANUAL_REVIEW` doit être résolu explicitement avant la suite.
 
-Le transfert navigateur -> UI -> API et la copie API -> corpus utilisent des chunks bornés. Une taille excessive répond `413`; une origine absente ou divergente répond `403 UI_ORIGIN_FORBIDDEN`; une saturation de quatre transferts lents répond `503 UI_TRANSFER_CAPACITY_EXHAUSTED` au suivant.
+Le PDF original est streamé et contrôlé par SHA-256. Son chemin interne et les
+secrets ne sont jamais exposés dans l'UI, les redirections ou les logs.
 
-## Quota et erreurs d'admission
+## Convertir et projeter automatiquement
 
-| Statut | Code public | Action |
-|---|---|---|
-| `401` | `LOCAL_API_TOKEN_REQUIRED` | Vérifier le montage du secret entre UI et API; ne pas contourner par un appel direct. |
-| `403` | `LOCAL_API_TOKEN_INVALID` ou `UI_ORIGIN_FORBIDDEN` | Vérifier que les deux services lisent le même secret ou que la requête provient de l'origine UI exacte. |
-| `413` | `HTTP_REQUEST_TOO_LARGE` | Choisir un PDF inférieur ou égal à 50 Mio; ne pas augmenter silencieusement la limite. |
-| `422` | `SOURCE_UNREADABLE` | Corriger ou remplacer le PDF; aucun parseur alternatif n'est appelé silencieusement. |
-| `507` | `CORPUS_QUOTA_EXCEEDED` | Libérer ou augmenter le quota par une décision d'exploitation explicite; ne pas écrire hors corpus. |
+1. Demander la conversion du document diagnostiqué. La configuration active
+   doit porter explicitement `m014-page-fanout-v1` ; une valeur absente ou
+   inconnue est refusée.
+2. SP fige le manifeste, persiste les pages `SKIP_EMPTY` et produit les jobs
+   `CONVERT_PAGE` pour les autres pages. Les deux workers documentaires
+   partagent exactement deux slots Granite, un par replica, sur `cuda:0`.
+3. La dernière complétion valide produit
+   `ASSEMBLE_CANONICAL_DOCUMENT`. La publication réussie rend visibles dans une
+   même transaction SP la version canonique, la progression terminale et
+   l'outbox `CanonicalSourcePublished`.
+4. Le worker KA consomme cette publication dans sa transaction propre, crée la
+   projection `REQUESTED` et l'outbox `PROJECT_DOCUMENT`, puis publie une
+   génération Qdrant complète avant `SEARCHABLE`.
+5. L'écran affiche la progression publique persistée de `CONVERT_DOCUMENT` et
+   `PROJECT_DOCUMENT`. Il ne déduit jamais l'avancement depuis les logs ou un
+   compteur local.
 
-Le quota agrégé est `paths.corpus_quota_bytes`. PostgreSQL sérialise les admissions concurrentes par la migration 009; un doublon de même fingerprint ne réserve pas deux fois son volume.
+La projection automatique est le parcours nominal M-014. L'ancien endpoint
+`/index` reste un contrat de compatibilité M-005 ; il n'est ni requis ni appelé
+par ce runbook après `CanonicalSourcePublished`.
 
-## Diagnostiquer et inspecter
+## États et erreurs opérateur
 
-- Depuis le corpus, demander le diagnostic du document. La réponse de commande `DIAGNOSTIC_REQUESTED` confirme seulement la prise en compte; l’écran de diagnostic affiche ensuite l’action `DIAGNOSE`, sa phase publique (`QUEUED`, `RUNNING`, `SUCCEEDED` ou `FAILED`) et les unités persistées sur le total connu. Il se rafraîchit tant que l’action est non terminale.
-- `MANIFEST_CREATED` signifie que l’action attend le worker; `DIAGNOSING` signifie que le worker réel l’exécute. Aucun de ces états ne constitue une réussite.
-- Le worker réel produit ensuite le manifeste et les signaux page par page. `SUCCEEDED` exige que le nombre de pages diagnostiquées soit égal au total affiché.
-- `MANUAL_REVIEW` affiche `manual_review_reason`; `FAILED` affiche `failure_error_code`.
-- Ouvrir le visualiseur en lecture seule ou télécharger l'original. Le contenu est streamé et vérifié par SHA-256 avant exposition; `original_storage_ref` ne devient jamais public.
-- Plus de cent documents sont parcourus page par page. L'UI ne charge jamais tout le corpus ni les manifestes de chaque document pour construire la liste.
+| État ou code | Sens et action |
+|---|---|
+| `QUEUED`, `RUNNING` | Attendre la progression persistée ; ne pas relancer la commande pour fabriquer un avancement. |
+| `CANONICAL_ACCEPTED` | La version canonique et son événement sont committés atomiquement. |
+| `REQUESTED`, `BUILDING`, `BUILT`, `INDEXING` | La projection automatique KA est en cours. |
+| `SEARCHABLE` | La génération Qdrant exacte a été vérifiée et peut être recherchée. |
+| `ARTIFACT_HASH_MISMATCH` | Restaurer l'artefact attendu ; aucun contenu alternatif n'est accepté. |
+| `CANONICAL_ARTIFACT_HASH_MISMATCH` | Restaurer l'artefact canonique publié ; KA ne projette pas un fichier divergent. |
+| `PROJECTION_REPLAY_INCOMPLETE` | La génération `SEARCHABLE` n'est plus exacte ; traiter la reprise explicite, sans index de secours. |
+| `JOB_LEASE_LOST` ou `PROJECTION_EVENT_LEASE_LOST` | L'ancien détenteur ne doit plus muter l'état ; laisser le détenteur courant reprendre. |
 
-## Limite M-004 explicite
+Les erreurs HTTP d'admission restent explicites : `401`
+`LOCAL_API_TOKEN_REQUIRED`, `403` `LOCAL_API_TOKEN_INVALID` ou
+`UI_ORIGIN_FORBIDDEN`, `413` `HTTP_REQUEST_TOO_LARGE`, `422`
+`SOURCE_UNREADABLE`, et `507` `CORPUS_QUOTA_EXCEEDED`.
 
-M13-FastAPI s'arrête au diagnostic documentaire. Aucun adaptateur Docling/OCRmyPDF de conversion canonique, aucune QA canonique et aucune publication durable `CanonicalSourcePublished` ne sont prouvés ici. Tant que M-004 n'est pas réellement raccordé, conversion et projection affichent `fonctionnalité non livrée` sans bouton ni conseil de retry. Un diagnostic `DIAGNOSED` ne constitue pas une preuve de conversion ou d'indexation.
+## Reprise et migrations
 
-## Compatibilité documentaire M-003/M-004
+Les migrations 027 et 028 durcissent les contraintes, les claims et la
+coexistence bornée. La migration 029 exécute la phase **expand** décidée par
+ADR-053 : elle enrichit les anciens contrats depuis leurs preuves durables,
+révoque les claims réécrits, reconstruit les outbox SP historiques et remet les
+projections qualifiées dans un chemin de rejeu explicite. Le relais public fait
+ensuite converger KA sans DML intercontexte.
 
-Les termes historiques `SourceDocumentId`, `SourceLocator`, quarantaine, route explicite et version canonique restent les marqueurs normatifs des spécifications M-003 et M-004. Leur présence dans ce runbook ne déclare pas le runtime M-004 livré par M13-FastAPI.
+La phase **contract** destructive est différée jusqu'au drainage démontré des
+anciens writers. Un rollback applicatif arrête les nouvelles admissions, draine
+les jobs et laisse les publications déjà committées converger ; il ne supprime
+pas les migrations et ne réécrit pas les résultats.
 
-- Résultat attendu : les contrats de spécification restent cohérents et chaque statut public conserve son sens normatif.
-- Erreur explicite : toute absence de route, quarantaine active, autorité textuelle manquante ou `SourceLocator` non résoluble bloque la publication canonique; M13-FastAPI ne contourne pas ce blocage.
-- Preuve à conserver : sorties des validateurs, identifiant `SourceDocumentId` et, uniquement lorsqu'un futur runtime M-004 les produit réellement, `SourceLocator` et référence de version canonique.
+## Preuves ciblées
 
-## Commandes de preuve
-
-```console
-uv run --locked gate
-```
-
-La gate valide les contrats et l’absence de fallback. La preuve opératoire locale s’exécute avec `uv run development`, qui démarre les participants réels du profil et rend l’avancement public observable.
+Les sous-agents utilisent les tests et scopes ciblés documentés par leur tâche.
+La gate globale de clôture n'est pas une commande opératoire de ce runbook :
+elle appartient exclusivement à l'orchestrateur selon la politique du milestone.
 
 ## Garde-fous
 
-- Aucun fallback silencieux, aucune route documentaire par défaut et aucune correction silencieuse d'un PDF.
-- Aucun secret, PDF complet ou chemin interne dans les logs, OpenAPI, HTML ou redirections.
-- Aucune suppression ordinaire ni purge depuis cet écran.
-- Aucun statut M-004, KA ou conversationnel fabriqué depuis le seul diagnostic SP.
+- Aucun fallback silencieux, aucune route documentaire par défaut et aucune
+  correction silencieuse d'un PDF.
+- Aucune publication canonique partielle et aucune projection avant
+  `CanonicalSourcePublished`.
+- Aucun secret, PDF complet ou chemin interne dans les logs, OpenAPI, HTML ou
+  redirections.
+- Aucune progression synthétique et aucune lecture UI directe de l'état des
+  workers, de PostgreSQL ou de Qdrant.

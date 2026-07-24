@@ -242,9 +242,14 @@ def test_quota_granite_postgresql_concurrence_reprise_et_ledger() -> None:
             runner_021.run()
             assert runner_021.required_schema_version == 21
 
+            migrations_022 = temporary_path / "migrations-022"
+            migrations_022.mkdir()
+            for path in sorted(migrations.glob("*.sql")):
+                if int(path.name[:3]) <= 22:
+                    shutil.copy2(path, migrations_022 / path.name)
             runner_022 = PostgresMigrationRunner(
                 connection_factory=factory,
-                migrations_path=migrations,
+                migrations_path=migrations_022,
                 operation_timeout_seconds=30,
                 identity_preflight=preflight,
                 initialize_identity_if_empty=False,

@@ -11,6 +11,10 @@ from app.platform.job_runtime.granite_capacity import (
     PostgresGraniteSlotRepository,
     PostgresGraniteWorkerRegistry,
 )
+from app.platform.job_runtime.page_completion import (
+    PostgresPageCompletionOutbox,
+    PostgresStandardPageExecutionRepository,
+)
 from app.platform.job_runtime.postgres import PostgresJobQueue
 from app.platform.job_runtime.relay import JobOutboxRelay, RelayOutbox
 from app.platform.postgres import PostgresConnectionFactory
@@ -21,7 +25,10 @@ class PostgresJobRuntime:
     queue: PostgresJobQueue
     outbox_relay: JobOutboxRelay
     granite_worker_registry: PostgresGraniteWorkerRegistry
+    granite_slot_repository: PostgresGraniteSlotRepository
     granite_capacity_controller: GraniteCapacityController
+    standard_page_repository: PostgresStandardPageExecutionRepository
+    page_completion_outbox: PostgresPageCompletionOutbox
 
 
 def build_postgres_job_runtime(
@@ -60,8 +67,18 @@ def build_postgres_job_runtime(
             consumer=queue,
         ),
         granite_worker_registry=granite_worker_registry,
+        granite_slot_repository=granite_slot_repository,
         granite_capacity_controller=GraniteCapacityController(
             repository=granite_slot_repository,
+        ),
+        standard_page_repository=PostgresStandardPageExecutionRepository(
+            connection_factory=connection_factory,
+            catalog=JOB_RUNTIME_CATALOG,
+            environment_identity=environment_identity,
+        ),
+        page_completion_outbox=PostgresPageCompletionOutbox(
+            connection_factory=connection_factory,
+            environment_identity=environment_identity,
         ),
     )
 

@@ -10,11 +10,16 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from hashlib import sha256
 from types import MappingProxyType
 from typing import Any, Generic, NamedTuple, Protocol, TypeVar
-from uuid import UUID
 
+from app.contracts.page_execution import (
+    GraniteCapacityConfigurationError,
+    GranitePageTerminalEnvelope,
+    GranitePageTerminalStatus,
+    GraniteSlotLease,
+    PageCompletionMessage,
+)
 from app.contracts.technical_jobs import (
     ClaimedJob,
     GraniteExecutionCapability,
@@ -39,18 +44,6 @@ _JOB_LEASE_LOST = "JOB_LEASE_LOST"
 ModelResultT = TypeVar("ModelResultT")
 
 
-class GraniteCapacityConfigurationError(ValueError):
-    """La capacité locale ne respecte pas le contrat strict T-003."""
-
-    code = _GRANITE_CAPACITY_ERROR
-
-    def __init__(self, reason: str) -> None:
-        if not isinstance(reason, str) or reason.strip() == "":
-            raise ValueError("motif Granite invalide")
-        self.reason = reason
-        super().__init__(f"{self.code}:{reason}")
-
-
 class GraniteSlotLeaseLostError(RuntimeError):
     """Le claim ou le slot ne correspond plus au détenteur courant."""
 
@@ -67,67 +60,6 @@ class GranitePageCompletionConflictError(RuntimeError):
 
     def __init__(self) -> None:
         super().__init__(self.code)
-
-
-class GranitePageTerminalStatus(str, Enum):
-    SUCCEEDED = "succeeded"
-    FAILED = "failed"
-    ABANDONED = "abandoned"
-
-
-@dataclass(frozen=True, slots=True)
-class GranitePageTerminalEnvelope:
-    """Enveloppe platform immutable produite sous le double fencing actif."""
-
-    completion_id: str
-    status: GranitePageTerminalStatus
-    payload: Mapping[str, Any]
-    payload_fingerprint: str
-    failure_reason: str | None
-
-    def __post_init__(self) -> None:
-        completion_id = _text(self.completion_id)
-        if not isinstance(self.status, GranitePageTerminalStatus):
-            raise GraniteCapacityConfigurationError("TERMINAL_STATUS_INVALID")
-        payload = _freeze_json_mapping(self.payload)
-        canonical_payload = _canonical_json(payload)
-        fingerprint = sha256(canonical_payload.encode("utf-8")).hexdigest()
-        if self.payload_fingerprint != fingerprint:
-            raise GraniteCapacityConfigurationError("TERMINAL_FINGERPRINT_MISMATCH")
-        if self.status is GranitePageTerminalStatus.SUCCEEDED:
-            if self.failure_reason is not None:
-                raise GraniteCapacityConfigurationError("TERMINAL_FAILURE_FORBIDDEN")
-        else:
-            _text(self.failure_reason)
-        object.__setattr__(self, "completion_id", completion_id)
-        object.__setattr__(self, "payload", payload)
-
-    @classmethod
-    def from_payload(
-        cls,
-        *,
-        completion_id: str,
-        status: GranitePageTerminalStatus,
-        payload: Mapping[str, Any],
-        failure_reason: str | None,
-    ) -> "GranitePageTerminalEnvelope":
-        parsed_payload = _freeze_json_mapping(payload)
-        serialized = _canonical_json(parsed_payload)
-        return cls(
-            completion_id=completion_id,
-            status=status,
-            payload=parsed_payload,
-            payload_fingerprint=sha256(serialized.encode("utf-8")).hexdigest(),
-            failure_reason=failure_reason,
-        )
-
-    def canonical_payload_json(self) -> str:
-        """Revalide le hash immédiatement avant toute persistance."""
-
-        serialized = _canonical_json(self.payload)
-        if sha256(serialized.encode("utf-8")).hexdigest() != self.payload_fingerprint:
-            raise GraniteCapacityConfigurationError("TERMINAL_FINGERPRINT_MISMATCH")
-        return serialized
 
 
 class GraniteWorkerState(str, Enum):
@@ -156,47 +88,6 @@ class GraniteWorker:
         if self.capabilities != _GENERALIST_CAPABILITIES:
             raise GraniteCapacityConfigurationError("WORKER_CAPABILITIES_INVALID")
         object.__setattr__(self, "worker_instance_id", worker_instance_id)
-
-
-@dataclass(frozen=True, slots=True)
-class GraniteSlotLease:
-    """Couple claim-slot immutable transporté pendant une conversion Granite."""
-
-    claimed_job: ClaimedJob
-    slot_ordinal: int
-    slot_generation: int
-    slot_token: str
-    lease_until: datetime
-
-    def __post_init__(self) -> None:
-        if not isinstance(self.claimed_job, ClaimedJob):
-            raise ValueError("GRANITE_SLOT_IDENTITY_INVALID")
-        if (
-            isinstance(self.slot_ordinal, bool)
-            or not isinstance(self.slot_ordinal, int)
-            or self.slot_ordinal not in (1, 2)
-        ):
-            raise ValueError("GRANITE_SLOT_IDENTITY_INVALID")
-        if (
-            isinstance(self.slot_generation, bool)
-            or not isinstance(self.slot_generation, int)
-            or self.slot_generation < 1
-        ):
-            raise ValueError("GRANITE_SLOT_IDENTITY_INVALID")
-        try:
-            token = UUID(_text(self.slot_token))
-        except (TypeError, ValueError) as exc:
-            raise ValueError("GRANITE_SLOT_IDENTITY_INVALID") from exc
-        if token.version != 4:
-            raise ValueError("GRANITE_SLOT_IDENTITY_INVALID")
-        if (
-            not isinstance(self.lease_until, datetime)
-            or self.lease_until.tzinfo is None
-        ):
-            raise ValueError("GRANITE_SLOT_IDENTITY_INVALID")
-        if self.lease_until != self.claimed_job.lease_expires_at:
-            raise ValueError("GRANITE_SLOT_LEASE_DEADLINE_MISMATCH")
-        object.__setattr__(self, "slot_token", str(token))
 
 
 @dataclass(frozen=True, slots=True)
@@ -1055,6 +946,54 @@ class PostgresGraniteSlotRepository(
                 if cursor.fetchone() is None:
                     raise GraniteSlotLeaseLostError()
 
+    def assert_page_execution_current(self, lease: GraniteSlotLease) -> None:
+        """Vérifie atomiquement le claim et le slot actuels avant publication."""
+
+        parsed_lease = _require_lease(lease)
+        claimed = parsed_lease.claimed_job
+        with self._connection_factory.connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT slot.slot_ordinal
+                      FROM platform.technical_jobs AS job
+                      JOIN platform.granite_slots AS slot
+                        ON slot.environment = job.environment
+                       AND slot.deployment_id = job.deployment_id
+                       AND slot.job_id = job.job_id
+                     WHERE job.job_id = %(job_id)s
+                       AND job.environment = %(environment)s
+                       AND job.deployment_id = %(deployment_id)s
+                       AND job.configuration_hash = %(configuration_hash)s
+                       AND job.status = 'running'
+                       AND job.lease_owner = %(worker_instance_id)s
+                       AND job.claim_generation = %(claim_generation)s
+                       AND job.claim_token = %(claim_token)s::uuid
+                       AND job.lease_expires_at > CURRENT_TIMESTAMP
+                       AND slot.slot_ordinal = %(slot_ordinal)s
+                       AND slot.lease_owner = %(worker_instance_id)s
+                       AND slot.claim_generation = %(claim_generation)s
+                       AND slot.claim_token = %(claim_token)s::uuid
+                       AND slot.slot_generation = %(slot_generation)s
+                       AND slot.slot_token = %(slot_token)s::uuid
+                       AND slot.lease_until > CURRENT_TIMESTAMP
+                    """,
+                    {
+                        "job_id": claimed.job.job_id,
+                        "environment": self._environment_identity.environment,
+                        "deployment_id": self._environment_identity.deployment_id,
+                        "configuration_hash": self._environment_identity.configuration_hash,
+                        "worker_instance_id": claimed.lease_owner,
+                        "claim_generation": claimed.claim_generation,
+                        "claim_token": claimed.claim_token,
+                        "slot_ordinal": parsed_lease.slot_ordinal,
+                        "slot_generation": parsed_lease.slot_generation,
+                        "slot_token": parsed_lease.slot_token,
+                    },
+                )
+                if cursor.fetchone() is None:
+                    raise GraniteSlotLeaseLostError()
+
     def complete_page_execution(
         self,
         lease: GraniteSlotLease,
@@ -1065,6 +1004,11 @@ class PostgresGraniteSlotRepository(
             raise GraniteCapacityConfigurationError("TERMINAL_ENVELOPE_INVALID")
         claimed = parsed_lease.claimed_job
         canonical_payload = envelope.canonical_payload_json()
+        expected = PageCompletionMessage.from_execution(
+            claimed_job=claimed,
+            granite_lease=parsed_lease,
+            envelope=envelope,
+        )
         with self._connection_factory.connect() as connection:
             with connection.transaction(), connection.cursor() as cursor:
                 cursor.execute(
@@ -1073,7 +1017,8 @@ class PostgresGraniteSlotRepository(
                 )
                 cursor.execute(
                     """
-                    SELECT job_id, claim_generation, claim_token::text,
+                    SELECT environment, deployment_id, configuration_hash,
+                           job_id, trace_id, claim_generation, claim_token::text,
                            worker_instance_id, slot_ordinal, slot_generation,
                            slot_token::text, payload, payload_fingerprint,
                            terminal_status, failure_reason
@@ -1085,25 +1030,11 @@ class PostgresGraniteSlotRepository(
                 )
                 existing = cursor.fetchone()
                 if existing is not None:
-                    actual = _row_values(existing, 11, "EXISTING_COMPLETION")
-                    expected = (
-                        claimed.job.job_id,
-                        claimed.claim_generation,
-                        claimed.claim_token,
-                        claimed.lease_owner,
-                        parsed_lease.slot_ordinal,
-                        parsed_lease.slot_generation,
-                        parsed_lease.slot_token,
-                        json.loads(canonical_payload),
-                        envelope.payload_fingerprint,
-                        envelope.status.value,
-                        envelope.failure_reason,
+                    actual = PageCompletionMessage.from_database_row(
+                        completion_id=envelope.completion_id,
+                        row=_row_values(existing, 15, "EXISTING_COMPLETION"),
                     )
-                    actual_payload = _mapping(actual[7], "completion_payload")
-                    comparable_actual = actual[:7] + (
-                        json.loads(_canonical_json(actual_payload)),
-                    ) + actual[8:]
-                    if comparable_actual != expected:
+                    if actual != expected:
                         raise GranitePageCompletionConflictError()
                     return _terminal_job_record(claimed, envelope)
                 cursor.execute(
@@ -1139,7 +1070,8 @@ class PostgresGraniteSlotRepository(
                     ),
                     immutable_outbox AS (
                         INSERT INTO platform.page_completion_outbox (
-                            completion_id, environment, deployment_id, job_id,
+                            completion_id, environment, deployment_id,
+                            configuration_hash, job_id, trace_id,
                             claim_generation, claim_token, worker_instance_id,
                             slot_ordinal, slot_generation, slot_token, payload,
                             payload_fingerprint, terminal_status, failure_reason,
@@ -1148,7 +1080,8 @@ class PostgresGraniteSlotRepository(
                         )
                         SELECT
                             %(completion_id)s, %(environment)s, %(deployment_id)s,
-                            active_job.job_id, %(claim_generation)s,
+                            %(configuration_hash)s, active_job.job_id, %(trace_id)s,
+                            %(claim_generation)s,
                             %(claim_token)s::uuid, %(worker_instance_id)s,
                             active_slot.slot_ordinal, %(slot_generation)s,
                             %(slot_token)s::uuid, %(payload)s::jsonb,
@@ -1206,6 +1139,7 @@ class PostgresGraniteSlotRepository(
                             self._environment_identity.configuration_hash
                         ),
                         "job_id": claimed.job.job_id,
+                        "trace_id": claimed.trace_id,
                         "worker_instance_id": claimed.lease_owner,
                         "claim_generation": claimed.claim_generation,
                         "claim_token": claimed.claim_token,
@@ -1344,6 +1278,43 @@ class GraniteCapacityController:
         )
         self._repository.release(lease)
         return GraniteExecution(lease=lease, model_result=result)
+
+    def execute_acquired_page_job(
+        self,
+        *,
+        lease: GraniteSlotLease,
+        lease_seconds: int,
+        heartbeat_seconds: float,
+        start_model: Callable[
+            [GraniteExecutionCapability], SupervisedGraniteProcess[ModelResultT]
+        ],
+    ) -> GraniteExecution[ModelResultT]:
+        """Supervise un job page dont claim et slot ont été acquis atomiquement."""
+
+        parsed_lease = _require_lease(lease)
+        parsed_lease_seconds = _positive_integer(lease_seconds)
+        parsed_heartbeat_seconds = _heartbeat_seconds(
+            heartbeat_seconds,
+            lease_seconds=parsed_lease_seconds,
+        )
+        if not callable(start_model):
+            raise GraniteCapacityConfigurationError("MODEL_CALLBACK_INVALID")
+        self._require_admissions_open()
+
+        def propagate_model_error(
+            _active_lease: GraniteSlotLease,
+            model_error: Exception,
+        ) -> None:
+            raise model_error
+
+        active_lease, result = self._execute_supervised(
+            lease=parsed_lease,
+            lease_seconds=parsed_lease_seconds,
+            heartbeat_seconds=parsed_heartbeat_seconds,
+            start_model=start_model,
+            on_model_error=propagate_model_error,
+        )
+        return GraniteExecution(lease=active_lease, model_result=result)
 
     def begin_draining(self) -> None:
         """Interdit les admissions sans interrompre le couple actif."""

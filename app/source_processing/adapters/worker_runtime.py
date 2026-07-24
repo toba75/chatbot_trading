@@ -17,6 +17,7 @@ from typing import Any
 from psycopg import Error as PsycopgError, IntegrityError, OperationalError
 from uuid import uuid4
 
+from app.contracts.technical_jobs import ClaimedJob
 from app.platform.configuration import (
     ApplicationConfiguration,
     load_application_configuration,
@@ -24,15 +25,17 @@ from app.platform.configuration import (
 from app.platform.configured_datastore_identity import (
     build_configured_datastore_preflight,
 )
-from app.platform.job_runtime import JobStatus
+from app.platform.job_runtime import JobExecutionRequirements, JobStatus
 from app.platform.job_runtime.composition import build_postgres_job_runtime
 from app.platform.job_runtime.granite_capacity import (
     GraniteCapacityConfigurationError,
     GraniteWorker,
     GraniteWorkerPresenceHeartbeat,
     GraniteWorkerState,
+    GraniteSlotLease,
     GraniteSlotLeaseLostError,
 )
+from app.platform.job_runtime.page_completion import PageCompletionRelay
 from app.platform.job_runtime.heartbeat import JobHeartbeatCoordinator, JobLeaseHeartbeat
 from app.platform.job_runtime.postgres import JobLeaseConflictError
 from app.platform.job_runtime.reconciliation import reconcile_stale_configuration_jobs
@@ -49,6 +52,24 @@ from app.source_processing.adapters.postgres_document_persistence import (
 )
 from app.source_processing.adapters.docling_native_conversion import (
     CanonicalArtifactFileStore,
+    IsolatedNativeDoclingConverter,
+)
+from app.source_processing.adapters.docling_granite_conversion import (
+    IsolatedGraniteDoclingConverter,
+)
+from app.source_processing.adapters.gemma_vision_conversion import (
+    IsolatedGemmaVisionPageConverter,
+)
+from app.source_processing.adapters.distributed_page_conversion import (
+    M004RoutedPageConverter,
+    load_runtime_locked_assets,
+)
+from app.source_processing.adapters.local_page_artifacts import LocalPageArtifactStore
+from app.source_processing.adapters.postgres_page_completion import (
+    PostgresPageResultRepository,
+)
+from app.source_processing.adapters.postgres_canonical_assembly import (
+    PostgresCanonicalAssemblyRepository,
 )
 from app.source_processing.adapters.postgres_job_outbox import PostgresJobOutbox
 from app.source_processing.adapters.pypdf_diagnostic_inspector import (
@@ -60,6 +81,28 @@ from app.source_processing.adapters.pdf_inspection_process import (
 from app.source_processing.application.document_worker import (
     DocumentDiagnosticWorker,
     WorkerProcessingError,
+)
+from app.source_processing.application.execute_document_page import (
+    ExecuteDocumentPageHandler,
+    PageRouteConverters,
+)
+from app.source_processing.application.fan_out_document_pages import (
+    DistributedDocumentConversionWorker,
+    VersionedDocumentConversionWorker,
+)
+from app.source_processing.application.record_page_completion import (
+    RecordPageCompletionHandler,
+)
+from app.source_processing.application.assemble_canonical_document import (
+    AssembleCanonicalDocumentHandler,
+    CanonicalAssemblyWorker,
+)
+from app.source_processing.domain.distribution_contracts import (
+    ASSEMBLE_CANONICAL_DOCUMENT_JOB_NAME,
+    CONVERT_PAGE_CONTRACT_VERSION,
+    CONVERT_PAGE_JOB_NAME,
+    ExecutionCapability,
+    PageResultStatus,
 )
 from app.source_processing.application.routed_document_conversion_worker import (
     build_routed_document_conversion_worker,
@@ -367,7 +410,12 @@ def _run_validated_worker_and_claim_next(
     signal.signal(signal.SIGTERM, lifecycle.handle_termination)
     reconcile_stale_configuration_jobs(
         job_queue=job_runtime.queue,
-        job_names=("DIAGNOSE", "CONVERT_DOCUMENT"),
+        job_names=(
+            "DIAGNOSE",
+            "CONVERT_DOCUMENT",
+            "CONVERT_PAGE",
+            ASSEMBLE_CANONICAL_DOCUMENT_JOB_NAME,
+        ),
         owner_id=f"{instance_owner_id}-RECONCILE",
         lease_seconds=lease_seconds,
         maximum_jobs=MAX_STARTUP_ENVIRONMENT_RECONCILIATIONS,
@@ -391,20 +439,40 @@ def _run_validated_worker_and_claim_next(
         ),
         routing_configuration=build_document_routing_configuration(),
     )
+    canonical_artifact_store = CanonicalArtifactFileStore(
+        root=Path(application_configuration.paths.canonical_sources_root)
+    )
+    page_artifact_store = LocalPageArtifactStore(
+        profile_root=(
+            Path(application_configuration.paths.data_root) / "page_artifacts"
+        ).resolve()
+    )
+    native_manifest_path = Path("config/docling-assets.native.json")
+    native_assets_root = (
+        Path(application_configuration.paths.data_root) / "docling_assets" / "native"
+    )
+    granite_manifest_path = Path("config/docling-assets.granite.json")
+    granite_assets_root = (
+        Path(application_configuration.paths.data_root) / "docling_assets" / "granite"
+    )
+    ocrmypdf_manifest_path = Path("config/ocrmypdf-image.json")
+    locked_assets = load_runtime_locked_assets(
+        native_manifest_path=native_manifest_path,
+        native_assets_root=native_assets_root,
+        granite_manifest_path=granite_manifest_path,
+        granite_assets_root=granite_assets_root,
+        ocrmypdf_manifest_path=ocrmypdf_manifest_path,
+    )
     routed_conversion_worker = build_routed_document_conversion_worker(
         source_document_repository=persistence.source_document_repository,
         processing_run_repository=persistence.processing_run_repository,
         conversion_repository=persistence.document_conversion_repository,
         original_source_store=persistence.original_source_store,
-        native_asset_manifest_path=Path("config/docling-assets.native.json"),
-        native_assets_root=Path(application_configuration.paths.data_root)
-        / "docling_assets"
-        / "native",
-        granite_asset_manifest_path=Path("config/docling-assets.granite.json"),
-        granite_assets_root=Path(application_configuration.paths.data_root)
-        / "docling_assets"
-        / "granite",
-        ocrmypdf_manifest_path=Path("config/ocrmypdf-image.json"),
+        native_asset_manifest_path=native_manifest_path,
+        native_assets_root=native_assets_root,
+        granite_asset_manifest_path=granite_manifest_path,
+        granite_assets_root=granite_assets_root,
+        ocrmypdf_manifest_path=ocrmypdf_manifest_path,
         audit_root=Path(application_configuration.paths.data_root) / "docling_audit",
         timeout_seconds=application_configuration.runtime.timeouts.request_seconds,
         llm_gateway_url=application_configuration.services.llm_gateway.url,
@@ -418,9 +486,7 @@ def _run_validated_worker_and_claim_next(
         ),
         llm_gateway_max_output_tokens=application_configuration.models.llm.max_output_tokens,
         expected_gemma_model_id=application_configuration.models.llm.reference_model,
-        artifact_store=CanonicalArtifactFileStore(
-            root=Path(application_configuration.paths.canonical_sources_root)
-        ),
+        artifact_store=canonical_artifact_store,
         max_parallel_pages=application_configuration.services.workers.concurrency,
         docling_max_concurrency=application_configuration.services.workers.docling_concurrency,
         granite_max_concurrency=application_configuration.services.workers.granite_concurrency,
@@ -430,9 +496,106 @@ def _run_validated_worker_and_claim_next(
         granite_heartbeat_seconds=lease_seconds / 3.0,
         job_heartbeat_control=job_heartbeat_coordinator,
     )
+    routed_page_converter = M004RoutedPageConverter(
+        native_converter=IsolatedNativeDoclingConverter(
+            asset_manifest_path=native_manifest_path,
+            assets_root=native_assets_root,
+            timeout_seconds=application_configuration.runtime.timeouts.request_seconds,
+        ),
+        granite_converter=IsolatedGraniteDoclingConverter(
+            asset_manifest_path=granite_manifest_path,
+            assets_root=granite_assets_root,
+            timeout_seconds=application_configuration.runtime.timeouts.request_seconds,
+        ),
+        gemma_converter=IsolatedGemmaVisionPageConverter(
+            timeout_seconds=_gemma_gateway_supervision_timeout_seconds(
+                spark_attempt_timeout_seconds=(
+                    application_configuration.services.llm_gateway.timeout_seconds
+                ),
+                retry_before_first_token=(
+                    application_configuration.services.llm_gateway.retry_before_first_token
+                ),
+            ),
+        ),
+        capacity_controller=job_runtime.granite_capacity_controller,
+        granite_worker=granite_worker,
+        granite_lease_seconds=lease_seconds,
+        granite_heartbeat_seconds=lease_seconds / 3.0,
+        ocrmypdf_manifest_path=ocrmypdf_manifest_path,
+        audit_root=Path(application_configuration.paths.data_root) / "docling_audit",
+        ocrmypdf_timeout_seconds=(
+            application_configuration.runtime.timeouts.request_seconds
+        ),
+        gateway_endpoint_url=application_configuration.services.llm_gateway.url,
+        gateway_timeout_seconds=_gemma_gateway_supervision_timeout_seconds(
+            spark_attempt_timeout_seconds=(
+                application_configuration.services.llm_gateway.timeout_seconds
+            ),
+            retry_before_first_token=(
+                application_configuration.services.llm_gateway.retry_before_first_token
+            ),
+        ),
+        gateway_max_output_tokens=application_configuration.models.llm.max_output_tokens,
+        expected_model_id=application_configuration.models.llm.reference_model,
+    )
+    page_converters = PageRouteConverters.from_routed(routed_page_converter)
+    page_worker = ExecuteDocumentPageHandler(
+        artifact_reader=page_artifact_store,
+        artifact_writer=page_artifact_store,
+        converters=page_converters,
+        standard_completion=job_runtime.standard_page_repository,
+        granite_completion=job_runtime.granite_slot_repository,
+        expected_locked_assets=locked_assets,
+    )
+    page_completion_relay = PageCompletionRelay(
+        outbox=job_runtime.page_completion_outbox,
+        consumer=RecordPageCompletionHandler(
+            repository=PostgresPageResultRepository(
+                connection_factory=connection_factory
+            )
+        ),
+    )
+    canonical_assembly_worker = CanonicalAssemblyWorker(
+        handler=AssembleCanonicalDocumentHandler(
+            repository=PostgresCanonicalAssemblyRepository(
+                connection_factory=connection_factory
+            ),
+            page_artifact_reader=page_artifact_store,
+            canonical_artifact_store=canonical_artifact_store,
+        )
+    )
+    standard_page_requirements = JobExecutionRequirements(
+        contract_name=CONVERT_PAGE_JOB_NAME,
+        contract_version=CONVERT_PAGE_CONTRACT_VERSION,
+        capacity_capability=ExecutionCapability.DOCUMENT_STANDARD.value,
+        capacity_slots=0,
+        capacity_device=None,
+        storage_environment=environment_identity.environment,
+    )
+    granite_page_requirements = JobExecutionRequirements(
+        contract_name=CONVERT_PAGE_JOB_NAME,
+        contract_version=CONVERT_PAGE_CONTRACT_VERSION,
+        capacity_capability=ExecutionCapability.GRANITE_CUDA.value,
+        capacity_slots=1,
+        capacity_device="cuda:0",
+        storage_environment=environment_identity.environment,
+    )
+    distributed_conversion_worker = DistributedDocumentConversionWorker(
+        source_document_repository=persistence.source_document_repository,
+        processing_run_repository=persistence.processing_run_repository,
+        page_fan_out_repository=persistence.document_conversion_repository,
+        original_source_store=persistence.original_source_store,
+        source_artifact_store=page_artifact_store,
+        locked_assets=locked_assets,
+    )
+    versioned_conversion_worker = VersionedDocumentConversionWorker(
+        legacy_worker=routed_conversion_worker,
+        distributed_worker=distributed_conversion_worker,
+    )
     workers = {
         "DIAGNOSE": worker,
-        "CONVERT_DOCUMENT": routed_conversion_worker,
+        "CONVERT_DOCUMENT": versioned_conversion_worker,
+        ASSEMBLE_CANONICAL_DOCUMENT_JOB_NAME: canonical_assembly_worker,
     }
     processed = 0
     while lifecycle.admissions_open and (max_jobs is None or processed < max_jobs):
@@ -443,10 +606,38 @@ def _run_validated_worker_and_claim_next(
                 owner_id=f"{instance_owner_id}-OUTBOX",
                 lease_seconds=lease_seconds,
             )
-            claimed = job_runtime.queue.claim_next(
-                owner_id=instance_owner_id,
+            page_completion_relay.relay_pending(
+                limit=16,
+                owner_id=f"{instance_owner_id}-PAGE-RESULTS",
                 lease_seconds=lease_seconds,
-                job_names=("DIAGNOSE", "CONVERT_DOCUMENT"),
+            )
+            page_authorization = job_runtime.granite_slot_repository.claim_compatible_job(
+                worker=granite_worker,
+                lease_seconds=lease_seconds,
+                job_names=(CONVERT_PAGE_JOB_NAME,),
+                execution_requirements=granite_page_requirements,
+            )
+            if page_authorization is None:
+                page_authorization = (
+                    job_runtime.standard_page_repository.claim_compatible_job(
+                        worker=granite_worker,
+                        lease_seconds=lease_seconds,
+                        job_names=(CONVERT_PAGE_JOB_NAME,),
+                        execution_requirements=standard_page_requirements,
+                    )
+                )
+            claimed = (
+                None
+                if page_authorization is not None
+                else job_runtime.queue.claim_next(
+                    owner_id=instance_owner_id,
+                    lease_seconds=lease_seconds,
+                    job_names=(
+                        "DIAGNOSE",
+                        "CONVERT_DOCUMENT",
+                        ASSEMBLE_CANONICAL_DOCUMENT_JOB_NAME,
+                    ),
+                )
             )
         except OperationalError:
             _log_runtime_error(
@@ -455,6 +646,17 @@ def _run_validated_worker_and_claim_next(
                 error_code="POSTGRES_TRANSIENT_FAILURE",
             )
             time.sleep(poll_seconds)
+            continue
+        if page_authorization is not None:
+            _execute_claimed_page(
+                application_configuration=application_configuration,
+                authorization=page_authorization,
+                page_worker=page_worker,
+                worker_binding=worker_binding,
+                job_queue=job_runtime.queue,
+                lease_seconds=lease_seconds,
+            )
+            processed += 1
             continue
         if claimed is None:
             if max_jobs is not None:
@@ -531,6 +733,66 @@ def _run_validated_worker_and_claim_next(
     atexit.unregister(lifecycle.close)
 
 
+def _execute_claimed_page(
+    *,
+    application_configuration: ApplicationConfiguration,
+    authorization: ClaimedJob | GraniteSlotLease,
+    page_worker: ExecuteDocumentPageHandler,
+    worker_binding: Any,
+    job_queue: Any,
+    lease_seconds: int,
+) -> None:
+    """Exécute une page sans réutiliser la terminalisation des jobs historiques."""
+
+    if isinstance(authorization, GraniteSlotLease):
+        claimed = authorization.claimed_job
+        standard_heartbeat = None
+    elif isinstance(authorization, ClaimedJob):
+        claimed = authorization
+        standard_heartbeat = JobLeaseHeartbeat(
+            job_queue=job_queue,
+            job_id=claimed.job.job_id,
+            owner_id=claimed.lease_owner,
+            claim_generation=claimed.claim_generation,
+            claim_token=claimed.claim_token,
+            lease_seconds=lease_seconds,
+            heartbeat_seconds=max(0.05, lease_seconds / 3),
+        )
+    else:
+        raise ValueError("PAGE_EXECUTION_AUTHORIZATION_INVALID")
+    worker_binding.require_job_request(claimed.job.request)
+    started_ns = time.perf_counter_ns()
+    trace_token = bind_trace_id(claimed.trace_id)
+    status = "failed"
+    error_code: str | None = None
+    if standard_heartbeat is not None:
+        standard_heartbeat.start()
+    try:
+        if isinstance(authorization, GraniteSlotLease):
+            outcome = page_worker.execute_granite(authorization)
+        else:
+            outcome = page_worker.execute_standard(claimed)
+        if outcome.result.status is PageResultStatus.SUCCEEDED:
+            status = "succeeded"
+        else:
+            error_code = outcome.result.error_code.value
+    except (JobLeaseConflictError, GraniteSlotLeaseLostError):
+        status = "lease_lost"
+        error_code = "JOB_LEASE_LOST"
+    finally:
+        if standard_heartbeat is not None:
+            standard_heartbeat.stop()
+        reset_trace_id(trace_token)
+        _log_job_result(
+            application_configuration=application_configuration,
+            claimed=claimed,
+            owner_id=claimed.lease_owner,
+            status=status,
+            error_code=error_code,
+            duration_ms=(time.perf_counter_ns() - started_ns) / 1_000_000,
+        )
+
+
 def _classify_processing_error(error: Exception) -> tuple[str, bool]:
     error = _primary_processing_error(error)
     if isinstance(error, GraniteSlotLeaseLostError):
@@ -576,7 +838,7 @@ def _settle_processing_failure(
     job_queue: Any,
     heartbeat: Any,
 ) -> str:
-    """Publie SP avant tout échec terminal platform, puis permet la réconciliation."""
+    """Terminalise le claim platform avant de publier son échec dans SP."""
 
     if retryable and claimed.execution_attempts < max_attempts:
         job = heartbeat.finalize(
@@ -592,19 +854,18 @@ def _settle_processing_failure(
             raise RuntimeError("JOB_RETRY_STATE_INVALID")
         return "retry_scheduled"
 
-    def fail_after_sp_publication() -> Any:
-        worker.mark_failed(claimed, error_code)
-        return job_queue.mark_failed(
+    job = heartbeat.finalize(
+        lambda: job_queue.mark_failed(
             job_id=claimed.job.job_id,
             owner_id=claimed.lease_owner,
             claim_generation=claimed.claim_generation,
             claim_token=claimed.claim_token,
             failure_reason=error_code,
         )
-
-    job = heartbeat.finalize(fail_after_sp_publication)
+    )
     if job.status is not JobStatus.FAILED:
         raise RuntimeError("JOB_TERMINAL_STATE_INVALID")
+    worker.mark_failed(claimed, error_code)
     return "failed"
 
 

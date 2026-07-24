@@ -21,6 +21,9 @@ Exécuter une tâche verticale à partir du métier du portefeuille convexe-anti
 8. Pour une action UI asynchrone, vérifier avant toute disponibilité la chaîne
    complète `API -> outbox -> relais -> worker -> état public`, la supervision
    des participants réels et le contrat public de progression.
+9. Déterminer si l'exécution est déléguée par un orchestrateur de milestone. Un
+   sous-agent de tâche ou de correction/revue exécute uniquement les tests, lint
+   et scopes ciblés reçus ; il ne lance jamais la gate globale.
 
 ## Analyse DDD
 
@@ -56,9 +59,14 @@ Maintenir le lien entre décision, spécification, tests, code et commits:
 Respecter l'ordre suivant pour chaque tâche d'implémentation:
 
 1. **Vérification GREEN initiale**
-   - Exécuter la suite pertinente avant tout changement.
-   - Préférer la commande canonique du dépôt : `uv run --locked gate`.
-   - Si la suite est déjà RED pour une raison indépendante, arrêter l'implémentation et documenter le blocage, sauf si la tâche demandée est précisément de remettre la suite au vert.
+   - Exécuter les tests, lint et scopes ciblés pertinents avant tout changement.
+   - Dans un sous-agent, ne jamais lancer la gate globale. La précondition
+     globale GREEN appartient à l'orchestrateur et peut être réutilisée
+     seulement lorsque `HEAD` et le worktree sont inchangés depuis sa preuve.
+   - Si les validations ciblées sont déjà RED pour une raison indépendante,
+     arrêter l'implémentation et documenter le blocage, sauf si la tâche demandée
+     est précisément de les remettre au vert. Le sous-agent ne remplace pas ce
+     diagnostic par une gate globale.
 
 2. **Décision ADR**
    - Déterminer si la tâche nécessite une ADR nouvelle, une mise à jour d'ADR ou aucune ADR.
@@ -95,7 +103,9 @@ Respecter l'ordre suivant pour chaque tâche d'implémentation:
    - Limiter les changements au périmètre de la tâche.
 
 8. **Validation GREEN**
-   - Exécuter les tests ciblés, puis la suite pertinente du dépôt.
+   - Exécuter les tests, lint et scopes ciblés de la tâche.
+   - Ne jamais lancer la gate globale dans un sous-agent de tâche ou de
+     correction/revue, y compris après le commit GREEN.
    - Exécuter la lint ou les validations configurées.
    - Corriger uniquement ce qui est nécessaire pour obtenir GREEN sans élargir la portée.
    - Vérifier que l'ADR applicable reste cohérente avec le comportement livré.
@@ -107,6 +117,20 @@ Respecter l'ordre suivant pour chaque tâche d'implémentation:
    - Ajouter l'identifiant ADR dans le message quand une ADR gouverne l'implémentation.
 
 Si Git signale `dubious ownership`, relancer les commandes Git avec `git -c safe.directory=<chemin-du-dépôt>` plutôt que modifier la configuration globale sans accord utilisateur.
+
+## Propriété De La Gate Globale
+
+- L'orchestrateur conserve la propriété exclusive de la précondition et de la
+  clôture globales. Quand `HEAD` ou le worktree change depuis la dernière preuve,
+  il choisit lui-même une validation pertinente sans transférer la gate à un
+  sous-agent.
+- Il exécute exactement une gate globale par état final candidat avec
+  `timeout_ms=3600000`. Après un yield ou la réception d'un cell ID, il utilise
+  l'outil `wait` sur le même cell ID ; il ne relance jamais la commande. Un
+  timeout ou yield de l'interface n'est pas un RED.
+- Un RED terminal réel est diagnostiqué et corrigé par tests, lint et scopes
+  ciblés. Une seule nouvelle gate globale est autorisée sur le nouveau candidat
+  final post-correction ; aucune boucle ni relance sans changement n'est admise.
 
 ## Règles De Qualité
 

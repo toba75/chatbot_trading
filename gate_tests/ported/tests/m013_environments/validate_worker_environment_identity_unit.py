@@ -56,7 +56,12 @@ def test_worker_environment_identity_unit() -> None:
         "worker-documents",
         "worker-projection",
     )
-    assert WORKER_JOB_NAMES["worker-documents"] == ("DIAGNOSE", "CONVERT_DOCUMENT")
+    assert WORKER_JOB_NAMES["worker-documents"] == (
+        "DIAGNOSE",
+        "CONVERT_DOCUMENT",
+        "CONVERT_PAGE",
+        "ASSEMBLE_CANONICAL_DOCUMENT",
+    )
     assert WORKER_JOB_NAMES["worker-projection"] == ("PROJECT_DOCUMENT",)
 
     binding = WorkerEnvironmentBinding(

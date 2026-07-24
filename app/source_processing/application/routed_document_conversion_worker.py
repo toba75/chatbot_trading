@@ -237,7 +237,7 @@ class _ConversionProgressRecorder:
             )
 
 
-class _NativePageConverter:
+class NativePageConverter:
     def __init__(
         self,
         *,
@@ -253,7 +253,7 @@ class _NativePageConverter:
             NativeDoclingConversionRequest(
                 document_id=request.document_id.value,
                 processing_run_id=request.processing_run_id.value,
-                source_sha256=_sha256_file(source_path),
+                source_sha256=request.source_sha256,
                 source_pdf_path=source_path,
                 expected_page_numbers=(request.page_number.value,),
                 routing_policy_version=request.routing_policy_version.value,
@@ -268,7 +268,7 @@ class _NativePageConverter:
         )
 
 
-class _GranitePageConverter:
+class GranitePageConverter:
     """Route Granite/Gemma dont chaque processus exige une lease PostgreSQL active."""
 
     def __init__(
@@ -359,7 +359,7 @@ class _RunningGraniteRouteConversion:
             GraniteDoclingConversionRequest(
                 document_id=request.document_id.value,
                 processing_run_id=request.processing_run_id.value,
-                source_sha256=_sha256_file(source_path),
+                source_sha256=request.source_sha256,
                 source_pdf_path=source_path,
                 page_number=request.page_number.value,
                 source_page_number=_source_page_number(request),
@@ -452,7 +452,7 @@ class _RunningGraniteRouteConversion:
         return GemmaVisionConversionRequest(
             document_id=self._request.document_id.value,
             processing_run_id=self._request.processing_run_id.value,
-            source_sha256=_sha256_file(self._source_path),
+            source_sha256=self._request.source_sha256,
             source_pdf_path=self._source_path,
             page_number=self._request.page_number.value,
             source_page_number=_source_page_number(self._request),
@@ -689,14 +689,14 @@ class RoutedDocumentConversionWorker:
             docling_capacity = SharedPageConversionCapacity(
                 max_concurrency=self._docling_max_concurrency,
             )
-            raw_native_page_converter = _NativePageConverter(
+            raw_native_page_converter = NativePageConverter(
                 converter=self._native_converter,
                 resolve_source_path=resolve_source_path,
             )
             native_page_converter = docling_capacity.limit(
                 page_converter=raw_native_page_converter,
             )
-            raw_granite_page_converter = _GranitePageConverter(
+            raw_granite_page_converter = GranitePageConverter(
                 granite_converter=self._granite_converter,
                 gemma_converter=self._gemma_converter,
                 capacity_controller=self._granite_capacity_controller,
@@ -1201,7 +1201,9 @@ def _required_gateway_url(value: Any) -> str:
 
 
 __all__ = [
+    "GranitePageConverter",
     "NON_NATIVE_TERMINAL_ERROR_CODES",
+    "NativePageConverter",
     "RoutedDocumentConversionWorker",
     "build_routed_document_conversion_worker",
 ]

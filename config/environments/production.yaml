@@ -50,6 +50,7 @@ services:
     queue_name: ostrading-production-jobs
     outbox_namespace: ostrading-production-outbox
     progress_namespace: ostrading-production-progress
+    document_orchestration_version: m014-page-fanout-v1
     concurrency: 8
     docling_concurrency: 2
     granite_concurrency: 1

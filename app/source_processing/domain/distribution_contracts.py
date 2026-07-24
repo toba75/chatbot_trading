@@ -21,7 +21,9 @@ from app.contracts.technical_jobs import (
     JobRequest,
 )
 from app.source_processing.domain.document_processing_run import (
+    PageManifest,
     PageNumber,
+    PageRoute,
     PageRouteName,
     ProcessingRunId,
     RoutingPolicyVersion,
@@ -39,6 +41,10 @@ _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 _ARTIFACT_REF_PATTERN = re.compile(
     r"^artifact:source_processing\.local/(development|test|production)/"
     r"[A-Za-z0-9_.@/-]+$"
+)
+_CANONICAL_ARTIFACT_REF_PATTERN = re.compile(
+    r"^artifact:source_processing\.canonical_sources/"
+    r"CSRC-[A-Z0-9-]+/CVER-[A-Z0-9-]+/docling\.json$"
 )
 _ASSET_NAME_PATTERN = re.compile(r"^[a-z0-9]+(?:[._-][a-z0-9]+)*$")
 _JOB_ID_PATTERN = re.compile(r"^JOB-M002-[0-9]{6}$")
@@ -79,10 +85,29 @@ class PageResultStatus(str, Enum):
 
 
 class PageResultErrorCode(str, Enum):
+    DOCLING_PAGE_MANIFEST_MISMATCH = "DOCLING_PAGE_MANIFEST_MISMATCH"
+    DOCLING_PROVENANCE_MISSING = "DOCLING_PROVENANCE_MISSING"
+    DOCLING_STANDARD_UNAVAILABLE = "DOCLING_STANDARD_UNAVAILABLE"
+    OCRMYPDF_UNAVAILABLE = "OCRMYPDF_UNAVAILABLE"
+    SOURCE_FINGERPRINT_MISMATCH = "SOURCE_FINGERPRINT_MISMATCH"
     GRANITE_CAPACITY_CONFIGURATION_INVALID = "GRANITE_CAPACITY_CONFIGURATION_INVALID"
     GRANITE_CUDA_UNAVAILABLE = "GRANITE_CUDA_UNAVAILABLE"
     GRANITE_DOCLING_TIMEOUT = "GRANITE_DOCLING_TIMEOUT"
+    GRANITE_DOCLING_UNAVAILABLE = "GRANITE_DOCLING_UNAVAILABLE"
+    GRANITE_TIMEOUT_AND_TERMINATION_FAILURE = "GRANITE_TIMEOUT_AND_TERMINATION_FAILURE"
+    GEMMA_TIMEOUT_AND_TERMINATION_FAILURE = "GEMMA_TIMEOUT_AND_TERMINATION_FAILURE"
+    GEMMA_VISION_IMAGE_TOO_LARGE = "GEMMA_VISION_IMAGE_TOO_LARGE"
+    GEMMA_VISION_MODEL_MISMATCH = "GEMMA_VISION_MODEL_MISMATCH"
+    GEMMA_VISION_OUTPUT_INVALID = "GEMMA_VISION_OUTPUT_INVALID"
+    GEMMA_VISION_OUTPUT_TRUNCATED = "GEMMA_VISION_OUTPUT_TRUNCATED"
+    GEMMA_VISION_PAGE_MISSING = "GEMMA_VISION_PAGE_MISSING"
+    GEMMA_VISION_RENDERING_FAILED = "GEMMA_VISION_RENDERING_FAILED"
+    GEMMA_VISION_REQUEST_INVALID = "GEMMA_VISION_REQUEST_INVALID"
+    GEMMA_VISION_SOURCE_INVALID = "GEMMA_VISION_SOURCE_INVALID"
     GEMMA_VISION_TIMEOUT = "GEMMA_VISION_TIMEOUT"
+    GEMMA_VISION_UNAVAILABLE = "GEMMA_VISION_UNAVAILABLE"
+    GEMMA_VISION_WORKER_PROTOCOL_INVALID = "GEMMA_VISION_WORKER_PROTOCOL_INVALID"
+    GEMMA_VISION_WORKER_UNEXPECTED = "GEMMA_VISION_WORKER_UNEXPECTED"
     JOB_LEASE_LOST = "JOB_LEASE_LOST"
     WORKER_MEMORY_LIMIT_EXCEEDED = "WORKER_MEMORY_LIMIT_EXCEEDED"
     ARTIFACT_NOT_FOUND = "ARTIFACT_NOT_FOUND"
@@ -316,6 +341,34 @@ class PageExecutionIdentity:
             "claim_token": self.claim_token,
             "worker_instance_id": self.worker_instance_id,
         }
+
+
+def claim_scoped_page_artifact_identity(
+    *,
+    expected_identity: LocalArtifactIdentity,
+    execution: PageExecutionIdentity,
+) -> LocalArtifactIdentity:
+    """Dérive le chemin immutable privé de l'exécution fenced."""
+
+    if not isinstance(expected_identity, LocalArtifactIdentity):
+        raise ArtifactContractError("ARTIFACT_IDENTITY_INVALID")
+    if not isinstance(execution, PageExecutionIdentity):
+        raise DistributionContractError("PAGE_EXECUTION_IDENTITY_REQUIRED")
+    suffix = PurePosixPath(expected_identity.relative_path)
+    relative_path = str(
+        PurePosixPath("page-claims")
+        / execution.job_id
+        / f"generation-{execution.claim_generation}-{execution.claim_token}"
+        / suffix
+    )
+    return LocalArtifactIdentity(
+        environment=expected_identity.environment,
+        artifact_ref=(
+            f"artifact:source_processing.local/{expected_identity.environment}/"
+            f"{relative_path}"
+        ),
+        relative_path=relative_path,
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -880,7 +933,7 @@ class AssembleCanonicalDocumentContract:
     page_count: int
     page_manifest_sha256: str
     page_result_contract_version: str
-    expected_canonical_artifact: LocalArtifactIdentity
+    expected_canonical_artifact: str
     idempotence_key: str
 
     def __post_init__(self) -> None:
@@ -888,7 +941,7 @@ class AssembleCanonicalDocumentContract:
             self.contract_version,
             ASSEMBLE_CANONICAL_DOCUMENT_CONTRACT_VERSION,
         )
-        identity = _environment_identity(self.environment_identity)
+        _environment_identity(self.environment_identity)
         document_id = _document_id(self.document_id)
         processing_run_id = _processing_run_id(self.processing_run_id)
         page_count = _positive_integer(self.page_count, "PAGE_COUNT_INVALID")
@@ -897,10 +950,12 @@ class AssembleCanonicalDocumentContract:
             self.page_result_contract_version,
             PAGE_RESULT_CONTRACT_VERSION,
         )
-        if not isinstance(self.expected_canonical_artifact, LocalArtifactIdentity):
-            raise ArtifactContractError("ARTIFACT_IDENTITY_INVALID")
-        if self.expected_canonical_artifact.environment != identity.environment:
-            raise DistributionContractError("CONTRACT_ENVIRONMENT_MISMATCH")
+        expected_artifact = _text(
+            self.expected_canonical_artifact,
+            "CANONICAL_ARTIFACT_REF_INVALID",
+        )
+        if _CANONICAL_ARTIFACT_REF_PATTERN.fullmatch(expected_artifact) is None:
+            raise ArtifactContractError("CANONICAL_ARTIFACT_REF_INVALID")
         expected_key = assemble_canonical_document_idempotence_key(
             processing_run_id=processing_run_id,
             page_manifest_sha256=manifest_hash,
@@ -913,6 +968,7 @@ class AssembleCanonicalDocumentContract:
         object.__setattr__(self, "processing_run_id", processing_run_id)
         object.__setattr__(self, "page_count", page_count)
         object.__setattr__(self, "page_manifest_sha256", manifest_hash)
+        object.__setattr__(self, "expected_canonical_artifact", expected_artifact)
 
     @classmethod
     def from_mapping(cls, value: Any) -> "AssembleCanonicalDocumentContract":
@@ -941,9 +997,7 @@ class AssembleCanonicalDocumentContract:
             page_count=payload["page_count"],
             page_manifest_sha256=payload["page_manifest_sha256"],
             page_result_contract_version=payload["page_result_contract_version"],
-            expected_canonical_artifact=LocalArtifactIdentity.from_mapping(
-                payload["expected_canonical_artifact"]
-            ),
+            expected_canonical_artifact=payload["expected_canonical_artifact"],
             idempotence_key=payload["idempotence_key"],
         )
 
@@ -977,7 +1031,7 @@ class AssembleCanonicalDocumentContract:
             "page_count": self.page_count,
             "page_manifest_sha256": self.page_manifest_sha256,
             "page_result_contract_version": self.page_result_contract_version,
-            "expected_canonical_artifact": self.expected_canonical_artifact.to_mapping(),
+            "expected_canonical_artifact": self.expected_canonical_artifact,
             "idempotence_key": self.idempotence_key,
         }
 
@@ -1031,6 +1085,69 @@ def convert_page_idempotence_key(
             "page_number": page,
             "route_name": route,
             "routing_policy_version": policy,
+        }
+    )
+
+
+def page_manifest_sha256(
+    *,
+    document_id: str | DocumentId,
+    processing_run_id: str | ProcessingRunId,
+    page_manifest: PageManifest,
+    page_routes: Sequence[PageRoute],
+    routing_policy_version: str | RoutingPolicyVersion,
+) -> str:
+    """Fige l'identité ordonnée du manifeste et de ses routes M-003."""
+
+    document = _document_id(
+        document_id.value if isinstance(document_id, DocumentId) else document_id
+    )
+    run = _processing_run_id(
+        processing_run_id.value
+        if isinstance(processing_run_id, ProcessingRunId)
+        else processing_run_id
+    )
+    if not isinstance(page_manifest, PageManifest):
+        raise DistributionContractError("PAGE_MANIFEST_INVALID")
+    if isinstance(page_routes, str) or not isinstance(page_routes, Sequence):
+        raise DistributionContractError("PAGE_MANIFEST_ROUTES_INVALID")
+    routes = tuple(page_routes)
+    if any(not isinstance(route, PageRoute) for route in routes):
+        raise DistributionContractError("PAGE_MANIFEST_ROUTES_INVALID")
+    manifest_pages = tuple(
+        entry.page_number.value for entry in page_manifest.entries
+    )
+    route_pages = tuple(route.page_number.value for route in routes)
+    if len(route_pages) != len(set(route_pages)):
+        raise DistributionContractError("PAGE_MANIFEST_ROUTE_DUPLICATED")
+    if any(page not in set(manifest_pages) for page in route_pages):
+        raise DistributionContractError("PAGE_MANIFEST_ROUTE_OUTSIDE")
+    if set(route_pages) != set(manifest_pages):
+        raise DistributionContractError("PAGE_MANIFEST_ROUTE_MISSING")
+    if route_pages != manifest_pages:
+        raise DistributionContractError("PAGE_MANIFEST_ROUTE_ORDER_INVALID")
+    policy = _routing_policy_version(
+        routing_policy_version.value
+        if isinstance(routing_policy_version, RoutingPolicyVersion)
+        else routing_policy_version
+    )
+    if any(route.routing_policy_version.value != policy for route in routes):
+        raise DistributionContractError("PAGE_MANIFEST_POLICY_DIVERGENT")
+    return _canonical_sha256(
+        {
+            "manifest_contract_version": "m014-page-manifest-v1",
+            "document_id": document,
+            "processing_run_id": run,
+            "routing_policy_version": policy,
+            "source_page_count": page_manifest.source_page_count,
+            "pages": tuple(
+                {
+                    "page_number": entry.page_number.value,
+                    "manifest_state": entry.state.value,
+                    "route_name": route.route_name.value,
+                }
+                for entry, route in zip(page_manifest.entries, routes, strict=True)
+            ),
         }
     )
 
@@ -1159,6 +1276,8 @@ def _validate_executed_page_result(
         route_name=route_name,
         granite_slot_execution=granite_slot_execution,
         technical_metrics=technical_metrics,
+        status=status,
+        error_code=error_code,
     )
     _validate_page_result_outcome(
         status=status,
@@ -1174,13 +1293,28 @@ def _validate_page_result_route_resources(
     route_name: PageRouteName,
     granite_slot_execution: GraniteSlotExecutionIdentity | None,
     technical_metrics: PageTechnicalMetrics | None,
+    status: PageResultStatus,
+    error_code: PageResultErrorCode | None,
 ) -> None:
     if not isinstance(technical_metrics, PageTechnicalMetrics):
         raise DistributionContractError("PAGE_RESULT_METRICS_REQUIRED")
     if route_name in _GRANITE_ROUTES:
         if not isinstance(granite_slot_execution, GraniteSlotExecutionIdentity):
             raise DistributionContractError("GRANITE_SLOT_IDENTITY_REQUIRED")
-        if technical_metrics.gpu is None:
+        gpu_absence_is_terminal_fact = (
+            status is PageResultStatus.FAILED
+            and error_code
+            in {
+                PageResultErrorCode.GRANITE_CAPACITY_CONFIGURATION_INVALID,
+                PageResultErrorCode.GRANITE_CUDA_UNAVAILABLE,
+                PageResultErrorCode.JOB_LEASE_LOST,
+                PageResultErrorCode.ARTIFACT_NOT_FOUND,
+                PageResultErrorCode.ARTIFACT_OUTSIDE_PROFILE_ROOT,
+                PageResultErrorCode.ARTIFACT_HASH_MISMATCH,
+                PageResultErrorCode.WORKER_MEMORY_LIMIT_EXCEEDED,
+            }
+        )
+        if technical_metrics.gpu is None and not gpu_absence_is_terminal_fact:
             raise DistributionContractError("PAGE_RESULT_GPU_METRICS_REQUIRED")
         return
     if granite_slot_execution is not None:
@@ -1436,5 +1570,7 @@ __all__ = [
     "PageResultStatus",
     "PageTechnicalMetrics",
     "assemble_canonical_document_idempotence_key",
+    "claim_scoped_page_artifact_identity",
     "convert_page_idempotence_key",
+    "page_manifest_sha256",
 ]

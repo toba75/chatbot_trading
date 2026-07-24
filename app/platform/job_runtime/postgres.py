@@ -381,7 +381,73 @@ class PostgresJobQueue:
                 if consumed is not None:
                     consumed_row = _ConsumedRelayRow.from_database(consumed)
                     if consumed_row.source_message_hash != message.content_hash:
-                        raise JobRelayMessageConflictError()
+                        cursor.execute(
+                            f"""
+                            SELECT {_EXISTING_RELAY_COLUMNS_SQL}
+                              FROM platform.technical_jobs
+                             WHERE job_id = %s
+                             FOR UPDATE
+                            """,
+                            (consumed_row.job_id,),
+                        )
+                        historical = cursor.fetchone()
+                        if historical is None:
+                            raise JobRelayMessageConflictError()
+                        historical_row = _ExistingRelayRow.from_database(historical)
+                        if not _is_historical_project_document_upgrade(
+                            existing_row=historical_row,
+                            request=request,
+                            message_id=message.message_id,
+                        ):
+                            raise JobRelayMessageConflictError()
+                        requirements = _execution_requirement_mapping(request)
+                        cursor.execute(
+                            """
+                            UPDATE platform.technical_jobs
+                               SET environment = %(environment)s,
+                                   deployment_id = %(deployment_id)s,
+                                   priority = %(priority)s,
+                                   input_hash = %(input_hash)s,
+                                   configuration_hash = %(configuration_hash)s,
+                                   code_version = %(code_version)s,
+                                   model_version = %(model_version)s,
+                                   execution_contract_name =
+                                       %(execution_contract_name)s,
+                                   execution_contract_version =
+                                       %(execution_contract_version)s,
+                                   capacity_capability = %(capacity_capability)s,
+                                   capacity_slots = %(capacity_slots)s,
+                                   capacity_device = %(capacity_device)s,
+                                   storage_environment = %(storage_environment)s,
+                                   payload = %(payload)s::jsonb,
+                                   trace_id = %(trace_id)s,
+                                   status = 'pending', result = NULL,
+                                   failure_reason = NULL, lease_owner = NULL,
+                                   lease_expires_at = NULL, claim_token = NULL,
+                                   source_message_hash = %(source_message_hash)s
+                             WHERE job_id = %(job_id)s
+                               AND source_message_id = %(source_message_id)s
+                            """,
+                            {
+                                "environment": request.environment,
+                                "deployment_id": request.deployment_id,
+                                "priority": request.priority.value,
+                                "input_hash": request.idempotence_key.input_hash,
+                                "configuration_hash": (
+                                    request.idempotence_key.configuration_hash
+                                ),
+                                "code_version": request.idempotence_key.code_version,
+                                "model_version": request.idempotence_key.model_version,
+                                **requirements,
+                                "payload": serialized_payload,
+                                "trace_id": message.trace_id,
+                                "source_message_id": message.message_id,
+                                "source_message_hash": message.content_hash,
+                                "job_id": consumed_row.job_id,
+                            },
+                        )
+                        if cursor.rowcount != 1:
+                            raise JobRelayMessageConflictError()
                     return consumed_row.job_id
 
                 cursor.execute(
@@ -407,6 +473,44 @@ class PostgresJobQueue:
                 existing = cursor.fetchone()
                 if existing is not None:
                     existing_row = _ExistingRelayRow.from_database(existing)
+                    if _is_historical_project_document_upgrade(
+                        existing_row=existing_row,
+                        request=request,
+                        message_id=message.message_id,
+                    ):
+                        requirements = _execution_requirement_mapping(request)
+                        cursor.execute(
+                            """
+                            UPDATE platform.technical_jobs
+                               SET execution_contract_name = %(execution_contract_name)s,
+                                   execution_contract_version = %(execution_contract_version)s,
+                                   capacity_capability = %(capacity_capability)s,
+                                   capacity_slots = %(capacity_slots)s,
+                                   capacity_device = %(capacity_device)s,
+                                   storage_environment = %(storage_environment)s,
+                                   payload = %(payload)s::jsonb,
+                                   trace_id = %(trace_id)s,
+                                   status = 'pending', result = NULL,
+                                   failure_reason = NULL, lease_owner = NULL,
+                                   lease_expires_at = NULL, claim_token = NULL,
+                                   source_message_id = %(source_message_id)s,
+                                   source_message_hash = %(source_message_hash)s
+                             WHERE job_id = %(job_id)s
+                               AND source_message_id IS NULL
+                               AND source_message_hash IS NULL
+                            """,
+                            {
+                                **requirements,
+                                "payload": serialized_payload,
+                                "trace_id": message.trace_id,
+                                "source_message_id": message.message_id,
+                                "source_message_hash": message.content_hash,
+                                "job_id": existing_row.job_id,
+                            },
+                        )
+                        if cursor.rowcount != 1:
+                            raise JobRelayMessageConflictError()
+                        return existing_row.job_id
                     if (
                         existing_row.priority != request.priority.value
                         or dict(existing_row.payload) != dict(request.payload)
@@ -483,7 +587,6 @@ class PostgresJobQueue:
         if inserted is None:
             raise RuntimeError("JOB_RELAY_PERSISTENCE_FAILED")
         return _InsertedJobRow.from_database(inserted).job_id
-
     def _require_environment_identity(self, request: JobRequest) -> None:
         if request.environment_identity != self._environment_identity:
             raise WorkerEnvironmentMismatchError()
@@ -538,6 +641,87 @@ class PostgresJobQueue:
                         ),
                     )
                     row = cursor.fetchone()
+        if row is None:
+            return None
+        claimed_row = _ClaimedJobRow.from_database(row)
+        return ClaimedJob(
+            job=_job_from_row(claimed_row.job_row()),
+            trace_id=claimed_row.trace_id,
+            lease_owner=claimed_row.lease_owner,
+            lease_expires_at=claimed_row.lease_expires_at,
+            claim_generation=claimed_row.claim_generation,
+            claim_token=str(claimed_row.claim_token),
+            execution_attempts=claimed_row.execution_attempts,
+        )
+
+    def claim_next_compatible(
+        self,
+        *,
+        owner_id: str,
+        lease_seconds: int,
+        job_names: tuple[str, ...],
+        execution_requirements: JobExecutionRequirements,
+    ) -> ClaimedJob | None:
+        """Réclame seulement un contrat d'exécution exactement compatible."""
+
+        parsed_owner = _ensure_text(owner_id, "owner_id")
+        parsed_lease = _ensure_positive_integer(lease_seconds, "lease_seconds")
+        parsed_names = _ensure_job_names(job_names, self._catalog)
+        if not isinstance(execution_requirements, JobExecutionRequirements):
+            raise ValueError("execution_requirements invalides")
+        with self._connection_factory.connect() as connection:
+            with connection.transaction(), connection.cursor() as cursor:
+                cursor.execute(
+                    f"""
+                    WITH candidate AS (
+                        SELECT sequence
+                          FROM platform.technical_jobs
+                         WHERE environment = %s
+                           AND deployment_id = %s
+                           AND configuration_hash = %s
+                           AND job_name = ANY(%s)
+                           AND execution_contract_name = %s
+                           AND execution_contract_version = %s
+                           AND capacity_capability = %s
+                           AND capacity_slots = %s
+                           AND capacity_device IS NOT DISTINCT FROM %s
+                           AND storage_environment = %s
+                           AND (
+                               status = 'pending'
+                               OR (status = 'running'
+                                   AND lease_expires_at <= CURRENT_TIMESTAMP)
+                           )
+                         ORDER BY priority, sequence
+                         FOR UPDATE SKIP LOCKED
+                         LIMIT 1
+                    )
+                    UPDATE platform.technical_jobs AS job
+                       SET status = 'running', lease_owner = %s,
+                           lease_expires_at =
+                               CURRENT_TIMESTAMP + (%s * INTERVAL '1 second'),
+                           execution_attempts = execution_attempts + 1,
+                           claim_generation = claim_generation + 1,
+                           claim_token = gen_random_uuid()
+                      FROM candidate
+                     WHERE job.sequence = candidate.sequence
+                    RETURNING {_QUALIFIED_CLAIMED_JOB_COLUMNS_SQL}
+                    """,
+                    (
+                        self._environment_identity.environment,
+                        self._environment_identity.deployment_id,
+                        self._environment_identity.configuration_hash,
+                        list(parsed_names),
+                        execution_requirements.contract_name,
+                        execution_requirements.contract_version,
+                        execution_requirements.capacity_capability,
+                        execution_requirements.capacity_slots,
+                        execution_requirements.capacity_device,
+                        execution_requirements.storage_environment,
+                        parsed_owner,
+                        parsed_lease,
+                    ),
+                )
+                row = cursor.fetchone()
         if row is None:
             return None
         claimed_row = _ClaimedJobRow.from_database(row)
@@ -1004,6 +1188,36 @@ def _existing_relay_requirement_values(row: _ExistingRelayRow) -> tuple[Any, ...
         row.capacity_slots,
         row.capacity_device,
         row.storage_environment,
+    )
+
+
+def _is_historical_project_document_upgrade(
+    *,
+    existing_row: _ExistingRelayRow,
+    request: JobRequest,
+    message_id: str,
+) -> bool:
+    existing_payload = dict(existing_row.payload)
+    requested_payload = dict(request.payload)
+    return (
+        request.job_name == "PROJECT_DOCUMENT"
+        and set(existing_payload)
+        == {"projection_id", "document_id", "canonical_version_id"}
+        and requested_payload.get("contract_version") == "1.0"
+        and all(
+            existing_payload[field_name] == requested_payload.get(field_name)
+            for field_name in existing_payload
+        )
+        and (
+            (
+                existing_row.source_message_id is None
+                and existing_row.source_message_hash is None
+            )
+            or (
+                existing_row.source_message_id == message_id
+                and existing_row.source_message_hash is not None
+            )
+        )
     )
 
 
