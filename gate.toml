@@ -5424,3 +5424,36 @@ timeout_seconds = 300
 serial_group = "live"
 depends_on = ["precondition.m014_local_pipeline"]
 live = true
+
+[[nodes]]
+id = "test.m014-local-pipeline.validate-canonical-assembly-acceptance"
+path = "gate_tests/ported/tests/m014_local_pipeline/validate_canonical_assembly_acceptance.py"
+kind = "test"
+scope = "m014_local_pipeline"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m014_local_pipeline"]
+live = false
+
+[[nodes]]
+id = "test.m014-local-pipeline.validate-canonical-assembly-unit"
+path = "gate_tests/ported/tests/m014_local_pipeline/validate_canonical_assembly_unit.py"
+kind = "test"
+scope = "m014_local_pipeline"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m014_local_pipeline"]
+live = false
+
+[[nodes]]
+id = "test.m014-local-pipeline.validate-canonical-assembly-postgresql-live"
+path = "gate_tests/ported/tests/m014_local_pipeline/validate_canonical_assembly_postgresql_live.py"
+kind = "test"
+scope = "m014_local_pipeline"
+phase = "live"
+timeout_seconds = 300
+serial_group = "live"
+depends_on = ["precondition.m014_local_pipeline"]
+live = true
