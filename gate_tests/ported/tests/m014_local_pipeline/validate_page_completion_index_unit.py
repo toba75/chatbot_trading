@@ -20,7 +20,6 @@ def test_lookup_completion_utilise_un_index_partiel_exact() -> None:
     assert "(payload ->> 'page_number')" in sql
     assert "WHERE job_name = 'CONVERT_PAGE'" in sql
 
-    adapter = inspect.getsource(PostgresPageResultRepository.record_result)
+    adapter = inspect.getsource(PostgresPageResultRepository.persist_page_result)
     assert "payload ->> 'page_number' = %s" in adapter
     assert "::integer" not in adapter
-

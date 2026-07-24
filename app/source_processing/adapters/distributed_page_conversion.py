@@ -6,10 +6,11 @@ import dataclasses
 import hashlib
 import json
 import subprocess
+import threading
 import time
 from enum import Enum
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import psutil
 
@@ -108,6 +109,111 @@ class _PreAcquiredCapacityController:
         )
 
 
+class _ResourcePeakSampler:
+    """Échantillonne les pics du processus de conversion et de ses enfants."""
+
+    def __init__(
+        self,
+        *,
+        ram_sampler: Callable[[], int],
+        gpu_sampler: Callable[[], PageGpuMetrics] | None,
+        sample_interval_seconds: float,
+    ) -> None:
+        if not callable(ram_sampler):
+            raise ValueError("PAGE_RAM_SAMPLER_INVALID")
+        if gpu_sampler is not None and not callable(gpu_sampler):
+            raise ValueError("PAGE_GPU_SAMPLER_INVALID")
+        if (
+            isinstance(sample_interval_seconds, bool)
+            or not isinstance(sample_interval_seconds, int | float)
+            or sample_interval_seconds <= 0
+        ):
+            raise ValueError("PAGE_RESOURCE_SAMPLE_INTERVAL_INVALID")
+        self._ram_sampler = ram_sampler
+        self._gpu_sampler = gpu_sampler
+        self._sample_interval_seconds = float(sample_interval_seconds)
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+        self._error: Exception | None = None
+        self._peak_ram_bytes = 0
+        self._peak_vram_bytes = 0
+        self._peak_gpu_utilization_percent = 0.0
+        self._peak_gpu_power_watts = 0.0
+
+    @property
+    def is_running(self) -> bool:
+        return self._thread is not None and self._thread.is_alive()
+
+    def start(self) -> None:
+        if self._thread is not None:
+            raise RuntimeError("PAGE_RESOURCE_SAMPLER_ALREADY_STARTED")
+        self._sample()
+        self._thread = threading.Thread(
+            target=self._run,
+            name="sp-page-resource-sampler",
+            daemon=True,
+        )
+        self._thread.start()
+
+    def stop(self, *, started: float) -> PageTechnicalMetrics:
+        thread = self._thread
+        if thread is None:
+            raise RuntimeError("PAGE_RESOURCE_SAMPLER_NOT_STARTED")
+        self._stop.set()
+        thread.join(timeout=max(12.0, self._sample_interval_seconds * 4))
+        if thread.is_alive():
+            raise RuntimeError("PAGE_RESOURCE_SAMPLER_STOP_TIMEOUT")
+        if self._error is None:
+            self._sample()
+        if self._error is not None:
+            raise self._error
+        return self._metrics(started=started, include_gpu=True)
+
+    def metrics_without_gpu(self, *, started: float) -> PageTechnicalMetrics:
+        return self._metrics(started=started, include_gpu=False)
+
+    def _run(self) -> None:
+        while not self._stop.wait(self._sample_interval_seconds):
+            try:
+                self._sample()
+            except Exception as error:
+                self._error = error
+                self._stop.set()
+                return
+
+    def _sample(self) -> None:
+        ram_bytes = self._ram_sampler()
+        if isinstance(ram_bytes, bool) or not isinstance(ram_bytes, int) or ram_bytes < 1:
+            raise RuntimeError("PAGE_RAM_SAMPLE_INVALID")
+        self._peak_ram_bytes = max(self._peak_ram_bytes, ram_bytes)
+        if self._gpu_sampler is None:
+            return
+        gpu = self._gpu_sampler()
+        self._peak_vram_bytes = max(self._peak_vram_bytes, gpu.peak_vram_bytes)
+        self._peak_gpu_utilization_percent = max(
+            self._peak_gpu_utilization_percent,
+            gpu.peak_utilization_percent,
+        )
+        self._peak_gpu_power_watts = max(
+            self._peak_gpu_power_watts,
+            gpu.peak_power_watts,
+        )
+
+    def _metrics(self, *, started: float, include_gpu: bool) -> PageTechnicalMetrics:
+        gpu = None
+        if include_gpu and self._gpu_sampler is not None:
+            gpu = PageGpuMetrics(
+                peak_vram_bytes=self._peak_vram_bytes,
+                peak_utilization_percent=self._peak_gpu_utilization_percent,
+                peak_power_watts=self._peak_gpu_power_watts,
+            )
+        return PageTechnicalMetrics(
+            duration_seconds=time.perf_counter() - started,
+            peak_ram_bytes=self._peak_ram_bytes,
+            gpu=gpu,
+        )
+
+
 class M004RoutedPageConverter:
     """Exécute exactement la route M-003 sans modifier son choix."""
 
@@ -173,37 +279,50 @@ class M004RoutedPageConverter:
         if requires_granite != isinstance(granite_lease, GraniteSlotLease):
             raise ValueError("GRANITE_SLOT_EXECUTION_VARIANT_INVALID")
         started = time.perf_counter()
+        sampler = _ResourcePeakSampler(
+            ram_sampler=_process_tree_rss,
+            gpu_sampler=_gpu_metrics if requires_granite else None,
+            sample_interval_seconds=0.1,
+        )
         try:
-            if requires_granite:
-                _gpu_metrics()
+            sampler.start()
+        except Exception as error:
+            code = _known_error_code(error)
+            if code is None:
+                raise
+            raise PageConversionFailure(
+                error_code=code,
+                technical_metrics=sampler.metrics_without_gpu(started=started),
+            ) from error
+        conversion_error: BaseException | None = None
+        page_output = None
+        try:
             page_output = self._convert(
                 contract=contract,
                 source_path=source_path,
                 granite_lease=granite_lease,
             )
-            metrics = _technical_metrics(
-                started=started,
-                requires_granite=requires_granite,
-            )
+        except BaseException as error:
+            conversion_error = error
+        sampling_error: Exception | None = None
+        try:
+            metrics = sampler.stop(started=started)
         except Exception as error:
-            code = _known_error_code(error)
+            sampling_error = error
+            metrics = sampler.metrics_without_gpu(started=started)
+        terminal_error = sampling_error or conversion_error
+        if terminal_error is not None:
+            if not isinstance(terminal_error, Exception):
+                raise terminal_error
+            code = _known_error_code(terminal_error)
             if code is None:
-                raise
-            try:
-                failure_metrics = _technical_metrics(
-                    started=started,
-                    requires_granite=requires_granite,
-                )
-            except RuntimeError as metrics_error:
-                metrics_code = _known_error_code(metrics_error)
-                if metrics_code is not PageResultErrorCode.GRANITE_CUDA_UNAVAILABLE:
-                    raise
-                code = metrics_code
-                failure_metrics = _technical_metrics_without_gpu(started=started)
+                raise terminal_error
             raise PageConversionFailure(
                 error_code=code,
-                technical_metrics=failure_metrics,
-            ) from error
+                technical_metrics=metrics,
+            ) from terminal_error
+        if page_output is None:
+            raise RuntimeError("PAGE_CONVERSION_OUTPUT_ABSENT")
         return PageConversionOutput(
             content=_serialize_page_output(page_output),
             tool_name=page_output.tool_name.value,
@@ -230,6 +349,7 @@ class M004RoutedPageConverter:
         request = _conversion_request(
             contract=contract,
             source_artifact_ref=contract.source_artifact.identity.artifact_ref,
+            source_sha256=contract.source_artifact.sha256,
         )
         if contract.route_name is PageRouteName.NATIVE_STANDARD:
             return native.convert_page(request)
@@ -265,6 +385,7 @@ class M004RoutedPageConverter:
             request = _conversion_request(
                 contract=contract,
                 source_artifact_ref=preprocessed.artifact_ref,
+                source_sha256=preprocessed.artifact_hash,
             )
 
         def resolve_granite_source(artifact_ref: str) -> Path:
@@ -305,6 +426,7 @@ def _conversion_request(
     *,
     contract: ConvertPageContract,
     source_artifact_ref: str,
+    source_sha256: str,
 ) -> PageConversionRequest:
     return PageConversionRequest(
         processing_run_id=ProcessingRunId.from_value(contract.processing_run_id),
@@ -315,6 +437,7 @@ def _conversion_request(
             contract.routing_policy_version
         ),
         source_artifact_ref=source_artifact_ref,
+        source_sha256=source_sha256,
         expected_output_artifact_ref=contract.expected_result_artifact.artifact_ref,
     )
 
@@ -340,18 +463,15 @@ def _json_value(value: Any) -> Any:
     return value
 
 
-def _technical_metrics(
-    *,
-    started: float,
-    requires_granite: bool,
-) -> PageTechnicalMetrics:
-    duration = time.perf_counter() - started
-    gpu = _gpu_metrics() if requires_granite else None
-    return PageTechnicalMetrics(
-        duration_seconds=duration,
-        peak_ram_bytes=psutil.Process().memory_info().rss,
-        gpu=gpu,
-    )
+def _process_tree_rss() -> int:
+    process = psutil.Process()
+    rss = process.memory_info().rss
+    for child in process.children(recursive=True):
+        try:
+            rss += child.memory_info().rss
+        except psutil.NoSuchProcess:
+            continue
+    return rss
 
 
 def _gpu_metrics() -> PageGpuMetrics:
@@ -385,14 +505,6 @@ def _gpu_metrics() -> PageGpuMetrics:
         peak_vram_bytes=int(memory_mib * 1024**2),
         peak_utilization_percent=utilization,
         peak_power_watts=power,
-    )
-
-
-def _technical_metrics_without_gpu(*, started: float) -> PageTechnicalMetrics:
-    return PageTechnicalMetrics(
-        duration_seconds=time.perf_counter() - started,
-        peak_ram_bytes=psutil.Process().memory_info().rss,
-        gpu=None,
     )
 
 

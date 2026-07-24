@@ -687,6 +687,7 @@ def _assert_transition_heartbeat(
         route_name=PageRouteName.SCAN_GRANITE,
         routing_policy_version=RoutingPolicyVersion.from_value("routing-cycle3-v1"),
         source_artifact_ref="artifact:source_processing.original/cycle3.pdf",
+        source_sha256="a" * 64,
         expected_output_artifact_ref=(
             "artifact:source_processing.page_conversion/"
             "RUN-M014-CYCLE3/page-001-scan_granite.json"

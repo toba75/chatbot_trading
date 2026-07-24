@@ -99,7 +99,7 @@ chaîne M14-local-pipeline.
 
 ## Déploiement et activation T-005 à T-008
 
-L’ordre est strict : migrer 023 à 029, démarrer les relais, puis les deux
+L’ordre est strict : migrer 023 à 030, démarrer les relais, puis les deux
 `worker-documents` annonçant `CONVERT_PAGE` et
 `ASSEMBLE_CANONICAL_DOCUMENT`, enfin les workers KA annonçant
 `PROJECT_DOCUMENT`. Vérifier l’identité `environment`, `deployment_id` et
@@ -120,6 +120,16 @@ collection Qdrant absente reste `reconciliation_required`. L’opérateur fourni
 ces valeurs exactes via les fonctions de qualification de la migration ; alors
 seulement l’outbox canonique SP ou le message KA redevient `pending` pour son
 rejeu. La phase contract reste différée jusqu'à la preuve de drainage.
+
+La migration 030 ajoute l’index partiel du lookup `CONVERT_PAGE` par
+`processing_run_id` et `page_number`. La conversion réutilise le SHA-256 porté
+par le descripteur vérifié, et l’assemblage lit chaque artefact de page en un
+seul parcours qui calcule simultanément taille, empreinte et contenu. Les pics
+RAM du processus et de ses enfants, ainsi que les pics GPU Granite, sont
+échantillonnés pendant toute la fenêtre de conversion ; une erreur de collecte
+GPU termine explicitement la page. L’encodage et les upserts Qdrant gardent au
+plus le parallélisme configuré en vol, et la vérification Qdrant consomme ses
+résultats page par page.
 
 Chaque replica `worker-documents` relaie d'abord l'outbox SP vers la file
 plateforme et les complétions plateforme vers SP, puis réclame ses jobs. Le

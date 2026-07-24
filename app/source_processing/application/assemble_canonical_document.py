@@ -172,7 +172,6 @@ class CanonicalAssemblyPolicy:
             if descriptor is None:
                 raise DistributionContractError("PAGE_MANIFEST_INCOMPLETE")
             content = artifact_reader.read(descriptor)
-            descriptor.verify_content(content)
             output = _page_output_from_bytes(content)
             if (
                 output.page_number.value != result.page_number

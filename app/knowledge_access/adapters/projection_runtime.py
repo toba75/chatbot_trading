@@ -11,7 +11,7 @@ from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from importlib.metadata import version
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any, Iterable, Mapping, Sequence
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -188,13 +188,12 @@ class QdrantHttpClient:
             raise ProjectionRuntimeError("QDRANT_RESPONSE_INVALID")
         return count
 
-    def scroll(
+    def scroll_pages(
         self,
         *,
         collection_name: str,
         scroll_filter: Mapping[str, Any],
-    ) -> tuple[Mapping[str, Any], ...]:
-        points: list[Mapping[str, Any]] = []
+    ) -> Iterable[tuple[Mapping[str, Any], ...]]:
         offset: Any = None
         while True:
             body: dict[str, Any] = {
@@ -220,9 +219,9 @@ class QdrantHttpClient:
                 not isinstance(point, Mapping) for point in batch
             ):
                 raise ProjectionRuntimeError("QDRANT_RESPONSE_INVALID")
-            points.extend(batch)
+            yield tuple(batch)
             if next_offset is None:
-                return tuple(points)
+                return
             offset = next_offset
 
     def _request(
@@ -655,10 +654,15 @@ class ProjectionRuntimeService:
                 building = projection
             else:
                 building = None
+            canonical_document = self.find_chunking_source_by_version_id(
+                projection.canonical_version_id
+            )
+            if canonical_document is None:
+                raise ProjectionRuntimeError("CANONICAL_SOURCE_NOT_FOUND")
             chunk_projection = ProjectCanonicalChunksHandler(
                 canonical_source_reader=self,
-            ).project_from_canonical_version(
-                ProjectCanonicalChunksCommand(
+            ).project_canonical_document(
+                command=ProjectCanonicalChunksCommand(
                     canonical_version_id=projection.canonical_version_id,
                     chunking_profile=ChunkingProfile(
                         profile_id=LOCAL_PROJECTION_PROFILE.chunking_profile,
@@ -667,7 +671,8 @@ class ProjectionRuntimeService:
                         max_child_items=16,
                         max_child_characters=4000,
                     ),
-                )
+                ),
+                canonical_document=canonical_document,
             )
             if building is not None:
                 self._set_running_progress(
@@ -758,11 +763,6 @@ class ProjectionRuntimeService:
             )
             if publication.published_point_count != len(points):
                 raise ProjectionRuntimeError("INDEX_PARTIAL")
-            canonical_document = self.find_chunking_source_by_version_id(
-                indexing.canonical_version_id
-            )
-            if canonical_document is None:
-                raise ProjectionRuntimeError("CANONICAL_SOURCE_NOT_FOUND")
             self._ensure_bibliographic_metadata(
                 repository=repository,
                 projection=indexing,
@@ -1018,8 +1018,8 @@ class ProjectionRuntimeService:
             )
         chunk_projection = ProjectCanonicalChunksHandler(
             canonical_source_reader=self,
-        ).project_from_canonical_version(
-            ProjectCanonicalChunksCommand(
+        ).project_canonical_document(
+            command=ProjectCanonicalChunksCommand(
                 canonical_version_id=projection.canonical_version_id,
                 chunking_profile=ChunkingProfile(
                     profile_id=LOCAL_PROJECTION_PROFILE.chunking_profile,
@@ -1028,7 +1028,8 @@ class ProjectionRuntimeService:
                     max_child_items=16,
                     max_child_characters=4000,
                 ),
-            )
+            ),
+            canonical_document=canonical_document,
         )
         encoded = ProjectionEncodingHandler(
             dense_encoder=HashingDenseEncoder(),

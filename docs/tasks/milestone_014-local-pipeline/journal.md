@@ -574,3 +574,47 @@ P-001 précondition GREEN
   corrige l'application de la gouvernance existante et le rendu d'un contrat
   public déjà défini, sans nouvelle décision structurante.
 - Commit GREEN : `fix(workflow): reserver gate globale a l orchestrateur`.
+
+## 2026-07-24 - Ressources et lectures bornées du pipeline local
+
+- Précondition ciblée réutilisée : 9/9 tests SP, assemblage, projection et
+  fencing GREEN en 0,35 s. Le sous-agent n’a lancé ni scope complet ni gate
+  globale ; cette dernière reste réservée à l’orchestrateur avec son délai de
+  3 600 000 ms et la reprise du même cell ID après yield.
+- Commit RED `394c95006` —
+  `test(m014-pipeline): mesurer ressources et couts bornes`. Les six échecs
+  distinguent la double lecture d’artefact, le rehachage du PDF, l’absence de
+  pic transitoire, le rehachage d’assemblage, la matérialisation Qdrant et
+  l’absence d’index de complétion.
+- `PageConversionRequest` porte maintenant le SHA-256 déjà prouvé par le
+  descripteur source ou l’artefact OCRmyPDF. Native, Granite et chaque reprise
+  Gemma réutilisent cette même valeur ; aucune cache globale n’est introduite.
+  L’artefact de page est ouvert une seule fois pour produire ensemble contenu,
+  taille et empreinte, puis l’assembleur consomme ce contenu déjà vérifié.
+- La projection soumet au plus `max_parallel_chunks` encodages et
+  `max_parallel_batches` lots Qdrant en vol. Les points Qdrant sont produits
+  par lots paresseux et la vérification exacte dépile les pages de `scroll` en
+  comparant progressivement leurs empreintes. Le résultat de domaine et la
+  requête d’index restent matérialisés selon leurs contrats actuels ; leur
+  streaming intégral nécessiterait une évolution verticale de contrat hors de
+  cette correction bornée.
+- L’artefact canonique est chargé, haché et parsé une seule fois par exécution
+  ou rejeu de projection, puis réutilisé pour le chunking et les métadonnées.
+  Le sampler de conversion couvre toute la fenêtre, additionne le processus
+  worker et ses enfants, agrège les maxima RAM/VRAM/utilisation/puissance et
+  garantit l’arrêt de son thread. Une erreur `nvidia-smi` reste terminale sous
+  `GRANITE_CUDA_UNAVAILABLE`, sans métrique GPU synthétique.
+- La migration 030 crée l’index partiel
+  `source_processing_job_outbox_convert_page_lookup_idx`; le lookup compare le
+  `page_number` JSON en texte, sans cast risqué sur l’historique. Une preuve
+  PostgreSQL réelle charge 20 000 messages, exécute `ANALYZE` puis confirme par
+  `EXPLAIN (FORMAT JSON)` l’utilisation de cet index.
+- Validations GREEN ciblées : nouvelles régressions et voisines 14/14 ; contrats
+  M-004/Granite 6/6 ; projection historique M-005/M-013 4/4 ; migration et
+  clôture 2/2 ; preuve PostgreSQL réelle de l’index 1/1 ; pipeline PostgreSQL et
+  Qdrant réel paginé 1/1 ; Ruff et `compileall` ciblés GREEN. Aucune gate globale
+  n’a été exécutée dans ce lot. ADR consultées : ADR-024, ADR-052 et ADR-053 ;
+  aucune ADR créée, car les changements appliquent les contrats de fencing, de
+  stockage local et d’upgrade déjà acceptés.
+- Commit GREEN : commit portant cette entrée —
+  `fix(m014-pipeline): borner ressources et lectures`.

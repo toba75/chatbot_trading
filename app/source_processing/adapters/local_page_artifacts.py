@@ -80,12 +80,21 @@ class LocalPageArtifactStore:
     def read(self, descriptor: LocalArtifactDescriptor) -> bytes:
         if not isinstance(descriptor, LocalArtifactDescriptor):
             raise ArtifactContractError("ARTIFACT_IDENTITY_INVALID")
-        path = self.resolve_verified_path(descriptor)
-        content = path.read_bytes()
-        if len(content) != descriptor.size_bytes:
+        path = descriptor.identity.resolve_under(self._profile_root)
+        if not path.is_file():
+            raise ArtifactContractError("ARTIFACT_NOT_FOUND")
+        digest = hashlib.sha256()
+        content = bytearray()
+        with path.open("rb") as stream:
+            while chunk := stream.read(1024 * 1024):
+                digest.update(chunk)
+                content.extend(chunk)
+        if (
+            len(content) != descriptor.size_bytes
+            or digest.hexdigest() != descriptor.sha256
+        ):
             raise ArtifactContractError("ARTIFACT_HASH_MISMATCH")
-        descriptor.verify_content(content)
-        return content
+        return bytes(content)
 
     def write_claim_scoped(
         self,

@@ -5,9 +5,9 @@ from __future__ import annotations
 import hashlib
 import json
 import struct
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from uuid import UUID
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from typing import Any, Protocol
 
 from app.knowledge_access.domain.projection_index import (
@@ -30,6 +30,14 @@ class QdrantClientPort(Protocol):
 
     def count(self, *, collection_name: str, count_filter: Mapping[str, Any], exact: bool) -> object:
         """Compte les points d'une génération."""
+
+    def scroll_pages(
+        self,
+        *,
+        collection_name: str,
+        scroll_filter: Mapping[str, Any],
+    ) -> Iterable[Sequence[Mapping[str, Any]]]:
+        """Itère les pages d'une génération sans matérialisation globale."""
 
 
 class QdrantVectorIndex:
@@ -81,7 +89,7 @@ class QdrantVectorIndex:
                 idempotent=True,
             )
 
-        qdrant_points = tuple(
+        qdrant_points = (
             _qdrant_point_for(parsed_request.index_generation, point)
             for point in parsed_request.points
         )
@@ -156,7 +164,7 @@ class QdrantVectorIndex:
                     },
                 )
             )
-        qdrant_points = tuple(
+        qdrant_points = (
             _qdrant_point_for(parsed_request.index_generation, point)
             for point in parsed_request.points
         )
@@ -189,44 +197,50 @@ class QdrantVectorIndex:
         )
 
     def _generation_matches(self, request: VectorIndexPublishRequest) -> bool:
-        scroll = getattr(self._client, "scroll", None)
-        if not callable(scroll):
-            raise ValueError("client Qdrant sans scroll exact")
-        actual = scroll(
+        scroll_pages = getattr(self._client, "scroll_pages", None)
+        if not callable(scroll_pages):
+            raise ValueError("client Qdrant sans pagination exacte")
+        pages = scroll_pages(
             collection_name=request.collection_name,
             scroll_filter=_generation_filter(request.index_generation),
         )
-        expected_points = tuple(
-            _qdrant_point_for(request.index_generation, point)
-            for point in request.points
-        )
         expected = {
             str(point["id"]): _point_fingerprint(point)
-            for point in expected_points
+            for point in (
+                _qdrant_point_for(request.index_generation, item)
+                for item in request.points
+            )
         }
-        parsed_actual: dict[str, str] = {}
-        for point in actual:
-            if not isinstance(point, Mapping) or set(point) < {"id", "vector", "payload"}:
-                return False
-            point_id = str(point["id"])
-            if point_id in parsed_actual:
-                return False
-            parsed_actual[point_id] = _point_fingerprint(point)
-        return parsed_actual == expected
+        for page in pages:
+            for point in page:
+                if not isinstance(point, Mapping) or set(point) < {
+                    "id",
+                    "vector",
+                    "payload",
+                }:
+                    return False
+                point_id = str(point["id"])
+                expected_fingerprint = expected.pop(point_id, None)
+                if (
+                    expected_fingerprint is None
+                    or _point_fingerprint(point) != expected_fingerprint
+                ):
+                    return False
+        return len(expected) == 0
 
     def _upsert_batches(
         self,
         *,
         collection_name: str,
-        qdrant_points: Sequence[Mapping[str, Any]],
+        qdrant_points: Iterable[Mapping[str, Any]],
         batch_size: int,
         max_parallel_batches: int,
         on_batch_published: Callable[[int], None] | None,
         fence_mutation: Callable[[Callable[[], object]], object] | None,
     ) -> None:
-        batches = _point_batches(qdrant_points, batch_size=batch_size)
+        batches = iter(_point_batches(qdrant_points, batch_size=batch_size))
         completed_points = 0
-        if max_parallel_batches == 1 or len(batches) == 1:
+        if max_parallel_batches == 1:
             for batch in batches:
                 self._fenced_upsert(
                     collection_name=collection_name,
@@ -239,23 +253,37 @@ class QdrantVectorIndex:
             return
 
         with ThreadPoolExecutor(
-            max_workers=min(max_parallel_batches, len(batches)),
+            max_workers=max_parallel_batches,
             thread_name_prefix="ka-qdrant-upsert",
         ) as executor:
-            futures = {
-                executor.submit(
+            futures: dict[Future[None], int] = {}
+
+            def submit_next() -> bool:
+                try:
+                    batch = next(batches)
+                except StopIteration:
+                    return False
+                future = executor.submit(
                     self._fenced_upsert,
                     collection_name=collection_name,
                     points=batch,
                     fence_mutation=fence_mutation,
-                ): len(batch)
-                for batch in batches
-            }
-            for future in as_completed(futures):
-                future.result()
-                completed_points += futures[future]
-                if on_batch_published is not None:
-                    on_batch_published(completed_points)
+                )
+                futures[future] = len(batch)
+                return True
+
+            for _ in range(max_parallel_batches):
+                if not submit_next():
+                    break
+            while futures:
+                completed, _ = wait(tuple(futures), return_when=FIRST_COMPLETED)
+                for future in completed:
+                    point_count = futures.pop(future)
+                    future.result()
+                    completed_points += point_count
+                    if on_batch_published is not None:
+                        on_batch_published(completed_points)
+                    submit_next()
 
     def _fenced_upsert(
         self,
@@ -419,14 +447,18 @@ def _ensure_batch_size(value: int | None, *, point_count: int) -> int:
 
 
 def _point_batches(
-    points: Sequence[Mapping[str, Any]],
+    points: Iterable[Mapping[str, Any]],
     *,
     batch_size: int,
-) -> tuple[tuple[Mapping[str, Any], ...], ...]:
-    return tuple(
-        tuple(points[index : index + batch_size])
-        for index in range(0, len(points), batch_size)
-    )
+) -> Iterator[tuple[Mapping[str, Any], ...]]:
+    batch: list[Mapping[str, Any]] = []
+    for point in points:
+        batch.append(point)
+        if len(batch) == batch_size:
+            yield tuple(batch)
+            batch.clear()
+    if batch:
+        yield tuple(batch)
 
 
 def _ensure_point(value: VectorIndexPoint) -> VectorIndexPoint:

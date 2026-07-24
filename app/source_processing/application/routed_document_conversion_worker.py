@@ -253,7 +253,7 @@ class NativePageConverter:
             NativeDoclingConversionRequest(
                 document_id=request.document_id.value,
                 processing_run_id=request.processing_run_id.value,
-                source_sha256=_sha256_file(source_path),
+                source_sha256=request.source_sha256,
                 source_pdf_path=source_path,
                 expected_page_numbers=(request.page_number.value,),
                 routing_policy_version=request.routing_policy_version.value,
@@ -359,7 +359,7 @@ class _RunningGraniteRouteConversion:
             GraniteDoclingConversionRequest(
                 document_id=request.document_id.value,
                 processing_run_id=request.processing_run_id.value,
-                source_sha256=_sha256_file(source_path),
+                source_sha256=request.source_sha256,
                 source_pdf_path=source_path,
                 page_number=request.page_number.value,
                 source_page_number=_source_page_number(request),
@@ -452,7 +452,7 @@ class _RunningGraniteRouteConversion:
         return GemmaVisionConversionRequest(
             document_id=self._request.document_id.value,
             processing_run_id=self._request.processing_run_id.value,
-            source_sha256=_sha256_file(self._source_path),
+            source_sha256=self._request.source_sha256,
             source_pdf_path=self._source_path,
             page_number=self._request.page_number.value,
             source_page_number=_source_page_number(self._request),

@@ -116,12 +116,12 @@ class PostgresPageResultRepository:
                     """
                     SELECT payload, environment, deployment_id, input_hash,
                            configuration_hash, code_version, model_version
-                      FROM source_processing.job_outbox
+                     FROM source_processing.job_outbox
                      WHERE job_name = 'CONVERT_PAGE'
                        AND payload ->> 'processing_run_id' = %s
-                       AND (payload ->> 'page_number')::integer = %s
+                       AND payload ->> 'page_number' = %s
                     """,
-                    (result.processing_run_id, result.page_number),
+                    (result.processing_run_id, str(result.page_number)),
                 )
                 frozen = cursor.fetchone()
                 if frozen is None:
