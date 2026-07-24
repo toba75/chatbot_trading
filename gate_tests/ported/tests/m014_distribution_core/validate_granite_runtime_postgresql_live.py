@@ -440,12 +440,13 @@ def test_runtime_postgresql_workers_terminal_union_et_chemin_chaud() -> None:
                                 claim_generation, claim_token, worker_instance_id,
                                 slot_ordinal, slot_generation, slot_token, payload,
                                 payload_fingerprint, terminal_status, failure_reason,
-                                status, relay_generation
+                                status, relay_generation, trace_id
                             ) VALUES (
                                 'COMPLETE-M014-CYCLE3-NULL-FAILURE',
                                 'test', 'ostrading-test-local', %s, %s, %s, %s::uuid,
                                 %s, %s, %s, %s::uuid, '{}'::jsonb, %s,
-                                'failed', NULL, 'pending', 0
+                                'failed', NULL, 'pending', 0,
+                                'TRACE-M014-CYCLE3-NULL-FAILURE'
                             )
                             """,
                             (
@@ -482,12 +483,13 @@ def test_runtime_postgresql_workers_terminal_union_et_chemin_chaud() -> None:
                                     worker_instance_id, slot_ordinal,
                                     slot_generation, slot_token, payload,
                                     payload_fingerprint, terminal_status,
-                                    failure_reason, status, relay_generation
+                                    failure_reason, status, relay_generation,
+                                    trace_id
                                 ) VALUES (
                                     %s, 'test', 'ostrading-test-local', %s, %s, %s,
                                     %s::uuid, %s, %s, %s, %s::uuid,
                                     '{}'::jsonb, %s, 'succeeded', NULL,
-                                    'pending', 0
+                                    'pending', 0, 'TRACE-M014-CYCLE3-NULL-SLOT'
                                 )
                                 """,
                                 (

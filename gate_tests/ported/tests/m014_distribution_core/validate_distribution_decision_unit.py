@@ -158,5 +158,5 @@ def test_validate_distribution_decision_unit() -> None:
 
     _assert_error(
         "M014_DISTRIBUTION_INDEX_INVALID",
-        index_text=index_text.replace("Prochaine ADR technique: ADR-053", "ADR-052"),
+        index_text=index_text.replace("Prochaine ADR technique: ADR-054", "ADR-053"),
     )

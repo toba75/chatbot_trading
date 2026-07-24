@@ -54,6 +54,7 @@ from app.source_processing.domain.distribution_contracts import (
     PageResultContract,
     PageResultStatus,
     PageTechnicalMetrics,
+    claim_scoped_page_artifact_identity,
 )
 from app.source_processing.domain.document_processing_run import (
     DiagnosticVersion,
@@ -303,19 +304,21 @@ def _page_result(request: JobRequest, store: LocalPageArtifactStore) -> PageResu
     payload = request.payload
     content = _page_bytes(payload["page_number"])
     expected = LocalArtifactIdentity.from_mapping(payload["expected_result_artifact"])
-    claim_identity = LocalArtifactIdentity(
-        environment=expected.environment,
-        artifact_ref=(
-            f"artifact:source_processing.local/{expected.environment}/"
-            f"page-claims/assembly-live/{expected.relative_path}"
-        ),
-        relative_path=f"page-claims/assembly-live/{expected.relative_path}",
+    page = payload["page_number"]
+    execution = PageExecutionIdentity(
+        job_id=f"JOB-M002-{page:06d}",
+        claim_generation=1,
+        claim_token=f"00000000-0000-4000-8000-{page:012d}",
+        worker_instance_id="worker-documents-a",
+    )
+    claim_identity = claim_scoped_page_artifact_identity(
+        expected_identity=expected,
+        execution=execution,
     )
     descriptor = store.write_claim_scoped(
         identity=claim_identity,
         content=content,
     )
-    page = payload["page_number"]
     return PageResultContract(
         contract_version=PAGE_RESULT_CONTRACT_VERSION,
         environment_identity=_identity(),
@@ -325,12 +328,7 @@ def _page_result(request: JobRequest, store: LocalPageArtifactStore) -> PageResu
         route_name=payload["route_name"],
         routing_policy_version=payload["routing_policy_version"],
         request_idempotence_key=payload["idempotence_key"],
-        execution=PageExecutionIdentity(
-            job_id=f"JOB-M002-{page:06d}",
-            claim_generation=1,
-            claim_token=f"00000000-0000-4000-8000-{page:012d}",
-            worker_instance_id="worker-documents-a",
-        ),
+        execution=execution,
         granite_slot_execution=None,
         status=PageResultStatus.SUCCEEDED,
         result_artifact=descriptor,

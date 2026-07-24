@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import replace
-
 import pytest
 
 from app.contracts.technical_jobs import (
@@ -269,6 +267,15 @@ def _fan_out_deterministe_skip_empty_total_et_rejeu_strict() -> None:
 
     plan = repository.plan
     assert plan is not None
+    assert plan.environment_identity == _identity()
+    assert all(
+        request.environment_identity == plan.environment_identity
+        for request in plan.page_jobs
+    )
+    assert all(
+        skipped.result.environment_identity == plan.environment_identity
+        for skipped in plan.skipped_results
+    )
     assert tuple(request.job_name for request in plan.page_jobs) == (
         CONVERT_PAGE_JOB_NAME,
         CONVERT_PAGE_JOB_NAME,
@@ -303,15 +310,19 @@ def _fan_out_deterministe_skip_empty_total_et_rejeu_strict() -> None:
     )
     assert same_hash == plan.page_manifest_sha256
 
-    divergent = replace(
-        plan,
-        locked_assets=_assets(sha256="b" * 64),
-    )
     with pytest.raises(
         DistributionContractError,
         match="PAGE_FAN_OUT_REPLAY_DIVERGENCE",
     ):
-        plan.assert_replay_compatible(divergent)
+        _handler(
+            run,
+            repository,
+            assets=_assets(sha256="b" * 64),
+        ).handle(
+            parent_job=parent,
+            source_artifact=_source_artifact(source),
+            trace_id="TRACE-M014-FANOUT-UNIT",
+        )
 
 
 def _fan_out_refuse_activation_ou_identite_divergente() -> None:

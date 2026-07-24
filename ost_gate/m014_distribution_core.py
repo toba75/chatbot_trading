@@ -482,7 +482,7 @@ def validate_distribution_decision(
     )
     if (
         _normalized_markdown(_ADR_052_INDEX_ROW) not in normalized_index
-        or "Prochaine ADR technique: ADR-053" not in normalized_index
+        or "Prochaine ADR technique: ADR-054" not in normalized_index
     ):
         raise DistributionDecisionError("M014_DISTRIBUTION_INDEX_INVALID")
 

@@ -355,7 +355,7 @@ def test_upgrade_historique_revoque_rejoue_et_exige_les_preuves_operateur() -> N
             )
             runner.run()
             runner.run()
-            assert runner.required_schema_version == 29
+            assert runner.required_schema_version == 30
             assert runner.is_required_schema_ready()
 
             with pytest.raises(JobOutboxLeaseConflictError):
