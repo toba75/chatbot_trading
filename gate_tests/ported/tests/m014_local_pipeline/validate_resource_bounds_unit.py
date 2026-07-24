@@ -33,7 +33,7 @@ from app.source_processing.domain.document_processing_run import (
 from app.source_processing.domain.source_document import DocumentId
 
 
-def test_lecture_artefact_retourne_le_contenu_verifie_sans_second_parcours(
+def test_ressources_et_lectures_du_pipeline_restent_bornees(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
@@ -60,32 +60,27 @@ def test_lecture_artefact_retourne_le_contenu_verifie_sans_second_parcours(
     assert LocalPageArtifactStore(profile_root=tmp_path).read(descriptor) == content
 
 
-class _NativeConverterSpy:
-    def __init__(self) -> None:
-        self.source_sha256: str | None = None
+    class _NativeConverterSpy:
+        def __init__(self) -> None:
+            self.source_sha256: str | None = None
 
-    def convert(self, request):
-        self.source_sha256 = request.source_sha256
-        return NativeDoclingConversionResponse(
-            tool_version="docling-m014-bounds-v1",
-            pages=(
-                NativeDoclingPage(
-                    page_number=1,
-                    items=(
-                        NativeDoclingPageItem(
-                            text="Page bornée.",
-                            bbox=(0.1, 0.1, 0.9, 0.2),
-                            provenance={"page": 1},
+        def convert(self, request):
+            self.source_sha256 = request.source_sha256
+            return NativeDoclingConversionResponse(
+                tool_version="docling-m014-bounds-v1",
+                pages=(
+                    NativeDoclingPage(
+                        page_number=1,
+                        items=(
+                            NativeDoclingPageItem(
+                                text="Page bornée.",
+                                bbox=(0.1, 0.1, 0.9, 0.2),
+                                provenance={"page": 1},
+                            ),
                         ),
                     ),
                 ),
-            ),
-        )
-
-
-def test_conversion_page_reutilise_le_hash_deja_verifie(
-    tmp_path: Path,
-) -> None:
+            )
     source = tmp_path / "source.pdf"
     source.write_bytes(b"%PDF-1.7\npage bornee\n%%EOF\n")
     source_sha256 = hashlib.sha256(source.read_bytes()).hexdigest()
@@ -110,9 +105,6 @@ def test_conversion_page_reutilise_le_hash_deja_verifie(
     ).convert_page(request)
 
     assert converter.source_sha256 == source_sha256
-
-
-def test_echantillonneur_conserve_le_pic_transitoire_et_termine_son_thread() -> None:
     sampler_type = getattr(distributed_page_conversion, "_ResourcePeakSampler")
     samples = iter((100, 400, 150, 150, 150))
     lock = threading.Lock()
@@ -134,9 +126,6 @@ def test_echantillonneur_conserve_le_pic_transitoire_et_termine_son_thread() -> 
     assert metrics.peak_ram_bytes == 400
     assert metrics.peak_ram_bytes > ram_sample()
     assert sampler.is_running is False
-
-
-def test_echantillonneur_propage_erreur_gpu_et_nettoie_son_thread() -> None:
     sampler_type = getattr(distributed_page_conversion, "_ResourcePeakSampler")
     gpu_calls = 0
 
@@ -168,9 +157,6 @@ def test_echantillonneur_propage_erreur_gpu_et_nettoie_son_thread() -> None:
     else:
         raise AssertionError("erreur GPU explicite attendue")
     assert sampler.is_running is False
-
-
-def test_ram_agrege_processus_worker_et_enfants(monkeypatch) -> None:
     class Process:
         def __init__(self, rss: int, children=()) -> None:
             self._rss = rss

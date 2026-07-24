@@ -172,7 +172,9 @@ def _result(page: int, *, status: PageResultStatus = PageResultStatus.SUCCEEDED)
     )
 
 
-def test_politique_assemblage_refuse_incomplet_echec_divergence_et_reordonne() -> None:
+def test_politique_assemblage_refuse_incomplet_echec_divergence_reordonne_et_ne_rehache_pas(
+    monkeypatch,
+) -> None:
     policy = CanonicalAssemblyPolicy()
     contract = _contract()
     # La politique travaille sur les faits SP et ne peut assimiler une absence à SKIP_EMPTY.
@@ -193,9 +195,6 @@ def test_politique_assemblage_refuse_incomplet_echec_divergence_et_reordonne() -
             contract=contract,
             results=(_result(1), _result(1), _result(3)),
         )
-
-
-def test_assemblage_ne_rehache_pas_un_contenu_deja_verifie(monkeypatch) -> None:
     content = _page_bytes(1, "Texte canonique page 1.")
     result = _result(1)
     verifications = 0

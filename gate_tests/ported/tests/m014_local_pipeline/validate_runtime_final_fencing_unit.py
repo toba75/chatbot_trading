@@ -70,7 +70,7 @@ class _SourceProcessingWorker:
         self.failures.append((claimed, error_code))
 
 
-def test_given_claim_sp_expire_when_terminalisation_then_aucune_mutation_sp() -> None:
+def test_fencing_runtime_final_refuse_toute_divergence_et_ecriture_tardive() -> None:
     request, _, _ = _page_jobs()
     claimed = _claimed(request, job_number=141, owner="worker-documents-a")
     worker = _SourceProcessingWorker()
@@ -105,9 +105,6 @@ def test_given_claim_sp_expire_when_terminalisation_then_aucune_mutation_sp() ->
         heartbeat=_Heartbeat(),
     ) == "failed"
     assert worker.failures == [(resumed, "DOCLING_STANDARD_UNAVAILABLE")]
-
-
-def test_given_plan_fan_out_when_un_enfant_diverge_then_persistence_refusee() -> None:
     source = _source()
     run = _planned_run(source)
     repository = _FanOutRepository()
@@ -138,9 +135,6 @@ def test_given_plan_fan_out_when_un_enfant_diverge_then_persistence_refusee() ->
             page_jobs=(divergent, *plan.page_jobs[1:]),
             skipped_results=plan.skipped_results,
         )
-
-
-def test_completion_rejouee_utilise_le_contrat_commun_complet() -> None:
     _, request, _ = _page_jobs()
     claimed = _claimed(request, job_number=142, owner="worker-documents-a")
     lease = _granite_lease(claimed)
@@ -190,9 +184,6 @@ def test_completion_rejouee_utilise_le_contrat_commun_complet() -> None:
     )
 
     assert parsed == expected
-
-
-def test_erreurs_reelles_sont_classees_meme_dans_un_exception_group() -> None:
     for code in (
         "DOCLING_PAGE_MANIFEST_MISMATCH",
         "GRANITE_DOCLING_UNAVAILABLE",
@@ -226,8 +217,5 @@ def test_erreurs_reelles_sont_classees_meme_dans_un_exception_group() -> None:
     assert completion.messages[0].failure_reason == (
         "DOCLING_PAGE_MANIFEST_MISMATCH"
     )
-
-
-def test_convertisseurs_reutilises_exposent_un_contrat_public() -> None:
     assert routed_document_conversion_worker.NativePageConverter is not None
     assert routed_document_conversion_worker.GranitePageConverter is not None
