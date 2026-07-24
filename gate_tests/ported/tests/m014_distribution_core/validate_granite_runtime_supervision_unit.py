@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
+from hashlib import sha256
 import inspect
+import json
+import math
 from pathlib import Path
 import subprocess
 import threading
@@ -34,7 +37,10 @@ from app.platform.job_runtime.granite_capacity import (
     GraniteSlotLeaseLostError,
     GraniteWorker,
     GraniteWorkerState,
+    PostgresGraniteSlotRepository,
+    PostgresGraniteWorkerRegistry,
 )
+from app.platform.job_runtime.relay import RelayedJobMessage
 from app.source_processing.adapters.docling_granite_conversion import (
     GraniteDoclingConversionError,
     GraniteDoclingConversionRequest,
@@ -1032,3 +1038,98 @@ def test_builder_reel_scan_granite_ne_demarre_jamais_avant_un_des_deux_slots(
     )
     assert sum(event.startswith("start:") for event in events) == 3
     assert repository.held == {}
+
+
+def test_enveloppe_terminale_est_json_gelee_et_revalidee() -> None:
+    payload = {"nested": [{"value": 1}], "flags": [True, None]}
+    envelope = GranitePageTerminalEnvelope.from_payload(
+        completion_id="COMPLETE-M014-CYCLE3-FROZEN",
+        status=GranitePageTerminalStatus.SUCCEEDED,
+        payload=payload,
+        failure_reason=None,
+    )
+    payload["nested"][0]["value"] = 2
+    payload["flags"].append(False)
+    assert envelope.payload["nested"][0]["value"] == 1
+    assert envelope.payload["flags"] == (True, None)
+    with pytest.raises(TypeError):
+        envelope.payload["new"] = "forbidden"  # type: ignore[index]
+
+    for invalid, reason in (
+        ({"set": {1}}, "TERMINAL_PAYLOAD_NON_JSON"),
+        ({"nan": math.nan}, "TERMINAL_PAYLOAD_NON_FINITE"),
+    ):
+        with pytest.raises(GraniteCapacityConfigurationError) as captured:
+            GranitePageTerminalEnvelope.from_payload(
+                completion_id="COMPLETE-M014-CYCLE3-INVALID",
+                status=GranitePageTerminalStatus.SUCCEEDED,
+                payload=invalid,
+                failure_reason=None,
+            )
+        assert captured.value.reason == reason
+
+
+def test_relais_none_preserve_hash_m013_et_parametres_runtime_restent_obligatoires() -> (
+    None
+):
+    message = RelayedJobMessage(
+        message_id="OUTBOX-M013-HISTORICAL-0001",
+        environment="test",
+        deployment_id="ostrading-test-local",
+        job_name="DIAGNOSE",
+        priority="P1",
+        input_hash="a" * 64,
+        configuration_hash="b" * 64,
+        code_version="m013-historical",
+        model_version="none",
+        payload={"document_id": "DOC-M013-HISTORICAL"},
+        trace_id="TRACE-M013-HISTORICAL",
+        execution_requirements=None,
+    )
+    historical = {
+        "configuration_hash": message.configuration_hash,
+        "deployment_id": message.deployment_id,
+        "environment": message.environment,
+        "input_hash": message.input_hash,
+        "job_name": message.job_name,
+        "message_id": message.message_id,
+        "model_version": message.model_version,
+        "payload": dict(message.payload),
+        "priority": message.priority,
+        "trace_id": message.trace_id,
+        "code_version": message.code_version,
+    }
+    expected_hash = sha256(
+        json.dumps(
+            historical,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode()
+    ).hexdigest()
+    assert message.content_hash == expected_hash
+    assert (
+        inspect.signature(RelayedJobMessage)
+        .parameters["execution_requirements"]
+        .default
+        is inspect.Parameter.empty
+    )
+    assert (
+        inspect.signature(PostgresGraniteSlotRepository.claim_compatible_job)
+        .parameters["execution_requirements"]
+        .default
+        is inspect.Parameter.empty
+    )
+    assert (
+        inspect.signature(PostgresGraniteWorkerRegistry.register)
+        .parameters["presence_lease_seconds"]
+        .default
+        is inspect.Parameter.empty
+    )
+
+    for adapter in (
+        "app/source_processing/adapters/docling_granite_conversion.py",
+        "app/source_processing/adapters/gemma_vision_conversion.py",
+    ):
+        source = (REPOSITORY_ROOT / adapter).read_text("utf-8")
+        assert "app.platform" not in source

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import fields, replace
 from pathlib import Path
 
 import pytest
@@ -14,7 +15,12 @@ SHA_B = "b" * 64
 
 
 def test_value_objects_et_serialisation_fermee(tmp_path: Path) -> None:
-    from app.contracts.technical_jobs import JobEnvironmentIdentity
+    from app.contracts.technical_jobs import (
+        JobEnvironmentIdentity,
+        JobExecutionRequirements,
+        JobPriority,
+        JobRequest,
+    )
     from app.source_processing.domain.distribution_contracts import (
         CONVERT_PAGE_CONTRACT_VERSION,
         PAGE_RESULT_CONTRACT_VERSION,
@@ -72,6 +78,57 @@ def test_value_objects_et_serialisation_fermee(tmp_path: Path) -> None:
     )
     assert ConvertPageContract.from_mapping(contract.to_mapping()) == contract
     assert json.loads(contract.to_json())["contract_version"] == "1.0"
+
+    requirement_fields = tuple(field.name for field in fields(JobExecutionRequirements))
+    assert requirement_fields == (
+        "contract_name",
+        "contract_version",
+        "capacity_capability",
+        "capacity_slots",
+        "capacity_device",
+        "storage_environment",
+    )
+    request = contract.to_job_request(
+        priority=JobPriority.P1,
+        code_version="m014-cycle3",
+        model_version="docling-2.111.0",
+    )
+    assert ConvertPageContract.from_job_request(request) == contract
+    assert request.execution_requirements == JobExecutionRequirements(
+        contract_name="CONVERT_PAGE",
+        contract_version="1.0",
+        capacity_capability="DOCUMENT_STANDARD",
+        capacity_slots=0,
+        capacity_device=None,
+        storage_environment="test",
+    )
+    assert not hasattr(request.execution_requirements, "route_name")
+    assert not hasattr(request.execution_requirements, "source_artifact_ref")
+    assert not hasattr(request.execution_requirements, "result_artifact_ref")
+
+    for divergent_fields in (
+        {"storage_environment": "development"},
+        {"capacity_capability": "GRANITE_CUDA"},
+        {"capacity_slots": 1, "capacity_device": "cuda:0"},
+        {"capacity_slots": 1, "capacity_device": "cpu"},
+    ):
+        divergent_request = JobRequest(
+            environment=request.environment,
+            deployment_id=request.deployment_id,
+            job_name=request.job_name,
+            priority=request.priority,
+            idempotence_key=request.idempotence_key,
+            execution_requirements=replace(
+                request.execution_requirements,
+                **divergent_fields,
+            ),
+            payload=request.payload,
+        )
+        with pytest.raises(
+            DistributionContractError,
+            match="JOB_EXECUTION_REQUIREMENTS_MISMATCH",
+        ):
+            ConvertPageContract.from_job_request(divergent_request)
 
     mutations = (
         (

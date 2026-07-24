@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 import importlib.util
 from pathlib import Path
@@ -84,13 +85,19 @@ def test_runtime_postgresql_workers_terminal_union_et_chemin_chaud() -> None:
     )
     from app.platform.job_runtime import JobCatalog
     from app.platform.job_runtime.granite_capacity import (
+        GranitePageCompletionConflictError,
         GranitePageTerminalEnvelope,
         GranitePageTerminalStatus,
         GraniteSlotLeaseLostError,
         PostgresGraniteSlotRepository,
         PostgresGraniteWorkerRegistry,
     )
-    from app.platform.job_runtime.postgres import PostgresJobQueue
+    from app.platform.job_runtime.postgres import (
+        JobRelayMessageConflictError,
+        JobSubmissionConflictError,
+        PostgresJobQueue,
+    )
+    from app.platform.job_runtime.relay import RelayedJobMessage
     from app.platform.postgres_migrations import PostgresMigrationRunner
     from app.platform.request_context import bind_trace_id, reset_trace_id
 
@@ -189,8 +196,7 @@ def test_runtime_postgresql_workers_terminal_union_et_chemin_chaud() -> None:
                     """
                     SELECT execution_contract_name, execution_contract_version,
                            capacity_capability, capacity_slots, capacity_device,
-                           storage_environment, source_artifact_ref,
-                           result_artifact_ref, execution_route_name
+                           storage_environment
                       FROM platform.technical_jobs
                      WHERE job_id = %s
                     """,
@@ -203,9 +209,56 @@ def test_runtime_postgresql_workers_terminal_union_et_chemin_chaud() -> None:
                     1,
                     "cuda:0",
                     "test",
-                    "artifact:source_processing.local/test/documents/source-1.pdf",
-                    "artifact:source_processing.local/test/results/page-1.json",
-                    "SCAN_GRANITE",
+                )
+
+            with pytest.raises(
+                JobSubmissionConflictError, match="JOB_SUBMISSION_CONFLICT"
+            ):
+                queue.submit(
+                    replace(
+                        jobs[0].request,
+                        payload=dict(jobs[0].request.payload) | {"page_number": 999},
+                    ),
+                    recalculate=False,
+                )
+            with factory.connect() as connection:
+                with pytest.raises(psycopg.errors.CheckViolation):
+                    with connection.transaction(), connection.cursor() as cursor:
+                        cursor.execute(
+                            """
+                            INSERT INTO platform.technical_jobs (
+                                environment, deployment_id, job_name, priority,
+                                input_hash, configuration_hash, code_version,
+                                model_version, execution_contract_name,
+                                execution_contract_version, payload, trace_id,
+                                status, recalculation_number
+                            ) VALUES (
+                                'test', 'ostrading-test-local', 'CONVERT_PAGE', 'P1',
+                                %s, %s, 'm014-cycle3-null', 'granite-locked',
+                                'CONVERT_PAGE', '1.0', '{}'::jsonb,
+                                'TRACE-M014-CYCLE3-NULL', 'pending', 0
+                            )
+                            """,
+                            ("9" * 64, "a" * 64),
+                        )
+            assert jobs[2].request.execution_requirements is not None
+            divergent_relay_request = replace(
+                jobs[2].request,
+                execution_requirements=replace(
+                    jobs[2].request.execution_requirements,
+                    capacity_device="cuda:1",
+                ),
+            )
+            with pytest.raises(
+                JobRelayMessageConflictError,
+                match="JOB_RELAY_MESSAGE_CONFLICT",
+            ):
+                queue.consume_relay_message(
+                    RelayedJobMessage.from_job_request(
+                        message_id="OUTBOX-M014-CYCLE3-DIVERGENT",
+                        request=divergent_relay_request,
+                        trace_id="TRACE-M014-RUNTIME-3",
+                    )
                 )
 
             registry = PostgresGraniteWorkerRegistry(
@@ -216,7 +269,11 @@ def test_runtime_postgresql_workers_terminal_union_et_chemin_chaud() -> None:
                 _worker(environment_identity, ordinal) for ordinal in (1, 2, 3)
             )
             for worker in workers:
-                registry.register(worker)
+                registry.register(worker, presence_lease_seconds=10)
+            presence_until = registry.heartbeat_presence(
+                workers[2], presence_lease_seconds=10
+            )
+            assert presence_until > datetime.now(timezone.utc)
             quota = PostgresGraniteSlotRepository(
                 connection_factory=factory,
                 catalog=catalog,
@@ -231,12 +288,18 @@ def test_runtime_postgresql_workers_terminal_union_et_chemin_chaud() -> None:
                             worker=workers[0],
                             lease_seconds=30,
                             job_names=("CONVERT_PAGE",),
+                            execution_requirements=jobs[
+                                0
+                            ].request.execution_requirements,
                         ),
                         executor.submit(
                             quota.claim_compatible_job,
                             worker=workers[1],
                             lease_seconds=30,
                             job_names=("CONVERT_PAGE",),
+                            execution_requirements=jobs[
+                                1
+                            ].request.execution_requirements,
                         ),
                     )
                 )
@@ -246,6 +309,7 @@ def test_runtime_postgresql_workers_terminal_union_et_chemin_chaud() -> None:
                     worker=workers[2],
                     lease_seconds=30,
                     job_names=("CONVERT_PAGE",),
+                    execution_requirements=jobs[2].request.execution_requirements,
                 )
                 is None
             )
@@ -262,6 +326,24 @@ def test_runtime_postgresql_workers_terminal_union_et_chemin_chaud() -> None:
             )
             completed_job = quota.complete_page_execution(lease_2, terminal)
             assert completed_job.status is JobStatus.SUCCEEDED
+            replayed_job = quota.complete_page_execution(lease_2, terminal)
+            assert replayed_job == completed_job
+            with pytest.raises(
+                GranitePageCompletionConflictError,
+                match="GRANITE_PAGE_COMPLETION_CONFLICT",
+            ):
+                quota.complete_page_execution(
+                    lease_2,
+                    GranitePageTerminalEnvelope.from_payload(
+                        completion_id=terminal.completion_id,
+                        status=GranitePageTerminalStatus.SUCCEEDED,
+                        payload={
+                            "contract_version": "1.0",
+                            "status": "DIVERGENT",
+                        },
+                        failure_reason=None,
+                    ),
+                )
             with factory.connect() as connection, connection.cursor() as cursor:
                 cursor.execute(
                     """
@@ -283,17 +365,112 @@ def test_runtime_postgresql_workers_terminal_union_et_chemin_chaud() -> None:
                     "succeeded",
                     None,
                 )
+            with factory.connect() as connection:
+                with pytest.raises(psycopg.errors.CheckViolation):
+                    with connection.transaction(), connection.cursor() as cursor:
+                        cursor.execute(
+                            """
+                            INSERT INTO platform.page_completion_outbox (
+                                completion_id, environment, deployment_id, job_id,
+                                claim_generation, claim_token, worker_instance_id,
+                                slot_ordinal, slot_generation, slot_token, payload,
+                                payload_fingerprint, terminal_status, failure_reason,
+                                status, relay_generation
+                            ) VALUES (
+                                'COMPLETE-M014-CYCLE3-NULL-FAILURE',
+                                'test', 'ostrading-test-local', %s, %s, %s::uuid,
+                                %s, %s, %s, %s::uuid, '{}'::jsonb, %s,
+                                'failed', NULL, 'pending', 0
+                            )
+                            """,
+                            (
+                                lease_2.claimed_job.job.job_id,
+                                lease_2.claimed_job.claim_generation,
+                                lease_2.claimed_job.claim_token,
+                                lease_2.claimed_job.lease_owner,
+                                lease_2.slot_ordinal,
+                                lease_2.slot_generation,
+                                lease_2.slot_token,
+                                "8" * 64,
+                            ),
+                        )
+                for missing_field in (
+                    "slot_ordinal",
+                    "slot_generation",
+                    "slot_token",
+                ):
+                    slot_values = {
+                        "slot_ordinal": lease_2.slot_ordinal,
+                        "slot_generation": lease_2.slot_generation,
+                        "slot_token": lease_2.slot_token,
+                    }
+                    slot_values[missing_field] = None
+                    with pytest.raises(psycopg.errors.CheckViolation):
+                        with connection.transaction(), connection.cursor() as cursor:
+                            cursor.execute(
+                                """
+                                INSERT INTO platform.page_completion_outbox (
+                                    completion_id, environment, deployment_id,
+                                    job_id, claim_generation, claim_token,
+                                    worker_instance_id, slot_ordinal,
+                                    slot_generation, slot_token, payload,
+                                    payload_fingerprint, terminal_status,
+                                    failure_reason, status, relay_generation
+                                ) VALUES (
+                                    %s, 'test', 'ostrading-test-local', %s, %s,
+                                    %s::uuid, %s, %s, %s, %s::uuid,
+                                    '{}'::jsonb, %s, 'succeeded', NULL,
+                                    'pending', 0
+                                )
+                                """,
+                                (
+                                    f"COMPLETE-M014-CYCLE3-NULL-{missing_field}",
+                                    lease_2.claimed_job.job.job_id,
+                                    lease_2.claimed_job.claim_generation,
+                                    lease_2.claimed_job.claim_token,
+                                    lease_2.claimed_job.lease_owner,
+                                    slot_values["slot_ordinal"],
+                                    slot_values["slot_generation"],
+                                    slot_values["slot_token"],
+                                    "6" * 64,
+                                ),
+                            )
 
             drain_deadline = datetime.now(timezone.utc) + timedelta(seconds=5)
             registry.begin_draining(
                 worker_instance_id=workers[0].worker_instance_id,
                 drain_deadline=drain_deadline,
             )
+            with factory.connect() as connection, connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT worker.drain_deadline, job.lease_expires_at,
+                           slot.lease_until
+                      FROM platform.document_workers AS worker
+                      JOIN platform.technical_jobs AS job
+                        ON job.environment = worker.environment
+                       AND job.deployment_id = worker.deployment_id
+                       AND job.lease_owner = worker.worker_instance_id
+                      JOIN platform.granite_slots AS slot
+                        ON slot.environment = worker.environment
+                       AND slot.deployment_id = worker.deployment_id
+                       AND slot.lease_owner = worker.worker_instance_id
+                     WHERE worker.worker_instance_id = %s
+                    """,
+                    (workers[0].worker_instance_id,),
+                )
+                bounded_deadlines = cursor.fetchone()
+            assert bounded_deadlines == (
+                drain_deadline,
+                drain_deadline,
+                drain_deadline,
+            )
             assert (
                 quota.claim_compatible_job(
                     worker=workers[0],
                     lease_seconds=30,
                     job_names=("CONVERT_PAGE",),
+                    execution_requirements=jobs[0].request.execution_requirements,
                 )
                 is None
             )
@@ -333,8 +510,36 @@ def test_runtime_postgresql_workers_terminal_union_et_chemin_chaud() -> None:
                     ),
                 )
 
+            with (
+                factory.connect() as connection,
+                connection.transaction(),
+                connection.cursor() as cursor,
+            ):
+                cursor.execute(
+                    """
+                    UPDATE platform.document_workers
+                       SET presence_lease_until = CURRENT_TIMESTAMP - INTERVAL '1 second'
+                     WHERE worker_instance_id = %s
+                    """,
+                    (workers[2].worker_instance_id,),
+                )
+            assert (
+                quota.claim_compatible_job(
+                    worker=workers[2],
+                    lease_seconds=30,
+                    job_names=("CONVERT_PAGE",),
+                    execution_requirements=jobs[2].request.execution_requirements,
+                )
+                is None
+            )
+
             _assert_page_result_discriminated_union(factory)
-            _assert_granite_claim_index(factory)
+            _assert_granite_claim_index(
+                factory,
+                quota=quota,
+                worker=workers[1],
+                requirements=jobs[2].request.execution_requirements,
+            )
     finally:
         _docker("rm", "--force", container)
 
@@ -442,8 +647,56 @@ def _assert_page_result_discriminated_union(factory: PsycopgConnectionFactory) -
                         ),
                     )
 
+        for missing_field in (
+            "slot_ordinal",
+            "slot_generation",
+            "slot_token",
+        ):
+            slot_values = {
+                "slot_ordinal": 1,
+                "slot_generation": 1,
+                "slot_token": str(uuid4()),
+            }
+            slot_values[missing_field] = None
+            with pytest.raises(psycopg.errors.CheckViolation):
+                with connection.transaction(), connection.cursor() as rejected:
+                    rejected.execute(
+                        """
+                        INSERT INTO source_processing.page_execution_results (
+                            processing_run_id, page_number, completion_id, job_id,
+                            claim_generation, claim_token, worker_instance_id,
+                            slot_ordinal, slot_generation, slot_token,
+                            result_contract_version, route_name, result_status,
+                            result_payload, result_fingerprint
+                        ) VALUES (
+                            'RUN-M014-UNION', 2, %s, 'JOB-M002-888888',
+                            1, %s::uuid, 'worker-documents-1', %s, %s, %s::uuid,
+                            '1.0', 'SCAN_GRANITE', 'SUCCEEDED', '{}'::jsonb, %s
+                        )
+                        """,
+                        (
+                            f"COMPLETE-GRANITE-NULL-{missing_field}",
+                            str(uuid4()),
+                            slot_values["slot_ordinal"],
+                            slot_values["slot_generation"],
+                            slot_values["slot_token"],
+                            "7" * 64,
+                        ),
+                    )
 
-def _assert_granite_claim_index(factory: PsycopgConnectionFactory) -> None:
+
+def _assert_granite_claim_index(
+    factory: PsycopgConnectionFactory,
+    *,
+    quota,
+    worker,
+    requirements,
+) -> None:
+    from app.platform.job_runtime.granite_capacity import (
+        _CLAIM_COMPATIBLE_JOB_SQL,
+        _claim_compatible_job_parameters,
+    )
+
     with (
         factory.connect() as connection,
         connection.transaction(),
@@ -453,36 +706,36 @@ def _assert_granite_claim_index(factory: PsycopgConnectionFactory) -> None:
             """
             INSERT INTO platform.technical_jobs (
                 environment, deployment_id, job_name, priority, input_hash,
-                configuration_hash, code_version, model_version, payload,
-                trace_id, status, recalculation_number
+                configuration_hash, code_version, model_version,
+                execution_contract_name, execution_contract_version,
+                capacity_capability, capacity_slots, capacity_device,
+                storage_environment, payload, trace_id, status,
+                recalculation_number
             )
-            SELECT 'test', 'ostrading-test-local', 'DIAGNOSE', 'P5',
-                   repeat(md5(item::text), 2), %s, 'm014-mixed', 'none',
-                   '{}'::jsonb, 'TRACE-MIXED-' || item, 'pending', 0
+            SELECT 'test', 'ostrading-test-local', 'CONVERT_PAGE',
+                   CASE WHEN item %% 2 = 0 THEN 'P1' ELSE 'P5' END,
+                   repeat(md5(('cycle3-' || item)::text), 2), %s,
+                   'm014-mixed', 'granite-locked', 'CONVERT_PAGE', '1.0',
+                   CASE WHEN item %% 3 = 0
+                        THEN 'DOCUMENT_STANDARD' ELSE 'GRANITE_CUDA' END,
+                   CASE WHEN item %% 3 = 0 THEN 0 ELSE 1 END,
+                   CASE WHEN item %% 3 = 0 THEN NULL ELSE 'cuda:0' END,
+                   'test', '{}'::jsonb, 'TRACE-MIXED-' || item, 'pending', 0
               FROM generate_series(1, 5000) AS item
             """,
             ("a" * 64,),
         )
         cursor.execute("ANALYZE platform.technical_jobs", ())
+        parameters = _claim_compatible_job_parameters(
+            environment_identity=quota._environment_identity,
+            worker=worker,
+            lease_seconds=30,
+            job_names=("CONVERT_PAGE",),
+            execution_requirements=requirements,
+        )
         cursor.execute(
-            """
-            EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)
-            SELECT sequence
-              FROM platform.technical_jobs
-             WHERE environment = 'test'
-               AND deployment_id = 'ostrading-test-local'
-               AND configuration_hash = %s
-               AND execution_contract_name = 'CONVERT_PAGE'
-               AND execution_contract_version = '1.0'
-               AND capacity_capability = 'GRANITE_CUDA'
-               AND capacity_slots = 1
-               AND capacity_device = 'cuda:0'
-               AND storage_environment = 'test'
-               AND status = 'pending'
-             ORDER BY priority, sequence
-             LIMIT 1
-            """,
-            ("a" * 64,),
+            "EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) " + _CLAIM_COMPATIBLE_JOB_SQL,
+            parameters,
         )
         plan = cursor.fetchone()[0][0]["Plan"]
         nodes = tuple(_plan_nodes(plan))
@@ -495,3 +748,9 @@ def _assert_granite_claim_index(factory: PsycopgConnectionFactory) -> None:
             and node.get("Relation Name") == "technical_jobs"
             for node in nodes
         )
+        candidate_limits = tuple(
+            node
+            for node in nodes
+            if node.get("Node Type") == "Limit" and node.get("Actual Rows") == 1
+        )
+        assert candidate_limits
