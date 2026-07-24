@@ -21,14 +21,27 @@ bloquer ces données durables. Un DML direct entre `source_processing` et
   ou un rejeu explicite, puis une phase **contract** séparée.
 - Chaque backfill **DOIT** dériver la version historique d’une preuve durable
   propre au contexte propriétaire ; l’absence de preuve **NE DOIT PAS** être
-  transformée en valeur par défaut.
+  transformée en valeur par défaut. Elle **DOIT** produire un état
+  `reconciliation_required` qualifiable par une entrée opérateur explicite.
 - Un message `relaying` réécrit **DOIT** repasser `pending`, perdre son owner,
   son échéance et son token, et incrémenter sa génération avant tout nouveau
   claim. Un ancien relais **NE DOIT PAS** pouvoir acquitter le message réécrit.
 - Une publication canonique historique **DOIT** être reconstruite dans une
-  transaction SP sous forme d’outbox publique ; KA la consomme ensuite dans sa
-  propre transaction idempotente. Une migration **NE DOIT PAS** écrire dans SP
-  et KA au sein du même DML de réconciliation.
+  transaction SP sous forme d’outbox publique seulement après qualification de
+  sa politique qualité et de l’identité consommatrice active ; KA la consomme
+  ensuite dans sa propre transaction idempotente. Une migration **NE DOIT
+  PAS** écrire dans SP et KA au sein du même DML de réconciliation.
+- L’identité productrice historique **DOIT** rester une preuve d’audit séparée
+  de l’identité/configuration active choisie pour le consommateur. Le nom de
+  collection Qdrant **DOIT** être fourni exactement ; il n’est jamais déduit
+  d’une convention de nommage. Si cette identité d’audit n’est pas prouvée,
+  l’opérateur la fournit séparément et toute divergence avec une preuve
+  existante est refusée.
+- Un job `running` dont le contrat change **DOIT** repasser `pending` et perdre
+  lease et token sans incrémenter isolément `claim_generation` : l’égalité avec
+  `execution_attempts` est préservée jusqu’au prochain vrai claim. Le binding
+  `source_message_id`/`source_message_hash` est soit détaché puis recréé par le
+  relais, soit remplacé atomiquement par ce relais pour le même message.
 - Une projection historique doit disposer d’un chemin de reconstruction vers
   `SEARCHABLE` sous l’identité locale explicite. La coexistence avec un ancien
   worker est bornée par drainage vérifié avant la phase contract.
@@ -59,7 +72,8 @@ bloquer ces données durables. Un DML direct entre `source_processing` et
 ### Risques et contrôles
 
 - Risque de double relais : révocation atomique de tout claim réécrit.
-- Risque de données sans preuve : échec stable et visible, jamais de défaut.
+- Risque de données sans preuve : `reconciliation_required` visible et
+  qualification opérateur contrôlée, jamais de défaut.
 - Risque de projection incomplète : reconstruction idempotente et vérification
   exacte de la génération Qdrant avant `SEARCHABLE`.
 
@@ -71,8 +85,10 @@ bloquer ces données durables. Un DML direct entre `source_processing` et
   lecture et durcissement du relais sans DML croisant SP et KA.
 - Migration 028 : coexistence bornée des writers M-004/M-014, correction des
   contrats d'assemblage en attente et révocation des claims de relais réécrits.
-- Migration 029 : phase expand des contrats historiques, reconstruction des
-  outbox canoniques SP et remise en rejeu des projections qualifiées.
+- Migration 029 : phase expand des contrats historiques, files de
+  réconciliation SP/KA, fonctions de qualification opérateur et remise en rejeu
+  seulement après fourniture de l’identité active, de la politique qualité et
+  du nom Qdrant manquants.
 - Configuration concernée : identité locale explicite seulement.
 - Tests attendus : upgrade PostgreSQL réel, anciens jobs relayés, rejeu des
   publications/projections, fencing des claims et Qdrant exact.
@@ -83,9 +99,11 @@ bloquer ces données durables. Un DML direct entre `source_processing` et
 - Spécification : `docs/specs/m014_local_pipeline_documentaire_distribue.md`.
 - Plan d'implémentation : `docs/tasks/milestone_014-local-pipeline/`.
 - Tests d'acceptation :
-  `gate_tests/ported/tests/m014_local_pipeline/validate_runtime_migration_final_regressions_unit.py`.
-- Commits : RED `c8b529f67` et GREEN `6b160e799` du lot « reprise et
-  compatibilité finale ».
+  `gate_tests/ported/tests/m014_local_pipeline/validate_runtime_migration_final_regressions_unit.py`
+  et preuve PostgreSQL réelle
+  `gate_tests/ported/tests/m014_local_pipeline/validate_historical_upgrade_postgresql_live.py`.
+- Commit RED de durcissement : `67e1c2dbf` ; commit GREEN : commit portant la
+  présente correction.
 
 ## Notes
 

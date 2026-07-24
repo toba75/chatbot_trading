@@ -13,7 +13,11 @@ ALTER TABLE source_processing.canonical_source_versions
             AND canonical_result_fingerprint IS NULL
         )
         OR (
-            canonical_assembly_id ~ '^[0-9a-f]{64}$'
+            canonical_assembly_id IS NOT NULL
+            AND page_count IS NOT NULL
+            AND quality_policy_version IS NOT NULL
+            AND canonical_result_fingerprint IS NOT NULL
+            AND canonical_assembly_id ~ '^[0-9a-f]{64}$'
             AND page_count > 0
             AND btrim(quality_policy_version) <> ''
             AND quality_policy_version = btrim(quality_policy_version)

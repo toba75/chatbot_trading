@@ -44,7 +44,11 @@ ALTER TABLE knowledge_access.knowledge_projections
             AND qdrant_collection_name IS NULL
         )
         OR (
-            environment IN ('development', 'test', 'production')
+            environment IS NOT NULL
+            AND deployment_id IS NOT NULL
+            AND configuration_hash IS NOT NULL
+            AND qdrant_collection_name IS NOT NULL
+            AND environment IN ('development', 'test', 'production')
             AND deployment_id ~ '^[a-z0-9]+(-[a-z0-9]+)*$'
             AND configuration_hash ~ '^[0-9a-f]{64}$'
             AND btrim(qdrant_collection_name) <> ''

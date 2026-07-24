@@ -516,3 +516,27 @@ P-001 précondition GREEN
 - Commit RED du présent lot : `dc3ed1df2` —
   `test(m014-pipeline): couvrir cloture finale de revue`. Commit GREEN : commit
   portant cette entrée. Aucune gate globale n'est exécutée par ce sous-agent.
+
+## 2026-07-24 - Upgrade historique strict pré-028/029
+
+- Commit RED `67e1c2dbf` — `test(m014-pipeline): prouver upgrade historique
+  strict`. La preuve PostgreSQL réelle reproduit l’ancien défaut : après reprise
+  d’un job `running`, `claim_generation=2` alors que `execution_attempts=1`.
+- Les migrations 028/029 révoquent désormais les leases touchées sans créer de
+  tentative worker fictive. Un payload réécrit perd son ancien binding source,
+  puis le relais réattache exactement le nouveau hash ; un ancien ACK est
+  refusé et la redélivrance réutilise le même job.
+- Aucun DML de réconciliation ne traverse SP, KA et `platform`. L’identité du
+  producteur historique reste une preuve d’audit ; l’identité/configuration du
+  consommateur actif, la politique qualité et la collection Qdrant exacte sont
+  des entrées opérateur distinctes. Toute valeur absente reste
+  `reconciliation_required`, sans synthèse.
+- Les contraintes 024/025 refusent désormais les groupes partiels : leurs
+  champs sont soit tous nuls, soit tous non nuls et valides.
+- Preuve ciblée :
+  `validate_historical_upgrade_postgresql_live.py` GREEN 1/1 après correction ;
+  elle part d’un état réellement pré-028/029, applique les migrations 028/029
+  avec le runner, vérifie fencing, rejeu exact, absence de publication
+  synthétique et `CHECK` PostgreSQL. Aucune gate globale, aucun scope M13/M14
+  complet n’est exécuté dans ce lot.
+- Commit GREEN : `fix(m014-pipeline): fiabiliser migrations historiques`.

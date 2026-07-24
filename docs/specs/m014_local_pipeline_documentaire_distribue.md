@@ -8,9 +8,10 @@
 - Domaine : traitement des sources documentaires et accès aux connaissances.
 - Bounded contexts : Source Processing (SP), `platform` et Knowledge Access (KA).
 - Source : `docs/specs/plan_distribution.md`, T-005 à T-008.
-- ADR applicables : ADR-024, ADR-025, ADR-052 et DDD-ADR-008.
+- ADR applicables : ADR-024, ADR-025, ADR-051, ADR-052, ADR-053 et DDD-ADR-008.
 - Contrats amont : M-004, M-005, M13-environments et M14-distribution-core.
-- ADR nouvelle : non requise ; ce contrat applique les décisions existantes sans en changer le sens.
+- Décision de migration : ADR-053 gouverne l’upgrade historique strict ; elle
+  complète ADR-051/ADR-052 sans modifier leur exigence CUDA et sans fallback.
 
 Cette spécification décrit le code de production livré par T-005 à T-008 et
 ses preuves unitaires, d’acceptation et live. Le pipeline est sélectionné
@@ -265,23 +266,29 @@ les publications par l’outbox du contexte propriétaire.
 ### DIST-006 - Upgrade d’un pipeline local historique
 
 - **Given** des jobs M-004/M-005, des versions canoniques publiées avant M-014
-  et des projections historiques sous une identité locale durable ;
+  et des projections historiques dont certaines données opérationnelles ne
+  sont pas prouvées ;
 - **When** les migrations M-014 finales sont appliquées pendant la phase
   d’expansion et que les relais/workers courants reprennent le travail ;
-- **Then** les contrats historiques sont enrichis depuis leurs preuves
-  durables, les anciens claims sont révoqués, les publications traversent les
-  outbox locales et les projections convergent de nouveau vers `SEARCHABLE`
-  sans DML transactionnel croisant SP et KA.
+- **Then** les contrats prouvés sont enrichis localement, les anciens claims
+  sont révoqués et les données incomplètes restent `reconciliation_required` ;
+  après saisie explicite de la politique qualité, de l’identité consommatrice
+  active et du nom Qdrant exact, les outbox locales rejouent vers `SEARCHABLE`
+  sans DML transactionnel croisant SP, KA et `platform`.
 
 Le pipeline livré applique les migrations 023 à 029 après le socle 022 : fan-out
 et version d’orchestration (023), publication canonique (024), projection KA
 (025), identité complète des complétions (026), durcissement du relais et des
 rejeux (027), puis coexistence bornée M004/M014 et correction de l’attente
-d’artefact canonique (028). La migration 029 réalise la phase expand : elle
-qualifie les anciens contrats depuis leurs preuves propriétaires, révoque leurs
-claims, reconstruit les publications historiques dans l'outbox SP et remet les
-projections qualifiées sur un chemin de rejeu. Leur simple déploiement n’active
-jamais le fan-out ; la phase contract attend une preuve de drainage distincte.
+d’artefact canonique (028). La migration 029 réalise la phase expand : chaque
+contexte révoque ses claims et qualifie seulement ses preuves propres. Les
+politiques qualité, identités/configurations actives et collections Qdrant
+absentes ne sont jamais synthétisées : elles attendent une qualification
+opérateur dans les registres de réconciliation SP/KA. Une identité productrice
+d’audit absente est saisie séparément de l’identité consommatrice active et ne
+peut contredire une preuve durable existante. Cette qualification
+produit ensuite les outbox rejouables. Le simple déploiement n’active jamais le
+fan-out ; la phase contract attend une preuve de drainage distincte.
 
 Le discriminateur fermé du job parent est `orchestration_version`. La valeur
 `m004-inline-v1` conserve le parcours documentaire antérieur et la valeur
@@ -322,6 +329,7 @@ Ces exclusions séquencent la livraison ; elles n’autorisent aucun mock, stub,
 
 ```console
 uv run --locked pytest -q gate_tests/ported/tests/m014_local_pipeline/validate_local_pipeline_specification_acceptance.py gate_tests/ported/tests/m014_local_pipeline/validate_local_pipeline_specification_unit.py
+uv run --locked pytest -q gate_tests/ported/tests/m014_local_pipeline/validate_historical_upgrade_postgresql_live.py
 uv run --locked gate --scope governance
 uv run --locked gate --scope m014_local_pipeline
 ```

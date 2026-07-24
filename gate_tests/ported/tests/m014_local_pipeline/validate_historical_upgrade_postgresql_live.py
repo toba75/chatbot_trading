@@ -77,7 +77,11 @@ def test_upgrade_historique_revoque_rejoue_et_exige_les_preuves_operateur() -> N
     from app.platform.datastore_identity import DatastoreIdentity, PostgresIdentityPreflight
     from app.platform.job_runtime import JobCatalog
     from app.platform.job_runtime.postgres import PostgresJobQueue
-    from app.platform.job_runtime.relay import JobOutboxRelay
+    from app.platform.job_runtime.relay import (
+        ClaimedRelayMessage,
+        JobOutboxRelay,
+        RelayedJobMessage,
+    )
     from app.platform.postgres import PsycopgConnectionFactory
     from app.platform.postgres_migrations import PostgresMigrationRunner
     from app.source_processing.adapters.postgres_job_outbox import (
@@ -139,6 +143,7 @@ def test_upgrade_historique_revoque_rejoue_et_exige_les_preuves_operateur() -> N
                 adopt_legacy_if_unidentified=False,
             ).run()
 
+            historical_ka_claim_token = str(uuid4())
             with factory.connect() as connection, connection.transaction(), connection.cursor() as cursor:
                 cursor.execute(
                     """
@@ -194,7 +199,9 @@ def test_upgrade_historique_revoque_rejoue_et_exige_les_preuves_operateur() -> N
                     ) VALUES (
                         'CVER-M014-HISTORICAL-UPGRADE', 'CSRC-M014-HISTORICAL-UPGRADE',
                         'DOC-M014-HISTORICAL-UPGRADE',
-                        'artifact:source_processing.canonical_sources/historical/docling.json',
+                        'artifact:source_processing.canonical_sources/'
+                        'CSRC-M014-HISTORICAL-UPGRADE/'
+                        'CVER-M014-HISTORICAL-UPGRADE/docling.json',
                         %s, 'NATIVE_STANDARD', 'docling-m004-v1',
                         '2026-07-24T10:00:00Z'::timestamptz
                     )
@@ -219,6 +226,101 @@ def test_upgrade_historique_revoque_rejoue_et_exige_les_preuves_operateur() -> N
                     """,
                     ("d" * 64,),
                 )
+                cursor.execute(
+                    """
+                    INSERT INTO knowledge_access.canonical_publication_inbox (
+                        event_id, event_fingerprint, canonical_version_id,
+                        document_id, canonical_artifact_ref,
+                        canonical_artifact_sha256, environment, deployment_id,
+                        configuration_hash, event_payload
+                    ) VALUES (
+                        'EVT-M014-HISTORICAL-UPGRADE', %s,
+                        'CVER-M014-HISTORICAL-UPGRADE',
+                        'DOC-M014-HISTORICAL-UPGRADE',
+                        'artifact:source_processing.canonical_sources/'
+                        'CSRC-M014-HISTORICAL-UPGRADE/'
+                        'CVER-M014-HISTORICAL-UPGRADE/docling.json',
+                        %s, 'test', 'ostrading-test-local', %s,
+                        '{"event_type":"CanonicalSourcePublished"}'::jsonb
+                    )
+                    """,
+                    ("1" * 64, "b" * 64, "f" * 64),
+                )
+                cursor.execute(
+                    """
+                    INSERT INTO knowledge_access.job_outbox (
+                        environment, deployment_id, job_name, priority,
+                        input_hash, configuration_hash, code_version,
+                        model_version, payload, trace_id, status,
+                        relay_attempts, relay_owner, relay_lease_expires_at,
+                        relay_claim_generation, relay_claim_token
+                    ) VALUES (
+                        'test', 'ostrading-test-local', 'PROJECT_DOCUMENT', 'P1',
+                        %s, %s, 'm005-historical-v1',
+                        'hashing-dense-256-v1',
+                        '{"projection_id":"PROJ-M014-HISTORICAL-UPGRADE",'
+                        '"document_id":"DOC-M014-HISTORICAL-UPGRADE",'
+                        '"canonical_version_id":"CVER-M014-HISTORICAL-UPGRADE"}'::jsonb,
+                        'TRACE-M014-HISTORICAL-PROJECTION', 'relaying',
+                        1, 'relay-ka-before-upgrade',
+                        CURRENT_TIMESTAMP + INTERVAL '5 minutes',
+                        1, %s::uuid
+                    ) RETURNING outbox_id, payload
+                    """,
+                    ("d" * 64, "f" * 64, historical_ka_claim_token),
+                )
+                historical_ka_outbox_id, historical_ka_payload = cursor.fetchone()
+                historical_ka_message = RelayedJobMessage(
+                    message_id=historical_ka_outbox_id,
+                    environment="test",
+                    deployment_id="ostrading-test-local",
+                    job_name="PROJECT_DOCUMENT",
+                    priority="P1",
+                    input_hash="d" * 64,
+                    configuration_hash="f" * 64,
+                    code_version="m005-historical-v1",
+                    model_version="hashing-dense-256-v1",
+                    payload=historical_ka_payload,
+                    trace_id="TRACE-M014-HISTORICAL-PROJECTION",
+                    execution_requirements=None,
+                )
+                cursor.execute(
+                    """
+                    INSERT INTO platform.technical_jobs (
+                        environment, deployment_id, job_name, priority,
+                        input_hash, configuration_hash, code_version,
+                        model_version, payload, trace_id, status,
+                        recalculation_number, lease_owner, lease_expires_at,
+                        execution_attempts, claim_generation, claim_token,
+                        source_message_id, source_message_hash
+                    ) VALUES (
+                        'test', 'ostrading-test-local', 'PROJECT_DOCUMENT', 'P1',
+                        %s, %s, 'm005-historical-v1',
+                        'hashing-dense-256-v1',
+                        '{"projection_id":"PROJ-M014-HISTORICAL-UPGRADE",'
+                        '"document_id":"DOC-M014-HISTORICAL-UPGRADE",'
+                        '"canonical_version_id":"CVER-M014-HISTORICAL-UPGRADE"}'::jsonb,
+                        'TRACE-M014-HISTORICAL-PROJECTION', 'running', 0,
+                        'worker-ka-before-upgrade',
+                        CURRENT_TIMESTAMP + INTERVAL '5 minutes',
+                        1, 1, gen_random_uuid(), %s, %s
+                    ) RETURNING job_id
+                    """,
+                    (
+                        "d" * 64,
+                        "f" * 64,
+                        historical_ka_outbox_id,
+                        historical_ka_message.content_hash,
+                    ),
+                )
+                historical_project_job_id = cursor.fetchone()[0]
+
+            old_ka_relay_claim = ClaimedRelayMessage(
+                message=historical_ka_message,
+                owner_id="relay-ka-before-upgrade",
+                claim_generation=1,
+                claim_token=historical_ka_claim_token,
+            )
 
             outbox = PostgresJobOutbox(
                 connection_factory=factory,
@@ -258,6 +360,20 @@ def test_upgrade_historique_revoque_rejoue_et_exige_les_preuves_operateur() -> N
 
             with pytest.raises(JobOutboxLeaseConflictError):
                 outbox.acknowledge(old_relay_claim, platform_job_id=platform_job_id)
+            ka_outbox_before_qualification = PostgresJobOutbox(
+                connection_factory=factory,
+                environment_identity=JobEnvironmentIdentity(
+                    environment="test",
+                    deployment_id="ostrading-test-local",
+                    configuration_hash="f" * 64,
+                ),
+                table_name="knowledge_access.job_outbox",
+            )
+            with pytest.raises(JobOutboxLeaseConflictError):
+                ka_outbox_before_qualification.acknowledge(
+                    old_ka_relay_claim,
+                    platform_job_id=historical_project_job_id,
+                )
 
             with factory.connect() as connection, connection.cursor() as cursor:
                 cursor.execute(
@@ -304,6 +420,92 @@ def test_upgrade_historique_revoque_rejoue_et_exige_les_preuves_operateur() -> N
                     (),
                 )
                 assert cursor.fetchone() == (None, None, None, None)
+                cursor.execute(
+                    """
+                    SELECT source_processing.qualify_historical_canonical_publication(
+                        'CVER-M014-HISTORICAL-UPGRADE',
+                        'test', 'ostrading-test-local', %s,
+                        'canonical-quality-operator-v1',
+                        'test', 'ostrading-test-local', %s
+                    )
+                    """,
+                    (IDENTITY.configuration_hash, "e" * 64),
+                )
+                cursor.fetchone()
+                cursor.execute(
+                    """
+                    SELECT producer_configuration_hash,
+                           consumer_configuration_hash,
+                           quality_policy_version, status
+                      FROM source_processing.historical_canonical_reconciliation
+                     WHERE canonical_version_id =
+                           'CVER-M014-HISTORICAL-UPGRADE'
+                    """,
+                    (),
+                )
+                assert cursor.fetchone() == (
+                    IDENTITY.configuration_hash,
+                    "e" * 64,
+                    "canonical-quality-operator-v1",
+                    "qualified",
+                )
+                cursor.execute(
+                    """
+                    SELECT configuration_hash, status,
+                           event_payload -> 'payload' ->> 'quality_policy_version'
+                      FROM source_processing.canonical_publication_outbox
+                     WHERE canonical_version_id =
+                           'CVER-M014-HISTORICAL-UPGRADE'
+                    """,
+                    (),
+                )
+                assert cursor.fetchone() == (
+                    "e" * 64,
+                    "pending",
+                    "canonical-quality-operator-v1",
+                )
+                cursor.execute(
+                    """
+                    SELECT producer_configuration_hash,
+                           qdrant_collection_name, consumer_configuration_hash,
+                           status
+                      FROM knowledge_access.historical_projection_reconciliation
+                     WHERE projection_id = 'PROJ-M014-HISTORICAL-UPGRADE'
+                    """,
+                    (),
+                )
+                assert cursor.fetchone() == (
+                    "f" * 64,
+                    None,
+                    None,
+                    "reconciliation_required",
+                )
+                cursor.execute(
+                    """
+                    SELECT status, claim_generation, execution_attempts,
+                           source_message_id, source_message_hash
+                      FROM platform.technical_jobs
+                     WHERE job_id = %s
+                    """,
+                    (historical_project_job_id,),
+                )
+                project_state = cursor.fetchone()
+                assert project_state[:3] == ("pending", 1, 1)
+                assert project_state[3:] == (
+                    historical_ka_outbox_id,
+                    historical_ka_message.content_hash,
+                )
+                cursor.execute(
+                    """
+                    SELECT knowledge_access.qualify_historical_projection(
+                        'PROJ-M014-HISTORICAL-UPGRADE',
+                        'operator-supplied-qdrant-collection',
+                        'test', 'ostrading-test-local', %s
+                    )
+                    """,
+                    ("e" * 64,),
+                )
+                cursor.fetchone()
 
             relay = JobOutboxRelay(outbox=outbox, consumer=queue)
             assert relay.relay_pending(
@@ -341,6 +543,67 @@ def test_upgrade_historique_revoque_rejoue_et_exige_les_preuves_operateur() -> N
             assert claimed_after_upgrade is not None
             assert claimed_after_upgrade.job.job_id == platform_job_id
 
+            active_projection_identity = JobEnvironmentIdentity(
+                environment="test",
+                deployment_id="ostrading-test-local",
+                configuration_hash="e" * 64,
+            )
+            active_ka_outbox = PostgresJobOutbox(
+                connection_factory=factory,
+                environment_identity=active_projection_identity,
+                table_name="knowledge_access.job_outbox",
+            )
+            active_projection_queue = PostgresJobQueue(
+                connection_factory=factory,
+                catalog=JobCatalog.from_job_names(("PROJECT_DOCUMENT",)),
+                environment_identity=active_projection_identity,
+            )
+            projection_relay = JobOutboxRelay(
+                outbox=active_ka_outbox,
+                consumer=active_projection_queue,
+            )
+            assert projection_relay.relay_pending(
+                limit=1,
+                owner_id="relay-ka-after-qualification",
+                lease_seconds=30,
+            ) == 1
+            assert projection_relay.relay_pending(
+                limit=1,
+                owner_id="relay-ka-after-qualification-replay",
+                lease_seconds=30,
+            ) == 0
+            claimed_projection = active_projection_queue.claim_next(
+                owner_id="worker-ka-after-upgrade",
+                lease_seconds=30,
+                job_names=("PROJECT_DOCUMENT",),
+            )
+            assert claimed_projection is not None
+            assert claimed_projection.job.job_id == historical_project_job_id
+            assert (
+                claimed_projection.job.request.payload["qdrant_collection_name"]
+                == "operator-supplied-qdrant-collection"
+            )
+
+            with factory.connect() as connection, connection.transaction(), connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO knowledge_access.knowledge_projections (
+                        projection_id, document_id, canonical_version_id,
+                        projection_profile_id, chunking_profile, embedding_model,
+                        sparse_profile, index_schema, build_fingerprint, status,
+                        chunk_count, state_observed_at, aggregate_version
+                    ) VALUES (
+                        'PROJ-M014-PARTIAL-CHECK',
+                        'DOC-M014-HISTORICAL-UPGRADE',
+                        'CVER-M014-HISTORICAL-UPGRADE', 'partial-check-profile',
+                        'partial-check-chunking', 'partial-check-embedding',
+                        'partial-check-sparse', 'partial-check-schema', %s,
+                        'REQUESTED', 0, CURRENT_TIMESTAMP, 0
+                    )
+                    """,
+                    ("9" * 64,),
+                )
+
             with factory.connect() as connection:
                 with pytest.raises(psycopg.errors.CheckViolation):
                     with connection.transaction(), connection.cursor() as cursor:
@@ -360,7 +623,7 @@ def test_upgrade_historique_revoque_rejoue_et_exige_les_preuves_operateur() -> N
                             UPDATE knowledge_access.knowledge_projections
                                SET environment = 'test'
                              WHERE projection_id =
-                                   'PROJ-M014-HISTORICAL-UPGRADE'
+                                   'PROJ-M014-PARTIAL-CHECK'
                             """,
                             (),
                         )

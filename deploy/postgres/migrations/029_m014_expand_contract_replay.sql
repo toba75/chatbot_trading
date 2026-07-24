@@ -1,8 +1,11 @@
--- ADR-053 : expand/contract et rejeu local des contrats historiques M-014.
--- Chaque backfill reste dans le bounded context propriétaire.
+-- ADR-053 : upgrade historique strict M-014.
+-- Chaque bounded context ne réconcilie que ses propres tables. Une valeur
+-- opérationnelle absente reste explicitement à qualifier par un opérateur.
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
+-- La trace de complétion appartient au contexte platform et provient de son
+-- propre job. Aucun agrégat SP ou KA n'est consulté.
 ALTER TABLE platform.page_completion_outbox
     ADD COLUMN IF NOT EXISTS trace_id text;
 
@@ -18,6 +21,9 @@ ALTER TABLE platform.page_completion_outbox
         btrim(trace_id) <> '' AND trace_id = btrim(trace_id)
     );
 
+-- L'identité historique du producteur est une donnée d'audit SP. Elle peut
+-- rester entièrement inconnue pour les lignes antérieures sans message SP,
+-- mais elle n'est jamais complétée depuis la file platform.
 ALTER TABLE source_processing.document_conversion_requests
     ADD COLUMN IF NOT EXISTS producer_environment text,
     ADD COLUMN IF NOT EXISTS producer_deployment_id text,
@@ -33,15 +39,22 @@ UPDATE source_processing.document_conversion_requests AS request
    AND request.producer_deployment_id IS NULL
    AND request.producer_configuration_hash IS NULL;
 
-UPDATE source_processing.document_conversion_requests AS request
-   SET producer_environment = job.environment,
-       producer_deployment_id = job.deployment_id,
-       producer_configuration_hash = job.configuration_hash
-  FROM platform.technical_jobs AS job
- WHERE job.job_id = request.job_id
-   AND request.producer_environment IS NULL
-   AND request.producer_deployment_id IS NULL
-   AND request.producer_configuration_hash IS NULL;
+ALTER TABLE source_processing.document_conversion_requests
+    ADD CONSTRAINT document_conversion_producer_identity_check CHECK (
+        (
+            producer_environment IS NULL
+            AND producer_deployment_id IS NULL
+            AND producer_configuration_hash IS NULL
+        )
+        OR (
+            producer_environment IS NOT NULL
+            AND producer_deployment_id IS NOT NULL
+            AND producer_configuration_hash IS NOT NULL
+            AND producer_environment IN ('development', 'test', 'production')
+            AND producer_deployment_id ~ '^[a-z0-9]+(-[a-z0-9]+)*$'
+            AND producer_configuration_hash ~ '^[0-9a-f]{64}$'
+        )
+    );
 
 CREATE OR REPLACE FUNCTION source_processing.enrich_m004_conversion_identity()
 RETURNS trigger
@@ -53,9 +66,12 @@ BEGIN
     IF NEW.producer_environment IS NULL
        AND NEW.producer_deployment_id IS NULL
        AND NEW.producer_configuration_hash IS NULL THEN
-        SELECT * INTO STRICT producer
+        SELECT * INTO producer
           FROM source_processing.job_outbox
          WHERE outbox_id = NEW.submission_id;
+        IF NOT FOUND THEN
+            RAISE EXCEPTION 'CONVERSION_PRODUCER_IDENTITY_UNPROVEN';
+        END IF;
         NEW.producer_environment := producer.environment;
         NEW.producer_deployment_id := producer.deployment_id;
         NEW.producer_configuration_hash := producer.configuration_hash;
@@ -76,18 +92,9 @@ ON source_processing.document_conversion_requests
 FOR EACH ROW
 EXECUTE FUNCTION source_processing.enrich_m004_conversion_identity();
 
-ALTER TABLE source_processing.document_conversion_requests
-    ALTER COLUMN producer_environment SET NOT NULL,
-    ALTER COLUMN producer_deployment_id SET NOT NULL,
-    ALTER COLUMN producer_configuration_hash SET NOT NULL,
-    ADD CONSTRAINT document_conversion_producer_identity_check CHECK (
-        producer_environment IN ('development', 'test', 'production')
-        AND producer_deployment_id ~ '^[a-z0-9]+(-[a-z0-9]+)*$'
-        AND producer_configuration_hash ~ '^[0-9a-f]{64}$'
-    );
-
--- Le vrai contrat M004 pré-023 est enrichi depuis son message durable. Toute
--- lease de relais ou de worker qui portait l'ancien payload est révoquée.
+-- Le message SP et le job platform sont réparés indépendamment à partir de
+-- leur payload local. Les deux anciennes leases sont révoquées. Le job garde
+-- claim_generation == execution_attempts ; seul un nouveau claim les avance.
 UPDATE source_processing.job_outbox
    SET payload = jsonb_set(
            payload, '{orchestration_version}', '"m004-inline-v1"'::jsonb, true
@@ -108,35 +115,134 @@ UPDATE platform.technical_jobs
    SET payload = jsonb_set(
            payload, '{orchestration_version}', '"m004-inline-v1"'::jsonb, true
        ),
-       status = CASE WHEN status = 'running' THEN 'pending' ELSE status END,
-       lease_owner = CASE WHEN status = 'running' THEN NULL ELSE lease_owner END,
-       lease_expires_at = CASE
-           WHEN status = 'running' THEN NULL ELSE lease_expires_at END,
-       claim_generation = CASE
-           WHEN status = 'running' THEN claim_generation + 1
-           ELSE claim_generation END,
-       claim_token = CASE WHEN status = 'running' THEN NULL ELSE claim_token END
+       status = 'pending', result = NULL, failure_reason = NULL,
+       lease_owner = NULL, lease_expires_at = NULL, claim_token = NULL,
+       source_message_id = NULL, source_message_hash = NULL
  WHERE job_name = 'CONVERT_DOCUMENT'
    AND status IN ('pending', 'running')
    AND NOT (payload ? 'orchestration_version');
 
--- Les projections des writers M005 à trois champs reçoivent d'abord leur
--- identité productrice durable. Le nom de collection est la convention locale
--- qualifiée par le couple environnement/déploiement de ce writer historique.
-UPDATE knowledge_access.knowledge_projections AS projection
-   SET environment = message.environment,
-       deployment_id = message.deployment_id,
-       configuration_hash = message.configuration_hash,
-       qdrant_collection_name =
-           'ostrading-' || message.environment || '-knowledge-access'
+-- Les anciens messages KA à trois champs sont mis en quarantaine explicite.
+-- L'identité de leur producteur est conservée pour audit ; l'identité active
+-- du consommateur et le nom Qdrant doivent être fournis séparément.
+ALTER TABLE knowledge_access.job_outbox
+    DROP CONSTRAINT IF EXISTS job_outbox_status_check,
+    DROP CONSTRAINT IF EXISTS knowledge_access_job_outbox_state_coherence;
+ALTER TABLE knowledge_access.job_outbox
+    ADD CONSTRAINT job_outbox_status_check CHECK (
+        status IN (
+            'pending', 'relaying', 'relayed', 'failed',
+            'reconciliation_required'
+        )
+    ),
+    ADD CONSTRAINT knowledge_access_job_outbox_state_coherence CHECK (
+        (status = 'pending'
+            AND platform_job_id IS NULL AND relayed_at IS NULL
+            AND relay_owner IS NULL AND relay_lease_expires_at IS NULL
+            AND relay_claim_token IS NULL AND failure_error_code IS NULL)
+        OR (status = 'relaying'
+            AND platform_job_id IS NULL AND relayed_at IS NULL
+            AND relay_owner IS NOT NULL AND relay_lease_expires_at IS NOT NULL
+            AND relay_claim_generation > 0 AND relay_claim_token IS NOT NULL
+            AND failure_error_code IS NULL)
+        OR (status = 'relayed'
+            AND platform_job_id IS NOT NULL AND relayed_at IS NOT NULL
+            AND relay_owner IS NULL AND relay_lease_expires_at IS NULL
+            AND relay_claim_token IS NULL AND failure_error_code IS NULL)
+        OR (status = 'failed'
+            AND platform_job_id IS NULL AND relayed_at IS NULL
+            AND relay_owner IS NULL AND relay_lease_expires_at IS NULL
+            AND relay_claim_token IS NULL
+            AND failure_error_code = 'WORKER_ENVIRONMENT_MISMATCH')
+        OR (status = 'reconciliation_required'
+            AND platform_job_id IS NULL AND relayed_at IS NULL
+            AND relay_owner IS NULL AND relay_lease_expires_at IS NULL
+            AND relay_claim_token IS NULL AND failure_error_code IS NULL)
+    );
+
+CREATE TABLE knowledge_access.historical_projection_reconciliation (
+    projection_id text PRIMARY KEY
+        REFERENCES knowledge_access.knowledge_projections(projection_id),
+    outbox_id text NOT NULL UNIQUE
+        REFERENCES knowledge_access.job_outbox(outbox_id),
+    producer_environment text NOT NULL,
+    producer_deployment_id text NOT NULL,
+    producer_configuration_hash char(64) NOT NULL,
+    historical_platform_job_id text,
+    qdrant_collection_name text,
+    consumer_environment text,
+    consumer_deployment_id text,
+    consumer_configuration_hash char(64),
+    status text NOT NULL CHECK (
+        status IN ('reconciliation_required', 'qualified')
+    ),
+    created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    qualified_at timestamptz,
+    CHECK (
+        (
+            status = 'reconciliation_required'
+            AND qdrant_collection_name IS NULL
+            AND consumer_environment IS NULL
+            AND consumer_deployment_id IS NULL
+            AND consumer_configuration_hash IS NULL
+            AND qualified_at IS NULL
+        )
+        OR (
+            status = 'qualified'
+            AND qdrant_collection_name IS NOT NULL
+            AND btrim(qdrant_collection_name) <> ''
+            AND qdrant_collection_name = btrim(qdrant_collection_name)
+            AND consumer_environment IN ('development', 'test', 'production')
+            AND consumer_deployment_id ~ '^[a-z0-9]+(-[a-z0-9]+)*$'
+            AND consumer_configuration_hash ~ '^[0-9a-f]{64}$'
+            AND qualified_at IS NOT NULL
+        )
+    )
+);
+
+INSERT INTO knowledge_access.historical_projection_reconciliation (
+    projection_id, outbox_id,
+    producer_environment, producer_deployment_id,
+    producer_configuration_hash, historical_platform_job_id,
+    status
+)
+SELECT projection.projection_id, message.outbox_id,
+       message.environment, message.deployment_id, message.configuration_hash,
+       message.platform_job_id, 'reconciliation_required'
   FROM knowledge_access.job_outbox AS message
+  JOIN knowledge_access.knowledge_projections AS projection
+    ON projection.projection_id = message.payload ->> 'projection_id'
  WHERE message.job_name = 'PROJECT_DOCUMENT'
    AND (SELECT count(*) FROM jsonb_object_keys(message.payload)) = 3
-   AND message.payload ->> 'projection_id' = projection.projection_id
-   AND projection.environment IS NULL
-   AND projection.deployment_id IS NULL
-   AND projection.configuration_hash IS NULL
-   AND projection.qdrant_collection_name IS NULL;
+   AND message.payload ?& ARRAY[
+       'projection_id', 'document_id', 'canonical_version_id'
+   ];
+
+UPDATE knowledge_access.job_outbox
+   SET status = 'reconciliation_required',
+       platform_job_id = NULL, relayed_at = NULL,
+       relay_owner = NULL, relay_lease_expires_at = NULL,
+       relay_claim_generation = CASE
+           WHEN status = 'relaying' THEN relay_claim_generation + 1
+           ELSE relay_claim_generation END,
+       relay_claim_token = NULL, failure_error_code = NULL
+ WHERE outbox_id IN (
+       SELECT reconciliation.outbox_id
+         FROM knowledge_access.historical_projection_reconciliation AS reconciliation
+   );
+
+-- Le job platform conserve son source_message_id pour que le relais puisse
+-- reconnaître le même message après qualification. Le hash est remplacé dans
+-- la transaction platform du relais, jamais par cette migration KA.
+UPDATE platform.technical_jobs
+   SET status = 'pending', result = NULL, failure_reason = NULL,
+       lease_owner = NULL, lease_expires_at = NULL, claim_token = NULL
+ WHERE job_name = 'PROJECT_DOCUMENT'
+   AND status IN ('pending', 'running')
+   AND (SELECT count(*) FROM jsonb_object_keys(payload)) = 3
+   AND payload ?& ARRAY[
+       'projection_id', 'document_id', 'canonical_version_id'
+   ];
 
 CREATE OR REPLACE FUNCTION knowledge_access.enrich_m005_projection_job_payload()
 RETURNS trigger
@@ -208,73 +314,66 @@ WHEN (
 )
 EXECUTE FUNCTION knowledge_access.enrich_m005_projection_job_payload();
 
-UPDATE knowledge_access.job_outbox
-   SET payload = payload,
-       status = CASE WHEN status = 'relaying' THEN 'pending' ELSE status END,
-       relay_owner = CASE WHEN status = 'relaying' THEN NULL ELSE relay_owner END,
-       relay_lease_expires_at = CASE
-           WHEN status = 'relaying' THEN NULL ELSE relay_lease_expires_at END,
-       relay_claim_generation = CASE
-           WHEN status = 'relaying' THEN relay_claim_generation + 1
-           ELSE relay_claim_generation END,
-       relay_claim_token = CASE
-           WHEN status = 'relaying' THEN NULL ELSE relay_claim_token END
- WHERE job_name = 'PROJECT_DOCUMENT'
-   AND NOT (payload ? 'contract_version')
-   AND EXISTS (
-       SELECT 1
-         FROM knowledge_access.canonical_publication_inbox AS publication
-        WHERE publication.canonical_version_id =
-              knowledge_access.job_outbox.payload ->> 'canonical_version_id'
-   );
+CREATE OR REPLACE FUNCTION knowledge_access.qualify_historical_projection(
+    requested_projection_id text,
+    requested_qdrant_collection_name text,
+    requested_consumer_environment text,
+    requested_consumer_deployment_id text,
+    requested_consumer_configuration_hash char(64)
+)
+RETURNS void
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    reconciliation knowledge_access.historical_projection_reconciliation%ROWTYPE;
+BEGIN
+    SELECT * INTO STRICT reconciliation
+      FROM knowledge_access.historical_projection_reconciliation
+     WHERE projection_id = requested_projection_id
+       AND status = 'reconciliation_required'
+     FOR UPDATE;
+    IF requested_qdrant_collection_name IS NULL
+       OR btrim(requested_qdrant_collection_name) = ''
+       OR requested_qdrant_collection_name <> btrim(requested_qdrant_collection_name)
+       OR requested_consumer_environment NOT IN (
+           'development', 'test', 'production'
+       )
+       OR requested_consumer_deployment_id !~ '^[a-z0-9]+(-[a-z0-9]+)*$'
+       OR requested_consumer_configuration_hash !~ '^[0-9a-f]{64}$' THEN
+        RAISE EXCEPTION 'HISTORICAL_PROJECTION_QUALIFICATION_INVALID';
+    END IF;
 
-UPDATE platform.technical_jobs AS job
-   SET payload = message.payload,
-       execution_contract_name = 'project-canonical-document',
-       execution_contract_version = '1.0',
-       capacity_capability = 'knowledge-projection',
-       capacity_slots = 0,
-       capacity_device = NULL,
-       storage_environment = job.environment,
-       status = CASE WHEN job.status = 'running' THEN 'pending' ELSE job.status END,
-       lease_owner = CASE WHEN job.status = 'running' THEN NULL ELSE job.lease_owner END,
-       lease_expires_at = CASE
-           WHEN job.status = 'running' THEN NULL ELSE job.lease_expires_at END,
-       claim_generation = CASE
-           WHEN job.status = 'running' THEN job.claim_generation + 1
-           ELSE job.claim_generation END,
-       claim_token = CASE WHEN job.status = 'running' THEN NULL ELSE job.claim_token END
-  FROM knowledge_access.job_outbox AS message
- WHERE job.job_name = 'PROJECT_DOCUMENT'
-   AND job.source_message_id = message.outbox_id
-   AND job.status IN ('pending', 'running')
-   AND NOT (job.payload ? 'contract_version');
+    UPDATE knowledge_access.knowledge_projections
+       SET environment = requested_consumer_environment,
+           deployment_id = requested_consumer_deployment_id,
+           configuration_hash = requested_consumer_configuration_hash,
+           qdrant_collection_name = requested_qdrant_collection_name,
+           status = 'REQUESTED', execution_phase = 'QUEUED',
+           completed_units = 0, total_units = 1, failure_error_code = NULL,
+           aggregate_version = aggregate_version + 1,
+           state_observed_at = CURRENT_TIMESTAMP
+     WHERE projection_id = requested_projection_id;
 
--- Les jobs M005 encore privés de publication KA sont drainés : le relais
--- canonique qualifiera ensuite l'outbox, puis le relais platform les réactivera.
-UPDATE platform.technical_jobs
-   SET status = 'pending', result = NULL, failure_reason = NULL,
-       lease_owner = NULL, lease_expires_at = NULL,
-       claim_generation = claim_generation + 1, claim_token = NULL,
-       source_message_id = NULL, source_message_hash = NULL
- WHERE job_name = 'PROJECT_DOCUMENT'
-   AND NOT (payload ? 'contract_version');
+    UPDATE knowledge_access.job_outbox
+       SET environment = requested_consumer_environment,
+           deployment_id = requested_consumer_deployment_id,
+           configuration_hash = requested_consumer_configuration_hash,
+           payload = payload, status = 'pending'
+     WHERE outbox_id = reconciliation.outbox_id
+       AND status = 'reconciliation_required';
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'HISTORICAL_PROJECTION_OUTBOX_NOT_QUALIFIED';
+    END IF;
 
--- Une projection historique sans génération redevient un travail explicite.
-UPDATE knowledge_access.knowledge_projections AS projection
-   SET status = 'REQUESTED', execution_phase = 'QUEUED',
-       completed_units = 0, total_units = 1, failure_error_code = NULL,
-       aggregate_version = aggregate_version + 1,
-       state_observed_at = CURRENT_TIMESTAMP
- WHERE projection.status = 'STALE'
-   AND projection.index_generation IS NULL
-   AND projection.environment IS NOT NULL
-   AND EXISTS (
-       SELECT 1
-         FROM knowledge_access.job_outbox AS message
-        WHERE message.job_name = 'PROJECT_DOCUMENT'
-          AND message.payload ->> 'projection_id' = projection.projection_id
-   );
+    UPDATE knowledge_access.historical_projection_reconciliation
+       SET qdrant_collection_name = requested_qdrant_collection_name,
+           consumer_environment = requested_consumer_environment,
+           consumer_deployment_id = requested_consumer_deployment_id,
+           consumer_configuration_hash = requested_consumer_configuration_hash,
+           status = 'qualified', qualified_at = CURRENT_TIMESTAMP
+     WHERE projection_id = requested_projection_id;
+END;
+$$;
 
 -- Sérialisation JSON canonique identique à sort_keys=True/separators(',', ':').
 CREATE OR REPLACE FUNCTION source_processing.canonical_jsonb(value jsonb)
@@ -303,78 +402,208 @@ SELECT CASE jsonb_typeof(value)
 END
 $$;
 
--- Les publications pré-024 reçoivent une outbox SP. KA sera touché seulement
--- par le relais idempotent, dans une transaction KA ultérieure.
-WITH historical AS (
-    SELECT version.*, request.producer_environment AS environment,
-           request.producer_deployment_id AS deployment_id,
-           request.producer_configuration_hash AS configuration_hash,
-           request.total_units AS historical_page_count,
-           ('EVT-M014-BACKFILL-' || upper(substr(encode(digest(
-               version.canonical_version_id, 'sha256'
-           ), 'hex'), 1, 40))) AS event_id,
-           source.fingerprint AS source_sha256
-      FROM source_processing.canonical_source_versions AS version
-      JOIN source_processing.source_documents AS source
-        ON source.document_id = version.document_id
-      JOIN source_processing.document_conversion_requests AS request
-        ON request.document_id = version.document_id
-     WHERE NOT EXISTS (
-         SELECT 1
-           FROM source_processing.canonical_publication_outbox AS existing
-          WHERE existing.canonical_version_id = version.canonical_version_id
-     )
-), events AS (
-    SELECT historical.*,
-           jsonb_build_object(
-               'event_id', event_id,
-               'event_type', 'CanonicalSourcePublished',
-               'event_version', 1,
-               'occurred_at', to_char(
-                   accepted_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'
-               ),
-               'aggregate_type', 'CanonicalSource',
-               'aggregate_id', canonical_source_id,
-               'aggregate_version', 1,
-               'correlation_id', 'CORR-' || canonical_version_id,
-               'causation_id', 'CMD-' || canonical_version_id,
-               'producer_context', 'SP',
-               'payload', jsonb_build_object(
-                   'schema_version', '1.0',
-                   'canonical_source_id', canonical_source_id,
-                   'document_id', document_id,
-                   'canonical_version_id', canonical_version_id,
-                   'source_sha256', source_sha256,
-                   'canonical_artifact_sha256', canonical_artifact_sha256,
-                   'page_count', CASE
-                       WHEN canonical_assembly_id IS NOT NULL THEN page_count
-                       ELSE historical_page_count
-                   END,
-                   'accepted_at', to_char(
-                       accepted_at AT TIME ZONE 'UTC',
-                       'YYYY-MM-DD"T"HH24:MI:SS"Z"'
-                   ),
-                   'quality_policy_version', CASE
-                       WHEN canonical_assembly_id IS NOT NULL
-                           THEN quality_policy_version
-                       ELSE 'canonical-quality-m004-v1'
-                   END
-               )
-           ) AS event_payload
-      FROM historical
+CREATE TABLE source_processing.historical_canonical_reconciliation (
+    canonical_version_id text PRIMARY KEY
+        REFERENCES source_processing.canonical_source_versions(canonical_version_id),
+    producer_environment text,
+    producer_deployment_id text,
+    producer_configuration_hash char(64),
+    quality_policy_version text,
+    consumer_environment text,
+    consumer_deployment_id text,
+    consumer_configuration_hash char(64),
+    status text NOT NULL CHECK (
+        status IN ('reconciliation_required', 'qualified')
+    ),
+    created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    qualified_at timestamptz,
+    CHECK (
+        (
+            producer_environment IS NULL
+            AND producer_deployment_id IS NULL
+            AND producer_configuration_hash IS NULL
+        )
+        OR (
+            producer_environment IS NOT NULL
+            AND producer_deployment_id IS NOT NULL
+            AND producer_configuration_hash IS NOT NULL
+            AND producer_environment IN ('development', 'test', 'production')
+            AND producer_deployment_id ~ '^[a-z0-9]+(-[a-z0-9]+)*$'
+            AND producer_configuration_hash ~ '^[0-9a-f]{64}$'
+        )
+    ),
+    CHECK (
+        (
+            status = 'reconciliation_required'
+            AND consumer_environment IS NULL
+            AND consumer_deployment_id IS NULL
+            AND consumer_configuration_hash IS NULL
+            AND qualified_at IS NULL
+        )
+        OR (
+            status = 'qualified'
+            AND producer_environment IS NOT NULL
+            AND producer_deployment_id IS NOT NULL
+            AND producer_configuration_hash IS NOT NULL
+            AND quality_policy_version IS NOT NULL
+            AND btrim(quality_policy_version) <> ''
+            AND quality_policy_version = btrim(quality_policy_version)
+            AND consumer_environment IN ('development', 'test', 'production')
+            AND consumer_deployment_id ~ '^[a-z0-9]+(-[a-z0-9]+)*$'
+            AND consumer_configuration_hash ~ '^[0-9a-f]{64}$'
+            AND qualified_at IS NOT NULL
+        )
+    )
+);
+
+INSERT INTO source_processing.historical_canonical_reconciliation (
+    canonical_version_id,
+    producer_environment, producer_deployment_id,
+    producer_configuration_hash, quality_policy_version, status
 )
-INSERT INTO source_processing.canonical_publication_outbox (
-    event_id, canonical_version_id, canonical_artifact_ref,
-    environment, deployment_id, configuration_hash,
-    event_payload, event_fingerprint, status, relay_generation
+SELECT version.canonical_version_id,
+       request.producer_environment, request.producer_deployment_id,
+       request.producer_configuration_hash, version.quality_policy_version,
+       'reconciliation_required'
+  FROM source_processing.canonical_source_versions AS version
+  JOIN source_processing.document_conversion_requests AS request
+    ON request.document_id = version.document_id
+ WHERE NOT EXISTS (
+       SELECT 1
+         FROM source_processing.canonical_publication_outbox AS publication
+        WHERE publication.canonical_version_id = version.canonical_version_id
+   );
+
+CREATE OR REPLACE FUNCTION source_processing.qualify_historical_canonical_publication(
+    requested_canonical_version_id text,
+    requested_producer_environment text,
+    requested_producer_deployment_id text,
+    requested_producer_configuration_hash char(64),
+    requested_quality_policy_version text,
+    requested_consumer_environment text,
+    requested_consumer_deployment_id text,
+    requested_consumer_configuration_hash char(64)
 )
-SELECT event_id, canonical_version_id, canonical_artifact_ref,
-       environment, deployment_id, configuration_hash,
-       event_payload,
-       encode(digest(source_processing.canonical_jsonb(event_payload),
-                     'sha256'), 'hex'),
-       'pending', 0
-  FROM events;
+RETURNS void
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    reconciliation source_processing.historical_canonical_reconciliation%ROWTYPE;
+    version source_processing.canonical_source_versions%ROWTYPE;
+    source source_processing.source_documents%ROWTYPE;
+    request source_processing.document_conversion_requests%ROWTYPE;
+    generated_event_id text;
+    generated_event jsonb;
+BEGIN
+    SELECT * INTO STRICT reconciliation
+      FROM source_processing.historical_canonical_reconciliation
+     WHERE canonical_version_id = requested_canonical_version_id
+       AND status = 'reconciliation_required'
+     FOR UPDATE;
+    IF requested_quality_policy_version IS NULL
+       OR btrim(requested_quality_policy_version) = ''
+       OR requested_quality_policy_version <>
+          btrim(requested_quality_policy_version)
+       OR requested_consumer_environment NOT IN (
+           'development', 'test', 'production'
+       )
+       OR requested_consumer_deployment_id !~ '^[a-z0-9]+(-[a-z0-9]+)*$'
+       OR requested_consumer_configuration_hash !~ '^[0-9a-f]{64}$' THEN
+        RAISE EXCEPTION 'HISTORICAL_CANONICAL_QUALIFICATION_INVALID';
+    END IF;
+    IF requested_producer_environment NOT IN (
+           'development', 'test', 'production'
+       )
+       OR requested_producer_deployment_id !~ '^[a-z0-9]+(-[a-z0-9]+)*$'
+       OR requested_producer_configuration_hash !~ '^[0-9a-f]{64}$' THEN
+        RAISE EXCEPTION 'HISTORICAL_CANONICAL_PRODUCER_IDENTITY_INVALID';
+    END IF;
+    IF reconciliation.producer_environment IS NOT NULL
+       AND (
+           reconciliation.producer_environment IS DISTINCT FROM
+               requested_producer_environment
+           OR reconciliation.producer_deployment_id IS DISTINCT FROM
+               requested_producer_deployment_id
+           OR reconciliation.producer_configuration_hash IS DISTINCT FROM
+               requested_producer_configuration_hash
+       ) THEN
+        RAISE EXCEPTION 'HISTORICAL_CANONICAL_PRODUCER_IDENTITY_CONFLICT';
+    END IF;
+    IF reconciliation.quality_policy_version IS NOT NULL
+       AND reconciliation.quality_policy_version IS DISTINCT FROM
+           requested_quality_policy_version THEN
+        RAISE EXCEPTION 'HISTORICAL_CANONICAL_QUALITY_POLICY_CONFLICT';
+    END IF;
+
+    SELECT * INTO STRICT version
+      FROM source_processing.canonical_source_versions
+     WHERE canonical_version_id = requested_canonical_version_id;
+    SELECT * INTO STRICT source
+      FROM source_processing.source_documents
+     WHERE document_id = version.document_id;
+    SELECT * INTO STRICT request
+      FROM source_processing.document_conversion_requests
+     WHERE document_id = version.document_id;
+
+    generated_event_id := 'EVT-M014-RECONCILED-' || upper(substr(encode(digest(
+        version.canonical_version_id, 'sha256'
+    ), 'hex'), 1, 40));
+    generated_event := jsonb_build_object(
+        'event_id', generated_event_id,
+        'event_type', 'CanonicalSourcePublished',
+        'event_version', 1,
+        'occurred_at', to_char(
+            version.accepted_at AT TIME ZONE 'UTC',
+            'YYYY-MM-DD"T"HH24:MI:SS"Z"'
+        ),
+        'aggregate_type', 'CanonicalSource',
+        'aggregate_id', version.canonical_source_id,
+        'aggregate_version', 1,
+        'correlation_id', 'CORR-' || version.canonical_version_id,
+        'causation_id', 'CMD-' || version.canonical_version_id,
+        'producer_context', 'SP',
+        'payload', jsonb_build_object(
+            'schema_version', '1.0',
+            'canonical_source_id', version.canonical_source_id,
+            'document_id', version.document_id,
+            'canonical_version_id', version.canonical_version_id,
+            'source_sha256', source.fingerprint,
+            'canonical_artifact_sha256', version.canonical_artifact_sha256,
+            'page_count', COALESCE(version.page_count, request.total_units),
+            'accepted_at', to_char(
+                version.accepted_at AT TIME ZONE 'UTC',
+                'YYYY-MM-DD"T"HH24:MI:SS"Z"'
+            ),
+            'quality_policy_version', requested_quality_policy_version
+        )
+    );
+
+    INSERT INTO source_processing.canonical_publication_outbox (
+        event_id, canonical_version_id, canonical_artifact_ref,
+        environment, deployment_id, configuration_hash,
+        event_payload, event_fingerprint, status, relay_generation
+    ) VALUES (
+        generated_event_id, version.canonical_version_id,
+        version.canonical_artifact_ref,
+        requested_consumer_environment, requested_consumer_deployment_id,
+        requested_consumer_configuration_hash, generated_event,
+        encode(digest(source_processing.canonical_jsonb(generated_event),
+                      'sha256'), 'hex'),
+        'pending', 0
+    );
+
+    UPDATE source_processing.historical_canonical_reconciliation
+       SET producer_environment = requested_producer_environment,
+           producer_deployment_id = requested_producer_deployment_id,
+           producer_configuration_hash = requested_producer_configuration_hash,
+           quality_policy_version = requested_quality_policy_version,
+           consumer_environment = requested_consumer_environment,
+           consumer_deployment_id = requested_consumer_deployment_id,
+           consumer_configuration_hash = requested_consumer_configuration_hash,
+           status = 'qualified', qualified_at = CURRENT_TIMESTAMP
+     WHERE canonical_version_id = requested_canonical_version_id;
+END;
+$$;
 
 -- Les triggers restent en phase expand. Leur retrait appartient à une
--- migration contract séparée après drainage vérifié des anciens workers.
+-- migration contract distincte après drainage vérifié des anciens writers.

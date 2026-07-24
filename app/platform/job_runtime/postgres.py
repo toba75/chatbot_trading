@@ -381,7 +381,73 @@ class PostgresJobQueue:
                 if consumed is not None:
                     consumed_row = _ConsumedRelayRow.from_database(consumed)
                     if consumed_row.source_message_hash != message.content_hash:
-                        raise JobRelayMessageConflictError()
+                        cursor.execute(
+                            f"""
+                            SELECT {_EXISTING_RELAY_COLUMNS_SQL}
+                              FROM platform.technical_jobs
+                             WHERE job_id = %s
+                             FOR UPDATE
+                            """,
+                            (consumed_row.job_id,),
+                        )
+                        historical = cursor.fetchone()
+                        if historical is None:
+                            raise JobRelayMessageConflictError()
+                        historical_row = _ExistingRelayRow.from_database(historical)
+                        if not _is_historical_project_document_upgrade(
+                            existing_row=historical_row,
+                            request=request,
+                            message_id=message.message_id,
+                        ):
+                            raise JobRelayMessageConflictError()
+                        requirements = _execution_requirement_mapping(request)
+                        cursor.execute(
+                            """
+                            UPDATE platform.technical_jobs
+                               SET environment = %(environment)s,
+                                   deployment_id = %(deployment_id)s,
+                                   priority = %(priority)s,
+                                   input_hash = %(input_hash)s,
+                                   configuration_hash = %(configuration_hash)s,
+                                   code_version = %(code_version)s,
+                                   model_version = %(model_version)s,
+                                   execution_contract_name =
+                                       %(execution_contract_name)s,
+                                   execution_contract_version =
+                                       %(execution_contract_version)s,
+                                   capacity_capability = %(capacity_capability)s,
+                                   capacity_slots = %(capacity_slots)s,
+                                   capacity_device = %(capacity_device)s,
+                                   storage_environment = %(storage_environment)s,
+                                   payload = %(payload)s::jsonb,
+                                   trace_id = %(trace_id)s,
+                                   status = 'pending', result = NULL,
+                                   failure_reason = NULL, lease_owner = NULL,
+                                   lease_expires_at = NULL, claim_token = NULL,
+                                   source_message_hash = %(source_message_hash)s
+                             WHERE job_id = %(job_id)s
+                               AND source_message_id = %(source_message_id)s
+                            """,
+                            {
+                                "environment": request.environment,
+                                "deployment_id": request.deployment_id,
+                                "priority": request.priority.value,
+                                "input_hash": request.idempotence_key.input_hash,
+                                "configuration_hash": (
+                                    request.idempotence_key.configuration_hash
+                                ),
+                                "code_version": request.idempotence_key.code_version,
+                                "model_version": request.idempotence_key.model_version,
+                                **requirements,
+                                "payload": serialized_payload,
+                                "trace_id": message.trace_id,
+                                "source_message_id": message.message_id,
+                                "source_message_hash": message.content_hash,
+                                "job_id": consumed_row.job_id,
+                            },
+                        )
+                        if cursor.rowcount != 1:
+                            raise JobRelayMessageConflictError()
                     return consumed_row.job_id
 
                 cursor.execute(
@@ -410,6 +476,7 @@ class PostgresJobQueue:
                     if _is_historical_project_document_upgrade(
                         existing_row=existing_row,
                         request=request,
+                        message_id=message.message_id,
                     ):
                         requirements = _execution_requirement_mapping(request)
                         cursor.execute(
@@ -426,7 +493,6 @@ class PostgresJobQueue:
                                    status = 'pending', result = NULL,
                                    failure_reason = NULL, lease_owner = NULL,
                                    lease_expires_at = NULL, claim_token = NULL,
-                                   claim_generation = claim_generation + 1,
                                    source_message_id = %(source_message_id)s,
                                    source_message_hash = %(source_message_hash)s
                              WHERE job_id = %(job_id)s
@@ -1129,6 +1195,7 @@ def _is_historical_project_document_upgrade(
     *,
     existing_row: _ExistingRelayRow,
     request: JobRequest,
+    message_id: str,
 ) -> bool:
     existing_payload = dict(existing_row.payload)
     requested_payload = dict(request.payload)
@@ -1141,8 +1208,16 @@ def _is_historical_project_document_upgrade(
             existing_payload[field_name] == requested_payload.get(field_name)
             for field_name in existing_payload
         )
-        and existing_row.source_message_id is None
-        and existing_row.source_message_hash is None
+        and (
+            (
+                existing_row.source_message_id is None
+                and existing_row.source_message_hash is None
+            )
+            or (
+                existing_row.source_message_id == message_id
+                and existing_row.source_message_hash is not None
+            )
+        )
     )
 
 

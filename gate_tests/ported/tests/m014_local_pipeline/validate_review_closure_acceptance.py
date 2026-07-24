@@ -144,6 +144,12 @@ def _assert_expand_replay_est_documente_sans_adr_fictive() -> None:
     assert "ADR-053" in adr_index
     assert "Prochaine ADR technique: ADR-054" in adr_index
     assert "ADR-054" not in "\n".join((specification, distribution, journal))
+    for marker in (
+        "reconciliation_required",
+        "qualification opérateur",
+        "validate_historical_upgrade_postgresql_live.py",
+    ):
+        assert marker in "\n".join((adr, specification, distribution))
 
 
 def _assert_la_migration_classe_seulement_un_writer_m004_prouve() -> None:

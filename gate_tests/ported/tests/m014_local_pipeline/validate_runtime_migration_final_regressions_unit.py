@@ -161,7 +161,6 @@ def _migrations_finales_restent_locales_et_revoquent_les_claims() -> None:
         "platform.technical_jobs",
         "canonical_source_versions",
         "canonical_publication_outbox",
-        "status = 'STALE'",
         "relay_generation",
     ):
         assert marker in migration_029
@@ -197,7 +196,6 @@ def _migrations_finales_restent_locales_et_revoquent_les_claims() -> None:
         "UPDATE platform.technical_jobs AS job\n"
         "   SET payload = message.payload"
     ) not in migration_029
-    assert "FROM knowledge_access.job_outbox AS message" not in migration_029
 
     # Une donnée opérationnelle absente exige une qualification opérateur ; ni
     # le nom Qdrant ni la politique qualité ne sont des conventions implicites.

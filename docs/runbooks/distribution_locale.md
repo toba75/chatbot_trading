@@ -114,8 +114,11 @@ installent les tables, contraintes, relais et index. La migration 028 ouvre une
 coexistence bornée avec un ancien writer M004 prouvé par son outbox et corrige
 les attentes d’artefacts d’assemblage en attente ; elle n’installe aucun
 `DEFAULT` métier silencieux. La migration 029 termine la phase expand : elle
-enrichit les contrats historiques depuis des preuves durables, révoque leurs
-claims, reconstruit l'outbox canonique SP et remet les projections qualifiées en
+enrichit seulement les contrats prouvés dans leur contexte et révoque leurs
+claims. Une politique qualité, une identité/configuration consommatrice ou une
+collection Qdrant absente reste `reconciliation_required`. L’opérateur fournit
+ces valeurs exactes via les fonctions de qualification de la migration ; alors
+seulement l’outbox canonique SP ou le message KA redevient `pending` pour son
 rejeu. La phase contract reste différée jusqu'à la preuve de drainage.
 
 Chaque replica `worker-documents` relaie d'abord l'outbox SP vers la file

@@ -75,7 +75,10 @@ UPDATE platform.technical_jobs
            || '/docling.json'
        ),
        false
-   )
+   ),
+       status = 'pending', result = NULL, failure_reason = NULL,
+       lease_owner = NULL, lease_expires_at = NULL, claim_token = NULL,
+       source_message_id = NULL, source_message_hash = NULL
  WHERE job_name = 'ASSEMBLE_CANONICAL_DOCUMENT'
    AND status IN ('pending', 'running')
    AND jsonb_typeof(payload -> 'expected_canonical_artifact') = 'object';
