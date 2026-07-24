@@ -193,3 +193,27 @@ def test_politique_assemblage_refuse_incomplet_echec_divergence_et_reordonne() -
             contract=contract,
             results=(_result(1), _result(1), _result(3)),
         )
+
+
+def test_assemblage_ne_rehache_pas_un_contenu_deja_verifie(monkeypatch) -> None:
+    content = _page_bytes(1, "Texte canonique page 1.")
+    result = _result(1)
+    verifications = 0
+
+    def count_verification(self, candidate: bytes) -> None:
+        nonlocal verifications
+        del self, candidate
+        verifications += 1
+
+    monkeypatch.setattr(LocalArtifactDescriptor, "verify_content", count_verification)
+    outputs = CanonicalAssemblyPolicy().read_page_outputs(
+        results=(result,),
+        artifact_reader=type(
+            "VerifiedReader",
+            (),
+            {"read": lambda self, descriptor: content},
+        )(),
+    )
+
+    assert len(outputs) == 1
+    assert verifications == 0

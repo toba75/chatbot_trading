@@ -176,9 +176,12 @@ class _ExactGenerationClient:
         assert exact is True
         return len(self.points)
 
-    def scroll(self, *, collection_name, scroll_filter):
+    def scroll_pages(self, *, collection_name, scroll_filter):
         del collection_name, scroll_filter
-        return tuple(self.points)
+        midpoint = max(1, len(self.points) // 2)
+        yield tuple(self.points[:midpoint])
+        if midpoint < len(self.points):
+            yield tuple(self.points[midpoint:])
 
     def delete(self, *, collection_name, points_selector):
         del collection_name, points_selector
@@ -357,6 +360,49 @@ def _frontiere_ka_ne_lit_aucune_table_privee_sp() -> None:
     assert "knowledge_projections_latest_publication_idx" in migration_text
 
 
+def _lots_qdrant_ne_sont_jamais_tous_soumis_a_lavance() -> None:
+    class BoundedPoints:
+        def __init__(self, count: int, max_ahead: int) -> None:
+            self.count = count
+            self.max_ahead = max_ahead
+            self.pulled = 0
+            self.completed = 0
+            self.lock = __import__("threading").Lock()
+
+        def __iter__(self):
+            for index in range(self.count):
+                with self.lock:
+                    if self.pulled - self.completed >= self.max_ahead:
+                        raise AssertionError("lots Qdrant matérialisés sans borne")
+                    self.pulled += 1
+                yield {"id": str(index), "vector": {}, "payload": {}}
+
+    source = BoundedPoints(count=12, max_ahead=2)
+
+    class SlowClient:
+        def upsert(self, *, collection_name, points):
+            del collection_name
+            __import__("time").sleep(0.002)
+            with source.lock:
+                source.completed += len(points)
+
+        def count(self, **_kwargs):
+            return 0
+
+        def delete(self, **_kwargs):
+            return None
+
+    QdrantVectorIndex(client=SlowClient())._upsert_batches(
+        collection_name="ostrading-test-knowledge-access",
+        qdrant_points=iter(source),
+        batch_size=1,
+        max_parallel_batches=2,
+        on_batch_published=None,
+        fence_mutation=None,
+    )
+    assert source.pulled == source.completed == source.count
+
+
 def test_validate_projection_review_regressions_unit() -> None:
     _contrat_project_document_reste_unique_et_strict()
     _pipeline_classe_les_reprises_sans_table_parallele()
@@ -366,3 +412,4 @@ def test_validate_projection_review_regressions_unit() -> None:
     _item_canonique_invalide_interdit_index_partiel()
     _contrats_persistants_nont_aucune_valeur_metier_implicite()
     _frontiere_ka_ne_lit_aucune_table_privee_sp()
+    _lots_qdrant_ne_sont_jamais_tous_soumis_a_lavance()
