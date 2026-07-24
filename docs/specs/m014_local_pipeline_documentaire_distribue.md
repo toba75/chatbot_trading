@@ -257,6 +257,22 @@ d’artefact, de collection ou d’environnement échoue avant mutation.
 
 ## Migration, activation et rollback explicites
 
+La stratégie durable de compatibilité et de reprise est gouvernée par
+ADR-053 : les migrations suivent `expand -> rejeu/requalification -> contract`,
+révoquent tout claim de relais dont le payload est réécrit et reconstruisent
+les publications par l’outbox du contexte propriétaire.
+
+### DIST-006 - Upgrade d’un pipeline local historique
+
+- **Given** des jobs M-004/M-005, des versions canoniques publiées avant M-014
+  et des projections historiques sous une identité locale durable ;
+- **When** les migrations M-014 finales sont appliquées pendant la phase
+  d’expansion et que les relais/workers courants reprennent le travail ;
+- **Then** les contrats historiques sont enrichis depuis leurs preuves
+  durables, les anciens claims sont révoqués, les publications traversent les
+  outbox locales et les projections convergent de nouveau vers `SEARCHABLE`
+  sans DML transactionnel croisant SP et KA.
+
 Le pipeline livré applique les migrations 023 à 028 après le socle 022 : fan-out
 et version d’orchestration (023), publication canonique (024), projection KA
 (025), identité complète des complétions (026), durcissement du relais et des

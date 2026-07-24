@@ -58,6 +58,7 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 | [ADR-050](ADR-050-separer-qualification-fonctionnelle-et-isolation.md) | Séparer qualification fonctionnelle et qualification d’isolation | Acceptée | 2026-07-23 | ADR-049 | Aucune |
 | [ADR-051](ADR-051-execution-granite-cuda-stricte.md) | Exécution Granite-Docling CUDA stricte | Acceptée | 2026-07-23 | Sélection automatique du périphérique Granite local | Partiellement par ADR-052 pour M-014 uniquement ; CUDA stricte reste applicable |
 | [ADR-052](ADR-052-distribution-locale-pages-quota-granite-fenced.md) | Distribution locale à la page et quota Granite fenced | Proposée | 2026-07-23 | Pour M-014 uniquement, mentions de flotte CPU multiarchitecture ou distante d’ADR-051 | Aucune |
+| [ADR-053](ADR-053-migrations-m014-expand-contract-rejeu.md) | Migrations M-014 par expand/contract et rejeu local | Proposée | 2026-07-24 | Aucun | Aucune |
 
 ## ADR DDD
 
@@ -79,7 +80,7 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 ## Prochains numéros disponibles
 
 ```text
-Prochaine ADR technique: ADR-053
+Prochaine ADR technique: ADR-054
 Prochaine DDD-ADR: DDD-ADR-013
 ```
 
