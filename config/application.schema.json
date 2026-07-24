@@ -310,7 +310,7 @@
             },
             "granite_concurrency": {
               "type": "integer",
-              "minimum": 1
+              "const": 1
             },
             "local_distribution": {
               "type": "object",

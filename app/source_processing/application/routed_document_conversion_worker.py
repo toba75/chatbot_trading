@@ -10,7 +10,12 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Protocol
 
-from app.contracts.technical_jobs import ClaimedJob, GraniteModelStillRunning, JobStatus
+from app.contracts.technical_jobs import (
+    ClaimedJob,
+    GraniteExecutionCapability,
+    GraniteModelStillRunning,
+    JobStatus,
+)
 from app.source_processing.adapters.docling_granite_conversion import (
     GraniteDoclingConversionError,
     GraniteDoclingConversionRequest,
@@ -107,6 +112,10 @@ NON_NATIVE_TERMINAL_ERROR_CODES = frozenset(
         "GEMMA_VISION_MODEL_MISMATCH",
         "GEMMA_VISION_RENDERING_FAILED",
         "GEMMA_VISION_IMAGE_TOO_LARGE",
+        "GRANITE_DOCLING_TIMEOUT",
+        "GEMMA_VISION_TIMEOUT",
+        "JOB_LEASE_LOST",
+        "GRANITE_CAPACITY_CONFIGURATION_INVALID",
     }
 )
 
@@ -114,12 +123,6 @@ NON_NATIVE_TERMINAL_ERROR_CODES = frozenset(
 class OriginalPathResolver(Protocol):
     def resolve_internal_path(self, storage_ref: Any) -> Path:
         """Résout l'original privé depuis le seul bounded context SP."""
-
-
-class GraniteSlotLease(Protocol):
-    """Lease opaque fournie par l'adaptateur de capacité au cas d'usage SP."""
-
-    claimed_job: ClaimedJob
 
 
 class GraniteWorker(Protocol):
@@ -144,7 +147,7 @@ class GraniteCapacityController(Protocol):
         claimed_job: ClaimedJob,
         lease_seconds: int,
         heartbeat_seconds: float,
-        start_model: Callable[[GraniteSlotLease], Any],
+        start_model: Callable[[GraniteExecutionCapability], Any],
     ) -> GraniteExecution:
         """Exécute un modèle seulement sous le double fencing actif."""
 
@@ -308,8 +311,8 @@ class _GranitePageConverter:
                 claimed_job=self._claimed_job,
                 lease_seconds=self._lease_seconds,
                 heartbeat_seconds=self._heartbeat_seconds,
-                start_model=lambda lease: _RunningGraniteRouteConversion(
-                    lease=lease,
+                start_model=lambda capability: _RunningGraniteRouteConversion(
+                    capability=capability,
                     request=request,
                     source_path=source_path,
                     granite_converter=self._granite_converter,
@@ -331,7 +334,7 @@ class _RunningGraniteRouteConversion:
     def __init__(
         self,
         *,
-        lease: GraniteSlotLease,
+        capability: GraniteExecutionCapability,
         request: PageConversionRequest,
         source_path: Path,
         granite_converter: IsolatedGraniteDoclingConverter,
@@ -341,7 +344,7 @@ class _RunningGraniteRouteConversion:
         gateway_max_output_tokens: int,
         expected_model_id: str,
     ) -> None:
-        self._lease = lease
+        self._capability = capability
         self._request = request
         self._source_path = source_path
         self._gemma_converter = gemma_converter
@@ -363,7 +366,7 @@ class _RunningGraniteRouteConversion:
                 route_name=request.route_name.value,
                 routing_policy_version=request.routing_policy_version.value,
             ),
-            lease=lease,
+            capability=capability,
         )
 
     def wait(self, *, timeout_seconds: float) -> PageConversionArtifact:
@@ -425,7 +428,7 @@ class _RunningGraniteRouteConversion:
         self._state = "gemma-initial" if rotation == 0 else "gemma-rotated"
         self._active_process = self._gemma_converter.start(
             self._gemma_request(render_rotation_degrees=rotation),
-            lease=self._lease,
+            capability=self._capability,
         )
 
     def _start_segment(self, segment_index: int) -> None:
@@ -436,7 +439,7 @@ class _RunningGraniteRouteConversion:
                 render_segment_index=segment_index,
                 render_segment_count=GEMMA_DENSE_RENDER_SEGMENT_COUNT,
             ),
-            lease=self._lease,
+            capability=self._capability,
         )
 
     def _gemma_request(
@@ -760,6 +763,10 @@ class RoutedDocumentConversionWorker:
                 getattr(error, "code", str(error)), retryable=False
             ) from error
         except ValueError as error:
+            if getattr(error, "code", None) == "GRANITE_CAPACITY_CONFIGURATION_INVALID":
+                raise WorkerProcessingError(
+                    "GRANITE_CAPACITY_CONFIGURATION_INVALID", retryable=False
+                ) from error
             raise WorkerProcessingError(
                 "DOCLING_PAGE_MANIFEST_MISMATCH", retryable=False
             ) from error

@@ -26,6 +26,8 @@ from app.contracts.technical_jobs import (
     JobRecord,
     JobRequest,
     JobStatus,
+    _issue_granite_execution_capability,
+    require_granite_execution_capability,
 )
 from app.platform.job_runtime.granite_capacity import (
     GraniteCapacityConfigurationError,
@@ -340,7 +342,7 @@ def test_runtime_granite_supervise_heartbeat_annulation_et_terminal_atomique(
 
     legacy_repository = _Repository()
     legacy_repository.legacy_acquisitions = [None, legacy_repository.lease]
-    legacy_model_starts: list[GraniteSlotLease] = []
+    legacy_model_starts: list[object] = []
     legacy_execution = GraniteCapacityController(
         repository=legacy_repository
     ).execute_claimed_job(
@@ -353,7 +355,8 @@ def test_runtime_granite_supervise_heartbeat_annulation_et_terminal_atomique(
         ),
     )
     assert legacy_execution.model_result == {"legacy": "ok"}
-    assert legacy_model_starts == [legacy_repository.lease]
+    assert len(legacy_model_starts) == 1
+    require_granite_execution_capability(legacy_model_starts[0])
     assert legacy_repository.releases == [legacy_repository.lease]
 
     parameter = inspect.signature(JobRequest).parameters["execution_requirements"]
@@ -414,8 +417,8 @@ def test_runtime_granite_supervise_heartbeat_annulation_et_terminal_atomique(
         Exception,
         "GEMMA_VISION_TIMEOUT",
     )
-    _assert_arret_popen_retentable_et_erreur_primaire(tmp_path)
     monkeypatch.undo()
+    _assert_arret_popen_retentable_et_erreur_primaire(tmp_path)
     _assert_perte_lease(False)
     _assert_perte_lease(True)
     _assert_classification_erreur_primaire()
@@ -557,7 +560,7 @@ def _assert_arret_popen_retentable_et_erreur_primaire(tmp_path: Path) -> None:
         input_payload=b"{}",
         timeout_seconds=0.001,
     )
-    time.sleep(0.002)
+    timed._deadline = time.monotonic() - 1  # type: ignore[attr-defined]
     with pytest.raises(ExceptionGroup) as captured:
         timed.wait(timeout_seconds=0.01)
     assert getattr(captured.value.exceptions[0], "code", None) == "GRANITE_DOCLING_TIMEOUT"
@@ -641,8 +644,9 @@ class _ImmediateProcess:
 
 
 class _TransitionGraniteConverter:
-    def start(self, request, *, lease):
-        del request, lease
+    def start(self, request, *, capability):
+        del request
+        require_granite_execution_capability(capability)
         return _ImmediateProcess(
             GraniteDoclingConversionError("GRANITE_DOCLING_UNAVAILABLE")
         )
@@ -652,8 +656,9 @@ class _TransitionGemmaConverter:
     def __init__(self) -> None:
         self.starts = 0
 
-    def start(self, request, *, lease):
-        del request, lease
+    def start(self, request, *, capability):
+        del request
+        require_granite_execution_capability(capability)
         self.starts += 1
         return _ImmediateProcess(
             GemmaVisionConversionResponse(
@@ -689,7 +694,7 @@ def _assert_transition_heartbeat(
     )
     gemma = _TransitionGemmaConverter()
     running = _RunningGraniteRouteConversion(
-        lease=_lease(),
+        capability=_issue_granite_execution_capability(),
         request=request,
         source_path=source,
         granite_converter=_TransitionGraniteConverter(),
@@ -778,8 +783,8 @@ class _UnusedNativeConverter:
 
 
 class _ForbiddenGemmaConverter:
-    def start(self, request, *, lease):
-        raise AssertionError((request, lease))
+    def start(self, request, *, capability):
+        raise AssertionError((request, capability))
 
 
 class _BlockingGraniteProcess:
@@ -813,18 +818,21 @@ class _BlockingGraniteConverter:
     def __init__(
         self,
         *,
+        worker_id: str,
         events: list[str],
         events_lock: threading.Lock,
         release_models: threading.Event,
     ) -> None:
+        self.worker_id = worker_id
         self.events = events
         self.events_lock = events_lock
         self.release_models = release_models
 
-    def start(self, request, *, lease):
+    def start(self, request, *, capability):
         del request
+        require_granite_execution_capability(capability)
         with self.events_lock:
-            self.events.append(f"start:{lease.claimed_job.lease_owner}")
+            self.events.append(f"start:{self.worker_id}")
         return _BlockingGraniteProcess(self.release_models)
 
 
@@ -1034,6 +1042,7 @@ def _assert_builder_quota_reel(
         worker_module,
         "IsolatedGraniteDoclingConverter",
         lambda **_arguments: _BlockingGraniteConverter(
+            worker_id=f"worker-documents-{len(workers_under_construction) + 1}",
             events=events,
             events_lock=events_lock,
             release_models=release_models,
@@ -1047,6 +1056,7 @@ def _assert_builder_quota_reel(
 
     identity = _lease().claimed_job.job.request.environment_identity
     fixtures = tuple(_built_scan_fixture(index, tmp_path) for index in (1, 2, 3))
+    workers_under_construction: list[object] = []
     workers = []
     for index, (source, run, source_path, claimed) in enumerate(fixtures, start=1):
         worker_id = f"worker-documents-{index}"
@@ -1093,6 +1103,7 @@ def _assert_builder_quota_reel(
                 claimed,
             )
         )
+        workers_under_construction.append(workers[-1])
 
     executor = ThreadPoolExecutor(max_workers=3)
     futures = []
@@ -1220,6 +1231,27 @@ def _assert_drainage_lifecycle_et_heartbeat_serialise() -> None:
     lifecycle.close()
     assert events.count("presence:stop") == 1
     assert sum(event.startswith("drain:") for event in events) == 1
+
+    sigterm_events: list[str] = []
+    sigterm_lifecycle = RegisteredDocumentWorkerLifecycle(
+        worker_registry=_LifecycleRegistry(sigterm_events),
+        capacity_controller=_LifecycleController(sigterm_events),
+        job_heartbeat_coordinator=_LifecycleHeartbeatCoordinator(sigterm_events),
+        worker=_worker(),
+        presence_heartbeat=_LifecyclePresence(sigterm_events),
+        presence_lease_seconds=30,
+        shutdown_seconds=9,
+        now=lambda: datetime(2026, 7, 24, 13, 0, tzinfo=timezone.utc),
+    )
+    sigterm_lifecycle.start()
+    sigterm_lifecycle.handle_termination(15, None)
+    deadline = time.monotonic() + 2
+    while not any(event.startswith("drain:") for event in sigterm_events):
+        assert time.monotonic() < deadline
+        time.sleep(0.01)
+    assert sigterm_lifecycle.admissions_open is False
+    assert "drain:worker-documents-1:2026-07-24T13:00:09+00:00" in sigterm_events
+    sigterm_lifecycle.close()
 
     lost_events: list[str] = []
     lost_presence = _LifecyclePresence(lost_events)

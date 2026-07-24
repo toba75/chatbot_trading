@@ -53,6 +53,7 @@ ALTER TABLE platform.technical_jobs
             )
             AND storage_environment IS NOT NULL
             AND storage_environment IN ('development', 'test', 'production')
+            AND storage_environment = environment
         )
     ),
     ADD CONSTRAINT technical_jobs_convert_page_requirements CHECK (
@@ -89,6 +90,7 @@ CREATE INDEX technical_jobs_granite_claim_idx
         capacity_device,
         storage_environment,
         priority,
+        (CASE WHEN status = 'pending' THEN 0 ELSE 1 END),
         sequence
     )
     WHERE status IN ('pending', 'running')

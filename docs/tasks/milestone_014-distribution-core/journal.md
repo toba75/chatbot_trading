@@ -542,3 +542,41 @@
 - Commit GREEN : `a9bffc487fb484533995a47aca4154397db7830a`.
 - ADR nouvelle : non requise. Le changement complète l’exploitation décidée
   par ADR-052 et ne livre aucun fan-out ni assemblage T-005.
+
+## 2026-07-24 - Fermeture des findings runtime résiduels T-004
+
+- Précondition GREEN : commit `2fcc22c2d`, arbre propre et scope M14 live à
+  40 nœuds exécutés exactement une fois, sans absence, surprise ni duplication.
+- RED comportemental séparé : `342fa4baa` démontre l'échec de la terminaison
+  `Popen` retentable, la course de complétion concurrente et les lacunes de
+  drainage, capability et plan SQL. `f41384dd4` démontre que le contrat
+  `JobRequest` restait spécialisé, que les codes terminaux publics manquaient
+  et qu'une soumission directe pouvait rejouer avec une priorité divergente.
+- Le contrat technique est désormais générique. L'égalité entre environnement
+  d'exécution et environnement de stockage est stricte, et seul le contrôleur
+  Granite peut émettre la capability opaque transmise aux adaptateurs modèle.
+- Le cycle worker ferme d'abord les admissions, sérialise le dernier heartbeat,
+  maintient le heartbeat couplé du travail déjà admis jusqu'à son terme, puis
+  publie `DRAINING` à la deadline configurée. Le gestionnaire SIGTERM délègue ce
+  drainage hors du contexte signal ; le double arrêt reste idempotent.
+- Les timeouts Docling Granite et Gemma, la perte de lease et la configuration
+  Granite invalide conservent leurs codes stables jusqu'au contrat public. Une
+  terminaison de processus qui échoue reste retentable, et l'erreur primaire
+  demeure observable dans l'`ExceptionGroup`.
+- La complétion PostgreSQL concurrente est sérialisée par l'identité de
+  complétion. Une répétition identique retourne le même terminal ; une valeur
+  divergente échoue de façon stable. La soumission directe compare aussi la
+  priorité et la migration 022 interdit un environnement de stockage divergent.
+- Le claim Granite priorise le slot expiré déjà possédé sans tri dépendant des
+  paramètres. La preuve réelle interdit `Sort`, `Incremental Sort` et scan
+  séquentiel, tout en contrôlant lignes, filtres et buffers sur la volumétrie
+  M14.
+- Régression M13-environments fermée : le préflight d'identité et le runner de
+  migrations restent explicitement exécutés dans `_run_worker` avant le chemin
+  de claim, tandis que la boucle extraite conserve une complexité bornée.
+- GREEN intermédiaire : Ruff ciblé et C901 ; scopes `m002` 34 nœuds, `m004` 45
+  nœuds, `m013_fastapi` 70 nœuds, `m013_environments` 49 nœuds et `governance`
+  25 nœuds ; M14 offline 38/38 et live 40/40. Les validations finales sont
+  consignées par le commit GREEN de cette tranche.
+- ADR nouvelle : non requise. La correction applique ADR-052 sans changer sa
+  décision structurante et exclut explicitement T-005 et les tâches suivantes.

@@ -7,12 +7,17 @@ import json
 import os
 import subprocess
 import sys
+import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping
 
-from app.contracts.technical_jobs import GraniteModelStillRunning
+from app.contracts.technical_jobs import (
+    GraniteExecutionCapability,
+    GraniteModelStillRunning,
+    require_granite_execution_capability,
+)
 from app.source_processing.adapters.docling_native_conversion import (
     NativeDoclingConversionResponse,
 )
@@ -216,12 +221,11 @@ class IsolatedGraniteDoclingConverter:
         self,
         request: GraniteDoclingConversionRequest,
         *,
-        lease: object,
+        capability: GraniteExecutionCapability,
     ) -> "RunningGraniteDoclingConversion":
         if not isinstance(request, GraniteDoclingConversionRequest):
             raise ValueError("requête Granite-Docling invalide")
-        if lease is None:
-            raise ValueError("lease Granite-Docling requise")
+        require_granite_execution_capability(capability)
         manifest = GraniteDoclingAssetManifest.load(
             manifest_path=self._asset_manifest_path,
             assets_root=self._assets_root,
@@ -284,6 +288,7 @@ class RunningGraniteDoclingConversion:
         self._input_payload: bytes | None = input_payload
         self._deadline = time.monotonic() + float(timeout_seconds)
         self._terminated = False
+        self._termination_lock = threading.Lock()
 
     def wait(self, *, timeout_seconds: float) -> NativeDoclingConversionResponse:
         if (
@@ -294,8 +299,7 @@ class RunningGraniteDoclingConversion:
             raise ValueError("timeout Granite-Docling invalide")
         remaining_seconds = self._deadline - time.monotonic()
         if remaining_seconds <= 0:
-            self.terminate()
-            raise GraniteDoclingConversionError("GRANITE_DOCLING_TIMEOUT")
+            self._raise_timeout()
         input_payload = self._input_payload
         self._input_payload = None
         try:
@@ -305,10 +309,7 @@ class RunningGraniteDoclingConversion:
             )
         except subprocess.TimeoutExpired as error:
             if time.monotonic() >= self._deadline:
-                self.terminate()
-                raise GraniteDoclingConversionError(
-                    "GRANITE_DOCLING_TIMEOUT"
-                ) from error
+                self._raise_timeout(cause=error)
             raise GraniteModelStillRunning() from error
         try:
             payload = json.loads(stdout)
@@ -328,17 +329,32 @@ class RunningGraniteDoclingConversion:
         )
 
     def terminate(self) -> None:
-        if self._terminated:
-            return
-        self._terminated = True
-        if self._process.poll() is not None:
-            return
-        self._process.terminate()
+        with self._termination_lock:
+            if self._terminated:
+                return
+            if self._process.poll() is not None:
+                self._terminated = True
+                return
+            self._process.terminate()
+            try:
+                self._process.wait(timeout=5.0)
+            except subprocess.TimeoutExpired:
+                self._process.kill()
+                self._process.wait(timeout=5.0)
+            self._terminated = True
+
+    def _raise_timeout(self, *, cause: Exception | None = None) -> None:
+        timeout_error = GraniteDoclingConversionError("GRANITE_DOCLING_TIMEOUT")
         try:
-            self._process.wait(timeout=5.0)
-        except subprocess.TimeoutExpired:
-            self._process.kill()
-            self._process.wait(timeout=5.0)
+            self.terminate()
+        except Exception as termination_error:
+            raise ExceptionGroup(
+                "GRANITE_TIMEOUT_AND_TERMINATION_FAILURE",
+                [timeout_error, termination_error],
+            ) from timeout_error
+        if cause is not None:
+            raise timeout_error from cause
+        raise timeout_error
 
 
 def _native_response_request(request: GraniteDoclingConversionRequest):

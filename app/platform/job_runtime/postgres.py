@@ -228,7 +228,8 @@ class PostgresJobQueue:
             if existing_row is not None:
                 existing = _job_from_row(existing_row)
                 if (
-                    existing.request.payload != parsed_request.payload
+                    existing.request.priority is not parsed_request.priority
+                    or existing.request.payload != parsed_request.payload
                     or existing.request.execution_requirements
                     != parsed_request.execution_requirements
                 ):

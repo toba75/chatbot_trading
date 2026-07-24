@@ -11,6 +11,8 @@ import subprocess
 
 import pytest
 
+from app.contracts.technical_jobs import _issue_granite_execution_capability
+
 
 def _response(source: str) -> bytes:
     return json.dumps(
@@ -168,7 +170,10 @@ def _assert_parent_protocol(
         monkeypatch.setattr(
             runtime.subprocess, "Popen", lambda *args, **kwargs: _Popen()
         )
-        converted = converter.start(request, lease=object()).wait(timeout_seconds=1)
+        converted = converter.start(
+            request,
+            capability=_issue_granite_execution_capability(),
+        ).wait(timeout_seconds=1)
     else:
         monkeypatch.setattr(runtime.subprocess, "run", valid_run)
         converted = converter.convert(request)
@@ -208,7 +213,10 @@ def _assert_parent_protocol(
     )
     with pytest.raises(error_type, match=error_code):
         if hasattr(converter, "start"):
-            converter.start(request, lease=object()).wait(timeout_seconds=1)
+            converter.start(
+                request,
+                capability=_issue_granite_execution_capability(),
+            ).wait(timeout_seconds=1)
         else:
             converter.convert(request)
 

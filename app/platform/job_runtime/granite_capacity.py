@@ -17,6 +17,7 @@ from uuid import UUID
 
 from app.contracts.technical_jobs import (
     ClaimedJob,
+    GraniteExecutionCapability,
     GraniteModelStillRunning,
     JobEnvironmentIdentity,
     JobExecutionRequirements,
@@ -25,6 +26,7 @@ from app.contracts.technical_jobs import (
     JobRecord,
     JobRequest,
     JobStatus,
+    _issue_granite_execution_capability,
 )
 from app.platform.job_runtime import JobCatalog
 from app.platform.postgres import PostgresConnectionFactory
@@ -335,24 +337,38 @@ candidate_job AS MATERIALIZED (
      FOR UPDATE OF job SKIP LOCKED
      LIMIT 1
 ),
-candidate_slot AS MATERIALIZED (
+owned_expired_slot AS MATERIALIZED (
     SELECT slot.environment, slot.deployment_id, slot.slot_ordinal
       FROM platform.granite_slots AS slot
      WHERE slot.environment = %(environment)s
        AND slot.deployment_id = %(deployment_id)s
        AND EXISTS (SELECT 1 FROM candidate_job)
+       AND slot.lease_owner = %(worker_instance_id)s
+       AND slot.lease_until <= CURRENT_TIMESTAMP
+     FOR UPDATE OF slot SKIP LOCKED
+     LIMIT 1
+), fallback_slot AS MATERIALIZED (
+    SELECT slot.environment, slot.deployment_id, slot.slot_ordinal
+      FROM platform.granite_slots AS slot
+     WHERE slot.environment = %(environment)s
+       AND slot.deployment_id = %(deployment_id)s
+       AND EXISTS (SELECT 1 FROM candidate_job)
+       AND NOT EXISTS (SELECT 1 FROM owned_expired_slot)
        AND (slot.lease_owner IS NULL OR slot.lease_until <= CURRENT_TIMESTAMP)
        AND NOT EXISTS (
             SELECT 1 FROM platform.granite_slots AS held
              WHERE held.environment = %(environment)s
                AND held.deployment_id = %(deployment_id)s
                AND held.lease_owner = %(worker_instance_id)s
-               AND held.lease_until > CURRENT_TIMESTAMP
        )
-     ORDER BY CASE WHEN slot.lease_owner = %(worker_instance_id)s THEN 0 ELSE 1 END,
-              slot.slot_ordinal
+     ORDER BY slot.slot_ordinal
      FOR UPDATE OF slot SKIP LOCKED
      LIMIT 1
+), candidate_slot AS MATERIALIZED (
+    SELECT * FROM owned_expired_slot
+    UNION ALL
+    SELECT * FROM fallback_slot
+    LIMIT 1
 ),
 claimed_job AS (
     UPDATE platform.technical_jobs AS job
@@ -1052,6 +1068,10 @@ class PostgresGraniteSlotRepository(
         with self._connection_factory.connect() as connection:
             with connection.transaction(), connection.cursor() as cursor:
                 cursor.execute(
+                    "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                    (envelope.completion_id,),
+                )
+                cursor.execute(
                     """
                     SELECT job_id, claim_generation, claim_token::text,
                            worker_instance_id, slot_ordinal, slot_generation,
@@ -1236,7 +1256,7 @@ class GraniteCapacityController:
         job_names: tuple[str, ...],
         execution_requirements: JobExecutionRequirements,
         start_model: Callable[
-            [GraniteSlotLease], SupervisedGraniteProcess[ModelResultT]
+            [GraniteExecutionCapability], SupervisedGraniteProcess[ModelResultT]
         ],
         success_envelope: Callable[
             [GraniteSlotLease, ModelResultT], GranitePageTerminalEnvelope
@@ -1288,7 +1308,7 @@ class GraniteCapacityController:
         lease_seconds: int,
         heartbeat_seconds: float,
         start_model: Callable[
-            [GraniteSlotLease], SupervisedGraniteProcess[ModelResultT]
+            [GraniteExecutionCapability], SupervisedGraniteProcess[ModelResultT]
         ],
     ) -> GraniteExecution[ModelResultT]:
         """Protège le parcours M-004 sans produire les jobs page réservés à T-005."""
@@ -1301,12 +1321,14 @@ class GraniteCapacityController:
         acquire = getattr(self._repository, "acquire_for_claimed_job", None)
         if not callable(acquire) or not callable(start_model):
             raise GraniteCapacityConfigurationError("LEGACY_EXECUTION_PORT_INCOMPLETE")
+        self._require_admissions_open()
         lease = acquire(
             worker=worker,
             claimed_job=claimed_job,
             lease_seconds=parsed_lease_seconds,
         )
         while lease is None:
+            self._require_admissions_open()
             time.sleep(parsed_heartbeat_seconds)
             lease = acquire(
                 worker=worker,
@@ -1323,8 +1345,14 @@ class GraniteCapacityController:
         self._repository.release(lease)
         return GraniteExecution(lease=lease, model_result=result)
 
+    def begin_draining(self) -> None:
+        """Interdit les admissions sans interrompre le couple actif."""
+
+        with self._process_lock:
+            self._draining = True
+
     def terminate_active_process(self) -> None:
-        """Arrête le modèle détenu avant de rendre le replica réassignable."""
+        """Force l'arrêt du modèle après perte de lease ou échéance de drainage."""
 
         with self._process_lock:
             self._draining = True
@@ -1339,7 +1367,7 @@ class GraniteCapacityController:
         lease_seconds: int,
         heartbeat_seconds: float,
         start_model: Callable[
-            [GraniteSlotLease], SupervisedGraniteProcess[ModelResultT]
+            [GraniteExecutionCapability], SupervisedGraniteProcess[ModelResultT]
         ],
         on_model_error: Callable[[GraniteSlotLease, Exception], None],
     ) -> tuple[GraniteSlotLease, ModelResultT]:
@@ -1347,7 +1375,7 @@ class GraniteCapacityController:
             if self._draining:
                 raise GraniteSlotLeaseLostError()
         try:
-            process = start_model(lease)
+            process = start_model(_issue_granite_execution_capability())
         except Exception as model_error:
             on_model_error(lease, model_error)
             raise AssertionError("unreachable")
@@ -1390,6 +1418,11 @@ class GraniteCapacityController:
             with self._process_lock:
                 if self._active_process is process:
                     self._active_process = None
+
+    def _require_admissions_open(self) -> None:
+        with self._process_lock:
+            if self._draining:
+                raise GraniteSlotLeaseLostError()
 
     def _release_legacy_after_model_error(
         self,

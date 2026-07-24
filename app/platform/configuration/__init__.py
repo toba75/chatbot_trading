@@ -668,6 +668,18 @@ def _validate_cross_field_invariants(payload: Mapping[str, Any], path: Path) -> 
             str(path),
         )
 
+    if (
+        workers["granite_concurrency"] != 1
+        or workers["local_distribution"]["granite_slots_per_worker"] != 1
+        or workers["granite_concurrency"]
+        != workers["local_distribution"]["granite_slots_per_worker"]
+    ):
+        raise ApplicationConfigurationError(
+            CONFIG_SCHEMA_INVALID,
+            "services.workers.granite_concurrency et granite_slots_per_worker doivent être égaux à 1",
+            str(path),
+        )
+
     docker_host = deployment_hosts["docker_local"]
     host_bind = docker_host["bind_host"]
     public_bindings = {"", "0.0.0.0", "::", "[::]", "*"}

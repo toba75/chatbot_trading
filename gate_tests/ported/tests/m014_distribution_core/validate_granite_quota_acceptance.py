@@ -17,6 +17,7 @@ from app.contracts.technical_jobs import (
     JobRecord,
     JobRequest,
     JobStatus,
+    require_granite_execution_capability,
 )
 
 
@@ -201,7 +202,13 @@ def _controleur_unique_libere_sous_la_meme_identite_fenced() -> None:
         heartbeat_seconds=5,
         job_names=("CONVERT_PAGE",),
         execution_requirements=lease.claimed_job.job.request.execution_requirements,
-        start_model=lambda acquired: _ModelProcess({"slot": acquired.slot_ordinal}),
+        start_model=lambda capability: _ModelProcess(
+            {
+                "slot": lease.slot_ordinal,
+                "authorized": require_granite_execution_capability(capability)
+                is capability,
+            }
+        ),
         success_envelope=lambda acquired, result: _terminal(
             acquired,
             GranitePageTerminalStatus.SUCCEEDED,
@@ -216,7 +223,7 @@ def _controleur_unique_libere_sous_la_meme_identite_fenced() -> None:
 
     assert execution is not None
     assert execution.lease == lease
-    assert execution.model_result == {"slot": 1}
+    assert execution.model_result == {"slot": 1, "authorized": True}
     assert repository.terminals[0][0] == lease
 
 

@@ -7,7 +7,10 @@ from pathlib import Path
 
 import pytest
 
-from app.contracts.technical_jobs import GraniteModelStillRunning
+from app.contracts.technical_jobs import (
+    GraniteModelStillRunning,
+    _issue_granite_execution_capability,
+)
 
 from app.source_processing.application.convert_routed_pages import (
     ConvertRoutedPagesCommand,
@@ -302,7 +305,7 @@ def _verifier_adaptateur_gemma_apres_indisponibilite_granite(tmp_path: Path) -> 
     source_path.write_bytes(b"%PDF-1.7\nGemma concrete recovery\n%%EOF\n")
     request = _request()
 
-    lease = object()
+    capability = _issue_granite_execution_capability()
 
     class _Process:
         def __init__(self, outcome) -> None:
@@ -317,7 +320,7 @@ def _verifier_adaptateur_gemma_apres_indisponibilite_granite(tmp_path: Path) -> 
             raise AssertionError("annulation inattendue")
 
     class _ConcreteGranitePort:
-        def start(self, granite_request, *, lease):
+        def start(self, granite_request, *, capability):
             return _Process(
                 GraniteDoclingConversionError("GRANITE_DOCLING_UNAVAILABLE")
             )
@@ -326,7 +329,7 @@ def _verifier_adaptateur_gemma_apres_indisponibilite_granite(tmp_path: Path) -> 
         def __init__(self) -> None:
             self.requests = []
 
-        def start(self, gemma_request, *, lease):
+        def start(self, gemma_request, *, capability):
             self.requests.append(gemma_request)
             return _Process(
                 GemmaVisionConversionResponse(
@@ -342,7 +345,7 @@ def _verifier_adaptateur_gemma_apres_indisponibilite_granite(tmp_path: Path) -> 
 
     gemma_port = _ConcreteGemmaPort()
     process = _RunningGraniteRouteConversion(
-        lease=lease,
+        capability=capability,
         request=request,
         source_path=source_path,
         granite_converter=_ConcreteGranitePort(),
@@ -426,7 +429,7 @@ def _verifier_recuperation_orientation_gemma_apres_bbox_invalide(
         def __init__(self) -> None:
             self.requests = []
 
-        def start(self, gemma_request, *, lease):
+        def start(self, gemma_request, *, capability):
             self.requests.append(gemma_request)
             if gemma_request.render_rotation_degrees == 0:
                 return _Process(
@@ -464,14 +467,14 @@ def _verifier_recuperation_orientation_gemma_apres_bbox_invalide(
             raise AssertionError("annulation inattendue")
 
     class _GraniteIndisponible:
-        def start(self, request, *, lease):
+        def start(self, request, *, capability):
             return _Process(
                 GraniteDoclingConversionError("GRANITE_DOCLING_UNAVAILABLE")
             )
 
     gemma_port = _GemmaAvecRecuperationOrientation()
     process = _RunningGraniteRouteConversion(
-        lease=object(),
+        capability=_issue_granite_execution_capability(),
         request=request,
         source_path=source_path,
         granite_converter=_GraniteIndisponible(),
@@ -655,7 +658,7 @@ def _verifier_segmentation_gemma_bornee_apres_troncature(tmp_path: Path) -> None
         def __init__(self) -> None:
             self.requests = []
 
-        def start(self, gemma_request, *, lease):
+        def start(self, gemma_request, *, capability):
             self.requests.append(gemma_request)
             signature = (
                 gemma_request.render_rotation_degrees,
@@ -703,14 +706,14 @@ def _verifier_segmentation_gemma_bornee_apres_troncature(tmp_path: Path) -> None
             raise AssertionError("annulation inattendue")
 
     class _GraniteIndisponible:
-        def start(self, request, *, lease):
+        def start(self, request, *, capability):
             return _Process(
                 GraniteDoclingConversionError("GRANITE_DOCLING_UNAVAILABLE")
             )
 
     gemma_port = _GemmaPageDense()
     process = _RunningGraniteRouteConversion(
-        lease=object(),
+        capability=_issue_granite_execution_capability(),
         request=_request(),
         source_path=source_path,
         granite_converter=_GraniteIndisponible(),

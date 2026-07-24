@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 import importlib.util
+import json
 from pathlib import Path
 import shutil
 import subprocess
@@ -814,7 +815,7 @@ def _assert_granite_claim_index(
         assert not any(
             node.get("Node Type") in {"Sort", "Incremental Sort"}
             for node in nodes
-        )
+        ), json.dumps(plan, indent=2)
         candidate_limits = tuple(
             node
             for node in nodes

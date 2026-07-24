@@ -47,6 +47,37 @@ class GraniteModelStillRunning(TimeoutError):
     """Le sous-processus Granite reste actif à l'échéance d'un heartbeat."""
 
 
+_GRANITE_EXECUTION_CAPABILITY_PROOF = object()
+
+
+class GraniteExecutionCapability:
+    """Preuve opaque qu'un démarrage modèle est autorisé par le contrôleur."""
+
+    __slots__ = ("_proof",)
+
+    def __new__(cls, *_arguments: Any, **_keywords: Any) -> "GraniteExecutionCapability":
+        raise TypeError("GRANITE_EXECUTION_CAPABILITY_NOT_INSTANTIABLE")
+
+
+def _issue_granite_execution_capability() -> GraniteExecutionCapability:
+    capability = object.__new__(GraniteExecutionCapability)
+    object.__setattr__(
+        capability,
+        "_proof",
+        _GRANITE_EXECUTION_CAPABILITY_PROOF,
+    )
+    return capability
+
+
+def require_granite_execution_capability(value: Any) -> GraniteExecutionCapability:
+    if (
+        type(value) is not GraniteExecutionCapability
+        or getattr(value, "_proof", None) is not _GRANITE_EXECUTION_CAPABILITY_PROOF
+    ):
+        raise ValueError("GRANITE_EXECUTION_CAPABILITY_REQUIRED")
+    return value
+
+
 @dataclass(frozen=True, slots=True)
 class JobEnvironmentIdentity:
     """Identité immutable de l'installation qui produit ou exécute un job."""
@@ -158,16 +189,11 @@ class JobRequest:
             JobExecutionRequirements,
         ):
             raise ValueError("execution_requirements invalides")
-        if job_name == "CONVERT_PAGE":
-            if self.execution_requirements is None:
-                raise ValueError("execution_requirements CONVERT_PAGE absentes")
-            if (
-                self.execution_requirements.contract_name != "CONVERT_PAGE"
-                or self.execution_requirements.contract_version != "1.0"
-            ):
-                raise ValueError("contrat CONVERT_PAGE inconnu")
-        elif self.execution_requirements is not None:
-            raise ValueError("execution_requirements interdites pour ce job")
+        if (
+            self.execution_requirements is not None
+            and self.execution_requirements.storage_environment != self.environment
+        ):
+            raise ValueError("storage_environment incohérent avec environment")
         object.__setattr__(self, "payload", _freeze_mapping(self.payload, "payload"))
 
     @property
@@ -318,6 +344,7 @@ def _freeze_payload_value(value: Any, field_name: str) -> Any:
 
 __all__ = [
     "ClaimedJob",
+    "GraniteExecutionCapability",
     "GraniteModelStillRunning",
     "JobEnvironmentIdentity",
     "JobExecutionRequirements",
@@ -327,4 +354,5 @@ __all__ = [
     "JobRequest",
     "JobStatus",
     "JobSubmissionDecision",
+    "require_granite_execution_capability",
 ]
