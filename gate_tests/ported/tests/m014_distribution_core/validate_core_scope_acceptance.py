@@ -13,6 +13,7 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
 
 def test_perimetre_m014_core_reste_borne_a_t001_t004() -> None:
     _assert_aucune_operation_reservee_a_t009()
+    _assert_identifiant_precondition_canonique()
     _assert_runbook_sans_cli_t009()
     _assert_gpu_requis_par_compose()
 
@@ -46,6 +47,26 @@ def _assert_aucune_operation_reservee_a_t009() -> None:
             / "gate_tests/ported/tests/m014_distribution_core"
             / filename
         ).exists()
+
+
+def _assert_identifiant_precondition_canonique() -> None:
+    # Given le scope public M14 utilise l'identifiant m014_distribution_core.
+    gate = tomllib.loads((REPOSITORY_ROOT / "gate.toml").read_text(encoding="utf-8"))
+    m014_nodes = [
+        node for node in gate["nodes"] if node["scope"] == "m014_distribution_core"
+    ]
+
+    # When les identifiants et leurs dépendances sont inspectés.
+    node_ids = {node["id"] for node in m014_nodes}
+    dependencies = {
+        dependency
+        for node in m014_nodes
+        for dependency in node.get("depends_on", ())
+    }
+
+    # Then l'ID de précondition suit exactement la convention precondition.<scope>.
+    assert "precondition.m014_distribution_core" in node_ids
+    assert "precondition.m014-distribution-core" not in node_ids | dependencies
 
 
 def _assert_runbook_sans_cli_t009() -> None:
