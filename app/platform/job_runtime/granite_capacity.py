@@ -18,6 +18,7 @@ from app.contracts.page_execution import (
     GranitePageTerminalEnvelope,
     GranitePageTerminalStatus,
     GraniteSlotLease,
+    PageCompletionMessage,
 )
 from app.contracts.technical_jobs import (
     ClaimedJob,
@@ -1003,6 +1004,11 @@ class PostgresGraniteSlotRepository(
             raise GraniteCapacityConfigurationError("TERMINAL_ENVELOPE_INVALID")
         claimed = parsed_lease.claimed_job
         canonical_payload = envelope.canonical_payload_json()
+        expected = PageCompletionMessage.from_execution(
+            claimed_job=claimed,
+            granite_lease=parsed_lease,
+            envelope=envelope,
+        )
         with self._connection_factory.connect() as connection:
             with connection.transaction(), connection.cursor() as cursor:
                 cursor.execute(
@@ -1011,10 +1017,11 @@ class PostgresGraniteSlotRepository(
                 )
                 cursor.execute(
                     """
-                    SELECT job_id, trace_id, claim_generation, claim_token::text,
+                    SELECT environment, deployment_id, configuration_hash,
+                           job_id, trace_id, claim_generation, claim_token::text,
                            worker_instance_id, slot_ordinal, slot_generation,
                            slot_token::text, payload, payload_fingerprint,
-                           terminal_status, failure_reason, configuration_hash
+                           terminal_status, failure_reason
                       FROM platform.page_completion_outbox
                      WHERE completion_id = %(completion_id)s
                      FOR UPDATE
@@ -1023,27 +1030,11 @@ class PostgresGraniteSlotRepository(
                 )
                 existing = cursor.fetchone()
                 if existing is not None:
-                    actual = _row_values(existing, 13, "EXISTING_COMPLETION")
-                    expected = (
-                        claimed.job.job_id,
-                        claimed.trace_id,
-                        claimed.claim_generation,
-                        claimed.claim_token,
-                        claimed.lease_owner,
-                        parsed_lease.slot_ordinal,
-                        parsed_lease.slot_generation,
-                        parsed_lease.slot_token,
-                        json.loads(canonical_payload),
-                        envelope.payload_fingerprint,
-                        envelope.status.value,
-                        envelope.failure_reason,
-                        self._environment_identity.configuration_hash,
+                    actual = PageCompletionMessage.from_database_row(
+                        completion_id=envelope.completion_id,
+                        row=_row_values(existing, 15, "EXISTING_COMPLETION"),
                     )
-                    actual_payload = _mapping(actual[8], "completion_payload")
-                    comparable_actual = actual[:8] + (
-                        json.loads(_canonical_json(actual_payload)),
-                    ) + actual[9:]
-                    if comparable_actual != expected:
+                    if actual != expected:
                         raise GranitePageCompletionConflictError()
                     return _terminal_job_record(claimed, envelope)
                 cursor.execute(

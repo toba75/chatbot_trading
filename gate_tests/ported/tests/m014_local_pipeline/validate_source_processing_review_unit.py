@@ -18,7 +18,10 @@ from app.source_processing.application.document_commands import (
     DocumentConversionState,
     DocumentConversionStatus,
 )
-from app.source_processing.application.execute_document_page import PageRouteConverters
+from app.source_processing.application.execute_document_page import (
+    PageRouteConverters,
+    page_claim_artifact_identity,
+)
 from app.source_processing.application.fan_out_document_pages import (
     DISTRIBUTED_PAGE_FAN_OUT_VERSION,
     DistributedDocumentConversionWorker,
@@ -162,28 +165,38 @@ def _erreur_artefact_devient_completion_failed_et_garde_configuration() -> None:
     assert message.configuration_hash == "c" * 64
 
 
-def _publication_artefact_refuse_un_claim_expire() -> None:
+def _artefact_perdant_ne_peut_pas_occuper_le_chemin_du_claim_suivant() -> None:
     with TemporaryDirectory(prefix="ostrading-m014-atomic-") as temporary:
         root = Path(temporary).resolve()
         store = LocalPageArtifactStore(profile_root=root)
-        identity = LocalArtifactIdentity(
+        expected = LocalArtifactIdentity(
             environment="test",
             artifact_ref="artifact:source_processing.local/test/pages/page-1.json",
             relative_path="pages/page-1.json",
         )
-        try:
-            store.write_immutable(
-                identity=identity,
-                content=b"resultat",
-                authorize_publication=lambda: (_ for _ in ()).throw(
-                    RuntimeError("JOB_LEASE_LOST")
-                ),
-            )
-        except Exception as error:
-            assert "JOB_LEASE_LOST" in str(error)
-        else:
-            raise AssertionError("un claim expiré ne doit pas publier l'artefact")
-        assert not identity.resolve_under(root).exists()
+        request, _, _ = _page_jobs()
+        losing = _claimed(request, job_number=83, owner="worker-documents-a")
+        winning = replace(
+            _claimed(request, job_number=83, owner="worker-documents-b"),
+            claim_generation=2,
+            claim_token="00000000-0000-4000-8000-000000000054",
+            execution_attempts=2,
+        )
+        losing_identity = page_claim_artifact_identity(
+            expected_identity=expected,
+            claimed_job=losing,
+        )
+        winning_identity = page_claim_artifact_identity(
+            expected_identity=expected,
+            claimed_job=winning,
+        )
+        store.write_claim_scoped(identity=losing_identity, content=b"ancien")
+        store.write_claim_scoped(identity=winning_identity, content=b"nouveau")
+
+        assert losing_identity != winning_identity
+        assert losing_identity.resolve_under(root).read_bytes() == b"ancien"
+        assert winning_identity.resolve_under(root).read_bytes() == b"nouveau"
+        assert not expected.resolve_under(root).exists()
 
 
 def _codes_m014_sont_des_echecs_publics_stables() -> None:
@@ -215,5 +228,5 @@ def test_corrections_revue_source_processing() -> None:
     _commande_publique_selectionne_explicitement_le_fan_out_m014()
     _worker_distribue_materialise_une_source_immutable_puis_cree_les_pages()
     _erreur_artefact_devient_completion_failed_et_garde_configuration()
-    _publication_artefact_refuse_un_claim_expire()
+    _artefact_perdant_ne_peut_pas_occuper_le_chemin_du_claim_suivant()
     _codes_m014_sont_des_echecs_publics_stables()

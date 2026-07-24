@@ -22,6 +22,7 @@ from app.knowledge_access.adapters.postgres_canonical_publication_relay import (
     PostgresCanonicalPublicationRelay,
 )
 from app.knowledge_access.adapters.postgres_projection_read import (
+    KnowledgeProjectionVersionConflictError,
     PostgresProjectionReadRepository,
 )
 from app.knowledge_access.adapters.live_documentary_retrieval import (
@@ -497,6 +498,30 @@ def test_projection_postgresql_qdrant_complete_rejouee_et_isolee() -> None:
                 max_parallel_workers=2,
                 inference_gateway=_BibliographicGateway(),
             )
+            expired_claim = claimed
+            with factory.connect() as connection, connection.transaction(), connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE platform.technical_jobs
+                       SET lease_expires_at = CURRENT_TIMESTAMP - INTERVAL '1 second'
+                     WHERE job_id = %s
+                    """,
+                    (expired_claim.job.job_id,),
+                )
+            claimed = queue.claim_next(
+                owner_id="worker-projection-m014-live-reprise",
+                lease_seconds=30,
+                job_names=("PROJECT_DOCUMENT",),
+            )
+            assert claimed is not None
+            assert claimed.claim_generation == expired_claim.claim_generation + 1
+            with pytest.raises(KnowledgeProjectionVersionConflictError):
+                runtime._set_running_progress(
+                    claimed_job=expired_claim,
+                    projection_id=claimed.job.request.payload["projection_id"],
+                    completed_units=0,
+                    total_units=1,
+                )
             with factory.connect() as connection, connection.cursor() as cursor:
                 cursor.execute(
                     """
@@ -507,7 +532,7 @@ def test_projection_postgresql_qdrant_complete_rejouee_et_isolee() -> None:
                     (claimed.job.request.payload["projection_id"],),
                 )
                 assert cursor.fetchone() == ("REQUESTED", "QUEUED", 0, 1)
-            first = runtime.execute_projection(request=claimed.job.request)
+            first = runtime.execute_projection(claimed_job=claimed)
             for resumable_status in ("BUILT", "INDEXING"):
                 with factory.connect() as connection, connection.transaction(), connection.cursor() as cursor:
                     cursor.execute(
@@ -522,7 +547,7 @@ def test_projection_postgresql_qdrant_complete_rejouee_et_isolee() -> None:
                             claimed.job.request.payload["projection_id"],
                         ),
                     )
-                resumed = runtime.execute_projection(request=claimed.job.request)
+                resumed = runtime.execute_projection(claimed_job=claimed)
                 assert resumed["index_generation"] == first["index_generation"]
             qdrant_client = QdrantHttpClient(
                 base_url=f"http://127.0.0.1:{qdrant_port}",
@@ -557,7 +582,7 @@ def test_projection_postgresql_qdrant_complete_rejouee_et_isolee() -> None:
                 ProjectionRuntimeError,
                 match="PROJECTION_REPLAY_INCOMPLETE",
             ):
-                runtime.execute_projection(request=claimed.job.request)
+                runtime.execute_projection(claimed_job=claimed)
             with factory.connect() as connection, connection.cursor() as cursor:
                 cursor.execute(
                     """
@@ -568,24 +593,14 @@ def test_projection_postgresql_qdrant_complete_rejouee_et_isolee() -> None:
                     (claimed.job.request.payload["projection_id"],),
                 )
                 assert cursor.fetchone() == (
-                    "SEARCHABLE",
+                    "STALE",
                     "SUCCEEDED",
                     first["index_generation"],
                 )
-            with factory.connect() as connection, connection.transaction(), connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    UPDATE knowledge_access.knowledge_projections
-                       SET status = 'INDEXING', execution_phase = 'RUNNING',
-                           aggregate_version = aggregate_version + 1
-                     WHERE projection_id = %s
-                    """,
-                    (claimed.job.request.payload["projection_id"],),
-                )
-            repaired = runtime.execute_projection(request=claimed.job.request)
+            repaired = runtime.execute_projection(claimed_job=claimed)
             assert repaired["index_generation"] == first["index_generation"]
             assert repaired["published_point_count"] == first["published_point_count"]
-            replay = runtime.execute_projection(request=claimed.job.request)
+            replay = runtime.execute_projection(claimed_job=claimed)
             assert replay == repaired
             assert first["published_point_count"] == first["chunk_count"]
             with factory.connect() as connection, connection.cursor() as cursor:
@@ -665,7 +680,7 @@ def test_projection_postgresql_qdrant_complete_rejouee_et_isolee() -> None:
                 ProjectionRuntimeError,
                 match="CANONICAL_ARTIFACT_HASH_MISMATCH",
             ):
-                runtime.execute_projection(request=claimed.job.request)
+                runtime.execute_projection(claimed_job=claimed)
             with factory.connect() as connection, connection.cursor() as cursor:
                 cursor.execute(
                     """

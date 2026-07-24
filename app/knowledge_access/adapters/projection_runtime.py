@@ -19,7 +19,12 @@ from psycopg import OperationalError
 
 from app.contracts.event_envelope import EventEnvelope
 from app.contracts.llm_inference import LlmInferenceGateway
-from app.contracts.technical_jobs import JobEnvironmentIdentity, JobRequest
+from app.contracts.technical_jobs import (
+    ClaimedJob,
+    JobEnvironmentIdentity,
+    JobRequest,
+    JobStatus,
+)
 from app.contracts.source_references import (
     ACCEPTED_CANONICAL_VERSION_STATUS,
     CanonicalSourceRef,
@@ -602,7 +607,9 @@ class ProjectionRuntimeService:
             "configuration_hash": self.configuration_hash,
         }
 
-    def execute_projection(self, *, request: JobRequest) -> Mapping[str, Any]:
+    def execute_projection(self, *, claimed_job: ClaimedJob) -> Mapping[str, Any]:
+        claimed = _claimed_projection_job(claimed_job)
+        request = claimed.job.request
         failure_projection_id: str | None = None
         try:
             contract = self._validated_contract(request)
@@ -633,11 +640,17 @@ class ProjectionRuntimeService:
                 or contract.canonical_artifact_sha256 != publication[2]
             ):
                 raise ProjectionRuntimeError("PROJECTION_JOB_REPLAY_DIVERGENCE")
-            stages = projection_resume_stages(projection.status.value)
-            if stages == ("VERIFY",):
-                return self._replay_searchable_projection(projection=projection)
-            if projection.status is ProjectionStatus.REQUESTED:
-                building = repository.save_transition(projection.start_build())
+            if projection.status is ProjectionStatus.SEARCHABLE:
+                return self._replay_searchable_projection(
+                    projection=projection,
+                    claimed_job=claimed,
+                    repository=repository,
+                )
+            if projection.status in {ProjectionStatus.REQUESTED, ProjectionStatus.STALE}:
+                building = repository.save_transition_fenced(
+                    projection.start_build(),
+                    claimed_job=claimed,
+                )
             elif projection.status is ProjectionStatus.BUILDING:
                 building = projection
             else:
@@ -658,17 +671,24 @@ class ProjectionRuntimeService:
             )
             if building is not None:
                 self._set_running_progress(
+                    claimed_job=claimed,
                     projection_id=building.projection_id,
                     completed_units=0,
                     total_units=len(chunk_projection.chunks) + 1,
                 )
-                built = repository.save_transition(building.mark_built())
+                built = repository.save_transition_fenced(
+                    building.mark_built(),
+                    claimed_job=claimed,
+                )
             elif projection.status is ProjectionStatus.BUILT:
                 built = projection
             else:
                 built = None
             if built is not None:
-                indexing = repository.save_transition(built.start_indexing())
+                indexing = repository.save_transition_fenced(
+                    built.start_indexing(),
+                    claimed_job=claimed,
+                )
             elif projection.status is ProjectionStatus.INDEXING:
                 indexing = projection
             else:
@@ -710,7 +730,10 @@ class ProjectionRuntimeService:
                 dense_dimensions=_DENSE_DIMENSIONS,
                 api_key=self.qdrant_api_key,
             )
-            client.ensure_collection(collection_name=schema.collection_name)
+            self._run_fenced_qdrant_mutation(
+                claimed,
+                lambda: client.ensure_collection(collection_name=schema.collection_name),
+            )
             publication = QdrantVectorIndex(client=client).repair_generation(
                 VectorIndexPublishRequest(
                     collection_name=schema.collection_name,
@@ -723,9 +746,14 @@ class ProjectionRuntimeService:
                 max_parallel_batches=self.max_parallel_workers,
                 batch_size=_PROJECTION_INDEX_BATCH_SIZE,
                 on_batch_published=lambda completed_units: self._set_running_progress(
+                    claimed_job=claimed,
                     projection_id=indexing.projection_id,
                     completed_units=completed_units,
                     total_units=len(points) + 1,
+                ),
+                fence_mutation=lambda operation: self._run_fenced_qdrant_mutation(
+                    claimed,
+                    operation,
                 ),
             )
             if publication.published_point_count != len(points):
@@ -739,21 +767,25 @@ class ProjectionRuntimeService:
                 repository=repository,
                 projection=indexing,
                 canonical_document=canonical_document,
+                claimed_job=claimed,
             )
             self._set_running_progress(
+                claimed_job=claimed,
                 projection_id=indexing.projection_id,
                 completed_units=len(points) + 1,
                 total_units=len(points) + 1,
             )
             searchable = indexing.mark_searchable()
-            repository.save_projection_outputs(
+            repository.save_projection_outputs_fenced(
                 projection=searchable,
                 chunk_count=len(chunk_projection.chunks),
                 chunks=chunk_projection.chunks[:3],
                 state_observed_at=_now(),
                 index_generation=generation,
+                claimed_job=claimed,
             )
             self._mark_succeeded(
+                claimed_job=claimed,
                 projection_id=searchable.projection_id,
                 completed_units=len(chunk_projection.chunks) + 1,
                 total_units=len(chunk_projection.chunks) + 1,
@@ -771,6 +803,7 @@ class ProjectionRuntimeService:
                 raise ProjectionRetryableError(error_code) from exc
             if failure_projection_id is not None:
                 self._mark_failed_if_possible(
+                    claimed_job=claimed,
                     projection_id=failure_projection_id,
                     error_code=error_code,
                 )
@@ -795,12 +828,13 @@ class ProjectionRuntimeService:
     def terminalize_retry_exhausted(
         self,
         *,
-        request: JobRequest,
+        claimed_job: ClaimedJob,
         error_code: str,
     ) -> None:
         """Publie l'échec final uniquement pour le contrat causal revalidé."""
 
-        contract = self._validated_contract(request)
+        claimed = _claimed_projection_job(claimed_job)
+        contract = self._validated_contract(claimed.job.request)
         self._require_projection_identity(contract.projection_id)
         projection = PostgresKnowledgeProjectionRepository(
             connection_factory=self.connection_factory,
@@ -818,6 +852,7 @@ class ProjectionRuntimeService:
         ):
             raise ProjectionRuntimeError("PROJECTION_JOB_REPLAY_DIVERGENCE")
         self._mark_failed_if_possible(
+            claimed_job=claimed,
             projection_id=contract.projection_id,
             error_code=error_code,
         )
@@ -885,6 +920,7 @@ class ProjectionRuntimeService:
         repository: PostgresKnowledgeProjectionRepository,
         projection: KnowledgeProjection,
         canonical_document: CanonicalChunkDocument,
+        claimed_job: ClaimedJob,
     ) -> None:
         with self.connection_factory.connect() as connection:
             with connection.cursor() as cursor:
@@ -918,15 +954,18 @@ class ProjectionRuntimeService:
                 evidences=_bibliographic_text_evidences(canonical_document.items),
             )
         )
-        repository.save_bibliographic_metadata(
+        repository.save_bibliographic_metadata_fenced(
             projection_id=projection.projection_id,
             metadata=metadata,
+            claimed_job=claimed_job,
         )
 
     def _replay_searchable_projection(
         self,
         *,
         projection: KnowledgeProjection,
+        claimed_job: ClaimedJob,
+        repository: PostgresKnowledgeProjectionRepository,
     ) -> Mapping[str, Any]:
         with self.connection_factory.connect() as connection:
             with connection.cursor() as cursor:
@@ -957,7 +996,11 @@ class ProjectionRuntimeService:
             or row[3] != row[4]
             or row[5] != self.qdrant_collection_name
         ):
-            raise ProjectionRuntimeError("PROJECTION_REPLAY_INCOMPLETE")
+            self._mark_searchable_projection_stale(
+                projection=projection,
+                claimed_job=claimed_job,
+                repository=repository,
+            )
         client = QdrantHttpClient(
             base_url=self.qdrant_url,
             timeout_seconds=self.qdrant_timeout_seconds,
@@ -968,7 +1011,11 @@ class ProjectionRuntimeService:
             projection.canonical_version_id
         )
         if canonical_document is None:
-            raise ProjectionRuntimeError("PROJECTION_REPLAY_INCOMPLETE")
+            self._mark_searchable_projection_stale(
+                projection=projection,
+                claimed_job=claimed_job,
+                repository=repository,
+            )
         chunk_projection = ProjectCanonicalChunksHandler(
             canonical_source_reader=self,
         ).project_from_canonical_version(
@@ -1002,7 +1049,11 @@ class ProjectionRuntimeService:
             index_schema=schema,
         )
         if generation != row[1]:
-            raise ProjectionRuntimeError("PROJECTION_REPLAY_INCOMPLETE")
+            self._mark_searchable_projection_stale(
+                projection=projection,
+                claimed_job=claimed_job,
+                repository=repository,
+            )
         points = tuple(
             _point_with_environment_identity(
                 VectorIndexPoint.from_encoded_chunk(
@@ -1027,7 +1078,11 @@ class ProjectionRuntimeService:
         if row[0] != len(points) or not QdrantVectorIndex(client=client).verify_generation(
             request
         ):
-            raise ProjectionRuntimeError("PROJECTION_REPLAY_INCOMPLETE")
+            self._mark_searchable_projection_stale(
+                projection=projection,
+                claimed_job=claimed_job,
+                repository=repository,
+            )
         return {
             "projection_id": projection.projection_id,
             "chunk_count": row[0],
@@ -1036,11 +1091,32 @@ class ProjectionRuntimeService:
             "bibliographic_metadata_status": "EXTRACTED",
         }
 
-    def _set_running_progress(self, *, projection_id: str, completed_units: int, total_units: int) -> None:
+    def _mark_searchable_projection_stale(
+        self,
+        *,
+        projection: KnowledgeProjection,
+        claimed_job: ClaimedJob,
+        repository: PostgresKnowledgeProjectionRepository,
+    ) -> None:
+        repository.save_transition_fenced(
+            projection.mark_stale(),
+            claimed_job=claimed_job,
+        )
+        raise ProjectionRetryableError("PROJECTION_REPLAY_INCOMPLETE")
+
+    def _set_running_progress(
+        self,
+        *,
+        claimed_job: ClaimedJob,
+        projection_id: str,
+        completed_units: int,
+        total_units: int,
+    ) -> None:
         if total_units < 1 or completed_units < 0 or completed_units > total_units:
             raise ValueError("progression projection invalide")
         with self.connection_factory.connect() as connection:
             with connection.transaction(), connection.cursor() as cursor:
+                self._lock_active_claim(cursor, claimed_job)
                 cursor.execute(
                     """
                     UPDATE knowledge_access.knowledge_projections
@@ -1063,9 +1139,17 @@ class ProjectionRuntimeService:
                 if cursor.rowcount != 1:
                     raise KnowledgeProjectionVersionConflictError()
 
-    def _mark_succeeded(self, *, projection_id: str, completed_units: int, total_units: int) -> None:
+    def _mark_succeeded(
+        self,
+        *,
+        claimed_job: ClaimedJob,
+        projection_id: str,
+        completed_units: int,
+        total_units: int,
+    ) -> None:
         with self.connection_factory.connect() as connection:
             with connection.transaction(), connection.cursor() as cursor:
+                self._lock_active_claim(cursor, claimed_job)
                 cursor.execute(
                     """
                     UPDATE knowledge_access.knowledge_projections
@@ -1089,9 +1173,16 @@ class ProjectionRuntimeService:
                 if cursor.rowcount != 1:
                     raise KnowledgeProjectionVersionConflictError()
 
-    def _mark_failed_if_possible(self, *, projection_id: str, error_code: str) -> None:
+    def _mark_failed_if_possible(
+        self,
+        *,
+        claimed_job: ClaimedJob,
+        projection_id: str,
+        error_code: str,
+    ) -> None:
         with self.connection_factory.connect() as connection:
             with connection.transaction(), connection.cursor() as cursor:
+                self._lock_active_claim(cursor, claimed_job)
                 cursor.execute(
                     """
                     UPDATE knowledge_access.knowledge_projections
@@ -1112,6 +1203,49 @@ class ProjectionRuntimeService:
                         self.configuration_hash,
                     ),
                 )
+
+    def _run_fenced_qdrant_mutation(
+        self,
+        claimed_job: ClaimedJob,
+        operation: Any,
+    ) -> object:
+        if not callable(operation):
+            raise ValueError("mutation Qdrant invalide")
+        with self.connection_factory.connect() as connection:
+            with connection.transaction(), connection.cursor() as cursor:
+                self._lock_active_claim(cursor, claimed_job)
+                return operation()
+
+    def _lock_active_claim(self, cursor: Any, claimed_job: ClaimedJob) -> None:
+        claimed = _claimed_projection_job(claimed_job)
+        request = claimed.job.request
+        cursor.execute(
+            """
+            SELECT job_id
+              FROM platform.technical_jobs
+             WHERE job_id = %(job_id)s
+               AND environment = %(environment)s
+               AND deployment_id = %(deployment_id)s
+               AND configuration_hash = %(configuration_hash)s
+               AND status = 'running'
+               AND lease_owner = %(lease_owner)s
+               AND claim_generation = %(claim_generation)s
+               AND claim_token = %(claim_token)s::uuid
+               AND lease_expires_at > CURRENT_TIMESTAMP
+             FOR UPDATE
+            """,
+            {
+                "job_id": claimed.job.job_id,
+                "environment": request.environment,
+                "deployment_id": request.deployment_id,
+                "configuration_hash": request.idempotence_key.configuration_hash,
+                "lease_owner": claimed.lease_owner,
+                "claim_generation": claimed.claim_generation,
+                "claim_token": claimed.claim_token,
+            },
+        )
+        if cursor.fetchone() is None:
+            raise KnowledgeProjectionVersionConflictError()
 
 
 def _canonical_items_payload(*, artifact: Any, canonical_ref: CanonicalSourceRef) -> tuple[dict[str, Any], ...]:
@@ -1153,22 +1287,6 @@ def _point_with_environment_identity(
             "configuration_hash": configuration_hash,
         },
     )
-
-
-def projection_resume_stages(status: str) -> tuple[str, ...]:
-    """Étapes déterministes à rejouer depuis chaque état public persistant."""
-
-    stages = {
-        "REQUESTED": ("BUILD", "INDEX", "FINALIZE"),
-        "BUILDING": ("BUILD", "INDEX", "FINALIZE"),
-        "BUILT": ("INDEX", "FINALIZE"),
-        "INDEXING": ("INDEX", "FINALIZE"),
-        "SEARCHABLE": ("VERIFY",),
-    }
-    try:
-        return stages[status]
-    except (KeyError, TypeError) as error:
-        raise ProjectionRuntimeError("PROJECTION_STATE_NOT_RESUMABLE") from error
 
 
 def projection_failure_disposition(exception: Exception) -> str:
@@ -1349,6 +1467,16 @@ def _projection_error_code(exception: Exception) -> str:
     return "PROJECTION_WORKER_UNEXPECTED_ERROR"
 
 
+def _claimed_projection_job(value: ClaimedJob) -> ClaimedJob:
+    if (
+        not isinstance(value, ClaimedJob)
+        or value.job.status is not JobStatus.RUNNING
+        or value.job.request.job_name != PROJECT_DOCUMENT_JOB_NAME
+    ):
+        raise ProjectionRuntimeError("PROJECTION_RUNNING_CLAIM_REQUIRED")
+    return value
+
+
 __all__ = [
     "LOCAL_PROJECTION_PROFILE",
     "PROJECT_DOCUMENT_JOB_NAME",
@@ -1357,5 +1485,4 @@ __all__ = [
     "ProjectionRuntimeService",
     "QdrantHttpClient",
     "projection_failure_disposition",
-    "projection_resume_stages",
 ]

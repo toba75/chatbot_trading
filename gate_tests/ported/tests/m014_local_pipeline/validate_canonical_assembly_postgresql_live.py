@@ -303,10 +303,17 @@ def _page_result(request: JobRequest, store: LocalPageArtifactStore) -> PageResu
     payload = request.payload
     content = _page_bytes(payload["page_number"])
     expected = LocalArtifactIdentity.from_mapping(payload["expected_result_artifact"])
-    descriptor = store.write_immutable(
-        identity=expected,
+    claim_identity = LocalArtifactIdentity(
+        environment=expected.environment,
+        artifact_ref=(
+            f"artifact:source_processing.local/{expected.environment}/"
+            f"page-claims/assembly-live/{expected.relative_path}"
+        ),
+        relative_path=f"page-claims/assembly-live/{expected.relative_path}",
+    )
+    descriptor = store.write_claim_scoped(
+        identity=claim_identity,
         content=content,
-        authorize_publication=lambda: None,
     )
     page = payload["page_number"]
     return PageResultContract(

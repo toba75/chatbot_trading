@@ -192,7 +192,7 @@ def _run_worker(
         error_code: str | None = None
         try:
             try:
-                result = runtime.execute_projection(request=claimed.job.request)
+                result = runtime.execute_projection(claimed_job=claimed)
             except ProjectionRetryableError as exc:
                 error_code = exc.error_code
                 if claimed.execution_attempts < MAX_PROJECTION_ATTEMPTS:
@@ -210,7 +210,7 @@ def _run_worker(
                     def terminalize_retry() -> Any:
                         if error_code != "PROJECTION_LEASE_CONFLICT":
                             runtime.terminalize_retry_exhausted(
-                                request=claimed.job.request,
+                                claimed_job=claimed,
                                 error_code=error_code,
                             )
                         return job_runtime.queue.mark_failed(

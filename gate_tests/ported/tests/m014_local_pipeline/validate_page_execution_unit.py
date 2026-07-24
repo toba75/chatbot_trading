@@ -120,8 +120,7 @@ class _Writer:
     def __init__(self) -> None:
         self.writes = 0
 
-    def write_immutable(self, *, identity, content: bytes, authorize_publication):
-        authorize_publication()
+    def write_claim_scoped(self, *, identity, content: bytes):
         self.writes += 1
         return LocalArtifactDescriptor(
             identity=identity,

@@ -4,17 +4,21 @@ from __future__ import annotations
 
 import inspect
 import os
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import pytest
 
 from app.contracts.technical_jobs import (
+    ClaimedJob,
     JobEnvironmentIdentity,
     JobExecutionRequirements,
     JobIdempotenceKey,
     JobPriority,
+    JobRecord,
     JobRequest,
+    JobStatus,
 )
 from app.knowledge_access.adapters.projection_runtime import (
     ProjectionRuntimeError,
@@ -78,6 +82,26 @@ def _invalid_projection_request() -> JobRequest:
     )
 
 
+def _invalid_projection_claim() -> ClaimedJob:
+    request = _invalid_projection_request()
+    return ClaimedJob(
+        job=JobRecord(
+            sequence=1,
+            job_id="JOB-M002-000001",
+            request=request,
+            status=JobStatus.RUNNING,
+            result=None,
+            failure_reason=None,
+        ),
+        trace_id="TRACE-M014-INVALID-PROJECTION",
+        lease_owner="worker-projection-a",
+        lease_expires_at=datetime.now(UTC) + timedelta(minutes=5),
+        claim_generation=1,
+        claim_token="00000000-0000-4000-8000-000000000001",
+        execution_attempts=1,
+    )
+
+
 def _artefact_remplace_de_meme_taille_est_refuse_a_la_consommation() -> None:
     with TemporaryDirectory(prefix="ostrading-m014-revalidation-") as temporary:
         root = Path(temporary).resolve()
@@ -132,7 +156,7 @@ def _job_projection_invalide_ne_touche_pas_un_agregat_homonyme() -> None:
     )
 
     with pytest.raises(ProjectionRuntimeError, match="PROJECTION_JOB_PAYLOAD_INVALID"):
-        runtime.execute_projection(request=_invalid_projection_request())
+        runtime.execute_projection(claimed_job=_invalid_projection_claim())
 
 
 def _migrations_finales_restent_locales_et_revoquent_les_claims() -> None:

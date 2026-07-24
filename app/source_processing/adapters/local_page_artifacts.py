@@ -5,7 +5,6 @@ from __future__ import annotations
 import hashlib
 import os
 import shutil
-from collections.abc import Callable
 from pathlib import Path
 from uuid import uuid4
 
@@ -88,19 +87,18 @@ class LocalPageArtifactStore:
         descriptor.verify_content(content)
         return content
 
-    def write_immutable(
+    def write_claim_scoped(
         self,
         *,
         identity: LocalArtifactIdentity,
         content: bytes,
-        authorize_publication: Callable[[], None],
     ) -> LocalArtifactDescriptor:
         if not isinstance(identity, LocalArtifactIdentity):
             raise ArtifactContractError("ARTIFACT_IDENTITY_INVALID")
         if not isinstance(content, bytes) or len(content) == 0:
             raise ArtifactContractError("ARTIFACT_CONTENT_INVALID")
-        if not callable(authorize_publication):
-            raise ArtifactContractError("PAGE_PUBLICATION_AUTHORIZATION_INVALID")
+        if not identity.relative_path.startswith("page-claims/"):
+            raise ArtifactContractError("PAGE_CLAIM_ARTIFACT_IDENTITY_REQUIRED")
         path = identity.resolve_under(self._profile_root)
         path.parent.mkdir(parents=True, exist_ok=True)
         temporary = path.parent / f".{path.name}.{uuid4().hex}.tmp"
@@ -109,7 +107,6 @@ class LocalPageArtifactStore:
                 stream.write(content)
                 stream.flush()
                 os.fsync(stream.fileno())
-            authorize_publication()
             try:
                 os.link(temporary, path)
             except FileExistsError:

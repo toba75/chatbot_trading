@@ -232,6 +232,40 @@ class PageCompletionMessage:
             failure_reason=envelope.failure_reason,
         )
 
+    @classmethod
+    def from_database_row(
+        cls,
+        *,
+        completion_id: str,
+        row: Sequence[Any],
+    ) -> "PageCompletionMessage":
+        """Reconstruit une complétion avec l'unique ordre SQL contractuel."""
+
+        if (
+            isinstance(row, str | bytes)
+            or not isinstance(row, Sequence)
+            or len(row) != 15
+        ):
+            raise ValueError("PAGE_COMPLETION_ROW_INVALID")
+        return cls(
+            completion_id=completion_id,
+            environment=row[0],
+            deployment_id=row[1],
+            configuration_hash=row[2],
+            job_id=row[3],
+            trace_id=row[4],
+            claim_generation=row[5],
+            claim_token=row[6],
+            worker_instance_id=row[7],
+            slot_ordinal=row[8],
+            slot_generation=row[9],
+            slot_token=row[10],
+            payload=row[11],
+            payload_fingerprint=row[12],
+            terminal_status=row[13],
+            failure_reason=row[14],
+        )
+
 
 def _validate_slot_identity(
     *,

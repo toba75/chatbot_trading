@@ -8,7 +8,7 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 from app.contracts.source_references import SourceLocator
-from app.contracts.technical_jobs import JobEnvironmentIdentity
+from app.contracts.technical_jobs import ClaimedJob, JobEnvironmentIdentity
 from app.knowledge_access.application.extract_projected_bibliographic_metadata import (
     ProjectedBibliographicMetadata,
 )
@@ -137,9 +137,30 @@ class PostgresKnowledgeProjectionRepository:
         self,
         projection: KnowledgeProjection,
     ) -> KnowledgeProjection:
+        return self._save_transition(projection=projection, claimed_job=None)
+
+    def save_transition_fenced(
+        self,
+        projection: KnowledgeProjection,
+        *,
+        claimed_job: ClaimedJob,
+    ) -> KnowledgeProjection:
+        return self._save_transition(
+            projection=projection,
+            claimed_job=_ensure_claimed_job(claimed_job),
+        )
+
+    def _save_transition(
+        self,
+        *,
+        projection: KnowledgeProjection,
+        claimed_job: ClaimedJob | None,
+    ) -> KnowledgeProjection:
         parsed_projection = _ensure_projection(projection)
         with self._connection_factory.connect() as connection:
             with connection.transaction(), connection.cursor() as cursor:
+                if claimed_job is not None:
+                    _lock_active_projection_claim(cursor, claimed_job)
                 cursor.execute(
                     """
                     UPDATE knowledge_access.knowledge_projections
@@ -194,6 +215,44 @@ class PostgresKnowledgeProjectionRepository:
         state_observed_at: str,
         index_generation: str | None,
     ) -> None:
+        self._save_projection_outputs(
+            projection=projection,
+            chunk_count=chunk_count,
+            chunks=chunks,
+            state_observed_at=state_observed_at,
+            index_generation=index_generation,
+            claimed_job=None,
+        )
+
+    def save_projection_outputs_fenced(
+        self,
+        *,
+        projection: KnowledgeProjection,
+        chunk_count: int,
+        chunks: Sequence[KnowledgeChunk],
+        state_observed_at: str,
+        index_generation: str | None,
+        claimed_job: ClaimedJob,
+    ) -> None:
+        self._save_projection_outputs(
+            projection=projection,
+            chunk_count=chunk_count,
+            chunks=chunks,
+            state_observed_at=state_observed_at,
+            index_generation=index_generation,
+            claimed_job=_ensure_claimed_job(claimed_job),
+        )
+
+    def _save_projection_outputs(
+        self,
+        *,
+        projection: KnowledgeProjection,
+        chunk_count: int,
+        chunks: Sequence[KnowledgeChunk],
+        state_observed_at: str,
+        index_generation: str | None,
+        claimed_job: ClaimedJob | None,
+    ) -> None:
         if not isinstance(projection, KnowledgeProjection):
             raise ValueError("KnowledgeProjection invalide")
         samples = _ensure_chunks(chunks, projection=projection)
@@ -230,6 +289,8 @@ class PostgresKnowledgeProjectionRepository:
         profile = projection.projection_profile
         with self._connection_factory.connect() as connection:
             with connection.transaction(), connection.cursor() as cursor:
+                if claimed_job is not None:
+                    _lock_active_projection_claim(cursor, claimed_job)
                 cursor.execute(
                     """
                     SELECT aggregate_version, outputs_fingerprint
@@ -332,6 +393,32 @@ class PostgresKnowledgeProjectionRepository:
         projection_id: str,
         metadata: ProjectedBibliographicMetadata,
     ) -> None:
+        self._save_bibliographic_metadata(
+            projection_id=projection_id,
+            metadata=metadata,
+            claimed_job=None,
+        )
+
+    def save_bibliographic_metadata_fenced(
+        self,
+        *,
+        projection_id: str,
+        metadata: ProjectedBibliographicMetadata,
+        claimed_job: ClaimedJob,
+    ) -> None:
+        self._save_bibliographic_metadata(
+            projection_id=projection_id,
+            metadata=metadata,
+            claimed_job=_ensure_claimed_job(claimed_job),
+        )
+
+    def _save_bibliographic_metadata(
+        self,
+        *,
+        projection_id: str,
+        metadata: ProjectedBibliographicMetadata,
+        claimed_job: ClaimedJob | None,
+    ) -> None:
         if not isinstance(projection_id, str) or not projection_id.startswith("PROJ-"):
             raise ValueError("projection_id bibliographique invalide")
         if not isinstance(metadata, ProjectedBibliographicMetadata):
@@ -346,6 +433,8 @@ class PostgresKnowledgeProjectionRepository:
         ]
         with self._connection_factory.connect() as connection:
             with connection.transaction(), connection.cursor() as cursor:
+                if claimed_job is not None:
+                    _lock_active_projection_claim(cursor, claimed_job)
                 cursor.execute(
                     """
                     UPDATE knowledge_access.knowledge_projections
@@ -723,6 +812,46 @@ def _outputs_fingerprint(
     }
     serialized = json.dumps(payload, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
     return sha256(serialized.encode("utf-8")).hexdigest()
+
+
+def _ensure_claimed_job(value: ClaimedJob) -> ClaimedJob:
+    if not isinstance(value, ClaimedJob):
+        raise ValueError("claimed_job projection invalide")
+    return value
+
+
+def _lock_active_projection_claim(cursor: Any, claimed_job: ClaimedJob) -> None:
+    """Verrouille le claim Platform dans la transaction de mutation KA."""
+
+    claimed = _ensure_claimed_job(claimed_job)
+    request = claimed.job.request
+    cursor.execute(
+        """
+        SELECT job_id
+          FROM platform.technical_jobs
+         WHERE job_id = %(job_id)s
+           AND environment = %(environment)s
+           AND deployment_id = %(deployment_id)s
+           AND configuration_hash = %(configuration_hash)s
+           AND status = 'running'
+           AND lease_owner = %(lease_owner)s
+           AND claim_generation = %(claim_generation)s
+           AND claim_token = %(claim_token)s::uuid
+           AND lease_expires_at > CURRENT_TIMESTAMP
+         FOR UPDATE
+        """,
+        {
+            "job_id": claimed.job.job_id,
+            "environment": request.environment,
+            "deployment_id": request.deployment_id,
+            "configuration_hash": request.idempotence_key.configuration_hash,
+            "lease_owner": claimed.lease_owner,
+            "claim_generation": claimed.claim_generation,
+            "claim_token": claimed.claim_token,
+        },
+    )
+    if cursor.fetchone() is None:
+        raise KnowledgeProjectionVersionConflictError()
 
 
 def _ensure_projection(value: KnowledgeProjection) -> KnowledgeProjection:

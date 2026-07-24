@@ -14,6 +14,7 @@ from app.source_processing.domain.distribution_contracts import (
     DistributionContractError,
     PageResultContract,
     PageResultStatus,
+    claim_scoped_page_artifact_identity,
 )
 
 
@@ -247,9 +248,13 @@ def _validate_result_against_frozen_contract(
     ):
         raise DistributionContractError("PAGE_RESULT_REQUEST_DIVERGENCE")
     if result.status is PageResultStatus.SUCCEEDED:
+        expected_claim_artifact = claim_scoped_page_artifact_identity(
+            expected_identity=contract.expected_result_artifact,
+            execution=result.execution,
+        )
         if (
             result.result_artifact is None
-            or result.result_artifact.identity != contract.expected_result_artifact
+            or result.result_artifact.identity != expected_claim_artifact
         ):
             raise DistributionContractError("PAGE_RESULT_ARTIFACT_IDENTITY_DIVERGENT")
 

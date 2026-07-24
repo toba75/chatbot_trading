@@ -85,12 +85,29 @@ class PageResultStatus(str, Enum):
 
 
 class PageResultErrorCode(str, Enum):
+    DOCLING_PAGE_MANIFEST_MISMATCH = "DOCLING_PAGE_MANIFEST_MISMATCH"
+    DOCLING_PROVENANCE_MISSING = "DOCLING_PROVENANCE_MISSING"
     DOCLING_STANDARD_UNAVAILABLE = "DOCLING_STANDARD_UNAVAILABLE"
     OCRMYPDF_UNAVAILABLE = "OCRMYPDF_UNAVAILABLE"
+    SOURCE_FINGERPRINT_MISMATCH = "SOURCE_FINGERPRINT_MISMATCH"
     GRANITE_CAPACITY_CONFIGURATION_INVALID = "GRANITE_CAPACITY_CONFIGURATION_INVALID"
     GRANITE_CUDA_UNAVAILABLE = "GRANITE_CUDA_UNAVAILABLE"
     GRANITE_DOCLING_TIMEOUT = "GRANITE_DOCLING_TIMEOUT"
+    GRANITE_DOCLING_UNAVAILABLE = "GRANITE_DOCLING_UNAVAILABLE"
+    GRANITE_TIMEOUT_AND_TERMINATION_FAILURE = "GRANITE_TIMEOUT_AND_TERMINATION_FAILURE"
+    GEMMA_TIMEOUT_AND_TERMINATION_FAILURE = "GEMMA_TIMEOUT_AND_TERMINATION_FAILURE"
+    GEMMA_VISION_IMAGE_TOO_LARGE = "GEMMA_VISION_IMAGE_TOO_LARGE"
+    GEMMA_VISION_MODEL_MISMATCH = "GEMMA_VISION_MODEL_MISMATCH"
+    GEMMA_VISION_OUTPUT_INVALID = "GEMMA_VISION_OUTPUT_INVALID"
+    GEMMA_VISION_OUTPUT_TRUNCATED = "GEMMA_VISION_OUTPUT_TRUNCATED"
+    GEMMA_VISION_PAGE_MISSING = "GEMMA_VISION_PAGE_MISSING"
+    GEMMA_VISION_RENDERING_FAILED = "GEMMA_VISION_RENDERING_FAILED"
+    GEMMA_VISION_REQUEST_INVALID = "GEMMA_VISION_REQUEST_INVALID"
+    GEMMA_VISION_SOURCE_INVALID = "GEMMA_VISION_SOURCE_INVALID"
     GEMMA_VISION_TIMEOUT = "GEMMA_VISION_TIMEOUT"
+    GEMMA_VISION_UNAVAILABLE = "GEMMA_VISION_UNAVAILABLE"
+    GEMMA_VISION_WORKER_PROTOCOL_INVALID = "GEMMA_VISION_WORKER_PROTOCOL_INVALID"
+    GEMMA_VISION_WORKER_UNEXPECTED = "GEMMA_VISION_WORKER_UNEXPECTED"
     JOB_LEASE_LOST = "JOB_LEASE_LOST"
     WORKER_MEMORY_LIMIT_EXCEEDED = "WORKER_MEMORY_LIMIT_EXCEEDED"
     ARTIFACT_NOT_FOUND = "ARTIFACT_NOT_FOUND"
@@ -324,6 +341,34 @@ class PageExecutionIdentity:
             "claim_token": self.claim_token,
             "worker_instance_id": self.worker_instance_id,
         }
+
+
+def claim_scoped_page_artifact_identity(
+    *,
+    expected_identity: LocalArtifactIdentity,
+    execution: PageExecutionIdentity,
+) -> LocalArtifactIdentity:
+    """Dérive le chemin immutable privé de l'exécution fenced."""
+
+    if not isinstance(expected_identity, LocalArtifactIdentity):
+        raise ArtifactContractError("ARTIFACT_IDENTITY_INVALID")
+    if not isinstance(execution, PageExecutionIdentity):
+        raise DistributionContractError("PAGE_EXECUTION_IDENTITY_REQUIRED")
+    suffix = PurePosixPath(expected_identity.relative_path)
+    relative_path = str(
+        PurePosixPath("page-claims")
+        / execution.job_id
+        / f"generation-{execution.claim_generation}-{execution.claim_token}"
+        / suffix
+    )
+    return LocalArtifactIdentity(
+        environment=expected_identity.environment,
+        artifact_ref=(
+            f"artifact:source_processing.local/{expected_identity.environment}/"
+            f"{relative_path}"
+        ),
+        relative_path=relative_path,
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -1525,6 +1570,7 @@ __all__ = [
     "PageResultStatus",
     "PageTechnicalMetrics",
     "assemble_canonical_document_idempotence_key",
+    "claim_scoped_page_artifact_identity",
     "convert_page_idempotence_key",
     "page_manifest_sha256",
 ]

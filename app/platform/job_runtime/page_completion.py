@@ -253,7 +253,7 @@ class PostgresStandardPageExecutionRepository:
                 )
                 replay = cursor.fetchone()
                 if replay is not None:
-                    actual = _completion_message_from_row(
+                    actual = PageCompletionMessage.from_database_row(
                         completion_id=envelope.completion_id,
                         row=replay,
                     )
@@ -563,33 +563,6 @@ class InMemoryPageCompletionOutbox:
         result = replace(claim, message=divergent)
         self._claimed[completion_id] = result
         return result
-
-
-def _completion_message_from_row(
-    *,
-    completion_id: str,
-    row: Any,
-) -> PageCompletionMessage:
-    if not isinstance(row, tuple) or len(row) != 15:
-        raise RuntimeError("PAGE_COMPLETION_ROW_INVALID")
-    return PageCompletionMessage(
-        completion_id=completion_id,
-        environment=row[0],
-        deployment_id=row[1],
-        configuration_hash=row[2],
-        job_id=row[3],
-        trace_id=row[4],
-        claim_generation=row[5],
-        claim_token=row[6],
-        worker_instance_id=row[7],
-        slot_ordinal=row[8],
-        slot_generation=row[9],
-        slot_token=row[10],
-        payload=row[11],
-        payload_fingerprint=row[12],
-        terminal_status=row[13],
-        failure_reason=row[14],
-    )
 
 
 def _print_page_completion_observation(

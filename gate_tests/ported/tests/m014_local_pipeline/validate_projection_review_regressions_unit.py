@@ -26,7 +26,6 @@ from app.knowledge_access.adapters.projection_runtime import (
     ProjectionRuntimeError,
     _canonical_items_payload,
     projection_failure_disposition,
-    projection_resume_stages,
 )
 from app.knowledge_access.adapters.qdrant_vector_index import QdrantVectorIndex
 from app.knowledge_access.application.project_document_contract import (
@@ -113,12 +112,7 @@ def _contrat_project_document_reste_unique_et_strict() -> None:
         ProjectDocumentContract.from_job_request(_job_request(requirements=None))
 
 
-def _pipeline_reprend_chaque_etat_intermediaire() -> None:
-    assert projection_resume_stages("REQUESTED") == ("BUILD", "INDEX", "FINALIZE")
-    assert projection_resume_stages("BUILDING") == ("BUILD", "INDEX", "FINALIZE")
-    assert projection_resume_stages("BUILT") == ("INDEX", "FINALIZE")
-    assert projection_resume_stages("INDEXING") == ("INDEX", "FINALIZE")
-    assert projection_resume_stages("SEARCHABLE") == ("VERIFY",)
+def _pipeline_classe_les_reprises_sans_table_parallele() -> None:
     assert projection_failure_disposition(
         ProjectionRuntimeError("QDRANT_UNAVAILABLE")
     ) == "RETRY"
@@ -238,6 +232,7 @@ def _generation_qdrant_de_meme_taille_mais_etrangere_est_reparee() -> None:
         max_parallel_batches=1,
         batch_size=1,
         on_batch_published=lambda _completed: None,
+        fence_mutation=lambda operation: operation(),
     )
     assert publication.idempotent is False
     assert client.delete_count == 1
@@ -245,6 +240,67 @@ def _generation_qdrant_de_meme_taille_mais_etrangere_est_reparee() -> None:
     client.points[0]["payload"]["content_hash"] = "e" * 64
     assert index.verify_generation(request) is False
     assert client.delete_count == 1
+
+
+def _claim_perdu_interdit_le_batch_qdrant_suivant() -> None:
+    schema = VectorIndexSchema(
+        schema_version="qdrant-m014-fencing-v1",
+        collection_name="ostrading-test-knowledge-access",
+        dense_dimensions=2,
+        distance="cosine",
+        payload_schema_version="payload-m014-fencing-v1",
+    )
+    point = VectorIndexPoint(
+        point_id="KCHK-M014-FENCING-0001",
+        chunk_id="KCHK-M014-FENCING-0001",
+        content_hash="d" * 64,
+        dense_vector=(0.1, 0.2),
+        sparse_weights=(("preuve", 1.0),),
+        payload={
+            "chunk_id": "KCHK-M014-FENCING-0001",
+            "content_hash": "d" * 64,
+        },
+    )
+    request = VectorIndexPublishRequest(
+        collection_name=schema.collection_name,
+        index_generation="IDX-M014-FENCING-0001",
+        schema=schema,
+        build_fingerprint=BuildFingerprint("b" * 64),
+        points=(point,),
+        expected_point_count=1,
+    )
+    client = _ExactGenerationClient(
+        (
+            {
+                "id": "00000000-0000-4000-8000-000000000001",
+                "vector": {
+                    "dense": [9.0, 9.0],
+                    "sparse": {"indices": [1], "values": [9.0]},
+                },
+                "payload": {"index_generation": request.index_generation},
+            },
+        )
+    )
+    mutations = 0
+
+    def fence(operation):
+        nonlocal mutations
+        mutations += 1
+        if mutations == 2:
+            raise KnowledgeProjectionVersionConflictError()
+        return operation()
+
+    with pytest.raises(KnowledgeProjectionVersionConflictError):
+        QdrantVectorIndex(client=client).repair_generation(
+            request,
+            max_parallel_batches=1,
+            batch_size=1,
+            on_batch_published=lambda _completed: None,
+            fence_mutation=fence,
+        )
+
+    assert client.delete_count == 1
+    assert client.points == []
 
 
 def _item_canonique_invalide_interdit_index_partiel() -> None:
@@ -303,9 +359,10 @@ def _frontiere_ka_ne_lit_aucune_table_privee_sp() -> None:
 
 def test_validate_projection_review_regressions_unit() -> None:
     _contrat_project_document_reste_unique_et_strict()
-    _pipeline_reprend_chaque_etat_intermediaire()
+    _pipeline_classe_les_reprises_sans_table_parallele()
     _collection_qdrant_divergente_est_refusee()
     _generation_qdrant_de_meme_taille_mais_etrangere_est_reparee()
+    _claim_perdu_interdit_le_batch_qdrant_suivant()
     _item_canonique_invalide_interdit_index_partiel()
     _contrats_persistants_nont_aucune_valeur_metier_implicite()
     _frontiere_ka_ne_lit_aucune_table_privee_sp()

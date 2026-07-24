@@ -838,7 +838,7 @@ def _settle_processing_failure(
     job_queue: Any,
     heartbeat: Any,
 ) -> str:
-    """Publie SP avant tout échec terminal platform, puis permet la réconciliation."""
+    """Terminalise le claim platform avant de publier son échec dans SP."""
 
     if retryable and claimed.execution_attempts < max_attempts:
         job = heartbeat.finalize(
@@ -854,19 +854,18 @@ def _settle_processing_failure(
             raise RuntimeError("JOB_RETRY_STATE_INVALID")
         return "retry_scheduled"
 
-    def fail_after_sp_publication() -> Any:
-        worker.mark_failed(claimed, error_code)
-        return job_queue.mark_failed(
+    job = heartbeat.finalize(
+        lambda: job_queue.mark_failed(
             job_id=claimed.job.job_id,
             owner_id=claimed.lease_owner,
             claim_generation=claimed.claim_generation,
             claim_token=claimed.claim_token,
             failure_reason=error_code,
         )
-
-    job = heartbeat.finalize(fail_after_sp_publication)
+    )
     if job.status is not JobStatus.FAILED:
         raise RuntimeError("JOB_TERMINAL_STATE_INVALID")
+    worker.mark_failed(claimed, error_code)
     return "failed"
 
 

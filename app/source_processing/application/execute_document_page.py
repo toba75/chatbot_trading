@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import time
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
@@ -32,6 +32,7 @@ from app.source_processing.domain.distribution_contracts import (
     PageResultErrorCode,
     PageResultStatus,
     PageTechnicalMetrics,
+    claim_scoped_page_artifact_identity,
 )
 from app.source_processing.domain.document_processing_run import PageRouteName
 
@@ -53,12 +54,11 @@ class PageArtifactReader(Protocol):
 
 
 class ImmutablePageArtifactWriter(Protocol):
-    def write_immutable(
+    def write_claim_scoped(
         self,
         *,
         identity: LocalArtifactIdentity,
         content: bytes,
-        authorize_publication: Callable[[], None],
     ) -> LocalArtifactDescriptor: ...
 
 
@@ -210,7 +210,7 @@ class ExecuteDocumentPageHandler:
     ) -> None:
         required_ports = (
             (artifact_reader, "resolve_verified_path"),
-            (artifact_writer, "write_immutable"),
+            (artifact_writer, "write_claim_scoped"),
             (standard_completion, "assert_standard_page_execution_current"),
             (standard_completion, "complete_standard_page_execution"),
             (granite_completion, "assert_page_execution_current"),
@@ -338,18 +338,13 @@ class ExecuteDocumentPageHandler:
         if not isinstance(converted, PageConversionOutput):
             raise ValueError("PAGE_CONVERSION_OUTPUT_INVALID")
         try:
-            artifact = self._artifact_writer.write_immutable(
-                identity=contract.expected_result_artifact,
+            claim_artifact_identity = claim_scoped_page_artifact_identity(
+                expected_identity=contract.expected_result_artifact,
+                execution=execution,
+            )
+            artifact = self._artifact_writer.write_claim_scoped(
+                identity=claim_artifact_identity,
                 content=converted.content,
-                authorize_publication=(
-                    lambda: self._standard_completion.assert_standard_page_execution_current(
-                        claimed
-                    )
-                    if granite_lease is None
-                    else self._granite_completion.assert_page_execution_current(
-                        granite_lease
-                    )
-                ),
             )
         except ArtifactContractError as error:
             return _failed_outcome_from_contract_error(
@@ -363,7 +358,7 @@ class ExecuteDocumentPageHandler:
             )
         if (
             not isinstance(artifact, LocalArtifactDescriptor)
-            or artifact.identity != contract.expected_result_artifact
+            or artifact.identity != claim_artifact_identity
         ):
             raise DistributionContractError("PAGE_RESULT_ARTIFACT_IDENTITY_DIVERGENT")
         artifact.verify_content(converted.content)
@@ -390,6 +385,27 @@ class ExecuteDocumentPageHandler:
             granite_lease=granite_lease,
             result=result,
         )
+
+
+def page_claim_artifact_identity(
+    *,
+    expected_identity: LocalArtifactIdentity,
+    claimed_job: ClaimedJob,
+) -> LocalArtifactIdentity:
+    """Isole l'artefact calculé sous l'identité immutable du claim."""
+
+    if not isinstance(expected_identity, LocalArtifactIdentity):
+        raise ArtifactContractError("ARTIFACT_IDENTITY_INVALID")
+    claimed = _claimed_job(claimed_job)
+    return claim_scoped_page_artifact_identity(
+        expected_identity=expected_identity,
+        execution=PageExecutionIdentity(
+            job_id=claimed.job.job_id,
+            claim_generation=claimed.claim_generation,
+            claim_token=claimed.claim_token,
+            worker_instance_id=claimed.lease_owner,
+        ),
+    )
 
 
 def _failed_outcome_from_contract_error(
@@ -500,5 +516,6 @@ __all__ = [
     "PageExecutionOutcome",
     "PageRouteConverters",
     "RoutedPageConverter",
+    "page_claim_artifact_identity",
     "page_completion_id",
 ]

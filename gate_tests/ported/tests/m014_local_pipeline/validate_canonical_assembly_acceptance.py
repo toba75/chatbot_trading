@@ -1,30 +1,28 @@
-"""Contrat d'acceptation T-007 de la publication canonique distribuée."""
+"""ATDD T-007 : assemblage canonique borné par les résultats de pages."""
 
-from pathlib import Path
+import pytest
+
+from app.source_processing.application.assemble_canonical_document import (
+    CanonicalAssemblyPolicy,
+)
+from app.source_processing.domain.distribution_contracts import (
+    DistributionContractError,
+)
+from validate_canonical_assembly_unit import _contract, _result
 
 
-def test_assemblage_canonique_est_borne_et_atomique() -> None:
-    root = Path(__file__).resolve().parents[4]
-    application = root / "app/source_processing/application/assemble_canonical_document.py"
-    adapter = root / "app/source_processing/adapters/postgres_canonical_assembly.py"
-    migration = root / "deploy/postgres/migrations/024_canonical_assembly_publication.sql"
+def test_given_pages_terminees_when_assemblage_then_ordre_et_completude_exiges() -> None:
+    policy = CanonicalAssemblyPolicy()
+    contract = _contract()
 
-    assert application.is_file()
-    assert adapter.is_file()
-    assert migration.is_file()
-    source = application.read_text(encoding="utf-8")
-    persistence = adapter.read_text(encoding="utf-8")
-    schema = migration.read_text(encoding="utf-8")
+    ordered = policy.validate_results(
+        contract=contract,
+        results=(_result(3), _result(1), _result(2)),
+    )
 
-    assert "ASSEMBLE_CANONICAL_DOCUMENT" in source
-    assert "CanonicalAcceptancePolicy" in source
-    assert "TextAuthoritySelectionPolicy" in source
-    assert "PublishCanonicalSourceHandler" in source
-    assert "build_canonical_source_published_event" in source
-    assert "model" not in source.lower() or "aucun modèle" in source.lower()
-    assert "source_processing.canonical_publication_outbox" in persistence
-    assert "source_processing.canonical_source_versions" in persistence
-    assert "source_processing.document_conversion_requests" in persistence
-    assert "CREATE TABLE source_processing.canonical_publication_outbox" in schema
-    assert "canonical_assembly_id" in schema
-
+    assert tuple(result.page_number for result in ordered) == (1, 2, 3)
+    with pytest.raises(DistributionContractError, match="PAGE_MANIFEST_INCOMPLETE"):
+        policy.validate_results(
+            contract=contract,
+            results=(_result(1), _result(2)),
+        )

@@ -91,6 +91,7 @@ class QdrantVectorIndex:
             batch_size=parsed_batch_size,
             max_parallel_batches=parsed_max_parallel_batches,
             on_batch_published=on_batch_published,
+            fence_mutation=None,
         )
         published_count = self._generation_count(
             collection_name=parsed_request.collection_name,
@@ -116,6 +117,7 @@ class QdrantVectorIndex:
         max_parallel_batches: int,
         batch_size: int,
         on_batch_published: Callable[[int], None],
+        fence_mutation: Callable[[Callable[[], object]], object],
     ) -> VectorIndexPublication:
         """Réécrit explicitement toute génération absente ou partielle puis vérifie."""
 
@@ -127,6 +129,8 @@ class QdrantVectorIndex:
         parsed_batch_size = _ensure_positive_int(batch_size, "batch_size")
         if not callable(on_batch_published):
             raise ValueError("rapporteur Qdrant invalide")
+        if not callable(fence_mutation):
+            raise ValueError("fencing Qdrant invalide")
         existing_count = self._generation_count(
             collection_name=parsed_request.collection_name,
             index_generation=parsed_request.index_generation,
@@ -144,9 +148,13 @@ class QdrantVectorIndex:
                 idempotent=True,
             )
         if existing_count > 0:
-            self._client.delete(
-                collection_name=parsed_request.collection_name,
-                points_selector={"filter": _generation_filter(parsed_request.index_generation)},
+            fence_mutation(
+                lambda: self._client.delete(
+                    collection_name=parsed_request.collection_name,
+                    points_selector={
+                        "filter": _generation_filter(parsed_request.index_generation)
+                    },
+                )
             )
         qdrant_points = tuple(
             _qdrant_point_for(parsed_request.index_generation, point)
@@ -158,6 +166,7 @@ class QdrantVectorIndex:
             batch_size=parsed_batch_size,
             max_parallel_batches=parsed_max_parallel_batches,
             on_batch_published=on_batch_published,
+            fence_mutation=fence_mutation,
         )
         published_count = self._generation_count(
             collection_name=parsed_request.collection_name,
@@ -213,12 +222,17 @@ class QdrantVectorIndex:
         batch_size: int,
         max_parallel_batches: int,
         on_batch_published: Callable[[int], None] | None,
+        fence_mutation: Callable[[Callable[[], object]], object] | None,
     ) -> None:
         batches = _point_batches(qdrant_points, batch_size=batch_size)
         completed_points = 0
         if max_parallel_batches == 1 or len(batches) == 1:
             for batch in batches:
-                self._client.upsert(collection_name=collection_name, points=batch)
+                self._fenced_upsert(
+                    collection_name=collection_name,
+                    points=batch,
+                    fence_mutation=fence_mutation,
+                )
                 completed_points += len(batch)
                 if on_batch_published is not None:
                     on_batch_published(completed_points)
@@ -230,9 +244,10 @@ class QdrantVectorIndex:
         ) as executor:
             futures = {
                 executor.submit(
-                    self._client.upsert,
+                    self._fenced_upsert,
                     collection_name=collection_name,
                     points=batch,
+                    fence_mutation=fence_mutation,
                 ): len(batch)
                 for batch in batches
             }
@@ -241,6 +256,24 @@ class QdrantVectorIndex:
                 completed_points += futures[future]
                 if on_batch_published is not None:
                     on_batch_published(completed_points)
+
+    def _fenced_upsert(
+        self,
+        *,
+        collection_name: str,
+        points: Sequence[Mapping[str, Any]],
+        fence_mutation: Callable[[Callable[[], object]], object] | None,
+    ) -> None:
+        def operation() -> object:
+            return self._client.upsert(
+                collection_name=collection_name,
+                points=points,
+            )
+
+        if fence_mutation is None:
+            operation()
+            return
+        fence_mutation(operation)
 
     def generation_exists(self, *, collection_name: str, index_generation: str) -> bool:
         parsed_collection_name = _ensure_text(collection_name, "collection_name")

@@ -991,15 +991,9 @@ class PostgresDocumentPersistence:
                         plan.processing_run_id.value,
                         plan.document_id.value,
                         plan.orchestration_version,
-                        plan.page_jobs[0].environment
-                        if plan.page_jobs
-                        else plan.skipped_results[0].result.environment_identity.environment,
-                        plan.page_jobs[0].deployment_id
-                        if plan.page_jobs
-                        else plan.skipped_results[0].result.environment_identity.deployment_id,
-                        plan.page_jobs[0].idempotence_key.configuration_hash
-                        if plan.page_jobs
-                        else plan.skipped_results[0].result.environment_identity.configuration_hash,
+                        plan.environment_identity.environment,
+                        plan.environment_identity.deployment_id,
+                        plan.environment_identity.configuration_hash,
                         plan.page_manifest_sha256,
                         plan.total_units,
                         json.dumps(plan_payload, ensure_ascii=False, separators=(",", ":"), sort_keys=True),

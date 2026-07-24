@@ -41,8 +41,8 @@ from app.source_processing.application.execute_document_page import (
     PageConversionOutput,
 )
 from app.source_processing.application.routed_document_conversion_worker import (
-    _GranitePageConverter,
-    _NativePageConverter,
+    GranitePageConverter,
+    NativePageConverter,
 )
 from app.source_processing.application.targeted_enrichment import (
     TargetedEnrichmentPageConverter,
@@ -223,7 +223,7 @@ class M004RoutedPageConverter:
                 raise ValueError("PAGE_SOURCE_ARTIFACT_REF_DIVERGENT")
             return source_path
 
-        native = _NativePageConverter(
+        native = NativePageConverter(
             converter=self._native_converter,
             resolve_source_path=resolve_original,
         )
@@ -274,7 +274,7 @@ class M004RoutedPageConverter:
                 return preprocessor.path_for_artifact_ref(artifact_ref)
             raise ValueError("PAGE_SOURCE_ARTIFACT_REF_DIVERGENT")
 
-        granite = _GranitePageConverter(
+        granite = GranitePageConverter(
             granite_converter=self._granite_converter,
             gemma_converter=self._gemma_converter,
             capacity_controller=_PreAcquiredCapacityController(
@@ -397,6 +397,13 @@ def _technical_metrics_without_gpu(*, started: float) -> PageTechnicalMetrics:
 
 
 def _known_error_code(error: Exception) -> PageResultErrorCode | None:
+    if isinstance(error, ExceptionGroup):
+        for nested in error.exceptions:
+            if isinstance(nested, Exception):
+                code = _known_error_code(nested)
+                if code is not None:
+                    return code
+        return None
     candidate = getattr(error, "code", None)
     if not isinstance(candidate, str):
         candidate = str(error)

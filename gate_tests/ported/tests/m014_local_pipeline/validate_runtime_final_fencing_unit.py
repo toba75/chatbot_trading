@@ -8,15 +8,28 @@ from hashlib import sha256
 import pytest
 
 from app.contracts.page_execution import PageCompletionMessage
+from app.contracts.technical_jobs import JobStatus
 from app.source_processing.adapters import distributed_page_conversion
 from app.source_processing.adapters.worker_runtime import _settle_processing_failure
 from app.source_processing.application import routed_document_conversion_worker
+from app.source_processing.application.execute_document_page import (
+    PageConversionFailure,
+    PageRouteConverters,
+)
 from app.source_processing.application.fan_out_document_pages import PageFanOutPlan
 from app.source_processing.domain.distribution_contracts import (
     DistributionContractError,
     PageResultErrorCode,
+    PageResultStatus,
 )
-from validate_page_execution_unit import _claimed, _granite_lease, _page_jobs
+from validate_page_execution_unit import (
+    _Converter,
+    _claimed,
+    _granite_lease,
+    _handler_for,
+    _page_jobs,
+    _standard_metrics,
+)
 from validate_page_fan_out_unit import (
     _FanOutRepository,
     _handler,
@@ -35,6 +48,18 @@ class _Heartbeat:
 class _ExpiredPlatformQueue:
     def mark_failed(self, **_kwargs):
         raise RuntimeError("JOB_LEASE_LOST")
+
+
+class _WinningPlatformQueue:
+    def __init__(self, claimed) -> None:
+        self.claimed = claimed
+
+    def mark_failed(self, **kwargs):
+        return replace(
+            self.claimed.job,
+            status=JobStatus.FAILED,
+            failure_reason=kwargs["failure_reason"],
+        )
 
 
 class _SourceProcessingWorker:
@@ -62,6 +87,24 @@ def test_given_claim_sp_expire_when_terminalisation_then_aucune_mutation_sp() ->
         )
 
     assert worker.failures == []
+
+    resumed = replace(
+        claimed,
+        lease_owner="worker-documents-b",
+        claim_generation=2,
+        claim_token="00000000-0000-4000-8000-00000000008e",
+        execution_attempts=2,
+    )
+    assert _settle_processing_failure(
+        claimed=resumed,
+        error_code="DOCLING_STANDARD_UNAVAILABLE",
+        retryable=False,
+        max_attempts=3,
+        worker=worker,
+        job_queue=_WinningPlatformQueue(resumed),
+        heartbeat=_Heartbeat(),
+    ) == "failed"
+    assert worker.failures == [(resumed, "DOCLING_STANDARD_UNAVAILABLE")]
 
 
 def test_given_plan_fan_out_when_un_enfant_diverge_then_persistence_refusee() -> None:
@@ -161,6 +204,28 @@ def test_erreurs_reelles_sont_classees_meme_dans_un_exception_group() -> None:
         assert distributed_page_conversion._known_error_code(grouped) is (
             PageResultErrorCode(code)
         )
+
+    request, _, _ = _page_jobs()
+    claimed = _claimed(request, job_number=143, owner="worker-documents-a")
+    converter = _Converter(
+        metrics=_standard_metrics(),
+        failure=PageConversionFailure(
+            error_code=PageResultErrorCode.DOCLING_PAGE_MANIFEST_MISMATCH,
+            technical_metrics=_standard_metrics(),
+        ),
+    )
+    handler, _, _, completion, _ = _handler_for(
+        b"%PDF-1.7\nM014 fan-out unit\n%%EOF\n",
+        converters=PageRouteConverters.from_routed(converter),
+    )
+
+    outcome = handler.execute_standard(claimed)
+
+    assert outcome.result.status is PageResultStatus.FAILED
+    assert completion.messages[0].terminal_status == "failed"
+    assert completion.messages[0].failure_reason == (
+        "DOCLING_PAGE_MANIFEST_MISMATCH"
+    )
 
 
 def test_convertisseurs_reutilises_exposent_un_contrat_public() -> None:

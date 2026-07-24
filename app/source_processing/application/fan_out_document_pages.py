@@ -9,7 +9,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
-from app.contracts.technical_jobs import ClaimedJob, JobRequest, JobStatus
+from app.contracts.technical_jobs import (
+    ClaimedJob,
+    JobEnvironmentIdentity,
+    JobRequest,
+    JobStatus,
+)
 from app.source_processing.domain.distribution_contracts import (
     CONVERT_PAGE_CONTRACT_VERSION,
     PAGE_RESULT_CONTRACT_VERSION,
@@ -122,6 +127,7 @@ class PageFanOutPlan:
     """Plan SP immutable écrit en une transaction avant tout relais."""
 
     orchestration_version: str
+    environment_identity: JobEnvironmentIdentity
     document_id: DocumentId
     processing_run_id: ProcessingRunId
     page_manifest_sha256: str
@@ -136,6 +142,8 @@ class PageFanOutPlan:
             raise DistributionContractError(
                 "PAGE_FAN_OUT_ORCHESTRATION_VERSION_UNSUPPORTED"
             )
+        if not isinstance(self.environment_identity, JobEnvironmentIdentity):
+            raise DistributionContractError("PAGE_FAN_OUT_IDENTITY_INVALID")
         if not isinstance(self.document_id, DocumentId):
             raise DistributionContractError("DOCUMENT_ID_INVALID")
         if not isinstance(self.processing_run_id, ProcessingRunId):
@@ -150,6 +158,11 @@ class PageFanOutPlan:
             raise DistributionContractError("PAGE_FAN_OUT_TOTAL_INVALID")
         if not isinstance(self.source_artifact, LocalArtifactDescriptor):
             raise DistributionContractError("PAGE_FAN_OUT_SOURCE_ARTIFACT_INVALID")
+        if (
+            self.source_artifact.identity.environment
+            != self.environment_identity.environment
+        ):
+            raise DistributionContractError("PAGE_FAN_OUT_CHILD_DIVERGENT")
         assets = tuple(self.locked_assets)
         if len(assets) == 0 or any(not isinstance(asset, LockedAssetVersion) for asset in assets):
             raise DistributionContractError("LOCKED_ASSET_INVALID")
@@ -159,7 +172,25 @@ class PageFanOutPlan:
             raise DistributionContractError("PAGE_FAN_OUT_JOB_INVALID")
         if any(not isinstance(result, SkippedPageFanOutResult) for result in skipped):
             raise DistributionContractError("SKIP_EMPTY_RESULT_INVALID")
-        job_pages = tuple(ConvertPageContract.from_job_request(request).page_number for request in jobs)
+        contracts = tuple(ConvertPageContract.from_job_request(request) for request in jobs)
+        for contract in contracts:
+            if (
+                contract.environment_identity != self.environment_identity
+                or contract.document_id != self.document_id.value
+                or contract.processing_run_id != self.processing_run_id.value
+                or contract.source_artifact != self.source_artifact
+                or tuple(contract.locked_assets) != assets
+            ):
+                raise DistributionContractError("PAGE_FAN_OUT_CHILD_DIVERGENT")
+        for skipped_result in skipped:
+            result = skipped_result.result
+            if (
+                result.environment_identity != self.environment_identity
+                or result.document_id != self.document_id.value
+                or result.processing_run_id != self.processing_run_id.value
+            ):
+                raise DistributionContractError("PAGE_FAN_OUT_CHILD_DIVERGENT")
+        job_pages = tuple(contract.page_number for contract in contracts)
         skipped_pages = tuple(result.result.page_number for result in skipped)
         all_pages = tuple(sorted((*job_pages, *skipped_pages)))
         if all_pages != tuple(range(1, self.total_units + 1)):
@@ -343,6 +374,7 @@ class FanOutDocumentPagesHandler:
             )
         plan = PageFanOutPlan(
             orchestration_version=DISTRIBUTED_PAGE_FAN_OUT_VERSION,
+            environment_identity=parent_job.environment_identity,
             document_id=run.document_id,
             processing_run_id=run.processing_run_id,
             page_manifest_sha256=manifest_hash,
