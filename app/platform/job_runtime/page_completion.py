@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, replace
 from typing import Any, Protocol, Sequence
 from uuid import UUID
@@ -22,6 +23,9 @@ from app.platform.job_runtime.granite_capacity import (
 )
 from app.platform.job_runtime.postgres import JobLeaseConflictError, PostgresJobQueue
 from app.platform.postgres import PostgresConnectionFactory
+
+
+_LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -100,6 +104,18 @@ class PageCompletionRelay:
             raise ValueError("claim invalide")
         created = self._consumer.record_page_completion(claim.message)
         self._outbox.acknowledge(claim)
+        _LOGGER.info(
+            "page_completion_relay_acknowledged",
+            extra={
+                "completion_id": claim.message.completion_id,
+                "job_id": claim.message.job_id,
+                "environment": claim.message.environment,
+                "deployment_id": claim.message.deployment_id,
+                "configuration_hash": claim.message.configuration_hash,
+                "terminal_status": claim.message.terminal_status,
+                "page_completion_created": created,
+            },
+        )
         return created
 
 
@@ -185,7 +201,8 @@ class PostgresStandardPageExecutionRepository:
                 )
                 cursor.execute(
                     """
-                    SELECT environment, deployment_id, job_id, claim_generation,
+                    SELECT environment, deployment_id, configuration_hash,
+                           job_id, claim_generation,
                            claim_token::text, worker_instance_id, slot_ordinal,
                            slot_generation, slot_token::text, payload,
                            payload_fingerprint, terminal_status, failure_reason
@@ -224,7 +241,8 @@ class PostgresStandardPageExecutionRepository:
                     ),
                     immutable_outbox AS (
                         INSERT INTO platform.page_completion_outbox (
-                            completion_id, environment, deployment_id, job_id,
+                            completion_id, environment, deployment_id,
+                            configuration_hash, job_id,
                             claim_generation, claim_token, worker_instance_id,
                             slot_ordinal, slot_generation, slot_token, payload,
                             payload_fingerprint, terminal_status, failure_reason,
@@ -233,7 +251,8 @@ class PostgresStandardPageExecutionRepository:
                         )
                         SELECT
                             %(completion_id)s, %(environment)s, %(deployment_id)s,
-                            active_job.job_id, %(claim_generation)s,
+                            %(configuration_hash)s, active_job.job_id,
+                            %(claim_generation)s,
                             %(claim_token)s::uuid, %(worker_instance_id)s,
                             NULL, NULL, NULL, %(payload)s::jsonb,
                             %(payload_fingerprint)s, %(terminal_status)s,
@@ -316,6 +335,7 @@ class PostgresPageCompletionOutbox:
                           FROM platform.page_completion_outbox
                          WHERE environment = %s
                            AND deployment_id = %s
+                           AND configuration_hash = %s
                            AND (
                                status = 'pending'
                                OR (status = 'relaying'
@@ -334,7 +354,8 @@ class PostgresPageCompletionOutbox:
                       FROM candidate
                      WHERE completion.sequence = candidate.sequence
                     RETURNING completion.completion_id, completion.environment,
-                              completion.deployment_id, completion.job_id,
+                              completion.deployment_id,
+                              completion.configuration_hash, completion.job_id,
                               completion.claim_generation,
                               completion.claim_token::text,
                               completion.worker_instance_id,
@@ -351,6 +372,7 @@ class PostgresPageCompletionOutbox:
                     (
                         self._environment_identity.environment,
                         self._environment_identity.deployment_id,
+                        self._environment_identity.configuration_hash,
                         owner,
                         lease_seconds,
                     ),
@@ -363,21 +385,22 @@ class PostgresPageCompletionOutbox:
                 completion_id=row[0],
                 environment=row[1],
                 deployment_id=row[2],
-                job_id=row[3],
-                claim_generation=row[4],
-                claim_token=row[5],
-                worker_instance_id=row[6],
-                slot_ordinal=row[7],
-                slot_generation=row[8],
-                slot_token=row[9],
-                payload=row[10],
-                payload_fingerprint=row[11],
-                terminal_status=row[12],
-                failure_reason=row[13],
+                configuration_hash=row[3],
+                job_id=row[4],
+                claim_generation=row[5],
+                claim_token=row[6],
+                worker_instance_id=row[7],
+                slot_ordinal=row[8],
+                slot_generation=row[9],
+                slot_token=row[10],
+                payload=row[11],
+                payload_fingerprint=row[12],
+                terminal_status=row[13],
+                failure_reason=row[14],
             ),
             owner_id=owner,
-            relay_generation=row[14],
-            relay_token=row[15],
+            relay_generation=row[15],
+            relay_token=row[16],
         )
 
     def acknowledge(self, claim: ClaimedPageCompletion) -> None:
@@ -394,6 +417,7 @@ class PostgresPageCompletionOutbox:
                      WHERE completion_id = %s
                        AND environment = %s
                        AND deployment_id = %s
+                       AND configuration_hash = %s
                        AND status = 'relaying'
                        AND relay_owner = %s
                        AND relay_generation = %s
@@ -405,6 +429,7 @@ class PostgresPageCompletionOutbox:
                         claim.message.completion_id,
                         self._environment_identity.environment,
                         self._environment_identity.deployment_id,
+                        self._environment_identity.configuration_hash,
                         claim.owner_id,
                         claim.relay_generation,
                         claim.relay_token,
@@ -503,23 +528,24 @@ def _completion_message_from_row(
     completion_id: str,
     row: Any,
 ) -> PageCompletionMessage:
-    if not isinstance(row, tuple) or len(row) != 13:
+    if not isinstance(row, tuple) or len(row) != 14:
         raise RuntimeError("PAGE_COMPLETION_ROW_INVALID")
     return PageCompletionMessage(
         completion_id=completion_id,
         environment=row[0],
         deployment_id=row[1],
-        job_id=row[2],
-        claim_generation=row[3],
-        claim_token=row[4],
-        worker_instance_id=row[5],
-        slot_ordinal=row[6],
-        slot_generation=row[7],
-        slot_token=row[8],
-        payload=row[9],
-        payload_fingerprint=row[10],
-        terminal_status=row[11],
-        failure_reason=row[12],
+        configuration_hash=row[2],
+        job_id=row[3],
+        claim_generation=row[4],
+        claim_token=row[5],
+        worker_instance_id=row[6],
+        slot_ordinal=row[7],
+        slot_generation=row[8],
+        slot_token=row[9],
+        payload=row[10],
+        payload_fingerprint=row[11],
+        terminal_status=row[12],
+        failure_reason=row[13],
     )
 
 

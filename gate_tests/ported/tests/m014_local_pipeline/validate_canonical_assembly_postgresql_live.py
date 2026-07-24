@@ -8,6 +8,7 @@ import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict
+from datetime import UTC, datetime, timedelta
 from hashlib import sha256
 from pathlib import Path
 from uuid import uuid4
@@ -303,7 +304,11 @@ def _page_result(request: JobRequest, store: LocalPageArtifactStore) -> PageResu
     payload = request.payload
     content = _page_bytes(payload["page_number"])
     expected = LocalArtifactIdentity.from_mapping(payload["expected_result_artifact"])
-    descriptor = store.write_immutable(identity=expected, content=content)
+    descriptor = store.write_immutable(
+        identity=expected,
+        content=content,
+        lease_expires_at=datetime.now(UTC) + timedelta(minutes=1),
+    )
     page = payload["page_number"]
     return PageResultContract(
         contract_version=PAGE_RESULT_CONTRACT_VERSION,

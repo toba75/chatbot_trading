@@ -445,6 +445,23 @@ class PostgresCanonicalAssemblyRepository:
                     (code, code, contract.processing_run_id),
                 )
                 if cursor.rowcount != 1:
+                    cursor.execute(
+                        """
+                        SELECT request.conversion_status,
+                               request.execution_phase,
+                               request.rejection_error_code,
+                               request.failure_error_code
+                          FROM source_processing.document_conversion_requests AS request
+                          JOIN source_processing.document_page_fanouts AS fanout
+                            ON fanout.document_id = request.document_id
+                         WHERE fanout.processing_run_id = %s
+                         FOR UPDATE OF request
+                        """,
+                        (contract.processing_run_id,),
+                    )
+                    replay = cursor.fetchone()
+                    if replay == ("QA_REJECTED", "FAILED", code, code):
+                        return
                     raise DistributionContractError(
                         "CANONICAL_ASSEMBLY_REPLAY_DIVERGENCE"
                     )

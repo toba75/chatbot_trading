@@ -139,6 +139,7 @@ class PageCompletionMessage:
     completion_id: str
     environment: str
     deployment_id: str
+    configuration_hash: str
     job_id: str
     claim_generation: int
     claim_token: str
@@ -165,6 +166,7 @@ class PageCompletionMessage:
             _text(value, field_name)
         if self.environment not in {"development", "test", "production"}:
             raise ValueError("environment invalide")
+        _sha256(self.configuration_hash, "configuration_hash")
         if (
             isinstance(self.claim_generation, bool)
             or not isinstance(self.claim_generation, int)
@@ -212,6 +214,7 @@ class PageCompletionMessage:
             completion_id=envelope.completion_id,
             environment=request.environment,
             deployment_id=request.deployment_id,
+            configuration_hash=request.idempotence_key.configuration_hash,
             job_id=claimed_job.job.job_id,
             claim_generation=claimed_job.claim_generation,
             claim_token=claimed_job.claim_token,
@@ -307,6 +310,13 @@ def _text(value: Any, field_name: str) -> str:
     if not isinstance(value, str) or value.strip() == "" or value != value.strip():
         raise ValueError(f"{field_name} invalide")
     return value
+
+
+def _sha256(value: Any, field_name: str) -> str:
+    text = _text(value, field_name)
+    if len(text) != 64 or any(character not in "0123456789abcdef" for character in text):
+        raise ValueError(f"{field_name} invalide")
+    return text
 
 
 __all__ = [

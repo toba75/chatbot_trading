@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -77,7 +78,7 @@ class _MissingReader:
         raise ArtifactContractError("ARTIFACT_NOT_FOUND")
 
 
-def test_commande_publique_selectionne_explicitement_le_fan_out_m014() -> None:
+def _commande_publique_selectionne_explicitement_le_fan_out_m014() -> None:
     source = _source()
     run = _planned_run(source)
     queue = InMemoryJobQueue.empty(catalog=JOB_RUNTIME_CATALOG)
@@ -102,11 +103,14 @@ def test_commande_publique_selectionne_explicitement_le_fan_out_m014() -> None:
     )
 
 
-def test_worker_distribue_materialise_une_source_immutable_puis_cree_les_pages() -> None:
+def _worker_distribue_materialise_une_source_immutable_puis_cree_les_pages() -> None:
     source = _source()
     run = _planned_run(source)
     parent = _parent_job(source, run)
-    claim = _claimed(parent, job_number=81, owner="worker-documents-a")
+    claim = replace(
+        _claimed(parent, job_number=81, owner="worker-documents-a"),
+        trace_id="TRACE-M014-FANOUT-UNIT",
+    )
     repository = _FanOutRepository()
     with TemporaryDirectory(prefix="ostrading-m014-review-") as temporary:
         root = Path(temporary)
@@ -133,7 +137,7 @@ def test_worker_distribue_materialise_une_source_immutable_puis_cree_les_pages()
         assert path.read_bytes() == original.read_bytes()
 
 
-def test_erreur_artefact_devient_completion_failed_et_garde_configuration() -> None:
+def _erreur_artefact_devient_completion_failed_et_garde_configuration() -> None:
     request, _, _ = _page_jobs()
     claim = _claimed(request, job_number=82, owner="worker-documents-a")
     routed = _Converter(metrics=_standard_metrics())
@@ -155,7 +159,7 @@ def test_erreur_artefact_devient_completion_failed_et_garde_configuration() -> N
     assert message.configuration_hash == "c" * 64
 
 
-def test_publication_artefact_refuse_un_claim_expire() -> None:
+def _publication_artefact_refuse_un_claim_expire() -> None:
     with TemporaryDirectory(prefix="ostrading-m014-atomic-") as temporary:
         root = Path(temporary).resolve()
         store = LocalPageArtifactStore(profile_root=root)
@@ -177,7 +181,7 @@ def test_publication_artefact_refuse_un_claim_expire() -> None:
         assert not identity.resolve_under(root).exists()
 
 
-def test_codes_m014_sont_des_echecs_publics_stables() -> None:
+def _codes_m014_sont_des_echecs_publics_stables() -> None:
     source = _source()
     for code in (
         "PAGE_MANIFEST_INCOMPLETE",
@@ -195,3 +199,11 @@ def test_codes_m014_sont_des_echecs_publics_stables() -> None:
             failure_error_code=code,
         )
         assert state.failure_error_code == code
+
+
+def test_corrections_revue_source_processing() -> None:
+    _commande_publique_selectionne_explicitement_le_fan_out_m014()
+    _worker_distribue_materialise_une_source_immutable_puis_cree_les_pages()
+    _erreur_artefact_devient_completion_failed_et_garde_configuration()
+    _publication_artefact_refuse_un_claim_expire()
+    _codes_m014_sont_des_echecs_publics_stables()

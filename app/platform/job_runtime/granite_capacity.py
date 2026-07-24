@@ -966,7 +966,7 @@ class PostgresGraniteSlotRepository(
                     SELECT job_id, claim_generation, claim_token::text,
                            worker_instance_id, slot_ordinal, slot_generation,
                            slot_token::text, payload, payload_fingerprint,
-                           terminal_status, failure_reason
+                           terminal_status, failure_reason, configuration_hash
                       FROM platform.page_completion_outbox
                      WHERE completion_id = %(completion_id)s
                      FOR UPDATE
@@ -975,7 +975,7 @@ class PostgresGraniteSlotRepository(
                 )
                 existing = cursor.fetchone()
                 if existing is not None:
-                    actual = _row_values(existing, 11, "EXISTING_COMPLETION")
+                    actual = _row_values(existing, 12, "EXISTING_COMPLETION")
                     expected = (
                         claimed.job.job_id,
                         claimed.claim_generation,
@@ -988,6 +988,7 @@ class PostgresGraniteSlotRepository(
                         envelope.payload_fingerprint,
                         envelope.status.value,
                         envelope.failure_reason,
+                        self._environment_identity.configuration_hash,
                     )
                     actual_payload = _mapping(actual[7], "completion_payload")
                     comparable_actual = actual[:7] + (
@@ -1029,7 +1030,8 @@ class PostgresGraniteSlotRepository(
                     ),
                     immutable_outbox AS (
                         INSERT INTO platform.page_completion_outbox (
-                            completion_id, environment, deployment_id, job_id,
+                            completion_id, environment, deployment_id,
+                            configuration_hash, job_id,
                             claim_generation, claim_token, worker_instance_id,
                             slot_ordinal, slot_generation, slot_token, payload,
                             payload_fingerprint, terminal_status, failure_reason,
@@ -1038,7 +1040,8 @@ class PostgresGraniteSlotRepository(
                         )
                         SELECT
                             %(completion_id)s, %(environment)s, %(deployment_id)s,
-                            active_job.job_id, %(claim_generation)s,
+                            %(configuration_hash)s, active_job.job_id,
+                            %(claim_generation)s,
                             %(claim_token)s::uuid, %(worker_instance_id)s,
                             active_slot.slot_ordinal, %(slot_generation)s,
                             %(slot_token)s::uuid, %(payload)s::jsonb,

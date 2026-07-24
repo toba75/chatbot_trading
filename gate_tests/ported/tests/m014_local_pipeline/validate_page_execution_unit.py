@@ -5,11 +5,14 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from hashlib import sha256
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from uuid import UUID
 
 import pytest
 
 from app.contracts.technical_jobs import ClaimedJob, JobRecord, JobStatus
+from app.contracts.page_execution import PageCompletionMessage
 from app.platform.job_runtime.granite_capacity import GraniteSlotLease
 from app.source_processing.application.execute_document_page import (
     ExecuteDocumentPageHandler,
@@ -18,7 +21,6 @@ from app.source_processing.application.execute_document_page import (
     PageRouteConverters,
 )
 from app.source_processing.domain.distribution_contracts import (
-    ArtifactContractError,
     DistributionContractError,
     LocalArtifactDescriptor,
     PageGpuMetrics,
@@ -103,17 +105,23 @@ class _Reader:
     def __init__(self, content: bytes) -> None:
         self.content = content
         self.reads = 0
+        self._temporary = TemporaryDirectory(prefix="ostrading-m014-reader-")
+        self.path = Path(self._temporary.name) / "source.pdf"
+        self.path.write_bytes(content)
 
-    def read(self, descriptor: LocalArtifactDescriptor) -> bytes:
+    def resolve_verified_path(self, descriptor: LocalArtifactDescriptor) -> Path:
         self.reads += 1
-        return self.content
+        descriptor.verify_content(self.path.read_bytes())
+        return self.path
 
 
 class _Writer:
     def __init__(self) -> None:
         self.writes = 0
 
-    def write_immutable(self, *, identity, content: bytes) -> LocalArtifactDescriptor:
+    def write_immutable(
+        self, *, identity, content: bytes, lease_expires_at
+    ) -> LocalArtifactDescriptor:
         self.writes += 1
         return LocalArtifactDescriptor(
             identity=identity,
@@ -128,7 +136,8 @@ class _Converter:
         self.failure = failure
         self.calls = []
 
-    def convert_page(self, *, contract, source_content: bytes, granite_lease):
+    def convert_page(self, *, contract, source_path: Path, granite_lease):
+        source_content = source_path.read_bytes()
         self.calls.append((contract.route_name, source_content, granite_lease))
         if self.failure is not None:
             raise self.failure
@@ -143,17 +152,33 @@ class _Converter:
 class _StandardCompletion:
     def __init__(self) -> None:
         self.calls = []
+        self.messages = []
 
     def complete_standard_page_execution(self, claimed_job, envelope):
         self.calls.append((claimed_job, envelope))
+        self.messages.append(
+            PageCompletionMessage.from_execution(
+                claimed_job=claimed_job,
+                granite_lease=None,
+                envelope=envelope,
+            )
+        )
 
 
 class _GraniteCompletion:
     def __init__(self) -> None:
         self.calls = []
+        self.messages = []
 
     def complete_page_execution(self, lease, envelope):
         self.calls.append((lease, envelope))
+        self.messages.append(
+            PageCompletionMessage.from_execution(
+                claimed_job=lease.claimed_job,
+                granite_lease=lease,
+                envelope=envelope,
+            )
+        )
 
 
 def _converters(*, native=None, granite=None) -> PageRouteConverters:
@@ -169,10 +194,16 @@ def _converters(*, native=None, granite=None) -> PageRouteConverters:
     )
 
 
-def _handler_for(content: bytes, *, converters=None):
+def _handler_for(
+    content: bytes,
+    *,
+    converters=None,
+    reader=None,
+    expected_locked_assets=None,
+):
     standard = _StandardCompletion()
     granite = _GraniteCompletion()
-    reader = _Reader(content)
+    reader = _Reader(content) if reader is None else reader
     writer = _Writer()
     return (
         ExecuteDocumentPageHandler(
@@ -181,6 +212,7 @@ def _handler_for(content: bytes, *, converters=None):
             converters=converters or _converters(),
             standard_completion=standard,
             granite_completion=granite,
+            expected_locked_assets=expected_locked_assets,
         ),
         reader,
         writer,
@@ -229,8 +261,9 @@ def _artefact_est_verifie_avant_convertisseur() -> None:
         b"contenu divergent",
         converters=_converters(native=converter),
     )
-    with pytest.raises(ArtifactContractError, match="ARTIFACT_HASH_MISMATCH"):
-        handler.execute_standard(claim)
+    outcome = handler.execute_standard(claim)
+    assert outcome.result.status is PageResultStatus.FAILED
+    assert outcome.result.error_code is PageResultErrorCode.ARTIFACT_HASH_MISMATCH
     assert reader.reads == 0 or reader.reads == 1
     assert converter.calls == []
     assert writer.writes == 0

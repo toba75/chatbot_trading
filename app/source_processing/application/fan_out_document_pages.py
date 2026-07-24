@@ -6,9 +6,10 @@ import hashlib
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Protocol
 
-from app.contracts.technical_jobs import JobRequest
+from app.contracts.technical_jobs import ClaimedJob, JobRequest, JobStatus
 from app.source_processing.domain.distribution_contracts import (
     CONVERT_PAGE_CONTRACT_VERSION,
     PAGE_RESULT_CONTRACT_VERSION,
@@ -29,7 +30,11 @@ from app.source_processing.domain.document_processing_run import (
     PageRouteName,
     ProcessingRunId,
 )
-from app.source_processing.domain.source_document import DocumentId
+from app.source_processing.domain.source_document import (
+    DocumentId,
+    OriginalStorageRef,
+    SourceDocument,
+)
 
 
 DISTRIBUTED_PAGE_FAN_OUT_VERSION = "m014-page-fanout-v1"
@@ -70,6 +75,20 @@ class PageFanOutRepository(Protocol):
         *,
         trace_id: str,
     ) -> bool: ...
+
+
+class OriginalSourcePathResolver(Protocol):
+    def resolve_internal_path(self, storage_ref: OriginalStorageRef) -> Path: ...
+
+
+class SourceArtifactMaterializer(Protocol):
+    def materialize_verified_source(
+        self,
+        *,
+        source_path: Path,
+        identity: LocalArtifactIdentity,
+        sha256: str,
+    ) -> LocalArtifactDescriptor: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -346,6 +365,131 @@ class FanOutDocumentPagesHandler:
         )
 
 
+class DistributedDocumentConversionWorker:
+    """Adapte le job parent public au fan-out et à l'artefact local partagé."""
+
+    def __init__(
+        self,
+        *,
+        source_document_repository: Any,
+        processing_run_repository: ProcessingRunForFanOutRepository,
+        page_fan_out_repository: PageFanOutRepository,
+        original_source_store: OriginalSourcePathResolver,
+        source_artifact_store: SourceArtifactMaterializer,
+        locked_assets: Sequence[LockedAssetVersion],
+    ) -> None:
+        required = (
+            (source_document_repository, "find_by_document_id"),
+            (original_source_store, "resolve_internal_path"),
+            (source_artifact_store, "materialize_verified_source"),
+        )
+        if any(not callable(getattr(port, method, None)) for port, method in required):
+            raise ValueError("PAGE_FAN_OUT_WORKER_PORT_INCOMPLETE")
+        self._source_document_repository = source_document_repository
+        self._original_source_store = original_source_store
+        self._source_artifact_store = source_artifact_store
+        self._page_fan_out_repository = page_fan_out_repository
+        self._handler = FanOutDocumentPagesHandler(
+            processing_run_repository=processing_run_repository,
+            page_fan_out_repository=page_fan_out_repository,
+            locked_assets=locked_assets,
+        )
+
+    def execute(self, claimed_job: ClaimedJob) -> dict[str, Any]:
+        if (
+            not isinstance(claimed_job, ClaimedJob)
+            or claimed_job.job.status is not JobStatus.RUNNING
+            or claimed_job.job.request.job_name != "CONVERT_DOCUMENT"
+        ):
+            raise DistributionContractError("PAGE_FAN_OUT_PARENT_JOB_INVALID")
+        request = claimed_job.job.request
+        payload = _mapping(request.payload, _PARENT_FIELDS)
+        if payload["orchestration_version"] != DISTRIBUTED_PAGE_FAN_OUT_VERSION:
+            raise DistributionContractError(
+                "PAGE_FAN_OUT_ORCHESTRATION_VERSION_UNSUPPORTED"
+            )
+        document_id = _document_id(payload["document_id"])
+        source = self._source_document_repository.find_by_document_id(document_id)
+        if not isinstance(source, SourceDocument):
+            raise DistributionContractError("PAGE_FAN_OUT_SOURCE_NOT_FOUND")
+        if source.fingerprint.value != payload["source_sha256"]:
+            raise DistributionContractError("PAGE_FAN_OUT_SOURCE_HASH_DIVERGENT")
+        original_path = self._original_source_store.resolve_internal_path(
+            source.original_storage_ref
+        )
+        relative_path = (
+            f"originals/{source.document_id.value}/{source.fingerprint.value}.pdf"
+        )
+        source_artifact = self._source_artifact_store.materialize_verified_source(
+            source_path=original_path,
+            identity=LocalArtifactIdentity(
+                environment=request.environment,
+                artifact_ref=(
+                    "artifact:source_processing.local/"
+                    f"{request.environment}/{relative_path}"
+                ),
+                relative_path=relative_path,
+            ),
+            sha256=source.fingerprint.value,
+        )
+        result = self._handler.handle(
+            parent_job=request,
+            source_artifact=source_artifact,
+            trace_id=claimed_job.trace_id,
+        )
+        return {
+            "created": result.created,
+            "total_units": result.total_units,
+            "completed_units": result.completed_units,
+            "page_job_count": result.page_job_count,
+            "page_manifest_sha256": result.page_manifest_sha256,
+        }
+
+    def mark_failed(self, claimed_job: ClaimedJob, error_code: str) -> None:
+        request = claimed_job.job.request
+        payload = _mapping(request.payload, _PARENT_FIELDS)
+        reject = getattr(self._page_fan_out_repository, "reject_native_conversion", None)
+        if not callable(reject):
+            raise ValueError("PAGE_FAN_OUT_FAILURE_PORT_INCOMPLETE")
+        reject(
+            document_id=_document_id(payload["document_id"]),
+            error_code=_text(error_code, "PAGE_FAN_OUT_ERROR_CODE_INVALID"),
+        )
+
+
+class VersionedDocumentConversionWorker:
+    """Dispatch fermé du job parent selon son discriminateur immutable."""
+
+    def __init__(self, *, legacy_worker: Any, distributed_worker: Any) -> None:
+        for worker in (legacy_worker, distributed_worker):
+            if any(
+                not callable(getattr(worker, method, None))
+                for method in ("execute", "mark_failed")
+            ):
+                raise ValueError("DOCUMENT_CONVERSION_WORKER_INCOMPLETE")
+        self._workers = {
+            LEGACY_INLINE_ORCHESTRATION_VERSION: legacy_worker,
+            DISTRIBUTED_PAGE_FAN_OUT_VERSION: distributed_worker,
+        }
+
+    def execute(self, claimed_job: ClaimedJob) -> dict[str, Any]:
+        return self._worker_for(claimed_job).execute(claimed_job)
+
+    def mark_failed(self, claimed_job: ClaimedJob, error_code: str) -> None:
+        self._worker_for(claimed_job).mark_failed(claimed_job, error_code)
+
+    def _worker_for(self, claimed_job: ClaimedJob) -> Any:
+        if not isinstance(claimed_job, ClaimedJob):
+            raise DistributionContractError("PAGE_FAN_OUT_PARENT_JOB_INVALID")
+        payload = _mapping(claimed_job.job.request.payload, _PARENT_FIELDS)
+        try:
+            return self._workers[payload["orchestration_version"]]
+        except (KeyError, TypeError) as error:
+            raise DistributionContractError(
+                "PAGE_FAN_OUT_ORCHESTRATION_VERSION_UNSUPPORTED"
+            ) from error
+
+
 def _capacity_for_route(route_name: PageRouteName) -> ExecutionCapacityRequirement:
     if route_name in _GRANITE_ROUTES:
         return ExecutionCapacityRequirement(
@@ -452,6 +596,7 @@ def _text(value: Any, code: str) -> str:
 
 __all__ = [
     "DISTRIBUTED_PAGE_FAN_OUT_VERSION",
+    "DistributedDocumentConversionWorker",
     "LEGACY_INLINE_ORCHESTRATION_VERSION",
     "FanOutDocumentPagesHandler",
     "FanOutDocumentPagesResult",
@@ -459,4 +604,5 @@ __all__ = [
     "PageFanOutRepository",
     "ProcessingRunForFanOutRepository",
     "SkippedPageFanOutResult",
+    "VersionedDocumentConversionWorker",
 ]

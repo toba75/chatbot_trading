@@ -357,14 +357,16 @@ def _authority_manifest(
         policy_version=CANONICAL_ASSEMBLY_QUALITY_POLICY_VERSION
     )
     skipped: list[SkippedEmptyPage] = []
+    decisions_by_page = {
+        decision.page_number: decision for decision in processing_run.page_decisions
+    }
     for route in processing_run.route_plan.page_routes:
         if route.route_name is not PageRouteName.SKIP_EMPTY:
             continue
-        decision = next(
-            candidate
-            for candidate in processing_run.page_decisions
-            if candidate.page_number == route.page_number
-        )
+        try:
+            decision = decisions_by_page[route.page_number]
+        except KeyError as error:
+            raise DistributionContractError("PAGE_MANIFEST_INCOMPLETE") from error
         resolution = decision.manual_review_resolution
         if resolution is None:
             if decision.page_state is not PageDecisionState.EMPTY:

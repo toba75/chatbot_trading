@@ -992,6 +992,7 @@ class PostgresDocumentPersistence:
                         plan.fingerprint,
                     ),
                 )
+                skipped_rows = []
                 for skipped in plan.skipped_results:
                     result_payload = skipped.result.to_mapping()
                     serialized_result = json.dumps(
@@ -1000,7 +1001,20 @@ class PostgresDocumentPersistence:
                         separators=(",", ":"),
                         sort_keys=True,
                     )
-                    cursor.execute(
+                    skipped_rows.append(
+                        (
+                            plan.processing_run_id.value,
+                            skipped.result.page_number,
+                            skipped.completion_id,
+                            skipped.result.contract_version,
+                            skipped.result.route_name.value,
+                            skipped.result.status.value,
+                            serialized_result,
+                            hashlib.sha256(serialized_result.encode("utf-8")).hexdigest(),
+                        )
+                    )
+                if skipped_rows:
+                    cursor.executemany(
                         """
                         INSERT INTO source_processing.page_execution_results (
                             processing_run_id, page_number, completion_id,
@@ -1012,24 +1026,45 @@ class PostgresDocumentPersistence:
                         VALUES (%s, %s, %s, NULL, NULL, NULL, NULL, NULL, NULL,
                                 NULL, %s, %s, %s, %s::jsonb, %s)
                         """,
-                        (
-                            plan.processing_run_id.value,
-                            skipped.result.page_number,
-                            skipped.completion_id,
-                            skipped.result.contract_version,
-                            skipped.result.route_name.value,
-                            skipped.result.status.value,
-                            serialized_result,
-                            hashlib.sha256(serialized_result.encode("utf-8")).hexdigest(),
+                        skipped_rows,
+                    )
+                page_job_rows = tuple(
+                    (
+                        page_job.environment,
+                        page_job.deployment_id,
+                        page_job.job_name,
+                        page_job.priority.value,
+                        page_job.idempotence_key.input_hash,
+                        page_job.idempotence_key.configuration_hash,
+                        page_job.idempotence_key.code_version,
+                        page_job.idempotence_key.model_version,
+                        json.dumps(
+                            _json_compatible(page_job.payload),
+                            separators=(",", ":"),
+                            sort_keys=True,
                         ),
+                        trace_id,
                     )
-                for page_job in plan.page_jobs:
-                    submission = self._enqueue_job_outbox(
-                        connection=connection,
-                        job_request=page_job,
-                        trace_id=trace_id,
+                    for page_job in plan.page_jobs
+                )
+                if page_job_rows:
+                    cursor.executemany(
+                        """
+                        INSERT INTO source_processing.job_outbox (
+                            environment, deployment_id, job_name, priority,
+                            input_hash, configuration_hash, code_version,
+                            model_version, payload, trace_id, status
+                        )
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s,
+                                %s::jsonb, %s, 'pending')
+                        ON CONFLICT (
+                            job_name, input_hash, configuration_hash,
+                            code_version, model_version
+                        ) DO NOTHING
+                        """,
+                        page_job_rows,
                     )
-                    if not submission.created:
+                    if cursor.rowcount != len(page_job_rows):
                         raise DistributionContractError(
                             "PAGE_FAN_OUT_OUTBOX_CONFLICT"
                         )

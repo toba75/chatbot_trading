@@ -346,14 +346,6 @@ def test_page_execution_postgresql_claim_fencing_relay_et_atomicite() -> None:
                 standard_completion=standard_repository,
                 granite_completion=granite_repository,
             )
-            standard_outcome = execution.execute_standard(standard_claim)
-            with pytest.raises(GraniteSlotLeaseLostError, match="JOB_LEASE_LOST"):
-                execution.execute_granite(expired_granite)
-            granite_outcome = execution.execute_granite(resumed_granite)
-            assert standard_outcome.result.granite_slot_execution is None
-            assert granite_outcome.result.granite_slot_execution is not None
-
-            # La dernière page standard échoue avec un code stable transporté à SP.
             last_standard = standard_repository.claim_compatible_job(
                 worker=worker_a,
                 lease_seconds=30,
@@ -376,6 +368,37 @@ def test_page_execution_postgresql_claim_fencing_relay_et_atomicite() -> None:
                 granite_completion=granite_repository,
             )
             failed_execution.execute_standard(last_standard)
+            standard_outcome = execution.execute_standard(standard_claim)
+            with pytest.raises(GraniteSlotLeaseLostError, match="JOB_LEASE_LOST"):
+                execution.execute_granite(expired_granite)
+            granite_outcome = execution.execute_granite(resumed_granite)
+            assert standard_outcome.result.granite_slot_execution is None
+            assert granite_outcome.result.granite_slot_execution is not None
+
+            # La dernière page standard échoue avec un code stable transporté à SP.
+            # L'échec est livré avant les succès déjà en vol : SP doit garder
+            # ce premier échec public puis drainer les autres résultats.
+            with factory.connect() as connection, connection.transaction(), connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    CREATE FUNCTION source_processing.fail_progress_after_result_for_test()
+                    RETURNS trigger LANGUAGE plpgsql AS $$
+                    BEGIN
+                        RAISE EXCEPTION 'M014_TEST_PROGRESS_UPDATE_FAILURE';
+                    END $$
+                    """,
+                    (),
+                )
+                cursor.execute(
+                    """
+                    CREATE TRIGGER fail_progress_after_result_for_test
+                    BEFORE UPDATE OF completed_units
+                    ON source_processing.document_conversion_requests
+                    FOR EACH ROW EXECUTE FUNCTION
+                        source_processing.fail_progress_after_result_for_test()
+                    """,
+                    (),
+                )
 
             completion_outbox = PostgresPageCompletionOutbox(
                 connection_factory=factory,
@@ -384,6 +407,48 @@ def test_page_execution_postgresql_claim_fencing_relay_et_atomicite() -> None:
             consumer = RecordPageCompletionHandler(
                 repository=PostgresPageResultRepository(connection_factory=factory)
             )
+            rollback_relay = PageCompletionRelay(
+                outbox=completion_outbox,
+                consumer=consumer,
+            )
+            with pytest.raises(Exception, match="M014_TEST_PROGRESS_UPDATE_FAILURE"):
+                rollback_relay.relay_pending(
+                    limit=1,
+                    owner_id="relay-page-results-rollback",
+                    lease_seconds=30,
+                )
+            with factory.connect() as connection, connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT count(*) FROM source_processing.page_execution_results",
+                    (),
+                )
+                assert cursor.fetchone() == (1,)
+                cursor.execute(
+                    """
+                    SELECT completed_units
+                      FROM source_processing.document_conversion_requests
+                     WHERE document_id = %s
+                    """,
+                    (source.document_id.value,),
+                )
+                assert cursor.fetchone() == (1,)
+            with factory.connect() as connection, connection.transaction(), connection.cursor() as cursor:
+                cursor.execute(
+                    "DROP TRIGGER fail_progress_after_result_for_test ON source_processing.document_conversion_requests",
+                    (),
+                )
+                cursor.execute(
+                    "DROP FUNCTION source_processing.fail_progress_after_result_for_test()",
+                    (),
+                )
+                cursor.execute(
+                    """
+                    UPDATE platform.page_completion_outbox
+                       SET relay_lease_until = CURRENT_TIMESTAMP - INTERVAL '1 second'
+                     WHERE status = 'relaying'
+                    """,
+                    (),
+                )
             crash_relay = PageCompletionRelay(
                 outbox=_CrashBeforeAck(completion_outbox),
                 consumer=consumer,

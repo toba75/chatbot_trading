@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import dataclasses
+import hashlib
 import json
 import subprocess
-import tempfile
 import time
 from enum import Enum
 from pathlib import Path
@@ -19,9 +19,11 @@ from app.platform.job_runtime.granite_capacity import (
     GraniteSlotLease,
 )
 from app.source_processing.adapters.docling_granite_conversion import (
+    GraniteDoclingAssetManifest,
     IsolatedGraniteDoclingConverter,
 )
 from app.source_processing.adapters.docling_native_conversion import (
+    DoclingAssetManifest,
     IsolatedNativeDoclingConverter,
 )
 from app.source_processing.adapters.gemma_vision_conversion import (
@@ -48,6 +50,7 @@ from app.source_processing.application.targeted_enrichment import (
 from app.source_processing.domain.distribution_contracts import (
     ConvertPageContract,
     ExecutionCapability,
+    LockedAssetVersion,
     PageGpuMetrics,
     PageResultErrorCode,
     PageTechnicalMetrics,
@@ -157,13 +160,13 @@ class M004RoutedPageConverter:
         self,
         *,
         contract: ConvertPageContract,
-        source_content: bytes,
+        source_path: Path,
         granite_lease: GraniteSlotLease | None,
     ) -> PageConversionOutput:
         if not isinstance(contract, ConvertPageContract):
             raise ValueError("CONVERT_PAGE_CONTRACT_INVALID")
-        if not isinstance(source_content, bytes) or len(source_content) == 0:
-            raise ValueError("PAGE_SOURCE_CONTENT_INVALID")
+        if not isinstance(source_path, Path) or not source_path.is_file():
+            raise ValueError("PAGE_SOURCE_PATH_INVALID")
         requires_granite = (
             contract.required_capacity.capability is ExecutionCapability.GRANITE_CUDA
         )
@@ -171,9 +174,11 @@ class M004RoutedPageConverter:
             raise ValueError("GRANITE_SLOT_EXECUTION_VARIANT_INVALID")
         started = time.perf_counter()
         try:
+            if requires_granite:
+                _gpu_metrics()
             page_output = self._convert(
                 contract=contract,
-                source_content=source_content,
+                source_path=source_path,
                 granite_lease=granite_lease,
             )
             metrics = _technical_metrics(
@@ -210,95 +215,90 @@ class M004RoutedPageConverter:
         self,
         *,
         contract: ConvertPageContract,
-        source_content: bytes,
+        source_path: Path,
         granite_lease: GraniteSlotLease | None,
     ) -> Any:
-        with tempfile.TemporaryDirectory(prefix="ostrading-m014-page-") as temporary:
-            root = Path(temporary)
-            source_path = root / "source.pdf"
-            source_path.write_bytes(source_content)
+        def resolve_original(artifact_ref: str) -> Path:
+            if artifact_ref != contract.source_artifact.identity.artifact_ref:
+                raise ValueError("PAGE_SOURCE_ARTIFACT_REF_DIVERGENT")
+            return source_path
 
-            def resolve_original(artifact_ref: str) -> Path:
-                if artifact_ref != contract.source_artifact.identity.artifact_ref:
-                    raise ValueError("PAGE_SOURCE_ARTIFACT_REF_DIVERGENT")
-                return source_path
-
-            native = _NativePageConverter(
-                converter=self._native_converter,
-                resolve_source_path=resolve_original,
+        native = _NativePageConverter(
+            converter=self._native_converter,
+            resolve_source_path=resolve_original,
+        )
+        request = _conversion_request(
+            contract=contract,
+            source_artifact_ref=contract.source_artifact.identity.artifact_ref,
+        )
+        if contract.route_name is PageRouteName.NATIVE_STANDARD:
+            return native.convert_page(request)
+        if granite_lease is None:
+            raise ValueError("GRANITE_SLOT_IDENTITY_REQUIRED")
+        preprocessor = None
+        if contract.route_name is PageRouteName.PREPROCESS_GRANITE:
+            preprocessor = OcrmyPdfPagePreprocessor(
+                image_manifest_path=self._ocrmypdf_manifest_path,
+                audit_root=self._audit_root,
+                source_path_resolver=resolve_original,
+                timeout_seconds=self._ocrmypdf_timeout_seconds,
+            )
+            preprocessed = preprocessor.preprocess_page(
+                PagePreprocessingRequest(
+                    processing_run_id=ProcessingRunId.from_value(
+                        contract.processing_run_id
+                    ),
+                    document_id=DocumentId.from_value(contract.document_id),
+                    page_number=PageNumber.from_value(contract.page_number),
+                    route_name=contract.route_name,
+                    routing_policy_version=RoutingPolicyVersion.from_value(
+                        contract.routing_policy_version
+                    ),
+                    source_artifact_ref=contract.source_artifact.identity.artifact_ref,
+                    expected_output_artifact_ref=(
+                        "artifact:source_processing.page_conversion/"
+                        f"{contract.processing_run_id}/"
+                        f"page-{contract.page_number:03d}-preprocessed.pdf"
+                    ),
+                )
             )
             request = _conversion_request(
                 contract=contract,
-                source_artifact_ref=contract.source_artifact.identity.artifact_ref,
+                source_artifact_ref=preprocessed.artifact_ref,
             )
-            if contract.route_name is PageRouteName.NATIVE_STANDARD:
-                return native.convert_page(request)
-            if granite_lease is None:
-                raise ValueError("GRANITE_SLOT_IDENTITY_REQUIRED")
-            preprocessor = None
-            if contract.route_name is PageRouteName.PREPROCESS_GRANITE:
-                preprocessor = OcrmyPdfPagePreprocessor(
-                    image_manifest_path=self._ocrmypdf_manifest_path,
-                    audit_root=self._audit_root,
-                    source_path_resolver=resolve_original,
-                    timeout_seconds=self._ocrmypdf_timeout_seconds,
-                )
-                preprocessed = preprocessor.preprocess_page(
-                    PagePreprocessingRequest(
-                        processing_run_id=ProcessingRunId.from_value(
-                            contract.processing_run_id
-                        ),
-                        document_id=DocumentId.from_value(contract.document_id),
-                        page_number=PageNumber.from_value(contract.page_number),
-                        route_name=contract.route_name,
-                        routing_policy_version=RoutingPolicyVersion.from_value(
-                            contract.routing_policy_version
-                        ),
-                        source_artifact_ref=contract.source_artifact.identity.artifact_ref,
-                        expected_output_artifact_ref=(
-                            "artifact:source_processing.page_conversion/"
-                            f"{contract.processing_run_id}/"
-                            f"page-{contract.page_number:03d}-preprocessed.pdf"
-                        ),
-                    )
-                )
-                request = _conversion_request(
-                    contract=contract,
-                    source_artifact_ref=preprocessed.artifact_ref,
-                )
 
-            def resolve_granite_source(artifact_ref: str) -> Path:
-                if artifact_ref == contract.source_artifact.identity.artifact_ref:
-                    return source_path
-                if preprocessor is not None:
-                    return preprocessor.path_for_artifact_ref(artifact_ref)
-                raise ValueError("PAGE_SOURCE_ARTIFACT_REF_DIVERGENT")
+        def resolve_granite_source(artifact_ref: str) -> Path:
+            if artifact_ref == contract.source_artifact.identity.artifact_ref:
+                return source_path
+            if preprocessor is not None:
+                return preprocessor.path_for_artifact_ref(artifact_ref)
+            raise ValueError("PAGE_SOURCE_ARTIFACT_REF_DIVERGENT")
 
-            granite = _GranitePageConverter(
-                granite_converter=self._granite_converter,
-                gemma_converter=self._gemma_converter,
-                capacity_controller=_PreAcquiredCapacityController(
-                    capacity_controller=self._capacity_controller,
-                    lease=granite_lease,
-                ),
-                granite_worker=self._granite_worker,
-                claimed_job=granite_lease.claimed_job,
-                lease_seconds=self._granite_lease_seconds,
-                heartbeat_seconds=self._granite_heartbeat_seconds,
-                job_heartbeat_control=_NoopHeartbeatControl(),
-                resolve_source_path=resolve_granite_source,
-                gateway_endpoint_url=self._gateway_endpoint_url,
-                gateway_timeout_seconds=self._gateway_timeout_seconds,
-                gateway_max_output_tokens=self._gateway_max_output_tokens,
-                expected_model_id=self._expected_model_id,
-            )
-            if contract.route_name is PageRouteName.TARGETED_ENRICHMENT:
-                return TargetedEnrichmentPageConverter(
-                    native_converter=native,
-                    granite_converter=granite,
-                    policy_version="targeted-enrichment-v1",
-                ).convert_page(request)
-            return granite.convert_page(request)
+        granite = _GranitePageConverter(
+            granite_converter=self._granite_converter,
+            gemma_converter=self._gemma_converter,
+            capacity_controller=_PreAcquiredCapacityController(
+                capacity_controller=self._capacity_controller,
+                lease=granite_lease,
+            ),
+            granite_worker=self._granite_worker,
+            claimed_job=granite_lease.claimed_job,
+            lease_seconds=self._granite_lease_seconds,
+            heartbeat_seconds=self._granite_heartbeat_seconds,
+            job_heartbeat_control=_NoopHeartbeatControl(),
+            resolve_source_path=resolve_granite_source,
+            gateway_endpoint_url=self._gateway_endpoint_url,
+            gateway_timeout_seconds=self._gateway_timeout_seconds,
+            gateway_max_output_tokens=self._gateway_max_output_tokens,
+            expected_model_id=self._expected_model_id,
+        )
+        if contract.route_name is PageRouteName.TARGETED_ENRICHMENT:
+            return TargetedEnrichmentPageConverter(
+                native_converter=native,
+                granite_converter=granite,
+                policy_version="targeted-enrichment-v1",
+            ).convert_page(request)
+        return granite.convert_page(request)
 
 
 def _conversion_request(
@@ -355,20 +355,23 @@ def _technical_metrics(
 
 
 def _gpu_metrics() -> PageGpuMetrics:
-    completed = subprocess.run(
-        (
-            "nvidia-smi",
-            "--id=0",
-            "--query-gpu=memory.used,utilization.gpu,power.draw",
-            "--format=csv,noheader,nounits",
-        ),
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="strict",
-        timeout=10,
-        check=False,
-    )
+    try:
+        completed = subprocess.run(
+            (
+                "nvidia-smi",
+                "--id=0",
+                "--query-gpu=memory.used,utilization.gpu,power.draw",
+                "--format=csv,noheader,nounits",
+            ),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="strict",
+            timeout=10,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise RuntimeError("GRANITE_CUDA_UNAVAILABLE") from error
     if completed.returncode != 0:
         raise RuntimeError("GRANITE_CUDA_UNAVAILABLE")
     fields = tuple(field.strip() for field in completed.stdout.strip().split(","))
@@ -403,4 +406,50 @@ def _known_error_code(error: Exception) -> PageResultErrorCode | None:
         return None
 
 
-__all__ = ["M004RoutedPageConverter"]
+def load_runtime_locked_assets(
+    *,
+    native_manifest_path: Path,
+    native_assets_root: Path,
+    granite_manifest_path: Path,
+    granite_assets_root: Path,
+    ocrmypdf_manifest_path: Path,
+) -> tuple[LockedAssetVersion, ...]:
+    native = DoclingAssetManifest.load(
+        manifest_path=native_manifest_path,
+        assets_root=native_assets_root,
+    )
+    granite = GraniteDoclingAssetManifest.load(
+        manifest_path=granite_manifest_path,
+        assets_root=granite_assets_root,
+    )
+    try:
+        ocr_payload = json.loads(ocrmypdf_manifest_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ValueError("CONVERSION_ASSET_MANIFEST_INVALID") from error
+    if not isinstance(ocr_payload, dict) or set(ocr_payload) != {
+        "schema_version",
+        "tool",
+        "tool_version",
+        "image_reference",
+    }:
+        raise ValueError("CONVERSION_ASSET_MANIFEST_INVALID")
+    return (
+        LockedAssetVersion(
+            name="docling-native",
+            version=native.tool_version,
+            sha256=hashlib.sha256(native_manifest_path.read_bytes()).hexdigest(),
+        ),
+        LockedAssetVersion(
+            name="docling-granite",
+            version=f"{granite.tool_version}@{granite.model_revision}",
+            sha256=hashlib.sha256(granite_manifest_path.read_bytes()).hexdigest(),
+        ),
+        LockedAssetVersion(
+            name="ocrmypdf-image",
+            version=str(ocr_payload["image_reference"]),
+            sha256=hashlib.sha256(ocrmypdf_manifest_path.read_bytes()).hexdigest(),
+        ),
+    )
+
+
+__all__ = ["M004RoutedPageConverter", "load_runtime_locked_assets"]

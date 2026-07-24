@@ -10,6 +10,7 @@ from app.source_processing.adapters.postgres_canonical_assembly import (
     enqueue_canonical_assembly_if_complete,
 )
 from app.source_processing.domain.distribution_contracts import (
+    ConvertPageContract,
     DistributionContractError,
     PageResultContract,
     PageResultStatus,
@@ -101,14 +102,35 @@ class PostgresPageResultRepository:
                     raise DistributionContractError("CONTRACT_ENVIRONMENT_MISMATCH")
                 total_units = owner[3]
                 completed_units = owner[4]
+                active = owner[5:7] == ("RUNNING", "CONVERSION_REQUESTED")
+                draining_failed = owner[5:7] == ("FAILED", "QA_REJECTED")
                 if (
-                    owner[5] != "RUNNING"
-                    or owner[6] != "CONVERSION_REQUESTED"
+                    not (active or draining_failed)
                     or owner[7] != result.route_name.value
                 ):
                     raise DistributionContractError("PAGE_RESULT_STATE_INVALID")
                 if completed_units >= total_units:
                     raise DistributionContractError("PAGE_PROGRESS_TOTAL_EXCEEDED")
+                cursor.execute(
+                    """
+                    SELECT payload, environment, deployment_id, input_hash,
+                           configuration_hash, code_version, model_version
+                      FROM source_processing.job_outbox
+                     WHERE job_name = 'CONVERT_PAGE'
+                       AND payload ->> 'processing_run_id' = %s
+                       AND (payload ->> 'page_number')::integer = %s
+                    """,
+                    (result.processing_run_id, result.page_number),
+                )
+                frozen = cursor.fetchone()
+                if frozen is None:
+                    raise DistributionContractError("PAGE_RESULT_REQUEST_NOT_FOUND")
+                contract = ConvertPageContract.from_mapping(frozen[0])
+                _validate_result_against_frozen_contract(
+                    result=result,
+                    contract=contract,
+                    outbox_identity=frozen[1:],
+                )
                 cursor.execute(
                     """
                     INSERT INTO source_processing.page_execution_results (
@@ -141,7 +163,7 @@ class PostgresPageResultRepository:
                         fingerprint,
                     ),
                 )
-                if result.status is PageResultStatus.FAILED:
+                if active and result.status is PageResultStatus.FAILED:
                     error_code = result.error_code.value
                     cursor.execute(
                         """
@@ -161,7 +183,7 @@ class PostgresPageResultRepository:
                         """,
                         (error_code, error_code, result.processing_run_id),
                     )
-                else:
+                elif active:
                     cursor.execute(
                         """
                         UPDATE source_processing.document_conversion_requests AS request
@@ -176,6 +198,21 @@ class PostgresPageResultRepository:
                         """,
                         (result.processing_run_id,),
                     )
+                else:
+                    cursor.execute(
+                        """
+                        UPDATE source_processing.document_conversion_requests AS request
+                           SET completed_units = completed_units + 1
+                          FROM source_processing.document_page_fanouts AS fanout
+                         WHERE fanout.processing_run_id = %s
+                           AND request.document_id = fanout.document_id
+                           AND request.conversion_status = 'QA_REJECTED'
+                           AND request.execution_phase = 'FAILED'
+                           AND request.completed_units < request.total_units
+                        RETURNING request.completed_units
+                        """,
+                        (result.processing_run_id,),
+                    )
                 progress = cursor.fetchone()
                 if progress is None or progress[0] != completed_units + 1:
                     raise DistributionContractError("PAGE_PROGRESS_PERSISTENCE_FAILED")
@@ -184,6 +221,37 @@ class PostgresPageResultRepository:
                     processing_run_id=result.processing_run_id,
                 )
         return True
+
+
+def _validate_result_against_frozen_contract(
+    *,
+    result: PageResultContract,
+    contract: ConvertPageContract,
+    outbox_identity: tuple[Any, ...],
+) -> None:
+    if len(outbox_identity) != 6 or outbox_identity[:4] != (
+        contract.environment_identity.environment,
+        contract.environment_identity.deployment_id,
+        contract.idempotence_key,
+        contract.environment_identity.configuration_hash,
+    ):
+        raise DistributionContractError("PAGE_RESULT_REQUEST_DIVERGENCE")
+    if (
+        result.environment_identity != contract.environment_identity
+        or result.document_id != contract.document_id
+        or result.processing_run_id != contract.processing_run_id
+        or result.page_number != contract.page_number
+        or result.route_name is not contract.route_name
+        or result.routing_policy_version != contract.routing_policy_version
+        or result.request_idempotence_key != contract.idempotence_key
+    ):
+        raise DistributionContractError("PAGE_RESULT_REQUEST_DIVERGENCE")
+    if result.status is PageResultStatus.SUCCEEDED:
+        if (
+            result.result_artifact is None
+            or result.result_artifact.identity != contract.expected_result_artifact
+        ):
+            raise DistributionContractError("PAGE_RESULT_ARTIFACT_IDENTITY_DIVERGENT")
 
 
 def _canonical_json(value: Any) -> str:

@@ -17,6 +17,7 @@ from typing import Any
 from psycopg import Error as PsycopgError, IntegrityError, OperationalError
 from uuid import uuid4
 
+from app.contracts.technical_jobs import ClaimedJob
 from app.platform.configuration import (
     ApplicationConfiguration,
     load_application_configuration,
@@ -61,6 +62,7 @@ from app.source_processing.adapters.gemma_vision_conversion import (
 )
 from app.source_processing.adapters.distributed_page_conversion import (
     M004RoutedPageConverter,
+    load_runtime_locked_assets,
 )
 from app.source_processing.adapters.local_page_artifacts import LocalPageArtifactStore
 from app.source_processing.adapters.postgres_page_completion import (
@@ -83,6 +85,10 @@ from app.source_processing.application.document_worker import (
 from app.source_processing.application.execute_document_page import (
     ExecuteDocumentPageHandler,
     PageRouteConverters,
+)
+from app.source_processing.application.fan_out_document_pages import (
+    DistributedDocumentConversionWorker,
+    VersionedDocumentConversionWorker,
 )
 from app.source_processing.application.record_page_completion import (
     RecordPageCompletionHandler,
@@ -436,20 +442,37 @@ def _run_validated_worker_and_claim_next(
     canonical_artifact_store = CanonicalArtifactFileStore(
         root=Path(application_configuration.paths.canonical_sources_root)
     )
+    page_artifact_store = LocalPageArtifactStore(
+        profile_root=(
+            Path(application_configuration.paths.data_root) / "page_artifacts"
+        ).resolve()
+    )
+    native_manifest_path = Path("config/docling-assets.native.json")
+    native_assets_root = (
+        Path(application_configuration.paths.data_root) / "docling_assets" / "native"
+    )
+    granite_manifest_path = Path("config/docling-assets.granite.json")
+    granite_assets_root = (
+        Path(application_configuration.paths.data_root) / "docling_assets" / "granite"
+    )
+    ocrmypdf_manifest_path = Path("config/ocrmypdf-image.json")
+    locked_assets = load_runtime_locked_assets(
+        native_manifest_path=native_manifest_path,
+        native_assets_root=native_assets_root,
+        granite_manifest_path=granite_manifest_path,
+        granite_assets_root=granite_assets_root,
+        ocrmypdf_manifest_path=ocrmypdf_manifest_path,
+    )
     routed_conversion_worker = build_routed_document_conversion_worker(
         source_document_repository=persistence.source_document_repository,
         processing_run_repository=persistence.processing_run_repository,
         conversion_repository=persistence.document_conversion_repository,
         original_source_store=persistence.original_source_store,
-        native_asset_manifest_path=Path("config/docling-assets.native.json"),
-        native_assets_root=Path(application_configuration.paths.data_root)
-        / "docling_assets"
-        / "native",
-        granite_asset_manifest_path=Path("config/docling-assets.granite.json"),
-        granite_assets_root=Path(application_configuration.paths.data_root)
-        / "docling_assets"
-        / "granite",
-        ocrmypdf_manifest_path=Path("config/ocrmypdf-image.json"),
+        native_asset_manifest_path=native_manifest_path,
+        native_assets_root=native_assets_root,
+        granite_asset_manifest_path=granite_manifest_path,
+        granite_assets_root=granite_assets_root,
+        ocrmypdf_manifest_path=ocrmypdf_manifest_path,
         audit_root=Path(application_configuration.paths.data_root) / "docling_audit",
         timeout_seconds=application_configuration.runtime.timeouts.request_seconds,
         llm_gateway_url=application_configuration.services.llm_gateway.url,
@@ -475,17 +498,13 @@ def _run_validated_worker_and_claim_next(
     )
     routed_page_converter = M004RoutedPageConverter(
         native_converter=IsolatedNativeDoclingConverter(
-            asset_manifest_path=Path("config/docling-assets.native.json"),
-            assets_root=Path(application_configuration.paths.data_root)
-            / "docling_assets"
-            / "native",
+            asset_manifest_path=native_manifest_path,
+            assets_root=native_assets_root,
             timeout_seconds=application_configuration.runtime.timeouts.request_seconds,
         ),
         granite_converter=IsolatedGraniteDoclingConverter(
-            asset_manifest_path=Path("config/docling-assets.granite.json"),
-            assets_root=Path(application_configuration.paths.data_root)
-            / "docling_assets"
-            / "granite",
+            asset_manifest_path=granite_manifest_path,
+            assets_root=granite_assets_root,
             timeout_seconds=application_configuration.runtime.timeouts.request_seconds,
         ),
         gemma_converter=IsolatedGemmaVisionPageConverter(
@@ -502,7 +521,7 @@ def _run_validated_worker_and_claim_next(
         granite_worker=granite_worker,
         granite_lease_seconds=lease_seconds,
         granite_heartbeat_seconds=lease_seconds / 3.0,
-        ocrmypdf_manifest_path=Path("config/ocrmypdf-image.json"),
+        ocrmypdf_manifest_path=ocrmypdf_manifest_path,
         audit_root=Path(application_configuration.paths.data_root) / "docling_audit",
         ocrmypdf_timeout_seconds=(
             application_configuration.runtime.timeouts.request_seconds
@@ -519,25 +538,14 @@ def _run_validated_worker_and_claim_next(
         gateway_max_output_tokens=application_configuration.models.llm.max_output_tokens,
         expected_model_id=application_configuration.models.llm.reference_model,
     )
-    page_converters = PageRouteConverters(
-        native_standard=routed_page_converter,
-        scan_granite=routed_page_converter,
-        preprocess_granite=routed_page_converter,
-        bad_ocr_to_granite=routed_page_converter,
-        mixed_pagewise=routed_page_converter,
-        targeted_enrichment=routed_page_converter,
-    )
-    page_artifact_store = LocalPageArtifactStore(
-        profile_root=(
-            Path(application_configuration.paths.data_root) / "page_artifacts"
-        ).resolve()
-    )
+    page_converters = PageRouteConverters.from_routed(routed_page_converter)
     page_worker = ExecuteDocumentPageHandler(
         artifact_reader=page_artifact_store,
         artifact_writer=page_artifact_store,
         converters=page_converters,
         standard_completion=job_runtime.standard_page_repository,
         granite_completion=job_runtime.granite_slot_repository,
+        expected_locked_assets=locked_assets,
     )
     page_completion_relay = PageCompletionRelay(
         outbox=job_runtime.page_completion_outbox,
@@ -572,9 +580,21 @@ def _run_validated_worker_and_claim_next(
         capacity_device="cuda:0",
         storage_environment=environment_identity.environment,
     )
+    distributed_conversion_worker = DistributedDocumentConversionWorker(
+        source_document_repository=persistence.source_document_repository,
+        processing_run_repository=persistence.processing_run_repository,
+        page_fan_out_repository=persistence.document_conversion_repository,
+        original_source_store=persistence.original_source_store,
+        source_artifact_store=page_artifact_store,
+        locked_assets=locked_assets,
+    )
+    versioned_conversion_worker = VersionedDocumentConversionWorker(
+        legacy_worker=routed_conversion_worker,
+        distributed_worker=distributed_conversion_worker,
+    )
     workers = {
         "DIAGNOSE": worker,
-        "CONVERT_DOCUMENT": routed_conversion_worker,
+        "CONVERT_DOCUMENT": versioned_conversion_worker,
         ASSEMBLE_CANONICAL_DOCUMENT_JOB_NAME: canonical_assembly_worker,
     }
     processed = 0
@@ -716,7 +736,7 @@ def _run_validated_worker_and_claim_next(
 def _execute_claimed_page(
     *,
     application_configuration: ApplicationConfiguration,
-    authorization: Any,
+    authorization: ClaimedJob | GraniteSlotLease,
     page_worker: ExecuteDocumentPageHandler,
     worker_binding: Any,
     job_queue: Any,
@@ -727,7 +747,7 @@ def _execute_claimed_page(
     if isinstance(authorization, GraniteSlotLease):
         claimed = authorization.claimed_job
         standard_heartbeat = None
-    elif hasattr(authorization, "job"):
+    elif isinstance(authorization, ClaimedJob):
         claimed = authorization
         standard_heartbeat = JobLeaseHeartbeat(
             job_queue=job_queue,

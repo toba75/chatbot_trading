@@ -40,6 +40,8 @@ class RecordPageCompletionHandler:
         if (
             result.environment_identity.environment != message.environment
             or result.environment_identity.deployment_id != message.deployment_id
+            or result.environment_identity.configuration_hash
+            != message.configuration_hash
         ):
             raise DistributionContractError("CONTRACT_ENVIRONMENT_MISMATCH")
         if (

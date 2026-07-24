@@ -390,6 +390,9 @@ def build_orchestrator_composition_root(
         conversion_configuration_hash=configuration.configuration_hash,
         code_version=version("chatbot-trading"),
         model_version=f"docling-{version('docling')}",
+        orchestration_version=(
+            configuration.services.workers.document_orchestration_version
+        ),
     )
     document_queries = DocumentQueryService(
         document_snapshot_repository=persistence.source_document_repository,

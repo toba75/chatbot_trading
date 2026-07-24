@@ -435,19 +435,21 @@ def test_runtime_postgresql_workers_terminal_union_et_chemin_chaud() -> None:
                         cursor.execute(
                             """
                             INSERT INTO platform.page_completion_outbox (
-                                completion_id, environment, deployment_id, job_id,
+                                completion_id, environment, deployment_id,
+                                configuration_hash, job_id,
                                 claim_generation, claim_token, worker_instance_id,
                                 slot_ordinal, slot_generation, slot_token, payload,
                                 payload_fingerprint, terminal_status, failure_reason,
                                 status, relay_generation
                             ) VALUES (
                                 'COMPLETE-M014-CYCLE3-NULL-FAILURE',
-                                'test', 'ostrading-test-local', %s, %s, %s::uuid,
+                                'test', 'ostrading-test-local', %s, %s, %s, %s::uuid,
                                 %s, %s, %s, %s::uuid, '{}'::jsonb, %s,
                                 'failed', NULL, 'pending', 0
                             )
                             """,
                             (
+                                "a" * 64,
                                 lease_2.claimed_job.job.job_id,
                                 lease_2.claimed_job.claim_generation,
                                 lease_2.claimed_job.claim_token,
@@ -475,13 +477,14 @@ def test_runtime_postgresql_workers_terminal_union_et_chemin_chaud() -> None:
                                 """
                                 INSERT INTO platform.page_completion_outbox (
                                     completion_id, environment, deployment_id,
-                                    job_id, claim_generation, claim_token,
+                                    configuration_hash, job_id,
+                                    claim_generation, claim_token,
                                     worker_instance_id, slot_ordinal,
                                     slot_generation, slot_token, payload,
                                     payload_fingerprint, terminal_status,
                                     failure_reason, status, relay_generation
                                 ) VALUES (
-                                    %s, 'test', 'ostrading-test-local', %s, %s,
+                                    %s, 'test', 'ostrading-test-local', %s, %s, %s,
                                     %s::uuid, %s, %s, %s, %s::uuid,
                                     '{}'::jsonb, %s, 'succeeded', NULL,
                                     'pending', 0
@@ -489,6 +492,7 @@ def test_runtime_postgresql_workers_terminal_union_et_chemin_chaud() -> None:
                                 """,
                                 (
                                     f"COMPLETE-M014-CYCLE3-NULL-{missing_field}",
+                                    "a" * 64,
                                     lease_2.claimed_job.job.job_id,
                                     lease_2.claimed_job.claim_generation,
                                     lease_2.claimed_job.claim_token,

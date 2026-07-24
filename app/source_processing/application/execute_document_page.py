@@ -3,8 +3,13 @@
 from __future__ import annotations
 
 import hashlib
+import time
+from collections.abc import Sequence
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Protocol
+
+import psutil
 
 from app.contracts.page_execution import (
     GranitePageTerminalEnvelope,
@@ -14,11 +19,13 @@ from app.contracts.page_execution import (
 from app.contracts.technical_jobs import ClaimedJob
 from app.source_processing.domain.distribution_contracts import (
     ConvertPageContract,
+    ArtifactContractError,
     DistributionContractError,
     ExecutionCapability,
     GraniteSlotExecutionIdentity,
     LocalArtifactDescriptor,
     LocalArtifactIdentity,
+    LockedAssetVersion,
     PAGE_RESULT_CONTRACT_VERSION,
     PageExecutionIdentity,
     PageResultContract,
@@ -42,7 +49,7 @@ _EXECUTED_PAGE_ROUTES = frozenset(
 
 
 class PageArtifactReader(Protocol):
-    def read(self, descriptor: LocalArtifactDescriptor) -> bytes: ...
+    def resolve_verified_path(self, descriptor: LocalArtifactDescriptor) -> Path: ...
 
 
 class ImmutablePageArtifactWriter(Protocol):
@@ -51,6 +58,7 @@ class ImmutablePageArtifactWriter(Protocol):
         *,
         identity: LocalArtifactIdentity,
         content: bytes,
+        lease_expires_at: Any,
     ) -> LocalArtifactDescriptor: ...
 
 
@@ -59,7 +67,7 @@ class RoutedPageConverter(Protocol):
         self,
         *,
         contract: ConvertPageContract,
-        source_content: bytes,
+        source_path: Path,
         granite_lease: GraniteSlotLease | None,
     ) -> "PageConversionOutput": ...
 
@@ -139,6 +147,19 @@ class PageRouteConverters:
             if not callable(getattr(converter, "convert_page", None)):
                 raise ValueError("PAGE_ROUTE_CONVERTER_INVALID")
 
+    @classmethod
+    def from_routed(cls, converter: RoutedPageConverter) -> "PageRouteConverters":
+        if not callable(getattr(converter, "convert_page", None)):
+            raise ValueError("PAGE_ROUTE_CONVERTER_INVALID")
+        return cls(
+            native_standard=converter,
+            scan_granite=converter,
+            preprocess_granite=converter,
+            bad_ocr_to_granite=converter,
+            mixed_pagewise=converter,
+            targeted_enrichment=converter,
+        )
+
     @property
     def route_names(self) -> frozenset[PageRouteName]:
         return _EXECUTED_PAGE_ROUTES
@@ -181,9 +202,10 @@ class ExecuteDocumentPageHandler:
         converters: PageRouteConverters,
         standard_completion: StandardPageCompletion,
         granite_completion: GranitePageCompletion,
+        expected_locked_assets: Sequence[LockedAssetVersion] | None = None,
     ) -> None:
         required_ports = (
-            (artifact_reader, "read"),
+            (artifact_reader, "resolve_verified_path"),
             (artifact_writer, "write_immutable"),
             (standard_completion, "complete_standard_page_execution"),
             (granite_completion, "complete_page_execution"),
@@ -197,6 +219,15 @@ class ExecuteDocumentPageHandler:
         self._converters = converters
         self._standard_completion = standard_completion
         self._granite_completion = granite_completion
+        if expected_locked_assets is None:
+            self._expected_locked_assets = None
+        else:
+            parsed_assets = tuple(expected_locked_assets)
+            if len(parsed_assets) == 0 or any(
+                not isinstance(asset, LockedAssetVersion) for asset in parsed_assets
+            ):
+                raise ValueError("LOCKED_ASSET_INVALID")
+            self._expected_locked_assets = parsed_assets
 
     def execute_standard(self, claimed_job: ClaimedJob) -> PageExecutionOutcome:
         claimed = _claimed_job(claimed_job)
@@ -236,6 +267,7 @@ class ExecuteDocumentPageHandler:
         contract: ConvertPageContract,
         granite_lease: GraniteSlotLease | None,
     ) -> PageExecutionOutcome:
+        started = time.perf_counter()
         execution = PageExecutionIdentity(
             job_id=claimed.job.job_id,
             claim_generation=claimed.claim_generation,
@@ -251,13 +283,30 @@ class ExecuteDocumentPageHandler:
                 slot_token=granite_lease.slot_token,
             )
         )
-        source_content = self._artifact_reader.read(contract.source_artifact)
-        contract.source_artifact.verify_content(source_content)
+        if (
+            self._expected_locked_assets is not None
+            and tuple(contract.locked_assets) != self._expected_locked_assets
+        ):
+            raise DistributionContractError("LOCKED_ASSET_DIVERGENT")
+        try:
+            source_path = self._artifact_reader.resolve_verified_path(
+                contract.source_artifact
+            )
+        except ArtifactContractError as error:
+            return _failed_outcome_from_contract_error(
+                claimed=claimed,
+                granite_lease=granite_lease,
+                contract=contract,
+                execution=execution,
+                slot_execution=slot_execution,
+                error=error,
+                started=started,
+            )
         converter = self._converters.for_route(contract.route_name)
         try:
             converted = converter.convert_page(
                 contract=contract,
-                source_content=source_content,
+                source_path=source_path,
                 granite_lease=granite_lease,
             )
         except PageConversionFailure as failure:
@@ -286,10 +335,22 @@ class ExecuteDocumentPageHandler:
             )
         if not isinstance(converted, PageConversionOutput):
             raise ValueError("PAGE_CONVERSION_OUTPUT_INVALID")
-        artifact = self._artifact_writer.write_immutable(
-            identity=contract.expected_result_artifact,
-            content=converted.content,
-        )
+        try:
+            artifact = self._artifact_writer.write_immutable(
+                identity=contract.expected_result_artifact,
+                content=converted.content,
+                lease_expires_at=claimed.lease_expires_at,
+            )
+        except ArtifactContractError as error:
+            return _failed_outcome_from_contract_error(
+                claimed=claimed,
+                granite_lease=granite_lease,
+                contract=contract,
+                execution=execution,
+                slot_execution=slot_execution,
+                error=error,
+                started=started,
+            )
         if (
             not isinstance(artifact, LocalArtifactDescriptor)
             or artifact.identity != contract.expected_result_artifact
@@ -319,6 +380,49 @@ class ExecuteDocumentPageHandler:
             granite_lease=granite_lease,
             result=result,
         )
+
+
+def _failed_outcome_from_contract_error(
+    *,
+    claimed: ClaimedJob,
+    granite_lease: GraniteSlotLease | None,
+    contract: ConvertPageContract,
+    execution: PageExecutionIdentity,
+    slot_execution: GraniteSlotExecutionIdentity | None,
+    error: ArtifactContractError,
+    started: float,
+) -> PageExecutionOutcome:
+    try:
+        error_code = PageResultErrorCode(error.code)
+    except ValueError:
+        raise error
+    result = PageResultContract(
+        contract_version=PAGE_RESULT_CONTRACT_VERSION,
+        environment_identity=contract.environment_identity,
+        document_id=contract.document_id,
+        processing_run_id=contract.processing_run_id,
+        page_number=contract.page_number,
+        route_name=contract.route_name,
+        routing_policy_version=contract.routing_policy_version,
+        request_idempotence_key=contract.idempotence_key,
+        execution=execution,
+        granite_slot_execution=slot_execution,
+        status=PageResultStatus.FAILED,
+        result_artifact=None,
+        tool_name=None,
+        tool_version=None,
+        error_code=error_code,
+        technical_metrics=PageTechnicalMetrics(
+            duration_seconds=max(time.perf_counter() - started, 0.000001),
+            peak_ram_bytes=psutil.Process().memory_info().rss,
+            gpu=None,
+        ),
+    )
+    return _outcome(
+        claimed=claimed,
+        granite_lease=granite_lease,
+        result=result,
+    )
 
 
 def _outcome(

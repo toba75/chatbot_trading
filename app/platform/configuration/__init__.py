@@ -147,6 +147,7 @@ class WorkerServiceConfiguration:
     queue_name: str
     outbox_namespace: str
     progress_namespace: str
+    document_orchestration_version: str
     concurrency: int
     docling_concurrency: int
     granite_concurrency: int
@@ -1120,6 +1121,9 @@ def _build_application_configuration(
                 queue_name=services["workers"]["queue_name"],
                 outbox_namespace=services["workers"]["outbox_namespace"],
                 progress_namespace=services["workers"]["progress_namespace"],
+                document_orchestration_version=services["workers"][
+                    "document_orchestration_version"
+                ],
                 concurrency=services["workers"]["concurrency"],
                 docling_concurrency=services["workers"]["docling_concurrency"],
                 granite_concurrency=services["workers"]["granite_concurrency"],
