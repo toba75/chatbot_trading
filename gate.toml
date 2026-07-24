@@ -5481,6 +5481,17 @@ depends_on = ["precondition.m014_local_pipeline"]
 live = false
 
 [[nodes]]
+id = "test.m014-local-pipeline.validate-projection-review-regressions-unit"
+path = "gate_tests/ported/tests/m014_local_pipeline/validate_projection_review_regressions_unit.py"
+kind = "test"
+scope = "m014_local_pipeline"
+phase = "tests"
+timeout_seconds = 120
+serial_group = "parallel"
+depends_on = ["precondition.m014_local_pipeline"]
+live = false
+
+[[nodes]]
 id = "test.m014-local-pipeline.validate-local-projection-postgresql-qdrant-live"
 path = "gate_tests/ported/tests/m014_local_pipeline/validate_local_projection_postgresql_qdrant_live.py"
 kind = "test"
