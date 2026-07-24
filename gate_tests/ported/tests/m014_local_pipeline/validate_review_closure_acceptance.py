@@ -57,6 +57,58 @@ def _assert_les_taches_ne_demandent_plus_de_gate_globale_aux_sous_agents() -> No
         assert "HEAD" in document and "worktree" in document
 
 
+def _assert_le_workflow_reserve_la_gate_globale_a_l_orchestrateur() -> None:
+    plan_skill = _read(".codex/skills/plan-milestone-tasks/SKILL.md")
+    execute_skill = _read(".codex/skills/execute-implementation-task/SKILL.md")
+    implement_skill = _read(".codex/skills/implement-milestone/SKILL.md")
+    adr_readme = _read("docs/adr/README.md")
+    adr_index = _read("docs/adr/index.md")
+
+    for delegated_document in (plan_skill, execute_skill):
+        assert "`uv run --locked gate`" not in delegated_document
+        normalized_document = " ".join(delegated_document.split())
+        assert "tests, lint et scopes ciblés" in normalized_document
+        assert "sous-agent" in normalized_document
+        assert "orchestrateur" in normalized_document
+
+    delegation = implement_skill.split("## Exécution Des Tâches", 1)[1].split(
+        "## Intégration Des Sous-Agents", 1
+    )[0]
+    integration = implement_skill.split("## Intégration Des Sous-Agents", 1)[1].split(
+        "## Revue Locale Jusqu'à Trois Itérations", 1
+    )[0]
+    review = implement_skill.split("## Revue Locale Jusqu'à Trois Itérations", 1)[1].split(
+        "## Gate De Clôture Du Milestone", 1
+    )[0]
+    closure = implement_skill.split("## Gate De Clôture Du Milestone", 1)[1].split(
+        "## Pull Request GitHub", 1
+    )[0]
+    for delegated_section in (delegation, integration, review):
+        normalized_section = " ".join(delegated_section.split())
+        assert "tests, lint et scopes ciblés" in normalized_section
+        assert "ne jamais lancer `uv run --locked gate`" in normalized_section
+
+    assert implement_skill.count("`uv run --locked gate`") == 1
+    normalized_closure = " ".join(closure.split())
+    assert "exactement une gate globale" in normalized_closure
+    assert "orchestrateur" in normalized_closure
+    assert "`uv run --locked gate`" in closure
+    assert "`timeout_ms=3600000`" in closure
+    assert "même cell ID" in closure
+    assert "outil `wait`" in closure
+    assert "timeout ou un yield" in normalized_closure
+    assert "n’est pas un RED" in normalized_closure
+    assert "nouveau candidat final" in normalized_closure
+    assert "sans changement" in normalized_closure
+
+    for adr_document in (adr_readme, adr_index):
+        assert "`uv run --locked gate`" not in adr_document
+        normalized_document = " ".join(adr_document.split())
+        assert "validations ciblées" in normalized_document
+        assert "gate globale" in normalized_document
+        assert "orchestrateur" in normalized_document
+
+
 def _assert_la_specification_et_la_matrice_decrivent_le_pipeline_livre() -> None:
     specification = _read("docs/specs/m014_local_pipeline_documentaire_distribue.md")
     for marker in (
@@ -177,6 +229,7 @@ def _assert_l_artefact_attendu_est_compare_a_l_artefact_canonique_publie() -> No
 
 def test_cloture_revue_m014_local_pipeline() -> None:
     _assert_les_taches_ne_demandent_plus_de_gate_globale_aux_sous_agents()
+    _assert_le_workflow_reserve_la_gate_globale_a_l_orchestrateur()
     _assert_la_specification_et_la_matrice_decrivent_le_pipeline_livre()
     _assert_les_runbooks_exposent_activation_rollback_gpu_et_gates_bornees()
     _assert_expand_replay_est_documente_sans_adr_fictive()
