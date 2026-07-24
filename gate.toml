@@ -5162,7 +5162,7 @@ depends_on = ["precondition.m013_fastapi"]
 live = false
 
 [[nodes]]
-id = "precondition.m014-distribution-core"
+id = "precondition.m014_distribution_core"
 path = "gate_tests/preconditions/test_m014_distribution_core.py"
 kind = "test"
 scope = "m014_distribution_core"
@@ -5180,7 +5180,7 @@ scope = "m014_distribution_core"
 phase = "tests"
 timeout_seconds = 120
 serial_group = "git"
-depends_on = ["precondition.m014-distribution-core"]
+depends_on = ["precondition.m014_distribution_core"]
 live = false
 
 [[nodes]]
@@ -5191,7 +5191,7 @@ scope = "m014_distribution_core"
 phase = "tests"
 timeout_seconds = 120
 serial_group = "parallel"
-depends_on = ["precondition.m014-distribution-core"]
+depends_on = ["precondition.m014_distribution_core"]
 live = false
 
 [[nodes]]
@@ -5202,7 +5202,7 @@ scope = "m014_distribution_core"
 phase = "tests"
 timeout_seconds = 120
 serial_group = "git"
-depends_on = ["precondition.m014-distribution-core"]
+depends_on = ["precondition.m014_distribution_core"]
 live = false
 
 [[nodes]]
@@ -5213,7 +5213,7 @@ scope = "m014_distribution_core"
 phase = "tests"
 timeout_seconds = 120
 serial_group = "parallel"
-depends_on = ["precondition.m014-distribution-core"]
+depends_on = ["precondition.m014_distribution_core"]
 live = false
 
 [[nodes]]
@@ -5224,7 +5224,7 @@ scope = "m014_distribution_core"
 phase = "tests"
 timeout_seconds = 120
 serial_group = "docker"
-depends_on = ["precondition.m014-distribution-core"]
+depends_on = ["precondition.m014_distribution_core"]
 live = false
 
 [[nodes]]
@@ -5235,7 +5235,7 @@ scope = "m014_distribution_core"
 phase = "tests"
 timeout_seconds = 120
 serial_group = "parallel"
-depends_on = ["precondition.m014-distribution-core"]
+depends_on = ["precondition.m014_distribution_core"]
 live = false
 
 [[nodes]]
@@ -5246,7 +5246,7 @@ scope = "m014_distribution_core"
 phase = "tests"
 timeout_seconds = 120
 serial_group = "parallel"
-depends_on = ["precondition.m014-distribution-core"]
+depends_on = ["precondition.m014_distribution_core"]
 live = false
 
 [[nodes]]
@@ -5257,7 +5257,7 @@ scope = "m014_distribution_core"
 phase = "tests"
 timeout_seconds = 120
 serial_group = "parallel"
-depends_on = ["precondition.m014-distribution-core"]
+depends_on = ["precondition.m014_distribution_core"]
 live = false
 
 [[nodes]]
@@ -5268,7 +5268,7 @@ scope = "m014_distribution_core"
 phase = "tests"
 timeout_seconds = 120
 serial_group = "parallel"
-depends_on = ["precondition.m014-distribution-core"]
+depends_on = ["precondition.m014_distribution_core"]
 live = false
 
 [[nodes]]
@@ -5279,7 +5279,7 @@ scope = "m014_distribution_core"
 phase = "tests"
 timeout_seconds = 120
 serial_group = "parallel"
-depends_on = ["precondition.m014-distribution-core"]
+depends_on = ["precondition.m014_distribution_core"]
 live = false
 
 [[nodes]]
@@ -5290,7 +5290,7 @@ scope = "m014_distribution_core"
 phase = "tests"
 timeout_seconds = 120
 serial_group = "parallel"
-depends_on = ["precondition.m014-distribution-core"]
+depends_on = ["precondition.m014_distribution_core"]
 live = false
 
 [[nodes]]
@@ -5301,7 +5301,7 @@ scope = "m014_distribution_core"
 phase = "tests"
 timeout_seconds = 120
 serial_group = "parallel"
-depends_on = ["precondition.m014-distribution-core"]
+depends_on = ["precondition.m014_distribution_core"]
 live = false
 
 [[nodes]]
@@ -5312,7 +5312,7 @@ scope = "m014_distribution_core"
 phase = "live"
 timeout_seconds = 180
 serial_group = "live"
-depends_on = ["precondition.m014-distribution-core"]
+depends_on = ["precondition.m014_distribution_core"]
 live = true
 
 [[nodes]]
@@ -5323,5 +5323,5 @@ scope = "m014_distribution_core"
 phase = "live"
 timeout_seconds = 240
 serial_group = "live"
-depends_on = ["precondition.m014-distribution-core"]
+depends_on = ["precondition.m014_distribution_core"]
 live = true
