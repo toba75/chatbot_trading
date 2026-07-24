@@ -27,15 +27,25 @@ def _read(relative_path: str) -> str:
 
 def _assert_les_taches_ne_demandent_plus_de_gate_globale_aux_sous_agents() -> None:
     for task_name in (
+        "0001_verifier_precondition_green.md",
+        "0002_publier_specification_pipeline_local_distribue.md",
         "0003_eclater_conversion_en_jobs_pages.md",
         "0004_executer_persister_page_fenced.md",
         "0005_assembler_publier_document_canonique.md",
         "0006_projeter_document_publie_localement.md",
     ):
         task = (TASKS / task_name).read_text(encoding="utf-8")
-        assert re.search(r"uv run --locked gate(?:`|\s*[.;])", task) is None, task_name
         assert "tests et scopes ciblés" in task
         assert "orchestrateur" in task
+        assert "exactement une gate globale de clôture" in task
+        assert "3 600 000 ms" in task
+        assert "même cell ID" in task
+        assert "jamais relancée" in task
+
+        validation_commands = task.split("- Commandes de validation :", 1)[1].split(
+            "- Commit RED", 1
+        )[0]
+        assert re.search(r"`uv run --locked gate`", validation_commands) is None, task_name
 
     specification = _read("docs/specs/m014_local_pipeline_documentaire_distribue.md")
     journal = _read("docs/tasks/milestone_014-local-pipeline/journal.md")
@@ -51,7 +61,7 @@ def _assert_la_specification_et_la_matrice_decrivent_le_pipeline_livre() -> None
     for marker in (
         "Statut : implémenté et activable explicitement",
         "CANONICAL_ARTIFACT_HASH_MISMATCH",
-        "migrations 023 à 028",
+        "migrations 023 à 029",
         "T-009 à T-011",
         "m014-page-fanout-v1",
     ):
@@ -73,25 +83,65 @@ def _assert_la_specification_et_la_matrice_decrivent_le_pipeline_livre() -> None
         "026_page_completion_configuration_identity.sql",
         "027_local_projection_review_hardening.sql",
         "028_m014_local_pipeline_compatibility.sql",
+        "029_m014_expand_contract_replay.sql",
     ):
         assert migration in matrix
+
+    obsolete_paths = (
+        "app/knowledge_access/application/local_canonical_projection.py",
+        "app/knowledge_access/adapters/postgres_local_projection.py",
+    )
+    assert all(path not in matrix for path in obsolete_paths)
+    for path in (
+        "app/knowledge_access/application/project_published_canonical.py",
+        "app/knowledge_access/adapters/postgres_canonical_publication_relay.py",
+        "app/knowledge_access/adapters/projection_runtime.py",
+        "app/knowledge_access/adapters/postgres_projection_read.py",
+    ):
+        assert path in matrix
+        assert (ROOT / path).is_file(), path
 
 
 def _assert_les_runbooks_exposent_activation_rollback_gpu_et_gates_bornees() -> None:
     distribution = _read("docs/runbooks/distribution_locale.md")
     environments = _read("docs/runbooks/environnements_explicites.md")
+    ingestion = _read("docs/runbooks/ingestion_pdf.md")
     for marker in (
         "CONVERT_PAGE",
         "ASSEMBLE_CANONICAL_DOCUMENT",
         "PROJECT_DOCUMENT",
         "nvidia-smi",
-        "migration 028",
+        "migration 029",
         "3 600 000 ms",
         "aucune alternative silencieuse",
     ):
         assert marker in distribution
     assert "m014_local_pipeline --live" in environments
     assert "exactement une gate globale de clôture" in environments
+    for marker in (
+        "M-014",
+        "CanonicalSourcePublished",
+        "projection automatique",
+        "REQUESTED",
+        "SEARCHABLE",
+    ):
+        assert marker in ingestion
+    assert "fonctionnalité non livrée" not in ingestion
+
+
+def _assert_expand_replay_est_documente_sans_adr_fictive() -> None:
+    adr = _read("docs/adr/ADR-053-migrations-m014-expand-contract-rejeu.md")
+    adr_index = _read("docs/adr/index.md")
+    specification = _read("docs/specs/m014_local_pipeline_documentaire_distribue.md")
+    distribution = _read("docs/runbooks/distribution_locale.md")
+    journal = _read("docs/tasks/milestone_014-local-pipeline/journal.md")
+    for document in (adr, specification, distribution, journal):
+        assert "migration 029" in document
+        assert "expand" in document
+        assert "rejeu" in document
+    assert "ADR-053" in adr_index
+    assert "Prochaine ADR technique: ADR-054" in adr_index
+    assert "ADR-054" not in "\n".join((specification, distribution, journal))
 
 
 def _assert_la_migration_classe_seulement_un_writer_m004_prouve() -> None:
@@ -121,6 +171,7 @@ def test_cloture_revue_m014_local_pipeline() -> None:
     _assert_les_taches_ne_demandent_plus_de_gate_globale_aux_sous_agents()
     _assert_la_specification_et_la_matrice_decrivent_le_pipeline_livre()
     _assert_les_runbooks_exposent_activation_rollback_gpu_et_gates_bornees()
+    _assert_expand_replay_est_documente_sans_adr_fictive()
     _assert_la_migration_classe_seulement_un_writer_m004_prouve()
     _assert_aucun_defaut_python_ne_choisit_le_parcours_de_conversion()
     _assert_l_artefact_attendu_est_compare_a_l_artefact_canonique_publie()

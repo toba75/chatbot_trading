@@ -599,6 +599,65 @@ def test_assemblage_postgresql_complet_concurrent_crash_et_rejeu() -> None:
                 page_artifact_reader=page_store,
                 canonical_artifact_store=canonical_store,
             )
+            with factory.connect() as connection, connection.transaction(), connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    CREATE FUNCTION source_processing.fail_canonical_publication_once()
+                    RETURNS trigger LANGUAGE plpgsql AS $$
+                    BEGIN
+                        RAISE EXCEPTION 'M014_INJECTED_CANONICAL_TRANSACTION_FAILURE';
+                    END;
+                    $$
+                    """,
+                    (),
+                )
+                cursor.execute(
+                    """
+                    CREATE TRIGGER fail_canonical_publication_once
+                    BEFORE INSERT ON source_processing.canonical_publication_outbox
+                    FOR EACH ROW EXECUTE FUNCTION
+                        source_processing.fail_canonical_publication_once()
+                    """,
+                    (),
+                )
+            with pytest.raises(psycopg.errors.RaiseException):
+                handler.handle(
+                    request=claimed.job.request,
+                    trace_id=claimed.trace_id,
+                )
+            with factory.connect() as connection, connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT count(*) FROM source_processing.canonical_source_versions",
+                    (),
+                )
+                assert cursor.fetchone() == (0,)
+                cursor.execute(
+                    "SELECT count(*) FROM source_processing.canonical_publication_outbox",
+                    (),
+                )
+                assert cursor.fetchone() == (0,)
+                cursor.execute(
+                    """
+                    SELECT conversion_status, execution_phase, canonical_version_id
+                      FROM source_processing.document_conversion_requests
+                     WHERE document_id = %s
+                    """,
+                    (source.document_id.value,),
+                )
+                assert cursor.fetchone() == (
+                    "CONVERSION_REQUESTED",
+                    "RUNNING",
+                    None,
+                )
+            with factory.connect() as connection, connection.transaction(), connection.cursor() as cursor:
+                cursor.execute(
+                    "DROP TRIGGER fail_canonical_publication_once ON source_processing.canonical_publication_outbox",
+                    (),
+                )
+                cursor.execute(
+                    "DROP FUNCTION source_processing.fail_canonical_publication_once()",
+                    (),
+                )
             published = handler.handle(
                 request=claimed.job.request,
                 trace_id=claimed.trace_id,
@@ -610,6 +669,41 @@ def test_assemblage_postgresql_complet_concurrent_crash_et_rejeu() -> None:
             assert published.created is True
             assert replay.created is False
             assert replay.canonical_ref == published.canonical_ref
+            canonical_artifacts = tuple(
+                (temporary_path / "canonical-sources").rglob("docling.json")
+            )
+            assert len(canonical_artifacts) == 1
+            canonical_payload = json.loads(
+                canonical_artifacts[0].read_text(encoding="utf-8")
+            )
+            assert canonical_payload["document_id"] == source.document_id.value
+            assert (
+                canonical_payload["canonical_version_id"]
+                == published.canonical_ref.canonical_version_id
+            )
+            assert tuple(page["page_pdf"] for page in canonical_payload["pages"]) == (
+                1,
+                2,
+                3,
+            )
+            assert canonical_payload["pages"][1]["items"] == []
+            actual_items = tuple(
+                item
+                for page in canonical_payload["pages"]
+                for item in page["items"]
+            )
+            assert tuple(item["text"] for item in actual_items) == (
+                "Texte canonique persistant de la page 1.",
+                "Texte canonique persistant de la page 3.",
+            )
+            assert all(
+                item["content_hash"]
+                == sha256(item["text"].encode("utf-8")).hexdigest()
+                for item in actual_items
+            )
+            assert tuple(
+                item["provenance"]["page_pdf"] for item in actual_items
+            ) == (1, 3)
             with factory.connect() as connection, connection.cursor() as cursor:
                 cursor.execute(
                     """

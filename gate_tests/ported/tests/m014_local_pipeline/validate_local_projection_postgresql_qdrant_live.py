@@ -497,16 +497,16 @@ def test_projection_postgresql_qdrant_complete_rejouee_et_isolee() -> None:
                 max_parallel_workers=2,
                 inference_gateway=_BibliographicGateway(),
             )
-            with factory.connect() as connection, connection.transaction(), connection.cursor() as cursor:
+            with factory.connect() as connection, connection.cursor() as cursor:
                 cursor.execute(
                     """
-                    UPDATE knowledge_access.knowledge_projections
-                       SET status = 'BUILDING', execution_phase = 'RUNNING',
-                           aggregate_version = aggregate_version + 1
+                    SELECT status, execution_phase, completed_units, total_units
+                      FROM knowledge_access.knowledge_projections
                      WHERE projection_id = %s
                     """,
                     (claimed.job.request.payload["projection_id"],),
                 )
+                assert cursor.fetchone() == ("REQUESTED", "QUEUED", 0, 1)
             first = runtime.execute_projection(request=claimed.job.request)
             for resumable_status in ("BUILT", "INDEXING"):
                 with factory.connect() as connection, connection.transaction(), connection.cursor() as cursor:
@@ -553,6 +553,25 @@ def test_projection_postgresql_qdrant_complete_rejouee_et_isolee() -> None:
                 collection_name=COLLECTION,
                 points_selector={"points": [deleted_point_id]},
             )
+            with pytest.raises(
+                ProjectionRuntimeError,
+                match="PROJECTION_REPLAY_INCOMPLETE",
+            ):
+                runtime.execute_projection(request=claimed.job.request)
+            with factory.connect() as connection, connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT status, execution_phase, index_generation
+                      FROM knowledge_access.knowledge_projections
+                     WHERE projection_id = %s
+                    """,
+                    (claimed.job.request.payload["projection_id"],),
+                )
+                assert cursor.fetchone() == (
+                    "SEARCHABLE",
+                    "SUCCEEDED",
+                    first["index_generation"],
+                )
             with factory.connect() as connection, connection.transaction(), connection.cursor() as cursor:
                 cursor.execute(
                     """
