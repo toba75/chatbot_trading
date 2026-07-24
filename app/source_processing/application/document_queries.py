@@ -570,7 +570,7 @@ def _conversion_action_progress(
         completed_units=parsed_conversion.completed_units,
         total_units=parsed_conversion.total_units,
         failure_error_code=parsed_conversion.failure_error_code,
-        **environment_identity.to_mapping(),
+        **parsed_conversion.producer_environment_identity.to_mapping(),
     )
 
 

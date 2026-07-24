@@ -24,7 +24,7 @@ from validate_page_execution_unit import (
 )
 
 
-def test_deux_workers_reprise_et_redelivrance_ne_comptent_qu_une_fois() -> None:
+def test_deux_workers_reprise_et_redelivrance_ne_comptent_qu_une_fois(capsys) -> None:
     # Given deux workers ont calculé une page standard et une page Granite,
     # puis la lease du premier détenteur Granite est devenue obsolète.
     content = b"%PDF-1.7\nM014 fan-out unit\n%%EOF\n"
@@ -78,3 +78,13 @@ def test_deux_workers_reprise_et_redelivrance_ne_comptent_qu_une_fois() -> None:
         )
     assert repository.completed_units == 3
     assert repository.result_count == 2
+    observations = capsys.readouterr().out
+    for marker in (
+        '"event_type": "page_completion_relay"',
+        '"correlation_id": "TRACE-M014-PAGE-72"',
+        '"error_code": "PAGE_RESULT_REPLAY_DIVERGENCE"',
+        '"success_count": 1',
+    ):
+        assert marker in observations
+    assert "claim_token" not in observations
+    assert '"payload"' not in observations

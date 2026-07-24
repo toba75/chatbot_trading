@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
 from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from app.platform.job_runtime import InMemoryJobQueue, JOB_RUNTIME_CATALOG
+from app.platform.job_runtime import (
+    InMemoryJobQueue,
+    JOB_RUNTIME_CATALOG,
+    JobEnvironmentIdentity,
+)
 from app.source_processing.adapters.local_page_artifacts import LocalPageArtifactStore
 from app.source_processing.application.document_commands import (
     DocumentConversionCommandService,
@@ -172,7 +175,9 @@ def _publication_artefact_refuse_un_claim_expire() -> None:
             store.write_immutable(
                 identity=identity,
                 content=b"resultat",
-                lease_expires_at=datetime.now(UTC) - timedelta(seconds=1),
+                authorize_publication=lambda: (_ for _ in ()).throw(
+                    RuntimeError("JOB_LEASE_LOST")
+                ),
             )
         except Exception as error:
             assert "JOB_LEASE_LOST" in str(error)
@@ -190,6 +195,11 @@ def _codes_m014_sont_des_echecs_publics_stables() -> None:
     ):
         state = DocumentConversionState(
             document_id=source.document_id,
+            producer_environment_identity=JobEnvironmentIdentity(
+                environment="test",
+                deployment_id="ostrading-test-local",
+                configuration_hash="c" * 64,
+            ),
             conversion_status=DocumentConversionStatus.QA_REJECTED,
             canonical_version_id=None,
             rejection_error_code=code,

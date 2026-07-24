@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import time
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
@@ -58,7 +58,7 @@ class ImmutablePageArtifactWriter(Protocol):
         *,
         identity: LocalArtifactIdentity,
         content: bytes,
-        lease_expires_at: Any,
+        authorize_publication: Callable[[], None],
     ) -> LocalArtifactDescriptor: ...
 
 
@@ -73,6 +73,8 @@ class RoutedPageConverter(Protocol):
 
 
 class StandardPageCompletion(Protocol):
+    def assert_standard_page_execution_current(self, claimed_job: ClaimedJob) -> None: ...
+
     def complete_standard_page_execution(
         self,
         claimed_job: ClaimedJob,
@@ -81,6 +83,8 @@ class StandardPageCompletion(Protocol):
 
 
 class GranitePageCompletion(Protocol):
+    def assert_page_execution_current(self, lease: GraniteSlotLease) -> None: ...
+
     def complete_page_execution(
         self,
         lease: GraniteSlotLease,
@@ -202,12 +206,14 @@ class ExecuteDocumentPageHandler:
         converters: PageRouteConverters,
         standard_completion: StandardPageCompletion,
         granite_completion: GranitePageCompletion,
-        expected_locked_assets: Sequence[LockedAssetVersion] | None = None,
+        expected_locked_assets: Sequence[LockedAssetVersion],
     ) -> None:
         required_ports = (
             (artifact_reader, "resolve_verified_path"),
             (artifact_writer, "write_immutable"),
+            (standard_completion, "assert_standard_page_execution_current"),
             (standard_completion, "complete_standard_page_execution"),
+            (granite_completion, "assert_page_execution_current"),
             (granite_completion, "complete_page_execution"),
         )
         if any(not callable(getattr(port, method, None)) for port, method in required_ports):
@@ -219,15 +225,12 @@ class ExecuteDocumentPageHandler:
         self._converters = converters
         self._standard_completion = standard_completion
         self._granite_completion = granite_completion
-        if expected_locked_assets is None:
-            self._expected_locked_assets = None
-        else:
-            parsed_assets = tuple(expected_locked_assets)
-            if len(parsed_assets) == 0 or any(
-                not isinstance(asset, LockedAssetVersion) for asset in parsed_assets
-            ):
-                raise ValueError("LOCKED_ASSET_INVALID")
-            self._expected_locked_assets = parsed_assets
+        parsed_assets = tuple(expected_locked_assets)
+        if len(parsed_assets) == 0 or any(
+            not isinstance(asset, LockedAssetVersion) for asset in parsed_assets
+        ):
+            raise ValueError("LOCKED_ASSET_INVALID")
+        self._expected_locked_assets = parsed_assets
 
     def execute_standard(self, claimed_job: ClaimedJob) -> PageExecutionOutcome:
         claimed = _claimed_job(claimed_job)
@@ -284,8 +287,7 @@ class ExecuteDocumentPageHandler:
             )
         )
         if (
-            self._expected_locked_assets is not None
-            and tuple(contract.locked_assets) != self._expected_locked_assets
+            tuple(contract.locked_assets) != self._expected_locked_assets
         ):
             raise DistributionContractError("LOCKED_ASSET_DIVERGENT")
         try:
@@ -339,7 +341,15 @@ class ExecuteDocumentPageHandler:
             artifact = self._artifact_writer.write_immutable(
                 identity=contract.expected_result_artifact,
                 content=converted.content,
-                lease_expires_at=claimed.lease_expires_at,
+                authorize_publication=(
+                    lambda: self._standard_completion.assert_standard_page_execution_current(
+                        claimed
+                    )
+                    if granite_lease is None
+                    else self._granite_completion.assert_page_execution_current(
+                        granite_lease
+                    )
+                ),
             )
         except ArtifactContractError as error:
             return _failed_outcome_from_contract_error(

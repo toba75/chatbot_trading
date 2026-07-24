@@ -8,7 +8,6 @@ import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict
-from datetime import UTC, datetime, timedelta
 from hashlib import sha256
 from pathlib import Path
 from uuid import uuid4
@@ -307,7 +306,7 @@ def _page_result(request: JobRequest, store: LocalPageArtifactStore) -> PageResu
     descriptor = store.write_immutable(
         identity=expected,
         content=content,
-        lease_expires_at=datetime.now(UTC) + timedelta(minutes=1),
+        authorize_publication=lambda: None,
     )
     page = payload["page_number"]
     return PageResultContract(
@@ -414,12 +413,19 @@ def test_assemblage_postgresql_complet_concurrent_crash_et_rejeu() -> None:
                         document_id, conversion_status, canonical_version_id,
                         rejection_error_code, submission_id, job_id,
                         execution_phase, completed_units, total_units,
-                        failure_error_code, orchestration_version
+                        failure_error_code, orchestration_version,
+                        producer_environment, producer_deployment_id,
+                        producer_configuration_hash
                     )
                     VALUES (%s, 'CONVERSION_REQUESTED', NULL, NULL, %s, NULL,
-                            'QUEUED', 0, 3, NULL, 'm014-page-fanout-v1')
+                            'QUEUED', 0, 3, NULL, 'm014-page-fanout-v1',
+                            'test', 'ostrading-test-local', %s)
                     """,
-                    (source.document_id.value, "OUTBOX-SP-M014-ASSEMBLY-PARENT"),
+                    (
+                        source.document_id.value,
+                        "OUTBOX-SP-M014-ASSEMBLY-PARENT",
+                        "c" * 64,
+                    ),
                 )
             fanout = FanOutDocumentPagesHandler(
                 processing_run_repository=PostgresProcessingRunRepository(persistence),

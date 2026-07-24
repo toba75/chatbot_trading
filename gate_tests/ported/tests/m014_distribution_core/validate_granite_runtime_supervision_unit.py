@@ -737,6 +737,11 @@ class _BuiltConversionRepository:
     def __init__(self, source: SourceDocument) -> None:
         self.state = DocumentConversionState(
             document_id=source.document_id,
+            producer_environment_identity=JobEnvironmentIdentity(
+                environment="test",
+                deployment_id="ostrading-test-local",
+                configuration_hash="c" * 64,
+            ),
             conversion_status=DocumentConversionStatus.CONVERSION_REQUESTED,
             canonical_version_id=None,
             rejection_error_code=None,

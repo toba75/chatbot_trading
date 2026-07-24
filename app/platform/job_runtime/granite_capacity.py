@@ -945,6 +945,54 @@ class PostgresGraniteSlotRepository(
                 if cursor.fetchone() is None:
                     raise GraniteSlotLeaseLostError()
 
+    def assert_page_execution_current(self, lease: GraniteSlotLease) -> None:
+        """Vérifie atomiquement le claim et le slot actuels avant publication."""
+
+        parsed_lease = _require_lease(lease)
+        claimed = parsed_lease.claimed_job
+        with self._connection_factory.connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT slot.slot_ordinal
+                      FROM platform.technical_jobs AS job
+                      JOIN platform.granite_slots AS slot
+                        ON slot.environment = job.environment
+                       AND slot.deployment_id = job.deployment_id
+                       AND slot.job_id = job.job_id
+                     WHERE job.job_id = %(job_id)s
+                       AND job.environment = %(environment)s
+                       AND job.deployment_id = %(deployment_id)s
+                       AND job.configuration_hash = %(configuration_hash)s
+                       AND job.status = 'running'
+                       AND job.lease_owner = %(worker_instance_id)s
+                       AND job.claim_generation = %(claim_generation)s
+                       AND job.claim_token = %(claim_token)s::uuid
+                       AND job.lease_expires_at > CURRENT_TIMESTAMP
+                       AND slot.slot_ordinal = %(slot_ordinal)s
+                       AND slot.lease_owner = %(worker_instance_id)s
+                       AND slot.claim_generation = %(claim_generation)s
+                       AND slot.claim_token = %(claim_token)s::uuid
+                       AND slot.slot_generation = %(slot_generation)s
+                       AND slot.slot_token = %(slot_token)s::uuid
+                       AND slot.lease_until > CURRENT_TIMESTAMP
+                    """,
+                    {
+                        "job_id": claimed.job.job_id,
+                        "environment": self._environment_identity.environment,
+                        "deployment_id": self._environment_identity.deployment_id,
+                        "configuration_hash": self._environment_identity.configuration_hash,
+                        "worker_instance_id": claimed.lease_owner,
+                        "claim_generation": claimed.claim_generation,
+                        "claim_token": claimed.claim_token,
+                        "slot_ordinal": parsed_lease.slot_ordinal,
+                        "slot_generation": parsed_lease.slot_generation,
+                        "slot_token": parsed_lease.slot_token,
+                    },
+                )
+                if cursor.fetchone() is None:
+                    raise GraniteSlotLeaseLostError()
+
     def complete_page_execution(
         self,
         lease: GraniteSlotLease,
@@ -963,7 +1011,7 @@ class PostgresGraniteSlotRepository(
                 )
                 cursor.execute(
                     """
-                    SELECT job_id, claim_generation, claim_token::text,
+                    SELECT job_id, trace_id, claim_generation, claim_token::text,
                            worker_instance_id, slot_ordinal, slot_generation,
                            slot_token::text, payload, payload_fingerprint,
                            terminal_status, failure_reason, configuration_hash
@@ -975,9 +1023,10 @@ class PostgresGraniteSlotRepository(
                 )
                 existing = cursor.fetchone()
                 if existing is not None:
-                    actual = _row_values(existing, 12, "EXISTING_COMPLETION")
+                    actual = _row_values(existing, 13, "EXISTING_COMPLETION")
                     expected = (
                         claimed.job.job_id,
+                        claimed.trace_id,
                         claimed.claim_generation,
                         claimed.claim_token,
                         claimed.lease_owner,
@@ -990,10 +1039,10 @@ class PostgresGraniteSlotRepository(
                         envelope.failure_reason,
                         self._environment_identity.configuration_hash,
                     )
-                    actual_payload = _mapping(actual[7], "completion_payload")
-                    comparable_actual = actual[:7] + (
+                    actual_payload = _mapping(actual[8], "completion_payload")
+                    comparable_actual = actual[:8] + (
                         json.loads(_canonical_json(actual_payload)),
-                    ) + actual[8:]
+                    ) + actual[9:]
                     if comparable_actual != expected:
                         raise GranitePageCompletionConflictError()
                     return _terminal_job_record(claimed, envelope)
@@ -1031,7 +1080,7 @@ class PostgresGraniteSlotRepository(
                     immutable_outbox AS (
                         INSERT INTO platform.page_completion_outbox (
                             completion_id, environment, deployment_id,
-                            configuration_hash, job_id,
+                            configuration_hash, job_id, trace_id,
                             claim_generation, claim_token, worker_instance_id,
                             slot_ordinal, slot_generation, slot_token, payload,
                             payload_fingerprint, terminal_status, failure_reason,
@@ -1040,7 +1089,7 @@ class PostgresGraniteSlotRepository(
                         )
                         SELECT
                             %(completion_id)s, %(environment)s, %(deployment_id)s,
-                            %(configuration_hash)s, active_job.job_id,
+                            %(configuration_hash)s, active_job.job_id, %(trace_id)s,
                             %(claim_generation)s,
                             %(claim_token)s::uuid, %(worker_instance_id)s,
                             active_slot.slot_ordinal, %(slot_generation)s,
@@ -1099,6 +1148,7 @@ class PostgresGraniteSlotRepository(
                             self._environment_identity.configuration_hash
                         ),
                         "job_id": claimed.job.job_id,
+                        "trace_id": claimed.trace_id,
                         "worker_instance_id": claimed.lease_owner,
                         "claim_generation": claimed.claim_generation,
                         "claim_token": claimed.claim_token,

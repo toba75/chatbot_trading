@@ -31,6 +31,7 @@ from app.source_processing.domain.distribution_contracts import (
 from app.source_processing.domain.document_processing_run import PageRouteName
 from validate_page_fan_out_unit import (
     _FanOutRepository,
+    _assets,
     _handler,
     _parent_job,
     _planned_run,
@@ -119,9 +120,8 @@ class _Writer:
     def __init__(self) -> None:
         self.writes = 0
 
-    def write_immutable(
-        self, *, identity, content: bytes, lease_expires_at
-    ) -> LocalArtifactDescriptor:
+    def write_immutable(self, *, identity, content: bytes, authorize_publication):
+        authorize_publication()
         self.writes += 1
         return LocalArtifactDescriptor(
             identity=identity,
@@ -154,6 +154,9 @@ class _StandardCompletion:
         self.calls = []
         self.messages = []
 
+    def assert_standard_page_execution_current(self, claimed_job):
+        self.current_claim = claimed_job
+
     def complete_standard_page_execution(self, claimed_job, envelope):
         self.calls.append((claimed_job, envelope))
         self.messages.append(
@@ -169,6 +172,9 @@ class _GraniteCompletion:
     def __init__(self) -> None:
         self.calls = []
         self.messages = []
+
+    def assert_page_execution_current(self, lease):
+        self.current_lease = lease
 
     def complete_page_execution(self, lease, envelope):
         self.calls.append((lease, envelope))
@@ -212,7 +218,9 @@ def _handler_for(
             converters=converters or _converters(),
             standard_completion=standard,
             granite_completion=granite,
-            expected_locked_assets=expected_locked_assets,
+            expected_locked_assets=(
+                _assets() if expected_locked_assets is None else expected_locked_assets
+            ),
         ),
         reader,
         writer,

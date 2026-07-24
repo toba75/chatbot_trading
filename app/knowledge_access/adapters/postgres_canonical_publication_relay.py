@@ -339,6 +339,28 @@ class PostgresCanonicalPublicationRelay:
                         )
                 cursor.execute(
                     """
+                    UPDATE knowledge_access.job_outbox
+                       SET payload = %s::jsonb,
+                           trace_id = %s,
+                           status = 'pending', platform_job_id = NULL,
+                           relayed_at = NULL, relay_owner = NULL,
+                           relay_lease_expires_at = NULL,
+                           relay_claim_generation = relay_claim_generation + 1,
+                           relay_claim_token = NULL
+                     WHERE job_name = 'PROJECT_DOCUMENT'
+                       AND input_hash = %s
+                       AND configuration_hash = %s
+                       AND NOT (payload ? 'contract_version')
+                    """,
+                    (
+                        _canonical_json(job_payload),
+                        event.correlation_id,
+                        request.idempotence_key.input_hash,
+                        request.idempotence_key.configuration_hash,
+                    ),
+                )
+                cursor.execute(
+                    """
                     INSERT INTO knowledge_access.job_outbox (
                         environment, deployment_id, job_name, priority,
                         input_hash, configuration_hash, code_version,
@@ -360,7 +382,7 @@ class PostgresCanonicalPublicationRelay:
                         request.idempotence_key.code_version,
                         request.idempotence_key.model_version,
                         _canonical_json(job_payload),
-                        f"TRACE-KA-{projection.projection_id}",
+                        event.correlation_id,
                     ),
                 )
                 job_created = cursor.fetchone() is not None

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import hashlib
+import json
+import struct
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from uuid import UUID
 from collections.abc import Callable, Mapping, Sequence
@@ -129,7 +131,9 @@ class QdrantVectorIndex:
             collection_name=parsed_request.collection_name,
             index_generation=parsed_request.index_generation,
         )
-        if existing_count == parsed_request.expected_point_count:
+        if existing_count == parsed_request.expected_point_count and self._generation_matches(
+            parsed_request
+        ):
             return VectorIndexPublication(
                 collection_name=parsed_request.collection_name,
                 index_generation=parsed_request.index_generation,
@@ -138,6 +142,11 @@ class QdrantVectorIndex:
                 ),
                 expected_point_count=parsed_request.expected_point_count,
                 idempotent=True,
+            )
+        if existing_count > 0:
+            self._client.delete(
+                collection_name=parsed_request.collection_name,
+                points_selector={"filter": _generation_filter(parsed_request.index_generation)},
             )
         qdrant_points = tuple(
             _qdrant_point_for(parsed_request.index_generation, point)
@@ -154,7 +163,10 @@ class QdrantVectorIndex:
             collection_name=parsed_request.collection_name,
             index_generation=parsed_request.index_generation,
         )
-        if published_count != parsed_request.expected_point_count:
+        if (
+            published_count != parsed_request.expected_point_count
+            or not self._generation_matches(parsed_request)
+        ):
             raise PartialVectorIndexError(
                 expected_point_count=parsed_request.expected_point_count,
                 published_point_count=published_count,
@@ -166,6 +178,32 @@ class QdrantVectorIndex:
             expected_point_count=parsed_request.expected_point_count,
             idempotent=False,
         )
+
+    def _generation_matches(self, request: VectorIndexPublishRequest) -> bool:
+        scroll = getattr(self._client, "scroll", None)
+        if not callable(scroll):
+            raise ValueError("client Qdrant sans scroll exact")
+        actual = scroll(
+            collection_name=request.collection_name,
+            scroll_filter=_generation_filter(request.index_generation),
+        )
+        expected_points = tuple(
+            _qdrant_point_for(request.index_generation, point)
+            for point in request.points
+        )
+        expected = {
+            str(point["id"]): _point_fingerprint(point)
+            for point in expected_points
+        }
+        parsed_actual: dict[str, str] = {}
+        for point in actual:
+            if not isinstance(point, Mapping) or set(point) < {"id", "vector", "payload"}:
+                return False
+            point_id = str(point["id"])
+            if point_id in parsed_actual:
+                return False
+            parsed_actual[point_id] = _point_fingerprint(point)
+        return parsed_actual == expected
 
     def _upsert_batches(
         self,
@@ -211,6 +249,19 @@ class QdrantVectorIndex:
             collection_name=parsed_collection_name,
             index_generation=parsed_index_generation,
         ) > 0
+
+    def verify_generation(self, request: VectorIndexPublishRequest) -> bool:
+        """Vérifie sans mutation l'ensemble exact et les empreintes attendues."""
+
+        parsed = _ensure_publish_request(request)
+        return (
+            self._generation_count(
+                collection_name=parsed.collection_name,
+                index_generation=parsed.index_generation,
+            )
+            == parsed.expected_point_count
+            and self._generation_matches(parsed)
+        )
 
     def delete_generation(self, *, collection_name: str, index_generation: str) -> VectorIndexDeletion:
         parsed_collection_name = _ensure_text(collection_name, "collection_name")
@@ -283,6 +334,37 @@ def _generation_filter(index_generation: str) -> dict[str, Any]:
             },
         )
     }
+
+
+def _point_fingerprint(point: Mapping[str, Any]) -> str:
+    comparable = {
+        "id": str(point["id"]),
+        "payload": _qdrant_canonical_value(point["payload"]),
+        "vector": _qdrant_canonical_value(point["vector"]),
+    }
+    return hashlib.sha256(
+        json.dumps(
+            comparable,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("utf-8")
+    ).hexdigest()
+
+
+def _qdrant_canonical_value(value: Any) -> Any:
+    """Normalise les vecteurs selon la précision float32 réellement stockée."""
+
+    if isinstance(value, float):
+        return struct.unpack("!f", struct.pack("!f", value))[0]
+    if isinstance(value, Mapping):
+        return {
+            str(key): _qdrant_canonical_value(item)
+            for key, item in value.items()
+        }
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+        return tuple(_qdrant_canonical_value(item) for item in value)
+    return value
 
 
 def _ensure_publish_request(value: VectorIndexPublishRequest) -> VectorIndexPublishRequest:

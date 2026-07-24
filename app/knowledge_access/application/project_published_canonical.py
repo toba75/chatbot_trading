@@ -114,6 +114,7 @@ class PublishedCanonicalProjectionRequest:
             projection_profile=projection_profile,
         )
         request = ProjectDocumentContract(
+            contract_version=PROJECT_DOCUMENT_CONTRACT_VERSION,
             projection_id=projection.projection_id,
             document_id=projection.document_id,
             canonical_version_id=projection.canonical_version_id,

@@ -5,6 +5,7 @@ import inspect
 from datetime import datetime, timezone
 
 from app.contracts.source_references import SourceLocator
+from app.contracts.technical_jobs import JobEnvironmentIdentity
 from app.knowledge_access.adapters.postgres_projection_read import (
     PostgresKnowledgeProjectionRepository,
     PostgresProjectionReadRepository,
@@ -172,7 +173,12 @@ def test_validate_ka_projection_persistence_unit() -> None:
     )
     reader_cursor = _Cursor(projection_row, sample_rows)
     reader = PostgresProjectionReadRepository(
-        connection_factory=_Factory([reader_cursor])
+        connection_factory=_Factory([reader_cursor]),
+        environment_identity=JobEnvironmentIdentity(
+            environment="test",
+            deployment_id="ostrading-test-local",
+            configuration_hash="c" * 64,
+        ),
     )
     record = reader.current_projection_for_document_id(DOCUMENT_ID, sample_limit=2)
     assert record is not None

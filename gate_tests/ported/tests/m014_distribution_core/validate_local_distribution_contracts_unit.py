@@ -237,6 +237,7 @@ def test_value_objects_et_serialisation_fermee(tmp_path: Path) -> None:
 
 
 def _assert_codes_terminaux_relis_publiquement() -> None:
+    from app.contracts.technical_jobs import JobEnvironmentIdentity
     from app.source_processing.application.document_commands import (
         DocumentConversionExecutionPhase,
         DocumentConversionState,
@@ -252,6 +253,11 @@ def _assert_codes_terminaux_relis_publiquement() -> None:
     ):
         state = DocumentConversionState(
             document_id=DocumentId.from_value("DOC-AAAAAAAAAAAAAAAA"),
+            producer_environment_identity=JobEnvironmentIdentity(
+                environment="test",
+                deployment_id="ostrading-test-local",
+                configuration_hash=SHA_A,
+            ),
             conversion_status=DocumentConversionStatus.QA_REJECTED,
             canonical_version_id=None,
             rejection_error_code=code,

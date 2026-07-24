@@ -140,6 +140,7 @@ class PageCompletionMessage:
     deployment_id: str
     configuration_hash: str
     job_id: str
+    trace_id: str
     claim_generation: int
     claim_token: str
     worker_instance_id: str
@@ -157,6 +158,7 @@ class PageCompletionMessage:
             (self.environment, "environment"),
             (self.deployment_id, "deployment_id"),
             (self.job_id, "job_id"),
+            (self.trace_id, "trace_id"),
             (self.claim_token, "claim_token"),
             (self.worker_instance_id, "worker_instance_id"),
             (self.payload_fingerprint, "payload_fingerprint"),
@@ -215,6 +217,7 @@ class PageCompletionMessage:
             deployment_id=request.deployment_id,
             configuration_hash=request.idempotence_key.configuration_hash,
             job_id=claimed_job.job.job_id,
+            trace_id=claimed_job.trace_id,
             claim_generation=claimed_job.claim_generation,
             claim_token=claimed_job.claim_token,
             worker_instance_id=claimed_job.lease_owner,

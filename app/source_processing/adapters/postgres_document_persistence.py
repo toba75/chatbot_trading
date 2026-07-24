@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, NamedTuple
 from uuid import uuid4
 
-from app.contracts.technical_jobs import JobRequest
+from app.contracts.technical_jobs import JobEnvironmentIdentity, JobRequest
 from app.platform.configuration import ApplicationConfiguration
 from app.platform.postgres import (
     PostgresConnection,
@@ -655,7 +655,9 @@ class PostgresDocumentPersistence:
                         """
                         SELECT document_id, conversion_status, canonical_version_id,
                                rejection_error_code, execution_phase, completed_units,
-                               total_units, failure_error_code
+                               total_units, failure_error_code,
+                               producer_environment, producer_deployment_id,
+                               producer_configuration_hash
                           FROM source_processing.document_conversion_requests
                          WHERE document_id = ANY(%s)
                         """,
@@ -664,6 +666,11 @@ class PostgresDocumentPersistence:
                     conversions = {
                         row[0]: DocumentConversionState(
                             document_id=DocumentId.from_value(row[0]),
+                            producer_environment_identity=JobEnvironmentIdentity(
+                                environment=row[8],
+                                deployment_id=row[9],
+                                configuration_hash=row[10],
+                            ),
                             conversion_status=DocumentConversionStatus.from_value(row[1]),
                             canonical_version_id=row[2],
                             rejection_error_code=row[3],
@@ -878,9 +885,13 @@ class PostgresDocumentPersistence:
                                 document_id, conversion_status, canonical_version_id,
                                 rejection_error_code, execution_phase, completed_units,
                                 total_units, failure_error_code, submission_id, job_id,
-                                orchestration_version
+                                orchestration_version, producer_environment,
+                                producer_deployment_id, producer_configuration_hash
                             )
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NULL, %s)
+                            VALUES (
+                                %s, %s, %s, %s, %s, %s, %s, %s, %s, NULL, %s,
+                                %s, %s, %s
+                            )
                             ON CONFLICT (document_id) DO NOTHING
                             RETURNING document_id
                             """,
@@ -895,6 +906,9 @@ class PostgresDocumentPersistence:
                                 conversion_state.failure_error_code,
                                 submission.outbox_id,
                                 orchestration_version,
+                                conversion_state.producer_environment_identity.environment,
+                                conversion_state.producer_environment_identity.deployment_id,
+                                conversion_state.producer_environment_identity.configuration_hash,
                             ),
                         )
                         if cursor.fetchone() is None:
@@ -1335,7 +1349,9 @@ class PostgresDocumentPersistence:
                 """
                 SELECT document_id, conversion_status, canonical_version_id,
                        rejection_error_code, execution_phase, completed_units,
-                       total_units, failure_error_code
+                       total_units, failure_error_code,
+                       producer_environment, producer_deployment_id,
+                       producer_configuration_hash
                   FROM source_processing.document_conversion_requests
                  WHERE document_id = %s
                 """,
@@ -1346,6 +1362,11 @@ class PostgresDocumentPersistence:
             return None
         return DocumentConversionState(
             document_id=DocumentId.from_value(row[0]),
+            producer_environment_identity=JobEnvironmentIdentity(
+                environment=row[8],
+                deployment_id=row[9],
+                configuration_hash=row[10],
+            ),
             conversion_status=DocumentConversionStatus.from_value(row[1]),
             canonical_version_id=row[2],
             rejection_error_code=row[3],

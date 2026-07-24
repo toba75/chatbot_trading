@@ -12,12 +12,14 @@ from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
 
 from app.contracts.technical_jobs import (
     ClaimedJob,
+    JobEnvironmentIdentity,
     JobIdempotenceKey,
     JobPriority,
     JobRecord,
     JobRequest,
     JobStatus,
 )
+
 from app.source_processing.adapters.docling_native_conversion import (
     CanonicalArtifactFileStore,
     IsolatedNativeDoclingConverter,
@@ -52,6 +54,12 @@ from app.source_processing.domain.source_document import (
     SourceFingerprint,
 )
 
+_ENVIRONMENT_IDENTITY = JobEnvironmentIdentity(
+    environment="test",
+    deployment_id="ostrading-test-local",
+    configuration_hash="c" * 64,
+)
+
 
 class _SourceRepository:
     def __init__(self, source: SourceDocument) -> None:
@@ -75,6 +83,7 @@ class _ConversionRepository:
     def __init__(self, source: SourceDocument) -> None:
         self.state = DocumentConversionState(
             document_id=source.document_id,
+            producer_environment_identity=_ENVIRONMENT_IDENTITY,
             conversion_status=DocumentConversionStatus.CONVERSION_REQUESTED,
             canonical_version_id=None,
             rejection_error_code=None,
@@ -94,6 +103,7 @@ class _ConversionRepository:
         self.publication = publication
         self.state = DocumentConversionState(
             document_id=publication.document_id,
+            producer_environment_identity=_ENVIRONMENT_IDENTITY,
             conversion_status=DocumentConversionStatus.CANONICAL_ACCEPTED,
             canonical_version_id=publication.canonical_version_id,
             rejection_error_code=None,
@@ -107,6 +117,7 @@ class _ConversionRepository:
         assert document_id == self.state.document_id
         self.state = DocumentConversionState(
             document_id=document_id,
+            producer_environment_identity=_ENVIRONMENT_IDENTITY,
             conversion_status=DocumentConversionStatus.CONVERSION_REQUESTED,
             canonical_version_id=None,
             rejection_error_code=None,
@@ -121,6 +132,7 @@ class _ConversionRepository:
     ) -> None:
         self.state = DocumentConversionState(
             document_id=document_id,
+            producer_environment_identity=_ENVIRONMENT_IDENTITY,
             conversion_status=DocumentConversionStatus.QA_REJECTED,
             canonical_version_id=None,
             rejection_error_code=error_code,

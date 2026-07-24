@@ -206,12 +206,19 @@ def test_page_execution_postgresql_claim_fencing_relay_et_atomicite() -> None:
                         document_id, conversion_status, canonical_version_id,
                         rejection_error_code, submission_id, job_id,
                         execution_phase, completed_units, total_units,
-                        failure_error_code, orchestration_version
+                        failure_error_code, orchestration_version,
+                        producer_environment, producer_deployment_id,
+                        producer_configuration_hash
                     )
                     VALUES (%s, 'CONVERSION_REQUESTED', NULL, NULL, %s, NULL,
-                            'QUEUED', 0, 4, NULL, 'm014-page-fanout-v1')
+                            'QUEUED', 0, 4, NULL, 'm014-page-fanout-v1',
+                            'test', 'ostrading-test-local', %s)
                     """,
-                    (source.document_id.value, "OUTBOX-SP-M014-PAGE-PARENT"),
+                    (
+                        source.document_id.value,
+                        "OUTBOX-SP-M014-PAGE-PARENT",
+                        "c" * 64,
+                    ),
                 )
             repository = PostgresDocumentConversionRepository(persistence)
             fan_out = FanOutDocumentPagesHandler(
@@ -345,6 +352,7 @@ def test_page_execution_postgresql_claim_fencing_relay_et_atomicite() -> None:
                 converters=_converters(),
                 standard_completion=standard_repository,
                 granite_completion=granite_repository,
+                expected_locked_assets=_assets(),
             )
             last_standard = standard_repository.claim_compatible_job(
                 worker=worker_a,
@@ -366,6 +374,7 @@ def test_page_execution_postgresql_claim_fencing_relay_et_atomicite() -> None:
                 converters=_converters(native=failed_converter),
                 standard_completion=standard_repository,
                 granite_completion=granite_repository,
+                expected_locked_assets=_assets(),
             )
             failed_execution.execute_standard(last_standard)
             standard_outcome = execution.execute_standard(standard_claim)

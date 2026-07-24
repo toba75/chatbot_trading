@@ -407,6 +407,44 @@ class PostgresJobQueue:
                 existing = cursor.fetchone()
                 if existing is not None:
                     existing_row = _ExistingRelayRow.from_database(existing)
+                    if _is_historical_project_document_upgrade(
+                        existing_row=existing_row,
+                        request=request,
+                    ):
+                        requirements = _execution_requirement_mapping(request)
+                        cursor.execute(
+                            """
+                            UPDATE platform.technical_jobs
+                               SET execution_contract_name = %(execution_contract_name)s,
+                                   execution_contract_version = %(execution_contract_version)s,
+                                   capacity_capability = %(capacity_capability)s,
+                                   capacity_slots = %(capacity_slots)s,
+                                   capacity_device = %(capacity_device)s,
+                                   storage_environment = %(storage_environment)s,
+                                   payload = %(payload)s::jsonb,
+                                   trace_id = %(trace_id)s,
+                                   status = 'pending', result = NULL,
+                                   failure_reason = NULL, lease_owner = NULL,
+                                   lease_expires_at = NULL, claim_token = NULL,
+                                   claim_generation = claim_generation + 1,
+                                   source_message_id = %(source_message_id)s,
+                                   source_message_hash = %(source_message_hash)s
+                             WHERE job_id = %(job_id)s
+                               AND source_message_id IS NULL
+                               AND source_message_hash IS NULL
+                            """,
+                            {
+                                **requirements,
+                                "payload": serialized_payload,
+                                "trace_id": message.trace_id,
+                                "source_message_id": message.message_id,
+                                "source_message_hash": message.content_hash,
+                                "job_id": existing_row.job_id,
+                            },
+                        )
+                        if cursor.rowcount != 1:
+                            raise JobRelayMessageConflictError()
+                        return existing_row.job_id
                     if (
                         existing_row.priority != request.priority.value
                         or dict(existing_row.payload) != dict(request.payload)
@@ -483,7 +521,6 @@ class PostgresJobQueue:
         if inserted is None:
             raise RuntimeError("JOB_RELAY_PERSISTENCE_FAILED")
         return _InsertedJobRow.from_database(inserted).job_id
-
     def _require_environment_identity(self, request: JobRequest) -> None:
         if request.environment_identity != self._environment_identity:
             raise WorkerEnvironmentMismatchError()
@@ -1085,6 +1122,27 @@ def _existing_relay_requirement_values(row: _ExistingRelayRow) -> tuple[Any, ...
         row.capacity_slots,
         row.capacity_device,
         row.storage_environment,
+    )
+
+
+def _is_historical_project_document_upgrade(
+    *,
+    existing_row: _ExistingRelayRow,
+    request: JobRequest,
+) -> bool:
+    existing_payload = dict(existing_row.payload)
+    requested_payload = dict(request.payload)
+    return (
+        request.job_name == "PROJECT_DOCUMENT"
+        and set(existing_payload)
+        == {"projection_id", "document_id", "canonical_version_id"}
+        and requested_payload.get("contract_version") == "1.0"
+        and all(
+            existing_payload[field_name] == requested_payload.get(field_name)
+            for field_name in existing_payload
+        )
+        and existing_row.source_message_id is None
+        and existing_row.source_message_hash is None
     )
 
 

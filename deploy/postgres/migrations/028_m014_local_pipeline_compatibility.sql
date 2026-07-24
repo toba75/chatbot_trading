@@ -54,7 +54,11 @@ UPDATE source_processing.job_outbox
            || '/docling.json'
        ),
        false
-   )
+   ),
+       status = 'pending', relay_owner = NULL,
+       relay_lease_expires_at = NULL,
+       relay_claim_generation = relay_claim_generation + 1,
+       relay_claim_token = NULL
  WHERE job_name = 'ASSEMBLE_CANONICAL_DOCUMENT'
    AND status <> 'relayed'
    AND jsonb_typeof(payload -> 'expected_canonical_artifact') = 'object';

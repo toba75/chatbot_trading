@@ -42,6 +42,7 @@ from app.source_processing.adapters.postgres_job_outbox import PostgresJobOutbox
 
 
 MAX_STARTUP_ENVIRONMENT_RECONCILIATIONS = 256
+MAX_PROJECTION_ATTEMPTS = 3
 
 
 def _run_worker(
@@ -194,7 +195,34 @@ def _run_worker(
                 result = runtime.execute_projection(request=claimed.job.request)
             except ProjectionRetryableError as exc:
                 error_code = exc.error_code
-                status = "retrying"
+                if claimed.execution_attempts < MAX_PROJECTION_ATTEMPTS:
+                    heartbeat.finalize(
+                        lambda: job_runtime.queue.schedule_retry(
+                            job_id=claimed.job.job_id,
+                            owner_id=instance_owner_id,
+                            claim_generation=claimed.claim_generation,
+                            claim_token=claimed.claim_token,
+                            max_attempts=MAX_PROJECTION_ATTEMPTS,
+                        )
+                    )
+                    status = "retry_scheduled"
+                else:
+                    def terminalize_retry() -> Any:
+                        if error_code != "PROJECTION_LEASE_CONFLICT":
+                            runtime.terminalize_retry_exhausted(
+                                request=claimed.job.request,
+                                error_code=error_code,
+                            )
+                        return job_runtime.queue.mark_failed(
+                            job_id=claimed.job.job_id,
+                            owner_id=instance_owner_id,
+                            claim_generation=claimed.claim_generation,
+                            claim_token=claimed.claim_token,
+                            failure_reason=error_code,
+                        )
+
+                    heartbeat.finalize(terminalize_retry)
+                    status = "failed"
             except Exception as exc:
                 error_code = (
                     exc.error_code

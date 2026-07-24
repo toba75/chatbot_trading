@@ -62,7 +62,7 @@ class ProjectDocumentContract:
     qdrant_collection_name: str
     environment_identity: JobEnvironmentIdentity
     causation_event_id: str
-    contract_version: str = PROJECT_DOCUMENT_CONTRACT_VERSION
+    contract_version: str
 
     def __post_init__(self) -> None:
         if self.contract_version != PROJECT_DOCUMENT_CONTRACT_VERSION:

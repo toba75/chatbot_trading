@@ -43,16 +43,6 @@ ALTER TABLE source_processing.canonical_publication_outbox
 
 -- Les publications antérieures à l'inbox KA sont rejouées explicitement. Le
 -- relais reste idempotent et l'ACK SP ne précède jamais la transaction KA.
-UPDATE source_processing.canonical_publication_outbox AS message
-   SET status = 'pending', relayed_at = NULL, relay_owner = NULL,
-       relay_lease_until = NULL, relay_token = NULL
- WHERE message.status = 'relayed'
-   AND NOT EXISTS (
-       SELECT 1
-         FROM knowledge_access.canonical_publication_inbox AS inbox
-        WHERE inbox.event_id = message.event_id
-   );
-
 -- CONTRACT : aucune valeur métier implicite pour la redélivrance.
 ALTER TABLE knowledge_access.projection_event_receipts
     ALTER COLUMN delivery_count DROP DEFAULT;
@@ -98,6 +88,16 @@ ALTER TABLE platform.technical_jobs
             AND capacity_slots = 0
             AND capacity_device IS NULL
             AND storage_environment = environment
+        )
+        OR (
+            job_name = 'PROJECT_DOCUMENT'
+            AND NOT (payload ? 'contract_version')
+            AND execution_contract_name IS NULL
+            AND execution_contract_version IS NULL
+            AND capacity_capability IS NULL
+            AND capacity_slots IS NULL
+            AND capacity_device IS NULL
+            AND storage_environment IS NULL
         )
         OR (
             job_name NOT IN ('CONVERT_PAGE', 'PROJECT_DOCUMENT')

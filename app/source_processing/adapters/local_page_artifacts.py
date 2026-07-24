@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import os
 import shutil
-from datetime import UTC, datetime
+from collections.abc import Callable
 from pathlib import Path
 from uuid import uuid4
 
@@ -23,7 +23,6 @@ class LocalPageArtifactStore:
         if not isinstance(profile_root, Path) or not profile_root.is_absolute():
             raise ValueError("ARTIFACT_ROOT_INVALID")
         self._profile_root = profile_root.resolve()
-        self._verified_sources: set[tuple[str, str, int]] = set()
 
     def materialize_verified_source(
         self,
@@ -66,7 +65,6 @@ class LocalPageArtifactStore:
             sha256=digest,
             size_bytes=size,
         )
-        self._verified_sources.add((identity.artifact_ref, digest, size))
         return descriptor
 
     def resolve_verified_path(self, descriptor: LocalArtifactDescriptor) -> Path:
@@ -75,16 +73,9 @@ class LocalPageArtifactStore:
         path = descriptor.identity.resolve_under(self._profile_root)
         if not path.is_file():
             raise ArtifactContractError("ARTIFACT_NOT_FOUND")
-        identity = (
-            descriptor.identity.artifact_ref,
-            descriptor.sha256,
-            descriptor.size_bytes,
-        )
-        if identity not in self._verified_sources:
-            digest, size = _hash_file(path)
-            if (digest, size) != (descriptor.sha256, descriptor.size_bytes):
-                raise ArtifactContractError("ARTIFACT_HASH_MISMATCH")
-            self._verified_sources.add(identity)
+        digest, size = _hash_file(path)
+        if (digest, size) != (descriptor.sha256, descriptor.size_bytes):
+            raise ArtifactContractError("ARTIFACT_HASH_MISMATCH")
         return path
 
     def read(self, descriptor: LocalArtifactDescriptor) -> bytes:
@@ -102,14 +93,14 @@ class LocalPageArtifactStore:
         *,
         identity: LocalArtifactIdentity,
         content: bytes,
-        lease_expires_at: datetime,
+        authorize_publication: Callable[[], None],
     ) -> LocalArtifactDescriptor:
         if not isinstance(identity, LocalArtifactIdentity):
             raise ArtifactContractError("ARTIFACT_IDENTITY_INVALID")
         if not isinstance(content, bytes) or len(content) == 0:
             raise ArtifactContractError("ARTIFACT_CONTENT_INVALID")
-        if not isinstance(lease_expires_at, datetime) or lease_expires_at.tzinfo is None:
-            raise ArtifactContractError("JOB_LEASE_DEADLINE_INVALID")
+        if not callable(authorize_publication):
+            raise ArtifactContractError("PAGE_PUBLICATION_AUTHORIZATION_INVALID")
         path = identity.resolve_under(self._profile_root)
         path.parent.mkdir(parents=True, exist_ok=True)
         temporary = path.parent / f".{path.name}.{uuid4().hex}.tmp"
@@ -118,8 +109,7 @@ class LocalPageArtifactStore:
                 stream.write(content)
                 stream.flush()
                 os.fsync(stream.fileno())
-            if datetime.now(UTC) >= lease_expires_at.astimezone(UTC):
-                raise ArtifactContractError("JOB_LEASE_LOST")
+            authorize_publication()
             try:
                 os.link(temporary, path)
             except FileExistsError:

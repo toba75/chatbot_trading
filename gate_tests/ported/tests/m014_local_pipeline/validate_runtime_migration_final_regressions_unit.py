@@ -151,7 +151,7 @@ def _migrations_finales_restent_locales_et_revoquent_les_claims() -> None:
         root / "deploy/postgres/migrations/029_m014_expand_contract_replay.sql"
     )
     assert "NOT EXISTS (\n       SELECT 1\n         FROM knowledge_access" not in migration_027
-    assert "relay_generation = relay_generation + 1" in migration_028
+    assert "relay_claim_generation = relay_claim_generation + 1" in migration_028
     assert migration_029_path.is_file()
     migration_029 = migration_029_path.read_text(encoding="utf-8")
     for marker in (
@@ -161,7 +161,7 @@ def _migrations_finales_restent_locales_et_revoquent_les_claims() -> None:
         "platform.technical_jobs",
         "canonical_source_versions",
         "canonical_publication_outbox",
-        "SEARCHABLE",
+        "status = 'STALE'",
         "relay_generation",
     ):
         assert marker in migration_029

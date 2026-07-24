@@ -478,6 +478,7 @@ def test_projection_postgresql_qdrant_complete_rejouee_et_isolee() -> None:
                 job_names=("PROJECT_DOCUMENT",),
             )
             assert claimed is not None
+            assert claimed.trace_id == event.correlation_id
             assert claimed.job.request.execution_requirements is not None
             assert (
                 claimed.job.request.execution_requirements.contract_name
@@ -602,7 +603,8 @@ def test_projection_postgresql_qdrant_complete_rejouee_et_isolee() -> None:
             retriever = DocumentaryProjectionRetriever(
                 projection_reader=PostgresSearchableProjectionReader(
                     projection_read_repository=PostgresProjectionReadRepository(
-                        connection_factory=factory
+                        connection_factory=factory,
+                        environment_identity=IDENTITY,
                     )
                 ),
                 canonical_reader=CanonicalProjectionChunkReader(
@@ -613,6 +615,7 @@ def test_projection_postgresql_qdrant_complete_rejouee_et_isolee() -> None:
                     collection_name=COLLECTION,
                     timeout_seconds=10,
                     api_key="q" * 32,
+                    environment_identity=IDENTITY,
                 ),
                 result_limit=1,
             )

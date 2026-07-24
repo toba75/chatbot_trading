@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-import logging
+import json
+import re
+import time
 from dataclasses import dataclass, replace
 from typing import Any, Protocol, Sequence
 from uuid import UUID
@@ -23,9 +25,6 @@ from app.platform.job_runtime.granite_capacity import (
 )
 from app.platform.job_runtime.postgres import JobLeaseConflictError, PostgresJobQueue
 from app.platform.postgres import PostgresConnectionFactory
-
-
-_LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,19 +101,23 @@ class PageCompletionRelay:
     def relay_claim(self, claim: ClaimedPageCompletion) -> bool:
         if not isinstance(claim, ClaimedPageCompletion):
             raise ValueError("claim invalide")
-        created = self._consumer.record_page_completion(claim.message)
-        self._outbox.acknowledge(claim)
-        _LOGGER.info(
-            "page_completion_relay_acknowledged",
-            extra={
-                "completion_id": claim.message.completion_id,
-                "job_id": claim.message.job_id,
-                "environment": claim.message.environment,
-                "deployment_id": claim.message.deployment_id,
-                "configuration_hash": claim.message.configuration_hash,
-                "terminal_status": claim.message.terminal_status,
-                "page_completion_created": created,
-            },
+        started_ns = time.perf_counter_ns()
+        try:
+            created = self._consumer.record_page_completion(claim.message)
+            self._outbox.acknowledge(claim)
+        except Exception as exception:
+            _print_page_completion_observation(
+                claim=claim,
+                started_ns=started_ns,
+                created=False,
+                error_code=_safe_page_completion_error_code(exception),
+            )
+            raise
+        _print_page_completion_observation(
+            claim=claim,
+            started_ns=started_ns,
+            created=created,
+            error_code=None,
         )
         return created
 
@@ -171,6 +174,42 @@ class PostgresStandardPageExecutionRepository:
             execution_requirements=execution_requirements,
         )
 
+    def assert_standard_page_execution_current(self, claimed_job: ClaimedJob) -> None:
+        """Vérifie l'autorité courante juste avant publication de l'artefact."""
+
+        if not isinstance(claimed_job, ClaimedJob):
+            raise ValueError("claimed_job invalide")
+        with self._connection_factory.connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT job_id
+                      FROM platform.technical_jobs
+                     WHERE job_id = %s
+                       AND environment = %s
+                       AND deployment_id = %s
+                       AND configuration_hash = %s
+                       AND status = 'running'
+                       AND lease_owner = %s
+                       AND claim_generation = %s
+                       AND claim_token = %s::uuid
+                       AND lease_expires_at > CURRENT_TIMESTAMP
+                       AND capacity_slots = 0
+                       AND capacity_device IS NULL
+                    """,
+                    (
+                        claimed_job.job.job_id,
+                        self._environment_identity.environment,
+                        self._environment_identity.deployment_id,
+                        self._environment_identity.configuration_hash,
+                        claimed_job.lease_owner,
+                        claimed_job.claim_generation,
+                        claimed_job.claim_token,
+                    ),
+                )
+                if cursor.fetchone() is None:
+                    raise JobLeaseConflictError()
+
     def complete_standard_page_execution(
         self,
         claimed_job: ClaimedJob,
@@ -202,7 +241,7 @@ class PostgresStandardPageExecutionRepository:
                 cursor.execute(
                     """
                     SELECT environment, deployment_id, configuration_hash,
-                           job_id, claim_generation,
+                           job_id, trace_id, claim_generation,
                            claim_token::text, worker_instance_id, slot_ordinal,
                            slot_generation, slot_token::text, payload,
                            payload_fingerprint, terminal_status, failure_reason
@@ -242,7 +281,7 @@ class PostgresStandardPageExecutionRepository:
                     immutable_outbox AS (
                         INSERT INTO platform.page_completion_outbox (
                             completion_id, environment, deployment_id,
-                            configuration_hash, job_id,
+                            configuration_hash, job_id, trace_id,
                             claim_generation, claim_token, worker_instance_id,
                             slot_ordinal, slot_generation, slot_token, payload,
                             payload_fingerprint, terminal_status, failure_reason,
@@ -251,7 +290,7 @@ class PostgresStandardPageExecutionRepository:
                         )
                         SELECT
                             %(completion_id)s, %(environment)s, %(deployment_id)s,
-                            %(configuration_hash)s, active_job.job_id,
+                            %(configuration_hash)s, active_job.job_id, %(trace_id)s,
                             %(claim_generation)s,
                             %(claim_token)s::uuid, %(worker_instance_id)s,
                             NULL, NULL, NULL, %(payload)s::jsonb,
@@ -283,6 +322,7 @@ class PostgresStandardPageExecutionRepository:
                         "deployment_id": self._environment_identity.deployment_id,
                         "configuration_hash": self._environment_identity.configuration_hash,
                         "job_id": claimed_job.job.job_id,
+                        "trace_id": claimed_job.trace_id,
                         "worker_instance_id": claimed_job.lease_owner,
                         "claim_generation": claimed_job.claim_generation,
                         "claim_token": claimed_job.claim_token,
@@ -356,6 +396,7 @@ class PostgresPageCompletionOutbox:
                     RETURNING completion.completion_id, completion.environment,
                               completion.deployment_id,
                               completion.configuration_hash, completion.job_id,
+                              completion.trace_id,
                               completion.claim_generation,
                               completion.claim_token::text,
                               completion.worker_instance_id,
@@ -387,20 +428,21 @@ class PostgresPageCompletionOutbox:
                 deployment_id=row[2],
                 configuration_hash=row[3],
                 job_id=row[4],
-                claim_generation=row[5],
-                claim_token=row[6],
-                worker_instance_id=row[7],
-                slot_ordinal=row[8],
-                slot_generation=row[9],
-                slot_token=row[10],
-                payload=row[11],
-                payload_fingerprint=row[12],
-                terminal_status=row[13],
-                failure_reason=row[14],
+                trace_id=row[5],
+                claim_generation=row[6],
+                claim_token=row[7],
+                worker_instance_id=row[8],
+                slot_ordinal=row[9],
+                slot_generation=row[10],
+                slot_token=row[11],
+                payload=row[12],
+                payload_fingerprint=row[13],
+                terminal_status=row[14],
+                failure_reason=row[15],
             ),
             owner_id=owner,
-            relay_generation=row[15],
-            relay_token=row[16],
+            relay_generation=row[16],
+            relay_token=row[17],
         )
 
     def acknowledge(self, claim: ClaimedPageCompletion) -> None:
@@ -528,7 +570,7 @@ def _completion_message_from_row(
     completion_id: str,
     row: Any,
 ) -> PageCompletionMessage:
-    if not isinstance(row, tuple) or len(row) != 14:
+    if not isinstance(row, tuple) or len(row) != 15:
         raise RuntimeError("PAGE_COMPLETION_ROW_INVALID")
     return PageCompletionMessage(
         completion_id=completion_id,
@@ -536,17 +578,61 @@ def _completion_message_from_row(
         deployment_id=row[1],
         configuration_hash=row[2],
         job_id=row[3],
-        claim_generation=row[4],
-        claim_token=row[5],
-        worker_instance_id=row[6],
-        slot_ordinal=row[7],
-        slot_generation=row[8],
-        slot_token=row[9],
-        payload=row[10],
-        payload_fingerprint=row[11],
-        terminal_status=row[12],
-        failure_reason=row[13],
+        trace_id=row[4],
+        claim_generation=row[5],
+        claim_token=row[6],
+        worker_instance_id=row[7],
+        slot_ordinal=row[8],
+        slot_generation=row[9],
+        slot_token=row[10],
+        payload=row[11],
+        payload_fingerprint=row[12],
+        terminal_status=row[13],
+        failure_reason=row[14],
     )
+
+
+def _print_page_completion_observation(
+    *,
+    claim: ClaimedPageCompletion,
+    started_ns: int,
+    created: bool,
+    error_code: str | None,
+) -> None:
+    print(
+        json.dumps(
+            {
+                "causation_job_id": claim.message.job_id,
+                "completion_id": claim.message.completion_id,
+                "configuration_hash": claim.message.configuration_hash,
+                "correlation_id": claim.message.trace_id,
+                "deployment_id": claim.message.deployment_id,
+                "duration_ms": round(
+                    (time.perf_counter_ns() - started_ns) / 1_000_000,
+                    3,
+                ),
+                "environment": claim.message.environment,
+                "error_code": error_code,
+                "error_count": 0 if error_code is None else 1,
+                "event_type": "page_completion_relay",
+                "persisted_count": 1 if created else 0,
+                "success_count": 1 if error_code is None else 0,
+                "terminal_status": claim.message.terminal_status,
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        ),
+        flush=True,
+    )
+
+
+def _safe_page_completion_error_code(exception: Exception) -> str:
+    candidate = getattr(exception, "code", None)
+    if not isinstance(candidate, str):
+        candidate = str(exception)
+    if re.fullmatch(r"[A-Z][A-Z0-9_]{2,127}", candidate):
+        return candidate
+    return "PAGE_COMPLETION_RELAY_FAILED"
 
 
 def _terminal_record(

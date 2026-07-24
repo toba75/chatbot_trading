@@ -203,6 +203,7 @@ class DocumentConversionState:
     """État applicatif strict d'une demande de conversion documentaire."""
 
     document_id: DocumentId
+    producer_environment_identity: JobEnvironmentIdentity
     conversion_status: DocumentConversionStatus
     canonical_version_id: str | None
     rejection_error_code: str | None
@@ -213,6 +214,8 @@ class DocumentConversionState:
 
     def __post_init__(self) -> None:
         _ensure_document_id(self.document_id)
+        if not isinstance(self.producer_environment_identity, JobEnvironmentIdentity):
+            raise ValueError("identite productrice de conversion invalide")
         object.__setattr__(
             self,
             "conversion_status",
@@ -721,6 +724,11 @@ class DocumentConversionCommandService:
 
         conversion_state = DocumentConversionState(
             document_id=parsed_document_id,
+            producer_environment_identity=JobEnvironmentIdentity(
+                environment=self._environment,
+                deployment_id=self._deployment_id,
+                configuration_hash=self._conversion_configuration_hash,
+            ),
             conversion_status=DocumentConversionStatus.CONVERSION_REQUESTED,
             canonical_version_id=None,
             rejection_error_code=None,

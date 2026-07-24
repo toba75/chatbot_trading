@@ -175,6 +175,7 @@ def test_environment_runtime_hardening_unit(
     from app.knowledge_access.adapters import live_documentary_retrieval, projection_runtime
     from app.knowledge_access.adapters.live_documentary_retrieval import QdrantSparseChunkSelector
     from app.knowledge_access.adapters.projection_runtime import QdrantHttpClient
+    from app.contracts.technical_jobs import JobEnvironmentIdentity
 
     qdrant_calls = []
     monkeypatch.setattr(
@@ -221,6 +222,11 @@ def test_environment_runtime_hardening_unit(
         collection_name="ostrading-development-knowledge-access",
         timeout_seconds=5,
         api_key="development-qdrant-key-000000000001",
+        environment_identity=JobEnvironmentIdentity(
+            environment="development",
+            deployment_id="ostrading-development-local",
+            configuration_hash="c" * 64,
+        ),
     ).select_chunk_ids(
         projection_id="PROJ-" + "A" * 64,
         question="Quelle preuve ?",

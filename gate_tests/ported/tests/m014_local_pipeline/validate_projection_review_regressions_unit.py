@@ -7,6 +7,7 @@ import inspect
 from pathlib import Path
 
 import pytest
+from psycopg import OperationalError
 
 from app.contracts.page_execution import GranitePageTerminalStatus
 from app.contracts.technical_jobs import (
@@ -17,6 +18,7 @@ from app.contracts.technical_jobs import (
     JobRequest,
 )
 from app.knowledge_access.adapters.postgres_projection_read import (
+    KnowledgeProjectionVersionConflictError,
     PostgresKnowledgeProjectionRepository,
 )
 from app.knowledge_access.adapters.projection_runtime import (
@@ -26,9 +28,16 @@ from app.knowledge_access.adapters.projection_runtime import (
     projection_failure_disposition,
     projection_resume_stages,
 )
+from app.knowledge_access.adapters.qdrant_vector_index import QdrantVectorIndex
 from app.knowledge_access.application.project_document_contract import (
     ProjectDocumentContract,
     ProjectDocumentContractError,
+)
+from app.knowledge_access.domain.knowledge_projection import BuildFingerprint
+from app.knowledge_access.domain.projection_index import (
+    VectorIndexPoint,
+    VectorIndexPublishRequest,
+    VectorIndexSchema,
 )
 
 
@@ -116,6 +125,12 @@ def _pipeline_reprend_chaque_etat_intermediaire() -> None:
     assert projection_failure_disposition(
         ProjectionRuntimeError("PROJECTION_COLLECTION_MISMATCH")
     ) == "FAILED"
+    assert projection_failure_disposition(
+        KnowledgeProjectionVersionConflictError()
+    ) == "RETRY"
+    assert projection_failure_disposition(
+        OperationalError("connexion PostgreSQL interrompue")
+    ) == "RETRY"
 
 
 class _ExistingCollectionClient(QdrantHttpClient):
@@ -155,6 +170,81 @@ def _collection_qdrant_divergente_est_refusee() -> None:
     )
     with pytest.raises(ProjectionRuntimeError, match="PROJECTION_COLLECTION_MISMATCH"):
         client.ensure_collection(collection_name="ostrading-test-knowledge-access")
+
+
+class _ExactGenerationClient:
+    def __init__(self, points):
+        self.points = list(points)
+        self.delete_count = 0
+
+    def count(self, *, collection_name, count_filter, exact):
+        del collection_name, count_filter
+        assert exact is True
+        return len(self.points)
+
+    def scroll(self, *, collection_name, scroll_filter):
+        del collection_name, scroll_filter
+        return tuple(self.points)
+
+    def delete(self, *, collection_name, points_selector):
+        del collection_name, points_selector
+        self.delete_count += 1
+        self.points = []
+
+    def upsert(self, *, collection_name, points):
+        del collection_name
+        self.points.extend(points)
+
+
+def _generation_qdrant_de_meme_taille_mais_etrangere_est_reparee() -> None:
+    schema = VectorIndexSchema(
+        schema_version="qdrant-m014-review-v1",
+        collection_name="ostrading-test-knowledge-access",
+        dense_dimensions=2,
+        distance="cosine",
+        payload_schema_version="payload-m014-review-v1",
+    )
+    point = VectorIndexPoint(
+        point_id="KCHK-M014-REVIEW-0001",
+        chunk_id="KCHK-M014-REVIEW-0001",
+        content_hash="d" * 64,
+        dense_vector=(0.1, 0.2),
+        sparse_weights=(("preuve", 1.0),),
+        payload={
+            "chunk_id": "KCHK-M014-REVIEW-0001",
+            "content_hash": "d" * 64,
+        },
+    )
+    request = VectorIndexPublishRequest(
+        collection_name=schema.collection_name,
+        index_generation="IDX-M014-REVIEW-0001",
+        schema=schema,
+        build_fingerprint=BuildFingerprint("b" * 64),
+        points=(point,),
+        expected_point_count=1,
+    )
+    client = _ExactGenerationClient(
+        (
+            {
+                "id": "00000000-0000-4000-8000-000000000001",
+                "vector": {"dense": [9.0, 9.0], "sparse": {"indices": [1], "values": [9.0]}},
+                "payload": {"index_generation": request.index_generation},
+            },
+        )
+    )
+    index = QdrantVectorIndex(client=client)
+    publication = index.repair_generation(
+        request,
+        max_parallel_batches=1,
+        batch_size=1,
+        on_batch_published=lambda _completed: None,
+    )
+    assert publication.idempotent is False
+    assert client.delete_count == 1
+    assert index.verify_generation(request) is True
+    client.points[0]["payload"]["content_hash"] = "e" * 64
+    assert index.verify_generation(request) is False
+    assert client.delete_count == 1
 
 
 def _item_canonique_invalide_interdit_index_partiel() -> None:
@@ -215,6 +305,7 @@ def test_validate_projection_review_regressions_unit() -> None:
     _contrat_project_document_reste_unique_et_strict()
     _pipeline_reprend_chaque_etat_intermediaire()
     _collection_qdrant_divergente_est_refusee()
+    _generation_qdrant_de_meme_taille_mais_etrangere_est_reparee()
     _item_canonique_invalide_interdit_index_partiel()
     _contrats_persistants_nont_aucune_valeur_metier_implicite()
     _frontiere_ka_ne_lit_aucune_table_privee_sp()

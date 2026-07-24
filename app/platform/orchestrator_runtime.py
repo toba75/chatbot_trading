@@ -407,7 +407,12 @@ def build_orchestrator_composition_root(
         original_source_reader=persistence.original_source_store,
     )
     projection_read_repository = PostgresProjectionReadRepository(
-        connection_factory=connection_factory
+        connection_factory=connection_factory,
+        environment_identity=JobEnvironmentIdentity(
+            environment=configuration.application.environment,
+            deployment_id=configuration.application.deployment_id,
+            configuration_hash=configuration.configuration_hash,
+        ),
     )
     projection_queries = ProjectionQueryService(
         projection_read_repository=projection_read_repository,
@@ -452,6 +457,11 @@ def build_orchestrator_composition_root(
             collection_name=configuration.services.qdrant.collections.knowledge_access,
             timeout_seconds=configuration.runtime.timeouts.request_seconds,
             api_key=qdrant_api_key,
+            environment_identity=JobEnvironmentIdentity(
+                environment=configuration.application.environment,
+                deployment_id=configuration.application.deployment_id,
+                configuration_hash=configuration.configuration_hash,
+            ),
         ),
         result_limit=4,
     )

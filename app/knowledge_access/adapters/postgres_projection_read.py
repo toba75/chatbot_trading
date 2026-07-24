@@ -8,6 +8,7 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 from app.contracts.source_references import SourceLocator
+from app.contracts.technical_jobs import JobEnvironmentIdentity
 from app.knowledge_access.application.extract_projected_bibliographic_metadata import (
     ProjectedBibliographicMetadata,
 )
@@ -405,10 +406,18 @@ class PostgresKnowledgeProjectionRepository:
 class PostgresProjectionReadRepository:
     """Lit l'agrégat KA courant sans déduire son état depuis Qdrant."""
 
-    def __init__(self, *, connection_factory: PostgresConnectionFactory) -> None:
+    def __init__(
+        self,
+        *,
+        connection_factory: PostgresConnectionFactory,
+        environment_identity: JobEnvironmentIdentity,
+    ) -> None:
         if not callable(getattr(connection_factory, "connect", None)):
             raise ValueError("connection_factory invalide")
+        if not isinstance(environment_identity, JobEnvironmentIdentity):
+            raise ValueError("environment_identity invalide")
         self._connection_factory = connection_factory
+        self._identity = environment_identity
 
     def current_projection_statuses_for_document_ids(
         self,
@@ -433,9 +442,17 @@ class PostgresProjectionReadRepository:
                     SELECT DISTINCT ON (document_id) document_id, status
                       FROM knowledge_access.knowledge_projections
                      WHERE document_id = ANY(%s)
+                       AND environment = %s
+                       AND deployment_id = %s
+                       AND configuration_hash = %s
                      ORDER BY document_id, state_observed_at DESC, projection_id DESC
                     """,
-                    (list(parsed_ids),),
+                    (
+                        list(parsed_ids),
+                        self._identity.environment,
+                        self._identity.deployment_id,
+                        self._identity.configuration_hash,
+                    ),
                 )
                 rows = cursor.fetchall()
         return {str(document_id): str(status) for document_id, status in rows}
@@ -465,9 +482,17 @@ class PostgresProjectionReadRepository:
                            bibliographic_publication_year, bibliographic_edition
                       FROM knowledge_access.knowledge_projections
                      WHERE document_id = ANY(%s)
+                       AND environment = %s
+                       AND deployment_id = %s
+                       AND configuration_hash = %s
                      ORDER BY document_id, state_observed_at DESC, projection_id DESC
                     """,
-                    (list(parsed_ids),),
+                    (
+                        list(parsed_ids),
+                        self._identity.environment,
+                        self._identity.deployment_id,
+                        self._identity.configuration_hash,
+                    ),
                 )
                 rows = cursor.fetchall()
         return {
@@ -507,10 +532,18 @@ class PostgresProjectionReadRepository:
                            aggregate_version, chunk_count, state_observed_at
                       FROM knowledge_access.knowledge_projections
                      WHERE document_id = %s
+                       AND environment = %s
+                       AND deployment_id = %s
+                       AND configuration_hash = %s
                      ORDER BY state_observed_at DESC, projection_id DESC
                      LIMIT 1
                     """,
-                    (document_id,),
+                    (
+                        document_id,
+                        self._identity.environment,
+                        self._identity.deployment_id,
+                        self._identity.configuration_hash,
+                    ),
                 )
                 row = cursor.fetchone()
                 if row is None:
