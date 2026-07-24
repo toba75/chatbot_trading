@@ -10,11 +10,15 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from hashlib import sha256
 from types import MappingProxyType
 from typing import Any, Generic, NamedTuple, Protocol, TypeVar
-from uuid import UUID
 
+from app.contracts.page_execution import (
+    GraniteCapacityConfigurationError,
+    GranitePageTerminalEnvelope,
+    GranitePageTerminalStatus,
+    GraniteSlotLease,
+)
 from app.contracts.technical_jobs import (
     ClaimedJob,
     GraniteExecutionCapability,
@@ -39,18 +43,6 @@ _JOB_LEASE_LOST = "JOB_LEASE_LOST"
 ModelResultT = TypeVar("ModelResultT")
 
 
-class GraniteCapacityConfigurationError(ValueError):
-    """La capacité locale ne respecte pas le contrat strict T-003."""
-
-    code = _GRANITE_CAPACITY_ERROR
-
-    def __init__(self, reason: str) -> None:
-        if not isinstance(reason, str) or reason.strip() == "":
-            raise ValueError("motif Granite invalide")
-        self.reason = reason
-        super().__init__(f"{self.code}:{reason}")
-
-
 class GraniteSlotLeaseLostError(RuntimeError):
     """Le claim ou le slot ne correspond plus au détenteur courant."""
 
@@ -67,67 +59,6 @@ class GranitePageCompletionConflictError(RuntimeError):
 
     def __init__(self) -> None:
         super().__init__(self.code)
-
-
-class GranitePageTerminalStatus(str, Enum):
-    SUCCEEDED = "succeeded"
-    FAILED = "failed"
-    ABANDONED = "abandoned"
-
-
-@dataclass(frozen=True, slots=True)
-class GranitePageTerminalEnvelope:
-    """Enveloppe platform immutable produite sous le double fencing actif."""
-
-    completion_id: str
-    status: GranitePageTerminalStatus
-    payload: Mapping[str, Any]
-    payload_fingerprint: str
-    failure_reason: str | None
-
-    def __post_init__(self) -> None:
-        completion_id = _text(self.completion_id)
-        if not isinstance(self.status, GranitePageTerminalStatus):
-            raise GraniteCapacityConfigurationError("TERMINAL_STATUS_INVALID")
-        payload = _freeze_json_mapping(self.payload)
-        canonical_payload = _canonical_json(payload)
-        fingerprint = sha256(canonical_payload.encode("utf-8")).hexdigest()
-        if self.payload_fingerprint != fingerprint:
-            raise GraniteCapacityConfigurationError("TERMINAL_FINGERPRINT_MISMATCH")
-        if self.status is GranitePageTerminalStatus.SUCCEEDED:
-            if self.failure_reason is not None:
-                raise GraniteCapacityConfigurationError("TERMINAL_FAILURE_FORBIDDEN")
-        else:
-            _text(self.failure_reason)
-        object.__setattr__(self, "completion_id", completion_id)
-        object.__setattr__(self, "payload", payload)
-
-    @classmethod
-    def from_payload(
-        cls,
-        *,
-        completion_id: str,
-        status: GranitePageTerminalStatus,
-        payload: Mapping[str, Any],
-        failure_reason: str | None,
-    ) -> "GranitePageTerminalEnvelope":
-        parsed_payload = _freeze_json_mapping(payload)
-        serialized = _canonical_json(parsed_payload)
-        return cls(
-            completion_id=completion_id,
-            status=status,
-            payload=parsed_payload,
-            payload_fingerprint=sha256(serialized.encode("utf-8")).hexdigest(),
-            failure_reason=failure_reason,
-        )
-
-    def canonical_payload_json(self) -> str:
-        """Revalide le hash immédiatement avant toute persistance."""
-
-        serialized = _canonical_json(self.payload)
-        if sha256(serialized.encode("utf-8")).hexdigest() != self.payload_fingerprint:
-            raise GraniteCapacityConfigurationError("TERMINAL_FINGERPRINT_MISMATCH")
-        return serialized
 
 
 class GraniteWorkerState(str, Enum):
@@ -156,47 +87,6 @@ class GraniteWorker:
         if self.capabilities != _GENERALIST_CAPABILITIES:
             raise GraniteCapacityConfigurationError("WORKER_CAPABILITIES_INVALID")
         object.__setattr__(self, "worker_instance_id", worker_instance_id)
-
-
-@dataclass(frozen=True, slots=True)
-class GraniteSlotLease:
-    """Couple claim-slot immutable transporté pendant une conversion Granite."""
-
-    claimed_job: ClaimedJob
-    slot_ordinal: int
-    slot_generation: int
-    slot_token: str
-    lease_until: datetime
-
-    def __post_init__(self) -> None:
-        if not isinstance(self.claimed_job, ClaimedJob):
-            raise ValueError("GRANITE_SLOT_IDENTITY_INVALID")
-        if (
-            isinstance(self.slot_ordinal, bool)
-            or not isinstance(self.slot_ordinal, int)
-            or self.slot_ordinal not in (1, 2)
-        ):
-            raise ValueError("GRANITE_SLOT_IDENTITY_INVALID")
-        if (
-            isinstance(self.slot_generation, bool)
-            or not isinstance(self.slot_generation, int)
-            or self.slot_generation < 1
-        ):
-            raise ValueError("GRANITE_SLOT_IDENTITY_INVALID")
-        try:
-            token = UUID(_text(self.slot_token))
-        except (TypeError, ValueError) as exc:
-            raise ValueError("GRANITE_SLOT_IDENTITY_INVALID") from exc
-        if token.version != 4:
-            raise ValueError("GRANITE_SLOT_IDENTITY_INVALID")
-        if (
-            not isinstance(self.lease_until, datetime)
-            or self.lease_until.tzinfo is None
-        ):
-            raise ValueError("GRANITE_SLOT_IDENTITY_INVALID")
-        if self.lease_until != self.claimed_job.lease_expires_at:
-            raise ValueError("GRANITE_SLOT_LEASE_DEADLINE_MISMATCH")
-        object.__setattr__(self, "slot_token", str(token))
 
 
 @dataclass(frozen=True, slots=True)

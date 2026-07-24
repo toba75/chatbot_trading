@@ -6,12 +6,12 @@ import hashlib
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from app.contracts.technical_jobs import ClaimedJob
-from app.platform.job_runtime.granite_capacity import (
+from app.contracts.page_execution import (
     GranitePageTerminalEnvelope,
     GranitePageTerminalStatus,
     GraniteSlotLease,
 )
+from app.contracts.technical_jobs import ClaimedJob
 from app.source_processing.domain.distribution_contracts import (
     ConvertPageContract,
     DistributionContractError,

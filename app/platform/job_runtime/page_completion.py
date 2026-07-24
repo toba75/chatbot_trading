@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
 from dataclasses import dataclass, replace
-from types import MappingProxyType
-from typing import Any, Mapping, Protocol, Sequence
+from typing import Any, Protocol, Sequence
 from uuid import UUID
 
+from app.contracts.page_execution import PageCompletionMessage
 from app.contracts.technical_jobs import (
     ClaimedJob,
     JobEnvironmentIdentity,
@@ -20,103 +18,10 @@ from app.platform.job_runtime import JobCatalog
 from app.platform.job_runtime.granite_capacity import (
     GranitePageCompletionConflictError,
     GranitePageTerminalEnvelope,
-    GraniteSlotLease,
     GraniteWorker,
 )
 from app.platform.job_runtime.postgres import JobLeaseConflictError, PostgresJobQueue
 from app.platform.postgres import PostgresConnectionFactory
-
-
-@dataclass(frozen=True, slots=True)
-class PageCompletionMessage:
-    """Fait platform immutable, transporté sans transaction intercontexte."""
-
-    completion_id: str
-    environment: str
-    deployment_id: str
-    job_id: str
-    claim_generation: int
-    claim_token: str
-    worker_instance_id: str
-    slot_ordinal: int | None
-    slot_generation: int | None
-    slot_token: str | None
-    payload: Mapping[str, Any]
-    payload_fingerprint: str
-    terminal_status: str
-    failure_reason: str | None
-
-    def __post_init__(self) -> None:
-        for value, field_name in (
-            (self.completion_id, "completion_id"),
-            (self.environment, "environment"),
-            (self.deployment_id, "deployment_id"),
-            (self.job_id, "job_id"),
-            (self.claim_token, "claim_token"),
-            (self.worker_instance_id, "worker_instance_id"),
-            (self.payload_fingerprint, "payload_fingerprint"),
-            (self.terminal_status, "terminal_status"),
-        ):
-            _text(value, field_name)
-        if self.environment not in {"development", "test", "production"}:
-            raise ValueError("environment invalide")
-        if isinstance(self.claim_generation, bool) or self.claim_generation < 1:
-            raise ValueError("claim_generation invalide")
-        _uuid4(self.claim_token, "claim_token")
-        _validate_slot_identity(
-            ordinal=self.slot_ordinal,
-            generation=self.slot_generation,
-            token=self.slot_token,
-        )
-        if not isinstance(self.payload, Mapping) or len(self.payload) == 0:
-            raise ValueError("payload invalide")
-        fingerprint = hashlib.sha256(
-            _canonical_payload(self.payload).encode("utf-8")
-        ).hexdigest()
-        if fingerprint != self.payload_fingerprint:
-            raise ValueError("payload_fingerprint invalide")
-        if self.terminal_status == "succeeded":
-            if self.failure_reason is not None:
-                raise ValueError("failure_reason interdit")
-        elif self.terminal_status in {"failed", "abandoned"}:
-            _text(self.failure_reason, "failure_reason")
-        else:
-            raise ValueError("terminal_status invalide")
-        object.__setattr__(self, "payload", MappingProxyType(dict(self.payload)))
-
-    @classmethod
-    def from_execution(
-        cls,
-        *,
-        claimed_job: ClaimedJob,
-        granite_lease: GraniteSlotLease | None,
-        envelope: GranitePageTerminalEnvelope,
-    ) -> "PageCompletionMessage":
-        if not isinstance(claimed_job, ClaimedJob):
-            raise ValueError("claimed_job invalide")
-        if not isinstance(envelope, GranitePageTerminalEnvelope):
-            raise ValueError("envelope invalide")
-        if granite_lease is not None and granite_lease.claimed_job != claimed_job:
-            raise ValueError("granite_lease divergente")
-        request = claimed_job.job.request
-        return cls(
-            completion_id=envelope.completion_id,
-            environment=request.environment,
-            deployment_id=request.deployment_id,
-            job_id=claimed_job.job.job_id,
-            claim_generation=claimed_job.claim_generation,
-            claim_token=claimed_job.claim_token,
-            worker_instance_id=claimed_job.lease_owner,
-            slot_ordinal=None if granite_lease is None else granite_lease.slot_ordinal,
-            slot_generation=(
-                None if granite_lease is None else granite_lease.slot_generation
-            ),
-            slot_token=None if granite_lease is None else granite_lease.slot_token,
-            payload=envelope.payload,
-            payload_fingerprint=envelope.payload_fingerprint,
-            terminal_status=envelope.status.value,
-            failure_reason=envelope.failure_reason,
-        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -591,42 +496,6 @@ class InMemoryPageCompletionOutbox:
         result = replace(claim, message=divergent)
         self._claimed[completion_id] = result
         return result
-
-
-def _validate_slot_identity(
-    *,
-    ordinal: int | None,
-    generation: int | None,
-    token: str | None,
-) -> None:
-    if ordinal is None and generation is None and token is None:
-        return
-    if (
-        ordinal not in {1, 2}
-        or isinstance(generation, bool)
-        or not isinstance(generation, int)
-        or generation < 1
-        or token is None
-    ):
-        raise ValueError("slot identity invalide")
-    _uuid4(token, "slot_token")
-
-
-def _canonical_payload(value: Mapping[str, Any]) -> str:
-    return json.dumps(
-        _json_value(value),
-        ensure_ascii=False,
-        separators=(",", ":"),
-        sort_keys=True,
-    )
-
-
-def _json_value(value: Any) -> Any:
-    if isinstance(value, Mapping):
-        return {str(key): _json_value(item) for key, item in value.items()}
-    if isinstance(value, Sequence) and not isinstance(value, str | bytes):
-        return [_json_value(item) for item in value]
-    return value
 
 
 def _completion_message_from_row(

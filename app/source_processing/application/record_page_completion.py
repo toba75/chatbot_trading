@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from app.platform.job_runtime.page_completion import PageCompletionMessage
+from app.contracts.page_execution import PageCompletionMessage
 from app.source_processing.domain.distribution_contracts import (
     DistributionContractError,
     PageResultContract,

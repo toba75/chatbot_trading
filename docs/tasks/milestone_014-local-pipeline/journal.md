@@ -293,8 +293,19 @@ P-001 précondition GREEN
 - ADR consultées : ADR-024, ADR-025, ADR-040, ADR-042, ADR-051 et ADR-052. ADR
   créée ou modifiée : aucune ; T-006 applique les frontières, le double fencing
   et la CUDA stricte déjà décidés sans nouvelle décision structurante.
-- Commit GREEN prévu :
-  `feat(m014-pipeline): persister resultats de pages sous fencing`. Après ce
-  commit et sur arbre propre, la gate globale sera lancée exactement une fois
-  avec un délai d’une heure et toute sortie différée sera attendue sur la même
-  exécution.
+- Commit GREEN : `a57c8d5a6` —
+  `feat(m014-pipeline): persister resultats de pages sous fencing`.
+- Gate globale finale : un seul lancement, exécution différée `91` attendue
+  jusqu’à son terme sans redémarrage, délai configuré à 3 600 secondes. Verdict
+  après 80,2 secondes : 472 nœuds, code 1, `PARTIAL RED`. L’échec n’était pas
+  un timeout : `test.m013-fastapi.validate-review3-api-architecture-acceptance`
+  refusait la dépendance de `source_processing/application` vers `platform`.
+- Correction ciblée : les contrats techniques de lease, enveloppe terminale et
+  message de complétion sont désormais neutres dans `app/contracts`. Les
+  modules d’application SP ne dépendent plus de `app.platform`. Après
+  correction : tests directs 5/5 GREEN, Ruff ciblé GREEN, scope `m013_fastapi`
+  70/70 GREEN, scope `m014_distribution_core --live` 38/38 GREEN et scope
+  `m014_local_pipeline --live` 33/33 GREEN. Conformément au contrat
+  d’exécution T-006, aucune seconde gate globale n’a été lancée.
+- Commit correctif prévu :
+  `fix(m014-pipeline): neutraliser contrat de completion de page`.
