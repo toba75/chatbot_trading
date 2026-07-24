@@ -44,6 +44,7 @@ from app.platform.job_runtime.relay import RelayedJobMessage
 from app.source_processing.adapters.docling_granite_conversion import (
     GraniteDoclingConversionError,
     GraniteDoclingConversionRequest,
+    IsolatedGraniteDoclingConverter,
     RunningGraniteDoclingConversion,
 )
 from app.source_processing.adapters.docling_native_conversion import (
@@ -413,12 +414,17 @@ def test_runtime_granite_supervise_heartbeat_annulation_et_terminal_atomique(
         Exception,
         "GEMMA_VISION_TIMEOUT",
     )
+    _assert_arret_popen_retentable_et_erreur_primaire(tmp_path)
     monkeypatch.undo()
     _assert_perte_lease(False)
     _assert_perte_lease(True)
+    _assert_classification_erreur_primaire()
     _assert_transition_heartbeat(tmp_path)
     _assert_erreur_configuration_precise()
     _assert_builder_quota_reel(monkeypatch, tmp_path)
+    _assert_drainage_lifecycle_et_heartbeat_serialise()
+    _assert_sigterm_laisse_finir_le_couple_actif()
+    _assert_capability_modele_emise_par_controleur(tmp_path)
     _assert_enveloppe_terminale_gelee()
     _assert_relais_historique_et_parametres_obligatoires()
 
@@ -524,6 +530,43 @@ def _assert_frontiere_popen(
     assert process.events.count("kill") == 1
 
 
+def _assert_arret_popen_retentable_et_erreur_primaire(tmp_path: Path) -> None:
+    """Given un arrêt système défaillant, When il est rejoué, Then la sortie reste confirmable."""
+
+    source = tmp_path / "source-arret-rejouable.pdf"
+    source.write_bytes(b"%PDF-1.7\ncycle3 retry terminate\n%%EOF\n")
+    termination_failure = RuntimeError("GRANITE_PROCESS_TERMINATION_FAILED")
+    process = _PopenBoundary(terminate_failure=termination_failure)
+    running = RunningGraniteDoclingConversion(
+        process=process,
+        request=_granite_request(source),
+        input_payload=b"{}",
+        timeout_seconds=1.0,
+    )
+    with pytest.raises(RuntimeError, match="GRANITE_PROCESS_TERMINATION_FAILED"):
+        running.terminate()
+    process.terminate_failure = None
+    running.terminate()
+    assert process.events.count("terminate") == 2
+    assert process.events.count("kill") == 1
+
+    failing_process = _PopenBoundary(terminate_failure=termination_failure)
+    timed = RunningGraniteDoclingConversion(
+        process=failing_process,
+        request=_granite_request(source),
+        input_payload=b"{}",
+        timeout_seconds=0.001,
+    )
+    time.sleep(0.002)
+    with pytest.raises(ExceptionGroup) as captured:
+        timed.wait(timeout_seconds=0.01)
+    assert getattr(captured.value.exceptions[0], "code", None) == "GRANITE_DOCLING_TIMEOUT"
+    assert captured.value.exceptions[1] is termination_failure
+    failing_process.terminate_failure = None
+    timed.terminate()
+    assert failing_process.events.count("terminate") == 2
+
+
 @pytest.mark.parametrize("legacy", (False, True))
 def _assert_perte_lease(
     legacy: bool,
@@ -567,6 +610,20 @@ def _assert_perte_lease(
             )
     assert captured.value.exceptions[0] is lost
     assert str(captured.value.exceptions[1]) == "GRANITE_PROCESS_TERMINATION_FAILED"
+
+
+def _assert_classification_erreur_primaire() -> None:
+    from app.source_processing.adapters.worker_runtime import _classify_processing_error
+
+    lost = GraniteSlotLeaseLostError()
+    grouped = ExceptionGroup(
+        "GRANITE_LEASE_AND_TERMINATION_FAILURE",
+        [lost, RuntimeError("GRANITE_PROCESS_TERMINATION_FAILED")],
+    )
+    assert _classify_processing_error(grouped) == ("JOB_LEASE_LOST", True)
+    assert _classify_processing_error(
+        GraniteCapacityConfigurationError("REPOSITORY_PORT_INCOMPLETE")
+    ) == ("GRANITE_CAPACITY_CONFIGURATION_INVALID", False)
 
 
 class _ImmediateProcess:
@@ -776,6 +833,7 @@ class _TwoSlotRepository:
         self.events = events
         self.lock = events_lock
         self.held: dict[int, GraniteSlotLease] = {}
+        self.third_waiting = threading.Event()
 
     def claim_compatible_job(self, **_arguments):
         raise AssertionError("claim page T-005 interdit")
@@ -796,6 +854,8 @@ class _TwoSlotRepository:
                 None,
             )
             if available is None:
+                if worker.worker_instance_id == "worker-documents-3":
+                    self.third_waiting.set()
                 return None
             lease = GraniteSlotLease(
                 claimed_job=claimed_job,
@@ -1034,9 +1094,12 @@ def _assert_builder_quota_reel(
             )
         )
 
-    with ThreadPoolExecutor(max_workers=3) as executor:
-        futures = tuple(
-            executor.submit(worker.execute, claimed) for worker, claimed in workers
+    executor = ThreadPoolExecutor(max_workers=3)
+    futures = []
+    try:
+        futures.extend(
+            executor.submit(worker.execute, claimed)
+            for worker, claimed in workers[:2]
         )
         deadline = time.monotonic() + 5
         while time.monotonic() < deadline:
@@ -1047,6 +1110,8 @@ def _assert_builder_quota_reel(
             time.sleep(0.01)
         assert len(starts) == 2
         assert len(set(starts)) == 2
+        futures.append(executor.submit(workers[2][0].execute, workers[2][1]))
+        assert repository.third_waiting.wait(timeout=5)
         with events_lock:
             snapshot = tuple(events)
         for start in starts:
@@ -1066,12 +1131,248 @@ def _assert_builder_quota_reel(
 
         release_models.set()
         results = tuple(future.result(timeout=10) for future in futures)
+    finally:
+        release_models.set()
+        for future in futures:
+            if not future.done():
+                future.cancel()
+        executor.shutdown(wait=True, cancel_futures=True)
 
     assert all(
         result["conversion_status"] == "CANONICAL_ACCEPTED" for result in results
     )
     assert sum(event.startswith("start:") for event in events) == 3
     assert repository.held == {}
+
+
+class _LifecycleRegistry:
+    def __init__(self, events: list[str]) -> None:
+        self.events = events
+
+    def register(self, worker, *, presence_lease_seconds: int) -> None:
+        self.events.append(f"register:{worker.worker_instance_id}:{presence_lease_seconds}")
+
+    def begin_draining(self, *, worker_instance_id: str, drain_deadline: datetime) -> None:
+        self.events.append(f"drain:{worker_instance_id}:{drain_deadline.isoformat()}")
+
+
+class _LifecyclePresence:
+    def __init__(self, events: list[str]) -> None:
+        self.events = events
+        self.failure: Exception | None = None
+
+    def start(self) -> None:
+        self.events.append("presence:start")
+
+    def assert_alive(self) -> None:
+        if self.failure is not None:
+            raise self.failure
+
+    def stop(self) -> None:
+        self.events.append("presence:stop")
+
+
+class _LifecycleController:
+    def __init__(self, events: list[str]) -> None:
+        self.events = events
+
+    def begin_draining(self) -> None:
+        self.events.append("controller:draining")
+
+
+class _LifecycleHeartbeatCoordinator:
+    def __init__(self, events: list[str]) -> None:
+        self.events = events
+
+    def freeze_for_drain(self) -> None:
+        self.events.append("job-heartbeat:frozen")
+
+
+def _assert_drainage_lifecycle_et_heartbeat_serialise() -> None:
+    from app.source_processing.adapters.worker_runtime import (
+        RegisteredDocumentWorkerLifecycle,
+    )
+
+    events: list[str] = []
+    presence = _LifecyclePresence(events)
+    lifecycle = RegisteredDocumentWorkerLifecycle(
+        worker_registry=_LifecycleRegistry(events),
+        capacity_controller=_LifecycleController(events),
+        job_heartbeat_coordinator=_LifecycleHeartbeatCoordinator(events),
+        worker=_worker(),
+        presence_heartbeat=presence,
+        presence_lease_seconds=30,
+        shutdown_seconds=9,
+        now=lambda: datetime(2026, 7, 24, 12, 0, tzinfo=timezone.utc),
+    )
+    lifecycle.start()
+    assert lifecycle.admissions_open is True
+    lifecycle.request_drain()
+    assert lifecycle.admissions_open is False
+    assert events[:5] == [
+        "register:worker-documents-1:30",
+        "presence:start",
+        "job-heartbeat:frozen",
+        "controller:draining",
+        "drain:worker-documents-1:2026-07-24T12:00:09+00:00",
+    ]
+    lifecycle.close()
+    lifecycle.close()
+    assert events.count("presence:stop") == 1
+    assert sum(event.startswith("drain:") for event in events) == 1
+
+    lost_events: list[str] = []
+    lost_presence = _LifecyclePresence(lost_events)
+    lost_presence.failure = GraniteSlotLeaseLostError()
+    lost_lifecycle = RegisteredDocumentWorkerLifecycle(
+        worker_registry=_LifecycleRegistry(lost_events),
+        capacity_controller=_LifecycleController(lost_events),
+        job_heartbeat_coordinator=_LifecycleHeartbeatCoordinator(lost_events),
+        worker=_worker(),
+        presence_heartbeat=lost_presence,
+        presence_lease_seconds=30,
+        shutdown_seconds=9,
+        now=lambda: datetime(2026, 7, 24, 12, 0, tzinfo=timezone.utc),
+    )
+    lost_lifecycle.start()
+    with pytest.raises(GraniteSlotLeaseLostError):
+        lost_lifecycle.assert_admission_allowed()
+    assert lost_lifecycle.admissions_open is False
+    lost_lifecycle.close()
+
+    from app.platform.job_runtime.heartbeat import (
+        JobHeartbeatCoordinator,
+        JobLeaseHeartbeat,
+    )
+
+    class BlockingQueue:
+        def __init__(self) -> None:
+            self.started = threading.Event()
+            self.release = threading.Event()
+            self.renewals = 0
+
+        def renew_lease(self, **_arguments):
+            self.renewals += 1
+            self.started.set()
+            assert self.release.wait(timeout=5)
+
+    queue = BlockingQueue()
+    heartbeat = JobLeaseHeartbeat(
+        job_queue=queue,
+        job_id="JOB-M002-000001",
+        owner_id="worker-documents-1",
+        claim_generation=1,
+        claim_token=str(uuid4()),
+        lease_seconds=3,
+        heartbeat_seconds=0.01,
+    )
+    coordinator = JobHeartbeatCoordinator()
+    coordinator.bind(heartbeat)
+    heartbeat.start()
+    assert queue.started.wait(timeout=2)
+    freeze = threading.Thread(target=coordinator.freeze_for_drain)
+    freeze.start()
+    freeze.join(timeout=0.05)
+    assert freeze.is_alive(), "le drainage doit attendre le renouvellement déjà engagé"
+    queue.release.set()
+    freeze.join(timeout=2)
+    assert not freeze.is_alive()
+    renewals_after_freeze = queue.renewals
+    time.sleep(0.05)
+    assert queue.renewals == renewals_after_freeze
+    heartbeat.stop()
+    coordinator.unbind(heartbeat)
+
+
+class _DrainAwareProcess:
+    def __init__(self) -> None:
+        self.started = threading.Event()
+        self.release = threading.Event()
+        self.terminated = False
+
+    def wait(self, *, timeout_seconds: float):
+        self.started.set()
+        if not self.release.wait(timeout_seconds):
+            raise GraniteModelStillRunning()
+        return {"drained": "completed"}
+
+    def terminate(self) -> None:
+        self.terminated = True
+        self.release.set()
+
+
+def _assert_sigterm_laisse_finir_le_couple_actif() -> None:
+    repository = _Repository()
+    controller = GraniteCapacityController(repository=repository)
+    process = _DrainAwareProcess()
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(
+            controller.execute_claimed_job,
+            worker=_worker(),
+            claimed_job=repository.lease.claimed_job,
+            lease_seconds=30,
+            heartbeat_seconds=0.01,
+            start_model=lambda _capability: process,
+        )
+        assert process.started.wait(timeout=2)
+        controller.begin_draining()
+        deadline = time.monotonic() + 2
+        while repository.heartbeats == 0 and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert repository.heartbeats > 0
+        assert process.terminated is False
+        process.release.set()
+        assert future.result(timeout=2).model_result == {"drained": "completed"}
+
+    with pytest.raises(GraniteSlotLeaseLostError):
+        controller.execute_claimed_job(
+            worker=_worker(),
+            claimed_job=repository.lease.claimed_job,
+            lease_seconds=30,
+            heartbeat_seconds=0.01,
+            start_model=lambda _capability: _Process([{"forbidden": True}]),
+        )
+
+
+def _assert_capability_modele_emise_par_controleur(tmp_path: Path) -> None:
+    from app.contracts.technical_jobs import (
+        GraniteExecutionCapability,
+        require_granite_execution_capability,
+    )
+
+    source = tmp_path / "source-capability.pdf"
+    source.write_bytes(b"%PDF-1.7\ncycle3 capability\n%%EOF\n")
+    converter = object.__new__(IsolatedGraniteDoclingConverter)
+    with pytest.raises(ValueError, match="GRANITE_EXECUTION_CAPABILITY_REQUIRED"):
+        converter.start(_granite_request(source), capability=object())
+
+    issued: list[GraniteExecutionCapability] = []
+    repository = _Repository()
+
+    def start_model(capability):
+        issued.append(require_granite_execution_capability(capability))
+        return _Process([{"capability": "ok"}])
+
+    execution = GraniteCapacityController(repository=repository).execute_next(
+        worker=_worker(),
+        lease_seconds=30,
+        heartbeat_seconds=0.01,
+        job_names=("CONVERT_PAGE",),
+        execution_requirements=_requirements(),
+        start_model=start_model,
+        success_envelope=lambda lease, result: _terminal(
+            lease, GranitePageTerminalStatus.SUCCEEDED, result
+        ),
+        failure_envelope=lambda lease, _error: _terminal(
+            lease,
+            GranitePageTerminalStatus.FAILED,
+            {"error_code": "MODEL_FAILED"},
+        ),
+    )
+    assert execution is not None and execution.model_result == {"capability": "ok"}
+    assert len(issued) == 1
+    with pytest.raises(TypeError):
+        GraniteExecutionCapability()
 
 
 def _assert_enveloppe_terminale_gelee() -> None:

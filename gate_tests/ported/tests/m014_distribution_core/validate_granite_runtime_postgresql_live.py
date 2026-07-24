@@ -10,6 +10,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import tempfile
+import threading
 from types import ModuleType
 from uuid import uuid4
 
@@ -324,9 +325,43 @@ def test_runtime_postgresql_workers_terminal_union_et_chemin_chaud() -> None:
                 payload={"contract_version": "1.0", "status": "SUCCEEDED"},
                 failure_reason=None,
             )
-            completed_job = quota.complete_page_execution(lease_2, terminal)
+            with (
+                factory.connect() as connection,
+                connection.transaction(),
+                connection.cursor() as cursor,
+            ):
+                cursor.execute(
+                    """
+                    CREATE FUNCTION platform.delay_cycle3_completion()
+                    RETURNS trigger LANGUAGE plpgsql AS $$
+                    BEGIN
+                        PERFORM pg_sleep(0.25);
+                        RETURN NEW;
+                    END $$
+                    """
+                )
+                cursor.execute(
+                    """
+                    CREATE TRIGGER delay_cycle3_completion
+                    BEFORE INSERT ON platform.page_completion_outbox
+                    FOR EACH ROW EXECUTE FUNCTION platform.delay_cycle3_completion()
+                    """
+                )
+            completion_barrier = threading.Barrier(2)
+
+            def complete_identically():
+                completion_barrier.wait(timeout=5)
+                return quota.complete_page_execution(lease_2, terminal)
+
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                completion_futures = tuple(
+                    executor.submit(complete_identically) for _ in range(2)
+                )
+                identical_results = tuple(
+                    future.result(timeout=10) for future in completion_futures
+                )
+            completed_job, replayed_job = identical_results
             assert completed_job.status is JobStatus.SUCCEEDED
-            replayed_job = quota.complete_page_execution(lease_2, terminal)
             assert replayed_job == completed_job
             with pytest.raises(
                 GranitePageCompletionConflictError,
@@ -748,9 +783,27 @@ def _assert_granite_claim_index(
             and node.get("Relation Name") == "technical_jobs"
             for node in nodes
         )
+        assert not any(
+            node.get("Node Type") in {"Sort", "Incremental Sort"}
+            for node in nodes
+        )
         candidate_limits = tuple(
             node
             for node in nodes
             if node.get("Node Type") == "Limit" and node.get("Actual Rows") == 1
         )
         assert candidate_limits
+        job_index_nodes = tuple(
+            node
+            for node in nodes
+            if node.get("Index Name") == "technical_jobs_granite_claim_idx"
+        )
+        assert job_index_nodes
+        assert all(node.get("Actual Rows", 0) <= 1 for node in job_index_nodes)
+        assert all(
+            node.get("Rows Removed by Filter", 0) <= 8 for node in job_index_nodes
+        )
+        assert sum(
+            node.get("Shared Hit Blocks", 0) + node.get("Shared Read Blocks", 0)
+            for node in job_index_nodes
+        ) <= 64
