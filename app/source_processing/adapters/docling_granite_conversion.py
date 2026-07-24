@@ -7,12 +7,12 @@ import json
 import os
 import subprocess
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping
 
 from app.contracts.technical_jobs import GraniteModelStillRunning
-from app.platform.job_runtime.granite_capacity import GraniteSlotLease
 from app.source_processing.adapters.docling_native_conversion import (
     NativeDoclingConversionResponse,
 )
@@ -216,11 +216,11 @@ class IsolatedGraniteDoclingConverter:
         self,
         request: GraniteDoclingConversionRequest,
         *,
-        lease: GraniteSlotLease,
+        lease: object,
     ) -> "RunningGraniteDoclingConversion":
         if not isinstance(request, GraniteDoclingConversionRequest):
             raise ValueError("requête Granite-Docling invalide")
-        if not isinstance(lease, GraniteSlotLease):
+        if lease is None:
             raise ValueError("lease Granite-Docling requise")
         manifest = GraniteDoclingAssetManifest.load(
             manifest_path=self._asset_manifest_path,
@@ -258,6 +258,7 @@ class IsolatedGraniteDoclingConverter:
                 request.to_payload(assets_root=manifest.assets_root),
                 separators=(",", ":"),
             ).encode("utf-8"),
+            timeout_seconds=self._timeout_seconds,
         )
 
 
@@ -270,10 +271,19 @@ class RunningGraniteDoclingConversion:
         process: subprocess.Popen[bytes],
         request: GraniteDoclingConversionRequest,
         input_payload: bytes,
+        timeout_seconds: float,
     ) -> None:
+        if (
+            isinstance(timeout_seconds, bool)
+            or not isinstance(timeout_seconds, int | float)
+            or timeout_seconds <= 0
+        ):
+            raise ValueError("timeout Granite-Docling invalide")
         self._process = process
         self._request = request
         self._input_payload: bytes | None = input_payload
+        self._deadline = time.monotonic() + float(timeout_seconds)
+        self._terminated = False
 
     def wait(self, *, timeout_seconds: float) -> NativeDoclingConversionResponse:
         if (
@@ -282,14 +292,23 @@ class RunningGraniteDoclingConversion:
             or timeout_seconds <= 0
         ):
             raise ValueError("timeout Granite-Docling invalide")
+        remaining_seconds = self._deadline - time.monotonic()
+        if remaining_seconds <= 0:
+            self.terminate()
+            raise GraniteDoclingConversionError("GRANITE_DOCLING_TIMEOUT")
         input_payload = self._input_payload
         self._input_payload = None
         try:
             stdout, _stderr = self._process.communicate(
                 input=input_payload,
-                timeout=float(timeout_seconds),
+                timeout=min(float(timeout_seconds), remaining_seconds),
             )
         except subprocess.TimeoutExpired as error:
+            if time.monotonic() >= self._deadline:
+                self.terminate()
+                raise GraniteDoclingConversionError(
+                    "GRANITE_DOCLING_TIMEOUT"
+                ) from error
             raise GraniteModelStillRunning() from error
         try:
             payload = json.loads(stdout)
@@ -309,14 +328,17 @@ class RunningGraniteDoclingConversion:
         )
 
     def terminate(self) -> None:
+        if self._terminated:
+            return
+        self._terminated = True
         if self._process.poll() is not None:
             return
         self._process.terminate()
         try:
-            self._process.wait(timeout=5)
+            self._process.wait(timeout=5.0)
         except subprocess.TimeoutExpired:
             self._process.kill()
-            self._process.wait(timeout=5)
+            self._process.wait(timeout=5.0)
 
 
 def _native_response_request(request: GraniteDoclingConversionRequest):

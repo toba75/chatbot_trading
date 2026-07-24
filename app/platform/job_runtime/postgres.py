@@ -41,9 +41,6 @@ class _JobRow(NamedTuple):
     capacity_slots: int | None
     capacity_device: str | None
     storage_environment: str | None
-    source_artifact_ref: str | None
-    result_artifact_ref: str | None
-    execution_route_name: str | None
     payload: Any
     status: str
     result: Any
@@ -71,9 +68,6 @@ class _ClaimedJobRow(NamedTuple):
     capacity_slots: int | None
     capacity_device: str | None
     storage_environment: str | None
-    source_artifact_ref: str | None
-    result_artifact_ref: str | None
-    execution_route_name: str | None
     payload: Any
     status: str
     result: Any
@@ -105,6 +99,12 @@ class _ConsumedRelayRow(NamedTuple):
 class _ExistingRelayRow(NamedTuple):
     job_id: str
     priority: str
+    execution_contract_name: str | None
+    execution_contract_version: str | None
+    capacity_capability: str | None
+    capacity_slots: int | None
+    capacity_device: str | None
+    storage_environment: str | None
     payload: Any
     trace_id: str
     source_message_id: str | None
@@ -145,6 +145,13 @@ class JobRelayMessageConflictError(RuntimeError):
 
     def __init__(self) -> None:
         super().__init__("JOB_RELAY_MESSAGE_CONFLICT")
+
+
+class JobSubmissionConflictError(RuntimeError):
+    """Une même identité idempotente désigne deux commandes divergentes."""
+
+    def __init__(self) -> None:
+        super().__init__("JOB_SUBMISSION_CONFLICT")
 
 
 class PostgresJobQueue:
@@ -220,6 +227,12 @@ class PostgresJobQueue:
             existing_row = cursor.fetchone()
             if existing_row is not None:
                 existing = _job_from_row(existing_row)
+                if (
+                    existing.request.payload != parsed_request.payload
+                    or existing.request.execution_requirements
+                    != parsed_request.execution_requirements
+                ):
+                    raise JobSubmissionConflictError()
                 if not recalculate and existing.status in {
                     JobStatus.PENDING,
                     JobStatus.RUNNING,
@@ -239,8 +252,7 @@ class PostgresJobQueue:
                     code_version, model_version,
                     execution_contract_name, execution_contract_version,
                     capacity_capability, capacity_slots, capacity_device,
-                    storage_environment, source_artifact_ref,
-                    result_artifact_ref, execution_route_name,
+                    storage_environment,
                     payload, trace_id, status,
                     recalculation_number
                 )
@@ -251,8 +263,6 @@ class PostgresJobQueue:
                     %(execution_contract_name)s, %(execution_contract_version)s,
                     %(capacity_capability)s, %(capacity_slots)s,
                     %(capacity_device)s, %(storage_environment)s,
-                    %(source_artifact_ref)s, %(result_artifact_ref)s,
-                    %(execution_route_name)s,
                     %(payload)s::jsonb, %(trace_id)s, 'pending',
                     COALESCE((
                         SELECT MAX(recalculation_number) + 1
@@ -399,6 +409,8 @@ class PostgresJobQueue:
                     if (
                         existing_row.priority != request.priority.value
                         or dict(existing_row.payload) != dict(request.payload)
+                        or _existing_relay_requirement_values(existing_row)
+                        != _execution_requirement_values(request)
                         or existing_row.trace_id != message.trace_id
                         or existing_row.source_message_id is not None
                         or existing_row.source_message_hash is not None
@@ -431,8 +443,7 @@ class PostgresJobQueue:
                         code_version, model_version,
                         execution_contract_name, execution_contract_version,
                         capacity_capability, capacity_slots, capacity_device,
-                        storage_environment, source_artifact_ref,
-                        result_artifact_ref, execution_route_name,
+                        storage_environment,
                         payload, trace_id, status,
                         recalculation_number, source_message_id, source_message_hash
                     )
@@ -444,8 +455,6 @@ class PostgresJobQueue:
                         %(execution_contract_version)s,
                         %(capacity_capability)s, %(capacity_slots)s,
                         %(capacity_device)s, %(storage_environment)s,
-                        %(source_artifact_ref)s, %(result_artifact_ref)s,
-                        %(execution_route_name)s,
                         %(payload)s::jsonb, %(trace_id)s, 'pending', 0,
                         %(source_message_id)s, %(source_message_hash)s
                     )
@@ -961,9 +970,6 @@ def _execution_requirement_mapping(request: JobRequest) -> dict[str, Any]:
             "capacity_slots": None,
             "capacity_device": None,
             "storage_environment": None,
-            "source_artifact_ref": None,
-            "result_artifact_ref": None,
-            "execution_route_name": None,
         }
     return {
         "execution_contract_name": requirements.contract_name,
@@ -972,10 +978,32 @@ def _execution_requirement_mapping(request: JobRequest) -> dict[str, Any]:
         "capacity_slots": requirements.capacity_slots,
         "capacity_device": requirements.capacity_device,
         "storage_environment": requirements.storage_environment,
-        "source_artifact_ref": requirements.source_artifact_ref,
-        "result_artifact_ref": requirements.result_artifact_ref,
-        "execution_route_name": requirements.route_name,
     }
+
+
+def _execution_requirement_values(request: JobRequest) -> tuple[Any, ...]:
+    requirements = request.execution_requirements
+    if requirements is None:
+        return (None, None, None, None, None, None)
+    return (
+        requirements.contract_name,
+        requirements.contract_version,
+        requirements.capacity_capability,
+        requirements.capacity_slots,
+        requirements.capacity_device,
+        requirements.storage_environment,
+    )
+
+
+def _existing_relay_requirement_values(row: _ExistingRelayRow) -> tuple[Any, ...]:
+    return (
+        row.execution_contract_name,
+        row.execution_contract_version,
+        row.capacity_capability,
+        row.capacity_slots,
+        row.capacity_device,
+        row.storage_environment,
+    )
 
 
 def _execution_requirements_from_row(
@@ -988,9 +1016,6 @@ def _execution_requirements_from_row(
         row.capacity_slots,
         row.capacity_device,
         row.storage_environment,
-        row.source_artifact_ref,
-        row.result_artifact_ref,
-        row.execution_route_name,
     )
     if all(value is None for value in values):
         return None
@@ -1003,9 +1028,6 @@ def _execution_requirements_from_row(
         capacity_slots=row.capacity_slots,
         capacity_device=row.capacity_device,
         storage_environment=row.storage_environment,
-        source_artifact_ref=row.source_artifact_ref,
-        result_artifact_ref=row.result_artifact_ref,
-        route_name=row.execution_route_name,
     )
 
 
@@ -1013,5 +1035,6 @@ __all__ = [
     "ClaimedJob",
     "JobLeaseConflictError",
     "JobRelayMessageConflictError",
+    "JobSubmissionConflictError",
     "PostgresJobQueue",
 ]

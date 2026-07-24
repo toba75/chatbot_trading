@@ -10,7 +10,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Protocol
 
-from app.contracts.technical_jobs import ClaimedJob, JobStatus
+from app.contracts.technical_jobs import ClaimedJob, GraniteModelStillRunning, JobStatus
 from app.source_processing.adapters.docling_granite_conversion import (
     GraniteDoclingConversionError,
     GraniteDoclingConversionRequest,
@@ -149,6 +149,14 @@ class GraniteCapacityController(Protocol):
         """Exécute un modèle seulement sous le double fencing actif."""
 
 
+class JobHeartbeatControl(Protocol):
+    """Transfère temporairement l'autorité au heartbeat du double fencing."""
+
+    def pause(self) -> None: ...
+
+    def resume(self) -> None: ...
+
+
 class RoutedConversionRepository(Protocol):
     def find_conversion_by_document_id(
         self, document_id: DocumentId
@@ -270,6 +278,7 @@ class _GranitePageConverter:
         claimed_job: ClaimedJob,
         lease_seconds: int,
         heartbeat_seconds: float,
+        job_heartbeat_control: JobHeartbeatControl,
         resolve_source_path: Callable[[str], Path],
         gateway_endpoint_url: str,
         gateway_timeout_seconds: int,
@@ -283,6 +292,7 @@ class _GranitePageConverter:
         self._claimed_job = claimed_job
         self._lease_seconds = lease_seconds
         self._heartbeat_seconds = heartbeat_seconds
+        self._job_heartbeat_control = job_heartbeat_control
         self._resolve_source_path = resolve_source_path
         self._gateway_endpoint_url = gateway_endpoint_url
         self._gateway_timeout_seconds = gateway_timeout_seconds
@@ -291,23 +301,27 @@ class _GranitePageConverter:
 
     def convert_page(self, request: PageConversionRequest) -> PageConversionArtifact:
         source_path = self._resolve_source_path(request.source_artifact_ref)
-        execution = self._capacity_controller.execute_claimed_job(
-            worker=self._granite_worker,
-            claimed_job=self._claimed_job,
-            lease_seconds=self._lease_seconds,
-            heartbeat_seconds=self._heartbeat_seconds,
-            start_model=lambda lease: _RunningGraniteRouteConversion(
-                lease=lease,
-                request=request,
-                source_path=source_path,
-                granite_converter=self._granite_converter,
-                gemma_converter=self._gemma_converter,
-                gateway_endpoint_url=self._gateway_endpoint_url,
-                gateway_timeout_seconds=self._gateway_timeout_seconds,
-                gateway_max_output_tokens=self._gateway_max_output_tokens,
-                expected_model_id=self._expected_model_id,
-            ),
-        )
+        self._job_heartbeat_control.pause()
+        try:
+            execution = self._capacity_controller.execute_claimed_job(
+                worker=self._granite_worker,
+                claimed_job=self._claimed_job,
+                lease_seconds=self._lease_seconds,
+                heartbeat_seconds=self._heartbeat_seconds,
+                start_model=lambda lease: _RunningGraniteRouteConversion(
+                    lease=lease,
+                    request=request,
+                    source_path=source_path,
+                    granite_converter=self._granite_converter,
+                    gemma_converter=self._gemma_converter,
+                    gateway_endpoint_url=self._gateway_endpoint_url,
+                    gateway_timeout_seconds=self._gateway_timeout_seconds,
+                    gateway_max_output_tokens=self._gateway_max_output_tokens,
+                    expected_model_id=self._expected_model_id,
+                ),
+            )
+        finally:
+            self._job_heartbeat_control.resume()
         return execution.model_result
 
 
@@ -361,7 +375,7 @@ class _RunningGraniteRouteConversion:
                     raise GraniteConversionFailure(error.code) from error
                 self._granite_error_code = error.code
                 self._start_gemma(rotation=0)
-                return self.wait(timeout_seconds=timeout_seconds)
+                raise GraniteModelStillRunning() from error
             return _page_output(
                 response=response,
                 page_number=self._request.page_number,
@@ -377,20 +391,20 @@ class _RunningGraniteRouteConversion:
                 and error.code == "GEMMA_VISION_OUTPUT_INVALID"
             ):
                 self._start_gemma(rotation=90)
-                return self.wait(timeout_seconds=timeout_seconds)
+                raise GraniteModelStillRunning() from error
             if (
                 self._state == "gemma-rotated"
                 and error.code == "GEMMA_VISION_OUTPUT_TRUNCATED"
             ):
                 self._start_segment(1)
-                return self.wait(timeout_seconds=timeout_seconds)
+                raise GraniteModelStillRunning() from error
             raise
         if self._state == "gemma-segment":
             self._segment_responses.append(gemma_response)
             next_segment = len(self._segment_responses) + 1
             if next_segment <= GEMMA_DENSE_RENDER_SEGMENT_COUNT:
                 self._start_segment(next_segment)
-                return self.wait(timeout_seconds=timeout_seconds)
+                raise GraniteModelStillRunning()
             gemma_response = _merge_gemma_segment_responses(
                 tuple(self._segment_responses)
             )
@@ -515,6 +529,7 @@ class RoutedDocumentConversionWorker:
         granite_worker: GraniteWorker,
         granite_lease_seconds: int,
         granite_heartbeat_seconds: float,
+        job_heartbeat_control: JobHeartbeatControl,
         llm_gateway_url: str,
         llm_gateway_timeout_seconds: int,
         llm_gateway_max_output_tokens: int,
@@ -540,6 +555,8 @@ class RoutedDocumentConversionWorker:
             (granite_converter, "start"),
             (gemma_converter, "start"),
             (granite_capacity_controller, "execute_claimed_job"),
+            (job_heartbeat_control, "pause"),
+            (job_heartbeat_control, "resume"),
             (artifact_store, "store_docling_json"),
         ):
             if not callable(getattr(dependency, method, None)):
@@ -565,6 +582,7 @@ class RoutedDocumentConversionWorker:
         ):
             raise ValueError("heartbeat Granite invalide")
         self._granite_heartbeat_seconds = float(granite_heartbeat_seconds)
+        self._job_heartbeat_control = job_heartbeat_control
         self._llm_gateway_url = _required_gateway_url(llm_gateway_url)
         self._llm_gateway_timeout_seconds = _required_positive_int(
             llm_gateway_timeout_seconds,
@@ -683,6 +701,7 @@ class RoutedDocumentConversionWorker:
                 claimed_job=claimed_job,
                 lease_seconds=self._granite_lease_seconds,
                 heartbeat_seconds=self._granite_heartbeat_seconds,
+                job_heartbeat_control=self._job_heartbeat_control,
                 resolve_source_path=resolve_source_path,
                 gateway_endpoint_url=self._llm_gateway_url,
                 gateway_timeout_seconds=self._llm_gateway_timeout_seconds,
@@ -885,6 +904,7 @@ def build_routed_document_conversion_worker(
     granite_worker: GraniteWorker,
     granite_lease_seconds: int,
     granite_heartbeat_seconds: float,
+    job_heartbeat_control: JobHeartbeatControl,
 ) -> RoutedDocumentConversionWorker:
     """Construit le worker uniquement si tous les runtimes réels annoncés sont prêts."""
 
@@ -916,6 +936,7 @@ def build_routed_document_conversion_worker(
         granite_worker=granite_worker,
         granite_lease_seconds=granite_lease_seconds,
         granite_heartbeat_seconds=granite_heartbeat_seconds,
+        job_heartbeat_control=job_heartbeat_control,
         llm_gateway_url=llm_gateway_url,
         llm_gateway_timeout_seconds=llm_gateway_timeout_seconds,
         llm_gateway_max_output_tokens=llm_gateway_max_output_tokens,

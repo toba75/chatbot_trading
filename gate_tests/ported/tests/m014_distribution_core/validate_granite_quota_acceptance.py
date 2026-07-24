@@ -49,9 +49,6 @@ def _claimed_job(*, owner: str = "worker-documents-1") -> ClaimedJob:
             capacity_slots=1,
             capacity_device="cuda:0",
             storage_environment="test",
-            source_artifact_ref="artifact:source_processing.local/test/source.pdf",
-            result_artifact_ref="artifact:source_processing.local/test/page-1.json",
-            route_name="SCAN_GRANITE",
         ),
         payload={"required_capacity": "GRANITE_CUDA"},
     )

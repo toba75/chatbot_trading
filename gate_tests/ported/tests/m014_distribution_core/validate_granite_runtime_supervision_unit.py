@@ -102,9 +102,6 @@ def _requirements() -> JobExecutionRequirements:
         capacity_slots=1,
         capacity_device="cuda:0",
         storage_environment="test",
-        source_artifact_ref="artifact:source_processing.local/test/source.pdf",
-        result_artifact_ref="artifact:source_processing.local/test/page-1.json",
-        route_name="SCAN_GRANITE",
     )
 
 
@@ -225,7 +222,8 @@ class _Repository:
         self.terminals.append(envelope)
         return lease.claimed_job.job
 
-    def acquire_for_claimed_job(self, *, worker, claimed_job):
+    def acquire_for_claimed_job(self, *, worker, claimed_job, lease_seconds):
+        assert lease_seconds == 30
         assert claimed_job == self.lease.claimed_job
         if self.legacy_acquisitions:
             return self.legacy_acquisitions.pop(0)
@@ -235,7 +233,10 @@ class _Repository:
         self.releases.append(lease)
 
 
-def test_runtime_granite_supervise_heartbeat_annulation_et_terminal_atomique() -> None:
+def test_runtime_granite_supervise_heartbeat_annulation_et_terminal_atomique(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
     """Given un job Granite leased, When il bloque ou perd sa lease, Then le processus reste supervisé."""
 
     repository = _Repository()
@@ -389,6 +390,38 @@ def test_runtime_granite_supervise_heartbeat_annulation_et_terminal_atomique() -
         assert "subprocess.Popen" in converter_source
         assert "subprocess.run(" not in converter_source
 
+    _assert_frontiere_popen(
+        monkeypatch,
+        tmp_path,
+        lambda process, source: RunningGraniteDoclingConversion(
+            process=process,
+            request=_granite_request(source),
+            input_payload=b"{}",
+            timeout_seconds=1.0,
+        ),
+        GraniteDoclingConversionError,
+        "GRANITE_DOCLING_TIMEOUT",
+    )
+    _assert_frontiere_popen(
+        monkeypatch,
+        tmp_path,
+        lambda process, _source: RunningGemmaVisionConversion(
+            process=process,
+            input_payload=b"{}",
+            timeout_seconds=1.0,
+        ),
+        Exception,
+        "GEMMA_VISION_TIMEOUT",
+    )
+    monkeypatch.undo()
+    _assert_perte_lease(False)
+    _assert_perte_lease(True)
+    _assert_transition_heartbeat(tmp_path)
+    _assert_erreur_configuration_precise()
+    _assert_builder_quota_reel(monkeypatch, tmp_path)
+    _assert_enveloppe_terminale_gelee()
+    _assert_relais_historique_et_parametres_obligatoires()
+
 
 class _PopenBoundary:
     def __init__(self, *, terminate_failure: Exception | None = None) -> None:
@@ -455,7 +488,7 @@ def _granite_request(source_path: Path) -> GraniteDoclingConversionRequest:
         ),
     ),
 )
-def test_frontiere_popen_applique_une_deadline_totale_et_termine_une_seule_fois(
+def _assert_frontiere_popen(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     factory,
@@ -492,7 +525,7 @@ def test_frontiere_popen_applique_une_deadline_totale_et_termine_une_seule_fois(
 
 
 @pytest.mark.parametrize("legacy", (False, True))
-def test_perte_lease_conserve_la_cause_primaire_si_terminate_echoue(
+def _assert_perte_lease(
     legacy: bool,
 ) -> None:
     """Given une lease perdue, When l'arrêt échoue, Then JOB_LEASE_LOST reste la première cause."""
@@ -578,7 +611,7 @@ class _TransitionGemmaConverter:
         )
 
 
-def test_transition_granite_vers_gemma_force_un_heartbeat_intermediaire(
+def _assert_transition_heartbeat(
     tmp_path: Path,
 ) -> None:
     """Given Granite finit vite, When Gemma prend le relais, Then le contrôleur renouvelle avant le second modèle."""
@@ -615,7 +648,7 @@ def test_transition_granite_vers_gemma_force_un_heartbeat_intermediaire(
     assert running.wait(timeout_seconds=0.01).tool_name.value == "GEMMA_VISION"
 
 
-def test_erreur_configuration_expose_un_motif_precis_sans_changer_le_code() -> None:
+def _assert_erreur_configuration_precise() -> None:
     with pytest.raises(GraniteCapacityConfigurationError) as captured:
         GraniteCapacityController(repository=object())
     assert captured.value.code == "GRANITE_CAPACITY_CONFIGURATION_INVALID"
@@ -750,7 +783,8 @@ class _TwoSlotRepository:
     def complete_page_execution(self, *_arguments):
         raise AssertionError("terminal page T-005 interdit")
 
-    def acquire_for_claimed_job(self, *, worker, claimed_job):
+    def acquire_for_claimed_job(self, *, worker, claimed_job, lease_seconds):
+        assert lease_seconds == 30
         with self.lock:
             if any(
                 lease.claimed_job.lease_owner == worker.worker_instance_id
@@ -912,7 +946,7 @@ def _built_scan_fixture(index: int, root: Path):
     return source, run, source_path, claimed
 
 
-def test_builder_reel_scan_granite_ne_demarre_jamais_avant_un_des_deux_slots(
+def _assert_builder_quota_reel(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -1040,7 +1074,7 @@ def test_builder_reel_scan_granite_ne_demarre_jamais_avant_un_des_deux_slots(
     assert repository.held == {}
 
 
-def test_enveloppe_terminale_est_json_gelee_et_revalidee() -> None:
+def _assert_enveloppe_terminale_gelee() -> None:
     payload = {"nested": [{"value": 1}], "flags": [True, None]}
     envelope = GranitePageTerminalEnvelope.from_payload(
         completion_id="COMPLETE-M014-CYCLE3-FROZEN",
@@ -1069,7 +1103,7 @@ def test_enveloppe_terminale_est_json_gelee_et_revalidee() -> None:
         assert captured.value.reason == reason
 
 
-def test_relais_none_preserve_hash_m013_et_parametres_runtime_restent_obligatoires() -> (
+def _assert_relais_historique_et_parametres_obligatoires() -> (
     None
 ):
     message = RelayedJobMessage(

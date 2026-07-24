@@ -21,9 +21,6 @@ ALTER TABLE platform.technical_jobs
     ADD COLUMN capacity_slots smallint,
     ADD COLUMN capacity_device text,
     ADD COLUMN storage_environment text,
-    ADD COLUMN source_artifact_ref text,
-    ADD COLUMN result_artifact_ref text,
-    ADD COLUMN execution_route_name text,
     ADD CONSTRAINT technical_jobs_execution_requirements_coherence CHECK (
         (
             execution_contract_name IS NULL
@@ -32,40 +29,42 @@ ALTER TABLE platform.technical_jobs
             AND capacity_slots IS NULL
             AND capacity_device IS NULL
             AND storage_environment IS NULL
-            AND source_artifact_ref IS NULL
-            AND result_artifact_ref IS NULL
-            AND execution_route_name IS NULL
         )
         OR (
-            btrim(execution_contract_name) <> ''
+            execution_contract_name IS NOT NULL
+            AND btrim(execution_contract_name) <> ''
             AND execution_contract_name = btrim(execution_contract_name)
+            AND execution_contract_version IS NOT NULL
             AND btrim(execution_contract_version) <> ''
             AND execution_contract_version = btrim(execution_contract_version)
+            AND capacity_capability IS NOT NULL
             AND btrim(capacity_capability) <> ''
             AND capacity_capability = btrim(capacity_capability)
+            AND capacity_slots IS NOT NULL
             AND capacity_slots >= 0
             AND (
                 (capacity_slots = 0 AND capacity_device IS NULL)
                 OR (
                     capacity_slots > 0
+                    AND capacity_device IS NOT NULL
                     AND btrim(capacity_device) <> ''
                     AND capacity_device = btrim(capacity_device)
                 )
             )
+            AND storage_environment IS NOT NULL
             AND storage_environment IN ('development', 'test', 'production')
-            AND btrim(source_artifact_ref) <> ''
-            AND source_artifact_ref = btrim(source_artifact_ref)
-            AND btrim(result_artifact_ref) <> ''
-            AND result_artifact_ref = btrim(result_artifact_ref)
-            AND btrim(execution_route_name) <> ''
-            AND execution_route_name = btrim(execution_route_name)
         )
     ),
     ADD CONSTRAINT technical_jobs_convert_page_requirements CHECK (
         (
             job_name = 'CONVERT_PAGE'
+            AND execution_contract_name IS NOT NULL
             AND execution_contract_name = 'CONVERT_PAGE'
+            AND execution_contract_version IS NOT NULL
             AND execution_contract_version = '1.0'
+            AND capacity_capability IS NOT NULL
+            AND capacity_slots IS NOT NULL
+            AND storage_environment IS NOT NULL
         )
         OR (
             job_name <> 'CONVERT_PAGE'
@@ -75,9 +74,6 @@ ALTER TABLE platform.technical_jobs
             AND capacity_slots IS NULL
             AND capacity_device IS NULL
             AND storage_environment IS NULL
-            AND source_artifact_ref IS NULL
-            AND result_artifact_ref IS NULL
-            AND execution_route_name IS NULL
         )
     );
 
@@ -114,6 +110,7 @@ CREATE TABLE platform.document_workers (
         CHECK (storage_environment IN ('development', 'test', 'production')),
     state text NOT NULL CHECK (state IN ('READY', 'DRAINING')),
     capabilities text[] NOT NULL,
+    presence_lease_until timestamptz NOT NULL,
     drain_deadline timestamptz,
     registered_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -156,6 +153,7 @@ CREATE TABLE platform.granite_slots (
             AND btrim(lease_owner) <> ''
             AND lease_owner = btrim(lease_owner)
             AND job_id IS NOT NULL
+            AND claim_generation IS NOT NULL
             AND claim_generation > 0
             AND claim_token IS NOT NULL
             AND slot_generation > 0
@@ -239,7 +237,9 @@ CREATE TABLE source_processing.page_execution_results (
             AND slot_token IS NULL
         )
         OR (
-            slot_ordinal IN (1, 2)
+            slot_ordinal IS NOT NULL
+            AND slot_ordinal IN (1, 2)
+            AND slot_generation IS NOT NULL
             AND slot_generation > 0
             AND slot_token IS NOT NULL
         )
@@ -335,6 +335,7 @@ CREATE TABLE platform.page_completion_outbox (
         (terminal_status = 'succeeded' AND failure_reason IS NULL)
         OR (
             terminal_status IN ('failed', 'abandoned')
+            AND failure_reason IS NOT NULL
             AND btrim(failure_reason) <> ''
             AND failure_reason = btrim(failure_reason)
         )
@@ -346,7 +347,9 @@ CREATE TABLE platform.page_completion_outbox (
             AND slot_token IS NULL
         )
         OR (
-            slot_ordinal IN (1, 2)
+            slot_ordinal IS NOT NULL
+            AND slot_ordinal IN (1, 2)
+            AND slot_generation IS NOT NULL
             AND slot_generation > 0
             AND slot_token IS NOT NULL
         )

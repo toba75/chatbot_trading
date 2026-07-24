@@ -326,19 +326,21 @@ def test_quota_granite_postgresql_concurrence_reprise_et_ledger() -> None:
                 environment_identity=environment_identity,
             )
             for worker_number in range(1, 5):
-                registry.register(worker(worker_number))
+                registry.register(worker(worker_number), presence_lease_seconds=60)
             with ThreadPoolExecutor(max_workers=2) as executor:
                 acquisition_1 = executor.submit(
                     quota.claim_compatible_job,
                     worker=worker(1),
                     lease_seconds=30,
                     job_names=("CONVERT_PAGE",),
+                    execution_requirements=submitted[0].request.execution_requirements,
                 )
                 acquisition_2 = executor.submit(
                     quota.claim_compatible_job,
                     worker=worker(2),
                     lease_seconds=30,
                     job_names=("CONVERT_PAGE",),
+                    execution_requirements=submitted[1].request.execution_requirements,
                 )
                 lease_1 = acquisition_1.result()
                 lease_2 = acquisition_2.result()
@@ -379,12 +381,14 @@ def test_quota_granite_postgresql_concurrence_reprise_et_ledger() -> None:
                     worker=draining_worker,
                     lease_seconds=30,
                     job_names=("CONVERT_PAGE",),
+                    execution_requirements=submitted[2].request.execution_requirements,
                 )
                 is None
             )
 
             same_worker = quota.claim_compatible_job(
-                worker=worker(2), lease_seconds=30, job_names=("CONVERT_PAGE",)
+                worker=worker(2), lease_seconds=30, job_names=("CONVERT_PAGE",),
+                execution_requirements=submitted[1].request.execution_requirements,
             )
             assert same_worker is None
 
@@ -416,7 +420,8 @@ def test_quota_granite_postgresql_concurrence_reprise_et_ledger() -> None:
                     )
 
             resumed = quota.claim_compatible_job(
-                worker=worker(3), lease_seconds=30, job_names=("CONVERT_PAGE",)
+                worker=worker(3), lease_seconds=30, job_names=("CONVERT_PAGE",),
+                execution_requirements=submitted[2].request.execution_requirements,
             )
             assert resumed is not None
             assert resumed.claimed_job.job.job_id == submitted[2].job_id
@@ -449,6 +454,7 @@ def test_quota_granite_postgresql_concurrence_reprise_et_ledger() -> None:
                     worker=worker(9, environment="production"),
                     lease_seconds=30,
                     job_names=("CONVERT_PAGE",),
+                    execution_requirements=submitted[2].request.execution_requirements,
                 )
                 is None
             )

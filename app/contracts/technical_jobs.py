@@ -106,9 +106,6 @@ class JobExecutionRequirements:
     capacity_slots: int
     capacity_device: str | None
     storage_environment: str
-    source_artifact_ref: str
-    result_artifact_ref: str
-    route_name: str
 
     def __post_init__(self) -> None:
         for field_name in (
@@ -116,9 +113,6 @@ class JobExecutionRequirements:
             "contract_version",
             "capacity_capability",
             "storage_environment",
-            "source_artifact_ref",
-            "result_artifact_ref",
-            "route_name",
         ):
             _ensure_text(getattr(self, field_name), field_name)
         if self.storage_environment not in _APPLICATION_ENVIRONMENTS:

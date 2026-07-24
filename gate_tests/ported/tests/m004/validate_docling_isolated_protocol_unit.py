@@ -165,7 +165,6 @@ def _assert_parent_protocol(
             def poll(self):
                 return 0
 
-        monkeypatch.setattr(runtime, "GraniteSlotLease", object)
         monkeypatch.setattr(
             runtime.subprocess, "Popen", lambda *args, **kwargs: _Popen()
         )

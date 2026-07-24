@@ -621,7 +621,21 @@ class ConvertPageContract:
             raise DistributionContractError("JOB_ENVELOPE_IDENTITY_MISMATCH")
         if request.idempotence_key.input_hash != contract.idempotence_key:
             raise DistributionContractError("JOB_ENVELOPE_IDEMPOTENCE_MISMATCH")
+        if request.execution_requirements != contract.execution_requirements():
+            raise DistributionContractError("JOB_EXECUTION_REQUIREMENTS_MISMATCH")
         return contract
+
+    def execution_requirements(self) -> JobExecutionRequirements:
+        """Dérive les seuls discriminants techniques admis par platform."""
+
+        return JobExecutionRequirements(
+            contract_name=CONVERT_PAGE_JOB_NAME,
+            contract_version=self.contract_version,
+            capacity_capability=self.required_capacity.capability.value,
+            capacity_slots=self.required_capacity.slots,
+            capacity_device=self.required_capacity.device,
+            storage_environment=self.environment_identity.environment,
+        )
 
     def to_mapping(self) -> dict[str, Any]:
         return {
@@ -662,17 +676,7 @@ class ConvertPageContract:
                 code_version=code_version,
                 model_version=model_version,
             ),
-            execution_requirements=JobExecutionRequirements(
-                contract_name=CONVERT_PAGE_JOB_NAME,
-                contract_version=self.contract_version,
-                capacity_capability=self.required_capacity.capability.value,
-                capacity_slots=self.required_capacity.slots,
-                capacity_device=self.required_capacity.device,
-                storage_environment=self.environment_identity.environment,
-                source_artifact_ref=self.source_artifact.identity.artifact_ref,
-                result_artifact_ref=self.expected_result_artifact.artifact_ref,
-                route_name=self.route_name.value,
-            ),
+            execution_requirements=self.execution_requirements(),
             payload=self.to_mapping(),
         )
 

@@ -412,12 +412,12 @@
   `validate_granite_runtime_postgresql_live.py` ont d’abord échoué sur les
   contrats runtime, le registre durable et le terminal atomique absents.
   Commit RED : `fcf1c579d`.
-- `JobRequest` transporte désormais des discriminants techniques neutres et
-  obligatoires pour `CONVERT_PAGE` : contrat/version, capacité, device,
-  environnement de stockage, références d’artefacts et route. La plateforme
-  les matérialise sans lire le payload Source Processing et refuse en amont
-  tout contrat ou version inconnu. Les insertions concernées utilisent des
-  paramètres psycopg nommés.
+- `JobRequest` transporte désormais les six discriminants techniques neutres
+  obligatoires pour `CONVERT_PAGE` : contrat/version, capacité, nombre de
+  slots, device et environnement de stockage. Les références d’artefacts et
+  la route restent dans le contrat métier Source Processing. La plateforme ne
+  lit pas ce payload et refuse en amont tout contrat ou version inconnu. Les
+  insertions concernées utilisent des paramètres psycopg nommés.
 - La migration 022 ajoute les colonnes techniques, l’index partiel du claim,
   le registre `platform.document_workers` et l’union discriminée des résultats
   de page. `SKIP_EMPTY` interdit toute identité d’exécution ; une route Granite
@@ -455,3 +455,41 @@
   aucune absence, surprise ou duplication, `PARTIAL GREEN: offline`.
 - Périmètre respecté : aucun fan-out, aucun producteur de job page, aucun
   assemblage, aucune projection, aucun fallback CPU et aucune ADR nouvelle.
+
+## 2026-07-24 - Revue corrective cycle 3 du runtime et du SQL T-004
+
+- RED comportemental séparé : le commit `bd5df1c50` prouve la frontière
+  `Popen`, la conservation de `JOB_LEASE_LOST`, les heartbeats entre Granite,
+  Gemma et les segments, ainsi que trois workers réels construits par
+  `build_routed_document_conversion_worker` sous deux slots globaux. Le commit
+  `dccb0ea1a` couvre les contrats DDD, l’idempotence et les invariants
+  PostgreSQL.
+- La deadline modèle est totale et monotone. À expiration, chaque adaptateur
+  exécute une seule séquence `terminate/wait/kill`; si cette terminaison échoue
+  après une perte de lease, l’`ExceptionGroup` conserve `JOB_LEASE_LOST` comme
+  cause primaire.
+- Pendant un slot Granite M-004, le heartbeat du job courant est suspendu et
+  le contrôleur devient l’unique autorité du job et du slot. Il renouvelle le
+  job même pendant l’attente d’un slot, puis force un heartbeat entre chaque
+  modèle ou segment avant de poursuivre.
+- Le registre worker possède une lease de présence durable renouvelée. Une
+  présence expirée interdit le claim ; le drainage borne atomiquement le job
+  et le slot à la deadline `shutdown_seconds` configurée, et le processus actif
+  est arrêté avant toute réassignation.
+- Les soumissions directes et relayées refusent toute identité idempotente dont
+  le payload ou les exigences divergent. Le hash historique M13 reste inchangé
+  lorsque les exigences explicites valent `None`.
+- L’enveloppe terminale gèle récursivement son JSON, refuse les valeurs non JSON
+  ou non finies et revalide son empreinte avant l’`INSERT`. Une répétition
+  identique après commit ambigu retourne le même résultat ; une répétition
+  divergente publie `GRANITE_PAGE_COMPLETION_CONFLICT`.
+- La migration 022 exprime chaque branche d’union avec des `IS NULL`/`IS NOT
+  NULL` explicites. Le SQL de claim réellement exécuté est partagé avec la
+  preuve `EXPLAIN (ANALYZE, BUFFERS)` sur 5 000 jobs mixtes et utilise l’index
+  `technical_jobs_granite_claim_idx` sans scan séquentiel de la file.
+- GREEN : Ruff ciblé ; scopes `m002`, `m004`, `m013_fastapi`,
+  `m013_environments` et `governance` ; M14 offline 36/36 et live 38/38.
+  Gate canonique offline : 465 nœuds exécutés exactement une fois, code 0,
+  aucune absence, surprise ou duplication, `PARTIAL GREEN: offline`.
+- ADR nouvelle : non requise. Ces corrections renforcent ADR-052 sans modifier
+  sa décision structurante. Le périmètre T-005 et ultérieur reste exclu.

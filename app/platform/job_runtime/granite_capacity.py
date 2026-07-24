@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import json
+import math
+import threading
 import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from hashlib import sha256
+from types import MappingProxyType
 from typing import Any, Generic, NamedTuple, Protocol, TypeVar
 from uuid import UUID
 
@@ -28,8 +31,6 @@ from app.platform.postgres import PostgresConnectionFactory
 
 
 _GENERALIST_CAPABILITIES = frozenset(("DOCUMENT_STANDARD", "GRANITE_CUDA"))
-_GRANITE_CAPABILITY = "GRANITE_CUDA"
-_GRANITE_DEVICE = "cuda:0"
 _GRANITE_CAPACITY_ERROR = "GRANITE_CAPACITY_CONFIGURATION_INVALID"
 _JOB_LEASE_LOST = "JOB_LEASE_LOST"
 
@@ -41,14 +42,26 @@ class GraniteCapacityConfigurationError(ValueError):
 
     code = _GRANITE_CAPACITY_ERROR
 
-    def __init__(self) -> None:
-        super().__init__(self.code)
+    def __init__(self, reason: str) -> None:
+        if not isinstance(reason, str) or reason.strip() == "":
+            raise ValueError("motif Granite invalide")
+        self.reason = reason
+        super().__init__(f"{self.code}:{reason}")
 
 
 class GraniteSlotLeaseLostError(RuntimeError):
     """Le claim ou le slot ne correspond plus au détenteur courant."""
 
     code = _JOB_LEASE_LOST
+
+    def __init__(self) -> None:
+        super().__init__(self.code)
+
+
+class GranitePageCompletionConflictError(RuntimeError):
+    """La même complétion terminale désigne une enveloppe divergente."""
+
+    code = "GRANITE_PAGE_COMPLETION_CONFLICT"
 
     def __init__(self) -> None:
         super().__init__(self.code)
@@ -73,23 +86,19 @@ class GranitePageTerminalEnvelope:
     def __post_init__(self) -> None:
         completion_id = _text(self.completion_id)
         if not isinstance(self.status, GranitePageTerminalStatus):
-            raise GraniteCapacityConfigurationError()
-        payload = _mapping(self.payload, "terminal_payload")
-        canonical_payload = json.dumps(
-            payload,
-            ensure_ascii=False,
-            separators=(",", ":"),
-            sort_keys=True,
-        )
+            raise GraniteCapacityConfigurationError("TERMINAL_STATUS_INVALID")
+        payload = _freeze_json_mapping(self.payload)
+        canonical_payload = _canonical_json(payload)
         fingerprint = sha256(canonical_payload.encode("utf-8")).hexdigest()
         if self.payload_fingerprint != fingerprint:
-            raise GraniteCapacityConfigurationError()
+            raise GraniteCapacityConfigurationError("TERMINAL_FINGERPRINT_MISMATCH")
         if self.status is GranitePageTerminalStatus.SUCCEEDED:
             if self.failure_reason is not None:
-                raise GraniteCapacityConfigurationError()
+                raise GraniteCapacityConfigurationError("TERMINAL_FAILURE_FORBIDDEN")
         else:
             _text(self.failure_reason)
         object.__setattr__(self, "completion_id", completion_id)
+        object.__setattr__(self, "payload", payload)
 
     @classmethod
     def from_payload(
@@ -100,13 +109,8 @@ class GranitePageTerminalEnvelope:
         payload: Mapping[str, Any],
         failure_reason: str | None,
     ) -> "GranitePageTerminalEnvelope":
-        parsed_payload = _mapping(payload, "terminal_payload")
-        serialized = json.dumps(
-            parsed_payload,
-            ensure_ascii=False,
-            separators=(",", ":"),
-            sort_keys=True,
-        )
+        parsed_payload = _freeze_json_mapping(payload)
+        serialized = _canonical_json(parsed_payload)
         return cls(
             completion_id=completion_id,
             status=status,
@@ -114,6 +118,14 @@ class GranitePageTerminalEnvelope:
             payload_fingerprint=sha256(serialized.encode("utf-8")).hexdigest(),
             failure_reason=failure_reason,
         )
+
+    def canonical_payload_json(self) -> str:
+        """Revalide le hash immédiatement avant toute persistance."""
+
+        serialized = _canonical_json(self.payload)
+        if sha256(serialized.encode("utf-8")).hexdigest() != self.payload_fingerprint:
+            raise GraniteCapacityConfigurationError("TERMINAL_FINGERPRINT_MISMATCH")
+        return serialized
 
 
 class GraniteWorkerState(str, Enum):
@@ -134,13 +146,13 @@ class GraniteWorker:
     def __post_init__(self) -> None:
         worker_instance_id = _text(self.worker_instance_id)
         if not isinstance(self.environment_identity, JobEnvironmentIdentity):
-            raise GraniteCapacityConfigurationError()
+            raise GraniteCapacityConfigurationError("WORKER_ENVIRONMENT_IDENTITY_INVALID")
         if self.storage_environment != self.environment_identity.environment:
-            raise GraniteCapacityConfigurationError()
+            raise GraniteCapacityConfigurationError("WORKER_STORAGE_ENVIRONMENT_MISMATCH")
         if not isinstance(self.state, GraniteWorkerState):
-            raise GraniteCapacityConfigurationError()
+            raise GraniteCapacityConfigurationError("WORKER_STATE_INVALID")
         if self.capabilities != _GENERALIST_CAPABILITIES:
-            raise GraniteCapacityConfigurationError()
+            raise GraniteCapacityConfigurationError("WORKER_CAPABILITIES_INVALID")
         object.__setattr__(self, "worker_instance_id", worker_instance_id)
 
 
@@ -204,7 +216,7 @@ class ClaimCompatibleTechnicalJob(Protocol):
         worker: GraniteWorker,
         lease_seconds: int,
         job_names: tuple[str, ...],
-        execution_requirements: JobExecutionRequirements | None = None,
+        execution_requirements: JobExecutionRequirements,
     ) -> GraniteSlotLease | None: ...
 
 
@@ -214,6 +226,7 @@ class AcquireGraniteSlotForClaimedJob(Protocol):
         *,
         worker: GraniteWorker,
         claimed_job: ClaimedJob,
+        lease_seconds: int,
     ) -> GraniteSlotLease | None: ...
 
 
@@ -261,9 +274,6 @@ class _AcquiredRow(NamedTuple):
     capacity_slots: int | None
     capacity_device: str | None
     storage_environment: str | None
-    source_artifact_ref: str | None
-    result_artifact_ref: str | None
-    execution_route_name: str | None
     payload: Any
     status: str
     result: Any
@@ -285,6 +295,137 @@ _QUALIFIED_CLAIMED_JOB_COLUMNS = ", ".join(
     f"job.{column}" for column in _CLAIMED_JOB_COLUMN_NAMES
 )
 
+_CLAIM_COMPATIBLE_JOB_SQL = f"""
+-- LOCK_ORDER: document_worker -> technical_job -> granite_slot
+WITH locked_worker AS MATERIALIZED (
+    SELECT worker.worker_instance_id
+      FROM platform.document_workers AS worker
+     WHERE worker.environment = %(environment)s
+       AND worker.deployment_id = %(deployment_id)s
+       AND worker.worker_instance_id = %(worker_instance_id)s
+       AND worker.configuration_hash = %(configuration_hash)s
+       AND worker.storage_environment = %(storage_environment)s
+       AND worker.state = 'READY'
+       AND worker.drain_deadline IS NULL
+       AND worker.presence_lease_until > CURRENT_TIMESTAMP
+       AND worker.capabilities = ARRAY['DOCUMENT_STANDARD', 'GRANITE_CUDA']::text[]
+     FOR UPDATE OF worker
+),
+candidate_job AS MATERIALIZED (
+    SELECT job.sequence, job.job_id
+      FROM platform.technical_jobs AS job
+      JOIN locked_worker ON true
+     WHERE job.environment = %(environment)s
+       AND job.deployment_id = %(deployment_id)s
+       AND job.configuration_hash = %(configuration_hash)s
+       AND job.job_name = ANY(%(job_names)s)
+       AND job.execution_contract_name = %(execution_contract_name)s
+       AND job.execution_contract_version = %(execution_contract_version)s
+       AND job.capacity_capability = %(capacity_capability)s
+       AND job.capacity_slots = %(capacity_slots)s
+       AND job.capacity_device = %(capacity_device)s
+       AND job.storage_environment = %(storage_environment)s
+       AND (
+            job.status = 'pending'
+           OR (job.status = 'running' AND job.lease_expires_at <= CURRENT_TIMESTAMP)
+       )
+     ORDER BY job.priority,
+              CASE WHEN job.status = 'pending' THEN 0 ELSE 1 END,
+              job.sequence
+     FOR UPDATE OF job SKIP LOCKED
+     LIMIT 1
+),
+candidate_slot AS MATERIALIZED (
+    SELECT slot.environment, slot.deployment_id, slot.slot_ordinal
+      FROM platform.granite_slots AS slot
+     WHERE slot.environment = %(environment)s
+       AND slot.deployment_id = %(deployment_id)s
+       AND EXISTS (SELECT 1 FROM candidate_job)
+       AND (slot.lease_owner IS NULL OR slot.lease_until <= CURRENT_TIMESTAMP)
+       AND NOT EXISTS (
+            SELECT 1 FROM platform.granite_slots AS held
+             WHERE held.environment = %(environment)s
+               AND held.deployment_id = %(deployment_id)s
+               AND held.lease_owner = %(worker_instance_id)s
+               AND held.lease_until > CURRENT_TIMESTAMP
+       )
+     ORDER BY CASE WHEN slot.lease_owner = %(worker_instance_id)s THEN 0 ELSE 1 END,
+              slot.slot_ordinal
+     FOR UPDATE OF slot SKIP LOCKED
+     LIMIT 1
+),
+claimed_job AS (
+    UPDATE platform.technical_jobs AS job
+       SET status = 'running',
+           lease_owner = %(worker_instance_id)s,
+           lease_expires_at = CURRENT_TIMESTAMP
+               + (%(lease_seconds)s * INTERVAL '1 second'),
+           execution_attempts = execution_attempts + 1,
+           claim_generation = claim_generation + 1,
+           claim_token = gen_random_uuid()
+      FROM candidate_job, candidate_slot
+     WHERE job.sequence = candidate_job.sequence
+    RETURNING {_QUALIFIED_CLAIMED_JOB_COLUMNS}
+),
+leased_slot AS (
+    UPDATE platform.granite_slots AS slot
+       SET lease_owner = %(worker_instance_id)s,
+           job_id = claimed_job.job_id,
+           claim_generation = claimed_job.claim_generation,
+           claim_token = claimed_job.claim_token,
+           slot_generation = slot.slot_generation + 1,
+           slot_token = gen_random_uuid(),
+           lease_until = claimed_job.lease_expires_at,
+           updated_at = CURRENT_TIMESTAMP
+      FROM candidate_slot, claimed_job
+     WHERE slot.environment = candidate_slot.environment
+       AND slot.deployment_id = candidate_slot.deployment_id
+       AND slot.slot_ordinal = candidate_slot.slot_ordinal
+    RETURNING slot.slot_ordinal, slot.slot_generation, slot.slot_token,
+              slot.lease_until AS slot_lease_until
+)
+SELECT claimed_job.*, leased_slot.*
+  FROM claimed_job
+  JOIN leased_slot ON true
+"""
+
+
+def _claim_compatible_job_parameters(
+    *,
+    environment_identity: JobEnvironmentIdentity,
+    worker: GraniteWorker,
+    lease_seconds: int,
+    job_names: tuple[str, ...],
+    execution_requirements: JobExecutionRequirements,
+) -> dict[str, Any]:
+    if not isinstance(environment_identity, JobEnvironmentIdentity):
+        raise GraniteCapacityConfigurationError("ENVIRONMENT_IDENTITY_INVALID")
+    if (
+        not isinstance(worker, GraniteWorker)
+        or worker.environment_identity != environment_identity
+    ):
+        raise GraniteCapacityConfigurationError("WORKER_IDENTITY_MISMATCH")
+    if not isinstance(execution_requirements, JobExecutionRequirements):
+        raise GraniteCapacityConfigurationError("EXECUTION_REQUIREMENTS_INVALID")
+    parsed_seconds = _positive_integer(lease_seconds)
+    if not isinstance(job_names, tuple) or not job_names:
+        raise GraniteCapacityConfigurationError("JOB_NAMES_INVALID")
+    parsed_names = tuple(_text(name) for name in job_names)
+    return {
+        "environment": environment_identity.environment,
+        "deployment_id": environment_identity.deployment_id,
+        "configuration_hash": environment_identity.configuration_hash,
+        "worker_instance_id": worker.worker_instance_id,
+        "storage_environment": execution_requirements.storage_environment,
+        "job_names": list(parsed_names),
+        "execution_contract_name": execution_requirements.contract_name,
+        "execution_contract_version": execution_requirements.contract_version,
+        "capacity_capability": execution_requirements.capacity_capability,
+        "capacity_slots": execution_requirements.capacity_slots,
+        "capacity_device": execution_requirements.capacity_device,
+        "lease_seconds": parsed_seconds,
+    }
+
 
 class PostgresGraniteWorkerRegistry:
     """Autorité durable de présence, capacités et drainage des replicas."""
@@ -296,16 +437,17 @@ class PostgresGraniteWorkerRegistry:
         environment_identity: JobEnvironmentIdentity,
     ) -> None:
         if not callable(getattr(connection_factory, "connect", None)):
-            raise GraniteCapacityConfigurationError()
+            raise GraniteCapacityConfigurationError("CONNECTION_FACTORY_PORT_INCOMPLETE")
         if not isinstance(environment_identity, JobEnvironmentIdentity):
-            raise GraniteCapacityConfigurationError()
+            raise GraniteCapacityConfigurationError("ENVIRONMENT_IDENTITY_INVALID")
         self._connection_factory = connection_factory
         self._environment_identity = environment_identity
 
-    def register(self, worker: GraniteWorker) -> None:
+    def register(self, worker: GraniteWorker, *, presence_lease_seconds: int) -> None:
         self._require_worker(worker)
+        parsed_presence_seconds = _positive_integer(presence_lease_seconds)
         if worker.state is not GraniteWorkerState.READY:
-            raise GraniteCapacityConfigurationError()
+            raise GraniteCapacityConfigurationError("WORKER_REGISTER_STATE_INVALID")
         with self._connection_factory.connect() as connection:
             with connection.transaction(), connection.cursor() as cursor:
                 cursor.execute(
@@ -313,14 +455,18 @@ class PostgresGraniteWorkerRegistry:
                     INSERT INTO platform.document_workers (
                         environment, deployment_id, worker_instance_id,
                         configuration_hash, storage_environment, state,
-                        capabilities, drain_deadline
+                        capabilities, presence_lease_until, drain_deadline
                     ) VALUES (
                         %(environment)s, %(deployment_id)s, %(worker_instance_id)s,
                         %(configuration_hash)s, %(storage_environment)s, 'READY',
-                        %(capabilities)s, NULL
+                        %(capabilities)s,
+                        CURRENT_TIMESTAMP + (%(presence_lease_seconds)s * INTERVAL '1 second'),
+                        NULL
                     )
                     ON CONFLICT (environment, deployment_id, worker_instance_id)
-                    DO UPDATE SET updated_at = CURRENT_TIMESTAMP
+                    DO UPDATE SET presence_lease_until =
+                                      EXCLUDED.presence_lease_until,
+                                  updated_at = CURRENT_TIMESTAMP
                       WHERE document_workers.configuration_hash =
                             EXCLUDED.configuration_hash
                         AND document_workers.storage_environment =
@@ -338,10 +484,49 @@ class PostgresGraniteWorkerRegistry:
                         ),
                         "storage_environment": worker.storage_environment,
                         "capabilities": sorted(worker.capabilities),
+                        "presence_lease_seconds": parsed_presence_seconds,
                     },
                 )
                 if cursor.fetchone() is None:
-                    raise GraniteCapacityConfigurationError()
+                    raise GraniteCapacityConfigurationError("WORKER_REGISTER_CONFLICT")
+
+    def heartbeat_presence(
+        self,
+        worker: GraniteWorker,
+        *,
+        presence_lease_seconds: int,
+    ) -> datetime:
+        self._require_worker(worker)
+        parsed_presence_seconds = _positive_integer(presence_lease_seconds)
+        with self._connection_factory.connect() as connection:
+            with connection.transaction(), connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE platform.document_workers
+                       SET presence_lease_until = CURRENT_TIMESTAMP
+                               + (%(presence_lease_seconds)s * INTERVAL '1 second'),
+                           updated_at = CURRENT_TIMESTAMP
+                     WHERE environment = %(environment)s
+                       AND deployment_id = %(deployment_id)s
+                       AND worker_instance_id = %(worker_instance_id)s
+                       AND configuration_hash = %(configuration_hash)s
+                       AND state = 'READY'
+                       AND presence_lease_until > CURRENT_TIMESTAMP
+                    RETURNING presence_lease_until
+                    """,
+                    {
+                        "environment": self._environment_identity.environment,
+                        "deployment_id": self._environment_identity.deployment_id,
+                        "worker_instance_id": worker.worker_instance_id,
+                        "configuration_hash": self._environment_identity.configuration_hash,
+                        "presence_lease_seconds": parsed_presence_seconds,
+                    },
+                )
+                row = cursor.fetchone()
+        if row is None:
+            raise GraniteSlotLeaseLostError()
+        (presence_lease_until,) = _row_values(row, 1, "WORKER_PRESENCE")
+        return presence_lease_until
 
     def begin_draining(
         self,
@@ -351,22 +536,53 @@ class PostgresGraniteWorkerRegistry:
     ) -> None:
         parsed_worker = _text(worker_instance_id)
         if not isinstance(drain_deadline, datetime) or drain_deadline.tzinfo is None:
-            raise GraniteCapacityConfigurationError()
+            raise GraniteCapacityConfigurationError("DRAIN_DEADLINE_INVALID")
         with self._connection_factory.connect() as connection:
             with connection.transaction(), connection.cursor() as cursor:
                 cursor.execute(
                     """
-                    UPDATE platform.document_workers
-                       SET state = 'DRAINING',
-                           drain_deadline = %(drain_deadline)s,
-                           updated_at = CURRENT_TIMESTAMP
-                     WHERE environment = %(environment)s
-                       AND deployment_id = %(deployment_id)s
-                       AND worker_instance_id = %(worker_instance_id)s
-                       AND configuration_hash = %(configuration_hash)s
-                       AND state = 'READY'
-                       AND %(drain_deadline)s > CURRENT_TIMESTAMP
-                    RETURNING worker_instance_id
+                    WITH draining_worker AS (
+                        UPDATE platform.document_workers
+                           SET state = 'DRAINING',
+                               drain_deadline = %(drain_deadline)s,
+                               presence_lease_until = LEAST(
+                                   presence_lease_until,
+                                   %(drain_deadline)s
+                               ),
+                               updated_at = CURRENT_TIMESTAMP
+                         WHERE environment = %(environment)s
+                           AND deployment_id = %(deployment_id)s
+                           AND worker_instance_id = %(worker_instance_id)s
+                           AND configuration_hash = %(configuration_hash)s
+                           AND state = 'READY'
+                           AND %(drain_deadline)s > CURRENT_TIMESTAMP
+                        RETURNING worker_instance_id
+                    ), bounded_jobs AS (
+                        UPDATE platform.technical_jobs AS job
+                           SET lease_expires_at = LEAST(
+                                   job.lease_expires_at,
+                                   %(drain_deadline)s
+                               )
+                          FROM draining_worker
+                         WHERE job.environment = %(environment)s
+                           AND job.deployment_id = %(deployment_id)s
+                           AND job.lease_owner = draining_worker.worker_instance_id
+                           AND job.status = 'running'
+                        RETURNING job.job_id
+                    ), bounded_slots AS (
+                        UPDATE platform.granite_slots AS slot
+                           SET lease_until = LEAST(
+                                   slot.lease_until,
+                                   %(drain_deadline)s
+                               ),
+                               updated_at = CURRENT_TIMESTAMP
+                          FROM draining_worker
+                         WHERE slot.environment = %(environment)s
+                           AND slot.deployment_id = %(deployment_id)s
+                           AND slot.lease_owner = draining_worker.worker_instance_id
+                        RETURNING slot.slot_ordinal
+                    )
+                    SELECT worker_instance_id FROM draining_worker
                     """,
                     {
                         "environment": self._environment_identity.environment,
@@ -379,14 +595,73 @@ class PostgresGraniteWorkerRegistry:
                     },
                 )
                 if cursor.fetchone() is None:
-                    raise GraniteCapacityConfigurationError()
+                    raise GraniteCapacityConfigurationError("WORKER_DRAIN_TRANSITION_INVALID")
 
     def _require_worker(self, worker: GraniteWorker) -> None:
         if (
             not isinstance(worker, GraniteWorker)
             or worker.environment_identity != self._environment_identity
         ):
-            raise GraniteCapacityConfigurationError()
+            raise GraniteCapacityConfigurationError("WORKER_IDENTITY_MISMATCH")
+
+
+class GraniteWorkerPresenceHeartbeat:
+    """Renouvelle la présence durable; un crash laisse expirer son autorité."""
+
+    def __init__(
+        self,
+        *,
+        registry: PostgresGraniteWorkerRegistry,
+        worker: GraniteWorker,
+        presence_lease_seconds: int,
+        heartbeat_seconds: float,
+    ) -> None:
+        if not isinstance(registry, PostgresGraniteWorkerRegistry):
+            raise GraniteCapacityConfigurationError("WORKER_REGISTRY_INVALID")
+        if not isinstance(worker, GraniteWorker):
+            raise GraniteCapacityConfigurationError("WORKER_IDENTITY_INVALID")
+        parsed_lease_seconds = _positive_integer(presence_lease_seconds)
+        parsed_heartbeat_seconds = _heartbeat_seconds(
+            heartbeat_seconds,
+            lease_seconds=parsed_lease_seconds,
+        )
+        self._registry = registry
+        self._worker = worker
+        self._presence_lease_seconds = parsed_lease_seconds
+        self._heartbeat_seconds = parsed_heartbeat_seconds
+        self._stop = threading.Event()
+        self._failure: Exception | None = None
+        self._thread = threading.Thread(
+            target=self._run,
+            name=f"granite-presence-{worker.worker_instance_id}",
+            daemon=True,
+        )
+
+    def start(self) -> None:
+        self._thread.start()
+
+    def assert_alive(self) -> None:
+        if self._failure is not None:
+            raise RuntimeError("GRANITE_WORKER_PRESENCE_HEARTBEAT_FAILED") from self._failure
+
+    def stop(self) -> None:
+        self._stop.set()
+        if self._thread.is_alive():
+            self._thread.join(timeout=max(1.0, self._heartbeat_seconds * 2))
+        if self._thread.is_alive():
+            raise RuntimeError("GRANITE_WORKER_PRESENCE_HEARTBEAT_STOP_TIMEOUT")
+
+    def _run(self) -> None:
+        while not self._stop.wait(self._heartbeat_seconds):
+            try:
+                self._registry.heartbeat_presence(
+                    self._worker,
+                    presence_lease_seconds=self._presence_lease_seconds,
+                )
+            except Exception as error:
+                self._failure = error
+                self._stop.set()
+                return
 
 
 class PostgresGraniteSlotRepository(
@@ -406,11 +681,11 @@ class PostgresGraniteSlotRepository(
         environment_identity: JobEnvironmentIdentity,
     ) -> None:
         if not callable(getattr(connection_factory, "connect", None)):
-            raise GraniteCapacityConfigurationError()
+            raise GraniteCapacityConfigurationError("CONNECTION_FACTORY_PORT_INCOMPLETE")
         if not isinstance(catalog, JobCatalog):
-            raise GraniteCapacityConfigurationError()
+            raise GraniteCapacityConfigurationError("JOB_CATALOG_INVALID")
         if not isinstance(environment_identity, JobEnvironmentIdentity):
-            raise GraniteCapacityConfigurationError()
+            raise GraniteCapacityConfigurationError("ENVIRONMENT_IDENTITY_INVALID")
         self._connection_factory = connection_factory
         self._catalog = catalog
         self._environment_identity = environment_identity
@@ -421,180 +696,24 @@ class PostgresGraniteSlotRepository(
         worker: GraniteWorker,
         lease_seconds: int,
         job_names: tuple[str, ...],
-        execution_requirements: JobExecutionRequirements | None = None,
+        execution_requirements: JobExecutionRequirements,
     ) -> GraniteSlotLease | None:
         parsed_lease_seconds = _positive_integer(lease_seconds)
         parsed_job_names = _job_names(job_names, self._catalog)
-        if execution_requirements is not None and not isinstance(
-            execution_requirements,
-            JobExecutionRequirements,
-        ):
-            raise GraniteCapacityConfigurationError()
-        requirements_filter = ""
-        if execution_requirements is not None:
-            requirements_filter = """
-                           AND job.source_artifact_ref = %(source_artifact_ref)s
-                           AND job.result_artifact_ref = %(result_artifact_ref)s
-                           AND job.execution_route_name = %(execution_route_name)s
-            """
+        if not isinstance(execution_requirements, JobExecutionRequirements):
+            raise GraniteCapacityConfigurationError("EXECUTION_REQUIREMENTS_INVALID")
         self._require_worker(worker)
         with self._connection_factory.connect() as connection:
             with connection.transaction(), connection.cursor() as cursor:
                 cursor.execute(
-                    f"""
-                    -- LOCK_ORDER: document_worker -> technical_job -> granite_slot
-                    WITH locked_worker AS MATERIALIZED (
-                        SELECT worker.worker_instance_id
-                          FROM platform.document_workers AS worker
-                         WHERE worker.environment = %(environment)s
-                           AND worker.deployment_id = %(deployment_id)s
-                           AND worker.worker_instance_id = %(worker_instance_id)s
-                           AND worker.configuration_hash = %(configuration_hash)s
-                           AND worker.storage_environment = %(storage_environment)s
-                           AND worker.state = 'READY'
-                           AND worker.drain_deadline IS NULL
-                           AND worker.capabilities =
-                               ARRAY['DOCUMENT_STANDARD', 'GRANITE_CUDA']::text[]
-                         FOR UPDATE OF worker
+                    _CLAIM_COMPATIBLE_JOB_SQL,
+                    _claim_compatible_job_parameters(
+                        environment_identity=self._environment_identity,
+                        worker=worker,
+                        lease_seconds=parsed_lease_seconds,
+                        job_names=parsed_job_names,
+                        execution_requirements=execution_requirements,
                     ),
-                    candidate_job AS MATERIALIZED (
-                        SELECT job.sequence, job.job_id
-                          FROM platform.technical_jobs AS job
-                          JOIN locked_worker ON true
-                         WHERE job.environment = %(environment)s
-                           AND job.deployment_id = %(deployment_id)s
-                           AND job.configuration_hash = %(configuration_hash)s
-                           AND job.job_name = ANY(%(job_names)s)
-                           AND job.execution_contract_name = 'CONVERT_PAGE'
-                           AND job.execution_contract_version = '1.0'
-                           AND job.capacity_capability = %(capacity_capability)s
-                           AND job.capacity_slots = 1
-                           AND job.capacity_device = %(capacity_device)s
-                           AND job.storage_environment = %(storage_environment)s
-                           AND job.source_artifact_ref IS NOT NULL
-                           AND job.result_artifact_ref IS NOT NULL
-                           {requirements_filter}
-                           AND (
-                                job.status = 'pending'
-                               OR (
-                                   job.status = 'running'
-                                   AND job.lease_expires_at <= CURRENT_TIMESTAMP
-                               )
-                           )
-                          ORDER BY
-                               job.priority,
-                               CASE WHEN job.status = 'pending' THEN 0 ELSE 1 END,
-                               job.sequence
-                         FOR UPDATE OF job SKIP LOCKED
-                         LIMIT 1
-                    ),
-                    candidate_slot AS MATERIALIZED (
-                        SELECT slot.environment, slot.deployment_id,
-                               slot.slot_ordinal
-                          FROM platform.granite_slots AS slot
-                          WHERE slot.environment = %(environment)s
-                            AND slot.deployment_id = %(deployment_id)s
-                           AND EXISTS (SELECT 1 FROM candidate_job)
-                           AND (
-                               slot.lease_owner IS NULL
-                               OR slot.lease_until <= CURRENT_TIMESTAMP
-                           )
-                           AND NOT EXISTS (
-                               SELECT 1
-                                 FROM platform.granite_slots AS held
-                                 WHERE held.environment = %(environment)s
-                                   AND held.deployment_id = %(deployment_id)s
-                                   AND held.lease_owner = %(worker_instance_id)s
-                                  AND held.lease_until > CURRENT_TIMESTAMP
-                           )
-                           AND (
-                                slot.lease_owner = %(worker_instance_id)s
-                               OR NOT EXISTS (
-                                   SELECT 1
-                                     FROM platform.granite_slots AS owned
-                                     WHERE owned.environment = %(environment)s
-                                       AND owned.deployment_id = %(deployment_id)s
-                                       AND owned.lease_owner = %(worker_instance_id)s
-                               )
-                           )
-                         ORDER BY
-                               CASE
-                                   WHEN slot.lease_owner = %(worker_instance_id)s
-                                   THEN 0 ELSE 1
-                               END,
-                               CASE
-                                   WHEN slot.job_id = (
-                                       SELECT job_id FROM candidate_job
-                                   ) THEN 0
-                                   ELSE 1
-                               END,
-                               slot.slot_ordinal
-                         FOR UPDATE SKIP LOCKED
-                         LIMIT 1
-                    ),
-                    claimed_job AS (
-                        UPDATE platform.technical_jobs AS job
-                           SET status = 'running',
-                               lease_owner = %(worker_instance_id)s,
-                               lease_expires_at = CURRENT_TIMESTAMP
-                                   + (%(lease_seconds)s * INTERVAL '1 second'),
-                               execution_attempts = execution_attempts + 1,
-                               claim_generation = claim_generation + 1,
-                               claim_token = gen_random_uuid()
-                          FROM candidate_job, candidate_slot
-                         WHERE job.sequence = candidate_job.sequence
-                        RETURNING {_QUALIFIED_CLAIMED_JOB_COLUMNS}
-                    ),
-                    leased_slot AS (
-                        UPDATE platform.granite_slots AS slot
-                           SET lease_owner = %(worker_instance_id)s,
-                               job_id = claimed_job.job_id,
-                               claim_generation = claimed_job.claim_generation,
-                               claim_token = claimed_job.claim_token,
-                               slot_generation = slot.slot_generation + 1,
-                               slot_token = gen_random_uuid(),
-                               lease_until = claimed_job.lease_expires_at,
-                               updated_at = CURRENT_TIMESTAMP
-                          FROM candidate_slot, claimed_job
-                         WHERE slot.environment = candidate_slot.environment
-                           AND slot.deployment_id = candidate_slot.deployment_id
-                           AND slot.slot_ordinal = candidate_slot.slot_ordinal
-                        RETURNING slot.slot_ordinal, slot.slot_generation,
-                                  slot.slot_token,
-                                  slot.lease_until AS slot_lease_until
-                    )
-                    SELECT claimed_job.*, leased_slot.*
-                      FROM claimed_job
-                      JOIN leased_slot ON true
-                    """,
-                    {
-                        "environment": self._environment_identity.environment,
-                        "deployment_id": self._environment_identity.deployment_id,
-                        "configuration_hash": (
-                            self._environment_identity.configuration_hash
-                        ),
-                        "worker_instance_id": worker.worker_instance_id,
-                        "storage_environment": worker.storage_environment,
-                        "job_names": list(parsed_job_names),
-                        "capacity_capability": _GRANITE_CAPABILITY,
-                        "capacity_device": _GRANITE_DEVICE,
-                        "lease_seconds": parsed_lease_seconds,
-                        "source_artifact_ref": (
-                            execution_requirements.source_artifact_ref
-                            if execution_requirements is not None
-                            else None
-                        ),
-                        "result_artifact_ref": (
-                            execution_requirements.result_artifact_ref
-                            if execution_requirements is not None
-                            else None
-                        ),
-                        "execution_route_name": (
-                            execution_requirements.route_name
-                            if execution_requirements is not None
-                            else None
-                        ),
-                    },
                 )
                 row = cursor.fetchone()
         if row is None:
@@ -606,16 +725,18 @@ class PostgresGraniteSlotRepository(
         *,
         worker: GraniteWorker,
         claimed_job: ClaimedJob,
+        lease_seconds: int,
     ) -> GraniteSlotLease | None:
         """Pont M-004 : réserve un slot sans créer le fan-out page de T-005."""
 
         self._require_worker(worker)
+        parsed_lease_seconds = _positive_integer(lease_seconds)
         if (
             not isinstance(claimed_job, ClaimedJob)
             or claimed_job.job.request.environment_identity
             != self._environment_identity
         ):
-            raise GraniteCapacityConfigurationError()
+            raise GraniteCapacityConfigurationError("CLAIMED_JOB_IDENTITY_MISMATCH")
         with self._connection_factory.connect() as connection:
             with connection.transaction(), connection.cursor() as cursor:
                 cursor.execute(
@@ -631,14 +752,16 @@ class PostgresGraniteSlotRepository(
                            AND worker.storage_environment = %(environment)s
                            AND worker.state = 'READY'
                            AND worker.drain_deadline IS NULL
+                           AND worker.presence_lease_until > CURRENT_TIMESTAMP
                            AND worker.capabilities =
                                ARRAY['DOCUMENT_STANDARD', 'GRANITE_CUDA']::text[]
                          FOR UPDATE OF worker
                     ),
                     active_job AS MATERIALIZED (
-                        SELECT job.job_id, job.lease_expires_at
-                          FROM platform.technical_jobs AS job
-                          JOIN locked_worker ON true
+                        UPDATE platform.technical_jobs AS job
+                           SET lease_expires_at = CURRENT_TIMESTAMP
+                               + (%(lease_seconds)s * INTERVAL '1 second')
+                          FROM locked_worker
                          WHERE job.job_id = %(job_id)s
                            AND job.environment = %(environment)s
                            AND job.deployment_id = %(deployment_id)s
@@ -648,7 +771,7 @@ class PostgresGraniteSlotRepository(
                            AND job.claim_generation = %(claim_generation)s
                            AND job.claim_token = %(claim_token)s::uuid
                            AND job.lease_expires_at > CURRENT_TIMESTAMP
-                         FOR UPDATE OF job
+                        RETURNING job.job_id, job.lease_expires_at
                     ),
                     candidate_slot AS MATERIALIZED (
                         SELECT slot.slot_ordinal
@@ -706,6 +829,7 @@ class PostgresGraniteSlotRepository(
                         "job_id": claimed_job.job.job_id,
                         "claim_generation": claimed_job.claim_generation,
                         "claim_token": claimed_job.claim_token,
+                        "lease_seconds": parsed_lease_seconds,
                     },
                 )
                 row = cursor.fetchone()
@@ -756,6 +880,7 @@ class PostgresGraniteSlotRepository(
                            AND worker.worker_instance_id = %(worker_instance_id)s
                            AND worker.configuration_hash = %(configuration_hash)s
                            AND worker.storage_environment = %(storage_environment)s
+                           AND worker.presence_lease_until > CURRENT_TIMESTAMP
                            AND (
                                 worker.state = 'READY'
                                OR (
@@ -921,15 +1046,46 @@ class PostgresGraniteSlotRepository(
     ) -> JobRecord:
         parsed_lease = _require_lease(lease)
         if not isinstance(envelope, GranitePageTerminalEnvelope):
-            raise GraniteCapacityConfigurationError()
+            raise GraniteCapacityConfigurationError("TERMINAL_ENVELOPE_INVALID")
         claimed = parsed_lease.claimed_job
-        terminal_status = (
-            JobStatus.SUCCEEDED
-            if envelope.status is GranitePageTerminalStatus.SUCCEEDED
-            else JobStatus.FAILED
-        )
+        canonical_payload = envelope.canonical_payload_json()
         with self._connection_factory.connect() as connection:
             with connection.transaction(), connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT job_id, claim_generation, claim_token::text,
+                           worker_instance_id, slot_ordinal, slot_generation,
+                           slot_token::text, payload, payload_fingerprint,
+                           terminal_status, failure_reason
+                      FROM platform.page_completion_outbox
+                     WHERE completion_id = %(completion_id)s
+                     FOR UPDATE
+                    """,
+                    {"completion_id": envelope.completion_id},
+                )
+                existing = cursor.fetchone()
+                if existing is not None:
+                    actual = _row_values(existing, 11, "EXISTING_COMPLETION")
+                    expected = (
+                        claimed.job.job_id,
+                        claimed.claim_generation,
+                        claimed.claim_token,
+                        claimed.lease_owner,
+                        parsed_lease.slot_ordinal,
+                        parsed_lease.slot_generation,
+                        parsed_lease.slot_token,
+                        json.loads(canonical_payload),
+                        envelope.payload_fingerprint,
+                        envelope.status.value,
+                        envelope.failure_reason,
+                    )
+                    actual_payload = _mapping(actual[7], "completion_payload")
+                    comparable_actual = actual[:7] + (
+                        json.loads(_canonical_json(actual_payload)),
+                    ) + actual[8:]
+                    if comparable_actual != expected:
+                        raise GranitePageCompletionConflictError()
+                    return _terminal_job_record(claimed, envelope)
                 cursor.execute(
                     """
                     WITH active_job AS MATERIALIZED (
@@ -1037,12 +1193,7 @@ class PostgresGraniteSlotRepository(
                         "slot_generation": parsed_lease.slot_generation,
                         "slot_token": parsed_lease.slot_token,
                         "completion_id": envelope.completion_id,
-                        "payload": json.dumps(
-                            envelope.payload,
-                            ensure_ascii=False,
-                            separators=(",", ":"),
-                            sort_keys=True,
-                        ),
+                        "payload": canonical_payload,
                         "payload_fingerprint": envelope.payload_fingerprint,
                         "terminal_status": envelope.status.value,
                         "failure_reason": envelope.failure_reason,
@@ -1050,26 +1201,14 @@ class PostgresGraniteSlotRepository(
                 )
                 if cursor.fetchone() is None:
                     raise GraniteSlotLeaseLostError()
-        result = (
-            {"completion_id": envelope.completion_id}
-            if terminal_status is JobStatus.SUCCEEDED
-            else None
-        )
-        return JobRecord(
-            sequence=claimed.job.sequence,
-            job_id=claimed.job.job_id,
-            request=claimed.job.request,
-            status=terminal_status,
-            result=result,
-            failure_reason=envelope.failure_reason,
-        )
+        return _terminal_job_record(claimed, envelope)
 
     def _require_worker(self, worker: GraniteWorker) -> None:
         if (
             not isinstance(worker, GraniteWorker)
             or worker.environment_identity != self._environment_identity
         ):
-            raise GraniteCapacityConfigurationError()
+            raise GraniteCapacityConfigurationError("WORKER_IDENTITY_MISMATCH")
 
 
 class GraniteCapacityController:
@@ -1082,8 +1221,11 @@ class GraniteCapacityController:
             "complete_page_execution",
         ):
             if not callable(getattr(repository, method_name, None)):
-                raise GraniteCapacityConfigurationError()
+                raise GraniteCapacityConfigurationError("REPOSITORY_PORT_INCOMPLETE")
         self._repository = repository
+        self._process_lock = threading.Lock()
+        self._active_process: SupervisedGraniteProcess[Any] | None = None
+        self._draining = False
 
     def execute_next(
         self,
@@ -1112,9 +1254,9 @@ class GraniteCapacityController:
             callable(callback)
             for callback in (start_model, success_envelope, failure_envelope)
         ):
-            raise GraniteCapacityConfigurationError()
+            raise GraniteCapacityConfigurationError("MODEL_CALLBACK_INVALID")
         if not isinstance(execution_requirements, JobExecutionRequirements):
-            raise GraniteCapacityConfigurationError()
+            raise GraniteCapacityConfigurationError("EXECUTION_REQUIREMENTS_INVALID")
         lease = self._repository.claim_compatible_job(
             worker=worker,
             lease_seconds=parsed_lease_seconds,
@@ -1123,39 +1265,17 @@ class GraniteCapacityController:
         )
         if lease is None:
             return None
-        try:
-            process = start_model(lease)
-        except Exception as model_error:
-            self._complete_failed_execution(
-                lease=lease,
-                model_error=model_error,
+        lease, result = self._execute_supervised(
+            lease=lease,
+            lease_seconds=parsed_lease_seconds,
+            heartbeat_seconds=parsed_heartbeat_seconds,
+            start_model=start_model,
+            on_model_error=lambda active_lease, error: self._complete_failed_execution(
+                lease=active_lease,
+                model_error=error,
                 failure_envelope=failure_envelope,
-            )
-            raise AssertionError("unreachable")
-        if not callable(getattr(process, "wait", None)) or not callable(
-            getattr(process, "terminate", None)
-        ):
-            raise GraniteCapacityConfigurationError()
-        while True:
-            try:
-                result = process.wait(timeout_seconds=parsed_heartbeat_seconds)
-                break
-            except GraniteModelStillRunning:
-                try:
-                    lease = self._repository.heartbeat(
-                        lease,
-                        lease_seconds=parsed_lease_seconds,
-                    )
-                except Exception:
-                    process.terminate()
-                    raise
-            except Exception as model_error:
-                self._complete_failed_execution(
-                    lease=lease,
-                    model_error=model_error,
-                    failure_envelope=failure_envelope,
-                )
-                raise AssertionError("unreachable")
+            ),
+        )
         envelope = success_envelope(lease, result)
         self._repository.complete_page_execution(lease, envelope)
         return GraniteExecution(lease=lease, model_result=result)
@@ -1180,38 +1300,96 @@ class GraniteCapacityController:
         )
         acquire = getattr(self._repository, "acquire_for_claimed_job", None)
         if not callable(acquire) or not callable(start_model):
-            raise GraniteCapacityConfigurationError()
-        lease = acquire(worker=worker, claimed_job=claimed_job)
+            raise GraniteCapacityConfigurationError("LEGACY_EXECUTION_PORT_INCOMPLETE")
+        lease = acquire(
+            worker=worker,
+            claimed_job=claimed_job,
+            lease_seconds=parsed_lease_seconds,
+        )
         while lease is None:
             time.sleep(parsed_heartbeat_seconds)
-            lease = acquire(worker=worker, claimed_job=claimed_job)
+            lease = acquire(
+                worker=worker,
+                claimed_job=claimed_job,
+                lease_seconds=parsed_lease_seconds,
+            )
+        lease, result = self._execute_supervised(
+            lease=lease,
+            lease_seconds=parsed_lease_seconds,
+            heartbeat_seconds=parsed_heartbeat_seconds,
+            start_model=start_model,
+            on_model_error=self._release_legacy_after_model_error,
+        )
+        self._repository.release(lease)
+        return GraniteExecution(lease=lease, model_result=result)
+
+    def terminate_active_process(self) -> None:
+        """Arrête le modèle détenu avant de rendre le replica réassignable."""
+
+        with self._process_lock:
+            self._draining = True
+            process = self._active_process
+        if process is not None:
+            process.terminate()
+
+    def _execute_supervised(
+        self,
+        *,
+        lease: GraniteSlotLease,
+        lease_seconds: int,
+        heartbeat_seconds: float,
+        start_model: Callable[
+            [GraniteSlotLease], SupervisedGraniteProcess[ModelResultT]
+        ],
+        on_model_error: Callable[[GraniteSlotLease, Exception], None],
+    ) -> tuple[GraniteSlotLease, ModelResultT]:
+        with self._process_lock:
+            if self._draining:
+                raise GraniteSlotLeaseLostError()
         try:
             process = start_model(lease)
         except Exception as model_error:
-            self._release_legacy_after_model_error(lease, model_error)
+            on_model_error(lease, model_error)
             raise AssertionError("unreachable")
         if not callable(getattr(process, "wait", None)) or not callable(
             getattr(process, "terminate", None)
         ):
-            raise GraniteCapacityConfigurationError()
-        while True:
-            try:
-                result = process.wait(timeout_seconds=parsed_heartbeat_seconds)
-                break
-            except GraniteModelStillRunning:
+            raise GraniteCapacityConfigurationError("MODEL_PROCESS_PORT_INCOMPLETE")
+        with self._process_lock:
+            if self._draining:
+                must_terminate = True
+            else:
+                self._active_process = process
+                must_terminate = False
+        if must_terminate:
+            process.terminate()
+            raise GraniteSlotLeaseLostError()
+        try:
+            while True:
                 try:
-                    lease = self._repository.heartbeat(
-                        lease,
-                        lease_seconds=parsed_lease_seconds,
-                    )
-                except Exception:
-                    process.terminate()
-                    raise
-            except Exception as model_error:
-                self._release_legacy_after_model_error(lease, model_error)
-                raise AssertionError("unreachable")
-        self._repository.release(lease)
-        return GraniteExecution(lease=lease, model_result=result)
+                    return lease, process.wait(timeout_seconds=heartbeat_seconds)
+                except GraniteModelStillRunning:
+                    try:
+                        lease = self._repository.heartbeat(
+                            lease,
+                            lease_seconds=lease_seconds,
+                        )
+                    except Exception as lease_error:
+                        try:
+                            process.terminate()
+                        except Exception as termination_error:
+                            raise ExceptionGroup(
+                                "GRANITE_LEASE_AND_TERMINATION_FAILURE",
+                                [lease_error, termination_error],
+                            ) from lease_error
+                        raise
+                except Exception as model_error:
+                    on_model_error(lease, model_error)
+                    raise AssertionError("unreachable")
+        finally:
+            with self._process_lock:
+                if self._active_process is process:
+                    self._active_process = None
 
     def _release_legacy_after_model_error(
         self,
@@ -1268,6 +1446,27 @@ def _lease_from_row(row: Any) -> GraniteSlotLease:
     )
 
 
+def _terminal_job_record(
+    claimed: ClaimedJob,
+    envelope: GranitePageTerminalEnvelope,
+) -> JobRecord:
+    terminal_status = (
+        JobStatus.SUCCEEDED
+        if envelope.status is GranitePageTerminalStatus.SUCCEEDED
+        else JobStatus.FAILED
+    )
+    return JobRecord(
+        sequence=claimed.job.sequence,
+        job_id=claimed.job.job_id,
+        request=claimed.job.request,
+        status=terminal_status,
+        result=(
+            {"completion_id": envelope.completion_id}
+            if terminal_status is JobStatus.SUCCEEDED
+            else None
+        ),
+        failure_reason=envelope.failure_reason,
+    )
 def _job_from_acquired_row(row: _AcquiredRow) -> JobRecord:
     payload = _mapping(row.payload, "payload")
     result = None if row.result is None else _mapping(row.result, "result")
@@ -1311,18 +1510,6 @@ def _job_from_acquired_row(row: _AcquiredRow) -> JobRecord:
                     row.storage_environment,
                     "storage_environment",
                 ),
-                source_artifact_ref=_required_database_text(
-                    row.source_artifact_ref,
-                    "source_artifact_ref",
-                ),
-                result_artifact_ref=_required_database_text(
-                    row.result_artifact_ref,
-                    "result_artifact_ref",
-                ),
-                route_name=_required_database_text(
-                    row.execution_route_name,
-                    "execution_route_name",
-                ),
             ),
             payload=payload,
         ),
@@ -1339,6 +1526,52 @@ def _mapping(value: Any, field_name: str) -> Mapping[str, Any]:
     return decoded
 
 
+def _freeze_json_mapping(value: Any) -> Mapping[str, Any]:
+    if not isinstance(value, Mapping):
+        raise GraniteCapacityConfigurationError("TERMINAL_PAYLOAD_NON_JSON")
+    frozen = _freeze_json_value(value)
+    if not isinstance(frozen, Mapping):
+        raise GraniteCapacityConfigurationError("TERMINAL_PAYLOAD_NON_JSON")
+    return frozen
+
+
+def _freeze_json_value(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        frozen: dict[str, Any] = {}
+        for key, item in value.items():
+            if not isinstance(key, str):
+                raise GraniteCapacityConfigurationError("TERMINAL_PAYLOAD_NON_JSON")
+            frozen[key] = _freeze_json_value(item)
+        return MappingProxyType(frozen)
+    if isinstance(value, (list, tuple)):
+        return tuple(_freeze_json_value(item) for item in value)
+    if value is None or isinstance(value, (str, bool, int)):
+        return value
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise GraniteCapacityConfigurationError("TERMINAL_PAYLOAD_NON_FINITE")
+        return value
+    raise GraniteCapacityConfigurationError("TERMINAL_PAYLOAD_NON_JSON")
+
+
+def _json_compatible(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {key: _json_compatible(item) for key, item in value.items()}
+    if isinstance(value, tuple):
+        return [_json_compatible(item) for item in value]
+    return value
+
+
+def _canonical_json(value: Mapping[str, Any]) -> str:
+    return json.dumps(
+        _json_compatible(value),
+        allow_nan=False,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+
+
 def _row_values(row: Any, expected_length: int, row_name: str) -> tuple[Any, ...]:
     if not isinstance(row, (tuple, list)) or len(row) != expected_length:
         actual = len(row) if isinstance(row, (tuple, list)) else "non-sequence"
@@ -1350,7 +1583,7 @@ def _row_values(row: Any, expected_length: int, row_name: str) -> tuple[Any, ...
 
 def _text(value: Any) -> str:
     if not isinstance(value, str) or value.strip() == "" or value != value.strip():
-        raise GraniteCapacityConfigurationError()
+        raise GraniteCapacityConfigurationError("TEXT_VALUE_INVALID")
     return value
 
 
@@ -1368,7 +1601,7 @@ def _required_database_integer(value: Any, field_name: str) -> int:
 
 def _positive_integer(value: Any) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or value < 1:
-        raise GraniteCapacityConfigurationError()
+        raise GraniteCapacityConfigurationError("POSITIVE_INTEGER_REQUIRED")
     return value
 
 
@@ -1379,22 +1612,22 @@ def _heartbeat_seconds(value: Any, *, lease_seconds: int) -> float:
         or value <= 0
         or value >= lease_seconds
     ):
-        raise GraniteCapacityConfigurationError()
+        raise GraniteCapacityConfigurationError("HEARTBEAT_INTERVAL_INVALID")
     return float(value)
 
 
 def _job_names(value: Any, catalog: JobCatalog) -> tuple[str, ...]:
     if not isinstance(value, tuple) or len(value) == 0:
-        raise GraniteCapacityConfigurationError()
+        raise GraniteCapacityConfigurationError("JOB_NAMES_INVALID")
     parsed = tuple(catalog.require_known_job(_text(name)) for name in value)
     if len(set(parsed)) != len(parsed):
-        raise GraniteCapacityConfigurationError()
+        raise GraniteCapacityConfigurationError("JOB_NAMES_DUPLICATED")
     return parsed
 
 
 def _require_lease(value: Any) -> GraniteSlotLease:
     if not isinstance(value, GraniteSlotLease):
-        raise GraniteCapacityConfigurationError()
+        raise GraniteCapacityConfigurationError("GRANITE_SLOT_LEASE_INVALID")
     return value
 
 
@@ -1406,10 +1639,12 @@ __all__ = [
     "GraniteExecution",
     "GraniteModelStillRunning",
     "GranitePageTerminalEnvelope",
+    "GranitePageCompletionConflictError",
     "GranitePageTerminalStatus",
     "GraniteSlotLease",
     "GraniteSlotLeaseLostError",
     "GraniteWorker",
+    "GraniteWorkerPresenceHeartbeat",
     "GraniteWorkerState",
     "HeartbeatClaimAndGraniteSlot",
     "PostgresGraniteWorkerRegistry",

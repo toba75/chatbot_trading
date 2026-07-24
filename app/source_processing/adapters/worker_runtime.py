@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import argparse
+import atexit
 import json
 import os
+import signal
+import threading
 import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -24,9 +27,11 @@ from app.platform.job_runtime import JobStatus
 from app.platform.job_runtime.composition import build_postgres_job_runtime
 from app.platform.job_runtime.granite_capacity import (
     GraniteWorker,
+    GraniteWorkerPresenceHeartbeat,
     GraniteWorkerState,
+    GraniteSlotLeaseLostError,
 )
-from app.platform.job_runtime.heartbeat import JobLeaseHeartbeat
+from app.platform.job_runtime.heartbeat import JobHeartbeatCoordinator, JobLeaseHeartbeat
 from app.platform.job_runtime.postgres import JobLeaseConflictError
 from app.platform.job_runtime.reconciliation import reconcile_stale_configuration_jobs
 from app.platform.postgres import PsycopgConnectionFactory
@@ -170,7 +175,42 @@ def _run_worker(
         state=GraniteWorkerState.READY,
         capabilities=frozenset(("DOCUMENT_STANDARD", "GRANITE_CUDA")),
     )
-    job_runtime.granite_worker_registry.register(granite_worker)
+    shutdown_seconds = application_configuration.runtime.timeouts.shutdown_seconds
+    job_runtime.granite_worker_registry.register(
+        granite_worker,
+        presence_lease_seconds=shutdown_seconds,
+    )
+    presence_heartbeat = GraniteWorkerPresenceHeartbeat(
+        registry=job_runtime.granite_worker_registry,
+        worker=granite_worker,
+        presence_lease_seconds=shutdown_seconds,
+        heartbeat_seconds=shutdown_seconds / 3.0,
+    )
+    presence_heartbeat.start()
+    drain_lock = threading.Lock()
+    drained = False
+
+    def drain_registered_worker() -> None:
+        nonlocal drained
+        with drain_lock:
+            if drained:
+                return
+            job_runtime.granite_capacity_controller.terminate_active_process()
+            job_runtime.granite_worker_registry.begin_draining(
+                worker_instance_id=granite_worker.worker_instance_id,
+                drain_deadline=datetime.now(UTC)
+                + timedelta(seconds=shutdown_seconds),
+            )
+            presence_heartbeat.stop()
+            drained = True
+
+    atexit.register(drain_registered_worker)
+
+    def handle_termination(_signal_number: int, _frame: object) -> None:
+        drain_registered_worker()
+        raise KeyboardInterrupt
+
+    signal.signal(signal.SIGTERM, handle_termination)
     reconcile_stale_configuration_jobs(
         job_queue=job_runtime.queue,
         job_names=("DIAGNOSE", "CONVERT_DOCUMENT"),
@@ -197,6 +237,7 @@ def _run_worker(
         ),
         routing_configuration=build_document_routing_configuration(),
     )
+    job_heartbeat_coordinator = JobHeartbeatCoordinator()
     routed_conversion_worker = build_routed_document_conversion_worker(
         source_document_repository=persistence.source_document_repository,
         processing_run_repository=persistence.processing_run_repository,
@@ -234,6 +275,7 @@ def _run_worker(
         granite_worker=granite_worker,
         granite_lease_seconds=lease_seconds,
         granite_heartbeat_seconds=lease_seconds / 3.0,
+        job_heartbeat_control=job_heartbeat_coordinator,
     )
     workers = {
         "DIAGNOSE": worker,
@@ -242,6 +284,7 @@ def _run_worker(
     processed = 0
     while max_jobs is None or processed < max_jobs:
         try:
+            presence_heartbeat.assert_alive()
             job_runtime.outbox_relay.relay_pending(
                 limit=16,
                 owner_id=f"{instance_owner_id}-OUTBOX",
@@ -262,10 +305,8 @@ def _run_worker(
             continue
         if claimed is None:
             if max_jobs is not None:
-                job_runtime.granite_worker_registry.begin_draining(
-                    worker_instance_id=granite_worker.worker_instance_id,
-                    drain_deadline=datetime.now(UTC) + timedelta(seconds=lease_seconds),
-                )
+                drain_registered_worker()
+                atexit.unregister(drain_registered_worker)
                 return
             time.sleep(poll_seconds)
             continue
@@ -283,6 +324,7 @@ def _run_worker(
             lease_seconds=lease_seconds,
             heartbeat_seconds=max(0.05, lease_seconds / 3),
         )
+        job_heartbeat_coordinator.bind(heartbeat)
         heartbeat.start()
         status = "failed"
         error_code: str | None = None
@@ -317,6 +359,7 @@ def _run_worker(
             error_code = "JOB_LEASE_LOST"
         finally:
             heartbeat.stop()
+            job_heartbeat_coordinator.unbind(heartbeat)
             reset_trace_id(trace_token)
 
         duration_ms = (time.perf_counter_ns() - started_ns) / 1_000_000
@@ -329,13 +372,13 @@ def _run_worker(
             duration_ms=duration_ms,
         )
         processed += 1
-    job_runtime.granite_worker_registry.begin_draining(
-        worker_instance_id=granite_worker.worker_instance_id,
-        drain_deadline=datetime.now(UTC) + timedelta(seconds=lease_seconds),
-    )
+    drain_registered_worker()
+    atexit.unregister(drain_registered_worker)
 
 
 def _classify_processing_error(error: Exception) -> tuple[str, bool]:
+    if isinstance(error, GraniteSlotLeaseLostError):
+        return "JOB_LEASE_LOST", True
     if isinstance(error, WorkerProcessingError):
         return error.error_code, error.retryable
     if isinstance(error, OperationalError):

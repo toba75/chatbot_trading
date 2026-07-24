@@ -5,12 +5,12 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
 
 from app.contracts.technical_jobs import GraniteModelStillRunning
-from app.platform.job_runtime.granite_capacity import GraniteSlotLease
 
 
 GEMMA_DENSE_RENDER_SEGMENT_COUNT = 16
@@ -197,11 +197,11 @@ class IsolatedGemmaVisionPageConverter:
         self,
         request: GemmaVisionConversionRequest,
         *,
-        lease: GraniteSlotLease,
+        lease: object,
     ) -> "RunningGemmaVisionConversion":
         if not isinstance(request, GemmaVisionConversionRequest):
             raise ValueError("requête Gemma Vision invalide")
-        if not isinstance(lease, GraniteSlotLease):
+        if lease is None:
             raise ValueError("lease Gemma Vision requise")
         process = subprocess.Popen(
             (
@@ -221,6 +221,7 @@ class IsolatedGemmaVisionPageConverter:
                 request.to_payload(),
                 separators=(",", ":"),
             ).encode("utf-8"),
+            timeout_seconds=self._timeout_seconds,
         )
 
 
@@ -232,9 +233,18 @@ class RunningGemmaVisionConversion:
         *,
         process: subprocess.Popen[bytes],
         input_payload: bytes,
+        timeout_seconds: float,
     ) -> None:
+        if (
+            isinstance(timeout_seconds, bool)
+            or not isinstance(timeout_seconds, int | float)
+            or timeout_seconds <= 0
+        ):
+            raise ValueError("timeout Gemma Vision invalide")
         self._process = process
         self._input_payload: bytes | None = input_payload
+        self._deadline = time.monotonic() + float(timeout_seconds)
+        self._terminated = False
 
     def wait(self, *, timeout_seconds: float) -> GemmaVisionConversionResponse:
         if (
@@ -243,14 +253,21 @@ class RunningGemmaVisionConversion:
             or timeout_seconds <= 0
         ):
             raise ValueError("timeout Gemma Vision invalide")
+        remaining_seconds = self._deadline - time.monotonic()
+        if remaining_seconds <= 0:
+            self.terminate()
+            raise GemmaVisionConversionError("GEMMA_VISION_TIMEOUT")
         input_payload = self._input_payload
         self._input_payload = None
         try:
             stdout, _stderr = self._process.communicate(
                 input=input_payload,
-                timeout=float(timeout_seconds),
+                timeout=min(float(timeout_seconds), remaining_seconds),
             )
         except subprocess.TimeoutExpired as error:
+            if time.monotonic() >= self._deadline:
+                self.terminate()
+                raise GemmaVisionConversionError("GEMMA_VISION_TIMEOUT") from error
             raise GraniteModelStillRunning() from error
         try:
             payload = json.loads(stdout)
@@ -270,14 +287,17 @@ class RunningGemmaVisionConversion:
         return GemmaVisionConversionResponse.from_payload(payload)
 
     def terminate(self) -> None:
+        if self._terminated:
+            return
+        self._terminated = True
         if self._process.poll() is not None:
             return
         self._process.terminate()
         try:
-            self._process.wait(timeout=5)
+            self._process.wait(timeout=5.0)
         except subprocess.TimeoutExpired:
             self._process.kill()
-            self._process.wait(timeout=5)
+            self._process.wait(timeout=5.0)
 
 
 def _required_text(payload: Any, field_name: str) -> str:

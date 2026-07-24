@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pytest
 
+from app.contracts.technical_jobs import GraniteModelStillRunning
+
 from app.source_processing.application.convert_routed_pages import (
     ConvertRoutedPagesCommand,
     ConvertRoutedPagesHandler,
@@ -351,6 +353,8 @@ def _verifier_adaptateur_gemma_apres_indisponibilite_granite(tmp_path: Path) -> 
         expected_model_id="google/gemma-4-26B-A4B-it",
     )
 
+    with pytest.raises(GraniteModelStillRunning):
+        process.wait(timeout_seconds=1)
     recovered = process.wait(timeout_seconds=1)
 
     assert len(gemma_port.requests) == 1
@@ -478,6 +482,9 @@ def _verifier_recuperation_orientation_gemma_apres_bbox_invalide(
         expected_model_id="google/gemma-4-26B-A4B-it",
     )
 
+    for _transition in range(2):
+        with pytest.raises(GraniteModelStillRunning):
+            process.wait(timeout_seconds=1)
     recovered = process.wait(timeout_seconds=1)
 
     assert [entry.render_rotation_degrees for entry in gemma_port.requests] == [0, 90]
@@ -714,6 +721,9 @@ def _verifier_segmentation_gemma_bornee_apres_troncature(tmp_path: Path) -> None
         expected_model_id="google/gemma-4-26B-A4B-it",
     )
 
+    for _transition in range(18):
+        with pytest.raises(GraniteModelStillRunning):
+            process.wait(timeout_seconds=1)
     recovered = process.wait(timeout_seconds=1)
 
     assert [
