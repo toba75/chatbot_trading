@@ -1055,6 +1055,15 @@ class PostgresDocumentPersistence:
                     raise DistributionContractError(
                         "PAGE_FAN_OUT_CONVERSION_STATE_INVALID"
                     )
+                if len(plan.skipped_results) == plan.total_units:
+                    from app.source_processing.adapters.postgres_canonical_assembly import (
+                        enqueue_canonical_assembly_if_complete,
+                    )
+
+                    enqueue_canonical_assembly_if_complete(
+                        cursor=cursor,
+                        processing_run_id=plan.processing_run_id.value,
+                    )
         return True
 
     def complete_native_conversion(self, publication: NativeCanonicalPublication) -> None:

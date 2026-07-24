@@ -309,3 +309,55 @@ P-001 précondition GREEN
   d’exécution T-006, aucune seconde gate globale n’a été lancée.
 - Commit correctif prévu :
   `fix(m014-pipeline): neutraliser contrat de completion de page`.
+
+## 2026-07-24 - T-007 assemblage et publication canoniques
+
+- Sous-agent : `/root/m14_t007_canonical`, chargé exclusivement de T-007 par
+  l'orchestrateur du milestone.
+- Baseline initiale réutilisée sans relance : commit T-006 correctif
+  `9683d3b0e`, arbre propre, gate canonique 472/472 GREEN, code 0, sortie
+  terminale `PARTIAL GREEN: offline`. Aucune gate globale n'a été démarrée
+  pendant le cycle RED/GREEN.
+- Scénario BDD : la dernière complétion de page crée une unique commande
+  `ASSEMBLE_CANONICAL_DOCUMENT`; deux workers concurrents ne publient qu'une
+  version complète et le rejeu exact conserve la même identité sans second
+  événement ni progression additionnelle.
+- RED utile : les preuves unitaires, d'acceptation et PostgreSQL échouaient à
+  la collecte sur l'absence du cas d'usage
+  `app.source_processing.application.assemble_canonical_document`. Commit RED :
+  `fa4d9e6ff` —
+  `test(m014-pipeline): couvrir assemblage canonique atomique`.
+- Complétude transactionnelle : la transaction SP qui persiste le dernier
+  résultat crée au plus une commande d'assemblage. Elle refuse tout résultat
+  manquant, échoué ou divergent et conserve le manifeste, l'environnement et
+  le contrat de résultat comme identité immutable.
+- Assemblage : le handler relit uniquement les faits SP, vérifie les octets et
+  empreintes des artefacts de pages, restaure l'ordre PDF puis réutilise les
+  politiques M-004 d'autorité textuelle, de fusion Docling et d'acceptation
+  canonique. Aucun port de modèle n'est appelé et aucun contenu alternatif
+  n'est inventé.
+- Publication : l'artefact immutable est préparé avant la transaction SP ; une
+  transaction unique rend ensuite visibles la version canonique, le succès
+  public et l'outbox `CanonicalSourcePublished`. Un crash avant ce commit peut
+  laisser un fichier non référencé, jamais une version partielle.
+- Chaîne réelle : `ASSEMBLE_CANONICAL_DOCUMENT` appartient au catalogue et aux
+  deux replicas `worker-documents`; le runtime construit son repository, son
+  stockage local et son worker. L'environnement étranger est refusé avant
+  insertion dans la file technique.
+- Preuve PostgreSQL réelle : absence de commande avant complétude, rejeu exact
+  idempotent, doublon divergent refusé, unique commande après la dernière page,
+  concurrence de claims, crash après écriture d'artefact avant commit, puis
+  reprise atomique avec une version et un événement uniques.
+- Validations avant commit GREEN : tests ciblés T-007 et compatibilité M-013
+  5/5 GREEN ; Ruff ciblé GREEN ; `git diff --check` GREEN ; preuves PostgreSQL
+  T-005/T-006 2/2 GREEN ; scope `m004` 45/45 GREEN ; scope
+  `m014_local_pipeline --live` 36/36 GREEN. Chaque scope est sans nœud absent,
+  inattendu ou dupliqué.
+- ADR consultées : ADR-001, ADR-002, ADR-003, ADR-004, ADR-024 et ADR-052. ADR
+  créée ou modifiée : aucune ; T-007 applique les autorités, frontières et
+  transactions déjà décidées sans nouvelle décision structurante.
+- Commit GREEN prévu :
+  `feat(m014-pipeline): publier document canonique complet`. Après ce commit et
+  un arbre propre, la gate globale finale sera lancée exactement une fois avec
+  un délai de 3 600 secondes ; toute exécution différée sera attendue jusqu'à
+  son verdict terminal sans relance.

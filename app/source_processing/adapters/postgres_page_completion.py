@@ -6,6 +6,9 @@ import json
 from typing import Any
 
 from app.platform.postgres import PostgresConnectionFactory
+from app.source_processing.adapters.postgres_canonical_assembly import (
+    enqueue_canonical_assembly_if_complete,
+)
 from app.source_processing.domain.distribution_contracts import (
     DistributionContractError,
     PageResultContract,
@@ -176,6 +179,10 @@ class PostgresPageResultRepository:
                 progress = cursor.fetchone()
                 if progress is None or progress[0] != completed_units + 1:
                     raise DistributionContractError("PAGE_PROGRESS_PERSISTENCE_FAILED")
+                enqueue_canonical_assembly_if_complete(
+                    cursor=cursor,
+                    processing_run_id=result.processing_run_id,
+                )
         return True
 
 

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, replace
+from dataclasses import asdict
 from hashlib import sha256
 
 import pytest
@@ -19,8 +19,11 @@ from app.source_processing.domain.distribution_contracts import (
     DistributionContractError,
     LocalArtifactDescriptor,
     LocalArtifactIdentity,
+    PageExecutionIdentity,
     PageResultContract,
+    PageResultErrorCode,
     PageResultStatus,
+    PageTechnicalMetrics,
     assemble_canonical_document_idempotence_key,
     convert_page_idempotence_key,
 )
@@ -129,14 +132,39 @@ def _result(page: int, *, status: PageResultStatus = PageResultStatus.SUCCEEDED)
         route_name=route,
         routing_policy_version="routing-m014-unit-v1",
         request_idempotence_key=key,
-        execution=None if status is PageResultStatus.SKIP_EMPTY else None,
+        execution=(
+            None
+            if status is PageResultStatus.SKIP_EMPTY
+            else PageExecutionIdentity(
+                job_id=f"JOB-M002-{page:06d}",
+                claim_generation=1,
+                claim_token=f"00000000-0000-4000-8000-{page:012d}",
+                worker_instance_id="worker-documents-a",
+            )
+        ),
         granite_slot_execution=None,
         status=status,
         result_artifact=artifact,
-        tool_name=None if status is PageResultStatus.SKIP_EMPTY else "DOCLING_STANDARD",
-        tool_version=None if status is PageResultStatus.SKIP_EMPTY else "docling-m014-unit-v1",
-        error_code=None,
-        technical_metrics=None,
+        tool_name=(
+            "DOCLING_STANDARD" if status is PageResultStatus.SUCCEEDED else None
+        ),
+        tool_version=(
+            "docling-m014-unit-v1" if status is PageResultStatus.SUCCEEDED else None
+        ),
+        error_code=(
+            PageResultErrorCode.ARTIFACT_HASH_MISMATCH
+            if status is PageResultStatus.FAILED
+            else None
+        ),
+        technical_metrics=(
+            None
+            if status is PageResultStatus.SKIP_EMPTY
+            else PageTechnicalMetrics(
+                duration_seconds=0.1,
+                peak_ram_bytes=1024,
+                gpu=None,
+            )
+        ),
     )
 
 
@@ -149,7 +177,7 @@ def test_politique_assemblage_refuse_incomplet_echec_divergence_et_reordonne() -
     with pytest.raises(DistributionContractError, match="PAGE_RESULT_TERMINAL_FAILURE"):
         policy.validate_results(
             contract=contract,
-            results=(_result(1), replace(_result(2), status=PageResultStatus.FAILED), _result(3)),
+            results=(_result(1), _result(2, status=PageResultStatus.FAILED), _result(3)),
         )
     ordered = policy.validate_results(
         contract=contract,
@@ -161,4 +189,3 @@ def test_politique_assemblage_refuse_incomplet_echec_divergence_et_reordonne() -
             contract=contract,
             results=(_result(1), _result(1), _result(3)),
         )
-

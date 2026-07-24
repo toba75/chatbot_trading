@@ -255,6 +255,26 @@ class PostgresJobOutbox:
                     _payload_text(payload, "document_id"),
                 ),
             )
+        elif (
+            self._table_name == "source_processing.job_outbox"
+            and job_name == "ASSEMBLE_CANONICAL_DOCUMENT"
+        ):
+            cursor.execute(
+                """
+                UPDATE source_processing.document_conversion_requests
+                   SET conversion_status = 'QA_REJECTED', execution_phase = 'FAILED',
+                       rejection_error_code = %s, failure_error_code = %s,
+                       canonical_version_id = NULL
+                 WHERE document_id = %s
+                   AND conversion_status = 'CONVERSION_REQUESTED'
+                   AND execution_phase = 'RUNNING'
+                """,
+                (
+                    WORKER_ENVIRONMENT_MISMATCH,
+                    WORKER_ENVIRONMENT_MISMATCH,
+                    _payload_text(payload, "document_id"),
+                ),
+            )
         elif self._table_name == "knowledge_access.job_outbox" and job_name == "PROJECT_DOCUMENT":
             cursor.execute(
                 """

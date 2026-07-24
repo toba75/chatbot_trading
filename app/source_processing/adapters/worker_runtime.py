@@ -66,6 +66,9 @@ from app.source_processing.adapters.local_page_artifacts import LocalPageArtifac
 from app.source_processing.adapters.postgres_page_completion import (
     PostgresPageResultRepository,
 )
+from app.source_processing.adapters.postgres_canonical_assembly import (
+    PostgresCanonicalAssemblyRepository,
+)
 from app.source_processing.adapters.postgres_job_outbox import PostgresJobOutbox
 from app.source_processing.adapters.pypdf_diagnostic_inspector import (
     PdfDiagnosticInspector,
@@ -84,7 +87,12 @@ from app.source_processing.application.execute_document_page import (
 from app.source_processing.application.record_page_completion import (
     RecordPageCompletionHandler,
 )
+from app.source_processing.application.assemble_canonical_document import (
+    AssembleCanonicalDocumentHandler,
+    CanonicalAssemblyWorker,
+)
 from app.source_processing.domain.distribution_contracts import (
+    ASSEMBLE_CANONICAL_DOCUMENT_JOB_NAME,
     CONVERT_PAGE_CONTRACT_VERSION,
     CONVERT_PAGE_JOB_NAME,
     ExecutionCapability,
@@ -396,7 +404,12 @@ def _run_validated_worker_and_claim_next(
     signal.signal(signal.SIGTERM, lifecycle.handle_termination)
     reconcile_stale_configuration_jobs(
         job_queue=job_runtime.queue,
-        job_names=("DIAGNOSE", "CONVERT_DOCUMENT", "CONVERT_PAGE"),
+        job_names=(
+            "DIAGNOSE",
+            "CONVERT_DOCUMENT",
+            "CONVERT_PAGE",
+            ASSEMBLE_CANONICAL_DOCUMENT_JOB_NAME,
+        ),
         owner_id=f"{instance_owner_id}-RECONCILE",
         lease_seconds=lease_seconds,
         maximum_jobs=MAX_STARTUP_ENVIRONMENT_RECONCILIATIONS,
@@ -419,6 +432,9 @@ def _run_validated_worker_and_claim_next(
             inspector=build_m13_isolated_pdf_inspector(),
         ),
         routing_configuration=build_document_routing_configuration(),
+    )
+    canonical_artifact_store = CanonicalArtifactFileStore(
+        root=Path(application_configuration.paths.canonical_sources_root)
     )
     routed_conversion_worker = build_routed_document_conversion_worker(
         source_document_repository=persistence.source_document_repository,
@@ -447,9 +463,7 @@ def _run_validated_worker_and_claim_next(
         ),
         llm_gateway_max_output_tokens=application_configuration.models.llm.max_output_tokens,
         expected_gemma_model_id=application_configuration.models.llm.reference_model,
-        artifact_store=CanonicalArtifactFileStore(
-            root=Path(application_configuration.paths.canonical_sources_root)
-        ),
+        artifact_store=canonical_artifact_store,
         max_parallel_pages=application_configuration.services.workers.concurrency,
         docling_max_concurrency=application_configuration.services.workers.docling_concurrency,
         granite_max_concurrency=application_configuration.services.workers.granite_concurrency,
@@ -533,6 +547,15 @@ def _run_validated_worker_and_claim_next(
             )
         ),
     )
+    canonical_assembly_worker = CanonicalAssemblyWorker(
+        handler=AssembleCanonicalDocumentHandler(
+            repository=PostgresCanonicalAssemblyRepository(
+                connection_factory=connection_factory
+            ),
+            page_artifact_reader=page_artifact_store,
+            canonical_artifact_store=canonical_artifact_store,
+        )
+    )
     standard_page_requirements = JobExecutionRequirements(
         contract_name=CONVERT_PAGE_JOB_NAME,
         contract_version=CONVERT_PAGE_CONTRACT_VERSION,
@@ -552,6 +575,7 @@ def _run_validated_worker_and_claim_next(
     workers = {
         "DIAGNOSE": worker,
         "CONVERT_DOCUMENT": routed_conversion_worker,
+        ASSEMBLE_CANONICAL_DOCUMENT_JOB_NAME: canonical_assembly_worker,
     }
     processed = 0
     while lifecycle.admissions_open and (max_jobs is None or processed < max_jobs):
@@ -588,7 +612,11 @@ def _run_validated_worker_and_claim_next(
                 else job_runtime.queue.claim_next(
                     owner_id=instance_owner_id,
                     lease_seconds=lease_seconds,
-                    job_names=("DIAGNOSE", "CONVERT_DOCUMENT"),
+                    job_names=(
+                        "DIAGNOSE",
+                        "CONVERT_DOCUMENT",
+                        ASSEMBLE_CANONICAL_DOCUMENT_JOB_NAME,
+                    ),
                 )
             )
         except OperationalError:

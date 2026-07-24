@@ -60,6 +60,7 @@ def test_worker_environment_identity_unit() -> None:
         "DIAGNOSE",
         "CONVERT_DOCUMENT",
         "CONVERT_PAGE",
+        "ASSEMBLE_CANONICAL_DOCUMENT",
     )
     assert WORKER_JOB_NAMES["worker-projection"] == ("PROJECT_DOCUMENT",)
 
