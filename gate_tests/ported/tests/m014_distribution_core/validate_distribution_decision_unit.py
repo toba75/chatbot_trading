@@ -126,6 +126,30 @@ def test_validate_distribution_decision_unit() -> None:
         adr_051_bytes=adr_051_bytes + b"\nmutation silencieuse\n",
     )
 
+    adr_051_text = adr_051_bytes.decode("utf-8").replace("\r\n", "\n")
+    reciprocite_absente_des_metadonnees = _replace_required(
+        adr_051_text,
+        "**Remplacée par :** Partiellement par ADR-052 pour M-014 uniquement ; "
+        "les exigences `cuda:0`, `GRANITE_CUDA_UNAVAILABLE` et sans fallback "
+        "restent applicables",
+        "**Remplacée par :** Aucune",
+    )
+    _assert_error(
+        "M014_DISTRIBUTION_ADR_051_RECIPROCITY_INVALID",
+        adr_051_bytes=reciprocite_absente_des_metadonnees.encode("utf-8"),
+    )
+
+    reciprocite_absente_des_notes = _replace_required(
+        adr_051_text,
+        "Ce\nlien réciproque est conditionnel au périmètre M-014 et ne change aucune\n"
+        "exigence d’exécution Granite CUDA stricte de la présente ADR.",
+        "Ce lien réciproque n'est plus documenté.",
+    )
+    _assert_error(
+        "M014_DISTRIBUTION_ADR_051_RECIPROCITY_INVALID",
+        adr_051_bytes=reciprocite_absente_des_notes.encode("utf-8"),
+    )
+
     sans_consequences_ni_rollback = adr_text.split("## Conséquences", maxsplit=1)[0]
     _assert_error(
         "M014_DISTRIBUTION_CONSEQUENCES_ROLLBACK_REQUIRED",

@@ -3,7 +3,8 @@
 ## Statut de planification
 
 - Date : 2026-07-24.
-- Statut : planifié, implémentation bloquée par la précondition P-001.
+- Statut : P-001 GREEN ; P-002 peut commencer, sans comportement T-005 à T-008
+  encore implémenté.
 - Branche de planification : `master` au moment du prévol ; aucune branche
   d'implémentation ni aucun commit RED n'a été créé.
 - Source canonique : `docs/specs/plan_distribution.md`, T-005 à T-008, et
@@ -107,3 +108,48 @@ P-001 précondition GREEN
 - La qualification GPU, les opérations, l'observabilité de capacité et la
   campagne de cent PDF restent hors périmètre, réservées à
   M14-local-qualification T-009 à T-011.
+
+## 2026-07-24 - P-001 précondition GREEN du pipeline local
+
+- Références Git avant correction : branche `codex/m14-local-pipeline` au commit
+  `5b41e160c1c3441b2b623cb5dfa165606e23b1d4` ; `master` et `origin/master`
+  alignés sur `665e2ae8f3b8158833891f3e2602d37b2ae5a1a7` ;
+  `git rev-list --left-right --count master...origin/master` retourne `0 0`.
+- Les arbres de `master` confirment la présence de M-013,
+  `docs/tasks/milestone_014-distribution-core`, des ADR, du code applicatif et
+  des tests de gate requis.
+- RED amont reproduit avant correction : `uv run --locked gate --scope m004`
+  planifie 45 nœuds et termine `PARTIAL RED` sur
+  `test.m004.validate-granite-gemma-recovery-unit`, avec
+  `CONFIG_SCHEMA_INVALID` à
+  `application.services.workers.granite_concurrency` car la valeur locale `2`
+  diffère de la constante `1`.
+- RED M14-core reproduit avant correction :
+  `uv run --locked gate --scope m014_distribution_core` planifie 36 nœuds et
+  termine `PARTIAL RED` sur
+  `test.m014-distribution-core.validate-distribution-decision-unit`, erreur
+  `M014_DISTRIBUTION_ADR_051_CHANGED`.
+- Le fichier local `config/application.yaml` a été explicitement réaligné sur
+  le profil `development` avec `granite_concurrency: 1`. Le quota versionné
+  reste `granite_slots_global: 2` et `granite_slots_per_worker: 1`.
+  `git check-ignore -v config/application.yaml` confirme la règle
+  `.gitignore:19:/config/application.yaml` et la commande
+  `git ls-files config/application.yaml` ne retourne aucun chemin : le fichier
+  reste local et absent du commit.
+- Le validateur M14-core accepte désormais l'empreinte actuelle
+  `2e81990a61b956f63f903b671dcf64acd494e90ad856f4130d67a8d07003d6e1`
+  d'ADR-051. Il exige en plus les métadonnées et la note qui bornent le
+  remplacement partiel par ADR-052 à M-014, avant de contrôler l'intégrité du
+  document complet.
+- Le test unitaire refuse séparément la suppression des métadonnées, la
+  suppression de la note de réciprocité et toute autre mutation du document.
+  Le test ciblé RED est celui déjà présent au prévol ; aucun commit RED
+  artificiel n'a été créé.
+- Validations finales : tests ADR ciblés 2/2 GREEN ; Ruff ciblé GREEN ;
+  `git diff --check` GREEN ; scope `governance` 25/25 GREEN ; scope `m004`
+  45/45 GREEN ; scope `m014_distribution_core` 36/36 GREEN ; gate canonique
+  465/465 GREEN, aucune absence, surprise ou duplication, sortie terminale
+  `PARTIAL GREEN: offline` avec code 0.
+- ADR consultées : ADR-051 et ADR-052. ADR créée ou modifiée : aucune ; la
+  correction valide leur lien réciproque sans en changer le sens.
+- Commit GREEN prévu : `fix(m014-core): realigner preuve reciproque ADR-051`.

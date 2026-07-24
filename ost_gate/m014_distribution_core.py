@@ -416,7 +416,17 @@ def _is_sha256(value: Any) -> bool:
     return isinstance(value, str) and _SHA256_PATTERN.fullmatch(value) is not None
 
 
-_ADR_051_SHA256 = "70d219179c703b36b44b877cace124e6aa671364e857a06f411c05c89d18183d"
+_ADR_051_SHA256 = "2e81990a61b956f63f903b671dcf64acd494e90ad856f4130d67a8d07003d6e1"
+_ADR_051_RECIPROCITY_MARKERS = (
+    "**Remplacée par :** Partiellement par ADR-052 pour M-014 uniquement ; "
+    "les exigences `cuda:0`, `GRANITE_CUDA_UNAVAILABLE` et sans fallback "
+    "restent applicables",
+    "Cette ADR est partiellement remplacée par ADR-052 pour M-014 uniquement "
+    "sur les mentions historiques d’une flotte CPU multiarchitecture ou "
+    "distante.",
+    "Ce lien réciproque est conditionnel au périmètre M-014 et ne change aucune "
+    "exigence d’exécution Granite CUDA stricte de la présente ADR.",
+)
 _ADR_052_INDEX_ROW = (
     "| [ADR-052](ADR-052-distribution-locale-pages-quota-granite-fenced.md) "
     "| Distribution locale à la page et quota Granite fenced | Proposée "
@@ -447,6 +457,12 @@ def validate_distribution_decision(
     ):
         raise DistributionDecisionError("M014_DISTRIBUTION_DOCUMENT_INVALID")
 
+    normalized_adr_051 = _normalized_markdown(adr_051_bytes.decode("utf-8"))
+    _require_markers(
+        normalized_adr_051,
+        _ADR_051_RECIPROCITY_MARKERS,
+        "M014_DISTRIBUTION_ADR_051_RECIPROCITY_INVALID",
+    )
     if sha256(adr_051_bytes).hexdigest() != _ADR_051_SHA256:
         raise DistributionDecisionError("M014_DISTRIBUTION_ADR_051_CHANGED")
 
