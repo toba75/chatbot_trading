@@ -493,3 +493,52 @@
   aucune absence, surprise ou duplication, `PARTIAL GREEN: offline`.
 - ADR nouvelle : non requise. Ces corrections renforcent ADR-052 sans modifier
   sa décision structurante. Le périmètre T-005 et ultérieur reste exclu.
+
+## 2026-07-24 - Exploitation finale, bascule et rollback M14-core
+
+- Précondition GREEN avant modification : gate canonique offline à 465 nœuds,
+  tous exécutés exactement une fois, sans absence, surprise ni duplication.
+- Scénario BDD : étant donné une ancienne release avec un message d’outbox non
+  relayé et deux workers attendus, quand l’exploitant prépare puis active la
+  nouvelle release ou demande un rollback, alors les admissions restent
+  fermées jusqu’à l’inventaire nul, exactement deux présences READY et la
+  vérification du commit, du hash et du schéma conservé.
+- RED utile : les ATDD `validate_distribution_rollout_unit.py` et
+  `validate_distribution_rollout_acceptance.py` ont échoué sur l’absence de
+  `app.platform.distribution_operations`. Commit RED :
+  `2fe452df341d58bdfc371c2623f0ada4a2e84cb0`.
+- `runtime.resource_limits.gpu_required` vaut désormais `true` dans l’exemple
+  et les trois profils. Le chargeur refuse explicitement `false`; cette
+  exigence reste cohérente avec `granite_device: cuda:0` et la réservation
+  Compose exclusive de `device_ids: ["0"]`.
+- La commande publique `uv run --locked distribution-core` calcule la révision
+  Git et le schéma PostgreSQL depuis le dépôt, même si les deux variables
+  techniques sont absentes du shell. Les actions `identity`, `gpu-preflight`,
+  `prepare`, `activate` et `rollback` sont explicites et sans valeur implicite.
+- `prepare` ferme d’abord `ui` et `edge-gateway`, inventorie dans une seule
+  requête les jobs plateforme et les outboxes Source Processing et Knowledge
+  Access de l’ancien hash, attend zéro, puis démarre les seuls services
+  internes. L’activation publique reste une seconde commande et exige
+  exactement deux workers READY vivants du nouveau hash.
+- Le rollback ferme les admissions, borne atomiquement présence, job et slot
+  lors du passage à `DRAINING`, attend terminaison ou expiration fenced,
+  conserve la migration 022 et les résultats, reprend l’image de l’ancien
+  commit et la configuration de l’ancien hash, vérifie les identités puis
+  rouvre seulement la surface publique. Toute erreur referme explicitement les
+  deux services publics.
+- ADR-051 référence désormais réciproquement son remplacement partiel et
+  conditionnel par ADR-052 pour M-014. Les exigences `cuda:0`, erreur stable et
+  interdiction de fallback ne changent pas. L’index, l’empreinte du validateur
+  M14 et l’allowlist historique ont été réconciliés explicitement.
+- Le runbook décrit le signal `SIGTERM`, `DRAINING`, la deadline, la présence
+  durable, l’échec worker laissant le port fermé, les commandes publiques et
+  le rollback conservateur. T-004, le runbook et la matrice portent tous la
+  commande exacte `uv run --locked gate --scope m014_distribution_core --live`.
+- GREEN ciblé : Ruff ; `m013_config` 36 nœuds ; `m013_environments` 49 nœuds ;
+  `governance` 25 nœuds ; M14 offline 38 nœuds et live 40 nœuds. Les deux
+  preuves PostgreSQL live passent et l’unicité ne contient aucune anomalie.
+- Gate canonique finale : 467 nœuds exécutés exactement une fois, code 0,
+  aucune absence, surprise ou duplication, `PARTIAL GREEN: offline`.
+- Commit GREEN : `a9bffc487fb484533995a47aca4154397db7830a`.
+- ADR nouvelle : non requise. Le changement complète l’exploitation décidée
+  par ADR-052 et ne livre aucun fan-out ni assemblage T-005.
