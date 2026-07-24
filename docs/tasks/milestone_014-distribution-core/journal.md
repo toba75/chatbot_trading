@@ -622,3 +622,21 @@
 - Commit GREEN : `72065b10d`. ADR nouvelle ou modifiée : non requise ; cette
   correction rétablit le découpage déjà décidé par le plan et conserve le sens
   d’ADR-051 et ADR-052.
+
+## 2026-07-24 - Revue Copilot PR 18, itération 1
+
+- Copilot a relu les 84 fichiers modifiés sur le head `11bf8d4dc` et publié un
+  seul thread actionnable, non résolu et non obsolète, dans `gate.toml` : l’ID
+  `precondition.m014-distribution-core` ne suivait pas le scope canonique
+  `m014_distribution_core`.
+- RED utile : l’acceptation de périmètre vérifie désormais l’existence exacte de
+  `precondition.m014_distribution_core` et l’absence de l’ancien ID dans les
+  nœuds et dépendances. Elle échouait avant correction. Commit RED :
+  `bb413fd5d`.
+- Correction GREEN : la précondition et les quatorze dépendances M14 utilisent
+  toutes `precondition.m014_distribution_core`. Commit GREEN : `4c235f4e9`.
+- Validations : acceptation ciblée 1/1 GREEN ; scope
+  `m014_distribution_core --live` 38/38 GREEN ; aucune absence, surprise ou
+  duplication dans la matrice d’unicité.
+- ADR nouvelle ou modifiée : non requise ; il s’agit d’un alignement de
+  nomenclature de gate, sans changement de décision architecturale.
