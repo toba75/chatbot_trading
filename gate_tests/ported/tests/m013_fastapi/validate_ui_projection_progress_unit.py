@@ -5,8 +5,8 @@ import pytest
 from app.platform.ui_corpus import render_document_inspection
 
 
-def test_given_a_running_projection_when_the_public_inspection_is_rendered_then_the_ui_displays_percentage_and_progress_bar() -> None:
-    """Given-When-Then : l'UI rend uniquement la progression publique KA."""
+def test_given_public_projection_states_when_inspection_is_rendered_then_the_ui_displays_strict_progress() -> None:
+    """Given-When-Then : l'UI rend les progressions publiques KA strictes."""
 
     html = render_document_inspection(
         title="Projection",
@@ -34,11 +34,6 @@ def test_given_a_running_projection_when_the_public_inspection_is_rendered_then_
     assert "Avancement : 25 % (50 / 200)" in html
     assert '<progress aria-label="Avancement de la projection : 25 %" value="50" max="200">25 %</progress>' in html
     assert 'http-equiv="refresh" content="1"' in html
-
-
-def test_given_a_published_canonical_source_not_yet_consumed_when_projection_is_inspected_then_the_ui_displays_the_automatic_wait() -> None:
-    """Given-When-Then : le gap publication vers inbox reste public et strict."""
-
     response = type(
         "ProjectionResponse",
         (),
