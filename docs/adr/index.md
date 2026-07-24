@@ -91,4 +91,6 @@ Prochaine DDD-ADR: DDD-ADR-013
 - Ne pas supprimer une ADR acceptée.
 - Quand une ADR est remplacée, mettre à jour son statut et le champ `Remplacée par`.
 - Quand une ADR remplace une décision antérieure, renseigner le champ `Remplace`.
-- Exécuter `uv run --locked gate` avant chaque commit modifiant `docs/adr`.
+- Exécuter les validations ciblées des ADR et documents touchés avant chaque
+  commit. La gate globale de clôture appartient à l'orchestrateur du milestone ;
+  elle n'est jamais déléguée à un sous-agent ni rejouée par tâche.

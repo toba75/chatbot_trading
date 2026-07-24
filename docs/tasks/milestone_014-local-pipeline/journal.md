@@ -540,3 +540,37 @@ P-001 précondition GREEN
   synthétique et `CHECK` PostgreSQL. Aucune gate globale, aucun scope M13/M14
   complet n’est exécuté dans ce lot.
 - Commit GREEN : `fix(m014-pipeline): fiabiliser migrations historiques`.
+
+## 2026-07-24 - Gate globale unique et attente UI de projection
+
+- Baseline ciblée avant changement : le validateur de clôture M14 et le test UI
+  de progression de projection passent, soit 2/2 GREEN. Aucune gate globale et
+  aucun scope complet ne sont exécutés pour établir cette précondition.
+- Commit RED `72c234ca5` —
+  `test(workflow): verrouiller gate globale unique`. Les preuves ajoutées
+  terminent avec 2 échecs attendus et 1 succès : les skills recommandent encore
+  la gate globale aux sous-agents et le rendu UI refuse le tuple public
+  `NOT_REQUESTED, 0, None, None` pendant le délai entre publication canonique et
+  consommation par l'inbox KA.
+- Les skills de planification, d'exécution de tâche et d'implémentation de
+  milestone imposent désormais aux sous-agents uniquement les tests, lint et
+  scopes ciblés. La précondition globale et l'unique clôture par candidat final
+  appartiennent à l'orchestrateur, avec `timeout_ms=3600000`, attente du même
+  cell ID par `wait` après yield et aucune relance sans changement. Un RED réel
+  se diagnostique en ciblé avant une seule nouvelle preuve sur un nouveau
+  candidat final.
+- Le README et l'index ADR ne prescrivent plus de gate globale par commit. Le
+  runbook d'ingestion décrit le formulaire réel : l'utilisateur fournit
+  seulement le PDF et les métadonnées sont extraites après projection.
+- L'inspection de projection accepte exclusivement le tuple d'attente public
+  `NOT_REQUESTED, completed_units=0, total_units=None, error=None`, l'explique
+  sans barre synthétique et se rafraîchit jusqu'à `QUEUED`. Toute combinaison
+  partielle divergente reste refusée.
+- Validations GREEN ciblées : workflow et UI proches 6/6 en 0,42 s ;
+  spécification, documentation et clôture M14 3/3 en 0,12 s ; Ruff ciblé GREEN ;
+  `compileall` ciblé GREEN ; `git diff --check` GREEN. Aucune gate globale,
+  aucun scope M13 complet et aucun scope M14 complet n'ont été lancés.
+- ADR consultées : ADR-029 et ADR-038. ADR créée ou modifiée : aucune ; le lot
+  corrige l'application de la gouvernance existante et le rendu d'un contrat
+  public déjà défini, sans nouvelle décision structurante.
+- Commit GREEN : `fix(workflow): reserver gate globale a l orchestrateur`.

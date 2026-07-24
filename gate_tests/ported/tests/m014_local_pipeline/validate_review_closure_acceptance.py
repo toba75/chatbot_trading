@@ -80,13 +80,16 @@ def _assert_le_workflow_reserve_la_gate_globale_a_l_orchestrateur() -> None:
     review = implement_skill.split("## Revue Locale Jusqu'à Trois Itérations", 1)[1].split(
         "## Gate De Clôture Du Milestone", 1
     )[0]
+    copilot = implement_skill.split("## Commentaires Copilot Jusqu'à Trois Itérations", 1)[1].split(
+        "## Règles De Qualité", 1
+    )[0]
     closure = implement_skill.split("## Gate De Clôture Du Milestone", 1)[1].split(
         "## Pull Request GitHub", 1
     )[0]
-    for delegated_section in (delegation, integration, review):
+    for delegated_section in (delegation, integration, review, copilot):
         normalized_section = " ".join(delegated_section.split())
         assert "tests, lint et scopes ciblés" in normalized_section
-        assert "ne jamais lancer `uv run --locked gate`" in normalized_section
+        assert "ne jamais lancer la gate globale" in normalized_section
 
     assert implement_skill.count("`uv run --locked gate`") == 1
     normalized_closure = " ".join(closure.split())

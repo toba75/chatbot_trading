@@ -71,6 +71,8 @@ def test_given_a_published_canonical_source_not_yet_consumed_when_projection_is_
 
     invalid_partial_states = (
         {**not_requested, "completed_units": 1},
+        {**not_requested, "completed_units": False},
+        {**not_requested, "completed_units": 0.0},
         {**not_requested, "total_units": 1},
         {**not_requested, "failure_error_code": "PROJECTION_FAILURE"},
     )

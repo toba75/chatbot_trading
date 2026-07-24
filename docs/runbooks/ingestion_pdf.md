@@ -44,8 +44,9 @@ substitution n'est sélectionné silencieusement.
 
 1. Ouvrir le corpus PDF et choisir un fichier `application/pdf` de 50 Mio au
    maximum.
-2. Saisir le titre, les auteurs, l'année et l'édition. Le nom du fichier n'est
-   jamais utilisé comme métadonnée.
+2. Fournir uniquement le PDF original. Le titre, les auteurs, l'année et
+   l'édition sont extraits automatiquement après la projection ; le nom du
+   fichier n'est jamais utilisé comme métadonnée.
 3. Envoyer le formulaire. La redirection `303` conserve le `document_id` et le
    marqueur de doublon éventuel.
 4. Demander le diagnostic. L'UI lit uniquement la progression publique
