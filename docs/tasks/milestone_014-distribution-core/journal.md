@@ -580,3 +580,45 @@
   consignées par le commit GREEN de cette tranche.
 - ADR nouvelle : non requise. La correction applique ADR-052 sans changer sa
   décision structurante et exclut explicitement T-005 et les tâches suivantes.
+
+## 2026-07-24 - Correction finale de périmètre M14-core
+
+- Précondition GREEN au commit `5835943c5` : arbre propre, scope M14-core
+  offline à 38 nœuds et live à 40 nœuds. Les deux preuves PostgreSQL réelles
+  étaient GREEN avant l’écriture de l’acceptation corrective.
+- Scénario BDD : étant donné que `M14-distribution-core` couvre uniquement
+  T-001 à T-004, quand ses surfaces publiques, sa configuration Compose et son
+  runbook sont inspectés, alors aucune opération T-009 n’est publiée, le GPU est
+  obligatoire et les règles de migration, drainage et rollback restent un
+  protocole documenté sans commande opératoire prématurée.
+- RED utile : `validate_core_scope_acceptance.py` échouait sur trois causes
+  distinctes : présence de `app/platform/distribution_operations.py`, absence
+  de la limite explicite T-009 dans le runbook et
+  `deploy/local-compose/application.compose.yaml` configuré avec
+  `gpu_required: false`. Commit RED : `850d1105b`.
+- Correction GREEN : le module et l’entrée `distribution-core` ont été retirés,
+  ainsi que les trois preuves et nœuds de gate consacrés au rollout. Les seuls
+  wrappers Compose ajoutés pour ce CLI ont été supprimés ; les helpers internes
+  utilisés par M13 restent présents. La configuration Compose locale exige
+  désormais `gpu_required: true`.
+- Le runbook est borné au socle : prérequis, CUDA stricte, migration 022
+  ascendante, drainage fenced et rollback conservant le ledger. Une révision
+  pré-M14 qui exige un ledger antérieur à 022 n’est pas une cible de rollback.
+  Inspection, drainage piloté et redémarrage ciblé restent déportés vers T-009
+  de `M14-local-qualification`, après T-005 à T-008.
+- La matrice relie T-003 aux contrats, à la configuration et à l’acceptation de
+  périmètre ; elle ne lui attribue plus le CLI ni les opérations T-009. T-004
+  conserve les preuves quota, runtime et PostgreSQL, sans fan-out T-005.
+- GREEN ciblé : acceptation de périmètre 1/1 ; Ruff ciblé ; `m013_config` 36
+  nœuds ; `m013_environments` 49 nœuds ; `m013_fastapi` 70 nœuds ; `m002` 34
+  nœuds ; `m004` 45 nœuds ; `governance` 25 nœuds ; M14-core offline 36 nœuds
+  et live 38 nœuds. Le manifeste contient 484 nœuds, sans chemin manquant ni
+  identifiant dupliqué.
+- Gate canonique finale : `uv run --locked gate --offline --workers 4`, 465/465
+  nœuds GREEN. Pour M-004 et cette gate globale, le fichier local ignoré
+  `config/application.yaml` a été temporairement aligné à
+  `granite_concurrency: 1`, puis restauré exactement à sa valeur locale initiale
+  `2` ; il n’est ni suivi ni committé.
+- Commit GREEN : `72065b10d`. ADR nouvelle ou modifiée : non requise ; cette
+  correction rétablit le découpage déjà décidé par le plan et conserve le sens
+  d’ADR-051 et ADR-052.
