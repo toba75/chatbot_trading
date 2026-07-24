@@ -166,6 +166,56 @@ def _migrations_finales_restent_locales_et_revoquent_les_claims() -> None:
     ):
         assert marker in migration_029
 
+    migration_024 = (
+        root / "deploy/postgres/migrations/024_canonical_assembly_publication.sql"
+    ).read_text(encoding="utf-8")
+    migration_025 = (
+        root / "deploy/postgres/migrations/025_local_canonical_projection.sql"
+    ).read_text(encoding="utf-8")
+    for marker in (
+        "canonical_assembly_id IS NOT NULL",
+        "page_count IS NOT NULL",
+        "quality_policy_version IS NOT NULL",
+        "canonical_result_fingerprint IS NOT NULL",
+    ):
+        assert marker in migration_024
+    for marker in (
+        "environment IS NOT NULL",
+        "deployment_id IS NOT NULL",
+        "configuration_hash IS NOT NULL",
+        "qdrant_collection_name IS NOT NULL",
+    ):
+        assert marker in migration_025
+
+    # Une migration de contexte n'observe jamais les tables d'un autre contexte
+    # pour fabriquer une preuve historique ou modifier son agrégat.
+    assert (
+        "UPDATE source_processing.document_conversion_requests AS request\n"
+        "   SET producer_environment = job.environment"
+    ) not in migration_029
+    assert (
+        "UPDATE platform.technical_jobs AS job\n"
+        "   SET payload = message.payload"
+    ) not in migration_029
+    assert "FROM knowledge_access.job_outbox AS message" not in migration_029
+
+    # Une donnée opérationnelle absente exige une qualification opérateur ; ni
+    # le nom Qdrant ni la politique qualité ne sont des conventions implicites.
+    assert "'ostrading-' || message.environment" not in migration_029
+    assert "canonical-quality-m004-v1" not in migration_029
+    for marker in (
+        "historical_projection_reconciliation",
+        "historical_canonical_reconciliation",
+        "reconciliation_required",
+        "qualify_historical_projection",
+        "qualify_historical_canonical_publication",
+        "consumer_configuration_hash",
+    ):
+        assert marker in migration_029
+
+    # Révoquer une lease ne crée pas artificiellement une tentative worker.
+    assert "claim_generation = claim_generation + 1" not in migration_029
+
 
 def test_reprise_et_compatibilite_finales() -> None:
     _artefact_remplace_de_meme_taille_est_refuse_a_la_consommation()

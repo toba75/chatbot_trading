@@ -5514,6 +5514,17 @@ depends_on = ["precondition.m014_local_pipeline"]
 live = false
 
 [[nodes]]
+id = "test.m014-local-pipeline.validate-historical-upgrade-postgresql-live"
+path = "gate_tests/ported/tests/m014_local_pipeline/validate_historical_upgrade_postgresql_live.py"
+kind = "test"
+scope = "m014_local_pipeline"
+entity = "pipeline"
+intent = "validation"
+dependencies = ["docker", "postgres"]
+timeout_seconds = 180
+live = true
+
+[[nodes]]
 id = "test.m014-local-pipeline.validate-review-closure-acceptance"
 path = "gate_tests/ported/tests/m014_local_pipeline/validate_review_closure_acceptance.py"
 kind = "test"
