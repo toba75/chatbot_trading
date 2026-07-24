@@ -344,17 +344,18 @@ class PostgresCanonicalAssemblyRepository:
                 cursor.execute(
                     """
                     INSERT INTO source_processing.canonical_publication_outbox (
-                        event_id, canonical_version_id, environment,
+                        event_id, canonical_version_id, canonical_artifact_ref, environment,
                         deployment_id, configuration_hash, event_payload,
                         event_fingerprint, status, relay_generation
                     )
-                    VALUES (%s, %s, %s, %s, %s, %s::jsonb, %s, 'pending', 0)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, %s, 'pending', 0)
                     ON CONFLICT (event_id) DO NOTHING
                     RETURNING event_id
                     """,
                     (
                         publication.event.event_id,
                         canonical.canonical_version_id,
+                        publication.canonical_artifact_ref,
                         contract.environment_identity.environment,
                         contract.environment_identity.deployment_id,
                         contract.environment_identity.configuration_hash,

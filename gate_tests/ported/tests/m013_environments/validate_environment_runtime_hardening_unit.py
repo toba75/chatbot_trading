@@ -184,7 +184,19 @@ def test_environment_runtime_hardening_unit(
             request=request,
             timeout=timeout,
             calls=qdrant_calls,
-            payload={"result": {"status": "green"}, "status": "ok"},
+            payload={
+                "result": {
+                    "config": {
+                        "params": {
+                            "vectors": {
+                                "dense": {"size": 8, "distance": "Cosine"}
+                            },
+                            "sparse_vectors": {"sparse": {}},
+                        }
+                    }
+                },
+                "status": "ok",
+            },
         ),
     )
     QdrantHttpClient(

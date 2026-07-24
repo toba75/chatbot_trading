@@ -162,7 +162,7 @@ def test_fan_out_postgresql_rollback_rejeu_relais_et_refus_divergent() -> None:
             )
             runner.run()
             runner.run()
-            assert runner.required_schema_version == 26
+            assert runner.required_schema_version == 27
             assert runner.is_required_schema_ready()
 
             source = _source()

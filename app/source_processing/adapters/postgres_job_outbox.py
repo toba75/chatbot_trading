@@ -5,6 +5,10 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 from app.contracts.technical_jobs import JobEnvironmentIdentity, JobRequest
+from app.knowledge_access.application.project_document_contract import (
+    PROJECT_DOCUMENT_JOB_NAME,
+    ProjectDocumentContract,
+)
 from app.platform.job_runtime.relay import ClaimedRelayMessage, RelayedJobMessage
 from app.platform.postgres import PostgresConnectionFactory
 from app.platform.worker_environment import WORKER_ENVIRONMENT_MISMATCH
@@ -104,6 +108,13 @@ class PostgresJobOutbox:
         execution_requirements = None
         if self._table_name == "source_processing.job_outbox" and row[1] == CONVERT_PAGE_JOB_NAME:
             execution_requirements = ConvertPageContract.from_mapping(
+                row[7]
+            ).execution_requirements()
+        elif (
+            self._table_name == "knowledge_access.job_outbox"
+            and row[1] == PROJECT_DOCUMENT_JOB_NAME
+        ):
+            execution_requirements = ProjectDocumentContract.from_mapping(
                 row[7]
             ).execution_requirements()
         return ClaimedRelayMessage(

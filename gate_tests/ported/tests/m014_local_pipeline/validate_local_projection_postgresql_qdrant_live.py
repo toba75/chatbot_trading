@@ -7,6 +7,7 @@ import json
 import subprocess
 import tempfile
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from urllib.request import urlopen
 from uuid import uuid4
@@ -20,8 +21,19 @@ from app.contracts.technical_jobs import JobEnvironmentIdentity
 from app.knowledge_access.adapters.postgres_canonical_publication_relay import (
     PostgresCanonicalPublicationRelay,
 )
+from app.knowledge_access.adapters.postgres_projection_read import (
+    PostgresProjectionReadRepository,
+)
+from app.knowledge_access.adapters.live_documentary_retrieval import (
+    CanonicalProjectionChunkReader,
+    DocumentaryProjectionRetriever,
+    PostgresSearchableProjectionReader,
+    QdrantSparseChunkSelector,
+)
 from app.knowledge_access.adapters.projection_runtime import (
     LOCAL_PROJECTION_PROFILE,
+    QdrantHttpClient,
+    ProjectionRuntimeError,
     ProjectionRuntimeService,
 )
 from app.knowledge_access.application.project_published_canonical import (
@@ -301,12 +313,84 @@ def test_projection_postgresql_qdrant_complete_rejouee_et_isolee() -> None:
                 environment_identity=IDENTITY,
                 projection_profile=LOCAL_PROJECTION_PROFILE,
                 configured_collection_name=COLLECTION,
+                observation_sink=lambda _observation: None,
             )
-            assert publication_relay.relay_pending(
-                limit=1,
-                owner_id="relay-m014-projection-live",
-                lease_seconds=30,
-            ) == 1
+            with factory.connect() as connection, connection.transaction(), connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    CREATE FUNCTION knowledge_access.fail_projection_job_outbox_once()
+                    RETURNS trigger LANGUAGE plpgsql AS $$
+                    BEGIN
+                        RAISE EXCEPTION 'M014_INJECTED_KA_TRANSACTION_FAILURE';
+                    END;
+                    $$
+                    """,
+                    (),
+                )
+                cursor.execute(
+                    """
+                    CREATE TRIGGER fail_projection_job_outbox_once
+                    BEFORE INSERT ON knowledge_access.job_outbox
+                    FOR EACH ROW EXECUTE FUNCTION
+                        knowledge_access.fail_projection_job_outbox_once()
+                    """,
+                    (),
+                )
+            with pytest.raises(psycopg.errors.RaiseException):
+                publication_relay.relay_pending(
+                    limit=1,
+                    owner_id="relay-m014-projection-live-crash",
+                    lease_seconds=30,
+                )
+            with factory.connect() as connection, connection.cursor() as cursor:
+                for table in (
+                    "knowledge_access.canonical_publication_inbox",
+                    "knowledge_access.projection_event_receipts",
+                    "knowledge_access.knowledge_projections",
+                    "knowledge_access.job_outbox",
+                ):
+                    cursor.execute(f"SELECT count(*) FROM {table}", ())
+                    assert cursor.fetchone() == (0,)
+                cursor.execute(
+                    """
+                    SELECT status
+                      FROM source_processing.canonical_publication_outbox
+                     WHERE event_id = %s
+                    """,
+                    (event.event_id,),
+                )
+                assert cursor.fetchone() == ("relaying",)
+            with factory.connect() as connection, connection.transaction(), connection.cursor() as cursor:
+                cursor.execute(
+                    "DROP TRIGGER fail_projection_job_outbox_once ON knowledge_access.job_outbox",
+                    (),
+                )
+                cursor.execute(
+                    "DROP FUNCTION knowledge_access.fail_projection_job_outbox_once()",
+                    (),
+                )
+                cursor.execute(
+                    """
+                    UPDATE source_processing.canonical_publication_outbox
+                       SET relay_lease_until = CURRENT_TIMESTAMP - INTERVAL '1 second'
+                     WHERE event_id = %s
+                    """,
+                    (event.event_id,),
+                )
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                relay_results = tuple(
+                    future.result()
+                    for future in (
+                        executor.submit(
+                            publication_relay.relay_pending,
+                            limit=1,
+                            owner_id=f"relay-m014-projection-live-{ordinal}",
+                            lease_seconds=30,
+                        )
+                        for ordinal in (1, 2)
+                    )
+                )
+            assert sorted(relay_results) == [0, 1]
             with factory.connect() as connection, connection.transaction(), connection.cursor() as cursor:
                 cursor.execute(
                     """
@@ -394,6 +478,11 @@ def test_projection_postgresql_qdrant_complete_rejouee_et_isolee() -> None:
                 job_names=("PROJECT_DOCUMENT",),
             )
             assert claimed is not None
+            assert claimed.job.request.execution_requirements is not None
+            assert (
+                claimed.job.request.execution_requirements.contract_name
+                == "project-canonical-document"
+            )
             runtime = ProjectionRuntimeService(
                 connection_factory=factory,
                 canonical_sources_root=canonical_root,
@@ -407,9 +496,77 @@ def test_projection_postgresql_qdrant_complete_rejouee_et_isolee() -> None:
                 max_parallel_workers=2,
                 inference_gateway=_BibliographicGateway(),
             )
+            with factory.connect() as connection, connection.transaction(), connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE knowledge_access.knowledge_projections
+                       SET status = 'BUILDING', execution_phase = 'RUNNING',
+                           aggregate_version = aggregate_version + 1
+                     WHERE projection_id = %s
+                    """,
+                    (claimed.job.request.payload["projection_id"],),
+                )
             first = runtime.execute_projection(request=claimed.job.request)
+            for resumable_status in ("BUILT", "INDEXING"):
+                with factory.connect() as connection, connection.transaction(), connection.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        UPDATE knowledge_access.knowledge_projections
+                           SET status = %s, execution_phase = 'RUNNING',
+                               aggregate_version = aggregate_version + 1
+                         WHERE projection_id = %s
+                        """,
+                        (
+                            resumable_status,
+                            claimed.job.request.payload["projection_id"],
+                        ),
+                    )
+                resumed = runtime.execute_projection(request=claimed.job.request)
+                assert resumed["index_generation"] == first["index_generation"]
+            qdrant_client = QdrantHttpClient(
+                base_url=f"http://127.0.0.1:{qdrant_port}",
+                timeout_seconds=10,
+                dense_dimensions=256,
+                api_key="q" * 32,
+            )
+            scroll = qdrant_client._request(
+                "POST",
+                f"/collections/{COLLECTION}/points/scroll",
+                {
+                    "filter": {
+                        "must": [
+                            {
+                                "key": "index_generation",
+                                "match": {"value": first["index_generation"]},
+                            }
+                        ]
+                    },
+                    "limit": 1,
+                    "with_payload": False,
+                    "with_vector": False,
+                },
+            )
+            assert scroll is not None
+            deleted_point_id = scroll["result"]["points"][0]["id"]
+            qdrant_client.delete(
+                collection_name=COLLECTION,
+                points_selector={"points": [deleted_point_id]},
+            )
+            with factory.connect() as connection, connection.transaction(), connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE knowledge_access.knowledge_projections
+                       SET status = 'INDEXING', execution_phase = 'RUNNING',
+                           aggregate_version = aggregate_version + 1
+                     WHERE projection_id = %s
+                    """,
+                    (claimed.job.request.payload["projection_id"],),
+                )
+            repaired = runtime.execute_projection(request=claimed.job.request)
+            assert repaired["index_generation"] == first["index_generation"]
+            assert repaired["published_point_count"] == first["published_point_count"]
             replay = runtime.execute_projection(request=claimed.job.request)
-            assert replay == first
+            assert replay == repaired
             assert first["published_point_count"] == first["chunk_count"]
             with factory.connect() as connection, connection.cursor() as cursor:
                 cursor.execute(
@@ -442,6 +599,65 @@ def test_projection_postgresql_qdrant_complete_rejouee_et_isolee() -> None:
                     for item in row[0]
                 }
                 assert persisted_locators == {locator["item_id"]}
+            retriever = DocumentaryProjectionRetriever(
+                projection_reader=PostgresSearchableProjectionReader(
+                    projection_read_repository=PostgresProjectionReadRepository(
+                        connection_factory=factory
+                    )
+                ),
+                canonical_reader=CanonicalProjectionChunkReader(
+                    projection_runtime=runtime
+                ),
+                chunk_selector=QdrantSparseChunkSelector(
+                    qdrant_url=f"http://127.0.0.1:{qdrant_port}",
+                    collection_name=COLLECTION,
+                    timeout_seconds=10,
+                    api_key="q" * 32,
+                ),
+                result_limit=1,
+            )
+            evidences = retriever.retrieve(
+                question="pipeline documentaire local",
+                selected_document_ids=("DOC-M014-PROJECTION-LIVE",),
+            )
+            assert len(evidences) == 1
+            assert {
+                (source["item_id"], source["content_hash"])
+                for evidence in evidences
+                for source in evidence.source_locators
+            } == {(locator["item_id"], locator["content_hash"])}
+
+            artifact_path.write_bytes(b"artefact-corrompu")
+            with factory.connect() as connection, connection.transaction(), connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE knowledge_access.knowledge_projections
+                       SET status = 'BUILT', execution_phase = 'RUNNING',
+                           failure_error_code = NULL,
+                           aggregate_version = aggregate_version + 1
+                     WHERE projection_id = %s
+                    """,
+                    (claimed.job.request.payload["projection_id"],),
+                )
+            with pytest.raises(
+                ProjectionRuntimeError,
+                match="CANONICAL_ARTIFACT_HASH_MISMATCH",
+            ):
+                runtime.execute_projection(request=claimed.job.request)
+            with factory.connect() as connection, connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT status, execution_phase, failure_error_code
+                      FROM knowledge_access.knowledge_projections
+                     WHERE projection_id = %s
+                    """,
+                    (claimed.job.request.payload["projection_id"],),
+                )
+                assert cursor.fetchone() == (
+                    "FAILED",
+                    "FAILED",
+                    "CANONICAL_ARTIFACT_HASH_MISMATCH",
+                )
     finally:
         assert _docker("rm", "--force", postgres).returncode == 0
         assert _docker("rm", "--force", qdrant).returncode == 0

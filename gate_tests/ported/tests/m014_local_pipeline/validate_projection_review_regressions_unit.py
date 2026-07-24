@@ -28,6 +28,7 @@ from app.knowledge_access.adapters.projection_runtime import (
 )
 from app.knowledge_access.application.project_document_contract import (
     ProjectDocumentContract,
+    ProjectDocumentContractError,
 )
 
 
@@ -81,7 +82,7 @@ def _job_request(*, requirements: JobExecutionRequirements | None) -> JobRequest
     )
 
 
-def test_given_contrat_project_document_when_relay_et_worker_then_meme_dto_strict() -> None:
+def _contrat_project_document_reste_unique_et_strict() -> None:
     contract = ProjectDocumentContract.from_mapping(_contract_payload())
     assert contract.to_mapping() == _contract_payload()
     requirements = contract.execution_requirements()
@@ -96,11 +97,14 @@ def test_given_contrat_project_document_when_relay_et_worker_then_meme_dto_stric
     assert ProjectDocumentContract.from_job_request(
         _job_request(requirements=requirements)
     ) == contract
-    with pytest.raises(ProjectionRuntimeError, match="PROJECTION_EXECUTION_REQUIREMENTS_REQUIRED"):
+    with pytest.raises(
+        ProjectDocumentContractError,
+        match="PROJECTION_EXECUTION_REQUIREMENTS_REQUIRED",
+    ):
         ProjectDocumentContract.from_job_request(_job_request(requirements=None))
 
 
-def test_given_etat_intermediaire_when_job_repris_then_pipeline_converge() -> None:
+def _pipeline_reprend_chaque_etat_intermediaire() -> None:
     assert projection_resume_stages("REQUESTED") == ("BUILD", "INDEX", "FINALIZE")
     assert projection_resume_stages("BUILDING") == ("BUILD", "INDEX", "FINALIZE")
     assert projection_resume_stages("BUILT") == ("INDEX", "FINALIZE")
@@ -136,7 +140,7 @@ class _ExistingCollectionClient(QdrantHttpClient):
         return self.response
 
 
-def test_given_collection_qdrant_existante_when_schema_diverge_then_aucun_upsert() -> None:
+def _collection_qdrant_divergente_est_refusee() -> None:
     client = _ExistingCollectionClient(
         {
             "result": {
@@ -153,7 +157,7 @@ def test_given_collection_qdrant_existante_when_schema_diverge_then_aucun_upsert
         client.ensure_collection(collection_name="ostrading-test-knowledge-access")
 
 
-def test_given_item_canonique_invalide_when_projection_then_pas_index_partiel() -> None:
+def _item_canonique_invalide_interdit_index_partiel() -> None:
     artifact_hash = hashlib.sha256(b"artefact").hexdigest()
     canonical_ref = type(
         "CanonicalRefStub",
@@ -178,7 +182,7 @@ def test_given_item_canonique_invalide_when_projection_then_pas_index_partiel() 
         _canonical_items_payload(artifact=artifact, canonical_ref=canonical_ref)
 
 
-def test_given_contrats_persistants_when_signatures_then_aucune_valeur_metier_implicite() -> None:
+def _contrats_persistants_nont_aucune_valeur_metier_implicite() -> None:
     index_parameter = inspect.signature(
         PostgresKnowledgeProjectionRepository.save_projection_outputs
     ).parameters["index_generation"]
@@ -186,7 +190,7 @@ def test_given_contrats_persistants_when_signatures_then_aucune_valeur_metier_im
     assert "abandoned" not in {status.value for status in GranitePageTerminalStatus}
 
 
-def test_given_frontiere_ka_when_code_revu_then_aucune_table_privee_sp() -> None:
+def _frontiere_ka_ne_lit_aucune_table_privee_sp() -> None:
     root = next(
         parent
         for parent in Path(__file__).resolve().parents
@@ -205,3 +209,12 @@ def test_given_frontiere_ka_when_code_revu_then_aucune_table_privee_sp() -> None
     assert "ALTER COLUMN delivery_count DROP DEFAULT" in migration_text
     assert "VALIDATE CONSTRAINT knowledge_projections_generation_coherence" in migration_text
     assert "knowledge_projections_latest_publication_idx" in migration_text
+
+
+def test_validate_projection_review_regressions_unit() -> None:
+    _contrat_project_document_reste_unique_et_strict()
+    _pipeline_reprend_chaque_etat_intermediaire()
+    _collection_qdrant_divergente_est_refusee()
+    _item_canonique_invalide_interdit_index_partiel()
+    _contrats_persistants_nont_aucune_valeur_metier_implicite()
+    _frontiere_ka_ne_lit_aucune_table_privee_sp()

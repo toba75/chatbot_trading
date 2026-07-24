@@ -15,6 +15,7 @@ from psycopg import OperationalError
 from app.knowledge_access.adapters.projection_runtime import (
     LOCAL_PROJECTION_PROFILE,
     PROJECT_DOCUMENT_JOB_NAME,
+    ProjectionRetryableError,
     ProjectionRuntimeError,
     ProjectionRuntimeService,
 )
@@ -113,6 +114,7 @@ def _run_worker(
         configured_collection_name=(
             application_configuration.services.qdrant.collections.knowledge_access
         ),
+        observation_sink=_emit_publication_relay_observation,
     )
     job_runtime = build_postgres_job_runtime(
         connection_factory=connection_factory,
@@ -190,6 +192,9 @@ def _run_worker(
         try:
             try:
                 result = runtime.execute_projection(request=claimed.job.request)
+            except ProjectionRetryableError as exc:
+                error_code = exc.error_code
+                status = "retrying"
             except Exception as exc:
                 error_code = (
                     exc.error_code
@@ -254,6 +259,14 @@ def _log_runtime_error(
         ),
         flush=True,
     )
+
+
+def _emit_publication_relay_observation(
+    observation: dict[str, object] | Any,
+) -> None:
+    if not isinstance(observation, dict):
+        observation = dict(observation)
+    print(json.dumps(observation, ensure_ascii=False, sort_keys=True), flush=True)
 
 
 def _log(

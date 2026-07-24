@@ -12,10 +12,12 @@ from app.contracts.event_envelope import EventEnvelope
 from app.contracts.source_references import CanonicalSourceRef
 from app.contracts.technical_jobs import (
     JobEnvironmentIdentity,
-    JobExecutionRequirements,
-    JobIdempotenceKey,
-    JobPriority,
     JobRequest,
+)
+from app.knowledge_access.application.project_document_contract import (
+    PROJECT_DOCUMENT_CONTRACT_VERSION,
+    PROJECT_DOCUMENT_JOB_NAME,
+    ProjectDocumentContract,
 )
 from app.knowledge_access.domain.knowledge_projection import (
     KnowledgeProjection,
@@ -23,8 +25,6 @@ from app.knowledge_access.domain.knowledge_projection import (
 )
 
 
-PROJECT_DOCUMENT_JOB_NAME = "PROJECT_DOCUMENT"
-PROJECT_DOCUMENT_CONTRACT_VERSION = "1.0"
 _CANONICAL_ARTIFACT_PREFIX = "artifact:source_processing.canonical_sources/"
 
 
@@ -113,41 +113,18 @@ class PublishedCanonicalProjectionRequest:
             canonical_ref=message.canonical_ref,
             projection_profile=projection_profile,
         )
-        payload = {
-            "contract_version": PROJECT_DOCUMENT_CONTRACT_VERSION,
-            "projection_id": projection.projection_id,
-            "document_id": projection.document_id,
-            "canonical_version_id": projection.canonical_version_id,
-            "canonical_artifact_ref": message.canonical_artifact_ref,
-            "canonical_artifact_sha256": message.canonical_ref.canonical_artifact_sha256,
-            "build_fingerprint": projection.build_fingerprint.value,
-            "projection_profile": projection_profile.to_fingerprint_payload(),
-            "qdrant_collection_name": collection_name,
-            "environment_identity": configured_identity.to_mapping(),
-            "causation_event_id": message.event.event_id,
-        }
-        request = JobRequest(
-            environment=configured_identity.environment,
-            deployment_id=configured_identity.deployment_id,
-            job_name=PROJECT_DOCUMENT_JOB_NAME,
-            priority=JobPriority.P1,
-            idempotence_key=JobIdempotenceKey(
-                job_name=PROJECT_DOCUMENT_JOB_NAME,
-                input_hash=projection.build_fingerprint.value,
-                configuration_hash=configured_identity.configuration_hash,
-                code_version=parsed_code_version,
-                model_version=projection_profile.embedding_model,
-            ),
-            execution_requirements=JobExecutionRequirements(
-                contract_name="project-canonical-document",
-                contract_version=PROJECT_DOCUMENT_CONTRACT_VERSION,
-                capacity_capability="knowledge-projection",
-                capacity_slots=0,
-                capacity_device=None,
-                storage_environment=configured_identity.environment,
-            ),
-            payload=payload,
-        )
+        request = ProjectDocumentContract(
+            projection_id=projection.projection_id,
+            document_id=projection.document_id,
+            canonical_version_id=projection.canonical_version_id,
+            canonical_artifact_ref=message.canonical_artifact_ref,
+            canonical_artifact_sha256=message.canonical_ref.canonical_artifact_sha256,
+            build_fingerprint=projection.build_fingerprint.value,
+            projection_profile=projection_profile,
+            qdrant_collection_name=collection_name,
+            environment_identity=configured_identity,
+            causation_event_id=message.event.event_id,
+        ).to_job_request(code_version=parsed_code_version)
         return cls(message=message, projection=projection, job_request=request)
 
     def __post_init__(self) -> None:

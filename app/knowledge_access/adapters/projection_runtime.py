@@ -45,7 +45,6 @@ from app.knowledge_access.application.extract_projected_bibliographic_metadata i
 )
 from app.knowledge_access.application.request_projection import (
     CanonicalSourceForProjection,
-    ProjectionAlreadyRequestedError,
     ProjectionEligibilityPolicy,
     ProjectionProfileInvalidError,
     RequestKnowledgeProjectionAcceptance,
@@ -60,6 +59,11 @@ from app.knowledge_access.domain.knowledge_projection import (
     KnowledgeProjection,
     ProjectionProfile,
     ProjectionStatus,
+)
+from app.knowledge_access.application.project_document_contract import (
+    PROJECT_DOCUMENT_JOB_NAME,
+    ProjectDocumentContract,
+    ProjectDocumentContractError,
 )
 from app.knowledge_access.domain.projection_encoding import (
     DenseEncodingProfile,
@@ -78,7 +82,6 @@ from app.knowledge_access.domain.projection_index import (
 from app.platform.postgres import PostgresConnectionFactory
 
 
-PROJECT_DOCUMENT_JOB_NAME = "PROJECT_DOCUMENT"
 LOCAL_PROJECTION_PROFILE = ProjectionProfile(
     projection_profile_id="local-hash-projection-v1",
     chunking_profile="hierarchical-pagewise-v1",
@@ -99,6 +102,10 @@ class ProjectionRuntimeError(RuntimeError):
     def __init__(self, error_code: str) -> None:
         self.error_code = _error_code(error_code)
         super().__init__(self.error_code)
+
+
+class ProjectionRetryableError(ProjectionRuntimeError):
+    """Indisponibilité transitoire : le job reste réclamable après sa lease."""
 
 
 class QdrantHttpClient:
@@ -128,6 +135,10 @@ class QdrantHttpClient:
     def ensure_collection(self, *, collection_name: str) -> None:
         response = self._request("GET", f"/collections/{collection_name}", None, allow_not_found=True)
         if response is not None:
+            _validate_qdrant_collection(
+                response,
+                expected_dense_dimensions=self._dense_dimensions,
+            )
             return
         self._request(
             "PUT",
@@ -194,9 +205,11 @@ class QdrantHttpClient:
         except HTTPError as exc:
             if allow_not_found and exc.code == 404:
                 return None
+            if exc.code == 429 or exc.code >= 500:
+                raise ProjectionRetryableError("QDRANT_UNAVAILABLE") from exc
             raise ProjectionRuntimeError("QDRANT_HTTP_ERROR") from exc
         except (URLError, OSError, TimeoutError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-            raise ProjectionRuntimeError("QDRANT_UNAVAILABLE") from exc
+            raise ProjectionRetryableError("QDRANT_UNAVAILABLE") from exc
         if not isinstance(payload, Mapping):
             raise ProjectionRuntimeError("QDRANT_RESPONSE_INVALID")
         return payload
@@ -290,40 +303,70 @@ class ProjectionRuntimeService:
         )
         trace_id = f"TRACE-KA-{projection.projection_id}"
         publication = self._publication_for_version_id(projection.canonical_version_id)
-        payload = {
-            "contract_version": "1.0",
-            "projection_id": projection.projection_id,
-            "document_id": projection.document_id,
-            "canonical_version_id": projection.canonical_version_id,
-            "canonical_artifact_ref": publication[1],
-            "canonical_artifact_sha256": canonical_ref.canonical_artifact_sha256,
-            "build_fingerprint": projection.build_fingerprint.value,
-            "projection_profile": projection.projection_profile.to_fingerprint_payload(),
-            "qdrant_collection_name": self.qdrant_collection_name,
-            "environment_identity": JobEnvironmentIdentity(
-                environment=self.environment,
-                deployment_id=self.deployment_id,
-                configuration_hash=self.configuration_hash,
-            ).to_mapping(),
-            "causation_event_id": publication[0],
-        }
         try:
             code_version = version("chatbot-trading")
         except Exception as exc:
             raise ProjectionRuntimeError("CODE_VERSION_UNAVAILABLE") from exc
+        request = ProjectDocumentContract(
+            projection_id=projection.projection_id,
+            document_id=projection.document_id,
+            canonical_version_id=projection.canonical_version_id,
+            canonical_artifact_ref=publication[1],
+            canonical_artifact_sha256=canonical_ref.canonical_artifact_sha256,
+            build_fingerprint=projection.build_fingerprint.value,
+            projection_profile=projection.projection_profile,
+            qdrant_collection_name=self.qdrant_collection_name,
+            environment_identity=JobEnvironmentIdentity(
+                environment=self.environment,
+                deployment_id=self.deployment_id,
+                configuration_hash=self.configuration_hash,
+            ),
+            causation_event_id=publication[0],
+        ).to_job_request(code_version=code_version)
         with self.connection_factory.connect() as connection:
             with connection.transaction(), connection.cursor() as cursor:
                 cursor.execute(
-                    "SELECT projection_id FROM knowledge_access.knowledge_projections "
-                    "WHERE build_fingerprint = %s FOR UPDATE",
-                    (projection.build_fingerprint.value,),
+                    """
+                    SELECT projection_id, status, aggregate_version
+                      FROM knowledge_access.knowledge_projections
+                     WHERE build_fingerprint = %s
+                       AND environment = %s
+                       AND deployment_id = %s
+                       AND configuration_hash = %s
+                     FOR UPDATE
+                    """,
+                    (
+                        projection.build_fingerprint.value,
+                        self.environment,
+                        self.deployment_id,
+                        self.configuration_hash,
+                    ),
                 )
                 existing = cursor.fetchone()
                 if existing is not None:
-                    raise ProjectionAlreadyRequestedError(
-                        projection_id=existing[0],
+                    if existing[0] != projection.projection_id:
+                        raise ProjectionRuntimeError("PROJECTION_BUILD_REPLAY_DIVERGENCE")
+                    current = KnowledgeProjection(
+                        projection_id=projection.projection_id,
+                        document_id=projection.document_id,
+                        canonical_version_id=projection.canonical_version_id,
+                        projection_profile=projection.projection_profile,
                         build_fingerprint=projection.build_fingerprint,
+                        status=ProjectionStatus.from_value(existing[1]),
+                        aggregate_version=existing[2],
                     )
+                    return RequestKnowledgeProjectionAcceptance.from_projection(current)
+                cursor.execute(
+                    """
+                    SELECT projection_id
+                      FROM knowledge_access.knowledge_projections
+                     WHERE build_fingerprint = %s
+                     FOR UPDATE
+                    """,
+                    (projection.build_fingerprint.value,),
+                )
+                if cursor.fetchone() is not None:
+                    raise ProjectionRuntimeError("PROJECTION_ENVIRONMENT_MISMATCH")
                 profile = projection.projection_profile
                 cursor.execute(
                     """
@@ -351,9 +394,9 @@ class ProjectionRuntimeService:
                         profile.sparse_profile,
                         profile.index_schema,
                         projection.build_fingerprint.value,
-                        self.environment,
-                        self.deployment_id,
-                        self.configuration_hash,
+                        request.environment,
+                        request.deployment_id,
+                        request.idempotence_key.configuration_hash,
                         self.qdrant_collection_name,
                     ),
                 )
@@ -366,14 +409,14 @@ class ProjectionRuntimeService:
                     ) VALUES (%s, %s, %s, 'P1', %s, %s, %s, %s, %s::jsonb, %s, 'pending')
                     """,
                     (
-                        self.environment,
-                        self.deployment_id,
-                        PROJECT_DOCUMENT_JOB_NAME,
-                        projection.build_fingerprint.value,
-                        self.configuration_hash,
-                        code_version,
-                        LOCAL_PROJECTION_PROFILE.embedding_model,
-                        json.dumps(payload, separators=(",", ":")),
+                        request.environment,
+                        request.deployment_id,
+                        request.job_name,
+                        request.idempotence_key.input_hash,
+                        request.idempotence_key.configuration_hash,
+                        request.idempotence_key.code_version,
+                        request.idempotence_key.model_version,
+                        json.dumps(dict(request.payload), separators=(",", ":")),
                         trace_id,
                     ),
                 )
@@ -482,10 +525,18 @@ class ProjectionRuntimeService:
                     SELECT execution_phase, completed_units, total_units, failure_error_code
                       FROM knowledge_access.knowledge_projections
                      WHERE document_id = %s
+                       AND environment = %s
+                       AND deployment_id = %s
+                       AND configuration_hash = %s
                      ORDER BY state_observed_at DESC, projection_id DESC
                      LIMIT 1
                     """,
-                    (document_id,),
+                    (
+                        document_id,
+                        self.environment,
+                        self.deployment_id,
+                        self.configuration_hash,
+                    ),
                 )
                 row = cursor.fetchone()
         if row is None:
@@ -511,38 +562,47 @@ class ProjectionRuntimeService:
         }
 
     def execute_projection(self, *, request: JobRequest) -> Mapping[str, Any]:
-        projection_id = self._validated_projection_id(request)
-        repository = PostgresKnowledgeProjectionRepository(
-            connection_factory=self.connection_factory,
-            sample_storage_limit=3,
-        )
-        projection = repository.projection_for_id(projection_id)
-        payload = dict(request.payload)
-        if (
-            payload["document_id"] != projection.document_id
-            or payload["canonical_version_id"] != projection.canonical_version_id
-            or payload["build_fingerprint"] != projection.build_fingerprint.value
-            or payload["projection_profile"]
-            != projection.projection_profile.to_fingerprint_payload()
-            or request.idempotence_key.input_hash != projection.build_fingerprint.value
-        ):
-            raise ProjectionRuntimeError("PROJECTION_JOB_REPLAY_DIVERGENCE")
-        publication = self._publication_for_version_id(projection.canonical_version_id)
-        if (
-            payload["causation_event_id"] != publication[0]
-            or payload["canonical_artifact_ref"] != publication[1]
-            or payload["canonical_artifact_sha256"] != publication[2]
-        ):
-            raise ProjectionRuntimeError("PROJECTION_JOB_REPLAY_DIVERGENCE")
-        if projection.status is ProjectionStatus.SEARCHABLE:
-            return self._replay_searchable_projection(projection=projection)
+        projection_id = _projection_id_hint(request)
         try:
-            building = repository.save_transition(projection.start_build())
+            contract = self._validated_contract(request)
+            projection_id = contract.projection_id
+            self._require_projection_identity(projection_id)
+            repository = PostgresKnowledgeProjectionRepository(
+                connection_factory=self.connection_factory,
+                sample_storage_limit=3,
+            )
+            projection = repository.projection_for_id(projection_id)
+            if (
+                contract.document_id != projection.document_id
+                or contract.canonical_version_id != projection.canonical_version_id
+                or contract.build_fingerprint != projection.build_fingerprint.value
+                or contract.projection_profile
+                != projection.projection_profile
+            ):
+                raise ProjectionRuntimeError("PROJECTION_JOB_REPLAY_DIVERGENCE")
+            publication = self._publication_for_version_id(
+                projection.canonical_version_id
+            )
+            if (
+                contract.causation_event_id != publication[0]
+                or contract.canonical_artifact_ref != publication[1]
+                or contract.canonical_artifact_sha256 != publication[2]
+            ):
+                raise ProjectionRuntimeError("PROJECTION_JOB_REPLAY_DIVERGENCE")
+            stages = projection_resume_stages(projection.status.value)
+            if stages == ("VERIFY",):
+                return self._replay_searchable_projection(projection=projection)
+            if projection.status is ProjectionStatus.REQUESTED:
+                building = repository.save_transition(projection.start_build())
+            elif projection.status is ProjectionStatus.BUILDING:
+                building = projection
+            else:
+                building = None
             chunk_projection = ProjectCanonicalChunksHandler(
                 canonical_source_reader=self,
             ).project_from_canonical_version(
                 ProjectCanonicalChunksCommand(
-                    canonical_version_id=building.canonical_version_id,
+                    canonical_version_id=projection.canonical_version_id,
                     chunking_profile=ChunkingProfile(
                         profile_id=LOCAL_PROJECTION_PROFILE.chunking_profile,
                         profile_version="hierarchical-v1",
@@ -552,13 +612,23 @@ class ProjectionRuntimeService:
                     ),
                 )
             )
-            self._set_running_progress(
-                projection_id=building.projection_id,
-                completed_units=0,
-                total_units=len(chunk_projection.chunks) + 1,
-            )
-            built = repository.save_transition(building.mark_built())
-            indexing = repository.save_transition(built.start_indexing())
+            if building is not None:
+                self._set_running_progress(
+                    projection_id=building.projection_id,
+                    completed_units=0,
+                    total_units=len(chunk_projection.chunks) + 1,
+                )
+                built = repository.save_transition(building.mark_built())
+            elif projection.status is ProjectionStatus.BUILT:
+                built = projection
+            else:
+                built = None
+            if built is not None:
+                indexing = repository.save_transition(built.start_indexing())
+            elif projection.status is ProjectionStatus.INDEXING:
+                indexing = projection
+            else:
+                raise ProjectionRuntimeError("PROJECTION_STATE_NOT_RESUMABLE")
             encoded = ProjectionEncodingHandler(
                 dense_encoder=HashingDenseEncoder(),
                 sparse_encoder=LexicalSparseEncoder(),
@@ -592,7 +662,7 @@ class ProjectionRuntimeService:
                 api_key=self.qdrant_api_key,
             )
             client.ensure_collection(collection_name=schema.collection_name)
-            publication = QdrantVectorIndex(client=client).publish_generation(
+            publication = QdrantVectorIndex(client=client).repair_generation(
                 VectorIndexPublishRequest(
                     collection_name=schema.collection_name,
                     index_generation=generation,
@@ -616,18 +686,10 @@ class ProjectionRuntimeService:
             )
             if canonical_document is None:
                 raise ProjectionRuntimeError("CANONICAL_SOURCE_NOT_FOUND")
-            metadata = ProjectedBibliographicMetadataExtractor(
-                inference_gateway=self.inference_gateway
-            ).extract(
-                ExtractProjectedBibliographicMetadataCommand(
-                    document_id=indexing.document_id,
-                    projection_id=indexing.projection_id,
-                    evidences=_bibliographic_text_evidences(canonical_document.items),
-                )
-            )
-            repository.save_bibliographic_metadata(
-                projection_id=indexing.projection_id,
-                metadata=metadata,
+            self._ensure_bibliographic_metadata(
+                repository=repository,
+                projection=indexing,
+                canonical_document=canonical_document,
             )
             self._set_running_progress(
                 projection_id=indexing.projection_id,
@@ -656,44 +718,53 @@ class ProjectionRuntimeService:
             }
         except Exception as exc:
             error_code = _projection_error_code(exc)
-            self._mark_failed_if_possible(projection_id=projection_id, error_code=error_code)
+            if projection_failure_disposition(exc) == "RETRY":
+                raise ProjectionRetryableError(error_code) from exc
+            if projection_id is not None:
+                self._mark_failed_if_possible(
+                    projection_id=projection_id,
+                    error_code=error_code,
+                )
             raise ProjectionRuntimeError(error_code) from exc
 
-    def _validated_projection_id(self, request: JobRequest) -> str:
-        if not isinstance(request, JobRequest) or request.job_name != PROJECT_DOCUMENT_JOB_NAME:
-            raise ProjectionRuntimeError("PROJECTION_JOB_PAYLOAD_INVALID")
+    def _validated_contract(self, request: JobRequest) -> ProjectDocumentContract:
         expected_identity = JobEnvironmentIdentity(
             environment=self.environment,
             deployment_id=self.deployment_id,
             configuration_hash=self.configuration_hash,
         )
-        if request.environment_identity != expected_identity:
+        try:
+            contract = ProjectDocumentContract.from_job_request(request)
+        except ProjectDocumentContractError as error:
+            raise ProjectionRuntimeError(error.code) from error
+        if contract.environment_identity != expected_identity:
             raise ProjectionRuntimeError("PROJECTION_ENVIRONMENT_MISMATCH")
-        payload = dict(request.payload)
-        if set(payload) != {
-            "contract_version",
-            "projection_id",
-            "document_id",
-            "canonical_version_id",
-            "canonical_artifact_ref",
-            "canonical_artifact_sha256",
-            "build_fingerprint",
-            "projection_profile",
-            "qdrant_collection_name",
-            "environment_identity",
-            "causation_event_id",
-        }:
-            raise ProjectionRuntimeError("PROJECTION_JOB_PAYLOAD_INVALID")
-        if payload["contract_version"] != "1.0":
-            raise ProjectionRuntimeError("PROJECTION_JOB_PAYLOAD_INVALID")
-        if payload["environment_identity"] != expected_identity.to_mapping():
-            raise ProjectionRuntimeError("PROJECTION_ENVIRONMENT_MISMATCH")
-        if payload["qdrant_collection_name"] != self.qdrant_collection_name:
+        if contract.qdrant_collection_name != self.qdrant_collection_name:
             raise ProjectionRuntimeError("PROJECTION_COLLECTION_MISMATCH")
-        projection_id = payload["projection_id"]
-        if not isinstance(projection_id, str):
-            raise ProjectionRuntimeError("PROJECTION_JOB_PAYLOAD_INVALID")
-        return projection_id
+        return contract
+
+    def _require_projection_identity(self, projection_id: str) -> None:
+        with self.connection_factory.connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT environment, deployment_id, configuration_hash,
+                           qdrant_collection_name
+                      FROM knowledge_access.knowledge_projections
+                     WHERE projection_id = %s
+                    """,
+                    (projection_id,),
+                )
+                row = cursor.fetchone()
+        if row is None:
+            raise ProjectionRuntimeError("PROJECTION_NOT_FOUND")
+        if tuple(row) != (
+            self.environment,
+            self.deployment_id,
+            self.configuration_hash,
+            self.qdrant_collection_name,
+        ):
+            raise ProjectionRuntimeError("PROJECTION_ENVIRONMENT_MISMATCH")
 
     def _publication_for_version_id(self, canonical_version_id: str) -> tuple[str, str, str]:
         with self.connection_factory.connect() as connection:
@@ -719,6 +790,50 @@ class ProjectionRuntimeService:
         if row is None:
             raise ProjectionRuntimeError("CANONICAL_SOURCE_NOT_FOUND")
         return str(row[0]), str(row[1]), str(row[2])
+
+    def _ensure_bibliographic_metadata(
+        self,
+        *,
+        repository: PostgresKnowledgeProjectionRepository,
+        projection: KnowledgeProjection,
+        canonical_document: CanonicalChunkDocument,
+    ) -> None:
+        with self.connection_factory.connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT bibliographic_metadata_status
+                      FROM knowledge_access.knowledge_projections
+                     WHERE projection_id = %s
+                       AND environment = %s
+                       AND deployment_id = %s
+                       AND configuration_hash = %s
+                    """,
+                    (
+                        projection.projection_id,
+                        self.environment,
+                        self.deployment_id,
+                        self.configuration_hash,
+                    ),
+                )
+                row = cursor.fetchone()
+        if row == ("EXTRACTED",):
+            return
+        if row != ("PENDING",):
+            raise ProjectionRuntimeError("BIBLIOGRAPHIC_METADATA_STATE_INVALID")
+        metadata = ProjectedBibliographicMetadataExtractor(
+            inference_gateway=self.inference_gateway
+        ).extract(
+            ExtractProjectedBibliographicMetadataCommand(
+                document_id=projection.document_id,
+                projection_id=projection.projection_id,
+                evidences=_bibliographic_text_evidences(canonical_document.items),
+            )
+        )
+        repository.save_bibliographic_metadata(
+            projection_id=projection.projection_id,
+            metadata=metadata,
+        )
 
     def _replay_searchable_projection(
         self,
@@ -791,8 +906,18 @@ class ProjectionRuntimeService:
                        SET execution_phase = 'RUNNING', completed_units = %s,
                            total_units = %s, state_observed_at = CURRENT_TIMESTAMP
                      WHERE projection_id = %s AND status IN ('BUILDING', 'BUILT', 'INDEXING')
+                       AND environment = %s
+                       AND deployment_id = %s
+                       AND configuration_hash = %s
                     """,
-                    (completed_units, total_units, projection_id),
+                    (
+                        completed_units,
+                        total_units,
+                        projection_id,
+                        self.environment,
+                        self.deployment_id,
+                        self.configuration_hash,
+                    ),
                 )
                 if cursor.rowcount != 1:
                     raise KnowledgeProjectionVersionConflictError()
@@ -807,8 +932,18 @@ class ProjectionRuntimeService:
                            total_units = %s, failure_error_code = NULL,
                            state_observed_at = CURRENT_TIMESTAMP
                      WHERE projection_id = %s AND status = 'SEARCHABLE'
+                       AND environment = %s
+                       AND deployment_id = %s
+                       AND configuration_hash = %s
                     """,
-                    (completed_units, total_units, projection_id),
+                    (
+                        completed_units,
+                        total_units,
+                        projection_id,
+                        self.environment,
+                        self.deployment_id,
+                        self.configuration_hash,
+                    ),
                 )
                 if cursor.rowcount != 1:
                     raise KnowledgeProjectionVersionConflictError()
@@ -823,9 +958,18 @@ class ProjectionRuntimeService:
                            failure_error_code = %s, state_observed_at = CURRENT_TIMESTAMP,
                            aggregate_version = aggregate_version + 1
                      WHERE projection_id = %s
-                       AND status IN ('REQUESTED', 'BUILDING', 'INDEXING')
+                       AND status IN ('REQUESTED', 'BUILDING', 'BUILT', 'INDEXING')
+                       AND environment = %s
+                       AND deployment_id = %s
+                       AND configuration_hash = %s
                     """,
-                    (error_code, projection_id),
+                    (
+                        error_code,
+                        projection_id,
+                        self.environment,
+                        self.deployment_id,
+                        self.configuration_hash,
+                    ),
                 )
 
 
@@ -845,11 +989,76 @@ def _canonical_items_payload(*, artifact: Any, canonical_ref: CanonicalSourceRef
             text = item.get("text")
             provenance = item.get("provenance")
             if not isinstance(text, str) or text.strip() == "" or not isinstance(provenance, Mapping):
-                continue
+                raise ProjectionRuntimeError("CANONICAL_ARTIFACT_INVALID")
             items.append({"text": text, "source_locator": dict(provenance)})
     if len(items) == 0:
         raise ProjectionRuntimeError("CANONICAL_CONTENT_EMPTY")
     return tuple(items)
+
+
+def projection_resume_stages(status: str) -> tuple[str, ...]:
+    """Étapes déterministes à rejouer depuis chaque état public persistant."""
+
+    stages = {
+        "REQUESTED": ("BUILD", "INDEX", "FINALIZE"),
+        "BUILDING": ("BUILD", "INDEX", "FINALIZE"),
+        "BUILT": ("INDEX", "FINALIZE"),
+        "INDEXING": ("INDEX", "FINALIZE"),
+        "SEARCHABLE": ("VERIFY",),
+    }
+    try:
+        return stages[status]
+    except (KeyError, TypeError) as error:
+        raise ProjectionRuntimeError("PROJECTION_STATE_NOT_RESUMABLE") from error
+
+
+def projection_failure_disposition(exception: Exception) -> str:
+    """Décide explicitement si la lease doit expirer ou l'état terminaliser."""
+
+    if isinstance(exception, ProjectionRetryableError):
+        return "RETRY"
+    code = _projection_error_code(exception)
+    if code in {"QDRANT_UNAVAILABLE"}:
+        return "RETRY"
+    return "FAILED"
+
+
+def _projection_id_hint(request: Any) -> str | None:
+    if not isinstance(request, JobRequest):
+        return None
+    value = request.payload.get("projection_id")
+    if not isinstance(value, str) or not value.startswith("PROJ-"):
+        return None
+    return value
+
+
+def _validate_qdrant_collection(
+    response: Mapping[str, Any],
+    *,
+    expected_dense_dimensions: int,
+) -> None:
+    try:
+        result = response["result"]
+        config = result["config"]
+        params = config["params"]
+        vectors = params["vectors"]
+        dense = vectors["dense"]
+        sparse_vectors = params["sparse_vectors"]
+        if (
+            not isinstance(result, Mapping)
+            or not isinstance(config, Mapping)
+            or not isinstance(params, Mapping)
+            or not isinstance(vectors, Mapping)
+            or not isinstance(dense, Mapping)
+            or dense.get("size") != expected_dense_dimensions
+            or dense.get("distance") != "Cosine"
+            or not isinstance(sparse_vectors, Mapping)
+            or "sparse" not in sparse_vectors
+            or not isinstance(sparse_vectors["sparse"], Mapping)
+        ):
+            raise ValueError
+    except (KeyError, TypeError, ValueError) as error:
+        raise ProjectionRuntimeError("PROJECTION_COLLECTION_MISMATCH") from error
 
 
 def _bibliographic_text_evidences(items: Sequence[Any]) -> tuple[ProjectedTextEvidence, ...]:
@@ -981,6 +1190,9 @@ __all__ = [
     "LOCAL_PROJECTION_PROFILE",
     "PROJECT_DOCUMENT_JOB_NAME",
     "ProjectionRuntimeError",
+    "ProjectionRetryableError",
     "ProjectionRuntimeService",
     "QdrantHttpClient",
+    "projection_failure_disposition",
+    "projection_resume_stages",
 ]

@@ -191,7 +191,7 @@ class PostgresKnowledgeProjectionRepository:
         chunk_count: int,
         chunks: Sequence[KnowledgeChunk],
         state_observed_at: str,
-        index_generation: str | None = None,
+        index_generation: str | None,
     ) -> None:
         if not isinstance(projection, KnowledgeProjection):
             raise ValueError("KnowledgeProjection invalide")

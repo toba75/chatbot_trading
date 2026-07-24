@@ -107,6 +107,66 @@ class QdrantVectorIndex:
             idempotent=False,
         )
 
+    def repair_generation(
+        self,
+        request: VectorIndexPublishRequest,
+        *,
+        max_parallel_batches: int,
+        batch_size: int,
+        on_batch_published: Callable[[int], None],
+    ) -> VectorIndexPublication:
+        """Réécrit explicitement toute génération absente ou partielle puis vérifie."""
+
+        parsed_request = _ensure_publish_request(request)
+        parsed_max_parallel_batches = _ensure_positive_int(
+            max_parallel_batches,
+            "max_parallel_batches",
+        )
+        parsed_batch_size = _ensure_positive_int(batch_size, "batch_size")
+        if not callable(on_batch_published):
+            raise ValueError("rapporteur Qdrant invalide")
+        existing_count = self._generation_count(
+            collection_name=parsed_request.collection_name,
+            index_generation=parsed_request.index_generation,
+        )
+        if existing_count == parsed_request.expected_point_count:
+            return VectorIndexPublication(
+                collection_name=parsed_request.collection_name,
+                index_generation=parsed_request.index_generation,
+                published_point_ids=tuple(
+                    point.point_id for point in parsed_request.points
+                ),
+                expected_point_count=parsed_request.expected_point_count,
+                idempotent=True,
+            )
+        qdrant_points = tuple(
+            _qdrant_point_for(parsed_request.index_generation, point)
+            for point in parsed_request.points
+        )
+        self._upsert_batches(
+            collection_name=parsed_request.collection_name,
+            qdrant_points=qdrant_points,
+            batch_size=parsed_batch_size,
+            max_parallel_batches=parsed_max_parallel_batches,
+            on_batch_published=on_batch_published,
+        )
+        published_count = self._generation_count(
+            collection_name=parsed_request.collection_name,
+            index_generation=parsed_request.index_generation,
+        )
+        if published_count != parsed_request.expected_point_count:
+            raise PartialVectorIndexError(
+                expected_point_count=parsed_request.expected_point_count,
+                published_point_count=published_count,
+            )
+        return VectorIndexPublication(
+            collection_name=parsed_request.collection_name,
+            index_generation=parsed_request.index_generation,
+            published_point_ids=tuple(point.point_id for point in parsed_request.points),
+            expected_point_count=parsed_request.expected_point_count,
+            idempotent=False,
+        )
+
     def _upsert_batches(
         self,
         *,

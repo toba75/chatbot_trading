@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import time
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -67,6 +69,7 @@ class PostgresCanonicalPublicationRelay:
         environment_identity: JobEnvironmentIdentity,
         projection_profile: ProjectionProfile,
         configured_collection_name: str,
+        observation_sink: Callable[[Mapping[str, object]], None],
     ) -> None:
         if not callable(getattr(connection_factory, "connect", None)):
             raise ValueError("PROJECTION_RELAY_CONNECTION_FACTORY_INVALID")
@@ -74,9 +77,12 @@ class PostgresCanonicalPublicationRelay:
             raise ValueError("PROJECTION_RELAY_ENVIRONMENT_INVALID")
         if not isinstance(projection_profile, ProjectionProfile):
             raise ValueError("PROJECTION_RELAY_PROFILE_INVALID")
+        if not callable(observation_sink):
+            raise ValueError("PROJECTION_RELAY_OBSERVATION_SINK_INVALID")
         self._connection_factory = connection_factory
         self._identity = environment_identity
         self._profile = projection_profile
+        self._observation_sink = observation_sink
         self._configured_collection_name = _text(
             configured_collection_name,
             "PROJECTION_COLLECTION_INVALID",
@@ -121,7 +127,7 @@ class PostgresCanonicalPublicationRelay:
                               message.event_fingerprint, message.environment,
                               message.deployment_id, message.configuration_hash,
                               message.relay_generation, message.relay_token,
-                              message.canonical_version_id
+                              message.canonical_artifact_ref
                     """,
                     (
                         self._identity.environment,
@@ -140,17 +146,6 @@ class PostgresCanonicalPublicationRelay:
                 stored_fingerprint = _sha256(row[2])
                 if hashlib.sha256(event.to_json().encode("utf-8")).hexdigest() != stored_fingerprint:
                     raise ProjectionPublicationError("PROJECTION_EVENT_REPLAY_DIVERGENCE")
-                cursor.execute(
-                    """
-                    SELECT canonical_artifact_ref
-                      FROM source_processing.canonical_source_versions
-                     WHERE canonical_version_id = %s
-                    """,
-                    (row[8],),
-                )
-                artifact = cursor.fetchone()
-                if artifact is None:
-                    raise ProjectionPublicationError("PROJECTION_CANONICAL_VERSION_MISSING")
         identity = JobEnvironmentIdentity(
             environment=row[3],
             deployment_id=row[4],
@@ -158,13 +153,13 @@ class PostgresCanonicalPublicationRelay:
         )
         fingerprint = canonical_publication_fingerprint(
             event=event,
-            canonical_artifact_ref=artifact[0],
+            canonical_artifact_ref=row[8],
             environment_identity=identity,
         )
         return ClaimedCanonicalPublication(
             message=CanonicalPublicationMessage(
                 event=event,
-                canonical_artifact_ref=artifact[0],
+                canonical_artifact_ref=row[8],
                 environment_identity=identity,
                 event_fingerprint=fingerprint,
             ),
@@ -374,8 +369,8 @@ class PostgresCanonicalPublicationRelay:
                 cursor.execute(
                     """
                     INSERT INTO knowledge_access.projection_event_receipts (
-                        event_id, event_fingerprint, projection_id
-                    ) VALUES (%s, %s, %s)
+                        event_id, event_fingerprint, projection_id, delivery_count
+                    ) VALUES (%s, %s, %s, 1)
                     """,
                     (
                         event.event_id,
@@ -425,13 +420,87 @@ class PostgresCanonicalPublicationRelay:
         maximum = _positive_int(limit, "PROJECTION_EVENT_RELAY_LIMIT_INVALID")
         relayed = 0
         for _ in range(maximum):
-            claim = self.claim_next(owner_id=owner_id, lease_seconds=lease_seconds)
-            if claim is None:
-                break
-            self.consume(claim)
-            self.acknowledge(claim)
+            started = time.perf_counter_ns()
+            claim: ClaimedCanonicalPublication | None = None
+            try:
+                claim = self.claim_next(owner_id=owner_id, lease_seconds=lease_seconds)
+                if claim is None:
+                    break
+                consumption = self.consume(claim)
+                self.acknowledge(claim)
+            except Exception as error:
+                self._observe(
+                    claim=claim,
+                    status="failed",
+                    duration_ns=time.perf_counter_ns() - started,
+                    relayed_count=0,
+                    redelivery_count=0,
+                    conflict_count=(
+                        1
+                        if _relay_error_code(error)
+                        in {
+                            "PROJECTION_EVENT_REPLAY_DIVERGENCE",
+                            "PROJECTION_BUILD_REPLAY_DIVERGENCE",
+                            "PROJECTION_JOB_ATOMICITY_CONFLICT",
+                        }
+                        else 0
+                    ),
+                    lease_lost_count=(
+                        1
+                        if _relay_error_code(error) == "PROJECTION_EVENT_LEASE_LOST"
+                        else 0
+                    ),
+                    error_code=_relay_error_code(error),
+                )
+                raise
+            self._observe(
+                claim=claim,
+                status="relayed",
+                duration_ns=time.perf_counter_ns() - started,
+                relayed_count=1,
+                redelivery_count=1 if consumption.duplicate else 0,
+                conflict_count=0,
+                lease_lost_count=0,
+                error_code=None,
+            )
             relayed += 1
         return relayed
+
+    def _observe(
+        self,
+        *,
+        claim: ClaimedCanonicalPublication | None,
+        status: str,
+        duration_ns: int,
+        relayed_count: int,
+        redelivery_count: int,
+        conflict_count: int,
+        lease_lost_count: int,
+        error_code: str | None,
+    ) -> None:
+        observation: dict[str, object] = {
+            "event_type": "canonical_publication_relay",
+            "status": status,
+            "duration_ms": round(duration_ns / 1_000_000, 3),
+            "relayed_count": relayed_count,
+            "redelivery_count": redelivery_count,
+            "conflict_count": conflict_count,
+            "lease_lost_count": lease_lost_count,
+            "environment": self._identity.environment,
+            "deployment_id": self._identity.deployment_id,
+            "configuration_hash": self._identity.configuration_hash,
+        }
+        if claim is not None:
+            observation.update(
+                {
+                    "message_id": claim.message.event.event_id,
+                    "correlation_id": claim.message.event.correlation_id,
+                    "claim_generation": claim.claim_generation,
+                }
+            )
+        if error_code is not None:
+            observation["error_code"] = error_code
+        self._observation_sink(observation)
 
 
 def _mapping(value: Any) -> dict[str, Any]:
@@ -463,6 +532,13 @@ def _positive_int(value: Any, code: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or value < 1:
         raise ValueError(code)
     return value
+
+
+def _relay_error_code(error: Exception) -> str:
+    code = getattr(error, "code", None)
+    if isinstance(code, str):
+        return code
+    return "PROJECTION_RELAY_UNEXPECTED_ERROR"
 
 
 __all__ = [

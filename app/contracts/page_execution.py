@@ -31,7 +31,6 @@ class GraniteCapacityConfigurationError(ValueError):
 class GranitePageTerminalStatus(str, Enum):
     SUCCEEDED = "succeeded"
     FAILED = "failed"
-    ABANDONED = "abandoned"
 
 
 @dataclass(frozen=True, slots=True)
@@ -189,7 +188,7 @@ class PageCompletionMessage:
         if self.terminal_status == "succeeded":
             if self.failure_reason is not None:
                 raise ValueError("failure_reason interdit")
-        elif self.terminal_status in {"failed", "abandoned"}:
+        elif self.terminal_status == "failed":
             _text(self.failure_reason, "failure_reason")
         else:
             raise ValueError("terminal_status invalide")

@@ -259,11 +259,10 @@ def _enrich_corpus_item(
         diagnostic_status=item.diagnostic_status,
         conversion_status=item.conversion_status,
         conversion_action_available=item.conversion_action_available,
-        projection_action_available=(
-            item.conversion_status == "CANONICAL_ACCEPTED"
-            and item.canonical_version_id is not None
-            and status == "PROJECTION_NOT_REQUESTED"
-        ),
+        # CanonicalSourcePublished déclenche la projection automatiquement.
+        # L'action manuelle reste un contrat API idempotent, jamais une action UI
+        # exposée avant que l'inbox et la progression KA soient consommables.
+        projection_action_available=False,
         canonical_version_id=item.canonical_version_id,
         projection_status=status,
         manual_review_reason=item.manual_review_reason,
