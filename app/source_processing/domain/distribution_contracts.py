@@ -21,7 +21,9 @@ from app.contracts.technical_jobs import (
     JobRequest,
 )
 from app.source_processing.domain.document_processing_run import (
+    PageManifest,
     PageNumber,
+    PageRoute,
     PageRouteName,
     ProcessingRunId,
     RoutingPolicyVersion,
@@ -1035,6 +1037,69 @@ def convert_page_idempotence_key(
     )
 
 
+def page_manifest_sha256(
+    *,
+    document_id: str | DocumentId,
+    processing_run_id: str | ProcessingRunId,
+    page_manifest: PageManifest,
+    page_routes: Sequence[PageRoute],
+    routing_policy_version: str | RoutingPolicyVersion,
+) -> str:
+    """Fige l'identité ordonnée du manifeste et de ses routes M-003."""
+
+    document = _document_id(
+        document_id.value if isinstance(document_id, DocumentId) else document_id
+    )
+    run = _processing_run_id(
+        processing_run_id.value
+        if isinstance(processing_run_id, ProcessingRunId)
+        else processing_run_id
+    )
+    if not isinstance(page_manifest, PageManifest):
+        raise DistributionContractError("PAGE_MANIFEST_INVALID")
+    if isinstance(page_routes, str) or not isinstance(page_routes, Sequence):
+        raise DistributionContractError("PAGE_MANIFEST_ROUTES_INVALID")
+    routes = tuple(page_routes)
+    if any(not isinstance(route, PageRoute) for route in routes):
+        raise DistributionContractError("PAGE_MANIFEST_ROUTES_INVALID")
+    manifest_pages = tuple(
+        entry.page_number.value for entry in page_manifest.entries
+    )
+    route_pages = tuple(route.page_number.value for route in routes)
+    if len(route_pages) != len(set(route_pages)):
+        raise DistributionContractError("PAGE_MANIFEST_ROUTE_DUPLICATED")
+    if any(page not in set(manifest_pages) for page in route_pages):
+        raise DistributionContractError("PAGE_MANIFEST_ROUTE_OUTSIDE")
+    if set(route_pages) != set(manifest_pages):
+        raise DistributionContractError("PAGE_MANIFEST_ROUTE_MISSING")
+    if route_pages != manifest_pages:
+        raise DistributionContractError("PAGE_MANIFEST_ROUTE_ORDER_INVALID")
+    policy = _routing_policy_version(
+        routing_policy_version.value
+        if isinstance(routing_policy_version, RoutingPolicyVersion)
+        else routing_policy_version
+    )
+    if any(route.routing_policy_version.value != policy for route in routes):
+        raise DistributionContractError("PAGE_MANIFEST_POLICY_DIVERGENT")
+    return _canonical_sha256(
+        {
+            "manifest_contract_version": "m014-page-manifest-v1",
+            "document_id": document,
+            "processing_run_id": run,
+            "routing_policy_version": policy,
+            "source_page_count": page_manifest.source_page_count,
+            "pages": tuple(
+                {
+                    "page_number": entry.page_number.value,
+                    "manifest_state": entry.state.value,
+                    "route_name": route.route_name.value,
+                }
+                for entry, route in zip(page_manifest.entries, routes, strict=True)
+            ),
+        }
+    )
+
+
 def assemble_canonical_document_idempotence_key(
     *,
     processing_run_id: str,
@@ -1437,4 +1502,5 @@ __all__ = [
     "PageTechnicalMetrics",
     "assemble_canonical_document_idempotence_key",
     "convert_page_idempotence_key",
+    "page_manifest_sha256",
 ]

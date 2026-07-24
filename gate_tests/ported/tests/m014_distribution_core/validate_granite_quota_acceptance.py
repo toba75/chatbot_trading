@@ -289,10 +289,12 @@ def _migration_022_est_ascendante_et_prepare_les_deux_proprietaires() -> None:
         in normalized
     )
 
-    versions = tuple(
-        int(path.name[:3]) for path in sorted((migration.parent).glob("*.sql"))
+    versions_jusqua_022 = tuple(
+        int(path.name[:3])
+        for path in sorted((migration.parent).glob("*.sql"))
+        if int(path.name[:3]) <= 22
     )
-    assert versions == tuple(range(1, 23))
+    assert versions_jusqua_022 == tuple(range(1, 23))
 
 
 def _adaptateur_documente_ordre_de_verrouillage_et_skip_locked() -> None:

@@ -19,6 +19,9 @@ from app.contracts.technical_jobs import (
 from app.source_processing.application.canonical_audit_signals import (
     PreCanonicalAuditEvent,
 )
+from app.source_processing.application.fan_out_document_pages import (
+    LEGACY_INLINE_ORCHESTRATION_VERSION,
+)
 from app.source_processing.application.register_source_document import (
     OriginalSourceStore,
     RegisterSourceDocumentCommand,
@@ -740,6 +743,7 @@ class DocumentConversionCommandService:
                 "source_sha256": parsed_source_document.fingerprint.value,
                 "routing_policy_version": route_plan.routing_policy_version.value,
                 "route_count": len(route_plan.page_routes),
+                "orchestration_version": LEGACY_INLINE_ORCHESTRATION_VERSION,
             },
         )
         submission = self._document_conversion_repository.submit_conversion_request(

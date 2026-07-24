@@ -8,6 +8,10 @@ from app.contracts.technical_jobs import JobEnvironmentIdentity, JobRequest
 from app.platform.job_runtime.relay import ClaimedRelayMessage, RelayedJobMessage
 from app.platform.postgres import PostgresConnectionFactory
 from app.platform.worker_environment import WORKER_ENVIRONMENT_MISMATCH
+from app.source_processing.domain.distribution_contracts import (
+    CONVERT_PAGE_JOB_NAME,
+    ConvertPageContract,
+)
 
 
 class JobOutboxLeaseConflictError(RuntimeError):
@@ -97,6 +101,11 @@ class PostgresJobOutbox:
                 row = cursor.fetchone()
         if row is None:
             return None
+        execution_requirements = None
+        if self._table_name == "source_processing.job_outbox" and row[1] == CONVERT_PAGE_JOB_NAME:
+            execution_requirements = ConvertPageContract.from_mapping(
+                row[7]
+            ).execution_requirements()
         return ClaimedRelayMessage(
             message=RelayedJobMessage(
                 message_id=row[0],
@@ -110,7 +119,7 @@ class PostgresJobOutbox:
                 model_version=row[6],
                 payload=row[7],
                 trace_id=row[8],
-                execution_requirements=None,
+                execution_requirements=execution_requirements,
             ),
             owner_id=parsed_owner,
             claim_generation=row[11],

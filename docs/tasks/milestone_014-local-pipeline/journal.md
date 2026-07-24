@@ -192,3 +192,54 @@ P-001 précondition GREEN
 - Commit GREEN : `docs(m014-pipeline): publier specification pipeline local distribue`
   (commit portant cette entrée). La gate globale finale doit être exécutée une
   seule fois après ce commit et son verdict terminal transmis à l'orchestrateur.
+
+## 2026-07-24 - T-005 fan-out transactionnel des pages
+
+- Sous-agent : `/root/m14_t005_fanout`, chargé exclusivement de T-005 par
+  l'orchestrateur du milestone.
+- Baseline initiale : commit `f90cfe505`, gate canonique 468/468 GREEN, code 0.
+  Cette preuve transmise par l'orchestrateur n'a pas été rejouée au démarrage.
+- Scénario BDD : un traitement SP de quatre pages, dont une `SKIP_EMPTY`,
+  active explicitement `m014-page-fanout-v1` ; le premier fan-out persiste un
+  résultat vide et trois enveloppes `CONVERT_PAGE`, puis le rejeu exact ne crée
+  aucun doublon et n'exécute aucun convertisseur.
+- RED utile : les tests unitaires, d'acceptation et PostgreSQL échouaient à la
+  collecte sur l'absence du cas d'usage
+  `app.source_processing.application.fan_out_document_pages`. Commit RED :
+  `2a4cce8b4` —
+  `test(m014-pipeline): couvrir fan-out transactionnel des pages`.
+- GREEN applicatif : `PageFanOutPlan` fige le manifeste, les actifs et les
+  contrats de page ; `FanOutDocumentPagesHandler` exige l'activation explicite,
+  conserve l'ordre PDF, matérialise `SKIP_EMPTY` sans artefact ni métrique et
+  produit les jobs réclamables sans appeler de convertisseur.
+- Persistance : la migration 023 classe explicitement l'existant sous
+  `m004-inline-v1`, ferme le discriminateur de parcours et ajoute le registre
+  immuable du fan-out. Une transaction locale SP verrouille la demande, écrit
+  le plan, les résultats vides, l'outbox et la progression publique. Le relais
+  reconstruit les exigences d'exécution de `CONVERT_PAGE` avant l'insertion
+  idempotente dans la file propriétaire `platform` ; aucune transaction
+  intercontextes n'est créée.
+- Preuve PostgreSQL réelle : migration 022 vers 023, refus de bascule d'une
+  demande historique, crash injecté sur la deuxième enveloppe puis rollback
+  total, rejeu exact, trois jobs relayés sans doublon, divergence d'actif et
+  environnement étranger refusés. Résultat ciblé : 1/1 GREEN.
+- Compatibilité : les preuves M14-core propres à la migration 022 bornent
+  désormais explicitement leur corpus aux migrations 001 à 022. Les tests
+  ciblés du fan-out sont 3/3 GREEN et Ruff ciblé est GREEN.
+- Scopes avant commit GREEN : `m004` 45/45 GREEN ; `m013_environments` 49/49
+  GREEN ; `m014_distribution_core` 36/36 GREEN ; `m014_local_pipeline` 29/29
+  GREEN en mode partiel hors live, complété par la preuve PostgreSQL réelle.
+  Les nœuds attendus sont présents une seule fois et aucune surprise n'est
+  signalée.
+- Fichiers ajoutés : cas d'usage du fan-out, migration 023 et trois preuves
+  T-005. Fichiers modifiés : contrats de distribution, commande documentaire,
+  persistance et relais PostgreSQL, manifeste de gate, spécification M14,
+  validateur sémantique, deux preuves de compatibilité M14-core et le présent
+  journal.
+- ADR consultées : ADR-024, ADR-025 et ADR-052. ADR créée ou modifiée : aucune ;
+  T-005 applique leur ordre de transactions et leur déploiement local sans en
+  changer le sens.
+- Commit GREEN prévu :
+  `feat(m014-pipeline): eclater conversion en jobs de pages`. La gate globale
+  finale sera exécutée une seule fois après ce commit avec un délai d'une heure ;
+  toute sortie différée sera attendue sur la même exécution, sans relance.

@@ -243,7 +243,7 @@ def _handler(run: DocumentProcessingRun, repository: _FanOutRepository, *, asset
     )
 
 
-def test_fan_out_deterministe_skip_empty_total_et_rejeu_strict() -> None:
+def _fan_out_deterministe_skip_empty_total_et_rejeu_strict() -> None:
     source = _source()
     run = _planned_run(source)
     repository = _FanOutRepository()
@@ -314,30 +314,31 @@ def test_fan_out_deterministe_skip_empty_total_et_rejeu_strict() -> None:
         plan.assert_replay_compatible(divergent)
 
 
-@pytest.mark.parametrize(
-    ("payload_override", "expected_code"),
-    (
-        ({"orchestration_version": "m004-inline-v1"}, "PAGE_FAN_OUT_ORCHESTRATION_VERSION_UNSUPPORTED"),
-        ({"routing_policy_version": "routing-divergent-v1"}, "PAGE_FAN_OUT_ROUTING_POLICY_DIVERGENT"),
-        ({"route_count": 3}, "PAGE_FAN_OUT_ROUTE_COUNT_DIVERGENT"),
-        ({"source_sha256": "f" * 64}, "PAGE_FAN_OUT_SOURCE_HASH_DIVERGENT"),
-    ),
-)
-def test_fan_out_refuse_activation_ou_identite_divergente(
-    payload_override: dict[str, object],
-    expected_code: str,
-) -> None:
+def _fan_out_refuse_activation_ou_identite_divergente() -> None:
     source = _source()
     run = _planned_run(source)
-    with pytest.raises(DistributionContractError, match=expected_code):
-        _handler(run, _FanOutRepository()).handle(
-            parent_job=_parent_job(source, run, **payload_override),
-            source_artifact=_source_artifact(source),
-            trace_id="TRACE-M014-FANOUT-UNIT",
-        )
+    invalid = (
+        (
+            {"orchestration_version": "m004-inline-v1"},
+            "PAGE_FAN_OUT_ORCHESTRATION_VERSION_UNSUPPORTED",
+        ),
+        (
+            {"routing_policy_version": "routing-divergent-v1"},
+            "PAGE_FAN_OUT_ROUTING_POLICY_DIVERGENT",
+        ),
+        ({"route_count": 3}, "PAGE_FAN_OUT_ROUTE_COUNT_DIVERGENT"),
+        ({"source_sha256": "f" * 64}, "PAGE_FAN_OUT_SOURCE_HASH_DIVERGENT"),
+    )
+    for payload_override, expected_code in invalid:
+        with pytest.raises(DistributionContractError, match=expected_code):
+            _handler(run, _FanOutRepository()).handle(
+                parent_job=_parent_job(source, run, **payload_override),
+                source_artifact=_source_artifact(source),
+                trace_id="TRACE-M014-FANOUT-UNIT",
+            )
 
 
-def test_hash_manifeste_refuse_page_absente_dupliquee_hors_manifeste_ou_desordonnee() -> None:
+def _hash_manifeste_refuse_routes_invalides() -> None:
     source = _source()
     run = _planned_run(source)
     routes = run.route_plan.page_routes
@@ -358,3 +359,8 @@ def test_hash_manifeste_refuse_page_absente_dupliquee_hors_manifeste_ou_desordon
                 routing_policy_version=run.route_plan.routing_policy_version,
             )
 
+
+def test_fan_out_document_pages_unit() -> None:
+    _fan_out_deterministe_skip_empty_total_et_rejeu_strict()
+    _fan_out_refuse_activation_ou_identite_divergente()
+    _hash_manifeste_refuse_routes_invalides()
