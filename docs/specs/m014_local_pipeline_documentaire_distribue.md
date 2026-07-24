@@ -227,6 +227,15 @@ KA demeure sans projection tant que l’événement complet n’existe pas. Apr�
 
 P-002 n’ajoute aucune migration. Les migrations ascendantes du socle restent présentes mais leur simple déploiement n’active pas le fan-out. L’activation future de T-005 doit être versionnée, explicite, réservée aux nouveaux traitements et incompatible avec une sélection automatique par matériel, nombre de workers ou présence de tables.
 
+Le discriminateur fermé du job parent est `orchestration_version`. La valeur
+`m004-inline-v1` conserve le parcours documentaire antérieur et la valeur
+`m014-page-fanout-v1` sélectionne le fan-out T-005. Le champ est obligatoire
+dès la création de la demande, persiste avec le traitement et ne peut plus être
+modifié après son démarrage. Une valeur absente ou inconnue est refusée ; elle
+ne sélectionne jamais silencieusement l’un des deux parcours. Tant que T-006 à
+T-008 ne ferment pas la chaîne réelle complète, l’action publique existante
+continue de créer explicitement `m004-inline-v1`.
+
 Le rollback arrête explicitement la création de nouveaux jobs de pages, draine les workers, laisse terminer ou expirer les claims et slots actifs, et conserve les résultats déjà persistés. Les traitements commencés restent liés à leur version d’orchestration ; seuls de nouveaux documents peuvent reprendre le parcours antérieur, par une configuration explicite.
 
 Le rollback ne supprime ni table ni colonne, ne réécrit aucun résultat, ne modifie aucune route, ne bascule pas Granite sur CPU et ne transfère aucun job vers un autre environnement.

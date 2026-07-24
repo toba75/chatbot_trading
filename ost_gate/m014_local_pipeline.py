@@ -209,6 +209,18 @@ def validate_local_pipeline_specification(specification_text: str) -> None:
     _require_markers(
         specification,
         (
+            "Le discriminateur fermé du job parent est `orchestration_version`.",
+            "`m004-inline-v1`",
+            "`m014-page-fanout-v1`",
+            "Une valeur absente ou inconnue est refusée",
+            "l’action publique existante continue de créer explicitement "
+            "`m004-inline-v1`",
+        ),
+        "M014_LOCAL_PIPELINE_ORCHESTRATION_VERSION_REQUIRED",
+    )
+    _require_markers(
+        specification,
+        (
             "T-009",
             "T-010",
             "T-011",

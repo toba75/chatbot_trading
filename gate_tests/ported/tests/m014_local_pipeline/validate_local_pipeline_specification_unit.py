@@ -112,3 +112,11 @@ def test_validate_local_pipeline_specification_unit() -> None:
             "Chaque échange peut déduire l’environnement depuis la file.",
         ),
     )
+    _assert_error(
+        "M014_LOCAL_PIPELINE_ORCHESTRATION_VERSION_REQUIRED",
+        _replace_required(
+            specification,
+            "Le discriminateur fermé du job parent est `orchestration_version`.",
+            "Le parcours est choisi depuis l’état local du worker.",
+        ),
+    )
