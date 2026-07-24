@@ -627,8 +627,15 @@ git ls-tree -r --name-only master -- docs/tasks docs/adr docs/specs
 
 - Source: tâches T-009 à T-011 de `docs/specs/plan_distribution.md`.
 - Objectif métier: exploiter, superviser et qualifier les deux workers à 2 Gio sur la RTX 4090 sans masquer une saturation ou une dépendance indisponible.
-- Dossier de tâches attendu: `docs/tasks/milestone_014-local-qualification`.
+- Dossier de tâches planifié: `docs/tasks/milestone_014-local-qualification`.
 - Dépendance: M14-local-pipeline; sous-milestone de M-014.
+- Tâches planifiées:
+  - P-001 vérifie la précondition GREEN offline et live sur `master`;
+  - P-002 publie la spécification DDD et le scope de gate de qualification;
+  - T-009 publie l'observabilité et les opérations locales;
+  - T-010 qualifie le parcours réel, la concurrence et la reprise fenced;
+  - T-011 exécute hors gate de PR la campagne de cent PDF puis accepte ou
+    remplace explicitement ADR-052.
 - Livrables:
   - observabilité des deux workers, des slots Granite, de la RAM et du GPU;
   - opérations d'inspection, drainage et redémarrage ciblé;
