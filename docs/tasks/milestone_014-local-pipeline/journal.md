@@ -3,10 +3,10 @@
 ## Statut de planification
 
 - Date : 2026-07-24.
-- Statut : P-001 GREEN ; P-002 peut commencer, sans comportement T-005 à T-008
-  encore implémenté.
-- Branche de planification : `master` au moment du prévol ; aucune branche
-  d'implémentation ni aucun commit RED n'a été créé.
+- Statut : P-001 et P-002 GREEN ; T-005 peut commencer, sans comportement
+  T-005 à T-008 encore implémenté.
+- Branche d'implémentation : `codex/m14-local-pipeline` ; le cycle RED/GREEN de
+  P-002 est documenté ci-dessous.
 - Source canonique : `docs/specs/plan_distribution.md`, T-005 à T-008, et
   `docs/specs/plan_implementation_milestones_workstreams.md`, section
   `M14-local-pipeline`.
@@ -153,3 +153,42 @@ P-001 précondition GREEN
 - ADR consultées : ADR-051 et ADR-052. ADR créée ou modifiée : aucune ; la
   correction valide leur lien réciproque sans en changer le sens.
 - Commit GREEN prévu : `fix(m014-core): realigner preuve reciproque ADR-051`.
+
+## 2026-07-24 - P-002 spécification du pipeline local distribué
+
+- Sous-agent : `/root/m14_p002_specification`, chargé exclusivement de P-002
+  par l'orchestrateur du milestone.
+- Baseline initiale : arbre propre sur `5433a1ab1`, résultat P-001 465/465,
+  code 0, sortie terminale `PARTIAL GREEN: offline`. Une invocation courte a
+  expiré sans verdict ; elle n'a pas été interprétée comme un RED. L'invocation
+  déjà active a ensuite été attendue jusqu'au même verdict terminal 465/465.
+- Scénario BDD : un manifeste SP figé est distribué entre deux workers locaux,
+  les complétions fenced sont persistées chez leur propriétaire, une seule
+  version canonique complète est publiée puis KA projette cette publication
+  dans l'environnement concordant.
+- RED utile : les tests d'acceptation et unitaires échouaient à la collecte sur
+  `ModuleNotFoundError: No module named 'ost_gate.m014_local_pipeline'`.
+  Commit RED : `303eed36a` —
+  `test(m014-pipeline): exiger specification pipeline local distribue`.
+- GREEN documentaire : `docs/specs/m014_local_pipeline_documentaire_distribue.md`
+  fixe mission, langage, propriétaires, invariants, machines d'états, ports,
+  enveloppes, erreurs, scénarios DIST-003 à DIST-005, ordre des transactions
+  ADR-024, activation et rollback. Le validateur
+  `ost_gate/m014_local_pipeline.py` refuse huit dérives sémantiques :
+  propriétaire absent, total mutable, transaction intercontexte, progression
+  synthétique, assemblage ou projection prématurés, fallback de route et
+  environnement ambigu.
+- Scope : `gate.toml` enregistre uniquement la précondition
+  `precondition.m014_local_pipeline` et les deux tests de spécification. Aucun
+  test d'implémentation T-005 à T-008 n'est encore enregistré.
+- Fichiers ajoutés : spécification, validateur, précondition et deux tests sous
+  `gate_tests/ported/tests/m014_local_pipeline/`. Fichiers modifiés :
+  `gate.toml` et le présent journal.
+- ADR consultées : ADR-024, ADR-025, ADR-052 et DDD-ADR-008. ADR créée ou
+  modifiée : aucune ; P-002 applique leurs décisions sans en changer le sens.
+- Validations avant commit GREEN : tests ciblés 2/2 GREEN ; Ruff ciblé GREEN ;
+  `git diff --check` GREEN ; scope `governance` 25/25 GREEN ; scope
+  `m014_local_pipeline` 27/27 GREEN, sans nœud absent, inattendu ou dupliqué.
+- Commit GREEN : `docs(m014-pipeline): publier specification pipeline local distribue`
+  (commit portant cette entrée). La gate globale finale doit être exécutée une
+  seule fois après ce commit et son verdict terminal transmis à l'orchestrateur.
