@@ -326,8 +326,15 @@ services:
       resources:
         limits:
           cpus: "4.0"
-          memory: 8G
+          memory: 2G
           pids: 256
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids:
+                - "0"
+              capabilities:
+                - gpu
     command:
       - --worker-id
       - worker-documents
@@ -357,6 +364,7 @@ services:
       - ocr-runtime-socket:/var/run/ocr-docker
     tmpfs:
       - /tmp:size=128m,mode=1777
+      - /triton-cache:rw,exec,nosuid,nodev,size=128m,mode=0770,gid=31000
     healthcheck:
       test:
         - CMD-SHELL

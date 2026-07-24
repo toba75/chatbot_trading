@@ -141,7 +141,7 @@ def test_environment_compose_acceptance() -> None:
         assert "ocr-control" not in worker_documents["networks"]
         assert worker_documents["depends_on"]["ocr-runtime"]["condition"] == "service_healthy"
         assert worker_documents["deploy"]["resources"]["limits"]["memory"] == str(
-            8 * 1024**3
+            2 * 1024**3
         )
         assert worker_documents["deploy"]["resources"]["limits"]["cpus"] == 4
         assert worker_documents["healthcheck"]["timeout"] == "30s"

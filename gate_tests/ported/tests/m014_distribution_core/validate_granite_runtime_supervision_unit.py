@@ -1,0 +1,1502 @@
+"""Tests unitaires T-004 du runtime Granite supervisé et terminal."""
+
+from __future__ import annotations
+
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timedelta, timezone
+from hashlib import sha256
+import inspect
+import json
+import math
+from pathlib import Path
+import subprocess
+import threading
+import time
+from uuid import uuid4
+
+import pytest
+import yaml
+
+from app.contracts.technical_jobs import (
+    ClaimedJob,
+    JobEnvironmentIdentity,
+    JobExecutionRequirements,
+    JobIdempotenceKey,
+    JobPriority,
+    JobRecord,
+    JobRequest,
+    JobStatus,
+    _issue_granite_execution_capability,
+    require_granite_execution_capability,
+)
+from app.platform.job_runtime.granite_capacity import (
+    GraniteCapacityConfigurationError,
+    GraniteCapacityController,
+    GraniteModelStillRunning,
+    GranitePageTerminalEnvelope,
+    GranitePageTerminalStatus,
+    GraniteSlotLease,
+    GraniteSlotLeaseLostError,
+    GraniteWorker,
+    GraniteWorkerState,
+    PostgresGraniteSlotRepository,
+    PostgresGraniteWorkerRegistry,
+)
+from app.platform.job_runtime.relay import RelayedJobMessage
+from app.source_processing.adapters.docling_granite_conversion import (
+    GraniteDoclingConversionError,
+    GraniteDoclingConversionRequest,
+    IsolatedGraniteDoclingConverter,
+    RunningGraniteDoclingConversion,
+)
+from app.source_processing.adapters.docling_native_conversion import (
+    CanonicalArtifactFileStore,
+    NativeDoclingConversionResponse,
+    NativeDoclingPage,
+    NativeDoclingPageItem,
+)
+from app.source_processing.adapters.gemma_vision_conversion import (
+    GemmaVisionConversionResponse,
+    GemmaVisionPageItem,
+    RunningGemmaVisionConversion,
+)
+from app.source_processing.application.convert_routed_pages import PageConversionRequest
+from app.source_processing.application.routed_document_conversion_worker import (
+    _RunningGraniteRouteConversion,
+    build_routed_document_conversion_worker,
+)
+from app.source_processing.application.document_commands import (
+    DocumentConversionExecutionPhase,
+    DocumentConversionState,
+    DocumentConversionStatus,
+)
+from app.source_processing.domain.document_processing_run import (
+    DiagnosticVersion,
+    DocumentProcessingRun,
+    PageDecision,
+    PageDecisionState,
+    PageDiagnosticSignals,
+    PageManifest,
+    PageManifestEntry,
+    PageManifestEntryState,
+    PageNumber,
+    PageRouteName,
+    PageRoutingConfiguration,
+    ProcessingRunId,
+    RoutingPolicyVersion,
+)
+from app.source_processing.domain.source_document import (
+    BibliographicMetadata,
+    DocumentId,
+    OriginalStorageRef,
+    SourceDocument,
+    SourceFingerprint,
+)
+
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
+
+
+def _requirements() -> JobExecutionRequirements:
+    return JobExecutionRequirements(
+        contract_name="CONVERT_PAGE",
+        contract_version="1.0",
+        capacity_capability="GRANITE_CUDA",
+        capacity_slots=1,
+        capacity_device="cuda:0",
+        storage_environment="test",
+    )
+
+
+def _lease() -> GraniteSlotLease:
+    identity = JobEnvironmentIdentity(
+        environment="test",
+        deployment_id="ostrading-test-local",
+        configuration_hash="a" * 64,
+    )
+    request = JobRequest(
+        environment=identity.environment,
+        deployment_id=identity.deployment_id,
+        job_name="CONVERT_PAGE",
+        priority=JobPriority.P1,
+        idempotence_key=JobIdempotenceKey(
+            job_name="CONVERT_PAGE",
+            input_hash="b" * 64,
+            configuration_hash=identity.configuration_hash,
+            code_version="m014-runtime",
+            model_version="granite-locked",
+        ),
+        execution_requirements=_requirements(),
+        payload={"contract_version": "1.0"},
+    )
+    expires_at = datetime.now(timezone.utc) + timedelta(seconds=30)
+    claimed = ClaimedJob(
+        job=JobRecord(
+            sequence=1,
+            job_id="JOB-M002-000001",
+            request=request,
+            status=JobStatus.RUNNING,
+            result=None,
+            failure_reason=None,
+        ),
+        trace_id="TRACE-M014-RUNTIME",
+        lease_owner="worker-documents-1",
+        lease_expires_at=expires_at,
+        claim_generation=1,
+        claim_token=str(uuid4()),
+        execution_attempts=1,
+    )
+    return GraniteSlotLease(
+        claimed_job=claimed,
+        slot_ordinal=1,
+        slot_generation=1,
+        slot_token=str(uuid4()),
+        lease_until=expires_at,
+    )
+
+
+def _worker() -> GraniteWorker:
+    return GraniteWorker(
+        worker_instance_id="worker-documents-1",
+        environment_identity=_lease().claimed_job.job.request.environment_identity,
+        storage_environment="test",
+        state=GraniteWorkerState.READY,
+        capabilities=frozenset(("DOCUMENT_STANDARD", "GRANITE_CUDA")),
+    )
+
+
+def _terminal(
+    lease: GraniteSlotLease,
+    status: GranitePageTerminalStatus,
+    payload: dict[str, object],
+) -> GranitePageTerminalEnvelope:
+    return GranitePageTerminalEnvelope.from_payload(
+        completion_id=f"COMPLETE-{lease.claimed_job.job.job_id}-{status.value}",
+        status=status,
+        payload=payload,
+        failure_reason=(
+            None if status is GranitePageTerminalStatus.SUCCEEDED else "MODEL_FAILED"
+        ),
+    )
+
+
+class _Process:
+    def __init__(self, outcomes: list[object]) -> None:
+        self._outcomes = outcomes
+        self.terminated = False
+        self.wait_timeouts: list[float] = []
+
+    def wait(self, *, timeout_seconds: float):
+        self.wait_timeouts.append(timeout_seconds)
+        outcome = self._outcomes.pop(0)
+        if isinstance(outcome, BaseException):
+            raise outcome
+        return outcome
+
+    def terminate(self) -> None:
+        self.terminated = True
+
+
+class _Repository:
+    def __init__(self, *, heartbeat_failure: Exception | None = None) -> None:
+        self.lease = _lease()
+        self.heartbeat_failure = heartbeat_failure
+        self.heartbeats = 0
+        self.terminals: list[GranitePageTerminalEnvelope] = []
+        self.claim_enabled = True
+        self.terminal_failure: Exception | None = None
+        self.legacy_acquisitions: list[GraniteSlotLease | None] = []
+        self.releases: list[GraniteSlotLease] = []
+
+    def claim_compatible_job(self, **_arguments):
+        return self.lease if self.claim_enabled else None
+
+    def heartbeat(self, lease, *, lease_seconds):
+        assert lease_seconds == 30
+        self.heartbeats += 1
+        if self.heartbeat_failure is not None:
+            raise self.heartbeat_failure
+        return lease
+
+    def complete_page_execution(self, lease, envelope):
+        assert lease == self.lease
+        if self.terminal_failure is not None:
+            raise self.terminal_failure
+        self.terminals.append(envelope)
+        return lease.claimed_job.job
+
+    def acquire_for_claimed_job(self, *, worker, claimed_job, lease_seconds):
+        assert lease_seconds == 30
+        assert claimed_job == self.lease.claimed_job
+        if self.legacy_acquisitions:
+            return self.legacy_acquisitions.pop(0)
+        return self.lease
+
+    def release(self, lease):
+        self.releases.append(lease)
+
+
+def test_runtime_granite_supervise_heartbeat_annulation_et_terminal_atomique(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Given un job Granite leased, When il bloque ou perd sa lease, Then le processus reste supervisé."""
+
+    repository = _Repository()
+    process = _Process(
+        [GraniteModelStillRunning(), GraniteModelStillRunning(), {"answer": "ok"}]
+    )
+    execution = GraniteCapacityController(repository=repository).execute_next(
+        worker=_worker(),
+        lease_seconds=30,
+        heartbeat_seconds=0.01,
+        job_names=("CONVERT_PAGE",),
+        execution_requirements=_requirements(),
+        start_model=lambda _lease: process,
+        success_envelope=lambda lease, result: _terminal(
+            lease,
+            GranitePageTerminalStatus.SUCCEEDED,
+            result,
+        ),
+        failure_envelope=lambda lease, _error: _terminal(
+            lease,
+            GranitePageTerminalStatus.FAILED,
+            {"error_code": "MODEL_FAILED"},
+        ),
+    )
+    assert execution is not None
+    assert execution.model_result == {"answer": "ok"}
+    assert repository.heartbeats == 2
+    assert len(repository.terminals) == 1
+    assert repository.terminals[0].status is GranitePageTerminalStatus.SUCCEEDED
+    assert process.terminated is False
+
+    lost_repository = _Repository(heartbeat_failure=GraniteSlotLeaseLostError())
+    blocked_process = _Process([GraniteModelStillRunning()])
+    with pytest.raises(GraniteSlotLeaseLostError, match="JOB_LEASE_LOST"):
+        GraniteCapacityController(repository=lost_repository).execute_next(
+            worker=_worker(),
+            lease_seconds=30,
+            heartbeat_seconds=0.01,
+            job_names=("CONVERT_PAGE",),
+            execution_requirements=_requirements(),
+            start_model=lambda _lease: blocked_process,
+            success_envelope=lambda lease, result: _terminal(
+                lease, GranitePageTerminalStatus.SUCCEEDED, result
+            ),
+            failure_envelope=lambda lease, _error: _terminal(
+                lease,
+                GranitePageTerminalStatus.FAILED,
+                {"error_code": "MODEL_FAILED"},
+            ),
+        )
+    assert blocked_process.terminated is True
+    assert lost_repository.terminals == []
+
+    primary = RuntimeError("GRANITE_MODEL_PRIMARY")
+    compensation = RuntimeError("GRANITE_TERMINAL_COMPENSATION_FAILED")
+    failing_repository = _Repository()
+    failing_repository.terminal_failure = compensation
+    with pytest.raises(ExceptionGroup) as captured:
+        GraniteCapacityController(repository=failing_repository).execute_next(
+            worker=_worker(),
+            lease_seconds=30,
+            heartbeat_seconds=0.01,
+            job_names=("CONVERT_PAGE",),
+            execution_requirements=_requirements(),
+            start_model=lambda _lease: _Process([primary]),
+            success_envelope=lambda lease, result: _terminal(
+                lease, GranitePageTerminalStatus.SUCCEEDED, result
+            ),
+            failure_envelope=lambda lease, _error: _terminal(
+                lease,
+                GranitePageTerminalStatus.FAILED,
+                {"error_code": "MODEL_FAILED"},
+            ),
+        )
+    assert captured.value.exceptions == (primary, compensation)
+
+    waiting_repository = _Repository()
+    waiting_repository.claim_enabled = False
+    model_started: list[object] = []
+    assert (
+        GraniteCapacityController(repository=waiting_repository).execute_next(
+            worker=_worker(),
+            lease_seconds=30,
+            heartbeat_seconds=0.01,
+            job_names=("CONVERT_PAGE",),
+            execution_requirements=_requirements(),
+            start_model=lambda lease: model_started.append(lease),
+            success_envelope=lambda lease, result: _terminal(
+                lease, GranitePageTerminalStatus.SUCCEEDED, result
+            ),
+            failure_envelope=lambda lease, _error: _terminal(
+                lease,
+                GranitePageTerminalStatus.FAILED,
+                {"error_code": "MODEL_FAILED"},
+            ),
+        )
+        is None
+    )
+    assert model_started == []
+
+    legacy_repository = _Repository()
+    legacy_repository.legacy_acquisitions = [None, legacy_repository.lease]
+    legacy_model_starts: list[object] = []
+    legacy_execution = GraniteCapacityController(
+        repository=legacy_repository
+    ).execute_claimed_job(
+        worker=_worker(),
+        claimed_job=legacy_repository.lease.claimed_job,
+        lease_seconds=30,
+        heartbeat_seconds=0.01,
+        start_model=lambda lease: (
+            legacy_model_starts.append(lease) or _Process([{"legacy": "ok"}])
+        ),
+    )
+    assert legacy_execution.model_result == {"legacy": "ok"}
+    assert len(legacy_model_starts) == 1
+    require_granite_execution_capability(legacy_model_starts[0])
+    assert legacy_repository.releases == [legacy_repository.lease]
+
+    parameter = inspect.signature(JobRequest).parameters["execution_requirements"]
+    assert parameter.default is inspect.Parameter.empty
+
+    for relative_path in (
+        "config/application.example.yaml",
+        "config/environments/development.yaml",
+        "config/environments/test.yaml",
+        "config/environments/production.yaml",
+        "deploy/local-compose/application.compose.yaml",
+    ):
+        configuration = yaml.safe_load(
+            (REPOSITORY_ROOT / relative_path).read_text("utf-8")
+        )
+        assert configuration["services"]["workers"]["granite_concurrency"] == 1
+
+    quota_source = (
+        REPOSITORY_ROOT / "app/platform/job_runtime/granite_capacity.py"
+    ).read_text("utf-8")
+    assert "payload ->" not in quota_source
+    assert "%(environment)s" in quota_source
+
+    composition_source = (
+        REPOSITORY_ROOT / "app/platform/job_runtime/composition.py"
+    ).read_text("utf-8")
+    assert "GraniteCapacityController" in composition_source
+    assert "PostgresGraniteWorkerRegistry" in composition_source
+
+    for converter_path in (
+        "app/source_processing/adapters/docling_granite_conversion.py",
+        "app/source_processing/adapters/gemma_vision_conversion.py",
+    ):
+        converter_source = (REPOSITORY_ROOT / converter_path).read_text("utf-8")
+        assert "subprocess.Popen" in converter_source
+        assert "subprocess.run(" not in converter_source
+
+    _assert_frontiere_popen(
+        monkeypatch,
+        tmp_path,
+        lambda process, source: RunningGraniteDoclingConversion(
+            process=process,
+            request=_granite_request(source),
+            input_payload=b"{}",
+            timeout_seconds=1.0,
+        ),
+        GraniteDoclingConversionError,
+        "GRANITE_DOCLING_TIMEOUT",
+    )
+    _assert_frontiere_popen(
+        monkeypatch,
+        tmp_path,
+        lambda process, _source: RunningGemmaVisionConversion(
+            process=process,
+            input_payload=b"{}",
+            timeout_seconds=1.0,
+        ),
+        Exception,
+        "GEMMA_VISION_TIMEOUT",
+    )
+    monkeypatch.undo()
+    _assert_arret_popen_retentable_et_erreur_primaire(tmp_path)
+    _assert_perte_lease(False)
+    _assert_perte_lease(True)
+    _assert_classification_erreur_primaire()
+    _assert_transition_heartbeat(tmp_path)
+    _assert_erreur_configuration_precise()
+    _assert_builder_quota_reel(monkeypatch, tmp_path)
+    _assert_drainage_lifecycle_et_heartbeat_serialise()
+    _assert_sigterm_laisse_finir_le_couple_actif()
+    _assert_capability_modele_emise_par_controleur(tmp_path)
+    _assert_enveloppe_terminale_gelee()
+    _assert_relais_historique_et_parametres_obligatoires()
+
+
+class _PopenBoundary:
+    def __init__(self, *, terminate_failure: Exception | None = None) -> None:
+        self.returncode = None
+        self.terminate_failure = terminate_failure
+        self.events: list[str] = []
+
+    def communicate(self, *, input, timeout):
+        self.events.append(f"communicate:{timeout}")
+        raise subprocess.TimeoutExpired("granite", timeout)
+
+    def poll(self):
+        return None
+
+    def terminate(self) -> None:
+        self.events.append("terminate")
+        if self.terminate_failure is not None:
+            raise self.terminate_failure
+
+    def wait(self, *, timeout):
+        self.events.append(f"wait:{timeout}")
+        if "kill" not in self.events:
+            raise subprocess.TimeoutExpired("granite", timeout)
+        return -9
+
+    def kill(self) -> None:
+        self.events.append("kill")
+
+
+def _granite_request(source_path: Path) -> GraniteDoclingConversionRequest:
+    return GraniteDoclingConversionRequest(
+        document_id="DOC-AAAAAAAAAAAAAAAA",
+        processing_run_id="RUN-M014-CYCLE3",
+        source_sha256="a" * 64,
+        source_pdf_path=source_path,
+        page_number=1,
+        source_page_number=1,
+        route_name="SCAN_GRANITE",
+        routing_policy_version="routing-cycle3-v1",
+    )
+
+
+@pytest.mark.parametrize(
+    ("factory", "error_type", "error_code"),
+    (
+        (
+            lambda process, source: RunningGraniteDoclingConversion(
+                process=process,
+                request=_granite_request(source),
+                input_payload=b"{}",
+                timeout_seconds=1.0,
+            ),
+            GraniteDoclingConversionError,
+            "GRANITE_DOCLING_TIMEOUT",
+        ),
+        (
+            lambda process, _source: RunningGemmaVisionConversion(
+                process=process,
+                input_payload=b"{}",
+                timeout_seconds=1.0,
+            ),
+            Exception,
+            "GEMMA_VISION_TIMEOUT",
+        ),
+    ),
+)
+def _assert_frontiere_popen(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    factory,
+    error_type,
+    error_code: str,
+) -> None:
+    """Given un Popen encore actif, When sa deadline totale expire, Then terminate/wait/kill est unique."""
+
+    now = [100.0]
+    monkeypatch.setattr(time, "monotonic", lambda: now[0])
+    source = tmp_path / "source.pdf"
+    source.write_bytes(b"%PDF-1.7\ncycle3\n%%EOF\n")
+    process = _PopenBoundary()
+    running = factory(process, source)
+
+    with pytest.raises(GraniteModelStillRunning):
+        running.wait(timeout_seconds=0.25)
+    assert process.events == ["communicate:0.25"]
+
+    now[0] = 101.0
+    with pytest.raises(error_type) as captured:
+        running.wait(timeout_seconds=0.25)
+    assert getattr(captured.value, "code", str(captured.value)) == error_code
+    assert process.events == [
+        "communicate:0.25",
+        "terminate",
+        "wait:5.0",
+        "kill",
+        "wait:5.0",
+    ]
+    running.terminate()
+    assert process.events.count("terminate") == 1
+    assert process.events.count("kill") == 1
+
+
+def _assert_arret_popen_retentable_et_erreur_primaire(tmp_path: Path) -> None:
+    """Given un arrêt système défaillant, When il est rejoué, Then la sortie reste confirmable."""
+
+    source = tmp_path / "source-arret-rejouable.pdf"
+    source.write_bytes(b"%PDF-1.7\ncycle3 retry terminate\n%%EOF\n")
+    termination_failure = RuntimeError("GRANITE_PROCESS_TERMINATION_FAILED")
+    process = _PopenBoundary(terminate_failure=termination_failure)
+    running = RunningGraniteDoclingConversion(
+        process=process,
+        request=_granite_request(source),
+        input_payload=b"{}",
+        timeout_seconds=1.0,
+    )
+    with pytest.raises(RuntimeError, match="GRANITE_PROCESS_TERMINATION_FAILED"):
+        running.terminate()
+    process.terminate_failure = None
+    running.terminate()
+    assert process.events.count("terminate") == 2
+    assert process.events.count("kill") == 1
+
+    failing_process = _PopenBoundary(terminate_failure=termination_failure)
+    timed = RunningGraniteDoclingConversion(
+        process=failing_process,
+        request=_granite_request(source),
+        input_payload=b"{}",
+        timeout_seconds=0.001,
+    )
+    timed._deadline = time.monotonic() - 1  # type: ignore[attr-defined]
+    with pytest.raises(ExceptionGroup) as captured:
+        timed.wait(timeout_seconds=0.01)
+    assert getattr(captured.value.exceptions[0], "code", None) == "GRANITE_DOCLING_TIMEOUT"
+    assert captured.value.exceptions[1] is termination_failure
+    failing_process.terminate_failure = None
+    timed.terminate()
+    assert failing_process.events.count("terminate") == 2
+
+
+@pytest.mark.parametrize("legacy", (False, True))
+def _assert_perte_lease(
+    legacy: bool,
+) -> None:
+    """Given une lease perdue, When l'arrêt échoue, Then JOB_LEASE_LOST reste la première cause."""
+
+    lost = GraniteSlotLeaseLostError()
+    repository = _Repository(heartbeat_failure=lost)
+    process = _Process([GraniteModelStillRunning()])
+
+    def terminate() -> None:
+        raise RuntimeError("GRANITE_PROCESS_TERMINATION_FAILED")
+
+    process.terminate = terminate  # type: ignore[method-assign]
+    controller = GraniteCapacityController(repository=repository)
+    with pytest.raises(ExceptionGroup) as captured:
+        if legacy:
+            controller.execute_claimed_job(
+                worker=_worker(),
+                claimed_job=repository.lease.claimed_job,
+                lease_seconds=30,
+                heartbeat_seconds=0.01,
+                start_model=lambda _lease: process,
+            )
+        else:
+            controller.execute_next(
+                worker=_worker(),
+                lease_seconds=30,
+                heartbeat_seconds=0.01,
+                job_names=("CONVERT_PAGE",),
+                execution_requirements=_requirements(),
+                start_model=lambda _lease: process,
+                success_envelope=lambda lease, result: _terminal(
+                    lease, GranitePageTerminalStatus.SUCCEEDED, result
+                ),
+                failure_envelope=lambda lease, _error: _terminal(
+                    lease,
+                    GranitePageTerminalStatus.FAILED,
+                    {"error_code": "MODEL_FAILED"},
+                ),
+            )
+    assert captured.value.exceptions[0] is lost
+    assert str(captured.value.exceptions[1]) == "GRANITE_PROCESS_TERMINATION_FAILED"
+
+
+def _assert_classification_erreur_primaire() -> None:
+    from app.source_processing.adapters.worker_runtime import _classify_processing_error
+
+    lost = GraniteSlotLeaseLostError()
+    grouped = ExceptionGroup(
+        "GRANITE_LEASE_AND_TERMINATION_FAILURE",
+        [lost, RuntimeError("GRANITE_PROCESS_TERMINATION_FAILED")],
+    )
+    assert _classify_processing_error(grouped) == ("JOB_LEASE_LOST", True)
+    assert _classify_processing_error(
+        GraniteCapacityConfigurationError("REPOSITORY_PORT_INCOMPLETE")
+    ) == ("GRANITE_CAPACITY_CONFIGURATION_INVALID", False)
+
+
+class _ImmediateProcess:
+    def __init__(self, outcome: object) -> None:
+        self.outcome = outcome
+
+    def wait(self, *, timeout_seconds: float):
+        del timeout_seconds
+        if isinstance(self.outcome, BaseException):
+            raise self.outcome
+        return self.outcome
+
+    def terminate(self) -> None:
+        raise AssertionError("arrêt inattendu")
+
+
+class _TransitionGraniteConverter:
+    def start(self, request, *, capability):
+        del request
+        require_granite_execution_capability(capability)
+        return _ImmediateProcess(
+            GraniteDoclingConversionError("GRANITE_DOCLING_UNAVAILABLE")
+        )
+
+
+class _TransitionGemmaConverter:
+    def __init__(self) -> None:
+        self.starts = 0
+
+    def start(self, request, *, capability):
+        del request
+        require_granite_execution_capability(capability)
+        self.starts += 1
+        return _ImmediateProcess(
+            GemmaVisionConversionResponse(
+                tool_version="gemma-cycle3-v1",
+                items=(
+                    GemmaVisionPageItem(
+                        text="Texte Gemma supervisé.",
+                        bbox=(0.1, 0.1, 0.9, 0.2),
+                    ),
+                ),
+            )
+        )
+
+
+def _assert_transition_heartbeat(
+    tmp_path: Path,
+) -> None:
+    """Given Granite finit vite, When Gemma prend le relais, Then le contrôleur renouvelle avant le second modèle."""
+
+    source = tmp_path / "source.pdf"
+    source.write_bytes(b"%PDF-1.7\ncycle3 transition\n%%EOF\n")
+    request = PageConversionRequest(
+        processing_run_id=ProcessingRunId.from_value("RUN-M014-CYCLE3"),
+        document_id=DocumentId.from_value("DOC-AAAAAAAAAAAAAAAA"),
+        page_number=PageNumber.from_value(1),
+        route_name=PageRouteName.SCAN_GRANITE,
+        routing_policy_version=RoutingPolicyVersion.from_value("routing-cycle3-v1"),
+        source_artifact_ref="artifact:source_processing.original/cycle3.pdf",
+        expected_output_artifact_ref=(
+            "artifact:source_processing.page_conversion/"
+            "RUN-M014-CYCLE3/page-001-scan_granite.json"
+        ),
+    )
+    gemma = _TransitionGemmaConverter()
+    running = _RunningGraniteRouteConversion(
+        capability=_issue_granite_execution_capability(),
+        request=request,
+        source_path=source,
+        granite_converter=_TransitionGraniteConverter(),
+        gemma_converter=gemma,
+        gateway_endpoint_url="http://llm-gateway:8001/v1/infer",
+        gateway_timeout_seconds=30,
+        gateway_max_output_tokens=128,
+        expected_model_id="google/gemma-3-27b-it",
+    )
+    with pytest.raises(GraniteModelStillRunning):
+        running.wait(timeout_seconds=0.01)
+    assert gemma.starts == 1
+    assert running.wait(timeout_seconds=0.01).tool_name.value == "GEMMA_VISION"
+
+
+def _assert_erreur_configuration_precise() -> None:
+    with pytest.raises(GraniteCapacityConfigurationError) as captured:
+        GraniteCapacityController(repository=object())
+    assert captured.value.code == "GRANITE_CAPACITY_CONFIGURATION_INVALID"
+    assert captured.value.reason == "REPOSITORY_PORT_INCOMPLETE"
+
+
+class _BuiltSourceRepository:
+    def __init__(self, source: SourceDocument) -> None:
+        self.source = source
+
+    def find_by_document_id(self, document_id: DocumentId):
+        return self.source if document_id == self.source.document_id else None
+
+
+class _BuiltRunRepository:
+    def __init__(self, run: DocumentProcessingRun) -> None:
+        self.run = run
+
+    def find_by_document_id(self, document_id: DocumentId):
+        return self.run if document_id == self.run.document_id else None
+
+
+class _BuiltConversionRepository:
+    def __init__(self, source: SourceDocument) -> None:
+        self.state = DocumentConversionState(
+            document_id=source.document_id,
+            conversion_status=DocumentConversionStatus.CONVERSION_REQUESTED,
+            canonical_version_id=None,
+            rejection_error_code=None,
+            execution_phase=DocumentConversionExecutionPhase.QUEUED,
+            completed_units=0,
+            total_units=1,
+            failure_error_code=None,
+        )
+        self.publication = None
+
+    def find_conversion_by_document_id(self, document_id: DocumentId):
+        return self.state if document_id == self.state.document_id else None
+
+    def begin_native_conversion(self, *, document_id: DocumentId) -> None:
+        assert document_id == self.state.document_id
+
+    def record_conversion_progress(
+        self, *, document_id: DocumentId, completed_units: int
+    ) -> None:
+        assert document_id == self.state.document_id
+        assert completed_units == 1
+
+    def complete_native_conversion(self, publication) -> None:
+        self.publication = publication
+
+    def reject_native_conversion(
+        self, *, document_id: DocumentId, error_code: str
+    ) -> None:
+        raise AssertionError((document_id, error_code))
+
+
+class _BuiltOriginalStore:
+    def __init__(self, source_path: Path) -> None:
+        self.source_path = source_path
+
+    def resolve_internal_path(self, storage_ref) -> Path:
+        del storage_ref
+        return self.source_path
+
+
+class _UnusedNativeConverter:
+    def convert(self, request):
+        raise AssertionError(request)
+
+
+class _ForbiddenGemmaConverter:
+    def start(self, request, *, capability):
+        raise AssertionError((request, capability))
+
+
+class _BlockingGraniteProcess:
+    def __init__(self, release_models: threading.Event) -> None:
+        self.release_models = release_models
+
+    def wait(self, *, timeout_seconds: float):
+        if not self.release_models.wait(timeout_seconds):
+            raise GraniteModelStillRunning()
+        return NativeDoclingConversionResponse(
+            tool_version="granite-cycle3-v1",
+            pages=(
+                NativeDoclingPage(
+                    page_number=1,
+                    items=(
+                        NativeDoclingPageItem(
+                            text="Texte Granite sous quota durable.",
+                            bbox=(0.1, 0.1, 0.9, 0.2),
+                            provenance={"page_number": 1, "source": "granite"},
+                        ),
+                    ),
+                ),
+            ),
+        )
+
+    def terminate(self) -> None:
+        self.release_models.set()
+
+
+class _BlockingGraniteConverter:
+    def __init__(
+        self,
+        *,
+        worker_id: str,
+        events: list[str],
+        events_lock: threading.Lock,
+        release_models: threading.Event,
+    ) -> None:
+        self.worker_id = worker_id
+        self.events = events
+        self.events_lock = events_lock
+        self.release_models = release_models
+
+    def start(self, request, *, capability):
+        del request
+        require_granite_execution_capability(capability)
+        with self.events_lock:
+            self.events.append(f"start:{self.worker_id}")
+        return _BlockingGraniteProcess(self.release_models)
+
+
+class _TwoSlotRepository:
+    def __init__(self, *, events: list[str], events_lock: threading.Lock) -> None:
+        self.events = events
+        self.lock = events_lock
+        self.held: dict[int, GraniteSlotLease] = {}
+        self.third_waiting = threading.Event()
+
+    def claim_compatible_job(self, **_arguments):
+        raise AssertionError("claim page T-005 interdit")
+
+    def complete_page_execution(self, *_arguments):
+        raise AssertionError("terminal page T-005 interdit")
+
+    def acquire_for_claimed_job(self, *, worker, claimed_job, lease_seconds):
+        assert lease_seconds == 30
+        with self.lock:
+            if any(
+                lease.claimed_job.lease_owner == worker.worker_instance_id
+                for lease in self.held.values()
+            ):
+                raise AssertionError("un worker ne peut détenir deux slots")
+            available = next(
+                (slot for slot in (1, 2) if slot not in self.held),
+                None,
+            )
+            if available is None:
+                if worker.worker_instance_id == "worker-documents-3":
+                    self.third_waiting.set()
+                return None
+            lease = GraniteSlotLease(
+                claimed_job=claimed_job,
+                slot_ordinal=available,
+                slot_generation=1,
+                slot_token=str(uuid4()),
+                lease_until=claimed_job.lease_expires_at,
+            )
+            self.held[available] = lease
+            self.events.append(f"acquire:{worker.worker_instance_id}:{available}")
+            return lease
+
+    def heartbeat(self, lease, *, lease_seconds):
+        assert lease_seconds == 30
+        with self.lock:
+            if self.held.get(lease.slot_ordinal) != lease:
+                raise GraniteSlotLeaseLostError()
+        return lease
+
+    def release(self, lease) -> None:
+        with self.lock:
+            if self.held.pop(lease.slot_ordinal, None) != lease:
+                raise GraniteSlotLeaseLostError()
+            self.events.append(f"release:{lease.claimed_job.lease_owner}")
+
+
+class _BuiltHeartbeatControl:
+    def __init__(self, *, worker_id: str, events: list[str], lock: threading.Lock):
+        self.worker_id = worker_id
+        self.events = events
+        self.lock = lock
+
+    def pause(self) -> None:
+        with self.lock:
+            self.events.append(f"pause:{self.worker_id}")
+
+    def resume(self) -> None:
+        with self.lock:
+            self.events.append(f"resume:{self.worker_id}")
+
+
+def _built_scan_fixture(index: int, root: Path):
+    content = f"%PDF-1.7\ncycle3 builder {index}\n%%EOF\n".encode()
+    source_path = root / f"source-{index}.pdf"
+    source_path.write_bytes(content)
+    fingerprint = SourceFingerprint.from_content(content)
+    document_id = DocumentId.from_fingerprint(fingerprint)
+    source = SourceDocument.register_original(
+        document_id=document_id,
+        fingerprint=fingerprint,
+        original_storage_ref=OriginalStorageRef.from_value(
+            "artifact:source_processing.original_sources/"
+            f"{document_id.value}/{fingerprint.value}.pdf"
+        ),
+        metadata=BibliographicMetadata.from_payload(
+            {
+                "title": f"Builder Granite {index}",
+                "authors": ["Perry J. Kaufman"],
+                "publication_year": 2020,
+                "edition": "1re édition",
+            }
+        ),
+    )
+    run = (
+        DocumentProcessingRun.start(
+            processing_run_id=ProcessingRunId.from_value(
+                f"RUN-M014-CYCLE3-BUILDER-{index}"
+            ),
+            source_document=source,
+            page_manifest=PageManifest.from_entries(
+                source_page_count=1,
+                entries=(
+                    PageManifestEntry(
+                        PageNumber.from_value(1),
+                        PageManifestEntryState.PRESENT,
+                    ),
+                ),
+            ),
+        )
+        .record_page_diagnostics(
+            (
+                PageDecision(
+                    page_number=PageNumber.from_value(1),
+                    page_state=PageDecisionState.SCAN_CLEAN,
+                    signals=PageDiagnosticSignals(
+                        native_text_state="ABSENT",
+                        image_state="SCAN_CLEAN",
+                        existing_ocr_state="NONE",
+                        layout_complexity="SIMPLE",
+                        corruption_state="NONE",
+                        mixed_content_detected=False,
+                        has_table=False,
+                        has_formula=False,
+                    ),
+                    diagnostic_version=DiagnosticVersion.from_value("diag-cycle3-v1"),
+                    justification="Scan propre pour quota comportemental.",
+                ),
+            )
+        )
+        .decide_route_plan(
+            PageRoutingConfiguration(
+                routing_policy_version=RoutingPolicyVersion.from_value(
+                    "routing-cycle3-v1"
+                ),
+                auto_confidence_min=0.9,
+                benchmark_confidence_min=0.85,
+            )
+        )
+    )
+    claimed = ClaimedJob(
+        job=JobRecord(
+            sequence=index,
+            job_id=f"JOB-M002-{index:06d}",
+            request=JobRequest(
+                environment="test",
+                deployment_id="ostrading-test-local",
+                job_name="CONVERT_DOCUMENT",
+                priority=JobPriority.P1,
+                idempotence_key=JobIdempotenceKey(
+                    job_name="CONVERT_DOCUMENT",
+                    input_hash=fingerprint.value,
+                    configuration_hash="a" * 64,
+                    code_version="m014-cycle3-builder",
+                    model_version="granite-locked",
+                ),
+                execution_requirements=None,
+                payload={
+                    "document_id": document_id.value,
+                    "processing_run_id": run.processing_run_id.value,
+                    "source_sha256": fingerprint.value,
+                    "routing_policy_version": (
+                        run.route_plan.routing_policy_version.value
+                    ),
+                    "route_count": 1,
+                },
+            ),
+            status=JobStatus.RUNNING,
+            result=None,
+            failure_reason=None,
+        ),
+        trace_id=f"TRACE-M014-CYCLE3-{index}",
+        lease_owner=f"worker-documents-{index}",
+        lease_expires_at=datetime.now(timezone.utc) + timedelta(seconds=30),
+        claim_generation=1,
+        claim_token=str(uuid4()),
+        execution_attempts=1,
+    )
+    return source, run, source_path, claimed
+
+
+def _assert_builder_quota_reel(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Given trois workers réels SCAN_GRANITE, When deux slots sont pris, Then le troisième attend sans modèle."""
+
+    import app.source_processing.adapters.ocrmypdf_container as ocrmypdf_module
+    import app.source_processing.application.routed_document_conversion_worker as worker_module
+
+    events: list[str] = []
+    events_lock = threading.Lock()
+    release_models = threading.Event()
+    repository = _TwoSlotRepository(events=events, events_lock=events_lock)
+    controller = GraniteCapacityController(repository=repository)
+    monkeypatch.setattr(
+        ocrmypdf_module.OcrmyPdfImageManifest,
+        "load",
+        lambda **_arguments: object(),
+    )
+    monkeypatch.setattr(
+        worker_module,
+        "IsolatedNativeDoclingConverter",
+        lambda **_arguments: _UnusedNativeConverter(),
+    )
+    monkeypatch.setattr(
+        worker_module,
+        "IsolatedGraniteDoclingConverter",
+        lambda **_arguments: _BlockingGraniteConverter(
+            worker_id=f"worker-documents-{len(workers_under_construction) + 1}",
+            events=events,
+            events_lock=events_lock,
+            release_models=release_models,
+        ),
+    )
+    monkeypatch.setattr(
+        worker_module,
+        "IsolatedGemmaVisionPageConverter",
+        lambda **_arguments: _ForbiddenGemmaConverter(),
+    )
+
+    identity = _lease().claimed_job.job.request.environment_identity
+    fixtures = tuple(_built_scan_fixture(index, tmp_path) for index in (1, 2, 3))
+    workers_under_construction: list[object] = []
+    workers = []
+    for index, (source, run, source_path, claimed) in enumerate(fixtures, start=1):
+        worker_id = f"worker-documents-{index}"
+        workers.append(
+            (
+                build_routed_document_conversion_worker(
+                    source_document_repository=_BuiltSourceRepository(source),
+                    processing_run_repository=_BuiltRunRepository(run),
+                    conversion_repository=_BuiltConversionRepository(source),
+                    original_source_store=_BuiltOriginalStore(source_path),
+                    native_asset_manifest_path=tmp_path / "native.json",
+                    native_assets_root=tmp_path / "native",
+                    granite_asset_manifest_path=tmp_path / "granite.json",
+                    granite_assets_root=tmp_path / "granite",
+                    ocrmypdf_manifest_path=tmp_path / "ocr.json",
+                    audit_root=tmp_path / "audit",
+                    timeout_seconds=30,
+                    llm_gateway_url="http://llm-gateway:8001/v1/infer",
+                    llm_gateway_timeout_seconds=30,
+                    llm_gateway_max_output_tokens=128,
+                    expected_gemma_model_id="google/gemma-3-27b-it",
+                    artifact_store=CanonicalArtifactFileStore(
+                        root=tmp_path / f"canonical-{index}"
+                    ),
+                    max_parallel_pages=1,
+                    docling_max_concurrency=1,
+                    granite_max_concurrency=1,
+                    granite_capacity_controller=controller,
+                    granite_worker=GraniteWorker(
+                        worker_instance_id=worker_id,
+                        environment_identity=identity,
+                        storage_environment="test",
+                        state=GraniteWorkerState.READY,
+                        capabilities=frozenset(("DOCUMENT_STANDARD", "GRANITE_CUDA")),
+                    ),
+                    granite_lease_seconds=30,
+                    granite_heartbeat_seconds=0.01,
+                    job_heartbeat_control=_BuiltHeartbeatControl(
+                        worker_id=worker_id,
+                        events=events,
+                        lock=events_lock,
+                    ),
+                ),
+                claimed,
+            )
+        )
+        workers_under_construction.append(workers[-1])
+
+    executor = ThreadPoolExecutor(max_workers=3)
+    futures = []
+    try:
+        futures.extend(
+            executor.submit(worker.execute, claimed)
+            for worker, claimed in workers[:2]
+        )
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            with events_lock:
+                starts = tuple(event for event in events if event.startswith("start:"))
+            if len(starts) == 2:
+                break
+            time.sleep(0.01)
+        assert len(starts) == 2
+        assert len(set(starts)) == 2
+        futures.append(executor.submit(workers[2][0].execute, workers[2][1]))
+        assert repository.third_waiting.wait(timeout=5)
+        with events_lock:
+            snapshot = tuple(events)
+        for start in starts:
+            worker_id = start.removeprefix("start:")
+            assert (
+                snapshot.index(f"pause:{worker_id}")
+                < snapshot.index(
+                    next(
+                        event
+                        for event in snapshot
+                        if event.startswith(f"acquire:{worker_id}:")
+                    )
+                )
+                < snapshot.index(start)
+            )
+        assert "start:worker-documents-3" not in snapshot
+
+        release_models.set()
+        results = tuple(future.result(timeout=10) for future in futures)
+    finally:
+        release_models.set()
+        for future in futures:
+            if not future.done():
+                future.cancel()
+        executor.shutdown(wait=True, cancel_futures=True)
+
+    assert all(
+        result["conversion_status"] == "CANONICAL_ACCEPTED" for result in results
+    )
+    assert sum(event.startswith("start:") for event in events) == 3
+    assert repository.held == {}
+
+
+class _LifecycleRegistry:
+    def __init__(self, events: list[str]) -> None:
+        self.events = events
+
+    def register(self, worker, *, presence_lease_seconds: int) -> None:
+        self.events.append(f"register:{worker.worker_instance_id}:{presence_lease_seconds}")
+
+    def begin_draining(self, *, worker_instance_id: str, drain_deadline: datetime) -> None:
+        self.events.append(f"drain:{worker_instance_id}:{drain_deadline.isoformat()}")
+
+
+class _LifecyclePresence:
+    def __init__(self, events: list[str]) -> None:
+        self.events = events
+        self.failure: Exception | None = None
+
+    def start(self) -> None:
+        self.events.append("presence:start")
+
+    def assert_alive(self) -> None:
+        if self.failure is not None:
+            raise self.failure
+
+    def stop(self) -> None:
+        self.events.append("presence:stop")
+
+
+class _LifecycleController:
+    def __init__(self, events: list[str]) -> None:
+        self.events = events
+
+    def begin_draining(self) -> None:
+        self.events.append("controller:draining")
+
+
+class _LifecycleHeartbeatCoordinator:
+    def __init__(self, events: list[str]) -> None:
+        self.events = events
+
+    def freeze_for_drain(self) -> None:
+        self.events.append("job-heartbeat:frozen")
+
+
+def _assert_drainage_lifecycle_et_heartbeat_serialise() -> None:
+    from app.source_processing.adapters.worker_runtime import (
+        RegisteredDocumentWorkerLifecycle,
+    )
+
+    events: list[str] = []
+    presence = _LifecyclePresence(events)
+    lifecycle = RegisteredDocumentWorkerLifecycle(
+        worker_registry=_LifecycleRegistry(events),
+        capacity_controller=_LifecycleController(events),
+        job_heartbeat_coordinator=_LifecycleHeartbeatCoordinator(events),
+        worker=_worker(),
+        presence_heartbeat=presence,
+        presence_lease_seconds=30,
+        shutdown_seconds=9,
+        now=lambda: datetime(2026, 7, 24, 12, 0, tzinfo=timezone.utc),
+    )
+    lifecycle.start()
+    assert lifecycle.admissions_open is True
+    lifecycle.request_drain()
+    assert lifecycle.admissions_open is False
+    assert events[:5] == [
+        "register:worker-documents-1:30",
+        "presence:start",
+        "job-heartbeat:frozen",
+        "controller:draining",
+        "drain:worker-documents-1:2026-07-24T12:00:09+00:00",
+    ]
+    lifecycle.close()
+    lifecycle.close()
+    assert events.count("presence:stop") == 1
+    assert sum(event.startswith("drain:") for event in events) == 1
+
+    sigterm_events: list[str] = []
+    sigterm_lifecycle = RegisteredDocumentWorkerLifecycle(
+        worker_registry=_LifecycleRegistry(sigterm_events),
+        capacity_controller=_LifecycleController(sigterm_events),
+        job_heartbeat_coordinator=_LifecycleHeartbeatCoordinator(sigterm_events),
+        worker=_worker(),
+        presence_heartbeat=_LifecyclePresence(sigterm_events),
+        presence_lease_seconds=30,
+        shutdown_seconds=9,
+        now=lambda: datetime(2026, 7, 24, 13, 0, tzinfo=timezone.utc),
+    )
+    sigterm_lifecycle.start()
+    sigterm_lifecycle.handle_termination(15, None)
+    deadline = time.monotonic() + 2
+    while not any(event.startswith("drain:") for event in sigterm_events):
+        assert time.monotonic() < deadline
+        time.sleep(0.01)
+    assert sigterm_lifecycle.admissions_open is False
+    assert "drain:worker-documents-1:2026-07-24T13:00:09+00:00" in sigterm_events
+    sigterm_lifecycle.close()
+
+    lost_events: list[str] = []
+    lost_presence = _LifecyclePresence(lost_events)
+    lost_presence.failure = GraniteSlotLeaseLostError()
+    lost_lifecycle = RegisteredDocumentWorkerLifecycle(
+        worker_registry=_LifecycleRegistry(lost_events),
+        capacity_controller=_LifecycleController(lost_events),
+        job_heartbeat_coordinator=_LifecycleHeartbeatCoordinator(lost_events),
+        worker=_worker(),
+        presence_heartbeat=lost_presence,
+        presence_lease_seconds=30,
+        shutdown_seconds=9,
+        now=lambda: datetime(2026, 7, 24, 12, 0, tzinfo=timezone.utc),
+    )
+    lost_lifecycle.start()
+    with pytest.raises(GraniteSlotLeaseLostError):
+        lost_lifecycle.assert_admission_allowed()
+    assert lost_lifecycle.admissions_open is False
+    lost_lifecycle.close()
+
+    from app.platform.job_runtime.heartbeat import (
+        JobHeartbeatCoordinator,
+        JobLeaseHeartbeat,
+    )
+
+    class BlockingQueue:
+        def __init__(self) -> None:
+            self.started = threading.Event()
+            self.release = threading.Event()
+            self.renewals = 0
+
+        def renew_lease(self, **_arguments):
+            self.renewals += 1
+            self.started.set()
+            assert self.release.wait(timeout=5)
+
+    queue = BlockingQueue()
+    heartbeat = JobLeaseHeartbeat(
+        job_queue=queue,
+        job_id="JOB-M002-000001",
+        owner_id="worker-documents-1",
+        claim_generation=1,
+        claim_token=str(uuid4()),
+        lease_seconds=3,
+        heartbeat_seconds=0.01,
+    )
+    coordinator = JobHeartbeatCoordinator()
+    coordinator.bind(heartbeat)
+    heartbeat.start()
+    assert queue.started.wait(timeout=2)
+    freeze = threading.Thread(target=coordinator.freeze_for_drain)
+    freeze.start()
+    freeze.join(timeout=0.05)
+    assert freeze.is_alive(), "le drainage doit attendre le renouvellement déjà engagé"
+    queue.release.set()
+    freeze.join(timeout=2)
+    assert not freeze.is_alive()
+    renewals_after_freeze = queue.renewals
+    time.sleep(0.05)
+    assert queue.renewals == renewals_after_freeze
+    heartbeat.stop()
+    coordinator.unbind(heartbeat)
+
+
+class _DrainAwareProcess:
+    def __init__(self) -> None:
+        self.started = threading.Event()
+        self.release = threading.Event()
+        self.terminated = False
+
+    def wait(self, *, timeout_seconds: float):
+        self.started.set()
+        if not self.release.wait(timeout_seconds):
+            raise GraniteModelStillRunning()
+        return {"drained": "completed"}
+
+    def terminate(self) -> None:
+        self.terminated = True
+        self.release.set()
+
+
+def _assert_sigterm_laisse_finir_le_couple_actif() -> None:
+    repository = _Repository()
+    controller = GraniteCapacityController(repository=repository)
+    process = _DrainAwareProcess()
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(
+            controller.execute_claimed_job,
+            worker=_worker(),
+            claimed_job=repository.lease.claimed_job,
+            lease_seconds=30,
+            heartbeat_seconds=0.01,
+            start_model=lambda _capability: process,
+        )
+        assert process.started.wait(timeout=2)
+        controller.begin_draining()
+        deadline = time.monotonic() + 2
+        while repository.heartbeats == 0 and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert repository.heartbeats > 0
+        assert process.terminated is False
+        process.release.set()
+        assert future.result(timeout=2).model_result == {"drained": "completed"}
+
+    with pytest.raises(GraniteSlotLeaseLostError):
+        controller.execute_claimed_job(
+            worker=_worker(),
+            claimed_job=repository.lease.claimed_job,
+            lease_seconds=30,
+            heartbeat_seconds=0.01,
+            start_model=lambda _capability: _Process([{"forbidden": True}]),
+        )
+
+
+def _assert_capability_modele_emise_par_controleur(tmp_path: Path) -> None:
+    from app.contracts.technical_jobs import (
+        GraniteExecutionCapability,
+        require_granite_execution_capability,
+    )
+
+    source = tmp_path / "source-capability.pdf"
+    source.write_bytes(b"%PDF-1.7\ncycle3 capability\n%%EOF\n")
+    converter = object.__new__(IsolatedGraniteDoclingConverter)
+    with pytest.raises(ValueError, match="GRANITE_EXECUTION_CAPABILITY_REQUIRED"):
+        converter.start(_granite_request(source), capability=object())
+
+    issued: list[GraniteExecutionCapability] = []
+    repository = _Repository()
+
+    def start_model(capability):
+        issued.append(require_granite_execution_capability(capability))
+        return _Process([{"capability": "ok"}])
+
+    execution = GraniteCapacityController(repository=repository).execute_next(
+        worker=_worker(),
+        lease_seconds=30,
+        heartbeat_seconds=0.01,
+        job_names=("CONVERT_PAGE",),
+        execution_requirements=_requirements(),
+        start_model=start_model,
+        success_envelope=lambda lease, result: _terminal(
+            lease, GranitePageTerminalStatus.SUCCEEDED, result
+        ),
+        failure_envelope=lambda lease, _error: _terminal(
+            lease,
+            GranitePageTerminalStatus.FAILED,
+            {"error_code": "MODEL_FAILED"},
+        ),
+    )
+    assert execution is not None and execution.model_result == {"capability": "ok"}
+    assert len(issued) == 1
+    with pytest.raises(TypeError):
+        GraniteExecutionCapability()
+
+
+def _assert_enveloppe_terminale_gelee() -> None:
+    payload = {"nested": [{"value": 1}], "flags": [True, None]}
+    envelope = GranitePageTerminalEnvelope.from_payload(
+        completion_id="COMPLETE-M014-CYCLE3-FROZEN",
+        status=GranitePageTerminalStatus.SUCCEEDED,
+        payload=payload,
+        failure_reason=None,
+    )
+    payload["nested"][0]["value"] = 2
+    payload["flags"].append(False)
+    assert envelope.payload["nested"][0]["value"] == 1
+    assert envelope.payload["flags"] == (True, None)
+    with pytest.raises(TypeError):
+        envelope.payload["new"] = "forbidden"  # type: ignore[index]
+
+    for invalid, reason in (
+        ({"set": {1}}, "TERMINAL_PAYLOAD_NON_JSON"),
+        ({"nan": math.nan}, "TERMINAL_PAYLOAD_NON_FINITE"),
+    ):
+        with pytest.raises(GraniteCapacityConfigurationError) as captured:
+            GranitePageTerminalEnvelope.from_payload(
+                completion_id="COMPLETE-M014-CYCLE3-INVALID",
+                status=GranitePageTerminalStatus.SUCCEEDED,
+                payload=invalid,
+                failure_reason=None,
+            )
+        assert captured.value.reason == reason
+
+
+def _assert_relais_historique_et_parametres_obligatoires() -> (
+    None
+):
+    message = RelayedJobMessage(
+        message_id="OUTBOX-M013-HISTORICAL-0001",
+        environment="test",
+        deployment_id="ostrading-test-local",
+        job_name="DIAGNOSE",
+        priority="P1",
+        input_hash="a" * 64,
+        configuration_hash="b" * 64,
+        code_version="m013-historical",
+        model_version="none",
+        payload={"document_id": "DOC-M013-HISTORICAL"},
+        trace_id="TRACE-M013-HISTORICAL",
+        execution_requirements=None,
+    )
+    historical = {
+        "configuration_hash": message.configuration_hash,
+        "deployment_id": message.deployment_id,
+        "environment": message.environment,
+        "input_hash": message.input_hash,
+        "job_name": message.job_name,
+        "message_id": message.message_id,
+        "model_version": message.model_version,
+        "payload": dict(message.payload),
+        "priority": message.priority,
+        "trace_id": message.trace_id,
+        "code_version": message.code_version,
+    }
+    expected_hash = sha256(
+        json.dumps(
+            historical,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode()
+    ).hexdigest()
+    assert message.content_hash == expected_hash
+    assert (
+        inspect.signature(RelayedJobMessage)
+        .parameters["execution_requirements"]
+        .default
+        is inspect.Parameter.empty
+    )
+    assert (
+        inspect.signature(PostgresGraniteSlotRepository.claim_compatible_job)
+        .parameters["execution_requirements"]
+        .default
+        is inspect.Parameter.empty
+    )
+    assert (
+        inspect.signature(PostgresGraniteWorkerRegistry.register)
+        .parameters["presence_lease_seconds"]
+        .default
+        is inspect.Parameter.empty
+    )
+
+    for adapter in (
+        "app/source_processing/adapters/docling_granite_conversion.py",
+        "app/source_processing/adapters/gemma_vision_conversion.py",
+    ):
+        source = (REPOSITORY_ROOT / adapter).read_text("utf-8")
+        assert "app.platform" not in source

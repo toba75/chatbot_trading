@@ -6,7 +6,7 @@ Date de création: 21 juin 2026.
 
 Statut: plan initial d'implémentation.
 
-Ce document repart de zéro depuis la spécification v4.1. Il ne reprend pas un plan antérieur comme source. M-014 constitue une extension post-V1 explicitement planifiée par `docs/specs/plan_distribution.md`; sa décision structurante reste soumise à ADR-051. Toute modification structurante ultérieure devra être documentée par ADR dans `docs/adr/` et reportée dans `docs/adr/index.md`.
+Ce document repart de zéro depuis la spécification v4.1. Il ne reprend pas un plan antérieur comme source. M-014 constitue une extension post-V1 locale explicitement planifiée par `docs/specs/plan_distribution.md`; sa décision structurante reste soumise à ADR-052. ADR-051 gouverne séparément l'exécution Granite CUDA stricte. Le déploiement de workers sur Mac ou PC distants par SSH est reporté hors de M-014. Toute modification structurante ultérieure devra être documentée par ADR dans `docs/adr/` et reportée dans `docs/adr/index.md`.
 
 ## 1. Intention métier
 
@@ -106,11 +106,10 @@ git ls-tree -r --name-only master -- docs/tasks docs/adr docs/specs
 | M13-config | Configuration applicative sans environnement | Remplacer toute entrée de processus par variables d'environnement par un fichier de configuration unique, explicite et validé | WS-01, WS-03, WS-11 | M-012; sous-milestone de M-013 |
 | M13-environments | Environnements explicites et données étanches | Démarrer `development`, `test` ou `production` par une commande UV dédiée et garantir que données, secrets, files et workers restent liés au profil choisi | WS-01, WS-03, WS-11 | M-012, M13-config; sous-milestone de M-013 |
 | M13-FastAPI | API orchestratrice ASGI raccordée | Remplacer le routeur HTTP artisanal par une frontière ASGI structurée et raccorder les contrats documentaires aux cas d'usage réels | WS-01, WS-03, WS-04, WS-05, WS-08, WS-11 | M-012; sous-milestone de M-013 |
-| M-014 | Distribution CPU des workers sur le réseau local | Distribuer les conversions de pages et les projections entre plusieurs machines CPU sans perdre l'idempotence, la progression publique ni l'étanchéité des environnements | WS-01, WS-03, WS-04, WS-05, WS-11 | M-013 |
-| M14-distribution-core | Socle de distribution durable | Décider la topologie, publier les contrats, migrer les autorités et rendre les artefacts portables entre les nœuds | WS-01, WS-02, WS-03, WS-04, WS-11 | M-013; sous-milestone de M-014 |
-| M14-worker-fleet | Flotte CPU multiarchitecture | Construire, déployer localement, enregistrer et faire réclamer des jobs compatibles aux workers `arm64` et `amd64` | WS-01, WS-03, WS-11 | M14-distribution-core; sous-milestone de M-014 |
-| M14-distributed-pipeline | Pipeline documentaire distribué | Exécuter les conversions à la page, assembler une version canonique unique et projeter depuis un nœud réseau | WS-03, WS-04, WS-05, WS-11 | M14-worker-fleet; sous-milestone de M-014 |
-| M14-deployment | Déploiement et qualification multi-nœuds | Exploiter, qualifier et déployer progressivement la distribution par Kamal et SSH sur Mac et PC | WS-01, WS-03, WS-11 | M14-distributed-pipeline; sous-milestone de M-014 |
+| M-014 | Traitement parallèle local des PDF | Distribuer les conversions de pages entre deux workers locaux généralistes, avec deux slots Granite CUDA, sans perdre l'idempotence, la progression publique ni l'étanchéité des environnements | WS-01, WS-03, WS-04, WS-05, WS-11 | M-013 |
+| M14-distribution-core | Socle de distribution locale durable | Décider la topologie locale, publier les contrats, migrer les autorités et borner Granite à deux slots sur la station | WS-01, WS-02, WS-03, WS-04, WS-11 | M-013; sous-milestone de M-014 |
+| M14-local-pipeline | Pipeline documentaire local distribué | Exécuter les conversions à la page sur deux replicas, assembler une version canonique unique et projeter localement | WS-03, WS-04, WS-05, WS-11 | M14-distribution-core; sous-milestone de M-014 |
+| M14-local-qualification | Qualification de capacité locale | Superviser, qualifier et mesurer les deux workers à 2 Gio sur la RTX 4090, puis publier le rapport de charge | WS-01, WS-03, WS-11 | M14-local-pipeline; sous-milestone de M-014 |
 
 ## 6. Milestones détaillés
 
@@ -571,84 +570,71 @@ git ls-tree -r --name-only master -- docs/tasks docs/adr docs/specs
   - test HTTP réel et test OpenAPI sur l'application ASGI.
 - Sortie attendue: `orchestrator-api` est une façade HTTP ASGI mince et opérationnelle; l'UI observe et déclenche le pipeline documentaire uniquement par ses contrats publics raccordés.
 
-### M-014 - Distribution CPU des workers sur le réseau local
+### M-014 - Traitement parallèle local des PDF
 
-- Source: `docs/specs/plan_distribution.md`; M-002, M-004, M13-environments et M13-FastAPI; ADR-024, ADR-025, ADR-040, ADR-042, ADR-046 et ADR-048.
-- Objectif métier: traiter un backlog important de PDF sur plusieurs machines CPU du réseau local, au niveau page, sans perdre la fidélité documentaire, l'idempotence, la progression publique ni l'étanchéité des environnements.
+- Source: `docs/specs/plan_distribution.md`; M-002, M-004, M13-environments et M13-FastAPI; ADR-024, ADR-025, ADR-040, ADR-042, ADR-046 et ADR-051.
+- Objectif métier: traiter un backlog important de PDF au niveau page avec deux workers généralistes sur la station locale, sans perdre la fidélité documentaire, l'idempotence, la progression publique ni l'étanchéité des environnements.
 - Workstreams actifs: WS-01, WS-03, WS-04, WS-05, WS-11.
-- Bounded contexts concernés: `platform`, Source Processing, Knowledge Access, API orchestratrice, stockage d'objets, déploiement et gouvernance.
+- Bounded contexts concernés: `platform`, Source Processing, Knowledge Access, API orchestratrice et gouvernance.
 - Dépendance: M-013 et ses sous-milestones applicables doivent être présents et GREEN dans `master` avant la création des tâches M-014.
 - Scénario directeur:
-  - Given un backlog de PDF dans un environnement explicite, un Mac `arm64` et un PC `amd64` enregistrés `READY`
-  - When les pages sont distribuées par la file PostgreSQL puis traitées sur les deux nœuds
-  - Then chaque résultat est écrit une seule fois sous claim fenced, le document canonique reste unique et la progression publique reflète exclusivement l'état persistant
+  - Given un backlog de PDF dans l'environnement `test`, deux workers documentaires locaux `READY` et deux slots Granite CUDA disponibles
+  - When les pages sont distribuées par la file PostgreSQL puis traitées par les deux replicas
+  - Then chaque résultat est écrit une seule fois sous claim fenced, au plus deux conversions Granite utilisent `cuda:0`, le document canonique reste unique et la progression publique reflète exclusivement l'état persistant
 - Livrables:
-  - ADR-051 à créer pour la topologie distribuée et le déploiement SSH;
-  - file de jobs enrichie des capacités et identités de workers;
-  - stockage d'objets partagé et artefacts portables entre nœuds;
-  - images CPU `arm64` et `amd64`, commandes worker-only et registre de flotte;
-  - conversion distribuée à la page, assemblage canonique et projection réseau;
-  - déploiement Kamal par SSH, observabilité, runbooks et rapport de charge multi-nœuds.
+  - ADR-052 à créer pour la distribution locale à la page et le quota de deux slots Granite;
+  - file de jobs enrichie des contrats de pages et des résultats fenced;
+  - quota global Granite, un slot par worker et deux slots au total;
+  - conversion locale distribuée à la page, assemblage canonique et projection locale;
+  - deux replicas limités à 2 Gio, observabilité, runbooks et rapport de charge.
 - Tests et gates:
   - tests rapides ciblés et gate canonique hors charge pour chaque tranche;
-  - tests PostgreSQL live pour claims, leases, fencing, migrations et idempotence;
-  - matrice multiarchitecture pour les images et dépendances;
-  - parcours live sur Mac et PC physiques avec perte d'un worker et reprise;
+  - tests PostgreSQL live pour claims, leases, slots, fencing, migrations et idempotence;
+  - parcours live dans `test` avec deux workers, troisième page Granite en attente, perte d'un worker et reprise;
+  - contrôles structurels seulement pour `development` et `production`;
   - qualification planifiée de cent PDF hors gate répétée de chaque PR.
-- Sortie attendue: plusieurs nœuds CPU traitent réellement le même backlog plus vite qu'un nœud seul, sans doublon, publication partielle, fuite entre environnements ni fallback.
+- Hors périmètre explicite: Mac, PC distant, `arm64`, Colima, Kamal, SSH, stockage d'objets réseau et worker hors de la station locale.
+- Sortie attendue: deux workers locaux traitent réellement le même backlog plus vite qu'un worker seul, sans doublon, publication partielle, fuite entre environnements ni fallback CPU.
 
-### M14-distribution-core - Socle de distribution durable
+### M14-distribution-core - Socle de distribution locale durable
 
-- Source: tâches T-001 à T-005 de `docs/specs/plan_distribution.md`.
-- Objectif métier: rendre le travail et les artefacts distribuables avant d'ajouter des machines au pool.
+- Source: tâches T-001 à T-004 de `docs/specs/plan_distribution.md`.
+- Objectif métier: rendre les pages réclamables par deux workers locaux et borner durablement Granite avant de modifier le pipeline documentaire.
 - Dossier de tâches attendu: `docs/tasks/milestone_014-distribution-core`.
 - Dépendance: M-013; sous-milestone de M-014.
 - Livrables:
-  - baseline mono-worker et inventaire des hôtes;
-  - ADR-051 proposée, indexée et revue;
-  - contrats de jobs, capacités, identités de workers et artefacts;
-  - migrations ascendantes depuis la version 021;
-  - port et adaptateur de stockage partagé avec TLS, empreintes et isolation.
-- Gate de sortie: les contrats, migrations et artefacts partagés sont GREEN sur PostgreSQL et stockage réels, sans modifier une migration déjà appliquée.
+  - baseline un/deux workers sur la RTX 4090;
+  - ADR-052 proposée, indexée et revue;
+  - contrats de jobs, résultats de pages, identités d'environnement et artefacts locaux;
+  - migrations ascendantes;
+  - quota fenced de deux slots Granite, un par worker.
+- Gate de sortie: deux workers et deux slots Granite sont décrits par des contrats versionnés, les migrations sont GREEN et une troisième acquisition Granite reste en attente sans fallback.
 
-### M14-worker-fleet - Flotte CPU multiarchitecture
+### M14-local-pipeline - Pipeline documentaire local distribué
 
-- Source: tâches T-006 à T-009 de `docs/specs/plan_distribution.md`.
-- Objectif métier: rendre des workers Mac et PC interchangeables dans un même pool CPU tout en conservant leur identité et leurs capacités explicites.
-- Dossier de tâches attendu: `docs/tasks/milestone_014-worker-fleet`.
+- Source: tâches T-005 à T-008 de `docs/specs/plan_distribution.md`.
+- Objectif métier: remplacer l'orchestration locale d'un document par des résultats de pages réclamés par deux replicas puis publier une seule version canonique recherchable.
+- Dossier de tâches attendu: `docs/tasks/milestone_014-local-pipeline`.
 - Dépendance: M14-distribution-core; sous-milestone de M-014.
-- Livrables:
-  - images worker documents et projection `linux/arm64` et `linux/amd64` par digest;
-  - commandes `development-worker`, `test-worker` et `production-worker`;
-  - paquet worker-only avec runtime OCR local et sans service central embarqué;
-  - registre, heartbeat, drainage, révocation et claim par capacité.
-- Gate de sortie: un Mac et un PC atteignent `READY`, réclament uniquement des jobs compatibles du bon environnement et refusent toute identité divergente.
-
-### M14-distributed-pipeline - Pipeline documentaire distribué
-
-- Source: tâches T-010 à T-013 de `docs/specs/plan_distribution.md`.
-- Objectif métier: remplacer l'orchestration locale d'un document par des résultats de pages distribués puis publier une seule version canonique recherchable.
-- Dossier de tâches attendu: `docs/tasks/milestone_014-distributed-pipeline`.
-- Dépendance: M14-worker-fleet; sous-milestone de M-014.
 - Livrables:
   - fan-out transactionnel en jobs `CONVERT_PAGE`;
   - exécution et résultat de page persistés sous fencing;
   - job idempotent `ASSEMBLE_CANONICAL_DOCUMENT` et publication atomique;
-  - projection `PROJECT_DOCUMENT` exécutable depuis un nœud réseau.
-- Gate de sortie: deux nœuds traitent des pages distinctes d'un même document, un crash est repris et le document canonique puis sa projection restent uniques et complets.
+  - projection `PROJECT_DOCUMENT` locale au niveau document.
+- Gate de sortie: deux workers locaux traitent des pages distinctes d'un même document, un crash est repris et le document canonique puis sa projection restent uniques et complets.
 
-### M14-deployment - Déploiement et qualification multi-nœuds
+### M14-local-qualification - Qualification de capacité locale
 
-- Source: tâches T-014 à T-016 de `docs/specs/plan_distribution.md`.
-- Objectif métier: exploiter et livrer progressivement la distribution sur le réseau local sans redémarrer les hôtes ni masquer une dépendance indisponible.
-- Dossier de tâches attendu: `docs/tasks/milestone_014-deployment`.
-- Dépendance: M14-distributed-pipeline; sous-milestone de M-014.
+- Source: tâches T-009 à T-011 de `docs/specs/plan_distribution.md`.
+- Objectif métier: exploiter, superviser et qualifier les deux workers à 2 Gio sur la RTX 4090 sans masquer une saturation ou une dépendance indisponible.
+- Dossier de tâches attendu: `docs/tasks/milestone_014-local-qualification`.
+- Dépendance: M14-local-pipeline; sous-milestone de M-014.
 - Livrables:
-  - observabilité de flotte et opérations d'enrôlement, drainage et révocation;
-  - destinations Kamal étanches par environnement et préflights SSH/Colima/Docker;
-  - qualification live Mac/PC, panne et reprise, comparaison cross-architecture;
-  - rapport de charge sur cent PDF et bascule progressive canari.
-- Gate de sortie: la livraison du même digest sur Mac et PC est reproductible, le débit distribué dépasse le baseline mono-worker et ADR-051 peut être acceptée avec ses preuves.
+  - observabilité des deux workers, des slots Granite, de la RAM et du GPU;
+  - opérations d'inspection, drainage et redémarrage ciblé;
+  - qualification live dans `test`, panne et reprise;
+  - rapport de charge sur cent PDF.
+- Gate de sortie: deux workers à 2 Gio doublent effectivement le débit Granite de référence sans OOM, le parcours documentaire complet reste conforme et ADR-052 peut être acceptée avec ses preuves.
 
 ## 7. Chemin critique
 
@@ -667,14 +653,13 @@ M-012 -> M13-config -> M13-environments
 M-012 -> M13-FastAPI
 ```
 
-Chemin critique post-V1 pour la distribution CPU:
+Chemin critique post-V1 pour la distribution locale:
 
 ```text
 M-013
   -> M14-distribution-core
-  -> M14-worker-fleet
-  -> M14-distributed-pipeline
-  -> M14-deployment
+  -> M14-local-pipeline
+  -> M14-local-qualification
   -> M-014 clôturé
 ```
 
@@ -713,7 +698,7 @@ Les points suivants doivent déclencher une vérification ADR avant implémentat
 | Configuration applicative par fichier unique sans variables d'environnement | M13-config | ADR-016 |
 | Profils `development`, `test`, `production` explicites et isolation des données/workers | M13-environments | ADR-046, remplaçant ADR-045 qui remplaçait ADR-016 |
 | Framework ASGI et serveur HTTP de l'API orchestratrice | M13-FastAPI | ADR-019 à créer |
-| Distribution CPU multi-nœuds, stockage partagé et déploiement Kamal par SSH | M14-distribution-core avant toute implémentation | ADR-051 à créer; remplacement borné des clauses concernées d'ADR-014 et ADR-048 après preuves live |
+| Distribution locale à la page et quota global de deux slots Granite CUDA | M14-distribution-core avant toute implémentation | ADR-052 à créer; ADR-051 reste l'autorité sur l'exécution CUDA stricte |
 
 Une ADR acceptée ne doit pas être réécrite pour changer son sens. Toute évolution doit créer une nouvelle ADR remplaçante.
 
@@ -747,7 +732,7 @@ Si un milestone amont requis n'est pas présent dans `master`, la création du d
 | Critère scientifique ignoré après GREEN logiciel | Évaluation M-012 séparant tests logiciels et métriques scientifiques |
 | Configuration pilotée par variable d'environnement ou valeur système | M13-config, chargeur strict, audit Compose et scan statique |
 | Donnée ou job consommé depuis un autre environnement | M13-environments, ressources distinctes, identité de stockage et refus worker avant claim |
-| Distribution plus lente ou divergente entre `arm64` et `amd64` | M-014, baseline mono-worker, digests communs, comparaison d'artefacts et qualification multi-nœuds |
+| Concurrence Granite supérieure à la capacité locale ou OOM sous 2 Gio | M-014, quota de deux slots, un slot par worker, gate Compose et qualification live sur la RTX 4090 |
 
 ## 12. Livrable V1 attendu
 
@@ -769,15 +754,18 @@ Si un milestone amont requis n'est pas présent dans `master`, la création du d
 
 ## 13. Livrable post-V1 M-014 attendu
 
-À la fin de M-014 et de ses quatre sous-milestones, l'utilisateur doit pouvoir:
+À la fin de M-014 et de ses trois sous-milestones, l'utilisateur doit pouvoir:
 
-- déployer par Kamal et SSH le même digest CPU sur un Mac Colima `arm64` et un PC Docker `amd64` sans redémarrer les machines;
-- enregistrer, drainer, remplacer et révoquer un worker avec une identité explicite propre à son environnement;
-- soumettre un backlog de PDF dont les pages sont réellement distribuées entre plusieurs nœuds compatibles;
-- perdre un worker pendant une conversion puis observer la reprise fenced sur un autre nœud sans doublon;
-- conserver les PDF et artefacts dans un stockage partagé immuable, identifié et vérifié par SHA-256;
-- publier une seule version canonique complète puis reconstruire sa projection depuis un nœud réseau;
-- observer la progression métier par le contrat public et l'état technique de la flotte par un contrat d'administration distinct;
-- comparer le débit distribué au baseline mono-worker sur un corpus contrôlé;
-- qualifier séparément la charge de cent PDF sans imposer cette exécution longue à chaque PR;
-- démontrer l'absence de fuite entre `development`, `test` et `production`, de port entrant de contrôle sur les workers et de fallback local en cas de panne réseau.
+- démarrer exactement deux workers documentaires généralistes sur la station locale avec une limite de 2 Gio chacun;
+- rendre disponibles deux slots Granite CUDA au total, un par worker, sans fallback CPU;
+- soumettre un backlog de PDF dont les pages sont réellement distribuées entre les deux replicas par PostgreSQL;
+- mettre une troisième page Granite en attente sans dépasser le quota ni changer sa route;
+- perdre un worker pendant une conversion puis observer la reprise fenced sur l'autre sans doublon;
+- conserver les PDF et artefacts dans les volumes locaux étanches de l'environnement, avec identité et SHA-256 vérifiés;
+- publier une seule version canonique complète puis reconstruire sa projection localement;
+- observer la progression métier par le contrat public et l'état technique des workers, de la RAM et du GPU par un contrat d'administration distinct;
+- comparer le débit à un puis deux workers sur un corpus contrôlé;
+- qualifier séparément la charge de cent PDF dans `test` sans imposer cette exécution longue à chaque PR;
+- démontrer l'absence de fuite entre `development`, `test` et `production` et l'absence de toute capacité réseau distante dans M-014.
+
+Les workers Mac ou PC distants, les images `arm64`, Colima, Kamal, SSH et le stockage partagé réseau sont explicitement reportés à un éventuel milestone ultérieur.

@@ -11,7 +11,12 @@ from hashlib import sha256
 from typing import Any, Protocol
 from uuid import UUID
 
-from app.platform.job_runtime import JobIdempotenceKey, JobPriority, JobRequest
+from app.platform.job_runtime import (
+    JobExecutionRequirements,
+    JobIdempotenceKey,
+    JobPriority,
+    JobRequest,
+)
 from app.platform.worker_environment import WorkerEnvironmentMismatchError
 
 
@@ -30,6 +35,7 @@ class RelayedJobMessage:
     model_version: str
     payload: Mapping[str, Any]
     trace_id: str
+    execution_requirements: JobExecutionRequirements | None
 
     def __post_init__(self) -> None:
         _required_text(self.message_id, "message_id")
@@ -59,6 +65,7 @@ class RelayedJobMessage:
             model_version=request.idempotence_key.model_version,
             payload=request.payload,
             trace_id=trace_id,
+            execution_requirements=request.execution_requirements,
         )
 
     def as_job_request(self) -> JobRequest:
@@ -78,12 +85,13 @@ class RelayedJobMessage:
                 code_version=self.code_version,
                 model_version=self.model_version,
             ),
+            execution_requirements=self.execution_requirements,
             payload=self.payload,
         )
 
     @property
     def content_hash(self) -> str:
-        canonical = {
+        canonical: dict[str, Any] = {
             "configuration_hash": self.configuration_hash,
             "deployment_id": self.deployment_id,
             "environment": self.environment,
@@ -96,6 +104,15 @@ class RelayedJobMessage:
             "trace_id": self.trace_id,
             "code_version": self.code_version,
         }
+        if self.execution_requirements is not None:
+            canonical["execution_requirements"] = {
+                "contract_name": self.execution_requirements.contract_name,
+                "contract_version": self.execution_requirements.contract_version,
+                "capacity_capability": self.execution_requirements.capacity_capability,
+                "capacity_slots": self.execution_requirements.capacity_slots,
+                "capacity_device": self.execution_requirements.capacity_device,
+                "storage_environment": self.execution_requirements.storage_environment,
+            }
         serialized = json.dumps(
             canonical,
             ensure_ascii=False,

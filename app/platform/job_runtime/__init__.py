@@ -11,6 +11,7 @@ from typing import Any
 
 from app.contracts.technical_jobs import (
     JobEnvironmentIdentity,
+    JobExecutionRequirements,
     JobIdempotenceKey,
     JobPriority,
     JobRecord,
@@ -26,6 +27,7 @@ _LOCAL_JOB_NAMES = (
     "INVENTORY",
     "DIAGNOSE",
     "CONVERT_DOCUMENT",
+    "CONVERT_PAGE",
     "PROJECT_DOCUMENT",
     "PREPROCESS",
     "CONVERT_STANDARD",
@@ -103,7 +105,9 @@ class InMemoryJobQueue:
     def empty(cls, *, catalog: JobCatalog) -> "InMemoryJobQueue":
         return cls(catalog=catalog, jobs=())
 
-    def submit(self, request: JobRequest, *, recalculate: bool) -> JobSubmissionDecision:
+    def submit(
+        self, request: JobRequest, *, recalculate: bool
+    ) -> JobSubmissionDecision:
         parsed_request = _ensure_job_request(request)
         if not isinstance(recalculate, bool):
             raise ValueError("recalculate non booleen")
@@ -219,7 +223,9 @@ class InMemoryJobQueue:
             del self._active_job_id_by_key[key]
         return failed_job
 
-    def execute_next(self, *, worker_registry: "InMemoryJobWorkerRegistry") -> JobRecord:
+    def execute_next(
+        self, *, worker_registry: "InMemoryJobWorkerRegistry"
+    ) -> JobRecord:
         if not isinstance(worker_registry, InMemoryJobWorkerRegistry):
             raise ValueError("worker_registry invalide")
         pending_jobs = self.pending_jobs()
@@ -368,6 +374,7 @@ __all__ = [
     "JOB_RUNTIME_CATALOG",
     "JobCatalog",
     "JobEnvironmentIdentity",
+    "JobExecutionRequirements",
     "JobIdempotenceKey",
     "JobPriority",
     "JobRecord",

@@ -88,6 +88,7 @@ def test_worker_environment_identity_unit() -> None:
             code_version="worker-environment-unit",
             model_version="none",
         ),
+        execution_requirements=None,
         payload={"document_id": "DOC-M013-ENV-WORKER-UNIT"},
     )
     with pytest.raises(WorkerEnvironmentMismatchError) as mismatch:

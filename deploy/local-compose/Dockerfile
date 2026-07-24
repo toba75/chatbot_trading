@@ -62,11 +62,26 @@ ENTRYPOINT ["api"]
 FROM runtime AS worker-documents
 
 ENV DOCKER_HOST="unix:///var/run/ocr-docker/docker.sock"
+ENV TRITON_CACHE_DIR="/triton-cache"
+
+USER root
+
+RUN sed -i \
+        -e 's|http://deb.debian.org/debian-security|http://snapshot.debian.org/archive/debian-security/20250203T000000Z|' \
+        -e 's|http://deb.debian.org/debian|http://snapshot.debian.org/archive/debian/20250203T000000Z|' \
+        /etc/apt/sources.list.d/debian.sources \
+    && apt-get -o Acquire::Check-Valid-Until=false update \
+    && apt-get install -y --no-install-recommends \
+        gcc=4:12.2.0-3 \
+        libc6-dev=2.36-9+deb12u9 \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY --from=docker-cli /usr/local/bin/docker /usr/local/bin/docker
 COPY --chown=ostrading:ostrading config/ocrmypdf-image.json ./config/ocrmypdf-image.json
 COPY --chown=ostrading:ostrading config/docling-assets.native.json ./config/docling-assets.native.json
 COPY --chown=ostrading:ostrading config/docling-assets.granite.json ./config/docling-assets.granite.json
+
+USER ostrading
 
 ENTRYPOINT ["python", "-m", "app.source_processing.adapters.worker_runtime"]
 

@@ -52,7 +52,14 @@ services:
     progress_namespace: ostrading-development-progress
     concurrency: 8
     docling_concurrency: 2
-    granite_concurrency: 2
+    granite_concurrency: 1
+    local_distribution:
+      replicas: 2
+      memory_bytes: 2147483648
+      cpus: 4
+      granite_device: cuda:0
+      granite_slots_global: 2
+      granite_slots_per_worker: 1
   llm_gateway:
     url: http://llm-gateway-development:8090
     port: 8090
@@ -136,4 +143,4 @@ runtime:
   resource_limits:
     cpu_count: 8
     memory_gb: 32
-    gpu_required: false
+    gpu_required: true

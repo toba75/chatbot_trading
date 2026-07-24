@@ -110,6 +110,7 @@ class PostgresJobOutbox:
                 model_version=row[6],
                 payload=row[7],
                 trace_id=row[8],
+                execution_requirements=None,
             ),
             owner_id=parsed_owner,
             claim_generation=row[11],

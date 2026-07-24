@@ -25,7 +25,10 @@ from app.platform.administrative_operations import (
     AdministrativeOperationRequest,
     execute_administrative_operation,
 )
-from app.platform.configuration import ApplicationConfiguration, load_application_configuration
+from app.platform.configuration import (
+    ApplicationConfiguration,
+    load_application_configuration,
+)
 from app.platform.configured_datastore_identity import (
     APPLICATION_FILE_ROOT_NAMES,
     build_configured_datastore_preflight,
@@ -56,7 +59,9 @@ REQUIRED_SERVICE_IDS: Final = (
 )
 EXPECTED_SERVICE_REPLICAS: Final = MappingProxyType(
     {
-        service_id: (2 if service_id in {"worker-documents", "worker-projection"} else 1)
+        service_id: (
+            2 if service_id in {"worker-documents", "worker-projection"} else 1
+        )
         for service_id in REQUIRED_SERVICE_IDS
     }
 )
@@ -121,7 +126,10 @@ class EnvironmentStackDefinition:
 
     def __post_init__(self) -> None:
         _require_environment(self.environment)
-        if not isinstance(self.repository_root, Path) or not self.repository_root.is_absolute():
+        if (
+            not isinstance(self.repository_root, Path)
+            or not self.repository_root.is_absolute()
+        ):
             raise ValueError("ENVIRONMENT_STACK_REPOSITORY_ROOT_INVALID")
         if self.project_name != f"ostrading-{self.environment}":
             raise ValueError("ENVIRONMENT_STACK_PROJECT_MISMATCH")
@@ -136,7 +144,11 @@ class EnvironmentStackDefinition:
                 raise ValueError("ENVIRONMENT_STACK_PATH_INVALID")
             _require_path_under(path, root=self.repository_root)
         for port in (self.edge_port, self.api_port, self.llm_gateway_port):
-            if isinstance(port, bool) or not isinstance(port, int) or not 1 <= port <= 65_535:
+            if (
+                isinstance(port, bool)
+                or not isinstance(port, int)
+                or not 1 <= port <= 65_535
+            ):
                 raise ValueError("ENVIRONMENT_STACK_PORT_INVALID")
 
 
@@ -149,7 +161,11 @@ class EnvironmentContainerState:
 
     def __post_init__(self) -> None:
         for value in (self.service, self.container_name, self.state, self.health):
-            if not isinstance(value, str) or value.strip() == "" or value != value.strip():
+            if (
+                not isinstance(value, str)
+                or value.strip() == ""
+                or value != value.strip()
+            ):
                 raise ValueError("ENVIRONMENT_CONTAINER_STATE_INVALID")
 
 
@@ -187,7 +203,9 @@ def environment_stack_definition(
         project_name=f"ostrading-{selected}",
         base_compose_path=(deploy_root / "compose.base.yaml").resolve(),
         compose_path=(deploy_root / f"{selected}.compose.yaml").resolve(),
-        configuration_path=(root / "config" / "environments" / f"{selected}.yaml").resolve(),
+        configuration_path=(
+            root / "config" / "environments" / f"{selected}.yaml"
+        ).resolve(),
         caddyfile_path=(deploy_root / f"Caddyfile.{selected}").resolve(),
         secrets_path=(root / "config" / "secrets" / selected).resolve(),
         edge_port=edge_port,
@@ -265,7 +283,9 @@ def aggregate_environment_readiness(
 ) -> EnvironmentStackReadiness:
     """Exige tous les services et toutes leurs réplicas running/healthy."""
 
-    if not isinstance(container_states, Sequence) or isinstance(container_states, (str, bytes)):
+    if not isinstance(container_states, Sequence) or isinstance(
+        container_states, (str, bytes)
+    ):
         raise ValueError("ENVIRONMENT_STACK_STATES_INVALID")
     by_service: dict[str, list[EnvironmentContainerState]] = {}
     prefix = f"{definition.project_name}-"
@@ -279,7 +299,11 @@ def aggregate_environment_readiness(
                 f"ENVIRONMENT_STACK_SERVICE_UNEXPECTED: {container_state.service}"
             )
         by_service.setdefault(container_state.service, []).append(container_state)
-    missing = tuple(service_id for service_id in REQUIRED_SERVICE_IDS if service_id not in by_service)
+    missing = tuple(
+        service_id
+        for service_id in REQUIRED_SERVICE_IDS
+        if service_id not in by_service
+    )
     if missing:
         raise ValueError(f"ENVIRONMENT_STACK_SERVICE_MISSING: {','.join(missing)}")
     for service_id in REQUIRED_SERVICE_IDS:
@@ -552,10 +576,15 @@ def _observed_stack_identity(
 
 
 def _publish_administrative_evidence(evidence: AdministrativeOperationEvidence) -> None:
-    print(json.dumps(evidence.to_mapping(), ensure_ascii=False, sort_keys=True), flush=True)
+    print(
+        json.dumps(evidence.to_mapping(), ensure_ascii=False, sort_keys=True),
+        flush=True,
+    )
 
 
-def wait_environment_compose_stack(*, service_id: str, port: int, config_path: str) -> None:
+def wait_environment_compose_stack(
+    *, service_id: str, port: int, config_path: str
+) -> None:
     """Bloque la commande UV tant que la pile sélectionnée reste en exécution."""
 
     if service_id != "ui" or port != 8081:
@@ -793,7 +822,9 @@ def export_environment_caddy_ca(
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Healthchecks des piles d'environnement.")
+    parser = argparse.ArgumentParser(
+        description="Healthchecks des piles d'environnement."
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
     config_parser = subparsers.add_parser("check-config")
     config_parser.add_argument("--config", required=True)
@@ -866,22 +897,39 @@ def _validate_environment_compose_document(
     if set(services) != set(REQUIRED_SERVICE_IDS):
         raise ValueError("ENVIRONMENT_COMPOSE_SERVICE_MATRIX_MISMATCH")
     expected_config = definition.configuration_path.resolve()
-    expected_schema = (definition.repository_root / "config" / "application.schema.json").resolve()
+    expected_schema = (
+        definition.repository_root / "config" / "application.schema.json"
+    ).resolve()
     for service_id in APPLICATION_SERVICE_IDS:
         service = _required_mapping_value(services[service_id], f"service {service_id}")
         if "environment" in service or "env_file" in service:
-            raise ValueError(f"ENVIRONMENT_COMPOSE_APPLICATION_ENV_FORBIDDEN: {service_id}")
+            raise ValueError(
+                f"ENVIRONMENT_COMPOSE_APPLICATION_ENV_FORBIDDEN: {service_id}"
+            )
         command = service.get("command")
         if not isinstance(command, list) or "--config" not in command:
-            raise ValueError(f"ENVIRONMENT_COMPOSE_CONFIG_ARGUMENT_MISSING: {service_id}")
+            raise ValueError(
+                f"ENVIRONMENT_COMPOSE_CONFIG_ARGUMENT_MISSING: {service_id}"
+            )
         config_index = command.index("--config")
-        if config_index + 1 >= len(command) or command[config_index + 1] != _CONFIG_CONTAINER_PATH:
-            raise ValueError(f"ENVIRONMENT_COMPOSE_CONFIG_ARGUMENT_INVALID: {service_id}")
+        if (
+            config_index + 1 >= len(command)
+            or command[config_index + 1] != _CONFIG_CONTAINER_PATH
+        ):
+            raise ValueError(
+                f"ENVIRONMENT_COMPOSE_CONFIG_ARGUMENT_INVALID: {service_id}"
+            )
         mounts = _mounts_by_target(service, service_id=service_id)
-        _require_read_only_bind(mounts, _CONFIG_CONTAINER_PATH, expected_config, service_id)
-        _require_read_only_bind(mounts, _SCHEMA_CONTAINER_PATH, expected_schema, service_id)
+        _require_read_only_bind(
+            mounts, _CONFIG_CONTAINER_PATH, expected_config, service_id
+        )
+        _require_read_only_bind(
+            mounts, _SCHEMA_CONTAINER_PATH, expected_schema, service_id
+        )
         if any(target.startswith("/workspace/config/secrets/") for target in mounts):
-            raise ValueError(f"ENVIRONMENT_COMPOSE_SECRET_DIRECTORY_FORBIDDEN: {service_id}")
+            raise ValueError(
+                f"ENVIRONMENT_COMPOSE_SECRET_DIRECTORY_FORBIDDEN: {service_id}"
+            )
     postgres = _required_mapping_value(services["postgres"], "service postgres")
     postgres_environment = _required_mapping(postgres, "environment")
     if set(postgres_environment) != {
@@ -890,7 +938,10 @@ def _validate_environment_compose_document(
         "POSTGRES_USER",
     }:
         raise ValueError("ENVIRONMENT_COMPOSE_TECHNICAL_ENVIRONMENT_INVALID")
-    if postgres_environment["POSTGRES_PASSWORD_FILE"] != "/run/secrets/postgres_password":
+    if (
+        postgres_environment["POSTGRES_PASSWORD_FILE"]
+        != "/run/secrets/postgres_password"
+    ):
         raise ValueError("ENVIRONMENT_COMPOSE_POSTGRES_SECRET_INVALID")
     for service_id, service_payload in services.items():
         service = _required_mapping_value(service_payload, f"service {service_id}")
@@ -909,7 +960,9 @@ def _validate_environment_compose_document(
                 else f"/workspace/config/secrets/{definition.environment}/{secret_id}"
             )
             if target != expected_target:
-                raise ValueError(f"ENVIRONMENT_COMPOSE_SECRET_TARGET_INVALID: {service_id}")
+                raise ValueError(
+                    f"ENVIRONMENT_COMPOSE_SECRET_TARGET_INVALID: {service_id}"
+                )
     edge = _required_mapping_value(services["edge-gateway"], "service edge-gateway")
     ports = edge.get("ports")
     if not isinstance(ports, list) or len(ports) != 1:
@@ -922,11 +975,17 @@ def _validate_environment_compose_document(
     ):
         raise ValueError("ENVIRONMENT_COMPOSE_EDGE_PORT_INVALID")
     secrets_payload = _required_mapping(document, "secrets")
-    if set(secrets_payload) != {"postgres_password", "qdrant_api_key", "local_api_token"}:
+    if set(secrets_payload) != {
+        "postgres_password",
+        "qdrant_api_key",
+        "local_api_token",
+    }:
         raise ValueError("ENVIRONMENT_COMPOSE_SECRETS_INVALID")
     for secret_id, secret_payload in secrets_payload.items():
         secret = _required_mapping_value(secret_payload, f"secret {secret_id}")
-        secret_file = Path(_required_text(secret, "file", f"secret {secret_id}")).resolve()
+        secret_file = Path(
+            _required_text(secret, "file", f"secret {secret_id}")
+        ).resolve()
         _require_path_under(secret_file, root=definition.secrets_path)
     qdrant_service = _required_mapping_value(services["qdrant"], "service qdrant")
     qdrant_command = qdrant_service.get("command")
@@ -937,13 +996,13 @@ def _validate_environment_compose_document(
         or "/run/secrets/qdrant_api_key" not in qdrant_command[0]
     ):
         raise ValueError("ENVIRONMENT_COMPOSE_QDRANT_AUTH_MISSING")
-    ocr_runtime = _required_mapping_value(services["ocr-runtime"], "service ocr-runtime")
+    ocr_runtime = _required_mapping_value(
+        services["ocr-runtime"], "service ocr-runtime"
+    )
     if "2375" in json.dumps(ocr_runtime, sort_keys=True):
         raise ValueError("ENVIRONMENT_COMPOSE_OCR_TCP_FORBIDDEN")
     ocr_environment = _required_mapping(ocr_runtime, "environment")
-    if ocr_environment != {
-        "DOCKER_HOST": "unix:///var/run/ocr-docker/docker.sock"
-    }:
+    if ocr_environment != {"DOCKER_HOST": "unix:///var/run/ocr-docker/docker.sock"}:
         raise ValueError("ENVIRONMENT_COMPOSE_OCR_SOCKET_INVALID")
     for service_id in ("ocr-runtime", "worker-documents"):
         socket_mount = _mounts_by_target(
@@ -970,16 +1029,61 @@ def _validate_environment_compose_document(
         raise ValueError("ENVIRONMENT_COMPOSE_GATEWAY_PORT_MISMATCH")
     if configuration.services.llm_gateway.spark_endpoint_url != _SPARK_ENDPOINT:
         raise ValueError("ENVIRONMENT_COMPOSE_SPARK_ENDPOINT_MISMATCH")
+    _validate_local_document_distribution(
+        _required_mapping_value(
+            services["worker-documents"],
+            "service worker-documents",
+        ),
+        configuration=configuration,
+    )
     volumes = _required_mapping(document, "volumes")
-    postgres_volume = _required_mapping_value(volumes["postgres-data"], "volume postgres-data")
+    postgres_volume = _required_mapping_value(
+        volumes["postgres-data"], "volume postgres-data"
+    )
     if postgres_volume.get("name") != configuration.services.postgres.data_volume:
         raise ValueError("ENVIRONMENT_COMPOSE_POSTGRES_VOLUME_MISMATCH")
-    qdrant_volume = _required_mapping_value(volumes["qdrant-data"], "volume qdrant-data")
+    qdrant_volume = _required_mapping_value(
+        volumes["qdrant-data"], "volume qdrant-data"
+    )
     if qdrant_volume.get("name") != configuration.services.qdrant.storage_volume:
         raise ValueError("ENVIRONMENT_COMPOSE_QDRANT_VOLUME_MISMATCH")
 
 
-def _mounts_by_target(service: Mapping[str, Any], *, service_id: str) -> Mapping[str, Mapping[str, Any]]:
+def _validate_local_document_distribution(
+    worker: Mapping[str, Any],
+    *,
+    configuration: ApplicationConfiguration,
+) -> None:
+    distribution = configuration.services.workers.local_distribution
+    deploy = _required_mapping(worker, "deploy")
+    if deploy.get("replicas") != distribution.replicas:
+        raise ValueError("ENVIRONMENT_COMPOSE_DOCUMENT_REPLICAS_MISMATCH")
+    resources = _required_mapping(deploy, "resources")
+    limits = _required_mapping(resources, "limits")
+    if limits.get("memory") != str(distribution.memory_bytes):
+        raise ValueError("ENVIRONMENT_COMPOSE_DOCUMENT_MEMORY_MISMATCH")
+    if limits.get("cpus") != distribution.cpus:
+        raise ValueError("ENVIRONMENT_COMPOSE_DOCUMENT_CPUS_MISMATCH")
+    reservations = _required_mapping(resources, "reservations")
+    if reservations.get("devices") != [
+        {
+            "capabilities": ["gpu"],
+            "device_ids": ["0"],
+            "driver": "nvidia",
+        }
+    ]:
+        raise ValueError("ENVIRONMENT_COMPOSE_DOCUMENT_GPU_ZERO_REQUIRED")
+    if (
+        distribution.granite_device != "cuda:0"
+        or distribution.granite_slots_global != 2
+        or distribution.granite_slots_per_worker != 1
+    ):
+        raise ValueError("ENVIRONMENT_COMPOSE_GRANITE_CAPACITY_MISMATCH")
+
+
+def _mounts_by_target(
+    service: Mapping[str, Any], *, service_id: str
+) -> Mapping[str, Mapping[str, Any]]:
     raw_mounts = service.get("volumes")
     if not isinstance(raw_mounts, list):
         raise ValueError(f"ENVIRONMENT_COMPOSE_VOLUMES_MISSING: {service_id}")
@@ -988,7 +1092,9 @@ def _mounts_by_target(service: Mapping[str, Any], *, service_id: str) -> Mapping
         mount = _required_mapping_value(raw_mount, f"volume {service_id}")
         target = _required_text(mount, "target", f"volume {service_id}")
         if target in mounts:
-            raise ValueError(f"ENVIRONMENT_COMPOSE_VOLUME_TARGET_DUPLICATE: {service_id}: {target}")
+            raise ValueError(
+                f"ENVIRONMENT_COMPOSE_VOLUME_TARGET_DUPLICATE: {service_id}: {target}"
+            )
         mounts[target] = mount
     return MappingProxyType(mounts)
 
@@ -1104,11 +1210,16 @@ def _technical_environment_from_repository(repository_root: Path) -> Mapping[str
         errors="replace",
     )
     revision = revision_result.stdout.strip()
-    if revision_result.returncode != 0 or re.fullmatch(r"[0-9a-f]{40}", revision) is None:
+    if (
+        revision_result.returncode != 0
+        or re.fullmatch(r"[0-9a-f]{40}", revision) is None
+    ):
         raise ValueError("ENVIRONMENT_GIT_REVISION_INVALID")
     migration_names = sorted(
         path.name
-        for path in (repository_root / "deploy" / "postgres" / "migrations").glob("*.sql")
+        for path in (repository_root / "deploy" / "postgres" / "migrations").glob(
+            "*.sql"
+        )
         if re.match(r"^[0-9]{3}_", path.name)
     )
     if not migration_names:
@@ -1164,8 +1275,13 @@ def _run_compose(
     return result
 
 
-def _compose_process_environment(technical_environment: Mapping[str, str]) -> Mapping[str, str]:
-    if not isinstance(technical_environment, Mapping) or set(technical_environment) != _TECHNICAL_ENVIRONMENT_KEYS:
+def _compose_process_environment(
+    technical_environment: Mapping[str, str],
+) -> Mapping[str, str]:
+    if (
+        not isinstance(technical_environment, Mapping)
+        or set(technical_environment) != _TECHNICAL_ENVIRONMENT_KEYS
+    ):
         raise ValueError("ENVIRONMENT_COMPOSE_TECHNICAL_ENVIRONMENT_INVALID")
     revision = technical_environment["OSTRADING_IMAGE_REVISION"]
     schema_version = technical_environment["OSTRADING_POSTGRES_SCHEMA_VERSION"]

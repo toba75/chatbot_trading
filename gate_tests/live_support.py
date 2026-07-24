@@ -11,8 +11,8 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator
 
+from app.platform.ui_local_stack import LOCAL_POSTGRES_IMAGE
 
-_POSTGRES_IMAGE = "postgres@sha256:7e5df973a74872482e320dcbdeb055e178d6f42de0558b083892c50cda833c96"
 _QDRANT_IMAGE = "qdrant/qdrant@sha256:318c11b72aaab96b36e9662ad244de3cabd0653a1b942d4e8191f18296c81af0"
 
 
@@ -21,7 +21,9 @@ def m013_real_runtime(repository_root: Path) -> Iterator[tuple[Path, str]]:
     """Démarre les composants locaux; Spark reste obligatoirement externe et réel."""
 
     source_config = repository_root / "config" / "application.yaml"
-    password_path = repository_root / "deploy" / "local-compose" / "secrets" / "postgres_password"
+    password_path = (
+        repository_root / "deploy" / "local-compose" / "secrets" / "postgres_password"
+    )
     if not source_config.is_file():
         raise RuntimeError(f"M013_RUNTIME_CONFIG_REQUIRED:{source_config}")
     if not password_path.is_file():
@@ -56,14 +58,14 @@ def m013_real_runtime(repository_root: Path) -> Iterator[tuple[Path, str]]:
             f"http://127.0.0.1:{qdrant_port}",
         )
         replaced = _replace_required(
-            replaced,
-            "config/secrets/local/postgres_password", postgres_secret_relative
+            replaced, "config/secrets/local/postgres_password", postgres_secret_relative
         )
         replaced = _replace_required(
-            replaced,
-            "config/secrets/local/local_api_token", token_secret_relative
+            replaced, "config/secrets/local/local_api_token", token_secret_relative
         )
-        with tempfile.TemporaryDirectory(prefix="ost_gate_m013_") as temporary_directory:
+        with tempfile.TemporaryDirectory(
+            prefix="ost_gate_m013_"
+        ) as temporary_directory:
             runtime_root = Path(temporary_directory).resolve()
             runtime_data_root = runtime_root / "data"
             runtime_reports_root = runtime_root / "reports"
@@ -98,18 +100,77 @@ def m013_real_runtime(repository_root: Path) -> Iterator[tuple[Path, str]]:
                 replaced = _replace_required(replaced, configured_path, runtime_path)
             runtime_config = Path(temporary_directory) / "application.yaml"
             runtime_config.write_text(replaced, encoding="utf-8")
-            _run(("docker", "run", "--detach", "--name", postgres_container, "--env", "POSTGRES_DB=app", "--env", "POSTGRES_USER=app", "--env", f"POSTGRES_PASSWORD={password}", "--publish", f"127.0.0.1:{postgres_port}:5432", _POSTGRES_IMAGE), "M013_POSTGRES_DOCKER_START_FAILED")
-            _run(("docker", "run", "--detach", "--name", qdrant_container, "--publish", f"127.0.0.1:{qdrant_port}:6333", _QDRANT_IMAGE), "M013_QDRANT_DOCKER_START_FAILED")
+            _run(
+                (
+                    "docker",
+                    "run",
+                    "--detach",
+                    "--name",
+                    postgres_container,
+                    "--env",
+                    "POSTGRES_DB=app",
+                    "--env",
+                    "POSTGRES_USER=app",
+                    "--env",
+                    f"POSTGRES_PASSWORD={password}",
+                    "--publish",
+                    f"127.0.0.1:{postgres_port}:5432",
+                    LOCAL_POSTGRES_IMAGE,
+                ),
+                "M013_POSTGRES_DOCKER_START_FAILED",
+            )
+            _run(
+                (
+                    "docker",
+                    "run",
+                    "--detach",
+                    "--name",
+                    qdrant_container,
+                    "--publish",
+                    f"127.0.0.1:{qdrant_port}:6333",
+                    _QDRANT_IMAGE,
+                ),
+                "M013_QDRANT_DOCKER_START_FAILED",
+            )
             _wait_postgres(postgres_container)
             _wait_qdrant(qdrant_port)
-            gateway = _start((sys.executable, "-m", "app.platform.local_runtime", "serve-http", "llm-gateway", "8090", "--config", str(runtime_config)), repository_root)
-            api = _start((sys.executable, "-m", "app.platform.orchestrator_command", "--config", str(runtime_config)), repository_root)
+            gateway = _start(
+                (
+                    sys.executable,
+                    "-m",
+                    "app.platform.local_runtime",
+                    "serve-http",
+                    "llm-gateway",
+                    "8090",
+                    "--config",
+                    str(runtime_config),
+                ),
+                repository_root,
+            )
+            api = _start(
+                (
+                    sys.executable,
+                    "-m",
+                    "app.platform.orchestrator_command",
+                    "--config",
+                    str(runtime_config),
+                ),
+                repository_root,
+            )
             yield runtime_config, token
     finally:
         _stop(api)
         _stop(gateway)
-        subprocess.run(("docker", "rm", "--force", postgres_container), capture_output=True, check=False)
-        subprocess.run(("docker", "rm", "--force", qdrant_container), capture_output=True, check=False)
+        subprocess.run(
+            ("docker", "rm", "--force", postgres_container),
+            capture_output=True,
+            check=False,
+        )
+        subprocess.run(
+            ("docker", "rm", "--force", qdrant_container),
+            capture_output=True,
+            check=False,
+        )
         postgres_secret.unlink(missing_ok=True)
         token_secret.unlink(missing_ok=True)
 
@@ -128,7 +189,14 @@ def _two_free_loopback_ports() -> tuple[int, int]:
 
 
 def _run(command: tuple[str, ...], error_code: str) -> None:
-    completed = subprocess.run(command, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)
+    completed = subprocess.run(
+        command,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    )
     if completed.returncode != 0:
         detail = (completed.stderr or completed.stdout).strip()
         raise RuntimeError(f"{error_code}:{detail}")
@@ -142,7 +210,11 @@ def _replace_required(document: str, configured_value: str, runtime_value: str) 
 
 def _wait_postgres(container: str) -> None:
     for _ in range(120):
-        completed = subprocess.run(("docker", "exec", container, "pg_isready", "-U", "app", "-d", "app"), capture_output=True, check=False)
+        completed = subprocess.run(
+            ("docker", "exec", container, "pg_isready", "-U", "app", "-d", "app"),
+            capture_output=True,
+            check=False,
+        )
         if completed.returncode == 0:
             return
         time.sleep(0.25)
@@ -154,7 +226,9 @@ def _wait_qdrant(port: int) -> None:
 
     for _ in range(120):
         try:
-            with urllib.request.urlopen(f"http://127.0.0.1:{port}/collections", timeout=1) as response:
+            with urllib.request.urlopen(
+                f"http://127.0.0.1:{port}/collections", timeout=1
+            ) as response:
                 if response.status == 200:
                     return
         except OSError:
@@ -163,7 +237,12 @@ def _wait_qdrant(port: int) -> None:
 
 
 def _start(command: tuple[str, ...], repository_root: Path) -> subprocess.Popen[bytes]:
-    return subprocess.Popen(command, cwd=repository_root, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return subprocess.Popen(
+        command,
+        cwd=repository_root,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
 
 
 def _stop(process: subprocess.Popen[bytes] | None) -> None:
