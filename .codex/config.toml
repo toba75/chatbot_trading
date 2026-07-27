@@ -1,5 +1,5 @@
 default_permissions = "ostrading-product"
-approval_policy = "on-request"
+approval_policy = "never"
 approvals_reviewer = "user"
 web_search = "disabled"
 allow_login_shell = false
