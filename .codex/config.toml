@@ -30,3 +30,6 @@ default_tools_approval_mode = "prompt"
 
 [mcp_servers.node_repl]
 enabled = false
+
+[windows]
+sandbox_private_desktop = true
