@@ -1,4 +1,0 @@
-interface:
-  display_name: "Review Performance Complexité"
-  short_description: "Repère coûts, latence et charge"
-  default_prompt: "Use $review-performance-complexite pour revoir ce changement selon cet axe de code review."

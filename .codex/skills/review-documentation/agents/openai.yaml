@@ -1,4 +1,0 @@
-interface:
-  display_name: "Review Documentation"
-  short_description: "Aligne docs, API et décisions"
-  default_prompt: "Use $review-documentation pour revoir ce changement selon cet axe de code review."

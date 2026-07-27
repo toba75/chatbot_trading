@@ -1,4 +1,0 @@
-interface:
-  display_name: "Review Compatibilité Impact"
-  short_description: "Évalue rupture et rollback"
-  default_prompt: "Use $review-compatibilite-impact pour revoir ce changement selon cet axe de code review."

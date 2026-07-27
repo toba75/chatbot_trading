@@ -1,4 +1,0 @@
-interface:
-  display_name: "Review Observabilité"
-  short_description: "Rend les incidents visibles"
-  default_prompt: "Use $review-observabilite pour revoir ce changement selon cet axe de code review."

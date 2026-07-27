@@ -1,4 +1,0 @@
-interface:
-  display_name: "Execute Implementation Task"
-  short_description: "Exécute tâches DDD, BDD, TDD et ADR"
-  default_prompt: "Use $execute-implementation-task to exécuter cette tâche selon DDD, BDD, TDD et traçabilité ADR."

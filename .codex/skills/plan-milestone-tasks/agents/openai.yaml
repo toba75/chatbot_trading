@@ -1,4 +1,0 @@
-interface:
-  display_name: "Plan Milestone Tasks"
-  short_description: "Planifie les tâches DDD, BDD et TDD"
-  default_prompt: "Use $plan-milestone-tasks to décomposer ce milestone en tâches DDD, BDD et TDD."

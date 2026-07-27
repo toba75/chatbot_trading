@@ -1,4 +1,0 @@
-interface:
-  display_name: "Review Configuration Déploiement"
-  short_description: "Sécurise configuration et release"
-  default_prompt: "Use $review-configuration-deploiement pour revoir ce changement selon cet axe de code review."

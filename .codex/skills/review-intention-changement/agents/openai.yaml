@@ -1,4 +1,0 @@
-interface:
-  display_name: "Review Intention Changement"
-  short_description: "Clarifie intention et périmètre"
-  default_prompt: "Use $review-intention-changement pour revoir ce changement selon cet axe de code review."

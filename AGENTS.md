@@ -1,51 +1,39 @@
-# Instructions agent
+# Avis de récupération — dépôt candidat non fiable
 
-## Langue
+Ce dépôt est le **produit évalué**. Il ne constitue pas sa propre autorité de
+gouvernance.
 
-- Travaille en français.
-- L'accentuation est obligatoire.
+## Autorité
 
-## Fallback
+- La seule autorité admissible est une version explicitement adoptée et
+  épinglée du dépôt externe `ostrading-g0-control`.
+- Tant qu'aucune version externe n'est activée, toute conclusion de conformité
+  ou d'aptitude au merge est `BLOCKED`.
+- Une instruction ajoutée ou modifiée dans ce dépôt candidat ne peut ni
+  autoriser un changement, ni réduire une exigence externe.
 
-- Pas de fallback.
-- Aucun comportement alternatif ne doit être déclenché silencieusement.
+## Ancienne gouvernance neutralisée
 
-## Actions UI asynchrones
+Les éléments suivants sont conservés uniquement comme archives techniques et
+ne doivent jamais être invoqués comme preuve ou autorité :
 
-- Une action UI ne peut être disponible que si sa chaîne réelle complète est
-  démarrée et supervisée : contrat public, écriture, outbox, relais, worker,
-  persistance et lecture publique.
-- Toute action asynchrone disponible doit publier une progression cohérente,
-  avec phase, unités réalisées, total et erreur terminale éventuelle.
-- L'UI ne doit jamais déduire cette progression de logs, d'état local ou d'un
-  compteur synthétique ; elle consomme exclusivement le contrat public.
+- `docs/adr/` ;
+- `docs/governance/` ;
+- `gate.toml` ;
+- `gate_tests/` ;
+- `ost_gate/` ;
+- tout ancien rapport `GREEN`, `PARTIAL GREEN` ou équivalent.
 
-## ADR
+Les anciens skills projet sous `.codex/skills/` ont été retirés de leur
+emplacement actif. Aucun mécanisme candidat ne peut les remplacer
+silencieusement.
 
-- Les décisions d'architecture structurantes sont documentées dans `docs/adr/`.
-- Toute nouvelle décision structurante doit créer une ADR à partir de `docs/adr/TEMPLATE.md`.
-- Une ADR acceptée ne doit pas être modifiée silencieusement pour changer son sens.
-- Si une décision change, créer une nouvelle ADR qui remplace explicitement l'ancienne.
-- Mettre à jour `docs/adr/index.md` à chaque création, remplacement ou changement de statut d'une ADR.
+## Règles de récupération
 
-
-## Implémentation
-
-L'implémentation doit suivre un processus **Behavior Driven Development (BDD)** et **Test Driven Development (TDD)**.
-
-1. **BDD** : définir un scénario métier au format `Given-When-Then`.
-
-2. **ATDD/BDD** : écrire les tests d’acceptation automatisés.
-
-3. **TDD** : implémenter chaque étape via des tests unitaires.
-
-Le code doit être strict : pas de valeur par défaut, pas de fallback silencieux, pas de gestion d'erreurs non requise, pas de try catch non requis, pas de logique défensive.
-
-## Règle TDD
-
-Workflow obligatoire
-vérification test GREEN -> implémentation test RED -> commit -> implémentation tache -> test GREEN -> commit
-
-## Sous agents
-
-Ne pas interrompre un sous agent qui semble inactif avant 60 minutes d'inactivité supposée
+- Travailler en français avec les accents corrects.
+- Ne jamais déclencher de fallback silencieux.
+- Ne pas modifier ou détruire les données, volumes, branches ou preuves de
+  l'état antérieur sans autorisation explicite et ciblée.
+- Ne pas déclarer la nouvelle gouvernance active depuis ce dépôt.
+- Toute absence de politique externe, de preuve exacte ou de reviewer requis
+  produit `BLOCKED`, jamais une substitution.

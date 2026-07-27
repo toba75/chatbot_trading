@@ -1,4 +1,0 @@
-interface:
-  display_name: "Review Adhérence Tâches Milestone"
-  short_description: "Contrôle tâches, specs et plan"
-  default_prompt: "Use $review-adherence-taches-milestone pour vérifier l'adhérence des tâches d'un milestone à la spécification et au plan."

@@ -1,4 +1,0 @@
-interface:
-  display_name: "Review Sécurité"
-  short_description: "Cherche risques exploitables"
-  default_prompt: "Use $review-securite pour revoir ce changement selon cet axe de code review."

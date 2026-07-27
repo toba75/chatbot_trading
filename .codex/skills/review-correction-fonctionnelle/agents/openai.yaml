@@ -1,4 +1,0 @@
-interface:
-  display_name: "Review Correction Fonctionnelle"
-  short_description: "Vérifie comportements et limites"
-  default_prompt: "Use $review-correction-fonctionnelle pour revoir ce changement selon cet axe de code review."

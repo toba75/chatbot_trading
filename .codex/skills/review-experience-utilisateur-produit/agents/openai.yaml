@@ -1,4 +1,0 @@
-interface:
-  display_name: "Review UX Produit"
-  short_description: "Contrôle impact utilisateur"
-  default_prompt: "Use $review-experience-utilisateur-produit pour revoir ce changement selon cet axe de code review."
