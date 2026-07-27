@@ -7,11 +7,6 @@ from pathlib import Path
 
 import pytest
 
-from app.contracts.technical_jobs import (
-    GraniteModelStillRunning,
-    _issue_granite_execution_capability,
-)
-
 from app.source_processing.application.convert_routed_pages import (
     ConvertRoutedPagesCommand,
     ConvertRoutedPagesHandler,
@@ -43,6 +38,7 @@ from app.source_processing.domain.page_conversion import (
     PageConversionItem,
     PageConversionItemLabel,
     PageItemGeometry,
+    PagewiseDoclingFusionService,
 )
 from app.source_processing.domain.source_document import (
     BibliographicMetadata,
@@ -64,7 +60,6 @@ def _request() -> PageConversionRequest:
             "artifact:source_processing.original_sources/"
             "DOC-0000000000000001/original.pdf"
         ),
-        source_sha256="a" * 64,
         expected_output_artifact_ref=(
             "artifact:source_processing.page_conversion/"
             "RUN-M004-GEMMA-UNIT/page-001-scan_granite.json"
@@ -171,40 +166,34 @@ def _source_and_run() -> tuple[SourceDocument, DocumentProcessingRun]:
             ),
         ),
     )
-    run = (
-        DocumentProcessingRun.start(
-            processing_run_id=ProcessingRunId.from_value("RUN-M004-GEMMA-HANDLER"),
-            source_document=source,
-            page_manifest=manifest,
-        )
-        .record_page_diagnostics(
-            (
-                PageDecision(
-                    page_number=PageNumber.from_value(1),
-                    page_state=PageDecisionState.SCAN_CLEAN,
-                    signals=PageDiagnosticSignals(
-                        native_text_state="ABSENT",
-                        image_state="SCAN_CLEAN",
-                        existing_ocr_state="NONE",
-                        layout_complexity="SIMPLE",
-                        corruption_state="NONE",
-                        mixed_content_detected=False,
-                        has_table=False,
-                        has_formula=False,
-                    ),
-                    diagnostic_version=DiagnosticVersion.from_value("diag-gemma-v1"),
-                    justification="Scan sans texte natif.",
+    run = DocumentProcessingRun.start(
+        processing_run_id=ProcessingRunId.from_value("RUN-M004-GEMMA-HANDLER"),
+        source_document=source,
+        page_manifest=manifest,
+    ).record_page_diagnostics(
+        (
+            PageDecision(
+                page_number=PageNumber.from_value(1),
+                page_state=PageDecisionState.SCAN_CLEAN,
+                signals=PageDiagnosticSignals(
+                    native_text_state="ABSENT",
+                    image_state="SCAN_CLEAN",
+                    existing_ocr_state="NONE",
+                    layout_complexity="SIMPLE",
+                    corruption_state="NONE",
+                    mixed_content_detected=False,
+                    has_table=False,
+                    has_formula=False,
                 ),
-            )
+                diagnostic_version=DiagnosticVersion.from_value("diag-gemma-v1"),
+                justification="Scan sans texte natif.",
+            ),
         )
-        .decide_route_plan(
-            PageRoutingConfiguration(
-                routing_policy_version=RoutingPolicyVersion.from_value(
-                    "routing-gemma-v1"
-                ),
-                auto_confidence_min=0.90,
-                benchmark_confidence_min=0.85,
-            )
+    ).decide_route_plan(
+        PageRoutingConfiguration(
+            routing_policy_version=RoutingPolicyVersion.from_value("routing-gemma-v1"),
+            auto_confidence_min=0.90,
+            benchmark_confidence_min=0.85,
         )
     )
     return source, run
@@ -295,71 +284,44 @@ def _verifier_adaptateur_gemma_apres_indisponibilite_granite(tmp_path: Path) -> 
         GemmaVisionConversionResponse,
         GemmaVisionPageItem,
     )
-    from app.source_processing.adapters.docling_granite_conversion import (
-        GraniteDoclingConversionError,
-    )
     from app.source_processing.application.routed_document_conversion_worker import (
-        _RunningGraniteRouteConversion,
+        _GemmaVisionFallbackPageConverter,
     )
 
     source_path = tmp_path / "source.pdf"
     source_path.write_bytes(b"%PDF-1.7\nGemma concrete recovery\n%%EOF\n")
     request = _request()
 
-    capability = _issue_granite_execution_capability()
-
-    class _Process:
-        def __init__(self, outcome) -> None:
-            self.outcome = outcome
-
-        def wait(self, *, timeout_seconds):
-            if isinstance(self.outcome, Exception):
-                raise self.outcome
-            return self.outcome
-
-        def terminate(self):
-            raise AssertionError("annulation inattendue")
-
-    class _ConcreteGranitePort:
-        def start(self, granite_request, *, capability):
-            return _Process(
-                GraniteDoclingConversionError("GRANITE_DOCLING_UNAVAILABLE")
-            )
-
     class _ConcreteGemmaPort:
         def __init__(self) -> None:
             self.requests = []
 
-        def start(self, gemma_request, *, capability):
+        def convert(self, gemma_request):
             self.requests.append(gemma_request)
-            return _Process(
-                GemmaVisionConversionResponse(
-                    tool_version="google/gemma-4-26B-A4B-it@immutable;nim-1.7.0",
-                    items=(
-                        GemmaVisionPageItem(
-                            text="Texte récupéré",
-                            bbox=(0.0, 0.0, 1000.0, 1000.0),
-                        ),
+            return GemmaVisionConversionResponse(
+                tool_version="google/gemma-4-26B-A4B-it@immutable;nim-1.7.0",
+                items=(
+                    GemmaVisionPageItem(
+                        text="Texte récupéré",
+                        bbox=(0.0, 0.0, 1000.0, 1000.0),
                     ),
-                )
+                ),
             )
 
     gemma_port = _ConcreteGemmaPort()
-    process = _RunningGraniteRouteConversion(
-        capability=capability,
-        request=request,
-        source_path=source_path,
-        granite_converter=_ConcreteGranitePort(),
-        gemma_converter=gemma_port,
+    converter = _GemmaVisionFallbackPageConverter(
+        converter=gemma_port,
+        resolve_source_path=lambda artifact_ref: source_path,
         gateway_endpoint_url="http://llm-gateway.local/v1/infer",
         gateway_timeout_seconds=120,
         gateway_max_output_tokens=2048,
         expected_model_id="google/gemma-4-26B-A4B-it",
     )
 
-    with pytest.raises(GraniteModelStillRunning):
-        process.wait(timeout_seconds=1)
-    recovered = process.wait(timeout_seconds=1)
+    recovered = converter.recover_page(
+        request,
+        granite_error_code="GRANITE_DOCLING_UNAVAILABLE",
+    )
 
     assert len(gemma_port.requests) == 1
     assert gemma_port.requests[0].max_output_tokens == 2048
@@ -400,9 +362,7 @@ def _verifier_normalisation_bbox_gemma_inversee() -> None:
     ) == [{"text": "Texte lu", "bbox": [74, 61, 104, 118]}]
 
 
-def _verifier_recuperation_orientation_gemma_apres_bbox_invalide(
-    tmp_path: Path,
-) -> None:
+def _verifier_recuperation_orientation_gemma_apres_bbox_invalide(tmp_path: Path) -> None:
     # Given Granite a échoué et le premier rendu Gemma retourne des bboxes invalides.
     # When la récupération d'orientation explicitement bornée est déclenchée.
     # Then Gemma reçoit exactement un second rendu à 90 degrés, ses coordonnées
@@ -415,11 +375,8 @@ def _verifier_recuperation_orientation_gemma_apres_bbox_invalide(
     from app.source_processing.adapters.gemma_vision_worker import (
         _bbox_dans_repere_source,
     )
-    from app.source_processing.adapters.docling_granite_conversion import (
-        GraniteDoclingConversionError,
-    )
     from app.source_processing.application.routed_document_conversion_worker import (
-        _RunningGraniteRouteConversion,
+        _GemmaVisionFallbackPageConverter,
     )
 
     source_path = tmp_path / "source.pdf"
@@ -430,72 +387,43 @@ def _verifier_recuperation_orientation_gemma_apres_bbox_invalide(
         def __init__(self) -> None:
             self.requests = []
 
-        def start(self, gemma_request, *, capability):
+        def convert(self, gemma_request):
             self.requests.append(gemma_request)
             if gemma_request.render_rotation_degrees == 0:
-                return _Process(
-                    GemmaVisionConversionError("GEMMA_VISION_OUTPUT_INVALID")
-                )
+                raise GemmaVisionConversionError("GEMMA_VISION_OUTPUT_INVALID")
             if gemma_request.render_rotation_degrees != 90:
-                raise AssertionError(
-                    "La récupération ne doit essayer aucune autre orientation."
-                )
-            return _Process(
-                GemmaVisionConversionResponse(
-                    tool_version=(
-                        "google/gemma-4-26B-A4B-it@immutable;nim-1.7.0;"
-                        "render-rotation-090"
+                raise AssertionError("La récupération ne doit essayer aucune autre orientation.")
+            return GemmaVisionConversionResponse(
+                tool_version=(
+                    "google/gemma-4-26B-A4B-it@immutable;nim-1.7.0;"
+                    "render-rotation-090"
+                ),
+                items=(
+                    GemmaVisionPageItem(
+                        text="Titre réorienté",
+                        bbox=(925.0, 46.0, 938.0, 159.0),
                     ),
-                    items=(
-                        GemmaVisionPageItem(
-                            text="Titre réorienté",
-                            bbox=(925.0, 46.0, 938.0, 159.0),
-                        ),
-                    ),
-                )
-            )
-
-    class _Process:
-        def __init__(self, outcome) -> None:
-            self.outcome = outcome
-
-        def wait(self, *, timeout_seconds):
-            if isinstance(self.outcome, Exception):
-                raise self.outcome
-            return self.outcome
-
-        def terminate(self):
-            raise AssertionError("annulation inattendue")
-
-    class _GraniteIndisponible:
-        def start(self, request, *, capability):
-            return _Process(
-                GraniteDoclingConversionError("GRANITE_DOCLING_UNAVAILABLE")
+                ),
             )
 
     gemma_port = _GemmaAvecRecuperationOrientation()
-    process = _RunningGraniteRouteConversion(
-        capability=_issue_granite_execution_capability(),
-        request=request,
-        source_path=source_path,
-        granite_converter=_GraniteIndisponible(),
-        gemma_converter=gemma_port,
+    converter = _GemmaVisionFallbackPageConverter(
+        converter=gemma_port,
+        resolve_source_path=lambda artifact_ref: source_path,
         gateway_endpoint_url="http://llm-gateway.local/v1/infer",
         gateway_timeout_seconds=120,
         gateway_max_output_tokens=2048,
         expected_model_id="google/gemma-4-26B-A4B-it",
     )
 
-    for _transition in range(2):
-        with pytest.raises(GraniteModelStillRunning):
-            process.wait(timeout_seconds=1)
-    recovered = process.wait(timeout_seconds=1)
+    recovered = converter.recover_page(
+        request,
+        granite_error_code="GRANITE_DOCLING_UNAVAILABLE",
+    )
 
     assert [entry.render_rotation_degrees for entry in gemma_port.requests] == [0, 90]
     assert recovered.tool_version.endswith("render-rotation-090")
-    assert _bbox_dans_repere_source(
-        [841, 925, 954, 938], render_rotation_degrees=90
-    ) == [
+    assert _bbox_dans_repere_source([841, 925, 954, 938], render_rotation_degrees=90) == [
         925,
         46,
         938,
@@ -598,9 +526,7 @@ def _verifier_sortie_gemma_tronquee_est_explicite(
                 latency_ms=120_000.0,
             )
 
-    monkeypatch.setattr(
-        gemma_vision_worker, "UrllibLlmInferenceGateway", _GatewaySortieTronquee
-    )
+    monkeypatch.setattr(gemma_vision_worker, "UrllibLlmInferenceGateway", _GatewaySortieTronquee)
     monkeypatch.setattr(
         gemma_vision_worker,
         "_render_page_png",
@@ -645,11 +571,8 @@ def _verifier_segmentation_gemma_bornee_apres_troncature(tmp_path: Path) -> None
         _segment_crop_box,
         _structured_items,
     )
-    from app.source_processing.adapters.docling_granite_conversion import (
-        GraniteDoclingConversionError,
-    )
     from app.source_processing.application.routed_document_conversion_worker import (
-        _RunningGraniteRouteConversion,
+        _GemmaVisionFallbackPageConverter,
     )
 
     source_path = tmp_path / "source-gemma-dense.pdf"
@@ -659,7 +582,7 @@ def _verifier_segmentation_gemma_bornee_apres_troncature(tmp_path: Path) -> None
         def __init__(self) -> None:
             self.requests = []
 
-        def start(self, gemma_request, *, capability):
+        def convert(self, gemma_request):
             self.requests.append(gemma_request)
             signature = (
                 gemma_request.render_rotation_degrees,
@@ -667,68 +590,42 @@ def _verifier_segmentation_gemma_bornee_apres_troncature(tmp_path: Path) -> None
                 gemma_request.render_segment_count,
             )
             if signature == (0, None, None):
-                return _Process(
-                    GemmaVisionConversionError("GEMMA_VISION_OUTPUT_INVALID")
-                )
+                raise GemmaVisionConversionError("GEMMA_VISION_OUTPUT_INVALID")
             if signature == (90, None, None):
-                return _Process(
-                    GemmaVisionConversionError("GEMMA_VISION_OUTPUT_TRUNCATED")
-                )
+                raise GemmaVisionConversionError("GEMMA_VISION_OUTPUT_TRUNCATED")
             if signature not in {
-                (90, segment_index, 16) for segment_index in range(1, 17)
+                (90, segment_index, 16)
+                for segment_index in range(1, 17)
             }:
                 raise AssertionError(f"Appel Gemma hors contrat : {signature!r}")
             segment_index = gemma_request.render_segment_index
-            return _Process(
-                GemmaVisionConversionResponse(
-                    tool_version=(
-                        "google/gemma-4-26B-A4B-it@immutable;nim-1.7.0;"
-                        f"render-rotation-090;render-segment-{segment_index:02d}-of-16"
+            return GemmaVisionConversionResponse(
+                tool_version=(
+                    "google/gemma-4-26B-A4B-it@immutable;nim-1.7.0;"
+                    f"render-rotation-090;render-segment-{segment_index:02d}-of-16"
+                ),
+                items=(
+                    GemmaVisionPageItem(
+                        text=f"Segment {segment_index}",
+                        bbox=(0.0, 0.0, 500.0, 1000.0),
                     ),
-                    items=(
-                        GemmaVisionPageItem(
-                            text=f"Segment {segment_index}",
-                            bbox=(0.0, 0.0, 500.0, 1000.0),
-                        ),
-                    ),
-                )
-            )
-
-    class _Process:
-        def __init__(self, outcome) -> None:
-            self.outcome = outcome
-
-        def wait(self, *, timeout_seconds):
-            if isinstance(self.outcome, Exception):
-                raise self.outcome
-            return self.outcome
-
-        def terminate(self):
-            raise AssertionError("annulation inattendue")
-
-    class _GraniteIndisponible:
-        def start(self, request, *, capability):
-            return _Process(
-                GraniteDoclingConversionError("GRANITE_DOCLING_UNAVAILABLE")
+                ),
             )
 
     gemma_port = _GemmaPageDense()
-    process = _RunningGraniteRouteConversion(
-        capability=_issue_granite_execution_capability(),
-        request=_request(),
-        source_path=source_path,
-        granite_converter=_GraniteIndisponible(),
-        gemma_converter=gemma_port,
+    converter = _GemmaVisionFallbackPageConverter(
+        converter=gemma_port,
+        resolve_source_path=lambda artifact_ref: source_path,
         gateway_endpoint_url="http://llm-gateway.local/v1/infer",
         gateway_timeout_seconds=120,
         gateway_max_output_tokens=2048,
         expected_model_id="google/gemma-4-26B-A4B-it",
     )
 
-    for _transition in range(18):
-        with pytest.raises(GraniteModelStillRunning):
-            process.wait(timeout_seconds=1)
-    recovered = process.wait(timeout_seconds=1)
+    recovered = converter.recover_page(
+        _request(),
+        granite_error_code="GRANITE_DOCLING_UNAVAILABLE",
+    )
 
     assert [
         (
@@ -746,19 +643,16 @@ def _verifier_segmentation_gemma_bornee_apres_troncature(tmp_path: Path) -> None
         f"Segment {segment_index}" for segment_index in range(1, 17)
     ]
     assert recovered.tool_version.endswith("render-rotation-090;render-segments-16")
-    assert (
-        len(
-            {
-                _request_identity_suffix(
-                    render_rotation_degrees=entry.render_rotation_degrees,
-                    render_segment_index=entry.render_segment_index,
-                    render_segment_count=entry.render_segment_count,
-                )
-                for entry in gemma_port.requests
-            }
-        )
-        == 18
-    )
+    assert len(
+        {
+            _request_identity_suffix(
+                render_rotation_degrees=entry.render_rotation_degrees,
+                render_segment_index=entry.render_segment_index,
+                render_segment_count=entry.render_segment_count,
+            )
+            for entry in gemma_port.requests
+        }
+    ) == 18
     assert _structured_items(
         {"items": [{"text": "Bas du rendu", "bbox": [0, 0, 1000, 1000]}]},
         render_rotation_degrees=90,
@@ -801,13 +695,10 @@ def _verifier_budget_gemma_et_supervision_du_retry() -> None:
 
     assert configuration.models.llm.max_output_tokens == 2048
     assert example_configuration.models.llm.max_output_tokens == 2048
-    assert (
-        _gemma_gateway_supervision_timeout_seconds(
-            spark_attempt_timeout_seconds=120,
-            retry_before_first_token=1,
-        )
-        == 270
-    )
+    assert _gemma_gateway_supervision_timeout_seconds(
+        spark_attempt_timeout_seconds=120,
+        retry_before_first_token=1,
+    ) == 270
 
 
 def test_recuperation_gemma_explicite_apres_absence_de_provenance_granite(
@@ -823,9 +714,7 @@ def test_recuperation_gemma_explicite_apres_absence_de_provenance_granite(
     _verifier_contrat_gemma_compact_pour_table_dense()
     _verifier_normalisation_bbox_gemma_inversee()
     _verifier_recuperation_orientation_gemma_apres_bbox_invalide(tmp_path)
-    _verifier_json_gemma_invalide_declenche_recuperation_orientation(
-        tmp_path, monkeypatch
-    )
+    _verifier_json_gemma_invalide_declenche_recuperation_orientation(tmp_path, monkeypatch)
     _verifier_sortie_gemma_tronquee_est_explicite(tmp_path, monkeypatch)
     _verifier_segmentation_gemma_bornee_apres_troncature(tmp_path)
     _verifier_budget_gemma_et_supervision_du_retry()

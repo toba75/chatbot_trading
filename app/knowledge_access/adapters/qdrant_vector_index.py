@@ -3,11 +3,9 @@
 from __future__ import annotations
 
 import hashlib
-import json
-import struct
-from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from uuid import UUID
-from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from typing import Any, Protocol
 
 from app.knowledge_access.domain.projection_index import (
@@ -30,14 +28,6 @@ class QdrantClientPort(Protocol):
 
     def count(self, *, collection_name: str, count_filter: Mapping[str, Any], exact: bool) -> object:
         """Compte les points d'une génération."""
-
-    def scroll_pages(
-        self,
-        *,
-        collection_name: str,
-        scroll_filter: Mapping[str, Any],
-    ) -> Iterable[Sequence[Mapping[str, Any]]]:
-        """Itère les pages d'une génération sans matérialisation globale."""
 
 
 class QdrantVectorIndex:
@@ -89,7 +79,7 @@ class QdrantVectorIndex:
                 idempotent=True,
             )
 
-        qdrant_points = (
+        qdrant_points = tuple(
             _qdrant_point_for(parsed_request.index_generation, point)
             for point in parsed_request.points
         )
@@ -99,7 +89,6 @@ class QdrantVectorIndex:
             batch_size=parsed_batch_size,
             max_parallel_batches=parsed_max_parallel_batches,
             on_batch_published=on_batch_published,
-            fence_mutation=None,
         )
         published_count = self._generation_count(
             collection_name=parsed_request.collection_name,
@@ -118,190 +107,42 @@ class QdrantVectorIndex:
             idempotent=False,
         )
 
-    def repair_generation(
-        self,
-        request: VectorIndexPublishRequest,
-        *,
-        max_parallel_batches: int,
-        batch_size: int,
-        on_batch_published: Callable[[int], None],
-        fence_mutation: Callable[[Callable[[], object]], object],
-    ) -> VectorIndexPublication:
-        """Réécrit explicitement toute génération absente ou partielle puis vérifie."""
-
-        parsed_request = _ensure_publish_request(request)
-        parsed_max_parallel_batches = _ensure_positive_int(
-            max_parallel_batches,
-            "max_parallel_batches",
-        )
-        parsed_batch_size = _ensure_positive_int(batch_size, "batch_size")
-        if not callable(on_batch_published):
-            raise ValueError("rapporteur Qdrant invalide")
-        if not callable(fence_mutation):
-            raise ValueError("fencing Qdrant invalide")
-        existing_count = self._generation_count(
-            collection_name=parsed_request.collection_name,
-            index_generation=parsed_request.index_generation,
-        )
-        if existing_count == parsed_request.expected_point_count and self._generation_matches(
-            parsed_request
-        ):
-            return VectorIndexPublication(
-                collection_name=parsed_request.collection_name,
-                index_generation=parsed_request.index_generation,
-                published_point_ids=tuple(
-                    point.point_id for point in parsed_request.points
-                ),
-                expected_point_count=parsed_request.expected_point_count,
-                idempotent=True,
-            )
-        if existing_count > 0:
-            fence_mutation(
-                lambda: self._client.delete(
-                    collection_name=parsed_request.collection_name,
-                    points_selector={
-                        "filter": _generation_filter(parsed_request.index_generation)
-                    },
-                )
-            )
-        qdrant_points = (
-            _qdrant_point_for(parsed_request.index_generation, point)
-            for point in parsed_request.points
-        )
-        self._upsert_batches(
-            collection_name=parsed_request.collection_name,
-            qdrant_points=qdrant_points,
-            batch_size=parsed_batch_size,
-            max_parallel_batches=parsed_max_parallel_batches,
-            on_batch_published=on_batch_published,
-            fence_mutation=fence_mutation,
-        )
-        published_count = self._generation_count(
-            collection_name=parsed_request.collection_name,
-            index_generation=parsed_request.index_generation,
-        )
-        if (
-            published_count != parsed_request.expected_point_count
-            or not self._generation_matches(parsed_request)
-        ):
-            raise PartialVectorIndexError(
-                expected_point_count=parsed_request.expected_point_count,
-                published_point_count=published_count,
-            )
-        return VectorIndexPublication(
-            collection_name=parsed_request.collection_name,
-            index_generation=parsed_request.index_generation,
-            published_point_ids=tuple(point.point_id for point in parsed_request.points),
-            expected_point_count=parsed_request.expected_point_count,
-            idempotent=False,
-        )
-
-    def _generation_matches(self, request: VectorIndexPublishRequest) -> bool:
-        scroll_pages = getattr(self._client, "scroll_pages", None)
-        if not callable(scroll_pages):
-            raise ValueError("client Qdrant sans pagination exacte")
-        pages = scroll_pages(
-            collection_name=request.collection_name,
-            scroll_filter=_generation_filter(request.index_generation),
-        )
-        expected = {
-            str(point["id"]): _point_fingerprint(point)
-            for point in (
-                _qdrant_point_for(request.index_generation, item)
-                for item in request.points
-            )
-        }
-        for page in pages:
-            for point in page:
-                if not isinstance(point, Mapping) or set(point) < {
-                    "id",
-                    "vector",
-                    "payload",
-                }:
-                    return False
-                point_id = str(point["id"])
-                expected_fingerprint = expected.pop(point_id, None)
-                if (
-                    expected_fingerprint is None
-                    or _point_fingerprint(point) != expected_fingerprint
-                ):
-                    return False
-        return len(expected) == 0
-
     def _upsert_batches(
         self,
         *,
         collection_name: str,
-        qdrant_points: Iterable[Mapping[str, Any]],
+        qdrant_points: Sequence[Mapping[str, Any]],
         batch_size: int,
         max_parallel_batches: int,
         on_batch_published: Callable[[int], None] | None,
-        fence_mutation: Callable[[Callable[[], object]], object] | None,
     ) -> None:
-        batches = iter(_point_batches(qdrant_points, batch_size=batch_size))
+        batches = _point_batches(qdrant_points, batch_size=batch_size)
         completed_points = 0
-        if max_parallel_batches == 1:
+        if max_parallel_batches == 1 or len(batches) == 1:
             for batch in batches:
-                self._fenced_upsert(
-                    collection_name=collection_name,
-                    points=batch,
-                    fence_mutation=fence_mutation,
-                )
+                self._client.upsert(collection_name=collection_name, points=batch)
                 completed_points += len(batch)
                 if on_batch_published is not None:
                     on_batch_published(completed_points)
             return
 
         with ThreadPoolExecutor(
-            max_workers=max_parallel_batches,
+            max_workers=min(max_parallel_batches, len(batches)),
             thread_name_prefix="ka-qdrant-upsert",
         ) as executor:
-            futures: dict[Future[None], int] = {}
-
-            def submit_next() -> bool:
-                try:
-                    batch = next(batches)
-                except StopIteration:
-                    return False
-                future = executor.submit(
-                    self._fenced_upsert,
+            futures = {
+                executor.submit(
+                    self._client.upsert,
                     collection_name=collection_name,
                     points=batch,
-                    fence_mutation=fence_mutation,
-                )
-                futures[future] = len(batch)
-                return True
-
-            for _ in range(max_parallel_batches):
-                if not submit_next():
-                    break
-            while futures:
-                completed, _ = wait(tuple(futures), return_when=FIRST_COMPLETED)
-                for future in completed:
-                    point_count = futures.pop(future)
-                    future.result()
-                    completed_points += point_count
-                    if on_batch_published is not None:
-                        on_batch_published(completed_points)
-                    submit_next()
-
-    def _fenced_upsert(
-        self,
-        *,
-        collection_name: str,
-        points: Sequence[Mapping[str, Any]],
-        fence_mutation: Callable[[Callable[[], object]], object] | None,
-    ) -> None:
-        def operation() -> object:
-            return self._client.upsert(
-                collection_name=collection_name,
-                points=points,
-            )
-
-        if fence_mutation is None:
-            operation()
-            return
-        fence_mutation(operation)
+                ): len(batch)
+                for batch in batches
+            }
+            for future in as_completed(futures):
+                future.result()
+                completed_points += futures[future]
+                if on_batch_published is not None:
+                    on_batch_published(completed_points)
 
     def generation_exists(self, *, collection_name: str, index_generation: str) -> bool:
         parsed_collection_name = _ensure_text(collection_name, "collection_name")
@@ -310,19 +151,6 @@ class QdrantVectorIndex:
             collection_name=parsed_collection_name,
             index_generation=parsed_index_generation,
         ) > 0
-
-    def verify_generation(self, request: VectorIndexPublishRequest) -> bool:
-        """Vérifie sans mutation l'ensemble exact et les empreintes attendues."""
-
-        parsed = _ensure_publish_request(request)
-        return (
-            self._generation_count(
-                collection_name=parsed.collection_name,
-                index_generation=parsed.index_generation,
-            )
-            == parsed.expected_point_count
-            and self._generation_matches(parsed)
-        )
 
     def delete_generation(self, *, collection_name: str, index_generation: str) -> VectorIndexDeletion:
         parsed_collection_name = _ensure_text(collection_name, "collection_name")
@@ -397,37 +225,6 @@ def _generation_filter(index_generation: str) -> dict[str, Any]:
     }
 
 
-def _point_fingerprint(point: Mapping[str, Any]) -> str:
-    comparable = {
-        "id": str(point["id"]),
-        "payload": _qdrant_canonical_value(point["payload"]),
-        "vector": _qdrant_canonical_value(point["vector"]),
-    }
-    return hashlib.sha256(
-        json.dumps(
-            comparable,
-            ensure_ascii=False,
-            separators=(",", ":"),
-            sort_keys=True,
-        ).encode("utf-8")
-    ).hexdigest()
-
-
-def _qdrant_canonical_value(value: Any) -> Any:
-    """Normalise les vecteurs selon la précision float32 réellement stockée."""
-
-    if isinstance(value, float):
-        return struct.unpack("!f", struct.pack("!f", value))[0]
-    if isinstance(value, Mapping):
-        return {
-            str(key): _qdrant_canonical_value(item)
-            for key, item in value.items()
-        }
-    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
-        return tuple(_qdrant_canonical_value(item) for item in value)
-    return value
-
-
 def _ensure_publish_request(value: VectorIndexPublishRequest) -> VectorIndexPublishRequest:
     if not isinstance(value, VectorIndexPublishRequest):
         raise ValueError("requete VectorIndex invalide")
@@ -447,18 +244,14 @@ def _ensure_batch_size(value: int | None, *, point_count: int) -> int:
 
 
 def _point_batches(
-    points: Iterable[Mapping[str, Any]],
+    points: Sequence[Mapping[str, Any]],
     *,
     batch_size: int,
-) -> Iterator[tuple[Mapping[str, Any], ...]]:
-    batch: list[Mapping[str, Any]] = []
-    for point in points:
-        batch.append(point)
-        if len(batch) == batch_size:
-            yield tuple(batch)
-            batch.clear()
-    if batch:
-        yield tuple(batch)
+) -> tuple[tuple[Mapping[str, Any], ...], ...]:
+    return tuple(
+        tuple(points[index : index + batch_size])
+        for index in range(0, len(points), batch_size)
+    )
 
 
 def _ensure_point(value: VectorIndexPoint) -> VectorIndexPoint:

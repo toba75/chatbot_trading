@@ -9,7 +9,6 @@ from typing import Any, NamedTuple
 from app.platform.job_runtime import (
     JobCatalog,
     JobEnvironmentIdentity,
-    JobExecutionRequirements,
     JobIdempotenceKey,
     JobPriority,
     JobRecord,
@@ -35,12 +34,6 @@ class _JobRow(NamedTuple):
     configuration_hash: str
     code_version: str
     model_version: str
-    execution_contract_name: str | None
-    execution_contract_version: str | None
-    capacity_capability: str | None
-    capacity_slots: int | None
-    capacity_device: str | None
-    storage_environment: str | None
     payload: Any
     status: str
     result: Any
@@ -62,12 +55,6 @@ class _ClaimedJobRow(NamedTuple):
     configuration_hash: str
     code_version: str
     model_version: str
-    execution_contract_name: str | None
-    execution_contract_version: str | None
-    capacity_capability: str | None
-    capacity_slots: int | None
-    capacity_device: str | None
-    storage_environment: str | None
     payload: Any
     status: str
     result: Any
@@ -99,12 +86,6 @@ class _ConsumedRelayRow(NamedTuple):
 class _ExistingRelayRow(NamedTuple):
     job_id: str
     priority: str
-    execution_contract_name: str | None
-    execution_contract_version: str | None
-    capacity_capability: str | None
-    capacity_slots: int | None
-    capacity_device: str | None
-    storage_environment: str | None
     payload: Any
     trace_id: str
     source_message_id: str | None
@@ -147,13 +128,6 @@ class JobRelayMessageConflictError(RuntimeError):
         super().__init__("JOB_RELAY_MESSAGE_CONFLICT")
 
 
-class JobSubmissionConflictError(RuntimeError):
-    """Une même identité idempotente désigne deux commandes divergentes."""
-
-    def __init__(self) -> None:
-        super().__init__("JOB_SUBMISSION_CONFLICT")
-
-
 class PostgresJobQueue:
     """File priorisée partagée par l'API et les workers via PostgreSQL."""
 
@@ -174,9 +148,7 @@ class PostgresJobQueue:
         self._catalog = catalog
         self._environment_identity = environment_identity
 
-    def submit(
-        self, request: JobRequest, *, recalculate: bool
-    ) -> JobSubmissionDecision:
+    def submit(self, request: JobRequest, *, recalculate: bool) -> JobSubmissionDecision:
         with self._connection_factory.connect() as connection:
             with connection.transaction():
                 return self.submit_in_transaction(
@@ -227,13 +199,6 @@ class PostgresJobQueue:
             existing_row = cursor.fetchone()
             if existing_row is not None:
                 existing = _job_from_row(existing_row)
-                if (
-                    existing.request.priority is not parsed_request.priority
-                    or existing.request.payload != parsed_request.payload
-                    or existing.request.execution_requirements
-                    != parsed_request.execution_requirements
-                ):
-                    raise JobSubmissionConflictError()
                 if not recalculate and existing.status in {
                     JobStatus.PENDING,
                     JobStatus.RUNNING,
@@ -250,50 +215,37 @@ class PostgresJobQueue:
                 INSERT INTO platform.technical_jobs (
                     environment, deployment_id,
                     job_name, priority, input_hash, configuration_hash,
-                    code_version, model_version,
-                    execution_contract_name, execution_contract_version,
-                    capacity_capability, capacity_slots, capacity_device,
-                    storage_environment,
-                    payload, trace_id, status,
+                    code_version, model_version, payload, trace_id, status,
                     recalculation_number
                 )
                 VALUES (
-                    %(environment)s, %(deployment_id)s, %(job_name)s,
-                    %(priority)s, %(input_hash)s, %(configuration_hash)s,
-                    %(code_version)s, %(model_version)s,
-                    %(execution_contract_name)s, %(execution_contract_version)s,
-                    %(capacity_capability)s, %(capacity_slots)s,
-                    %(capacity_device)s, %(storage_environment)s,
-                    %(payload)s::jsonb, %(trace_id)s, 'pending',
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, 'pending',
                     COALESCE((
                         SELECT MAX(recalculation_number) + 1
                           FROM platform.technical_jobs
-                         WHERE environment = %(environment)s
-                           AND deployment_id = %(deployment_id)s
-                           AND job_name = %(job_name)s
-                           AND input_hash = %(input_hash)s
-                           AND configuration_hash = %(configuration_hash)s
-                           AND code_version = %(code_version)s
-                           AND model_version = %(model_version)s
+                         WHERE environment = %s
+                           AND deployment_id = %s
+                           AND job_name = %s
+                           AND input_hash = %s
+                           AND configuration_hash = %s
+                           AND code_version = %s
+                           AND model_version = %s
                     ), 0)
                 )
                 RETURNING {_JOB_COLUMNS_SQL}
                 """,
-                {
-                    "environment": parsed_request.environment,
-                    "deployment_id": parsed_request.deployment_id,
-                    "job_name": parsed_request.job_name,
-                    "priority": parsed_request.priority.value,
-                    "input_hash": parsed_request.idempotence_key.input_hash,
-                    "configuration_hash": (
-                        parsed_request.idempotence_key.configuration_hash
-                    ),
-                    "code_version": parsed_request.idempotence_key.code_version,
-                    "model_version": parsed_request.idempotence_key.model_version,
-                    **_execution_requirement_mapping(parsed_request),
-                    "payload": _json_dumps(parsed_request.payload),
-                    "trace_id": current_trace_id(),
-                },
+                (
+                    parsed_request.environment,
+                    parsed_request.deployment_id,
+                    parsed_request.job_name,
+                    parsed_request.priority.value,
+                    *identity[1:],
+                    json.dumps(dict(parsed_request.payload), separators=(",", ":"), sort_keys=True),
+                    current_trace_id(),
+                    parsed_request.environment,
+                    parsed_request.deployment_id,
+                    *identity,
+                ),
             )
             created_row = cursor.fetchone()
         if created_row is None:
@@ -362,7 +314,12 @@ class PostgresJobQueue:
         request = message.as_job_request()
         self._catalog.require_known_job(request.job_name)
         self._require_environment_identity(request)
-        serialized_payload = _json_dumps(request.payload)
+        serialized_payload = json.dumps(
+            dict(request.payload),
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        )
         with self._connection_factory.connect() as connection:
             with connection.transaction(), connection.cursor() as cursor:
                 cursor.execute(
@@ -381,73 +338,7 @@ class PostgresJobQueue:
                 if consumed is not None:
                     consumed_row = _ConsumedRelayRow.from_database(consumed)
                     if consumed_row.source_message_hash != message.content_hash:
-                        cursor.execute(
-                            f"""
-                            SELECT {_EXISTING_RELAY_COLUMNS_SQL}
-                              FROM platform.technical_jobs
-                             WHERE job_id = %s
-                             FOR UPDATE
-                            """,
-                            (consumed_row.job_id,),
-                        )
-                        historical = cursor.fetchone()
-                        if historical is None:
-                            raise JobRelayMessageConflictError()
-                        historical_row = _ExistingRelayRow.from_database(historical)
-                        if not _is_historical_project_document_upgrade(
-                            existing_row=historical_row,
-                            request=request,
-                            message_id=message.message_id,
-                        ):
-                            raise JobRelayMessageConflictError()
-                        requirements = _execution_requirement_mapping(request)
-                        cursor.execute(
-                            """
-                            UPDATE platform.technical_jobs
-                               SET environment = %(environment)s,
-                                   deployment_id = %(deployment_id)s,
-                                   priority = %(priority)s,
-                                   input_hash = %(input_hash)s,
-                                   configuration_hash = %(configuration_hash)s,
-                                   code_version = %(code_version)s,
-                                   model_version = %(model_version)s,
-                                   execution_contract_name =
-                                       %(execution_contract_name)s,
-                                   execution_contract_version =
-                                       %(execution_contract_version)s,
-                                   capacity_capability = %(capacity_capability)s,
-                                   capacity_slots = %(capacity_slots)s,
-                                   capacity_device = %(capacity_device)s,
-                                   storage_environment = %(storage_environment)s,
-                                   payload = %(payload)s::jsonb,
-                                   trace_id = %(trace_id)s,
-                                   status = 'pending', result = NULL,
-                                   failure_reason = NULL, lease_owner = NULL,
-                                   lease_expires_at = NULL, claim_token = NULL,
-                                   source_message_hash = %(source_message_hash)s
-                             WHERE job_id = %(job_id)s
-                               AND source_message_id = %(source_message_id)s
-                            """,
-                            {
-                                "environment": request.environment,
-                                "deployment_id": request.deployment_id,
-                                "priority": request.priority.value,
-                                "input_hash": request.idempotence_key.input_hash,
-                                "configuration_hash": (
-                                    request.idempotence_key.configuration_hash
-                                ),
-                                "code_version": request.idempotence_key.code_version,
-                                "model_version": request.idempotence_key.model_version,
-                                **requirements,
-                                "payload": serialized_payload,
-                                "trace_id": message.trace_id,
-                                "source_message_id": message.message_id,
-                                "source_message_hash": message.content_hash,
-                                "job_id": consumed_row.job_id,
-                            },
-                        )
-                        if cursor.rowcount != 1:
-                            raise JobRelayMessageConflictError()
+                        raise JobRelayMessageConflictError()
                     return consumed_row.job_id
 
                 cursor.execute(
@@ -473,49 +364,9 @@ class PostgresJobQueue:
                 existing = cursor.fetchone()
                 if existing is not None:
                     existing_row = _ExistingRelayRow.from_database(existing)
-                    if _is_historical_project_document_upgrade(
-                        existing_row=existing_row,
-                        request=request,
-                        message_id=message.message_id,
-                    ):
-                        requirements = _execution_requirement_mapping(request)
-                        cursor.execute(
-                            """
-                            UPDATE platform.technical_jobs
-                               SET execution_contract_name = %(execution_contract_name)s,
-                                   execution_contract_version = %(execution_contract_version)s,
-                                   capacity_capability = %(capacity_capability)s,
-                                   capacity_slots = %(capacity_slots)s,
-                                   capacity_device = %(capacity_device)s,
-                                   storage_environment = %(storage_environment)s,
-                                   payload = %(payload)s::jsonb,
-                                   trace_id = %(trace_id)s,
-                                   status = 'pending', result = NULL,
-                                   failure_reason = NULL, lease_owner = NULL,
-                                   lease_expires_at = NULL, claim_token = NULL,
-                                   source_message_id = %(source_message_id)s,
-                                   source_message_hash = %(source_message_hash)s
-                             WHERE job_id = %(job_id)s
-                               AND source_message_id IS NULL
-                               AND source_message_hash IS NULL
-                            """,
-                            {
-                                **requirements,
-                                "payload": serialized_payload,
-                                "trace_id": message.trace_id,
-                                "source_message_id": message.message_id,
-                                "source_message_hash": message.content_hash,
-                                "job_id": existing_row.job_id,
-                            },
-                        )
-                        if cursor.rowcount != 1:
-                            raise JobRelayMessageConflictError()
-                        return existing_row.job_id
                     if (
                         existing_row.priority != request.priority.value
                         or dict(existing_row.payload) != dict(request.payload)
-                        or _existing_relay_requirement_values(existing_row)
-                        != _execution_requirement_values(request)
                         or existing_row.trace_id != message.trace_id
                         or existing_row.source_message_id is not None
                         or existing_row.source_message_hash is not None
@@ -545,48 +396,35 @@ class PostgresJobQueue:
                     INSERT INTO platform.technical_jobs (
                         environment, deployment_id,
                         job_name, priority, input_hash, configuration_hash,
-                        code_version, model_version,
-                        execution_contract_name, execution_contract_version,
-                        capacity_capability, capacity_slots, capacity_device,
-                        storage_environment,
-                        payload, trace_id, status,
+                        code_version, model_version, payload, trace_id, status,
                         recalculation_number, source_message_id, source_message_hash
                     )
                     VALUES (
-                        %(environment)s, %(deployment_id)s, %(job_name)s,
-                        %(priority)s, %(input_hash)s, %(configuration_hash)s,
-                        %(code_version)s, %(model_version)s,
-                        %(execution_contract_name)s,
-                        %(execution_contract_version)s,
-                        %(capacity_capability)s, %(capacity_slots)s,
-                        %(capacity_device)s, %(storage_environment)s,
-                        %(payload)s::jsonb, %(trace_id)s, 'pending', 0,
-                        %(source_message_id)s, %(source_message_hash)s
+                        %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s, 'pending', 0,
+                        %s, %s
                     )
                     RETURNING {_INSERTED_JOB_COLUMNS_SQL}
                     """,
-                    {
-                        "environment": request.environment,
-                        "deployment_id": request.deployment_id,
-                        "job_name": request.job_name,
-                        "priority": request.priority.value,
-                        "input_hash": request.idempotence_key.input_hash,
-                        "configuration_hash": (
-                            request.idempotence_key.configuration_hash
-                        ),
-                        "code_version": request.idempotence_key.code_version,
-                        "model_version": request.idempotence_key.model_version,
-                        **_execution_requirement_mapping(request),
-                        "payload": serialized_payload,
-                        "trace_id": message.trace_id,
-                        "source_message_id": message.message_id,
-                        "source_message_hash": message.content_hash,
-                    },
+                    (
+                        request.environment,
+                        request.deployment_id,
+                        request.job_name,
+                        request.priority.value,
+                        request.idempotence_key.input_hash,
+                        request.idempotence_key.configuration_hash,
+                        request.idempotence_key.code_version,
+                        request.idempotence_key.model_version,
+                        serialized_payload,
+                        message.trace_id,
+                        message.message_id,
+                        message.content_hash,
+                    ),
                 )
                 inserted = cursor.fetchone()
         if inserted is None:
             raise RuntimeError("JOB_RELAY_PERSISTENCE_FAILED")
         return _InsertedJobRow.from_database(inserted).job_id
+
     def _require_environment_identity(self, request: JobRequest) -> None:
         if request.environment_identity != self._environment_identity:
             raise WorkerEnvironmentMismatchError()
@@ -641,87 +479,6 @@ class PostgresJobQueue:
                         ),
                     )
                     row = cursor.fetchone()
-        if row is None:
-            return None
-        claimed_row = _ClaimedJobRow.from_database(row)
-        return ClaimedJob(
-            job=_job_from_row(claimed_row.job_row()),
-            trace_id=claimed_row.trace_id,
-            lease_owner=claimed_row.lease_owner,
-            lease_expires_at=claimed_row.lease_expires_at,
-            claim_generation=claimed_row.claim_generation,
-            claim_token=str(claimed_row.claim_token),
-            execution_attempts=claimed_row.execution_attempts,
-        )
-
-    def claim_next_compatible(
-        self,
-        *,
-        owner_id: str,
-        lease_seconds: int,
-        job_names: tuple[str, ...],
-        execution_requirements: JobExecutionRequirements,
-    ) -> ClaimedJob | None:
-        """Réclame seulement un contrat d'exécution exactement compatible."""
-
-        parsed_owner = _ensure_text(owner_id, "owner_id")
-        parsed_lease = _ensure_positive_integer(lease_seconds, "lease_seconds")
-        parsed_names = _ensure_job_names(job_names, self._catalog)
-        if not isinstance(execution_requirements, JobExecutionRequirements):
-            raise ValueError("execution_requirements invalides")
-        with self._connection_factory.connect() as connection:
-            with connection.transaction(), connection.cursor() as cursor:
-                cursor.execute(
-                    f"""
-                    WITH candidate AS (
-                        SELECT sequence
-                          FROM platform.technical_jobs
-                         WHERE environment = %s
-                           AND deployment_id = %s
-                           AND configuration_hash = %s
-                           AND job_name = ANY(%s)
-                           AND execution_contract_name = %s
-                           AND execution_contract_version = %s
-                           AND capacity_capability = %s
-                           AND capacity_slots = %s
-                           AND capacity_device IS NOT DISTINCT FROM %s
-                           AND storage_environment = %s
-                           AND (
-                               status = 'pending'
-                               OR (status = 'running'
-                                   AND lease_expires_at <= CURRENT_TIMESTAMP)
-                           )
-                         ORDER BY priority, sequence
-                         FOR UPDATE SKIP LOCKED
-                         LIMIT 1
-                    )
-                    UPDATE platform.technical_jobs AS job
-                       SET status = 'running', lease_owner = %s,
-                           lease_expires_at =
-                               CURRENT_TIMESTAMP + (%s * INTERVAL '1 second'),
-                           execution_attempts = execution_attempts + 1,
-                           claim_generation = claim_generation + 1,
-                           claim_token = gen_random_uuid()
-                      FROM candidate
-                     WHERE job.sequence = candidate.sequence
-                    RETURNING {_QUALIFIED_CLAIMED_JOB_COLUMNS_SQL}
-                    """,
-                    (
-                        self._environment_identity.environment,
-                        self._environment_identity.deployment_id,
-                        self._environment_identity.configuration_hash,
-                        list(parsed_names),
-                        execution_requirements.contract_name,
-                        execution_requirements.contract_version,
-                        execution_requirements.capacity_capability,
-                        execution_requirements.capacity_slots,
-                        execution_requirements.capacity_device,
-                        execution_requirements.storage_environment,
-                        parsed_owner,
-                        parsed_lease,
-                    ),
-                )
-                row = cursor.fetchone()
         if row is None:
             return None
         claimed_row = _ClaimedJobRow.from_database(row)
@@ -868,7 +625,7 @@ class PostgresJobQueue:
             claim_generation=claim_generation,
             claim_token=claim_token,
             status="succeeded",
-            result=_json_dumps(parsed_result),
+            result=json.dumps(dict(parsed_result), separators=(",", ":"), sort_keys=True),
             failure_reason=None,
         )
 
@@ -904,9 +661,7 @@ class PostgresJobQueue:
 
         parsed_job_id = _ensure_text(job_id, "job_id")
         parsed_owner = _ensure_text(owner_id, "owner_id")
-        parsed_generation = _ensure_positive_integer(
-            claim_generation, "claim_generation"
-        )
+        parsed_generation = _ensure_positive_integer(claim_generation, "claim_generation")
         parsed_token = _ensure_text(claim_token, "claim_token")
         parsed_max_attempts = _ensure_positive_integer(max_attempts, "max_attempts")
         with self._connection_factory.connect() as connection:
@@ -950,9 +705,7 @@ class PostgresJobQueue:
     ) -> ClaimedJob:
         parsed_job_id = _ensure_text(job_id, "job_id")
         parsed_owner = _ensure_text(owner_id, "owner_id")
-        parsed_generation = _ensure_positive_integer(
-            claim_generation, "claim_generation"
-        )
+        parsed_generation = _ensure_positive_integer(claim_generation, "claim_generation")
         parsed_token = _ensure_text(claim_token, "claim_token")
         parsed_lease = _ensure_positive_integer(lease_seconds, "lease_seconds")
         with self._connection_factory.connect() as connection:
@@ -1005,9 +758,7 @@ class PostgresJobQueue:
     ) -> JobRecord:
         parsed_job_id = _ensure_text(job_id, "job_id")
         parsed_owner = _ensure_text(owner_id, "owner_id")
-        parsed_generation = _ensure_positive_integer(
-            claim_generation, "claim_generation"
-        )
+        parsed_generation = _ensure_positive_integer(claim_generation, "claim_generation")
         parsed_token = _ensure_text(claim_token, "claim_token")
         with self._connection_factory.connect() as connection:
             with connection.transaction():
@@ -1025,15 +776,11 @@ class PostgresJobQueue:
                         RETURNING {_JOB_COLUMNS_SQL}
                         """,
                         (
-                            status,
-                            result,
-                            failure_reason,
-                            parsed_job_id,
+                            status, result, failure_reason, parsed_job_id,
                             self._environment_identity.environment,
                             self._environment_identity.deployment_id,
                             parsed_owner,
-                            parsed_generation,
-                            parsed_token,
+                            parsed_generation, parsed_token,
                         ),
                     )
                     row = cursor.fetchone()
@@ -1084,28 +831,7 @@ def _mapping(value: Any, field_name: str) -> Mapping[str, Any] | None:
     return decoded
 
 
-def _json_dumps(value: Mapping[str, Any]) -> str:
-    """Sérialise récursivement les contrats immutables sans les affaiblir."""
-
-    return json.dumps(
-        _json_compatible(value),
-        ensure_ascii=False,
-        separators=(",", ":"),
-        sort_keys=True,
-    )
-
-
-def _json_compatible(value: Any) -> Any:
-    if isinstance(value, Mapping):
-        return {key: _json_compatible(item) for key, item in value.items()}
-    if isinstance(value, tuple):
-        return [_json_compatible(item) for item in value]
-    return value
-
-
-def _database_row_values(
-    row: Any, expected_length: int, row_name: str
-) -> tuple[Any, ...]:
+def _database_row_values(row: Any, expected_length: int, row_name: str) -> tuple[Any, ...]:
     if not isinstance(row, (tuple, list)) or len(row) != expected_length:
         actual_length = len(row) if isinstance(row, (tuple, list)) else "non-sequence"
         raise RuntimeError(
@@ -1136,7 +862,6 @@ def _job_from_row(row: Any) -> JobRecord:
                 code_version=parsed_row.code_version,
                 model_version=parsed_row.model_version,
             ),
-            execution_requirements=_execution_requirements_from_row(parsed_row),
             payload=payload,
         ),
         status=status,
@@ -1145,111 +870,9 @@ def _job_from_row(row: Any) -> JobRecord:
     )
 
 
-def _execution_requirement_mapping(request: JobRequest) -> dict[str, Any]:
-    requirements = request.execution_requirements
-    if requirements is None:
-        return {
-            "execution_contract_name": None,
-            "execution_contract_version": None,
-            "capacity_capability": None,
-            "capacity_slots": None,
-            "capacity_device": None,
-            "storage_environment": None,
-        }
-    return {
-        "execution_contract_name": requirements.contract_name,
-        "execution_contract_version": requirements.contract_version,
-        "capacity_capability": requirements.capacity_capability,
-        "capacity_slots": requirements.capacity_slots,
-        "capacity_device": requirements.capacity_device,
-        "storage_environment": requirements.storage_environment,
-    }
-
-
-def _execution_requirement_values(request: JobRequest) -> tuple[Any, ...]:
-    requirements = request.execution_requirements
-    if requirements is None:
-        return (None, None, None, None, None, None)
-    return (
-        requirements.contract_name,
-        requirements.contract_version,
-        requirements.capacity_capability,
-        requirements.capacity_slots,
-        requirements.capacity_device,
-        requirements.storage_environment,
-    )
-
-
-def _existing_relay_requirement_values(row: _ExistingRelayRow) -> tuple[Any, ...]:
-    return (
-        row.execution_contract_name,
-        row.execution_contract_version,
-        row.capacity_capability,
-        row.capacity_slots,
-        row.capacity_device,
-        row.storage_environment,
-    )
-
-
-def _is_historical_project_document_upgrade(
-    *,
-    existing_row: _ExistingRelayRow,
-    request: JobRequest,
-    message_id: str,
-) -> bool:
-    existing_payload = dict(existing_row.payload)
-    requested_payload = dict(request.payload)
-    return (
-        request.job_name == "PROJECT_DOCUMENT"
-        and set(existing_payload)
-        == {"projection_id", "document_id", "canonical_version_id"}
-        and requested_payload.get("contract_version") == "1.0"
-        and all(
-            existing_payload[field_name] == requested_payload.get(field_name)
-            for field_name in existing_payload
-        )
-        and (
-            (
-                existing_row.source_message_id is None
-                and existing_row.source_message_hash is None
-            )
-            or (
-                existing_row.source_message_id == message_id
-                and existing_row.source_message_hash is not None
-            )
-        )
-    )
-
-
-def _execution_requirements_from_row(
-    row: _JobRow,
-) -> JobExecutionRequirements | None:
-    values = (
-        row.execution_contract_name,
-        row.execution_contract_version,
-        row.capacity_capability,
-        row.capacity_slots,
-        row.capacity_device,
-        row.storage_environment,
-    )
-    if all(value is None for value in values):
-        return None
-    if any(value is None for index, value in enumerate(values) if index != 4):
-        raise RuntimeError("JOB_EXECUTION_REQUIREMENTS_INCOMPLETE")
-    return JobExecutionRequirements(
-        contract_name=row.execution_contract_name,
-        contract_version=row.execution_contract_version,
-        capacity_capability=row.capacity_capability,
-        capacity_slots=row.capacity_slots,
-        capacity_device=row.capacity_device,
-        storage_environment=row.storage_environment,
-    )
-
-
 __all__ = [
     "ClaimedJob",
     "JobLeaseConflictError",
     "JobRelayMessageConflictError",
-    "JobSubmissionConflictError",
     "PostgresJobQueue",
 ]

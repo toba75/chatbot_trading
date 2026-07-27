@@ -57,8 +57,6 @@ class JobLeaseHeartbeat:
         self._lock = threading.Lock()
         self._failure: Exception | None = None
         self._finalized = False
-        self._paused = False
-        self._draining = False
         self._thread = threading.Thread(
             target=self._run,
             name=f"lease-heartbeat-{job_id}",
@@ -71,33 +69,6 @@ class JobLeaseHeartbeat:
     def assert_owned(self) -> None:
         with self._lock:
             self._raise_failure()
-
-    def pause(self) -> None:
-        """Suspend le renouvellement simple avant la prise du slot Granite."""
-
-        with self._lock:
-            self._raise_failure()
-            if self._finalized or self._paused:
-                raise RuntimeError("JOB_LEASE_HEARTBEAT_PAUSE_INVALID")
-            self._paused = True
-
-    def resume(self) -> None:
-        """Rend l'autorité au heartbeat simple après libération du slot."""
-
-        with self._lock:
-            self._raise_failure()
-            if self._draining:
-                return
-            if self._finalized or not self._paused:
-                raise RuntimeError("JOB_LEASE_HEARTBEAT_RESUME_INVALID")
-            self._paused = False
-
-    def freeze_for_drain(self) -> None:
-        """Attend tout renew engagé puis interdit définitivement les suivants."""
-
-        with self._lock:
-            self._draining = True
-            self._paused = True
 
     def finalize(self, transition: Callable[[], Any]) -> Any:
         if not callable(transition):
@@ -121,8 +92,6 @@ class JobLeaseHeartbeat:
             with self._lock:
                 if self._finalized:
                     return
-                if self._paused:
-                    continue
                 try:
                     self._job_queue.renew_lease(
                         job_id=self._job_id,
@@ -144,61 +113,4 @@ class JobLeaseHeartbeat:
         raise RuntimeError("JOB_LEASE_RENEWAL_FAILED") from self._failure
 
 
-class JobHeartbeatCoordinator:
-    """Relie le worker construit une fois au heartbeat du job courant."""
-
-    def __init__(self) -> None:
-        self._lock = threading.Lock()
-        self._heartbeat: JobLeaseHeartbeat | None = None
-        self._draining = False
-
-    def bind(self, heartbeat: JobLeaseHeartbeat) -> None:
-        if not isinstance(heartbeat, JobLeaseHeartbeat):
-            raise ValueError("heartbeat à lier invalide")
-        with self._lock:
-            if self._draining:
-                raise RuntimeError("JOB_HEARTBEAT_DRAINING")
-            if self._heartbeat is not None:
-                raise RuntimeError("JOB_HEARTBEAT_ALREADY_BOUND")
-            self._heartbeat = heartbeat
-
-    def unbind(self, heartbeat: JobLeaseHeartbeat) -> None:
-        with self._lock:
-            if self._heartbeat is not heartbeat:
-                raise RuntimeError("JOB_HEARTBEAT_BINDING_MISMATCH")
-            self._heartbeat = None
-
-    def pause(self) -> None:
-        with self._lock:
-            if self._draining:
-                raise JobLeaseConflictError()
-            heartbeat = self._heartbeat
-        if heartbeat is None:
-            raise RuntimeError("JOB_HEARTBEAT_NOT_BOUND")
-        heartbeat.pause()
-
-    def resume(self) -> None:
-        with self._lock:
-            if self._draining:
-                return
-            heartbeat = self._heartbeat
-        if heartbeat is None:
-            raise RuntimeError("JOB_HEARTBEAT_NOT_BOUND")
-        heartbeat.resume()
-
-    def freeze_for_drain(self) -> None:
-        with self._lock:
-            self._draining = True
-            heartbeat = self._heartbeat
-            if heartbeat is not None:
-                heartbeat.freeze_for_drain()
-
-    def _bound(self) -> JobLeaseHeartbeat:
-        with self._lock:
-            heartbeat = self._heartbeat
-        if heartbeat is None:
-            raise RuntimeError("JOB_HEARTBEAT_NOT_BOUND")
-        return heartbeat
-
-
-__all__ = ["JobHeartbeatCoordinator", "JobLeaseHeartbeat"]
+__all__ = ["JobLeaseHeartbeat"]

@@ -5,17 +5,9 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
-import threading
-import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
-
-from app.contracts.technical_jobs import (
-    GraniteExecutionCapability,
-    GraniteModelStillRunning,
-    require_granite_execution_capability,
-)
 
 
 GEMMA_DENSE_RENDER_SEGMENT_COUNT = 16
@@ -60,15 +52,9 @@ class GemmaVisionConversionRequest:
             "expected_model_id",
         ):
             value = getattr(self, field_name)
-            if (
-                not isinstance(value, str)
-                or value.strip() == ""
-                or value != value.strip()
-            ):
+            if not isinstance(value, str) or value.strip() == "" or value != value.strip():
                 raise ValueError(f"{field_name} invalide")
-        if len(self.source_sha256) != 64 or any(
-            character not in "0123456789abcdef" for character in self.source_sha256
-        ):
+        if len(self.source_sha256) != 64 or any(character not in "0123456789abcdef" for character in self.source_sha256):
             raise ValueError("source_sha256 invalide")
         if not isinstance(self.source_pdf_path, Path):
             raise ValueError("source_pdf_path invalide")
@@ -89,8 +75,7 @@ class GemmaVisionConversionRequest:
             if (
                 self.render_rotation_degrees != 90
                 or self.render_segment_count != GEMMA_DENSE_RENDER_SEGMENT_COUNT
-                or self.render_segment_index
-                not in range(
+                or self.render_segment_index not in range(
                     1,
                     GEMMA_DENSE_RENDER_SEGMENT_COUNT + 1,
                 )
@@ -126,11 +111,7 @@ class GemmaVisionPageItem:
     bbox: tuple[float, float, float, float]
 
     def __post_init__(self) -> None:
-        if (
-            not isinstance(self.text, str)
-            or self.text.strip() == ""
-            or self.text != self.text.strip()
-        ):
+        if not isinstance(self.text, str) or self.text.strip() == "" or self.text != self.text.strip():
             raise ValueError("texte Gemma Vision invalide")
         if not isinstance(self.bbox, tuple) or len(self.bbox) != 4:
             raise ValueError("bbox Gemma Vision invalide")
@@ -149,11 +130,7 @@ class GemmaVisionConversionResponse:
     items: tuple[GemmaVisionPageItem, ...]
 
     def __post_init__(self) -> None:
-        if (
-            not isinstance(self.tool_version, str)
-            or self.tool_version.strip() == ""
-            or self.tool_version != self.tool_version.strip()
-        ):
+        if not isinstance(self.tool_version, str) or self.tool_version.strip() == "" or self.tool_version != self.tool_version.strip():
             raise ValueError("version Gemma Vision invalide")
         if not isinstance(self.items, tuple) or len(self.items) == 0:
             raise ValueError("items Gemma Vision requis")
@@ -161,13 +138,8 @@ class GemmaVisionConversionResponse:
             raise ValueError("item Gemma Vision invalide")
 
     @classmethod
-    def from_payload(
-        cls, payload: Mapping[str, Any]
-    ) -> "GemmaVisionConversionResponse":
-        if not isinstance(payload, Mapping) or set(payload) != {
-            "tool_version",
-            "items",
-        }:
+    def from_payload(cls, payload: Mapping[str, Any]) -> "GemmaVisionConversionResponse":
+        if not isinstance(payload, Mapping) or set(payload) != {"tool_version", "items"}:
             raise GemmaVisionConversionError("GEMMA_VISION_OUTPUT_INVALID")
         tool_version = payload["tool_version"]
         raw_items = payload["items"]
@@ -190,132 +162,36 @@ class IsolatedGemmaVisionPageConverter:
     """Lance un rendu PDF et l'appel Gateway dans un processus Python isolé."""
 
     def __init__(self, *, timeout_seconds: int) -> None:
-        if (
-            isinstance(timeout_seconds, bool)
-            or not isinstance(timeout_seconds, int)
-            or timeout_seconds < 1
-        ):
+        if isinstance(timeout_seconds, bool) or not isinstance(timeout_seconds, int) or timeout_seconds < 1:
             raise ValueError("timeout Gemma Vision invalide")
         self._timeout_seconds = timeout_seconds
 
-    def start(
-        self,
-        request: GemmaVisionConversionRequest,
-        *,
-        capability: GraniteExecutionCapability,
-    ) -> "RunningGemmaVisionConversion":
+    def convert(self, request: GemmaVisionConversionRequest) -> GemmaVisionConversionResponse:
         if not isinstance(request, GemmaVisionConversionRequest):
             raise ValueError("requête Gemma Vision invalide")
-        require_granite_execution_capability(capability)
-        process = subprocess.Popen(
-            (
-                sys.executable,
-                "-B",
-                "-m",
-                "app.source_processing.adapters.gemma_vision_worker",
-            ),
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            creationflags=_worker_process_creation_flags(),
-        )
-        return RunningGemmaVisionConversion(
-            process=process,
-            input_payload=json.dumps(
-                request.to_payload(),
-                separators=(",", ":"),
-            ).encode("utf-8"),
-            timeout_seconds=self._timeout_seconds,
-        )
-
-
-class RunningGemmaVisionConversion:
-    """Sous-processus Gemma observable et annulable sous une lease Granite."""
-
-    def __init__(
-        self,
-        *,
-        process: subprocess.Popen[bytes],
-        input_payload: bytes,
-        timeout_seconds: float,
-    ) -> None:
-        if (
-            isinstance(timeout_seconds, bool)
-            or not isinstance(timeout_seconds, int | float)
-            or timeout_seconds <= 0
-        ):
-            raise ValueError("timeout Gemma Vision invalide")
-        self._process = process
-        self._input_payload: bytes | None = input_payload
-        self._deadline = time.monotonic() + float(timeout_seconds)
-        self._terminated = False
-        self._termination_lock = threading.Lock()
-
-    def wait(self, *, timeout_seconds: float) -> GemmaVisionConversionResponse:
-        if (
-            isinstance(timeout_seconds, bool)
-            or not isinstance(timeout_seconds, int | float)
-            or timeout_seconds <= 0
-        ):
-            raise ValueError("timeout Gemma Vision invalide")
-        remaining_seconds = self._deadline - time.monotonic()
-        if remaining_seconds <= 0:
-            self._raise_timeout()
-        input_payload = self._input_payload
-        self._input_payload = None
         try:
-            stdout, _stderr = self._process.communicate(
-                input=input_payload,
-                timeout=min(float(timeout_seconds), remaining_seconds),
+            completed = subprocess.run(
+                (sys.executable, "-B", "-m", "app.source_processing.adapters.gemma_vision_worker"),
+                input=json.dumps(request.to_payload(), separators=(",", ":")).encode("utf-8"),
+                capture_output=True,
+                timeout=self._timeout_seconds,
+                check=False,
+                creationflags=_worker_process_creation_flags(),
             )
         except subprocess.TimeoutExpired as error:
-            if time.monotonic() >= self._deadline:
-                self._raise_timeout(cause=error)
-            raise GraniteModelStillRunning() from error
+            raise GemmaVisionConversionError("GEMMA_VISION_UNAVAILABLE") from error
         try:
-            payload = json.loads(stdout)
+            payload = json.loads(completed.stdout)
         except (TypeError, UnicodeDecodeError, json.JSONDecodeError) as error:
-            raise GemmaVisionConversionError(
-                "GEMMA_VISION_WORKER_PROTOCOL_INVALID"
-            ) from error
+            raise GemmaVisionConversionError("GEMMA_VISION_WORKER_PROTOCOL_INVALID") from error
         if not isinstance(payload, Mapping):
             raise GemmaVisionConversionError("GEMMA_VISION_WORKER_PROTOCOL_INVALID")
-        if self._process.returncode != 0:
+        if completed.returncode != 0:
             code = payload.get("error_code")
             raise GemmaVisionConversionError(
-                code
-                if isinstance(code, str) and code.strip() != ""
-                else "GEMMA_VISION_WORKER_PROTOCOL_INVALID"
+                code if isinstance(code, str) and code.strip() != "" else "GEMMA_VISION_WORKER_PROTOCOL_INVALID"
             )
         return GemmaVisionConversionResponse.from_payload(payload)
-
-    def terminate(self) -> None:
-        with self._termination_lock:
-            if self._terminated:
-                return
-            if self._process.poll() is not None:
-                self._terminated = True
-                return
-            self._process.terminate()
-            try:
-                self._process.wait(timeout=5.0)
-            except subprocess.TimeoutExpired:
-                self._process.kill()
-                self._process.wait(timeout=5.0)
-            self._terminated = True
-
-    def _raise_timeout(self, *, cause: Exception | None = None) -> None:
-        timeout_error = GemmaVisionConversionError("GEMMA_VISION_TIMEOUT")
-        try:
-            self.terminate()
-        except Exception as termination_error:
-            raise ExceptionGroup(
-                "GEMMA_TIMEOUT_AND_TERMINATION_FAILURE",
-                [timeout_error, termination_error],
-            ) from timeout_error
-        if cause is not None:
-            raise timeout_error from cause
-        raise timeout_error
 
 
 def _required_text(payload: Any, field_name: str) -> str:
@@ -333,10 +209,7 @@ def _bbox_from_payload(payload: Any) -> tuple[float, float, float, float]:
     raw_bbox = payload.get("bbox")
     if not isinstance(raw_bbox, list) or len(raw_bbox) != 4:
         raise ValueError("bbox Gemma Vision invalide")
-    if any(
-        isinstance(coordinate, bool) or not isinstance(coordinate, (int, float))
-        for coordinate in raw_bbox
-    ):
+    if any(isinstance(coordinate, bool) or not isinstance(coordinate, (int, float)) for coordinate in raw_bbox):
         raise ValueError("bbox Gemma Vision invalide")
     return tuple(float(coordinate) for coordinate in raw_bbox)  # type: ignore[return-value]
 
@@ -352,5 +225,4 @@ __all__ = [
     "GemmaVisionConversionResponse",
     "GemmaVisionPageItem",
     "IsolatedGemmaVisionPageConverter",
-    "RunningGemmaVisionConversion",
 ]

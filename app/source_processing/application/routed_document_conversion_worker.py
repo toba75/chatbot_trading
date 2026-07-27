@@ -10,12 +10,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Protocol
 
-from app.contracts.technical_jobs import (
-    ClaimedJob,
-    GraniteExecutionCapability,
-    GraniteModelStillRunning,
-    JobStatus,
-)
+from app.contracts.technical_jobs import ClaimedJob, JobStatus
 from app.source_processing.adapters.docling_granite_conversion import (
     GraniteDoclingConversionError,
     GraniteDoclingConversionRequest,
@@ -60,6 +55,7 @@ from app.source_processing.application.document_worker import WorkerProcessingEr
 from app.source_processing.application.granite_gemma_recovery import (
     GEMMA_RECOVERY_GRANITE_ERROR_CODES,
     GraniteConversionFailure,
+    GraniteThenGemmaPageConverter,
 )
 from app.source_processing.application.targeted_enrichment import (
     TargetedEnrichmentPageConverter,
@@ -112,10 +108,6 @@ NON_NATIVE_TERMINAL_ERROR_CODES = frozenset(
         "GEMMA_VISION_MODEL_MISMATCH",
         "GEMMA_VISION_RENDERING_FAILED",
         "GEMMA_VISION_IMAGE_TOO_LARGE",
-        "GRANITE_DOCLING_TIMEOUT",
-        "GEMMA_VISION_TIMEOUT",
-        "JOB_LEASE_LOST",
-        "GRANITE_CAPACITY_CONFIGURATION_INVALID",
     }
 )
 
@@ -125,63 +117,20 @@ class OriginalPathResolver(Protocol):
         """Résout l'original privé depuis le seul bounded context SP."""
 
 
-class GraniteWorker(Protocol):
-    """Identité opaque du worker enregistré par la composition technique."""
-
-    worker_instance_id: str
-
-
-class GraniteExecution(Protocol):
-    """Résultat d'un appel modèle supervisé par la capacité technique."""
-
-    model_result: Any
-
-
-class GraniteCapacityController(Protocol):
-    """Port applicatif vers la capacité Granite durable de la plateforme."""
-
-    def execute_claimed_job(
-        self,
-        *,
-        worker: GraniteWorker,
-        claimed_job: ClaimedJob,
-        lease_seconds: int,
-        heartbeat_seconds: float,
-        start_model: Callable[[GraniteExecutionCapability], Any],
-    ) -> GraniteExecution:
-        """Exécute un modèle seulement sous le double fencing actif."""
-
-
-class JobHeartbeatControl(Protocol):
-    """Transfère temporairement l'autorité au heartbeat du double fencing."""
-
-    def pause(self) -> None: ...
-
-    def resume(self) -> None: ...
-
-
 class RoutedConversionRepository(Protocol):
-    def find_conversion_by_document_id(
-        self, document_id: DocumentId
-    ) -> DocumentConversionState | None:
+    def find_conversion_by_document_id(self, document_id: DocumentId) -> DocumentConversionState | None:
         """Lit l'état durable de conversion."""
 
-    def complete_native_conversion(
-        self, publication: NativeCanonicalPublication
-    ) -> None:
+    def complete_native_conversion(self, publication: NativeCanonicalPublication) -> None:
         """Persiste une unique publication canonique, quelle que soit sa route."""
 
     def begin_native_conversion(self, *, document_id: DocumentId) -> None:
         """Persiste RUNNING avant tout processus d'outil."""
 
-    def record_conversion_progress(
-        self, *, document_id: DocumentId, completed_units: int
-    ) -> None:
+    def record_conversion_progress(self, *, document_id: DocumentId, completed_units: int) -> None:
         """Persiste chaque page réellement convertie avant la lecture publique."""
 
-    def reject_native_conversion(
-        self, *, document_id: DocumentId, error_code: str
-    ) -> None:
+    def reject_native_conversion(self, *, document_id: DocumentId, error_code: str) -> None:
         """Persiste un échec terminal sans route de secours."""
 
 
@@ -204,10 +153,7 @@ class _ConversionProgressRecorder:
         ):
             if isinstance(value, bool) or not isinstance(value, int) or value < 0:
                 raise ValueError(error_message)
-        if (
-            persisted_completed_units != 0
-            and persisted_completed_units < skipped_empty_page_count
-        ):
+        if persisted_completed_units != 0 and persisted_completed_units < skipped_empty_page_count:
             raise ValueError("progression persistée antérieure aux pages vides")
         self._conversion_repository = conversion_repository
         self._document_id = document_id
@@ -237,13 +183,8 @@ class _ConversionProgressRecorder:
             )
 
 
-class NativePageConverter:
-    def __init__(
-        self,
-        *,
-        converter: IsolatedNativeDoclingConverter,
-        resolve_source_path: Callable[[str], Path],
-    ) -> None:
+class _NativePageConverter:
+    def __init__(self, *, converter: IsolatedNativeDoclingConverter, resolve_source_path: Callable[[str], Path]) -> None:
         self._converter = converter
         self._resolve_source_path = resolve_source_path
 
@@ -253,7 +194,7 @@ class NativePageConverter:
             NativeDoclingConversionRequest(
                 document_id=request.document_id.value,
                 processing_run_id=request.processing_run_id.value,
-                source_sha256=request.source_sha256,
+                source_sha256=_sha256_file(source_path),
                 source_pdf_path=source_path,
                 expected_page_numbers=(request.page_number.value,),
                 routing_policy_version=request.routing_policy_version.value,
@@ -268,214 +209,133 @@ class NativePageConverter:
         )
 
 
-class GranitePageConverter:
-    """Route Granite/Gemma dont chaque processus exige une lease PostgreSQL active."""
+class _GranitePageConverter:
+    def __init__(self, *, converter: IsolatedGraniteDoclingConverter, resolve_source_path: Callable[[str], Path]) -> None:
+        self._converter = converter
+        self._resolve_source_path = resolve_source_path
+
+    def convert_page(self, request: PageConversionRequest) -> PageConversionArtifact:
+        source_path = self._resolve_source_path(request.source_artifact_ref)
+        try:
+            response = self._converter.convert(
+                GraniteDoclingConversionRequest(
+                    document_id=request.document_id.value,
+                    processing_run_id=request.processing_run_id.value,
+                    source_sha256=_sha256_file(source_path),
+                    source_pdf_path=source_path,
+                    page_number=request.page_number.value,
+                    source_page_number=(
+                        1
+                        if request.source_artifact_ref.startswith(
+                            "artifact:source_processing.page_conversion/"
+                        )
+                        else request.page_number.value
+                    ),
+                    route_name=request.route_name.value,
+                    routing_policy_version=request.routing_policy_version.value,
+                )
+            )
+        except GraniteDoclingConversionError as error:
+            raise GraniteConversionFailure(error.code) from error
+        return _page_output(
+            response=response,
+            page_number=request.page_number,
+            route_name=request.route_name,
+            tool_name=ConversionToolName.GRANITE_DOCLING,
+            expected_artifact_ref=request.expected_output_artifact_ref,
+        )
+
+
+class _GemmaVisionFallbackPageConverter:
+    """Produit une page Gemma seulement après l'échec Granite explicitement admis."""
 
     def __init__(
         self,
         *,
-        granite_converter: IsolatedGraniteDoclingConverter,
-        gemma_converter: IsolatedGemmaVisionPageConverter,
-        capacity_controller: GraniteCapacityController,
-        granite_worker: GraniteWorker,
-        claimed_job: ClaimedJob,
-        lease_seconds: int,
-        heartbeat_seconds: float,
-        job_heartbeat_control: JobHeartbeatControl,
+        converter: IsolatedGemmaVisionPageConverter,
         resolve_source_path: Callable[[str], Path],
         gateway_endpoint_url: str,
         gateway_timeout_seconds: int,
         gateway_max_output_tokens: int,
         expected_model_id: str,
     ) -> None:
-        self._granite_converter = granite_converter
-        self._gemma_converter = gemma_converter
-        self._capacity_controller = capacity_controller
-        self._granite_worker = granite_worker
-        self._claimed_job = claimed_job
-        self._lease_seconds = lease_seconds
-        self._heartbeat_seconds = heartbeat_seconds
-        self._job_heartbeat_control = job_heartbeat_control
+        self._converter = converter
         self._resolve_source_path = resolve_source_path
         self._gateway_endpoint_url = gateway_endpoint_url
         self._gateway_timeout_seconds = gateway_timeout_seconds
-        self._gateway_max_output_tokens = gateway_max_output_tokens
+        self._gateway_max_output_tokens = _required_positive_int(
+            gateway_max_output_tokens,
+            "maximum de sortie gateway LLM invalide",
+        )
         self._expected_model_id = expected_model_id
 
-    def convert_page(self, request: PageConversionRequest) -> PageConversionArtifact:
-        source_path = self._resolve_source_path(request.source_artifact_ref)
-        self._job_heartbeat_control.pause()
-        try:
-            execution = self._capacity_controller.execute_claimed_job(
-                worker=self._granite_worker,
-                claimed_job=self._claimed_job,
-                lease_seconds=self._lease_seconds,
-                heartbeat_seconds=self._heartbeat_seconds,
-                start_model=lambda capability: _RunningGraniteRouteConversion(
-                    capability=capability,
-                    request=request,
-                    source_path=source_path,
-                    granite_converter=self._granite_converter,
-                    gemma_converter=self._gemma_converter,
-                    gateway_endpoint_url=self._gateway_endpoint_url,
-                    gateway_timeout_seconds=self._gateway_timeout_seconds,
-                    gateway_max_output_tokens=self._gateway_max_output_tokens,
-                    expected_model_id=self._expected_model_id,
-                ),
-            )
-        finally:
-            self._job_heartbeat_control.resume()
-        return execution.model_result
-
-
-class _RunningGraniteRouteConversion:
-    """Séquence Granite puis Gemma, conservée sous la même double fencing."""
-
-    def __init__(
+    def recover_page(
         self,
-        *,
-        capability: GraniteExecutionCapability,
         request: PageConversionRequest,
-        source_path: Path,
-        granite_converter: IsolatedGraniteDoclingConverter,
-        gemma_converter: IsolatedGemmaVisionPageConverter,
-        gateway_endpoint_url: str,
-        gateway_timeout_seconds: int,
-        gateway_max_output_tokens: int,
-        expected_model_id: str,
-    ) -> None:
-        self._capability = capability
-        self._request = request
-        self._source_path = source_path
-        self._gemma_converter = gemma_converter
-        self._gateway_endpoint_url = gateway_endpoint_url
-        self._gateway_timeout_seconds = gateway_timeout_seconds
-        self._gateway_max_output_tokens = gateway_max_output_tokens
-        self._expected_model_id = expected_model_id
-        self._state = "granite"
-        self._granite_error_code: str | None = None
-        self._segment_responses: list[GemmaVisionConversionResponse] = []
-        self._active_process = granite_converter.start(
-            GraniteDoclingConversionRequest(
+        *,
+        granite_error_code: str,
+    ) -> PageConversionArtifact:
+        if granite_error_code not in GEMMA_RECOVERY_GRANITE_ERROR_CODES:
+            raise ValueError("récupération Gemma non autorisée")
+        source_path = self._resolve_source_path(request.source_artifact_ref)
+
+        def gemma_request(
+            *,
+            render_rotation_degrees: int,
+            render_segment_index: int | None = None,
+            render_segment_count: int | None = None,
+        ) -> GemmaVisionConversionRequest:
+            return GemmaVisionConversionRequest(
                 document_id=request.document_id.value,
                 processing_run_id=request.processing_run_id.value,
-                source_sha256=request.source_sha256,
+                source_sha256=_sha256_file(source_path),
                 source_pdf_path=source_path,
                 page_number=request.page_number.value,
-                source_page_number=_source_page_number(request),
+                source_page_number=(
+                    1
+                    if request.source_artifact_ref.startswith(
+                        "artifact:source_processing.page_conversion/"
+                    )
+                    else request.page_number.value
+                ),
                 route_name=request.route_name.value,
                 routing_policy_version=request.routing_policy_version.value,
-            ),
-            capability=capability,
-        )
-
-    def wait(self, *, timeout_seconds: float) -> PageConversionArtifact:
-        if self._state == "granite":
-            try:
-                response = self._active_process.wait(timeout_seconds=timeout_seconds)
-            except GraniteDoclingConversionError as error:
-                if error.code not in GEMMA_RECOVERY_GRANITE_ERROR_CODES:
-                    raise GraniteConversionFailure(error.code) from error
-                self._granite_error_code = error.code
-                self._start_gemma(rotation=0)
-                raise GraniteModelStillRunning() from error
-            return _page_output(
-                response=response,
-                page_number=self._request.page_number,
-                route_name=self._request.route_name,
-                tool_name=ConversionToolName.GRANITE_DOCLING,
-                expected_artifact_ref=self._request.expected_output_artifact_ref,
+                gateway_endpoint_url=self._gateway_endpoint_url,
+                gateway_timeout_seconds=self._gateway_timeout_seconds,
+                max_output_tokens=self._gateway_max_output_tokens,
+                expected_model_id=self._expected_model_id,
+                render_rotation_degrees=render_rotation_degrees,
+                render_segment_index=render_segment_index,
+                render_segment_count=render_segment_count,
             )
         try:
-            gemma_response = self._active_process.wait(timeout_seconds=timeout_seconds)
+            response = self._converter.convert(gemma_request(render_rotation_degrees=0))
         except GemmaVisionConversionError as error:
-            if (
-                self._state == "gemma-initial"
-                and error.code == "GEMMA_VISION_OUTPUT_INVALID"
-            ):
-                self._start_gemma(rotation=90)
-                raise GraniteModelStillRunning() from error
-            if (
-                self._state == "gemma-rotated"
-                and error.code == "GEMMA_VISION_OUTPUT_TRUNCATED"
-            ):
-                self._start_segment(1)
-                raise GraniteModelStillRunning() from error
-            raise
-        if self._state == "gemma-segment":
-            self._segment_responses.append(gemma_response)
-            next_segment = len(self._segment_responses) + 1
-            if next_segment <= GEMMA_DENSE_RENDER_SEGMENT_COUNT:
-                self._start_segment(next_segment)
-                raise GraniteModelStillRunning()
-            gemma_response = _merge_gemma_segment_responses(
-                tuple(self._segment_responses)
-            )
-        if self._granite_error_code is None:
-            raise RuntimeError("GRANITE_PRIMARY_ERROR_ABSENT")
+            if error.code != "GEMMA_VISION_OUTPUT_INVALID":
+                raise
+            try:
+                response = self._converter.convert(gemma_request(render_rotation_degrees=90))
+            except GemmaVisionConversionError as rotated_error:
+                if rotated_error.code != "GEMMA_VISION_OUTPUT_TRUNCATED":
+                    raise
+                segment_responses = tuple(
+                    self._converter.convert(
+                        gemma_request(
+                            render_rotation_degrees=90,
+                            render_segment_index=segment_index,
+                            render_segment_count=GEMMA_DENSE_RENDER_SEGMENT_COUNT,
+                        )
+                    )
+                    for segment_index in range(1, GEMMA_DENSE_RENDER_SEGMENT_COUNT + 1)
+                )
+                response = _merge_gemma_segment_responses(segment_responses)
         return _gemma_page_output(
-            response=gemma_response,
-            page_number=self._request.page_number,
-            route_name=self._request.route_name,
-            expected_artifact_ref=self._request.expected_output_artifact_ref,
-            granite_error_code=self._granite_error_code,
+            response=response,
+            page_number=request.page_number,
+            route_name=request.route_name,
+            expected_artifact_ref=request.expected_output_artifact_ref,
+            granite_error_code=granite_error_code,
         )
-
-    def terminate(self) -> None:
-        self._active_process.terminate()
-
-    def _start_gemma(self, *, rotation: int) -> None:
-        self._state = "gemma-initial" if rotation == 0 else "gemma-rotated"
-        self._active_process = self._gemma_converter.start(
-            self._gemma_request(render_rotation_degrees=rotation),
-            capability=self._capability,
-        )
-
-    def _start_segment(self, segment_index: int) -> None:
-        self._state = "gemma-segment"
-        self._active_process = self._gemma_converter.start(
-            self._gemma_request(
-                render_rotation_degrees=90,
-                render_segment_index=segment_index,
-                render_segment_count=GEMMA_DENSE_RENDER_SEGMENT_COUNT,
-            ),
-            capability=self._capability,
-        )
-
-    def _gemma_request(
-        self,
-        *,
-        render_rotation_degrees: int,
-        render_segment_index: int | None = None,
-        render_segment_count: int | None = None,
-    ) -> GemmaVisionConversionRequest:
-        return GemmaVisionConversionRequest(
-            document_id=self._request.document_id.value,
-            processing_run_id=self._request.processing_run_id.value,
-            source_sha256=self._request.source_sha256,
-            source_pdf_path=self._source_path,
-            page_number=self._request.page_number.value,
-            source_page_number=_source_page_number(self._request),
-            route_name=self._request.route_name.value,
-            routing_policy_version=self._request.routing_policy_version.value,
-            gateway_endpoint_url=self._gateway_endpoint_url,
-            gateway_timeout_seconds=self._gateway_timeout_seconds,
-            max_output_tokens=self._gateway_max_output_tokens,
-            expected_model_id=self._expected_model_id,
-            render_rotation_degrees=render_rotation_degrees,
-            render_segment_index=render_segment_index,
-            render_segment_count=render_segment_count,
-        )
-
-
-def _source_page_number(request: PageConversionRequest) -> int:
-    return (
-        1
-        if request.source_artifact_ref.startswith(
-            "artifact:source_processing.page_conversion/"
-        )
-        else request.page_number.value
-    )
 
 
 def _merge_gemma_segment_responses(
@@ -502,7 +362,8 @@ def _merge_gemma_segment_responses(
         raise GemmaVisionConversionError("GEMMA_VISION_OUTPUT_INVALID")
     return GemmaVisionConversionResponse(
         tool_version=(
-            f"{base_version};render-segments-{GEMMA_DENSE_RENDER_SEGMENT_COUNT:02d}"
+            f"{base_version};render-segments-"
+            f"{GEMMA_DENSE_RENDER_SEGMENT_COUNT:02d}"
         ),
         items=tuple(items),
     )
@@ -528,11 +389,6 @@ class RoutedDocumentConversionWorker:
         native_converter: IsolatedNativeDoclingConverter,
         granite_converter: IsolatedGraniteDoclingConverter,
         gemma_converter: IsolatedGemmaVisionPageConverter,
-        granite_capacity_controller: GraniteCapacityController,
-        granite_worker: GraniteWorker,
-        granite_lease_seconds: int,
-        granite_heartbeat_seconds: float,
-        job_heartbeat_control: JobHeartbeatControl,
         llm_gateway_url: str,
         llm_gateway_timeout_seconds: int,
         llm_gateway_max_output_tokens: int,
@@ -555,11 +411,8 @@ class RoutedDocumentConversionWorker:
             (conversion_repository, "reject_native_conversion"),
             (original_source_store, "resolve_internal_path"),
             (native_converter, "convert"),
-            (granite_converter, "start"),
-            (gemma_converter, "start"),
-            (granite_capacity_controller, "execute_claimed_job"),
-            (job_heartbeat_control, "pause"),
-            (job_heartbeat_control, "resume"),
+            (granite_converter, "convert"),
+            (gemma_converter, "convert"),
             (artifact_store, "store_docling_json"),
         ):
             if not callable(getattr(dependency, method, None)):
@@ -571,21 +424,6 @@ class RoutedDocumentConversionWorker:
         self._native_converter = native_converter
         self._granite_converter = granite_converter
         self._gemma_converter = gemma_converter
-        self._granite_capacity_controller = granite_capacity_controller
-        self._granite_worker = granite_worker
-        self._granite_lease_seconds = _required_positive_int(
-            granite_lease_seconds,
-            "durée de lease Granite invalide",
-        )
-        if (
-            isinstance(granite_heartbeat_seconds, bool)
-            or not isinstance(granite_heartbeat_seconds, int | float)
-            or granite_heartbeat_seconds <= 0
-            or granite_heartbeat_seconds >= granite_lease_seconds
-        ):
-            raise ValueError("heartbeat Granite invalide")
-        self._granite_heartbeat_seconds = float(granite_heartbeat_seconds)
-        self._job_heartbeat_control = job_heartbeat_control
         self._llm_gateway_url = _required_gateway_url(llm_gateway_url)
         self._llm_gateway_timeout_seconds = _required_positive_int(
             llm_gateway_timeout_seconds,
@@ -626,10 +464,7 @@ class RoutedDocumentConversionWorker:
         if not isinstance(claimed_job, ClaimedJob):
             raise ValueError("claimed_job invalide")
         job = claimed_job.job
-        if (
-            job.status is not JobStatus.RUNNING
-            or job.request.job_name != "CONVERT_DOCUMENT"
-        ):
+        if job.status is not JobStatus.RUNNING or job.request.job_name != "CONVERT_DOCUMENT":
             raise ValueError("job CONVERT_DOCUMENT running requis")
         payload = dict(job.request.payload)
         document_id = DocumentId.from_value(_required_text(payload, "document_id"))
@@ -649,9 +484,7 @@ class RoutedDocumentConversionWorker:
                 "canonical_version_id": conversion.canonical_version_id,
             }
         self._conversion_repository.begin_native_conversion(document_id=document_id)
-        original_path = self._original_source_store.resolve_internal_path(
-            source_document.original_storage_ref
-        )
+        original_path = self._original_source_store.resolve_internal_path(source_document.original_storage_ref)
 
         def resolve_original_path(artifact_ref: str) -> Path:
             if artifact_ref != source_document.original_storage_ref.value:
@@ -689,27 +522,16 @@ class RoutedDocumentConversionWorker:
             docling_capacity = SharedPageConversionCapacity(
                 max_concurrency=self._docling_max_concurrency,
             )
-            raw_native_page_converter = NativePageConverter(
+            raw_native_page_converter = _NativePageConverter(
                 converter=self._native_converter,
                 resolve_source_path=resolve_source_path,
             )
             native_page_converter = docling_capacity.limit(
                 page_converter=raw_native_page_converter,
             )
-            raw_granite_page_converter = GranitePageConverter(
-                granite_converter=self._granite_converter,
-                gemma_converter=self._gemma_converter,
-                capacity_controller=self._granite_capacity_controller,
-                granite_worker=self._granite_worker,
-                claimed_job=claimed_job,
-                lease_seconds=self._granite_lease_seconds,
-                heartbeat_seconds=self._granite_heartbeat_seconds,
-                job_heartbeat_control=self._job_heartbeat_control,
+            raw_granite_page_converter = _GranitePageConverter(
+                converter=self._granite_converter,
                 resolve_source_path=resolve_source_path,
-                gateway_endpoint_url=self._llm_gateway_url,
-                gateway_timeout_seconds=self._llm_gateway_timeout_seconds,
-                gateway_max_output_tokens=self._llm_gateway_max_output_tokens,
-                expected_model_id=self._expected_gemma_model_id,
             )
             granite_page_converter = ConcurrencyLimitedPageConverter(
                 page_converter=docling_capacity.limit(
@@ -719,7 +541,17 @@ class RoutedDocumentConversionWorker:
             )
             handler = ConvertRoutedPagesHandler(
                 native_converter=native_page_converter,
-                granite_converter=granite_page_converter,
+                granite_converter=GraniteThenGemmaPageConverter(
+                    granite_converter=granite_page_converter,
+                    gemma_converter=_GemmaVisionFallbackPageConverter(
+                        converter=self._gemma_converter,
+                        resolve_source_path=resolve_source_path,
+                        gateway_endpoint_url=self._llm_gateway_url,
+                        gateway_timeout_seconds=self._llm_gateway_timeout_seconds,
+                        gateway_max_output_tokens=self._llm_gateway_max_output_tokens,
+                        expected_model_id=self._expected_gemma_model_id,
+                    ),
+                ),
                 targeted_enrichment_converter=TargetedEnrichmentPageConverter(
                     native_converter=native_page_converter,
                     granite_converter=granite_page_converter,
@@ -749,9 +581,7 @@ class RoutedDocumentConversionWorker:
                 on_page_converted=progress_recorder.record_page,
             )
         except (DoclingAssetManifestError, OcrmyPdfImageManifestError) as error:
-            raise WorkerProcessingError(
-                "CONVERSION_ASSET_MANIFEST_INVALID", retryable=False
-            ) from error
+            raise WorkerProcessingError("CONVERSION_ASSET_MANIFEST_INVALID", retryable=False) from error
         except (
             DoclingNativeConversionError,
             GraniteDoclingConversionError,
@@ -759,29 +589,17 @@ class RoutedDocumentConversionWorker:
             GemmaVisionConversionError,
             OcrmyPdfContainerError,
         ) as error:
-            raise WorkerProcessingError(
-                getattr(error, "code", str(error)), retryable=False
-            ) from error
+            raise WorkerProcessingError(getattr(error, "code", str(error)), retryable=False) from error
         except ValueError as error:
-            if getattr(error, "code", None) == "GRANITE_CAPACITY_CONFIGURATION_INVALID":
-                raise WorkerProcessingError(
-                    "GRANITE_CAPACITY_CONFIGURATION_INVALID", retryable=False
-                ) from error
-            raise WorkerProcessingError(
-                "DOCLING_PAGE_MANIFEST_MISMATCH", retryable=False
-            ) from error
+            raise WorkerProcessingError("DOCLING_PAGE_MANIFEST_MISMATCH", retryable=False) from error
 
         authority_manifest = _authority_manifest(
             processing_run=processing_run,
             page_outputs=result.page_outputs,
         )
         docling_document = result.docling_document
-        quality_policy = CanonicalAcceptancePolicy(
-            policy_version="m004-routed-docling-v1"
-        )
-        pre_report = _pre_conversion_report(
-            processing_run=processing_run, policy_version=quality_policy.policy_version
-        )
+        quality_policy = CanonicalAcceptancePolicy(policy_version="m004-routed-docling-v1")
+        pre_report = _pre_conversion_report(processing_run=processing_run, policy_version=quality_policy.policy_version)
         post_report = quality_policy.evaluate_post_conversion(
             page_manifest=processing_run.page_manifest,
             text_authority_manifest=authority_manifest,
@@ -796,9 +614,7 @@ class RoutedDocumentConversionWorker:
             post_conversion_report=post_report,
         )
         try:
-            publication = PublishCanonicalSourceHandler(
-                artifact_store=self._artifact_store
-            ).handle(
+            publication = PublishCanonicalSourceHandler(artifact_store=self._artifact_store).handle(
                 PublishCanonicalSourceCommand(
                     source_document=source_document,
                     docling_document=docling_document,
@@ -817,9 +633,7 @@ class RoutedDocumentConversionWorker:
                     canonical_artifact_ref=publication.stored_artifact_ref,
                     canonical_artifact_sha256=publication.published_version.canonical_artifact.artifact_sha256,
                     route_name=processing_run.route_plan.dominant_route_name.value,
-                    tool_version=";".join(
-                        sorted({output.tool_version for output in result.page_outputs})
-                    ),
+                    tool_version=";".join(sorted({output.tool_version for output in result.page_outputs})),
                 )
             )
         except CanonicalArtifactStoreError as error:
@@ -834,54 +648,30 @@ class RoutedDocumentConversionWorker:
     def mark_failed(self, claimed_job: ClaimedJob, error_code: str) -> None:
         payload = dict(claimed_job.job.request.payload)
         document_id = DocumentId.from_value(_required_text(payload, "document_id"))
-        self._conversion_repository.reject_native_conversion(
-            document_id=document_id, error_code=error_code
-        )
+        self._conversion_repository.reject_native_conversion(document_id=document_id, error_code=error_code)
 
-    def _load_executable_state(
-        self,
-        *,
-        document_id: DocumentId,
-        processing_run_id: str,
-        source_sha256: str,
-        routing_policy_version: str,
-    ):
-        source_document = self._source_document_repository.find_by_document_id(
-            document_id
-        )
+    def _load_executable_state(self, *, document_id: DocumentId, processing_run_id: str, source_sha256: str, routing_policy_version: str):
+        source_document = self._source_document_repository.find_by_document_id(document_id)
         if source_document is None:
             raise WorkerProcessingError("SOURCE_NOT_FOUND", retryable=False)
         if source_document.fingerprint.value != source_sha256:
             raise WorkerProcessingError("SOURCE_FINGERPRINT_MISMATCH", retryable=False)
-        processing_run = self._processing_run_repository.find_by_document_id(
-            document_id
-        )
+        processing_run = self._processing_run_repository.find_by_document_id(document_id)
         if processing_run is None:
             raise WorkerProcessingError("PROCESSING_RUN_NOT_FOUND", retryable=False)
         if processing_run.processing_run_id.value != processing_run_id:
             raise WorkerProcessingError("PROCESSING_RUN_ID_MISMATCH", retryable=False)
-        if (
-            processing_run.route_plan is None
-            or processing_run.route_plan.routing_policy_version.value
-            != routing_policy_version
-        ):
+        if processing_run.route_plan is None or processing_run.route_plan.routing_policy_version.value != routing_policy_version:
             raise WorkerProcessingError("SOURCE_NOT_ROUTED", retryable=False)
-        conversion = self._conversion_repository.find_conversion_by_document_id(
-            document_id
-        )
+        conversion = self._conversion_repository.find_conversion_by_document_id(document_id)
         if conversion is None:
             raise WorkerProcessingError("CONVERSION_REQUEST_NOT_FOUND", retryable=False)
         if conversion.conversion_status is DocumentConversionStatus.CANONICAL_ACCEPTED:
             return source_document, processing_run, conversion
-        if (
-            conversion.conversion_status
-            is not DocumentConversionStatus.CONVERSION_REQUESTED
-            or conversion.execution_phase
-            not in {
-                DocumentConversionExecutionPhase.QUEUED,
-                DocumentConversionExecutionPhase.RUNNING,
-            }
-        ):
+        if conversion.conversion_status is not DocumentConversionStatus.CONVERSION_REQUESTED or conversion.execution_phase not in {
+            DocumentConversionExecutionPhase.QUEUED,
+            DocumentConversionExecutionPhase.RUNNING,
+        }:
             raise WorkerProcessingError("CONVERSION_NOT_EXECUTABLE", retryable=False)
         return source_document, processing_run, conversion
 
@@ -907,11 +697,6 @@ def build_routed_document_conversion_worker(
     max_parallel_pages: int,
     docling_max_concurrency: int,
     granite_max_concurrency: int,
-    granite_capacity_controller: GraniteCapacityController,
-    granite_worker: GraniteWorker,
-    granite_lease_seconds: int,
-    granite_heartbeat_seconds: float,
-    job_heartbeat_control: JobHeartbeatControl,
 ) -> RoutedDocumentConversionWorker:
     """Construit le worker uniquement si tous les runtimes réels annoncés sont prêts."""
 
@@ -939,11 +724,6 @@ def build_routed_document_conversion_worker(
         gemma_converter=IsolatedGemmaVisionPageConverter(
             timeout_seconds=llm_gateway_timeout_seconds,
         ),
-        granite_capacity_controller=granite_capacity_controller,
-        granite_worker=granite_worker,
-        granite_lease_seconds=granite_lease_seconds,
-        granite_heartbeat_seconds=granite_heartbeat_seconds,
-        job_heartbeat_control=job_heartbeat_control,
         llm_gateway_url=llm_gateway_url,
         llm_gateway_timeout_seconds=llm_gateway_timeout_seconds,
         llm_gateway_max_output_tokens=llm_gateway_max_output_tokens,
@@ -958,17 +738,8 @@ def build_routed_document_conversion_worker(
     )
 
 
-def _page_output(
-    *,
-    response: NativeDoclingConversionResponse,
-    page_number: PageNumber,
-    route_name: PageRouteName,
-    tool_name: ConversionToolName,
-    expected_artifact_ref: str,
-) -> PageConversionArtifact:
-    pages = tuple(
-        page for page in response.pages if page.page_number == page_number.value
-    )
+def _page_output(*, response: NativeDoclingConversionResponse, page_number: PageNumber, route_name: PageRouteName, tool_name: ConversionToolName, expected_artifact_ref: str) -> PageConversionArtifact:
+    pages = tuple(page for page in response.pages if page.page_number == page_number.value)
     if len(pages) != 1 or len(response.pages) != 1:
         raise ValueError("réponse Docling partielle")
     page = pages[0]
@@ -977,12 +748,7 @@ def _page_output(
             label=PageConversionItemLabel.TEXT,
             text=item.text,
             geometry=PageItemGeometry(
-                left=item.bbox[0],
-                top=item.bbox[1],
-                right=item.bbox[2],
-                bottom=item.bbox[3],
-                page_width=1.0,
-                page_height=1.0,
+                left=item.bbox[0], top=item.bbox[1], right=item.bbox[2], bottom=item.bbox[3], page_width=1.0, page_height=1.0
             ),
             content_hash=hashlib.sha256(item.text.encode("utf-8")).hexdigest(),
         )
@@ -993,11 +759,7 @@ def _page_output(
         "route_name": route_name.value,
         "tool_name": tool_name.value,
         "items": [
-            {
-                "text": item.text,
-                "bbox": list(item.bbox),
-                "provenance": dict(item.provenance),
-            }
+            {"text": item.text, "bbox": list(item.bbox), "provenance": dict(item.provenance)}
             for item in page.items
         ],
     }
@@ -1006,11 +768,7 @@ def _page_output(
         route_name=route_name,
         tool_name=tool_name,
         tool_version=response.tool_version,
-        artifact_hash=hashlib.sha256(
-            json.dumps(artifact_payload, sort_keys=True, separators=(",", ":")).encode(
-                "utf-8"
-            )
-        ).hexdigest(),
+        artifact_hash=hashlib.sha256(json.dumps(artifact_payload, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest(),
         audit_artifact_ref=expected_artifact_ref,
         items=items,
     )
@@ -1050,7 +808,8 @@ def _gemma_page_output(
             "triggering_error_code": granite_error_code,
         },
         "items": [
-            {"text": item.text, "bbox": list(item.bbox)} for item in response.items
+            {"text": item.text, "bbox": list(item.bbox)}
+            for item in response.items
         ],
     }
     return PageConversionArtifact(
@@ -1059,9 +818,7 @@ def _gemma_page_output(
         tool_name=ConversionToolName.GEMMA_VISION,
         tool_version=response.tool_version,
         artifact_hash=hashlib.sha256(
-            json.dumps(artifact_payload, sort_keys=True, separators=(",", ":")).encode(
-                "utf-8"
-            )
+            json.dumps(artifact_payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
         ).hexdigest(),
         audit_artifact_ref=expected_artifact_ref,
         items=items,
@@ -1116,12 +873,7 @@ def _authority_manifest(
         page_decisions=tuple(
             policy.select(
                 page_number=output.page_number,
-                candidates=(
-                    PageConversionCandidate(
-                        candidate_id=f"AUTH-P{output.page_number.value:03d}",
-                        page_output=output,
-                    ),
-                ),
+                candidates=(PageConversionCandidate(candidate_id=f"AUTH-P{output.page_number.value:03d}", page_output=output),),
                 selected_candidate_ids=(f"AUTH-P{output.page_number.value:03d}",),
                 justification=f"{output.tool_name.value} est l'autorité unique imposée par {output.route_name.value}.",
             )
@@ -1131,13 +883,9 @@ def _authority_manifest(
     )
 
 
-def _pre_conversion_report(
-    *, processing_run: Any, policy_version: str
-) -> PreConversionQualityReport:
+def _pre_conversion_report(*, processing_run: Any, policy_version: str) -> PreConversionQualityReport:
     route_plan = processing_run.route_plan
-    selection = CriticalPageSamplingPolicy(
-        policy_version=policy_version, low_confidence_threshold=0.85
-    ).select(
+    selection = CriticalPageSamplingPolicy(policy_version=policy_version, low_confidence_threshold=0.85).select(
         page_manifest=processing_run.page_manifest,
         page_diagnostics=processing_run.page_decisions,
         route_plan=route_plan,
@@ -1172,9 +920,7 @@ def _sha256_file(path: Path) -> str:
 def _required_text(payload: Mapping[str, Any], field_name: str) -> str:
     value = payload.get(field_name)
     if not isinstance(value, str) or value.strip() == "" or value != value.strip():
-        raise WorkerProcessingError(
-            f"JOB_PAYLOAD_INVALID_{field_name.upper()}", retryable=False
-        )
+        raise WorkerProcessingError(f"JOB_PAYLOAD_INVALID_{field_name.upper()}", retryable=False)
     return value
 
 
@@ -1201,9 +947,7 @@ def _required_gateway_url(value: Any) -> str:
 
 
 __all__ = [
-    "GranitePageConverter",
     "NON_NATIVE_TERMINAL_ERROR_CODES",
-    "NativePageConverter",
     "RoutedDocumentConversionWorker",
     "build_routed_document_conversion_worker",
 ]

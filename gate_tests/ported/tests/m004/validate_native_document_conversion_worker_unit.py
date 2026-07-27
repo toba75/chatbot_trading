@@ -9,14 +9,12 @@ from uuid import uuid4
 
 from app.contracts.technical_jobs import (
     ClaimedJob,
-    JobEnvironmentIdentity,
     JobIdempotenceKey,
     JobPriority,
     JobRecord,
     JobRequest,
     JobStatus,
 )
-
 from app.source_processing.adapters.docling_native_conversion import (
     CanonicalArtifactFileStore,
     NativeDoclingConversionResponse,
@@ -53,12 +51,6 @@ from app.source_processing.domain.source_document import (
     SourceFingerprint,
 )
 
-_ENVIRONMENT_IDENTITY = JobEnvironmentIdentity(
-    environment="test",
-    deployment_id="ostrading-test-local",
-    configuration_hash="c" * 64,
-)
-
 
 class _SourceRepository:
     def __init__(self, source: SourceDocument) -> None:
@@ -72,9 +64,7 @@ class _RunRepository:
     def __init__(self, run: DocumentProcessingRun) -> None:
         self.run = run
 
-    def find_by_document_id(
-        self, document_id: DocumentId
-    ) -> DocumentProcessingRun | None:
+    def find_by_document_id(self, document_id: DocumentId) -> DocumentProcessingRun | None:
         return self.run if document_id == self.run.document_id else None
 
 
@@ -82,7 +72,6 @@ class _ConversionRepository:
     def __init__(self, source: SourceDocument) -> None:
         self.state = DocumentConversionState(
             document_id=source.document_id,
-            producer_environment_identity=_ENVIRONMENT_IDENTITY,
             conversion_status=DocumentConversionStatus.CONVERSION_REQUESTED,
             canonical_version_id=None,
             rejection_error_code=None,
@@ -93,16 +82,13 @@ class _ConversionRepository:
         )
         self.publication = None
 
-    def find_conversion_by_document_id(
-        self, document_id: DocumentId
-    ) -> DocumentConversionState | None:
+    def find_conversion_by_document_id(self, document_id: DocumentId) -> DocumentConversionState | None:
         return self.state if document_id == self.state.document_id else None
 
     def complete_native_conversion(self, publication) -> None:
         self.publication = publication
         self.state = DocumentConversionState(
             document_id=publication.document_id,
-            producer_environment_identity=_ENVIRONMENT_IDENTITY,
             conversion_status=DocumentConversionStatus.CANONICAL_ACCEPTED,
             canonical_version_id=publication.canonical_version_id,
             rejection_error_code=None,
@@ -116,7 +102,6 @@ class _ConversionRepository:
         assert document_id == self.state.document_id
         self.state = DocumentConversionState(
             document_id=document_id,
-            producer_environment_identity=_ENVIRONMENT_IDENTITY,
             conversion_status=DocumentConversionStatus.CONVERSION_REQUESTED,
             canonical_version_id=None,
             rejection_error_code=None,
@@ -126,12 +111,9 @@ class _ConversionRepository:
             failure_error_code=None,
         )
 
-    def reject_native_conversion(
-        self, *, document_id: DocumentId, error_code: str
-    ) -> None:
+    def reject_native_conversion(self, *, document_id: DocumentId, error_code: str) -> None:
         self.state = DocumentConversionState(
             document_id=document_id,
-            producer_environment_identity=_ENVIRONMENT_IDENTITY,
             conversion_status=DocumentConversionStatus.QA_REJECTED,
             canonical_version_id=None,
             rejection_error_code=error_code,
@@ -193,42 +175,36 @@ def _source_and_run() -> tuple[SourceDocument, DocumentProcessingRun]:
     )
     manifest = PageManifest.from_entries(
         source_page_count=1,
-        entries=(
-            PageManifestEntry(PageNumber.from_value(1), PageManifestEntryState.PRESENT),
-        ),
+        entries=(PageManifestEntry(PageNumber.from_value(1), PageManifestEntryState.PRESENT),),
     )
-    run = (
-        DocumentProcessingRun.start(
-            processing_run_id=ProcessingRunId.from_value("RUN-M004-T003-WORKER"),
-            source_document=source,
-            page_manifest=manifest,
-        )
-        .record_page_diagnostics(
-            (
-                PageDecision(
-                    page_number=PageNumber.from_value(1),
-                    page_state=PageDecisionState.NATIVE_OK,
-                    signals=PageDiagnosticSignals(
-                        native_text_state="RELIABLE",
-                        image_state="NONE",
-                        existing_ocr_state="NONE",
-                        layout_complexity="SIMPLE",
-                        corruption_state="NONE",
-                        mixed_content_detected=False,
-                        has_table=False,
-                        has_formula=False,
-                    ),
-                    diagnostic_version=DiagnosticVersion.from_value("diag-v1"),
-                    justification="Couche texte native fiable.",
+    run = DocumentProcessingRun.start(
+        processing_run_id=ProcessingRunId.from_value("RUN-M004-T003-WORKER"),
+        source_document=source,
+        page_manifest=manifest,
+    ).record_page_diagnostics(
+        (
+            PageDecision(
+                page_number=PageNumber.from_value(1),
+                page_state=PageDecisionState.NATIVE_OK,
+                signals=PageDiagnosticSignals(
+                    native_text_state="RELIABLE",
+                    image_state="NONE",
+                    existing_ocr_state="NONE",
+                    layout_complexity="SIMPLE",
+                    corruption_state="NONE",
+                    mixed_content_detected=False,
+                    has_table=False,
+                    has_formula=False,
                 ),
-            )
+                diagnostic_version=DiagnosticVersion.from_value("diag-v1"),
+                justification="Couche texte native fiable.",
+            ),
         )
-        .decide_route_plan(
-            PageRoutingConfiguration(
-                routing_policy_version=RoutingPolicyVersion.from_value("routing-v1"),
-                auto_confidence_min=0.9,
-                benchmark_confidence_min=0.85,
-            )
+    ).decide_route_plan(
+        PageRoutingConfiguration(
+            routing_policy_version=RoutingPolicyVersion.from_value("routing-v1"),
+            auto_confidence_min=0.9,
+            benchmark_confidence_min=0.85,
         )
     )
     return source, run
@@ -247,7 +223,6 @@ def _claimed_job(source: SourceDocument, run: DocumentProcessingRun) -> ClaimedJ
             code_version="m004-native-worker",
             model_version="docling-2.111.0",
         ),
-        execution_requirements=None,
         payload={
             "document_id": source.document_id.value,
             "processing_run_id": run.processing_run_id.value,
@@ -267,9 +242,7 @@ def _claimed_job(source: SourceDocument, run: DocumentProcessingRun) -> ClaimedJ
     )
 
 
-def test_native_worker_persists_hashed_immutable_canonical_acceptance(
-    tmp_path: Path,
-) -> None:
+def test_native_worker_persists_hashed_immutable_canonical_acceptance(tmp_path: Path) -> None:
     # Given un job CONVERT_DOCUMENT dont le manifeste M-003 ne contient que NATIVE_STANDARD.
     # When le worker reçoit la sortie Docling contrôlée.
     # Then l'artefact est immuable, haché et la persistance marque CANONICAL_ACCEPTED atomiquement.
@@ -289,20 +262,8 @@ def test_native_worker_persists_hashed_immutable_canonical_acceptance(
     result = worker.execute(_claimed_job(source, run))
 
     assert result["conversion_status"] == "CANONICAL_ACCEPTED"
-    assert (
-        conversions.state.conversion_status
-        is DocumentConversionStatus.CANONICAL_ACCEPTED
-    )
+    assert conversions.state.conversion_status is DocumentConversionStatus.CANONICAL_ACCEPTED
     assert conversions.publication is not None
-    stored = (
-        tmp_path
-        / "canonical"
-        / conversions.publication.canonical_source_id
-        / conversions.publication.canonical_version_id
-        / "docling.json"
-    )
+    stored = tmp_path / "canonical" / conversions.publication.canonical_source_id / conversions.publication.canonical_version_id / "docling.json"
     assert stored.is_file()
-    assert (
-        hashlib.sha256(stored.read_bytes()).hexdigest()
-        == conversions.publication.canonical_artifact_sha256
-    )
+    assert hashlib.sha256(stored.read_bytes()).hexdigest() == conversions.publication.canonical_artifact_sha256

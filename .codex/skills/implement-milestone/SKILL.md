@@ -17,18 +17,6 @@ Orchestrer l'implémentation complète d'un milestone sans court-circuiter les r
 4. Identifier la branche de base, le remote GitHub et le nom du milestone.
 5. Extraire la liste ordonnée des tâches à exécuter; si l'ordre ou le périmètre est ambigu, poser une seule question courte.
 
-## Politique De Validation Et De Gate
-
-- Chaque sous-agent de tâche, de correction ou de revue exécute uniquement les
-  tests, lint et scopes ciblés de son périmètre. Il ne doit jamais lancer la
-  gate globale.
-- La précondition globale GREEN appartient à l'orchestrateur. Elle est
-  réutilisable pour la tâche suivante uniquement si `HEAD` et le worktree sont
-  inchangés depuis la preuve. Sinon, l'orchestrateur choisit lui-même une
-  validation pertinente sans transférer la gate globale au sous-agent.
-- La seule commande globale autorisée est celle de la section « Gate De Clôture
-  Du Milestone » et elle est toujours exécutée par l'orchestrateur.
-
 ## Branche Dédiée
 
 Créer une branche dédiée avant toute implémentation:
@@ -51,16 +39,12 @@ Pour chaque tâche:
    - l'identifiant et le texte complet de la tâche;
    - la branche courante;
    - les specs, ADR ou fichiers sources pertinents;
-   - l'obligation de respecter DDD, BDD, ATDD, TDD, ADR, commit RED et commit GREEN;
-   - les tests, lint et scopes ciblés autorisés, ainsi que l'instruction de ne
-     jamais lancer la gate globale.
+   - l'obligation de respecter DDD, BDD, ATDD, TDD, ADR, commit RED et commit GREEN.
 2. Attendre la fin du sous-agent avant de lancer la tâche suivante.
 3. Lire son résultat: commits créés, validations exécutées, ADR créées ou modifiées, risques résiduels.
 4. Intégrer les changements du sous-agent sur la branche milestone selon le mode de retour disponible: commits, patch, fichiers modifiés ou instructions d'application.
 5. Vérifier `git status --short`, le log récent et les validations annoncées.
-6. Rejouer au minimum les tests, lint et scopes ciblés de la tâche dans la
-   branche milestone après intégration et ne jamais lancer la gate globale à
-   cette étape.
+6. Rejouer au minimum les validations ciblées de la tâche dans la branche milestone après intégration.
 7. Si la tâche échoue, ne fournit pas de changements intégrables ou laisse la suite RED, corriger dans le même cadre `$execute-implementation-task` ou arrêter avec le blocage exact.
 
 Ne pas considérer une tâche terminée tant que ses changements ne sont pas présents sur la branche milestone, que ses commits RED/GREEN sont identifiés ou expliqués, et que les validations annoncées ont été confirmées localement.
@@ -75,18 +59,13 @@ Traiter chaque sous-agent comme une source de changements à intégrer, pas comm
 - Appliquer les changements sur la branche milestone sans écraser les commits ou modifications d'une autre tâche.
 - Résoudre les conflits en préservant le comportement métier déjà validé.
 - Vérifier que les commits produits respectent la séparation RED/GREEN attendue; si ce n'est pas le cas, documenter l'écart ou refaire la tâche proprement.
-- Relancer les tests, lint et scopes ciblés après chaque intégration, même si le
-  sous-agent les a déjà exécutés, et ne jamais lancer la gate globale pendant
-  cette intégration.
+- Relancer les tests ciblés après chaque intégration, même si le sous-agent les a déjà exécutés.
 - Mettre à jour le journal du milestone avec tâche, sous-agent, fichiers intégrés, commits, ADR et validations.
 - Ne pas interrompre un sous agent qui semble inactif avant 60 minutes d'inactivité supposée
 
 ## Revue Locale Jusqu'à Trois Itérations
 
 Après toutes les tâches et leur intégration locale, mener une revue de code avant la PR avec le skill `code-review`.
-
-Tout prompt de revue ou de correction autorise seulement les tests, lint et
-scopes ciblés du finding traité et ordonne de ne jamais lancer la gate globale.
 
 À chaque itération, jusqu'à trois fois:
 
@@ -98,8 +77,7 @@ scopes ciblés du finding traité et ordonne de ne jamais lancer la gate globale
    - fallback silencieux, valeur par défaut implicite ou conversion ambiguë;
    - commit mal séparé ou changement hors périmètre;
    - documentation ADR incohérente avec le code.
-3. Exécuter les tests, lint et scopes ciblés pertinents et ne jamais lancer la
-   gate globale pendant une itération de revue ou de correction.
+3. Exécuter les tests et validations pertinentes.
 4. Corriger uniquement les problèmes actionnables (mais corriger tous les problèmes quelque soit le niveau de sévérité).
 5. Committer les corrections avec un message explicite, par exemple `fix(review): corriger <problème>`.
 6. Arrêter la boucle dès qu'aucun problème bloquant n'est trouvé.
@@ -115,20 +93,8 @@ Avant de créer la PR, vérifier que le milestone est réellement livrable:
 3. Vérifier que chaque changement de comportement possède les tests unitaires nécessaires.
 4. Vérifier que chaque décision structurante possède une ADR créée ou mise à jour, ou une mention explicite `ADR: non requise`.
 5. Vérifier la cohérence de la matrice specs -> tests -> code: chaque exigence métier livrée doit pointer vers au moins un test et le code correspondant.
-6. Vérifier la preuve globale selon le protocole ci-dessous.
+6. Vérifier que les validations globales pertinentes sont GREEN.
 7. Vérifier que le journal du milestone contient tâches, commits RED/GREEN, ADR, validations et corrections de revue.
-
-L'orchestrateur lance exactement une gate globale par état final candidat avec
-la commande `uv run --locked gate` et `timeout_ms=3600000`. Si l'outil produit
-un yield ou retourne un cell ID, attendre la même exécution avec l'outil `wait`
-sur le même cell ID ; ne jamais redémarrer la commande. Un timeout ou un yield
-de l'interface n’est pas un RED et n'autorise aucune relance.
-
-Un verdict terminal réel RED est diagnostiqué puis corrigé uniquement avec les
-tests, lint et scopes ciblés. Après correction, l'orchestrateur peut lancer une
-seule nouvelle gate globale sur le nouveau candidat final. Il ne boucle pas et
-ne rejoue pas la gate sans changement de `HEAD` ou du worktree. Une preuve GREEN
-reste réutilisable tant que ces deux états sont inchangés.
 
 Cette gate est bloquante. Si un point échoue, corriger avant la PR ou documenter le blocage et demander une décision utilisateur.
 
@@ -191,8 +157,7 @@ Avant de décider qu'il n'y a rien à traiter:
 1. Relancer le workflow `github:gh-address-comments` pour récupérer les commentaires Copilot, les review threads et l'état des checks PR.
 2. Filtrer les commentaires actionnables; ignorer seulement avec justification les remarques non applicables ou contraires au modèle métier.
 3. Appliquer les corrections avec le même niveau d'exigence que les tâches: tests avant code quand le comportement change, pas de fallback silencieux, ADR mise à jour si décision structurante.
-4. Exécuter seulement les tests, lint et scopes ciblés du commentaire traité et
-   ne jamais lancer la gate globale pendant une correction Copilot.
+4. Exécuter les validations pertinentes.
 5. Committer et pousser les corrections.
 6. Réinterroger Copilot et les threads de revue avec `github:gh-address-comments`; distinguer `résolu`, `outdated`, `non résolu actionnable` et `non actionnable justifié`.
 7. Arrêter la boucle dès qu'il n'y a plus de commentaire Copilot actionnable.

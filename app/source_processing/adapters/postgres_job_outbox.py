@@ -5,17 +5,9 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 from app.contracts.technical_jobs import JobEnvironmentIdentity, JobRequest
-from app.knowledge_access.application.project_document_contract import (
-    PROJECT_DOCUMENT_JOB_NAME,
-    ProjectDocumentContract,
-)
 from app.platform.job_runtime.relay import ClaimedRelayMessage, RelayedJobMessage
 from app.platform.postgres import PostgresConnectionFactory
 from app.platform.worker_environment import WORKER_ENVIRONMENT_MISMATCH
-from app.source_processing.domain.distribution_contracts import (
-    CONVERT_PAGE_JOB_NAME,
-    ConvertPageContract,
-)
 
 
 class JobOutboxLeaseConflictError(RuntimeError):
@@ -105,18 +97,6 @@ class PostgresJobOutbox:
                 row = cursor.fetchone()
         if row is None:
             return None
-        execution_requirements = None
-        if self._table_name == "source_processing.job_outbox" and row[1] == CONVERT_PAGE_JOB_NAME:
-            execution_requirements = ConvertPageContract.from_mapping(
-                row[7]
-            ).execution_requirements()
-        elif (
-            self._table_name == "knowledge_access.job_outbox"
-            and row[1] == PROJECT_DOCUMENT_JOB_NAME
-        ):
-            execution_requirements = ProjectDocumentContract.from_mapping(
-                row[7]
-            ).execution_requirements()
         return ClaimedRelayMessage(
             message=RelayedJobMessage(
                 message_id=row[0],
@@ -130,7 +110,6 @@ class PostgresJobOutbox:
                 model_version=row[6],
                 payload=row[7],
                 trace_id=row[8],
-                execution_requirements=execution_requirements,
             ),
             owner_id=parsed_owner,
             claim_generation=row[11],
@@ -259,26 +238,6 @@ class PostgresJobOutbox:
                        canonical_version_id = NULL
                  WHERE document_id = %s
                    AND conversion_status = 'CONVERSION_REQUESTED'
-                """,
-                (
-                    WORKER_ENVIRONMENT_MISMATCH,
-                    WORKER_ENVIRONMENT_MISMATCH,
-                    _payload_text(payload, "document_id"),
-                ),
-            )
-        elif (
-            self._table_name == "source_processing.job_outbox"
-            and job_name == "ASSEMBLE_CANONICAL_DOCUMENT"
-        ):
-            cursor.execute(
-                """
-                UPDATE source_processing.document_conversion_requests
-                   SET conversion_status = 'QA_REJECTED', execution_phase = 'FAILED',
-                       rejection_error_code = %s, failure_error_code = %s,
-                       canonical_version_id = NULL
-                 WHERE document_id = %s
-                   AND conversion_status = 'CONVERSION_REQUESTED'
-                   AND execution_phase = 'RUNNING'
                 """,
                 (
                     WORKER_ENVIRONMENT_MISMATCH,

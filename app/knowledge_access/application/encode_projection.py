@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from typing import Any, Protocol, Sequence
 
@@ -181,46 +181,32 @@ class ProjectionEncodingHandler:
         chunks: Sequence[KnowledgeChunk],
         encoding_profile: ProjectionEncodingProfile,
     ) -> tuple[EncodedProjectionChunk, ...]:
-        chunk_count = len(chunks)
-        if chunk_count == 0:
+        parsed_chunks = tuple(_ensure_chunk(chunk) for chunk in chunks)
+        if len(parsed_chunks) == 0:
             raise ValueError("chunks de projection absents")
-        if self._max_parallel_chunks == 1 or chunk_count == 1:
+        if self._max_parallel_chunks == 1 or len(parsed_chunks) == 1:
             return tuple(
                 self._encode_chunk(
-                    chunk=_ensure_chunk(chunk),
+                    chunk=chunk,
                     encoding_profile=encoding_profile,
                 )
-                for chunk in chunks
+                for chunk in parsed_chunks
             )
-        results: list[EncodedProjectionChunk | None] = [None] * chunk_count
+        results: list[EncodedProjectionChunk | None] = [None] * len(parsed_chunks)
         with ThreadPoolExecutor(
-            max_workers=min(self._max_parallel_chunks, chunk_count),
+            max_workers=min(self._max_parallel_chunks, len(parsed_chunks)),
             thread_name_prefix="ka-projection-encoding",
         ) as executor:
-            futures: dict[Future[EncodedProjectionChunk], int] = {}
-            next_index = 0
-
-            def submit_next() -> bool:
-                nonlocal next_index
-                if next_index >= chunk_count:
-                    return False
-                index = next_index
-                next_index += 1
-                future = executor.submit(
+            futures = {
+                executor.submit(
                     self._encode_chunk,
-                    chunk=_ensure_chunk(chunks[index]),
+                    chunk=chunk,
                     encoding_profile=encoding_profile,
-                )
-                futures[future] = index
-                return True
-
-            for _ in range(min(self._max_parallel_chunks, chunk_count)):
-                submit_next()
-            while futures:
-                completed, _ = wait(tuple(futures), return_when=FIRST_COMPLETED)
-                for future in completed:
-                    results[futures.pop(future)] = future.result()
-                    submit_next()
+                ): index
+                for index, chunk in enumerate(parsed_chunks)
+            }
+            for future in as_completed(futures):
+                results[futures[future]] = future.result()
         return tuple(_ensure_encoded_chunk(value) for value in results)
 
     def _encode_chunk(

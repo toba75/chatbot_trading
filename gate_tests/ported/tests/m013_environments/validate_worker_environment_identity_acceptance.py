@@ -47,7 +47,6 @@ def test_worker_environment_identity_acceptance() -> None:
             code_version="worker-environment-acceptance",
             model_version="none",
         ),
-        execution_requirements=None,
         payload={
             "document_id": "DOC-M013-ENV-WORKER-ACCEPTANCE",
             "processing_run_id": "RUN-M013-ENV-WORKER-ACCEPTANCE",
@@ -73,9 +72,7 @@ def test_worker_environment_identity_acceptance() -> None:
     outcome = execute_environment_bound_job(
         binding=binding,
         job_request=request,
-        execute=lambda job: (
-            callback_calls.append(job.job_name) or {"status": "executed"}
-        ),
+        execute=lambda job: callback_calls.append(job.job_name) or {"status": "executed"},
         persist_terminal_failure=lambda job, error_code: public_progress.append(
             {
                 "environment": job.environment,
@@ -145,13 +142,9 @@ def test_worker_environment_identity_acceptance() -> None:
     assert foreign_outbox.rejected == [claim]
 
     repository_root = next(
-        parent
-        for parent in Path(__file__).resolve().parents
-        if (parent / "pyproject.toml").is_file()
+        parent for parent in Path(__file__).resolve().parents if (parent / "pyproject.toml").is_file()
     )
-    migration = (
-        repository_root / "deploy/postgres/migrations/020_job_environment_identity.sql"
-    )
+    migration = repository_root / "deploy/postgres/migrations/020_job_environment_identity.sql"
     migration_text = migration.read_text(encoding="utf-8")
     for table in (
         "platform.technical_jobs",
@@ -163,9 +156,7 @@ def test_worker_environment_identity_acceptance() -> None:
         assert column in migration_text
     assert "WORKER_ENVIRONMENT_MISMATCH" in migration_text
 
-    compose = (repository_root / "deploy/environments/compose.base.yaml").read_text(
-        encoding="utf-8"
-    )
+    compose = (repository_root / "deploy/environments/compose.base.yaml").read_text(encoding="utf-8")
     for worker_id in WORKER_JOB_NAMES:
         assert (
             "python -m app.platform.environment_compose check-worker "

@@ -56,9 +56,7 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 | [ADR-048](ADR-048-progression-et-parallelisme-dans-profils-explicites.md) | Progression et parallélisme dans les profils explicites | Acceptée | 2026-07-22 | ADR-031 ; ADR-037 | Aucune |
 | [ADR-049](ADR-049-qualification-complete-reservee-au-profil-test.md) | Qualification complète réservée au profil test | Remplacée | 2026-07-23 | Sémantique de qualification des commandes d'ADR-046 | ADR-050 |
 | [ADR-050](ADR-050-separer-qualification-fonctionnelle-et-isolation.md) | Séparer qualification fonctionnelle et qualification d’isolation | Acceptée | 2026-07-23 | ADR-049 | Aucune |
-| [ADR-051](ADR-051-execution-granite-cuda-stricte.md) | Exécution Granite-Docling CUDA stricte | Acceptée | 2026-07-23 | Sélection automatique du périphérique Granite local | Partiellement par ADR-052 pour M-014 uniquement ; CUDA stricte reste applicable |
-| [ADR-052](ADR-052-distribution-locale-pages-quota-granite-fenced.md) | Distribution locale à la page et quota Granite fenced | Proposée | 2026-07-23 | Pour M-014 uniquement, mentions de flotte CPU multiarchitecture ou distante d’ADR-051 | Aucune |
-| [ADR-053](ADR-053-migrations-m014-expand-contract-rejeu.md) | Migrations M-014 par expand/contract et rejeu local | Acceptée | 2026-07-24 | Aucun | Aucune |
+| [ADR-051](ADR-051-execution-granite-cuda-stricte.md) | Exécution Granite-Docling CUDA stricte | Acceptée | 2026-07-23 | Sélection automatique du périphérique Granite local | Aucune |
 
 ## ADR DDD
 
@@ -80,7 +78,7 @@ Cet index est la liste canonique des décisions d'architecture du projet.
 ## Prochains numéros disponibles
 
 ```text
-Prochaine ADR technique: ADR-054
+Prochaine ADR technique: ADR-052
 Prochaine DDD-ADR: DDD-ADR-013
 ```
 
@@ -91,6 +89,4 @@ Prochaine DDD-ADR: DDD-ADR-013
 - Ne pas supprimer une ADR acceptée.
 - Quand une ADR est remplacée, mettre à jour son statut et le champ `Remplacée par`.
 - Quand une ADR remplace une décision antérieure, renseigner le champ `Remplace`.
-- Exécuter les validations ciblées des ADR et documents touchés avant chaque
-  commit. La gate globale de clôture appartient à l'orchestrateur du milestone ;
-  elle n'est jamais déléguée à un sous-agent ni rejouée par tâche.
+- Exécuter `uv run --locked gate` avant chaque commit modifiant `docs/adr`.

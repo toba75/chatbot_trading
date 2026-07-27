@@ -13,7 +13,6 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from app.contracts.documentary_evidence import DocumentaryEvidence
-from app.contracts.technical_jobs import JobEnvironmentIdentity
 from app.knowledge_access.adapters.postgres_projection_read import PostgresProjectionReadRepository
 from app.knowledge_access.adapters.projection_runtime import ProjectionRuntimeService
 from app.knowledge_access.application.chunk_canonical_source import (
@@ -224,7 +223,6 @@ class QdrantSparseChunkSelector:
         collection_name: str,
         timeout_seconds: int,
         api_key: str,
-        environment_identity: JobEnvironmentIdentity,
     ) -> None:
         if not isinstance(qdrant_url, str) or qdrant_url.strip() == "" or qdrant_url != qdrant_url.strip():
             raise ValueError("qdrant_url invalide")
@@ -234,13 +232,10 @@ class QdrantSparseChunkSelector:
             raise ValueError("qdrant_collection_name invalide")
         if not isinstance(api_key, str) or len(api_key.encode("utf-8")) < 32:
             raise ValueError("qdrant_api_key invalide")
-        if not isinstance(environment_identity, JobEnvironmentIdentity):
-            raise ValueError("environment_identity invalide")
         self._qdrant_url = qdrant_url.rstrip("/")
         self._collection_name = collection_name
         self._timeout_seconds = timeout_seconds
         self._api_key = api_key
-        self._identity = environment_identity
 
     def select_chunk_ids(self, *, projection_id: str, question: str, limit: int) -> tuple[str, ...]:
         parsed_projection_id = _identifier(projection_id, "PROJ", "projection_id")
@@ -259,12 +254,6 @@ class QdrantSparseChunkSelector:
             "filter": {
                 "must": [
                     {"key": "projection_id", "match": {"value": parsed_projection_id}},
-                    {"key": "environment", "match": {"value": self._identity.environment}},
-                    {"key": "deployment_id", "match": {"value": self._identity.deployment_id}},
-                    {
-                        "key": "configuration_hash",
-                        "match": {"value": self._identity.configuration_hash},
-                    },
                 ]
             },
         }

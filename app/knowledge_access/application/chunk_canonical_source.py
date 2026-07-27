@@ -8,7 +8,6 @@ from typing import Any
 from app.contracts.identity import DomainIdentifier
 from app.knowledge_access.application.request_projection import CanonicalSourceReader
 from app.knowledge_access.domain.chunking import (
-    CanonicalChunkDocument,
     ChunkingProfile,
     HierarchicalChunkProjection,
     HierarchicalChunkProjector,
@@ -59,27 +58,6 @@ class ProjectCanonicalChunksHandler:
         )
         if canonical_document is None:
             raise ChunkingSourceNotFoundError(parsed_command.canonical_version_id)
-        return self.project_canonical_document(
-            command=parsed_command,
-            canonical_document=canonical_document,
-        )
-
-    def project_canonical_document(
-        self,
-        *,
-        command: ProjectCanonicalChunksCommand,
-        canonical_document: CanonicalChunkDocument,
-    ) -> HierarchicalChunkProjection:
-        """Projette un artefact déjà chargé et vérifié dans la portée d'exécution."""
-
-        parsed_command = _ensure_command(command)
-        if not isinstance(canonical_document, CanonicalChunkDocument):
-            raise ValueError("document canonique de chunking invalide")
-        if (
-            canonical_document.canonical_ref.canonical_version_id
-            != parsed_command.canonical_version_id
-        ):
-            raise ValueError("version canonique de chunking divergente")
         return self._projector.project(
             canonical_document=canonical_document,
             chunking_profile=parsed_command.chunking_profile,

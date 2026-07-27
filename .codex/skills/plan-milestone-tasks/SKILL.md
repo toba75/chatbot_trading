@@ -52,11 +52,7 @@ Créer des tâches verticales et vérifiables. Une tâche doit couvrir un compor
 
 Ordre obligatoire pour chaque tranche de milestone:
 
-1. **Précondition GREEN**: vérifier l'état des tests existants avec les tests,
-   lint et scopes ciblés de la tâche. La preuve globale appartient à
-   l'orchestrateur et ne doit jamais devenir une commande de sous-agent. Si les
-   validations ciblées sont déjà RED, créer une tâche préalable de remise au
-   vert ou isoler explicitement le blocage existant.
+1. **Précondition GREEN**: vérifier l'état des tests existants. Si la suite est déjà RED, créer une tâche préalable de remise au vert ou isoler explicitement le blocage existant.
 2. **Spécification DDD**: compléter ou créer la spécification détaillée du comportement métier.
 3. **Scénario BDD**: écrire le scénario métier au format `Given-When-Then`, avec vocabulaire métier français.
 4. **ATDD/BDD RED**: ajouter le test d'acceptation automatisé qui échoue pour la bonne raison.
@@ -129,24 +125,6 @@ Exemple pour le milestone 7:
 
 Chaque fichier de tâche doit contenir la structure détaillée de la tâche concernée, notamment le but métier, la portée DDD, le scénario BDD, les tests RED/GREEN, l'implémentation attendue, les invariants, les dépendances, les commandes de validation et les commits RED/GREEN.
 
-## Politique De Validation Et De Gate
-
-- Les commandes d'une tâche prescrivent uniquement les tests, lint et scopes
-  ciblés nécessaires à cette tâche. Elles ne prescrivent jamais la gate globale
-  à un sous-agent de tâche, de correction ou de revue.
-- La précondition globale GREEN appartient à l'orchestrateur. Elle est
-  réutilisable pour la tâche suivante seulement si `HEAD` et le worktree sont
-  inchangés depuis la preuve. Sinon, l'orchestrateur choisit une validation
-  pertinente ; il ne délègue pas la gate globale au sous-agent.
-- L'orchestrateur exécute exactement une gate globale de clôture par état final
-  candidat avec `timeout_ms=3600000`. Si l'outil produit un yield ou un cell ID,
-  il appelle l'outil `wait` sur le même cell ID et ne redémarre pas la commande.
-  Un timeout ou yield de l'interface n'est pas un RED.
-- Si la gate réelle est RED, les corrections et diagnostics utilisent seulement
-  les tests, lint et scopes ciblés. Une seule nouvelle gate est permise après
-  correction sur un nouveau candidat final ; aucun rejeu en boucle n'est
-  planifié sans changement de `HEAD` ou du worktree.
-
 ## Règles De Qualité
 
 - Utiliser le français accentué.
@@ -154,9 +132,7 @@ Chaque fichier de tâche doit contenir la structure détaillée de la tâche con
 - Prévoir les tests avant l'implémentation.
 - Refuser les valeurs par défaut implicites, les fallbacks silencieux et les conversions ambiguës.
 - Rendre chaque garde-fou testable.
-- Préférer des commandes de validation ciblées, rapides et attribuables à la
-  tâche ; réserver la gate globale à l'orchestrateur selon la politique
-  précédente.
+- Préférer la commande de validation canonique : `uv run --locked gate`.
 - Ne jamais planifier un milestone si un milestone amont requis est absent de `master`, même s'il existe sur une branche de milestone ou une branche remote non fusionnée dans `master`.
 - Ne pas planifier l'UI, les connecteurs externes ou la persistance avant le contrat de domaine qui les justifie.
 - Ne pas inclure de refactor transverse sans lien direct avec le comportement du milestone.

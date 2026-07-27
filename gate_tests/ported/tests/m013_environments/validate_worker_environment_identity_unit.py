@@ -56,12 +56,7 @@ def test_worker_environment_identity_unit() -> None:
         "worker-documents",
         "worker-projection",
     )
-    assert WORKER_JOB_NAMES["worker-documents"] == (
-        "DIAGNOSE",
-        "CONVERT_DOCUMENT",
-        "CONVERT_PAGE",
-        "ASSEMBLE_CANONICAL_DOCUMENT",
-    )
+    assert WORKER_JOB_NAMES["worker-documents"] == ("DIAGNOSE", "CONVERT_DOCUMENT")
     assert WORKER_JOB_NAMES["worker-projection"] == ("PROJECT_DOCUMENT",)
 
     binding = WorkerEnvironmentBinding(
@@ -93,7 +88,6 @@ def test_worker_environment_identity_unit() -> None:
             code_version="worker-environment-unit",
             model_version="none",
         ),
-        execution_requirements=None,
         payload={"document_id": "DOC-M013-ENV-WORKER-UNIT"},
     )
     with pytest.raises(WorkerEnvironmentMismatchError) as mismatch:

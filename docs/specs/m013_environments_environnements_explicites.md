@@ -288,8 +288,8 @@ Le rapport fonctionnel porte le discriminant `FUNCTIONAL` et exactement une
 exécution numérotée `1`. Le rapport d'isolation porte le discriminant
 `ISOLATION`, deux exécutions numérotées `1` et `2`, et deux documents de preuve
 distincts. Chaque progression publique aboutit à `SUCCEEDED`. Les workers
-documentaires conservent une limite de 2 Gio et 4 CPU, conformément au socle
-local `M14-distribution-core`, ainsi qu'un healthcheck de 30 secondes. Aucun conteneur test ne monte un fichier
+documentaires conservent une limite de 8 Gio,
+4 CPU et un healthcheck de 30 secondes. Aucun conteneur test ne monte un fichier
 de configuration ou un répertoire de secrets `development` ou `production`.
 Les noms, dates de création et points de montage des volumes sentinelles de ces
 deux profils sont identiques avant et après chaque campagne.
@@ -310,8 +310,8 @@ jusqu'à l'interruption explicite de l'opérateur. Les 14 conteneurs et les quat
 réplicas workers doivent publier l'identité `production` /
 `ostrading-production-primary` et le même hash de configuration. Le rendu
 Compose et les conteneurs refusent tout chemin, secret ou donnée `development`
-ou `test`. Les workers documentaires conservent 2 Gio et 4 CPU, conformément
-au socle local `M14-distribution-core`, ainsi qu'un healthcheck de 30 secondes.
+ou `test`. Les workers documentaires conservent 8 Gio, 4 CPU et un healthcheck
+de 30 secondes.
 
 Cette commande ne charge aucune fixture, ne lance aucun parcours PDF et ne crée
 aucune donnée de qualification. Les contrôles automatisés de production sont

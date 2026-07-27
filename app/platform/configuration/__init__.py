@@ -33,9 +33,7 @@ _HISTORICAL_ENVIRONMENT_NAMES = frozenset(
     }
 )
 _HISTORICAL_ENVIRONMENT_PREFIXES = ("GEMMA_",)
-_INLINE_SECRET_KEYS = frozenset(
-    {"password", "token", "api_key", "secret", "secret_value"}
-)
+_INLINE_SECRET_KEYS = frozenset({"password", "token", "api_key", "secret", "secret_value"})
 
 
 class ApplicationConfigurationError(ValueError):
@@ -133,25 +131,13 @@ class ApiServiceConfiguration:
 
 
 @dataclass(frozen=True)
-class LocalDocumentDistributionConfiguration:
-    replicas: int
-    memory_bytes: int
-    cpus: int
-    granite_device: str
-    granite_slots_global: int
-    granite_slots_per_worker: int
-
-
-@dataclass(frozen=True)
 class WorkerServiceConfiguration:
     queue_name: str
     outbox_namespace: str
     progress_namespace: str
-    document_orchestration_version: str
     concurrency: int
     docling_concurrency: int
     granite_concurrency: int
-    local_distribution: LocalDocumentDistributionConfiguration
 
 
 @dataclass(frozen=True)
@@ -345,15 +331,11 @@ def _repository_root() -> Path:
 
 def _require_config_path(config_path: str | Path) -> Path:
     if config_path is None:
-        raise ApplicationConfigurationError(
-            CONFIG_FILE_REQUIRED, "chemin --config absent"
-        )
+        raise ApplicationConfigurationError(CONFIG_FILE_REQUIRED, "chemin --config absent")
 
     path_text = str(config_path)
     if path_text.strip() == "":
-        raise ApplicationConfigurationError(
-            CONFIG_FILE_REQUIRED, "chemin --config absent"
-        )
+        raise ApplicationConfigurationError(CONFIG_FILE_REQUIRED, "chemin --config absent")
 
     path = Path(path_text)
     if not path.is_file():
@@ -411,15 +393,11 @@ def _parse_application_yaml(content: str) -> Mapping[str, Any]:
         if raw_line.strip() == "" or raw_line.lstrip().startswith("#"):
             continue
         if "\t" in raw_line:
-            raise _ConfigurationSyntaxError(
-                f"tabulation interdite ligne {line_index + 1}"
-            )
+            raise _ConfigurationSyntaxError(f"tabulation interdite ligne {line_index + 1}")
 
         indent = len(raw_line) - len(raw_line.lstrip(" "))
         if indent % 2 != 0:
-            raise _ConfigurationSyntaxError(
-                f"indentation impaire ligne {line_index + 1}"
-            )
+            raise _ConfigurationSyntaxError(f"indentation impaire ligne {line_index + 1}")
 
         stripped = raw_line.strip()
         while len(stack) > 1 and indent <= stack[-1][0]:
@@ -428,47 +406,33 @@ def _parse_application_yaml(content: str) -> Mapping[str, Any]:
         parent = stack[-1][1]
         if stripped.startswith("- "):
             if not isinstance(parent, list):
-                raise _ConfigurationSyntaxError(
-                    f"entrée de liste sans liste parente ligne {line_index + 1}"
-                )
+                raise _ConfigurationSyntaxError(f"entrée de liste sans liste parente ligne {line_index + 1}")
             item_text = stripped[2:].strip()
             if item_text == "":
-                raise _ConfigurationSyntaxError(
-                    f"entrée de liste vide ligne {line_index + 1}"
-                )
+                raise _ConfigurationSyntaxError(f"entrée de liste vide ligne {line_index + 1}")
             parent.append(_parse_yaml_scalar(item_text))
             continue
 
         if ":" not in stripped:
-            raise _ConfigurationSyntaxError(
-                f"séparateur clé-valeur absent ligne {line_index + 1}"
-            )
+            raise _ConfigurationSyntaxError(f"séparateur clé-valeur absent ligne {line_index + 1}")
 
         key_text, value_text = stripped.split(":", 1)
         key = key_text.strip()
         if key == "":
             raise _ConfigurationSyntaxError(f"clé vide ligne {line_index + 1}")
         if not isinstance(parent, dict):
-            raise _ConfigurationSyntaxError(
-                f"clé sous liste scalaire ligne {line_index + 1}"
-            )
+            raise _ConfigurationSyntaxError(f"clé sous liste scalaire ligne {line_index + 1}")
         if key in parent:
-            raise _ConfigurationSyntaxError(
-                f"clé dupliquée ligne {line_index + 1}: {key}"
-            )
+            raise _ConfigurationSyntaxError(f"clé dupliquée ligne {line_index + 1}: {key}")
 
         stripped_value = value_text.strip()
         if stripped_value == "":
             next_line = _next_yaml_content_line(lines, line_index + 1)
             if next_line is None:
-                raise _ConfigurationSyntaxError(
-                    f"valeur imbriquée absente ligne {line_index + 1}"
-                )
+                raise _ConfigurationSyntaxError(f"valeur imbriquée absente ligne {line_index + 1}")
             next_indent, next_stripped = next_line
             if next_indent <= indent:
-                raise _ConfigurationSyntaxError(
-                    f"valeur imbriquée absente ligne {line_index + 1}"
-                )
+                raise _ConfigurationSyntaxError(f"valeur imbriquée absente ligne {line_index + 1}")
             child: dict[str, Any] | list[Any]
             if next_stripped.startswith("- "):
                 child = []
@@ -483,9 +447,7 @@ def _parse_application_yaml(content: str) -> Mapping[str, Any]:
     return root
 
 
-def _next_yaml_content_line(
-    lines: list[str], start_index: int
-) -> tuple[int, str] | None:
+def _next_yaml_content_line(lines: list[str], start_index: int) -> tuple[int, str] | None:
     for raw_line in lines[start_index:]:
         if raw_line.strip() == "" or raw_line.lstrip().startswith("#"):
             continue
@@ -522,10 +484,7 @@ def _reject_environment_inputs(
                 CONFIG_ENV_INPUT_REJECTED,
                 f"variable d'environnement applicative interdite: {environment_name}",
             )
-        if any(
-            normalized_name.startswith(prefix)
-            for prefix in _HISTORICAL_ENVIRONMENT_PREFIXES
-        ):
+        if any(normalized_name.startswith(prefix) for prefix in _HISTORICAL_ENVIRONMENT_PREFIXES):
             raise ApplicationConfigurationError(
                 CONFIG_ENV_INPUT_REJECTED,
                 f"variable d'environnement applicative interdite: {environment_name}",
@@ -620,9 +579,7 @@ def _validate_required_keys_and_values(
             )
 
 
-def _validate_schema(
-    payload: Mapping[str, Any], schema: Mapping[str, Any], path: Path
-) -> None:
+def _validate_schema(payload: Mapping[str, Any], schema: Mapping[str, Any], path: Path) -> None:
     try:
         _validate_schema_node(payload, schema, schema, ())
     except _SchemaValidationError as exc:
@@ -639,14 +596,6 @@ def _validate_cross_field_invariants(payload: Mapping[str, Any], path: Path) -> 
     gateway_service = payload["services"]["llm_gateway"]
     security = payload["security"]
     workers = payload["services"]["workers"]
-    runtime_resource_limits = payload["runtime"]["resource_limits"]
-
-    if runtime_resource_limits["gpu_required"] is not True:
-        raise ApplicationConfigurationError(
-            CONFIG_SCHEMA_INVALID,
-            "runtime.resource_limits.gpu_required doit être true pour cuda:0",
-            str(path),
-        )
 
     if workers["docling_concurrency"] > workers["concurrency"]:
         raise ApplicationConfigurationError(
@@ -669,27 +618,12 @@ def _validate_cross_field_invariants(payload: Mapping[str, Any], path: Path) -> 
             str(path),
         )
 
-    if (
-        workers["granite_concurrency"] != 1
-        or workers["local_distribution"]["granite_slots_per_worker"] != 1
-        or workers["granite_concurrency"]
-        != workers["local_distribution"]["granite_slots_per_worker"]
-    ):
-        raise ApplicationConfigurationError(
-            CONFIG_SCHEMA_INVALID,
-            "services.workers.granite_concurrency et granite_slots_per_worker doivent être égaux à 1",
-            str(path),
-        )
-
     docker_host = deployment_hosts["docker_local"]
     host_bind = docker_host["bind_host"]
     public_bindings = {"", "0.0.0.0", "::", "[::]", "*"}
     loopback_bindings = {"127.0.0.1", "localhost", "::1", "[::1]"}
 
-    if (
-        security["network_exposure"] == "loopback_only"
-        and host_bind not in loopback_bindings
-    ):
+    if security["network_exposure"] == "loopback_only" and host_bind not in loopback_bindings:
         raise ApplicationConfigurationError(
             CONFIG_SCHEMA_INVALID,
             "security.network_exposure=loopback_only exige deployment.hosts.docker_local.bind_host loopback",
@@ -702,8 +636,7 @@ def _validate_cross_field_invariants(payload: Mapping[str, Any], path: Path) -> 
             str(path),
         )
     if docker_host["public_access"] and (
-        security["network_exposure"] == "loopback_only"
-        or not security["allow_public_bind"]
+        security["network_exposure"] == "loopback_only" or not security["allow_public_bind"]
     ):
         raise ApplicationConfigurationError(
             CONFIG_SCHEMA_INVALID,
@@ -723,28 +656,19 @@ def _validate_cross_field_invariants(payload: Mapping[str, Any], path: Path) -> 
             "require_tls exige services.llm_gateway.tls_mode=ca_bundle",
             str(path),
         )
-    if (
-        not deployment_network["require_tls"]
-        and gateway_service["tls_mode"] == "ca_bundle"
-    ):
+    if not deployment_network["require_tls"] and gateway_service["tls_mode"] == "ca_bundle":
         raise ApplicationConfigurationError(
             CONFIG_SCHEMA_INVALID,
             "services.llm_gateway.tls_mode=ca_bundle exige require_tls",
             str(path),
         )
-    if (
-        deployment_network["require_api_key"]
-        and gateway_service["auth_mode"] != "api_key_file"
-    ):
+    if deployment_network["require_api_key"] and gateway_service["auth_mode"] != "api_key_file":
         raise ApplicationConfigurationError(
             CONFIG_SCHEMA_INVALID,
             "require_api_key exige services.llm_gateway.auth_mode=api_key_file",
             str(path),
         )
-    if (
-        not deployment_network["require_api_key"]
-        and gateway_service["auth_mode"] == "api_key_file"
-    ):
+    if not deployment_network["require_api_key"] and gateway_service["auth_mode"] == "api_key_file":
         raise ApplicationConfigurationError(
             CONFIG_SCHEMA_INVALID,
             "services.llm_gateway.auth_mode=api_key_file exige require_api_key",
@@ -765,10 +689,7 @@ def _validate_persistent_service_invariants(
 ) -> None:
     postgres = services["postgres"]
     parsed_postgres = urlparse(postgres["url"])
-    if (
-        parsed_postgres.scheme not in {"postgresql", "postgresql+psycopg"}
-        or parsed_postgres.hostname is None
-    ):
+    if parsed_postgres.scheme not in {"postgresql", "postgresql+psycopg"} or parsed_postgres.hostname is None:
         raise ApplicationConfigurationError(
             CONFIG_SCHEMA_INVALID,
             "services.postgres.url doit être une URL PostgreSQL explicite",
@@ -847,12 +768,7 @@ def _validate_spark_endpoint_invariants(
             str(path),
         )
 
-    allowed_hosts = {
-        "spark-inference",
-        "spark-inference.test",
-        spark_host["dns_name"],
-        *spark_host["endpoint_hosts"],
-    }
+    allowed_hosts = {"spark-inference", "spark-inference.test", spark_host["dns_name"], *spark_host["endpoint_hosts"]}
     if parsed_endpoint.hostname not in allowed_hosts:
         raise ApplicationConfigurationError(
             CONFIG_SCHEMA_INVALID,
@@ -918,18 +834,12 @@ def _validate_schema_node(
                 if key in properties:
                     child_schema = properties[key]
                     if not isinstance(child_schema, Mapping):
-                        raise _SchemaValidationError(
-                            "schéma de propriété non objet", (*path_parts, str(key))
-                        )
-                    _validate_schema_node(
-                        item, child_schema, root_schema, (*path_parts, str(key))
-                    )
+                        raise _SchemaValidationError("schéma de propriété non objet", (*path_parts, str(key)))
+                    _validate_schema_node(item, child_schema, root_schema, (*path_parts, str(key)))
                     continue
 
                 if additional_properties is False:
-                    raise _SchemaValidationError(
-                        "propriété inconnue interdite", (*path_parts, str(key))
-                    )
+                    raise _SchemaValidationError("propriété inconnue interdite", (*path_parts, str(key)))
 
     if isinstance(value, list):
         min_items = resolved_node.get("minItems")
@@ -939,14 +849,10 @@ def _validate_schema_node(
         item_schema = resolved_node.get("items")
         if isinstance(item_schema, Mapping):
             for index, item in enumerate(value):
-                _validate_schema_node(
-                    item, item_schema, root_schema, (*path_parts, str(index))
-                )
+                _validate_schema_node(item, item_schema, root_schema, (*path_parts, str(index)))
 
     not_schema = resolved_node.get("not")
-    if isinstance(not_schema, Mapping) and _matches_schema_node(
-        value, not_schema, root_schema, path_parts
-    ):
+    if isinstance(not_schema, Mapping) and _matches_schema_node(value, not_schema, root_schema, path_parts):
         raise _SchemaValidationError("condition not violée", path_parts)
 
 
@@ -963,9 +869,7 @@ def _matches_schema_node(
     return True
 
 
-def _validate_json_schema_type(
-    value: Any, expected_type: str, path_parts: tuple[str, ...]
-) -> None:
+def _validate_json_schema_type(value: Any, expected_type: str, path_parts: tuple[str, ...]) -> None:
     if expected_type == "object":
         if not isinstance(value, Mapping):
             raise _SchemaValidationError("objet attendu", path_parts)
@@ -990,9 +894,7 @@ def _validate_json_schema_type(
         if not isinstance(value, bool):
             raise _SchemaValidationError("booléen attendu", path_parts)
         return
-    raise _SchemaValidationError(
-        f"type de schéma non supporté: {expected_type}", path_parts
-    )
+    raise _SchemaValidationError(f"type de schéma non supporté: {expected_type}", path_parts)
 
 
 def _is_json_number(value: Any) -> bool:
@@ -1008,17 +910,13 @@ def _resolve_schema_node(
         return schema_node
 
     if not reference.startswith("#/"):
-        raise ApplicationConfigurationError(
-            CONFIG_SCHEMA_INVALID, f"référence de schéma externe interdite: {reference}"
-        )
+        raise ApplicationConfigurationError(CONFIG_SCHEMA_INVALID, f"référence de schéma externe interdite: {reference}")
 
     resolved: Any = root_schema
     for part in reference[2:].split("/"):
         resolved = resolved[part]
     if not isinstance(resolved, Mapping):
-        raise ApplicationConfigurationError(
-            CONFIG_SCHEMA_INVALID, f"référence de schéma non objet: {reference}"
-        )
+        raise ApplicationConfigurationError(CONFIG_SCHEMA_INVALID, f"référence de schéma non objet: {reference}")
     return resolved
 
 
@@ -1062,20 +960,14 @@ def _build_application_configuration(
                 docker_local=DockerLocalHostConfiguration(
                     role=deployment_hosts["docker_local"]["role"],
                     bind_host=deployment_hosts["docker_local"]["bind_host"],
-                    container_listen_host=deployment_hosts["docker_local"][
-                        "container_listen_host"
-                    ],
+                    container_listen_host=deployment_hosts["docker_local"]["container_listen_host"],
                     public_access=deployment_hosts["docker_local"]["public_access"],
                 ),
                 spark_inference=SparkInferenceHostConfiguration(
                     role=deployment_hosts["spark_inference"]["role"],
                     dns_name=deployment_hosts["spark_inference"]["dns_name"],
-                    endpoint_hosts=tuple(
-                        deployment_hosts["spark_inference"]["endpoint_hosts"]
-                    ),
-                    allowed_client_cidrs=tuple(
-                        deployment_hosts["spark_inference"]["allowed_client_cidrs"]
-                    ),
+                    endpoint_hosts=tuple(deployment_hosts["spark_inference"]["endpoint_hosts"]),
+                    allowed_client_cidrs=tuple(deployment_hosts["spark_inference"]["allowed_client_cidrs"]),
                 ),
             ),
             network=DeploymentNetworkConfiguration(
@@ -1105,12 +997,8 @@ def _build_application_configuration(
                 instance_id=services["qdrant"]["instance_id"],
                 storage_volume=services["qdrant"]["storage_volume"],
                 collections=QdrantCollectionsConfiguration(
-                    datastore_identity=services["qdrant"]["collections"][
-                        "datastore_identity"
-                    ],
-                    knowledge_access=services["qdrant"]["collections"][
-                        "knowledge_access"
-                    ],
+                    datastore_identity=services["qdrant"]["collections"]["datastore_identity"],
+                    knowledge_access=services["qdrant"]["collections"]["knowledge_access"],
                 ),
             ),
             api=ApiServiceConfiguration(
@@ -1121,28 +1009,9 @@ def _build_application_configuration(
                 queue_name=services["workers"]["queue_name"],
                 outbox_namespace=services["workers"]["outbox_namespace"],
                 progress_namespace=services["workers"]["progress_namespace"],
-                document_orchestration_version=services["workers"][
-                    "document_orchestration_version"
-                ],
                 concurrency=services["workers"]["concurrency"],
                 docling_concurrency=services["workers"]["docling_concurrency"],
                 granite_concurrency=services["workers"]["granite_concurrency"],
-                local_distribution=LocalDocumentDistributionConfiguration(
-                    replicas=services["workers"]["local_distribution"]["replicas"],
-                    memory_bytes=services["workers"]["local_distribution"][
-                        "memory_bytes"
-                    ],
-                    cpus=services["workers"]["local_distribution"]["cpus"],
-                    granite_device=services["workers"]["local_distribution"][
-                        "granite_device"
-                    ],
-                    granite_slots_global=services["workers"]["local_distribution"][
-                        "granite_slots_global"
-                    ],
-                    granite_slots_per_worker=services["workers"]["local_distribution"][
-                        "granite_slots_per_worker"
-                    ],
-                ),
             ),
             llm_gateway=LLMGatewayServiceConfiguration(
                 url=services["llm_gateway"]["url"],
@@ -1151,15 +1020,9 @@ def _build_application_configuration(
                 auth_mode=services["llm_gateway"]["auth_mode"],
                 tls_mode=services["llm_gateway"]["tls_mode"],
                 timeout_seconds=services["llm_gateway"]["timeout_seconds"],
-                retry_before_first_token=services["llm_gateway"][
-                    "retry_before_first_token"
-                ],
-                circuit_breaker_failure_threshold=services["llm_gateway"][
-                    "circuit_breaker_failure_threshold"
-                ],
-                circuit_breaker_reset_seconds=services["llm_gateway"][
-                    "circuit_breaker_reset_seconds"
-                ],
+                retry_before_first_token=services["llm_gateway"]["retry_before_first_token"],
+                circuit_breaker_failure_threshold=services["llm_gateway"]["circuit_breaker_failure_threshold"],
+                circuit_breaker_reset_seconds=services["llm_gateway"]["circuit_breaker_reset_seconds"],
             ),
         ),
         models=ModelsConfiguration(
@@ -1206,21 +1069,15 @@ def _build_application_configuration(
         quality_gates=QualityGatesConfiguration(
             post_conversion=PostConversionQualityGateConfiguration(
                 page_count_match=quality_gates["post_conversion"]["page_count_match"],
-                provenance_coverage_min=quality_gates["post_conversion"][
-                    "provenance_coverage_min"
-                ],
+                provenance_coverage_min=quality_gates["post_conversion"]["provenance_coverage_min"],
                 missing_page_max=quality_gates["post_conversion"]["missing_page_max"],
             ),
             retrieval=RetrievalQualityGateConfiguration(
                 citation_required=quality_gates["retrieval"]["citation_required"],
-                min_evidence_candidates=quality_gates["retrieval"][
-                    "min_evidence_candidates"
-                ],
+                min_evidence_candidates=quality_gates["retrieval"]["min_evidence_candidates"],
             ),
             answering=AnsweringQualityGateConfiguration(
-                unsupported_claim_policy=quality_gates["answering"][
-                    "unsupported_claim_policy"
-                ],
+                unsupported_claim_policy=quality_gates["answering"]["unsupported_claim_policy"],
                 abstention_required_on_insufficient_evidence=quality_gates["answering"][
                     "abstention_required_on_insufficient_evidence"
                 ],
@@ -1288,7 +1145,6 @@ __all__ = [
     "QdrantServiceConfiguration",
     "LLMGatewayServiceConfiguration",
     "LLMModelConfiguration",
-    "LocalDocumentDistributionConfiguration",
     "ModelsConfiguration",
     "ObservabilityConfiguration",
     "PathsConfiguration",

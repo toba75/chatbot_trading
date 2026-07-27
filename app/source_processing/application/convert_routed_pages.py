@@ -62,7 +62,6 @@ class PageConversionRequest:
     route_name: PageRouteName
     routing_policy_version: RoutingPolicyVersion
     source_artifact_ref: str
-    source_sha256: str
     expected_output_artifact_ref: str
 
     def __post_init__(self) -> None:
@@ -76,7 +75,6 @@ class PageConversionRequest:
             "source_artifact_ref",
             _ensure_artifact_ref(self.source_artifact_ref),
         )
-        object.__setattr__(self, "source_sha256", _ensure_sha256(self.source_sha256))
         object.__setattr__(
             self,
             "expected_output_artifact_ref",
@@ -334,7 +332,6 @@ class ConvertRoutedPagesHandler:
                 processing_run=processing_run,
                 page_route=page_route,
                 source_artifact_ref=source_document.original_storage_ref.value,
-                source_sha256=source_document.fingerprint.value,
             )
             page_output = self._native_converter.convert_page(request)
             _ensure_conversion_output(
@@ -367,7 +364,6 @@ class ConvertRoutedPagesHandler:
                 processing_run=processing_run,
                 page_route=page_route,
                 source_artifact_ref=preprocessed_artifact.artifact_ref,
-                source_sha256=preprocessed_artifact.artifact_hash,
             )
             page_output = self._granite_converter.convert_page(request)
             _ensure_conversion_output(
@@ -389,7 +385,6 @@ class ConvertRoutedPagesHandler:
                 processing_run=processing_run,
                 page_route=page_route,
                 source_artifact_ref=source_document.original_storage_ref.value,
-                source_sha256=source_document.fingerprint.value,
             )
             page_output = self._targeted_enrichment_converter.convert_page(request)
             _ensure_conversion_output(
@@ -416,7 +411,6 @@ class ConvertRoutedPagesHandler:
                 processing_run=processing_run,
                 page_route=page_route,
                 source_artifact_ref=source_document.original_storage_ref.value,
-                source_sha256=source_document.fingerprint.value,
             )
             page_output = self._granite_converter.convert_page(request)
             _ensure_conversion_output(
@@ -454,7 +448,6 @@ def _conversion_request(
     processing_run: DocumentProcessingRun,
     page_route: PageRoute,
     source_artifact_ref: str,
-    source_sha256: str,
 ) -> PageConversionRequest:
     return PageConversionRequest(
         processing_run_id=processing_run.processing_run_id,
@@ -463,7 +456,6 @@ def _conversion_request(
         route_name=page_route.route_name,
         routing_policy_version=page_route.routing_policy_version,
         source_artifact_ref=source_artifact_ref,
-        source_sha256=source_sha256,
         expected_output_artifact_ref=_conversion_output_artifact_ref(
             processing_run_id=processing_run.processing_run_id,
             page_number=page_route.page_number,
@@ -581,16 +573,6 @@ def _ensure_artifact_ref(value: str) -> str:
         raise ValueError("référence d'artefact invalide")
     if not value.startswith("artifact:source_processing."):
         raise ValueError("référence d'artefact invalide")
-    return value
-
-
-def _ensure_sha256(value: str) -> str:
-    if (
-        not isinstance(value, str)
-        or len(value) != 64
-        or any(character not in "0123456789abcdef" for character in value)
-    ):
-        raise ValueError("source_sha256 invalide")
     return value
 
 

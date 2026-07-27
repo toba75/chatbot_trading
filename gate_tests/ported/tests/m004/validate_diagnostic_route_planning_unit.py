@@ -14,9 +14,7 @@ from app.contracts.technical_jobs import (
     JobStatus,
 )
 from app.source_processing.application.document_worker import DocumentDiagnosticWorker
-from app.source_processing.application.record_page_diagnostics import (
-    PageDiagnosticInput,
-)
+from app.source_processing.application.record_page_diagnostics import PageDiagnosticInput
 from app.source_processing.domain.document_processing_run import (
     DocumentProcessingRun,
     DocumentProcessingRunStatus,
@@ -54,13 +52,9 @@ class _SourceRepository:
 class _RunRepository:
     def __init__(self, run: DocumentProcessingRun) -> None:
         self.run = run
-        self.transitions: list[
-            tuple[DocumentProcessingRunStatus, DocumentProcessingRun]
-        ] = []
+        self.transitions: list[tuple[DocumentProcessingRunStatus, DocumentProcessingRun]] = []
 
-    def find_by_document_id(
-        self, document_id: DocumentId
-    ) -> DocumentProcessingRun | None:
+    def find_by_document_id(self, document_id: DocumentId) -> DocumentProcessingRun | None:
         return self.run if document_id == self.run.document_id else None
 
     def save(self, processing_run: DocumentProcessingRun) -> None:
@@ -78,9 +72,7 @@ class _RunRepository:
 
 class _ScanInspector:
     def inspect(self, original_storage_ref: str) -> tuple[PageDiagnosticInput, ...]:
-        assert original_storage_ref.startswith(
-            "artifact:source_processing.original_sources/"
-        )
+        assert original_storage_ref.startswith("artifact:source_processing.original_sources/")
         return (
             PageDiagnosticInput(
                 page_number=1,
@@ -135,9 +127,7 @@ def _source_and_run() -> tuple[SourceDocument, DocumentProcessingRun]:
     return source, run
 
 
-def _claimed_diagnosis_job(
-    source: SourceDocument, run: DocumentProcessingRun
-) -> ClaimedJob:
+def _claimed_diagnosis_job(source: SourceDocument, run: DocumentProcessingRun) -> ClaimedJob:
     request = JobRequest(
         environment="development",
         deployment_id="ostrading-development-local",
@@ -150,7 +140,6 @@ def _claimed_diagnosis_job(
             code_version="m004-t005-route-chain",
             model_version="pypdf-isolated-v3",
         ),
-        execution_requirements=None,
         payload={
             "document_id": source.document_id.value,
             "processing_run_id": run.processing_run_id.value,
@@ -192,13 +181,8 @@ def test_diagnostic_worker_publishes_route_plan_after_inspection() -> None:
     assert result["diagnostic_status"] == "ROUTE_PLANNED"
     assert repository.run.status is DocumentProcessingRunStatus.ROUTE_PLANNED
     assert repository.run.route_plan is not None
-    assert (
-        repository.run.route_plan.page_routes[0].route_name
-        is PageRouteName.SCAN_GRANITE
-    )
-    assert repository.transitions == [
-        (DocumentProcessingRunStatus.DIAGNOSED, repository.run)
-    ]
+    assert repository.run.route_plan.page_routes[0].route_name is PageRouteName.SCAN_GRANITE
+    assert repository.transitions == [(DocumentProcessingRunStatus.DIAGNOSED, repository.run)]
 
 
 def test_ocr_priority_keeps_degraded_scans_and_bad_ocr_routes_reachable() -> None:

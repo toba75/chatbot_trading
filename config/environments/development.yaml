@@ -50,17 +50,9 @@ services:
     queue_name: ostrading-development-jobs
     outbox_namespace: ostrading-development-outbox
     progress_namespace: ostrading-development-progress
-    document_orchestration_version: m014-page-fanout-v1
     concurrency: 8
     docling_concurrency: 2
-    granite_concurrency: 1
-    local_distribution:
-      replicas: 2
-      memory_bytes: 2147483648
-      cpus: 4
-      granite_device: cuda:0
-      granite_slots_global: 2
-      granite_slots_per_worker: 1
+    granite_concurrency: 2
   llm_gateway:
     url: http://llm-gateway-development:8090
     port: 8090
@@ -144,4 +136,4 @@ runtime:
   resource_limits:
     cpu_count: 8
     memory_gb: 32
-    gpu_required: true
+    gpu_required: false

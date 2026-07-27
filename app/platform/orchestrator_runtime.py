@@ -259,10 +259,11 @@ def _enrich_corpus_item(
         diagnostic_status=item.diagnostic_status,
         conversion_status=item.conversion_status,
         conversion_action_available=item.conversion_action_available,
-        # CanonicalSourcePublished déclenche la projection automatiquement.
-        # L'action manuelle reste un contrat API idempotent, jamais une action UI
-        # exposée avant que l'inbox et la progression KA soient consommables.
-        projection_action_available=False,
+        projection_action_available=(
+            item.conversion_status == "CANONICAL_ACCEPTED"
+            and item.canonical_version_id is not None
+            and status == "PROJECTION_NOT_REQUESTED"
+        ),
         canonical_version_id=item.canonical_version_id,
         projection_status=status,
         manual_review_reason=item.manual_review_reason,
@@ -389,9 +390,6 @@ def build_orchestrator_composition_root(
         conversion_configuration_hash=configuration.configuration_hash,
         code_version=version("chatbot-trading"),
         model_version=f"docling-{version('docling')}",
-        orchestration_version=(
-            configuration.services.workers.document_orchestration_version
-        ),
     )
     document_queries = DocumentQueryService(
         document_snapshot_repository=persistence.source_document_repository,
@@ -407,12 +405,7 @@ def build_orchestrator_composition_root(
         original_source_reader=persistence.original_source_store,
     )
     projection_read_repository = PostgresProjectionReadRepository(
-        connection_factory=connection_factory,
-        environment_identity=JobEnvironmentIdentity(
-            environment=configuration.application.environment,
-            deployment_id=configuration.application.deployment_id,
-            configuration_hash=configuration.configuration_hash,
-        ),
+        connection_factory=connection_factory
     )
     projection_queries = ProjectionQueryService(
         projection_read_repository=projection_read_repository,
@@ -457,11 +450,6 @@ def build_orchestrator_composition_root(
             collection_name=configuration.services.qdrant.collections.knowledge_access,
             timeout_seconds=configuration.runtime.timeouts.request_seconds,
             api_key=qdrant_api_key,
-            environment_identity=JobEnvironmentIdentity(
-                environment=configuration.application.environment,
-                deployment_id=configuration.application.deployment_id,
-                configuration_hash=configuration.configuration_hash,
-            ),
         ),
         result_limit=4,
     )

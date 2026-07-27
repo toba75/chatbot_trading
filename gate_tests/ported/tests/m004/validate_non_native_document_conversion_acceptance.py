@@ -7,8 +7,6 @@ from pathlib import Path
 
 import pytest
 
-from app.contracts.technical_jobs import JobEnvironmentIdentity
-
 from app.source_processing.adapters.docling_native_conversion import (
     NativeDoclingConversionResponse,
 )
@@ -38,12 +36,6 @@ from app.source_processing.domain.source_document import (
     OriginalStorageRef,
     SourceDocument,
     SourceFingerprint,
-)
-
-_ENVIRONMENT_IDENTITY = JobEnvironmentIdentity(
-    environment="test",
-    deployment_id="ostrading-test-local",
-    configuration_hash="c" * 64,
 )
 
 
@@ -149,7 +141,6 @@ def test_non_native_route_is_publicly_convertible_and_its_terminal_failure_is_pe
     assert _conversion_action_available(processing_run=run, conversion=None) is True
     failed = DocumentConversionState(
         document_id=source.document_id,
-        producer_environment_identity=_ENVIRONMENT_IDENTITY,
         conversion_status=DocumentConversionStatus.QA_REJECTED,
         canonical_version_id=None,
         rejection_error_code="GRANITE_DOCLING_UNAVAILABLE",
@@ -162,7 +153,6 @@ def test_non_native_route_is_publicly_convertible_and_its_terminal_failure_is_pe
 
     persistence_failed = DocumentConversionState(
         document_id=source.document_id,
-        producer_environment_identity=_ENVIRONMENT_IDENTITY,
         conversion_status=DocumentConversionStatus.QA_REJECTED,
         canonical_version_id=None,
         rejection_error_code="POSTGRES_INTEGRITY_FAILURE",

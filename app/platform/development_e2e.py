@@ -17,6 +17,7 @@ import socket
 import subprocess
 from tempfile import TemporaryDirectory
 import time
+from types import MappingProxyType
 from typing import Any, Final
 from urllib.parse import quote
 from uuid import uuid4
@@ -66,6 +67,15 @@ _EXPECTED_QUALIFICATION_PAGE_COUNT: Final = len(_EXPECTED_QUALIFICATION_ROUTES)
 _WINDOWS_CONTROL_C_EXIT: Final = 0xC000013A
 _WORKER_IDS: Final = frozenset(
     {"worker-documents", "worker-projection"}
+)
+_PROJECTION_PROFILE: Final = MappingProxyType(
+    {
+        "projection_profile_id": "local-hash-projection-v1",
+        "chunking_profile": "hierarchical-pagewise-v1",
+        "embedding_model": "hashing-dense-256-v1",
+        "sparse_profile": "lexical-tf-v1",
+        "index_schema": "qdrant-hybrid-v1",
+    }
 )
 
 
@@ -592,7 +602,6 @@ def _exercise_product(
         path=f"/v1/documents/{document_id}/diagnostic/progress",
         expected_action="DIAGNOSE",
         timeout_seconds=600,
-        allow_not_requested=False,
     )
     diagnostic = _get_json(client, f"/v1/documents/{document_id}/diagnostic")
     if diagnostic.get("diagnostic_status") != "ROUTE_PLANNED":
@@ -609,7 +618,6 @@ def _exercise_product(
         path=f"/v1/documents/{document_id}/conversion/progress",
         expected_action="CONVERT_DOCUMENT",
         timeout_seconds=7200,
-        allow_not_requested=False,
     )
     conversion = _get_json(client, f"/v1/documents/{document_id}/conversion")
     if conversion.get("conversion_status") != "CANONICAL_ACCEPTED":
@@ -622,12 +630,19 @@ def _exercise_product(
         "canonical_version_id",
     )
 
+    state = _find_document(client, document_id)
+    if state.get("projection_status") == "PROJECTION_NOT_REQUESTED":
+        response = client.post(
+            f"/v1/documents/{document_id}/index",
+            json=dict(_PROJECTION_PROFILE),
+        )
+        if response.status_code != 202:
+            _raise_http("DEVELOPMENT_E2E_PROJECTION_REQUEST_FAILED", response)
     projection_progress = _wait_action_progress(
         client,
         path=f"/v1/documents/{document_id}/projection/progress",
         expected_action="PROJECT_DOCUMENT",
         timeout_seconds=1800,
-        allow_not_requested=True,
     )
     projection = _get_json(client, f"/v1/documents/{document_id}/projection")
     if projection.get("projection_status") != "SEARCHABLE":
@@ -1292,7 +1307,6 @@ def _wait_action_progress(
     path: str,
     expected_action: str,
     timeout_seconds: int,
-    allow_not_requested: bool,
 ) -> Mapping[str, Any]:
     deadline = time.monotonic() + timeout_seconds
     previous_completed = -1
@@ -1304,13 +1318,6 @@ def _wait_action_progress(
         completed = progress.get("completed_units")
         total = progress.get("total_units")
         failure = progress.get("failure_error_code")
-        if allow_not_requested and phase == "NOT_REQUESTED":
-            if completed != 0 or total is not None or failure is not None:
-                raise DevelopmentE2EError(
-                    "DEVELOPMENT_E2E_PROGRESS_NOT_REQUESTED_INVALID"
-                )
-            time.sleep(2)
-            continue
         if isinstance(completed, bool) or not isinstance(completed, int) or completed < 0:
             raise DevelopmentE2EError("DEVELOPMENT_E2E_PROGRESS_COMPLETED_INVALID")
         if isinstance(total, bool) or not isinstance(total, int) or total < 1:

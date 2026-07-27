@@ -70,12 +70,7 @@ Ne pas créer d'ADR pour une correction locale, un renommage mineur ou une tâch
 3. Renseigner le contexte, la décision, les conséquences et les liens de traçabilité.
 4. Ajouter l'entrée dans `index.md`.
 5. Mettre à jour les tâches, tests ou spécifications concernés.
-6. Exécuter les validations ciblées des ADR, documents et comportements touchés.
-
-La gate globale n'est jamais une validation par tâche ou par sous-agent. Elle
-appartient à l'orchestrateur du milestone, qui l'exécute une seule fois sur un
-état final candidat avec le délai long prévu par le workflow. Un correctif se
-diagnostique par validations ciblées avant toute nouvelle clôture globale.
+6. Exécuter `uv run --locked gate`.
 
 ## Index
 

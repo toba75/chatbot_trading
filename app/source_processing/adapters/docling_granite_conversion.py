@@ -7,17 +7,10 @@ import json
 import os
 import subprocess
 import sys
-import threading
-import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Mapping
+from typing import Any, Mapping
 
-from app.contracts.technical_jobs import (
-    GraniteExecutionCapability,
-    GraniteModelStillRunning,
-    require_granite_execution_capability,
-)
 from app.source_processing.adapters.docling_native_conversion import (
     NativeDoclingConversionResponse,
 )
@@ -97,17 +90,11 @@ class GraniteDoclingAssetManifest:
         ):
             raise GraniteDoclingAssetManifestError()
         resolved_root = assets_root.resolve()
-        if (
-            not resolved_root.is_dir()
-            or not (resolved_root / _GRANITE_MODEL_DIRECTORY).is_dir()
-        ):
+        if not resolved_root.is_dir() or not (resolved_root / _GRANITE_MODEL_DIRECTORY).is_dir():
             raise GraniteDoclingAssetManifestError()
         hashes: dict[str, str] = {}
         for asset in payload["assets"]:
-            if not isinstance(asset, Mapping) or set(asset) != {
-                "relative_path",
-                "sha256",
-            }:
+            if not isinstance(asset, Mapping) or set(asset) != {"relative_path", "sha256"}:
                 raise GraniteDoclingAssetManifestError()
             relative_path = asset["relative_path"]
             expected_hash = asset["sha256"]
@@ -121,10 +108,7 @@ class GraniteDoclingAssetManifest:
             ):
                 raise GraniteDoclingAssetManifestError()
             resolved_asset = (resolved_root / relative_path).resolve()
-            if (
-                not resolved_asset.is_relative_to(resolved_root)
-                or not resolved_asset.is_file()
-            ):
+            if not resolved_asset.is_relative_to(resolved_root) or not resolved_asset.is_file():
                 raise GraniteDoclingAssetManifestError()
             if hashlib.sha256(resolved_asset.read_bytes()).hexdigest() != expected_hash:
                 raise GraniteDoclingAssetManifestError()
@@ -152,18 +136,9 @@ class GraniteDoclingConversionRequest:
     routing_policy_version: str
 
     def __post_init__(self) -> None:
-        for field_name in (
-            "document_id",
-            "processing_run_id",
-            "route_name",
-            "routing_policy_version",
-        ):
+        for field_name in ("document_id", "processing_run_id", "route_name", "routing_policy_version"):
             value = getattr(self, field_name)
-            if (
-                not isinstance(value, str)
-                or value.strip() == ""
-                or value != value.strip()
-            ):
+            if not isinstance(value, str) or value.strip() == "" or value != value.strip():
                 raise ValueError(f"{field_name} invalide")
         if self.route_name not in _GRANITE_ROUTE_NAMES:
             raise ValueError("route Granite invalide")
@@ -196,18 +171,10 @@ class GraniteDoclingConversionRequest:
 class IsolatedGraniteDoclingConverter:
     """Démarre Granite-Docling seulement dans l'interpréteur courant de ``uv``."""
 
-    def __init__(
-        self, *, asset_manifest_path: Path, assets_root: Path, timeout_seconds: float
-    ) -> None:
-        if not isinstance(asset_manifest_path, Path) or not isinstance(
-            assets_root, Path
-        ):
+    def __init__(self, *, asset_manifest_path: Path, assets_root: Path, timeout_seconds: float) -> None:
+        if not isinstance(asset_manifest_path, Path) or not isinstance(assets_root, Path):
             raise ValueError("configuration Granite-Docling invalide")
-        if (
-            isinstance(timeout_seconds, bool)
-            or not isinstance(timeout_seconds, int | float)
-            or timeout_seconds <= 0
-        ):
+        if isinstance(timeout_seconds, bool) or not isinstance(timeout_seconds, int | float) or timeout_seconds <= 0:
             raise ValueError("timeout Granite-Docling invalide")
         self._asset_manifest_path = asset_manifest_path
         self._assets_root = assets_root
@@ -217,152 +184,57 @@ class IsolatedGraniteDoclingConverter:
             assets_root=self._assets_root,
         )
 
-    def start(
-        self,
-        request: GraniteDoclingConversionRequest,
-        *,
-        capability: GraniteExecutionCapability,
-    ) -> "RunningGraniteDoclingConversion":
+    def convert(self, request: GraniteDoclingConversionRequest) -> NativeDoclingConversionResponse:
         if not isinstance(request, GraniteDoclingConversionRequest):
             raise ValueError("requête Granite-Docling invalide")
-        require_granite_execution_capability(capability)
         manifest = GraniteDoclingAssetManifest.load(
             manifest_path=self._asset_manifest_path,
             assets_root=self._assets_root,
         )
         if not request.source_pdf_path.is_file():
             raise GraniteDoclingConversionError()
-        if (
-            hashlib.sha256(request.source_pdf_path.read_bytes()).hexdigest()
-            != request.source_sha256
-        ):
+        if hashlib.sha256(request.source_pdf_path.read_bytes()).hexdigest() != request.source_sha256:
             raise GraniteDoclingConversionError("SOURCE_FINGERPRINT_MISMATCH")
         environment = dict(os.environ)
         environment["HF_HUB_OFFLINE"] = "1"
         environment["TRANSFORMERS_OFFLINE"] = "1"
         environment["HF_HOME"] = str(manifest.assets_root)
         environment["PYTHONNOUSERSITE"] = "1"
-        process = subprocess.Popen(
-            (
-                sys.executable,
-                "-B",
-                "-m",
-                "app.source_processing.adapters.docling_granite_worker",
-            ),
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            env=environment,
-            creationflags=_worker_process_creation_flags(),
-        )
-        return RunningGraniteDoclingConversion(
-            process=process,
-            request=request,
-            input_payload=json.dumps(
-                request.to_payload(assets_root=manifest.assets_root),
-                separators=(",", ":"),
-            ).encode("utf-8"),
-            timeout_seconds=self._timeout_seconds,
-        )
-
-
-class RunningGraniteDoclingConversion:
-    """Processus Granite observable et annulable par le contrôleur de capacité."""
-
-    def __init__(
-        self,
-        *,
-        process: subprocess.Popen[bytes],
-        request: GraniteDoclingConversionRequest,
-        input_payload: bytes,
-        timeout_seconds: float,
-    ) -> None:
-        if (
-            isinstance(timeout_seconds, bool)
-            or not isinstance(timeout_seconds, int | float)
-            or timeout_seconds <= 0
-        ):
-            raise ValueError("timeout Granite-Docling invalide")
-        self._process = process
-        self._request = request
-        self._input_payload: bytes | None = input_payload
-        self._deadline = time.monotonic() + float(timeout_seconds)
-        self._terminated = False
-        self._termination_lock = threading.Lock()
-
-    def wait(self, *, timeout_seconds: float) -> NativeDoclingConversionResponse:
-        if (
-            isinstance(timeout_seconds, bool)
-            or not isinstance(timeout_seconds, int | float)
-            or timeout_seconds <= 0
-        ):
-            raise ValueError("timeout Granite-Docling invalide")
-        remaining_seconds = self._deadline - time.monotonic()
-        if remaining_seconds <= 0:
-            self._raise_timeout()
-        input_payload = self._input_payload
-        self._input_payload = None
         try:
-            stdout, _stderr = self._process.communicate(
-                input=input_payload,
-                timeout=min(float(timeout_seconds), remaining_seconds),
+            completed = subprocess.run(
+                (sys.executable, "-B", "-m", "app.source_processing.adapters.docling_granite_worker"),
+                input=json.dumps(
+                    request.to_payload(assets_root=manifest.assets_root),
+                    separators=(",", ":"),
+                ).encode("utf-8"),
+                capture_output=True,
+                env=environment,
+                timeout=self._timeout_seconds,
+                check=False,
+                creationflags=_worker_process_creation_flags(),
             )
         except subprocess.TimeoutExpired as error:
-            if time.monotonic() >= self._deadline:
-                self._raise_timeout(cause=error)
-            raise GraniteModelStillRunning() from error
+            raise GraniteDoclingConversionError() from error
         try:
-            payload = json.loads(stdout)
+            payload = json.loads(completed.stdout)
         except (TypeError, UnicodeDecodeError, json.JSONDecodeError) as error:
             raise GraniteDoclingConversionError() from error
-        if self._process.returncode != 0:
+        if completed.returncode != 0:
             code = payload.get("error_code") if isinstance(payload, Mapping) else None
             raise GraniteDoclingConversionError(
-                code
-                if isinstance(code, str) and code != ""
-                else "GRANITE_DOCLING_UNAVAILABLE"
+                code if isinstance(code, str) and code != "" else "GRANITE_DOCLING_UNAVAILABLE"
             )
-        native_request = _native_response_request(self._request)
+        native_request = _native_response_request(request)
         return NativeDoclingConversionResponse.from_payload(
             request=native_request,
             payload=payload,
         )
 
-    def terminate(self) -> None:
-        with self._termination_lock:
-            if self._terminated:
-                return
-            if self._process.poll() is not None:
-                self._terminated = True
-                return
-            self._process.terminate()
-            try:
-                self._process.wait(timeout=5.0)
-            except subprocess.TimeoutExpired:
-                self._process.kill()
-                self._process.wait(timeout=5.0)
-            self._terminated = True
-
-    def _raise_timeout(self, *, cause: Exception | None = None) -> None:
-        timeout_error = GraniteDoclingConversionError("GRANITE_DOCLING_TIMEOUT")
-        try:
-            self.terminate()
-        except Exception as termination_error:
-            raise ExceptionGroup(
-                "GRANITE_TIMEOUT_AND_TERMINATION_FAILURE",
-                [timeout_error, termination_error],
-            ) from timeout_error
-        if cause is not None:
-            raise timeout_error from cause
-        raise timeout_error
-
 
 def _native_response_request(request: GraniteDoclingConversionRequest):
     """Réemploie le validateur strict de réponse Docling pagewise déjà livré en T-003."""
 
-    from app.source_processing.adapters.docling_native_conversion import (
-        NativeDoclingConversionRequest,
-    )
+    from app.source_processing.adapters.docling_native_conversion import NativeDoclingConversionRequest
 
     return NativeDoclingConversionRequest(
         document_id=request.document_id,
@@ -375,11 +247,7 @@ def _native_response_request(request: GraniteDoclingConversionRequest):
 
 
 def _is_sha256(value: object) -> bool:
-    return (
-        isinstance(value, str)
-        and len(value) == 64
-        and all(character in "0123456789abcdef" for character in value)
-    )
+    return isinstance(value, str) and len(value) == 64 and all(character in "0123456789abcdef" for character in value)
 
 
 def _worker_process_creation_flags() -> int:
@@ -394,5 +262,4 @@ __all__ = [
     "GraniteDoclingConversionError",
     "GraniteDoclingConversionRequest",
     "IsolatedGraniteDoclingConverter",
-    "RunningGraniteDoclingConversion",
 ]

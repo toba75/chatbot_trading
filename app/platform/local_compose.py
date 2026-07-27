@@ -54,16 +54,10 @@ REQUIRED_ENVIRONMENT_PATTERN = re.compile(r"^\$\{[A-Z][A-Z0-9_]*\?[^}]+\}$")
 SECRET_ENVIRONMENT_MARKERS = ("PASSWORD", "TOKEN", "SECRET", "API_KEY")
 INTERNAL_IMAGE_PREFIX = "ostrading/"
 APPLICATION_CONFIG_CONTAINER_PATH = "/workspace/config/application.yaml"
-APPLICATION_CONFIG_VOLUME = (
-    f"./application.compose.yaml:{APPLICATION_CONFIG_CONTAINER_PATH}:ro"
-)
+APPLICATION_CONFIG_VOLUME = f"./application.compose.yaml:{APPLICATION_CONFIG_CONTAINER_PATH}:ro"
 APPLICATION_SCHEMA_CONTAINER_PATH = "/workspace/config/application.schema.json"
-APPLICATION_SCHEMA_VOLUME = (
-    f"../../config/application.schema.json:{APPLICATION_SCHEMA_CONTAINER_PATH}:ro"
-)
-LLM_GATEWAY_LOCAL_SECRETS_VOLUME = (
-    "../../config/secrets/local:/workspace/config/secrets/local:ro"
-)
+APPLICATION_SCHEMA_VOLUME = f"../../config/application.schema.json:{APPLICATION_SCHEMA_CONTAINER_PATH}:ro"
+LLM_GATEWAY_LOCAL_SECRETS_VOLUME = "../../config/secrets/local:/workspace/config/secrets/local:ro"
 APPLICATION_CONFIG_ARGUMENTS = ("--config", APPLICATION_CONFIG_CONTAINER_PATH)
 FORBIDDEN_APPLICATION_ENVIRONMENT_KEYS = frozenset(
     (
@@ -104,13 +98,7 @@ HISTORICAL_GATEWAY_ENVIRONMENT_KEYS = (
 
 
 def _runtime_command(*arguments: str) -> tuple[str, ...]:
-    return (
-        "python",
-        "-m",
-        "app.platform.local_runtime",
-        *arguments,
-        *APPLICATION_CONFIG_ARGUMENTS,
-    )
+    return ("python", "-m", "app.platform.local_runtime", *arguments, *APPLICATION_CONFIG_ARGUMENTS)
 
 
 EXPECTED_SERVICE_COMMANDS = {
@@ -204,9 +192,7 @@ def parse_local_compose_document(document: str, source: str) -> LocalCompose:
         if not isinstance(service_id, str) or service_id.strip() == "":
             raise ValueError("Identifiant de service Compose invalide.")
         if service_id != service_id.strip():
-            raise ValueError(
-                f"Identifiant de service Compose non normalisé: {service_id}"
-            )
+            raise ValueError(f"Identifiant de service Compose non normalisé: {service_id}")
         if service_id in seen_service_ids:
             raise ValueError(f"Service Compose dupliqué: {service_id}")
         if not isinstance(service_payload, Mapping):
@@ -251,32 +237,20 @@ def validate_local_compose(compose: LocalCompose) -> None:
 
 
 def _parse_service(service_id: str, payload: Mapping[str, Any]) -> ComposeService:
-    environment_payload = _optional_mapping(
-        payload, "environment", f"service {service_id}"
-    )
+    environment_payload = _optional_mapping(payload, "environment", f"service {service_id}")
     environment: dict[str, str] = {}
     for key, value in environment_payload.items():
         if not isinstance(key, str) or key.strip() == "":
-            raise ValueError(
-                f"Variable d'environnement invalide pour service {service_id}."
-            )
+            raise ValueError(f"Variable d'environnement invalide pour service {service_id}.")
         if not isinstance(value, str):
-            raise ValueError(
-                f"Variable d'environnement non textuelle pour service {service_id}: {key}"
-            )
+            raise ValueError(f"Variable d'environnement non textuelle pour service {service_id}: {key}")
         if value.strip() == "":
-            raise ValueError(
-                f"Variable d'environnement vide pour service {service_id}: {key}"
-            )
+            raise ValueError(f"Variable d'environnement vide pour service {service_id}: {key}")
         if value != value.strip():
-            raise ValueError(
-                f"Variable d'environnement non normalisée pour service {service_id}: {key}"
-            )
+            raise ValueError(f"Variable d'environnement non normalisée pour service {service_id}: {key}")
         environment[key] = value
 
-    healthcheck_payload = _optional_mapping(
-        payload, "healthcheck", f"service {service_id}"
-    )
+    healthcheck_payload = _optional_mapping(payload, "healthcheck", f"service {service_id}")
 
     return ComposeService(
         id=service_id,
@@ -301,9 +275,7 @@ def _validate_services(compose: LocalCompose) -> None:
 
     for service in compose.services:
         if FORBIDDEN_MODEL_SERVICE_PATTERN.search(service.id):
-            raise ValueError(
-                f"Service Gemma/vLLM principal interdit dans Compose local: {service.id}"
-            )
+            raise ValueError(f"Service Gemma/vLLM principal interdit dans Compose local: {service.id}")
         if service.id not in REQUIRED_SERVICE_IDS:
             raise ValueError(f"Service Compose non prévu par M-002: {service.id}")
 
@@ -338,17 +310,10 @@ def _validate_secrets(compose: LocalCompose) -> None:
 
 
 def _validate_service_image(service: ComposeService) -> None:
-    if (
-        not service.image.startswith(INTERNAL_IMAGE_PREFIX)
-        and "@sha256:" not in service.image
-    ):
-        raise ValueError(
-            f"Image tierce sans digest pour service {service.id}: {service.image}"
-        )
+    if not service.image.startswith(INTERNAL_IMAGE_PREFIX) and "@sha256:" not in service.image:
+        raise ValueError(f"Image tierce sans digest pour service {service.id}: {service.image}")
     if not _is_pinned_image(service.image):
-        raise ValueError(
-            f"Image non épinglée pour service {service.id}: {service.image}"
-        )
+        raise ValueError(f"Image non épinglée pour service {service.id}: {service.image}")
 
 
 def _validate_service_ports(service: ComposeService) -> None:
@@ -357,9 +322,7 @@ def _validate_service_ports(service: ComposeService) -> None:
             raise ValueError("Port utilisateur absent pour edge-gateway.")
         for port in service.ports:
             if not port.startswith("127.0.0.1:"):
-                raise ValueError(
-                    f"Port utilisateur non lié à 127.0.0.1 pour edge-gateway: {port}"
-                )
+                raise ValueError(f"Port utilisateur non lié à 127.0.0.1 pour edge-gateway: {port}")
         return
 
     if len(service.ports) > 0:
@@ -421,15 +384,11 @@ def _validate_service_healthcheck(service: ComposeService) -> None:
 
     for field_name in ("interval", "timeout", "retries", "start_period"):
         if field_name not in service.healthcheck:
-            raise ValueError(
-                f"Healthcheck incomplet pour service {service.id}: {field_name}"
-            )
+            raise ValueError(f"Healthcheck incomplet pour service {service.id}: {field_name}")
 
     command_text = " ".join(str(item) for item in test)
     if service.read_only and ("touch " in command_text or ">" in command_text):
-        raise ValueError(
-            f"Healthcheck mutant interdit pour service read_only: {service.id}"
-        )
+        raise ValueError(f"Healthcheck mutant interdit pour service read_only: {service.id}")
 
 
 def _validate_service_application_configuration(service: ComposeService) -> None:
@@ -440,19 +399,13 @@ def _validate_service_application_configuration(service: ComposeService) -> None
         return
 
     if "--config" not in service.command:
-        raise ValueError(
-            f"Argument --config absent pour service applicatif: {service.id}"
-        )
+        raise ValueError(f"Argument --config absent pour service applicatif: {service.id}")
 
     config_index = service.command.index("--config")
     if config_index + 1 >= len(service.command):
-        raise ValueError(
-            f"Chemin --config absent pour service applicatif: {service.id}"
-        )
+        raise ValueError(f"Chemin --config absent pour service applicatif: {service.id}")
     if service.command[config_index + 1] != APPLICATION_CONFIG_CONTAINER_PATH:
-        raise ValueError(
-            f"Chemin --config invalide pour service applicatif: {service.id}"
-        )
+        raise ValueError(f"Chemin --config invalide pour service applicatif: {service.id}")
 
     if APPLICATION_CONFIG_VOLUME not in service.volumes:
         raise ValueError(
@@ -462,13 +415,8 @@ def _validate_service_application_configuration(service: ComposeService) -> None
         raise ValueError(
             f"Montage config/application.schema.json read-only absent pour service applicatif: {service.id}"
         )
-    if (
-        service.id == "llm-gateway"
-        and LLM_GATEWAY_LOCAL_SECRETS_VOLUME not in service.volumes
-    ):
-        raise ValueError(
-            "Montage config/secrets/local read-only absent pour service llm-gateway"
-        )
+    if service.id == "llm-gateway" and LLM_GATEWAY_LOCAL_SECRETS_VOLUME not in service.volumes:
+        raise ValueError("Montage config/secrets/local read-only absent pour service llm-gateway")
 
 
 def _validate_service_command(service: ComposeService) -> None:
@@ -481,36 +429,22 @@ def _validate_service_command(service: ComposeService) -> None:
     if service.command != expected_command:
         if service.id == "orchestrator-api" and service.command[0:1] == ("api",):
             raise ValueError("Commande Compose Uvicorn orchestrator-api invalide")
-        if (
-            len(service.command) >= 3
-            and service.command[0] == "python"
-            and service.command[1] == "-m"
-        ):
+        if len(service.command) >= 3 and service.command[0] == "python" and service.command[1] == "-m":
             module_name = service.command[2]
             if importlib.util.find_spec(module_name) is None:
-                raise ValueError(
-                    f"Commande Compose non exécutable pour service {service.id}: {module_name}"
-                )
+                raise ValueError(f"Commande Compose non exécutable pour service {service.id}: {module_name}")
         raise ValueError(f"Commande Compose invalide pour service {service.id}")
     if service.id in {"orchestrator-api", "worker-documents"}:
         return
-    if (
-        len(service.command) >= 3
-        and service.command[0] == "python"
-        and service.command[1] == "-m"
-    ):
+    if len(service.command) >= 3 and service.command[0] == "python" and service.command[1] == "-m":
         module_name = service.command[2]
         if importlib.util.find_spec(module_name) is None:
-            raise ValueError(
-                f"Commande Compose non exécutable pour service {service.id}: {module_name}"
-            )
+            raise ValueError(f"Commande Compose non exécutable pour service {service.id}: {module_name}")
         return
     raise ValueError(f"Commande Compose non exécutable pour service {service.id}")
 
 
-def _validate_service_networks(
-    service: ComposeService, networks: Mapping[str, Any]
-) -> None:
+def _validate_service_networks(service: ComposeService, networks: Mapping[str, Any]) -> None:
     if len(service.networks) == 0:
         raise ValueError(f"Réseau absent pour service: {service.id}")
 
@@ -531,24 +465,16 @@ def _validate_service_networks(
         raise ValueError(f"Réseau spark-egress interdit pour service: {service.id}")
 
 
-def _validate_service_secrets(
-    service: ComposeService, secrets: Mapping[str, Mapping[str, Any]]
-) -> None:
+def _validate_service_secrets(service: ComposeService, secrets: Mapping[str, Mapping[str, Any]]) -> None:
     for secret_id in service.secrets:
         if secret_id not in secrets:
-            raise ValueError(
-                f"Secret référencé absent pour service {service.id}: {secret_id}"
-            )
+            raise ValueError(f"Secret référencé absent pour service {service.id}: {secret_id}")
 
     if service.id == "llm-gateway":
         if SPARK_API_KEY_SECRET in service.secrets:
-            raise ValueError(
-                f"Secret Spark interdit pour llm-gateway: {SPARK_API_KEY_SECRET}"
-            )
+            raise ValueError(f"Secret Spark interdit pour llm-gateway: {SPARK_API_KEY_SECRET}")
         if SPARK_CA_SECRET in service.secrets:
-            raise ValueError(
-                f"Secret Spark interdit pour llm-gateway: {SPARK_CA_SECRET}"
-            )
+            raise ValueError(f"Secret Spark interdit pour llm-gateway: {SPARK_CA_SECRET}")
 
     if service.id == "postgres" and "postgres_password" not in service.secrets:
         raise ValueError("Secret PostgreSQL absent pour postgres: postgres_password")
@@ -557,69 +483,42 @@ def _validate_service_secrets(
 def _validate_service_environment(service: ComposeService) -> None:
     for key, value in service.environment.items():
         if _is_application_environment_key(key):
-            raise ValueError(
-                f"Variable applicative interdite pour service {service.id}: {key}"
-            )
+            raise ValueError(f"Variable applicative interdite pour service {service.id}: {key}")
         if service.id in APPLICATION_SERVICE_IDS:
-            raise ValueError(
-                f"Variable applicative interdite pour service {service.id}: {key}"
-            )
+            raise ValueError(f"Variable applicative interdite pour service {service.id}: {key}")
 
-        allowed_keys = ALLOWED_TECHNICAL_ENVIRONMENT_BY_SERVICE.get(
-            service.id, frozenset()
-        )
+        allowed_keys = ALLOWED_TECHNICAL_ENVIRONMENT_BY_SERVICE.get(service.id, frozenset())
         if key not in allowed_keys:
-            raise ValueError(
-                f"Variable non allowlistée pour service {service.id}: {key}"
-            )
+            raise ValueError(f"Variable non allowlistée pour service {service.id}: {key}")
 
         key_upper = key.upper()
-        is_secret_file_reference = key_upper.endswith("_FILE") or key_upper.endswith(
-            "_BUNDLE"
-        )
-        contains_secret_marker = any(
-            marker in key_upper for marker in SECRET_ENVIRONMENT_MARKERS
-        )
+        is_secret_file_reference = key_upper.endswith("_FILE") or key_upper.endswith("_BUNDLE")
+        contains_secret_marker = any(marker in key_upper for marker in SECRET_ENVIRONMENT_MARKERS)
 
         if contains_secret_marker and not is_secret_file_reference:
-            raise ValueError(
-                f"Secret en clair interdit pour service {service.id}: {key}"
-            )
+            raise ValueError(f"Secret en clair interdit pour service {service.id}: {key}")
 
         if key_upper.endswith("_FILE") and not value.startswith("/run/secrets/"):
-            raise ValueError(
-                f"Fichier secret invalide pour service {service.id}: {key}"
-            )
+            raise ValueError(f"Fichier secret invalide pour service {service.id}: {key}")
 
         if value.startswith("/run/secrets/"):
             continue
 
-        if (
-            service.id == "postgres"
-            and key in {"POSTGRES_DB", "POSTGRES_USER"}
-            and value == "ostrading"
-        ):
+        if service.id == "postgres" and key in {"POSTGRES_DB", "POSTGRES_USER"} and value == "ostrading":
             continue
 
         if not REQUIRED_ENVIRONMENT_PATTERN.match(value):
-            raise ValueError(
-                f"Variable non injectée explicitement pour service {service.id}: {key}"
-            )
+            raise ValueError(f"Variable non injectée explicitement pour service {service.id}: {key}")
 
         if ":-" in value or "-" in value.split("?", 1)[0]:
-            raise ValueError(
-                f"Valeur par défaut interdite pour service {service.id}: {key}"
-            )
-
+            raise ValueError(f"Valeur par défaut interdite pour service {service.id}: {key}")
 
 def _is_application_environment_key(key: str) -> bool:
     if key in FORBIDDEN_APPLICATION_ENVIRONMENT_KEYS:
         return True
     if key in HISTORICAL_GATEWAY_ENVIRONMENT_KEYS:
         return True
-    return any(
-        key.startswith(prefix) for prefix in FORBIDDEN_APPLICATION_ENVIRONMENT_PREFIXES
-    )
+    return any(key.startswith(prefix) for prefix in FORBIDDEN_APPLICATION_ENVIRONMENT_PREFIXES)
 
 
 def _is_pinned_image(image: str) -> bool:
@@ -760,29 +659,6 @@ def _parse_sequence(
                 raise ValueError(f"Valeur de liste YAML absente {source}:{line.number}")
             value, index = _parse_block(lines, next_index, indent + 2, source)
             sequence.append(value)
-        elif re.match(r"^[A-Za-z_][A-Za-z0-9_-]*:(?:\s|$)", raw_value):
-            item_end = index + 1
-            while item_end < len(lines) and lines[item_end].indent > indent:
-                item_end += 1
-            item_lines = (
-                _YamlLine(
-                    number=line.number,
-                    indent=indent + 2,
-                    text=raw_value,
-                ),
-                *lines[index + 1 : item_end],
-            )
-            value, parsed_end = _parse_mapping(
-                item_lines,
-                0,
-                indent + 2,
-                source,
-            )
-            if parsed_end != len(item_lines):
-                unexpected = item_lines[parsed_end]
-                raise ValueError(f"Ligne YAML inattendue {source}:{unexpected.number}")
-            sequence.append(value)
-            index = item_end
         else:
             sequence.append(_parse_scalar(raw_value, source, line.number))
             index += 1
@@ -840,9 +716,7 @@ def _required_text(payload: Mapping[str, Any], field_name: str, context: str) ->
     return value
 
 
-def _required_mapping(
-    payload: Mapping[str, Any], field_name: str, context: str
-) -> Mapping[str, Any]:
+def _required_mapping(payload: Mapping[str, Any], field_name: str, context: str) -> Mapping[str, Any]:
     if field_name not in payload:
         raise ValueError(f"Champ {field_name} absent pour {context}.")
 
@@ -854,9 +728,7 @@ def _required_mapping(
     return value
 
 
-def _optional_mapping(
-    payload: Mapping[str, Any], field_name: str, context: str
-) -> Mapping[str, Any]:
+def _optional_mapping(payload: Mapping[str, Any], field_name: str, context: str) -> Mapping[str, Any]:
     if field_name not in payload:
         return {}
 
@@ -866,9 +738,7 @@ def _optional_mapping(
     return value
 
 
-def _optional_text_list(
-    payload: Mapping[str, Any], field_name: str, context: str
-) -> tuple[str, ...]:
+def _optional_text_list(payload: Mapping[str, Any], field_name: str, context: str) -> tuple[str, ...]:
     if field_name not in payload:
         return ()
 
@@ -879,22 +749,16 @@ def _optional_text_list(
     values: list[str] = []
     for index, item in enumerate(value):
         if not isinstance(item, str):
-            raise ValueError(
-                f"Entrée {field_name}[{index}] non textuelle pour {context}."
-            )
+            raise ValueError(f"Entrée {field_name}[{index}] non textuelle pour {context}.")
         if item.strip() == "":
             raise ValueError(f"Entrée {field_name}[{index}] vide pour {context}.")
         if item != item.strip():
-            raise ValueError(
-                f"Entrée {field_name}[{index}] non normalisée pour {context}."
-            )
+            raise ValueError(f"Entrée {field_name}[{index}] non normalisée pour {context}.")
         values.append(item)
     return tuple(values)
 
 
-def _optional_env_file_list(
-    payload: Mapping[str, Any], field_name: str, context: str
-) -> tuple[str, ...]:
+def _optional_env_file_list(payload: Mapping[str, Any], field_name: str, context: str) -> tuple[str, ...]:
     if field_name not in payload:
         return ()
 

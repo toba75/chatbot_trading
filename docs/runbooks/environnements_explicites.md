@@ -176,28 +176,14 @@ restent couverts par les contrôles statiques et les sondes de readiness non
 mutatrices. La qualification live est volontairement explicite et coûteuse :
 
 Les seules boucles asynchrones publiées par ces piles sont les deux réplicas
-documentaires (`DIAGNOSE`, `CONVERT_DOCUMENT`, `CONVERT_PAGE`,
-`ASSEMBLE_CANONICAL_DOCUMENT`) et les deux réplicas de projection
-(`PROJECT_DOCUMENT`). La sélection `m014-page-fanout-v1` doit être explicite et
-les migrations 023 à 029 doivent précéder l’activation. Avant une route Granite,
-`nvidia-smi` doit prouver `cuda:0`; aucune alternative silencieuse n’est
-admise. `DEEP_RESEARCH`, `VERIFY_RESPONSE` et
+documentaires (`DIAGNOSE`, `CONVERT_DOCUMENT`) et les deux réplicas de
+projection (`PROJECT_DOCUMENT`). `DEEP_RESEARCH`, `VERIFY_RESPONSE` et
 `BACKTEST` restent indisponibles tant que leur chaîne API, outbox, relais,
 worker, progression et lecture publique n'est pas complète.
 
 ```console
 uv run --locked gate --scope m013_environments --live
-uv run --locked gate --scope m014_local_pipeline
-uv run --locked gate --scope m014_local_pipeline --live
 ```
-
-Ces commandes ciblées servent au diagnostic et aux sous-agents. Une preuve
-globale GREEN précédente reste réutilisable tant que `HEAD` et le worktree
-n’ont pas changé. L’orchestrateur lance exactement une gate globale de clôture
-par itération ou milestone, avec un timeout de 3 600 000 ms ; après yield il
-attend le même cell ID, sans relancer pour compenser une fenêtre courte. Un RED
-réel est d’abord isolé par scope, puis suivi d’une unique preuve globale après
-correctif.
 
 Sans `--live`, même une gate sans `--scope` exclut les nœuds live. Le parcours
 live repart d'une pile `test` vide : aucun volume étranger n'est un prérequis.

@@ -661,28 +661,6 @@ def _render_action_progress(
         raise ValueError("action de progression invalide")
     if phase not in {"NOT_REQUESTED", "QUEUED", "RUNNING", "SUCCEEDED", "FAILED"}:
         raise ValueError("phase de progression invalide")
-    if phase == "NOT_REQUESTED":
-        if (
-            action_name != "PROJECT_DOCUMENT"
-            or isinstance(completed_units, bool)
-            or not isinstance(completed_units, int)
-            or completed_units != 0
-            or total_units is not None
-            or failure_error_code is not None
-        ):
-            raise ValueError("progression NOT_REQUESTED invalide")
-        return (
-            "".join(
-                (
-                    '<section aria-live="polite" aria-label="Progression de l’action">',
-                    "<p>Projection automatique en attente : la publication canonique "
-                    "n’a pas encore été consommée par Knowledge Access.</p>",
-                    "<p>Phase : <code>NOT_REQUESTED</code></p>",
-                    "</section>",
-                )
-            ),
-            '<meta http-equiv="refresh" content="1">',
-        )
     if isinstance(completed_units, bool) or not isinstance(completed_units, int) or completed_units < 0:
         raise ValueError("unités réalisées invalides")
     if isinstance(total_units, bool) or not isinstance(total_units, int) or total_units < 1:

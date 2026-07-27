@@ -37,7 +37,6 @@ def _verifier_echec_gemma_relisible_publiquement() -> None:
 
     conversion = DocumentConversionState(
         document_id=DocumentId.from_value("DOC-4444444444444444"),
-        producer_environment_identity=_ENVIRONMENT_IDENTITY,
         conversion_status=DocumentConversionStatus.QA_REJECTED,
         canonical_version_id=None,
         rejection_error_code="GEMMA_VISION_UNAVAILABLE",
@@ -48,20 +47,13 @@ def _verifier_echec_gemma_relisible_publiquement() -> None:
     )
     progress = DocumentActionProgressView.from_conversion(
         conversion,
-        environment_identity=JobEnvironmentIdentity(
-            environment="test",
-            deployment_id="ostrading-test-current",
-            configuration_hash="b" * 64,
-        ),
+        environment_identity=_ENVIRONMENT_IDENTITY,
     )
 
     assert progress.phase is PublicActionPhase.FAILED
     assert progress.completed_units == 4
     assert progress.total_units == 289
     assert progress.failure_error_code == "GEMMA_VISION_UNAVAILABLE"
-    assert progress.environment == _ENVIRONMENT_IDENTITY.environment
-    assert progress.deployment_id == _ENVIRONMENT_IDENTITY.deployment_id
-    assert progress.configuration_hash == _ENVIRONMENT_IDENTITY.configuration_hash
 
 
 class _Queries:
