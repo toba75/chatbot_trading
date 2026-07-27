@@ -2,6 +2,10 @@ default_permissions = "ostrading-product"
 approval_policy = "on-request"
 approvals_reviewer = "user"
 web_search = "disabled"
+allow_login_shell = false
+
+[agents]
+enabled = false
 
 [features]
 apps = false
