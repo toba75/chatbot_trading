@@ -1,0 +1,23 @@
+default_permissions = "ostrading-product"
+approval_policy = "on-request"
+approvals_reviewer = "user"
+web_search = "disabled"
+
+[features]
+browser_use = false
+browser_use_full_cdp_access = false
+browser_use_external = false
+in_app_browser = false
+computer_use = false
+remote_plugin = false
+multi_agent = false
+
+[apps._default]
+enabled = false
+destructive_enabled = false
+open_world_enabled = false
+approvals_reviewer = "user"
+default_tools_approval_mode = "prompt"
+
+[mcp_servers.node_repl]
+enabled = false
