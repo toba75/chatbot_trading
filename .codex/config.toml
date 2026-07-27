@@ -1,4 +1,4 @@
-default_permissions = "ostrading-product"
+default_permissions = "ostrading-review"
 approval_policy = "never"
 approvals_reviewer = "user"
 web_search = "disabled"
