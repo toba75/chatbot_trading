@@ -1,6 +1,0 @@
-{
-  "schema_version": "1.0",
-  "tool": "ocrmypdf",
-  "tool_version": "17.8.0",
-  "image_reference": "jbarlow83/ocrmypdf@sha256:88d50f2ce7c054e5aacfc48794eca50dbb8af9a6ef1d2a540456dcd9a4687e42"
-}

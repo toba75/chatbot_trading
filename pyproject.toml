@@ -1,47 +1,21 @@
-[build-system]
-requires = ["setuptools==80.10.2"]
-build-backend = "setuptools.build_meta"
-
 [project]
 name = "chatbot-trading"
 version = "0.1.0"
+description = "Pipeline documentaire minimal fondé sur Docling"
 requires-python = "==3.12.8"
-dependencies = [
-    "docling[vlm]==2.111.0",
-    "fastapi==0.135.1",
-    "pydantic==2.13.4",
-    "pypdfium2==5.11.0",
-    "pillow==12.3.0",
-    "psycopg[binary]==3.2.13",
-    "pypdf==6.14.2",
-    "python-multipart==0.0.32",
-    "setuptools==80.10.2",
-    "starlette==1.3.1",
-    "uvicorn==0.41.0",
-    "cryptography==46.0.3",
-]
-
-[project.scripts]
-api = "app.platform.orchestrator_command:main"
-development = "app.platform.environment_command:development"
-test = "app.platform.environment_command:test"
-test-isolation = "app.platform.environment_command:test_isolation"
-production = "app.platform.environment_command:production"
-gate = "ost_gate.cli:main"
-backup-v1 = "ost_gate.operations.backup:main"
-restore-v1 = "ost_gate.operations.restore:main"
-rebuild-knowledge-projection = "ost_gate.operations.rebuild_knowledge_projection:main"
-preload-docling-native-assets = "app.source_processing.adapters.docling_native_assets:main"
-preload-docling-granite-assets = "app.source_processing.adapters.docling_granite_assets:main"
-preload-ocrmypdf-image = "app.source_processing.adapters.ocrmypdf_image_assets:main"
+dependencies = []
 
 [dependency-groups]
 dev = [
+    "docling-core==2.87.1",
     "pytest==8.4.2",
-    "pytest-timeout==2.4.0",
     "pytest-xdist==3.8.0",
+    "ruff==0.15.4",
 ]
 
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["app*", "ost_gate*"]
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["live: nécessite le conteneur Docling CUDA réellement démarré"]

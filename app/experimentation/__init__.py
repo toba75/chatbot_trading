@@ -1,1 +1,0 @@
-"""Contexte EX: expérimentation."""

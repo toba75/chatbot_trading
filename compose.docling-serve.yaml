@@ -1,0 +1,72 @@
+name: docling-serve-cuda
+
+services:
+  docling-serve:
+    image: quay.io/docling-project/docling-serve-cu130:v1.28.0@sha256:9a031c7d36088865a128e7c4419fee4ab03b2ac9a1e8eb207902a54fede68119
+    platform: linux/amd64
+    ports:
+      - "${DOCLING_SERVE_BIND_HOST:?DOCLING_SERVE_BIND_HOST requis}:${DOCLING_SERVE_PORT:?DOCLING_SERVE_PORT requis}:5001"
+    environment:
+      UVICORN_WORKERS: "1"
+      DOCLING_DEVICE: "${DOCLING_SERVE_DEVICE:?DOCLING_SERVE_DEVICE requis}"
+      DOCLING_NUM_THREADS: "${DOCLING_SERVE_NUM_THREADS:?DOCLING_SERVE_NUM_THREADS requis}"
+      DOCLING_PERF_PAGE_BATCH_SIZE: "${DOCLING_SERVE_PAGE_BATCH_SIZE:?DOCLING_SERVE_PAGE_BATCH_SIZE requis}"
+      DOCLING_SERVE_ARTIFACTS_PATH: /models
+      DOCLING_SERVE_SCRATCH_PATH: /scratch
+      DOCLING_SERVE_ENABLE_UI: "false"
+      DOCLING_SERVE_ENABLE_REMOTE_SERVICES: "false"
+      DOCLING_SERVE_ALLOW_EXTERNAL_PLUGINS: "false"
+      DOCLING_SERVE_ALLOW_CUSTOM_VLM_CONFIG: "false"
+      DOCLING_SERVE_ALLOWED_VLM_PRESETS: granite_docling
+      DOCLING_SERVE_ALLOWED_VLM_ENGINES: auto_inline
+      DOCLING_SERVE_DEFAULT_VLM_PRESET: granite_docling
+      DOCLING_SERVE_LOAD_MODELS_AT_BOOT: "false"
+      DOCLING_SERVE_ENG_KIND: local
+      DOCLING_SERVE_ENG_LOC_NUM_WORKERS: "${DOCLING_SERVE_LOCAL_WORKERS:?DOCLING_SERVE_LOCAL_WORKERS requis}"
+      DOCLING_SERVE_ENG_LOC_SHARE_MODELS: "true"
+      DOCLING_SERVE_OPTIONS_CACHE_SIZE: "${DOCLING_SERVE_OPTIONS_CACHE_SIZE:?DOCLING_SERVE_OPTIONS_CACHE_SIZE requis}"
+      DOCLING_SERVE_MAX_FILE_SIZE: "${DOCLING_SERVE_MAX_FILE_SIZE:?DOCLING_SERVE_MAX_FILE_SIZE requis}"
+      DOCLING_SERVE_MAX_NUM_PAGES: "${DOCLING_SERVE_MAX_NUM_PAGES:?DOCLING_SERVE_MAX_NUM_PAGES requis}"
+      DOCLING_SERVE_MAX_SYNC_WAIT: "${DOCLING_SERVE_MAX_SYNC_WAIT:?DOCLING_SERVE_MAX_SYNC_WAIT requis}"
+      DOCLING_SERVE_MAX_DOCUMENT_TIMEOUT: "${DOCLING_SERVE_MAX_DOCUMENT_TIMEOUT:?DOCLING_SERVE_MAX_DOCUMENT_TIMEOUT requis}"
+      DOCLING_SERVE_LOG_LEVEL: INFO
+      DOCLING_SERVE_DEBUG_ERROR_DETAILS: "false"
+      DOCLING_SERVE_SHOW_VERSION_INFO: "true"
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+      HF_HOME: /models
+      PYTHONNOUSERSITE: "1"
+      XDG_CACHE_HOME: /tmp/.cache
+      TORCHINDUCTOR_CACHE_DIR: /tmp/torchinductor
+      TRITON_CACHE_DIR: /triton-cache
+      NVIDIA_VISIBLE_DEVICES: "${DOCLING_SERVE_GPU_DEVICE_ID:?DOCLING_SERVE_GPU_DEVICE_ID requis}"
+    volumes:
+      - "${DOCLING_SERVE_ASSETS_PATH:?DOCLING_SERVE_ASSETS_PATH requis}:/models:ro"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids:
+                - "${DOCLING_SERVE_GPU_DEVICE_ID:?DOCLING_SERVE_GPU_DEVICE_ID requis}"
+              capabilities:
+                - gpu
+    cpus: "${DOCLING_SERVE_CPUS:?DOCLING_SERVE_CPUS requis}"
+    mem_limit: "${DOCLING_SERVE_MEMORY:?DOCLING_SERVE_MEMORY requis}"
+    pids_limit: "${DOCLING_SERVE_PIDS_LIMIT:?DOCLING_SERVE_PIDS_LIMIT requis}"
+    shm_size: "${DOCLING_SERVE_SHM_SIZE:?DOCLING_SERVE_SHM_SIZE requis}"
+    read_only: true
+    tmpfs:
+      - "/tmp:size=${DOCLING_SERVE_TMP_SIZE:?DOCLING_SERVE_TMP_SIZE requis},mode=1777"
+      - "/scratch:size=${DOCLING_SERVE_SCRATCH_SIZE:?DOCLING_SERVE_SCRATCH_SIZE requis},mode=0770,uid=1001,gid=0"
+      - "/triton-cache:size=${DOCLING_SERVE_TRITON_CACHE_SIZE:?DOCLING_SERVE_TRITON_CACHE_SIZE requis},mode=0770,uid=1001,gid=0,exec"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "python -c \"import json,urllib.request; h=json.load(urllib.request.urlopen('http://127.0.0.1:5001/health',timeout=5)); assert h['status']=='ok'\""
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 30s
+    init: true
+    restart: "no"
