@@ -32,10 +32,13 @@
   au besoin. N'utilise pas une dépendance lourde pour un problème simple et local.
 - N'introduis pas d'abstraction pour un seul usage. Extrais seulement la plus
   petite duplication réelle.
+- N'introduis pas de code défensif non sollicité par le développeur sans son accord 
+  explicite.
 - Vers 200 nouvelles lignes de production, relis et simplifie l'unité. Au-delà
   de 250 lignes pour une même responsabilité, arrête l'expansion, propose une
   décomposition et demande au développeur d'accepter l'exception ou le découpage.
   Ces seuils signalent un risque ; ils ne prouvent pas la qualité.
+- Au final il faut produire du "beau code"
 
 ## Préserver la vérité
 
@@ -59,6 +62,8 @@
 - Un objectif de charge de production ne devient jamais un test de qualification
   sans demande explicite du développeur.
 - Ne reconstruis pas une image Docker ou une base inchangée pour répéter un test.
+- N'utilise pas de stub ou mock pour des tests d'intégration. Stubs et mocks sont réservés aux
+  tests unitaires.
 
 ## Revue contradictoire
 
