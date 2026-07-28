@@ -2,5 +2,6 @@
 .pytest_cache/
 .ruff_cache/
 .venv/
+data/docling_assets/
 __pycache__/
 *.py[cod]
