@@ -1,0 +1,95 @@
+<main
+  class="document-page"
+  data-controller="cable-reconcile"
+  data-cable-reconcile-url-value="<%= document_path(@document) %>"
+>
+  <%= turbo_stream_from @document %>
+
+  <%= turbo_frame_tag @document, data: { cable_reconcile_target: "frame" } do %>
+    <header class="document-header">
+      <div>
+        <p class="eyebrow">Conversion Docling</p>
+        <h1><%= @document.source_pdf.filename %></h1>
+      </div>
+      <%= link_to "Nouveau document", root_path, class: "button secondary", data: { turbo_frame: "_top" } %>
+    </header>
+
+    <p class="elapsed-time">
+      Durée écoulée depuis l’envoi :
+      <%= tag.time "00:00:00", data: {
+        controller: "elapsed-time",
+        elapsed_time_started_at_value: @attempt.created_at.iso8601,
+        elapsed_time_ended_at_value: @attempt.completed_at&.iso8601
+      } %>
+    </p>
+
+    <% if @attempt.queued? || @attempt.converting? %>
+      <section class="status-card" aria-live="polite">
+        <span class="status-dot"></span>
+        <div>
+          <strong><%= @attempt.queued? ? "En attente" : "Conversion en cours" %></strong>
+          <p>La page se mettra à jour dès que l’état persistant changera.</p>
+        </div>
+      </section>
+    <% elsif @attempt.failed? %>
+      <section class="status-card error" role="alert">
+        <div>
+          <strong>La conversion a échoué</strong>
+          <p><%= @attempt.error_message %></p>
+          <code><%= @attempt.error_code %></code>
+        </div>
+      </section>
+      <%= render "attempt_outputs", attempt: @attempt, title: "Sorties conservées" %>
+      <%= button_to "Relancer le traitement", retry_document_path(@document), method: :post,
+        class: "button", data: { turbo_frame: "_top" } %>
+    <% else %>
+      <section class="quality-summary" aria-label="Résumé de la conversion">
+        <p><strong><%= @attempt.page_count %> pages</strong>, dont <%= @attempt.page_inventory.count { |page| page[:blank] } %> vide</p>
+        <p><strong><%= @attempt.picture_count %> images</strong> — pages <%= @attempt.picture_pages.to_sentence(two_words_connector: " et ", last_word_connector: " et ") %></p>
+      </section>
+
+      <section class="comparison" aria-label="Comparaison du document">
+        <article>
+          <h2>PDF original</h2>
+          <iframe title="PDF original" src="<%= rails_blob_path(@document.source_pdf, disposition: "inline") %>"></iframe>
+        </article>
+        <article>
+          <h2>Conversion HTML</h2>
+          <iframe title="Conversion HTML" sandbox="" src="<%= html_preview_document_path(@document) %>"></iframe>
+        </article>
+      </section>
+
+      <p class="notice">L’HTML et le Markdown suivent l’ordre de lecture ; le PDF reste la référence pour la géométrie et la mise en page.</p>
+
+      <section class="details-grid">
+        <article>
+          <h2>Pages canoniques</h2>
+          <ol class="page-list">
+            <% @attempt.page_inventory.each do |page| %>
+              <li>Page <%= page[:number] %><%= " — vide" if page[:blank] %></li>
+            <% end %>
+          </ol>
+        </article>
+        <details>
+          <summary>Markdown brut</summary>
+          <pre><%= @attempt.markdown.download.force_encoding(Encoding::UTF_8) %></pre>
+        </details>
+      </section>
+    <% end %>
+
+    <% if @previous_attempts.any? %>
+      <details class="attempt-history">
+        <summary>Historique des tentatives</summary>
+        <% @previous_attempts.each do |attempt| %>
+          <article>
+            <h2>Tentative du <%= l attempt.created_at, format: :long %> — <%= attempt.status %></h2>
+            <% if attempt.failed? %>
+              <p><%= attempt.error_message %> <code><%= attempt.error_code %></code></p>
+            <% end %>
+            <%= render "attempt_outputs", attempt: attempt, title: nil %>
+          </article>
+        <% end %>
+      </details>
+    <% end %>
+  <% end %>
+</main>

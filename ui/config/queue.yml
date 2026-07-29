@@ -1,0 +1,24 @@
+default: &default
+  dispatchers:
+    - polling_interval: <%= Float(ENV.fetch("SOLID_QUEUE_DISPATCHER_POLLING_INTERVAL")) %>
+      batch_size: <%= Integer(ENV.fetch("SOLID_QUEUE_DISPATCHER_BATCH_SIZE")) %>
+  workers:
+    - queues:
+        - default
+      threads: <%= Integer(ENV.fetch("SOLID_QUEUE_DEFAULT_THREADS")) %>
+      processes: <%= Integer(ENV.fetch("SOLID_QUEUE_DEFAULT_PROCESSES")) %>
+      polling_interval: <%= Float(ENV.fetch("SOLID_QUEUE_WORKER_POLLING_INTERVAL")) %>
+    - queues:
+        - conversions
+      threads: <%= Integer(ENV.fetch("SOLID_QUEUE_CONVERSION_THREADS")) %>
+      processes: <%= Integer(ENV.fetch("SOLID_QUEUE_CONVERSION_PROCESSES")) %>
+      polling_interval: <%= Float(ENV.fetch("SOLID_QUEUE_WORKER_POLLING_INTERVAL")) %>
+
+development:
+  <<: *default
+
+test:
+  <<: *default
+
+production:
+  <<: *default

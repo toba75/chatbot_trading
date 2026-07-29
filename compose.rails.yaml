@@ -1,0 +1,128 @@
+x-rails-environment: &rails_environment
+  RAILS_ENV: development
+  POSTGRES_HOST: postgres
+  POSTGRES_PORT: "5432"
+  POSTGRES_USER: "${RAILS_POSTGRES_USER:?RAILS_POSTGRES_USER requis}"
+  POSTGRES_PASSWORD: "${RAILS_POSTGRES_PASSWORD:?RAILS_POSTGRES_PASSWORD requis}"
+  PRIMARY_DATABASE: "${RAILS_PRIMARY_DATABASE:?RAILS_PRIMARY_DATABASE requis}"
+  CABLE_DATABASE: "${RAILS_CABLE_DATABASE:?RAILS_CABLE_DATABASE requis}"
+  TEST_PRIMARY_DATABASE: "${RAILS_TEST_PRIMARY_DATABASE:?RAILS_TEST_PRIMARY_DATABASE requis}"
+  TEST_CABLE_DATABASE: "${RAILS_TEST_CABLE_DATABASE:?RAILS_TEST_CABLE_DATABASE requis}"
+  RAILS_MAX_THREADS: "${RAILS_MAX_THREADS:?RAILS_MAX_THREADS requis}"
+  SOLID_CABLE_POLLING_INTERVAL: "${SOLID_CABLE_POLLING_INTERVAL:?SOLID_CABLE_POLLING_INTERVAL requis}"
+  SOLID_CABLE_MESSAGE_RETENTION_SECONDS: "${SOLID_CABLE_MESSAGE_RETENTION_SECONDS:?SOLID_CABLE_MESSAGE_RETENTION_SECONDS requis}"
+  SOLID_QUEUE_DEFAULT_THREADS: "${SOLID_QUEUE_DEFAULT_THREADS:?SOLID_QUEUE_DEFAULT_THREADS requis}"
+  SOLID_QUEUE_DEFAULT_PROCESSES: "${SOLID_QUEUE_DEFAULT_PROCESSES:?SOLID_QUEUE_DEFAULT_PROCESSES requis}"
+  SOLID_QUEUE_CONVERSION_THREADS: "${SOLID_QUEUE_CONVERSION_THREADS:?SOLID_QUEUE_CONVERSION_THREADS requis}"
+  SOLID_QUEUE_CONVERSION_PROCESSES: "${SOLID_QUEUE_CONVERSION_PROCESSES:?SOLID_QUEUE_CONVERSION_PROCESSES requis}"
+  SOLID_QUEUE_DISPATCHER_POLLING_INTERVAL: "${SOLID_QUEUE_DISPATCHER_POLLING_INTERVAL:?SOLID_QUEUE_DISPATCHER_POLLING_INTERVAL requis}"
+  SOLID_QUEUE_DISPATCHER_BATCH_SIZE: "${SOLID_QUEUE_DISPATCHER_BATCH_SIZE:?SOLID_QUEUE_DISPATCHER_BATCH_SIZE requis}"
+  SOLID_QUEUE_WORKER_POLLING_INTERVAL: "${SOLID_QUEUE_WORKER_POLLING_INTERVAL:?SOLID_QUEUE_WORKER_POLLING_INTERVAL requis}"
+  DOCLING_SERVE_URL: "${DOCLING_SERVE_URL:?DOCLING_SERVE_URL requis}"
+  DOCLING_OPEN_TIMEOUT_SECONDS: "${DOCLING_OPEN_TIMEOUT_SECONDS:?DOCLING_OPEN_TIMEOUT_SECONDS requis}"
+  DOCLING_READ_TIMEOUT_SECONDS: "${DOCLING_READ_TIMEOUT_SECONDS:?DOCLING_READ_TIMEOUT_SECONDS requis}"
+  DOCLING_DOCUMENT_TIMEOUT_SECONDS: "${DOCLING_DOCUMENT_TIMEOUT_SECONDS:?DOCLING_DOCUMENT_TIMEOUT_SECONDS requis}"
+  PDF_MAX_BYTES: "${PDF_MAX_BYTES:?PDF_MAX_BYTES requis}"
+  SYSTEM_TEST_APP_URL: "${SYSTEM_TEST_APP_URL:?SYSTEM_TEST_APP_URL requis}"
+  SYSTEM_TEST_WAIT_SECONDS: "${SYSTEM_TEST_WAIT_SECONDS:?SYSTEM_TEST_WAIT_SECONDS requis}"
+
+x-rails-volumes: &rails_volumes
+  - ./ui:/app
+  - ./reference:/reference:ro
+  - rails_storage:/app/storage
+
+services:
+  postgres:
+    image: postgres:18.4-bookworm@sha256:1961f96e6029a02c3812d7cb329a3b03a3ac2bb067058dec17b0f5596aca9296
+    environment:
+      POSTGRES_USER: "${RAILS_POSTGRES_USER:?RAILS_POSTGRES_USER requis}"
+      POSTGRES_PASSWORD: "${RAILS_POSTGRES_PASSWORD:?RAILS_POSTGRES_PASSWORD requis}"
+      POSTGRES_DB: "${RAILS_PRIMARY_DATABASE:?RAILS_PRIMARY_DATABASE requis}"
+    volumes:
+      - rails_postgres:/var/lib/postgresql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "pg_isready -U ${RAILS_POSTGRES_USER:?RAILS_POSTGRES_USER requis} -d ${RAILS_PRIMARY_DATABASE:?RAILS_PRIMARY_DATABASE requis}"
+      interval: 2s
+      timeout: 5s
+      retries: 30
+    cpus: "${RAILS_POSTGRES_CPUS:?RAILS_POSTGRES_CPUS requis}"
+    mem_limit: "${RAILS_POSTGRES_MEMORY:?RAILS_POSTGRES_MEMORY requis}"
+    pids_limit: "${RAILS_POSTGRES_PIDS_LIMIT:?RAILS_POSTGRES_PIDS_LIMIT requis}"
+    restart: "no"
+
+  setup:
+    image: chatbot-trading-ui:development
+    build:
+      context: ./ui
+    command: bundle exec rails db:prepare
+    environment: *rails_environment
+    volumes: *rails_volumes
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  web:
+    image: chatbot-trading-ui:development
+    command: bundle exec rails server --binding=0.0.0.0
+    environment: *rails_environment
+    volumes: *rails_volumes
+    ports:
+      - "127.0.0.1:${RAILS_PORT:?RAILS_PORT requis}:3000"
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+    cpus: "${RAILS_WEB_CPUS:?RAILS_WEB_CPUS requis}"
+    mem_limit: "${RAILS_WEB_MEMORY:?RAILS_WEB_MEMORY requis}"
+    pids_limit: "${RAILS_WEB_PIDS_LIMIT:?RAILS_WEB_PIDS_LIMIT requis}"
+    restart: "no"
+
+  jobs:
+    image: chatbot-trading-ui:development
+    command: bundle exec ruby bin/jobs
+    environment: *rails_environment
+    volumes: *rails_volumes
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+    cpus: "${RAILS_JOBS_CPUS:?RAILS_JOBS_CPUS requis}"
+    mem_limit: "${RAILS_JOBS_MEMORY:?RAILS_JOBS_MEMORY requis}"
+    pids_limit: "${RAILS_JOBS_PIDS_LIMIT:?RAILS_JOBS_PIDS_LIMIT requis}"
+    restart: "no"
+
+  test-setup:
+    image: chatbot-trading-ui:development
+    command: bundle exec rails db:prepare
+    environment:
+      <<: *rails_environment
+      RAILS_ENV: test
+    volumes: *rails_volumes
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+    profiles:
+      - test
+    restart: "no"
+
+  test:
+    image: chatbot-trading-ui:development
+    command: bundle exec rails test
+    environment:
+      <<: *rails_environment
+      RAILS_ENV: test
+    volumes:
+      - ./ui:/app
+      - ./reference:/reference:ro
+    tmpfs:
+      - /app/tmp/storage:size=512m,mode=1777
+    depends_on:
+      test-setup:
+        condition: service_completed_successfully
+    profiles:
+      - test
+
+volumes:
+  rails_postgres:
+  rails_storage:

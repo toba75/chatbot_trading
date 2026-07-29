@@ -1,0 +1,17 @@
+<% outputs = {
+  "Réponse Docling brute" => attempt.docling_response,
+  "DoclingDocument" => attempt.docling_document,
+  "DocTags" => attempt.doctags,
+  "HTML" => attempt.html,
+  "Markdown" => attempt.markdown
+  }.select { |_label, attachment| attachment.attached? } %>
+<% if outputs.any? %>
+  <section class="failure-outputs">
+    <% if title %><h2><%= title %></h2><% end %>
+    <ul>
+      <% outputs.each do |label, attachment| %>
+        <li><%= link_to label, rails_blob_path(attachment, disposition: "attachment") %></li>
+      <% end %>
+    </ul>
+  </section>
+<% end %>

@@ -1,0 +1,5 @@
+fr:
+  application_name: "Conversion PDF"
+  time:
+    formats:
+      long: "%d/%m/%Y à %H:%M:%S"

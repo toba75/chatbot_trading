@@ -1,0 +1,45 @@
+<% status_labels = {
+  "queued" => "En attente",
+  "converting" => "Conversion en cours",
+  "succeeded" => "Terminée",
+  "failed" => "Échec"
+} %>
+
+<main
+  class="documents-index"
+  data-controller="cable-reconcile"
+  data-cable-reconcile-url-value="<%= documents_path %>"
+>
+  <%= turbo_stream_from "documents" %>
+
+  <%= turbo_frame_tag "documents_index", target: "_top", data: { cable_reconcile_target: "frame" } do %>
+    <header class="document-header">
+      <div>
+        <p class="eyebrow">Docling · Granite CUDA</p>
+        <h1>Documents</h1>
+      </div>
+      <%= link_to "Nouveau document", root_path, class: "button" %>
+    </header>
+
+    <% if @documents.empty? %>
+      <p class="notice">Aucun document n’a encore été envoyé.</p>
+    <% else %>
+      <ol class="document-list">
+        <% @documents.each do |document| %>
+          <% attempt = document.current_attempt %>
+          <%= turbo_stream_from document if attempt.queued? || attempt.converting? %>
+          <li>
+            <%= link_to document_path(document), class: "document-link" do %>
+              <strong><%= document.source_pdf.filename %></strong>
+              <span>
+                Document <%= document.id %> ·
+                <%= status_labels.fetch(attempt.status) %> ·
+                <time datetime="<%= document.created_at.iso8601 %>"><%= document.created_at.strftime("%d/%m/%Y %H:%M") %></time>
+              </span>
+            <% end %>
+          </li>
+        <% end %>
+      </ol>
+    <% end %>
+  <% end %>
+</main>

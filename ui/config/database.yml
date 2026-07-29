@@ -1,0 +1,38 @@
+default: &default
+  adapter: postgresql
+  encoding: unicode
+  host: <%= ENV.fetch("POSTGRES_HOST") %>
+  port: <%= Integer(ENV.fetch("POSTGRES_PORT")) %>
+  username: <%= ENV.fetch("POSTGRES_USER") %>
+  password: <%= ENV.fetch("POSTGRES_PASSWORD") %>
+  max_connections: <%= Integer(ENV.fetch("RAILS_MAX_THREADS")) %>
+
+development:
+  primary:
+    <<: *default
+    database: <%= ENV.fetch("PRIMARY_DATABASE") %>
+  cable:
+    <<: *default
+    database: <%= ENV.fetch("CABLE_DATABASE") %>
+    migrations_paths: db/cable_migrate
+    schema_dump: cable_schema.rb
+
+test:
+  primary:
+    <<: *default
+    database: <%= ENV.fetch("TEST_PRIMARY_DATABASE") %>
+  cable:
+    <<: *default
+    database: <%= ENV.fetch("TEST_CABLE_DATABASE") %>
+    migrations_paths: db/cable_migrate
+    schema_dump: cable_schema.rb
+
+production:
+  primary:
+    <<: *default
+    database: <%= ENV.fetch("PRIMARY_DATABASE") %>
+  cable:
+    <<: *default
+    database: <%= ENV.fetch("CABLE_DATABASE") %>
+    migrations_paths: db/cable_migrate
+    schema_dump: cable_schema.rb

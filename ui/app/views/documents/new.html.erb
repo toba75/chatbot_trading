@@ -1,0 +1,19 @@
+<main class="upload-page">
+  <section class="upload-card">
+    <p class="eyebrow">Docling · Granite CUDA</p>
+    <h1>Vérifier la conversion d’un PDF</h1>
+    <p class="lead">Déposez un document pour comparer son contenu original aux représentations Docling conservées sans simplification.</p>
+
+    <% if @upload_error %>
+      <p class="form-error" role="alert"><%= @upload_error %></p>
+    <% end %>
+
+    <%= form_with url: documents_path, scope: :document, class: "upload-form" do |form| %>
+      <%= form.label :source_pdf, "Document PDF" %>
+      <%= form.file_field :source_pdf, accept: "application/pdf,.pdf", required: true %>
+      <%= form.submit "Lancer la conversion", class: "button" %>
+    <% end %>
+
+    <%= link_to "Voir les documents", documents_path, class: "button secondary document-list-link" %>
+  </section>
+</main>

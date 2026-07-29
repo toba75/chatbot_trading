@@ -1,0 +1,12 @@
+require "test_helper"
+
+class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
+  driven_by :selenium, using: :headless_chrome, screen_size: [ 1440, 1000 ] do |options|
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+  end
+
+  Capybara.run_server = false
+  Capybara.app_host = ENV.fetch("SYSTEM_TEST_APP_URL")
+  Capybara.default_max_wait_time = Integer(ENV.fetch("SYSTEM_TEST_WAIT_SECONDS"))
+end

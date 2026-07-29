@@ -1,0 +1,7 @@
+.bundle
+.env*
+config/*.key
+log/*
+storage/*
+tmp/*
+public/assets

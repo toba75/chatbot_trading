@@ -1,0 +1,16 @@
+default: &default
+  adapter: solid_cable
+  connects_to:
+    database:
+      writing: cable
+  polling_interval: <%= "#{Float(ENV.fetch("SOLID_CABLE_POLLING_INTERVAL"))}.seconds" %>
+  message_retention: <%= "#{Integer(ENV.fetch("SOLID_CABLE_MESSAGE_RETENTION_SECONDS"))}.seconds" %>
+
+development:
+  <<: *default
+
+test:
+  <<: *default
+
+production:
+  <<: *default

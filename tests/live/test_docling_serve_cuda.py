@@ -80,10 +80,11 @@ def test_docling_serve_converts_the_whole_pdf_with_granite() -> None:
                 "to_formats": ["json", "doctags"],
                 "pipeline": "vlm",
                 "vlm_pipeline_preset": "default",
-                "document_timeout": 180,
+                "document_timeout": 86400,
                 "abort_on_error": True,
-                "include_images": True,
-                "include_page_images": False,
+                "include_images": False,
+                "include_page_images": True,
+                "images_scale": 2.0,
                 "image_export_mode": "placeholder",
             },
             "target": {"kind": "inbody"},
@@ -112,10 +113,16 @@ def test_docling_serve_converts_the_whole_pdf_with_granite() -> None:
     document = DoclingDocument.model_validate(document_payload)
     assert list(document.pages) == [1, 2, 3, 4, 5]
     assert [page.page_no for page in document.pages.values()] == [1, 2, 3, 4, 5]
+    assert all(page.image is not None for page in document.pages.values())
     assert document.validate_tree(document.body, raise_on_error=True)
     assert len(document.texts) == 7
     assert len(document.tables) == 1
     assert len(document.pictures) == 2
+    for picture in document.pictures:
+        assert picture.image is not None
+        provenance = picture.prov[0]
+        assert abs(picture.image.size.width - provenance.bbox.width) <= 1
+        assert abs(picture.image.size.height - provenance.bbox.height) <= 1
     content_pages = {
         provenance.page_no
         for items in (document.texts, document.tables, document.pictures)
@@ -191,6 +198,8 @@ def _running_service() -> tuple[str, Path]:
         "HF_HUB_OFFLINE": "1",
         "TRANSFORMERS_OFFLINE": "1",
         "UVICORN_WORKERS": "1",
+        "DOCLING_SERVE_MAX_DOCUMENT_TIMEOUT": "86400",
+        "DOCLING_SERVE_MAX_SYNC_WAIT": "86700",
     }.items() <= environment.items()
     device_requests = container["HostConfig"]["DeviceRequests"]
     assert len(device_requests) == 1

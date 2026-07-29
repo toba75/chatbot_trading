@@ -76,9 +76,9 @@ flowchart LR
 - Rails ne tourne jamais directement sur l'hôte, y compris en développement et
   pendant les tests. Une image Linux commune fournit Ruby, Rails et les gems aux
   services `web`, `jobs` et aux commandes de test.
-- Ruby 3.4.7 sert de version initiale de l'image. Une version stable de Rails 8
-  compatible est choisie au démarrage de l'implémentation puis figée dans
-  `Gemfile.lock` ; l'image de base est elle aussi épinglée par digest.
+- Ruby 4.0.6 et Rails 8.1.3 sont figés dans l’image et `Gemfile.lock` ; ils
+  constituaient leurs dernières versions stables compatibles au démarrage de
+  l’implémentation. L’image de base est elle aussi épinglée par digest.
 - Un seul service PostgreSQL. Chaque environnement Rails possède une base
   principale isolée (`development` ou `test`) pour le métier, Active Storage et
   Solid Queue, ainsi qu'une base `cable` séparée réservée à Solid Cable. Cette
@@ -110,23 +110,35 @@ flowchart LR
 
 ## Contrat de données
 
-### Modèle `Document`
+### Modèles `Document` et `ConversionAttempt`
 
-Champs applicatifs minimaux :
+`Document` conserve l’identité et les octets originaux du PDF. Chaque lancement
+ou relance crée une `ConversionAttempt` distincte rattachée au même document,
+afin de ne jamais écraser un résultat ou un échec antérieur.
+
+Champs applicatifs minimaux de `Document` :
+
+| Champ | Rôle |
+| --- | --- |
+| `source_sha256` | Identité du PDF reçu |
+
+Pièce jointe Active Storage de `Document` :
+
+- `source_pdf` : octets originaux immuables.
+
+Champs applicatifs minimaux de `ConversionAttempt` :
 
 | Champ | Rôle |
 | --- | --- |
 | `status` | `queued`, `converting`, `succeeded` ou `failed` |
-| `source_sha256` | Identité du PDF reçu |
 | `conversion_options` | Options Docling exactes, en `jsonb` |
 | `page_count` | Nombre de pages annoncé par le DoclingDocument terminé |
 | `processing_seconds` | Durée fournie par Docling, si présente |
 | `started_at` / `completed_at` | Horodatage réel des transitions |
 | `error_code` / `error_message` | Erreur terminale bornée et présentable |
 
-Pièces jointes Active Storage :
+Pièces jointes Active Storage de `ConversionAttempt` :
 
-- `source_pdf` : octets originaux immuables ;
 - `docling_response` : réponse JSON brute complète ;
 - `docling_document` : `document.json_content` canonique ;
 - `doctags` : `document.doctags_content` exact ;
@@ -157,7 +169,7 @@ L'appel multipart transmet le PDF et demande au minimum :
 - les formats `json`, `html`, `md` et `doctags` dans la même conversion ;
 - l'arrêt sur erreur ;
 - un marqueur de saut de page distinctif dans le Markdown ;
-- `include_images=true`, `include_page_images=false` et
+- `include_images=false`, `include_page_images=true`, `images_scale=2.0` et
   `image_export_mode=embedded` ;
 - le délai document configuré pour Rails et cohérent avec celui du serveur.
 
@@ -327,7 +339,7 @@ non résolu proprement par ce socle.
   Queue conserve lui aussi la preuve d'échec.
 - Aucun appel à Turbo ou Action Cable n'est autorisé dans le contrôleur, le job
   ou le client Docling.
-- Tester les transitions, la complétude atomique et l'absence de retry.
+- Tester les transitions, la complétude atomique et l'absence de retry automatique.
 
 ### 5. Brancher Hotwire sur Active Record avec Solid Cable
 
@@ -371,7 +383,7 @@ non résolu proprement par ce socle.
   le Markdown brut est accessible à la demande et que les six fichiers sont
   conservés.
 - Arrêter Docling lors d'un second essai et vérifier l'état terminal `failed`,
-  sans retry ni fallback.
+  sans retry automatique ni fallback.
 - Mettre alors seulement `README.md` et `PROCESS.md` en conformité avec le
   pipeline réellement construit.
 
@@ -404,7 +416,8 @@ le besoin avant d'ajouter une couche.
 - authentification, comptes ou droits d'accès ;
 - édition ou correction du Markdown ;
 - Qdrant, recherche, embeddings ou découpage sémantique ;
-- conversions multiples, réordonnancement, reprise manuelle ou déduplication ;
+- conversions parallèles volontaires du même document, réordonnancement ou
+  déduplication ;
 - plusieurs serveurs Granite ou régulation distribuée ;
 - rendu du Markdown en HTML et synchronisation du défilement PDF/HTML ;
 - stockage objet distant, déploiement de production ou observabilité complète ;
@@ -418,7 +431,7 @@ le besoin avant d'ajouter une couche.
   persistant, après un broadcast ou la réconciliation d'une connexion Cable ;
 - le développement et tous les tests Rails s'exécutent dans Docker à partir de
   l'image commune ;
-- aucun polling navigateur, Redis, retry ou fallback n'existe ;
+- aucun polling navigateur, Redis, retry automatique ou fallback n'existe ;
 - les données brutes et les projections sont toutes récupérables après
   redémarrage ;
 - les tests ciblés restent rapides et la qualification réelle est distincte ;
