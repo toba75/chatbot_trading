@@ -1,0 +1,2139 @@
+{
+  "command": "python source-render-proof/verify_all_glyphs.py",
+  "coverage": {
+    "agl_mapped": 4088,
+    "cff_charstrings": 4088,
+    "encoding_named": 4088,
+    "gid_matches": 4088,
+    "gid_mismatches": 0,
+    "rawdict_ambiguous": 0,
+    "rawdict_assignments": 4088,
+    "rawdict_missing": 0,
+    "source_codes": 4088,
+    "to_unicode_absent": 4067,
+    "to_unicode_conflicts": 21,
+    "to_unicode_matches": 0,
+    "to_unicode_present": 21,
+    "trace_glyphs": 4088,
+    "trace_unicode_matches": 4068,
+    "trace_unicode_mismatches": 20
+  },
+  "pages": [
+    {
+      "box": [
+        0.0,
+        0.0,
+        540.0,
+        666.1420288085938
+      ],
+      "coverage": {
+        "agl_mapped": 2161,
+        "cff_charstrings": 2161,
+        "encoding_named": 2161,
+        "gid_matches": 2161,
+        "gid_mismatches": 0,
+        "rawdict_ambiguous": 0,
+        "rawdict_assignments": 2161,
+        "rawdict_missing": 0,
+        "source_codes": 2161,
+        "to_unicode_absent": 2161,
+        "to_unicode_conflicts": 0,
+        "to_unicode_matches": 0,
+        "to_unicode_present": 0,
+        "trace_glyphs": 2161,
+        "trace_unicode_matches": 2161,
+        "trace_unicode_mismatches": 0
+      },
+      "font_usage": {
+        "/Ty10": 12,
+        "/Ty11": 45,
+        "/Ty12": 19,
+        "/Ty13": 1,
+        "/Ty14": 80,
+        "/Ty15": 6,
+        "/Ty3": 55,
+        "/Ty4": 1795,
+        "/Ty5": 127,
+        "/Ty6": 1,
+        "/Ty7": 6,
+        "/Ty8": 8,
+        "/Ty9": 6
+      },
+      "fonts": {
+        "/Ty10": {
+          "base_font": "/QNDLZQ+LMMathItalic7-Regular",
+          "embedded_font": {
+            "bytes": 1249,
+            "charset": [
+              ".notdef",
+              "D",
+              "N",
+              "i",
+              "j",
+              "k"
+            ],
+            "subtype": "/Type1C"
+          },
+          "encoding": {
+            "base": "/MacRomanEncoding",
+            "differences": []
+          },
+          "resource": "/Ty10",
+          "subtype": "/Type1",
+          "to_unicode": {},
+          "trace_font": "LMMathItalic7-Regular",
+          "xref": 22
+        },
+        "/Ty11": {
+          "base_font": "/FISVAW+LMMathItalic10-Regular",
+          "embedded_font": {
+            "bytes": 3873,
+            "charset": [
+              ".notdef",
+              "period",
+              "comma",
+              "C",
+              "D",
+              "N",
+              "a",
+              "b",
+              "f",
+              "i",
+              "j",
+              "k",
+              "m",
+              "n",
+              "o",
+              "p",
+              "s",
+              "t",
+              "w",
+              "x",
+              "y"
+            ],
+            "subtype": "/Type1C"
+          },
+          "encoding": {
+            "base": "/MacRomanEncoding",
+            "differences": []
+          },
+          "resource": "/Ty11",
+          "subtype": "/Type1",
+          "to_unicode": {},
+          "trace_font": "LMMathItalic10-Regular",
+          "xref": 25
+        },
+        "/Ty12": {
+          "base_font": "/OTONFS+LMRoman7-Regular",
+          "embedded_font": {
+            "bytes": 948,
+            "charset": [
+              ".notdef",
+              "equal",
+              "one",
+              "parenleft",
+              "parenright",
+              "three",
+              "two"
+            ],
+            "subtype": "/Type1C"
+          },
+          "encoding": {
+            "base": "/MacRomanEncoding",
+            "differences": []
+          },
+          "resource": "/Ty12",
+          "subtype": "/Type1",
+          "to_unicode": {},
+          "trace_font": "LMRoman7-Regular",
+          "xref": 28
+        },
+        "/Ty13": {
+          "base_font": "/RYKUGZ+LMRoman6-Regular",
+          "embedded_font": {
+            "bytes": 506,
+            "charset": [
+              ".notdef",
+              "one",
+              "two"
+            ],
+            "subtype": "/Type1C"
+          },
+          "encoding": {
+            "base": "/MacRomanEncoding",
+            "differences": []
+          },
+          "resource": "/Ty13",
+          "subtype": "/Type1",
+          "to_unicode": {},
+          "trace_font": "LMRoman6-Regular",
+          "xref": 29
+        },
+        "/Ty14": {
+          "base_font": "/LEOGOS+LMRoman8-Regular",
+          "embedded_font": {
+            "bytes": 4537,
+            "charset": [
+              ".notdef",
+              "a",
+              "b",
+              "c",
+              "colon",
+              "comma",
+              "d",
+              "e",
+              "f",
+              "fi",
+              "fl",
+              "g",
+              "H",
+              "h",
+              "hyphen",
+              "I",
+              "k",
+              "l",
+              "m",
+              "n",
+              "o",
+              "p",
+              "period",
+              "r",
+              "s",
+              "T",
+              "t",
+              "u",
+              "v",
+              "w",
+              "x",
+              "y",
+              "i"
+            ],
+            "subtype": "/Type1C"
+          },
+          "encoding": {
+            "base": "/MacRomanEncoding",
+            "differences": []
+          },
+          "resource": "/Ty14",
+          "subtype": "/Type1",
+          "to_unicode": {},
+          "trace_font": "LMRoman8-Regular",
+          "xref": 32
+        },
+        "/Ty15": {
+          "base_font": "/FXVJUB+LMRoman8-Bold",
+          "embedded_font": {
+            "bytes": 875,
+            "charset": [
+              ".notdef",
+              "b",
+              "d",
+              "l",
+              "n",
+              "o",
+              "i"
+            ],
+            "subtype": "/Type1C"
+          },
+          "encoding": {
+            "base": "/MacRomanEncoding",
+            "differences": []
+          },
+          "resource": "/Ty15",
+          "subtype": "/Type1",
+          "to_unicode": {},
+          "trace_font": "LMRoman8-Bold",
+          "xref": 35
+        },
+        "/Ty3": {
+          "base_font": "/MVSOHN+LMRoman12-Bold",
+          "embedded_font": {
+            "bytes": 4598,
+            "charset": [
+              ".notdef",
+              "a",
+              "c",
+              "D",
+              "d",
+              "e",
+              "f",
+              "four",
+              "g",
+              "H",
+              "h",
+              "I",
+              "k",
+              "L",
+              "l",
+              "M",
+              "N",
+              "n",
+              "o",
+              "one",
+              "p",
+              "period",
+              "r",
+              "S",
+              "s",
+              "T",
+              "t",
+              "three",
+              "two",
+              "u",
+              "v",
+              "W",
+              "w",
+              "y",
+              "i"
+            ],
+            "subtype": "/Type1C"
+          },
+          "encoding": {
+            "base": "/MacRomanEncoding",
+            "differences": []
+          },
+          "resource": "/Ty3",
+          "subtype": "/Type1",
+          "to_unicode": {},
+          "trace_font": "LMRoman12-Bold",
+          "xref": 5
+        },
+        "/Ty4": {
+          "base_font": "/BKSOEQ+LMRoman10-Regular",
+          "embedded_font": {
+            "bytes": 10091,
+            "charset": [
+              ".notdef",
+              "A",
+              "a",
+              "B",
+              "b",
+              "bracketleft",
+              "bracketright",
+              "bullet",
+              "C",
+              "c",
+              "colon",
+              "comma",
+              "D",
+              "d",
+              "E",
+              "e",
+              "eight",
+              "emdash",
+              "equal",
+              "F",
+              "f",
+              "fi",
+              "five",
+              "fl",
+              "four",
+              "G",
+              "g",
+              "H",
+              "h",
+              "hyphen",
+              "I",
+              "k",
+              "L",
+              "l",
+              "M",
+              "m",
+              "N",
+              "n",
+              "nine",
+              "O",
+              "o",
+              "one",
+              "P",
+              "p",
+              "parenleft",
+              "parenright",
+              "period",
+              "plus",
+              "q",
+              "question",
+              "quoteright",
+              "R",
+              "r",
+              "S",
+              "s",
+              "semicolon",
+              "seven",
+              "six",
+              "slash",
+              "T",
+              "t",
+              "three",
+              "two",
+              "U",
+              "u",
+              "underscore",
+              "V",
+              "v",
+              "W",
+              "w",
+              "x",
+              "Y",
+              "y",
+              "z",
+              "zero",
+              "i",
+              "j",
+              "quotedblleft",
+              "quotedblright"
+            ],
+            "subtype": "/Type1C"
+          },
+          "encoding": {
+            "base": "/MacRomanEncoding",
+            "differences": []
+          },
+          "resource": "/Ty4",
+          "subtype": "/Type1",
+          "to_unicode": {},
+          "trace_font": "LMRoman10-Regular",
+          "xref": 8
+        },
+        "/Ty5": {
+          "base_font": "/JAIFYZ+LMRoman10-Bold",
+          "embedded_font": {
+            "bytes": 4715,
+            "charset": [
+              ".notdef",
+              "a",
+              "b",
+              "c",
+              "d",
+              "e",
+              "f",
+              "four",
+              "g",
+              "h",
+              "hyphen",
+              "k",
+              "L",
+              "l",
+              "M",
+              "m",
+              "n",
+              "o",
+              "one",
+              "p",
+              "period",
+              "R",
+              "r",
+              "S",
+              "s",
+              "t",
+              "three",
+              "two",
+              "U",
+              "u",
+              "V",
+              "v",
+              "w",
+              "x",
+              "y",
+              "z",
+              "i"
+            ],
+            "subtype": "/Type1C"
+          },
+          "encoding": {
+            "base": "/MacRomanEncoding",
+            "differences": []
+          },
+          "resource": "/Ty5",
+          "subtype": "/Type1",
+          "to_unicode": {},
+          "trace_font": "LMRoman10-Bold",
+          "xref": 11
+        },
+        "/Ty6": {
+          "base_font": "/OTONFS+LMRoman7-Regular",
+          "embedded_font": {
+            "bytes": 948,
+            "charset": [
+              ".notdef",
+              "equal",
+              "one",
+              "parenleft",
+              "parenright",
+              "three",
+              "two"
+            ],
+            "subtype": "/Type1C"
+          },
+          "encoding": {
+            "base": "/MacRomanEncoding",
+            "differences": []
+          },
+          "resource": "/Ty6",
+          "subtype": "/Type1",
+          "to_unicode": {},
+          "trace_font": "LMRoman7-Regular",
+          "xref": 14
+        },
+        "/Ty7": {
+          "base_font": "/AAAAAH+LMMathSymbols10-Regular",
+          "embedded_font": {
+            "bytes": 648,
+            "charset": [
+              ".notdef",
+              "braceleft",
+              "braceright"
+            ],
+            "subtype": "/Type1C"
+          },
+          "encoding": {
+            "base": "/MacRomanEncoding",
+            "differences": []
+          },
+          "resource": "/Ty7",
+          "subtype": "/Type1",
+          "to_unicode": {},
+          "trace_font": "LMMathSymbols10-Regular",
+          "xref": 17
+        },
+        "/Ty8": {
+          "base_font": "/BKSOEQ+LMRoman10-Regular",
+          "embedded_font": {
+            "bytes": 10091,
+            "charset": [
+              ".notdef",
+              "A",
+              "a",
+              "B",
+              "b",
+              "bracketleft",
+              "bracketright",
+              "bullet",
+              "C",
+              "c",
+              "colon",
+              "comma",
+              "D",
+              "d",
+              "E",
+              "e",
+              "eight",
+              "emdash",
+              "equal",
+              "F",
+              "f",
+              "fi",
+              "five",
+              "fl",
+              "four",
+              "G",
+              "g",
+              "H",
+              "h",
+              "hyphen",
+              "I",
+              "k",
+              "L",
+              "l",
+              "M",
+              "m",
+              "N",
+              "n",
+              "nine",
+              "O",
+              "o",
+              "one",
+              "P",
+              "p",
+              "parenleft",
+              "parenright",
+              "period",
+              "plus",
+              "q",
+              "question",
+              "quoteright",
+              "R",
+              "r",
+              "S",
+              "s",
+              "semicolon",
+              "seven",
+              "six",
+              "slash",
+              "T",
+              "t",
+              "three",
+              "two",
+              "U",
+              "u",
+              "underscore",
+              "V",
+              "v",
+              "W",
+              "w",
+              "x",
+              "Y",
+              "y",
+              "z",
+              "zero",
+              "i",
+              "j",
+              "quotedblleft",
+              "quotedblright"
+            ],
+            "subtype": "/Type1C"
+          },
+          "encoding": {
+            "base": "/MacRomanEncoding",
+            "differences": []
+          },
+          "resource": "/Ty8",
+          "subtype": "/Type1",
+          "to_unicode": {},
+          "trace_font": "LMRoman10-Regular",
+          "xref": 20
+        },
+        "/Ty9": {
+          "base_font": "/JAIFYZ+LMRoman10-Bold",
+          "embedded_font": {
+            "bytes": 4715,
+            "charset": [
+              ".notdef",
+              "a",
+              "b",
+              "c",
+              "d",
+              "e",
+              "f",
+              "four",
+              "g",
+              "h",
+              "hyphen",
+              "k",
+              "L",
+              "l",
+              "M",
+              "m",
+              "n",
+              "o",
+              "one",
+              "p",
+              "period",
+              "R",
+              "r",
+              "S",
+              "s",
+              "t",
+              "three",
+              "two",
+              "U",
+              "u",
+              "V",
+              "v",
+              "w",
+              "x",
+              "y",
+              "z",
+              "i"
+            ],
+            "subtype": "/Type1C"
+          },
+          "encoding": {
+            "base": "/MacRomanEncoding",
+            "differences": []
+          },
+          "resource": "/Ty9",
+          "subtype": "/Type1",
+          "to_unicode": {},
+          "trace_font": "LMRoman10-Bold",
+          "xref": 21
+        }
+      },
+      "layout": {
+        "rawdict_characters": 2588,
+        "rawdict_text_blocks": 15,
+        "trace_characters": 2161,
+        "trace_unicode_matches": 2161,
+        "trace_unicode_mismatches": 0
+      },
+      "operation_counts": [
+        {
+          "count": 132,
+          "operator": "BT"
+        },
+        {
+          "count": 132,
+          "operator": "ET"
+        },
+        {
+          "count": 3,
+          "operator": "Q"
+        },
+        {
+          "count": 1,
+          "operator": "S"
+        },
+        {
+          "count": 70,
+          "operator": "TJ"
+        },
+        {
+          "count": 42,
+          "operator": "Tc"
+        },
+        {
+          "count": 104,
+          "operator": "Tf"
+        },
+        {
+          "count": 62,
+          "operator": "Tj"
+        },
+        {
+          "count": 132,
+          "operator": "Tm"
+        },
+        {
+          "count": 1,
+          "operator": "W"
+        },
+        {
+          "count": 1,
+          "operator": "cm"
+        },
+        {
+          "count": 1,
+          "operator": "g"
+        },
+        {
+          "count": 1,
+          "operator": "l"
+        },
+        {
+          "count": 1,
+          "operator": "m"
+        },
+        {
+          "count": 1,
+          "operator": "n"
+        },
+        {
+          "count": 3,
+          "operator": "q"
+        },
+        {
+          "count": 1,
+          "operator": "re"
+        },
+        {
+          "count": 1,
+          "operator": "w"
+        }
+      ],
+      "page": 1,
+      "rotation": 0,
+      "sequence_sha256": "bee86b42abf65c7e6fd8815ad2a34a232675df2b137f98fb1ae399cda7795153",
+      "to_unicode_conflicts": []
+    },
+    {
+      "box": [
+        0.0,
+        0.0,
+        540.0,
+        666.1420288085938
+      ],
+      "coverage": {
+        "agl_mapped": 1927,
+        "cff_charstrings": 1927,
+        "encoding_named": 1927,
+        "gid_matches": 1927,
+        "gid_mismatches": 0,
+        "rawdict_ambiguous": 0,
+        "rawdict_assignments": 1927,
+        "rawdict_missing": 0,
+        "source_codes": 1927,
+        "to_unicode_absent": 1906,
+        "to_unicode_conflicts": 21,
+        "to_unicode_matches": 0,
+        "to_unicode_present": 21,
+        "trace_glyphs": 1927,
+        "trace_unicode_matches": 1907,
+        "trace_unicode_mismatches": 20
+      },
+      "font_usage": {
+        "/Ty10": 10,
+        "/Ty11": 37,
+        "/Ty12": 16,
+        "/Ty16": 1,
+        "/Ty17": 2,
+        "/Ty18": 12,
+        "/Ty19": 10,
+        "/Ty21": 8,
+        "/Ty4": 1724,
+        "/Ty5": 31,
+        "/Ty8": 52,
+        "/Ty9": 24
+      },
+      "fonts": {
+        "/Ty10": {
+          "base_font": "/QNDLZQ+LMMathItalic7-Regular",
+          "embedded_font": {
+            "bytes": 1249,
+            "charset": [
+              ".notdef",
+              "D",
+              "N",
+              "i",
+              "j",
+              "k"
+            ],
+            "subtype": "/Type1C"
+          },
+          "encoding": {
+            "base": "/MacRomanEncoding",
+            "differences": []
+          },
+          "resource": "/Ty10",
+          "subtype": "/Type1",
+          "to_unicode": {},
+          "trace_font": "LMMathItalic7-Regular",
+          "xref": 22
+        },
+        "/Ty11": {
+          "base_font": "/FISVAW+LMMathItalic10-Regular",
+          "embedded_font": {
+            "bytes": 3873,
+            "charset": [
+              ".notdef",
+              "period",
+              "comma",
+              "C",
+              "D",
+              "N",
+              "a",
+              "b",
+              "f",
+              "i",
+              "j",
+              "k",
+              "m",
+              "n",
+              "o",
+              "p",
+              "s",
+              "t",
+              "w",
+              "x",
+              "y"
+            ],
+            "subtype": "/Type1C"
+          },
+          "encoding": {
+            "base": "/MacRomanEncoding",
+            "differences": []
+          },
+          "resource": "/Ty11",
+          "subtype": "/Type1",
+          "to_unicode": {},
+          "trace_font": "LMMathItalic10-Regular",
+          "xref": 25
+        },
+        "/Ty12": {
+          "base_font": "/OTONFS+LMRoman7-Regular",
+          "embedded_font": {
+            "bytes": 948,
+            "charset": [
+              ".notdef",
+              "equal",
+              "one",
+              "parenleft",
+              "parenright",
+              "three",
+              "two"
+            ],
+            "subtype": "/Type1C"
+          },
+          "encoding": {
+            "base": "/MacRomanEncoding",
+            "differences": []
+          },
+          "resource": "/Ty12",
+          "subtype": "/Type1",
+          "to_unicode": {},
+          "trace_font": "LMRoman7-Regular",
+          "xref": 28
+        },
+        "/Ty16": {
+          "base_font": "/AAAAAD+LMRoman10-Regular",
+          "embedded_font": {
+            "bytes": 510,
+            "charset": [
+              ".notdef",
+              "ff"
+            ],
+            "subtype": "/Type1C"
+          },
+          "encoding": {
+            "base": "/StandardEncoding",
+            "differences": [
+              {
+                "code": 33,
+                "code_hex": "0x21",
+                "glyph_name": "ff"
+              }
+            ]
+          },
+          "resource": "/Ty16",
+          "subtype": "/Type1",
+          "to_unicode": {
+            "0x21": "\u0000"
+          },
+          "trace_font": "LMRoman10-Regular",
+          "xref": 49
+        },
+        "/Ty17": {
+          "base_font": "/BKSOEQ+LMRoman10-Regular",
+          "embedded_font": {
+            "bytes": 10091,
+            "charset": [
+              ".notdef",
+              "A",
+              "a",
+              "B",
+              "b",
+              "bracketleft",
+              "bracketright",
+              "bullet",
+              "C",
+              "c",
+              "colon",
+              "comma",
+              "D",
+              "d",
+              "E",
+              "e",
+              "eight",
+              "emdash",
+              "equal",
+              "F",
+              "f",
+              "fi",
+              "five",
+              "fl",
+              "four",
+              "G",
+              "g",
+              "H",
+              "h",
+              "hyphen",
+              "I",
+              "k",
+              "L",
+              "l",
+              "M",
+              "m",
+              "N",
+              "n",
+              "nine",
+              "O",
+              "o",
+              "one",
+              "P",
+              "p",
+              "parenleft",
+              "parenright",
+              "period",
+              "plus",
+              "q",
+              "question",
+              "quoteright",
+              "R",
+              "r",
+              "S",
+              "s",
+              "semicolon",
+              "seven",
+              "six",
+              "slash",
+              "T",
+              "t",
+              "three",
+              "two",
+              "U",
+              "u",
+              "underscore",
+              "V",
+              "v",
+              "W",
+              "w",
+              "x",
+              "Y",
+              "y",
+              "z",
+              "zero",
+              "i",
+              "j",
+              "quotedblleft",
+              "quotedblright"
+            ],
+            "subtype": "/Type1C"
+          },
+          "encoding": {
+            "base": "/MacRomanEncoding",
+            "differences": []
+          },
+          "resource": "/Ty17",
+          "subtype": "/Type1",
+          "to_unicode": {},
+          "trace_font": "LMRoman10-Regular",
+          "xref": 61
+        },
+        "/Ty18": {
+          "base_font": "/AAAABF+LMMathSymbols10-Regular",
+          "embedded_font": {
+            "bytes": 711,
+            "charset": [
+              ".notdef",
+              "minus",
+              "lessequal",
+              "greaterequal",
+              "bardbl"
+            ],
+            "subtype": "/Type1C"
+          },
+          "encoding": {
+            "base": "/StandardEncoding",
+            "differences": [
+              {
+                "code": 33,
+                "code_hex": "0x21",
+                "glyph_name": "minus"
+              },
+              {
+                "code": 34,
+                "code_hex": "0x22",
+                "glyph_name": "greaterequal"
+              },
+              {
+                "code": 35,
+                "code_hex": "0x23",
+                "glyph_name": "lessequal"
+              },
+              {
+                "code": 36,
+                "code_hex": "0x24",
+                "glyph_name": "bardbl"
+              }
+            ]
+          },
+          "resource": "/Ty18",
+          "subtype": "/Type1",
+          "to_unicode": {
+            "0x21": "≠",
+            "0x22": "Ø",
+            "0x23": "Æ",
+            "0x24": "Î"
+          },
+          "trace_font": "LMMathSymbols10-Regular",
+          "xref": 53
+        },
+        "/Ty19": {
+          "base_font": "/KYLCEB+LMRoman10-Italic",
+          "embedded_font": {
+            "bytes": 6236,
+            "charset": [
+              ".notdef",
+              "A",
+              "a",
+              "B",
+              "b",
+              "C",
+              "c",
+              "comma",
+              "d",
+              "e",
+              "f",
+              "G",
+              "g",
+              "h",
+              "k",
+              "l",
+              "M",
+              "m",
+              "n",
+              "o",
+              "P",
+              "p",
+              "period",
+              "r",
+              "s",
+              "t",
+              "u",
+              "w",
+              "x",
+              "y",
+              "z",
+              "i",
+              "j",
+              "quotedblleft",
+              "quotedblright"
+            ],
+            "subtype": "/Type1C"
+          },
+          "encoding": {
+            "base": "/MacRomanEncoding",
+            "differences": []
+          },
+          "resource": "/Ty19",
+          "subtype": "/Type1",
+          "to_unicode": {},
+          "trace_font": "LMRoman10-Italic",
+          "xref": 46
+        },
+        "/Ty21": {
+          "base_font": "/AAAAAP+LMMathSymbols7-Regular",
+          "embedded_font": {
+            "bytes": 698,
+            "charset": [
+              ".notdef",
+              "asteriskmath",
+              "bardbl",
+              "element"
+            ],
+            "subtype": "/Type1C"
+          },
+          "encoding": {
+            "base": "/StandardEncoding",
+            "differences": [
+              {
+                "code": 33,
+                "code_hex": "0x21",
+                "glyph_name": "asteriskmath"
+              },
+              {
+                "code": 34,
+                "code_hex": "0x22",
+                "glyph_name": "bardbl"
+              }
+            ]
+          },
+          "resource": "/Ty21",
+          "subtype": "/Type1",
+          "to_unicode": {
+            "0x21": "ú",
+            "0x22": "Î"
+          },
+          "trace_font": "LMMathSymbols7-Regular",
+          "xref": 57
+        },
+        "/Ty4": {
+          "base_font": "/BKSOEQ+LMRoman10-Regular",
+          "embedded_font": {
+            "bytes": 10091,
+            "charset": [
+              ".notdef",
+              "A",
+              "a",
+              "B",
+              "b",
+              "bracketleft",
+              "bracketright",
+              "bullet",
+              "C",
+              "c",
+              "colon",
+              "comma",
+              "D",
+              "d",
+              "E",
+              "e",
+              "eight",
+              "emdash",
+              "equal",
+              "F",
+              "f",
+              "fi",
+              "five",
+              "fl",
+              "four",
+              "G",
+              "g",
+              "H",
+              "h",
+              "hyphen",
+              "I",
+              "k",
+              "L",
+              "l",
+              "M",
+              "m",
+              "N",
+              "n",
+              "nine",
+              "O",
+              "o",
+              "one",
+              "P",
+              "p",
+              "parenleft",
+              "parenright",
+              "period",
+              "plus",
+              "q",
+              "question",
+              "quoteright",
+              "R",
+              "r",
+              "S",
+              "s",
+              "semicolon",
+              "seven",
+              "six",
+              "slash",
+              "T",
+              "t",
+              "three",
+              "two",
+              "U",
+              "u",
+              "underscore",
+              "V",
+              "v",
+              "W",
+              "w",
+              "x",
+              "Y",
+              "y",
+              "z",
+              "zero",
+              "i",
+              "j",
+              "quotedblleft",
+              "quotedblright"
+            ],
+            "subtype": "/Type1C"
+          },
+          "encoding": {
+            "base": "/MacRomanEncoding",
+            "differences": []
+          },
+          "resource": "/Ty4",
+          "subtype": "/Type1",
+          "to_unicode": {},
+          "trace_font": "LMRoman10-Regular",
+          "xref": 8
+        },
+        "/Ty5": {
+          "base_font": "/JAIFYZ+LMRoman10-Bold",
+          "embedded_font": {
+            "bytes": 4715,
+            "charset": [
+              ".notdef",
+              "a",
+              "b",
+              "c",
+              "d",
+              "e",
+              "f",
+              "four",
+              "g",
+              "h",
+              "hyphen",
+              "k",
+              "L",
+              "l",
+              "M",
+              "m",
+              "n",
+              "o",
+              "one",
+              "p",
+              "period",
+              "R",
+              "r",
+              "S",
+              "s",
+              "t",
+              "three",
+              "two",
+              "U",
+              "u",
+              "V",
+              "v",
+              "w",
+              "x",
+              "y",
+              "z",
+              "i"
+            ],
+            "subtype": "/Type1C"
+          },
+          "encoding": {
+            "base": "/MacRomanEncoding",
+            "differences": []
+          },
+          "resource": "/Ty5",
+          "subtype": "/Type1",
+          "to_unicode": {},
+          "trace_font": "LMRoman10-Bold",
+          "xref": 11
+        },
+        "/Ty8": {
+          "base_font": "/BKSOEQ+LMRoman10-Regular",
+          "embedded_font": {
+            "bytes": 10091,
+            "charset": [
+              ".notdef",
+              "A",
+              "a",
+              "B",
+              "b",
+              "bracketleft",
+              "bracketright",
+              "bullet",
+              "C",
+              "c",
+              "colon",
+              "comma",
+              "D",
+              "d",
+              "E",
+              "e",
+              "eight",
+              "emdash",
+              "equal",
+              "F",
+              "f",
+              "fi",
+              "five",
+              "fl",
+              "four",
+              "G",
+              "g",
+              "H",
+              "h",
+              "hyphen",
+              "I",
+              "k",
+              "L",
+              "l",
+              "M",
+              "m",
+              "N",
+              "n",
+              "nine",
+              "O",
+              "o",
+              "one",
+              "P",
+              "p",
+              "parenleft",
+              "parenright",
+              "period",
+              "plus",
+              "q",
+              "question",
+              "quoteright",
+              "R",
+              "r",
+              "S",
+              "s",
+              "semicolon",
+              "seven",
+              "six",
+              "slash",
+              "T",
+              "t",
+              "three",
+              "two",
+              "U",
+              "u",
+              "underscore",
+              "V",
+              "v",
+              "W",
+              "w",
+              "x",
+              "Y",
+              "y",
+              "z",
+              "zero",
+              "i",
+              "j",
+              "quotedblleft",
+              "quotedblright"
+            ],
+            "subtype": "/Type1C"
+          },
+          "encoding": {
+            "base": "/MacRomanEncoding",
+            "differences": []
+          },
+          "resource": "/Ty8",
+          "subtype": "/Type1",
+          "to_unicode": {},
+          "trace_font": "LMRoman10-Regular",
+          "xref": 20
+        },
+        "/Ty9": {
+          "base_font": "/JAIFYZ+LMRoman10-Bold",
+          "embedded_font": {
+            "bytes": 4715,
+            "charset": [
+              ".notdef",
+              "a",
+              "b",
+              "c",
+              "d",
+              "e",
+              "f",
+              "four",
+              "g",
+              "h",
+              "hyphen",
+              "k",
+              "L",
+              "l",
+              "M",
+              "m",
+              "n",
+              "o",
+              "one",
+              "p",
+              "period",
+              "R",
+              "r",
+              "S",
+              "s",
+              "t",
+              "three",
+              "two",
+              "U",
+              "u",
+              "V",
+              "v",
+              "w",
+              "x",
+              "y",
+              "z",
+              "i"
+            ],
+            "subtype": "/Type1C"
+          },
+          "encoding": {
+            "base": "/MacRomanEncoding",
+            "differences": []
+          },
+          "resource": "/Ty9",
+          "subtype": "/Type1",
+          "to_unicode": {},
+          "trace_font": "LMRoman10-Bold",
+          "xref": 21
+        }
+      },
+      "layout": {
+        "rawdict_characters": 2326,
+        "rawdict_text_blocks": 16,
+        "trace_characters": 1927,
+        "trace_unicode_matches": 1907,
+        "trace_unicode_mismatches": 20
+      },
+      "operation_counts": [
+        {
+          "count": 183,
+          "operator": "BT"
+        },
+        {
+          "count": 183,
+          "operator": "ET"
+        },
+        {
+          "count": 2,
+          "operator": "Q"
+        },
+        {
+          "count": 69,
+          "operator": "TJ"
+        },
+        {
+          "count": 56,
+          "operator": "Tc"
+        },
+        {
+          "count": 161,
+          "operator": "Tf"
+        },
+        {
+          "count": 116,
+          "operator": "Tj"
+        },
+        {
+          "count": 183,
+          "operator": "Tm"
+        },
+        {
+          "count": 1,
+          "operator": "W"
+        },
+        {
+          "count": 1,
+          "operator": "g"
+        },
+        {
+          "count": 1,
+          "operator": "n"
+        },
+        {
+          "count": 2,
+          "operator": "q"
+        },
+        {
+          "count": 1,
+          "operator": "re"
+        }
+      ],
+      "page": 2,
+      "rotation": 0,
+      "sequence_sha256": "bded608f4398369f13e3019e3a243fb539ded2dced06db23077f7c7fc80559f7",
+      "to_unicode_conflicts": [
+        {
+          "agl_codepoints": [
+            "U+FB00"
+          ],
+          "agl_unicode": "ﬀ",
+          "code": 33,
+          "code_hex": "0x21",
+          "font_resource": "/Ty16",
+          "glyph_name": "ff",
+          "occurrences": 1,
+          "operation_indices": [
+            33
+          ],
+          "page": 2,
+          "to_unicode": "\u0000",
+          "to_unicode_codepoints": [
+            "U+0000"
+          ]
+        },
+        {
+          "agl_codepoints": [
+            "U+2212"
+          ],
+          "agl_unicode": "−",
+          "code": 33,
+          "code_hex": "0x21",
+          "font_resource": "/Ty18",
+          "glyph_name": "minus",
+          "occurrences": 10,
+          "operation_indices": [
+            107,
+            330,
+            385,
+            529,
+            604,
+            783,
+            827,
+            893,
+            904,
+            937
+          ],
+          "page": 2,
+          "to_unicode": "≠",
+          "to_unicode_codepoints": [
+            "U+2260"
+          ]
+        },
+        {
+          "agl_codepoints": [
+            "U+2217"
+          ],
+          "agl_unicode": "∗",
+          "code": 33,
+          "code_hex": "0x21",
+          "font_resource": "/Ty21",
+          "glyph_name": "asteriskmath",
+          "occurrences": 8,
+          "operation_indices": [
+            413,
+            428,
+            519,
+            539,
+            567,
+            582,
+            628,
+            643
+          ],
+          "page": 2,
+          "to_unicode": "ú",
+          "to_unicode_codepoints": [
+            "U+00FA"
+          ]
+        },
+        {
+          "agl_codepoints": [
+            "U+2265"
+          ],
+          "agl_unicode": "≥",
+          "code": 34,
+          "code_hex": "0x22",
+          "font_resource": "/Ty18",
+          "glyph_name": "greaterequal",
+          "occurrences": 1,
+          "operation_indices": [
+            837
+          ],
+          "page": 2,
+          "to_unicode": "Ø",
+          "to_unicode_codepoints": [
+            "U+00D8"
+          ]
+        },
+        {
+          "agl_codepoints": [
+            "U+2264"
+          ],
+          "agl_unicode": "≤",
+          "code": 35,
+          "code_hex": "0x23",
+          "font_resource": "/Ty18",
+          "glyph_name": "lessequal",
+          "occurrences": 1,
+          "operation_indices": [
+            904
+          ],
+          "page": 2,
+          "to_unicode": "Æ",
+          "to_unicode_codepoints": [
+            "U+00C6"
+          ]
+        }
+      ]
+    }
+  ],
+  "pdf": {
+    "bytes": 54206,
+    "filename": "source-pages-7-10.pdf",
+    "pages": 2,
+    "sha256": "219c2064ba9292d286f4b3bcc65eb9e94b418705c51b9f98f54f2ad70321ddf1"
+  },
+  "proofs": {
+    "minus": {
+      "cff_outline": {
+        "bounds": [
+          83,
+          230,
+          694,
+          270
+        ],
+        "interpretation": "une barre horizontale sans diagonale",
+        "path": [
+          {
+            "operator": "moveTo",
+            "points": [
+              [
+                694,
+                250
+              ]
+            ]
+          },
+          {
+            "operator": "curveTo",
+            "points": [
+              [
+                694,
+                270
+              ],
+              [
+                675,
+                270
+              ],
+              [
+                661,
+                270
+              ]
+            ]
+          },
+          {
+            "operator": "lineTo",
+            "points": [
+              [
+                116,
+                270
+              ]
+            ]
+          },
+          {
+            "operator": "curveTo",
+            "points": [
+              [
+                102,
+                270
+              ],
+              [
+                83,
+                270
+              ],
+              [
+                83,
+                250
+              ]
+            ]
+          },
+          {
+            "operator": "curveTo",
+            "points": [
+              [
+                83,
+                230
+              ],
+              [
+                102,
+                230
+              ],
+              [
+                116,
+                230
+              ]
+            ]
+          },
+          {
+            "operator": "lineTo",
+            "points": [
+              [
+                661,
+                230
+              ]
+            ]
+          },
+          {
+            "operator": "curveTo",
+            "points": [
+              [
+                675,
+                230
+              ],
+              [
+                694,
+                230
+              ],
+              [
+                694,
+                250
+              ]
+            ]
+          },
+          {
+            "operator": "closePath",
+            "points": []
+          }
+        ]
+      },
+      "first_occurrence": {
+        "agl_codepoints": [
+          "U+2212"
+        ],
+        "agl_unicode": "−",
+        "cff_gid": 1,
+        "code": 33,
+        "code_hex": "0x21",
+        "font_resource": "/Ty18",
+        "glyph_name": "minus",
+        "operation_index": 107,
+        "rawdict": {
+          "block": 2,
+          "block_bbox": [
+            244.0679931640625,
+            151.0093994140625,
+            295.9346008300781,
+            171.8611297607422
+          ],
+          "char": 1,
+          "line": 0,
+          "line_bbox": [
+            244.0679931640625,
+            151.0093994140625,
+            295.9346008300781,
+            171.8611297607422
+          ],
+          "span": 1
+        },
+        "rendered": {
+          "bbox": [
+            260.6619873046875,
+            157.8468780517578,
+            268.41290283203125,
+            167.80947875976562
+          ],
+          "font": "LMMathSymbols10-Regular",
+          "gid": 1,
+          "origin": [
+            260.6619873046875,
+            162.29702758789062
+          ],
+          "seqno": 19,
+          "size": 9.962599754333496,
+          "unicode": 8800,
+          "unicode_codepoints": [
+            "U+2260"
+          ],
+          "unicode_matches_agl": false,
+          "unicode_text": "≠"
+        },
+        "sequence_index": 451,
+        "text_matrix": [
+          9.9626,
+          0.0,
+          0.0,
+          9.9626,
+          260.662,
+          503.845
+        ]
+      },
+      "font": {
+        "base_font": "/AAAABF+LMMathSymbols10-Regular",
+        "embedded_font": {
+          "bytes": 711,
+          "charset": [
+            ".notdef",
+            "minus",
+            "lessequal",
+            "greaterequal",
+            "bardbl"
+          ],
+          "subtype": "/Type1C"
+        },
+        "encoding": {
+          "base": "/StandardEncoding",
+          "differences": [
+            {
+              "code": 33,
+              "code_hex": "0x21",
+              "glyph_name": "minus"
+            },
+            {
+              "code": 34,
+              "code_hex": "0x22",
+              "glyph_name": "greaterequal"
+            },
+            {
+              "code": 35,
+              "code_hex": "0x23",
+              "glyph_name": "lessequal"
+            },
+            {
+              "code": 36,
+              "code_hex": "0x24",
+              "glyph_name": "bardbl"
+            }
+          ]
+        },
+        "resource": "/Ty18",
+        "subtype": "/Type1",
+        "to_unicode": {
+          "0x21": "≠",
+          "0x22": "Ø",
+          "0x23": "Æ",
+          "0x24": "Î"
+        },
+        "trace_font": "LMMathSymbols10-Regular",
+        "xref": 53
+      },
+      "occurrences": 10,
+      "page": 2
+    },
+    "x_k": {
+      "base_x": {
+        "agl_codepoints": [
+          "U+0078"
+        ],
+        "agl_unicode": "x",
+        "cff_gid": 33,
+        "code": 120,
+        "code_hex": "0x78",
+        "font_resource": "/Ty9",
+        "glyph_name": "x",
+        "operation_index": 420,
+        "rawdict": {
+          "block": 11,
+          "block_bbox": [
+            70.86599731445312,
+            406.9333801269531,
+            470.5236511230469,
+            487.56109619140625
+          ],
+          "char": 0,
+          "line": 1,
+          "line_bbox": [
+            112.85900115966797,
+            406.9333801269531,
+            469.1389465332031,
+            422.6051940917969
+          ],
+          "span": 18
+        },
+        "rendered": {
+          "bbox": [
+            316.81500244140625,
+            410.3164978027344,
+            322.8623046875,
+            420.27911376953125
+          ],
+          "font": "LMRoman10-Bold",
+          "gid": 33,
+          "origin": [
+            316.81500244140625,
+            418.22100830078125
+          ],
+          "seqno": 81,
+          "size": 9.962599754333496,
+          "unicode": 120,
+          "unicode_codepoints": [
+            "U+0078"
+          ],
+          "unicode_matches_agl": true,
+          "unicode_text": "x"
+        },
+        "sequence_index": 1317,
+        "text_matrix": [
+          9.9626,
+          0.0,
+          0.0,
+          9.9626,
+          316.815,
+          247.921
+        ]
+      },
+      "font": {
+        "base_font": "/QNDLZQ+LMMathItalic7-Regular",
+        "embedded_font": {
+          "bytes": 1249,
+          "charset": [
+            ".notdef",
+            "D",
+            "N",
+            "i",
+            "j",
+            "k"
+          ],
+          "subtype": "/Type1C"
+        },
+        "encoding": {
+          "base": "/MacRomanEncoding",
+          "differences": []
+        },
+        "resource": "/Ty10",
+        "subtype": "/Type1",
+        "to_unicode": {},
+        "trace_font": "LMMathItalic7-Regular",
+        "xref": 22
+      },
+      "geometric_relation": {
+        "k_baseline_below_x": 1.495025634765625,
+        "x_end_minus_k_start": 0.001312255859375
+      },
+      "page": 1,
+      "subscript_k": {
+        "agl_codepoints": [
+          "U+006B"
+        ],
+        "agl_unicode": "k",
+        "cff_gid": 5,
+        "code": 107,
+        "code_hex": "0x6b",
+        "font_resource": "/Ty10",
+        "glyph_name": "k",
+        "operation_index": 425,
+        "rawdict": {
+          "block": 11,
+          "block_bbox": [
+            70.86599731445312,
+            406.9333801269531,
+            470.5236511230469,
+            487.56109619140625
+          ],
+          "char": 0,
+          "line": 1,
+          "line_bbox": [
+            112.85900115966797,
+            406.9333801269531,
+            469.1389465332031,
+            422.6051940917969
+          ],
+          "span": 19
+        },
+        "rendered": {
+          "bbox": [
+            322.8609924316406,
+            414.4856872558594,
+            327.0940856933594,
+            421.45947265625
+          ],
+          "font": "LMMathItalic7-Regular",
+          "gid": 5,
+          "origin": [
+            322.8609924316406,
+            419.7160339355469
+          ],
+          "seqno": 82,
+          "size": 6.973800182342529,
+          "unicode": 107,
+          "unicode_codepoints": [
+            "U+006B"
+          ],
+          "unicode_matches_agl": true,
+          "unicode_text": "k"
+        },
+        "sequence_index": 1318,
+        "text_matrix": [
+          6.9738,
+          0.0,
+          0.0,
+          6.9738,
+          322.861,
+          246.426
+        ]
+      }
+    }
+  },
+  "runtime": {
+    "fonttools": "4.60.1",
+    "pymupdf": "1.27.2.2",
+    "pypdf": "6.10.2",
+    "python": "3.11.9"
+  },
+  "schema_version": "1.1",
+  "support": {
+    "rejected": [
+      "PDF dont le SHA-256 diffère",
+      "Form XObjects ou opérateur Do",
+      "mode de rendu Tr",
+      "polices Type0/CID, Type3, non embarquées ou non CFF",
+      "CMap multioctet ou bfrange en tableau",
+      "rotation de page",
+      "écart de longueur, de police, de GID ou association rawdict non univoque",
+      "dessins vectoriels et images sans glyphe texte"
+    ],
+    "supported": [
+      "contenus de page directs",
+      "polices Type1 avec FontFile3 Type1C embarqué",
+      "codes monooctets MacRoman ou StandardEncoding avec Differences",
+      "ToUnicode bfchar et bfrange directs",
+      "association source-rendu par ordre et GID CFF",
+      "association aux blocs MuPDF par police, origine et Unicode rendu"
+    ]
+  },
+  "to_unicode_conflicts": [
+    {
+      "agl_codepoints": [
+        "U+FB00"
+      ],
+      "agl_unicode": "ﬀ",
+      "code": 33,
+      "code_hex": "0x21",
+      "font_resource": "/Ty16",
+      "glyph_name": "ff",
+      "occurrences": 1,
+      "operation_indices": [
+        33
+      ],
+      "page": 2,
+      "to_unicode": "\u0000",
+      "to_unicode_codepoints": [
+        "U+0000"
+      ]
+    },
+    {
+      "agl_codepoints": [
+        "U+2212"
+      ],
+      "agl_unicode": "−",
+      "code": 33,
+      "code_hex": "0x21",
+      "font_resource": "/Ty18",
+      "glyph_name": "minus",
+      "occurrences": 10,
+      "operation_indices": [
+        107,
+        330,
+        385,
+        529,
+        604,
+        783,
+        827,
+        893,
+        904,
+        937
+      ],
+      "page": 2,
+      "to_unicode": "≠",
+      "to_unicode_codepoints": [
+        "U+2260"
+      ]
+    },
+    {
+      "agl_codepoints": [
+        "U+2217"
+      ],
+      "agl_unicode": "∗",
+      "code": 33,
+      "code_hex": "0x21",
+      "font_resource": "/Ty21",
+      "glyph_name": "asteriskmath",
+      "occurrences": 8,
+      "operation_indices": [
+        413,
+        428,
+        519,
+        539,
+        567,
+        582,
+        628,
+        643
+      ],
+      "page": 2,
+      "to_unicode": "ú",
+      "to_unicode_codepoints": [
+        "U+00FA"
+      ]
+    },
+    {
+      "agl_codepoints": [
+        "U+2265"
+      ],
+      "agl_unicode": "≥",
+      "code": 34,
+      "code_hex": "0x22",
+      "font_resource": "/Ty18",
+      "glyph_name": "greaterequal",
+      "occurrences": 1,
+      "operation_indices": [
+        837
+      ],
+      "page": 2,
+      "to_unicode": "Ø",
+      "to_unicode_codepoints": [
+        "U+00D8"
+      ]
+    },
+    {
+      "agl_codepoints": [
+        "U+2264"
+      ],
+      "agl_unicode": "≤",
+      "code": 35,
+      "code_hex": "0x23",
+      "font_resource": "/Ty18",
+      "glyph_name": "lessequal",
+      "occurrences": 1,
+      "operation_indices": [
+        904
+      ],
+      "page": 2,
+      "to_unicode": "Æ",
+      "to_unicode_codepoints": [
+        "U+00C6"
+      ]
+    }
+  ],
+  "verdict": "TRAÇABILITÉ_STRUCTURELLE_COMPLÈTE"
+}

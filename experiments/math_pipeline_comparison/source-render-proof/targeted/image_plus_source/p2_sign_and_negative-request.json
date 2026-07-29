@@ -1,0 +1,10 @@
+{
+  "model": "google/gemma-4-26B-A4B-it",
+  "temperature": 0,
+  "max_tokens": 2048,
+  "prompt": "Transcribe exactly this crop from one PDF page. Preserve every visible symbol. Use valid LaTeX for mathematics. Do not summarize, correct the author, add commentary, or wrap the answer in a code fence. Return the visible text as Markdown. A second channel extracted from the PDF drawing program accompanies the image. It describes glyphs and order, not the author's original LaTeX. Use it only to resolve visual ambiguity. If a Unicode text map conflicts with a font glyph, preserve the glyph actually drawn. Source evidence: signe moins de y=sign(wx-b): source drawing sequence `y=sign(wx−b)`; valeur -1 retournée pour une entrée négative: source drawing sequence `returns+1iftheinputisapositivenumberor−1if`.",
+  "image": {
+    "path": "C:\\Users\\maxim\\python\\math_pipeline_comparison\\source-render-proof\\crops\\p2_sign_and_negative-600dpi.png",
+    "sha256": "30208d6bcb4329c9d6b24f42557840f0c038096beb95f265c2a3a209fe9954a9"
+  }
+}

@@ -1,0 +1,41 @@
+{
+    "id":  "chatcmpl-919a7dd11d664c48",
+    "object":  "chat.completion",
+    "created":  1785326142,
+    "prompt_routed_experts":  null,
+    "model":  "google/gemma-4-26B-A4B-it",
+    "choices":  [
+                    {
+                        "index":  0,
+                        "message":  {
+                                        "role":  "assistant",
+                                        "content":  "is 20,000-dimensional). The algorithm puts all feature vectors on an imaginary 20,000-dimensional plot and draws an imaginary 20,000-dimensional line (a *hyperplane*) that separates examples with positive labels from examples with negative labels. In machine learning, the boundary separating the examples of different classes is called the **decision boundary**.\n\nThe equation of the hyperplane is given by two **parameters**, a real-valued vector $\\mathbf{w}$ of the same dimensionality as our input feature vector $\\mathbf{x}$, and a real number $b$ like this:\n\n$$\\mathbf{wx} - b = 0,$$\n\nwhere the expression $\\mathbf{wx}$ means $w^{(1)}x^{(1)} + w^{(2)}x^{(2)} + \\dots + w^{(D)}x^{(D)}$, and $D$ is the number of dimensions of the feature vector $\\mathbf{x}$.\n\n(If some equations aren\u0027t clear to you right now, in Chapter 2 we revisit the math and statistical concepts necessary to understand them. For the moment, try to get an intuition of what\u0027s happening here. It will become more clear after you read the next chapter.)\n\nNow, the predicted label for some input feature vector $\\mathbf{x}$ is given like this:\n\n$$y = \\text{sign}(\\mathbf{wx} - b),$$\n\nwhere sign is a mathematical operator that takes any value as input and returns $+1$ if the input is a positive number or $-1$ if the input is a negative number.\n\nThe goal of the learning algorithm — SVM in this case — is to leverage the dataset and find the optimal values $\\mathbf{w}^*$ and $b^*$ for parameters $\\mathbf{w}$ and $b$. Once the learning algorithm identifies these optimal values, the **model** $f(\\mathbf{x})$ is then defined as:\n\n$$f(\\mathbf{x}) = \\text{sign}(\\mathbf{w}^*\\mathbf{x} - b^*)$$\n\nTherefore, to predict whether an email message is spam or not spam using an SVM model, you have to take a text of the message, convert it into a feature vector, then multiply this vector by $\\mathbf{w}^*$, subtract $b^*$ and take the sign of the result. This will give us the prediction ($+1$ means \"spam\", $-1$ means \"not\\_spam\").\n\nNow, how does the machine find $\\mathbf{w}^*$ and $b^*$? It solves an optimization problem. Machines are good at optimizing functions under constraints.\n\nSo what are the constraints we want to satisfy here? First of all, we want the model to predict the labels of our 10,000 examples correctly. Remember that each example $i = 1, \\dots, 10000$ is given by a pair $(\\mathbf{x}_i, y_i)$, where $\\mathbf{x}_i$ is the feature vector of example $i$ and $y_i$ is its label that takes values either $-1$ or $+1$. So the constraints are naturally:\n\n* $\\mathbf{wx}_i - b \\ge 1$ if $y_i = +1$, and\n* $\\mathbf{wx}_i - b \\le -1$ if $y_i = -1$\n\nAndriy Burkov $\\quad$ The Hundred-Page Machine Learning Book - Draft $\\quad$ 6",
+                                        "refusal":  null,
+                                        "annotations":  null,
+                                        "audio":  null,
+                                        "function_call":  null,
+                                        "tool_calls":  [
+
+                                                       ],
+                                        "reasoning":  null
+                                    },
+                        "logprobs":  null,
+                        "finish_reason":  "stop",
+                        "stop_reason":  106,
+                        "token_ids":  null,
+                        "routed_experts":  null
+                    }
+                ],
+    "service_tier":  null,
+    "system_fingerprint":  "vllm-0.21.0-3c9634b3",
+    "usage":  {
+                  "prompt_tokens":  752,
+                  "total_tokens":  1482,
+                  "completion_tokens":  730,
+                  "prompt_tokens_details":  null
+              },
+    "prompt_logprobs":  null,
+    "prompt_token_ids":  null,
+    "prompt_text":  null,
+    "kv_transfer_params":  null
+}

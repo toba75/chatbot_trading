@@ -1,0 +1,22 @@
+{
+  "model": "google/gemma-4-26B-A4B-it",
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "You are a document transcription engine. Transcribe this entire page into Markdown. Preserve every visible word and symbol. Represent inline and display mathematics as valid LaTeX using $...$ and $$...$$. Preserve superscripts, subscripts, vector boldness, braces, inequality signs, minus signs, footnotes, headings, lists, and reading order. Do not summarize, correct, infer missing content, or add commentary. Do not wrap the output in a code fence. If a character is uncertain, reproduce the best visible reading; never omit it."
+        },
+        {
+          "type": "image_url",
+          "image_url": {
+            "url": "data:image/png;base64,<omitted>"
+          }
+        }
+      ]
+    }
+  ],
+  "temperature": 0,
+  "max_tokens": 8192
+}

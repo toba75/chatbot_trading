@@ -80,6 +80,13 @@ Pour arrêter le service :
 docker compose --env-file .env.docling-serve -f compose.docling-serve.yaml down
 ```
 
+## Expériences conservées
+
+La [comparaison des pipelines mathématiques](experiments/math_pipeline_comparison/README.md)
+conserve le corpus réduit, les sorties Docling/Granite, Marker, MinerU et Gemma
+4, ainsi que l'expérience de validation croisée entre le PDF source et son
+rendu. Les environnements et caches de modèles n'y sont pas versionnés.
+
 ## Fichiers principaux
 
 - [compose.docling-serve.yaml](compose.docling-serve.yaml)

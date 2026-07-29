@@ -1,0 +1,171 @@
+{
+  "table_of_contents": [
+    {
+      "title": "1 Introduction",
+      "heading_level": null,
+      "page_id": 0,
+      "polygon": [
+        [
+          68.58,
+          55.361000000000004
+        ],
+        [
+          184.14000000000001,
+          55.361000000000004
+        ],
+        [
+          184.14000000000001,
+          68.701
+        ],
+        [
+          68.58,
+          68.701
+        ]
+      ]
+    },
+    {
+      "title": "1.1 What is Machine Learning",
+      "heading_level": null,
+      "page_id": 0,
+      "polygon": [
+        [
+          68.58,
+          86.71000000000001
+        ],
+        [
+          259.2,
+          86.71000000000001
+        ],
+        [
+          259.2,
+          98.716
+        ],
+        [
+          68.58,
+          98.716
+        ]
+      ]
+    },
+    {
+      "title": "1.2 Types of Learning",
+      "heading_level": null,
+      "page_id": 0,
+      "polygon": [
+        [
+          68.58,
+          227.447
+        ],
+        [
+          208.98,
+          227.447
+        ],
+        [
+          208.98,
+          240.78699999999998
+        ],
+        [
+          68.58,
+          240.78699999999998
+        ]
+      ]
+    },
+    {
+      "title": "1.2.1 Supervised Learning",
+      "heading_level": null,
+      "page_id": 0,
+      "polygon": [
+        [
+          68.58,
+          284.809
+        ],
+        [
+          208.98,
+          284.809
+        ],
+        [
+          208.98,
+          296.815
+        ],
+        [
+          68.58,
+          296.815
+        ]
+      ]
+    }
+  ],
+  "page_stats": [
+    {
+      "page_id": 0,
+      "text_extraction_method": "surya",
+      "block_counts": [
+        [
+          "Text",
+          12
+        ],
+        [
+          "SectionHeader",
+          8
+        ],
+        [
+          "PageFooter",
+          5
+        ],
+        [
+          "Footnote",
+          2
+        ]
+      ],
+      "block_metadata": {
+        "llm_request_count": 0,
+        "llm_error_count": 0,
+        "llm_tokens_used": 0,
+        "previous_text": "",
+        "previous_type": "",
+        "previous_order": 0
+      }
+    },
+    {
+      "page_id": 1,
+      "text_extraction_method": "pdftext",
+      "block_counts": [
+        [
+          "Span",
+          300
+        ],
+        [
+          "Line",
+          35
+        ],
+        [
+          "Text",
+          10
+        ],
+        [
+          "Equation",
+          3
+        ],
+        [
+          "PageFooter",
+          3
+        ],
+        [
+          "ListItem",
+          2
+        ],
+        [
+          "ListGroup",
+          1
+        ]
+      ],
+      "block_metadata": {
+        "llm_request_count": 0,
+        "llm_error_count": 0,
+        "llm_tokens_used": 0,
+        "previous_text": "",
+        "previous_type": "",
+        "previous_order": 0
+      }
+    }
+  ],
+  "debug_data_path": "debug_data\\source-pages-7-10"
+}

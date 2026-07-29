@@ -1,0 +1,10 @@
+{
+  "model": "google/gemma-4-26B-A4B-it",
+  "temperature": 0,
+  "max_tokens": 2048,
+  "prompt": "Transcribe exactly this crop from one PDF page. Preserve every visible symbol. Use valid LaTeX for mathematics. Do not summarize, correct the author, add commentary, or wrap the answer in a code fence. Return only the formula or formulas visible in the crop. ",
+  "image": {
+    "path": "C:\\Users\\maxim\\python\\math_pipeline_comparison\\source-render-proof\\crops\\p2_model-600dpi.png",
+    "sha256": "aae24a405256332260efa8039b4e6925a63b13404490ddebf255b7fa3222c305"
+  }
+}

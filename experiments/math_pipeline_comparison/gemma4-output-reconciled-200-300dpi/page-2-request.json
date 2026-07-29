@@ -1,0 +1,18 @@
+{
+    "model":  "google/gemma-4-26B-A4B-it",
+    "temperature":  0,
+    "max_tokens":  8192,
+    "prompt":  "You are a document transcription engine. The two images below show exactly the same complete PDF page, rendered at two different resolutions: the first image is 200 dpi and the second image is 300 dpi. They are not consecutive pages and must not be concatenated.\n\nProduce one definitive Markdown transcription of that single page by reconciling the two visual observations. Compare every disagreement and retain the reading best supported by the page itself; do not automatically prefer the 300 dpi image. Preserve every visible word and symbol. Represent inline and display mathematics as valid LaTeX using $...$ and $$...$$. Preserve superscripts, subscripts, vector boldness, braces, inequality signs, minus signs, footnotes, headings, lists, and reading order. Do not summarize, correct, infer missing content, or add commentary. Do not wrap the output in a code fence. If a character remains genuinely uncertain after comparing both images, reproduce the best visible reading; never omit it.",
+    "images":  [
+                   {
+                       "path":  "C:\\Users\\maxim\\python\\math_pipeline_comparison\\gemma4-input\\page-2.png",
+                       "sha256":  "F835F733030C1E5C414070543B32390B6A0258DB2A0EC8AA5D0CD66F06C281BD",
+                       "role":  "same_page_200_dpi"
+                   },
+                   {
+                       "path":  "C:\\Users\\maxim\\python\\math_pipeline_comparison\\gemma4-input-300dpi\\page-2.png",
+                       "sha256":  "E42494CB3AE50C366E863487A97453012FE85384CF0ECB92638350EA391172A8",
+                       "role":  "same_page_300_dpi"
+                   }
+               ]
+}

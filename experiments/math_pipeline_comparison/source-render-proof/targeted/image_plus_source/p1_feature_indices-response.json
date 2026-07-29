@@ -1,0 +1,39 @@
+{
+  "id": "chatcmpl-9e67d598c1788ed7",
+  "object": "chat.completion",
+  "created": 1785335489,
+  "prompt_routed_experts": null,
+  "model": "google/gemma-4-26B-A4B-it",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "examples in the dataset, the feature at position $j$ in the feature vector always contains the\nsame kind of information. It means that if $x_i^{(2)}$ contains weight in kg in some example $\\mathbf{x}_i$,\nthen $x_k^{(2)}$ will also contain weight in kg in every example $\\mathbf{x}_k$, $k = 1, \\dots, N$. The **label** $y_i$ can\nbe either an element belonging to a finite set of **classes** $\\{1, 2, \\dots, C\\}$, or a real number, or a\nmore complex structure, like a vector, a matrix, a tree, or a graph. Unless otherwise stated,",
+        "refusal": null,
+        "annotations": null,
+        "audio": null,
+        "function_call": null,
+        "tool_calls": [],
+        "reasoning": null
+      },
+      "logprobs": null,
+      "finish_reason": "stop",
+      "stop_reason": 106,
+      "token_ids": null,
+      "routed_experts": null
+    }
+  ],
+  "service_tier": null,
+  "system_fingerprint": "vllm-0.21.0-3c9634b3",
+  "usage": {
+    "prompt_tokens": 472,
+    "total_tokens": 624,
+    "completion_tokens": 152,
+    "prompt_tokens_details": null
+  },
+  "prompt_logprobs": null,
+  "prompt_token_ids": null,
+  "prompt_text": null,
+  "kv_transfer_params": null
+}

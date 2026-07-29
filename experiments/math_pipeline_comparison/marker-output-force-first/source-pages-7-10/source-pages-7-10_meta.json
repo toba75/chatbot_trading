@@ -1,0 +1,159 @@
+{
+  "table_of_contents": [
+    {
+      "title": "1 Introduction",
+      "heading_level": null,
+      "page_id": 0,
+      "polygon": [
+        [
+          68.58,
+          55.289788391113284
+        ],
+        [
+          184.14000000000001,
+          55.289788391113284
+        ],
+        [
+          184.14000000000001,
+          68.61262896728515
+        ],
+        [
+          68.58,
+          68.61262896728515
+        ]
+      ]
+    },
+    {
+      "title": "1.1 What is Machine Learning",
+      "heading_level": null,
+      "page_id": 0,
+      "polygon": [
+        [
+          68.58,
+          86.59846374511719
+        ],
+        [
+          259.2,
+          86.59846374511719
+        ],
+        [
+          259.2,
+          98.58902026367187
+        ],
+        [
+          68.58,
+          98.58902026367187
+        ]
+      ]
+    },
+    {
+      "title": "1.2 Types of Learning",
+      "heading_level": null,
+      "page_id": 0,
+      "polygon": [
+        [
+          68.58,
+          227.15443182373045
+        ],
+        [
+          208.98,
+          227.15443182373045
+        ],
+        [
+          208.98,
+          240.47727239990232
+        ],
+        [
+          68.58,
+          240.47727239990232
+        ]
+      ]
+    },
+    {
+      "title": "1.2.1 Supervised Learning",
+      "heading_level": null,
+      "page_id": 0,
+      "polygon": [
+        [
+          68.58,
+          284.4426463012695
+        ],
+        [
+          208.98,
+          284.4426463012695
+        ],
+        [
+          208.98,
+          296.4332028198242
+        ],
+        [
+          68.58,
+          296.4332028198242
+        ]
+      ]
+    }
+  ],
+  "page_stats": [
+    {
+      "page_id": 0,
+      "text_extraction_method": "surya",
+      "block_counts": [
+        [
+          "Text",
+          6
+        ],
+        [
+          "SectionHeader",
+          4
+        ],
+        [
+          "PageFooter",
+          3
+        ],
+        [
+          "Footnote",
+          1
+        ]
+      ],
+      "block_metadata": {
+        "llm_request_count": 0,
+        "llm_error_count": 0,
+        "llm_tokens_used": 0,
+        "previous_text": "",
+        "previous_type": "",
+        "previous_order": 0
+      }
+    },
+    {
+      "page_id": 1,
+      "text_extraction_method": "surya",
+      "block_counts": [
+        [
+          "Text",
+          10
+        ],
+        [
+          "Equation",
+          3
+        ],
+        [
+          "PageFooter",
+          2
+        ],
+        [
+          "ListGroup",
+          1
+        ]
+      ],
+      "block_metadata": {
+        "llm_request_count": 0,
+        "llm_error_count": 0,
+        "llm_tokens_used": 0,
+        "previous_text": "",
+        "previous_type": "",
+        "previous_order": 0
+      }
+    }
+  ],
+  "debug_data_path": "debug_data\\source-pages-7-10"
+}

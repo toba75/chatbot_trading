@@ -1,0 +1,548 @@
+{
+  "input": {
+    "path": "C:\\Users\\maxim\\python\\math_pipeline_comparison\\source-pages-7-10.pdf",
+    "sha256": "219c2064ba9292d286f4b3bcc65eb9e94b418705c51b9f98f54f2ad70321ddf1",
+    "bytes": 54206
+  },
+  "runtime": {
+    "pdftoppm": "C:\\Users\\maxim\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\native\\poppler\\Library\\bin\\pdftoppm.exe",
+    "dpi": 600,
+    "gemma_endpoint": "http://192.168.1.120:8000/v1",
+    "gemma_model": "google/gemma-4-26B-A4B-it"
+  },
+  "source_manifest": {
+    "path": "C:\\Users\\maxim\\python\\math_pipeline_comparison\\source-render-proof\\source-manifest.json",
+    "sha256": "a0aeb49c1115178ab92f9bd02c9e6c06b3dd6f8b444f2b050a20ce91798ab991"
+  },
+  "source_facts": {
+    "p1_i2": {
+      "page": 1,
+      "description": "premier indice i avec exposant (2)",
+      "source_needle": "x(2)i",
+      "status": "PROVEN"
+    },
+    "p1_k2": {
+      "page": 1,
+      "description": "second indice k avec exposant (2)",
+      "source_needle": "x(2)k",
+      "status": "PROVEN"
+    },
+    "p1_xk": {
+      "page": 1,
+      "description": "exemple x_k puis k = 1,...,N",
+      "source_needle": "examplexk,k=1,...,N",
+      "status": "PROVEN"
+    },
+    "p1_C": {
+      "page": 1,
+      "description": "borne C de l’ensemble des classes",
+      "source_needle": "{1,2,...,C}",
+      "status": "PROVEN"
+    },
+    "p2_hyper_minus": {
+      "page": 2,
+      "description": "signe moins de wx-b=0",
+      "source_needle": "wx−b=0",
+      "status": "PROVEN"
+    },
+    "p2_sign_minus": {
+      "page": 2,
+      "description": "signe moins de y=sign(wx-b)",
+      "source_needle": "y=sign(wx−b)",
+      "status": "PROVEN"
+    },
+    "p2_model_minus": {
+      "page": 2,
+      "description": "étoiles et moins de f(x)=sign(w*x-b*)",
+      "source_needle": "f(x)=sign(w∗x−b∗)",
+      "status": "PROVEN"
+    },
+    "p2_negative_one": {
+      "page": 2,
+      "description": "valeur -1 retournée pour une entrée négative",
+      "source_needle": "returns+1iftheinputisapositivenumberor−1if",
+      "status": "PROVEN"
+    },
+    "p2_constraints": {
+      "page": 2,
+      "description": "contraintes >=1 et <=-1",
+      "source_needle": "wxi−b≥1ifyi=+1,and•wxi−b≤−1ifyi=−1",
+      "status": "PROVEN"
+    }
+  },
+  "candidate_provenance": {
+    "marker_force_ocr": [
+      {
+        "path": "C:\\Users\\maxim\\python\\math_pipeline_comparison\\marker-output-force-warm\\source-pages-7-10\\source-pages-7-10.md",
+        "sha256": "4e3e4a9d4ebebb8b39e6a7bdd35519b192cf47aab884682b7a0757dbb217e30b",
+        "bytes": 5663
+      }
+    ],
+    "gemma_200dpi": [
+      {
+        "path": "C:\\Users\\maxim\\python\\math_pipeline_comparison\\gemma4-output\\page-1.md",
+        "sha256": "ce198592debc19f68df8dc709e9ad8049683be707de50ee34d498fe2966fe9fe",
+        "bytes": 2893
+      },
+      {
+        "path": "C:\\Users\\maxim\\python\\math_pipeline_comparison\\gemma4-output\\page-2.md",
+        "sha256": "42ab7272cad6f93721816aa28aa143907a52bf34cf1c6203eaac60210cf2ba57",
+        "bytes": 2748
+      }
+    ],
+    "gemma_300dpi": [
+      {
+        "path": "C:\\Users\\maxim\\python\\math_pipeline_comparison\\gemma4-output-300dpi\\page-1.md",
+        "sha256": "81b3ce2b7faab791e2758cf727af1122c0cc946293875e2c6e87e8fe1b7ab60a",
+        "bytes": 2872
+      },
+      {
+        "path": "C:\\Users\\maxim\\python\\math_pipeline_comparison\\gemma4-output-300dpi\\page-2.md",
+        "sha256": "9e9ae4e45a7d94f9b0556f24c13068ce2793608ec0e8e58826f2ee6c91d40f6d",
+        "bytes": 2745
+      }
+    ],
+    "gemma_200_300_reconciled": [
+      {
+        "path": "C:\\Users\\maxim\\python\\math_pipeline_comparison\\gemma4-output-reconciled-200-300dpi\\page-1.md",
+        "sha256": "57737a29afb6b15b69383a7dec5ca11b3f3ed4b08f1e0a7a349f7ceb0b5dd040",
+        "bytes": 2864
+      },
+      {
+        "path": "C:\\Users\\maxim\\python\\math_pipeline_comparison\\gemma4-output-reconciled-200-300dpi\\page-2.md",
+        "sha256": "c9dda3aff3a9055cae313f4625d124919eb6808e28a3aeef03fb95e6552dff61",
+        "bytes": 2716
+      }
+    ],
+    "docling_granite": [
+      {
+        "path": "C:\\Users\\maxim\\python\\math_pipeline_comparison\\docling-subset.md",
+        "sha256": "97ee32fa204773d973a2d6864b36ba73c37a19f7695e167052c3862cc86ec72f",
+        "bytes": 5235
+      }
+    ],
+    "mineru": [
+      {
+        "path": "C:\\Users\\maxim\\python\\math_pipeline_comparison\\mineru-output-service-warm\\source-pages-7-10\\hybrid_auto\\source-pages-7-10.md",
+        "sha256": "18a99cb0095c6c7301edf1221f241d32f714adee9d85ce74c5b98b1e73ef31fd",
+        "bytes": 5519
+      }
+    ]
+  },
+  "existing_candidates": {
+    "marker_force_ocr": {
+      "matched": 9,
+      "proven": 9,
+      "facts": {
+        "p1_i2": "MATCH",
+        "p1_k2": "MATCH",
+        "p1_xk": "MATCH",
+        "p1_C": "MATCH",
+        "p2_hyper_minus": "MATCH",
+        "p2_sign_minus": "MATCH",
+        "p2_model_minus": "MATCH",
+        "p2_negative_one": "MATCH",
+        "p2_constraints": "MATCH"
+      }
+    },
+    "gemma_200dpi": {
+      "matched": 9,
+      "proven": 9,
+      "facts": {
+        "p1_i2": "MATCH",
+        "p1_k2": "MATCH",
+        "p1_xk": "MATCH",
+        "p1_C": "MATCH",
+        "p2_hyper_minus": "MATCH",
+        "p2_sign_minus": "MATCH",
+        "p2_model_minus": "MATCH",
+        "p2_negative_one": "MATCH",
+        "p2_constraints": "MATCH"
+      }
+    },
+    "gemma_300dpi": {
+      "matched": 8,
+      "proven": 9,
+      "facts": {
+        "p1_i2": "MATCH",
+        "p1_k2": "MATCH",
+        "p1_xk": "MATCH",
+        "p1_C": "REJECTED_CONTRADICTION_OR_ABSENCE",
+        "p2_hyper_minus": "MATCH",
+        "p2_sign_minus": "MATCH",
+        "p2_model_minus": "MATCH",
+        "p2_negative_one": "MATCH",
+        "p2_constraints": "MATCH"
+      }
+    },
+    "gemma_200_300_reconciled": {
+      "matched": 7,
+      "proven": 9,
+      "facts": {
+        "p1_i2": "MATCH",
+        "p1_k2": "REJECTED_CONTRADICTION_OR_ABSENCE",
+        "p1_xk": "REJECTED_CONTRADICTION_OR_ABSENCE",
+        "p1_C": "MATCH",
+        "p2_hyper_minus": "MATCH",
+        "p2_sign_minus": "MATCH",
+        "p2_model_minus": "MATCH",
+        "p2_negative_one": "MATCH",
+        "p2_constraints": "MATCH"
+      }
+    },
+    "docling_granite": {
+      "matched": 8,
+      "proven": 9,
+      "facts": {
+        "p1_i2": "MATCH",
+        "p1_k2": "MATCH",
+        "p1_xk": "MATCH",
+        "p1_C": "MATCH",
+        "p2_hyper_minus": "MATCH",
+        "p2_sign_minus": "REJECTED_CONTRADICTION_OR_ABSENCE",
+        "p2_model_minus": "MATCH",
+        "p2_negative_one": "MATCH",
+        "p2_constraints": "MATCH"
+      }
+    },
+    "mineru": {
+      "matched": 8,
+      "proven": 9,
+      "facts": {
+        "p1_i2": "MATCH",
+        "p1_k2": "MATCH",
+        "p1_xk": "MATCH",
+        "p1_C": "MATCH",
+        "p2_hyper_minus": "MATCH",
+        "p2_sign_minus": "MATCH",
+        "p2_model_minus": "MATCH",
+        "p2_negative_one": "REJECTED_CONTRADICTION_OR_ABSENCE",
+        "p2_constraints": "MATCH"
+      }
+    }
+  },
+  "mutation_controls": {
+    "p1_i2": {
+      "before": "x_i^{(2)}",
+      "after": "x_k^{(2)}",
+      "rejected": true
+    },
+    "p1_k2": {
+      "before": "x_k^{(2)}",
+      "after": "x_i^{(2)}",
+      "rejected": true
+    },
+    "p1_xk": {
+      "before": "\\mathbf{x}_k",
+      "after": "\\mathbf{x}_i",
+      "rejected": true
+    },
+    "p1_C": {
+      "before": "\\dots, C",
+      "after": "\\dots",
+      "rejected": true
+    },
+    "p2_hyper_minus": {
+      "before": "\\mathbf{w}\\mathbf{x} - b = 0",
+      "after": "\\mathbf{w}\\mathbf{x} \\ne b = 0",
+      "rejected": true
+    },
+    "p2_sign_minus": {
+      "before": "y = \\text{sign}(\\mathbf{w}\\mathbf{x} - b)",
+      "after": "y = \\text{sign}(\\mathbf{w} - b)",
+      "rejected": true
+    },
+    "p2_model_minus": {
+      "before": "\\mathbf{w}^*\\mathbf{x} - b^*",
+      "after": "\\mathbf{w}^*\\mathbf{x} + b^*",
+      "rejected": true
+    },
+    "p2_negative_one": {
+      "before": "or  $-1$  if the input",
+      "after": "or  $1$  if the input",
+      "rejected": true
+    },
+    "p2_constraints": {
+      "before": "\\leq -1",
+      "after": "\\leq 1",
+      "rejected": true
+    }
+  },
+  "crops": {
+    "p1_feature_indices": {
+      "path": "C:\\Users\\maxim\\python\\math_pipeline_comparison\\source-render-proof\\crops\\p1_feature_indices-600dpi.png",
+      "sha256": "f41323a6081152b631b34981b4a9d197ae8e6e62fd3df9c418d863bbb3acbc0f",
+      "page": 1,
+      "box_points": [
+        60,
+        385,
+        480,
+        442
+      ],
+      "box_pixels": [
+        500,
+        3208,
+        4000,
+        3683
+      ],
+      "width": 3500,
+      "height": 475
+    },
+    "p2_hyperplane": {
+      "path": "C:\\Users\\maxim\\python\\math_pipeline_comparison\\source-render-proof\\crops\\p2_hyperplane-600dpi.png",
+      "sha256": "332156b579df2d40e757d56cd5a9c0f99c87c2503bb8617bd21d5e1abc018472",
+      "page": 2,
+      "box_points": [
+        225,
+        142,
+        315,
+        176
+      ],
+      "box_pixels": [
+        1875,
+        1183,
+        2625,
+        1467
+      ],
+      "width": 750,
+      "height": 284
+    },
+    "p2_sign_and_negative": {
+      "path": "C:\\Users\\maxim\\python\\math_pipeline_comparison\\source-render-proof\\crops\\p2_sign_and_negative-600dpi.png",
+      "sha256": "7a9ff4067b06f1a61d2cecb3f15efcbcdc04af1b4cedfc38d3efe4bb0413577b",
+      "page": 2,
+      "box_points": [
+        215,
+        270,
+        475,
+        330
+      ],
+      "box_pixels": [
+        1792,
+        2250,
+        3958,
+        2750
+      ],
+      "width": 2166,
+      "height": 500
+    },
+    "p2_model": {
+      "path": "C:\\Users\\maxim\\python\\math_pipeline_comparison\\source-render-proof\\crops\\p2_model-600dpi.png",
+      "sha256": "aae24a405256332260efa8039b4e6925a63b13404490ddebf255b7fa3222c305",
+      "page": 2,
+      "box_points": [
+        205,
+        378,
+        330,
+        412
+      ],
+      "box_pixels": [
+        1708,
+        3150,
+        2750,
+        3433
+      ],
+      "width": 1042,
+      "height": 283
+    },
+    "p2_constraints": {
+      "path": "C:\\Users\\maxim\\python\\math_pipeline_comparison\\source-render-proof\\crops\\p2_constraints-600dpi.png",
+      "sha256": "6801f2d29334fe64252c5f058c2d94c1135dffadb573132838ca4a912277603c",
+      "page": 2,
+      "box_points": [
+        75,
+        538,
+        225,
+        582
+      ],
+      "box_pixels": [
+        625,
+        4483,
+        1875,
+        4850
+      ],
+      "width": 1250,
+      "height": 367
+    },
+    "contact_sheet": {
+      "path": "C:\\Users\\maxim\\python\\math_pipeline_comparison\\source-render-proof\\crops\\contact-sheet.png",
+      "sha256": "2f806fd53ebcc85ae06ae24350635071e18ccd7e36c4d6743001c7d1b706cfa6"
+    }
+  },
+  "targeted_gemma": {
+    "image_only/p1_feature_indices": {
+      "elapsed_seconds": 6.174,
+      "prompt_tokens": 333,
+      "completion_tokens": 148,
+      "response_id": "chatcmpl-a76c27461f761bdb",
+      "system_fingerprint": "vllm-0.21.0-3c9634b3",
+      "output": "C:\\Users\\maxim\\python\\math_pipeline_comparison\\source-render-proof\\targeted\\image_only\\p1_feature_indices.md",
+      "output_sha256": "4424af5b395540a56c4ae45251160077125db85eefe0a0a3ebb67eead1298afc",
+      "facts": {
+        "p1_i2": "MATCH",
+        "p1_k2": "MATCH",
+        "p1_xk": "MATCH",
+        "p1_C": "MATCH"
+      }
+    },
+    "image_only/p2_hyperplane": {
+      "elapsed_seconds": 0.87,
+      "prompt_tokens": 337,
+      "completion_tokens": 12,
+      "response_id": "chatcmpl-8791881f739bfd4d",
+      "system_fingerprint": "vllm-0.21.0-3c9634b3",
+      "output": "C:\\Users\\maxim\\python\\math_pipeline_comparison\\source-render-proof\\targeted\\image_only\\p2_hyperplane.md",
+      "output_sha256": "34e2922957a1844700c4e462b3a5c42a5f8ba00a52c79ff6a2cb1701fbc26bc2",
+      "facts": {
+        "p2_hyper_minus": "MATCH"
+      }
+    },
+    "image_only/p2_sign_and_negative": {
+      "elapsed_seconds": 2.132,
+      "prompt_tokens": 335,
+      "completion_tokens": 41,
+      "response_id": "chatcmpl-a26d684a53d50d21",
+      "system_fingerprint": "vllm-0.21.0-3c9634b3",
+      "output": "C:\\Users\\maxim\\python\\math_pipeline_comparison\\source-render-proof\\targeted\\image_only\\p2_sign_and_negative.md",
+      "output_sha256": "b79a3a852c63383d41f478cd1ca5ceb3fe5b15d8ac37e65566cbce09c025dec7",
+      "facts": {
+        "p2_sign_minus": "MATCH",
+        "p2_negative_one": "REJECTED_CONTRADICTION_OR_ABSENCE"
+      }
+    },
+    "image_only/p2_model": {
+      "elapsed_seconds": 1.638,
+      "prompt_tokens": 323,
+      "completion_tokens": 27,
+      "response_id": "chatcmpl-95fa1e34bc51d3f7",
+      "system_fingerprint": "vllm-0.21.0-3c9634b3",
+      "output": "C:\\Users\\maxim\\python\\math_pipeline_comparison\\source-render-proof\\targeted\\image_only\\p2_model.md",
+      "output_sha256": "0ba54475073b7513ef2065cd21c61bb940f093b45dfe46bac0cd79be42f17d62",
+      "facts": {
+        "p2_model_minus": "MATCH"
+      }
+    },
+    "image_only/p2_constraints": {
+      "elapsed_seconds": 3.236,
+      "prompt_tokens": 337,
+      "completion_tokens": 71,
+      "response_id": "chatcmpl-b675f23b3125ea11",
+      "system_fingerprint": "vllm-0.21.0-3c9634b3",
+      "output": "C:\\Users\\maxim\\python\\math_pipeline_comparison\\source-render-proof\\targeted\\image_only\\p2_constraints.md",
+      "output_sha256": "c9a1c04b9d06bbcaaefb39555b04513e4d5dcd563ed65b0320f17fafd7971ada",
+      "facts": {
+        "p2_constraints": "MATCH"
+      }
+    },
+    "image_plus_source/p1_feature_indices": {
+      "elapsed_seconds": 6.126,
+      "prompt_tokens": 472,
+      "completion_tokens": 152,
+      "response_id": "chatcmpl-8cc536bd1f86cb17",
+      "system_fingerprint": "vllm-0.21.0-3c9634b3",
+      "output": "C:\\Users\\maxim\\python\\math_pipeline_comparison\\source-render-proof\\targeted\\image_plus_source\\p1_feature_indices.md",
+      "output_sha256": "48be702e821e0374aadd8370a18f5961c2543d064732ffc67f81dad4e65acfcf",
+      "facts": {
+        "p1_i2": "MATCH",
+        "p1_k2": "MATCH",
+        "p1_xk": "MATCH",
+        "p1_C": "MATCH"
+      }
+    },
+    "image_plus_source/p2_hyperplane": {
+      "elapsed_seconds": 0.714,
+      "prompt_tokens": 412,
+      "completion_tokens": 10,
+      "response_id": "chatcmpl-88f151fdb847f213",
+      "system_fingerprint": "vllm-0.21.0-3c9634b3",
+      "output": "C:\\Users\\maxim\\python\\math_pipeline_comparison\\source-render-proof\\targeted\\image_plus_source\\p2_hyperplane.md",
+      "output_sha256": "3c901b7dab7b57658f7231ba4e1301fb709e863167e2c6735d68421b4ccd02d6",
+      "facts": {
+        "p2_hyper_minus": "MATCH"
+      }
+    },
+    "image_plus_source/p2_sign_and_negative": {
+      "elapsed_seconds": 1.845,
+      "prompt_tokens": 445,
+      "completion_tokens": 40,
+      "response_id": "chatcmpl-990e3c9c5ea6501b",
+      "system_fingerprint": "vllm-0.21.0-3c9634b3",
+      "output": "C:\\Users\\maxim\\python\\math_pipeline_comparison\\source-render-proof\\targeted\\image_plus_source\\p2_sign_and_negative.md",
+      "output_sha256": "e77fa6306ae3ccbf7a1441219ca66f85bcd3c7976eae7dd384c829e8bdf36697",
+      "facts": {
+        "p2_sign_minus": "MATCH",
+        "p2_negative_one": "REJECTED_CONTRADICTION_OR_ABSENCE"
+      }
+    },
+    "image_plus_source/p2_model": {
+      "elapsed_seconds": 1.222,
+      "prompt_tokens": 414,
+      "completion_tokens": 26,
+      "response_id": "chatcmpl-9636fe9d4b22abe6",
+      "system_fingerprint": "vllm-0.21.0-3c9634b3",
+      "output": "C:\\Users\\maxim\\python\\math_pipeline_comparison\\source-render-proof\\targeted\\image_plus_source\\p2_model.md",
+      "output_sha256": "e4ab0636ef223cfd1e71919b8f4c363e1b38dbaa1aebbe81b647c4967213d6d6",
+      "facts": {
+        "p2_model_minus": "MATCH"
+      }
+    },
+    "image_plus_source/p2_constraints": {
+      "elapsed_seconds": 2.908,
+      "prompt_tokens": 432,
+      "completion_tokens": 69,
+      "response_id": "chatcmpl-a8eb866bc5c3e4e0",
+      "system_fingerprint": "vllm-0.21.0-3c9634b3",
+      "output": "C:\\Users\\maxim\\python\\math_pipeline_comparison\\source-render-proof\\targeted\\image_plus_source\\p2_constraints.md",
+      "output_sha256": "816a6efaf4cd12f603e61ac9b950795ac159a8d3d5a4e4ce5dbb4f3cfc94f524",
+      "facts": {
+        "p2_constraints": "MATCH"
+      }
+    }
+  },
+  "targeted_overall": {
+    "image_only": {
+      "matched": 8,
+      "proven": 9,
+      "facts": {
+        "p1_i2": "MATCH",
+        "p1_k2": "MATCH",
+        "p1_xk": "MATCH",
+        "p1_C": "MATCH",
+        "p2_hyper_minus": "MATCH",
+        "p2_sign_minus": "MATCH",
+        "p2_model_minus": "MATCH",
+        "p2_negative_one": "REJECTED_CONTRADICTION_OR_ABSENCE",
+        "p2_constraints": "MATCH"
+      }
+    },
+    "image_plus_source": {
+      "matched": 8,
+      "proven": 9,
+      "facts": {
+        "p1_i2": "MATCH",
+        "p1_k2": "MATCH",
+        "p1_xk": "MATCH",
+        "p1_C": "MATCH",
+        "p2_hyper_minus": "MATCH",
+        "p2_sign_minus": "MATCH",
+        "p2_model_minus": "MATCH",
+        "p2_negative_one": "REJECTED_CONTRADICTION_OR_ABSENCE",
+        "p2_constraints": "MATCH"
+      }
+    }
+  },
+  "metrics": {
+    "facts_total": 9,
+    "source_proven": 9,
+    "mutations_total": 9,
+    "mutations_rejected": 9,
+    "targeted_image_only_matches": 8,
+    "targeted_image_plus_source_matches": 8
+  },
+  "verdict": {
+    "all_mutations_rejected": true,
+    "no_unproven_acceptance": true,
+    "source_not_worse": true,
+    "source_fixed_xk": true
+  }
+}

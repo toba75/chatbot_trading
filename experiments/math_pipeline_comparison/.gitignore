@@ -1,0 +1,14 @@
+# Environnements et caches locaux
+/.venv/
+/marker-venv/
+/mineru-inspect-venv/
+/marker-hf-cache/
+/marker-model-cache/
+/.ruff_cache/
+**/__pycache__/
+*.py[cod]
+*.log
+
+# Conversions intégrales hors du périmètre de l'expérience à deux pages
+/docling-granite-document-*.json
+/docling-granite-document-*.md

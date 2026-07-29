@@ -1,0 +1,4665 @@
+{
+    "pdf_info": [
+        {
+            "preproc_blocks": [
+                {
+                    "bbox": [
+                        69,
+                        54,
+                        185,
+                        69
+                    ],
+                    "type": "title",
+                    "angle": 0,
+                    "index": 1,
+                    "lines": [
+                        {
+                            "bbox": [
+                                69,
+                                55,
+                                184,
+                                69
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        55,
+                                        184,
+                                        69
+                                    ],
+                                    "type": "text",
+                                    "content": "1 Introduction",
+                                    "score": 1.0
+                                }
+                            ]
+                        }
+                    ],
+                    "level": 2
+                },
+                {
+                    "bbox": [
+                        68,
+                        85,
+                        260,
+                        99
+                    ],
+                    "type": "title",
+                    "angle": 0,
+                    "index": 2,
+                    "lines": [
+                        {
+                            "bbox": [
+                                70,
+                                85,
+                                259,
+                                99
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        85,
+                                        259,
+                                        99
+                                    ],
+                                    "type": "text",
+                                    "content": "1.1 What is Machine Learning",
+                                    "score": 1.0
+                                }
+                            ]
+                        }
+                    ],
+                    "level": 2
+                },
+                {
+                    "bbox": [
+                        67,
+                        111,
+                        471,
+                        148
+                    ],
+                    "type": "text",
+                    "angle": 0,
+                    "index": 3,
+                    "lines": [
+                        {
+                            "bbox": [
+                                69,
+                                113,
+                                468,
+                                122
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        113,
+                                        468,
+                                        122
+                                    ],
+                                    "type": "text",
+                                    "content": "Machine learning is a subfield of computer science that is concerned with building algorithms",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                124,
+                                469,
+                                135
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        124,
+                                        469,
+                                        135
+                                    ],
+                                    "type": "text",
+                                    "content": "which, to be useful, rely on a collection of examples of some phenomenon. These examples",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                136,
+                                443,
+                                146
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        136,
+                                        443,
+                                        146
+                                    ],
+                                    "type": "text",
+                                    "content": "can come from nature, be handcrafted by humans or generated by another algorithm.",
+                                    "score": 1.0
+                                }
+                            ]
+                        }
+                    ],
+                    "merge_prev": false
+                },
+                {
+                    "bbox": [
+                        67,
+                        153,
+                        471,
+                        189
+                    ],
+                    "type": "text",
+                    "angle": 0,
+                    "index": 4,
+                    "lines": [
+                        {
+                            "bbox": [
+                                69,
+                                155,
+                                469,
+                                164
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        155,
+                                        469,
+                                        164
+                                    ],
+                                    "type": "text",
+                                    "content": "Machine learning can also be defined as the process of solving a practical problem by 1)",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                166,
+                                470,
+                                176
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        166,
+                                        470,
+                                        176
+                                    ],
+                                    "type": "text",
+                                    "content": "gathering a dataset, and 2) algorithmically building a statistical model based on that dataset.",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                178,
+                                443,
+                                188
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        178,
+                                        443,
+                                        188
+                                    ],
+                                    "type": "text",
+                                    "content": "That statistical model is assumed to be used somehow to solve the practical problem.",
+                                    "score": 1.0
+                                }
+                            ]
+                        }
+                    ],
+                    "merge_prev": false
+                },
+                {
+                    "bbox": [
+                        67,
+                        195,
+                        451,
+                        207
+                    ],
+                    "type": "text",
+                    "angle": 0,
+                    "index": 5,
+                    "lines": [
+                        {
+                            "bbox": [
+                                69,
+                                194,
+                                450,
+                                207
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        194,
+                                        450,
+                                        207
+                                    ],
+                                    "type": "text",
+                                    "content": "To save keystrokes, I use the terms “learning” and “machine learning” interchangeably.",
+                                    "score": 1.0
+                                }
+                            ]
+                        }
+                    ],
+                    "merge_prev": false
+                },
+                {
+                    "bbox": [
+                        68,
+                        227,
+                        210,
+                        242
+                    ],
+                    "type": "title",
+                    "angle": 0,
+                    "index": 6,
+                    "lines": [
+                        {
+                            "bbox": [
+                                69,
+                                227,
+                                208,
+                                242
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        227,
+                                        208,
+                                        242
+                                    ],
+                                    "type": "text",
+                                    "content": "1.2 Types of Learning",
+                                    "score": 1.0
+                                }
+                            ]
+                        }
+                    ],
+                    "level": 2
+                },
+                {
+                    "bbox": [
+                        67,
+                        253,
+                        412,
+                        266
+                    ],
+                    "type": "text",
+                    "angle": 0,
+                    "index": 7,
+                    "lines": [
+                        {
+                            "bbox": [
+                                70,
+                                255,
+                                410,
+                                264
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        255,
+                                        410,
+                                        264
+                                    ],
+                                    "type": "text",
+                                    "content": "Learning can be supervised, semi-supervised, unsupervised and reinforcement.",
+                                    "score": 1.0
+                                }
+                            ]
+                        }
+                    ],
+                    "merge_prev": false
+                },
+                {
+                    "bbox": [
+                        68,
+                        285,
+                        210,
+                        297
+                    ],
+                    "type": "title",
+                    "angle": 0,
+                    "index": 8,
+                    "lines": [
+                        {
+                            "bbox": [
+                                69,
+                                285,
+                                208,
+                                297
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        285,
+                                        208,
+                                        297
+                                    ],
+                                    "type": "text",
+                                    "content": "1.2.1 Supervised Learning",
+                                    "score": 1.0
+                                }
+                            ]
+                        }
+                    ],
+                    "level": 2
+                },
+                {
+                    "bbox": [
+                        67,
+                        309,
+                        471,
+                        482
+                    ],
+                    "type": "text",
+                    "angle": 0,
+                    "index": 9,
+                    "lines": [
+                        {
+                            "bbox": [
+                                69,
+                                309,
+                                468,
+                                323
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        311,
+                                        412,
+                                        320
+                                    ],
+                                    "type": "text",
+                                    "content": "In supervised learning<sup>1</sup>, the dataset is the collection of labeled examples",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        415,
+                                        309,
+                                        468,
+                                        323
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "\\{ ( \\mathbf { x } _ { i } , y _ { i } ) \\} _ { i = 1 } ^ { N }",
+                                    "score": 0.9351
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                322,
+                                469,
+                                333
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        322,
+                                        129,
+                                        333
+                                    ],
+                                    "type": "text",
+                                    "content": "Each element",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        129,
+                                        324,
+                                        140,
+                                        333
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "\\mathbf { x } _ { i }",
+                                    "score": 0.8637
+                                },
+                                {
+                                    "bbox": [
+                                        141,
+                                        322,
+                                        469,
+                                        333
+                                    ],
+                                    "type": "text",
+                                    "content": "among N is called a feature vector. A feature vector is a vector in which",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                334,
+                                469,
+                                344
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        334,
+                                        138,
+                                        344
+                                    ],
+                                    "type": "text",
+                                    "content": "each dimension",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        140,
+                                        334,
+                                        197,
+                                        344
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "j = 1 , \\dots , D",
+                                    "score": 0.8687
+                                },
+                                {
+                                    "bbox": [
+                                        199,
+                                        336,
+                                        469,
+                                        343
+                                    ],
+                                    "type": "text",
+                                    "content": "contains a value that describes the example somehow. That",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                344,
+                                469,
+                                356
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        346,
+                                        267,
+                                        356
+                                    ],
+                                    "type": "text",
+                                    "content": "value is called a feature and is denoted as",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        268,
+                                        344,
+                                        285,
+                                        356
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "x ^ { ( j ) }",
+                                    "score": 0.8917
+                                },
+                                {
+                                    "bbox": [
+                                        285,
+                                        346,
+                                        469,
+                                        356
+                                    ],
+                                    "type": "text",
+                                    "content": ". For instance, if each example x in our",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                356,
+                                468,
+                                368
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        358,
+                                        305,
+                                        367
+                                    ],
+                                    "type": "text",
+                                    "content": "collection represents a person, then the first feature,",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        305,
+                                        356,
+                                        322,
+                                        368
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "x ^ { ( 1 ) }",
+                                    "score": 0.8835
+                                },
+                                {
+                                    "bbox": [
+                                        322,
+                                        358,
+                                        468,
+                                        367
+                                    ],
+                                    "type": "text",
+                                    "content": ", could contain height in cm, the",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                368,
+                                468,
+                                380
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        370,
+                                        136,
+                                        380
+                                    ],
+                                    "type": "text",
+                                    "content": "second feature,",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        136,
+                                        368,
+                                        152,
+                                        380
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "x ^ { ( 2 ) }",
+                                    "score": 0.878
+                                },
+                                {
+                                    "bbox": [
+                                        153,
+                                        370,
+                                        277,
+                                        380
+                                    ],
+                                    "type": "text",
+                                    "content": ", could contain weight in kg,",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        277,
+                                        368,
+                                        294,
+                                        380
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "x ^ { ( 3 ) }",
+                                    "score": 0.8941
+                                },
+                                {
+                                    "bbox": [
+                                        296,
+                                        371,
+                                        468,
+                                        379
+                                    ],
+                                    "type": "text",
+                                    "content": "could contain gender, and so on. For all",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                70,
+                                382,
+                                468,
+                                392
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        382,
+                                        468,
+                                        392
+                                    ],
+                                    "type": "text",
+                                    "content": "examples in the dataset, the feature at position j in the feature vector always contains the",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                392,
+                                469,
+                                407
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        396,
+                                        261,
+                                        406
+                                    ],
+                                    "type": "text",
+                                    "content": "same kind of information. It means that if",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        261,
+                                        392,
+                                        279,
+                                        407
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "x _ { i } ^ { ( 2 ) }",
+                                    "score": 0.9032
+                                },
+                                {
+                                    "bbox": [
+                                        279,
+                                        396,
+                                        455,
+                                        406
+                                    ],
+                                    "type": "text",
+                                    "content": "contains weight in kg in some example",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        456,
+                                        396,
+                                        469,
+                                        406
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "\\mathbf { x } _ { i } .",
+                                    "score": 0.8292
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                406,
+                                469,
+                                421
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        409,
+                                        91,
+                                        419
+                                    ],
+                                    "type": "text",
+                                    "content": "then",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        91,
+                                        406,
+                                        109,
+                                        421
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "x _ { k } ^ { ( 2 ) }",
+                                    "score": 0.9083
+                                },
+                                {
+                                    "bbox": [
+                                        110,
+                                        410,
+                                        313,
+                                        420
+                                    ],
+                                    "type": "text",
+                                    "content": "will also contain weight in kg in every example",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        315,
+                                        409,
+                                        388,
+                                        420
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "\\mathbf { x } _ { k } , k = 1 , \\ldots , N",
+                                    "score": 0.8971
+                                },
+                                {
+                                    "bbox": [
+                                        389,
+                                        409,
+                                        441,
+                                        419
+                                    ],
+                                    "type": "text",
+                                    "content": ". The label",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        441,
+                                        411,
+                                        451,
+                                        421
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "y _ { i }",
+                                    "score": 0.8013
+                                },
+                                {
+                                    "bbox": [
+                                        451,
+                                        409,
+                                        469,
+                                        419
+                                    ],
+                                    "type": "text",
+                                    "content": "can",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                420,
+                                469,
+                                432
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        422,
+                                        311,
+                                        431
+                                    ],
+                                    "type": "text",
+                                    "content": "be either an element belonging to a finite set of classes",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        314,
+                                        420,
+                                        367,
+                                        432
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "\\{ 1 , 2 , \\ldots , C \\}",
+                                    "score": 0.9209
+                                },
+                                {
+                                    "bbox": [
+                                        367,
+                                        422,
+                                        469,
+                                        432
+                                    ],
+                                    "type": "text",
+                                    "content": ", or a real number, or a",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                434,
+                                469,
+                                444
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        434,
+                                        469,
+                                        444
+                                    ],
+                                    "type": "text",
+                                    "content": "more complex structure, like a vector, a matrix, a tree, or a graph. Unless otherwise stated,",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                70,
+                                447,
+                                468,
+                                457
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        447,
+                                        123,
+                                        454
+                                    ],
+                                    "type": "text",
+                                    "content": "in this book",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        124,
+                                        447,
+                                        134,
+                                        457
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "y _ { i }",
+                                    "score": 0.8373
+                                },
+                                {
+                                    "bbox": [
+                                        134,
+                                        447,
+                                        468,
+                                        454
+                                    ],
+                                    "type": "text",
+                                    "content": "is either one of a finite set of classes or a real number. You can see a class as",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                458,
+                                469,
+                                467
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        458,
+                                        469,
+                                        467
+                                    ],
+                                    "type": "text",
+                                    "content": "a category to which an example belongs. For instance, if your examples are email messages",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                70,
+                                470,
+                                434,
+                                480
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        470,
+                                        434,
+                                        480
+                                    ],
+                                    "type": "text",
+                                    "content": "and your problem is spam detection, then you have two classes spam, not_spam .",
+                                    "score": 1.0
+                                }
+                            ]
+                        }
+                    ],
+                    "merge_prev": false
+                },
+                {
+                    "bbox": [
+                        67,
+                        486,
+                        471,
+                        547
+                    ],
+                    "type": "text",
+                    "angle": 0,
+                    "index": 10,
+                    "lines": [
+                        {
+                            "bbox": [
+                                69,
+                                488,
+                                469,
+                                498
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        488,
+                                        469,
+                                        498
+                                    ],
+                                    "type": "text",
+                                    "content": "The goal of a supervised learning algorithm is to use the dataset to produce a model",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                499,
+                                468,
+                                508
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        499,
+                                        468,
+                                        508
+                                    ],
+                                    "type": "text",
+                                    "content": "that takes a feature vector x as input and outputs information that allows deducing the label",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                512,
+                                469,
+                                521
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        512,
+                                        469,
+                                        521
+                                    ],
+                                    "type": "text",
+                                    "content": "for this feature vector. For instance, the model created using the dataset of people could",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                70,
+                                524,
+                                468,
+                                532
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        524,
+                                        468,
+                                        532
+                                    ],
+                                    "type": "text",
+                                    "content": "take as input a feature vector describing a person and output a probability that the person",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                536,
+                                118,
+                                545
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        536,
+                                        118,
+                                        545
+                                    ],
+                                    "type": "text",
+                                    "content": "has cancer.",
+                                    "score": 1.0
+                                }
+                            ]
+                        }
+                    ],
+                    "merge_prev": false
+                }
+            ],
+            "discarded_blocks": [
+                {
+                    "bbox": [
+                        462,
+                        602,
+                        470,
+                        612
+                    ],
+                    "type": "page_number",
+                    "angle": 0,
+                    "index": 0,
+                    "lines": [
+                        {
+                            "bbox": [
+                                463,
+                                603,
+                                469,
+                                612
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        463,
+                                        603,
+                                        469,
+                                        612
+                                    ],
+                                    "type": "text",
+                                    "content": "3",
+                                    "score": 1.0
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "bbox": [
+                        67,
+                        550,
+                        471,
+                        570
+                    ],
+                    "type": "page_footnote",
+                    "angle": 0,
+                    "index": 11,
+                    "lines": [
+                        {
+                            "bbox": [
+                                80,
+                                551,
+                                469,
+                                560
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        80,
+                                        551,
+                                        469,
+                                        560
+                                    ],
+                                    "type": "text",
+                                    "content": "<sup>1</sup>In this book, if a term is in bold, that means that this term can be found in the index at the end of the",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                561,
+                                91,
+                                570
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        561,
+                                        91,
+                                        570
+                                    ],
+                                    "type": "text",
+                                    "content": "book.",
+                                    "score": 1.0
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "bbox": [
+                        68,
+                        602,
+                        382,
+                        614
+                    ],
+                    "type": "footer",
+                    "angle": 0,
+                    "index": 12,
+                    "lines": [
+                        {
+                            "bbox": [
+                                70,
+                                604,
+                                380,
+                                612
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        604,
+                                        156,
+                                        612
+                                    ],
+                                    "type": "text",
+                                    "content": "Andriy Burkov",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        157,
+                                        604,
+                                        380,
+                                        612
+                                    ],
+                                    "type": "text",
+                                    "content": "The Hundred-Page Machine Learning Book - Draft",
+                                    "score": 1.0
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ],
+            "page_size": [
+                540,
+                666
+            ],
+            "page_idx": 0,
+            "para_blocks": [
+                {
+                    "bbox": [
+                        69,
+                        54,
+                        185,
+                        69
+                    ],
+                    "type": "title",
+                    "angle": 0,
+                    "index": 1,
+                    "lines": [
+                        {
+                            "bbox": [
+                                69,
+                                55,
+                                184,
+                                69
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        55,
+                                        184,
+                                        69
+                                    ],
+                                    "type": "text",
+                                    "content": "1 Introduction",
+                                    "score": 1.0
+                                }
+                            ]
+                        }
+                    ],
+                    "level": 2
+                },
+                {
+                    "bbox": [
+                        68,
+                        85,
+                        260,
+                        99
+                    ],
+                    "type": "title",
+                    "angle": 0,
+                    "index": 2,
+                    "lines": [
+                        {
+                            "bbox": [
+                                70,
+                                85,
+                                259,
+                                99
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        85,
+                                        259,
+                                        99
+                                    ],
+                                    "type": "text",
+                                    "content": "1.1 What is Machine Learning",
+                                    "score": 1.0
+                                }
+                            ]
+                        }
+                    ],
+                    "level": 2
+                },
+                {
+                    "bbox": [
+                        67,
+                        111,
+                        471,
+                        148
+                    ],
+                    "type": "text",
+                    "angle": 0,
+                    "index": 3,
+                    "lines": [
+                        {
+                            "bbox": [
+                                69,
+                                113,
+                                468,
+                                122
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        113,
+                                        468,
+                                        122
+                                    ],
+                                    "type": "text",
+                                    "content": "Machine learning is a subfield of computer science that is concerned with building algorithms",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                124,
+                                469,
+                                135
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        124,
+                                        469,
+                                        135
+                                    ],
+                                    "type": "text",
+                                    "content": "which, to be useful, rely on a collection of examples of some phenomenon. These examples",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                136,
+                                443,
+                                146
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        136,
+                                        443,
+                                        146
+                                    ],
+                                    "type": "text",
+                                    "content": "can come from nature, be handcrafted by humans or generated by another algorithm.",
+                                    "score": 1.0
+                                }
+                            ]
+                        }
+                    ],
+                    "merge_prev": false
+                },
+                {
+                    "bbox": [
+                        67,
+                        153,
+                        471,
+                        189
+                    ],
+                    "type": "text",
+                    "angle": 0,
+                    "index": 4,
+                    "lines": [
+                        {
+                            "bbox": [
+                                69,
+                                155,
+                                469,
+                                164
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        155,
+                                        469,
+                                        164
+                                    ],
+                                    "type": "text",
+                                    "content": "Machine learning can also be defined as the process of solving a practical problem by 1)",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                166,
+                                470,
+                                176
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        166,
+                                        470,
+                                        176
+                                    ],
+                                    "type": "text",
+                                    "content": "gathering a dataset, and 2) algorithmically building a statistical model based on that dataset.",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                178,
+                                443,
+                                188
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        178,
+                                        443,
+                                        188
+                                    ],
+                                    "type": "text",
+                                    "content": "That statistical model is assumed to be used somehow to solve the practical problem.",
+                                    "score": 1.0
+                                }
+                            ]
+                        }
+                    ],
+                    "merge_prev": false
+                },
+                {
+                    "bbox": [
+                        67,
+                        195,
+                        451,
+                        207
+                    ],
+                    "type": "text",
+                    "angle": 0,
+                    "index": 5,
+                    "lines": [
+                        {
+                            "bbox": [
+                                69,
+                                194,
+                                450,
+                                207
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        194,
+                                        450,
+                                        207
+                                    ],
+                                    "type": "text",
+                                    "content": "To save keystrokes, I use the terms “learning” and “machine learning” interchangeably.",
+                                    "score": 1.0
+                                }
+                            ]
+                        }
+                    ],
+                    "merge_prev": false
+                },
+                {
+                    "bbox": [
+                        68,
+                        227,
+                        210,
+                        242
+                    ],
+                    "type": "title",
+                    "angle": 0,
+                    "index": 6,
+                    "lines": [
+                        {
+                            "bbox": [
+                                69,
+                                227,
+                                208,
+                                242
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        227,
+                                        208,
+                                        242
+                                    ],
+                                    "type": "text",
+                                    "content": "1.2 Types of Learning",
+                                    "score": 1.0
+                                }
+                            ]
+                        }
+                    ],
+                    "level": 2
+                },
+                {
+                    "bbox": [
+                        67,
+                        253,
+                        412,
+                        266
+                    ],
+                    "type": "text",
+                    "angle": 0,
+                    "index": 7,
+                    "lines": [
+                        {
+                            "bbox": [
+                                70,
+                                255,
+                                410,
+                                264
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        255,
+                                        410,
+                                        264
+                                    ],
+                                    "type": "text",
+                                    "content": "Learning can be supervised, semi-supervised, unsupervised and reinforcement.",
+                                    "score": 1.0
+                                }
+                            ]
+                        }
+                    ],
+                    "merge_prev": false
+                },
+                {
+                    "bbox": [
+                        68,
+                        285,
+                        210,
+                        297
+                    ],
+                    "type": "title",
+                    "angle": 0,
+                    "index": 8,
+                    "lines": [
+                        {
+                            "bbox": [
+                                69,
+                                285,
+                                208,
+                                297
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        285,
+                                        208,
+                                        297
+                                    ],
+                                    "type": "text",
+                                    "content": "1.2.1 Supervised Learning",
+                                    "score": 1.0
+                                }
+                            ]
+                        }
+                    ],
+                    "level": 2
+                },
+                {
+                    "bbox": [
+                        67,
+                        309,
+                        471,
+                        482
+                    ],
+                    "type": "text",
+                    "angle": 0,
+                    "index": 9,
+                    "lines": [
+                        {
+                            "bbox": [
+                                69,
+                                309,
+                                468,
+                                323
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        311,
+                                        412,
+                                        320
+                                    ],
+                                    "type": "text",
+                                    "content": "In supervised learning<sup>1</sup>, the dataset is the collection of labeled examples",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        415,
+                                        309,
+                                        468,
+                                        323
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "\\{ ( \\mathbf { x } _ { i } , y _ { i } ) \\} _ { i = 1 } ^ { N }",
+                                    "score": 0.9351
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                322,
+                                469,
+                                333
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        322,
+                                        129,
+                                        333
+                                    ],
+                                    "type": "text",
+                                    "content": "Each element",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        129,
+                                        324,
+                                        140,
+                                        333
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "\\mathbf { x } _ { i }",
+                                    "score": 0.8637
+                                },
+                                {
+                                    "bbox": [
+                                        141,
+                                        322,
+                                        469,
+                                        333
+                                    ],
+                                    "type": "text",
+                                    "content": "among N is called a feature vector. A feature vector is a vector in which",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                334,
+                                469,
+                                344
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        334,
+                                        138,
+                                        344
+                                    ],
+                                    "type": "text",
+                                    "content": "each dimension",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        140,
+                                        334,
+                                        197,
+                                        344
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "j = 1 , \\dots , D",
+                                    "score": 0.8687
+                                },
+                                {
+                                    "bbox": [
+                                        199,
+                                        336,
+                                        469,
+                                        343
+                                    ],
+                                    "type": "text",
+                                    "content": "contains a value that describes the example somehow. That",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                344,
+                                469,
+                                356
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        346,
+                                        267,
+                                        356
+                                    ],
+                                    "type": "text",
+                                    "content": "value is called a feature and is denoted as",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        268,
+                                        344,
+                                        285,
+                                        356
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "x ^ { ( j ) }",
+                                    "score": 0.8917
+                                },
+                                {
+                                    "bbox": [
+                                        285,
+                                        346,
+                                        469,
+                                        356
+                                    ],
+                                    "type": "text",
+                                    "content": ". For instance, if each example x in our",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                356,
+                                468,
+                                368
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        358,
+                                        305,
+                                        367
+                                    ],
+                                    "type": "text",
+                                    "content": "collection represents a person, then the first feature,",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        305,
+                                        356,
+                                        322,
+                                        368
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "x ^ { ( 1 ) }",
+                                    "score": 0.8835
+                                },
+                                {
+                                    "bbox": [
+                                        322,
+                                        358,
+                                        468,
+                                        367
+                                    ],
+                                    "type": "text",
+                                    "content": ", could contain height in cm, the",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                368,
+                                468,
+                                380
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        370,
+                                        136,
+                                        380
+                                    ],
+                                    "type": "text",
+                                    "content": "second feature,",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        136,
+                                        368,
+                                        152,
+                                        380
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "x ^ { ( 2 ) }",
+                                    "score": 0.878
+                                },
+                                {
+                                    "bbox": [
+                                        153,
+                                        370,
+                                        277,
+                                        380
+                                    ],
+                                    "type": "text",
+                                    "content": ", could contain weight in kg,",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        277,
+                                        368,
+                                        294,
+                                        380
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "x ^ { ( 3 ) }",
+                                    "score": 0.8941
+                                },
+                                {
+                                    "bbox": [
+                                        296,
+                                        371,
+                                        468,
+                                        379
+                                    ],
+                                    "type": "text",
+                                    "content": "could contain gender, and so on. For all",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                70,
+                                382,
+                                468,
+                                392
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        382,
+                                        468,
+                                        392
+                                    ],
+                                    "type": "text",
+                                    "content": "examples in the dataset, the feature at position j in the feature vector always contains the",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                392,
+                                469,
+                                407
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        396,
+                                        261,
+                                        406
+                                    ],
+                                    "type": "text",
+                                    "content": "same kind of information. It means that if",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        261,
+                                        392,
+                                        279,
+                                        407
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "x _ { i } ^ { ( 2 ) }",
+                                    "score": 0.9032
+                                },
+                                {
+                                    "bbox": [
+                                        279,
+                                        396,
+                                        455,
+                                        406
+                                    ],
+                                    "type": "text",
+                                    "content": "contains weight in kg in some example",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        456,
+                                        396,
+                                        469,
+                                        406
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "\\mathbf { x } _ { i } .",
+                                    "score": 0.8292
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                406,
+                                469,
+                                421
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        409,
+                                        91,
+                                        419
+                                    ],
+                                    "type": "text",
+                                    "content": "then",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        91,
+                                        406,
+                                        109,
+                                        421
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "x _ { k } ^ { ( 2 ) }",
+                                    "score": 0.9083
+                                },
+                                {
+                                    "bbox": [
+                                        110,
+                                        410,
+                                        313,
+                                        420
+                                    ],
+                                    "type": "text",
+                                    "content": "will also contain weight in kg in every example",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        315,
+                                        409,
+                                        388,
+                                        420
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "\\mathbf { x } _ { k } , k = 1 , \\ldots , N",
+                                    "score": 0.8971
+                                },
+                                {
+                                    "bbox": [
+                                        389,
+                                        409,
+                                        441,
+                                        419
+                                    ],
+                                    "type": "text",
+                                    "content": ". The label",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        441,
+                                        411,
+                                        451,
+                                        421
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "y _ { i }",
+                                    "score": 0.8013
+                                },
+                                {
+                                    "bbox": [
+                                        451,
+                                        409,
+                                        469,
+                                        419
+                                    ],
+                                    "type": "text",
+                                    "content": "can",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                420,
+                                469,
+                                432
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        422,
+                                        311,
+                                        431
+                                    ],
+                                    "type": "text",
+                                    "content": "be either an element belonging to a finite set of classes",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        314,
+                                        420,
+                                        367,
+                                        432
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "\\{ 1 , 2 , \\ldots , C \\}",
+                                    "score": 0.9209
+                                },
+                                {
+                                    "bbox": [
+                                        367,
+                                        422,
+                                        469,
+                                        432
+                                    ],
+                                    "type": "text",
+                                    "content": ", or a real number, or a",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                434,
+                                469,
+                                444
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        434,
+                                        469,
+                                        444
+                                    ],
+                                    "type": "text",
+                                    "content": "more complex structure, like a vector, a matrix, a tree, or a graph. Unless otherwise stated,",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                70,
+                                447,
+                                468,
+                                457
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        447,
+                                        123,
+                                        454
+                                    ],
+                                    "type": "text",
+                                    "content": "in this book",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        124,
+                                        447,
+                                        134,
+                                        457
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "y _ { i }",
+                                    "score": 0.8373
+                                },
+                                {
+                                    "bbox": [
+                                        134,
+                                        447,
+                                        468,
+                                        454
+                                    ],
+                                    "type": "text",
+                                    "content": "is either one of a finite set of classes or a real number. You can see a class as",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                458,
+                                469,
+                                467
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        458,
+                                        469,
+                                        467
+                                    ],
+                                    "type": "text",
+                                    "content": "a category to which an example belongs. For instance, if your examples are email messages",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                70,
+                                470,
+                                434,
+                                480
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        470,
+                                        434,
+                                        480
+                                    ],
+                                    "type": "text",
+                                    "content": "and your problem is spam detection, then you have two classes spam, not_spam .",
+                                    "score": 1.0
+                                }
+                            ]
+                        }
+                    ],
+                    "merge_prev": false
+                },
+                {
+                    "bbox": [
+                        67,
+                        486,
+                        471,
+                        547
+                    ],
+                    "type": "text",
+                    "angle": 0,
+                    "index": 10,
+                    "lines": [
+                        {
+                            "bbox": [
+                                69,
+                                488,
+                                469,
+                                498
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        488,
+                                        469,
+                                        498
+                                    ],
+                                    "type": "text",
+                                    "content": "The goal of a supervised learning algorithm is to use the dataset to produce a model",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                499,
+                                468,
+                                508
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        499,
+                                        468,
+                                        508
+                                    ],
+                                    "type": "text",
+                                    "content": "that takes a feature vector x as input and outputs information that allows deducing the label",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                512,
+                                469,
+                                521
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        512,
+                                        469,
+                                        521
+                                    ],
+                                    "type": "text",
+                                    "content": "for this feature vector. For instance, the model created using the dataset of people could",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                70,
+                                524,
+                                468,
+                                532
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        524,
+                                        468,
+                                        532
+                                    ],
+                                    "type": "text",
+                                    "content": "take as input a feature vector describing a person and output a probability that the person",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                536,
+                                118,
+                                545
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        536,
+                                        118,
+                                        545
+                                    ],
+                                    "type": "text",
+                                    "content": "has cancer.",
+                                    "score": 1.0
+                                }
+                            ]
+                        }
+                    ],
+                    "merge_prev": false
+                }
+            ]
+        },
+        {
+            "preproc_blocks": [
+                {
+                    "bbox": [
+                        67,
+                        57,
+                        472,
+                        106
+                    ],
+                    "type": "text",
+                    "angle": 0,
+                    "index": 0,
+                    "lines": [
+                        {
+                            "bbox": [
+                                69,
+                                58,
+                                470,
+                                69
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        58,
+                                        470,
+                                        69
+                                    ],
+                                    "type": "text",
+                                    "content": "is 20,000-dimensional). The algorithm puts all feature vectors on an imaginary 20,000-",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                70,
+                                469,
+                                81
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        70,
+                                        469,
+                                        81
+                                    ],
+                                    "type": "text",
+                                    "content": "dimensional plot and draws an imaginary 20,000-dimensional line (a hyperplane) that separates",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                70,
+                                83,
+                                469,
+                                92
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        83,
+                                        469,
+                                        92
+                                    ],
+                                    "type": "text",
+                                    "content": "examples with positive labels from examples with negative labels. In machine learning, the",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                94,
+                                455,
+                                105
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        94,
+                                        455,
+                                        105
+                                    ],
+                                    "type": "text",
+                                    "content": "boundary separating the examples of di\u0000erent classes is called the decision boundary.",
+                                    "score": 1.0
+                                }
+                            ]
+                        }
+                    ],
+                    "merge_prev": false
+                },
+                {
+                    "bbox": [
+                        66,
+                        111,
+                        471,
+                        136
+                    ],
+                    "type": "text",
+                    "angle": 0,
+                    "index": 1,
+                    "lines": [
+                        {
+                            "bbox": [
+                                69,
+                                111,
+                                469,
+                                123
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        111,
+                                        469,
+                                        123
+                                    ],
+                                    "type": "text",
+                                    "content": "The equation of the hyperplane is given by two parameters, a real-valued vector w of the",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                70,
+                                124,
+                                422,
+                                134
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        124,
+                                        422,
+                                        134
+                                    ],
+                                    "type": "text",
+                                    "content": "same dimensionality as our input feature vector x, and a real number b like this:",
+                                    "score": 1.0
+                                }
+                            ]
+                        }
+                    ],
+                    "merge_prev": false
+                },
+                {
+                    "bbox": [
+                        240,
+                        153,
+                        297,
+                        164
+                    ],
+                    "type": "interline_equation",
+                    "angle": 0,
+                    "lines": [
+                        {
+                            "bbox": [
+                                240,
+                                153,
+                                297,
+                                164
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        240,
+                                        153,
+                                        297,
+                                        164
+                                    ],
+                                    "type": "interline_equation",
+                                    "content": "\\mathbf {w x} - b = 0,",
+                                    "image_path": "6c206393ae423b549f45e618fb211cd2f7b98db2b286877ec88ba4a0cd8b7bd1.jpg"
+                                }
+                            ]
+                        }
+                    ],
+                    "index": 2
+                },
+                {
+                    "bbox": [
+                        66,
+                        175,
+                        470,
+                        201
+                    ],
+                    "type": "text",
+                    "angle": 0,
+                    "index": 3,
+                    "lines": [
+                        {
+                            "bbox": [
+                                70,
+                                175,
+                                469,
+                                188
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        178,
+                                        210,
+                                        188
+                                    ],
+                                    "type": "text",
+                                    "content": "where the expression wx means",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        212,
+                                        175,
+                                        370,
+                                        187
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "w ^ { ( 1 ) } x ^ { ( 1 ) } + w ^ { ( 2 ) } x ^ { ( 2 ) } + . . . + w ^ { ( D ) } x ^ { ( D ) }",
+                                    "score": 0.9419
+                                },
+                                {
+                                    "bbox": [
+                                        370,
+                                        178,
+                                        469,
+                                        188
+                                    ],
+                                    "type": "text",
+                                    "content": ", and D is the number",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                189,
+                                233,
+                                199
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        189,
+                                        233,
+                                        199
+                                    ],
+                                    "type": "text",
+                                    "content": "of dimensions of the feature vector x.",
+                                    "score": 1.0
+                                }
+                            ]
+                        }
+                    ],
+                    "merge_prev": false
+                },
+                {
+                    "bbox": [
+                        66,
+                        206,
+                        471,
+                        243
+                    ],
+                    "type": "text",
+                    "angle": 0,
+                    "index": 4,
+                    "lines": [
+                        {
+                            "bbox": [
+                                69,
+                                207,
+                                469,
+                                218
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        207,
+                                        469,
+                                        218
+                                    ],
+                                    "type": "text",
+                                    "content": "(If some equations aren’t clear to you right now, in Chapter 2 we revisit the math and",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                70,
+                                221,
+                                469,
+                                229
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        221,
+                                        469,
+                                        229
+                                    ],
+                                    "type": "text",
+                                    "content": "statistical concepts necessary to understand them. For the moment, try to get an intuition of",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                70,
+                                233,
+                                431,
+                                241
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        233,
+                                        431,
+                                        241
+                                    ],
+                                    "type": "text",
+                                    "content": "what’s happening here. It all becomes more clear after you read the next chapter.)",
+                                    "score": 1.0
+                                }
+                            ]
+                        }
+                    ],
+                    "merge_prev": false
+                },
+                {
+                    "bbox": [
+                        67,
+                        248,
+                        396,
+                        261
+                    ],
+                    "type": "text",
+                    "angle": 0,
+                    "index": 5,
+                    "lines": [
+                        {
+                            "bbox": [
+                                70,
+                                251,
+                                393,
+                                259
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        251,
+                                        393,
+                                        259
+                                    ],
+                                    "type": "text",
+                                    "content": "Now, the predicted label for some input feature vector x is given like this:",
+                                    "score": 1.0
+                                }
+                            ]
+                        }
+                    ],
+                    "merge_prev": false
+                },
+                {
+                    "bbox": [
+                        227,
+                        279,
+                        310,
+                        291
+                    ],
+                    "type": "interline_equation",
+                    "angle": 0,
+                    "lines": [
+                        {
+                            "bbox": [
+                                227,
+                                279,
+                                310,
+                                291
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        227,
+                                        279,
+                                        310,
+                                        291
+                                    ],
+                                    "type": "interline_equation",
+                                    "content": "y = \\mathrm{sign} (\\mathbf {w x} - b),",
+                                    "image_path": "ef7350b4ef54e17662256bb5b1ab641e270907b535d6795eaacd159742b0fcbe.jpg"
+                                }
+                            ]
+                        }
+                    ],
+                    "index": 6
+                },
+                {
+                    "bbox": [
+                        66,
+                        302,
+                        470,
+                        327
+                    ],
+                    "type": "text",
+                    "angle": 0,
+                    "index": 7,
+                    "lines": [
+                        {
+                            "bbox": [
+                                70,
+                                305,
+                                468,
+                                313
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        305,
+                                        468,
+                                        313
+                                    ],
+                                    "type": "text",
+                                    "content": "where sign is a mathematical operator that takes any value as input and returns +1 if the",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                70,
+                                316,
+                                362,
+                                325
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        316,
+                                        362,
+                                        325
+                                    ],
+                                    "type": "text",
+                                    "content": "input is a positive number or 1 if the input is a negative number.",
+                                    "score": 1.0
+                                }
+                            ]
+                        }
+                    ],
+                    "merge_prev": false
+                },
+                {
+                    "bbox": [
+                        67,
+                        332,
+                        471,
+                        369
+                    ],
+                    "type": "text",
+                    "angle": 0,
+                    "index": 8,
+                    "lines": [
+                        {
+                            "bbox": [
+                                69,
+                                333,
+                                469,
+                                343
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        333,
+                                        469,
+                                        343
+                                    ],
+                                    "type": "text",
+                                    "content": "The goal of the learning algorithm — SVM in this case — is to leverage the dataset and find",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                343,
+                                469,
+                                355
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        345,
+                                        150,
+                                        355
+                                    ],
+                                    "type": "text",
+                                    "content": "the optimal values",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        150,
+                                        344,
+                                        165,
+                                        354
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "\\mathbf { w } ^ { * }",
+                                    "score": 0.8031
+                                },
+                                {
+                                    "bbox": [
+                                        166,
+                                        345,
+                                        185,
+                                        355
+                                    ],
+                                    "type": "text",
+                                    "content": "and",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        185,
+                                        343,
+                                        197,
+                                        354
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "b ^ { * }",
+                                    "score": 0.7933
+                                },
+                                {
+                                    "bbox": [
+                                        197,
+                                        345,
+                                        469,
+                                        355
+                                    ],
+                                    "type": "text",
+                                    "content": "for parameters w and b. Once the learning algorithm identifies",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                70,
+                                356,
+                                318,
+                                368
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        358,
+                                        214,
+                                        367
+                                    ],
+                                    "type": "text",
+                                    "content": "these optimal values, the model",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        214,
+                                        356,
+                                        235,
+                                        368
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "f ( \\mathbf { x } )",
+                                    "score": 0.5075
+                                },
+                                {
+                                    "bbox": [
+                                        237,
+                                        358,
+                                        318,
+                                        367
+                                    ],
+                                    "type": "text",
+                                    "content": "is then defined as:",
+                                    "score": 1.0
+                                }
+                            ]
+                        }
+                    ],
+                    "merge_prev": false
+                },
+                {
+                    "bbox": [
+                        217,
+                        386,
+                        321,
+                        399
+                    ],
+                    "type": "interline_equation",
+                    "angle": 0,
+                    "lines": [
+                        {
+                            "bbox": [
+                                217,
+                                386,
+                                321,
+                                399
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        217,
+                                        386,
+                                        321,
+                                        399
+                                    ],
+                                    "type": "interline_equation",
+                                    "content": "f (\\mathbf {x}) = \\mathrm{sign} (\\mathbf {w} ^ {*} \\mathbf {x} - b ^ {*})",
+                                    "image_path": "ed383e95bc8c1ece3a8153b12c7d50add562fbf6489077497beb7a6f60c38e84.jpg"
+                                }
+                            ]
+                        }
+                    ],
+                    "index": 9
+                },
+                {
+                    "bbox": [
+                        66,
+                        410,
+                        471,
+                        458
+                    ],
+                    "type": "text",
+                    "angle": 0,
+                    "index": 10,
+                    "lines": [
+                        {
+                            "bbox": [
+                                69,
+                                410,
+                                470,
+                                421
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        410,
+                                        470,
+                                        421
+                                    ],
+                                    "type": "text",
+                                    "content": "Therefore, to predict whether an email message is spam or not spam using an SVM model,",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                423,
+                                469,
+                                433
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        423,
+                                        469,
+                                        433
+                                    ],
+                                    "type": "text",
+                                    "content": "you have to take a text of the message, convert it into a feature vector, then multiply this",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                434,
+                                469,
+                                445
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        435,
+                                        111,
+                                        445
+                                    ],
+                                    "type": "text",
+                                    "content": "vector by",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        111,
+                                        434,
+                                        126,
+                                        445
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "\\mathbf { w } ^ { * }",
+                                    "score": 0.7836
+                                },
+                                {
+                                    "bbox": [
+                                        126,
+                                        435,
+                                        167,
+                                        445
+                                    ],
+                                    "type": "text",
+                                    "content": ", subtract",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        168,
+                                        434,
+                                        179,
+                                        444
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "b ^ { * }",
+                                    "score": 0.7701
+                                },
+                                {
+                                    "bbox": [
+                                        180,
+                                        435,
+                                        469,
+                                        445
+                                    ],
+                                    "type": "text",
+                                    "content": "and take the sign of the result. This will give us the prediction (+1",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                70,
+                                448,
+                                246,
+                                456
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        448,
+                                        246,
+                                        456
+                                    ],
+                                    "type": "text",
+                                    "content": "means “spam”, 1 means “not_spam”).",
+                                    "score": 1.0
+                                }
+                            ]
+                        }
+                    ],
+                    "merge_prev": false
+                },
+                {
+                    "bbox": [
+                        67,
+                        463,
+                        470,
+                        488
+                    ],
+                    "type": "text",
+                    "angle": 0,
+                    "index": 11,
+                    "lines": [
+                        {
+                            "bbox": [
+                                70,
+                                464,
+                                469,
+                                474
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        465,
+                                        215,
+                                        474
+                                    ],
+                                    "type": "text",
+                                    "content": "Now, how does the machine find",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        216,
+                                        464,
+                                        231,
+                                        474
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "\\mathbf { w } ^ { * }",
+                                    "score": 0.7288
+                                },
+                                {
+                                    "bbox": [
+                                        231,
+                                        465,
+                                        251,
+                                        474
+                                    ],
+                                    "type": "text",
+                                    "content": "and",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        252,
+                                        464,
+                                        267,
+                                        474
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "b ^ { \\ast } ?",
+                                    "score": 0.7903
+                                },
+                                {
+                                    "bbox": [
+                                        268,
+                                        465,
+                                        469,
+                                        474
+                                    ],
+                                    "type": "text",
+                                    "content": "It solves an optimization problem. Machines",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                70,
+                                478,
+                                293,
+                                486
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        478,
+                                        293,
+                                        486
+                                    ],
+                                    "type": "text",
+                                    "content": "are good at optimizing functions under constraints.",
+                                    "score": 1.0
+                                }
+                            ]
+                        }
+                    ],
+                    "merge_prev": false
+                },
+                {
+                    "bbox": [
+                        67,
+                        494,
+                        471,
+                        542
+                    ],
+                    "type": "text",
+                    "angle": 0,
+                    "index": 12,
+                    "lines": [
+                        {
+                            "bbox": [
+                                69,
+                                494,
+                                469,
+                                505
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        494,
+                                        469,
+                                        505
+                                    ],
+                                    "type": "text",
+                                    "content": "So what are the constraints we want to satisfy here? First of all, we want the model to predict",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                506,
+                                469,
+                                516
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        506,
+                                        469,
+                                        516
+                                    ],
+                                    "type": "text",
+                                    "content": "the labels of our 10,000 examples correctly. Remember that each example i = 1, . . . , 10000 is",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                70,
+                                518,
+                                469,
+                                530
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        519,
+                                        138,
+                                        528
+                                    ],
+                                    "type": "text",
+                                    "content": "given by a pair",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        140,
+                                        518,
+                                        170,
+                                        529
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "\\left( \\mathbf { x } _ { i } , y _ { i } \\right)",
+                                    "score": 0.8793
+                                },
+                                {
+                                    "bbox": [
+                                        170,
+                                        518,
+                                        204,
+                                        528
+                                    ],
+                                    "type": "text",
+                                    "content": ", where",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        204,
+                                        519,
+                                        216,
+                                        529
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "\\mathbf { x } _ { i }",
+                                    "score": 0.8418
+                                },
+                                {
+                                    "bbox": [
+                                        216,
+                                        518,
+                                        388,
+                                        528
+                                    ],
+                                    "type": "text",
+                                    "content": "is the feature vector of example i and",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        388,
+                                        520,
+                                        399,
+                                        530
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "y _ { i }",
+                                    "score": 0.8495
+                                },
+                                {
+                                    "bbox": [
+                                        399,
+                                        518,
+                                        469,
+                                        528
+                                    ],
+                                    "type": "text",
+                                    "content": "is its label that",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                530,
+                                342,
+                                540
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        530,
+                                        342,
+                                        540
+                                    ],
+                                    "type": "text",
+                                    "content": "takes values either 1 or +1. So the constraints are naturally:",
+                                    "score": 1.0
+                                }
+                            ]
+                        }
+                    ],
+                    "merge_prev": false
+                },
+                {
+                    "bbox": [
+                        81,
+                        547,
+                        219,
+                        559
+                    ],
+                    "type": "text",
+                    "angle": 0,
+                    "index": 13,
+                    "lines": [
+                        {
+                            "bbox": [
+                                93,
+                                547,
+                                217,
+                                560
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        93,
+                                        548,
+                                        195,
+                                        559
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "\\mathbf { w x } _ { i } - b \\geq 1 { \\mathrm { ~ i f ~ } } y _ { i } = + 1",
+                                    "score": 0.5056
+                                },
+                                {
+                                    "bbox": [
+                                        196,
+                                        547,
+                                        217,
+                                        560
+                                    ],
+                                    "type": "text",
+                                    "content": ", and",
+                                    "score": 1.0
+                                }
+                            ]
+                        }
+                    ],
+                    "merge_prev": false
+                },
+                {
+                    "bbox": [
+                        82,
+                        560,
+                        204,
+                        571
+                    ],
+                    "type": "text",
+                    "angle": 0,
+                    "index": 14,
+                    "lines": [
+                        {
+                            "bbox": [
+                                94,
+                                560,
+                                203,
+                                571
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        94,
+                                        560,
+                                        203,
+                                        571
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "\\mathbf { w x } _ { i } - b \\leq - 1 { \\mathrm { ~ i f ~ } } y _ { i } = - 1",
+                                    "score": 0.6986
+                                }
+                            ]
+                        }
+                    ],
+                    "merge_prev": false
+                }
+            ],
+            "discarded_blocks": [
+                {
+                    "bbox": [
+                        68,
+                        601,
+                        382,
+                        614
+                    ],
+                    "type": "footer",
+                    "angle": 0,
+                    "index": 15,
+                    "lines": [
+                        {
+                            "bbox": [
+                                70,
+                                604,
+                                380,
+                                612
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        604,
+                                        153,
+                                        612
+                                    ],
+                                    "type": "text",
+                                    "content": "Andriy Burkov",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        157,
+                                        604,
+                                        380,
+                                        612
+                                    ],
+                                    "type": "text",
+                                    "content": "The Hundred-Page Machine Learning Book - Draft",
+                                    "score": 1.0
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "bbox": [
+                        462,
+                        602,
+                        470,
+                        612
+                    ],
+                    "type": "page_number",
+                    "angle": 0,
+                    "index": 16,
+                    "lines": [
+                        {
+                            "bbox": [
+                                463,
+                                603,
+                                469,
+                                612
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        463,
+                                        603,
+                                        469,
+                                        612
+                                    ],
+                                    "type": "text",
+                                    "content": "6",
+                                    "score": 1.0
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ],
+            "page_size": [
+                540,
+                666
+            ],
+            "page_idx": 1,
+            "para_blocks": [
+                {
+                    "bbox": [
+                        67,
+                        57,
+                        472,
+                        106
+                    ],
+                    "type": "text",
+                    "angle": 0,
+                    "index": 0,
+                    "lines": [
+                        {
+                            "bbox": [
+                                69,
+                                58,
+                                470,
+                                69
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        58,
+                                        470,
+                                        69
+                                    ],
+                                    "type": "text",
+                                    "content": "is 20,000-dimensional). The algorithm puts all feature vectors on an imaginary 20,000-",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                70,
+                                469,
+                                81
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        70,
+                                        469,
+                                        81
+                                    ],
+                                    "type": "text",
+                                    "content": "dimensional plot and draws an imaginary 20,000-dimensional line (a hyperplane) that separates",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                70,
+                                83,
+                                469,
+                                92
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        83,
+                                        469,
+                                        92
+                                    ],
+                                    "type": "text",
+                                    "content": "examples with positive labels from examples with negative labels. In machine learning, the",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                94,
+                                455,
+                                105
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        94,
+                                        455,
+                                        105
+                                    ],
+                                    "type": "text",
+                                    "content": "boundary separating the examples of di\u0000erent classes is called the decision boundary.",
+                                    "score": 1.0
+                                }
+                            ]
+                        }
+                    ],
+                    "merge_prev": false
+                },
+                {
+                    "bbox": [
+                        66,
+                        111,
+                        471,
+                        136
+                    ],
+                    "type": "text",
+                    "angle": 0,
+                    "index": 1,
+                    "lines": [
+                        {
+                            "bbox": [
+                                69,
+                                111,
+                                469,
+                                123
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        111,
+                                        469,
+                                        123
+                                    ],
+                                    "type": "text",
+                                    "content": "The equation of the hyperplane is given by two parameters, a real-valued vector w of the",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                70,
+                                124,
+                                422,
+                                134
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        124,
+                                        422,
+                                        134
+                                    ],
+                                    "type": "text",
+                                    "content": "same dimensionality as our input feature vector x, and a real number b like this:",
+                                    "score": 1.0
+                                }
+                            ]
+                        }
+                    ],
+                    "merge_prev": false
+                },
+                {
+                    "bbox": [
+                        240,
+                        153,
+                        297,
+                        164
+                    ],
+                    "type": "interline_equation",
+                    "angle": 0,
+                    "lines": [
+                        {
+                            "bbox": [
+                                240,
+                                153,
+                                297,
+                                164
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        240,
+                                        153,
+                                        297,
+                                        164
+                                    ],
+                                    "type": "interline_equation",
+                                    "content": "\\mathbf {w x} - b = 0,",
+                                    "image_path": "6c206393ae423b549f45e618fb211cd2f7b98db2b286877ec88ba4a0cd8b7bd1.jpg"
+                                }
+                            ]
+                        }
+                    ],
+                    "index": 2
+                },
+                {
+                    "bbox": [
+                        66,
+                        175,
+                        470,
+                        201
+                    ],
+                    "type": "text",
+                    "angle": 0,
+                    "index": 3,
+                    "lines": [
+                        {
+                            "bbox": [
+                                70,
+                                175,
+                                469,
+                                188
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        178,
+                                        210,
+                                        188
+                                    ],
+                                    "type": "text",
+                                    "content": "where the expression wx means",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        212,
+                                        175,
+                                        370,
+                                        187
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "w ^ { ( 1 ) } x ^ { ( 1 ) } + w ^ { ( 2 ) } x ^ { ( 2 ) } + . . . + w ^ { ( D ) } x ^ { ( D ) }",
+                                    "score": 0.9419
+                                },
+                                {
+                                    "bbox": [
+                                        370,
+                                        178,
+                                        469,
+                                        188
+                                    ],
+                                    "type": "text",
+                                    "content": ", and D is the number",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                189,
+                                233,
+                                199
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        189,
+                                        233,
+                                        199
+                                    ],
+                                    "type": "text",
+                                    "content": "of dimensions of the feature vector x.",
+                                    "score": 1.0
+                                }
+                            ]
+                        }
+                    ],
+                    "merge_prev": false
+                },
+                {
+                    "bbox": [
+                        66,
+                        206,
+                        471,
+                        243
+                    ],
+                    "type": "text",
+                    "angle": 0,
+                    "index": 4,
+                    "lines": [
+                        {
+                            "bbox": [
+                                69,
+                                207,
+                                469,
+                                218
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        207,
+                                        469,
+                                        218
+                                    ],
+                                    "type": "text",
+                                    "content": "(If some equations aren’t clear to you right now, in Chapter 2 we revisit the math and",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                70,
+                                221,
+                                469,
+                                229
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        221,
+                                        469,
+                                        229
+                                    ],
+                                    "type": "text",
+                                    "content": "statistical concepts necessary to understand them. For the moment, try to get an intuition of",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                70,
+                                233,
+                                431,
+                                241
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        233,
+                                        431,
+                                        241
+                                    ],
+                                    "type": "text",
+                                    "content": "what’s happening here. It all becomes more clear after you read the next chapter.)",
+                                    "score": 1.0
+                                }
+                            ]
+                        }
+                    ],
+                    "merge_prev": false
+                },
+                {
+                    "bbox": [
+                        67,
+                        248,
+                        396,
+                        261
+                    ],
+                    "type": "text",
+                    "angle": 0,
+                    "index": 5,
+                    "lines": [
+                        {
+                            "bbox": [
+                                70,
+                                251,
+                                393,
+                                259
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        251,
+                                        393,
+                                        259
+                                    ],
+                                    "type": "text",
+                                    "content": "Now, the predicted label for some input feature vector x is given like this:",
+                                    "score": 1.0
+                                }
+                            ]
+                        }
+                    ],
+                    "merge_prev": false
+                },
+                {
+                    "bbox": [
+                        227,
+                        279,
+                        310,
+                        291
+                    ],
+                    "type": "interline_equation",
+                    "angle": 0,
+                    "lines": [
+                        {
+                            "bbox": [
+                                227,
+                                279,
+                                310,
+                                291
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        227,
+                                        279,
+                                        310,
+                                        291
+                                    ],
+                                    "type": "interline_equation",
+                                    "content": "y = \\mathrm{sign} (\\mathbf {w x} - b),",
+                                    "image_path": "ef7350b4ef54e17662256bb5b1ab641e270907b535d6795eaacd159742b0fcbe.jpg"
+                                }
+                            ]
+                        }
+                    ],
+                    "index": 6
+                },
+                {
+                    "bbox": [
+                        66,
+                        302,
+                        470,
+                        327
+                    ],
+                    "type": "text",
+                    "angle": 0,
+                    "index": 7,
+                    "lines": [
+                        {
+                            "bbox": [
+                                70,
+                                305,
+                                468,
+                                313
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        305,
+                                        468,
+                                        313
+                                    ],
+                                    "type": "text",
+                                    "content": "where sign is a mathematical operator that takes any value as input and returns +1 if the",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                70,
+                                316,
+                                362,
+                                325
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        316,
+                                        362,
+                                        325
+                                    ],
+                                    "type": "text",
+                                    "content": "input is a positive number or 1 if the input is a negative number.",
+                                    "score": 1.0
+                                }
+                            ]
+                        }
+                    ],
+                    "merge_prev": false
+                },
+                {
+                    "bbox": [
+                        67,
+                        332,
+                        471,
+                        369
+                    ],
+                    "type": "text",
+                    "angle": 0,
+                    "index": 8,
+                    "lines": [
+                        {
+                            "bbox": [
+                                69,
+                                333,
+                                469,
+                                343
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        333,
+                                        469,
+                                        343
+                                    ],
+                                    "type": "text",
+                                    "content": "The goal of the learning algorithm — SVM in this case — is to leverage the dataset and find",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                343,
+                                469,
+                                355
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        345,
+                                        150,
+                                        355
+                                    ],
+                                    "type": "text",
+                                    "content": "the optimal values",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        150,
+                                        344,
+                                        165,
+                                        354
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "\\mathbf { w } ^ { * }",
+                                    "score": 0.8031
+                                },
+                                {
+                                    "bbox": [
+                                        166,
+                                        345,
+                                        185,
+                                        355
+                                    ],
+                                    "type": "text",
+                                    "content": "and",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        185,
+                                        343,
+                                        197,
+                                        354
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "b ^ { * }",
+                                    "score": 0.7933
+                                },
+                                {
+                                    "bbox": [
+                                        197,
+                                        345,
+                                        469,
+                                        355
+                                    ],
+                                    "type": "text",
+                                    "content": "for parameters w and b. Once the learning algorithm identifies",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                70,
+                                356,
+                                318,
+                                368
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        358,
+                                        214,
+                                        367
+                                    ],
+                                    "type": "text",
+                                    "content": "these optimal values, the model",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        214,
+                                        356,
+                                        235,
+                                        368
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "f ( \\mathbf { x } )",
+                                    "score": 0.5075
+                                },
+                                {
+                                    "bbox": [
+                                        237,
+                                        358,
+                                        318,
+                                        367
+                                    ],
+                                    "type": "text",
+                                    "content": "is then defined as:",
+                                    "score": 1.0
+                                }
+                            ]
+                        }
+                    ],
+                    "merge_prev": false
+                },
+                {
+                    "bbox": [
+                        217,
+                        386,
+                        321,
+                        399
+                    ],
+                    "type": "interline_equation",
+                    "angle": 0,
+                    "lines": [
+                        {
+                            "bbox": [
+                                217,
+                                386,
+                                321,
+                                399
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        217,
+                                        386,
+                                        321,
+                                        399
+                                    ],
+                                    "type": "interline_equation",
+                                    "content": "f (\\mathbf {x}) = \\mathrm{sign} (\\mathbf {w} ^ {*} \\mathbf {x} - b ^ {*})",
+                                    "image_path": "ed383e95bc8c1ece3a8153b12c7d50add562fbf6489077497beb7a6f60c38e84.jpg"
+                                }
+                            ]
+                        }
+                    ],
+                    "index": 9
+                },
+                {
+                    "bbox": [
+                        66,
+                        410,
+                        471,
+                        458
+                    ],
+                    "type": "text",
+                    "angle": 0,
+                    "index": 10,
+                    "lines": [
+                        {
+                            "bbox": [
+                                69,
+                                410,
+                                470,
+                                421
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        410,
+                                        470,
+                                        421
+                                    ],
+                                    "type": "text",
+                                    "content": "Therefore, to predict whether an email message is spam or not spam using an SVM model,",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                423,
+                                469,
+                                433
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        423,
+                                        469,
+                                        433
+                                    ],
+                                    "type": "text",
+                                    "content": "you have to take a text of the message, convert it into a feature vector, then multiply this",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                434,
+                                469,
+                                445
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        435,
+                                        111,
+                                        445
+                                    ],
+                                    "type": "text",
+                                    "content": "vector by",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        111,
+                                        434,
+                                        126,
+                                        445
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "\\mathbf { w } ^ { * }",
+                                    "score": 0.7836
+                                },
+                                {
+                                    "bbox": [
+                                        126,
+                                        435,
+                                        167,
+                                        445
+                                    ],
+                                    "type": "text",
+                                    "content": ", subtract",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        168,
+                                        434,
+                                        179,
+                                        444
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "b ^ { * }",
+                                    "score": 0.7701
+                                },
+                                {
+                                    "bbox": [
+                                        180,
+                                        435,
+                                        469,
+                                        445
+                                    ],
+                                    "type": "text",
+                                    "content": "and take the sign of the result. This will give us the prediction (+1",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                70,
+                                448,
+                                246,
+                                456
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        448,
+                                        246,
+                                        456
+                                    ],
+                                    "type": "text",
+                                    "content": "means “spam”, 1 means “not_spam”).",
+                                    "score": 1.0
+                                }
+                            ]
+                        }
+                    ],
+                    "merge_prev": false
+                },
+                {
+                    "bbox": [
+                        67,
+                        463,
+                        470,
+                        488
+                    ],
+                    "type": "text",
+                    "angle": 0,
+                    "index": 11,
+                    "lines": [
+                        {
+                            "bbox": [
+                                70,
+                                464,
+                                469,
+                                474
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        465,
+                                        215,
+                                        474
+                                    ],
+                                    "type": "text",
+                                    "content": "Now, how does the machine find",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        216,
+                                        464,
+                                        231,
+                                        474
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "\\mathbf { w } ^ { * }",
+                                    "score": 0.7288
+                                },
+                                {
+                                    "bbox": [
+                                        231,
+                                        465,
+                                        251,
+                                        474
+                                    ],
+                                    "type": "text",
+                                    "content": "and",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        252,
+                                        464,
+                                        267,
+                                        474
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "b ^ { \\ast } ?",
+                                    "score": 0.7903
+                                },
+                                {
+                                    "bbox": [
+                                        268,
+                                        465,
+                                        469,
+                                        474
+                                    ],
+                                    "type": "text",
+                                    "content": "It solves an optimization problem. Machines",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                70,
+                                478,
+                                293,
+                                486
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        478,
+                                        293,
+                                        486
+                                    ],
+                                    "type": "text",
+                                    "content": "are good at optimizing functions under constraints.",
+                                    "score": 1.0
+                                }
+                            ]
+                        }
+                    ],
+                    "merge_prev": false
+                },
+                {
+                    "bbox": [
+                        67,
+                        494,
+                        471,
+                        542
+                    ],
+                    "type": "text",
+                    "angle": 0,
+                    "index": 12,
+                    "lines": [
+                        {
+                            "bbox": [
+                                69,
+                                494,
+                                469,
+                                505
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        494,
+                                        469,
+                                        505
+                                    ],
+                                    "type": "text",
+                                    "content": "So what are the constraints we want to satisfy here? First of all, we want the model to predict",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                506,
+                                469,
+                                516
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        506,
+                                        469,
+                                        516
+                                    ],
+                                    "type": "text",
+                                    "content": "the labels of our 10,000 examples correctly. Remember that each example i = 1, . . . , 10000 is",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                70,
+                                518,
+                                469,
+                                530
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        519,
+                                        138,
+                                        528
+                                    ],
+                                    "type": "text",
+                                    "content": "given by a pair",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        140,
+                                        518,
+                                        170,
+                                        529
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "\\left( \\mathbf { x } _ { i } , y _ { i } \\right)",
+                                    "score": 0.8793
+                                },
+                                {
+                                    "bbox": [
+                                        170,
+                                        518,
+                                        204,
+                                        528
+                                    ],
+                                    "type": "text",
+                                    "content": ", where",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        204,
+                                        519,
+                                        216,
+                                        529
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "\\mathbf { x } _ { i }",
+                                    "score": 0.8418
+                                },
+                                {
+                                    "bbox": [
+                                        216,
+                                        518,
+                                        388,
+                                        528
+                                    ],
+                                    "type": "text",
+                                    "content": "is the feature vector of example i and",
+                                    "score": 1.0
+                                },
+                                {
+                                    "bbox": [
+                                        388,
+                                        520,
+                                        399,
+                                        530
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "y _ { i }",
+                                    "score": 0.8495
+                                },
+                                {
+                                    "bbox": [
+                                        399,
+                                        518,
+                                        469,
+                                        528
+                                    ],
+                                    "type": "text",
+                                    "content": "is its label that",
+                                    "score": 1.0
+                                }
+                            ]
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                530,
+                                342,
+                                540
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        530,
+                                        342,
+                                        540
+                                    ],
+                                    "type": "text",
+                                    "content": "takes values either 1 or +1. So the constraints are naturally:",
+                                    "score": 1.0
+                                }
+                            ]
+                        }
+                    ],
+                    "merge_prev": false
+                },
+                {
+                    "bbox": [
+                        81,
+                        547,
+                        219,
+                        559
+                    ],
+                    "type": "text",
+                    "angle": 0,
+                    "index": 13,
+                    "lines": [
+                        {
+                            "bbox": [
+                                93,
+                                547,
+                                217,
+                                560
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        93,
+                                        548,
+                                        195,
+                                        559
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "\\mathbf { w x } _ { i } - b \\geq 1 { \\mathrm { ~ i f ~ } } y _ { i } = + 1",
+                                    "score": 0.5056
+                                },
+                                {
+                                    "bbox": [
+                                        196,
+                                        547,
+                                        217,
+                                        560
+                                    ],
+                                    "type": "text",
+                                    "content": ", and",
+                                    "score": 1.0
+                                }
+                            ]
+                        }
+                    ],
+                    "merge_prev": false
+                },
+                {
+                    "bbox": [
+                        82,
+                        560,
+                        204,
+                        571
+                    ],
+                    "type": "text",
+                    "angle": 0,
+                    "index": 14,
+                    "lines": [
+                        {
+                            "bbox": [
+                                94,
+                                560,
+                                203,
+                                571
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        94,
+                                        560,
+                                        203,
+                                        571
+                                    ],
+                                    "type": "inline_equation",
+                                    "content": "\\mathbf { w x } _ { i } - b \\leq - 1 { \\mathrm { ~ i f ~ } } y _ { i } = - 1",
+                                    "score": 0.6986
+                                }
+                            ]
+                        }
+                    ],
+                    "merge_prev": false
+                }
+            ]
+        }
+    ],
+    "_backend": "hybrid",
+    "_effort": "medium",
+    "_ocr_enable": false,
+    "_version_name": "3.4.4"
+}
