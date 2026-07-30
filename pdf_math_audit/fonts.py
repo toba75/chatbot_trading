@@ -19,6 +19,10 @@ SUPPORTED_BASE_ENCODINGS = {
     "/StandardEncoding": StandardEncoding,
 }
 HEX_STRING = re.compile(rb"(?<!<)<([^<>]*)>(?!>)")
+CMAP_BLOCKS = {
+    "bfchar": re.compile(rb"(\d+)\s+beginbfchar\b(.*?)\bendbfchar\b", re.DOTALL),
+    "bfrange": re.compile(rb"(\d+)\s+beginbfrange\b(.*?)\bendbfrange\b", re.DOTALL),
+}
 
 
 @dataclass(frozen=True)
@@ -41,6 +45,41 @@ def agl_unicode(glyph_name: str) -> str:
     return value
 
 
+def _validate_cmap_blocks(cmap: bytes) -> None:
+    for name, pattern in CMAP_BLOCKS.items():
+        matches = list(pattern.finditer(cmap))
+        require_supported(
+            len(matches)
+            == cmap.count(f"begin{name}".encode())
+            == cmap.count(f"end{name}".encode()),
+            "to_unicode_cmap_invalid",
+            f"Bloc ToUnicode {name} incomplet",
+        )
+        arity = 2 if name == "bfchar" else 3
+        for match in matches:
+            body = match.group(2)
+            require_supported(
+                b"[" not in body and b"]" not in body,
+                "to_unicode_cmap_unsupported",
+                "Les destinations ToUnicode en tableau ne sont pas supportées",
+            )
+            tokens = HEX_STRING.findall(body)
+            require_supported(
+                len(tokens) == int(match.group(1)) * arity
+                and not HEX_STRING.sub(b"", body).strip(),
+                "to_unicode_cmap_invalid",
+                f"Nombre d'opérandes ToUnicode {name} incohérent",
+            )
+            sources = (
+                tokens[::arity] if name == "bfchar" else tokens[0::3] + tokens[1::3]
+            )
+            require_supported(
+                all(len(source) == 2 for source in sources),
+                "to_unicode_cmap_unsupported",
+                "Seules les sources ToUnicode monooctet sont supportées",
+            )
+
+
 def parse_to_unicode(font: Any) -> dict[int, str]:
     stream = font.get("/ToUnicode")
     if stream is None:
@@ -55,6 +94,7 @@ def parse_to_unicode(font: Any) -> dict[int, str]:
         "to_unicode_cmap_invalid",
         "Chaîne hexadécimale ToUnicode invalide",
     )
+    _validate_cmap_blocks(cmap)
     _encoding, character_map = get_encoding(font)
     require_supported(
         character_map.get(-1) == 1,
