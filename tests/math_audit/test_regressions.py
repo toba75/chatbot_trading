@@ -79,6 +79,38 @@ def test_to_unicode_refuse_une_destination_hexadecimale_invalide() -> None:
     assert error.value.code == "to_unicode_cmap_invalid"
 
 
+@pytest.mark.parametrize(
+    ("cmap_data", "reason_code"),
+    [
+        (
+            b"2 beginbfchar <21> <2212> endbfchar",
+            "to_unicode_cmap_invalid",
+        ),
+        (
+            b"2 beginbfchar <21> <2212> <22> endbfchar",
+            "to_unicode_cmap_invalid",
+        ),
+        (
+            b"1 beginbfchar <0100> <0041> endbfchar "
+            b"1 beginbfchar <21> <2212> endbfchar",
+            "to_unicode_cmap_unsupported",
+        ),
+    ],
+)
+def test_to_unicode_refuse_une_structure_non_prouvee(
+    cmap_data: bytes, reason_code: str
+) -> None:
+    cmap = DecodedStreamObject()
+    cmap.set_data(cmap_data)
+    font = DictionaryObject({NameObject("/ToUnicode"): cmap})
+
+    with pytest.raises(AnalysisLimitation) as error:
+        parse_to_unicode(font)
+
+    assert error.value.status == "unsupported"
+    assert error.value.code == reason_code
+
+
 def test_xobject_declare_mais_inutilise_ne_change_pas_la_capacite(
     tmp_path: Path,
 ) -> None:
