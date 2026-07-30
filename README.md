@@ -87,6 +87,26 @@ conserve le corpus réduit, les sorties Docling/Granite, Marker, MinerU et Gemma
 4, ainsi que l'expérience de validation croisée entre le PDF source et son
 rendu. Les environnements et caches de modèles n'y sont pas versionnés.
 
+## Audit structurel des glyphes PDF
+
+Le package `pdf_math_audit` extrait un rapport générique de traçabilité
+structurelle. Il relie, lorsque le profil `type1-cff-v1` le permet, les codes
+texte PDF aux CharStrings CFF, aux GID rendus par MuPDF et aux blocs
+géométriques. Une page hors capacité est marquée `unsupported` ou `ambiguous` ;
+aucun OCR, modèle ou autre moteur n'est appelé.
+
+```powershell
+uv run pdf-math-audit document.pdf `
+    --report audit.json `
+    --evidence audit-glyphs.ndjson.gz
+```
+
+La sortie standard est un flux NDJSON de progression terminé par l'empreinte du
+rapport. Le rapport synthétique conserve les capacités et les conflits ; le
+second fichier conserve chaque glyphe et son évidence en NDJSON gzip. L'audit
+ne prétend prouver ni l'Unicode, ni le LaTeX, ni la correction sémantique du
+document. Il n'est pas encore raccordé au pipeline Rails.
+
 ## Fichiers principaux
 
 - [compose.docling-serve.yaml](compose.docling-serve.yaml)
