@@ -2,11 +2,13 @@ import hashlib
 from pathlib import Path
 
 import fitz
+import pytest
 from pypdf import PdfReader, PdfWriter
 from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
 
 from pdf_math_audit.analyzer import analyze_pdf
 from pdf_math_audit.fonts import parse_to_unicode
+from pdf_math_audit.limitations import AnalysisLimitation
 
 
 REFERENCE_PDF = (
@@ -65,6 +67,18 @@ def test_to_unicode_accepte_une_cmap_valide_sur_une_ligne() -> None:
     assert parse_to_unicode(font) == {0x21: "−"}
 
 
+def test_to_unicode_refuse_une_destination_hexadecimale_invalide() -> None:
+    cmap = DecodedStreamObject()
+    cmap.set_data(b"1 beginbfchar <21> <ZZZZ> endbfchar")
+    font = DictionaryObject({NameObject("/ToUnicode"): cmap})
+
+    with pytest.raises(AnalysisLimitation) as error:
+        parse_to_unicode(font)
+
+    assert error.value.status == "unsupported"
+    assert error.value.code == "to_unicode_cmap_invalid"
+
+
 def test_xobject_declare_mais_inutilise_ne_change_pas_la_capacite(
     tmp_path: Path,
 ) -> None:
@@ -80,3 +94,29 @@ def test_xobject_declare_mais_inutilise_ne_change_pas_la_capacite(
     report = analyze_pdf(pdf_path)
 
     assert [page["status"] for page in report["pages"]] == ["traced", "traced"]
+
+
+def test_image_inline_melee_au_texte_est_hors_capacite(tmp_path: Path) -> None:
+    reader = PdfReader(REFERENCE_PDF)
+    page = reader.pages[0]
+    content = DecodedStreamObject()
+    content.set_data(
+        page.get_contents().get_data()
+        + b"\nq BI /W 1 /H 1 /BPC 8 /CS /DeviceGray ID \x00 EI Q\n"
+    )
+    page[NameObject("/Contents")] = content
+    pdf_path = tmp_path / "inline-image.pdf"
+    writer = PdfWriter()
+    writer.append_pages_from_reader(reader)
+    with pdf_path.open("wb") as destination:
+        writer.write(destination)
+
+    report = analyze_pdf(pdf_path)
+
+    assert report["pages"][0]["status"] == "unsupported"
+    assert report["pages"][0]["reasons"] == [
+        {
+            "code": "page_content_unsupported",
+            "message": "Opérateurs non supportés: INLINE IMAGE",
+        }
+    ]

@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 import fitz
+import pytest
 
 
 def test_cli_ecrit_le_rapport_et_publie_la_progression(tmp_path: Path) -> None:
@@ -64,3 +65,44 @@ def test_cli_ecrit_le_rapport_et_publie_la_progression(tmp_path: Path) -> None:
     }
     with gzip.open(evidence_path, "rt", encoding="utf-8") as evidence:
         assert evidence.read() == ""
+
+
+@pytest.mark.parametrize(
+    ("report_name", "evidence_name"),
+    [
+        ("source.pdf", "evidence.ndjson.gz"),
+        ("report.json", "source.pdf"),
+        ("same-output", "same-output"),
+    ],
+)
+def test_cli_refuse_toute_collision_entre_entree_et_sorties(
+    tmp_path: Path, report_name: str, evidence_name: str
+) -> None:
+    pdf_path = tmp_path / "source.pdf"
+    with fitz.open() as document:
+        document.new_page()
+        document.save(pdf_path)
+    original = pdf_path.read_bytes()
+    report_path = tmp_path / report_name
+    evidence_path = tmp_path / evidence_name
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pdf_math_audit",
+            str(pdf_path),
+            "--report",
+            str(report_path),
+            "--evidence",
+            str(evidence_path),
+        ],
+        check=False,
+        capture_output=True,
+        encoding="utf-8",
+    )
+
+    assert completed.returncode == 2
+    assert pdf_path.read_bytes() == original
+    for output in {report_path, evidence_path} - {pdf_path}:
+        assert not output.exists()
