@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from io import BytesIO
 from typing import Any
@@ -17,6 +18,7 @@ SUPPORTED_BASE_ENCODINGS = {
     "/MacRomanEncoding": MacRoman,
     "/StandardEncoding": StandardEncoding,
 }
+HEX_STRING = re.compile(rb"(?<!<)<([^<>]*)>(?!>)")
 
 
 @dataclass(frozen=True)
@@ -40,8 +42,19 @@ def agl_unicode(glyph_name: str) -> str:
 
 
 def parse_to_unicode(font: Any) -> dict[int, str]:
-    if font.get("/ToUnicode") is None:
+    stream = font.get("/ToUnicode")
+    if stream is None:
         return {}
+    cmap = re.sub(rb"%[^\r\n]*", b"", stream.get_object().get_data())
+    hex_strings = HEX_STRING.findall(cmap)
+    require_supported(
+        all(
+            token and len(token) % 2 == 0 and re.fullmatch(rb"[0-9A-Fa-f]+", token)
+            for token in hex_strings
+        ),
+        "to_unicode_cmap_invalid",
+        "Chaîne hexadécimale ToUnicode invalide",
+    )
     _encoding, character_map = get_encoding(font)
     require_supported(
         character_map.get(-1) == 1,
@@ -53,6 +66,11 @@ def parse_to_unicode(font: Any) -> dict[int, str]:
         for source, destination in character_map.items()
         if isinstance(source, str)
     }
+    require_supported(
+        all(mappings.values()),
+        "to_unicode_cmap_invalid",
+        "Destination ToUnicode vide ou invalide",
+    )
     require_supported(
         len(mappings) == len(character_map) - 1,
         "to_unicode_cmap_unsupported",

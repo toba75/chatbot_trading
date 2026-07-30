@@ -13,7 +13,21 @@ def _emit(event: dict[str, Any]) -> None:
     print(json.dumps(event, ensure_ascii=False, separators=(",", ":")), flush=True)
 
 
+def _require_distinct_paths(
+    parser: argparse.ArgumentParser, paths: dict[str, Path]
+) -> None:
+    entries = list(paths.items())
+    for index, (left_name, left) in enumerate(entries):
+        for right_name, right in entries[index + 1 :]:
+            same_path = left.resolve() == right.resolve()
+            same_file = left.exists() and right.exists() and left.samefile(right)
+            if same_path or same_file:
+                parser.error(f"{left_name} et {right_name} doivent être distincts")
+
+
 def main() -> int:
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(
         description="Analyse la traçabilité structurelle d'un PDF."
     )
@@ -21,8 +35,11 @@ def main() -> int:
     parser.add_argument("--report", type=Path, required=True)
     parser.add_argument("--evidence", type=Path, required=True)
     args = parser.parse_args()
+    _require_distinct_paths(
+        parser,
+        {"pdf": args.pdf, "report": args.report, "evidence": args.evidence},
+    )
 
-    sys.stdout.reconfigure(encoding="utf-8")
     glyph_count = 0
     with args.evidence.open("wb") as evidence_file:
         with gzip.GzipFile(

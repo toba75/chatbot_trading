@@ -12,6 +12,9 @@ from pdf_math_audit.fonts import LoadedFont, agl_unicode, codepoints, load_font
 from pdf_math_audit.limitations import require_supported, require_unambiguous
 
 
+UNSUPPORTED_OPERATORS = {"Do", "Tr", "'", '"', "INLINE IMAGE", "sh"}
+
+
 @dataclass(frozen=True)
 class PageTrace:
     glyphs: list[dict[str, Any]]
@@ -53,10 +56,11 @@ def _source_glyphs(
     }
     operations = ContentStream(page.get_contents(), reader).operations
     counts = Counter(operator.decode("latin-1") for _, operator in operations)
+    unsupported = sorted(UNSUPPORTED_OPERATORS.intersection(counts))
     require_supported(
-        counts["Do"] == counts["Tr"] == counts["'"] == counts['"'] == 0,
+        not unsupported,
         "page_content_unsupported",
-        "Les opérateurs Do, Tr, ' et \" ne sont pas supportés",
+        f"Opérateurs non supportés: {', '.join(unsupported)}",
     )
 
     current_font: str | None = None
