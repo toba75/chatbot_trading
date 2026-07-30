@@ -95,6 +95,19 @@ def test_to_unicode_refuse_une_destination_hexadecimale_invalide() -> None:
             b"1 beginbfchar <21> <2212> endbfchar",
             "to_unicode_cmap_unsupported",
         ),
+        (
+            b"1 beginbfrange <22> <21> <0041> endbfrange",
+            "to_unicode_cmap_invalid",
+        ),
+        (
+            b"1 begincodespacerange <0000> <FFFF> endcodespacerange "
+            b"1 beginbfchar <21> <2212> endbfchar",
+            "to_unicode_cmap_unsupported",
+        ),
+        (
+            b"/Adobe-Identity-UCS usecmap 1 beginbfchar <21> <2212> endbfchar",
+            "to_unicode_cmap_unsupported",
+        ),
     ],
 )
 def test_to_unicode_refuse_une_structure_non_prouvee(
