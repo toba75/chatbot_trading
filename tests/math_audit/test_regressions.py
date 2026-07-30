@@ -120,6 +120,10 @@ def test_to_unicode_refuse_une_destination_hexadecimale_invalide() -> None:
             b"1 beginbfchar <21> <DC00> endbfchar",
             "to_unicode_cmap_invalid",
         ),
+        (
+            b"1 beginbfrange <21> <22> <D7FF> endbfrange",
+            "to_unicode_cmap_invalid",
+        ),
     ],
 )
 def test_to_unicode_refuse_une_structure_non_prouvee(
