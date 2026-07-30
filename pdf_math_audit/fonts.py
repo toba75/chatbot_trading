@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 from io import BytesIO
 from typing import Any
@@ -9,6 +8,7 @@ from fontTools import agl
 from fontTools.cffLib import CFFFontSet
 from fontTools.encodings.MacRoman import MacRoman
 from fontTools.encodings.StandardEncoding import StandardEncoding
+from pypdf._cmap import get_encoding
 
 from pdf_math_audit.limitations import require_supported
 
@@ -40,65 +40,25 @@ def agl_unicode(glyph_name: str) -> str:
 
 
 def parse_to_unicode(font: Any) -> dict[int, str]:
-    stream = font.get("/ToUnicode")
-    if stream is None:
+    if font.get("/ToUnicode") is None:
         return {}
-
-    lines = (
-        stream.get_object().get_data().decode("latin-1").replace("\r", "").splitlines()
+    _encoding, character_map = get_encoding(font)
+    require_supported(
+        character_map.get(-1) == 1,
+        "to_unicode_cmap_unsupported",
+        "Seules les CMap ToUnicode monooctet sont supportées",
     )
-    result: dict[int, str] = {}
-    mode: str | None = None
-    for raw_line in lines:
-        line = raw_line.split("%", 1)[0].strip()
-        if line.endswith("beginbfchar"):
-            mode = "char"
-            continue
-        if line.endswith("beginbfrange"):
-            mode = "range"
-            continue
-        if line in {"endbfchar", "endbfrange"}:
-            mode = None
-            continue
-        if not line or mode is None:
-            continue
-
-        tokens = re.findall(r"<([0-9A-Fa-f]+)>", line)
-        if mode == "char":
-            require_supported(
-                len(tokens) == 2,
-                "to_unicode_cmap_unsupported",
-                f"ToUnicode bfchar non supporté: {line}",
-            )
-            source, destination = tokens
-            require_supported(
-                len(source) == 2,
-                "to_unicode_cmap_unsupported",
-                f"Code ToUnicode non monooctet: {source}",
-            )
-            result[int(source, 16)] = bytes.fromhex(destination).decode("utf-16-be")
-            continue
-
-        require_supported(
-            len(tokens) == 3 and "[" not in line,
-            "to_unicode_cmap_unsupported",
-            f"ToUnicode bfrange non supporté: {line}",
-        )
-        start, end, destination = tokens
-        require_supported(
-            len(start) == len(end) == 2,
-            "to_unicode_cmap_unsupported",
-            f"Plage ToUnicode non monooctet: {line}",
-        )
-        base = bytes.fromhex(destination).decode("utf-16-be")
-        require_supported(
-            len(base) == 1,
-            "to_unicode_cmap_unsupported",
-            f"Destination ToUnicode complexe: {destination}",
-        )
-        for offset, source in enumerate(range(int(start, 16), int(end, 16) + 1)):
-            result[source] = chr(ord(base) + offset)
-    return result
+    mappings = {
+        ord(source): destination
+        for source, destination in character_map.items()
+        if isinstance(source, str)
+    }
+    require_supported(
+        len(mappings) == len(character_map) - 1,
+        "to_unicode_cmap_unsupported",
+        "Entrée ToUnicode non supportée",
+    )
+    return mappings
 
 
 def font_encoding(font: Any) -> tuple[list[str], dict[str, Any]]:

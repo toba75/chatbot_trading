@@ -4,6 +4,7 @@ import hashlib
 import json
 import platform
 from collections import Counter
+from io import BytesIO
 from pathlib import Path
 from typing import Any, Callable
 
@@ -149,11 +150,6 @@ def _page_report(
         return base | {"status": limitation.status, "reasons": [limitation.as_dict()]}
 
 
-def _file_sha256(path: Path) -> str:
-    with path.open("rb") as source:
-        return hashlib.file_digest(source, "sha256").hexdigest()
-
-
 def _progress(completed: int, total: int) -> dict[str, Any]:
     return {
         "type": "progress",
@@ -169,8 +165,10 @@ def analyze_pdf(
     on_evidence: EvidenceCallback | None = None,
 ) -> dict[str, Any]:
     path = Path(pdf_path).resolve()
-    with path.open("rb") as source, fitz.open(str(path)) as rendered_document:
-        reader = PdfReader(source)
+    source_bytes = path.read_bytes()
+    source_sha256 = hashlib.sha256(source_bytes).hexdigest()
+    with fitz.open(stream=source_bytes, filetype="pdf") as rendered_document:
+        reader = PdfReader(BytesIO(source_bytes))
         total_pages = len(reader.pages)
         require_unambiguous(
             len(rendered_document) == total_pages,
@@ -220,8 +218,8 @@ def analyze_pdf(
         },
         "pdf": {
             "filename": path.name,
-            "bytes": path.stat().st_size,
-            "sha256": _file_sha256(path),
+            "bytes": len(source_bytes),
+            "sha256": source_sha256,
             "pages": len(pages),
         },
         "coverage": coverage,

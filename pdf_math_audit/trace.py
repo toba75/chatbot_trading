@@ -47,11 +47,6 @@ def _source_glyphs(
     reader: PdfReader,
 ) -> tuple[list[dict[str, Any]], Counter[str], dict[str, LoadedFont]]:
     resources = page["/Resources"]
-    require_supported(
-        "/XObject" not in resources,
-        "page_content_unsupported",
-        "Les Form/Image XObjects ne sont pas supportés",
-    )
     font_dictionary = resources.get("/Font", {})
     font_references = {
         str(resource): reference for resource, reference in font_dictionary.items()
@@ -111,6 +106,11 @@ def _source_glyphs(
                         "text_matrix": current_matrix,
                     }
                 )
+    require_supported(
+        bool(glyphs) or not operations,
+        "page_content_unsupported",
+        "Contenu de page sans texte supporté",
+    )
     return glyphs, counts, fonts
 
 
