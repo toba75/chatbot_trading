@@ -70,6 +70,18 @@ def _is_valid_utf16be(token: bytes) -> bool:
     return bool(value)
 
 
+def _has_valid_bfrange_destinations(entry: list[bytes]) -> bool:
+    first, last = (int(token, 16) for token in entry[:2])
+    base = int(entry[2], 16)
+    width = len(entry[2]) // 2
+    limit = 1 << (width * 8)
+    return all(
+        base + offset < limit
+        and _is_valid_utf16be((base + offset).to_bytes(width, "big").hex().encode())
+        for offset in range(last - first + 1)
+    )
+
+
 def _validate_cmap(cmap: bytes) -> set[int]:
     operators = set(re.findall(rb"\bbegin([a-z]+(?:char|range))\b", cmap))
     require_supported(
@@ -96,8 +108,13 @@ def _validate_cmap(cmap: bytes) -> set[int]:
             if name == "codespacerange":
                 code_spaces.append((bounds[0], bounds[1]))
                 continue
+            destinations_are_valid = (
+                _has_valid_bfrange_destinations(entry)
+                if name == "bfrange"
+                else _is_valid_utf16be(entry[-1])
+            )
             require_supported(
-                _is_valid_utf16be(entry[-1]),
+                destinations_are_valid,
                 "to_unicode_cmap_invalid",
                 "Destination ToUnicode non UTF-16BE",
             )
