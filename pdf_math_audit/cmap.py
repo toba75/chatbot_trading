@@ -62,6 +62,14 @@ def _entries(name: str, cmap: bytes) -> list[list[bytes]]:
     return entries
 
 
+def _is_valid_utf16be(token: bytes) -> bool:
+    try:
+        value = bytes.fromhex(token.decode("ascii")).decode("utf-16-be")
+    except UnicodeDecodeError:
+        return False
+    return bool(value)
+
+
 def _validate_cmap(cmap: bytes) -> set[int]:
     operators = set(re.findall(rb"\bbegin([a-z]+(?:char|range))\b", cmap))
     require_supported(
@@ -88,6 +96,11 @@ def _validate_cmap(cmap: bytes) -> set[int]:
             if name == "codespacerange":
                 code_spaces.append((bounds[0], bounds[1]))
                 continue
+            require_supported(
+                _is_valid_utf16be(entry[-1]),
+                "to_unicode_cmap_invalid",
+                "Destination ToUnicode non UTF-16BE",
+            )
             codes = (
                 {bounds[0]}
                 if len(bounds) == 1
