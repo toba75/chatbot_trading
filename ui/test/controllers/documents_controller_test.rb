@@ -154,6 +154,70 @@ class DocumentsControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.headers.fetch("Content-Security-Policy"), "img-src data:"
   end
 
+  test "affiche la progression puis le verdict et les preuves de la qualification" do
+    document, attempt = completed_document
+    qualification = MathQualification.build_for(
+      attempt,
+      docling_document_sha256: Digest::SHA256.hexdigest(attempt.docling_document.download)
+    )
+    qualification.update!(
+      status: "running",
+      phase: "candidate_evaluation",
+      completed_units: 3,
+      total_units: 5,
+      execution_job_id: "qualification-en-cours",
+      started_at: Time.current
+    )
+
+    get document_path(document)
+
+    assert_select "h2", text: "Qualification mathématique"
+    assert_select %(progress[value="3"][max="5"])
+
+    qualification.update!(
+      status: "succeeded",
+      phase: "persisting_result",
+      completed_units: 1,
+      total_units: 1,
+      verdict: "partial",
+      summary: {
+        "regions" => 5,
+        "conformant" => 3,
+        "contradicted" => 0,
+        "non_verifiable" => 2,
+        "coverage" => { "pages_total" => 2, "pages_traced" => 1 },
+        "region_details" => [
+          { "id" => "r1", "page" => 1, "bbox" => [ 1, 2, 3, 4 ], "verdict" => "partial", "reasons" => [] }
+        ],
+        "page_exclusions" => [
+          { "page" => 2, "status" => "unsupported", "reasons" => [ { "message" => "Police non supportée" } ] }
+        ]
+      },
+      completed_at: Time.current
+    )
+    {
+      report: [ "{}", "report.json", "application/json" ],
+      source_evidence: [ "preuve", "evidence.ndjson.gz", "application/gzip" ],
+      analyzer_response: [ "flux", "response.ndjson", "application/x-ndjson" ]
+    }.each do |name, (content, filename, content_type)|
+      qualification.public_send(name).attach(
+        io: StringIO.new(content),
+        filename: filename,
+        content_type: content_type
+      )
+    end
+
+    get document_path(document)
+
+    assert_select ".math-verdict", text: /partial/
+    assert_select ".math-summary dd", text: "5"
+    assert_select ".math-regions td", text: "1, 2, 3, 4"
+    assert_select "li", text: /Police non supportée/
+    assert_select "a", text: "Rapport de qualification"
+    assert_select "a", text: "Preuve source"
+    assert_select "a", text: "Réponse brute de l’analyseur"
+  end
+
   private
 
   def conversion_jobs

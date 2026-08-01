@@ -13,6 +13,8 @@ import fontTools
 import pypdf
 from pypdf import PdfReader
 
+from pdf_math_audit.contract import ANALYZER_VERSION
+from pdf_math_audit.events import ProgressCallback, progress_event
 from pdf_math_audit.fonts import codepoints
 from pdf_math_audit.limitations import (
     AnalysisLimitation,
@@ -22,7 +24,6 @@ from pdf_math_audit.limitations import (
 from pdf_math_audit.trace import PageTrace, number_list, trace_page
 
 
-ProgressCallback = Callable[[dict[str, Any]], None]
 EvidenceCallback = Callable[[int, dict[str, Any]], None]
 COVERAGE_KEYS = (
     "source_codes",
@@ -136,6 +137,7 @@ def _page_report(
         "page": page_number,
         "box": number_list(rendered_page.rect),
         "rotation": rendered_page.rotation,
+        "fonts": {},
     }
     try:
         require_supported(
@@ -148,15 +150,6 @@ def _page_report(
         )
     except AnalysisLimitation as limitation:
         return base | {"status": limitation.status, "reasons": [limitation.as_dict()]}
-
-
-def _progress(completed: int, total: int) -> dict[str, Any]:
-    return {
-        "type": "progress",
-        "phase": "source_analysis",
-        "completed_units": completed,
-        "total_units": total,
-    }
 
 
 def analyze_pdf(
@@ -176,7 +169,7 @@ def analyze_pdf(
             f"pypdf={total_pages}, MuPDF={len(rendered_document)}",
         )
         if on_progress:
-            on_progress(_progress(0, total_pages))
+            on_progress(progress_event("source_analysis", 0, total_pages))
         pages = []
         for index, source_page in enumerate(reader.pages):
             page = _page_report(
@@ -187,7 +180,7 @@ def analyze_pdf(
                     on_evidence(page["page"], glyph)
             pages.append(page)
             if on_progress:
-                on_progress(_progress(index + 1, total_pages))
+                on_progress(progress_event("source_analysis", index + 1, total_pages))
 
     traced_pages = [page for page in pages if page["status"] == "traced"]
     conflicts = [
@@ -207,7 +200,7 @@ def analyze_pdf(
     )
     return {
         "schema_version": "1.0",
-        "analyzer_version": "0.1.0",
+        "analyzer_version": ANALYZER_VERSION,
         "capability_profile": "type1-cff-v1",
         "status": "completed",
         "runtime": {

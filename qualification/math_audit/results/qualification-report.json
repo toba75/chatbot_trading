@@ -1,0 +1,482 @@
+{
+  "accepted": true,
+  "blocking_reasons": [],
+  "corpora": [
+    {
+      "exhaustive_oracle": true,
+      "false_alignment_regions": [],
+      "id": "generated-regression-v1",
+      "independent_proofs": [],
+      "matches": [],
+      "metrics": {
+        "candidate_regions": 0,
+        "candidate_regions_by_localization_method": {},
+        "detection_precision": 0.0,
+        "detection_recall": 0.0,
+        "false_alignments": 0,
+        "matched_regions": 0,
+        "matched_regions_by_localization_method": {},
+        "oracle_regions": 6,
+        "semantic_assertion_coverage": 0.0,
+        "semantic_coverage": 0.0,
+        "semantic_expectation_accuracy": 0.0,
+        "traceability_coverage": 0.0
+      },
+      "missed_oracle_regions": [
+        "type1-inline",
+        "type1-display",
+        "cid-inline",
+        "cid-display",
+        "rotated-display",
+        "scan-display"
+      ],
+      "representative": false,
+      "resources": {
+        "cpu_seconds": 0.0,
+        "docling_processing_seconds": 5.056089157995302,
+        "peak_python_bytes": 127569,
+        "wall_seconds": 0.010839
+      },
+      "same_page_overlaps_below_threshold": []
+    },
+    {
+      "exhaustive_oracle": true,
+      "false_alignment_regions": [],
+      "id": "real-book-pages-3-and-6-v1",
+      "independent_proofs": [
+        {
+          "id": "source-glyph-proof",
+          "path": "../../../experiments/math_pipeline_comparison/source-render-proof/glyph-proof.json",
+          "sha256": "5b964664c14b8ef152bcb300555747b3463a17b154ae61d1b162e0d12e0d796a"
+        },
+        {
+          "id": "page-1-render-600dpi",
+          "path": "../../../experiments/math_pipeline_comparison/source-render-proof/crops/page-1-600dpi.png",
+          "sha256": "cb2358b69568043092c59c9dd95e04bb94cf22fabee3db3e264f75bf84ad4687"
+        },
+        {
+          "id": "page-2-render-600dpi",
+          "path": "../../../experiments/math_pipeline_comparison/source-render-proof/crops/page-2-600dpi.png",
+          "sha256": "c18b0e2cf5ad02ba0c08d9fb9f312a60af3020d5be573febadaf680adeb5bbd0"
+        }
+      ],
+      "matches": [
+        {
+          "candidate_region": "pdf-source:1:733",
+          "iou": 0.688604,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p1-01"
+        },
+        {
+          "candidate_region": "pdf-source:1:758",
+          "iou": 0.767002,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p1-02"
+        },
+        {
+          "candidate_region": "pdf-source:1:765",
+          "iou": 0.999957,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p1-03"
+        },
+        {
+          "candidate_region": "pdf-source:1:832",
+          "iou": 0.748939,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p1-04"
+        },
+        {
+          "candidate_region": "pdf-source:1:925",
+          "iou": 0.834792,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p1-05"
+        },
+        {
+          "candidate_region": "pdf-source:1:955",
+          "iou": 0.700236,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p1-06"
+        },
+        {
+          "candidate_region": "pdf-source:1:1008",
+          "iou": 0.834791,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p1-07"
+        },
+        {
+          "candidate_region": "pdf-source:1:1053",
+          "iou": 0.834804,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p1-08"
+        },
+        {
+          "candidate_region": "pdf-source:1:1081",
+          "iou": 0.834804,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p1-09"
+        },
+        {
+          "candidate_region": "pdf-source:1:1159",
+          "iou": 0.99986,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p1-10"
+        },
+        {
+          "candidate_region": "pdf-source:1:1230",
+          "iou": 0.868598,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p1-11"
+        },
+        {
+          "candidate_region": "pdf-source:1:1266",
+          "iou": 0.767004,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p1-12"
+        },
+        {
+          "candidate_region": "pdf-source:1:1273",
+          "iou": 0.870293,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p1-13"
+        },
+        {
+          "candidate_region": "pdf-source:1:1317",
+          "iou": 0.767043,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p1-14"
+        },
+        {
+          "candidate_region": "pdf-source:1:1320",
+          "iou": 0.726489,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p1-15"
+        },
+        {
+          "candidate_region": "pdf-source:1:1338",
+          "iou": 0.999896,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p1-16"
+        },
+        {
+          "candidate_region": "pdf-source:1:1389",
+          "iou": 0.638592,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p1-17"
+        },
+        {
+          "candidate_region": "pdf-source:1:1506",
+          "iou": 0.999896,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p1-18"
+        },
+        {
+          "candidate_region": "pdf-source:1:1696",
+          "iou": 0.646215,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p1-19"
+        },
+        {
+          "candidate_region": "pdf-source:1:1804",
+          "iou": 0.700236,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p1-20"
+        },
+        {
+          "candidate_region": "pdf-source:2:376",
+          "iou": 0.700254,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p2-01"
+        },
+        {
+          "candidate_region": "pdf-source:2:423",
+          "iou": 0.700235,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p2-02"
+        },
+        {
+          "candidate_region": "pdf-source:2:439",
+          "iou": 0.999949,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p2-03"
+        },
+        {
+          "candidate_region": "pdf-source:2:449",
+          "iou": 0.621773,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p2-04"
+        },
+        {
+          "candidate_region": "pdf-source:2:474",
+          "iou": 0.700252,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p2-05"
+        },
+        {
+          "candidate_region": "pdf-source:2:481",
+          "iou": 0.656535,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p2-06"
+        },
+        {
+          "candidate_region": "pdf-source:2:515",
+          "iou": 0.999954,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p2-07"
+        },
+        {
+          "candidate_region": "pdf-source:2:557",
+          "iou": 0.700236,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p2-08"
+        },
+        {
+          "candidate_region": "pdf-source:2:823",
+          "iou": 0.700233,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p2-09"
+        },
+        {
+          "candidate_region": "pdf-source:2:840",
+          "iou": 0.629266,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p2-10"
+        },
+        {
+          "candidate_region": "pdf-source:2:919",
+          "iou": 0.716295,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p2-11"
+        },
+        {
+          "candidate_region": "pdf-source:2:950",
+          "iou": 0.646206,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p2-12"
+        },
+        {
+          "candidate_region": "pdf-source:2:1068",
+          "iou": 0.696473,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p2-13"
+        },
+        {
+          "candidate_region": "pdf-source:2:1073",
+          "iou": 0.824278,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p2-14"
+        },
+        {
+          "candidate_region": "pdf-source:2:1088",
+          "iou": 0.700255,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p2-15"
+        },
+        {
+          "candidate_region": "pdf-source:2:1092",
+          "iou": 0.999947,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p2-16"
+        },
+        {
+          "candidate_region": "pdf-source:2:1154",
+          "iou": 0.732,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p2-17"
+        },
+        {
+          "candidate_region": "pdf-source:2:1173",
+          "iou": 0.644355,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p2-18"
+        },
+        {
+          "candidate_region": "pdf-source:2:1344",
+          "iou": 0.696473,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p2-19"
+        },
+        {
+          "candidate_region": "pdf-source:2:1355",
+          "iou": 0.824277,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p2-20"
+        },
+        {
+          "candidate_region": "pdf-source:2:1411",
+          "iou": 0.69158,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p2-21"
+        },
+        {
+          "candidate_region": "pdf-source:2:1425",
+          "iou": 0.646206,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p2-22"
+        },
+        {
+          "candidate_region": "pdf-source:2:1468",
+          "iou": 0.696473,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p2-23"
+        },
+        {
+          "candidate_region": "pdf-source:2:1473",
+          "iou": 0.824278,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p2-24"
+        },
+        {
+          "candidate_region": "pdf-source:2:1697",
+          "iou": 0.727611,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p2-25"
+        },
+        {
+          "candidate_region": "pdf-source:2:1724",
+          "iou": 0.779252,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p2-26"
+        },
+        {
+          "candidate_region": "pdf-source:2:1737",
+          "iou": 0.766998,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p2-27"
+        },
+        {
+          "candidate_region": "pdf-source:2:1766",
+          "iou": 0.999928,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p2-28"
+        },
+        {
+          "candidate_region": "pdf-source:2:1770",
+          "iou": 0.999889,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p2-29"
+        },
+        {
+          "candidate_region": "pdf-source:2:1803",
+          "iou": 0.646208,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p2-30"
+        },
+        {
+          "candidate_region": "pdf-source:2:1807",
+          "iou": 0.705711,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p2-31"
+        },
+        {
+          "candidate_region": "pdf-source:2:1840",
+          "iou": 0.601276,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p2-32"
+        },
+        {
+          "candidate_region": "pdf-source:2:1859",
+          "iou": 0.601277,
+          "localization_method": "pdf_source_typography",
+          "oracle_region": "p2-33"
+        }
+      ],
+      "metrics": {
+        "candidate_regions": 53,
+        "candidate_regions_by_localization_method": {
+          "pdf_source_typography": 53
+        },
+        "detection_precision": 1.0,
+        "detection_recall": 1.0,
+        "false_alignments": 0,
+        "matched_regions": 53,
+        "matched_regions_by_localization_method": {
+          "pdf_source_typography": 53
+        },
+        "oracle_regions": 53,
+        "semantic_assertion_coverage": 0.7358490566037735,
+        "semantic_coverage": 0.7358490566037735,
+        "semantic_expectation_accuracy": 1.0,
+        "traceability_coverage": 1.0
+      },
+      "missed_oracle_regions": [],
+      "representative": true,
+      "resources": {
+        "cpu_seconds": 1.953125,
+        "docling_processing_seconds": 23.487577885010978,
+        "peak_python_bytes": 9709921,
+        "wall_seconds": 1.992732
+      },
+      "same_page_overlaps_below_threshold": []
+    }
+  ],
+  "mutations": {
+    "false_conformant": 0,
+    "results": [
+      {
+        "candidate": "w x \\neq b = 0",
+        "expected": "contradicted",
+        "id": "operator-not-equal",
+        "observed": "contradicted",
+        "source": "wx−b=0"
+      },
+      {
+        "candidate": "w x b = 0",
+        "expected": "contradicted",
+        "id": "operator-removed",
+        "observed": "contradicted",
+        "source": "wx−b=0"
+      },
+      {
+        "candidate": "w - b = 0",
+        "expected": "contradicted",
+        "id": "term-removed",
+        "observed": "contradicted",
+        "source": "wx−b=0"
+      },
+      {
+        "candidate": "x",
+        "expected": "contradicted",
+        "id": "suffix-removed",
+        "observed": "contradicted",
+        "source": "x=1"
+      },
+      {
+        "candidate": "x-y",
+        "expected": "contradicted",
+        "id": "plus-to-minus",
+        "observed": "contradicted",
+        "source": "x+y"
+      },
+      {
+        "candidate": "a=b \\quad a \\neq b",
+        "expected": "contradicted",
+        "id": "contradiction-appended",
+        "observed": "contradicted",
+        "source": "a=b"
+      },
+      {
+        "candidate": "E = m c c 2",
+        "expected": "contradicted",
+        "id": "term-duplicated",
+        "observed": "contradicted",
+        "source": "E=mc2"
+      },
+      {
+        "candidate": "y x",
+        "expected": "contradicted",
+        "id": "terms-reversed",
+        "observed": "contradicted",
+        "source": "xy"
+      },
+      {
+        "candidate": "p * q",
+        "expected": "contradicted",
+        "id": "division-to-product",
+        "observed": "contradicted",
+        "source": "p/q"
+      }
+    ],
+    "total": 9
+  },
+  "schema_version": 1
+}

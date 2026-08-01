@@ -6,7 +6,18 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from docling_core.types.doc import DoclingDocument
+
+from pdf_math_audit.alignment import DoclingAlignment
 from pdf_math_audit.analyzer import analyze_pdf
+from pdf_math_audit.contract import (
+    ANALYZER_VERSION,
+    CAPABILITY_PROFILE,
+    CONTRACT_VERSION,
+    file_sha256,
+    require_fingerprint,
+    sha256_argument,
+)
 
 
 def _emit(event: dict[str, Any]) -> None:
@@ -32,14 +43,45 @@ def main() -> int:
         description="Analyse la traçabilité structurelle d'un PDF."
     )
     parser.add_argument("pdf", type=Path)
+    parser.add_argument("--docling-document", type=Path, required=True)
+    parser.add_argument("--source-sha256", type=sha256_argument, required=True)
+    parser.add_argument(
+        "--docling-document-sha256", type=sha256_argument, required=True
+    )
+    parser.add_argument("--contract-version", choices=[CONTRACT_VERSION], required=True)
+    parser.add_argument(
+        "--capability-profile", choices=[CAPABILITY_PROFILE], required=True
+    )
     parser.add_argument("--report", type=Path, required=True)
     parser.add_argument("--evidence", type=Path, required=True)
     args = parser.parse_args()
     _require_distinct_paths(
         parser,
-        {"pdf": args.pdf, "report": args.report, "evidence": args.evidence},
+        {
+            "pdf": args.pdf,
+            "docling-document": args.docling_document,
+            "report": args.report,
+            "evidence": args.evidence,
+        },
     )
 
+    source_sha256 = file_sha256(args.pdf)
+    require_fingerprint(
+        parser,
+        label="le PDF source",
+        actual=source_sha256,
+        announced=args.source_sha256,
+    )
+    docling_bytes = args.docling_document.read_bytes()
+    docling_sha256 = hashlib.sha256(docling_bytes).hexdigest()
+    require_fingerprint(
+        parser,
+        label="le DoclingDocument",
+        actual=docling_sha256,
+        announced=args.docling_document_sha256,
+    )
+    document = DoclingDocument.model_validate_json(docling_bytes)
+    alignment = DoclingAlignment(document)
     glyph_count = 0
     with args.evidence.open("wb") as evidence_file:
         with gzip.GzipFile(
@@ -48,6 +90,7 @@ def main() -> int:
 
             def write_evidence(page: int, glyph: dict[str, Any]) -> None:
                 nonlocal glyph_count
+                alignment.observe_glyph(page, glyph)
                 record = {"page": page, **glyph}
                 evidence.write(
                     (
@@ -68,6 +111,21 @@ def main() -> int:
             )
 
     evidence_bytes = args.evidence.read_bytes()
+    report["docling_document"] = {
+        "filename": args.docling_document.name,
+        "bytes": len(docling_bytes),
+        "sha256": docling_sha256,
+        "schema_name": document.schema_name,
+        "version": document.version,
+    }
+    report["contract"] = {
+        "version": args.contract_version,
+        "analyzer_version": ANALYZER_VERSION,
+        "capability_profile": args.capability_profile,
+        "source_sha256": source_sha256,
+        "docling_document_sha256": docling_sha256,
+    }
+    report["alignment"] = alignment.finalize(report, on_progress=_emit)
     report["evidence"] = {
         "bytes": len(evidence_bytes),
         "content_encoding": "gzip",
@@ -87,3 +145,7 @@ def main() -> int:
         }
     )
     return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

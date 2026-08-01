@@ -1,0 +1,111 @@
+{
+  "schema_version": 1,
+  "coordinate_system": "PDF points, TOPLEFT",
+  "source_pdf_sha256": "219c2064ba9292d286f4b3bcc65eb9e94b418705c51b9f98f54f2ad70321ddf1",
+  "independent_proofs": [
+    {
+      "id": "source-glyph-proof",
+      "path": "../../../experiments/math_pipeline_comparison/source-render-proof/glyph-proof.json",
+      "sha256": "5b964664c14b8ef152bcb300555747b3463a17b154ae61d1b162e0d12e0d796a"
+    },
+    {
+      "id": "page-1-render-600dpi",
+      "path": "../../../experiments/math_pipeline_comparison/source-render-proof/crops/page-1-600dpi.png",
+      "sha256": "cb2358b69568043092c59c9dd95e04bb94cf22fabee3db3e264f75bf84ad4687"
+    },
+    {
+      "id": "page-2-render-600dpi",
+      "path": "../../../experiments/math_pipeline_comparison/source-render-proof/crops/page-2-600dpi.png",
+      "sha256": "c18b0e2cf5ad02ba0c08d9fb9f312a60af3020d5be573febadaf680adeb5bbd0"
+    }
+  ],
+  "exhaustive": true,
+  "representative": true,
+  "granularity": "contiguous_typeset_mathematical_expression",
+  "construction": {
+    "candidate_blind": false,
+    "candidate_outputs_used_as_evidence": false,
+    "mineru_used_only_for_completeness_cross_check": true,
+    "authority": "embedded CFF glyph names, PDF geometry and independent 600 DPI render"
+  },
+  "expected_non_verifiable": {
+    "p2-04": "source_signal_conflict",
+    "p2-10": "source_signal_conflict",
+    "p2-12": "source_signal_conflict",
+    "p2-13": "source_signal_conflict",
+    "p2-14": "source_signal_conflict",
+    "p2-18": "source_signal_conflict",
+    "p2-19": "source_signal_conflict",
+    "p2-20": "source_signal_conflict",
+    "p2-22": "source_signal_conflict",
+    "p2-23": "source_signal_conflict",
+    "p2-24": "source_signal_conflict",
+    "p2-30": "source_signal_conflict",
+    "p2-32": "source_signal_conflict",
+    "p2-33": "source_signal_conflict"
+  },
+  "exclusions": [
+    "nombres employés uniquement comme prose, par exemple 20 000",
+    "numéro d'appel de note",
+    "ponctuation terminale extérieure à l'expression"
+  ],
+  "pages": [
+    {"page": 1, "width": 540.0, "height": 666.1420288085938, "source_kind": "born_digital_type1_cff"},
+    {"page": 2, "width": 540.0, "height": 666.1420288085938, "source_kind": "born_digital_type1_cff_with_conflicting_tounicode"}
+  ],
+  "regions": [
+    {"id":"p1-01","page":1,"layout":"inline","bbox":[415.401,307.685,467.853,328.537],"bbox_coord_origin":"TOPLEFT","text":"{(x_i,y_i)}_{i=1}^N","semantic_assertions":[{"relation":"sequence","expected":"{(xi,yi)}Ni=1"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 1 + page-1-600dpi.png; p1-01"}},
+    {"id":"p1-02","page":1,"layout":"inline","bbox":[131.677,319.64,140.54,334.165],"bbox_coord_origin":"TOPLEFT","text":"x_i","semantic_assertions":[{"relation":"sequence","expected":"xi"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 1 + page-1-600dpi.png; p1-02"}},
+    {"id":"p1-03","page":1,"layout":"inline","bbox":[176.073,323.456,184.073,333.419],"bbox_coord_origin":"TOPLEFT","text":"N","semantic_assertions":[{"relation":"sequence","expected":"N"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 1 + page-1-600dpi.png; p1-03"}},
+    {"id":"p1-04","page":1,"layout":"inline","bbox":[142.219,331.655,196.752,345.772],"bbox_coord_origin":"TOPLEFT","text":"j=1,...,D","semantic_assertions":[{"relation":"sequence","expected":"j=1,...,D"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 1 + page-1-600dpi.png; p1-04"}},
+    {"id":"p1-05","page":1,"layout":"inline","bbox":[269.998,343.384,285.615,357.329],"bbox_coord_origin":"TOPLEFT","text":"x^(j)","semantic_assertions":[{"relation":"sequence","expected":"x(j)"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 1 + page-1-600dpi.png; p1-05"}},
+    {"id":"p1-06","page":1,"layout":"inline","bbox":[431.901,343.55,437.948,357.777],"bbox_coord_origin":"TOPLEFT","text":"x","semantic_assertions":[{"relation":"sequence","expected":"x"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 1 + page-1-600dpi.png; p1-06"}},
+    {"id":"p1-07","page":1,"layout":"inline","bbox":[307.087,355.339,322.975,369.284],"bbox_coord_origin":"TOPLEFT","text":"x^(1)","semantic_assertions":[{"relation":"sequence","expected":"x(1)"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 1 + page-1-600dpi.png; p1-07"}},
+    {"id":"p1-08","page":1,"layout":"inline","bbox":[137.886,367.294,153.774,381.24],"bbox_coord_origin":"TOPLEFT","text":"x^(2)","semantic_assertions":[{"relation":"sequence","expected":"x(2)"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 1 + page-1-600dpi.png; p1-08"}},
+    {"id":"p1-09","page":1,"layout":"inline","bbox":[278.847,367.294,294.735,381.24],"bbox_coord_origin":"TOPLEFT","text":"x^(3)","semantic_assertions":[{"relation":"sequence","expected":"x(3)"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 1 + page-1-600dpi.png; p1-09"}},
+    {"id":"p1-10","page":1,"layout":"inline","bbox":[282.734,383.232,286.839,393.195],"bbox_coord_origin":"TOPLEFT","text":"j","semantic_assertions":[{"relation":"sequence","expected":"j"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 1 + page-1-600dpi.png; p1-10"}},
+    {"id":"p1-11","page":1,"layout":"inline","bbox":[263.542,391.029,279.43,408.563],"bbox_coord_origin":"TOPLEFT","text":"x_i^(2)","semantic_assertions":[{"relation":"sequence","expected":"x(2)i"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 1 + page-1-600dpi.png; p1-11"}},
+    {"id":"p1-12","page":1,"layout":"inline","bbox":[458.332,392.755,467.196,407.28],"bbox_coord_origin":"TOPLEFT","text":"x_i","semantic_assertions":[{"relation":"sequence","expected":"xi"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 1 + page-1-600dpi.png; p1-12"}},
+    {"id":"p1-13","page":1,"layout":"inline","bbox":[93.16,405.207,109.048,422.97],"bbox_coord_origin":"TOPLEFT","text":"x_k^(2)","semantic_assertions":[{"relation":"sequence","expected":"x(2)k"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 1 + page-1-600dpi.png; p1-13"}},
+    {"id":"p1-14","page":1,"layout":"inline","bbox":[316.815,406.933,327.094,421.459],"bbox_coord_origin":"TOPLEFT","text":"x_k","semantic_assertions":[{"relation":"sequence","expected":"xk"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 1 + page-1-600dpi.png; p1-14"}},
+    {"id":"p1-15","page":1,"layout":"inline","bbox":[333.787,406.993,387.434,421.11],"bbox_coord_origin":"TOPLEFT","text":"k=1,...,N","semantic_assertions":[{"relation":"sequence","expected":"k=1,...,N"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 1 + page-1-600dpi.png; p1-15"}},
+    {"id":"p1-16","page":1,"layout":"inline","bbox":[442.978,410.749,450.68,421.459],"bbox_coord_origin":"TOPLEFT","text":"y_i","semantic_assertions":[{"relation":"sequence","expected":"yi"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 1 + page-1-600dpi.png; p1-16"}},
+    {"id":"p1-17","page":1,"layout":"inline","bbox":[314.454,418.948,368.579,439.74],"bbox_coord_origin":"TOPLEFT","text":"{1,2,...,C}","semantic_assertions":[{"relation":"sequence","expected":"{1,2,...,C}"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 1 + page-1-600dpi.png; p1-17"}},
+    {"id":"p1-18","page":1,"layout":"inline","bbox":[125.887,446.615,133.588,457.324],"bbox_coord_origin":"TOPLEFT","text":"y_i","semantic_assertions":[{"relation":"sequence","expected":"yi"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 1 + page-1-600dpi.png; p1-18"}},
+    {"id":"p1-19","page":1,"layout":"inline","bbox":[348.768,466.769,432.429,487.561],"bbox_coord_origin":"TOPLEFT","text":"{spam,not_spam}","semantic_assertions":[{"relation":"sequence","expected":"{spam,not_spam}"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 1 + page-1-600dpi.png; p1-19"}},
+    {"id":"p1-20","page":1,"layout":"inline","bbox":[186.673,496.597,192.72,510.824],"bbox_coord_origin":"TOPLEFT","text":"x","semantic_assertions":[{"relation":"sequence","expected":"x"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 1 + page-1-600dpi.png; p1-20"}},
+    {"id":"p2-01","page":2,"layout":"inline","bbox":[432.239,109.166,440.518,123.393],"bbox_coord_origin":"TOPLEFT","text":"w","semantic_assertions":[{"relation":"sequence","expected":"w"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 2 + page-2-600dpi.png; p2-01"}},
+    {"id":"p2-02","page":2,"layout":"inline","bbox":[282.268,121.121,288.315,135.348],"bbox_coord_origin":"TOPLEFT","text":"x","semantic_assertions":[{"relation":"sequence","expected":"x"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 2 + page-2-600dpi.png; p2-02"}},
+    {"id":"p2-03","page":2,"layout":"inline","bbox":[377.815,124.937,382.089,134.9],"bbox_coord_origin":"TOPLEFT","text":"b","semantic_assertions":[{"relation":"sequence","expected":"b"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 2 + page-2-600dpi.png; p2-03"}},
+    {"id":"p2-04","page":2,"layout":"display","bbox":[244.068,151.009,293.167,171.861],"bbox_coord_origin":"TOPLEFT","text":"wx−b=0","semantic_assertions":[{"relation":"sequence","expected":"wx−b=0"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 2 glyph minus + page-2-600dpi.png; p2-04"}},
+    {"id":"p2-05","page":2,"layout":"inline","bbox":[165.331,174.92,179.653,189.147],"bbox_coord_origin":"TOPLEFT","text":"wx","semantic_assertions":[{"relation":"sequence","expected":"wx"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 2 + page-2-600dpi.png; p2-05"}},
+    {"id":"p2-06","page":2,"layout":"inline","bbox":[213.801,171.364,370.661,189.097],"bbox_coord_origin":"TOPLEFT","text":"w^(1)x^(1)+w^(2)x^(2)+...+w^(D)x^(D)","semantic_assertions":[{"relation":"sequence","expected":"w(1)x(1)+w(2)x(2)+...+w(D)x(D)"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 2 + page-2-600dpi.png; p2-06"}},
+    {"id":"p2-07","page":2,"layout":"inline","bbox":[396.812,178.736,405.061,188.699],"bbox_coord_origin":"TOPLEFT","text":"D","semantic_assertions":[{"relation":"sequence","expected":"D"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 2 + page-2-600dpi.png; p2-07"}},
+    {"id":"p2-08","page":2,"layout":"inline","bbox":[225.176,186.875,231.223,201.102],"bbox_coord_origin":"TOPLEFT","text":"x","semantic_assertions":[{"relation":"sequence","expected":"x"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 2 + page-2-600dpi.png; p2-08"}},
+    {"id":"p2-09","page":2,"layout":"inline","bbox":[311.519,246.651,317.566,260.878],"bbox_coord_origin":"TOPLEFT","text":"x","semantic_assertions":[{"relation":"sequence","expected":"x"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 2 + page-2-600dpi.png; p2-09"}},
+    {"id":"p2-10","page":2,"layout":"display","bbox":[231.421,276.538,305.813,297.39],"bbox_coord_origin":"TOPLEFT","text":"y=sign(wx−b)","semantic_assertions":[{"relation":"sequence","expected":"y=sign(wx−b)"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 2 glyph minus + page-2-600dpi.png; p2-10"}},
+    {"id":"p2-11","page":2,"layout":"inline","bbox":[429.624,300.509,442.545,314.626],"bbox_coord_origin":"TOPLEFT","text":"+1","semantic_assertions":[{"relation":"sequence","expected":"+1"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 2 + page-2-600dpi.png; p2-11"}},
+    {"id":"p2-12","page":2,"layout":"inline","bbox":[201.1,312.464,213.83,333.256],"bbox_coord_origin":"TOPLEFT","text":"−1","semantic_assertions":[{"relation":"sequence","expected":"−1"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 2 glyph minus + page-2-600dpi.png; p2-12"}},
+    {"id":"p2-13","page":2,"layout":"inline","bbox":[152.641,342.292,165.018,356.596],"bbox_coord_origin":"TOPLEFT","text":"w∗","semantic_assertions":[{"relation":"sequence","expected":"w∗"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 2 glyph asteriskmath + page-2-600dpi.png; p2-13"}},
+    {"id":"p2-14","page":2,"layout":"inline","bbox":[187.822,344.51,196.178,356.596],"bbox_coord_origin":"TOPLEFT","text":"b∗","semantic_assertions":[{"relation":"sequence","expected":"b∗"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 2 glyph asteriskmath + page-2-600dpi.png; p2-14"}},
+    {"id":"p2-15","page":2,"layout":"inline","bbox":[265.527,342.292,273.806,356.519],"bbox_coord_origin":"TOPLEFT","text":"w","semantic_assertions":[{"relation":"sequence","expected":"w"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 2 + page-2-600dpi.png; p2-15"}},
+    {"id":"p2-16","page":2,"layout":"inline","bbox":[296.128,346.108,300.402,356.071],"bbox_coord_origin":"TOPLEFT","text":"b","semantic_assertions":[{"relation":"sequence","expected":"b"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 2 + page-2-600dpi.png; p2-16"}},
+    {"id":"p2-17","page":2,"layout":"inline","bbox":[216.23,354.247,236.035,368.474],"bbox_coord_origin":"TOPLEFT","text":"f(x)","semantic_assertions":[{"relation":"sequence","expected":"f(x)"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 2 + page-2-600dpi.png; p2-17"}},
+    {"id":"p2-18","page":2,"layout":"display","bbox":[220.932,384.135,319.068,404.987],"bbox_coord_origin":"TOPLEFT","text":"f(x)=sign(w∗x−b∗)","semantic_assertions":[{"relation":"sequence","expected":"f(x)=sign(w∗x−b∗)"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 2 glyphs asteriskmath/minus + page-2-600dpi.png; p2-18"}},
+    {"id":"p2-19","page":2,"layout":"inline","bbox":[113.296,431.956,125.674,446.26],"bbox_coord_origin":"TOPLEFT","text":"w∗","semantic_assertions":[{"relation":"sequence","expected":"w∗"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 2 glyph asteriskmath + page-2-600dpi.png; p2-19"}},
+    {"id":"p2-20","page":2,"layout":"inline","bbox":[170.586,434.174,178.942,446.26],"bbox_coord_origin":"TOPLEFT","text":"b∗","semantic_assertions":[{"relation":"sequence","expected":"b∗"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 2 glyph asteriskmath + page-2-600dpi.png; p2-20"}},
+    {"id":"p2-21","page":2,"layout":"inline","bbox":[457.655,432.016,470.131,446.133],"bbox_coord_origin":"TOPLEFT","text":"+1","semantic_assertions":[{"relation":"sequence","expected":"+1"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 2 + page-2-600dpi.png; p2-21"}},
+    {"id":"p2-22","page":2,"layout":"inline","bbox":[139.603,443.971,152.333,464.763],"bbox_coord_origin":"TOPLEFT","text":"−1","semantic_assertions":[{"relation":"sequence","expected":"−1"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 2 glyph minus + page-2-600dpi.png; p2-22"}},
+    {"id":"p2-23","page":2,"layout":"inline","bbox":[217.873,461.844,230.25,476.148],"bbox_coord_origin":"TOPLEFT","text":"w∗","semantic_assertions":[{"relation":"sequence","expected":"w∗"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 2 glyph asteriskmath + page-2-600dpi.png; p2-23"}},
+    {"id":"p2-24","page":2,"layout":"inline","bbox":[253.718,464.062,262.074,476.148],"bbox_coord_origin":"TOPLEFT","text":"b∗","semantic_assertions":[{"relation":"sequence","expected":"b∗"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 2 glyph asteriskmath + page-2-600dpi.png; p2-24"}},
+    {"id":"p2-25","page":2,"layout":"inline","bbox":[391.174,503.747,459.239,517.864],"bbox_coord_origin":"TOPLEFT","text":"i=1,...,10000","semantic_assertions":[{"relation":"sequence","expected":"i=1,...,10000"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 2 + page-2-600dpi.png; p2-25"}},
+    {"id":"p2-26","page":2,"layout":"inline","bbox":[141.055,515.642,170.953,530.167],"bbox_coord_origin":"TOPLEFT","text":"(x_i,y_i)","semantic_assertions":[{"relation":"sequence","expected":"(xi,yi)"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 2 + page-2-600dpi.png; p2-26"}},
+    {"id":"p2-27","page":2,"layout":"inline","bbox":[206.645,515.642,215.509,530.167],"bbox_coord_origin":"TOPLEFT","text":"x_i","semantic_assertions":[{"relation":"sequence","expected":"xi"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 2 + page-2-600dpi.png; p2-27"}},
+    {"id":"p2-28","page":2,"layout":"inline","bbox":[363.447,519.458,366.884,529.421],"bbox_coord_origin":"TOPLEFT","text":"i","semantic_assertions":[{"relation":"sequence","expected":"i"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 2 + page-2-600dpi.png; p2-28"}},
+    {"id":"p2-29","page":2,"layout":"inline","bbox":[390.098,519.458,397.799,530.167],"bbox_coord_origin":"TOPLEFT","text":"y_i","semantic_assertions":[{"relation":"sequence","expected":"yi"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 2 + page-2-600dpi.png; p2-29"}},
+    {"id":"p2-30","page":2,"layout":"inline","bbox":[154.304,527.657,167.034,548.449],"bbox_coord_origin":"TOPLEFT","text":"−1","semantic_assertions":[{"relation":"sequence","expected":"−1"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 2 glyph minus + page-2-600dpi.png; p2-30"}},
+    {"id":"p2-31","page":2,"layout":"inline","bbox":[182.559,527.657,195.289,541.774],"bbox_coord_origin":"TOPLEFT","text":"+1","semantic_assertions":[{"relation":"sequence","expected":"+1"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 2 + page-2-600dpi.png; p2-31"}},
+    {"id":"p2-32","page":2,"layout":"inline","bbox":[95.773,545.53,194.799,567.876],"bbox_coord_origin":"TOPLEFT","text":"wx_i−b≥1 if y_i=+1","semantic_assertions":[{"relation":"sequence","expected":"wxi−b≥1ifyi=+1"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 2 glyphs minus/greaterequal + page-2-600dpi.png; p2-32"}},
+    {"id":"p2-33","page":2,"layout":"inline","bbox":[95.773,557.485,202.545,579.831],"bbox_coord_origin":"TOPLEFT","text":"wx_i−b≤−1 if y_i=−1","semantic_assertions":[{"relation":"sequence","expected":"wxi−b≤−1ifyi=−1"}],"evidence":{"kind":"source_glyph_and_render","reference":"glyph-proof.json page 2 glyphs minus/lessequal + page-2-600dpi.png; p2-33"}}
+  ]
+}

@@ -13,6 +13,11 @@ default: &default
       threads: <%= Integer(ENV.fetch("SOLID_QUEUE_CONVERSION_THREADS")) %>
       processes: <%= Integer(ENV.fetch("SOLID_QUEUE_CONVERSION_PROCESSES")) %>
       polling_interval: <%= Float(ENV.fetch("SOLID_QUEUE_WORKER_POLLING_INTERVAL")) %>
+    - queues:
+        - math_qualifications
+      threads: <%= Integer(ENV.fetch("SOLID_QUEUE_MATH_QUALIFICATION_THREADS")) %>
+      processes: <%= Integer(ENV.fetch("SOLID_QUEUE_MATH_QUALIFICATION_PROCESSES")) %>
+      polling_interval: <%= Float(ENV.fetch("SOLID_QUEUE_WORKER_POLLING_INTERVAL")) %>
 
 development:
   <<: *default

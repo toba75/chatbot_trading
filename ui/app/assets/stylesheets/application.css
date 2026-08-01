@@ -105,6 +105,14 @@ h2 { font-size: 1rem; }
 .status-card.error { border-color: #e5b9b9; }
 .failure-outputs { margin: 0 0 1rem; }
 .quality-summary { display: flex; flex-wrap: wrap; gap: 1rem 3rem; }
+.math-qualification { max-width: 54rem; margin: 2rem 0; padding: 1.25rem; border: 1px solid var(--line); border-radius: 1rem; background: var(--surface); }
+.math-qualification progress { width: min(30rem, 100%); accent-color: var(--accent); }
+.math-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .75rem; }
+.math-summary div { padding: .75rem; border-radius: .65rem; background: #f1f2ef; }
+.math-summary dt { color: var(--muted); font-size: .8rem; }
+.math-summary dd { margin: .25rem 0 0; font-size: 1.4rem; font-weight: 700; }
+.math-regions { width: 100%; border-collapse: collapse; }
+.math-regions th, .math-regions td { padding: .55rem; border-bottom: 1px solid var(--line); text-align: left; }
 
 .comparison {
   display: grid;
@@ -129,7 +137,7 @@ pre { overflow: auto; max-height: 35rem; padding: 1rem; white-space: pre-wrap; b
 @keyframes pulse { 50% { opacity: .35; transform: scale(.8); } }
 
 @media (max-width: 800px) {
-  .comparison, .details-grid { grid-template-columns: 1fr; }
+  .comparison, .details-grid, .math-summary { grid-template-columns: 1fr; }
   .comparison iframe { height: 55vh; }
   .document-header { display: block; }
   .document-header .button { margin-bottom: 1rem; }

@@ -21,6 +21,11 @@ class ConvertDocumentJobTest < ActiveJob::TestCase
     assert_equal attempt.conversion_options, client.recorded_options
     assert attempt.started_at
     assert attempt.completed_at
+    qualification = attempt.math_qualification
+    assert_predicate qualification, :queued?
+    assert_equal attempt.document.source_sha256, qualification.source_sha256
+    assert_equal Digest::SHA256.hexdigest(attempt.docling_document.download), qualification.docling_document_sha256
+    assert_equal 1, SolidQueue::Job.where(class_name: "QualifyMathJob").count
   end
 
   test "rend l'échec Docling visible et laisse le job échouer" do
@@ -84,6 +89,112 @@ class ConvertDocumentJobTest < ActiveJob::TestCase
     assert_not attempt.docling_document.attached?
   end
 
+  test "conserve le succès Docling et rend un échec d'enqueue visible" do
+    attempt = create_attempt
+    job = job_with(FakeClient.new(successful_result))
+    job.define_singleton_method(:enqueue_math_qualification) do |_qualification|
+      raise SolidQueue::Job::EnqueueError, "base indisponible"
+    end
+
+    job.perform(attempt)
+
+    attempt.reload
+    assert_predicate attempt, :succeeded?
+    assert_predicate attempt.math_qualification, :failed?
+    assert_equal "enqueue_failed", attempt.math_qualification.error_code
+    assert_equal 0, SolidQueue::Job.where(class_name: "QualifyMathJob").count
+  end
+
+  test "un échec après l'enqueue annule ensemble le succès, la qualification et le job" do
+    attempt = create_attempt
+    job = job_with(FakeClient.new(successful_result))
+    job.define_singleton_method(:enqueue_math_qualification) do |qualification|
+      QualifyMathJob.perform_later(qualification)
+      raise "échec transactionnel"
+    end
+
+    assert_raises(RuntimeError) do
+      job.perform(attempt)
+    end
+
+    attempt.reload
+    assert_predicate attempt, :failed?
+    assert_equal "unexpected_error", attempt.error_code
+    assert_nil attempt.math_qualification
+    assert_equal 0, SolidQueue::Job.where(class_name: "QualifyMathJob").count
+    assert_not attempt.docling_document.attached?
+  end
+
+  test "refuse de reconvertir une tentative terminée sans remplacer sa qualification" do
+    attempt = create_attempt
+    client = FakeClient.new(successful_result)
+    job = job_with(client)
+    job.perform(attempt)
+    qualification_id = attempt.reload.math_qualification.id
+
+    assert_raises(ConvertDocumentJob::InvalidState) { job.perform(attempt) }
+
+    assert_equal 1, client.calls
+    assert_equal qualification_id, attempt.reload.math_qualification.id
+    assert_predicate attempt, :succeeded?
+  end
+
+  test "rend terminale une exécution interrompue redélivrée au même job" do
+    attempt = create_attempt
+    client = FakeClient.new(successful_result)
+    job = job_with(client)
+    attempt.update!(
+      status: "converting",
+      execution_job_id: job.job_id,
+      started_at: 1.minute.ago
+    )
+
+    assert_raises(ConvertDocumentJob::InterruptedExecution) { job.perform(attempt) }
+
+    attempt.reload
+    assert_predicate attempt, :failed?
+    assert_equal "interrupted_execution", attempt.error_code
+    assert attempt.completed_at
+    assert_equal 0, client.calls
+  end
+
+  test "ne prend pas la place d'un autre job de conversion actif" do
+    attempt = create_attempt
+    client = FakeClient.new(successful_result)
+    attempt.update!(
+      status: "converting",
+      execution_job_id: "job-actif",
+      started_at: 1.minute.ago
+    )
+
+    assert_raises(ConvertDocumentJob::InvalidState) do
+      job_with(client).perform(attempt)
+    end
+
+    assert_predicate attempt.reload, :converting?
+    assert_nil attempt.completed_at
+    assert_equal 0, client.calls
+  end
+
+  test "une ancienne exécution ne peut pas écraser un état terminal" do
+    attempt = create_attempt
+    job = job_with(FakeClient.new(successful_result))
+    attempt.update!(
+      status: "failed",
+      execution_job_id: job.job_id,
+      error_code: "interrupted_execution",
+      completed_at: Time.current
+    )
+
+    assert_raises(ConvertDocumentJob::InvalidState) do
+      job.send(:persist_result!, attempt, successful_result)
+    end
+
+    assert_predicate attempt.reload, :failed?
+    assert_equal "interrupted_execution", attempt.error_code
+    assert_not attempt.docling_document.attached?
+  end
+
   private
 
   def job_with(client)
@@ -124,14 +235,16 @@ class ConvertDocumentJobTest < ActiveJob::TestCase
   end
 
   class FakeClient
-    attr_reader :recorded_options
+    attr_reader :calls, :recorded_options
 
     def initialize(result = nil, error: nil)
       @result = result
       @error = error
+      @calls = 0
     end
 
     def convert(file:, filename:, options:)
+      @calls += 1
       @recorded_options = options
       raise @error if @error
 

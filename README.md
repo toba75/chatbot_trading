@@ -1,8 +1,8 @@
 # Pipeline documentaire minimal
 
-Ce dépôt repart d'un socle volontairement réduit : le PDF de référence et le
-déploiement qualifié du serveur industriel `docling-serve`. Le pipeline
-applicatif et son stockage seront ajoutés ensuite, une responsabilité à la fois.
+Ce dépôt contient le pipeline minimal complet : interface Rails, PostgreSQL,
+Solid Queue, Solid Cable, serveur industriel `docling-serve` CUDA et service de
+qualification mathématique fondé sur le PDF source.
 
 ## Serveur Granite CUDA
 
@@ -96,7 +96,14 @@ géométriques. Une page hors capacité est marquée `unsupported` ou `ambiguous
 aucun OCR, modèle ou autre moteur n'est appelé.
 
 ```powershell
+$pdfSha = (Get-FileHash -Algorithm SHA256 document.pdf).Hash.ToLowerInvariant()
+$doclingSha = (Get-FileHash -Algorithm SHA256 docling-document.json).Hash.ToLowerInvariant()
 uv run pdf-math-audit document.pdf `
+    --docling-document docling-document.json `
+    --source-sha256 $pdfSha `
+    --docling-document-sha256 $doclingSha `
+    --contract-version 1.0 `
+    --capability-profile pdf-docling-semantic-v1 `
     --report audit.json `
     --evidence audit-glyphs.ndjson.gz
 ```
@@ -104,13 +111,41 @@ uv run pdf-math-audit document.pdf `
 La sortie standard est un flux NDJSON de progression terminé par l'empreinte du
 rapport. Le rapport synthétique conserve les capacités et les conflits ; le
 second fichier conserve chaque glyphe et son évidence en NDJSON gzip. L'audit
-ne prétend prouver ni l'Unicode, ni le LaTeX, ni la correction sémantique du
-document. Il n'est pas encore raccordé au pipeline Rails.
+vérifie les empreintes annoncées avant toute écriture. Il détecte d’abord les
+régions mathématiques dans la typographie du PDF, puis relie chaque région à
+l’unique élément Docling qui la contient et à sa sous-séquence textuelle. Une
+région sans conteneur ou sans alignement textuel reste explicitement non reliée.
+
+Pour les régions reliées, le profil sémantique convertit le fragment LaTeX
+Docling en MathML avec `latex2mathml`, puis compare la séquence complète aux
+glyphes CFF/AGL. Le profil versionné `type1-cff-agl-rendered-sequence-v3`
+n’établit la séquence source que si l’ordre PDF est univoque et si chaque GID
+CFF correspond au GID réellement rendu. Les signaux `ToUnicode` et Unicode
+rendu restent conservés dans la preuve. Toute contradiction entre ces signaux
+produit `conflicting` et `non_verifiable` : un nom de glyphe et un GID ne
+prouvent pas à eux seuls la forme ni la signification Unicode. Une omission
+devient `missing`, toute substitution, permutation ou information ajoutée
+devient `contradicting`. Une relation MathML non prise en charge ou un ordre
+ambigu produit `not_evaluated` et `non_verifiable`.
+
+L’audit ne génère aucun crop et n’appelle aucun modèle supplémentaire. Il est
+raccordé à Rails après chaque conversion Docling réussie ; son verdict reste
+strictement limité aux régions et relations qu’il peut prouver.
+
+Le [corpus de qualification mathématique](qualification/math_audit/README.md)
+fige un oracle indépendant, capture une conversion Docling CUDA réelle et
+publie séparément les métriques de détection et de preuve. Son verdict actuel
+est GREEN sur les 53 régions du corpus représentatif : précision, rappel et
+traçabilité valent `1.0`. La preuve sémantique couvre honnêtement 39 régions sur
+53 (`0.735849`) ; les 14 conflits attendus sont tous refusés, sans faux conforme,
+ce qui porte l’exactitude des comportements attendus à `1.0`.
 
 ## Fichiers principaux
 
 - [compose.docling-serve.yaml](compose.docling-serve.yaml)
+- [compose.rails.yaml](compose.rails.yaml)
 - [.env.docling-serve.example](.env.docling-serve.example)
+- [.env.rails.example](.env.rails.example)
 - [test_docling_serve_cuda.py](tests/live/test_docling_serve_cuda.py)
 - [manifeste Granite](config/granite-docling-258M.manifest.json)
 - [PROCESS.md](PROCESS.md)

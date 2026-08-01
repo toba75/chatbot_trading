@@ -8,9 +8,17 @@ class ConversionAttemptTest < ActiveSupport::TestCase
     attempt = create_attempt
 
     assert_difference -> { SolidQueue::Job.count }, 2 do
-      attempt.update!(status: "converting", started_at: Time.current)
+      attempt.update!(status: "converting", started_at: Time.current, execution_job_id: "job-1")
     end
     assert_equal [ "default", "default" ], SolidQueue::Job.order(:id).last(2).map(&:queue_name)
+  end
+
+  test "refuse un état de conversion sans propriétaire d'exécution" do
+    attempt = create_attempt
+    attempt.status = "converting"
+
+    assert_not_predicate attempt, :valid?
+    assert_includes attempt.errors.details[:execution_job_id], { error: :blank }
   end
 
   test "dérive du JSON canonique les pages vides et les images" do

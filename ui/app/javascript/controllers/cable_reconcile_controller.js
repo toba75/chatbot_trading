@@ -5,10 +5,14 @@ export default class extends Controller {
   static values = { url: String }
 
   connect() {
-    this.source = this.element.querySelector("turbo-cable-stream-source")
     this.wasConnected = false
     this.observer = new MutationObserver(() => this.reconcileIfConnected())
-    this.observer.observe(this.source, { attributes: true, attributeFilter: ["connected"] })
+    this.observer.observe(this.element, {
+      attributes: true,
+      attributeFilter: ["connected"],
+      childList: true,
+      subtree: true
+    })
     this.reconcileIfConnected()
   }
 
@@ -17,7 +21,10 @@ export default class extends Controller {
   }
 
   reconcileIfConnected() {
-    const connected = this.source.hasAttribute("connected")
+    const source = this.element.querySelector("turbo-cable-stream-source")
+    if (!source) return
+
+    const connected = source.hasAttribute("connected")
     if (connected && !this.wasConnected) {
       this.frameTarget.hasAttribute("src") ? this.frameTarget.reload() : this.frameTarget.setAttribute("src", this.urlValue)
     }

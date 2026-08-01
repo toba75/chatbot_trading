@@ -1,0 +1,79 @@
+<section id="<%= dom_id(qualification) %>" class="math-qualification" aria-labelledby="math-qualification-title">
+  <h2 id="math-qualification-title">Qualification mathématique</h2>
+
+  <% if qualification.queued? || qualification.running? %>
+    <p><strong><%= qualification.queued? ? "En attente" : "Analyse en cours" %></strong></p>
+    <p>Phase : <%= qualification.phase %></p>
+    <% if qualification.total_units.zero? %>
+      <p>0 / 0 unité pour cette phase.</p>
+    <% else %>
+      <progress value="<%= qualification.completed_units %>" max="<%= qualification.total_units %>">
+        <%= qualification.completed_units %> / <%= qualification.total_units %>
+      </progress>
+    <% end %>
+  <% elsif qualification.failed? %>
+    <div class="status-card error" role="alert">
+      <div>
+        <strong>La qualification mathématique a échoué</strong>
+        <p><%= qualification.error_message %></p>
+        <code><%= qualification.error_code %></code>
+      </div>
+    </div>
+  <% else %>
+    <p class="math-verdict"><strong>Verdict : <%= qualification.verdict %></strong></p>
+    <dl class="math-summary">
+      <div><dt>Régions observées</dt><dd><%= qualification.summary.fetch("regions") %></dd></div>
+      <div><dt>Conformes</dt><dd><%= qualification.summary.fetch("conformant") %></dd></div>
+      <div><dt>Contradictoires</dt><dd><%= qualification.summary.fetch("contradicted") %></dd></div>
+      <div><dt>Non vérifiables</dt><dd><%= qualification.summary.fetch("non_verifiable") %></dd></div>
+    </dl>
+    <p>
+      Pages prouvées : <%= qualification.summary.dig("coverage", "pages_traced") %> / <%= qualification.summary.dig("coverage", "pages_total") %>.
+    </p>
+    <% if qualification.summary.fetch("region_details").any? %>
+      <details>
+        <summary>Régions et boîtes qualifiées</summary>
+        <table class="math-regions">
+          <thead><tr><th>Page</th><th>Boîte PDF</th><th>Verdict</th></tr></thead>
+          <tbody>
+            <% qualification.summary.fetch("region_details").each do |region| %>
+              <tr>
+                <td><%= region.fetch("page") %></td>
+                <td><code><%= region.fetch("bbox").join(", ") %></code></td>
+                <td><%= region.fetch("verdict") %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </details>
+    <% end %>
+    <% if qualification.summary.fetch("page_exclusions").any? %>
+      <details>
+        <summary>Pages non prouvées</summary>
+        <ul>
+          <% qualification.summary.fetch("page_exclusions").each do |page| %>
+            <li>
+              Page <%= page.fetch("page") %> — <%= page.fetch("status") %> :
+              <%= page.fetch("reasons").map { |reason| reason.fetch("message") }.join(" ; ") %>
+            </li>
+          <% end %>
+        </ul>
+      </details>
+    <% end %>
+  <% end %>
+
+  <% if qualification.analyzer_response.attached? || qualification.source_evidence.attached? || qualification.report.attached? %>
+    <h3>Preuves conservées</h3>
+    <ul>
+      <% if qualification.report.attached? %>
+        <li><%= link_to "Rapport de qualification", rails_blob_path(qualification.report, disposition: "attachment") %></li>
+      <% end %>
+      <% if qualification.source_evidence.attached? %>
+        <li><%= link_to "Preuve source", rails_blob_path(qualification.source_evidence, disposition: "attachment") %></li>
+      <% end %>
+      <% if qualification.analyzer_response.attached? %>
+        <li><%= link_to "Réponse brute de l’analyseur", rails_blob_path(qualification.analyzer_response, disposition: "attachment") %></li>
+      <% end %>
+    </ul>
+  <% end %>
+</section>

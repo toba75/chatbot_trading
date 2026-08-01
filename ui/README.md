@@ -1,11 +1,10 @@
 # Interface de conversion PDF
 
-Application Rails 8.1.3 sur Ruby 4.0.6. Elle dépose un PDF, confie toutes ses
-pages à Docling Serve Granite CUDA via Solid Queue, puis compare le PDF à
-l’HTML Docling. Une relance ajoute une tentative au même document sans écraser
-les sorties précédentes. PostgreSQL stocke le métier, Solid Queue et, dans une base
-séparée de la même instance, Solid Cable. Aucun composant Rails ne s’exécute sur
-Windows.
+Application Rails 8.1.3 sur Ruby 4.0.6. Elle convertit toutes les pages avec
+Docling Serve Granite CUDA puis qualifie automatiquement les expressions
+mathématiques à partir du PDF et du `DoclingDocument`. PostgreSQL stocke le
+métier et Solid Queue ; une base séparée de la même instance stocke Solid Cable.
+Aucun composant Rails ne s’exécute directement sur Windows.
 
 Les commandes suivantes se lancent depuis la racine du dépôt.
 
@@ -27,11 +26,17 @@ docker compose `
   --env-file .env.rails `
   -f compose.docling-serve.yaml `
   -f compose.rails.yaml `
-  up -d --no-build docling-serve web jobs --wait
+  up -d --no-build docling-serve math-audit web jobs --wait
 ```
 
 L’interface est alors disponible sur `http://127.0.0.1:3000`. Le service
 `setup` prépare explicitement les bases et les schémas avant `web` et `jobs`.
+Les files `conversions` et `math_qualifications` ont leurs propres workers.
+Chaque job persiste son identifiant de prise en charge. Après un arrêt brutal,
+le réconciliateur relie la `FailedExecution` Solid Queue à l’état métier et
+rend l’exécution `failed` avec `interrupted_execution`, sans rejouer
+silencieusement Docling ou l’analyse mathématique. Sa cadence vient de
+`INTERRUPTED_EXECUTION_RECONCILIATION_SCHEDULE`.
 
 ## Tests rapides
 
@@ -55,8 +60,10 @@ docker compose `
   bundle exec rails test:system test/system/pdf_conversion_test.rb
 ```
 
-Les paramètres de capacité, les délais, les noms de bases et la taille maximale
-du PDF sont tous déclarés dans `.env.rails` à partir de
+Les paramètres de capacité, les délais, les noms de bases, la taille maximale
+du PDF et les limites du flux et des artefacts de qualification sont tous
+déclarés dans `.env.rails` à partir de
 `.env.rails.example`. La conversion Docling est limitée à 24 heures ; le délai
 HTTP de Rails lui laisse cinq minutes supplémentaires pour publier sa réponse
-terminale.
+terminale. L’analyse mathématique possède également une limite de 24 heures et
+un délai de réception multipart indépendant.

@@ -48,6 +48,10 @@
         <p><strong><%= @attempt.picture_count %> images</strong> — pages <%= @attempt.picture_pages.to_sentence(two_words_connector: " et ", last_word_connector: " et ") %></p>
       </section>
 
+      <% if @attempt.math_qualification %>
+        <%= render "math_qualification", qualification: @attempt.math_qualification %>
+      <% end %>
+
       <section class="comparison" aria-label="Comparaison du document">
         <article>
           <h2>PDF original</h2>

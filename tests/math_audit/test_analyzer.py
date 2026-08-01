@@ -25,6 +25,7 @@ def test_analyse_generiquement_la_trace_structurelle_du_pdf_de_reference() -> No
     )
 
     assert report["schema_version"] == "1.0"
+    assert report["analyzer_version"] == "0.4.0"
     assert report["capability_profile"] == "type1-cff-v1"
     assert report["pdf"] == {
         "filename": REFERENCE_PDF.name,
@@ -81,6 +82,7 @@ def test_signale_une_capacite_absente_sans_moteur_alternatif(tmp_path: Path) -> 
     assert report["coverage"]["pages_traced"] == 0
     assert report["coverage"]["pages_unsupported"] == 1
     assert report["pages"][0]["status"] == "unsupported"
+    assert report["pages"][0]["fonts"] == {}
     assert report["pages"][0]["reasons"] == [
         {
             "code": "embedded_type1c_font_required",

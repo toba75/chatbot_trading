@@ -1,0 +1,36 @@
+{
+  "captured_at": "2026-07-31T16:11:53.010199+00:00",
+  "docling_document": "docling-document.json",
+  "docling_document_sha256": "10e912330107b9a0b12ef1c6c77c07a895f73f2da6594a57e87375f54828837e",
+  "endpoint": "http://127.0.0.1:5001",
+  "processing_time": 5.056089157995302,
+  "raw_response": "docling-response.json",
+  "raw_response_sha256": "c470a4de80fa75a56b8c9f0b5fd6e7baa609a98a28bc043cbd79914c6f9d0f33",
+  "runtime_proof": {
+    "container_id": "e280bd8d11db9880f51cb9bde581d51952cb49fff5aa1d84ad5b1edde3221f92",
+    "container_started_at": "2026-07-29T11:34:39.973543586Z",
+    "cuda_available": true,
+    "device": "cuda:0",
+    "image_digest": "sha256:9a031c7d36088865a128e7c4419fee4ab03b2ac9a1e8eb207902a54fede68119",
+    "image_reference": "quay.io/docling-project/docling-serve-cu130:v1.28.0@sha256:9a031c7d36088865a128e7c4419fee4ab03b2ac9a1e8eb207902a54fede68119",
+    "model_assets_verified": 17,
+    "model_manifest_sha256": "cb38313ea8815def8c22dfc72162f946b8935721c5ffafeedee4a78126f96003",
+    "model_repository": "ibm-granite/granite-docling-258M",
+    "model_revision": "982fe3b40f2fa73c365bdb1bcacf6c81b7184bfe",
+    "verified_at": "2026-07-31T16:11:47.037679+00:00",
+    "vlm_preset": "granite_docling"
+  },
+  "schema_version": 1,
+  "source_pdf": "math-regression.pdf",
+  "source_pdf_sha256": "9e95553eabdc7d73ac4cbf27177526ee3318bc795cd6700e8dacf1c6058c4a0d",
+  "versions": {
+    "docling": "2.115.0",
+    "docling-core": "2.87.1",
+    "docling-ibm-models": "3.13.3",
+    "docling-jobkit": "3.0.0",
+    "docling-parse": "7.8.1",
+    "docling-serve": "1.28.0",
+    "plaform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.34",
+    "python": "cpython-312 (3.12.13)"
+  }
+}

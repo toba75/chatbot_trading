@@ -1,0 +1,169 @@
+{
+  "coordinate_system": "PDF points, TOPLEFT",
+  "exhaustive": true,
+  "pages": [
+    {
+      "page": 1,
+      "source_kind": "born_digital_type1"
+    },
+    {
+      "page": 2,
+      "source_kind": "born_digital_type0_cid"
+    },
+    {
+      "page": 3,
+      "source_kind": "born_digital_rotated"
+    },
+    {
+      "page": 4,
+      "source_kind": "scanned_raster"
+    }
+  ],
+  "regions": [
+    {
+      "bbox": [
+        205,
+        129.89,
+        240.69,
+        144.89
+      ],
+      "bbox_coord_origin": "TOPLEFT",
+      "evidence": {
+        "kind": "generator_geometry",
+        "reference": "qualification.math_audit.corpus:type1-inline"
+      },
+      "id": "type1-inline",
+      "layout": "inline",
+      "page": 1,
+      "semantic_assertions": [
+        {
+          "expected": "x_i=3",
+          "relation": "sequence"
+        }
+      ],
+      "text": "x_i = 3"
+    },
+    {
+      "bbox": [
+        205,
+        231.89,
+        297.82,
+        256.89
+      ],
+      "bbox_coord_origin": "TOPLEFT",
+      "evidence": {
+        "kind": "generator_geometry",
+        "reference": "qualification.math_audit.corpus:type1-display"
+      },
+      "id": "type1-display",
+      "layout": "display",
+      "page": 1,
+      "semantic_assertions": [
+        {
+          "expected": "wx-b=0",
+          "relation": "sequence"
+        }
+      ],
+      "text": "w x - b = 0"
+    },
+    {
+      "bbox": [
+        230,
+        129.89,
+        273.54,
+        144.89
+      ],
+      "bbox_coord_origin": "TOPLEFT",
+      "evidence": {
+        "kind": "generator_geometry",
+        "reference": "qualification.math_audit.corpus:cid-inline"
+      },
+      "id": "cid-inline",
+      "layout": "inline",
+      "page": 2,
+      "semantic_assertions": [
+        {
+          "expected": "y=x+1",
+          "relation": "sequence"
+        }
+      ],
+      "text": "y = x + 1"
+    },
+    {
+      "bbox": [
+        220,
+        229.89,
+        287.26,
+        256.89
+      ],
+      "bbox_coord_origin": "TOPLEFT",
+      "evidence": {
+        "kind": "generator_geometry",
+        "reference": "qualification.math_audit.corpus:cid-display"
+      },
+      "id": "cid-display",
+      "layout": "display",
+      "page": 2,
+      "semantic_assertions": [
+        {
+          "expected": "f(x)=x2",
+          "relation": "sequence"
+        },
+        {
+          "base": "x",
+          "expected": "2",
+          "relation": "superscript"
+        }
+      ],
+      "text": "f(x) = x²"
+    },
+    {
+      "bbox": [
+        285.0,
+        190,
+        310,
+        329.34
+      ],
+      "bbox_coord_origin": "TOPLEFT",
+      "evidence": {
+        "kind": "generator_geometry",
+        "reference": "qualification.math_audit.corpus:rotated-display"
+      },
+      "id": "rotated-display",
+      "layout": "display",
+      "page": 3,
+      "semantic_assertions": [
+        {
+          "expected": "a^2+b^2=c^2",
+          "relation": "sequence"
+        }
+      ],
+      "text": "a^2 + b^2 = c^2"
+    },
+    {
+      "bbox": [
+        105.0,
+        308.5,
+        219.0,
+        324.5
+      ],
+      "bbox_coord_origin": "TOPLEFT",
+      "evidence": {
+        "kind": "generator_geometry",
+        "reference": "qualification.math_audit.corpus:scan-display"
+      },
+      "id": "scan-display",
+      "layout": "display",
+      "page": 4,
+      "semantic_assertions": [
+        {
+          "expected": "E=mc^2",
+          "relation": "sequence"
+        }
+      ],
+      "text": "E = m c^2"
+    }
+  ],
+  "representative": false,
+  "schema_version": 1
+}

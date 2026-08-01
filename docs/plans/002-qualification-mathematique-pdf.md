@@ -1,5 +1,20 @@
 # Plan — Qualification mathématique des conversions PDF
 
+## État au 1er août 2026
+
+La première phase est implémentée. Le corpus représentatif est GREEN sur ses
+53 régions : 39 sont sémantiquement prouvées et 14 conflits sont correctement
+refusés. La chaîne réelle Rails → Solid Queue → service d’audit →
+PostgreSQL → Solid Cable est raccordée. La phase 2 de correction ciblée reste
+hors périmètre et nécessitera une décision distincte.
+
+Le gate recalcule maintenant les empreintes des trois fichiers de preuve
+indépendants déclarés par l’oracle. Les jobs de conversion et de qualification
+persistent leur identifiant d’exécution. Un réconciliateur lie les pertes de
+worker constatées par Solid Queue à ces identifiants et termine l’état métier
+par `interrupted_execution`, sans recommencer silencieusement. Chaque écriture
+du processus original est gardée contre une terminaison concurrente.
+
 ## Résultat attendu
 
 Ajouter au pipeline Rails une qualification mathématique automatique, distincte
@@ -61,7 +76,7 @@ appelé par Rails, ni déplacé tel quel dans un module de production.
 ## Principes de conception
 
 1. Séparer la conversion technique de la qualification du contenu.
-2. Qualifier un périmètre déclaré, jamais le document entier par extrapolation.
+2. Qualifier un périmètre déclaré, jamais le document entier par extrapolation
 3. Conserver les entrées, sorties brutes, versions et empreintes de chaque
    calcul.
 4. Produire `non_verifiable` lorsqu'une preuve manque, est ambiguë ou sort des
@@ -110,6 +125,14 @@ Et la tentative Docling reste techniquement réussie
 Et Solid Queue conserve également l'échec du job de qualification
 ```
 
+```gherkin
+Étant donné un job de conversion ou de qualification tué sans pouvoir persister son échec
+Quand Solid Queue redélivre le même identifiant de job
+Alors l'état intermédiaire devient failed avec interrupted_execution
+Et aucun appel externe n'est rejoué silencieusement
+Et un job d'un autre identifiant ne peut pas usurper l'exécution active
+```
+
 ## Architecture cible de la première phase
 
 ```mermaid
@@ -140,16 +163,17 @@ signifie seulement que le contrat Docling a été exécuté avec succès.
 
 ### `MathQualification`
 
-Une `ConversionAttempt` possède plusieurs qualifications afin qu'une nouvelle
-version de l'analyseur ne détruise jamais un résultat antérieur.
+Une `ConversionAttempt` possède exactement une qualification. Une contrainte
+d’unicité sur la tentative empêche tout remplacement silencieux ; une politique
+d’historisation multiversion exigera une évolution explicite du modèle.
 
 Champs minimaux :
 
 | Champ | Rôle |
 | --- | --- |
 | `conversion_attempt_id` | Tentative Docling qualifiée |
-| `status` | `queued`, `running`, `completed` ou `failed` |
-| `verdict` | Verdict terminal agrégé, absent avant `completed` |
+| `status` | `queued`, `running`, `succeeded` ou `failed` |
+| `verdict` | Verdict terminal agrégé, absent avant `succeeded` |
 | `phase` | Phase réelle actuellement exécutée |
 | `completed_units` / `total_units` | Progression persistante, généralement en pages |
 | `contract_version` | Version du format échangé |
@@ -158,7 +182,7 @@ Champs minimaux :
 | `input_fingerprint` | Empreinte déterministe de toutes les entrées |
 | `source_sha256` | Identité du PDF analysé |
 | `docling_document_sha256` | Identité du candidat Docling |
-| `scope_metrics` | Couverture et exclusions synthétiques en `jsonb` |
+| `summary` | Couverture, régions et exclusions synthétiques en `jsonb` |
 | `started_at` / `completed_at` | Horodatage réel |
 | `error_code` / `error_message` | Erreur technique terminale éventuelle |
 
@@ -201,8 +225,9 @@ Les phases initiales sont :
 
 Chaque progression enregistrée comporte une phase, un nombre d'unités réalisées
 et un total. L'interface ne déduit rien des logs ou du temps écoulé. Le modèle
-`MathQualification` diffuse un refresh vers le flux du document après commit.
-Le navigateur ne fait aucun polling.
+`MathQualification` remplace après commit sa seule section dans le flux du
+document. Ce remplacement ciblé conserve la souscription Cable pendant les
+mises à jour rapprochées. Le navigateur ne fait aucun polling.
 
 ## Contrat de l'analyseur
 
@@ -241,10 +266,11 @@ implicite. Une sémantique n'est établie que par une règle nommée, versionné
 déclarée dans le profil de capacités et validée sur le corpus. Si ces signaux se
 contredisent sans règle applicable, la région est `non_verifiable`.
 
-Ainsi, le conflit observé dans le spécimen entre `ToUnicode=≠` et le glyphe CFF
-`/minus` n'autorise pas une règle universelle « le nom du glyphe gagne ». La
-conclusion locale de l'expérience reste une preuve du spécimen ; sa
-généralisation exige une règle et des contre-exemples dédiés.
+Le profil `type1-cff-agl-rendered-sequence-v3` refuse tout conflit entre AGL,
+`ToUnicode` et Unicode extrait. L’égalité du GID CFF et du GID rendu identifie le
+même glyphe, mais ne prouve ni sa forme ni sa signification : elle ne peut donc
+jamais départager seule les signaux. Le rapport conserve le conflit et produit
+`non_verifiable`.
 
 Une simple présence de sous-chaîne ne suffit pas. Par exemple, un candidat qui
 contient à la fois `wx-b=0` et `wx≠b=0` doit être contradictoire, jamais conforme
@@ -318,8 +344,8 @@ responsabilité non couverte le justifie. Aucun parseur PDF maison n'est ajouté
 - Pour chaque région, annoter aussi les assertions sémantiques attendues ou les
   déclarer explicitement ambiguës : symboles, ordre et relations géométriques
   nécessaires au verdict. Chaque assertion cite son évidence de référence ; un
-  conflit non résolu comme `ToUnicode=≠` contre CFF `/minus` reste ambigu dans
-  l'oracle et ne peut produire de faux verdict conforme.
+  conflit non couvert par une règle nommée reste ambigu dans l'oracle et ne peut
+  produire de faux verdict conforme.
 - Cette annotation qualifie le détecteur et les règles sémantiques en
   développement ; elle n'introduit aucune vérification humaine dans le pipeline
   produit.
@@ -375,14 +401,23 @@ explicitement ; elle ne déclenche ni polling, ni retry, ni autre moteur.
   principale ; elle n'annule ni les sorties ni le succès technique Docling. Une
   perte de la transaction principale annule au contraire ensemble la réussite,
   la qualification et l'éventuel job.
-- Ajouter une contrainte d'unicité sur la tentative, l'empreinte d'entrée et la
-  version d'analyseur.
+- Ajouter une contrainte d'unicité sur la tentative et refuser sa réexécution
+  avant tout nouvel appel au service.
 - Tester les trois issues atomiques : succès Docling + qualification `queued` +
   job ; succès Docling + qualification `failed` sans job après erreur d'enqueue ;
   rollback global sans réussite, qualification ni job.
-- Rendre l'opération idempotente par `input_fingerprint` et version d'analyseur.
+- Conserver `input_fingerprint` pour la provenance exacte ; une relance produit
+  une nouvelle tentative, jamais le remplacement d’une qualification existante.
 - Persister l'échec attendu avant de relever l'exception afin que Solid Queue
   conserve lui aussi l'échec.
+- Revendiquer chaque exécution avec le `job_id` Active Job. Une redélivrance du
+  même identifiant après perte du processus rend l'état terminal avec
+  `interrupted_execution`, sans nouvel appel externe ; un autre identifiant est
+  refusé comme exécution concurrente.
+- Réconcilier périodiquement, à cadence configurée, les seuls états actifs dont
+  Solid Queue possède une `FailedExecution` verrouillée pour le même `job_id` et
+  la classe attendue. Revérifier l’état avant toute progression, tout résultat
+  ou tout échec afin qu’un processus tardif ne puisse pas réécrire le terminal.
 - Limiter la modification de `ConvertDocumentJob` à cette persistance et cette
   mise en file atomiques ; ne modifier aucune sortie native déjà attachée.
 

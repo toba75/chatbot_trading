@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_29_103000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_01_125500) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -49,13 +49,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_29_103000) do
     t.bigint "document_id", null: false
     t.string "error_code"
     t.text "error_message"
+    t.string "execution_job_id", limit: 64
     t.integer "page_count"
     t.decimal "processing_seconds", precision: 12, scale: 3
     t.datetime "started_at"
     t.string "status", null: false
     t.datetime "updated_at", null: false
     t.index ["document_id"], name: "index_conversion_attempts_on_document_id"
-    t.check_constraint "status::text = ANY (ARRAY['queued'::character varying, 'converting'::character varying, 'succeeded'::character varying, 'failed'::character varying]::text[])", name: "conversion_attempts_status"
+    t.check_constraint "status::text <> 'converting'::text OR execution_job_id IS NOT NULL", name: "conversion_attempts_active_execution"
+    t.check_constraint "status::text = ANY (ARRAY['queued'::character varying::text, 'converting'::character varying::text, 'succeeded'::character varying::text, 'failed'::character varying::text])", name: "conversion_attempts_status"
   end
 
   create_table "documents", force: :cascade do |t|
@@ -65,6 +67,35 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_29_103000) do
     t.datetime "updated_at", null: false
     t.index ["retried_from_id"], name: "index_documents_on_retried_from_id"
     t.index ["source_sha256"], name: "index_documents_on_source_sha256"
+  end
+
+  create_table "math_qualifications", force: :cascade do |t|
+    t.string "analyzer_version", null: false
+    t.string "capability_profile", null: false
+    t.datetime "completed_at"
+    t.integer "completed_units", null: false
+    t.string "contract_version", null: false
+    t.bigint "conversion_attempt_id", null: false
+    t.datetime "created_at", null: false
+    t.string "docling_document_sha256", limit: 64, null: false
+    t.string "error_code"
+    t.text "error_message"
+    t.string "execution_job_id", limit: 64
+    t.string "input_fingerprint", limit: 64, null: false
+    t.string "phase", null: false
+    t.string "source_sha256", limit: 64, null: false
+    t.datetime "started_at"
+    t.string "status", null: false
+    t.jsonb "summary"
+    t.integer "total_units", null: false
+    t.datetime "updated_at", null: false
+    t.string "verdict"
+    t.index ["conversion_attempt_id"], name: "index_math_qualifications_on_conversion_attempt_id", unique: true
+    t.check_constraint "completed_units <= total_units", name: "math_qualifications_progress"
+    t.check_constraint "completed_units >= 0", name: "math_qualifications_completed_units"
+    t.check_constraint "status::text <> 'running'::text OR execution_job_id IS NOT NULL", name: "math_qualifications_active_execution"
+    t.check_constraint "status::text = ANY (ARRAY['queued'::character varying::text, 'running'::character varying::text, 'succeeded'::character varying::text, 'failed'::character varying::text])", name: "math_qualifications_status"
+    t.check_constraint "total_units >= 0", name: "math_qualifications_total_units"
   end
 
   create_table "solid_queue_blocked_executions", force: :cascade do |t|
@@ -192,6 +223,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_29_103000) do
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "conversion_attempts", "documents"
   add_foreign_key "documents", "documents", column: "retried_from_id"
+  add_foreign_key "math_qualifications", "conversion_attempts"
   add_foreign_key "solid_queue_blocked_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_claimed_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_failed_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade

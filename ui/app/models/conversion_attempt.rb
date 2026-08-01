@@ -2,6 +2,7 @@ require "set"
 
 class ConversionAttempt < ApplicationRecord
   belongs_to :document
+  has_one :math_qualification, dependent: :destroy
 
   enum :status, {
     queued: "queued",
@@ -20,6 +21,8 @@ class ConversionAttempt < ApplicationRecord
   broadcasts_refreshes_to ->(_attempt) { "documents" }
 
   validates :conversion_options, presence: true
+  validates :execution_job_id, length: { maximum: 64 }, allow_nil: true
+  validates :execution_job_id, presence: true, if: :converting?
 
   def page_inventory
     content_pages = %w[texts tables pictures].flat_map do |collection|

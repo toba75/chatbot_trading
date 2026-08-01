@@ -1,0 +1,13 @@
+.git
+.venv
+.pytest_cache
+.ruff_cache
+data
+docs
+experiments
+qualification
+reference
+tests
+ui
+__pycache__
+*.pyc
