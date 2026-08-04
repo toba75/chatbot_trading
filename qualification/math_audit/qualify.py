@@ -72,6 +72,9 @@ def _mutation_glyphs(text: str) -> list[dict[str, Any]]:
             "sequence_index": index,
             "glyph_name": character,
             "unicode": character,
+            "source_unicode": character,
+            "source_unicode_method": "to_unicode",
+            "agl_unicode": None,
             "font_resource": "/oracle",
             "code": ord(character),
             "code_hex": f"{ord(character):04X}",
@@ -79,9 +82,18 @@ def _mutation_glyphs(text: str) -> list[dict[str, Any]]:
             "rendered_gid": index + 1,
             "to_unicode": character,
             "rendered_unicode": character,
+            "rendered_font": "oracle",
+            "rendered_origin_x": float(index),
             "rendered_origin_y": 10.0,
             "rendered_size": 10.0,
-            "rawdict": {"block": 0, "line": 0, "span": 0, "char": index},
+            "bbox": [float(index), 0.0, float(index) + 0.8, 10.0],
+            "rawdict": {
+                "block": 0,
+                "line": 0,
+                "span": 0,
+                "char": index,
+                "span_flags": 0,
+            },
         }
         for index, character in enumerate(text)
     ]

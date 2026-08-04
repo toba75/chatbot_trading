@@ -38,6 +38,13 @@ class InfrastructureTest < ActiveSupport::TestCase
     assert_equal ENV.fetch("INTERRUPTED_EXECUTION_RECONCILIATION_SCHEDULE"), task.fetch("schedule")
   end
 
+  test "autorise les formats Docling non exécutables dans le visualiseur inline" do
+    allowed = Rails.application.config.active_storage.content_types_allowed_inline
+
+    assert_includes allowed, "application/json"
+    assert_includes allowed, "text/markdown"
+  end
+
   private
 
   def cable_database

@@ -28,22 +28,7 @@
     "mineru_used_only_for_completeness_cross_check": true,
     "authority": "embedded CFF glyph names, PDF geometry and independent 600 DPI render"
   },
-  "expected_non_verifiable": {
-    "p2-04": "source_signal_conflict",
-    "p2-10": "source_signal_conflict",
-    "p2-12": "source_signal_conflict",
-    "p2-13": "source_signal_conflict",
-    "p2-14": "source_signal_conflict",
-    "p2-18": "source_signal_conflict",
-    "p2-19": "source_signal_conflict",
-    "p2-20": "source_signal_conflict",
-    "p2-22": "source_signal_conflict",
-    "p2-23": "source_signal_conflict",
-    "p2-24": "source_signal_conflict",
-    "p2-30": "source_signal_conflict",
-    "p2-32": "source_signal_conflict",
-    "p2-33": "source_signal_conflict"
-  },
+  "expected_non_verifiable": {},
   "exclusions": [
     "nombres employés uniquement comme prose, par exemple 20 000",
     "numéro d'appel de note",

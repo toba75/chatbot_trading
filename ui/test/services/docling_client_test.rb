@@ -86,6 +86,24 @@ class DoclingClientTest < ActiveSupport::TestCase
     assert_equal "incomplete_response", error.code
   end
 
+  test "refuse un inventaire de pages non contigu" do
+    payload = JSON.parse(successful_body)
+    page = payload.dig("document", "json_content", "pages").delete("1")
+    page["page_no"] = 2
+    payload.dig("document", "json_content", "pages")["2"] = page
+    client = DoclingClient.new(
+      transport: RecordingTransport.new(Response.new(code: "200", body: JSON.generate(payload)))
+    )
+
+    error = assert_raises(DoclingClient::ConversionError) do
+      File.open("/reference/ostrading-environment-qualification-5-pages.pdf", "rb") do |file|
+        client.convert(file: file, filename: "reference.pdf", options: DoclingClient.conversion_options)
+      end
+    end
+
+    assert_equal "incomplete_response", error.code
+  end
+
   test "refuse un élément sans provenance canonique" do
     payload = JSON.parse(successful_body)
     payload.fetch("document").fetch("json_content")["texts"] = [ { "text" => "sans provenance" } ]

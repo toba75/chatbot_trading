@@ -54,14 +54,16 @@ def _unique_context_start(
     return positions[0] + target_start - left
 
 
-def _target_span(region: Region, characters: list[tuple[str, int]]) -> tuple[int, int]:
+def _target_span(
+    region: Region, characters: list[tuple[str, int]]
+) -> tuple[int, int] | None:
     positions = [
         position
         for position, (_character, original) in enumerate(characters)
         if region.charspan[0] <= original < region.charspan[1]
     ]
     if not positions:
-        raise ValueError("Le fragment inline ne contient aucun caractère alignable")
+        return None
     start, end = min(positions), max(positions) + 1
     marker = region.candidate_text.lstrip()
     if start > 0 and marker.startswith(("$_", "$^")):
@@ -102,7 +104,16 @@ def _localize(
         ), []
     item = items[0]
     document_characters = aligned_document_characters(item.text)
-    target_start, target_end = _target_span(region, document_characters)
+    target_span = _target_span(region, document_characters)
+    if target_span is None:
+        return replace(
+            region,
+            reason=_reason(
+                "inline_math_no_alignable_character",
+                "Le fragment inline ne contient aucun caractère alignable",
+            ),
+        ), []
+    target_start, target_end = target_span
     container_glyphs = [
         glyph
         for glyph in glyphs

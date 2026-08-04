@@ -6,9 +6,9 @@ import re
 from pathlib import Path
 
 
-CONTRACT_VERSION = "1.0"
-CAPABILITY_PROFILE = "pdf-docling-semantic-v1"
-ANALYZER_VERSION = "0.4.0"
+CONTRACT_VERSION = "2.0"
+CAPABILITY_PROFILE = "pdf-docling-semantic-correction-v2"
+ANALYZER_VERSION = "0.5.25"
 _SHA256_PATTERN = re.compile(r"[0-9a-fA-F]{64}")
 
 

@@ -1,0 +1,19 @@
+<% attachments = {
+  "Rapport de qualification" => qualification.report,
+  "Preuve source" => qualification.source_evidence,
+  "Réponse brute de l’analyseur" => qualification.analyzer_response,
+  "Registre des corrections" => qualification.corrections,
+  "Crops, requêtes et réponses de correction" => qualification.correction_evidence,
+  "DoclingDocument dérivé" => qualification.derived_docling_document,
+  "HTML dérivé" => qualification.derived_html,
+  "Markdown dérivé" => qualification.derived_markdown
+}.select { |_label, attachment| attachment.attached? } %>
+
+<% if attachments.any? %>
+  <h3>Preuves conservées</h3>
+  <ul>
+    <% attachments.each do |label, attachment| %>
+      <li><%= link_to label, rails_blob_path(attachment, disposition: "attachment") %></li>
+    <% end %>
+  </ul>
+<% end %>

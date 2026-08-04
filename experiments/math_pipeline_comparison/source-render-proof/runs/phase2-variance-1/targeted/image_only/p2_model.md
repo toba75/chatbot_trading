@@ -1,0 +1,1 @@
+$f(\mathbf{x}) = \text{sign}(\mathbf{w}^*\mathbf{x} - b^*)$

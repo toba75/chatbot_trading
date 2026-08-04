@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import zipfile
 from collections.abc import AsyncIterator, Callable
 from pathlib import Path
 from typing import Any
@@ -59,6 +60,7 @@ def _command(
     evidence: Path,
     source_sha256: str,
     document_sha256: str,
+    config: ServiceConfig,
 ) -> list[str]:
     return [
         sys.executable,
@@ -79,7 +81,80 @@ def _command(
         str(report),
         "--evidence",
         str(evidence),
+        "--correction-endpoint",
+        config.correction_endpoint,
+        "--correction-model",
+        config.correction_model,
+        "--correction-dpi",
+        str(config.correction_dpi),
+        "--correction-padding-points",
+        str(config.correction_padding_points),
+        "--correction-timeout-seconds",
+        str(config.correction_timeout_seconds),
+        "--correction-max-response-bytes",
+        str(config.correction_max_response_bytes),
+        "--correction-records",
+        str(report.parent / "corrections.json"),
+        "--correction-evidence",
+        str(report.parent / "correction-evidence.zip"),
+        "--derived-docling-document",
+        str(report.parent / "derived-document.json"),
+        "--derived-html",
+        str(report.parent / "derived.html"),
+        "--derived-markdown",
+        str(report.parent / "derived.md"),
+        "--native-page-html",
+        str(report.parent / "native-page.html"),
+        "--correction-checkpoint-records",
+        str(report.parent / "corrections.partial.ndjson"),
+        "--correction-checkpoint-evidence",
+        str(report.parent / "correction-checkpoints"),
     ]
+
+
+def _partial_artifacts(root: Path) -> tuple[tuple[str, Path], ...]:
+    available: list[tuple[str, Path]] = []
+    evidence = root / "evidence.ndjson.gz"
+    if evidence.exists():
+        available.append(("evidence", evidence))
+
+    records_path = root / "corrections.partial.ndjson"
+    if records_path.exists():
+        records = []
+        for line in records_path.read_bytes().splitlines():
+            try:
+                records.append(json.loads(line))
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                records.append(
+                    {"status": "checkpoint_unreadable", "raw_hex": line.hex()}
+                )
+        correction_path = root / "corrections.partial.json"
+        correction_path.write_text(
+            json.dumps(
+                {"status": "interrupted", "records": records},
+                ensure_ascii=False,
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        available.append(("corrections", correction_path))
+
+    checkpoint_root = root / "correction-checkpoints"
+    if checkpoint_root.exists():
+        archive_path = root / "correction-evidence.partial.zip"
+        with zipfile.ZipFile(archive_path, "w", zipfile.ZIP_DEFLATED) as archive:
+            for path in checkpoint_root.rglob("*"):
+                if path.is_file():
+                    archive.write(path, path.relative_to(checkpoint_root))
+        available.append(("correction_evidence", archive_path))
+    return tuple(available)
+
+
+async def _stream_partial(root: Path, chunk_bytes: int) -> AsyncIterator[bytes]:
+    for name, path in _partial_artifacts(root):
+        for event in artifact_events(name, path, chunk_bytes):
+            yield ndjson_line(event)
 
 
 def start_analysis(
@@ -88,6 +163,7 @@ def start_analysis(
     process_factory: ProcessFactory,
     source_sha256: str,
     document_sha256: str,
+    config: ServiceConfig,
 ) -> Any:
     root = Path(directory.name)
     return process_factory(
@@ -98,6 +174,7 @@ def start_analysis(
             root / "evidence.ndjson.gz",
             source_sha256,
             document_sha256,
+            config,
         ),
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -148,6 +225,8 @@ async def stream_analysis(
                 return_code = process.poll()
 
         if timed_out:
+            async for event in _stream_partial(root, config.artifact_chunk_bytes):
+                yield event
             yield ndjson_line(
                 {
                     "type": "error",
@@ -157,14 +236,28 @@ async def stream_analysis(
             )
             return
         if return_code != 0 or not terminal_seen:
+            async for event in _stream_partial(root, config.artifact_chunk_bytes):
+                yield event
             message = "".join(diagnostics).strip() or "L’analyse a échoué."
             yield ndjson_line(
                 {"type": "error", "code": "analysis_failed", "message": message}
             )
             return
 
+        available = (
+            ("evidence", evidence),
+            ("corrections", root / "corrections.json"),
+            ("correction_evidence", root / "correction-evidence.zip"),
+            ("derived_docling_document", root / "derived-document.json"),
+            ("derived_html", root / "derived.html"),
+            ("derived_markdown", root / "derived.md"),
+            ("native_page_html", root / "native-page.html"),
+            ("report", report),
+        )
         artifacts = {}
-        for name, path in (("evidence", evidence), ("report", report)):
+        for name, path in available:
+            if not path.exists():
+                continue
             chunks = 0
             for event in artifact_events(name, path, config.artifact_chunk_bytes):
                 chunks += 1

@@ -1,16 +1,17 @@
-<section id="<%= dom_id(qualification) %>" class="math-qualification" aria-labelledby="math-qualification-title">
+<section id="math_qualification" class="math-qualification" aria-labelledby="math-qualification-title">
+  <% if qualification.succeeded? && qualification.native_page_html.attached? %>
+    <% corrected_preview = qualification.current_contract? && qualification.derived_html.attached? %>
+    <span hidden
+      data-controller="page-html-availability"
+      data-page-html-availability-url-value="<%= corrected_preview ? derived_html_preview_document_path(qualification.conversion_attempt.document) : page_html_preview_document_path(qualification.conversion_attempt.document) %>"
+      data-page-html-availability-label-value="<%= corrected_preview ? "HTML corrigé" : "HTML natif paginé" %>"
+      data-page-html-availability-corrected-value="<%= corrected_preview %>"></span>
+  <% end %>
   <h2 id="math-qualification-title">Qualification mathématique</h2>
 
   <% if qualification.queued? || qualification.running? %>
     <p><strong><%= qualification.queued? ? "En attente" : "Analyse en cours" %></strong></p>
-    <p>Phase : <%= qualification.phase %></p>
-    <% if qualification.total_units.zero? %>
-      <p>0 / 0 unité pour cette phase.</p>
-    <% else %>
-      <progress value="<%= qualification.completed_units %>" max="<%= qualification.total_units %>">
-        <%= qualification.completed_units %> / <%= qualification.total_units %>
-      </progress>
-    <% end %>
+    <%= render "documents/math_qualification_progress", qualification: qualification %>
   <% elsif qualification.failed? %>
     <div class="status-card error" role="alert">
       <div>
@@ -19,7 +20,18 @@
         <code><%= qualification.error_code %></code>
       </div>
     </div>
+    <%= button_to "Relancer la qualification", retry_math_qualification_document_path(qualification.conversion_attempt.document),
+      method: :post, class: "button", data: { turbo_frame: "_top" } %>
   <% else %>
+    <% unless qualification.current_contract? %>
+      <%= button_to "Requalifier avec l’analyseur courant", retry_math_qualification_document_path(qualification.conversion_attempt.document),
+        method: :post, class: "button", data: { turbo_frame: "_top" } %>
+    <% else %>
+      <% if qualification.conversion_attempt.current_math_requalification_allowed? %>
+        <%= button_to "Relancer l’analyse et les corrections", retry_math_qualification_document_path(qualification.conversion_attempt.document),
+          method: :post, class: "button", data: { turbo_frame: "_top" } %>
+      <% end %>
+    <% end %>
     <p class="math-verdict"><strong>Verdict : <%= qualification.verdict %></strong></p>
     <dl class="math-summary">
       <div><dt>Régions observées</dt><dd><%= qualification.summary.fetch("regions") %></dd></div>
@@ -30,6 +42,28 @@
     <p>
       Pages prouvées : <%= qualification.summary.dig("coverage", "pages_traced") %> / <%= qualification.summary.dig("coverage", "pages_total") %>.
     </p>
+    <% correction = qualification.summary["correction"] %>
+    <% if correction %>
+      <div class="math-correction">
+        <h3>Correction mathématique dérivée</h3>
+        <% case correction.fetch("status") %>
+        <% when "corrected" %>
+          <p><strong><%= correction.fetch("accepted") %> région(s) corrigée(s) et prouvée(s).</strong></p>
+          <p>Les sorties Docling natives ci-dessus restent inchangées.</p>
+          <% if qualification.derived_html.attached? %>
+            <p>La vue paginée correspondante est disponible dans l’onglet « HTML corrigé ».</p>
+          <% end %>
+        <% when "failed" %>
+          <p><strong>La proposition de correction a échoué explicitement.</strong> Aucune sortie native n’a été remplacée.</p>
+        <% when "rejected" %>
+          <p><strong>Aucune proposition n’était entièrement prouvée.</strong> Aucun document dérivé n’a été produit.</p>
+        <% else %>
+          <p>Aucune région contradictoire ne nécessitait de correction.</p>
+        <% end %>
+      </div>
+    <% else %>
+      <p>Qualification historique sans phase de correction automatique.</p>
+    <% end %>
     <% if qualification.summary.fetch("region_details").any? %>
       <details>
         <summary>Régions et boîtes qualifiées</summary>
@@ -39,7 +73,7 @@
             <% qualification.summary.fetch("region_details").each do |region| %>
               <tr>
                 <td><%= region.fetch("page") %></td>
-                <td><code><%= region.fetch("bbox").join(", ") %></code></td>
+                <td><code><%= region.fetch("source_bbox", region["bbox"]).join(", ") %></code></td>
                 <td><%= region.fetch("verdict") %></td>
               </tr>
             <% end %>
@@ -49,12 +83,22 @@
     <% end %>
     <% if qualification.summary.fetch("page_exclusions").any? %>
       <details>
-        <summary>Pages non prouvées</summary>
+        <summary>Pages ou zones non prouvées</summary>
         <ul>
           <% qualification.summary.fetch("page_exclusions").each do |page| %>
             <li>
               Page <%= page.fetch("page") %> — <%= page.fetch("status") %> :
               <%= page.fetch("reasons").map { |reason| reason.fetch("message") }.join(" ; ") %>
+              <% if page.fetch("regions", []).any? %>
+                <ul>
+                  <% page.fetch("regions").each do |region| %>
+                    <li>
+                      <%= region.fetch("resource") %> —
+                      [<%= region.fetch("bbox").map { |value| value.round(1) }.join(", ") %>]
+                    </li>
+                  <% end %>
+                </ul>
+              <% end %>
             </li>
           <% end %>
         </ul>
@@ -62,18 +106,5 @@
     <% end %>
   <% end %>
 
-  <% if qualification.analyzer_response.attached? || qualification.source_evidence.attached? || qualification.report.attached? %>
-    <h3>Preuves conservées</h3>
-    <ul>
-      <% if qualification.report.attached? %>
-        <li><%= link_to "Rapport de qualification", rails_blob_path(qualification.report, disposition: "attachment") %></li>
-      <% end %>
-      <% if qualification.source_evidence.attached? %>
-        <li><%= link_to "Preuve source", rails_blob_path(qualification.source_evidence, disposition: "attachment") %></li>
-      <% end %>
-      <% if qualification.analyzer_response.attached? %>
-        <li><%= link_to "Réponse brute de l’analyseur", rails_blob_path(qualification.analyzer_response, disposition: "attachment") %></li>
-      <% end %>
-    </ul>
-  <% end %>
+  <%= render "documents/math_qualification_artifacts", qualification: qualification %>
 </section>

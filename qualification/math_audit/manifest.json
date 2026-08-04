@@ -36,7 +36,7 @@
       "pdf": "../../experiments/math_pipeline_comparison/source-pages-7-10.pdf",
       "pdf_sha256": "219c2064ba9292d286f4b3bcc65eb9e94b418705c51b9f98f54f2ad70321ddf1",
       "oracle": "real_book/oracle.json",
-      "oracle_sha256": "35439a80cc3ca0b2def1e764026db2131eeb7e6de46310c3a1c43c40216ac0ac",
+      "oracle_sha256": "a47891d3b67aceae375f761c3f3a72f1ad8cf7659fd874147c181f028a6afee4",
       "candidate_provenance": "real_book/results/candidate-provenance.json",
       "candidate_provenance_sha256": "7a7f59ee3cf663aaa84b74e62c58a86ab54a46ab50b25b0627c533c218cc7eb2",
       "exhaustive_oracle": true,

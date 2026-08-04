@@ -528,13 +528,15 @@ def markdown_report(report: dict[str, object]) -> str:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", type=Path, required=True)
+    parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--pdftoppm", type=Path, required=True)
     parser.add_argument("--gemma-endpoint", required=True)
     parser.add_argument("--gemma-model", required=True)
     parser.add_argument("--dpi", type=int, required=True)
     args = parser.parse_args()
 
-    experiment_dir = Path(__file__).resolve().parent
+    experiment_dir = args.output_dir.resolve()
+    experiment_dir.mkdir(parents=True, exist_ok=True)
     pdf_path = args.root / "source-pages-7-10.pdf"
     if not pdf_path.is_file() or not args.pdftoppm.is_file():
         raise FileNotFoundError("PDF ou pdftoppm absent")

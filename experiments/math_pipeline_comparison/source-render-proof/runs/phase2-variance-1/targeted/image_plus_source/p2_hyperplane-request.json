@@ -1,0 +1,10 @@
+{
+  "model": "google/gemma-4-26B-A4B-it",
+  "temperature": 0,
+  "max_tokens": 2048,
+  "prompt": "Transcribe exactly this crop from one PDF page. Preserve every visible symbol. Use valid LaTeX for mathematics. Do not summarize, correct the author, add commentary, or wrap the answer in a code fence. Return only the formula or formulas visible in the crop. A second channel extracted from the PDF drawing program accompanies the image. It describes glyphs and order, not the author's original LaTeX. Use it only to resolve visual ambiguity. If a Unicode text map conflicts with a font glyph, preserve the glyph actually drawn. Source evidence: signe moins de wx-b=0: source drawing sequence `wx−b=0`.",
+  "image": {
+    "path": "C:\\Users\\maxim\\python\\chatbot_trading\\experiments\\math_pipeline_comparison\\source-render-proof\\runs\\phase2-variance-1\\crops\\p2_hyperplane-600dpi.png",
+    "sha256": "332156b579df2d40e757d56cd5a9c0f99c87c2503bb8617bd21d5e1abc018472"
+  }
+}

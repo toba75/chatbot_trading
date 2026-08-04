@@ -46,7 +46,7 @@ Le rapport versionné est GREEN (`accepted: true`). Sur le corpus représentatif
 - 53 appariements, tous par `pdf_source_typography` ;
 - rappel `1.0` et précision `1.0` ;
 - couverture de traçabilité `1.0` ;
-- couverture des assertions sémantiques `39/53`, soit `0.735849` ;
+- couverture des assertions sémantiques `44/53`, soit `0.830189` ;
 - exactitude des comportements attendus `1.0` : les 14 régions aux signaux
   contradictoires sont toutes `non_verifiable` ;
 - zéro faux alignement et zéro faux conforme sur les mutations.

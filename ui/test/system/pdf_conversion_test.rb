@@ -16,16 +16,35 @@ class PdfConversionTest < ApplicationSystemTestCase
     assert_text "5 pages"
     assert_text "Page 5 — vide"
     assert_text "2 images — pages 2 et 3"
-    assert_selector %(iframe[title="PDF original"])
-    assert_selector "pre", text: /While the rules are free/, visible: :all
+    assert_selector %(canvas[title="Page courante du PDF original"])
     assert_text "Qualification mathématique"
     assert_text(/Verdict : (conformant_within_scope|contradicted|partial|non_verifiable)/)
     assert_link "Rapport de qualification"
     assert_link "Preuve source"
     assert_link "Réponse brute de l’analyseur"
 
-    within_frame(find(%(iframe[title="Conversion HTML"]))) do
+    html_label = find(%(a[role="tab"][aria-selected="true"])).text
+    within_frame(find(%(iframe[title="#{html_label} — page 1"]))) do
       assert_selector "img", count: 2
+    end
+
+    fill_in "Page", with: "2"
+    find_field("Page").send_keys(:enter)
+    assert_selector %(iframe[title="#{html_label} — page 2"][src$="#page-2"])
+
+    click_on "Markdown"
+    assert_selector %(a[role="tab"][aria-selected="true"]), text: "Markdown"
+    within_frame(find(%(iframe[title="Conversion Markdown"]))) do
+      assert_text(/While the rules are free/)
+    end
+
+    find_link("Markdown").send_keys(:arrow_right)
+    assert_selector %(a[role="tab"][aria-selected="true"]), text: "JSON"
+    fill_in "Page", with: "2"
+    assert_selector %(iframe[title="Projection JSON de la page 2"])
+    within_frame(find(%(iframe[title="Projection JSON de la page 2"]))) do
+      assert_text(/"kind": "docling_page"/)
+      assert_text(/"page_no": 2/)
     end
 
     completed_elapsed = find(%([data-controller="elapsed-time"])).text

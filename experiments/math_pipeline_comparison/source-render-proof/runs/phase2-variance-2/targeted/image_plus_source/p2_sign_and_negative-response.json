@@ -1,0 +1,39 @@
+{
+  "id": "chatcmpl-92eb304a5e0380f3",
+  "object": "chat.completion",
+  "created": 1785599438,
+  "prompt_routed_experts": null,
+  "model": "google/gemma-4-26B-A4B-it",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "$y = \\text{sign}(\\mathbf{wx} - b),$\n\nwhere $\\text{sign}$ is a mathematical operator that takes any value as input and returns $+1$ if the input is a positive number or $-1$ if the input is a negative number.",
+        "refusal": null,
+        "annotations": null,
+        "audio": null,
+        "function_call": null,
+        "tool_calls": [],
+        "reasoning": null
+      },
+      "logprobs": null,
+      "finish_reason": "stop",
+      "stop_reason": 106,
+      "token_ids": null,
+      "routed_experts": null
+    }
+  ],
+  "service_tier": null,
+  "system_fingerprint": "vllm-0.21.0-3c9634b3",
+  "usage": {
+    "prompt_tokens": 425,
+    "total_tokens": 482,
+    "completion_tokens": 57,
+    "prompt_tokens_details": null
+  },
+  "prompt_logprobs": null,
+  "prompt_token_ids": null,
+  "prompt_text": null,
+  "kv_transfer_params": null
+}

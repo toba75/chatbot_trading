@@ -1,0 +1,10 @@
+{
+  "model": "google/gemma-4-26B-A4B-it",
+  "temperature": 0,
+  "max_tokens": 2048,
+  "prompt": "Transcribe exactly this crop from one PDF page. Preserve every visible symbol. Use valid LaTeX for mathematics. Do not summarize, correct the author, add commentary, or wrap the answer in a code fence. Return the visible text as Markdown. A second channel extracted from the PDF drawing program accompanies the image. It describes glyphs and order, not the author's original LaTeX. Use it only to resolve visual ambiguity. If a Unicode text map conflicts with a font glyph, preserve the glyph actually drawn. Source evidence: premier indice i avec exposant (2): source drawing sequence `x(2)i`; second indice k avec exposant (2): source drawing sequence `x(2)k`; exemple x_k puis k = 1,...,N: source drawing sequence `examplexk,k=1,...,N`; borne C de l’ensemble des classes: source drawing sequence `{1,2,...,C}`.",
+  "image": {
+    "path": "C:\\Users\\maxim\\python\\chatbot_trading\\experiments\\math_pipeline_comparison\\source-render-proof\\runs\\phase2-variance-1\\crops\\p1_feature_indices-600dpi.png",
+    "sha256": "f41323a6081152b631b34981b4a9d197ae8e6e62fd3df9c418d863bbb3acbc0f"
+  }
+}

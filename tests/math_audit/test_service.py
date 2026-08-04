@@ -24,8 +24,16 @@ class CompletedProcess:
     def __init__(self, command: list[str], **_options: Any) -> None:
         report_path = Path(command[command.index("--report") + 1])
         evidence_path = Path(command[command.index("--evidence") + 1])
+        corrections_path = Path(command[command.index("--correction-records") + 1])
+        correction_evidence_path = Path(
+            command[command.index("--correction-evidence") + 1]
+        )
+        native_page_html_path = Path(command[command.index("--native-page-html") + 1])
         report_path.write_bytes(b'{"status":"completed"}\n')
         evidence_path.write_bytes(b"proof")
+        corrections_path.write_bytes(b'{"records":[]}\n')
+        correction_evidence_path.write_bytes(b"PK")
+        native_page_html_path.write_bytes(b"<div id='page-1'></div>")
         self.stdout = io.StringIO(
             "".join(
                 [
@@ -64,6 +72,20 @@ class FailedProcess:
         raise AssertionError("Le processus terminé ne doit pas être tué")
 
 
+class FailedProcessWithCheckpoints(FailedProcess):
+    def __init__(self, command: list[str], **_options: Any) -> None:
+        root = Path(command[command.index("--report") + 1]).parent
+        (root / "evidence.ndjson.gz").write_bytes(b"source-proof")
+        records = Path(command[command.index("--correction-checkpoint-records") + 1])
+        records.write_text(
+            '{"region_id":"r1","status":"accepted"}\n', encoding="utf-8"
+        )
+        evidence = Path(command[command.index("--correction-checkpoint-evidence") + 1])
+        (evidence / "r1").mkdir(parents=True)
+        (evidence / "r1" / "response.json").write_text("{}", encoding="utf-8")
+        super().__init__(command)
+
+
 class StartFailureThenSuccess:
     calls = 0
 
@@ -86,6 +108,12 @@ def _config(*, max_pdf_bytes: int = 100) -> ServiceConfig:
         artifact_chunk_bytes=4,
         max_form_field_bytes=128,
         multipart_spool_bytes=16,
+        correction_endpoint="http://gemma/v1",
+        correction_model="gemma",
+        correction_dpi=600,
+        correction_padding_points=4.0,
+        correction_timeout_seconds=30,
+        correction_max_response_bytes=10_000,
     )
 
 
@@ -103,8 +131,8 @@ def _request(client: TestClient) -> Any:
         data={
             "source_sha256": hashlib.sha256(PDF).hexdigest(),
             "docling_document_sha256": hashlib.sha256(DOCUMENT).hexdigest(),
-            "contract_version": "1.0",
-            "capability_profile": "pdf-docling-semantic-v1",
+            "contract_version": "2.0",
+            "capability_profile": "pdf-docling-semantic-correction-v2",
         },
     )
 
@@ -139,7 +167,13 @@ def test_diffuse_progression_artefacts_et_resultat_terminal() -> None:
         if event["name"] == "report"
     ) == b'{"status":"completed"}\n'
     assert events[-1]["type"] == "result"
-    assert set(events[-1]["artifacts"]) == {"evidence", "report"}
+    assert set(events[-1]["artifacts"]) == {
+        "evidence",
+        "corrections",
+        "correction_evidence",
+        "native_page_html",
+        "report",
+    }
 
 
 def test_refuse_un_pdf_trop_volumineux_avant_de_lancer_l_analyse() -> None:
@@ -166,6 +200,30 @@ def test_une_erreur_cli_devient_un_evenement_terminal_sans_artefact() -> None:
             "message": "contrat invalide",
         }
     ]
+
+
+def test_diffuse_les_preuves_deja_produites_avant_une_erreur_cli() -> None:
+    client = TestClient(
+        create_app(_config(), process_factory=FailedProcessWithCheckpoints)
+    )
+
+    events = _events(_request(client))
+
+    artifacts = [event for event in events if event["type"] == "artifact"]
+    contents = {
+        name: b"".join(
+            base64.b64decode(event["content_base64"])
+            for event in artifacts
+            if event["name"] == name
+        )
+        for name in {event["name"] for event in artifacts}
+    }
+    assert contents["evidence"] == b"source-proof"
+    assert json.loads(contents["corrections"])["records"] == [
+        {"region_id": "r1", "status": "accepted"}
+    ]
+    assert contents["correction_evidence"].startswith(b"PK")
+    assert events[-1]["type"] == "error"
 
 
 def test_valide_strictement_les_parametres_de_configuration() -> None:
@@ -330,8 +388,8 @@ def _request_arguments() -> dict[str, Any]:
         "data": {
             "source_sha256": hashlib.sha256(PDF).hexdigest(),
             "docling_document_sha256": hashlib.sha256(DOCUMENT).hexdigest(),
-            "contract_version": "1.0",
-            "capability_profile": "pdf-docling-semantic-v1",
+            "contract_version": "2.0",
+            "capability_profile": "pdf-docling-semantic-correction-v2",
         },
     }
 

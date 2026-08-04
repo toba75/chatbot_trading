@@ -4,7 +4,18 @@ require "json"
 require "net/http"
 
 class MathQualificationClient
-  Result = Data.define(:raw_response, :report, :report_bytes, :evidence)
+  Result = Data.define(
+    :raw_response,
+    :report,
+    :report_bytes,
+    :evidence,
+    :corrections,
+    :correction_evidence,
+    :derived_docling_document,
+    :derived_html,
+    :derived_markdown,
+    :native_page_html
+  )
 
   class QualificationError < StandardError
     attr_reader :code, :result
@@ -29,8 +40,14 @@ class MathQualificationClient
     Errno::ETIMEDOUT,
     Errno::EPIPE
   ].freeze
-  ARTIFACT_NAMES = %w[evidence report].freeze
-  PROGRESS_PHASES = %w[source_analysis docling_alignment candidate_evaluation].freeze
+  REQUIRED_ARTIFACT_NAMES = %w[
+    evidence corrections correction_evidence native_page_html report
+  ].freeze
+  DERIVED_ARTIFACT_NAMES = %w[derived_docling_document derived_html derived_markdown].freeze
+  ARTIFACT_NAMES = (REQUIRED_ARTIFACT_NAMES + DERIVED_ARTIFACT_NAMES).freeze
+  PROGRESS_PHASES = %w[
+    source_analysis docling_alignment candidate_evaluation correction_proposal correction_export
+  ].freeze
 
   def initialize(
     transport: nil,
@@ -121,11 +138,10 @@ class MathQualificationClient
     validate_artifacts!(terminal.fetch("artifacts"), artifacts, sequences, raw)
     report = JSON.parse(artifacts.fetch("report"))
     invalid!(raw, artifacts, "Le rapport terminal n’est pas un objet JSON.") unless report.is_a?(Hash)
-    Result.new(
-      raw_response: raw,
-      report: report,
-      report_bytes: artifacts.fetch("report"),
-      evidence: artifacts.fetch("evidence")
+    build_result(
+      raw,
+      artifacts,
+      report: report
     )
   rescue *NETWORK_ERRORS
     raise QualificationError.new(
@@ -141,6 +157,21 @@ class MathQualificationClient
     )
   rescue JSON::ParserError, KeyError, ArgumentError => error
     invalid!(raw, artifacts, "Flux NDJSON invalide : #{error.message}")
+  end
+
+  def build_result(raw, artifacts, report:)
+    Result.new(
+      raw_response: raw,
+      report: report,
+      report_bytes: artifacts.fetch("report"),
+      evidence: artifacts.fetch("evidence"),
+      corrections: artifacts.fetch("corrections"),
+      correction_evidence: artifacts.fetch("correction_evidence"),
+      derived_docling_document: artifacts.fetch("derived_docling_document"),
+      derived_html: artifacts.fetch("derived_html"),
+      derived_markdown: artifacts.fetch("derived_markdown"),
+      native_page_html: artifacts.fetch("native_page_html")
+    )
   end
 
   def consume_event(event, terminal, artifacts, sequences, raw, progress_state)
@@ -197,8 +228,12 @@ class MathQualificationClient
 
   def validate_artifacts!(metadata, artifacts, sequences, raw)
     invalid!(raw, artifacts, "Inventaire d’artefacts invalide.") unless metadata.is_a?(Hash)
-    invalid!(raw, artifacts, "Inventaire d’artefacts invalide.") unless metadata.keys.sort == ARTIFACT_NAMES.sort
-    ARTIFACT_NAMES.each do |name|
+    names = metadata.keys
+    valid_names = (names - ARTIFACT_NAMES).empty? &&
+      (REQUIRED_ARTIFACT_NAMES - names).empty? &&
+      ((names & DERIVED_ARTIFACT_NAMES).empty? || (DERIVED_ARTIFACT_NAMES - names).empty?)
+    invalid!(raw, artifacts, "Inventaire d’artefacts invalide.") unless valid_names
+    names.each do |name|
       expected = metadata.fetch(name)
       content = artifacts.fetch(name)
       valid = expected.is_a?(Hash) &&
@@ -211,19 +246,9 @@ class MathQualificationClient
 
   def partial(raw, artifacts)
     report = JSON.parse(artifacts.fetch("report")) unless artifacts.fetch("report").empty?
-    Result.new(
-      raw_response: raw,
-      report: report,
-      report_bytes: artifacts.fetch("report"),
-      evidence: artifacts.fetch("evidence")
-    )
+    build_result(raw, artifacts, report: report)
   rescue JSON::ParserError
-    Result.new(
-      raw_response: raw,
-      report: nil,
-      report_bytes: artifacts.fetch("report"),
-      evidence: artifacts.fetch("evidence")
-    )
+    build_result(raw, artifacts, report: nil)
   end
 
   def invalid!(raw, artifacts, message)

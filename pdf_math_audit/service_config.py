@@ -16,6 +16,12 @@ class ServiceConfig:
     artifact_chunk_bytes: int
     max_form_field_bytes: int
     multipart_spool_bytes: int
+    correction_endpoint: str
+    correction_model: str
+    correction_dpi: int
+    correction_padding_points: float
+    correction_timeout_seconds: int
+    correction_max_response_bytes: int
 
     @classmethod
     def from_env(cls) -> ServiceConfig:
@@ -32,10 +38,25 @@ class ServiceConfig:
             "multipart_spool_bytes": "MATH_AUDIT_MULTIPART_SPOOL_BYTES",
         }
         return cls(
-            **{field: int(os.environ[variable]) for field, variable in names.items()}
+            **{field: int(os.environ[variable]) for field, variable in names.items()},
+            correction_endpoint=os.environ["MATH_CORRECTION_ENDPOINT"],
+            correction_model=os.environ["MATH_CORRECTION_MODEL"],
+            correction_dpi=int(os.environ["MATH_CORRECTION_DPI"]),
+            correction_padding_points=float(
+                os.environ["MATH_CORRECTION_PADDING_POINTS"]
+            ),
+            correction_timeout_seconds=int(
+                os.environ["MATH_CORRECTION_TIMEOUT_SECONDS"]
+            ),
+            correction_max_response_bytes=int(
+                os.environ["MATH_CORRECTION_MAX_RESPONSE_BYTES"]
+            ),
         )
 
     def validate(self) -> None:
         for field in fields(self):
-            if getattr(self, field.name) <= 0:
+            value = getattr(self, field.name)
+            if isinstance(value, str) and not value.strip():
+                raise ValueError(f"{field.name} ne doit pas être vide")
+            if isinstance(value, (int, float)) and value <= 0:
                 raise ValueError(f"{field.name} doit être strictement positif")

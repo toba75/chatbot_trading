@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_01_125500) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_02_114500) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -90,7 +90,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_01_125500) do
     t.integer "total_units", null: false
     t.datetime "updated_at", null: false
     t.string "verdict"
-    t.index ["conversion_attempt_id"], name: "index_math_qualifications_on_conversion_attempt_id", unique: true
+    t.index ["conversion_attempt_id"], name: "index_math_qualifications_on_conversion_attempt_id"
     t.check_constraint "completed_units <= total_units", name: "math_qualifications_progress"
     t.check_constraint "completed_units >= 0", name: "math_qualifications_completed_units"
     t.check_constraint "status::text <> 'running'::text OR execution_job_id IS NOT NULL", name: "math_qualifications_active_execution"

@@ -124,13 +124,15 @@ class DoclingClient
   end
 
   def valid_pages?(pages)
-    pages.is_a?(Hash) && pages.any? && pages.all? do |key, page|
+    return false unless pages.is_a?(Hash) && pages.any? && pages.all? do |key, page|
       page_number = page["page_no"] if page.is_a?(Hash)
       image_uri = page.dig("image", "uri") if page.is_a?(Hash)
       page_number.is_a?(Integer) && page_number.positive? && key == page_number.to_s &&
         image_uri.is_a?(String) &&
         image_uri.match?(/\Adata:image\/[a-z0-9.+-]+;base64,[a-z0-9+\/=]+\z/i)
     end
+
+    pages.values.pluck("page_no").sort == (1..pages.size).to_a
   end
 
   def valid_items?(content, page_numbers)

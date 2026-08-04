@@ -4,11 +4,18 @@ from pathlib import Path
 import fitz
 import pytest
 from pypdf import PdfReader, PdfWriter
-from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
+from pypdf.generic import (
+    ArrayObject,
+    DecodedStreamObject,
+    DictionaryObject,
+    FloatObject,
+    NameObject,
+)
 
 from pdf_math_audit.analyzer import analyze_pdf
 from pdf_math_audit.fonts import parse_to_unicode
 from pdf_math_audit.limitations import AnalysisLimitation
+from pdf_math_audit.trace import _font_resource_key
 
 
 REFERENCE_PDF = (
@@ -17,6 +24,79 @@ REFERENCE_PDF = (
     / "math_pipeline_comparison"
     / "source-pages-7-10.pdf"
 )
+
+
+def _pdf_with_form_xobject(
+    tmp_path: Path, form_data: bytes, invocation: bytes
+) -> Path:
+    reader = PdfReader(REFERENCE_PDF)
+    page = reader.pages[0]
+    form = DecodedStreamObject()
+    form.set_data(form_data)
+    form_resources = DictionaryObject()
+    if fonts := page["/Resources"].get("/Font"):
+        form_resources[NameObject("/Font")] = fonts
+    form.update(
+        {
+            NameObject("/Type"): NameObject("/XObject"),
+            NameObject("/Subtype"): NameObject("/Form"),
+            NameObject("/BBox"): ArrayObject(map(FloatObject, [0, 0, 10, 10])),
+            NameObject("/Resources"): form_resources,
+        }
+    )
+    resources = page["/Resources"]
+    xobjects = resources.get("/XObject") or DictionaryObject()
+    resources[NameObject("/XObject")] = xobjects
+    xobjects[NameObject("/XTest")] = form
+    content = DecodedStreamObject()
+    content.set_data(page.get_contents().get_data() + invocation)
+    page[NameObject("/Contents")] = content
+    output = tmp_path / "form-xobject.pdf"
+    writer = PdfWriter()
+    writer.add_page(page)
+    with output.open("wb") as destination:
+        writer.write(destination)
+    return output
+
+
+def test_conserve_la_boite_transformee_d_un_formulaire_vectoriel(
+    tmp_path: Path,
+) -> None:
+    pdf_path = _pdf_with_form_xobject(
+        tmp_path,
+        b"0 0 m 10 10 l S",
+        b"\nq 2 0 0 3 10 20 cm /XTest Do Q\n",
+    )
+
+    report = analyze_pdf(pdf_path)
+
+    page = report["pages"][0]
+    assert page["status"] == "traced_with_exclusions"
+    assert page["opaque_regions"][0]["bbox"] == pytest.approx(
+        [10.0, 616.1420288085938, 30.0, 646.1420288085938]
+    )
+
+
+def test_trace_le_texte_embarque_dans_un_formulaire(tmp_path: Path) -> None:
+    pdf_path = _pdf_with_form_xobject(
+        tmp_path,
+        b"BT /Ty3 5 Tf 1 0 0 1 1 5 Tm (T) Tj ET",
+        b"\n/XTest Do\n",
+    )
+
+    report = analyze_pdf(pdf_path)
+
+    page = report["pages"][0]
+    assert page["status"] == "traced_with_exclusions"
+    assert page["opaque_regions"][-1]["resource"] == "/XTest"
+    assert page["opaque_regions"][-1]["text_traced"] is True
+
+
+def test_distingue_deux_polices_de_meme_nom_local_apres_une_limitation() -> None:
+    first_xrefs = {}
+
+    assert _font_resource_key("/F1", 10, first_xrefs) == "/F1"
+    assert _font_resource_key("/F1", 20, first_xrefs) == "/F1@20"
 
 
 def test_identite_pdf_reste_celle_des_octets_analyses(tmp_path: Path) -> None:

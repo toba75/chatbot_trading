@@ -144,10 +144,7 @@ def test_l_oracle_reel_est_exhaustif_et_independant_des_candidats() -> None:
     assert all(region["semantic_assertions"] for region in oracle["regions"])
     assert all(region["evidence"]["kind"] == "source_glyph_and_render" for region in oracle["regions"])
     assert all("candidate" not in region["evidence"]["reference"] for region in oracle["regions"])
-    assert len(oracle["expected_non_verifiable"]) == 14
-    assert set(oracle["expected_non_verifiable"].values()) == {
-        "source_signal_conflict"
-    }
+    assert oracle["expected_non_verifiable"] == {}
 
     expected_critical = {
         "p2-04": "wx\u2212b=0",

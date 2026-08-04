@@ -101,6 +101,7 @@ class DoclingAlignment:
         boundary = self._boundary.get(region.region_id, [])
         multiple = self._multiple.get(region.region_id, [])
         reasons = []
+        trace_exclusions = []
         status = "traced"
         if region.reason is not None:
             status = "not_traced"
@@ -113,7 +114,39 @@ class DoclingAlignment:
                     "La page PDF ne fournit aucune trace exploitable",
                 )
             )
-        elif pages[region.page]["status"] != "traced":
+        elif pages[region.page]["status"] == "traced_with_exclusions" and (
+            trace_exclusions := [
+                exclusion
+                for exclusion in pages[region.page].get("opaque_regions", [])
+                if overlaps(region.bbox, exclusion["bbox"])  # type: ignore[arg-type]
+            ]
+        ):
+            status = "not_traced"
+            glyphs = []
+            boundary = []
+            multiple = []
+            reasons.append(
+                _reason(
+                    "pdf_opaque_region_intersection",
+                    "La région Docling intersecte une zone PDF opaque non qualifiée",
+                )
+            )
+        elif pages[region.page]["status"] == "partially_traced":
+            status = "not_traced"
+            glyphs = []
+            boundary = []
+            multiple = []
+            reasons.append(
+                _reason(
+                    "pdf_page_partially_traced",
+                    "La région Docling ne peut pas être prouvée sur une page partiellement tracée",
+                )
+            )
+            reasons.extend(pages[region.page]["reasons"])
+        elif pages[region.page]["status"] not in {
+            "traced",
+            "traced_with_exclusions",
+        }:
             status = pages[region.page]["status"]
             glyphs = []
             boundary = []
@@ -181,6 +214,7 @@ class DoclingAlignment:
                 glyph["sequence_index"] for glyph in multiple
             ],
             "reasons": reasons,
+            "trace_exclusions": trace_exclusions,
         }
 
     def finalize(

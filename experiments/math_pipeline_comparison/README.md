@@ -61,14 +61,16 @@ OpenAI-compatible servant `google/gemma-4-26B-A4B-it` :
 ```powershell
 .\.venv\Scripts\python.exe .\source-render-proof\run_experiment.py `
   --root . `
+  --output-dir .\source-render-proof\runs\phase2-variance-1 `
   --pdftoppm C:\chemin\vers\pdftoppm.exe `
   --gemma-endpoint http://adresse-du-service/v1 `
   --gemma-model google/gemma-4-26B-A4B-it `
   --dpi 600
 ```
 
-Cette commande remplace les crops, les réponses ciblées et les rapports
-finaux. Le run conservé a utilisé une température nulle et dix appels ciblés :
+Chaque exécution doit utiliser un nouveau répertoire de sortie afin de conserver
+les crops, les requêtes, les réponses et les rapports précédents. Le run
+conservé a utilisé une température nulle et dix appels ciblés :
 cinq contrôles image seule, puis les cinq mêmes images accompagnées des faits
 issus du PDF.
 

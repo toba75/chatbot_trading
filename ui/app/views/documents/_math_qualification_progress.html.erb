@@ -1,0 +1,10 @@
+<div id="math_qualification_progress">
+  <p>Phase : <%= qualification.phase %></p>
+  <% if qualification.total_units.zero? %>
+    <p>0 / 0 unité pour cette phase.</p>
+  <% else %>
+    <progress value="<%= qualification.completed_units %>" max="<%= qualification.total_units %>">
+      <%= qualification.completed_units %> / <%= qualification.total_units %>
+    </progress>
+  <% end %>
+</div>

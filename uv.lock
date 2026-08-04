@@ -71,13 +71,14 @@ wheels = [
 
 [[package]]
 name = "chatbot-trading"
-version = "0.4.0"
+version = "0.5.25"
 source = { editable = "." }
 dependencies = [
     { name = "docling-core" },
     { name = "fastapi" },
     { name = "fonttools" },
     { name = "latex2mathml" },
+    { name = "lxml" },
     { name = "pymupdf" },
     { name = "pypdf" },
     { name = "python-multipart" },
@@ -100,6 +101,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.141.1" },
     { name = "fonttools", specifier = "==4.60.1" },
     { name = "latex2mathml", specifier = "==3.81.0" },
+    { name = "lxml", specifier = "==6.1.1" },
     { name = "pymupdf", specifier = "==1.27.2.2" },
     { name = "pypdf", specifier = "==6.10.2" },
     { name = "python-multipart", specifier = ">=0.0.32" },

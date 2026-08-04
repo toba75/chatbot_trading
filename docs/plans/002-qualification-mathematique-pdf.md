@@ -2,11 +2,12 @@
 
 ## État au 1er août 2026
 
-La première phase est implémentée. Le corpus représentatif est GREEN sur ses
+Les deux phases sont implémentées. Le corpus représentatif est GREEN sur ses
 53 régions : 39 sont sémantiquement prouvées et 14 conflits sont correctement
 refusés. La chaîne réelle Rails → Solid Queue → service d’audit →
-PostgreSQL → Solid Cable est raccordée. La phase 2 de correction ciblée reste
-hors périmètre et nécessitera une décision distincte.
+PostgreSQL → Solid Cable est raccordée. La phase 2 corrige uniquement une
+région contradictoire dont les glyphes, le style et les relations sont prouvés.
+Elle produit des sorties dérivées séparées et ne modifie aucune sortie native.
 
 Le gate recalcule maintenant les empreintes des trois fichiers de preuve
 indépendants déclarés par l’oracle. Les jobs de conversion et de qualification
@@ -147,8 +148,8 @@ flowchart LR
     P --> T["Broadcast Active Record"]
     T --> W["Turbo via Solid Cable"]
 
-    Q -. "Phase 2 conditionnelle" .-> G["Crop ciblé + candidat correctif"]
-    G -. "preuve locale complète" .-> V["DoclingDocument dérivé"]
+    Q --> G["Crop ciblé + proposition Gemma"]
+    G -->|"preuve locale complète"| V["DoclingDocument dérivé"]
 ```
 
 La qualification et sa tentative d'enqueue sont matérialisées dans la même
@@ -163,9 +164,11 @@ signifie seulement que le contrat Docling a été exécuté avec succès.
 
 ### `MathQualification`
 
-Une `ConversionAttempt` possède exactement une qualification. Une contrainte
-d’unicité sur la tentative empêche tout remplacement silencieux ; une politique
-d’historisation multiversion exigera une évolution explicite du modèle.
+Une `ConversionAttempt` possède un historique ordonné de qualifications et
+expose la dernière comme qualification courante. Une relance d’une qualification
+échouée crée une nouvelle ligne sans remplacer l’erreur ni les preuves
+précédentes ; elle réutilise les sorties Docling de la tentative et ne relance
+pas la conversion.
 
 Champs minimaux :
 
@@ -451,9 +454,26 @@ aussi vers le flux global `documents`.
   conversion Docling.
 - Mettre `PROCESS.md` à jour seulement lorsque cette chaîne réelle fonctionne.
 
-## Phase 2 conditionnelle — Correction ciblée
+## Phase 2 implémentée — Correction ciblée
 
-Cette phase nécessite une décision distincte fondée sur les mesures de phase 1.
+La décision a été prise après les mesures de phase 1 et l'expérience de
+répétabilité conservée dans `source-render-proof/runs/phase2-variance-*`.
+
+### Résultat préalable
+
+Trois runs indépendants à 600 dpi ont obtenu chacun 9/9 sur les crops seuls et
+9/9 sur les crops accompagnés de la preuve source. Les trente appels mesurent
+la répétabilité de Gemma ; ils ne reçoivent pas les neuf mutations. Celles-ci
+sont rejetées séparément par l'évaluateur déterministe du laboratoire. Le test
+live couvre l'acceptation réelle et les tests négatifs du validateur injectent
+les propositions erronées. Les durées cumulées par run sont 25,974 s, 25,852 s
+et 25,989 s. Le détail et les limites sont consignés dans
+`source-render-proof/VARIANCE_RESULTS.md`.
+
+Gemma est donc utilisé comme générateur de proposition locale. Il n'est jamais
+une autorité : la proposition doit reproduire exactement la séquence logique,
+le style gras prouvé et les relations indice/exposant déduites de la géométrie
+des glyphes. Sinon elle est `rejected` et aucun document dérivé n'est produit.
 
 ### Expérience préalable
 
@@ -482,6 +502,18 @@ Cette phase nécessite une décision distincte fondée sur les mesures de phase 
 
 Une région partiellement couverte reste non vérifiable. L'accord entre Docling,
 Marker, MinerU et Gemma ne suffit jamais à la promouvoir.
+
+Le passage réel conservé par le test live exerce le conteneur d'audit et le
+service Gemma du DGX. Sur le corpus représentatif, une région contradictoire est
+corrigée, le `DoclingDocument` dérivé est rechargé par Docling Core et les
+empreintes confirment que le document natif n'a pas changé.
+
+Les preuves terminées sont checkpointées après chaque proposition. Un timeout
+ou un échec ultérieur diffuse le registre et les preuves partielles avant
+l'événement d'erreur. Les limites de taille cohérentes avec les documents longs
+sont exprimées en octets dans la configuration, jamais en nombre de pages.
+Rails recoupe le registre avec les régions contradictoires, ses compteurs avec
+le rapport et la structure du `DoclingDocument` dérivé avant publication.
 
 ## Vérification rapide
 

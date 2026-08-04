@@ -47,7 +47,9 @@ def _glyph(
 
 
 def _texts(glyphs: list[dict[str, object]]) -> list[str]:
-    return [region["source_glyph_text"] for region in source_math_regions(glyphs, FONTS)]
+    return [
+        region["source_glyph_text"] for region in source_math_regions(glyphs, FONTS)
+    ]
 
 
 def test_detecte_les_variables_grasses_courtes_et_ignore_un_mot_gras() -> None:
@@ -122,6 +124,52 @@ def test_fusionne_un_indice_place_sur_une_ligne_pdf_distincte() -> None:
     assert regions[0]["glyph_sequence_indices"] == [1, 2, 3]
 
 
+def test_fusionne_indices_et_exposants_superposes_meme_si_leurs_departs_different() -> (
+    None
+):
+    glyphs = [
+        _glyph(1, "f", "/Math", 0, 0, top=10, size=10),
+        _glyph(2, "S", "/Math", 1, 3, line=1, top=5, size=7),
+        _glyph(3, "I", "/Math", 2, 2, line=2, top=14, size=7),
+        _glyph(4, "D", "/Math", 2, 6, line=2, top=14, size=7),
+        _glyph(5, "3", "/Math", 2, 10, line=2, top=14, size=7),
+    ]
+
+    regions = source_math_regions(glyphs, FONTS)
+
+    assert len(regions) == 1
+    assert regions[0]["glyph_sequence_indices"] == [1, 2, 3, 4, 5]
+
+
+def test_fusionne_une_annotation_textuelle_avec_son_operateur() -> None:
+    glyphs = [
+        _glyph(1, "S", "/Math", 0, 0, top=10, size=10),
+        _glyph(2, "d", "/Body", 1, 8.5, line=1, top=5, size=7),
+        _glyph(3, "e", "/Body", 1, 10, line=1, top=5, size=7),
+        _glyph(4, "f", "/Body", 1, 11.5, line=1, top=5, size=7),
+        _glyph(5, "=", "/Math", 2, 10, line=2, top=10, size=10),
+        _glyph(6, "x", "/Math", 2, 18, line=2, top=10, size=10),
+    ]
+
+    regions = source_math_regions(glyphs, FONTS)
+
+    assert len(regions) == 1
+    assert regions[0]["glyph_sequence_indices"] == [1, 2, 3, 4, 5, 6]
+
+
+def test_ne_fusionne_pas_une_annotation_lointaine_avec_un_operateur() -> None:
+    glyphs = [
+        _glyph(1, "d", "/Body", 0, 8.5, line=1, top=-100, size=5),
+        _glyph(2, "e", "/Body", 0, 10, line=1, top=-100, size=5),
+        _glyph(3, "f", "/Body", 0, 11.5, line=1, top=-100, size=5),
+        _glyph(4, "=", "/Math", 1, 10, line=2, top=10, size=10),
+    ]
+
+    regions = source_math_regions(glyphs, FONTS)
+
+    assert [region["glyph_sequence_indices"] for region in regions] == [[4]]
+
+
 def test_ne_fusionne_pas_deux_expressions_de_meme_taille_sur_deux_lignes() -> None:
     glyphs = [
         _glyph(1, "x=1", "/Math", 0, 0, top=10),
@@ -129,6 +177,129 @@ def test_ne_fusionne_pas_deux_expressions_de_meme_taille_sur_deux_lignes() -> No
     ]
 
     assert _texts(glyphs) == ["x=1", "y=1"]
+
+
+def test_ne_fusionne_pas_deux_expressions_indexees_sur_deux_lignes() -> None:
+    glyphs = [
+        _glyph(1, "x", "/Math", 0, 0, top=10, size=10),
+        _glyph(2, "i", "/Math", 1, 4, top=15, size=8),
+        _glyph(3, "y", "/Math", 0, 0, line=1, top=19, size=13),
+        _glyph(4, "j", "/Math", 1, 4, line=1, top=24, size=7),
+    ]
+
+    assert _texts(glyphs) == ["xi", "yj"]
+
+
+def test_fusionne_une_petite_borne_portant_son_propre_indice() -> None:
+    glyphs = [
+        _glyph(1, "f", "/Math", 0, 0, top=10, size=10),
+        _glyph(2, "S", "/Math", 1, 3, line=1, top=5, size=7),
+        _glyph(3, "i", "/Math", 1, 6, line=1, top=7, size=6),
+    ]
+
+    assert _texts(glyphs) == ["fSi"]
+
+
+def test_ignore_les_hauts_de_boite_differents_sur_une_meme_ligne_de_base() -> None:
+    glyphs = [
+        _glyph(1, "f", "/Math", 0, 0, top=10, size=10),
+        _glyph(2, "x", "/Math", 0, 4, top=12, size=10),
+        _glyph(3, "S", "/Math", 1, 3, line=1, top=5, size=7),
+        _glyph(4, "i", "/Math", 1, 7, line=1, top=6, size=7),
+    ]
+    glyphs[1]["rendered_origin_y"] = 20
+    glyphs[3]["rendered_origin_y"] = 12
+
+    assert _texts(glyphs) == ["fxSi"]
+
+
+def test_fusionne_les_bornes_superposees_d_un_operateur_mathématique() -> None:
+    glyphs = [
+        _glyph(1, "√", "/Math", 0, 0, top=10, size=10),
+        _glyph(2, "∑", "/Math", 0, 5, top=10, size=10),
+        _glyph(3, "D", "/Math", 1, 10, top=7, size=7),
+        _glyph(4, "j=1", "/Math", 0, 10, line=1, top=14, size=7),
+        _glyph(5, "(w(j))2", "/Math", 1, 22, line=1, top=11, size=10),
+    ]
+    glyphs[0]["glyph_name"] = "radicalBig"
+    glyphs[1]["glyph_name"] = "summationtext"
+
+    assert _texts(glyphs) == ["√∑Dj=1(w(j))2"]
+
+
+def test_fusionne_le_numerateur_et_le_denominateur_par_la_barre_de_fraction() -> None:
+    glyphs = [
+        _glyph(1, "2", "/Body", 0, 5, top=5, size=7),
+        _glyph(2, "‖", "/Math", 1, 0, line=1, top=18, size=7),
+        _glyph(3, "w", "/VariableBold", 2, 4, line=1, top=18, size=7),
+        _glyph(4, "‖", "/Math", 3, 9, line=1, top=18, size=7),
+    ]
+    rules = {1: [{"x0": 0.0, "y": 14.0, "x1": 13.0, "width": 0.4, "seqno": 2}]}
+
+    regions = source_math_regions(glyphs, FONTS, rules)
+
+    assert [region["source_glyph_text"] for region in regions] == ["2‖w‖"]
+    assert regions[0]["structural_rules"]["fraction"]["seqno"] == 2
+
+
+def test_fusionne_une_fraction_inseree_et_une_somme_avec_sa_borne() -> None:
+    glyphs = [
+        _glyph(1, "a", "/Math", 0, 0, top=10),
+        _glyph(2, "=", "/Math", 1, 5, top=10),
+        _glyph(3, "1", "/Body", 2, 20, top=5, size=7),
+        _glyph(4, "2", "/Body", 3, 20, line=1, top=18, size=7),
+        _glyph(5, "∑", "/Math", 4, 30, line=2, top=10, size=14),
+        _glyph(6, "i", "/Math", 5, 28, line=3, top=25, size=7),
+        _glyph(7, "=", "/Math", 6, 31, line=3, top=25, size=7),
+        _glyph(8, "1", "/Body", 7, 34, line=3, top=25, size=7),
+        _glyph(9, "y", "/Math", 8, 40, line=4, top=14),
+    ]
+    glyphs[4]["glyph_name"] = "summationdisplay"
+    rules = {1: [{"x0": 20.0, "y": 14.0, "x1": 24.0, "width": 0.4, "seqno": 2}]}
+
+    regions = source_math_regions(glyphs, FONTS, rules)
+
+    assert len(regions) == 1
+    assert regions[0]["glyph_sequence_indices"] == list(range(1, 10))
+    assert regions[0]["structural_rules"]["fraction"]["seqno"] == 2
+
+
+def test_ne_prouve_pas_une_fraction_par_une_barre_trop_courte() -> None:
+    glyphs = [
+        _glyph(1, "2", "/Body", 0, 0, top=5, size=4),
+        _glyph(2, "w", "/VariableBold", 1, 0, line=1, top=11, size=4),
+    ]
+    rules = {1: [{"x0": 1.9, "y": 10.0, "x1": 2.1, "width": 0.1, "seqno": 2}]}
+
+    regions = source_math_regions(glyphs, FONTS, rules)
+
+    assert all("fraction" not in region["structural_rules"] for region in regions)
+
+
+def test_adapte_la_couverture_de_fraction_aux_glyphes_tres_petits() -> None:
+    glyphs = [
+        _glyph(1, "x", "/Math", 0, 0.1, top=0, size=1),
+        _glyph(2, "y", "/Math", 1, 0.1, line=1, top=2, size=1),
+    ]
+    for glyph in glyphs:
+        glyph["bbox"][2] = 0.9
+    rules = {1: [{"x0": 0.45, "y": 1.5, "x1": 0.55, "width": 0.1, "seqno": 2}]}
+
+    regions = source_math_regions(glyphs, FONTS, rules)
+
+    assert all("fraction" not in region["structural_rules"] for region in regions)
+
+
+def test_ne_prouve_pas_une_fraction_par_un_separateur_trop_long() -> None:
+    glyphs = [
+        _glyph(1, "x", "/Math", 0, 48, top=0, size=4),
+        _glyph(2, "y", "/Math", 1, 48, line=1, top=6, size=4),
+    ]
+    rules = {1: [{"x0": 0.0, "y": 5.0, "x1": 100.0, "width": 0.1, "seqno": 2}]}
+
+    regions = source_math_regions(glyphs, FONTS, rules)
+
+    assert all("fraction" not in region["structural_rules"] for region in regions)
 
 
 def test_conserve_un_identifiant_de_fonction_entre_operateur_et_parenthese() -> None:

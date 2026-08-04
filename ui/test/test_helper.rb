@@ -10,6 +10,12 @@ module ActiveSupport
     # Setup all fixtures in test/fixtures/*.yml for all tests in alphabetical order.
     fixtures :all
 
-    # Add more helper methods to be used by all tests here...
+    def with_current_math_requalification
+      original = ConversionAttempt.instance_method(:current_math_requalification_allowed?)
+      ConversionAttempt.define_method(:current_math_requalification_allowed?) { true }
+      yield
+    ensure
+      ConversionAttempt.define_method(:current_math_requalification_allowed?, original)
+    end
   end
 end

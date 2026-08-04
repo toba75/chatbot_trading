@@ -73,6 +73,8 @@ def _text(
 def _glyph(index: int, value: str, bbox: list[float]) -> dict[str, object]:
     return {
         "sequence_index": index,
+        "source_unicode": value,
+        "source_unicode_method": "agl",
         "agl_unicode": value,
         "glyph_name": "equal" if value == "=" else "x",
         "font_resource": "/F1",
@@ -81,6 +83,7 @@ def _glyph(index: int, value: str, bbox: list[float]) -> dict[str, object]:
         "cff_gid": index + 1,
         "to_unicode": value,
         "rendered": {
+            "font": "Regular",
             "bbox": bbox,
             "gid": index + 1,
             "unicode_text": value,
@@ -144,14 +147,13 @@ def test_aligne_les_formules_et_evalue_les_regions_source_reelles() -> None:
         "linked"
     }
     semantic_statuses = [region["semantic_status"] for region in source_regions]
-    assert semantic_statuses.count("established") == 39
-    assert semantic_statuses.count("conflicting") == 14
+    assert semantic_statuses == ["established"] * 53
     assert {region["verdict"] for region in source_regions} <= {
         "conformant_within_scope",
         "contradicted",
         "non_verifiable",
     }
-    assert sum(region["verdict"] == "non_verifiable" for region in source_regions) == 14
+    assert all(region["verdict"] != "non_verifiable" for region in source_regions)
     assert result["coverage"] == {
         "regions_total": 26,
         "formula_regions": 3,
@@ -255,6 +257,43 @@ def test_preserve_le_statut_structurel_d_une_page_non_supportee() -> None:
     assert result["coverage"]["regions_unsupported"] == 1
 
 
+def test_refuse_seulement_la_region_docling_dans_une_zone_opaque() -> None:
+    alignment = DoclingAlignment(
+        _document(
+            _text(0, "x", (10, 10, 20, 20)),
+            _text(1, "y", (40, 40, 50, 50)),
+        )
+    )
+    alignment.observe_glyph(1, _glyph(1, "x", [12, 12, 18, 18]))
+    alignment.observe_glyph(1, _glyph(2, "y", [42, 42, 48, 48]))
+    report = _pdf_report()
+    report["pages"][0].update(
+        {
+            "status": "traced_with_exclusions",
+            "opaque_regions": [
+                {
+                    "kind": "form_xobject",
+                    "resource": "/X1",
+                    "bbox": [5, 5, 25, 25],
+                    "text_traced": True,
+                }
+            ],
+        }
+    )
+
+    result = alignment.finalize(report)
+
+    assert result["regions"][0]["status"] == "not_traced"
+    assert result["regions"][0]["reasons"][0]["code"] == (
+        "pdf_opaque_region_intersection"
+    )
+    assert result["regions"][0]["trace_exclusions"] == report["pages"][0][
+        "opaque_regions"
+    ]
+    assert result["regions"][1]["status"] == "traced"
+    assert result["regions"][1]["trace_exclusions"] == []
+
+
 def test_publie_les_math_inline_et_les_indices_pdf_non_attribues() -> None:
     document = _document(_text(0, "Avant $x_i$ après", (10, 10, 90, 30), label="text"))
     alignment = DoclingAlignment(document)
@@ -351,6 +390,44 @@ def test_refuse_de_choisir_entre_deux_fragments_inline_identiques() -> None:
     assert inline["reasons"][0]["code"] == (
         "inline_math_source_alignment_ambiguous"
     )
+
+
+def test_un_fragment_inline_sans_caractere_alignable_reste_local() -> None:
+    document = _document(
+        _text(0, "p 1 $_{-$_{p}$}$", (10, 10, 90, 30), label="text"),
+        _text(1, "x$_{i}$", (10, 40, 90, 60), label="text"),
+    )
+    alignment = DoclingAlignment(document)
+    alignment.observe_glyph(1, _glyph(1, "x", [20, 40, 25, 50]))
+    alignment.observe_glyph(1, _glyph(2, "i", [26, 43, 30, 50]))
+    progress = []
+
+    result = alignment.finalize(_pdf_report(), on_progress=progress.append)
+
+    fragment = result["regions"][1]
+    assert fragment["region_id"] == "#/texts/0:inline:1"
+    assert fragment["candidate_text"] == "$}$"
+    assert fragment["charspan"] == [13, 16]
+    assert fragment["page"] == 1
+    assert fragment["container_bbox"] == [10.0, 10.0, 90.0, 30.0]
+    assert fragment["status"] == "not_traced"
+    assert fragment["reasons"] == [
+        {
+            "code": "inline_math_no_alignable_character",
+            "message": "Le fragment inline ne contient aucun caractère alignable",
+        }
+    ]
+    assert result["regions"][2]["candidate_text"] == "$_{i}$"
+    assert result["regions"][2]["status"] == "traced"
+    alignment_progress = [
+        event for event in progress if event["phase"] == "docling_alignment"
+    ]
+    assert alignment_progress[-1] == {
+        "type": "progress",
+        "phase": "docling_alignment",
+        "completed_units": 3,
+        "total_units": 3,
+    }
 
 
 def test_ne_compte_pas_un_glyphe_multi_associe_comme_non_attribue() -> None:

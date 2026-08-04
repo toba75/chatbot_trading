@@ -82,7 +82,7 @@ def _has_valid_bfrange_destinations(entry: list[bytes]) -> bool:
     )
 
 
-def _validate_cmap(cmap: bytes) -> set[int]:
+def _validate_cmap(cmap: bytes, code_bytes: int) -> set[int]:
     operators = set(re.findall(rb"\bbegin([a-z]+(?:char|range))\b", cmap))
     require_supported(
         b"usecmap" not in cmap and operators <= {name.encode() for name in BLOCKS},
@@ -95,9 +95,9 @@ def _validate_cmap(cmap: bytes) -> set[int]:
         for entry in _entries(name, cmap):
             sources = [entry[offset] for offset in source_offsets]
             require_supported(
-                all(len(source) == 2 for source in sources),
+                all(len(source) == code_bytes * 2 for source in sources),
                 "to_unicode_cmap_unsupported",
-                "Seules les sources ToUnicode monooctet sont supportées",
+                "Largeur des sources ToUnicode incohérente avec la CMap",
             )
             bounds = [int(source, 16) for source in sources]
             require_supported(
@@ -155,13 +155,14 @@ def parse_to_unicode(font: Any) -> dict[int, str]:
         "to_unicode_cmap_invalid",
         "Chaîne hexadécimale ToUnicode invalide",
     )
-    declared_codes = _validate_cmap(cmap)
     _encoding, character_map = get_encoding(font)
+    code_bytes = character_map.get(-1)
     require_supported(
-        character_map.get(-1) == 1,
+        code_bytes in {1, 2},
         "to_unicode_cmap_unsupported",
-        "Seules les CMap ToUnicode monooctet sont supportées",
+        "Seules les CMap ToUnicode sur un ou deux octets sont supportées",
     )
+    declared_codes = _validate_cmap(cmap, code_bytes)
     mappings = {
         ord(source): destination
         for source, destination in character_map.items()

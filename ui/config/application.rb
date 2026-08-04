@@ -24,6 +24,7 @@ module Ui
     config.load_defaults 8.1
 
     config.active_storage.variant_processor = :disabled
+    config.active_storage.content_types_allowed_inline += %w[application/json text/markdown]
     config.i18n.default_locale = :fr
 
     # Please, add to the `ignore` list any other `lib` subdirectories that do

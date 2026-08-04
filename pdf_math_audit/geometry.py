@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from typing import Any
 
 
 MIN_GLYPH_OVERLAP_RATIO = 0.5
@@ -40,3 +41,27 @@ def overlap_ratio(region: tuple[float, ...], glyph: list[float]) -> float:
     intersection_width = max(0.0, min(region[2], glyph[2]) - max(region[0], glyph[0]))
     intersection_height = max(0.0, min(region[3], glyph[3]) - max(region[1], glyph[1]))
     return intersection_width * intersection_height / glyph_area
+
+
+def rule_covers_horizontal_span(
+    rule: dict[str, float | int], glyphs: list[dict[str, Any]]
+) -> bool:
+    glyph_x0 = min(glyph["bbox"][0] for glyph in glyphs)
+    glyph_x1 = max(glyph["bbox"][2] for glyph in glyphs)
+    tolerance = min(max(0.1, float(rule["width"])), (glyph_x1 - glyph_x0) * 0.2)
+    return (
+        float(rule["x0"]) <= glyph_x0 + tolerance
+        and float(rule["x1"]) >= glyph_x1 - tolerance
+    )
+
+
+def rule_fits_horizontal_span(
+    rule: dict[str, float | int], glyphs: list[dict[str, Any]]
+) -> bool:
+    glyph_x0 = min(glyph["bbox"][0] for glyph in glyphs)
+    glyph_x1 = max(glyph["bbox"][2] for glyph in glyphs)
+    tolerance = min(max(1.0, float(rule["width"]) * 2), (glyph_x1 - glyph_x0) * 0.25)
+    return (
+        float(rule["x0"]) >= glyph_x0 - tolerance
+        and float(rule["x1"]) <= glyph_x1 + tolerance
+    )

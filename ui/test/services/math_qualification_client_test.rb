@@ -30,6 +30,10 @@ class MathQualificationClientTest < ActiveSupport::TestCase
     assert_equal JSON.parse(report), result.report
     assert_equal report, result.report_bytes
     assert_equal evidence, result.evidence
+    assert_equal "{\"records\":[]}", result.corrections
+    assert_equal "PK", result.correction_evidence
+    assert_empty result.derived_docling_document
+    assert_equal "<div id='page-1'></div>", result.native_page_html
     assert_equal success_events(report, evidence), result.raw_response
     assert_equal "/v1/qualifications", transport.recorded_request.path
   end
@@ -245,7 +249,13 @@ class MathQualificationClientTest < ActiveSupport::TestCase
   end
 
   def success_events(report, evidence)
-    artifacts = { "report" => report.b, "evidence" => evidence }
+    artifacts = {
+      "report" => report.b,
+      "evidence" => evidence,
+      "corrections" => '{"records":[]}'.b,
+      "correction_evidence" => "PK".b,
+      "native_page_html" => "<div id='page-1'></div>".b
+    }
     events = [
       { type: "progress", phase: "source_analysis", completed_units: 1, total_units: 1 }
     ]

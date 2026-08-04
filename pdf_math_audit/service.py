@@ -184,6 +184,7 @@ def create_app(
                     process_factory=process_factory,
                     source_sha256=source_sha256,
                     document_sha256=document_sha256,
+                    config=config,
                 )
             except OSError:
                 return _start_failure()

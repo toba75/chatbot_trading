@@ -18,6 +18,8 @@ from pdf_math_audit.contract import (
     require_fingerprint,
     sha256_argument,
 )
+from pdf_math_audit.correction import CorrectionConfig, correct_document
+from pdf_math_audit.page_html import render_page_anchored_html
 
 
 def _emit(event: dict[str, Any]) -> None:
@@ -54,14 +56,80 @@ def main() -> int:
     )
     parser.add_argument("--report", type=Path, required=True)
     parser.add_argument("--evidence", type=Path, required=True)
+    parser.add_argument("--correction-endpoint")
+    parser.add_argument("--correction-model")
+    parser.add_argument("--correction-dpi", type=int)
+    parser.add_argument("--correction-padding-points", type=float)
+    parser.add_argument("--correction-timeout-seconds", type=int)
+    parser.add_argument("--correction-max-response-bytes", type=int)
+    parser.add_argument("--correction-records", type=Path)
+    parser.add_argument("--correction-evidence", type=Path)
+    parser.add_argument("--derived-docling-document", type=Path)
+    parser.add_argument("--derived-html", type=Path)
+    parser.add_argument("--derived-markdown", type=Path)
+    parser.add_argument("--native-page-html", type=Path)
+    parser.add_argument("--correction-checkpoint-records", type=Path)
+    parser.add_argument("--correction-checkpoint-evidence", type=Path)
     args = parser.parse_args()
+    correction_names = (
+        "correction_endpoint",
+        "correction_model",
+        "correction_dpi",
+        "correction_padding_points",
+        "correction_timeout_seconds",
+        "correction_max_response_bytes",
+        "correction_records",
+        "correction_evidence",
+        "derived_docling_document",
+        "derived_html",
+        "derived_markdown",
+        "native_page_html",
+    )
+    correction_values = [getattr(args, name) for name in correction_names]
+    if any(value is not None for value in correction_values) and not all(
+        value is not None for value in correction_values
+    ):
+        parser.error("la configuration de correction doit être fournie intégralement")
+    correction_enabled = all(value is not None for value in correction_values)
+    checkpoints = (
+        args.correction_checkpoint_records,
+        args.correction_checkpoint_evidence,
+    )
+    if any(path is not None for path in checkpoints) and not all(
+        path is not None for path in checkpoints
+    ):
+        parser.error("les deux chemins de reprise de correction sont requis ensemble")
+    if correction_enabled and (
+        args.correction_dpi <= 0
+        or args.correction_padding_points < 0
+        or args.correction_timeout_seconds <= 0
+        or args.correction_max_response_bytes <= 0
+    ):
+        parser.error("les dimensions de correction sont invalides")
+    output_paths = {
+        "report": args.report,
+        "evidence": args.evidence,
+    }
+    if correction_enabled:
+        output_paths.update(
+            {
+                name.replace("_", "-"): getattr(args, name)
+                for name in correction_names[6:]
+            }
+        )
+        if all(path is not None for path in checkpoints):
+            output_paths.update(
+                {
+                    "correction-checkpoint-records": args.correction_checkpoint_records,
+                    "correction-checkpoint-evidence": args.correction_checkpoint_evidence,
+                }
+            )
     _require_distinct_paths(
         parser,
         {
             "pdf": args.pdf,
             "docling-document": args.docling_document,
-            "report": args.report,
-            "evidence": args.evidence,
+            **output_paths,
         },
     )
 
@@ -126,6 +194,63 @@ def main() -> int:
         "docling_document_sha256": docling_sha256,
     }
     report["alignment"] = alignment.finalize(report, on_progress=_emit)
+    if correction_enabled:
+        correction = correct_document(
+            args.pdf,
+            document,
+            report["alignment"]["pdf_source_math_regions"],
+            CorrectionConfig(
+                endpoint=args.correction_endpoint,
+                model=args.correction_model,
+                dpi=args.correction_dpi,
+                padding_points=args.correction_padding_points,
+                timeout_seconds=args.correction_timeout_seconds,
+                max_response_bytes=args.correction_max_response_bytes,
+            ),
+            on_progress=_emit,
+            checkpoint_records=args.correction_checkpoint_records,
+            checkpoint_evidence=args.correction_checkpoint_evidence,
+        )
+        args.correction_records.write_bytes(correction.records)
+        args.correction_evidence.write_bytes(correction.evidence)
+        args.native_page_html.write_bytes(render_page_anchored_html(document))
+        report["native_page_html"] = {
+            "bytes": args.native_page_html.stat().st_size,
+            "sha256": file_sha256(args.native_page_html),
+        }
+        correction_artifacts = {
+            "corrections": args.correction_records,
+            "correction_evidence": args.correction_evidence,
+        }
+        if correction.document is not None:
+            args.derived_docling_document.write_bytes(correction.document)
+            args.derived_html.write_bytes(correction.html)
+            args.derived_markdown.write_bytes(correction.markdown)
+            correction_artifacts.update(
+                {
+                    "derived_docling_document": args.derived_docling_document,
+                    "derived_html": args.derived_html,
+                    "derived_markdown": args.derived_markdown,
+                }
+            )
+        report["correction"] = correction.summary | {
+            "artifacts": {
+                name: {
+                    "bytes": path.stat().st_size,
+                    "sha256": file_sha256(path),
+                }
+                for name, path in correction_artifacts.items()
+            }
+        }
+    else:
+        report["correction"] = {
+            "status": "not_requested",
+            "targets": 0,
+            "accepted": 0,
+            "rejected": 0,
+            "failed": 0,
+            "artifacts": {},
+        }
     report["evidence"] = {
         "bytes": len(evidence_bytes),
         "content_encoding": "gzip",

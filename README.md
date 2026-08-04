@@ -102,8 +102,8 @@ uv run pdf-math-audit document.pdf `
     --docling-document docling-document.json `
     --source-sha256 $pdfSha `
     --docling-document-sha256 $doclingSha `
-    --contract-version 1.0 `
-    --capability-profile pdf-docling-semantic-v1 `
+    --contract-version 2.0 `
+    --capability-profile pdf-docling-semantic-correction-v2 `
     --report audit.json `
     --evidence audit-glyphs.ndjson.gz
 ```
@@ -117,9 +117,10 @@ l’unique élément Docling qui la contient et à sa sous-séquence textuelle. 
 région sans conteneur ou sans alignement textuel reste explicitement non reliée.
 
 Pour les régions reliées, le profil sémantique convertit le fragment LaTeX
-Docling en MathML avec `latex2mathml`, puis compare la séquence complète aux
-glyphes CFF/AGL. Le profil versionné `type1-cff-agl-rendered-sequence-v3`
-n’établit la séquence source que si l’ordre PDF est univoque et si chaque GID
+Docling en MathML avec `latex2mathml`, puis compare la séquence complète et sa
+structure — graisse, indices et exposants — aux glyphes CFF/AGL. Le profil
+versionné `type1-cff-agl-rendered-structure-v4` n’établit la source que si
+l’ordre PDF est univoque et si chaque GID
 CFF correspond au GID réellement rendu. Les signaux `ToUnicode` et Unicode
 rendu restent conservés dans la preuve. Toute contradiction entre ces signaux
 produit `conflicting` et `non_verifiable` : un nom de glyphe et un GID ne
@@ -128,17 +129,18 @@ devient `missing`, toute substitution, permutation ou information ajoutée
 devient `contradicting`. Une relation MathML non prise en charge ou un ordre
 ambigu produit `not_evaluated` et `non_verifiable`.
 
-L’audit ne génère aucun crop et n’appelle aucun modèle supplémentaire. Il est
-raccordé à Rails après chaque conversion Docling réussie ; son verdict reste
-strictement limité aux régions et relations qu’il peut prouver.
+L’audit source ne génère aucun crop et n’appelle aucun modèle. Après ce verdict,
+les seules régions `contradicted` et entièrement prouvées sont recadrées puis
+proposées à Gemma pour une correction locale ; la proposition n’est conservée
+que si sa signature correspond exactement à la preuve source. L’ensemble est
+raccordé à Rails après chaque conversion Docling réussie.
 
 Le [corpus de qualification mathématique](qualification/math_audit/README.md)
 fige un oracle indépendant, capture une conversion Docling CUDA réelle et
 publie séparément les métriques de détection et de preuve. Son verdict actuel
-est GREEN sur les 53 régions du corpus représentatif : précision, rappel et
-traçabilité valent `1.0`. La preuve sémantique couvre honnêtement 39 régions sur
-53 (`0.735849`) ; les 14 conflits attendus sont tous refusés, sans faux conforme,
-ce qui porte l’exactitude des comportements attendus à `1.0`.
+est GREEN sur les 53 régions du corpus représentatif : précision, rappel,
+traçabilité, couverture sémantique et exactitude valent `1.0`, sans faux
+alignement.
 
 ## Fichiers principaux
 

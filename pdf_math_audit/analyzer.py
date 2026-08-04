@@ -29,7 +29,9 @@ COVERAGE_KEYS = (
     "source_codes",
     "encoding_named",
     "cff_charstrings",
+    "truetype_glyphs",
     "agl_mapped",
+    "source_unicode_mapped",
     "trace_glyphs",
     "gid_matches",
     "rawdict_assignments",
@@ -54,10 +56,15 @@ def _trace_report(page_number: int, trace: PageTrace) -> dict[str, Any]:
         if declared is None:
             continue
         to_unicode_present += 1
-        if declared == glyph["agl_unicode"]:
+        if declared == glyph["source_unicode"]:
             to_unicode_matches += 1
             continue
-        key = (glyph["font_resource"], glyph["code"], declared, glyph["agl_unicode"])
+        key = (
+            glyph["font_resource"],
+            glyph["code"],
+            declared,
+            glyph["source_unicode"],
+        )
         conflict = conflicts.setdefault(
             key,
             {
@@ -68,6 +75,8 @@ def _trace_report(page_number: int, trace: PageTrace) -> dict[str, Any]:
                 "glyph_name": glyph["glyph_name"],
                 "to_unicode": declared,
                 "to_unicode_codepoints": codepoints(declared),
+                "source_unicode": glyph["source_unicode"],
+                "source_unicode_method": glyph["source_unicode_method"],
                 "agl_unicode": glyph["agl_unicode"],
                 "agl_codepoints": glyph["agl_codepoints"],
                 "occurrences": 0,
@@ -79,11 +88,19 @@ def _trace_report(page_number: int, trace: PageTrace) -> dict[str, Any]:
             conflict["operation_indices"].append(glyph["operation_index"])
 
     total = len(trace.glyphs)
+    cff_charstrings = sum(
+        trace.fonts[glyph["font_resource"]].public["subtype"] == "/Type1"
+        for glyph in trace.glyphs
+    )
     coverage = {
         "source_codes": total,
         "encoding_named": total,
-        "cff_charstrings": total,
-        "agl_mapped": total,
+        "cff_charstrings": cff_charstrings,
+        "truetype_glyphs": total - cff_charstrings,
+        "agl_mapped": sum(
+            glyph["source_unicode_method"] == "agl" for glyph in trace.glyphs
+        ),
+        "source_unicode_mapped": total,
         "trace_glyphs": trace.layout["trace_characters"],
         "gid_matches": total,
         "rawdict_assignments": total,
@@ -107,8 +124,15 @@ def _trace_report(page_number: int, trace: PageTrace) -> dict[str, Any]:
         ]
         for glyph in trace.glyphs
     ]
-    return {
-        "status": "traced",
+    status = (
+        "partially_traced"
+        if trace.font_limitations
+        else "traced_with_exclusions"
+        if trace.opaque_regions
+        else "traced"
+    )
+    result = {
+        "status": status,
         "coverage": coverage,
         "sequence_sha256": hashlib.sha256(
             json.dumps(sequence, separators=(",", ":"), ensure_ascii=False).encode()
@@ -122,9 +146,14 @@ def _trace_report(page_number: int, trace: PageTrace) -> dict[str, Any]:
             sorted(Counter(glyph["font_resource"] for glyph in trace.glyphs).items())
         ),
         "fonts": {name: font.public for name, font in trace.fonts.items()},
+        "horizontal_rules": trace.horizontal_rules,
+        "opaque_regions": trace.opaque_regions,
         "to_unicode_conflicts": list(conflicts.values()),
         "glyphs": trace.glyphs,
     }
+    if trace.font_limitations:
+        result["reasons"] = trace.font_limitations
+    return result
 
 
 def _page_report(
@@ -182,26 +211,37 @@ def analyze_pdf(
             if on_progress:
                 on_progress(progress_event("source_analysis", index + 1, total_pages))
 
-    traced_pages = [page for page in pages if page["status"] == "traced"]
+    evidence_pages = [
+        page
+        for page in pages
+        if page["status"]
+        in {"traced", "traced_with_exclusions", "partially_traced"}
+    ]
     conflicts = [
-        conflict for page in traced_pages for conflict in page["to_unicode_conflicts"]
+        conflict for page in evidence_pages for conflict in page["to_unicode_conflicts"]
     ]
     coverage = {
         "pages_total": len(pages),
-        "pages_traced": len(traced_pages),
+        "pages_traced": sum(page["status"] == "traced" for page in pages),
+        "pages_traced_with_exclusions": sum(
+            page["status"] == "traced_with_exclusions" for page in pages
+        ),
+        "pages_partially_traced": sum(
+            page["status"] == "partially_traced" for page in pages
+        ),
         "pages_unsupported": sum(page["status"] == "unsupported" for page in pages),
         "pages_ambiguous": sum(page["status"] == "ambiguous" for page in pages),
     }
     coverage.update(
         {
-            key: sum(page["coverage"][key] for page in traced_pages)
+            key: sum(page["coverage"][key] for page in evidence_pages)
             for key in COVERAGE_KEYS
         }
     )
     return {
         "schema_version": "1.0",
         "analyzer_version": ANALYZER_VERSION,
-        "capability_profile": "type1-cff-v1",
+        "capability_profile": "type1-cff-type0-identity-h-truetype-form-v3",
         "status": "completed",
         "runtime": {
             "python": platform.python_version(),

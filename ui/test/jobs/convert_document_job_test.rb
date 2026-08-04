@@ -21,7 +21,7 @@ class ConvertDocumentJobTest < ActiveJob::TestCase
     assert_equal attempt.conversion_options, client.recorded_options
     assert attempt.started_at
     assert attempt.completed_at
-    qualification = attempt.math_qualification
+    qualification = attempt.current_math_qualification
     assert_predicate qualification, :queued?
     assert_equal attempt.document.source_sha256, qualification.source_sha256
     assert_equal Digest::SHA256.hexdigest(attempt.docling_document.download), qualification.docling_document_sha256
@@ -100,8 +100,8 @@ class ConvertDocumentJobTest < ActiveJob::TestCase
 
     attempt.reload
     assert_predicate attempt, :succeeded?
-    assert_predicate attempt.math_qualification, :failed?
-    assert_equal "enqueue_failed", attempt.math_qualification.error_code
+    assert_predicate attempt.current_math_qualification, :failed?
+    assert_equal "enqueue_failed", attempt.current_math_qualification.error_code
     assert_equal 0, SolidQueue::Job.where(class_name: "QualifyMathJob").count
   end
 
@@ -120,7 +120,7 @@ class ConvertDocumentJobTest < ActiveJob::TestCase
     attempt.reload
     assert_predicate attempt, :failed?
     assert_equal "unexpected_error", attempt.error_code
-    assert_nil attempt.math_qualification
+    assert_nil attempt.current_math_qualification
     assert_equal 0, SolidQueue::Job.where(class_name: "QualifyMathJob").count
     assert_not attempt.docling_document.attached?
   end
@@ -130,12 +130,12 @@ class ConvertDocumentJobTest < ActiveJob::TestCase
     client = FakeClient.new(successful_result)
     job = job_with(client)
     job.perform(attempt)
-    qualification_id = attempt.reload.math_qualification.id
+    qualification_id = attempt.reload.current_math_qualification.id
 
     assert_raises(ConvertDocumentJob::InvalidState) { job.perform(attempt) }
 
     assert_equal 1, client.calls
-    assert_equal qualification_id, attempt.reload.math_qualification.id
+    assert_equal qualification_id, attempt.reload.current_math_qualification.id
     assert_predicate attempt, :succeeded?
   end
 
