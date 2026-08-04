@@ -7,3 +7,8 @@ data/docling_assets/
 data/backups/
 __pycache__/
 *.py[cod]
+
+# Artefacts locaux de développement
+/tmp/
+/package/
+/pdfjs-dist-*.tgz
