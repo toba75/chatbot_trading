@@ -192,6 +192,12 @@ une expression structurée mais que les fragments `$...$` de Docling ne forment
 pas du LaTeX analysable, le candidat est contradictoire. La correction ne devient
 cependant acceptable que si sa séquence et toutes ses relations correspondent
 exactement à cette preuve source ; elle produit alors un unique MathML inline.
+La première proposition est construite de façon déterministe à partir de cette
+séquence et de ces relations. Elle n'est retenue qu'après une nouvelle analyse
+LaTeX qui reproduit exactement la preuve. Si cette sérialisation ressemble à un
+mot éclaté en variables isolées, Gemma doit la confirmer visuellement sans
+recevoir la preuve source. Sa proposition reste soumise à la même égalité de
+jetons et de structure.
 
 Pour relier une formule source à un fragment inline Docling, les provenances
 Docling sont d’abord ramenées dans les coordonnées de la page PDF à partir des
@@ -221,6 +227,12 @@ non ambigus en MathML côté serveur avec `latex2mathml`. Ce post-traitement ne
 s'applique pas aux nœuds déjà typés `formula` par Docling : leur
 sérialisation MathML native reste l'unique autorité de rendu. Un `$` isolé,
 notamment dans une unité monétaire telle que `M$`, reste du texte.
+Quand cette sérialisation contient explicitement un fragment `$...$` dans un
+`mtext`, seul ce fragment est rendu en MathML imbriqué ; l'annotation TeX brute
+reste inchangée et aucun `$` monétaire hors formule n'est interprété.
+Les `&` utilisés par LaTeX pour aligner les colonnes sont retirés de la seule
+présentation MathML ; une `\&` littérale est conservée. Un mélange dont la
+correspondance ne peut pas être établie sans ambiguïté fait échouer l'export.
 Le LaTeX alternatif ajouté par Docling aux formules reste conservé dans un
 `<annotation encoding="TeX">`, replacé sous le conteneur MathML standard
 `<semantics>` afin qu'il ne soit pas rendu comme une seconde formule. Une
@@ -228,15 +240,29 @@ structure d'annotation inattendue fait échouer explicitement l'export.
 Dans une formule de bloc, les limites de `max`, `min`, `arg max` et `arg min`
 sont rendues par `<munder>` : la condition reste centrée sous l'opérateur, sans
 modifier le LaTeX Docling conservé dans l'annotation.
-Une correction visant un élément Docling `formula` n'est applicable que si elle
-remplace la formule entière. Un sous-fragment est rejeté explicitement, car son
-charspan pourrait couper une commande LaTeX. Le document dérivé conserve alors
-la formule native. Pour une correction complète, le LaTeX brut remplace le nœud
-et son `<math>` sérialisé est remplacé en bloc ; aucun marqueur interne ne peut
-devenir du contenu visible. Chaque marqueur temporaire est absent de tout le
-contenu Docling sérialisable et son occurrence HTML doit être unique. Un
-charspan vide, inversé,
-négatif ou hors limites est rejeté avant toute transformation.
+Les régions partielles qui désignent un même élément Docling `formula` sont
+regroupées en une seule cible. La formule complète est validée et remplacée de
+façon atomique : aucune région du groupe ne peut être appliquée seule. La
+transcription visuelle indépendante ne reçoit ni les jetons ni la structure
+source et doit pourtant reproduire exactement cette preuve. Si la formule
+native est déjà prouvée, elle est conservée telle quelle. Sinon, toutes les
+substitutions sont construites puis le LaTeX complet doit être analysable et
+rendu en MathML. Un chevauchement ou une reconstruction incomplète produit
+`full_formula_reconstruction_unproven`, sans document partiellement modifié.
+
+Une région source établie sans candidat Docling reste une cible d'acquisition
+observable, mais elle n'est pas insérée dans le flux visible : aucune position
+Docling ou relation de lecture n'est alors prouvée. Elle est rejetée avec
+`formula_insertion_rendering_unproven`. De même, une cible fusionnée qui
+absorberait du contexte, une correction qui contient de la prose ou un mot
+mathématique sérialisé comme une suite ambiguë de variables est refusée. Une
+commande LaTeX qui subsiste dans le MathML visible fait échouer l'export.
+
+Pour une correction complète, le LaTeX brut remplace le nœud et son `<math>`
+sérialisé est remplacé en bloc ; aucun marqueur interne ne peut devenir du
+contenu visible. Chaque marqueur temporaire est absent de tout le contenu
+Docling sérialisable et son occurrence HTML doit être unique. Un charspan vide,
+inversé, négatif ou hors limites est rejeté avant toute transformation.
 Le `DoclingDocument`, le Markdown et
 les sorties natives conservent leurs chaînes originales. Rails
 conserve séparément le registre, le ZIP des crops/requêtes/réponses, le document
@@ -249,7 +275,7 @@ conservent la resérialisation native paginée et l’HTML natif exact reçu de
 Docling Serve. Toutes les routes conservent leur politique `sandbox` et les
 artefacts bruts restent téléchargeables séparément.
 
-Le contrat v2 et les paramètres `MATH_CORRECTION_ENDPOINT`,
+Le contrat v2.1 et les paramètres `MATH_CORRECTION_ENDPOINT`,
 `MATH_CORRECTION_MODEL`, `MATH_CORRECTION_DPI`,
 `MATH_CORRECTION_PADDING_POINTS`, `MATH_CORRECTION_TIMEOUT_SECONDS` et
 `MATH_CORRECTION_MAX_RESPONSE_BYTES` rendent ce dimensionnement explicite.

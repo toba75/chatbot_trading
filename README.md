@@ -102,8 +102,8 @@ uv run pdf-math-audit document.pdf `
     --docling-document docling-document.json `
     --source-sha256 $pdfSha `
     --docling-document-sha256 $doclingSha `
-    --contract-version 2.0 `
-    --capability-profile pdf-docling-semantic-correction-v2 `
+    --contract-version 2.1 `
+    --capability-profile pdf-docling-semantic-correction-v3 `
     --report audit.json `
     --evidence audit-glyphs.ndjson.gz
 ```

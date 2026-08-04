@@ -76,6 +76,119 @@ def test_conserve_le_tex_dans_une_semantique_mathml_non_visible() -> None:
     assert all("</annotation></semantics></math>" in formula for formula in formulas)
 
 
+def test_rend_le_latex_inline_explicitement_delimite_dans_un_texte_mathml() -> None:
+    latex = r"\begin{cases} 0 & \text{if $z<0$} \\ z & \text{otherwise} \end{cases}"
+    source = convert(latex).replace(
+        "</math>", f'<annotation encoding="TeX">{latex}</annotation></math>'
+    )
+
+    html = _wrap_tex_annotations(source)
+    math = lxml_html.fragment_fromstring(html)
+
+    visible = "".join(math.xpath("./semantics/*[1]")[0].itertext())
+    assert "$" not in visible
+    assert "&" not in visible
+    assert "z<0" in visible
+    assert math.xpath("string(./semantics/annotation)") == latex
+
+
+def test_ne_prend_pas_un_dollar_echappe_pour_un_delimiteur_math() -> None:
+    latex = r"\text{cost \$5 and $x$}"
+    source = convert(latex).replace(
+        "</math>", f'<annotation encoding="TeX">{latex}</annotation></math>'
+    )
+
+    html = _wrap_tex_annotations(source)
+    math = lxml_html.fragment_fromstring(html)
+
+    visible = "".join(math.xpath("./semantics/*[1]")[0].itertext())
+    assert visible.replace("\N{NO-BREAK SPACE}", " ") == "cost $5 and x"
+    assert math.xpath("string(./semantics/annotation)") == latex
+
+
+def test_conserve_une_esperluette_litterale() -> None:
+    latex = r"A \& B"
+    source = convert(latex).replace(
+        "</math>", f'<annotation encoding="TeX">{latex}</annotation></math>'
+    )
+
+    html = _wrap_tex_annotations(source)
+    math = lxml_html.fragment_fromstring(html)
+
+    assert "".join(math.xpath("./semantics/*[1]")[0].itertext()) == "A&B"
+    assert math.xpath("string(./semantics/annotation)") == latex
+
+
+def test_refuse_les_esperluettes_litterales_et_d_alignement_ambigues() -> None:
+    source = (
+        '<math xmlns="http://www.w3.org/1998/Math/MathML">'
+        '<mrow><mi>A</mi><mi>&amp;</mi><mi>B</mi><mi>&amp;</mi><mi>C</mi></mrow>'
+        '<annotation encoding="TeX">A \\&amp; B &amp; C</annotation></math>'
+    )
+
+    with pytest.raises(ValueError, match="littérales et d'alignement ambiguës"):
+        _wrap_tex_annotations(source)
+
+
+def test_distingue_l_alignement_d_une_esperluette_litterale_dans_du_texte() -> None:
+    latex = r"\begin{aligned} a & \text{A \& B} \end{aligned}"
+    source = convert(latex).replace(
+        "</math>", f'<annotation encoding="TeX">{latex}</annotation></math>'
+    )
+
+    html = _wrap_tex_annotations(source)
+    math = lxml_html.fragment_fromstring(html)
+    visible = "".join(math.xpath("./semantics/*[1]")[0].itertext())
+
+    assert visible.count("&") == 1
+    assert "\\" not in visible
+    assert math.xpath("string(./semantics/annotation)") == latex
+
+
+@pytest.mark.parametrize(
+    "latex",
+    [
+        r"\text{see $A \& B$}",
+        r"\begin{aligned} x & \text{see $A \& B$} \end{aligned}",
+    ],
+)
+def test_conserve_une_esperluette_litterale_dans_un_fragment_math(
+    latex: str,
+) -> None:
+    source = convert(latex).replace(
+        "</math>", f'<annotation encoding="TeX">{latex}</annotation></math>'
+    )
+
+    html = _wrap_tex_annotations(source)
+    math = lxml_html.fragment_fromstring(html)
+    visible = "".join(math.xpath("./semantics/*[1]")[0].itertext())
+
+    assert visible.count("&") == 1
+    assert "\\" not in visible
+    assert not math.xpath(".//*[@data-docling-literal-ampersand]")
+    assert math.xpath("string(./semantics/annotation)") == latex
+
+
+def test_distingue_alignement_et_esperluette_dans_un_fragment_imbrique() -> None:
+    nested = r"\begin{aligned} a & \text{A \& B} \end{aligned}"
+    latex = rf"\text{{outer ${nested}$}}"
+    encoded = latex.replace("&", "&amp;")
+    source = (
+        '<math xmlns="http://www.w3.org/1998/Math/MathML"><mrow>'
+        f"<mtext>outer ${nested.replace('&', '&amp;')}$</mtext></mrow>"
+        f'<annotation encoding="TeX">{encoded}</annotation></math>'
+    )
+
+    html = _wrap_tex_annotations(source)
+    math = lxml_html.fragment_fromstring(html)
+    visible = "".join(math.xpath("./semantics/*[1]")[0].itertext())
+
+    assert visible.count("&") == 1
+    assert "\\" not in visible
+    assert not math.xpath(".//*[@data-docling-literal-ampersand]")
+    assert math.xpath("string(./semantics/annotation)") == latex
+
+
 def test_refuse_une_annotation_tex_de_structure_inattendue() -> None:
     malformed = (
         '<math xmlns="http://www.w3.org/1998/Math/MathML">'

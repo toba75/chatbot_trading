@@ -3,10 +3,18 @@ from pathlib import Path
 
 import pytest
 
-from docling_core.types.doc import DoclingDocument, TableCell, TableData
+from docling_core.types.doc import (
+    BoundingBox,
+    CoordOrigin,
+    DoclingDocument,
+    ProvenanceItem,
+    TableCell,
+    TableData,
+)
 
 from pdf_math_audit.correction import CorrectionConfig, correct_document
-from pdf_math_audit.correction_targets import ineligibility
+from pdf_math_audit.correction_application import apply_target, target_ineligibility
+from pdf_math_audit.correction_targets import correction_targets, ineligibility
 from pdf_math_audit.derived_document import (
     derive_document,
     derive_document_and_page_html,
@@ -92,28 +100,40 @@ def test_cree_un_document_derive_sans_modifier_le_document_natif() -> None:
 
     assert result.summary == {
         "status": "corrected",
+        "regions": 1,
         "targets": 1,
         "accepted": 1,
+        "accepted_regions": 1,
         "rejected": 0,
         "failed": 0,
-        "engine": {"model": "gemma", "dpi": 300, "padding_points": 4.0},
+        "engine": {
+            "model": "gemma",
+            "dpi": 300,
+            "padding_points": 4.0,
+            "strategy": "deterministic_source_then_proven_vision",
+            "selected": {"deterministic_source": 1},
+            "vision_calls": 0,
+        },
     }
     assert document.texts[8].text == original_text
     assert document.texts[8].orig == original_orig
     derived = DoclingDocument.model_validate_json(result.document)
-    assert derived.texts[8].text[83 : 83 + len(FORMULA) + 2] == f"${FORMULA}$"
+    records = json.loads(result.records)
+    corrected = records["records"][0]["after"]
+    assert derived.texts[8].text[83 : 83 + len(corrected)] == corrected
     assert derived.texts[8].orig == original_orig
     assert [item.model_dump() for item in derived.texts[8].prov] == original_provenance
     assert result.markdown == derived.export_to_markdown().encode("utf-8")
-    records = json.loads(result.records)
     assert records["records"][0]["before"] == _region()["candidate_text"]
-    assert records["records"][0]["after"] == f"${FORMULA}$"
+    assert records["records"][0]["proposals"][0]["selected_engine"] == (
+        "deterministic_source"
+    )
     mathml = records["records"][0]["mathml"]
     assert mathml.startswith('<math data-correction-id="pdf-source:1:733" ')
     assert 'xmlns="http://www.w3.org/1998/Math/MathML"' in mathml
     assert mathml.encode() in result.html
     assert b"id='page-1'" in result.html
-    assert f"${FORMULA}$".encode() not in result.html
+    assert corrected.encode() not in result.html
     assert b"$^{1}$" not in result.html
     assert b"$^{(2)}$" not in result.html
     assert b"$^{2}$" not in result.html
@@ -148,6 +168,240 @@ def test_refuse_le_remplacement_partiel_d_une_formule_docling() -> None:
     assert ineligibility(region, document) == (
         "formula_partial_replacement_unsupported"
     )
+
+
+def test_regroupe_les_fragments_d_une_formule_en_un_remplacement_atomique() -> None:
+    document = DoclingDocument.model_validate_json(DOCUMENT.read_bytes())
+    node = document.texts[16]
+    first = _region() | {
+        "region_id": "formula:first",
+        "docling_ref": node.self_ref,
+        "candidate_charspan": [0, 1],
+        "candidate_text": node.text[:1],
+        "candidate_format": "latex",
+        "bbox": [10.0, 10.0, 30.0, 30.0],
+        "glyph_sequence_indices": [10],
+    }
+    second = first | {
+        "region_id": "formula:second",
+        "candidate_charspan": [2, 3],
+        "candidate_text": node.text[2:3],
+        "glyph_sequence_indices": [20],
+    }
+
+    targets, region_count = correction_targets([first, second], document)
+
+    assert region_count == 2
+    assert len(targets) == 1
+    assert targets[0]["kind"] == "formula_replacement"
+    assert targets[0]["candidate_charspan"] == [0, len(node.text)]
+    assert targets[0]["candidate_text"] == node.text
+    assert [item["region_id"] for item in targets[0]["regions"]] == [
+        "formula:first",
+        "formula:second",
+    ]
+
+
+def test_regroupe_une_region_complete_et_un_fragment_de_la_meme_formule() -> None:
+    document = DoclingDocument.model_validate_json(DOCUMENT.read_bytes())
+    node = document.texts[16]
+    fragment = _region() | {
+        "region_id": "formula:fragment",
+        "docling_ref": node.self_ref,
+        "candidate_charspan": [0, 1],
+        "candidate_text": node.text[:1],
+        "candidate_format": "latex",
+        "glyph_sequence_indices": [10],
+    }
+    complete = fragment | {
+        "region_id": "formula:complete",
+        "candidate_charspan": [0, len(node.text)],
+        "candidate_text": node.text,
+        "glyph_sequence_indices": [20],
+    }
+
+    targets, _region_count = correction_targets([fragment, complete], document)
+
+    assert len(targets) == 1
+    assert targets[0]["kind"] == "formula_replacement"
+    assert {region["region_id"] for region in targets[0]["regions"]} == {
+        "formula:fragment",
+        "formula:complete",
+    }
+
+
+def test_classe_une_formule_complete_comme_remplacement_de_formule() -> None:
+    document = DoclingDocument.model_validate_json(DOCUMENT.read_bytes())
+    node = document.texts[16]
+    complete = _region() | {
+        "region_id": "formula:complete",
+        "docling_ref": node.self_ref,
+        "candidate_charspan": [0, len(node.text)],
+        "candidate_text": node.text,
+        "candidate_format": "latex",
+        "glyph_sequence_indices": [10],
+    }
+
+    targets, _region_count = correction_targets([complete], document)
+
+    assert len(targets) == 1
+    assert targets[0]["kind"] == "formula_replacement"
+
+
+def test_refuse_deux_preuves_source_superposees_dans_une_formule() -> None:
+    document = DoclingDocument.model_validate_json(DOCUMENT.read_bytes())
+    node = document.texts[16]
+    first = _region() | {
+        "region_id": "formula:first",
+        "docling_ref": node.self_ref,
+        "candidate_charspan": [0, 1],
+        "candidate_text": node.text[:1],
+        "candidate_format": "latex",
+        "glyph_sequence_indices": [10],
+    }
+    second = first | {
+        "region_id": "formula:second",
+        "candidate_charspan": [2, 3],
+        "candidate_text": node.text[2:3],
+    }
+    targets, _region_count = correction_targets([first, second], document)
+
+    assert target_ineligibility(targets[0], document) == "source_loci_overlap"
+
+
+def test_un_locus_invalide_bloque_toute_la_formule() -> None:
+    document = DoclingDocument.model_validate_json(DOCUMENT.read_bytes())
+    node = document.texts[16]
+    valid = _region() | {
+        "region_id": "formula:valid",
+        "docling_ref": node.self_ref,
+        "candidate_charspan": [0, 1],
+        "candidate_text": node.text[:1],
+        "candidate_format": "latex",
+        "glyph_sequence_indices": [10],
+    }
+    invalid = valid | {
+        "region_id": "formula:invalid",
+        "candidate_charspan": None,
+        "candidate_text": "",
+        "glyph_sequence_indices": [20],
+    }
+
+    targets, _region_count = correction_targets([valid, invalid], document)
+
+    assert len(targets) == 1
+    assert targets[0]["kind"] == "formula_replacement"
+    assert target_ineligibility(targets[0], document) == (
+        "candidate_charspan_missing"
+    )
+
+
+def test_remplace_atomiquement_une_formule_complete_prouvee() -> None:
+    target = {
+        "target_id": "formula:complete",
+        "kind": "formula_replacement",
+        "candidate_text": "x - z + y",
+        "regions": [
+            {
+                "candidate_charspan": [0, 9],
+                "candidate_text": "x - z + y",
+                "source_canonical_tokens": ["x", "+", "y"],
+                "source_relation_signature": ["x", "+", "y"],
+            },
+        ],
+    }
+
+    after, mathml = apply_target(target, ["x + y"])
+
+    assert after == "x + y"
+    assert 'display="block"' in mathml
+
+
+def test_refuse_une_formule_dont_des_jetons_ne_sont_pas_prouves() -> None:
+    target = {
+        "target_id": "formula:complete",
+        "kind": "formula_replacement",
+        "candidate_text": "x - z + y",
+        "regions": [
+            {
+                "candidate_charspan": [0, 1],
+                "candidate_text": "x",
+                "source_canonical_tokens": ["x"],
+                "source_relation_signature": ["x"],
+            },
+            {
+                "candidate_charspan": [8, 9],
+                "candidate_text": "y",
+                "source_canonical_tokens": ["y"],
+                "source_relation_signature": ["y"],
+            },
+        ],
+    }
+
+    with pytest.raises(ValueError, match="full_formula_reconstruction_unproven"):
+        apply_target(target, ["x", "y"])
+
+
+def test_ne_confond_pas_deux_occurrences_identiques_dans_une_formule() -> None:
+    target = {
+        "target_id": "formula:ambiguous",
+        "kind": "formula_replacement",
+        "candidate_text": "x + x",
+        "regions": [
+            {
+                "candidate_charspan": [0, 5],
+                "candidate_text": "x + x",
+                "source_canonical_tokens": ["x"],
+                "source_relation_signature": ["x"],
+            }
+        ],
+    }
+
+    after, _mathml = apply_target(target, ["x"])
+
+    assert after == "x"
+
+
+def test_regroupe_deux_loci_chevauches_si_leurs_sources_sont_distinctes() -> None:
+    document = DoclingDocument.model_validate_json(DOCUMENT.read_bytes())
+    first = _region() | {
+        "region_id": "overlap:first",
+        "candidate_charspan": [80, 100],
+        "candidate_text": document.texts[8].text[80:100],
+        "glyph_sequence_indices": [10, 11],
+    }
+    second = first | {
+        "region_id": "overlap:second",
+        "candidate_charspan": [95, 110],
+        "candidate_text": document.texts[8].text[95:110],
+        "glyph_sequence_indices": [12, 13],
+    }
+
+    targets, region_count = correction_targets([first, second], document)
+
+    assert region_count == 2
+    assert len(targets) == 1
+    assert targets[0]["kind"] == "merged_replacement"
+    assert targets[0]["candidate_charspan"] == [80, 110]
+
+
+def test_ajoute_une_region_sans_candidat_aux_cibles_d_acquisition() -> None:
+    document = DoclingDocument.model_validate_json(DOCUMENT.read_bytes())
+    missing = _region() | {
+        "verdict": "non_verifiable",
+        "docling_ref": None,
+        "candidate_charspan": None,
+        "candidate_text": "",
+        "candidate_format": None,
+        "candidate_link_status": "not_linked",
+        "candidate_link_reason": {"code": "docling_text_container_missing"},
+        "glyph_sequence_indices": [10],
+    }
+
+    targets, region_count = correction_targets([missing], document)
+
+    assert region_count == 1
+    assert targets[0]["kind"] == "formula_insertion"
 
 
 @pytest.mark.parametrize("span", [[-1, 3], [3, 3], [5, 3], [0, 10_000]])
@@ -222,6 +476,7 @@ def test_le_registre_d_une_formule_complete_conserve_le_latex_brut() -> None:
         "source_relation_signature": signature,
         "source_relations": [],
         "source_relation_reason": None,
+        "glyph_sequence_indices": [10],
     }
 
     result = correct_document(
@@ -291,8 +546,14 @@ def test_ne_retraite_pas_le_latex_inline_d_un_noeud_formule() -> None:
     assert b'<annotation encoding="TeX">' in html
 
 
-def test_rejette_une_proposition_non_prouvee_sans_produire_de_document() -> None:
+def test_rejette_une_proposition_non_prouvee_sans_produire_de_document(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     document = DoclingDocument.model_validate_json(DOCUMENT.read_bytes())
+    monkeypatch.setattr(
+        "pdf_math_audit.correction_proposals.proven_source_latex",
+        lambda _region: (None, "forced_model_path"),
+    )
 
     result = correct_document(
         PDF,
@@ -309,8 +570,14 @@ def test_rejette_une_proposition_non_prouvee_sans_produire_de_document() -> None
     )
 
 
-def test_rejette_une_relation_fausse_meme_si_les_symboles_sont_identiques() -> None:
+def test_rejette_une_relation_fausse_meme_si_les_symboles_sont_identiques(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     document = DoclingDocument.model_validate_json(DOCUMENT.read_bytes())
+    monkeypatch.setattr(
+        "pdf_math_audit.correction_proposals.proven_source_latex",
+        lambda _region: (None, "forced_model_path"),
+    )
     wrong_relation = r"\{(\mathbf{x}^i,y_i)\}_{i=1}^{N}"
 
     result = correct_document(
@@ -328,8 +595,14 @@ def test_rejette_une_relation_fausse_meme_si_les_symboles_sont_identiques() -> N
     assert result.document is None
 
 
-def test_rejette_la_perte_du_gras_meme_si_les_symboles_sont_identiques() -> None:
+def test_rejette_la_perte_du_gras_meme_si_les_symboles_sont_identiques(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     document = DoclingDocument.model_validate_json(DOCUMENT.read_bytes())
+    monkeypatch.setattr(
+        "pdf_math_audit.correction_proposals.proven_source_latex",
+        lambda _region: (None, "forced_model_path"),
+    )
     without_bold = r"\{(x_i,y_i)\}_{i=1}^{N}"
 
     result = correct_document(
@@ -346,8 +619,14 @@ def test_rejette_la_perte_du_gras_meme_si_les_symboles_sont_identiques() -> None
     assert record["status"] == "rejected"
 
 
-def test_signale_explicitement_un_service_de_proposition_indisponible() -> None:
+def test_signale_explicitement_un_service_de_proposition_indisponible(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     document = DoclingDocument.model_validate_json(DOCUMENT.read_bytes())
+    monkeypatch.setattr(
+        "pdf_math_audit.correction_proposals.proven_source_latex",
+        lambda _region: (None, "forced_model_path"),
+    )
 
     def unavailable(**_arguments: object) -> Proposal:
         raise ProposalError("indisponible", request={"request": True}, response=b"brut")
@@ -366,8 +645,13 @@ def test_signale_explicitement_un_service_de_proposition_indisponible() -> None:
 
 def test_checkpoint_chaque_proposition_avant_la_fin_du_traitement(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     document = DoclingDocument.model_validate_json(DOCUMENT.read_bytes())
+    monkeypatch.setattr(
+        "pdf_math_audit.correction_proposals.proven_source_latex",
+        lambda _region: (None, "forced_model_path"),
+    )
     records = tmp_path / "records.ndjson"
     evidence = tmp_path / "evidence"
 
@@ -389,9 +673,10 @@ def test_checkpoint_chaque_proposition_avant_la_fin_du_traitement(
     assert (evidence / "pdf-source_1_733" / "response.json").is_file()
 
 
-def test_refuse_deux_loci_qui_se_chevauchent_avant_tout_appel_modele() -> None:
+def test_refuse_deux_preuves_source_qui_se_chevauchent_avant_tout_appel_modele() -> None:
     document = DoclingDocument.model_validate_json(DOCUMENT.read_bytes())
-    second = _region() | {"region_id": "pdf-source:1:734"}
+    first = _region() | {"glyph_sequence_indices": [10]}
+    second = first | {"region_id": "pdf-source:1:734"}
     calls = 0
 
     def unexpected(**_arguments: object) -> Proposal:
@@ -400,12 +685,159 @@ def test_refuse_deux_loci_qui_se_chevauchent_avant_tout_appel_modele() -> None:
         return _proposal()
 
     result = correct_document(
-        PDF, document, [_region(), second], _config(), proposal_client=unexpected
+        PDF, document, [first, second], _config(), proposal_client=unexpected
     )
 
     assert calls == 0
-    assert result.summary["rejected"] == 2
-    assert {record["reason"] for record in json.loads(result.records)["records"]} == {
-        "candidate_loci_overlap"
-    }
+    assert result.summary["targets"] == 1
+    assert result.summary["rejected"] == 1
+    assert json.loads(result.records)["records"][0]["reason"] == (
+        "source_loci_overlap"
+    )
     assert result.document is None
+
+
+def test_refuse_une_formule_absente_sans_ancrage_de_rendu_prouve() -> None:
+    document = DoclingDocument.model_validate_json(DOCUMENT.read_bytes())
+    picture = document.add_picture(
+        prov=ProvenanceItem(
+            page_no=1,
+            bbox=BoundingBox(
+                l=0,
+                t=0,
+                r=40,
+                b=40,
+                coord_origin=CoordOrigin.TOPLEFT,
+            ),
+            charspan=(0, 0),
+        )
+    )
+    calls = 0
+    region = {
+        "region_id": "missing:formula",
+        "page": 1,
+        "bbox": [10.0, 10.0, 30.0, 30.0],
+        "glyph_sequence_indices": [1],
+        "docling_ref": picture.self_ref,
+        "candidate_source_kind": "picture",
+        "candidate_text": "",
+        "candidate_format": None,
+        "candidate_charspan": None,
+        "candidate_link_status": "not_linked",
+        "candidate_link_reason": {"code": "docling_picture_candidate_missing"},
+        "status": "traced",
+        "semantic_status": "established",
+        "verdict": "non_verifiable",
+        "source_canonical_tokens": ["x"],
+        "source_relation_signature": ["x"],
+        "source_relations": [],
+        "source_relation_reason": None,
+    }
+
+    def vision(**arguments: object) -> Proposal:
+        nonlocal calls
+        calls += 1
+        return Proposal("x", {}, {})
+
+    result = correct_document(
+        PDF, document, [region], _config(), proposal_client=vision
+    )
+
+    assert calls == 0
+    assert result.summary["accepted"] == 0
+    assert result.summary["rejected"] == 1
+    assert result.summary["engine"]["vision_calls"] == 0
+    assert result.document is None
+    record = json.loads(result.records)["records"][0]
+    assert record["kind"] == "formula_insertion"
+    assert record["reason"] == "formula_insertion_rendering_unproven"
+
+
+def test_refuse_une_cible_qui_absorbe_un_connecteur_de_prose() -> None:
+    document = DoclingDocument.model_validate_json(DOCUMENT.read_bytes())
+    target = {
+        "kind": "replacement",
+        "candidate_format": "mixed_text",
+        "candidate_text": "S if x$_{i}$",
+        "regions": [],
+    }
+
+    assert target_ineligibility(target, document) == "candidate_contains_prose"
+
+
+def test_refuse_generiquement_une_cible_qui_absorbe_de_la_prose() -> None:
+    document = DoclingDocument.model_validate_json(DOCUMENT.read_bytes())
+    target = {
+        "kind": "replacement",
+        "candidate_format": "mixed_text",
+        "candidate_text": "real-valued vector w",
+        "regions": [],
+    }
+
+    assert target_ineligibility(target, document) == "candidate_contains_prose"
+
+
+def test_refuse_un_mot_serialise_comme_une_suite_de_variables() -> None:
+    target = {
+        "target_id": "unsafe-word",
+        "kind": "replacement",
+        "candidate_format": "mixed_text",
+    }
+
+    with pytest.raises(ValueError, match="mathematical_text_grouping_unproven"):
+        apply_target(target, ["d e n s i t y"])
+
+
+def test_normalise_arg_vers_une_commande_rendue() -> None:
+    target = {
+        "target_id": "arg-max",
+        "kind": "replacement",
+        "candidate_format": "latex",
+    }
+
+    after, mathml = apply_target(target, [r"\arg \max_{x}"])
+
+    assert after == r"\operatorname{arg} \max_{x}"
+    assert "<mo>arg</mo>" in mathml
+    assert r"<mi>\arg</mi>" not in mathml
+
+
+def test_exige_la_vision_independante_pour_une_formule_complete() -> None:
+    document = DoclingDocument.model_validate_json(DOCUMENT.read_bytes())
+    node = document.texts[16]
+    tokens, token_reason = candidate_tokens(node.text, "latex")
+    signature, signature_reason = candidate_signature(node.text)
+    assert token_reason is None
+    assert signature_reason is None
+    region = _region() | {
+        "region_id": "formula:complete",
+        "docling_ref": node.self_ref,
+        "candidate_charspan": [0, len(node.text)],
+        "candidate_text": node.text,
+        "candidate_format": "latex",
+        "bbox": [10.0, 10.0, 30.0, 30.0],
+        "glyph_sequence_indices": [10],
+        "source_canonical_tokens": tokens,
+        "source_relation_signature": signature,
+    }
+    calls = 0
+
+    def vision(**_arguments: object) -> Proposal:
+        nonlocal calls
+        calls += 1
+        return Proposal(node.text, {}, {})
+
+    result = correct_document(
+        PDF, document, [region], _config(), proposal_client=vision
+    )
+
+    records = json.loads(result.records)["records"]
+    assert calls == 1, records
+    assert result.summary["accepted"] == 1
+    assert result.summary["engine"]["vision_calls"] == 1
+    record = records[0]
+    assert record["kind"] == "formula_replacement"
+    assert record["proposals"][0]["selected_engine"] == (
+        "vision_proven_by_source"
+    )
+    assert record["proposals"][0]["vision_confirmation"] == "exact"

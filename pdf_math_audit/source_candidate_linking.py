@@ -5,6 +5,7 @@ from typing import Any
 from docling_core.types.doc import DocItemLabel, DoclingDocument
 
 from pdf_math_audit.geometry import contains_center
+from pdf_math_audit.latex_boundaries import expanded_latex_locus
 from pdf_math_audit.text_alignment import (
     document_characters,
     matching_positions,
@@ -66,99 +67,6 @@ def _containers(
             <= box[3]
         )
     ]
-
-
-def _expanded_latex_command(text: str, start: int, end: int) -> tuple[int, int]:
-    for position in {start, end - 1}:
-        if 0 <= position < len(text) and text[position] == "\\":
-            command_end = position + 1
-            while command_end < len(text) and text[command_end].isalpha():
-                command_end += 1
-            end = max(end, command_end)
-    balance = text[start:end].count("{") - text[start:end].count("}")
-    while balance > 0 and end < len(text):
-        if text[end] == "{":
-            balance += 1
-        elif text[end] == "}":
-            balance -= 1
-        end += 1
-    return start, end
-
-
-_STRUCTURAL_WRAPPERS = {
-    "bar",
-    "boldsymbol",
-    "hat",
-    "mathbb",
-    "mathbf",
-    "mathcal",
-    "mathit",
-    "mathrm",
-    "mathsf",
-    "mathtt",
-    "overline",
-    "text",
-    "underline",
-    "vec",
-}
-
-
-def _expanded_latex_wrapper(text: str, start: int, end: int) -> tuple[int, int]:
-    while start > 0:
-        opening = start - 1
-        while opening >= 0 and text[opening].isspace():
-            opening -= 1
-        if opening < 0 or text[opening] != "{":
-            break
-        command_end = opening
-        while command_end > 0 and text[command_end - 1].isspace():
-            command_end -= 1
-        command_start = command_end
-        while command_start > 0 and text[command_start - 1].isalpha():
-            command_start -= 1
-        if command_start == 0 or text[command_start - 1] != "\\":
-            break
-        command_start -= 1
-        if text[command_start + 1 : command_end] not in _STRUCTURAL_WRAPPERS:
-            break
-
-        depth = 1
-        closing = opening + 1
-        while closing < len(text) and depth:
-            if text[closing] == "{":
-                depth += 1
-            elif text[closing] == "}":
-                depth -= 1
-            closing += 1
-        if depth or end > closing:
-            break
-        start, end = command_start, closing
-    return start, end
-
-
-def _expanded_delimiters(
-    text: str, start: int, end: int, source_text: str
-) -> tuple[int, int]:
-    if text[:start].count("$") % 2:
-        start = text.rfind("$", 0, start)
-    if text[start:end].count("$") % 2:
-        closing = text.find("$", end)
-        if closing >= 0:
-            end = closing + 1
-    pairs = {"{": "}", "[": "]"}
-    if source_text[:1] in pairs:
-        before = start - 1
-        while before >= 0 and text[before].isspace():
-            before -= 1
-        if before >= 0 and text[before] == source_text[0]:
-            start = before
-    if source_text[-1:] in pairs.values():
-        after = end
-        while after < len(text) and text[after].isspace():
-            after += 1
-        if after < len(text) and text[after] == source_text[-1]:
-            end = after + 1
-    return start, end
 
 
 def _candidate_format(item: Any) -> str:
@@ -281,9 +189,7 @@ def _linked(
         }
     original_positions = [document_mapping[position][1] for position in document_positions]
     start, end = min(original_positions), max(original_positions) + 1
-    start, end = _expanded_latex_command(item.text, start, end)
-    start, end = _expanded_latex_wrapper(item.text, start, end)
-    start, end = _expanded_delimiters(
+    start, end = expanded_latex_locus(
         item.text, start, end, region["source_glyph_text"]
     )
     return region | {

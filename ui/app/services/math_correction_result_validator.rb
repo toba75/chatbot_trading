@@ -26,12 +26,13 @@ class MathCorrectionResultValidator
 
   def correction_counts(correction)
     reject! unless correction.is_a?(Hash)
-    counts = %w[targets accepted rejected failed].to_h do |name|
+    counts = %w[regions targets accepted accepted_regions rejected failed].to_h do |name|
       value = correction[name]
       reject! unless value.is_a?(Integer) && value >= 0
       [ name, value ]
     end
     reject! unless counts.fetch("targets") == counts.values_at("accepted", "rejected", "failed").sum
+    reject! if counts.fetch("accepted_regions") > counts.fetch("regions")
     counts
   end
 
@@ -73,15 +74,22 @@ class MathCorrectionResultValidator
     records = payload["records"]
     reject! unless records.is_a?(Array) && records.all? { |record| record.is_a?(Hash) }
     reject! unless records.size == counts.fetch("targets")
-    reject! unless records.map { |record| record["region_id"] }.sort == target_region_ids.sort
+    record_region_ids = records.flat_map { |record| record["region_ids"] }
+    reject! unless record_region_ids.uniq.size == record_region_ids.size
+    reject! unless record_region_ids.sort == target_region_ids.sort
+    reject! unless counts.fetch("regions") == target_region_ids.size
     reject! unless records.all? { |record| valid_record?(record) }
     tallies = records.map { |record| record["status"] }.tally
     %w[accepted rejected failed].each do |status|
       reject! unless tallies.fetch(status, 0) == counts.fetch(status)
     end
+    accepted_regions = records.sum do |record|
+      record["status"] == "accepted" ? record["region_ids"].size : 0
+    end
+    reject! unless accepted_regions == counts.fetch("accepted_regions")
     summary = payload["summary"]
     valid_summary = summary.is_a?(Hash) &&
-      %w[status targets accepted rejected failed].all? do |name|
+      %w[status regions targets accepted accepted_regions rejected failed].all? do |name|
         summary[name] == (name == "status" ? expected_status(counts) : counts.fetch(name))
       end
     reject! unless valid_summary
@@ -89,20 +97,93 @@ class MathCorrectionResultValidator
   end
 
   def valid_record?(record)
-    return false unless record["region_id"].is_a?(String)
+    return false unless record["target_id"].is_a?(String)
+    return false unless record["region_ids"].is_a?(Array) && record["region_ids"].any?
+    return false unless record["region_ids"].all? { |identifier| identifier.is_a?(String) }
+    return false unless record["region_id"] == record["region_ids"].first
     return record["reason"].is_a?(String) if %w[rejected failed].include?(record["status"])
     return false unless record["status"] == "accepted"
 
-    record["page"].is_a?(Integer) && record["page"].positive? &&
-      record["docling_ref"].is_a?(String) &&
+    valid_accepted_record?(record)
+  end
+
+  def valid_accepted_record?(record)
+    return false unless record["page"].is_a?(Integer) && record["page"].positive?
+    return false unless record["after"].is_a?(String)
+    return false unless record["mathml"].is_a?(String) && record["mathml"].start_with?("<math ")
+    return false unless valid_source_proofs?(record) && valid_proposals?(record)
+    return false if record["kind"] == "formula_insertion"
+    return false unless valid_formula_replacement_output?(record)
+
+    record["docling_ref"].is_a?(String) &&
       record["charspan"].is_a?(Array) && record["charspan"].size == 2 &&
       record["charspan"].all? { |value| value.is_a?(Integer) } &&
-      record["before"].is_a?(String) && record["after"].is_a?(String) &&
-      record["mathml"].is_a?(String) && record["mathml"].start_with?("<math ") &&
-      record["proposal"].is_a?(String) &&
-      record["proposal_tokens"] == record["source_tokens"] &&
-      record["proposal_signature"] == record["source_signature"] &&
-      record["crop_sha256"].is_a?(String) && record["crop_sha256"].match?(/\A[0-9a-f]{64}\z/)
+      record["before"].is_a?(String)
+  end
+
+  def valid_source_proofs?(record)
+    proofs = record["source_proofs"]
+    proofs.is_a?(Array) && proofs.size == record["region_ids"].size &&
+      proofs.map { |proof| proof["region_id"] } == record["region_ids"] &&
+      proofs.all? do |proof|
+        proof["tokens"].is_a?(Array) && proof["signature"].is_a?(Array)
+      end
+  end
+
+  def valid_proposals?(record)
+    proposals = record["proposals"]
+    proposals.is_a?(Array) && proposals.size == record["region_ids"].size &&
+      proposals.zip(record["source_proofs"]).all? do |proposal, proof|
+        proposal["selected_engine"].is_a?(String) &&
+          proposal["proposal_tokens"] == proof["tokens"] &&
+          proposal["proposal_signature"] == proof["signature"] &&
+          valid_vision_evidence?(
+            proposal,
+            proof: proof,
+            required: record["kind"] == "formula_replacement"
+          )
+      end
+  end
+
+  def valid_vision_evidence?(proposal, proof:, required:)
+    return false if required && !proposal.key?("vision_proposal")
+    return true unless proposal.key?("vision_proposal")
+
+    proposal["selected_engine"] == "vision_proven_by_source" &&
+      proposal["vision_proposal"].is_a?(String) && proposal["vision_proposal"].present? &&
+      proposal["vision_proposal_tokens"] == proof["tokens"] &&
+      proposal["vision_proposal_signature"] == proof["signature"] &&
+      proposal["crop_sha256"].is_a?(String) &&
+      proposal["crop_sha256"].match?(/\A[0-9a-f]{64}\z/) &&
+      proposal["vision_confirmation"] == "exact"
+  end
+
+  def valid_formula_replacement_output?(record)
+    return true unless record["kind"] == "formula_replacement"
+
+    replacements = record["source_proofs"].zip(record["proposals"]).map do |proof, proposal|
+      span = proof["candidate_charspan"]
+      return false unless span.is_a?(Array) && span.size == 2
+      return false unless span.all? { |value| value.is_a?(Integer) }
+      return false unless proof["candidate_text"].is_a?(String)
+
+      [ span, proof["candidate_text"], normalized_latex(proposal["vision_proposal"]) ]
+    end.sort_by { |span, _before, _after| span.first }
+    return false if replacements.each_cons(2).any? { |left, right| left.first.last > right.first.first }
+
+    reconstructed = record["before"].dup
+    replacements.reverse_each do |span, before, after|
+      start, finish = span
+      return false unless 0 <= start && start < finish && finish <= reconstructed.length
+      return false unless reconstructed[start...finish] == before
+
+      reconstructed[start...finish] = after
+    end
+    reconstructed == record["after"]
+  end
+
+  def normalized_latex(latex)
+    latex.gsub(/\\arg\b/, "\\operatorname{arg}")
   end
 
   def validate_derived_outputs(counts, records)
@@ -129,6 +210,13 @@ class MathCorrectionResultValidator
     reject! unless page_numbers&.all? && page_numbers.uniq.size == page_numbers.size
 
     html = Nokogiri::HTML5.parse(@result.derived_html)
+    visible_math = html.css("math").flat_map do |math|
+      math.xpath(
+        ".//text()[not(ancestor::*[local-name()='annotation'])]"
+      ).map(&:text)
+    end.join
+    reject! if visible_math.match?(/\\[A-Za-z]+/)
+
     pages = html.css("div.page[id]")
     html_page_numbers = pages.filter_map do |page|
       match = /\Apage-(\d+)\z/.match(page["id"])
@@ -138,11 +226,11 @@ class MathCorrectionResultValidator
 
     correction_nodes = html.css("math[data-correction-id]")
     reject! unless correction_nodes.map { |math| math["data-correction-id"] }.sort ==
-      accepted.map { |record| record.fetch("region_id") }.sort
+      accepted.map { |record| record.fetch("target_id") }.sort
 
     accepted.each do |record|
       matches = correction_nodes.select do |math|
-        math["data-correction-id"] == record.fetch("region_id")
+        math["data-correction-id"] == record.fetch("target_id")
       end
       reject! unless matches.one?
 

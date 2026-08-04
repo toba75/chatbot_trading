@@ -245,8 +245,10 @@ def main() -> int:
     else:
         report["correction"] = {
             "status": "not_requested",
+            "regions": 0,
             "targets": 0,
             "accepted": 0,
+            "accepted_regions": 0,
             "rejected": 0,
             "failed": 0,
             "artifacts": {},

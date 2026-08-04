@@ -32,9 +32,9 @@ def _contract_arguments(pdf_path: Path, docling_bytes: bytes) -> list[str]:
         "--docling-document-sha256",
         hashlib.sha256(docling_bytes).hexdigest(),
         "--contract-version",
-        "2.0",
+        "2.1",
         "--capability-profile",
-        "pdf-docling-semantic-correction-v2",
+        "pdf-docling-semantic-correction-v3",
     ]
 
 
@@ -111,9 +111,9 @@ def test_cli_ecrit_le_rapport_et_publie_la_progression(tmp_path: Path) -> None:
         "version": "1.10.0",
     }
     assert report["contract"] == {
-        "version": "2.0",
-        "analyzer_version": "0.5.25",
-        "capability_profile": "pdf-docling-semantic-correction-v2",
+        "version": "2.1",
+        "analyzer_version": "0.6.1",
+        "capability_profile": "pdf-docling-semantic-correction-v3",
         "source_sha256": hashlib.sha256(pdf_path.read_bytes()).hexdigest(),
         "docling_document_sha256": hashlib.sha256(docling_bytes).hexdigest(),
     }

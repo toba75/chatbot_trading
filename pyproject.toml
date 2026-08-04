@@ -1,6 +1,6 @@
 [project]
 name = "chatbot-trading"
-version = "0.5.25"
+version = "0.6.1"
 description = "Pipeline documentaire minimal fondé sur Docling"
 requires-python = "==3.12.8"
 dependencies = [
@@ -9,6 +9,7 @@ dependencies = [
     "fonttools==4.60.1",
     "latex2mathml==3.81.0",
     "lxml==6.1.1",
+    "pylatexenc==2.10",
     "pymupdf==1.27.2.2",
     "pypdf==6.10.2",
     "python-multipart>=0.0.32",

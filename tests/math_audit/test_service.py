@@ -131,8 +131,8 @@ def _request(client: TestClient) -> Any:
         data={
             "source_sha256": hashlib.sha256(PDF).hexdigest(),
             "docling_document_sha256": hashlib.sha256(DOCUMENT).hexdigest(),
-            "contract_version": "2.0",
-            "capability_profile": "pdf-docling-semantic-correction-v2",
+            "contract_version": "2.1",
+            "capability_profile": "pdf-docling-semantic-correction-v3",
         },
     )
 
@@ -388,8 +388,8 @@ def _request_arguments() -> dict[str, Any]:
         "data": {
             "source_sha256": hashlib.sha256(PDF).hexdigest(),
             "docling_document_sha256": hashlib.sha256(DOCUMENT).hexdigest(),
-            "contract_version": "2.0",
-            "capability_profile": "pdf-docling-semantic-correction-v2",
+            "contract_version": "2.1",
+            "capability_profile": "pdf-docling-semantic-correction-v3",
         },
     }
 

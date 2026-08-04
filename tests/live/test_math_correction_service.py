@@ -88,7 +88,56 @@ def test_service_produit_et_prouve_un_docling_document_derive() -> None:
 
     report = json.loads(artifacts["report"])
     assert report["correction"]["status"] == "corrected"
-    assert report["correction"]["accepted"] == 1
+    assert report["correction"]["accepted"] > 0
+    assert report["correction"]["accepted_regions"] >= report["correction"]["accepted"]
+    corrections = json.loads(artifacts["corrections"])
+    expected_statuses = {
+        **{f"pdf-source:1:{suffix}": "accepted" for suffix in (
+            733, 758, 925, 955, 1081, 1230, 1266, 1273, 1317, 1804
+        )},
+        **{f"pdf-source:2:{suffix}": "accepted" for suffix in (
+            376, 423, 481, 557, 823, 840, 1068, 1073, 1088, 1154, 1173,
+            1344, 1355, 1468, 1724, 1737
+        )},
+        "pdf-source:2:449": "rejected",
+        "pdf-source:2:474": "rejected",
+        "pdf-source:2:1840": "rejected",
+        "pdf-source:2:1859": "rejected",
+    }
+    assert {
+        record["target_id"]: record["status"] for record in corrections["records"]
+    } == expected_statuses
+    assert report["correction"] | {"artifacts": None, "engine": None} == {
+        "status": "corrected",
+        "regions": 30,
+        "targets": 30,
+        "accepted": 26,
+        "accepted_regions": 26,
+        "rejected": 4,
+        "failed": 0,
+        "artifacts": None,
+        "engine": None,
+    }
+    assert report["correction"]["engine"]["selected"] == {
+        "deterministic_source": 24,
+        "vision_proven_by_source": 2,
+    }
+    assert report["correction"]["engine"]["vision_calls"] == 3
+    formula_records = [
+        record
+        for record in corrections["records"]
+        if record["status"] == "accepted"
+        and record["kind"] == "formula_replacement"
+    ]
+    assert formula_records
+    assert all(
+        proposal.get("vision_confirmation") == "exact"
+        for record in formula_records
+        for proposal in record["proposals"]
+    )
+    assert report["correction"]["engine"]["vision_calls"] >= sum(
+        len(record["proposals"]) for record in formula_records
+    )
     assert set(artifacts) == {
         "evidence",
         "corrections",

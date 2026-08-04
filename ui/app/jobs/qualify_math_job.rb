@@ -166,7 +166,11 @@ class QualifyMathJob < ApplicationJob
       "page_exclusions" => pages.filter_map { |page| page_exclusion(page, result) }
     }
     target_region_ids = regions_detail.filter_map do |region|
-      region["region_id"] if region["verdict"] == "contradicted"
+      missing_candidate = %w[
+        docling_picture_candidate_missing
+        docling_text_container_missing
+      ].include?(region.dig("candidate_link_reason", "code"))
+      region["region_id"] if region["verdict"] == "contradicted" || missing_candidate
     end
     summary["correction"] = correction_summary(
       report["correction"],
@@ -174,7 +178,6 @@ class QualifyMathJob < ApplicationJob
       target_region_ids: target_region_ids,
       native_document: qualification.conversion_attempt.docling_document.download
     )
-    invalid_report!(result) unless summary.dig("correction", "targets") == summary.fetch("contradicted")
     invalid_report!(result) unless summary.dig("coverage", "pages_total") == pages.size
     page_statuses = {
       "traced" => "pages_traced",

@@ -353,3 +353,49 @@ def test_conserve_la_macro_structurelle_autour_du_glyphe_aligne() -> None:
 
     assert linked[0]["candidate_text"] == candidate
     assert linked[0]["candidate_charspan"] == [0, len(candidate)]
+
+
+def test_etend_la_macro_structurelle_si_la_region_continue_apres_la_macro() -> None:
+    candidate = r"\hat { \theta } ( S _ { X } )"
+    source = "θ(SX)"
+
+    linked = link_source_candidates(
+        _document(candidate, label="formula"),
+        [_region(source, source)],
+        _glyphs(source),
+        SOURCE_PAGE_BOXES,
+    )
+
+    assert linked[0]["candidate_text"] == candidate
+    assert linked[0]["candidate_charspan"] == [0, len(candidate)]
+
+
+def test_etend_une_paire_left_right_si_la_region_commence_apres_left() -> None:
+    candidate = r"\max \left ( 0 , x \right )"
+    source = "(0,x)"
+
+    linked = link_source_candidates(
+        _document(candidate, label="formula"),
+        [_region(source, source)],
+        _glyphs(source),
+        SOURCE_PAGE_BOXES,
+    )
+
+    expected = r"\left ( 0 , x \right )"
+    assert linked[0]["candidate_text"] == expected
+    assert linked[0]["candidate_charspan"] == [len(r"\max "), len(candidate)]
+
+
+def test_etend_le_script_attache_au_dernier_symbole_aligne() -> None:
+    candidate = r"\alpha _ { 1 } \dots \alpha _ { N }"
+    source = "α1...αN"
+
+    linked = link_source_candidates(
+        _document(candidate, label="formula"),
+        [_region(source, source)],
+        _glyphs(source),
+        SOURCE_PAGE_BOXES,
+    )
+
+    assert linked[0]["candidate_text"] == candidate
+    assert linked[0]["candidate_charspan"] == [0, len(candidate)]

@@ -4,7 +4,10 @@ import html as html_module
 import re
 from typing import Any
 
-from docling_core.types.doc import DocItemLabel, DoclingDocument
+from docling_core.types.doc import (
+    DocItemLabel,
+    DoclingDocument,
+)
 from latex2mathml.converter import convert
 
 from pdf_math_audit.correction_targets import TEXT_REF
@@ -69,6 +72,8 @@ def derive_document(
     derived = document.model_copy(deep=True)
     by_text: dict[int, list[dict[str, Any]]] = {}
     for record in accepted:
+        if record.get("kind") == "formula_insertion":
+            raise ValueError("Une formule sans ancrage Docling ne peut pas être publiée")
         match = TEXT_REF.fullmatch(record["docling_ref"])
         if match is None:
             raise ValueError("Référence Docling invalide après validation")
@@ -102,13 +107,20 @@ def derive_document_and_page_html(
     for index, record in enumerate(accepted):
         marker = _unique_marker(serialized_document, _MATH_MARKER, index)
         markers.append(marker)
-        marked_records.append(record | {"after": marker})
+        marked_records.append(
+            record | {"after": marker, "final_after": record["after"]}
+        )
 
     derived = derive_document(document, marked_records)
     inline_math = _mark_inline_math(derived)
     html = render_page_anchored_html(derived).decode("utf-8")
-    for marker, record in zip(markers, accepted, strict=True):
-        match = TEXT_REF.fullmatch(record["docling_ref"])
+    for marker, record, source_record in zip(
+        markers, marked_records, accepted, strict=True
+    ):
+        reference = record.get("derived_docling_ref") or record.get("docling_ref")
+        if record.get("derived_docling_ref"):
+            source_record["derived_docling_ref"] = reference
+        match = TEXT_REF.fullmatch(str(reference or ""))
         if match is None:
             raise ValueError("Référence Docling invalide après validation")
         node = derived.texts[int(match.group(1))]
@@ -123,20 +135,22 @@ def derive_document_and_page_html(
                     "La formule corrigée n'est pas localisable dans l'HTML dérivé"
                 )
             html = html.replace(candidates[0], record["mathml"], 1)
-            replacement = record["after"]
+            replacement = record["final_after"]
         else:
             if html.count(marker) != 1:
                 raise ValueError(
                     "La correction n'est pas localisable dans l'HTML dérivé"
                 )
             html = html.replace(marker, record["mathml"], 1)
-            replacement = record["after"]
+            replacement = record["final_after"]
 
         if node.text.count(marker) != 1:
             raise ValueError(
                 "La correction n'est pas localisable dans le document dérivé"
             )
         node.text = node.text.replace(marker, replacement, 1)
+        if node.orig == marker:
+            node.orig = replacement
 
     for marker, node_index, source, mathml in inline_math:
         if html.count(marker) != 1:

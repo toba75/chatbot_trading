@@ -553,12 +553,21 @@ class QualifyMathJobTest < ActiveJob::TestCase
     correction_status = corrected ? "accepted" : "rejected"
     counts = {
       "status" => corrected ? "corrected" : "rejected",
+      "regions" => 1,
       "targets" => 1,
       "accepted" => corrected ? 1 : 0,
+      "accepted_regions" => corrected ? 1 : 0,
       "rejected" => corrected ? 0 : 1,
       "failed" => 0
     }
-    record = { "region_id" => "#/texts/1", "page" => 1, "status" => correction_status }
+    record = {
+      "target_id" => "#/texts/1",
+      "kind" => "replacement",
+      "region_ids" => [ "#/texts/1" ],
+      "region_id" => "#/texts/1",
+      "page" => 1,
+      "status" => correction_status
+    }
     mathml = '<math data-correction-id="#/texts/1" xmlns="http://www.w3.org/1998/Math/MathML"><mi>x</mi></math>'
     derived_html = "<div class='page' id='page-1'>#{mathml}</div>"
     if corrected
@@ -573,7 +582,16 @@ class QualifyMathJobTest < ActiveJob::TestCase
         "proposal_tokens" => [ "x" ],
         "source_signature" => [ "x" ],
         "proposal_signature" => [ "x" ],
-        "crop_sha256" => "c" * 64
+        "source_proofs" => [
+          { "region_id" => "#/texts/1", "tokens" => [ "x" ], "signature" => [ "x" ] }
+        ],
+        "proposals" => [
+          {
+            "selected_engine" => "deterministic_source",
+            "proposal_tokens" => [ "x" ],
+            "proposal_signature" => [ "x" ]
+          }
+        ]
       )
     else
       record["reason"] = "proposal_not_proven_by_source"
@@ -587,7 +605,7 @@ class QualifyMathJobTest < ActiveJob::TestCase
     native_page_html = "<div class='page' id='page-1'>native</div>"
     report = {
       "contract" => {
-        "version" => "2.0",
+        "version" => MathQualification::CONTRACT_VERSION,
         "analyzer_version" => MathQualification::ANALYZER_VERSION,
         "capability_profile" => MathQualification::CAPABILITY_PROFILE,
         "source_sha256" => qualification.source_sha256,
@@ -620,8 +638,10 @@ class QualifyMathJobTest < ActiveJob::TestCase
       },
       "correction" => {
         "status" => corrected ? "corrected" : "rejected",
+        "regions" => 1,
         "targets" => 1,
         "accepted" => corrected ? 1 : 0,
+        "accepted_regions" => corrected ? 1 : 0,
         "rejected" => corrected ? 0 : 1,
         "failed" => 0,
         "engine" => { "model" => "gemma" },

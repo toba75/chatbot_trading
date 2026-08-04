@@ -1,9 +1,9 @@
 require "digest"
 
 class MathQualification < ApplicationRecord
-  CONTRACT_VERSION = "2.0"
-  ANALYZER_VERSION = "0.5.25"
-  CAPABILITY_PROFILE = "pdf-docling-semantic-correction-v2"
+  CONTRACT_VERSION = "2.1"
+  ANALYZER_VERSION = "0.6.1"
+  CAPABILITY_PROFILE = "pdf-docling-semantic-correction-v3"
   IDENTITY_FIELDS = %w[
     contract_version analyzer_version capability_profile source_sha256
     docling_document_sha256 input_fingerprint
