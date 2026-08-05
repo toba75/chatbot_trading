@@ -1,4 +1,5 @@
 require "test_helper"
+require "securerandom"
 
 class ConversionAttemptTest < ActiveSupport::TestCase
   REFERENCE_PDF = "/reference/ostrading-environment-qualification-5-pages.pdf"
@@ -49,7 +50,7 @@ class ConversionAttemptTest < ActiveSupport::TestCase
   test "conserve l'historique des documents créés par les anciennes relances" do
     original = Document.create_from_pdf!(uploaded_file)
     original_attempt = original.start_conversion!(conversion_options: OPTIONS)
-    retried = Document.create_from_pdf!(uploaded_file)
+    retried = Document.create_from_pdf!(unique_uploaded_file)
     retried.update!(retried_from: original)
     current_attempt = retried.start_conversion!(conversion_options: OPTIONS)
 
@@ -80,7 +81,7 @@ class ConversionAttemptTest < ActiveSupport::TestCase
 
     assert_equal [ failed, retry_qualification ], attempt.reload.math_qualifications.to_a
     assert_equal retry_qualification, attempt.current_math_qualification
-    assert_predicate retry_qualification, :queued?
+    assert_predicate retry_qualification, :staging?
     assert_equal failed.source_sha256, retry_qualification.source_sha256
     assert_equal failed.docling_document_sha256, retry_qualification.docling_document_sha256
     assert_equal "preuve de l’échec".b, failed.analyzer_response.download
@@ -115,7 +116,7 @@ class ConversionAttemptTest < ActiveSupport::TestCase
     end
 
     assert_equal [ previous, current ], attempt.reload.math_qualifications.to_a
-    assert_predicate current, :queued?
+    assert_predicate current, :staging?
     assert_not current.derived_docling_document.attached?
     assert_not current.derived_html.attached?
     assert_not current.derived_markdown.attached?
@@ -172,6 +173,17 @@ class ConversionAttemptTest < ActiveSupport::TestCase
     ActionDispatch::Http::UploadedFile.new(
       tempfile: tempfile,
       filename: File.basename(REFERENCE_PDF),
+      type: "application/pdf"
+    )
+  end
+
+  def unique_uploaded_file
+    tempfile = Tempfile.new([ "reference", ".pdf" ])
+    tempfile.write("%PDF-#{SecureRandom.uuid}")
+    tempfile.rewind
+    ActionDispatch::Http::UploadedFile.new(
+      tempfile: tempfile,
+      filename: "#{SecureRandom.hex(4)}.pdf",
       type: "application/pdf"
     )
   end

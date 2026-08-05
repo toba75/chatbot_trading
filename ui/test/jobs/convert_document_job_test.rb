@@ -105,24 +105,41 @@ class ConvertDocumentJobTest < ActiveJob::TestCase
     assert_equal 0, SolidQueue::Job.where(class_name: "QualifyMathJob").count
   end
 
-  test "un échec après l'enqueue annule ensemble le succès, la qualification et le job" do
+  test "ne marque pas la conversion réussie lorsque le stockage des sorties échoue" do
     attempt = create_attempt
     job = job_with(FakeClient.new(successful_result))
-    job.define_singleton_method(:enqueue_math_qualification) do |qualification|
-      QualifyMathJob.perform_later(qualification)
-      raise "échec transactionnel"
+    job.define_singleton_method(:persist_outputs!) do |_attempt, _result|
+      raise IOError, "disque plein"
     end
 
-    assert_raises(RuntimeError) do
-      job.perform(attempt)
-    end
+    assert_raises(IOError) { job.perform(attempt) }
 
     attempt.reload
     assert_predicate attempt, :failed?
     assert_equal "unexpected_error", attempt.error_code
+    assert_equal "disque plein", attempt.error_message
     assert_nil attempt.current_math_qualification
     assert_equal 0, SolidQueue::Job.where(class_name: "QualifyMathJob").count
-    assert_not attempt.docling_document.attached?
+  end
+
+  test "programme la qualification seulement lorsque le document Docling est lisible" do
+    attempt = create_attempt
+    job = job_with(FakeClient.new(successful_result))
+    storage_ready = []
+    job.define_singleton_method(:enqueue_math_qualification) do |qualification|
+      blob = qualification.conversion_attempt.docling_document.blob
+      storage_ready << blob.service.exist?(blob.key)
+      QualifyMathJob.perform_later(qualification)
+    end
+
+    job.perform(attempt)
+
+    attempt.reload
+    assert_predicate attempt, :succeeded?
+    assert_equal [ true ], storage_ready
+    assert_predicate attempt.current_math_qualification, :queued?
+    assert_equal 1, SolidQueue::Job.where(class_name: "QualifyMathJob").count
+    assert_predicate attempt.docling_document, :attached?
   end
 
   test "refuse de reconvertir une tentative terminée sans remplacer sa qualification" do
@@ -173,6 +190,20 @@ class ConvertDocumentJobTest < ActiveJob::TestCase
 
     assert_predicate attempt.reload, :converting?
     assert_nil attempt.completed_at
+    assert_equal 0, client.calls
+  end
+
+  test "ne prend pas une tentative déjà mise en file par un autre job" do
+    attempt = create_attempt
+    client = FakeClient.new(successful_result)
+    attempt.update!(status: "queued", execution_job_id: "job-en-file")
+
+    assert_raises(ConvertDocumentJob::InvalidState) do
+      job_with(client).perform(attempt)
+    end
+
+    assert_predicate attempt.reload, :queued?
+    assert_equal "job-en-file", attempt.execution_job_id
     assert_equal 0, client.calls
   end
 

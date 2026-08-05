@@ -13,6 +13,57 @@ class ReconcileInterruptedExecutionsJobTest < ActiveJob::TestCase
     assert_interrupted qualification.reload
   end
 
+  test "rend explicite une mise en file interrompue avant création du job" do
+    attempt = staged_conversion_attempt(updated_at: 10.minutes.ago)
+
+    ReconcileInterruptedExecutionsJob.perform_now
+
+    assert_predicate attempt.reload, :failed?
+    assert_equal "enqueue_interrupted", attempt.error_code
+    assert attempt.completed_at
+  end
+
+  test "préserve une conversion en préparation lorsqu'un job existe déjà" do
+    attempt = staged_conversion_attempt(updated_at: 10.minutes.ago)
+    job = queue_job_for(attempt, "ConvertDocumentJob", "conversion-active-job")
+
+    ReconcileInterruptedExecutionsJob.perform_now
+
+    assert_predicate attempt.reload, :queued?
+    assert_equal job.active_job_id, attempt.execution_job_id
+    assert_nil attempt.completed_at
+  end
+
+  test "rend explicite une qualification interrompue avant création du job" do
+    qualification = staged_math_qualification(updated_at: 10.minutes.ago)
+
+    ReconcileInterruptedExecutionsJob.perform_now
+
+    assert_predicate qualification.reload, :failed?
+    assert_equal "enqueue_interrupted", qualification.error_code
+    assert qualification.completed_at
+  end
+
+  test "préserve une qualification en préparation lorsqu'un job existe déjà" do
+    qualification = staged_math_qualification(updated_at: 10.minutes.ago)
+    job = queue_job_for(qualification, "QualifyMathJob", "qualification-active-job")
+
+    ReconcileInterruptedExecutionsJob.perform_now
+
+    assert_predicate qualification.reload, :queued?
+    assert_equal job.active_job_id, qualification.execution_job_id
+    assert_nil qualification.completed_at
+  end
+
+  test "ignore une mise en file en préparation récente" do
+    attempt = staged_conversion_attempt(updated_at: 1.minute.ago)
+
+    ReconcileInterruptedExecutionsJob.perform_now
+
+    assert_predicate attempt.reload, :staging?
+    assert_nil attempt.completed_at
+  end
+
   test "ignore une exécution encore prise en charge par Solid Queue" do
     attempt = conversion_attempt("active-job")
     queue_job("ConvertDocumentJob", attempt.execution_job_id)
@@ -42,6 +93,31 @@ class ReconcileInterruptedExecutionsJobTest < ActiveJob::TestCase
       execution_job_id: execution_job_id,
       started_at: Time.current
     )
+  end
+
+  def staged_conversion_attempt(updated_at:)
+    document = Document.create!(source_sha256: "d" * 64)
+    document.conversion_attempts.create!(
+      status: "staging",
+      conversion_options: { "pipeline" => "vlm" },
+      created_at: updated_at,
+      updated_at: updated_at
+    )
+  end
+
+  def staged_math_qualification(updated_at:)
+    document = Document.create!(source_sha256: "e" * 64)
+    attempt = document.conversion_attempts.create!(
+      status: "succeeded",
+      conversion_options: { "pipeline" => "vlm" }
+    )
+    MathQualification.build_for(
+      attempt,
+      docling_document_sha256: "f" * 64
+    ).tap do |qualification|
+      qualification.save!
+      qualification.update_columns(created_at: updated_at, updated_at: updated_at)
+    end
   end
 
   def math_qualification(execution_job_id)
@@ -79,6 +155,17 @@ class ReconcileInterruptedExecutionsJobTest < ActiveJob::TestCase
       queue_name: "test",
       class_name: class_name,
       arguments: {},
+      priority: 0,
+      active_job_id: active_job_id,
+      scheduled_at: Time.current
+    )
+  end
+
+  def queue_job_for(record, class_name, active_job_id)
+    SolidQueue::Job.create!(
+      queue_name: "test",
+      class_name: class_name,
+      arguments: { "arguments" => [ record.to_global_id.to_s ] },
       priority: 0,
       active_job_id: active_job_id,
       scheduled_at: Time.current

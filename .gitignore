@@ -1,9 +1,11 @@
 .env.docling-serve
 .env.rails
+.env.rails.*
 .pytest_cache/
 .ruff_cache/
 .venv/
 data/docling_assets/
+data/*/active_storage/
 data/backups/
 __pycache__/
 *.py[cod]

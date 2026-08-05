@@ -1,19 +1,43 @@
-<main class="upload-page">
-  <section class="upload-card">
-    <p class="eyebrow">Docling · Granite CUDA</p>
-    <h1>Vérifier la conversion d’un PDF</h1>
-    <p class="lead">Déposez un document pour comparer son contenu original aux représentations Docling conservées sans simplification.</p>
+<main class="page-shell upload-page">
+  <header class="page-heading">
+    <p class="eyebrow">Nouvelle conversion</p>
+    <h1>Importer des documents PDF</h1>
+    <p class="lead">Sélectionnez un ou plusieurs fichiers à traiter dans la même opération.</p>
+  </header>
 
-    <% if @upload_error %>
-      <p class="form-error" role="alert"><%= @upload_error %></p>
-    <% end %>
+  <div class="upload-workspace">
+    <section class="upload-panel" aria-labelledby="upload-panel-title">
+      <div class="panel-heading">
+        <p class="panel-index">01</p>
+        <div>
+          <h2 id="upload-panel-title">Documents sources</h2>
+          <p>Format PDF · Plusieurs fichiers acceptés</p>
+        </div>
+      </div>
 
-    <%= form_with url: documents_path, scope: :document, class: "upload-form" do |form| %>
-      <%= form.label :source_pdf, "Document PDF" %>
-      <%= form.file_field :source_pdf, accept: "application/pdf,.pdf", required: true %>
-      <%= form.submit "Lancer la conversion", class: "button" %>
-    <% end %>
+      <% if @upload_error %>
+        <p class="form-error" role="alert"><%= @upload_error %></p>
+      <% end %>
 
-    <%= link_to "Voir les documents", documents_path, class: "button secondary document-list-link" %>
-  </section>
+      <%= form_with url: documents_path, scope: :document, class: "upload-form" do |form| %>
+        <%= form.label :source_pdfs, "Documents PDF", class: "sr-only" %>
+        <%= form.file_field :source_pdfs, accept: "application/pdf,.pdf", multiple: true, required: true %>
+        <div class="form-actions">
+          <%= form.submit "Lancer les conversions", class: "button" %>
+          <%= link_to "Voir les documents", documents_path, class: "text-link" %>
+        </div>
+      <% end %>
+    </section>
+
+    <aside class="runtime-panel" aria-labelledby="runtime-panel-title">
+      <p class="eyebrow">Conservation</p>
+      <h2 id="runtime-panel-title">Sorties documentaires</h2>
+      <dl class="runtime-list">
+        <div><dt>Source</dt><dd>PDF original</dd></div>
+        <div><dt>Structure</dt><dd>JSON canonique</dd></div>
+        <div><dt>Lecture</dt><dd>HTML · Markdown</dd></div>
+        <div><dt>Contrôle</dt><dd>Comparaison par page</dd></div>
+      </dl>
+    </aside>
+  </div>
 </main>

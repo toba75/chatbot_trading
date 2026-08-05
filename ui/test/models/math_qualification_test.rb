@@ -10,7 +10,7 @@ class MathQualificationTest < ActiveSupport::TestCase
     )
 
     assert_predicate qualification, :valid?
-    assert_predicate qualification, :queued?
+    assert_predicate qualification, :staging?
     assert_equal "queued", qualification.phase
     assert_equal "2.1", qualification.contract_version
     assert_equal "0.6.1", qualification.analyzer_version
@@ -60,6 +60,7 @@ class MathQualificationTest < ActiveSupport::TestCase
       docling_document_sha256: "b" * 64
     )
     qualification.save!
+    qualification.define_singleton_method(:broadcast_documents_index) {}
     SolidQueue::Job.delete_all
 
     assert_difference -> { SolidQueue::Job.count }, 1 do
@@ -76,6 +77,28 @@ class MathQualificationTest < ActiveSupport::TestCase
     assert_equal "Turbo::Streams::ActionBroadcastJob", job.class_name
     assert_includes job.arguments.to_json, '"target":"math_qualification"'
     assert_includes job.arguments.to_json, "documents/current_math_qualification"
+  end
+
+  test "rafraîchit l'index lorsque le statut de qualification change" do
+    qualification = MathQualification.build_for(
+      conversion_attempt,
+      docling_document_sha256: "b" * 64
+    )
+    qualification.save!
+    refreshes = []
+    qualification.define_singleton_method(:broadcast_refresh_later_to) do |stream|
+      refreshes << stream
+    end
+
+    qualification.update!(
+      status: "running",
+      phase: "candidate_evaluation",
+      completed_units: 0,
+      total_units: 0,
+      execution_job_id: "job-1"
+    )
+
+    assert_equal [ "documents" ], refreshes
   end
 
   test "diffuse une progression légère par palier de cinq pour cent" do

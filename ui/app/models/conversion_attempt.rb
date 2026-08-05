@@ -7,6 +7,7 @@ class ConversionAttempt < ApplicationRecord
   has_many :math_qualifications, -> { order(:id) }, dependent: :destroy
 
   enum :status, {
+    staging: "staging",
     queued: "queued",
     converting: "converting",
     succeeded: "succeeded",

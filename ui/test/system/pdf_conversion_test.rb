@@ -3,8 +3,9 @@ require "application_system_test_case"
 class PdfConversionTest < ApplicationSystemTestCase
   test "convertit réellement le PDF de référence et rafraîchit l'écran par Cable" do
     visit root_path
-    attach_file "Document PDF", "/reference/ostrading-environment-qualification-5-pages.pdf"
-    click_on "Lancer la conversion"
+    attach_file "Documents PDF", "/reference/ostrading-environment-qualification-5-pages.pdf"
+    click_on "Lancer les conversions"
+    click_on "ostrading-environment-qualification-5-pages.pdf"
 
     assert_text(/En attente|Conversion en cours/)
     running_elapsed = find(%([data-controller="elapsed-time"])).text

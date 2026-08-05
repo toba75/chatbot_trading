@@ -1,4 +1,5 @@
 require "test_helper"
+require "securerandom"
 
 class QualifyMathJobTest < ActiveJob::TestCase
   test "persiste la progression, les preuves et un verdict contradictoire" do
@@ -49,6 +50,22 @@ class QualifyMathJobTest < ActiveJob::TestCase
     assert_includes qualification.derived_html.download, "<math "
     assert_equal "$x$".b, qualification.derived_markdown.download
     assert_equal '{"schema_name":"DoclingDocument","texts":[{"text":"autre"},{"text":"x"}],"pages":{"1":{}}}', qualification.conversion_attempt.docling_document.download
+  end
+
+  test "ne marque pas la qualification réussie lorsque le stockage des preuves échoue" do
+    qualification = create_qualification
+    job = job_with(FakeClient.new(successful_result))
+    job.define_singleton_method(:attach_result) do |_qualification, _result|
+      raise IOError, "disque plein"
+    end
+
+    assert_raises(IOError) { job.perform(qualification) }
+
+    qualification.reload
+    assert_predicate qualification, :failed?
+    assert_equal "unexpected_error", qualification.error_code
+    assert_equal "disque plein", qualification.error_message
+    assert_nil qualification.verdict
   end
 
   test "publie les zones opaques sans exclure toute la page" do
@@ -496,6 +513,19 @@ class QualifyMathJobTest < ActiveJob::TestCase
     assert_nil qualification.completed_at
   end
 
+  test "ne prend pas une qualification déjà mise en file par un autre job" do
+    qualification = create_qualification
+    qualification.update!(status: "queued", execution_job_id: "job-en-file")
+
+    assert_raises(QualifyMathJob::InvalidState) do
+      job_with(FakeClient.new(successful_result)).perform(qualification)
+    end
+
+    assert_predicate qualification.reload, :queued?
+    assert_equal "job-en-file", qualification.execution_job_id
+    assert_nil qualification.completed_at
+  end
+
   test "une ancienne analyse ne peut pas écraser un état terminal" do
     qualification = create_qualification
     job = job_with(FakeClient.new(successful_result))
@@ -527,7 +557,8 @@ class QualifyMathJobTest < ActiveJob::TestCase
   end
 
   def create_qualification
-    document = Document.create!(source_sha256: "a" * 64)
+    source_sha256 = SecureRandom.hex(32)
+    document = Document.create!(source_sha256: source_sha256)
     document.source_pdf.attach(
       io: StringIO.new("%PDF-source"),
       filename: "source.pdf",

@@ -9,8 +9,8 @@
   <% end %>
   <h2 id="math-qualification-title">Qualification mathématique</h2>
 
-  <% if qualification.queued? || qualification.running? %>
-    <p><strong><%= qualification.queued? ? "En attente" : "Analyse en cours" %></strong></p>
+  <% if qualification.staging? || qualification.queued? || qualification.running? %>
+    <p><strong><%= qualification.running? ? "Analyse en cours" : "En attente" %></strong></p>
     <%= render "documents/math_qualification_progress", qualification: qualification %>
   <% elsif qualification.failed? %>
     <div class="status-card error" role="alert">

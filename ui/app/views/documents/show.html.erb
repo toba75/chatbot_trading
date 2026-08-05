@@ -6,12 +6,14 @@
   <%= turbo_stream_from @document %>
 
   <%= turbo_frame_tag @document, data: { cable_reconcile_target: "frame" } do %>
-    <header class="document-header">
+    <%= link_to "Documents", documents_path, class: "back-link", data: { turbo_frame: "_top" } %>
+
+    <header class="page-heading document-header">
       <div>
         <p class="eyebrow">Conversion Docling</p>
         <h1><%= @document.source_pdf.filename %></h1>
+        <p class="lead">Document <%= @document.id %></p>
       </div>
-      <%= link_to "Nouveau document", root_path, class: "button secondary", data: { turbo_frame: "_top" } %>
     </header>
 
     <p class="elapsed-time">
@@ -23,11 +25,12 @@
       } %>
     </p>
 
-    <% if @attempt.queued? || @attempt.converting? %>
+    <% if @attempt.staging? || @attempt.queued? || @attempt.converting? %>
+      <% status = @document.processing_status %>
       <section class="status-card" aria-live="polite">
         <span class="status-dot"></span>
         <div>
-          <strong><%= @attempt.queued? ? "En attente" : "Conversion en cours" %></strong>
+          <strong><%= status.fetch(:label) %></strong>
           <p>La page se mettra à jour dès que l’état persistant changera.</p>
         </div>
       </section>

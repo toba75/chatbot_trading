@@ -1,10 +1,3 @@
-<% status_labels = {
-  "queued" => "En attente",
-  "converting" => "Conversion en cours",
-  "succeeded" => "Terminée",
-  "failed" => "Échec"
-} %>
-
 <main
   class="documents-index"
   data-controller="cable-reconcile"
@@ -13,33 +6,47 @@
   <%= turbo_stream_from "documents" %>
 
   <%= turbo_frame_tag "documents_index", target: "_top", data: { cable_reconcile_target: "frame" } do %>
-    <header class="document-header">
+    <header class="page-heading page-heading--split">
       <div>
-        <p class="eyebrow">Docling · Granite CUDA</p>
+        <p class="eyebrow">Bibliothèque</p>
         <h1>Documents</h1>
+        <p class="lead"><%= pluralize(@documents.size, "document", plural: "documents") %> dans l’espace de travail</p>
       </div>
       <%= link_to "Nouveau document", root_path, class: "button" %>
     </header>
 
-    <% if @documents.empty? %>
-      <p class="notice">Aucun document n’a encore été envoyé.</p>
-    <% else %>
-      <ol class="document-list">
-        <% @documents.each do |document| %>
-          <% attempt = document.current_attempt %>
-          <%= turbo_stream_from document if attempt.queued? || attempt.converting? %>
-          <li>
-            <%= link_to document_path(document), class: "document-link" do %>
-              <strong><%= document.source_pdf.filename %></strong>
-              <span>
-                Document <%= document.id %> ·
-                <%= status_labels.fetch(attempt.status) %> ·
+    <section class="documents-panel" aria-label="Documents traités">
+      <% if @documents.empty? %>
+        <div class="empty-state">
+          <p class="empty-state__mark" aria-hidden="true">PDF</p>
+          <h2>Aucun document</h2>
+          <p>Les prochains fichiers importés apparaîtront ici.</p>
+        </div>
+      <% else %>
+        <div class="document-list-header" aria-hidden="true">
+          <span>Document</span>
+          <span>Statut</span>
+          <span>Ajouté le</span>
+          <span></span>
+        </div>
+        <ol class="document-list">
+          <% @documents.each do |document| %>
+            <% status = document.processing_status %>
+            <%= turbo_stream_from document if document.processing_status_transient? %>
+            <li>
+              <%= link_to document_path(document), class: "document-link" do %>
+                <span class="document-identity">
+                  <strong><%= document.source_pdf.filename %></strong>
+                  <small>Document <%= document.id %></small>
+                </span>
+                <span class="status-badge status-badge--<%= status.fetch(:key) %>"><%= status.fetch(:label) %></span>
                 <time datetime="<%= document.created_at.iso8601 %>"><%= document.created_at.strftime("%d/%m/%Y %H:%M") %></time>
-              </span>
-            <% end %>
-          </li>
-        <% end %>
-      </ol>
-    <% end %>
+                <span class="document-open">Consulter</span>
+              <% end %>
+            </li>
+          <% end %>
+        </ol>
+      <% end %>
+    </section>
   <% end %>
 </main>

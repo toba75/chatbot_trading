@@ -40,6 +40,7 @@ class MathQualification < ApplicationRecord
   end
 
   enum :status, {
+    staging: "staging",
     queued: "queued",
     running: "running",
     succeeded: "succeeded",
@@ -53,7 +54,7 @@ class MathQualification < ApplicationRecord
     non_verifiable: "non_verifiable"
   }, validate: { allow_nil: true }
 
-  after_create_commit :broadcast_full_qualification
+  after_create_commit :broadcast_full_qualification, :broadcast_documents_index
   after_update_commit :broadcast_qualification_change
 
   validates :phase, inclusion: { in: PHASES }
@@ -71,7 +72,7 @@ class MathQualification < ApplicationRecord
   def self.build_for(attempt, docling_document_sha256:)
     source_sha256 = attempt.document.source_sha256
     attempt.math_qualifications.build(
-      status: "queued",
+      status: "staging",
       phase: "queued",
       completed_units: 0,
       total_units: 1,
@@ -124,6 +125,8 @@ class MathQualification < ApplicationRecord
   end
 
   def broadcast_qualification_change
+    broadcast_documents_index if previous_changes.key?("status")
+
     if previous_changes.key?("status") || previous_changes.key?("phase")
       broadcast_full_qualification
     elsif progress_bucket_changed?
@@ -138,6 +141,10 @@ class MathQualification < ApplicationRecord
       partial: "documents/current_math_qualification",
       locals: { conversion_attempt: conversion_attempt }
     )
+  end
+
+  def broadcast_documents_index
+    broadcast_refresh_later_to("documents")
   end
 
   def broadcast_progress

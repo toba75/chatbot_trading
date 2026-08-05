@@ -7,7 +7,7 @@ class ConvertDocumentJob < ApplicationJob
   class InterruptedExecution < StandardError; end
 
   queue_as :conversions
-  self.enqueue_after_transaction_commit = false
+  self.enqueue_after_transaction_commit = true
 
   def perform(attempt)
     begin_conversion!(attempt)
@@ -37,7 +37,7 @@ class ConvertDocumentJob < ApplicationJob
   def begin_conversion!(attempt)
     interrupted = false
     attempt.with_lock do
-      if attempt.queued?
+      if conversion_ready_for_job?(attempt)
         attempt.update!(
           status: "converting",
           started_at: Time.current,
@@ -64,49 +64,78 @@ class ConvertDocumentJob < ApplicationJob
     DoclingClient.new
   end
 
+  def conversion_ready_for_job?(attempt)
+    (attempt.staging? || attempt.queued?) &&
+      (attempt.execution_job_id.blank? || attempt.execution_job_id == job_id)
+  end
+
   def persist_result!(attempt, result)
     payload = result.payload
     content = payload.fetch("document")
     document_bytes = JSON.generate(content.fetch("json_content"))
+    qualification = nil
 
+    attempt.with_lock { ensure_active!(attempt) }
+    persist_outputs!(attempt, result)
     attempt.with_lock do
       ensure_active!(attempt)
-      persist_outputs!(attempt, result)
       attempt.update!(
         status: "succeeded",
         page_count: content.fetch("json_content").fetch("pages").size,
         processing_seconds: payload["processing_time"],
         completed_at: Time.current
       )
-      create_and_enqueue_qualification!(
+      qualification = create_qualification!(
         attempt,
         Digest::SHA256.hexdigest(document_bytes)
       )
     end
+    enqueue_math_qualification_or_mark_failed!(qualification)
   end
 
-  def create_and_enqueue_qualification!(attempt, document_sha256)
+  def create_qualification!(attempt, document_sha256)
     qualification = MathQualification.build_for(
       attempt,
       docling_document_sha256: document_sha256
     )
     qualification.save!
-    begin
-      MathQualification.transaction(requires_new: true) do
-        enqueue_math_qualification(qualification)
-      end
-    rescue SolidQueue::Job::EnqueueError, EnqueueFailed => error
-      qualification.update!(
-        status: "failed",
-        error_code: "enqueue_failed",
-        error_message: error.message.truncate(500),
-        completed_at: Time.current
-      )
-    end
+    qualification
+  end
+
+  def enqueue_math_qualification_or_mark_failed!(qualification)
+    job = enqueue_math_qualification(qualification)
+    mark_math_qualification_enqueued!(qualification, job)
+  rescue ActiveJob::EnqueueError, SolidQueue::Job::EnqueueError, EnqueueFailed => error
+    mark_math_qualification_enqueue_failure!(qualification, error.message)
   end
 
   def enqueue_math_qualification(qualification)
-    raise EnqueueFailed, "Solid Queue a refusé le job de qualification." unless QualifyMathJob.perform_later(qualification)
+    QualifyMathJob.perform_later(qualification).tap do |job|
+      raise EnqueueFailed, "Solid Queue a refusé le job de qualification." unless job
+    end
+  end
+
+  def mark_math_qualification_enqueued!(qualification, job)
+    qualification.with_lock do
+      if qualification.staging?
+        qualification.update!(status: "queued", execution_job_id: job.job_id)
+      elsif qualification.queued? && qualification.execution_job_id.blank?
+        qualification.update!(execution_job_id: job.job_id)
+      end
+    end
+  end
+
+  def mark_math_qualification_enqueue_failure!(qualification, message)
+    qualification.with_lock do
+      return unless qualification.staging? || qualification.queued?
+
+      qualification.update!(
+        status: "failed",
+        error_code: "enqueue_failed",
+        error_message: message.truncate(500),
+        completed_at: Time.current
+      )
+    end
   end
 
   def attach(attachment, content, filename, content_type)
@@ -127,14 +156,23 @@ class ConvertDocumentJob < ApplicationJob
   end
 
   def persist_failure!(attempt, error)
+    output_error_message = nil
+    attempt.with_lock { return unless active?(attempt) }
+    if error.result
+      begin
+        persist_outputs!(attempt, error.result)
+      rescue StandardError => output_error
+        output_error_message = "Les sorties partielles n'ont pas pu être stockées : #{output_error.message}"
+      end
+    end
+
     attempt.with_lock do
       return unless active?(attempt)
 
-      persist_outputs!(attempt, error.result) if error.result
       attempt.update!(
         status: "failed",
         error_code: error.code,
-        error_message: error.message.truncate(500),
+        error_message: [ error.message, output_error_message ].compact.join(" ").truncate(500),
         completed_at: Time.current
       )
     end

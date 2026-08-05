@@ -38,6 +38,11 @@ class InfrastructureTest < ActiveSupport::TestCase
     assert_equal ENV.fetch("INTERRUPTED_EXECUTION_RECONCILIATION_SCHEDULE"), task.fetch("schedule")
   end
 
+  test "diffère les jobs qui lisent des fichiers ActiveStorage jusqu'au commit" do
+    assert_equal true, ConvertDocumentJob.enqueue_after_transaction_commit
+    assert_equal true, QualifyMathJob.enqueue_after_transaction_commit
+  end
+
   test "autorise les formats Docling non exécutables dans le visualiseur inline" do
     allowed = Rails.application.config.active_storage.content_types_allowed_inline
 

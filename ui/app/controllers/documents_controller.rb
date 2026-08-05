@@ -1,10 +1,11 @@
 class DocumentsController < ApplicationController
   class EnqueueFailed < StandardError; end
+  SOURCE_UPLOAD_ERRORS = [ ActiveStorage::IntegrityError, IOError, SystemCallError ].freeze
 
   def index
     retried_document_ids = Document.where.not(retried_from_id: nil).select(:retried_from_id)
     @documents = Document.where.not(id: retried_document_ids)
-      .includes(:conversion_attempts, source_pdf_attachment: :blob)
+      .includes(conversion_attempts: :math_qualifications, source_pdf_attachment: :blob)
       .order(created_at: :desc, id: :desc)
   end
 
@@ -12,13 +13,23 @@ class DocumentsController < ApplicationController
   end
 
   def create
-    document = Document.transaction do
-      created = Document.create_from_pdf!(source_pdf)
-      attempt = created.start_conversion!(conversion_options: DoclingClient.conversion_options)
-      ConvertDocumentJob.perform_later(attempt)
-      created
+    duplicate_uploads = []
+    source_upload_failures = []
+    attempts = []
+    upload_candidates.each do |candidate|
+      result = create_document_with_attempt!(candidate)
+      if result == :duplicate
+        duplicate_uploads << candidate.fetch(:filename)
+      elsif result
+        attempts << result
+      else
+        source_upload_failures << candidate.fetch(:filename)
+      end
     end
-    redirect_to document
+
+    enqueue_failures = enqueue_conversion_attempts(attempts)
+    alert = import_alert(duplicate_uploads, source_upload_failures, enqueue_failures)
+    redirect_to documents_path, alert: alert
   rescue Document::InvalidPdf => error
     @upload_error = error.message
     render :new, status: :unprocessable_content
@@ -36,25 +47,19 @@ class DocumentsController < ApplicationController
 
   def retry_conversion
     document = Document.find(params[:id])
-    Document.transaction do
-      attempt = document.retry_conversion!(conversion_options: DoclingClient.conversion_options)
-      ConvertDocumentJob.perform_later(attempt)
+    attempt = Document.transaction do
+      document.retry_conversion!(conversion_options: DoclingClient.conversion_options)
     end
-    redirect_to document
+    enqueue_failure = enqueue_conversion_attempt(attempt)
+    redirect_to document, alert: retry_conversion_alert(enqueue_failure)
   rescue Document::NotRetryable
     head :conflict
   end
 
   def retry_math_qualification
     document = Document.find(params[:id])
-    document.current_attempt.retry_math_qualification! do |qualification|
-      begin
-        job = QualifyMathJob.perform_later(qualification)
-        raise EnqueueFailed, "Solid Queue a refusé le job de qualification." unless job
-      rescue SolidQueue::Job::EnqueueError, EnqueueFailed => error
-        mark_enqueue_failure!(qualification, error.message)
-      end
-    end
+    qualification = document.current_attempt.retry_math_qualification! { |_qualification| }
+    enqueue_math_qualification_or_mark_failed!(qualification)
     redirect_to document
   rescue ConversionAttempt::MathQualificationNotRetryable
     head :conflict
@@ -134,8 +139,118 @@ class DocumentsController < ApplicationController
 
   private
 
-  def source_pdf
-    params.require(:document).require(:source_pdf)
+  def source_pdfs
+    document_params = params.require(:document)
+    uploads = if document_params.key?(:source_pdfs)
+      document_params.fetch(:source_pdfs)
+    else
+      document_params.require(:source_pdf)
+    end
+
+    Array.wrap(uploads).reject(&:blank?).tap do |selected_uploads|
+      raise ActionController::ParameterMissing, :source_pdfs if selected_uploads.empty?
+    end
+  end
+
+  def upload_candidates
+    source_pdfs.map do |upload|
+      {
+        upload: upload,
+        filename: upload_filename(upload),
+        source_sha256: Document.source_sha256_for_pdf!(upload)
+      }
+    rescue Document::InvalidPdf => error
+      raise Document::InvalidPdf, "#{upload_filename(upload)} : #{error.message}"
+    end
+  end
+
+  def create_document_with_attempt!(candidate)
+    source_sha256 = candidate.fetch(:source_sha256)
+    return :duplicate if Document.exists?(source_sha256: source_sha256)
+
+    document = nil
+    attempt = nil
+    Document.transaction(requires_new: true) do
+      document = Document.create_from_pdf!(candidate.fetch(:upload), source_sha256: source_sha256)
+      attempt = document.start_conversion!(conversion_options: DoclingClient.conversion_options)
+    end
+    attempt
+
+  rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotUnique
+    raise unless defined?(source_sha256) && Document.exists?(source_sha256: source_sha256)
+
+    :duplicate
+  rescue *SOURCE_UPLOAD_ERRORS => error
+    raise unless document&.persisted?
+
+    discard_failed_source_upload!(document)
+    nil
+  end
+
+  def enqueue_conversion_attempts(attempts)
+    attempts.filter_map { |attempt| enqueue_conversion_attempt(attempt) }
+  end
+
+  def enqueue_conversion_attempt(attempt)
+    job = ConvertDocumentJob.perform_later(attempt)
+    raise EnqueueFailed, "Solid Queue a refusé le job de conversion." unless job
+
+    mark_conversion_enqueued!(attempt, job)
+    nil
+  rescue ActiveJob::EnqueueError, SolidQueue::Job::EnqueueError, EnqueueFailed => error
+    mark_conversion_enqueue_failure!(attempt, error.message)
+    attempt.document.source_pdf.filename.to_s
+  end
+
+  def enqueue_math_qualification_or_mark_failed!(qualification)
+    job = QualifyMathJob.perform_later(qualification)
+    raise EnqueueFailed, "Solid Queue a refusé le job de qualification." unless job
+    mark_math_qualification_enqueued!(qualification, job)
+  rescue ActiveJob::EnqueueError, SolidQueue::Job::EnqueueError, EnqueueFailed => error
+    mark_enqueue_failure!(qualification, error.message)
+  end
+
+  def import_alert(duplicate_uploads, source_upload_failures, enqueue_failures)
+    messages = []
+    messages << duplicate_import_message(duplicate_uploads) if duplicate_uploads.any?
+    messages << source_upload_failure_message(source_upload_failures) if source_upload_failures.any?
+    messages << conversion_enqueue_failure_message(enqueue_failures) if enqueue_failures.any?
+    messages.to_sentence.presence
+  end
+
+  def duplicate_import_message(filenames)
+    names = filenames.uniq
+    if names.one?
+      "#{names.first} a déjà été importé."
+    else
+      "#{names.size} PDF ont déjà été importés : #{names.to_sentence}."
+    end
+  end
+
+  def conversion_enqueue_failure_message(filenames)
+    names = filenames.uniq
+    if names.one?
+      "#{names.first} n'a pas pu être mis en file de conversion."
+    else
+      "#{names.size} PDF n'ont pas pu être mis en file de conversion : #{names.to_sentence}."
+    end
+  end
+
+  def source_upload_failure_message(filenames)
+    names = filenames.uniq
+    if names.one?
+      "#{names.first} n'a pas pu être stocké sur la machine hôte."
+    else
+      "#{names.size} PDF n'ont pas pu être stockés sur la machine hôte : #{names.to_sentence}."
+    end
+  end
+
+  def retry_conversion_alert(filename)
+    "#{filename} n'a pas pu être remis en file de conversion." if filename
+  end
+
+  def upload_filename(upload)
+    upload.respond_to?(:original_filename) ? upload.original_filename : "fichier"
   end
 
   def set_preview_headers(content_security_policy)
@@ -144,12 +259,60 @@ class DocumentsController < ApplicationController
     response.headers["Referrer-Policy"] = "no-referrer"
   end
 
+  def mark_conversion_enqueue_failure!(attempt, message = "La conversion n'a pas pu être mise en file.")
+    mark_conversion_failure!(attempt, "enqueue_failed", message)
+  end
+
+  def mark_conversion_enqueued!(attempt, job)
+    attempt.with_lock do
+      if attempt.staging?
+        attempt.update!(status: "queued", execution_job_id: job.job_id)
+      elsif attempt.queued? && attempt.execution_job_id.blank?
+        attempt.update!(execution_job_id: job.job_id)
+      end
+    end
+  end
+
+  def mark_conversion_failure!(attempt, code, message)
+    attempt.with_lock do
+      if attempt.staging? || attempt.queued?
+        attempt.update!(
+          status: "failed",
+          error_code: code,
+          error_message: message.truncate(500),
+          completed_at: Time.current
+        )
+      end
+    end
+  end
+
+  def discard_failed_source_upload!(document)
+    Document.transaction do
+      document.conversion_attempts.destroy_all
+      document.destroy!
+    end
+  end
+
   def mark_enqueue_failure!(qualification, message = "La qualification n'a pas pu être mise en file.")
-    qualification.update!(
-      status: "failed",
-      error_code: "enqueue_failed",
-      error_message: message,
-      completed_at: Time.current
-    )
+    qualification.with_lock do
+      if qualification.staging? || qualification.queued?
+        qualification.update!(
+          status: "failed",
+          error_code: "enqueue_failed",
+          error_message: message.truncate(500),
+          completed_at: Time.current
+        )
+      end
+    end
+  end
+
+  def mark_math_qualification_enqueued!(qualification, job)
+    qualification.with_lock do
+      if qualification.staging?
+        qualification.update!(status: "queued", execution_job_id: job.job_id)
+      elsif qualification.queued? && qualification.execution_job_id.blank?
+        qualification.update!(execution_job_id: job.job_id)
+      end
+    end
   end
 end

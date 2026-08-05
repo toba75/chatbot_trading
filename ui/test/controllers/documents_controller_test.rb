@@ -1,4 +1,5 @@
 require "test_helper"
+require "securerandom"
 
 class DocumentsControllerTest < ActionDispatch::IntegrationTest
   REFERENCE_PDF = "/reference/ostrading-environment-qualification-5-pages.pdf"
@@ -23,18 +24,100 @@ class DocumentsControllerTest < ActionDispatch::IntegrationTest
     assert_select "a[href='#{root_path}']", text: "Nouveau document"
   end
 
+  test "liste une qualification échouée sans déclarer le document terminé" do
+    document, attempt = completed_document
+    qualification = MathQualification.build_for(
+      attempt,
+      docling_document_sha256: Digest::SHA256.hexdigest(attempt.docling_document.download)
+    )
+    qualification.save!
+    qualification.update!(
+      status: "failed",
+      error_code: "analysis_failed",
+      error_message: "Analyse impossible.",
+      completed_at: Time.current
+    )
+
+    get documents_path
+
+    assert_response :success
+    assert_select ".status-badge--qualification_failed", text: "Échec qualification"
+    assert_select ".status-badge--completed", text: "Terminé", count: 0
+    assert_select "a[href='#{document_path(document)}']"
+  end
+
   test "dépose le PDF et programme sa première tentative sans l'exécuter" do
     assert_difference -> { Document.count }, 1 do
       assert_difference -> { ConversionAttempt.count }, 1 do
         assert_difference -> { conversion_jobs.count }, 1 do
-          post documents_path, params: { document: { source_pdf: uploaded_file } }
+          post documents_path, params: { document: { source_pdfs: [ uploaded_file ] } }
         end
       end
     end
 
     document = Document.order(:id).last
-    assert_redirected_to document_path(document)
+    assert_redirected_to documents_path
     assert_predicate document.current_attempt, :queued?
+  end
+
+  test "programme la conversion seulement lorsque le fichier source est lisible" do
+    original = ConvertDocumentJob.method(:perform_later)
+    storage_ready = []
+    ConvertDocumentJob.define_singleton_method(:perform_later) do |attempt|
+      blob = attempt.document.source_pdf.blob
+      storage_ready << blob.service.exist?(blob.key)
+      original.call(attempt)
+    end
+
+    post documents_path, params: { document: { source_pdfs: [ uploaded_file ] } }
+
+    assert_redirected_to documents_path
+    assert_equal [ true ], storage_ready
+  ensure
+    ConvertDocumentJob.define_singleton_method(:perform_later, original)
+  end
+
+  test "dépose plusieurs PDFs et programme une tentative par document" do
+    assert_difference -> { Document.count }, 2 do
+      assert_difference -> { ConversionAttempt.count }, 2 do
+        assert_difference -> { conversion_jobs.count }, 2 do
+          post documents_path, params: { document: { source_pdfs: [ uploaded_file, unique_uploaded_file ] } }
+        end
+      end
+    end
+
+    assert_redirected_to documents_path
+    assert_equal [ true, true ], Document.order(:id).last(2).map { |document| document.current_attempt.queued? }
+  end
+
+  test "ignore un PDF déjà importé même si le nom diffère" do
+    create_document_with_attempt(uploaded_file(filename: "original.pdf"))
+
+    assert_no_difference -> { Document.count } do
+      assert_no_difference -> { ConversionAttempt.count } do
+        assert_no_difference -> { conversion_jobs.count } do
+          post documents_path, params: { document: { source_pdfs: [ uploaded_file(filename: "copie.pdf") ] } }
+        end
+      end
+    end
+
+    assert_redirected_to documents_path
+    assert_equal "copie.pdf a déjà été importé.", flash[:alert]
+  end
+
+  test "importe les PDF nouveaux et signale les doublons du même lot" do
+    assert_difference -> { Document.count }, 1 do
+      assert_difference -> { ConversionAttempt.count }, 1 do
+        assert_difference -> { conversion_jobs.count }, 1 do
+          post documents_path, params: {
+            document: { source_pdfs: [ uploaded_file(filename: "original.pdf"), uploaded_file(filename: "copie.pdf") ] }
+          }
+        end
+      end
+    end
+
+    assert_redirected_to documents_path
+    assert_equal "copie.pdf a déjà été importé.", flash[:alert]
   end
 
   test "ne persiste rien lorsque le fichier n'est pas un PDF" do
@@ -44,9 +127,9 @@ class DocumentsControllerTest < ActionDispatch::IntegrationTest
 
     assert_no_difference -> { Document.count } do
       assert_no_difference -> { ConversionAttempt.count } do
-        assert_no_difference -> { SolidQueue::Job.count } do
+        assert_no_difference -> { conversion_jobs.count } do
           post documents_path, params: {
-            document: { source_pdf: fixture_file_upload(invalid.path, "application/pdf", true) }
+            document: { source_pdfs: [ fixture_file_upload(invalid.path, "application/pdf", true) ] }
           }
         end
       end
@@ -58,17 +141,93 @@ class DocumentsControllerTest < ActionDispatch::IntegrationTest
     invalid.close!
   end
 
-  test "annule le document et la tentative si la mise en file échoue" do
-    original = ConvertDocumentJob.method(:perform_later)
-    ConvertDocumentJob.define_singleton_method(:perform_later) { |_| raise ActiveJob::EnqueueError, "queue indisponible" }
+  test "annule tout le lot lorsqu'un des fichiers n'est pas un PDF" do
+    invalid = Tempfile.new([ "invalid", ".pdf" ])
+    invalid.write("texte")
+    invalid.rewind
 
     assert_no_difference -> { Document.count } do
       assert_no_difference -> { ConversionAttempt.count } do
-        assert_raises(ActiveJob::EnqueueError) do
-          post documents_path, params: { document: { source_pdf: uploaded_file } }
+        assert_no_difference -> { conversion_jobs.count } do
+          post documents_path, params: {
+            document: {
+              source_pdfs: [
+                uploaded_file,
+                fixture_file_upload(invalid.path, "application/pdf", true)
+              ]
+            }
+          }
         end
       end
     end
+
+    assert_response :unprocessable_content
+    assert_includes response.body, "signature d’un PDF"
+    assert_select "nav[aria-label='Navigation principale'] a[href='#{root_path}'][aria-current='page']", text: "Importer"
+  ensure
+    invalid.close!
+  end
+
+  test "rend visible l'échec de mise en file de conversion" do
+    original = ConvertDocumentJob.method(:perform_later)
+    ConvertDocumentJob.define_singleton_method(:perform_later) { |_| raise ActiveJob::EnqueueError, "queue indisponible" }
+
+    assert_difference -> { Document.count }, 1 do
+      assert_difference -> { ConversionAttempt.count }, 1 do
+        assert_no_difference -> { conversion_jobs.count } do
+          post documents_path, params: { document: { source_pdfs: [ uploaded_file ] } }
+        end
+      end
+    end
+
+    attempt = Document.order(:id).last.current_attempt
+    assert_redirected_to documents_path
+    assert_predicate attempt, :failed?
+    assert_equal "enqueue_failed", attempt.error_code
+    assert_equal "queue indisponible", attempt.error_message
+    assert_includes flash[:alert], "n'a pas pu être mis en file de conversion"
+  ensure
+    ConvertDocumentJob.define_singleton_method(:perform_later, original)
+  end
+
+  test "rend visible l'échec de stockage du PDF source" do
+    service = ActiveStorage::Blob.service
+    original_upload = service.method(:upload)
+    service.define_singleton_method(:upload) do |_key, _io, **_options|
+      raise IOError, "disque plein"
+    end
+
+    assert_no_difference -> { Document.count } do
+      assert_no_difference -> { ConversionAttempt.count } do
+        assert_no_difference -> { conversion_jobs.count } do
+          post documents_path, params: { document: { source_pdfs: [ uploaded_file ] } }
+        end
+      end
+    end
+
+    assert_redirected_to documents_path
+    assert_includes flash[:alert], "n'a pas pu être stocké sur la machine hôte"
+  ensure
+    service.define_singleton_method(:upload, original_upload) if service && original_upload
+  end
+
+  test "rend visible une mise en file de conversion refusée sans exception" do
+    original = ConvertDocumentJob.method(:perform_later)
+    ConvertDocumentJob.define_singleton_method(:perform_later) { |_| false }
+
+    assert_difference -> { Document.count }, 1 do
+      assert_difference -> { ConversionAttempt.count }, 1 do
+        assert_no_difference -> { conversion_jobs.count } do
+          post documents_path, params: { document: { source_pdfs: [ uploaded_file ] } }
+        end
+      end
+    end
+
+    attempt = Document.order(:id).last.current_attempt
+    assert_redirected_to documents_path
+    assert_predicate attempt, :failed?
+    assert_equal "enqueue_failed", attempt.error_code
+    assert_equal "Solid Queue a refusé le job de conversion.", attempt.error_message
   ensure
     ConvertDocumentJob.define_singleton_method(:perform_later, original)
   end
@@ -86,6 +245,8 @@ class DocumentsControllerTest < ActionDispatch::IntegrationTest
     assert_operator stream, :<, frame
     assert_select %(main[data-controller="cable-reconcile"])
     assert_select %(turbo-frame#document_#{document.id})
+    assert_select "a[href='#{root_path}']", text: "Nouveau document", count: 0
+    assert_select "a[href='#{documents_path}'][data-turbo-frame='_top']", text: "Documents"
     assert_select %(time[data-controller="elapsed-time"][data-elapsed-time-started-at-value="#{attempt.created_at.iso8601}"])
   end
 
@@ -557,12 +718,22 @@ class DocumentsControllerTest < ActionDispatch::IntegrationTest
     SolidQueue::Job.where(queue_name: "math_qualifications")
   end
 
-  def uploaded_file
-    fixture_file_upload(REFERENCE_PDF, "application/pdf", true)
+  def uploaded_file(filename: File.basename(REFERENCE_PDF))
+    Rack::Test::UploadedFile.new(REFERENCE_PDF, "application/pdf", true, original_filename: filename)
   end
 
-  def create_document_with_attempt
-    document = Document.create_from_pdf!(uploaded_file)
+  def unique_uploaded_file(filename: "document-#{SecureRandom.hex(4)}.pdf")
+    file = Tempfile.new([ "document", ".pdf" ])
+    file.binmode
+    file.write("%PDF-#{SecureRandom.uuid}")
+    file.rewind
+    (@uploaded_tempfiles ||= []) << file
+
+    Rack::Test::UploadedFile.new(file.path, "application/pdf", true, original_filename: filename)
+  end
+
+  def create_document_with_attempt(upload = unique_uploaded_file)
+    document = Document.create_from_pdf!(upload)
     attempt = document.start_conversion!(conversion_options: DoclingClient.conversion_options)
     [ document, attempt ]
   end

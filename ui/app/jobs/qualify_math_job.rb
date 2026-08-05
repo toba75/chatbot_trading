@@ -19,7 +19,7 @@ class QualifyMathJob < ApplicationJob
   class InterruptedExecution < StandardError; end
 
   queue_as :math_qualifications
-  self.enqueue_after_transaction_commit = false
+  self.enqueue_after_transaction_commit = true
 
   def perform(qualification)
     return unless begin_qualification!(qualification)
@@ -52,14 +52,14 @@ class QualifyMathJob < ApplicationJob
     interrupted = false
     started = false
     qualification.with_lock do
-      if qualification.queued? && !qualification.current_contract?
+      if qualification_waiting_for_job?(qualification) && !qualification.current_contract?
         qualification.update!(
           status: "failed",
           error_code: "obsolete_contract",
           error_message: "Cette qualification historique doit être recréée avec le contrat courant.",
           completed_at: Time.current
         )
-      elsif qualification.queued?
+      elsif qualification_ready_for_job?(qualification)
         qualification.update!(
           status: "running",
           phase: "source_analysis",
@@ -88,6 +88,15 @@ class QualifyMathJob < ApplicationJob
 
   def math_qualification_client
     MathQualificationClient.new
+  end
+
+  def qualification_waiting_for_job?(qualification)
+    qualification.staging? || qualification.queued?
+  end
+
+  def qualification_ready_for_job?(qualification)
+    qualification_waiting_for_job?(qualification) &&
+      (qualification.execution_job_id.blank? || qualification.execution_job_id == job_id)
   end
 
   def open_inputs(qualification)
@@ -119,7 +128,10 @@ class QualifyMathJob < ApplicationJob
         completed_units: 0,
         total_units: 1
       )
-      attach_result(qualification, result)
+    end
+    attach_result(qualification, result)
+    qualification.with_lock do
+      ensure_active!(qualification)
       qualification.update!(
         status: "succeeded",
         verdict: verdict,
@@ -311,14 +323,23 @@ class QualifyMathJob < ApplicationJob
   end
 
   def persist_failure!(qualification, error)
+    output_error_message = nil
+    qualification.with_lock { return unless active?(qualification) }
+    if error.result
+      begin
+        attach_partial(qualification, error.result)
+      rescue StandardError => output_error
+        output_error_message = "Les preuves partielles n'ont pas pu être stockées : #{output_error.message}"
+      end
+    end
+
     qualification.with_lock do
       return unless active?(qualification)
 
-      attach_partial(qualification, error.result) if error.result
       qualification.update!(
         status: "failed",
         error_code: error.code,
-        error_message: error.message.truncate(500),
+        error_message: [ error.message, output_error_message ].compact.join(" ").truncate(500),
         completed_at: Time.current
       )
     end

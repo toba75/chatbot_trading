@@ -3,12 +3,44 @@
   <head>
     <title><%= content_for(:title) || t("application_name") %></title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="theme-color" content="#163a32">
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
     <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
     <%= javascript_importmap_tags %>
   </head>
   <body>
-    <%= yield %>
+    <header class="app-header">
+      <div class="app-header__inner">
+        <%= link_to root_path, class: "app-brand", aria: { label: "Accueil #{t("application_name")}" } do %>
+          <span class="app-brand__mark" aria-hidden="true">D</span>
+          <span class="app-brand__name">
+            <strong><%= t("application_name") %></strong>
+            <small>Atelier documentaire</small>
+          </span>
+        <% end %>
+
+        <% import_active = action_name.in?(%w[new create]) %>
+        <nav class="app-nav" aria-label="Navigation principale">
+          <%= link_to "Importer", root_path,
+            class: class_names("app-nav__link", active: import_active),
+            aria: { current: import_active ? "page" : nil } %>
+          <%= link_to "Documents", documents_path,
+            class: class_names("app-nav__link", active: !import_active),
+            aria: { current: import_active ? nil : "page" } %>
+        </nav>
+      </div>
+    </header>
+
+    <div class="app-content">
+      <% if flash[:alert].present? %>
+        <p class="flash-message flash-message--alert" role="alert"><%= flash[:alert] %></p>
+      <% end %>
+      <% if flash[:notice].present? %>
+        <p class="flash-message flash-message--notice" role="status"><%= flash[:notice] %></p>
+      <% end %>
+
+      <%= yield %>
+    </div>
   </body>
 </html>

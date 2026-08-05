@@ -18,6 +18,28 @@ docker compose --env-file .env.rails -f compose.rails.yaml build setup
 Le fichier `.env.docling-serve` et les actifs Granite qualifiés doivent déjà
 être présents selon le README racine.
 
+Les fichiers Active Storage sont montés directement sur l’hôte. Par défaut,
+`.env.rails.example` sépare `development` et `test` dans `data/development/active_storage`
+et `data/test/active_storage`. Pour `production`, renseigner un fichier
+d’environnement dédié avec `RAILS_ENV=production` et un
+`RAILS_ACTIVE_STORAGE_HOST_PATH` propre à la production, par exemple
+`./data/production/active_storage`.
+
+Si une version précédente a déjà écrit des fichiers dans le volume Docker
+`chatbot_trading_rails_storage`, les copier vers le dossier hôte avant le
+premier démarrage avec cette configuration :
+
+```powershell
+New-Item -ItemType Directory -Force data\development\active_storage | Out-Null
+docker run --rm `
+  -v chatbot_trading_rails_storage:/from:ro `
+  -v "${PWD}\data\development\active_storage:/to" `
+  alpine:3.20 sh -c "cp -a /from/. /to/"
+```
+
+Adapter le chemin de destination si les fichiers doivent rejoindre un autre
+environnement, par exemple `data\production\active_storage`.
+
 ## Démarrage
 
 ```powershell

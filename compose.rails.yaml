@@ -1,14 +1,17 @@
 x-rails-environment: &rails_environment
-  RAILS_ENV: development
+  RAILS_ENV: "${RAILS_ENV:-development}"
   POSTGRES_HOST: postgres
   POSTGRES_PORT: "5432"
   POSTGRES_USER: "${RAILS_POSTGRES_USER:?RAILS_POSTGRES_USER requis}"
   POSTGRES_PASSWORD: "${RAILS_POSTGRES_PASSWORD:?RAILS_POSTGRES_PASSWORD requis}"
+  SECRET_KEY_BASE: "${SECRET_KEY_BASE:?SECRET_KEY_BASE requis}"
   PRIMARY_DATABASE: "${RAILS_PRIMARY_DATABASE:?RAILS_PRIMARY_DATABASE requis}"
   CABLE_DATABASE: "${RAILS_CABLE_DATABASE:?RAILS_CABLE_DATABASE requis}"
   TEST_PRIMARY_DATABASE: "${RAILS_TEST_PRIMARY_DATABASE:?RAILS_TEST_PRIMARY_DATABASE requis}"
   TEST_CABLE_DATABASE: "${RAILS_TEST_CABLE_DATABASE:?RAILS_TEST_CABLE_DATABASE requis}"
   RAILS_MAX_THREADS: "${RAILS_MAX_THREADS:?RAILS_MAX_THREADS requis}"
+  RAILS_ASSUME_SSL: "${RAILS_ASSUME_SSL:?RAILS_ASSUME_SSL requis}"
+  RAILS_FORCE_SSL: "${RAILS_FORCE_SSL:?RAILS_FORCE_SSL requis}"
   SOLID_CABLE_POLLING_INTERVAL: "${SOLID_CABLE_POLLING_INTERVAL:?SOLID_CABLE_POLLING_INTERVAL requis}"
   SOLID_CABLE_MESSAGE_RETENTION_SECONDS: "${SOLID_CABLE_MESSAGE_RETENTION_SECONDS:?SOLID_CABLE_MESSAGE_RETENTION_SECONDS requis}"
   SOLID_QUEUE_DEFAULT_THREADS: "${SOLID_QUEUE_DEFAULT_THREADS:?SOLID_QUEUE_DEFAULT_THREADS requis}"
@@ -33,13 +36,20 @@ x-rails-environment: &rails_environment
   MATH_AUDIT_MAX_REPORT_BYTES: "${MATH_AUDIT_MAX_REPORT_BYTES:?MATH_AUDIT_MAX_REPORT_BYTES requis}"
   MATH_AUDIT_MAX_EVENT_BYTES: "${MATH_AUDIT_MAX_EVENT_BYTES:?MATH_AUDIT_MAX_EVENT_BYTES requis}"
   PDF_MAX_BYTES: "${PDF_MAX_BYTES:?PDF_MAX_BYTES requis}"
+  RAILS_ACTIVE_STORAGE_ROOT: "${RAILS_ACTIVE_STORAGE_ROOT:-/app/storage}"
+  RAILS_TEST_ACTIVE_STORAGE_ROOT: "${RAILS_TEST_ACTIVE_STORAGE_ROOT:-/app/tmp/storage}"
   SYSTEM_TEST_APP_URL: "${SYSTEM_TEST_APP_URL:?SYSTEM_TEST_APP_URL requis}"
   SYSTEM_TEST_WAIT_SECONDS: "${SYSTEM_TEST_WAIT_SECONDS:?SYSTEM_TEST_WAIT_SECONDS requis}"
 
 x-rails-volumes: &rails_volumes
   - ./ui:/app
   - ./reference:/reference:ro
-  - rails_storage:/app/storage
+  - "${RAILS_ACTIVE_STORAGE_HOST_PATH:?RAILS_ACTIVE_STORAGE_HOST_PATH requis}:/app/storage"
+
+x-rails-test-volumes: &rails_test_volumes
+  - ./ui:/app
+  - ./reference:/reference:ro
+  - "${RAILS_TEST_ACTIVE_STORAGE_HOST_PATH:?RAILS_TEST_ACTIVE_STORAGE_HOST_PATH requis}:/app/tmp/storage"
 
 services:
   math-audit:
@@ -108,7 +118,10 @@ services:
     image: chatbot-trading-ui:development
     build:
       context: ./ui
-    command: bundle exec rails db:prepare
+    command:
+      - /bin/sh
+      - -lc
+      - bundle exec rails db:prepare && if [ "${RAILS_ENV:-development}" = "production" ]; then bundle exec rails assets:precompile; fi
     environment: *rails_environment
     volumes: *rails_volumes
     depends_on:
@@ -126,6 +139,8 @@ services:
     depends_on:
       setup:
         condition: service_completed_successfully
+      jobs:
+        condition: service_started
     cpus: "${RAILS_WEB_CPUS:?RAILS_WEB_CPUS requis}"
     mem_limit: "${RAILS_WEB_MEMORY:?RAILS_WEB_MEMORY requis}"
     pids_limit: "${RAILS_WEB_PIDS_LIMIT:?RAILS_WEB_PIDS_LIMIT requis}"
@@ -152,7 +167,7 @@ services:
     environment:
       <<: *rails_environment
       RAILS_ENV: test
-    volumes: *rails_volumes
+    volumes: *rails_test_volumes
     depends_on:
       setup:
         condition: service_completed_successfully
@@ -166,11 +181,7 @@ services:
     environment:
       <<: *rails_environment
       RAILS_ENV: test
-    volumes:
-      - ./ui:/app
-      - ./reference:/reference:ro
-    tmpfs:
-      - /app/tmp/storage:size=512m,mode=1777
+    volumes: *rails_test_volumes
     depends_on:
       test-setup:
         condition: service_completed_successfully
@@ -179,4 +190,3 @@ services:
 
 volumes:
   rails_postgres:
-  rails_storage:
