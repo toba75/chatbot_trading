@@ -36,6 +36,12 @@ brute, le `DoclingDocument` JSON, les DocTags, l’HTML et le Markdown. Une erre
 réseau, HTTP ou Docling passe la tentative à `failed` et conserve toutes les
 sorties déjà reçues. Il n’existe ni retry automatique ni moteur de secours.
 
+Le contrat exige une provenance canonique pour chaque élément qui porte du
+contenu. Un élément de `texts` dont `text` et `orig` sont exactement vides peut
+avoir une provenance vide : il reste intact dans le `DoclingDocument` et son
+`self_ref` est journalisé. Tout autre élément sans provenance rend la réponse
+incomplète.
+
 Le job inscrit son `job_id` dans la tentative lorsqu’il prend le travail. Si ce
 même job est redélivré alors que la tentative est encore `converting`, son
 processus précédent a disparu sans produire d’état terminal : la tentative passe
@@ -156,6 +162,15 @@ le caractère et le programme embarqué fournit le GID ; la trace rendue doit
 confirmer ce GID. Le nom local d'une ressource, par exemple `/G1`, ne constitue
 jamais une règle d'acceptation.
 
+Les polices simples appliquent aussi `WinAnsiEncoding` et leurs `Differences`.
+Une CMap `ToUnicode` qui annonce deux octets tout en ne mappant que les codes
+simples d'un octet est admise comme anomalie nommée ; les CMap Type0 restent
+strictes. Un caractère synthétique MuPDF de GID `-1` n'est retiré que s'il est
+sans largeur et possède un unique glyphe jumeau de même police, origine, taille
+et boîte englobante. Toute autre valeur négative ou ambiguïté échoue. Les
+divergences Unicode de `rawdict` restent attachées à chaque preuve, et deux
+ressources homonymes de capacité différente rendent l'association ambiguë.
+
 Une page qui contient encore une police non supportée est déclarée
 `partially_traced` et chaque police ignorée est nommée dans le rapport. Aucun
 fragment de cette page ne peut produire une correction : une trace amputée ne
@@ -192,6 +207,16 @@ une expression structurée mais que les fragments `$...$` de Docling ne forment
 pas du LaTeX analysable, le candidat est contradictoire. La correction ne devient
 cependant acceptable que si sa séquence et toutes ses relations correspondent
 exactement à cette preuve source ; elle produit alors un unique MathML inline.
+Avant de remplacer un fragment de texte mixte, le pipeline reconstruit ses
+fragments `$...$`, fusionne leurs indices ou exposants consécutifs, puis exige
+la séquence exacte des tokens PDF, dans leur ordre brut ou dans leur ordre
+canonique prouvé. Une permutation ou un caractère voisin interdit la
+correction. Les phrases non structurées restent refusées, y compris sous une
+forme Unicode décomposée. Un connecteur textuel comme `if` reste refusé tant
+que son rôle textuel n'est pas distingué des variables par la preuve source.
+Une lettre romaine n'est rattachée à un indice mathématique voisin que si leur
+taille, leur ligne de base et leur proximité prouvent cette unité ; un exposant
+ambigu pouvant être un appel de note n'est pas absorbé par cette règle.
 La première proposition est construite de façon déterministe à partir de cette
 séquence et de ces relations. Elle n'est retenue qu'après une nouvelle analyse
 LaTeX qui reproduit exactement la preuve. Si cette sérialisation ressemble à un
@@ -216,6 +241,15 @@ correspondance partielle sans ces preuves reste `not_linked`. Une région conten
 incomplet restent trois causes distinctes. Le rapport expose aussi l’étape
 d’échec du candidat : acquisition, alignement, analyse LaTeX ou structure
 mathématique.
+
+Cette normalisation géométrique n'est appliquée que si les axes horizontal et
+vertical prouvent la même échelle uniforme ; l'échelle et le résidu maximal sont
+conservés dans le rapport. Une transformation non uniforme reste refusée.
+Quand Docling sépare une base et son indice, par exemple `σ$_{j,t}$`, la taille
+et la ligne de base des glyphes PDF doivent prouver la relation. Si la signature
+Docling est sémantiquement exacte mais non rendable comme une formule unique,
+une cible `render_normalization` remplace le charspan complet par un MathML
+inline reconstruit déterministement ; elle n'appelle pas le service vision.
 
 Une correction acceptée crée une copie validée du `DoclingDocument`. Seul le
 charspan prouvé de cette copie change ; `orig`, les provenances source et le
@@ -254,8 +288,9 @@ Une région source établie sans candidat Docling reste une cible d'acquisition
 observable, mais elle n'est pas insérée dans le flux visible : aucune position
 Docling ou relation de lecture n'est alors prouvée. Elle est rejetée avec
 `formula_insertion_rendering_unproven`. De même, une cible fusionnée qui
-absorberait du contexte, une correction qui contient de la prose ou un mot
-mathématique sérialisé comme une suite ambiguë de variables est refusée. Une
+absorberait du contexte, une correction dont les tokens dépassent la preuve PDF,
+une phrase non structurée ou un mot mathématique sérialisé comme une suite
+ambiguë de variables est refusé. Une
 commande LaTeX qui subsiste dans le MathML visible fait échouer l'export.
 
 Pour une correction complète, le LaTeX brut remplace le nœud et son `<math>`

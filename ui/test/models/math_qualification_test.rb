@@ -13,7 +13,7 @@ class MathQualificationTest < ActiveSupport::TestCase
     assert_predicate qualification, :staging?
     assert_equal "queued", qualification.phase
     assert_equal "2.1", qualification.contract_version
-    assert_equal "0.6.1", qualification.analyzer_version
+    assert_equal "0.6.2", qualification.analyzer_version
     assert_equal "a" * 64, qualification.source_sha256
     assert_equal "b" * 64, qualification.docling_document_sha256
     assert_equal 64, qualification.input_fingerprint.length

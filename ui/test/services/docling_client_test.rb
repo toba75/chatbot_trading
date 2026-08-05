@@ -120,6 +120,70 @@ class DoclingClientTest < ActiveSupport::TestCase
     assert_equal "incomplete_response", error.code
   end
 
+  test "accepte et signale un texte vide sans provenance sans le modifier" do
+    payload = JSON.parse(successful_body)
+    empty_text = {
+      "self_ref" => "#/texts/0",
+      "label" => "text",
+      "text" => "",
+      "orig" => "",
+      "prov" => [],
+      "parent" => { "$ref" => "#/body" }
+    }
+    payload.fetch("document").fetch("json_content")["texts"] = [ empty_text ]
+    client = DoclingClient.new(
+      transport: RecordingTransport.new(Response.new(code: "200", body: JSON.generate(payload)))
+    )
+    log = StringIO.new
+    original_logger = Rails.logger
+    Rails.logger = ActiveSupport::Logger.new(log)
+
+    result = begin
+      File.open("/reference/ostrading-environment-qualification-5-pages.pdf", "rb") do |file|
+        client.convert(file: file, filename: "reference.pdf", options: DoclingClient.conversion_options)
+      end
+    ensure
+      Rails.logger = original_logger
+    end
+
+    assert_equal empty_text, result.payload.dig("document", "json_content", "texts", 0)
+    assert_includes log.string, "Docling text without provenance preserved: #/texts/0"
+  end
+
+  test "refuse un tableau vide sans provenance" do
+    payload = JSON.parse(successful_body)
+    payload.fetch("document").fetch("json_content")["tables"] = [ { "prov" => [] } ]
+    client = DoclingClient.new(
+      transport: RecordingTransport.new(Response.new(code: "200", body: JSON.generate(payload)))
+    )
+
+    error = assert_raises(DoclingClient::ConversionError) do
+      File.open("/reference/ostrading-environment-qualification-5-pages.pdf", "rb") do |file|
+        client.convert(file: file, filename: "reference.pdf", options: DoclingClient.conversion_options)
+      end
+    end
+
+    assert_equal "incomplete_response", error.code
+  end
+
+  test "refuse un texte vide sans provenance et sans référence canonique" do
+    payload = JSON.parse(successful_body)
+    payload.fetch("document").fetch("json_content")["texts"] = [
+      { "text" => "", "orig" => "", "prov" => [] }
+    ]
+    client = DoclingClient.new(
+      transport: RecordingTransport.new(Response.new(code: "200", body: JSON.generate(payload)))
+    )
+
+    error = assert_raises(DoclingClient::ConversionError) do
+      File.open("/reference/ostrading-environment-qualification-5-pages.pdf", "rb") do |file|
+        client.convert(file: file, filename: "reference.pdf", options: DoclingClient.conversion_options)
+      end
+    end
+
+    assert_equal "incomplete_response", error.code
+  end
+
   test "refuse une image de page sans octets" do
     payload = JSON.parse(successful_body)
     payload.fetch("document").fetch("json_content").fetch("pages").fetch("1").fetch("image")["uri"] =

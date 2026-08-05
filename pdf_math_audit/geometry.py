@@ -11,15 +11,39 @@ PAGE_SIZE_TOLERANCE_POINTS = 0.5
 def page_geometry_matches(
     pdf_box: list[float], docling_width: float, docling_height: float
 ) -> bool:
-    return all(
-        math.isclose(value, expected, abs_tol=PAGE_SIZE_TOLERANCE_POINTS)
-        for value, expected in (
-            (pdf_box[0], 0),
-            (pdf_box[1], 0),
-            (pdf_box[2] - pdf_box[0], docling_width),
-            (pdf_box[3] - pdf_box[1], docling_height),
-        )
+    return page_geometry_scale(pdf_box, docling_width, docling_height) is not None
+
+
+def page_geometry_scale(
+    pdf_box: list[float], docling_width: float, docling_height: float
+) -> tuple[float, float] | None:
+    if (
+        not math.isclose(pdf_box[0], 0, abs_tol=PAGE_SIZE_TOLERANCE_POINTS)
+        or not math.isclose(pdf_box[1], 0, abs_tol=PAGE_SIZE_TOLERANCE_POINTS)
+        or docling_width <= 0
+        or docling_height <= 0
+    ):
+        return None
+    pdf_width = pdf_box[2] - pdf_box[0]
+    pdf_height = pdf_box[3] - pdf_box[1]
+    scale_x = pdf_width / docling_width
+    scale_y = pdf_height / docling_height
+    if not math.isclose(scale_x, scale_y, rel_tol=1e-3):
+        return None
+    scale = (scale_x + scale_y) / 2
+    residual = max(
+        abs(docling_width * scale - pdf_width),
+        abs(docling_height * scale - pdf_height),
     )
+    if residual > PAGE_SIZE_TOLERANCE_POINTS:
+        return None
+    return scale, residual
+
+
+def scale_bbox(
+    bbox: tuple[float, float, float, float] | None, scale: float
+) -> tuple[float, float, float, float] | None:
+    return None if bbox is None else tuple(value * scale for value in bbox)
 
 
 def overlaps(region: tuple[float, ...], glyph: list[float]) -> bool:

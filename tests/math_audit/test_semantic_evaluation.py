@@ -100,6 +100,47 @@ def test_compare_la_sequence_complete_sans_accepter_une_sous_chaine(
     assert metrics["overall"]["candidate_statuses"][expected_status] == 1
 
 
+def test_reconstruit_un_indice_de_taille_reduite_proche_de_la_ligne_de_base() -> None:
+    glyphs = [
+        _glyph(0, "σ", origin_x=10.0, origin_y=20.0, size=11.0),
+        _glyph(1, "j", origin_x=16.0, origin_y=21.0, size=7.0),
+        _glyph(2, ",", origin_x=19.0, origin_y=21.0, size=7.0),
+        _glyph(3, "t", origin_x=22.0, origin_y=21.0, size=7.0),
+    ]
+
+    regions, _metrics = evaluate_regions([_region(r"\sigma_{j,t}", 4)], glyphs)
+
+    result = regions[0]
+    assert result["source_relation_signature"] == [
+        "σ",
+        "<sub>",
+        "j",
+        ",",
+        "t",
+        "</sub>",
+    ]
+    assert [relation["role"] for relation in result["source_relations"]] == [
+        "subscript",
+        "subscript",
+        "subscript",
+    ]
+    assert result["verdict"] == "conformant_within_scope"
+
+
+def test_ne_rattache_pas_un_petit_glyphe_horizontalement_eloigne() -> None:
+    glyphs = [
+        _glyph(0, "x", origin_x=0.0, origin_y=20.0, size=10.0),
+        _glyph(1, "i", origin_x=100.0, origin_y=20.6, size=7.0),
+    ]
+
+    regions, _metrics = evaluate_regions([_region("x_i", 2)], glyphs)
+
+    result = regions[0]
+    assert result["semantic_status"] == "not_established"
+    assert result["source_relation_reason"] == "source_script_anchor_missing"
+    assert result["verdict"] == "non_verifiable"
+
+
 def test_ne_transforme_pas_une_absence_de_candidat_en_contradiction() -> None:
     source = "wx−b=0"
 
@@ -210,6 +251,58 @@ def test_resout_un_conflit_unicode_par_un_nom_cff_tex_explicitement_supporte() -
         {
             "code": "cff_tex_glyph_name_authoritative",
             "message": "Le nom du glyphe CFF TeX résout les signaux Unicode divergents",
+        }
+    ]
+
+
+def test_signale_et_ecarte_un_tounicode_de_controle_quand_agl_fait_autorite() -> None:
+    glyph = _glyph(0, "Γ", to_unicode="\x00", rendered_unicode="Γ")
+    glyph["glyph_name"] = "Gamma"
+
+    regions, _metrics = evaluate_regions([_region(r"\Gamma", 1)], [glyph])
+
+    result = regions[0]
+    assert result["semantic_status"] == "established"
+    assert result["candidate_status"] == "matching"
+    assert result["source_signal_conflicts"] == []
+    assert result["semantic_resolution_rules"] == [
+        {
+            "code": "invalid_tounicode_control_ignored_for_agl_source",
+            "message": (
+                "Le ToUnicode de contrôle invalide est écarté ; "
+                "le nom de glyphe AGL reste l’autorité source"
+            ),
+        }
+    ]
+
+
+def test_conserve_un_conflit_agl_rendu_malgre_un_tounicode_de_controle() -> None:
+    glyph = _glyph(0, "x", to_unicode="\x00", rendered_unicode="y")
+
+    regions, _metrics = evaluate_regions([_region("x", 1)], [glyph])
+
+    result = regions[0]
+    assert result["semantic_status"] == "conflicting"
+    assert result["candidate_status"] == "not_evaluated"
+    assert result["verdict"] == "non_verifiable"
+    assert result["source_signal_conflicts"] == [0]
+
+
+def test_refuse_un_tounicode_de_controle_lorsqu_il_est_l_autorite_source() -> None:
+    glyph = _glyph(0, "\x00", to_unicode="\x00", rendered_unicode="Γ")
+    glyph["source_unicode_method"] = "to_unicode"
+    glyph["agl_unicode"] = None
+
+    regions, _metrics = evaluate_regions([_region("x", 1)], [glyph])
+
+    result = regions[0]
+    assert result["semantic_status"] == "not_established"
+    assert result["candidate_status"] == "not_evaluated"
+    assert result["verdict"] == "non_verifiable"
+    assert result["semantic_reasons"] == [
+        {
+            "code": "authoritative_tounicode_control_invalid",
+            "message": "Le ToUnicode faisant autorité contient un caractère de contrôle",
         }
     ]
 
@@ -792,7 +885,7 @@ def test_canonicalise_des_indices_dans_deux_exposants_inline() -> None:
     assert regions[0]["verdict"] == "conformant_within_scope"
 
 
-def test_refuse_des_fragments_latex_invalides_face_a_une_structure_prouvee() -> None:
+def test_reconstruit_des_fragments_docling_face_a_une_structure_prouvee() -> None:
     glyphs = [
         _glyph(0, "f", origin_x=0, origin_y=10, size=10),
         _glyph(1, "w", origin_x=1, origin_y=11.5, size=7),
@@ -812,9 +905,9 @@ def test_refuse_des_fragments_latex_invalides_face_a_une_structure_prouvee() -> 
         "b",
         "</sub>",
     ]
-    assert regions[0]["candidate_failure_stage"] == "latex_parsing"
-    assert regions[0]["candidate_status"] == "contradicting"
-    assert regions[0]["verdict"] == "contradicted"
+    assert regions[0]["candidate_failure_stage"] is None
+    assert regions[0]["candidate_status"] == "matching"
+    assert regions[0]["verdict"] == "conformant_within_scope"
 
 
 def test_refuse_d_aplatir_un_indice_imbrique_de_meme_corps() -> None:

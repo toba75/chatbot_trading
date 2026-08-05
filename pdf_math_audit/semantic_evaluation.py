@@ -125,6 +125,21 @@ def _source_semantics(
             ],
             [],
         )
+    if any(
+        glyph.get("source_unicode_method") == "to_unicode"
+        and _invalid_tounicode_control(glyph)
+        for glyph in glyphs
+    ):
+        return (
+            "not_established",
+            [
+                _reason(
+                    "authoritative_tounicode_control_invalid",
+                    "Le ToUnicode faisant autorité contient un caractère de contrôle",
+                )
+            ],
+            [],
+        )
     conflicts = _source_signal_conflicts(glyphs)
     if conflicts:
         return (
@@ -143,6 +158,18 @@ def _source_semantics(
             _reason(
                 "cff_tex_glyph_name_authoritative",
                 "Le nom du glyphe CFF TeX résout les signaux Unicode divergents",
+            )
+        )
+    if any(
+        glyph.get("source_unicode_method") == "agl"
+        and _invalid_tounicode_control(glyph)
+        for glyph in glyphs
+    ):
+        resolution_rules.append(
+            _reason(
+                "invalid_tounicode_control_ignored_for_agl_source",
+                "Le ToUnicode de contrôle invalide est écarté ; "
+                "le nom de glyphe AGL reste l’autorité source",
             )
         )
     return "established", [], resolution_rules
@@ -167,18 +194,29 @@ def _is_extensible_delimiter_fragment(glyph: dict[str, Any]) -> bool:
     )
 
 
+def _invalid_tounicode_control(glyph: dict[str, Any]) -> bool:
+    value = glyph.get("to_unicode")
+    return isinstance(value, str) and any(
+        unicodedata.category(character) in {"Cc", "Cs"} for character in value
+    )
+
+
 def _source_signal_conflicts(glyphs: list[dict[str, Any]]) -> list[int]:
-    return [
-        glyph["sequence_index"]
-        for glyph in glyphs
-        if not _tex_glyph_name_resolves(glyph)
-        and not _is_extensible_delimiter_fragment(glyph)
-        and len(
-            {glyph["unicode"], glyph["rendered_unicode"]}
-            | ({glyph["to_unicode"]} if glyph["to_unicode"] is not None else set())
-        )
-        > 1
-    ]
+    conflicts = []
+    for glyph in glyphs:
+        if _tex_glyph_name_resolves(glyph) or _is_extensible_delimiter_fragment(
+            glyph
+        ):
+            continue
+        signals = {glyph["unicode"], glyph["rendered_unicode"]}
+        if not (
+            glyph.get("source_unicode_method") == "agl"
+            and _invalid_tounicode_control(glyph)
+        ) and glyph["to_unicode"] is not None:
+            signals.add(glyph["to_unicode"])
+        if len(signals) > 1:
+            conflicts.append(glyph["sequence_index"])
+    return conflicts
 
 
 def _is_subsequence(candidate: list[str], source: list[str]) -> bool:

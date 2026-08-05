@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import html
 import re
+import unicodedata
 from typing import Any
 
 from docling_core.types.doc import DoclingDocument
@@ -16,10 +17,65 @@ from pdf_math_audit.relation_signature import normalize_relation_signature
 
 _SPACED_WORD = re.compile(r"(?<![A-Za-z])(?:[A-Za-z]\s+){3,}[A-Za-z](?![A-Za-z])")
 _RAW_COMMAND = re.compile(r"\\[A-Za-z]+")
+_PROSE_PHRASE = re.compile(
+    r"[^\W\d_]{2,}(?:-[^\W\d_]+)*(?:\s+[^\W\d_]+(?:-[^\W\d_]+)*)+"
+)
+_UNPROVEN_CONNECTIVE = re.compile(
+    r"(?<![A-Za-z])(?:and|if|is|or|otherwise|when|where)(?![A-Za-z])",
+    re.IGNORECASE,
+)
 
 
-def _contains_prose(text: str) -> bool:
-    return bool(re.search(r"[A-Za-z]{2,}", text))
+def candidate_scope_reason(target: dict[str, Any]) -> str | None:
+    if target["kind"] not in {
+        "replacement",
+        "render_normalization",
+    } or target.get("candidate_format") == "latex":
+        return None
+    regions = target.get("regions", [])
+    if len(regions) != 1:
+        return "candidate_scope_unproven"
+    region = regions[0]
+    candidate_tokens = region.get("candidate_tokens")
+    source_tokens = region.get("source_tokens")
+    canonical_tokens = region.get("source_canonical_tokens")
+    if (
+        not isinstance(candidate_tokens, list)
+        or not isinstance(source_tokens, list)
+        or not isinstance(canonical_tokens, list)
+        or candidate_tokens not in (source_tokens, canonical_tokens)
+    ):
+        return "candidate_content_not_covered_by_source"
+    candidate_text = unicodedata.normalize("NFC", target.get("candidate_text", ""))
+    if _UNPROVEN_CONNECTIVE.search(candidate_text):
+        return "candidate_contains_unproven_connective"
+    definition_count = _sequence_count(
+        region.get("source_relation_signature"),
+        ["<over>", "d", "e", "f", "</over>"],
+    )
+    candidate_definitions = re.findall(r"\bdef\b", candidate_text, re.IGNORECASE)
+    if len(candidate_definitions) > definition_count:
+        return "candidate_contains_unstructured_prose"
+    if definition_count:
+        candidate_text = re.sub(
+            r"\bdef\b",
+            "",
+            candidate_text,
+            count=definition_count,
+            flags=re.IGNORECASE,
+        )
+    if _PROSE_PHRASE.search(candidate_text):
+        return "candidate_contains_unstructured_prose"
+    return None
+
+
+def _sequence_count(value: Any, sequence: list[str]) -> int:
+    if not isinstance(value, list):
+        return 0
+    width = len(sequence)
+    return sum(
+        value[index : index + width] == sequence for index in range(len(value))
+    )
 
 
 def _normalize_renderable_latex(latex: str) -> str:
@@ -38,17 +94,14 @@ def target_ineligibility(
 ) -> str | None:
     if target["kind"] == "formula_insertion":
         return "formula_insertion_rendering_unproven"
-    if (
-        target["kind"] == "replacement"
-        and target.get("candidate_format") != "latex"
-        and _contains_prose(target.get("candidate_text", ""))
-    ):
-        return "candidate_contains_prose"
+    if reason := candidate_scope_reason(target):
+        return reason
     for region in target["regions"]:
         reason = ineligibility(
             region,
             document,
             allow_partial_formula=target["kind"] == "formula_replacement",
+            allow_render_normalization=target["kind"] == "render_normalization",
         )
         if reason is not None:
             return reason

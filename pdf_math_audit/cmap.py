@@ -82,20 +82,56 @@ def _has_valid_bfrange_destinations(entry: list[bytes]) -> bool:
     )
 
 
-def _validate_cmap(cmap: bytes, code_bytes: int) -> set[int]:
+def _validate_cmap(
+    cmap: bytes,
+    code_bytes: int,
+    *,
+    allow_simple_codespace_mismatch: bool,
+    anomalies: list[dict[str, Any]],
+) -> set[int]:
     operators = set(re.findall(rb"\bbegin([a-z]+(?:char|range))\b", cmap))
     require_supported(
         b"usecmap" not in cmap and operators <= {name.encode() for name in BLOCKS},
         "to_unicode_cmap_unsupported",
         "Construction ToUnicode non supportée",
     )
+    entries = {name: _entries(name, cmap) for name in BLOCKS}
+    codespace_widths = {
+        len(entry[offset]) // 2
+        for entry in entries["codespacerange"]
+        for offset in BLOCKS["codespacerange"][2]
+    }
+    codespace_mismatch = bool(codespace_widths) and codespace_widths != {
+        code_bytes
+    }
+    if codespace_mismatch:
+        require_supported(
+            allow_simple_codespace_mismatch
+            and code_bytes == 1
+            and codespace_widths == {2},
+            "to_unicode_cmap_unsupported",
+            "Largeur des sources ToUnicode incohérente avec la CMap",
+        )
+        anomalies.append(
+            {
+                "code": "to_unicode_codespace_width_mismatch",
+                "message": (
+                    "Codespace ToUnicode sur 2 octets ignoré pour une police simple "
+                    "à codes sur 1 octet"
+                ),
+                "declared_code_bytes": sorted(codespace_widths),
+                "effective_code_bytes": code_bytes,
+            }
+        )
+
     mapped_codes: set[int] = set()
     code_spaces: list[tuple[int, int]] = []
     for name, (_pattern, _arity, source_offsets) in BLOCKS.items():
-        for entry in _entries(name, cmap):
+        for entry in entries[name]:
             sources = [entry[offset] for offset in source_offsets]
             require_supported(
-                all(len(source) == code_bytes * 2 for source in sources),
+                (name == "codespacerange" and codespace_mismatch)
+                or all(len(source) == code_bytes * 2 for source in sources),
                 "to_unicode_cmap_unsupported",
                 "Largeur des sources ToUnicode incohérente avec la CMap",
             )
@@ -141,7 +177,12 @@ def _validate_cmap(cmap: bytes, code_bytes: int) -> set[int]:
     return mapped_codes
 
 
-def parse_to_unicode(font: Any) -> dict[int, str]:
+def parse_to_unicode(
+    font: Any,
+    *,
+    allow_simple_codespace_mismatch: bool = False,
+    anomalies: list[dict[str, Any]] | None = None,
+) -> dict[int, str]:
     stream = font.get("/ToUnicode")
     if stream is None:
         return {}
@@ -162,7 +203,12 @@ def parse_to_unicode(font: Any) -> dict[int, str]:
         "to_unicode_cmap_unsupported",
         "Seules les CMap ToUnicode sur un ou deux octets sont supportées",
     )
-    declared_codes = _validate_cmap(cmap, code_bytes)
+    declared_codes = _validate_cmap(
+        cmap,
+        code_bytes,
+        allow_simple_codespace_mismatch=allow_simple_codespace_mismatch,
+        anomalies=anomalies if anomalies is not None else [],
+    )
     mappings = {
         ord(source): destination
         for source, destination in character_map.items()

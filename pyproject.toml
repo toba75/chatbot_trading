@@ -1,6 +1,6 @@
 [project]
 name = "chatbot-trading"
-version = "0.6.1"
+version = "0.6.2"
 description = "Pipeline documentaire minimal fondé sur Docling"
 requires-python = "==3.12.8"
 dependencies = [
@@ -13,6 +13,7 @@ dependencies = [
     "pymupdf==1.27.2.2",
     "pypdf==6.10.2",
     "python-multipart>=0.0.32",
+    "reportlab==4.4.9",
     "uvicorn>=0.52.0",
 ]
 
@@ -29,7 +30,6 @@ dev = [
     "pillow==12.3.0",
     "pytest==8.4.2",
     "pytest-xdist==3.8.0",
-    "reportlab==4.4.9",
     "ruff==0.15.4",
 ]
 

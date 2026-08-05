@@ -24,6 +24,22 @@ def _missing_candidate(region: dict[str, Any]) -> bool:
     )
 
 
+def _render_normalization_required(region: dict[str, Any]) -> bool:
+    candidate = region.get("candidate_text")
+    signature = region.get("source_relation_signature")
+    return (
+        region.get("verdict") == "conformant_within_scope"
+        and region.get("candidate_format") == "mixed_text"
+        and region.get("candidate_link_status") == "linked"
+        and isinstance(candidate, str)
+        and "$" in candidate
+        and not (candidate.startswith("$") and candidate.endswith("$"))
+        and isinstance(signature, list)
+        and any(token in {"<sub>", "<sup>"} for token in signature)
+        and region.get("candidate_relation_signature") == signature
+    )
+
+
 def _target(
     kind: str,
     regions: list[dict[str, Any]],
@@ -116,7 +132,9 @@ def correction_targets(
     candidates = [
         region
         for region in regions
-        if region.get("verdict") == "contradicted" or _missing_candidate(region)
+        if region.get("verdict") == "contradicted"
+        or _missing_candidate(region)
+        or _render_normalization_required(region)
     ]
     assigned: set[str] = set()
     targets: list[dict[str, Any]] = []
@@ -166,7 +184,12 @@ def correction_targets(
     for region in candidates:
         if region["region_id"] in assigned:
             continue
-        kind = "formula_insertion" if _missing_candidate(region) else "replacement"
+        if _missing_candidate(region):
+            kind = "formula_insertion"
+        elif _render_normalization_required(region):
+            kind = "render_normalization"
+        else:
+            kind = "replacement"
         targets.append(_target(kind, [region], document))
 
     targets.sort(
@@ -207,8 +230,11 @@ def ineligibility(
     document: DoclingDocument,
     *,
     allow_partial_formula: bool = False,
+    allow_render_normalization: bool = False,
 ) -> str | None:
-    if region.get("verdict") != "contradicted":
+    if region.get("verdict") != "contradicted" and not (
+        allow_render_normalization and _render_normalization_required(region)
+    ):
         return "region_not_contradicted"
     if reason := _source_ineligibility(region):
         return reason

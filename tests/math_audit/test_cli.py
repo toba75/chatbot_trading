@@ -112,7 +112,7 @@ def test_cli_ecrit_le_rapport_et_publie_la_progression(tmp_path: Path) -> None:
     }
     assert report["contract"] == {
         "version": "2.1",
-        "analyzer_version": "0.6.1",
+        "analyzer_version": "0.6.2",
         "capability_profile": "pdf-docling-semantic-correction-v3",
         "source_sha256": hashlib.sha256(pdf_path.read_bytes()).hexdigest(),
         "docling_document_sha256": hashlib.sha256(docling_bytes).hexdigest(),

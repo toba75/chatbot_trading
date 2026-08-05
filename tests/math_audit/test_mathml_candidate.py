@@ -35,6 +35,60 @@ def test_analyse_les_jetons_et_la_structure_en_une_seule_conversion(
     assert conversions == 1
 
 
+def test_reconstruit_les_fragments_d_indices_docling_sur_une_base_unique() -> None:
+    tokens, signature, reason = candidate_analysis(
+        r"f$_{w}$$_{,}$$_{b}$ ( x )",
+        "mixed_text",
+    )
+
+    assert reason is None
+    assert tokens == list("fw,b(x)")
+    assert signature == [
+        "f",
+        "<sub>",
+        "w",
+        ",",
+        "b",
+        "</sub>",
+        "(",
+        "x",
+        ")",
+    ]
+
+
+def test_reconstruit_un_indice_docling_fragmente_en_plusieurs_groupes() -> None:
+    tokens, signature, reason = candidate_analysis(
+        r"x$_{n}$$_{-}$$_{1}$",
+        "mixed_text",
+    )
+
+    assert reason is None
+    assert tokens == list("xn−1")
+    assert signature == ["x", "<sub>", "n", "−", "1", "</sub>"]
+
+
+def test_refuse_un_fragment_mixed_text_aux_delimiteurs_dollar_incomplets() -> None:
+    tokens, signature, reason = candidate_analysis(r"x$_{i}", "mixed_text")
+
+    assert tokens is None
+    assert signature is None
+    assert reason == {
+        "code": "candidate_mixed_text_invalid",
+        "message": "Le candidat contient un fragment mathématique non refermé",
+    }
+
+
+def test_refuse_un_indice_docling_vide() -> None:
+    tokens, signature, reason = candidate_analysis(r"x$_{i}$$_{}$", "mixed_text")
+
+    assert tokens is None
+    assert signature is None
+    assert reason == {
+        "code": "candidate_mixed_text_invalid",
+        "message": "Le candidat contient un indice ou exposant vide",
+    }
+
+
 def test_normalise_dots_comme_les_trois_points_du_pdf() -> None:
     latex = r"w^{(1)}x^{(1)} + \dots + w^{(D)}x^{(D)}"
 

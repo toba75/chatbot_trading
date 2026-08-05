@@ -1,0 +1,16 @@
+[project]
+name = "pdf-inspector-spike"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+  "pdf-inspector==0.2.6",
+]
+
+[dependency-groups]
+dev = [
+  "pytest==8.4.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

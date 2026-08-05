@@ -35,9 +35,9 @@ def test_analyse_generiquement_la_trace_structurelle_du_pdf_de_reference() -> No
     )
 
     assert report["schema_version"] == "1.0"
-    assert report["analyzer_version"] == "0.6.1"
+    assert report["analyzer_version"] == "0.6.2"
     assert report["capability_profile"] == (
-        "type1-cff-type0-identity-h-truetype-form-v3"
+        "type1c-winansi-type0-truetype-scaled-page-v4"
     )
     assert report["pdf"] == {
         "filename": REFERENCE_PDF.name,

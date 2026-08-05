@@ -16,15 +16,14 @@ def _tokens(metadata: dict[str, Any]) -> set[str]:
     }
 
 
-def math_and_variable_fonts(
-    page_fonts: dict[int, dict[str, dict[str, Any]]],
+def short_variable_text(text: str) -> bool:
+    letters = text.replace(",", "")
+    return letters.isalpha() and len(letters) <= 2
+
+
+def _variable_texts(
     page_glyphs: list[dict[str, Any]],
-    page: int,
-) -> tuple[set[str], set[str]]:
-    font_tokens = {
-        resource: _tokens(metadata)
-        for resource, metadata in page_fonts[page].items()
-    }
+) -> dict[str, list[str]]:
     usage: dict[tuple[str, int, int, int], list[str]] = defaultdict(list)
     for glyph in page_glyphs:
         rawdict = glyph["rawdict"]
@@ -38,16 +37,33 @@ def math_and_variable_fonts(
         ].append(glyph["unicode"])
     texts_by_font: dict[str, list[str]] = defaultdict(list)
     for (resource, _block, _line, _span), characters in usage.items():
-        texts_by_font[resource].append("".join(characters))
+        text = "".join(characters)
+        if text.replace(",", "").isalpha():
+            texts_by_font[resource].append(text)
+    return texts_by_font
 
+
+def math_and_variable_fonts(
+    page_fonts: dict[int, dict[str, dict[str, Any]]],
+    page_glyphs: list[dict[str, Any]],
+    page: int,
+) -> tuple[set[str], dict[str, str]]:
+    font_tokens = {
+        resource: _tokens(metadata)
+        for resource, metadata in page_fonts[page].items()
+    }
     math_fonts = {
         resource for resource, tokens in font_tokens.items() if "math" in tokens
     }
-    variable_fonts = {
-        resource
-        for resource, tokens in font_tokens.items()
-        if "bold" in tokens
-        and texts_by_font[resource]
-        and all(text.isalpha() and len(text) <= 2 for text in texts_by_font[resource])
-    }
+    texts_by_font = _variable_texts(page_glyphs)
+    variable_fonts = {}
+    for resource, tokens in font_tokens.items():
+        if (
+            "bold" in tokens
+            and texts_by_font[resource]
+            and all(short_variable_text(text) for text in texts_by_font[resource])
+        ):
+            variable_fonts[resource] = "standalone"
+        elif "italic" in tokens:
+            variable_fonts[resource] = "contextual"
     return math_fonts, variable_fonts

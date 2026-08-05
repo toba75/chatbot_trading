@@ -658,7 +658,7 @@ class DocumentsControllerTest < ActionDispatch::IntegrationTest
 
     assert_select "section#math_qualification", text: /En attente/
     assert_select "details.math-qualification-history"
-    assert_select "h3", text: /— échec/
+    assert_select "h3", text: /Qualification ##{failed.id} du .* — échec/
     assert_select "p", text: /La qualification a échoué/
     assert_no_match(/Traceback|chemin interne/, response.body)
     assert_select "code", text: "analysis_failed"

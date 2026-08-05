@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import unicodedata
 from html import unescape
 
@@ -26,6 +27,7 @@ _SEQUENCE_MATHML_TAGS = {
     "mtext",
 }
 _TOKEN_EQUIVALENTS = str.maketrans({"-": "−", "*": "∗"})
+_SCRIPT_FRAGMENT = re.compile(r"(?P<role>[_^])\{(?P<body>.*)\}\Z", re.DOTALL)
 _RELATION_ARITIES = {
     "mfrac": 2,
     "mover": 2,
@@ -69,17 +71,56 @@ def _relation_arity_reason(root: object) -> dict[str, str] | None:
     )
 
 
-def _mixed_text_latex(candidate: str) -> str:
-    converted = []
-    in_math = False
-    for character in candidate:
-        if character == "$":
-            in_math = not in_math
-        elif not in_math and character in "{}_":
-            converted.append("\\" + character)
-        else:
-            converted.append(character)
-    return "".join(converted)
+def _escaped_plain_text(text: str) -> str:
+    return "".join("\\" + character if character in "{}_" else character for character in text)
+
+
+def _mixed_text_latex(
+    candidate: str,
+) -> tuple[str | None, dict[str, str] | None]:
+    parts = candidate.split("$")
+    if len(parts) % 2 == 0:
+        return None, _reason(
+            "candidate_mixed_text_invalid",
+            "Le candidat contient un fragment mathématique non refermé",
+        )
+
+    converted = [_escaped_plain_text(parts[0])]
+    index = 1
+    while index < len(parts):
+        fragment = parts[index]
+        following_text = parts[index + 1]
+        script = _SCRIPT_FRAGMENT.fullmatch(fragment)
+        if script is None:
+            converted.extend((fragment, _escaped_plain_text(following_text)))
+            index += 2
+            continue
+
+        role = script.group("role")
+        if not script.group("body").strip():
+            return None, _reason(
+                "candidate_mixed_text_invalid",
+                "Le candidat contient un indice ou exposant vide",
+            )
+        bodies = [script.group("body")]
+        while index + 2 < len(parts) and not following_text.strip():
+            next_script = _SCRIPT_FRAGMENT.fullmatch(parts[index + 2])
+            if next_script is None or next_script.group("role") != role:
+                break
+            if not next_script.group("body").strip():
+                return None, _reason(
+                    "candidate_mixed_text_invalid",
+                    "Le candidat contient un indice ou exposant vide",
+                )
+            bodies.append(next_script.group("body"))
+            index += 2
+            following_text = parts[index + 1]
+        converted.extend(
+            (f"{role}{{{''.join(bodies)}}}", _escaped_plain_text(following_text))
+        )
+        index += 2
+
+    return "".join(converted), None
 
 
 def _candidate_root(
@@ -88,7 +129,9 @@ def _candidate_root(
     if not candidate.strip():
         return None, None
     if candidate_format == "mixed_text":
-        candidate = _mixed_text_latex(candidate)
+        candidate, reason = _mixed_text_latex(candidate)
+        if reason is not None or candidate is None:
+            return None, reason
     elif candidate_format != "latex":
         raise ValueError(f"Format candidat inconnu : {candidate_format}")
     try:

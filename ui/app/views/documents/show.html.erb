@@ -60,7 +60,7 @@
           <summary>Historique des qualifications mathématiques</summary>
           <% @previous_math_qualifications.each do |qualification| %>
             <article>
-              <h3>Qualification du <%= l qualification.created_at, format: :long %> — <%= qualification.failed? ? "échec" : "réussie" %></h3>
+              <h3>Qualification #<%= qualification.id %> du <%= l qualification.created_at, format: :long %> — <%= qualification.failed? ? "échec" : "réussie" %></h3>
               <% if qualification.failed? %>
                 <p>
                   La qualification a échoué.

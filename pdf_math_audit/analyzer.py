@@ -241,7 +241,7 @@ def analyze_pdf(
     return {
         "schema_version": "1.0",
         "analyzer_version": ANALYZER_VERSION,
-        "capability_profile": "type1-cff-type0-identity-h-truetype-form-v3",
+        "capability_profile": "type1c-winansi-type0-truetype-scaled-page-v4",
         "status": "completed",
         "runtime": {
             "python": platform.python_version(),

@@ -139,11 +139,28 @@ class DoclingClient
     %w[texts tables pictures].all? do |name|
       items = content[name]
       items.is_a?(Array) && items.all? do |item|
-        provenance = item["prov"] if item.is_a?(Hash)
-        provenance.is_a?(Array) && provenance.any? && provenance.all? do |entry|
-          entry.is_a?(Hash) && page_numbers.include?(entry["page_no"])
-        end
+        valid_item?(name, item, page_numbers)
       end
     end
+  end
+
+  def valid_item?(collection, item, page_numbers)
+    return false unless item.is_a?(Hash)
+
+    provenance = item["prov"]
+    return provenance.all? do |entry|
+      entry.is_a?(Hash) && page_numbers.include?(entry["page_no"])
+    end if provenance.is_a?(Array) && provenance.any?
+
+    return false unless empty_text_without_provenance?(collection, item)
+
+    Rails.logger.warn("Docling text without provenance preserved: #{item['self_ref']}")
+    true
+  end
+
+  def empty_text_without_provenance?(collection, item)
+    collection == "texts" &&
+      item["self_ref"].is_a?(String) && item["self_ref"].match?(%r{\A#/texts/\d+\z}) &&
+      item["prov"] == [] && item["text"] == "" && item["orig"] == ""
   end
 end

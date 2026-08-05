@@ -13,7 +13,11 @@ from docling_core.types.doc import (
 )
 
 from pdf_math_audit.correction import CorrectionConfig, correct_document
-from pdf_math_audit.correction_application import apply_target, target_ineligibility
+from pdf_math_audit.correction_application import (
+    apply_target,
+    candidate_scope_reason,
+    target_ineligibility,
+)
 from pdf_math_audit.correction_targets import correction_targets, ineligibility
 from pdf_math_audit.derived_document import (
     derive_document,
@@ -30,6 +34,7 @@ FORMULA = r"\{(\mathbf{x}_i,y_i)\}_{i=1}^{N}"
 
 
 def _region() -> dict[str, object]:
+    source_tokens = list("{(xi,yi)}i=1N")
     return {
         "region_id": "pdf-source:1:733",
         "page": 1,
@@ -41,7 +46,9 @@ def _region() -> dict[str, object]:
         "status": "traced",
         "semantic_status": "established",
         "verdict": "contradicted",
-        "source_canonical_tokens": list("{(xi,yi)}i=1N"),
+        "candidate_tokens": source_tokens,
+        "source_tokens": source_tokens,
+        "source_canonical_tokens": source_tokens,
         "source_relation_signature": [
             "{",
             "(",
@@ -404,6 +411,69 @@ def test_ajoute_une_region_sans_candidat_aux_cibles_d_acquisition() -> None:
     assert targets[0]["kind"] == "formula_insertion"
 
 
+def test_normalise_un_indice_inline_separe_de_sa_base_par_les_dollars() -> None:
+    document = DoclingDocument.model_validate_json(DOCUMENT.read_bytes())
+    node = document.texts[8]
+    node.text = "where σ$_{j,t}$ is observed"
+    region = {
+        "region_id": "pdf-source:9:31",
+        "page": 1,
+        "bbox": [10.0, 10.0, 30.0, 30.0],
+        "docling_ref": node.self_ref,
+        "candidate_charspan": [6, 15],
+        "candidate_text": "σ$_{j,t}$",
+        "candidate_format": "mixed_text",
+        "candidate_link_status": "linked",
+        "candidate_tokens": ["σ", "j", ",", "t"],
+        "candidate_relation_signature": [
+            "σ",
+            "<sub>",
+            "j",
+            ",",
+            "t",
+            "</sub>",
+        ],
+        "status": "traced",
+        "semantic_status": "established",
+        "verdict": "conformant_within_scope",
+        "glyph_sequence_indices": [31, 32, 33, 34],
+        "source_tokens": ["σ", "j", ",", "t"],
+        "source_canonical_tokens": ["σ", "j", ",", "t"],
+        "source_relation_signature": [
+            "σ",
+            "<sub>",
+            "j",
+            ",",
+            "t",
+            "</sub>",
+        ],
+        "source_relations": [
+            {"token": "j", "role": "subscript"},
+            {"token": ",", "role": "subscript"},
+            {"token": "t", "role": "subscript"},
+        ],
+        "source_relation_reason": None,
+    }
+
+    targets, region_count = correction_targets([region], document)
+
+    assert region_count == 1
+    assert len(targets) == 1
+    assert targets[0]["kind"] == "render_normalization"
+    assert target_ineligibility(targets[0], document) is None
+
+    result = correct_document(PDF, document, [region], _config())
+
+    record = json.loads(result.records)["records"][0]
+    assert result.summary["accepted"] == 1
+    assert result.summary["engine"]["vision_calls"] == 0
+    assert record["kind"] == "render_normalization"
+    assert record["proposals"][0]["selected_engine"] == "deterministic_source"
+    assert record["proposal_signature"] == region["source_relation_signature"]
+    assert b'display="inline"' in result.html
+    assert b"$_{j,t}$" not in result.html
+
+
 @pytest.mark.parametrize("span", [[-1, 3], [3, 3], [5, 3], [0, 10_000]])
 def test_refuse_un_charspan_invalide(span: list[int]) -> None:
     document = DoclingDocument.model_validate_json(DOCUMENT.read_bytes())
@@ -753,28 +823,287 @@ def test_refuse_une_formule_absente_sans_ancrage_de_rendu_prouve() -> None:
     assert record["reason"] == "formula_insertion_rendering_unproven"
 
 
-def test_refuse_une_cible_qui_absorbe_un_connecteur_de_prose() -> None:
-    document = DoclingDocument.model_validate_json(DOCUMENT.read_bytes())
+def test_refuse_un_connecteur_dont_le_role_textuel_n_est_pas_prouve() -> None:
     target = {
         "kind": "replacement",
         "candidate_format": "mixed_text",
         "candidate_text": "S if x$_{i}$",
-        "regions": [],
+        "regions": [
+            {
+                "candidate_tokens": ["S", "i", "f", "x", "i"],
+                "source_tokens": ["S", "i", "f", "x", "i"],
+                "source_canonical_tokens": ["S", "i", "f", "x", "i"],
+            }
+        ],
     }
 
-    assert target_ineligibility(target, document) == "candidate_contains_prose"
+    assert candidate_scope_reason(target) == "candidate_contains_unproven_connective"
+
+
+def test_refuse_aussi_le_connecteur_is_dans_une_phrase_courte() -> None:
+    target = {
+        "kind": "replacement",
+        "candidate_format": "mixed_text",
+        "candidate_text": "a is",
+        "regions": [
+            {
+                "candidate_tokens": list("ais"),
+                "source_tokens": list("ais"),
+                "source_canonical_tokens": list("ais"),
+            }
+        ],
+    }
+
+    assert candidate_scope_reason(target) == "candidate_contains_unproven_connective"
 
 
 def test_refuse_generiquement_une_cible_qui_absorbe_de_la_prose() -> None:
-    document = DoclingDocument.model_validate_json(DOCUMENT.read_bytes())
     target = {
         "kind": "replacement",
         "candidate_format": "mixed_text",
         "candidate_text": "real-valued vector w",
-        "regions": [],
+        "regions": [
+            {
+                "candidate_tokens": list("real-valuedvectorw"),
+                "source_tokens": list("real-valuedvectorw"),
+                "source_canonical_tokens": list("real-valuedvectorw"),
+            }
+        ],
     }
 
-    assert target_ineligibility(target, document) == "candidate_contains_prose"
+    assert (
+        candidate_scope_reason(target) == "candidate_contains_unstructured_prose"
+    )
+
+
+def test_refuse_une_phrase_courte_qui_absorbe_de_la_prose() -> None:
+    target = {
+        "kind": "replacement",
+        "candidate_format": "mixed_text",
+        "candidate_text": "let x",
+        "regions": [
+            {
+                "candidate_tokens": list("letx"),
+                "source_tokens": list("letx"),
+                "source_canonical_tokens": list("letx"),
+            }
+        ],
+    }
+
+    assert candidate_scope_reason(target) == "candidate_contains_unstructured_prose"
+
+
+def test_refuse_une_phrase_accentuee_qui_absorbe_de_la_prose() -> None:
+    target = {
+        "kind": "replacement",
+        "candidate_format": "mixed_text",
+        "candidate_text": "café x",
+        "regions": [
+            {
+                "candidate_tokens": list("caféx"),
+                "source_tokens": list("caféx"),
+                "source_canonical_tokens": list("caféx"),
+            }
+        ],
+    }
+
+    assert candidate_scope_reason(target) == "candidate_contains_unstructured_prose"
+
+
+def test_ne_confond_pas_un_operateur_moins_avec_un_mot_compose() -> None:
+    target = {
+        "kind": "replacement",
+        "candidate_format": "mixed_text",
+        "candidate_text": "wx - b = 0",
+        "regions": [
+            {
+                "candidate_tokens": list("wx−b=0"),
+                "source_tokens": list("wx−b=0"),
+                "source_canonical_tokens": list("wx−b=0"),
+                "source_relation_signature": list("wx−b=0"),
+            }
+        ],
+    }
+
+    assert candidate_scope_reason(target) is None
+
+
+def test_ne_confond_pas_un_operateur_moins_sans_espaces_avec_un_mot_compose() -> None:
+    target = {
+        "kind": "replacement",
+        "candidate_format": "mixed_text",
+        "candidate_text": "wx-b",
+        "regions": [
+            {
+                "candidate_tokens": list("wx−b"),
+                "source_tokens": list("wx−b"),
+                "source_canonical_tokens": list("wx−b"),
+                "source_relation_signature": [
+                    "w",
+                    "<sub>",
+                    "x",
+                    "</sub>",
+                    "−",
+                    "b",
+                ],
+            }
+        ],
+    }
+
+    assert candidate_scope_reason(target) is None
+
+
+def test_refuse_une_phrase_accentuee_unicode_decomposee() -> None:
+    target = {
+        "kind": "replacement",
+        "candidate_format": "mixed_text",
+        "candidate_text": "cafe\u0301 x",
+        "regions": [
+            {
+                "candidate_tokens": list("caféx"),
+                "source_tokens": list("caféx"),
+                "source_canonical_tokens": list("caféx"),
+            }
+        ],
+    }
+
+    assert candidate_scope_reason(target) == "candidate_contains_unstructured_prose"
+
+
+def test_accepte_def_quand_l_annotation_superieure_est_prouvee() -> None:
+    target = {
+        "kind": "replacement",
+        "candidate_format": "mixed_text",
+        "candidate_text": "xc def = [x]",
+        "regions": [
+            {
+                "candidate_tokens": list("xcdef=[x]"),
+                "source_tokens": list("xcdef=[x]"),
+                "source_canonical_tokens": list("xc=def[x]"),
+                "source_relation_signature": [
+                    "x",
+                    "c",
+                    "=",
+                    "<over>",
+                    "d",
+                    "e",
+                    "f",
+                    "</over>",
+                    "[",
+                    "x",
+                    "]",
+                ],
+            }
+        ],
+    }
+
+    assert candidate_scope_reason(target) is None
+
+
+def test_une_annotation_def_ne_blanchit_pas_une_autre_occurrence_textuelle() -> None:
+    target = {
+        "kind": "replacement",
+        "candidate_format": "mixed_text",
+        "candidate_text": "def x xc def = [x]",
+        "regions": [
+            {
+                "candidate_tokens": list("defxxcdef=[x]"),
+                "source_tokens": list("defxxcdef=[x]"),
+                "source_canonical_tokens": list("defxxc=def[x]"),
+                "source_relation_signature": [
+                    "d",
+                    "e",
+                    "f",
+                    "x",
+                    "x",
+                    "c",
+                    "=",
+                    "<over>",
+                    "d",
+                    "e",
+                    "f",
+                    "</over>",
+                    "[",
+                    "x",
+                    "]",
+                ],
+            }
+        ],
+    }
+
+    assert candidate_scope_reason(target) == "candidate_contains_unstructured_prose"
+
+
+def test_refuse_une_cible_dont_le_contenu_depasse_la_preuve_source() -> None:
+    target = {
+        "kind": "replacement",
+        "candidate_format": "mixed_text",
+        "candidate_text": "x and surrounding prose",
+        "regions": [
+            {
+                "candidate_tokens": list("xandsurroundingprose"),
+                "source_tokens": ["x"],
+                "source_canonical_tokens": ["x"],
+            }
+        ],
+    }
+
+    assert (
+        candidate_scope_reason(target) == "candidate_content_not_covered_by_source"
+    )
+
+
+def test_refuse_une_cible_qui_reordonne_les_tokens_de_la_preuve_source() -> None:
+    target = {
+        "kind": "replacement",
+        "candidate_format": "mixed_text",
+        "candidate_text": "y x",
+        "regions": [
+            {
+                "candidate_tokens": ["y", "x"],
+                "source_tokens": ["x", "y"],
+                "source_canonical_tokens": ["x", "y"],
+            }
+        ],
+    }
+
+    assert (
+        candidate_scope_reason(target) == "candidate_content_not_covered_by_source"
+    )
+
+
+def test_accepte_l_ordre_pdf_meme_si_la_structure_canonique_le_reordonne() -> None:
+    target = {
+        "kind": "replacement",
+        "candidate_format": "mixed_text",
+        "candidate_text": "} N i = 1",
+        "regions": [
+            {
+                "candidate_tokens": ["}", "N", "i", "=", "1"],
+                "source_tokens": ["}", "N", "i", "=", "1"],
+                "source_canonical_tokens": ["}", "i", "=", "1", "N"],
+            }
+        ],
+    }
+
+    assert candidate_scope_reason(target) is None
+
+
+def test_accepte_l_ordre_canonique_quand_le_flux_pdf_est_reordonne() -> None:
+    target = {
+        "kind": "replacement",
+        "candidate_format": "mixed_text",
+        "candidate_text": "x i prime",
+        "regions": [
+            {
+                "candidate_tokens": ["x", "i", "′"],
+                "source_tokens": ["x", "′", "i"],
+                "source_canonical_tokens": ["x", "i", "′"],
+            }
+        ],
+    }
+
+    assert candidate_scope_reason(target) is None
 
 
 def test_refuse_un_mot_serialise_comme_une_suite_de_variables() -> None:

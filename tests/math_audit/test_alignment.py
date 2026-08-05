@@ -21,12 +21,16 @@ REFERENCE_DOCUMENT = (
 )
 
 
-def _document(*texts: dict[str, object]) -> DoclingDocument:
+def _document(
+    *texts: dict[str, object], width: float = 100, height: float = 100
+) -> DoclingDocument:
     children = [{"$ref": text["self_ref"]} for text in texts]
     return DoclingDocument.model_validate(
         {
             "name": "alignment-test",
-            "pages": {"1": {"page_no": 1, "size": {"width": 100, "height": 100}}},
+            "pages": {
+                "1": {"page_no": 1, "size": {"width": width, "height": height}}
+            },
             "body": {
                 "self_ref": "#/body",
                 "children": children,
@@ -240,6 +244,46 @@ def test_normalise_bottomleft_et_refuse_une_geometrie_de_page_differente() -> No
     assert aligned["regions"][0]["bbox"] == [10.0, 10.0, 30.0, 30.0]
     assert mismatched["regions"][0]["status"] == "ambiguous"
     assert mismatched["regions"][0]["reasons"][0]["code"] == ("page_geometry_mismatch")
+
+
+def test_normalise_une_echelle_docling_uniforme_et_la_rend_observable() -> None:
+    document = _document(
+        _text(0, "x", (20, 20, 60, 60)), width=200, height=200
+    )
+    alignment = DoclingAlignment(document)
+    alignment.observe_glyph(1, _glyph(1, "x", [15, 15, 20, 20]))
+
+    result = alignment.finalize(_pdf_report())
+
+    assert result["regions"][0]["status"] == "traced"
+    assert result["regions"][0]["bbox"] == [10.0, 10.0, 30.0, 30.0]
+    assert result["page_geometry_transforms"] == [
+        {
+            "page": 1,
+            "method": "uniform_page_scale",
+            "docling_size": [200.0, 200.0],
+            "pdf_box": [0.0, 0.0, 100.0, 100.0],
+            "scale": 0.5,
+            "max_residual_points": 0.0,
+        }
+    ]
+
+
+def test_normalise_aussi_le_conteneur_d_un_fragment_inline() -> None:
+    document = _document(
+        _text(0, "Avant x$_{i}$ après", (20, 20, 180, 60), label="text"),
+        width=200,
+        height=200,
+    )
+    alignment = DoclingAlignment(document)
+    alignment.observe_glyph(1, _glyph(1, "x", [40, 10, 45, 20]))
+    alignment.observe_glyph(1, _glyph(2, "i", [46, 13, 50, 20]))
+
+    result = alignment.finalize(_pdf_report())
+
+    inline = result["regions"][0]
+    assert inline["status"] == "traced"
+    assert inline["container_bbox"] == [10.0, 10.0, 90.0, 30.0]
 
 
 def test_preserve_le_statut_structurel_d_une_page_non_supportee() -> None:

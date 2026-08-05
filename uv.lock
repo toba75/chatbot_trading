@@ -71,7 +71,7 @@ wheels = [
 
 [[package]]
 name = "chatbot-trading"
-version = "0.6.1"
+version = "0.6.2"
 source = { editable = "." }
 dependencies = [
     { name = "docling-core" },
@@ -83,6 +83,7 @@ dependencies = [
     { name = "pymupdf" },
     { name = "pypdf" },
     { name = "python-multipart" },
+    { name = "reportlab" },
     { name = "uvicorn" },
 ]
 
@@ -92,7 +93,6 @@ dev = [
     { name = "pillow" },
     { name = "pytest" },
     { name = "pytest-xdist" },
-    { name = "reportlab" },
     { name = "ruff" },
 ]
 
@@ -107,6 +107,7 @@ requires-dist = [
     { name = "pymupdf", specifier = "==1.27.2.2" },
     { name = "pypdf", specifier = "==6.10.2" },
     { name = "python-multipart", specifier = ">=0.0.32" },
+    { name = "reportlab", specifier = "==4.4.9" },
     { name = "uvicorn", specifier = ">=0.52.0" },
 ]
 
@@ -116,7 +117,6 @@ dev = [
     { name = "pillow", specifier = "==12.3.0" },
     { name = "pytest", specifier = "==8.4.2" },
     { name = "pytest-xdist", specifier = "==3.8.0" },
-    { name = "reportlab", specifier = "==4.4.9" },
     { name = "ruff", specifier = "==0.15.4" },
 ]
 

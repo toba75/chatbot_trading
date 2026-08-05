@@ -14,6 +14,14 @@ FONTS = {
             "base_font": "/LMRoman10-Bold",
             "trace_font": "LMRoman-Bold",
         },
+        "/VariableItalic": {
+            "base_font": "/BookmanOldStyle-Italic",
+            "trace_font": "BookmanOldStyle-Italic",
+        },
+        "/EmphasisItalic": {
+            "base_font": "/BookmanOldStyle-Italic",
+            "trace_font": "BookmanOldStyle-Italic",
+        },
         "/Math": {
             "base_font": "/LMMathItalic10-Regular",
             "trace_font": "LMMathItalic",
@@ -64,6 +72,24 @@ def test_detecte_les_variables_grasses_courtes_et_ignore_un_mot_gras() -> None:
     assert _texts(glyphs) == ["wx"]
 
 
+def test_detecte_les_variables_italiques_courtes_et_ignore_un_mot_italique() -> None:
+    glyphs = [
+        _glyph(1, "σ", "/VariableItalic", 0, 0),
+        _glyph(2, "j", "/VariableItalic", 1, 4, top=11, size=7),
+        _glyph(3, ",", "/VariableItalic", 1, 8, top=11, size=7),
+        _glyph(4, "t", "/VariableItalic", 1, 12, top=11, size=7),
+        _glyph(5, "where", "/EmphasisItalic", 2, 20),
+    ]
+
+    assert _texts(glyphs) == ["σj,t"]
+
+
+def test_ne_transforme_pas_un_mot_court_italique_en_variable() -> None:
+    glyphs = [_glyph(1, "is", "/EmphasisItalic", 0, 0)]
+
+    assert _texts(glyphs) == []
+
+
 def test_conserve_une_expression_delimitee_avec_du_texte_mathematique() -> None:
     glyphs = [
         _glyph(1, "{", "/Math", 0, 0),
@@ -75,6 +101,52 @@ def test_conserve_une_expression_delimitee_avec_du_texte_mathematique() -> None:
     ]
 
     assert _texts(glyphs) == ["{spam,not_spam}"]
+
+
+def test_rattache_une_base_romaine_a_son_indice_mathematique() -> None:
+    glyphs = [
+        _glyph(1, "Γ", "/Body", 0, 0, top=10, size=10),
+        _glyph(2, "l", "/Math", 1, 4, top=15, size=7),
+        _glyph(3, ",", "/Math", 1, 8, top=15, size=7),
+        _glyph(4, "u", "/Math", 1, 12, top=15, size=7),
+    ]
+
+    regions = source_math_regions(glyphs, FONTS)
+
+    assert len(regions) == 1
+    assert regions[0]["source_glyph_text"] == "Γl,u"
+    assert regions[0]["glyph_sequence_indices"] == [1, 2, 3, 4]
+
+
+def test_ne_rattache_pas_une_lettre_de_prose_a_un_fragment_lointain() -> None:
+    glyphs = [
+        _glyph(1, "Γ", "/Body", 0, 0, top=10, size=10),
+        _glyph(2, "l", "/Math", 1, 8.5, top=15, size=7),
+        _glyph(3, ",", "/Math", 1, 12.5, top=15, size=7),
+        _glyph(4, "u", "/Math", 1, 16.5, top=15, size=7),
+    ]
+
+    assert _texts(glyphs) == ["l,u"]
+
+
+def test_ne_rattache_pas_un_indice_entierement_a_gauche_de_sa_base() -> None:
+    glyphs = [
+        _glyph(1, "A", "/Body", 0, 10, top=10, size=10),
+        _glyph(2, "i", "/Math", 1, 6, top=15, size=7),
+    ]
+
+    assert _texts(glyphs) == ["i"]
+
+
+def test_ne_rattache_pas_un_appel_de_note_en_exposant_a_une_base_de_prose() -> None:
+    glyphs = [
+        _glyph(1, "A", "/Body", 0, 0, top=10, size=10),
+        _glyph(2, "1", "/Math", 1, 5, top=5, size=7),
+    ]
+    glyphs[0]["rendered_origin_y"] = 20
+    glyphs[1]["rendered_origin_y"] = 12
+
+    assert _texts(glyphs) == ["1"]
 
 
 def test_reconnait_un_connecteur_conditionnel_sans_fusionner_la_prose() -> None:
@@ -239,6 +311,49 @@ def test_fusionne_le_numerateur_et_le_denominateur_par_la_barre_de_fraction() ->
     regions = source_math_regions(glyphs, FONTS, rules)
 
     assert [region["source_glyph_text"] for region in regions] == ["2‖w‖"]
+    assert regions[0]["structural_rules"]["fraction"]["seqno"] == 2
+
+
+def test_ne_transforme_pas_deux_mots_italiques_en_fraction() -> None:
+    glyphs = [
+        _glyph(1, "where", "/EmphasisItalic", 0, 5, top=5, size=7),
+        _glyph(2, "value", "/EmphasisItalic", 1, 5, line=1, top=18, size=7),
+    ]
+    rules = {1: [{"x0": 4.0, "y": 14.0, "x1": 10.0, "width": 0.4, "seqno": 2}]}
+
+    assert source_math_regions(glyphs, FONTS, rules) == []
+
+
+def test_ne_transforme_pas_deux_mots_italiques_courts_en_fraction() -> None:
+    glyphs = [
+        _glyph(1, "is", "/EmphasisItalic", 0, 5, top=5, size=7),
+        _glyph(2, "it", "/EmphasisItalic", 1, 5, line=1, top=18, size=7),
+    ]
+    rules = {1: [{"x0": 4.0, "y": 14.0, "x1": 10.0, "width": 0.4, "seqno": 2}]}
+
+    assert source_math_regions(glyphs, FONTS, rules) == []
+
+
+def test_ne_prend_pas_une_virgule_terminale_pour_une_liste_de_variables() -> None:
+    glyphs = [
+        _glyph(1, "is,", "/EmphasisItalic", 0, 5, top=5, size=7),
+        _glyph(2, "it,", "/EmphasisItalic", 1, 5, line=1, top=18, size=7),
+    ]
+    rules = {1: [{"x0": 4.0, "y": 14.0, "x1": 10.0, "width": 0.4, "seqno": 2}]}
+
+    assert source_math_regions(glyphs, FONTS, rules) == []
+
+
+def test_conserve_une_fraction_de_variables_italiques_contextuelles() -> None:
+    glyphs = [
+        _glyph(1, "x", "/VariableItalic", 0, 5, top=5, size=7),
+        _glyph(2, "y", "/VariableItalic", 1, 5, line=1, top=18, size=7),
+    ]
+    rules = {1: [{"x0": 4.0, "y": 14.0, "x1": 10.0, "width": 0.4, "seqno": 2}]}
+
+    regions = source_math_regions(glyphs, FONTS, rules)
+
+    assert [region["source_glyph_text"] for region in regions] == ["xy"]
     assert regions[0]["structural_rules"]["fraction"]["seqno"] == 2
 
 

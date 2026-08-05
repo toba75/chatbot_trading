@@ -36,7 +36,10 @@ def _baseline_cluster(
 ) -> list[dict[str, Any]] | None:
     clusters: list[list[dict[str, Any]]] = []
     tolerance = largest_size * 0.10
-    for glyph in sorted(glyphs, key=lambda item: item["rendered_origin_y"]):
+    baseline_sized = [
+        glyph for glyph in glyphs if glyph["rendered_size"] >= largest_size * 0.8
+    ]
+    for glyph in sorted(baseline_sized, key=lambda item: item["rendered_origin_y"]):
         if (
             not clusters
             or abs(
@@ -107,13 +110,21 @@ def _canonical_linear(
         if glyph in baseline or glyph["sequence_index"] in over_sequences:
             continue
         vertical_delta = glyph["rendered_origin_y"] - baseline_y
-        if not tolerance <= abs(vertical_delta) <= largest_size * 1.5:
+        reduced_script = (
+            glyph["rendered_size"] < largest_size * 0.8
+            and abs(vertical_delta) >= largest_size * 0.05
+        )
+        if not (
+            (reduced_script or abs(vertical_delta) >= tolerance)
+            and abs(vertical_delta) <= largest_size * 1.5
+        ):
             return None, None, [], "source_script_position_ambiguous"
         role = "subscript" if vertical_delta > 0 else "superscript"
         anchors = [
             candidate
             for candidate in baseline_by_x
             if candidate["rendered_origin_x"] <= glyph["rendered_origin_x"]
+            and glyph["bbox"][0] - candidate["bbox"][2] <= largest_size * 2.0
         ]
         if not anchors:
             return None, None, [], "source_script_anchor_missing"

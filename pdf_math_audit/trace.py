@@ -8,7 +8,13 @@ import fitz
 from pypdf import PdfReader, Transformation
 from pypdf.generic import ContentStream
 
-from pdf_math_audit.fonts import LoadedFont, agl_unicode, codepoints, load_font
+from pdf_math_audit.fonts import (
+    LoadedFont,
+    _trace_font,
+    agl_unicode,
+    codepoints,
+    load_font,
+)
 from pdf_math_audit.limitations import (
     AnalysisLimitation,
     require_supported,
@@ -248,6 +254,7 @@ def _source_glyphs(
     dict[str, LoadedFont],
     list[dict[str, str]],
     list[dict[str, Any]],
+    set[str],
 ]:
     resources = page["/Resources"]
     operations = ContentStream(page.get_contents(), reader).operations
@@ -257,6 +264,7 @@ def _source_glyphs(
     counts: Counter[str] = Counter()
     fonts: dict[str, LoadedFont] = {}
     font_limitations: dict[str, AnalysisLimitation] = {}
+    limited_trace_fonts: set[str] = set()
     first_font_xrefs: dict[str, int] = {}
     glyphs: list[dict[str, Any]] = []
     sequence_index = 0
@@ -341,6 +349,9 @@ def _source_glyphs(
                         fonts[font_key] = load_font(font_key, reference)
                     except AnalysisLimitation as limitation:
                         font_limitations[font_key] = limitation
+                        limited_trace_fonts.add(
+                            _trace_font(str(_resolved(reference).get("/BaseFont", "")))
+                        )
                 if font_key in font_limitations:
                     sequence_index += len(chunk)
                     continue
@@ -406,15 +417,13 @@ def _source_glyphs(
             for resource, limitation in font_limitations.items()
         ],
         opaque_regions,
+        limited_trace_fonts,
     )
 
 
-def _attach_render_and_blocks(
-    page: fitz.Page,
-    glyphs: list[dict[str, Any]],
-    fonts: dict[str, LoadedFont],
-) -> dict[str, int]:
-    supported_fonts = {font.public["trace_font"] for font in fonts.values()}
+def _rendered_trace(
+    page: fitz.Page, supported_fonts: set[str]
+) -> tuple[list[dict[str, Any]], int]:
     trace = [
         {
             "font": span["font"],
@@ -429,6 +438,79 @@ def _attach_render_and_blocks(
         if span["font"] in supported_fonts
         for value, gid, origin, bbox in span["chars"]
     ]
+    real: defaultdict[tuple[Any, ...], list[dict[str, Any]]] = defaultdict(list)
+    for character in trace:
+        if character["gid"] >= 0:
+            real[
+                (
+                    character["font"],
+                    character["seqno"],
+                    character["unicode"],
+                    tuple(character["origin"]),
+                    character["size"],
+                )
+            ].append(character)
+    synthetic = [character for character in trace if character["gid"] < 0]
+    for character in synthetic:
+        bbox = character["bbox"]
+        key = (
+            character["font"],
+            character["seqno"],
+            character["unicode"],
+            tuple(character["origin"]),
+            character["size"],
+        )
+        twins = real[key]
+        within_twin = False
+        if len(twins) == 1:
+            twin_bbox = twins[0]["bbox"]
+            within_twin = (
+                twin_bbox[0] - 0.01 <= bbox[0] <= twin_bbox[2] + 0.01
+                and twin_bbox[0] - 0.01 <= bbox[2] <= twin_bbox[2] + 0.01
+                and twin_bbox[1] - 0.01 <= bbox[1] <= twin_bbox[3] + 0.01
+                and twin_bbox[1] - 0.01 <= bbox[3] <= twin_bbox[3] + 0.01
+            )
+        require_unambiguous(
+            character["gid"] == -1
+            and (bbox[0] == bbox[2] or bbox[1] == bbox[3])
+            and within_twin,
+            "rendered_synthetic_character_ambiguous",
+            "Caractère synthétique MuPDF sans glyphe jumeau univoque",
+        )
+    return [character for character in trace if character["gid"] >= 0], len(
+        synthetic
+    )
+
+
+def _select_rawdict_match(
+    exact_matches: list[dict[str, Any]],
+    positioned_matches: list[dict[str, Any]],
+    sequence_index: int,
+) -> tuple[dict[str, Any], bool]:
+    matches = exact_matches or positioned_matches
+    require_unambiguous(
+        len(matches) == 1,
+        "rawdict_alignment_ambiguous",
+        f"Association rawdict non univoque à {sequence_index}: {len(matches)}",
+    )
+    return matches[0], bool(exact_matches)
+
+
+def _attach_render_and_blocks(
+    page: fitz.Page,
+    glyphs: list[dict[str, Any]],
+    fonts: dict[str, LoadedFont],
+    limited_trace_fonts: set[str],
+) -> dict[str, int]:
+    supported_fonts = {font.public["trace_font"] for font in fonts.values()}
+    ambiguous_fonts = supported_fonts & limited_trace_fonts
+    require_unambiguous(
+        not ambiguous_fonts,
+        "rendered_font_resource_ambiguous",
+        "Ressources supportées et non supportées homonymes: "
+        + ", ".join(sorted(ambiguous_fonts)),
+    )
+    trace, synthetic_duplicates = _rendered_trace(page, supported_fonts)
     require_unambiguous(
         len(trace) == len(glyphs),
         "source_trace_length_mismatch",
@@ -458,6 +540,9 @@ def _attach_render_and_blocks(
 
     rawdict = page.get_text("rawdict", sort=False)
     block_index: defaultdict[tuple[Any, ...], list[dict[str, Any]]] = defaultdict(list)
+    positioned_block_index: defaultdict[
+        tuple[Any, ...], list[dict[str, Any]]
+    ] = defaultdict(list)
     rawdict_characters = 0
     for block_id, block in enumerate(rawdict["blocks"]):
         if block.get("type") != 0:
@@ -477,19 +562,22 @@ def _attach_render_and_blocks(
                         round(char["origin"][1], 3),
                         ord(char["c"]),
                     )
-                    block_index[key].append(
-                        {
-                            "block": block_id,
-                            "line": line_id,
-                            "span": span_id,
-                            "char": char_id,
-                            "span_flags": span["flags"],
-                            "block_bbox": number_list(block["bbox"]),
-                            "line_bbox": number_list(line["bbox"]),
-                        }
-                    )
+                    match = {
+                        "block": block_id,
+                        "line": line_id,
+                        "span": span_id,
+                        "char": char_id,
+                        "unicode_text": char["c"],
+                        "unicode_codepoints": codepoints(char["c"]),
+                        "span_flags": span["flags"],
+                        "block_bbox": number_list(block["bbox"]),
+                        "line_bbox": number_list(line["bbox"]),
+                    }
+                    block_index[key].append(match)
+                    positioned_block_index[key[:3]].append(match)
 
     claimed: set[tuple[int, int, int, int]] = set()
+    rawdict_unicode_mismatches = 0
     for source in glyphs:
         rendered = source["rendered"]
         key = (
@@ -498,13 +586,13 @@ def _attach_render_and_blocks(
             round(rendered["origin"][1], 3),
             rendered["unicode"],
         )
-        matches = block_index.get(key, [])
-        require_unambiguous(
-            len(matches) == 1,
-            "rawdict_alignment_ambiguous",
-            f"Association rawdict non univoque à {source['sequence_index']}: {len(matches)}",
+        match, rawdict_unicode_matches = _select_rawdict_match(
+            block_index.get(key, []),
+            positioned_block_index.get(key[:3], []),
+            source["sequence_index"],
         )
-        match = matches[0]
+        rawdict_unicode_mismatches += not rawdict_unicode_matches
+        match["unicode_matches_rendered"] = rawdict_unicode_matches
         identity = (match["block"], match["line"], match["span"], match["char"])
         require_unambiguous(
             identity not in claimed,
@@ -515,10 +603,12 @@ def _attach_render_and_blocks(
         source["rawdict"] = match
     return {
         "trace_characters": len(trace),
+        "trace_synthetic_duplicates": synthetic_duplicates,
         "rawdict_characters": rawdict_characters,
         "rawdict_text_blocks": sum(
             block.get("type") == 0 for block in rawdict["blocks"]
         ),
+        "rawdict_unicode_mismatches": rawdict_unicode_mismatches,
         "trace_unicode_matches": unicode_matches,
         "trace_unicode_mismatches": len(trace) - unicode_matches,
     }
@@ -548,10 +638,17 @@ def _horizontal_rules(page: fitz.Page) -> list[dict[str, float | int]]:
 def trace_page(
     source_page: Any, rendered_page: fitz.Page, reader: PdfReader
 ) -> PageTrace:
-    glyphs, operation_counts, fonts, font_limitations, opaque_regions = _source_glyphs(
-        source_page, rendered_page, reader
+    (
+        glyphs,
+        operation_counts,
+        fonts,
+        font_limitations,
+        opaque_regions,
+        limited_trace_fonts,
+    ) = _source_glyphs(source_page, rendered_page, reader)
+    layout = _attach_render_and_blocks(
+        rendered_page, glyphs, fonts, limited_trace_fonts
     )
-    layout = _attach_render_and_blocks(rendered_page, glyphs, fonts)
     return PageTrace(
         glyphs,
         operation_counts,

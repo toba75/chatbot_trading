@@ -9,6 +9,7 @@ from fontTools.cffLib import CFFFontSet
 from fontTools.encodings.MacRoman import MacRoman
 from fontTools.encodings.StandardEncoding import StandardEncoding
 from fontTools.ttLib import TTFont
+from reportlab.pdfbase._fontdata_enc_winansi import WinAnsiEncoding
 
 from pdf_math_audit.cmap import parse_to_unicode
 from pdf_math_audit.limitations import require_supported
@@ -17,6 +18,7 @@ from pdf_math_audit.limitations import require_supported
 SUPPORTED_BASE_ENCODINGS = {
     "/MacRomanEncoding": MacRoman,
     "/StandardEncoding": StandardEncoding,
+    "/WinAnsiEncoding": WinAnsiEncoding,
 }
 TEX_GLYPH_UNICODE = {
     "Sigma": "Σ",
@@ -220,7 +222,7 @@ def font_encoding(font: Any) -> tuple[list[str], dict[str, Any]]:
         "font_encoding_unsupported",
         f"Encodage non supporté: {base_name}",
     )
-    names = list(SUPPORTED_BASE_ENCODINGS[base_name])
+    names = [name or ".notdef" for name in SUPPORTED_BASE_ENCODINGS[base_name]]
     differences: list[dict[str, Any]] = []
     code: int | None = None
     for item in raw_differences:
@@ -282,7 +284,12 @@ def _load_type1_font(resource: str, reference: Any, font: Any) -> LoadedFont:
     top = cff[cff.fontNames[0]]
     charset = list(top.charset)
     names, encoding = font_encoding(font)
-    to_unicode = parse_to_unicode(font)
+    to_unicode_anomalies: list[dict[str, Any]] = []
+    to_unicode = parse_to_unicode(
+        font,
+        allow_simple_codespace_mismatch=True,
+        anomalies=to_unicode_anomalies,
+    )
     base_font = str(font.get("/BaseFont"))
     return LoadedFont(
         public={
@@ -295,6 +302,7 @@ def _load_type1_font(resource: str, reference: Any, font: Any) -> LoadedFont:
             "to_unicode": {
                 f"0x{code:02x}": value for code, value in to_unicode.items()
             },
+            "to_unicode_anomalies": to_unicode_anomalies,
             "embedded_font": {
                 "subtype": "/Type1C",
                 "bytes": len(cff_bytes),
@@ -403,7 +411,12 @@ def _load_true_type_font(resource: str, reference: Any, font: Any) -> LoadedFont
         f"{resource}: FontFile2 embarqué absent",
     )
     font_bytes = font_file.get_object().get_data()
-    to_unicode = parse_to_unicode(font)
+    to_unicode_anomalies: list[dict[str, Any]] = []
+    to_unicode = parse_to_unicode(
+        font,
+        allow_simple_codespace_mismatch=True,
+        anomalies=to_unicode_anomalies,
+    )
     require_supported(
         bool(to_unicode),
         "truetype_to_unicode_required",
@@ -446,6 +459,7 @@ def _load_true_type_font(resource: str, reference: Any, font: Any) -> LoadedFont
             "to_unicode": {
                 f"0x{code:02x}": value for code, value in to_unicode.items()
             },
+            "to_unicode_anomalies": to_unicode_anomalies,
             "embedded_font": {
                 "subtype": "/TrueType",
                 "bytes": len(font_bytes),

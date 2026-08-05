@@ -8,7 +8,7 @@ from pdf_math_audit.geometry import (
     rule_covers_horizontal_span,
     rule_fits_horizontal_span,
 )
-from pdf_math_audit.math_fonts import math_and_variable_fonts
+from pdf_math_audit.math_fonts import math_and_variable_fonts, short_variable_text
 from pdf_math_audit.pdf_indicators import is_math_indicator
 
 
@@ -53,18 +53,24 @@ def _primitive_kind(
 
 
 def _tokens(
-    glyphs: list[dict[str, Any]], math_fonts: set[str], bold_fonts: set[str]
+    glyphs: list[dict[str, Any]],
+    math_fonts: set[str],
+    variable_fonts: dict[str, str],
 ) -> list[dict[str, Any]]:
     tokens: list[dict[str, Any]] = []
-    for group in _span_groups(glyphs):
+    groups = _span_groups(glyphs)
+    contextual_groups = set()
+    for index in range(len(groups) - 1):
+        if _contextual_script_pair(groups[index], groups[index + 1], variable_fonts):
+            contextual_groups.update((index, index + 1))
+    for index, group in enumerate(groups):
         text = "".join(glyph["unicode"] for glyph in group)
-        short_bold = (
-            group[0]["font_resource"] in bold_fonts
-            and text.isalpha()
-            and len(text) <= 2
+        variable_mode = variable_fonts.get(group[0]["font_resource"])
+        short_variable = short_variable_text(text) and (
+            variable_mode == "standalone" or index in contextual_groups
         )
         for glyph in group:
-            kind = _primitive_kind(glyph, math_fonts, short_bold)
+            kind = _primitive_kind(glyph, math_fonts, short_variable)
             if (
                 tokens
                 and tokens[-1]["span"] == glyph["rawdict"]["span"]
@@ -80,6 +86,32 @@ def _tokens(
                     }
                 )
     return tokens
+
+
+def _contextual_script_pair(
+    base_group: list[dict[str, Any]],
+    script_group: list[dict[str, Any]],
+    variable_fonts: dict[str, str],
+) -> bool:
+    base = base_group[-1]
+    script = script_group[0]
+    if (
+        variable_fonts.get(base["font_resource"]) != "contextual"
+        or variable_fonts.get(script["font_resource"]) != "contextual"
+        or not short_variable_text("".join(item["unicode"] for item in base_group))
+        or not short_variable_text("".join(item["unicode"] for item in script_group))
+    ):
+        return False
+    size = base["rendered_size"]
+    scale = script["rendered_size"] / size
+    baseline_shift = abs(script["rendered_origin_y"] - base["rendered_origin_y"])
+    gap = script["bbox"][0] - base["bbox"][2]
+    return (
+        0.5 <= scale <= 0.8
+        and size * 0.05 <= baseline_shift <= size * 0.6
+        and -size * 0.25 <= gap <= max(1.0, size * 0.15)
+        and script["bbox"][2] >= base["bbox"][0]
+    )
 
 
 def _text(token: dict[str, Any]) -> str:
@@ -117,15 +149,36 @@ def _preceding_variable(
     same_size = (
         previous_glyphs[-1]["rendered_size"] == current_glyphs[0]["rendered_size"]
     )
+    base = previous_glyphs[-1]
+    script = current_glyphs[0]
+    script_scale = script["rendered_size"] / base["rendered_size"]
+    baseline_shift = script["rendered_origin_y"] - base["rendered_origin_y"]
+    script_gap = script["bbox"][0] - base["bbox"][2]
+    indexed_base = (
+        len(previous_glyphs) == 1
+        and 0.5 <= script_scale <= 0.8
+        and base["rendered_size"] * 0.05
+        <= baseline_shift
+        <= base["rendered_size"] * 0.6
+        and -base["rendered_size"] * 0.25
+        <= script_gap
+        <= max(1.0, base["rendered_size"] * 0.15)
+        and script["bbox"][2] >= base["bbox"][0]
+    )
     if (
         previous["kind"] == "prose"
-        and previous_glyphs[-1]["unicode"].isalpha()
-        and is_math_indicator(_text(current))
-        and touching
-        and same_baseline
-        and same_size
+        and base["unicode"].isalpha()
+        and (
+            (
+                is_math_indicator(_text(current))
+                and touching
+                and same_baseline
+                and same_size
+            )
+            or indexed_base
+        )
     ):
-        return [previous_glyphs[-1]]
+        return [base]
     return []
 
 
@@ -358,18 +411,47 @@ def _rule_matches_span(
     return rule_fits_horizontal_span(rule, glyphs)
 
 
+def _fraction_side_is_math(
+    glyphs: list[dict[str, Any]],
+    math_fonts: set[str],
+    variable_fonts: dict[str, str],
+) -> bool:
+    contextual_text = "".join(
+        glyph["unicode"]
+        for glyph in glyphs
+        if glyph["font_resource"] not in math_fonts
+        and variable_fonts.get(glyph["font_resource"]) == "contextual"
+    )
+    if contextual_text:
+        variables = contextual_text.split(",")
+        if len(variables) > 2 or any(
+            len(variable) != 1 or not variable.isalpha() for variable in variables
+        ):
+            return False
+    return all(
+        glyph["font_resource"] in math_fonts
+        or variable_fonts.get(glyph["font_resource"])
+        in {"standalone", "contextual"}
+        or is_math_indicator(glyph["unicode"])
+        or all(
+            character.isdigit() or character in _ATOM_CHARACTERS
+            for character in glyph["unicode"]
+        )
+        for glyph in glyphs
+    )
+
+
 def _fraction_candidates(
     glyphs_by_page: dict[int, list[dict[str, Any]]],
     page_rules: dict[int, list[dict[str, float | int]]],
-    roles: dict[int, tuple[set[str], set[str]]],
+    roles: dict[int, tuple[set[str], dict[str, str]]],
 ) -> list[tuple[int, list[dict[str, Any]]]]:
     candidates = []
     for page, rules in page_rules.items():
-        math_fonts, bold_fonts = roles.get(page, (set(), set()))
+        math_fonts, variable_fonts = roles.get(page, (set(), {}))
         for rule in rules:
             above, below, crossing = _rule_sides(glyphs_by_page.get(page, []), rule)
             selected = [*above, *below]
-            permitted_fonts = math_fonts | bold_fonts
             if (
                 above
                 and below
@@ -377,15 +459,8 @@ def _fraction_candidates(
                 and _rule_covers(rule, above)
                 and _rule_covers(rule, below)
                 and _rule_matches_span(rule, selected)
-                and all(
-                    glyph["font_resource"] in permitted_fonts
-                    or is_math_indicator(glyph["unicode"])
-                    or all(
-                        character.isdigit() or character in _ATOM_CHARACTERS
-                        for character in glyph["unicode"]
-                    )
-                    for glyph in selected
-                )
+                and _fraction_side_is_math(above, math_fonts, variable_fonts)
+                and _fraction_side_is_math(below, math_fonts, variable_fonts)
             ):
                 candidates.append((page, selected))
     return candidates
@@ -484,8 +559,8 @@ def source_math_regions(
         for page, page_glyphs in glyphs_by_page.items()
     }
     for (page, _block, _line), line_glyphs in sorted(by_line.items()):
-        math_fonts, bold_fonts = roles[page]
-        tokens = _tokens(line_glyphs, math_fonts, bold_fonts)
+        math_fonts, variable_fonts = roles[page]
+        tokens = _tokens(line_glyphs, math_fonts, variable_fonts)
         candidates.extend((page, glyphs) for glyphs in _line_candidates(tokens))
     candidates.extend(_operator_annotation_candidates(glyphs_by_page))
     candidates.extend(_fraction_candidates(glyphs_by_page, page_rules, roles))
