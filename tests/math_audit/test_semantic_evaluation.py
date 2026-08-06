@@ -51,6 +51,7 @@ def _glyph(
         "code": ord(text),
         "code_hex": f"{ord(text):02X}",
         "cff_gid": sequence + 1,
+        "font_math_glyph_evidence": [],
         "rendered_gid": sequence + 1,
         "to_unicode": text if to_unicode is None else to_unicode,
         "rendered_unicode": text if rendered_unicode is None else rendered_unicode,
@@ -203,8 +204,9 @@ def test_conserve_le_conflit_tounicode_sans_remplacer_le_glyphe_rendu() -> None:
         "font_resource": "/F1",
         "code": 8722,
         "code_hex": "2212",
-        "cff_gid": 3,
-        "rendered_gid": 3,
+            "cff_gid": 3,
+            "font_math_glyph_evidence": [],
+            "rendered_gid": 3,
         "glyph_name": "minus",
         "source_unicode": "−",
         "source_unicode_method": "agl",
@@ -240,6 +242,7 @@ def test_resout_un_conflit_unicode_par_un_nom_cff_tex_explicitement_supporte() -
         rendered_font="LMMathSymbols10-Regular",
     )
     glyph["glyph_name"] = "bardbl"
+    glyph["font_math_glyph_evidence"] = ["bardbl"]
 
     regions, _metrics = evaluate_regions([_region("‖", 1)], [glyph])
 
@@ -316,6 +319,7 @@ def test_resout_le_symbole_d_appartenance_errone_de_lm_math_symbols() -> None:
         rendered_font="LMMathSymbols7-Regular",
     )
     glyph["glyph_name"] = "element"
+    glyph["font_math_glyph_evidence"] = ["element"]
 
     regions, _metrics = evaluate_regions([_region(r"\in", 1)], [glyph])
 
@@ -376,6 +380,7 @@ def test_resout_les_couples_glyphe_police_observes_dans_le_pdf_reel(
         rendered_font=rendered_font,
     )
     glyph["glyph_name"] = glyph_name
+    glyph["font_math_glyph_evidence"] = [glyph_name]
 
     regions, _metrics = evaluate_regions([_region("", 1)], [glyph])
 
@@ -405,6 +410,7 @@ def test_identifie_un_fragment_de_delimiteur_extensible_sans_l_aplatir(
         rendered_font="LMMathExtension10-Regula",
     )
     glyph["glyph_name"] = glyph_name
+    glyph["font_math_glyph_evidence"] = [glyph_name]
 
     regions, _ = evaluate_regions([_region("", 1)], [glyph])
 
@@ -427,6 +433,7 @@ def test_resout_le_minus_errone_de_lm_math_symbols(rendered_font: str) -> None:
         rendered_unicode="≠",
         rendered_font=rendered_font,
     )
+    glyphs[2]["font_math_glyph_evidence"] = ["minus"]
 
     regions, _metrics = evaluate_regions([_region("w x - b", 4)], glyphs)
 
@@ -445,7 +452,7 @@ def test_resout_le_minus_errone_de_lm_math_symbols(rendered_font: str) -> None:
 @pytest.mark.parametrize(
     "rendered_font", ["Regular", "LMMathSymbolsEvil", "LMMathSymbols10-Evil"]
 )
-def test_ne_fait_pas_autorite_d_un_nom_tex_hors_d_une_police_tex(
+def test_le_nom_de_police_ne_change_pas_l_autorite_du_glyphe_embarque(
     rendered_font: str,
 ) -> None:
     glyph = _glyph(
@@ -456,11 +463,12 @@ def test_ne_fait_pas_autorite_d_un_nom_tex_hors_d_une_police_tex(
         rendered_font=rendered_font,
     )
     glyph["glyph_name"] = "bardbl"
+    glyph["font_math_glyph_evidence"] = ["bardbl"]
 
     regions, _metrics = evaluate_regions([_region("‖", 1)], [glyph])
 
-    assert regions[0]["semantic_status"] == "conflicting"
-    assert regions[0]["candidate_status"] == "not_evaluated"
+    assert regions[0]["semantic_status"] == "established"
+    assert regions[0]["candidate_status"] == "matching"
 
 
 @pytest.mark.parametrize("summation_glyph", ["summationdisplay", "summationtext"])

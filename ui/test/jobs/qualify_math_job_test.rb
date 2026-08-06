@@ -49,7 +49,37 @@ class QualifyMathJobTest < ActiveJob::TestCase
     assert_includes qualification.derived_html.download, "id='page-1'"
     assert_includes qualification.derived_html.download, "<math "
     assert_equal "$x$".b, qualification.derived_markdown.download
-    assert_equal '{"schema_name":"DoclingDocument","texts":[{"text":"autre"},{"text":"x"}],"pages":{"1":{}}}', qualification.conversion_attempt.docling_document.download
+    assert_equal(
+      '{"schema_name":"DoclingDocument","texts":[' \
+      '{"self_ref":"#/texts/0","label":"text","text":"x"},' \
+      '{"self_ref":"#/texts/1","label":"text","text":"x"}' \
+      '],"pages":{"1":{}}}',
+      qualification.conversion_attempt.docling_document.download
+    )
+  end
+
+  test "accepte une normalisation de rendu sur une région conforme" do
+    qualification = create_qualification
+    result = successful_result(corrected: true)
+    result.report.dig("alignment", "pdf_source_math_regions").last["verdict"] = "conformant_within_scope"
+    result.report.dig("alignment", "evaluation", "overall", "verdicts").merge!(
+      "conformant_within_scope" => 2,
+      "contradicted" => 0
+    )
+    registry = JSON.parse(result.corrections)
+    registry.dig("records", 0)["kind"] = "render_normalization"
+    result.corrections.replace(JSON.generate(registry))
+    result.report.dig("correction", "artifacts", "corrections").replace(
+      artifact_metadata(result.corrections)
+    )
+    result = result.with(report_bytes: JSON.generate(result.report))
+
+    job_with(FakeClient.new(result)).perform(qualification)
+
+    qualification.reload
+    assert_predicate qualification, :succeeded?
+    assert_predicate qualification, :conformant_within_scope?
+    assert_equal "corrected", qualification.summary.dig("correction", "status")
   end
 
   test "ne marque pas la qualification réussie lorsque le stockage des preuves échoue" do
@@ -84,6 +114,8 @@ class QualifyMathJobTest < ActiveJob::TestCase
             "kind" => "form_xobject",
             "resource" => "/X1",
             "bbox" => [ 10.0, 20.0, 30.0, 40.0 ],
+            "operation_indices" => [ 7 ],
+            "glyph_sequence_indices" => [],
             "reason" => {
               "code" => "form_xobject_vector_content_unqualified",
               "message" => "Contenu vectoriel non qualifié"
@@ -93,6 +125,8 @@ class QualifyMathJobTest < ActiveJob::TestCase
             "kind" => "image_xobject",
             "resource" => "/X2",
             "bbox" => [ 40.0, 50.0, 60.0, 70.0 ],
+            "operation_indices" => [ 9 ],
+            "glyph_sequence_indices" => [],
             "reason" => {
               "code" => "image_xobject_content_unqualified",
               "message" => "Contenu matriciel non qualifié"
@@ -112,6 +146,333 @@ class QualifyMathJobTest < ActiveJob::TestCase
     assert_equal 1, qualification.summary.dig("coverage", "pages_traced_with_exclusions")
   end
 
+  test "publie les exclusions de police localisees d'une page partiellement tracee" do
+    qualification = create_qualification
+    result = successful_result
+    reason = {
+      "font_resource" => "/F1@12",
+      "code" => "identity_cid_to_gid_required",
+      "message" => "CIDToGIDMap non supportee"
+    }
+    result.report.fetch("coverage").merge!(
+      "pages_traced" => 0,
+      "pages_partially_traced" => 1
+    )
+    result.report["pages"] = [
+      {
+        "page" => 1,
+        "status" => "partially_traced",
+        "reasons" => [ reason ],
+        "font_exclusions" => [
+          {
+            "kind" => "font",
+            "scope" => "line",
+            "resources" => [ "/F1@12" ],
+            "trace_font" => "LimitedFont",
+            "bbox" => [ 10.0, 20.0, 30.0, 40.0 ],
+            "operation_index_ranges" => [ [ 7, 7 ] ],
+            "glyph_sequence_index_ranges" => [ [ 10, 11 ] ],
+            "reasons" => [ reason ]
+          }
+        ]
+      }
+    ]
+    result = result.with(report_bytes: JSON.generate(result.report))
+
+    job_with(FakeClient.new(result)).perform(qualification)
+
+    exclusion = qualification.reload.summary.fetch("page_exclusions").sole
+    assert_equal "partially_traced", exclusion.fetch("status")
+    assert_equal "font", exclusion.dig("regions", 0, "kind")
+    assert_equal "/F1@12", exclusion.dig("regions", 0, "resource")
+    assert_equal [ 10.0, 20.0, 30.0, 40.0 ], exclusion.dig("regions", 0, "bbox")
+    assert_equal [ [ 7, 7 ] ], exclusion.dig("regions", 0, "operation_index_ranges")
+    assert_equal [ [ 10, 11 ] ], exclusion.dig("regions", 0, "glyph_sequence_index_ranges")
+  end
+
+  test "refuse une page partielle sans exclusion de police localisee" do
+    qualification = create_qualification
+    result = successful_result
+    result.report.fetch("coverage").merge!(
+      "pages_traced" => 0,
+      "pages_partially_traced" => 1
+    )
+    result.report["pages"] = [
+      {
+        "page" => 1,
+        "status" => "partially_traced",
+        "reasons" => [
+          {
+            "font_resource" => "/F1@12",
+            "code" => "identity_cid_to_gid_required",
+            "message" => "CIDToGIDMap non supportee"
+          }
+        ]
+      }
+    ]
+
+    error = assert_raises(MathQualificationClient::QualificationError) do
+      job_with(FakeClient.new(result)).perform(qualification)
+    end
+
+    assert_equal "invalid_report", error.code
+  end
+
+  test "refuse une page unsupported sans preuve d'exclusion" do
+    qualification = create_qualification
+    result = successful_result
+    result.report.fetch("coverage").merge!(
+      "pages_traced" => 0,
+      "pages_unsupported" => 1
+    )
+    result.report["pages"] = [
+      { "page" => 1, "status" => "unsupported", "reasons" => [] }
+    ]
+
+    error = assert_raises(MathQualificationClient::QualificationError) do
+      job_with(FakeClient.new(result)).perform(qualification)
+    end
+
+    assert_equal "invalid_report", error.code
+  end
+
+  test "accepte plusieurs exclusions localisees pour la meme police unsupported" do
+    qualification = create_qualification
+    result = successful_result
+    reason = {
+      "font_resource" => "/F1",
+      "code" => "font_encoding_unsupported",
+      "message" => "Police non qualifiee"
+    }
+    exclusion = {
+      "kind" => "font",
+      "scope" => "line",
+      "resources" => [ "/F1" ],
+      "trace_font" => "LimitedFont",
+      "bbox" => [ 10.0, 20.0, 30.0, 40.0 ],
+      "operation_index_ranges" => [ [ 7, 7 ] ],
+      "glyph_sequence_index_ranges" => [ [ 10, 11 ] ],
+      "reasons" => [ reason ]
+    }
+    result.report.fetch("coverage").merge!("pages_traced" => 0, "pages_unsupported" => 1)
+    result.report["pages"] = [
+      {
+        "page" => 1,
+        "status" => "unsupported",
+        "box" => [ 0.0, 0.0, 100.0, 120.0 ],
+        "reasons" => [ reason ],
+        "font_exclusions" => [
+          exclusion,
+          exclusion.merge("bbox" => [ 10.0, 50.0, 30.0, 70.0 ])
+        ]
+      }
+    ]
+    result = result.with(report_bytes: JSON.generate(result.report))
+
+    job_with(FakeClient.new(result)).perform(qualification)
+
+    assert_predicate qualification.reload, :succeeded?
+    assert_equal 2, qualification.summary.dig("page_exclusions", 0, "regions").size
+  end
+
+  test "refuse une raison de police unsupported sans ressource de police" do
+    qualification = create_qualification
+    result = successful_result
+    result.report.fetch("coverage").merge!("pages_traced" => 0, "pages_unsupported" => 1)
+    result.report["pages"] = [
+      {
+        "page" => 1,
+        "status" => "unsupported",
+        "box" => [ 0.0, 0.0, 100.0, 120.0 ],
+        "reasons" => [
+          { "code" => "font_encoding_unsupported", "message" => "Police inconnue" }
+        ]
+      }
+    ]
+
+    error = assert_raises(MathQualificationClient::QualificationError) do
+      job_with(FakeClient.new(result)).perform(qualification)
+    end
+
+    assert_equal "invalid_report", error.code
+  end
+
+  test "accepte une ambiguite de rendu de police au niveau de la page" do
+    qualification = create_qualification
+    result = successful_result
+    reason = {
+      "code" => "rendered_font_mismatch",
+      "message" => "Police trace divergente a 1102"
+    }
+    result.report.fetch("coverage").merge!("pages_traced" => 0, "pages_ambiguous" => 1)
+    result.report["pages"] = [
+      {
+        "page" => 1,
+        "status" => "ambiguous",
+        "box" => [ 0.0, 0.0, 100.0, 120.0 ],
+        "reasons" => [ reason ]
+      }
+    ]
+    result = result.with(report_bytes: JSON.generate(result.report))
+
+    job_with(FakeClient.new(result)).perform(qualification)
+
+    qualification.reload
+    assert_predicate qualification, :succeeded?
+    exclusion = qualification.summary.fetch("page_exclusions").sole
+    assert_equal "rendered_font_mismatch", exclusion.dig("regions", 0, "resource")
+    assert_equal reason, exclusion.fetch("reasons").sole
+  end
+
+  test "refuse une ambiguite de rendu declaree unsupported" do
+    qualification = create_qualification
+    result = successful_result
+    result.report.fetch("coverage").merge!("pages_traced" => 0, "pages_unsupported" => 1)
+    result.report["pages"] = [
+      {
+        "page" => 1,
+        "status" => "unsupported",
+        "box" => [ 0.0, 0.0, 100.0, 120.0 ],
+        "reasons" => [
+          {
+            "code" => "rendered_font_mismatch",
+            "message" => "Police trace divergente a 1102"
+          }
+        ]
+      }
+    ]
+
+    error = assert_raises(MathQualificationClient::QualificationError) do
+      job_with(FakeClient.new(result)).perform(qualification)
+    end
+
+    assert_equal "invalid_report", error.code
+  end
+
+  test "refuse une exclusion de police sans indice probant" do
+    qualification = create_qualification
+    result = successful_result
+    reason = {
+      "font_resource" => "/F1",
+      "code" => "font_encoding_unsupported",
+      "message" => "Police non qualifiee"
+    }
+    result.report.fetch("coverage").merge!("pages_traced" => 0, "pages_unsupported" => 1)
+    result.report["pages"] = [
+      {
+        "page" => 1,
+        "status" => "unsupported",
+        "box" => [ 0.0, 0.0, 100.0, 120.0 ],
+        "reasons" => [ reason ],
+        "font_exclusions" => [
+          {
+            "kind" => "font", "scope" => "line", "resources" => [ "/F1" ],
+            "trace_font" => "LimitedFont", "bbox" => [ 10.0, 20.0, 30.0, 40.0 ],
+            "operation_indices" => [], "glyph_sequence_indices" => [],
+            "reasons" => [ reason ]
+          }
+        ]
+      }
+    ]
+
+    error = assert_raises(MathQualificationClient::QualificationError) do
+      job_with(FakeClient.new(result)).perform(qualification)
+    end
+
+    assert_equal "invalid_report", error.code
+  end
+
+  test "conserve ensemble les exclusions de police et de xobject" do
+    qualification = create_qualification
+    result = successful_result
+    font_reason = {
+      "font_resource" => "/F1@12",
+      "code" => "identity_cid_to_gid_required",
+      "message" => "CIDToGIDMap non supportee"
+    }
+    opaque_reason = {
+      "code" => "image_xobject_content_unqualified",
+      "message" => "Contenu matriciel non qualifie"
+    }
+    result.report.fetch("coverage").merge!(
+      "pages_traced" => 0,
+      "pages_partially_traced" => 1
+    )
+    result.report["pages"] = [
+      {
+        "page" => 1,
+        "status" => "partially_traced",
+        "reasons" => [ font_reason ],
+        "font_exclusions" => [
+          {
+            "kind" => "font",
+            "scope" => "line",
+            "resources" => [ "/F1@12" ],
+            "trace_font" => "LimitedFont",
+            "bbox" => [ 10.0, 20.0, 30.0, 40.0 ],
+            "operation_indices" => [ 7 ],
+            "glyph_sequence_indices" => [ 10, 11 ],
+            "reasons" => [ font_reason ]
+          }
+        ],
+        "opaque_regions" => [
+          {
+            "kind" => "image_xobject",
+            "resource" => "/Im1",
+            "bbox" => [ 50.0, 60.0, 70.0, 80.0 ],
+            "operation_indices" => [ 9 ],
+            "glyph_sequence_indices" => [],
+            "reason" => opaque_reason
+          }
+        ]
+      }
+    ]
+    result = result.with(report_bytes: JSON.generate(result.report))
+
+    job_with(FakeClient.new(result)).perform(qualification)
+
+    exclusion = qualification.reload.summary.fetch("page_exclusions").sole
+    assert_equal %w[font image_xobject], exclusion.fetch("regions").pluck("kind")
+    assert_equal [ font_reason, opaque_reason ], exclusion.fetch("reasons")
+  end
+
+  test "accepte les raisons de police equivalentes dans un ordre different" do
+    qualification = create_qualification
+    result = successful_result
+    reasons = [ "/Z", "/A" ].map do |resource|
+      {
+        "font_resource" => resource,
+        "code" => "identity_cid_to_gid_required",
+        "message" => "CIDToGIDMap non supportee"
+      }
+    end
+    result.report.fetch("coverage").merge!("pages_traced" => 0, "pages_partially_traced" => 1)
+    result.report["pages"] = [
+      {
+        "page" => 1,
+        "status" => "partially_traced",
+        "reasons" => reasons,
+        "font_exclusions" => [
+          {
+            "kind" => "font",
+            "scope" => "line",
+            "resources" => [ "/A", "/Z" ],
+            "trace_font" => "LimitedFont",
+            "bbox" => [ 10.0, 20.0, 30.0, 40.0 ],
+            "operation_indices" => [ 7 ],
+            "glyph_sequence_indices" => [ 10, 11 ],
+            "reasons" => reasons.reverse
+          }
+        ]
+      }
+    ]
+    result = result.with(report_bytes: JSON.generate(result.report))
+
+    job_with(FakeClient.new(result)).perform(qualification)
+
+    assert_predicate qualification.reload, :succeeded?
+  end
+
   test "refuse des compteurs de pages qui contredisent leurs statuts" do
     qualification = create_qualification
     result = successful_result
@@ -127,6 +488,168 @@ class QualifyMathJobTest < ActiveJob::TestCase
     assert_equal "invalid_report", error.code
   end
 
+  test "refuse un audit html qui designe le mauvais artefact" do
+    qualification = create_qualification
+    result = successful_result
+    result.report.fetch("html_integrity")["artifact"] = "derived_html"
+
+    error = assert_raises(MathQualificationClient::QualificationError) do
+      job_with(FakeClient.new(result)).perform(qualification)
+    end
+
+    assert_equal "invalid_report", error.code
+  end
+
+  test "refuse un audit html qui ne couvre pas toutes les pages" do
+    qualification = create_qualification
+    result = successful_result
+    result.report.fetch("html_integrity")["pages_checked"] = 0
+
+    error = assert_raises(MathQualificationClient::QualificationError) do
+      job_with(FakeClient.new(result)).perform(qualification)
+    end
+
+    assert_equal "invalid_report", error.code
+  end
+
+  test "refuse un audit html sans preuve par page" do
+    qualification = create_qualification
+    result = successful_result
+    result.report.fetch("html_integrity").delete("pages")
+
+    error = assert_raises(MathQualificationClient::QualificationError) do
+      job_with(FakeClient.new(result)).perform(qualification)
+    end
+
+    assert_equal "invalid_report", error.code
+  end
+
+  test "refuse une page html passee dont les inventaires divergent" do
+    qualification = create_qualification
+    result = successful_result
+    page = result.report.dig("html_integrity", "pages").sole
+    page["expected"]["math"] = 1
+
+    error = assert_raises(MathQualificationClient::QualificationError) do
+      job_with(FakeClient.new(result)).perform(qualification)
+    end
+
+    assert_equal "invalid_report", error.code
+  end
+
+  test "refuse la disparition des liens entre regions prouvees et dom" do
+    qualification = create_qualification
+    result = successful_result
+    result.report.fetch("html_integrity")["region_links"] = []
+
+    error = assert_raises(MathQualificationClient::QualificationError) do
+      job_with(FakeClient.new(result)).perform(qualification)
+    end
+
+    assert_equal "invalid_report", error.code
+  end
+
+  test "refuse un lien dom matched sans occurrence" do
+    qualification = create_qualification
+    result = successful_result
+    result.report.dig("html_integrity", "region_links").first["matches"] = 0
+
+    error = assert_raises(MathQualificationClient::QualificationError) do
+      job_with(FakeClient.new(result)).perform(qualification)
+    end
+
+    assert_equal "invalid_report", error.code
+  end
+
+  test "refuse un lien dom qui contredit la region source" do
+    qualification = create_qualification
+    result = successful_result
+    link = result.report.dig("html_integrity", "region_links").first
+    link.merge!(
+      "page" => 999,
+      "docling_ref" => "#/texts/999",
+      "candidate_charspan" => [ 100, 200 ],
+      "dom_charspan" => [ 100, 200 ],
+      "dom_selector" => (
+        "math[@data-docling-ref='#/texts/999']" \
+        "[@data-docling-charspan='100:200']"
+      )
+    )
+
+    error = assert_raises(MathQualificationClient::QualificationError) do
+      job_with(FakeClient.new(result)).perform(qualification)
+    end
+
+    assert_equal "invalid_report", error.code
+  end
+
+  test "refuse un charspan dom arbitraire avec un selecteur auto coherent" do
+    qualification = create_qualification
+    result = successful_result
+    link = result.report.dig("html_integrity", "region_links").first
+    link["dom_charspan"] = [ 100, 200 ]
+    link["dom_selector"] = (
+      "math[@data-docling-ref='#/texts/0']" \
+      "[@data-docling-charspan='100:200']"
+    )
+
+    error = assert_raises(MathQualificationClient::QualificationError) do
+      job_with(FakeClient.new(result)).perform(qualification)
+    end
+
+    assert_equal "invalid_report", error.code
+  end
+
+  test "refuse une anomalie html rattachee a une page inexistante" do
+    qualification = create_qualification
+    result = successful_result
+    integrity = result.report.fetch("html_integrity")
+    integrity["status"] = "failed"
+    integrity["issues"] = [
+      { "page" => 999, "code" => "invalid", "message" => "hors document" }
+    ]
+
+    error = assert_raises(MathQualificationClient::QualificationError) do
+      job_with(FakeClient.new(result)).perform(qualification)
+    end
+
+    assert_equal "invalid_report", error.code
+  end
+
+  test "refuse une page html failed sans anomalie correspondante" do
+    qualification = create_qualification
+    result = successful_result
+    result.report.dig("html_integrity", "pages").sole["status"] = "failed"
+
+    error = assert_raises(MathQualificationClient::QualificationError) do
+      job_with(FakeClient.new(result)).perform(qualification)
+    end
+
+    assert_equal "invalid_report", error.code
+  end
+
+  test "refuse un total de pages html different de la couverture" do
+    qualification = create_qualification
+    result = successful_result
+    result.report.fetch("html_integrity").merge!("pages_total" => 2, "pages_checked" => 2)
+
+    error = assert_raises(MathQualificationClient::QualificationError) do
+      job_with(FakeClient.new(result)).perform(qualification)
+    end
+
+    assert_equal "invalid_report", error.code
+  end
+
+  test "audite le html derive si une correction est acceptee avant un echec" do
+    qualification = create_qualification
+
+    job_with(FakeClient.new(successful_result(corrected: true, mixed: true))).perform(qualification)
+
+    assert_predicate qualification.reload, :succeeded?
+    assert_equal "failed", qualification.summary.dig("correction", "status")
+    assert_equal "derived_html", qualification.summary.dig("html_integrity", "artifact")
+  end
+
   test "refuse une zone opaque sur une page déclarée entièrement tracée" do
     qualification = create_qualification
     result = successful_result
@@ -135,6 +658,8 @@ class QualifyMathJobTest < ActiveJob::TestCase
         "kind" => "image_xobject",
         "resource" => "/Im1",
         "bbox" => [ 1.0, 1.0, 2.0, 2.0 ],
+        "operation_indices" => [ 1 ],
+        "glyph_sequence_indices" => [],
         "reason" => {
           "code" => "image_xobject_content_unqualified",
           "message" => "Contenu matriciel non qualifié"
@@ -360,11 +885,19 @@ class QualifyMathJobTest < ActiveJob::TestCase
     qualification = create_qualification
     result = successful_result(corrected: true)
     after = %q($x'<y\_z > 0$)
+    derived_charspan = [ 0, after.length ]
     registry = JSON.parse(result.corrections)
-    mathml = '<math data-correction-id="#/texts/1" xmlns="http://www.w3.org/1998/Math/MathML"><mi>x</mi><mo>&lt;</mo><mi>y</mi></math>'
+    mathml = (
+      "<math data-docling-ref=\"#/texts/1\" " \
+      "data-docling-charspan=\"#{derived_charspan.join(':')}\" " \
+      "data-correction-id=\"#/texts/1\" " \
+      "xmlns=\"http://www.w3.org/1998/Math/MathML\">" \
+      "<mi>x</mi><mo>&lt;</mo><mi>y</mi></math>"
+    )
     registry.fetch("records").first.merge!(
       "after" => after,
       "mathml" => mathml,
+      "derived_charspan" => derived_charspan,
       "proposal" => %q(x'<y\_z > 0),
       "source_tokens" => [ "x", "'", "<", "y", "_", "z", ">", "0" ],
       "proposal_tokens" => [ "x", "'", "<", "y", "_", "z", ">", "0" ],
@@ -373,10 +906,23 @@ class QualifyMathJobTest < ActiveJob::TestCase
     )
     result.corrections.replace(JSON.generate(registry))
     result.derived_docling_document.replace(
-      JSON.generate("schema_name" => "DoclingDocument", "texts" => [ { "text" => "autre" }, { "text" => after } ], "pages" => { "1" => {} })
+      JSON.generate(
+        "schema_name" => "DoclingDocument",
+        "texts" => [
+          { "self_ref" => "#/texts/0", "label" => "text", "text" => "x" },
+          { "self_ref" => "#/texts/1", "label" => "text", "text" => after }
+        ],
+        "pages" => { "1" => {} }
+      )
     )
     result.derived_html.replace("<div class='page' id='page-1'>#{mathml}</div>")
     result.derived_markdown.replace(%q($x'&lt;y\_z &gt; 0$))
+    link = result.report.dig("html_integrity", "region_links").last
+    link["dom_charspan"] = derived_charspan
+    link["dom_selector"] = (
+      "math[@data-docling-ref='#/texts/1']" \
+      "[@data-docling-charspan='#{derived_charspan.join(':')}']"
+    )
     %w[corrections derived_docling_document derived_html derived_markdown].each do |name|
       content = result.public_send(name)
       metadata = result.report.dig("correction", "artifacts", name)
@@ -569,7 +1115,12 @@ class QualifyMathJobTest < ActiveJob::TestCase
       conversion_options: { "pipeline" => "vlm" }
     )
     attempt.docling_document.attach(
-      io: StringIO.new('{"schema_name":"DoclingDocument","texts":[{"text":"autre"},{"text":"x"}],"pages":{"1":{}}}'),
+      io: StringIO.new(
+        '{"schema_name":"DoclingDocument","texts":[' \
+        '{"self_ref":"#/texts/0","label":"text","text":"x"},' \
+        '{"self_ref":"#/texts/1","label":"text","text":"x"}' \
+        '],"pages":{"1":{}}}'
+      ),
       filename: "document.json",
       content_type: "application/json"
     )
@@ -579,17 +1130,19 @@ class QualifyMathJobTest < ActiveJob::TestCase
     ).tap(&:save!)
   end
 
-  def successful_result(corrected: false)
+  def successful_result(corrected: false, mixed: false)
     qualification = MathQualification.last
     correction_status = corrected ? "accepted" : "rejected"
+    target_region_ids = mixed ? [ "#/texts/1", "#/texts/0" ] : [ "#/texts/1" ]
     counts = {
-      "status" => corrected ? "corrected" : "rejected",
-      "regions" => 1,
-      "targets" => 1,
+      "status" => mixed ? "failed" : (corrected ? "corrected" : "rejected"),
+      "regions" => target_region_ids.size,
+      "target_region_ids" => target_region_ids,
+      "targets" => target_region_ids.size,
       "accepted" => corrected ? 1 : 0,
       "accepted_regions" => corrected ? 1 : 0,
       "rejected" => corrected ? 0 : 1,
-      "failed" => 0
+      "failed" => mixed ? 1 : 0
     }
     record = {
       "target_id" => "#/texts/1",
@@ -599,12 +1152,18 @@ class QualifyMathJobTest < ActiveJob::TestCase
       "page" => 1,
       "status" => correction_status
     }
-    mathml = '<math data-correction-id="#/texts/1" xmlns="http://www.w3.org/1998/Math/MathML"><mi>x</mi></math>'
+    mathml = (
+      '<math data-docling-ref="#/texts/1" data-docling-charspan="0:3" ' \
+      'data-correction-id="#/texts/1" xmlns="http://www.w3.org/1998/Math/MathML">' \
+      '<mi>x</mi></math>'
+    )
     derived_html = "<div class='page' id='page-1'>#{mathml}</div>"
     if corrected
       record.merge!(
         "docling_ref" => "#/texts/1",
         "charspan" => [ 0, 1 ],
+        "derived_docling_ref" => "#/texts/1",
+        "derived_charspan" => [ 0, 3 ],
         "before" => "x",
         "after" => "$x$",
         "mathml" => mathml,
@@ -627,10 +1186,23 @@ class QualifyMathJobTest < ActiveJob::TestCase
     else
       record["reason"] = "proposal_not_proven_by_source"
     end
-    corrections = JSON.generate("summary" => counts, "records" => [ record ])
+    records = [ record ]
+    if mixed
+      records << {
+        "target_id" => "#/texts/0",
+        "region_ids" => [ "#/texts/0" ],
+        "region_id" => "#/texts/0",
+        "status" => "failed",
+        "reason" => "proposal_request_failed"
+      }
+    end
+    corrections = JSON.generate("summary" => counts, "records" => records)
     derived_document = JSON.generate(
       "schema_name" => "DoclingDocument",
-      "texts" => [ { "text" => "autre" }, { "text" => "$x$" } ],
+      "texts" => [
+        { "self_ref" => "#/texts/0", "label" => "text", "text" => "x" },
+        { "self_ref" => "#/texts/1", "label" => "text", "text" => "$x$" }
+      ],
       "pages" => { "1" => {} }
     )
     native_page_html = "<div class='page' id='page-1'>native</div>"
@@ -667,14 +1239,7 @@ class QualifyMathJobTest < ActiveJob::TestCase
           }
         }
       },
-      "correction" => {
-        "status" => corrected ? "corrected" : "rejected",
-        "regions" => 1,
-        "targets" => 1,
-        "accepted" => corrected ? 1 : 0,
-        "accepted_regions" => corrected ? 1 : 0,
-        "rejected" => corrected ? 0 : 1,
-        "failed" => 0,
+      "correction" => counts.merge(
         "engine" => { "model" => "gemma" },
         "artifacts" => {
           "corrections" => artifact_metadata(corrections),
@@ -686,8 +1251,45 @@ class QualifyMathJobTest < ActiveJob::TestCase
             artifacts["derived_markdown"] = artifact_metadata("$x$")
           end
         end
-      },
-      "native_page_html" => artifact_metadata(native_page_html)
+      ),
+      "native_page_html" => artifact_metadata(native_page_html),
+      "html_integrity" => {
+        "artifact" => corrected ? "derived_html" : "native_page_html",
+        "status" => "passed",
+        "pages_total" => 1,
+        "pages_checked" => 1,
+        "issues" => [],
+        "region_links" => [
+          {
+            "region_id" => "#/texts/0", "page" => 1,
+            "docling_ref" => "#/texts/0", "candidate_charspan" => [ 0, 1 ],
+            "dom_charspan" => [ 0, 1 ],
+            "dom_selector" => (
+              "math[@data-docling-ref='#/texts/0']" \
+              "[@data-docling-charspan='0:1']"
+            ),
+            "matches" => 1, "status" => "matched"
+          },
+          {
+            "region_id" => "#/texts/1", "page" => 1,
+            "docling_ref" => "#/texts/1", "candidate_charspan" => [ 0, 1 ],
+            "dom_charspan" => corrected ? [ 0, 3 ] : [ 0, 1 ],
+            "dom_selector" => (
+              "math[@data-docling-ref='#/texts/1']" \
+              "[@data-docling-charspan='#{corrected ? '0:3' : '0:1'}']"
+            ),
+            "matches" => 1, "status" => "matched"
+          }
+        ],
+        "pages" => [
+          {
+            "page" => 1,
+            "expected" => { "math" => 0, "images" => 0 },
+            "rendered" => { "math" => 0, "images" => 0 },
+            "status" => "passed"
+          }
+        ]
+      }
     }
     report_bytes = JSON.generate(report)
     MathQualificationClient::Result.new(

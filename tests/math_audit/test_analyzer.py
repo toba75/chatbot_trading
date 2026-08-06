@@ -3,9 +3,10 @@ from pathlib import Path
 
 import fitz
 from pypdf import PdfReader, PdfWriter
+from pypdf.generic import DecodedStreamObject, NameObject
 
 from pdf_math_audit.analyzer import analyze_pdf
-from pdf_math_audit.fonts import agl_unicode
+from pdf_math_audit.fonts import agl_unicode, parse_to_unicode
 from pdf_math_audit.pdf_indicators import glyph_reference
 from pdf_math_audit.source_math_regions import source_math_regions
 
@@ -35,9 +36,9 @@ def test_analyse_generiquement_la_trace_structurelle_du_pdf_de_reference() -> No
     )
 
     assert report["schema_version"] == "1.0"
-    assert report["analyzer_version"] == "0.6.2"
+    assert report["analyzer_version"] == "0.8.0"
     assert report["capability_profile"] == (
-        "type1c-winansi-type0-truetype-scaled-page-v4"
+        "type1c-winansi-type0-truetype-scaled-page-v5"
     )
     assert report["pdf"] == {
         "filename": REFERENCE_PDF.name,
@@ -99,8 +100,19 @@ def test_signale_une_capacite_absente_sans_moteur_alternatif(tmp_path: Path) -> 
         {
             "code": "embedded_type1c_font_required",
             "message": "/helv: FontDescriptor absent",
+            "font_resource": "/helv",
+            "operation_indices": [4],
+            "glyph_sequence_indices": [0, 1, 2, 3, 4],
         }
     ]
+    assert report["pages"][0]["font_exclusions"][0]["scope"] == "line"
+    assert report["pages"][0]["font_exclusions"][0]["resources"] == ["/helv"]
+    assert report["pages"][0]["font_exclusions"][0][
+        "operation_index_ranges"
+    ] == [[4, 4]]
+    assert report["pages"][0]["font_exclusions"][0][
+        "glyph_sequence_index_ranges"
+    ] == [[0, 4]]
     assert "glyphs" not in report["pages"][0]
 
 
@@ -286,6 +298,53 @@ def test_trace_les_polices_type0_identity_h_de_la_page_mixte(
         region for region in regions if region["source_glyph_text"] == "2‖w‖"
     )
     assert fraction["structural_rules"]["fraction"]["seqno"] == 179
+
+
+def test_exclut_une_cid_to_gid_map_sans_gain_mathematique(tmp_path: Path) -> None:
+    reader = PdfReader(FULL_REFERENCE_PDF)
+    page = reader.pages[10]
+    for reference in page["/Resources"]["/Font"].values():
+        font = reference.get_object()
+        if font.get("/Subtype") != "/Type0":
+            continue
+        descendant = font["/DescendantFonts"][0].get_object()
+        if descendant.get("/CIDToGIDMap") is not None and str(
+            descendant.get("/CIDToGIDMap")
+        ) != "/Identity":
+            continue
+        to_unicode = parse_to_unicode(font)
+        last_cid = max(to_unicode)
+        mapping = bytearray((last_cid + 1) * 2)
+        for cid in to_unicode:
+            mapping[cid * 2 : cid * 2 + 2] = cid.to_bytes(2, "big")
+        stream = DecodedStreamObject()
+        stream.set_data(bytes(mapping))
+        descendant[NameObject("/CIDToGIDMap")] = stream
+        break
+    else:
+        raise AssertionError("Aucune police Type0 Identity-H dans la fixture")
+
+    writer = PdfWriter()
+    writer.add_page(page)
+    pdf_path = tmp_path / "cid-to-gid-stream.pdf"
+    with pdf_path.open("wb") as destination:
+        writer.write(destination)
+
+    report = analyze_pdf(pdf_path)
+
+    page = report["pages"][0]
+    assert page["status"] == "partially_traced"
+    reason = next(
+        reason
+        for reason in page["reasons"]
+        if reason["code"] == "cid_to_gid_stream_not_qualified"
+    )
+    assert reason["operation_indices"]
+    assert reason["glyph_sequence_indices"]
+    assert any(
+        reason["font_resource"] in exclusion["resources"]
+        for exclusion in page["font_exclusions"]
+    )
 
 
 def test_trace_le_texte_hors_des_formulaires_vectoriels_de_la_page_16(

@@ -3,10 +3,12 @@ from __future__ import annotations
 import re
 import unicodedata
 from html import unescape
+from xml.etree import ElementTree
 
 from latex2mathml import exceptions as latex_exceptions
-from latex2mathml.converter import convert_to_element
+from latex2mathml.converter import convert, convert_to_element
 
+from pdf_math_audit.inline_math import unescaped_positions
 from pdf_math_audit.math_unicode import is_mathematical_bold, normalize_bold_variants
 from pdf_math_audit.relation_signature import normalize_relation_signature
 
@@ -72,7 +74,14 @@ def _relation_arity_reason(root: object) -> dict[str, str] | None:
 
 
 def _escaped_plain_text(text: str) -> str:
-    return "".join("\\" + character if character in "{}_" else character for character in text)
+    escaped: list[str] = []
+    preceding_backslashes = 0
+    for character in text:
+        if character in "{}_%" and preceding_backslashes % 2 == 0:
+            escaped.append("\\")
+        escaped.append(character)
+        preceding_backslashes = preceding_backslashes + 1 if character == "\\" else 0
+    return "".join(escaped)
 
 
 def _mixed_text_latex(
@@ -237,6 +246,42 @@ def candidate_analysis(
             ),
         )
     return tokens, signature, None
+
+
+def _published_root(mathml: str) -> object | None:
+    try:
+        root = ElementTree.fromstring(mathml)
+    except ElementTree.ParseError:
+        return None
+    for element in root.iter():
+        element.tag = element.tag.rpartition("}")[2]
+    return root
+
+
+def publishable_mathml(latex: str) -> str | None:
+    """MathML publiable pour un fragment LaTeX, ou `None` si la conversion n'est pas prouvée.
+
+    Le fragment doit s'analyser comme un candidat, ne pas contenir de commentaire
+    LaTeX qui amputerait silencieusement son contenu, et se re-sérialiser en un
+    arbre MathML dont les éléments et les jetons sont exactement ceux analysés.
+    Cette dernière relecture est la seule à voir le texte réellement publié : elle
+    seule refuse le balisage qu'un `\\text{...}` fait traverser le sérialiseur.
+    """
+    if unescaped_positions(latex, "%"):
+        return None
+    tokens, _signature, reason = candidate_analysis(latex)
+    if reason is not None or not tokens:
+        return None
+
+    mathml = convert(latex)
+    root = _published_root(mathml)
+    if root is None:
+        return None
+    if {element.tag for element in root.iter()} - _SEQUENCE_MATHML_TAGS:
+        return None
+    if _candidate_tokens(root) != tokens:
+        return None
+    return mathml
 
 
 def candidate_tokens(

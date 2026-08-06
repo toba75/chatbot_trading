@@ -59,18 +59,16 @@ def _tokens(
 ) -> list[dict[str, Any]]:
     tokens: list[dict[str, Any]] = []
     groups = _span_groups(glyphs)
-    contextual_groups = set()
-    for index in range(len(groups) - 1):
-        if _contextual_script_pair(groups[index], groups[index + 1], variable_fonts):
-            contextual_groups.update((index, index + 1))
-    for index, group in enumerate(groups):
+    for group in groups:
         text = "".join(glyph["unicode"] for glyph in group)
         variable_mode = variable_fonts.get(group[0]["font_resource"])
-        short_variable = short_variable_text(text) and (
-            variable_mode == "standalone" or index in contextual_groups
-        )
+        short_variable = short_variable_text(text) and variable_mode is not None
         for glyph in group:
-            kind = _primitive_kind(glyph, math_fonts, short_variable)
+            kind = _primitive_kind(
+                glyph, math_fonts, short_variable and variable_mode == "standalone"
+            )
+            if kind == "prose" and short_variable and variable_mode == "contextual":
+                kind = "atom"
             if (
                 tokens
                 and tokens[-1]["span"] == glyph["rawdict"]["span"]
@@ -86,32 +84,6 @@ def _tokens(
                     }
                 )
     return tokens
-
-
-def _contextual_script_pair(
-    base_group: list[dict[str, Any]],
-    script_group: list[dict[str, Any]],
-    variable_fonts: dict[str, str],
-) -> bool:
-    base = base_group[-1]
-    script = script_group[0]
-    if (
-        variable_fonts.get(base["font_resource"]) != "contextual"
-        or variable_fonts.get(script["font_resource"]) != "contextual"
-        or not short_variable_text("".join(item["unicode"] for item in base_group))
-        or not short_variable_text("".join(item["unicode"] for item in script_group))
-    ):
-        return False
-    size = base["rendered_size"]
-    scale = script["rendered_size"] / size
-    baseline_shift = abs(script["rendered_origin_y"] - base["rendered_origin_y"])
-    gap = script["bbox"][0] - base["bbox"][2]
-    return (
-        0.5 <= scale <= 0.8
-        and size * 0.05 <= baseline_shift <= size * 0.6
-        and -size * 0.25 <= gap <= max(1.0, size * 0.15)
-        and script["bbox"][2] >= base["bbox"][0]
-    )
 
 
 def _text(token: dict[str, Any]) -> str:

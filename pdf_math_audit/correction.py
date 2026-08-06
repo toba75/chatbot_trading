@@ -190,13 +190,18 @@ def correct_document(
     else:
         status = "not_required"
     derived, derived_html = (
-        derive_document_and_page_html(document, accepted) if accepted else (None, None)
+        derive_document_and_page_html(document, accepted, pdf_path)
+        if accepted
+        else (None, None)
     )
     if on_progress and accepted:
         on_progress(progress_event("correction_export", 1, 1))
     summary = {
         "status": status,
         "regions": region_count,
+        "target_region_ids": [
+            region_id for record in records for region_id in record["region_ids"]
+        ],
         "targets": len(targets),
         "accepted": len(accepted),
         "accepted_regions": sum(len(record["region_ids"]) for record in accepted),

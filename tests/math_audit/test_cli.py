@@ -102,6 +102,7 @@ def test_cli_ecrit_le_rapport_et_publie_la_progression(tmp_path: Path) -> None:
         "report_sha256": hashlib.sha256(report_path.read_bytes()).hexdigest(),
     }
     report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert report_path.read_bytes().count(b"\n") == 1
     assert report["pages"][0]["status"] == "unsupported"
     assert report["docling_document"] == {
         "filename": "docling.json",
@@ -112,7 +113,7 @@ def test_cli_ecrit_le_rapport_et_publie_la_progression(tmp_path: Path) -> None:
     }
     assert report["contract"] == {
         "version": "2.1",
-        "analyzer_version": "0.6.2",
+        "analyzer_version": "0.8.0",
         "capability_profile": "pdf-docling-semantic-correction-v3",
         "source_sha256": hashlib.sha256(pdf_path.read_bytes()).hexdigest(),
         "docling_document_sha256": hashlib.sha256(docling_bytes).hexdigest(),

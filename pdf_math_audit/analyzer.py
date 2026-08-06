@@ -125,7 +125,9 @@ def _trace_report(page_number: int, trace: PageTrace) -> dict[str, Any]:
         for glyph in trace.glyphs
     ]
     status = (
-        "partially_traced"
+        "unsupported"
+        if not trace.glyphs and trace.font_limitations
+        else "partially_traced"
         if trace.font_limitations
         else "traced_with_exclusions"
         if trace.opaque_regions
@@ -147,6 +149,7 @@ def _trace_report(page_number: int, trace: PageTrace) -> dict[str, Any]:
         ),
         "fonts": {name: font.public for name, font in trace.fonts.items()},
         "horizontal_rules": trace.horizontal_rules,
+        "font_exclusions": trace.font_exclusions,
         "opaque_regions": trace.opaque_regions,
         "to_unicode_conflicts": list(conflicts.values()),
         "glyphs": trace.glyphs,
@@ -241,7 +244,7 @@ def analyze_pdf(
     return {
         "schema_version": "1.0",
         "analyzer_version": ANALYZER_VERSION,
-        "capability_profile": "type1c-winansi-type0-truetype-scaled-page-v4",
+        "capability_profile": "type1c-winansi-type0-truetype-scaled-page-v5",
         "status": "completed",
         "runtime": {
             "python": platform.python_version(),

@@ -17,6 +17,7 @@ FONTS = {
         "/VariableItalic": {
             "base_font": "/BookmanOldStyle-Italic",
             "trace_font": "BookmanOldStyle-Italic",
+            "math_glyph_evidence": ["sigma"],
         },
         "/EmphasisItalic": {
             "base_font": "/BookmanOldStyle-Italic",
@@ -25,6 +26,11 @@ FONTS = {
         "/Math": {
             "base_font": "/LMMathItalic10-Regular",
             "trace_font": "LMMathItalic",
+            "math_glyph_evidence": [
+                "alpha", "sigma", "theta", "braceleftBigg", "bracerightBigg",
+                "greaterequal", "x", "y", "f", "l", "u", "i", "S", "I", "D",
+                "one", "three",
+            ],
         },
     }
 }
@@ -41,16 +47,36 @@ def _glyph(
     top: float = 10.0,
     size: float = 10.0,
 ) -> dict[str, object]:
+    flags = 2 if "Italic" in font or font == "/Math" else 16 if "Bold" in font else 0
+    glyph_name = {
+        "σ": "sigma",
+        "α": "alpha",
+        "θ": "theta",
+        "{": "braceleftBigg",
+        "}": "bracerightBigg",
+        "≥": "greaterequal",
+        "1": "one",
+        "3": "three",
+    }.get(text, text)
     return {
         "page": 1,
         "sequence_index": sequence,
-        "glyph_name": text,
+        "glyph_name": glyph_name,
         "unicode": text,
         "bbox": [left, top, left + 4.0, top + size],
         "font_resource": font,
+        "font_math_glyph_evidence": FONTS[1][font].get(
+            "math_glyph_evidence", []
+        ),
         "rendered_size": size,
         "rendered_origin_y": top + size,
-        "rawdict": {"block": 0, "line": line, "span": span, "char": sequence},
+        "rawdict": {
+            "block": 0,
+            "line": line,
+            "span": span,
+            "char": sequence,
+            "span_flags": flags,
+        },
     }
 
 
@@ -86,6 +112,33 @@ def test_detecte_les_variables_italiques_courtes_et_ignore_un_mot_italique() -> 
 
 def test_ne_transforme_pas_un_mot_court_italique_en_variable() -> None:
     glyphs = [_glyph(1, "is", "/EmphasisItalic", 0, 0)]
+
+    assert _texts(glyphs) == []
+
+
+def test_renommer_les_polices_ne_change_pas_les_regions() -> None:
+    glyphs = [
+        _glyph(1, "σ", "/VariableItalic", 0, 0),
+        _glyph(2, "j", "/VariableItalic", 1, 4, top=11, size=7),
+        _glyph(3, ",", "/VariableItalic", 1, 8, top=11, size=7),
+        _glyph(4, "t", "/VariableItalic", 1, 12, top=11, size=7),
+    ]
+    renamed = {
+        1: {
+            resource: metadata
+            | {"base_font": f"/Unknown{index}", "trace_font": f"R{index}"}
+            for index, (resource, metadata) in enumerate(FONTS[1].items())
+        }
+    }
+
+    original = source_math_regions(glyphs, FONTS)
+    after_rename = source_math_regions(glyphs, renamed)
+
+    assert after_rename == original
+
+
+def test_n_etend_pas_un_role_mathematique_aux_glyphes_non_utilises() -> None:
+    glyphs = [_glyph(1, "hello", "/Math", 0, 0)]
 
     assert _texts(glyphs) == []
 

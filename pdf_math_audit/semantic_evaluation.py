@@ -6,9 +6,7 @@ from typing import Any
 from pdf_math_audit.evaluation_metrics import evaluation_metrics
 from pdf_math_audit.events import ProgressCallback, progress_event
 from pdf_math_audit.fonts import (
-    TEX_EXTENSIBLE_DELIMITER_FONTS,
     TEX_EXTENSIBLE_DELIMITER_GLYPHS,
-    TEX_GLYPH_RENDERED_FONTS,
     TEX_GLYPH_UNICODE,
 )
 from pdf_math_audit.mathml_candidate import candidate_analysis
@@ -30,6 +28,7 @@ def _evidence(glyph: dict[str, Any]) -> dict[str, Any]:
         "code": glyph["code"],
         "code_hex": glyph["code_hex"],
         "cff_gid": glyph["cff_gid"],
+        "font_math_glyph_evidence": glyph.get("font_math_glyph_evidence", []),
         "rendered_gid": glyph["rendered_gid"],
         "glyph_name": glyph["glyph_name"],
         "source_unicode": glyph["source_unicode"],
@@ -61,17 +60,31 @@ def _source_semantics(
         )
     if region["status"] != "traced":
         limitation = region.get("trace_limitation")
+        limitations = region.get("trace_limitations") or [
+            limitation or "structural_alignment_not_traced"
+        ]
+        messages = {
+            "pdf_font_exclusion_intersection": (
+                "La région intersecte une zone de police PDF non qualifiée"
+            ),
+            "pdf_opaque_region_intersection": (
+                "La région intersecte une zone PDF opaque non qualifiée"
+            ),
+            "pdf_page_partially_traced": (
+                "La région se trouve sur une page PDF partiellement tracée"
+            ),
+        }
         return (
             "not_established",
             [
                 _reason(
-                    limitation or "structural_alignment_not_traced",
-                    (
-                        "La région intersecte une zone PDF opaque non qualifiée"
-                        if limitation == "pdf_opaque_region_intersection"
-                        else "La région ne possède aucune association structurelle établie"
+                    code,
+                    messages.get(
+                        code,
+                        "La région ne possède aucune association structurelle établie",
                     ),
                 )
+                for code in limitations
             ],
             [],
         )
@@ -177,20 +190,21 @@ def _source_semantics(
 
 def _tex_glyph_name_resolves(glyph: dict[str, Any]) -> bool:
     expected = TEX_GLYPH_UNICODE.get(glyph["glyph_name"])
-    rendered_fonts = TEX_GLYPH_RENDERED_FONTS.get(glyph["glyph_name"])
-    rendered_font = str(glyph.get("rendered_font", ""))
     return (
         expected is not None
-        and rendered_fonts is not None
+        and glyph["glyph_name"] in glyph.get("font_math_glyph_evidence", [])
         and glyph["unicode"] == expected
-        and rendered_font in rendered_fonts
+        and glyph["source_unicode_method"] == "agl"
+        and glyph["cff_gid"] == glyph["rendered_gid"]
     )
 
 
 def _is_extensible_delimiter_fragment(glyph: dict[str, Any]) -> bool:
     return (
         glyph["glyph_name"] in TEX_EXTENSIBLE_DELIMITER_GLYPHS
-        and glyph.get("rendered_font") in TEX_EXTENSIBLE_DELIMITER_FONTS
+        and glyph["glyph_name"] in glyph.get("font_math_glyph_evidence", [])
+        and glyph["source_unicode_method"] == "agl"
+        and glyph["cff_gid"] == glyph["rendered_gid"]
     )
 
 

@@ -8,7 +8,7 @@ from pathlib import Path
 
 CONTRACT_VERSION = "2.1"
 CAPABILITY_PROFILE = "pdf-docling-semantic-correction-v3"
-ANALYZER_VERSION = "0.6.2"
+ANALYZER_VERSION = "0.8.0"
 _SHA256_PATTERN = re.compile(r"[0-9a-fA-F]{64}")
 
 

@@ -13,6 +13,7 @@ from reportlab.pdfbase._fontdata_enc_winansi import WinAnsiEncoding
 
 from pdf_math_audit.cmap import parse_to_unicode
 from pdf_math_audit.limitations import require_supported
+from pdf_math_audit.pdf_indicators import is_math_indicator
 
 
 SUPPORTED_BASE_ENCODINGS = {
@@ -80,108 +81,11 @@ TEX_GLYPH_UNICODE = {
     "theta": "θ",
     "union": "∪",
 }
-_LM_MATH_EXTENSION_FONTS = {
-    "LMMathExtension10-Regula",
-    "LMMathExtension10-Regular",
-}
 TEX_EXTENSIBLE_DELIMITER_GLYPHS = {
     "bracketleftbt",
     "bracketlefttp",
     "bracketrightbt",
     "bracketrighttp",
-}
-TEX_EXTENSIBLE_DELIMITER_FONTS = _LM_MATH_EXTENSION_FONTS
-_LM_MATH_SYMBOL_FONTS = {
-    "LMMathSymbols5-Regular",
-    "LMMathSymbols7-Regular",
-    "LMMathSymbols8-Regular",
-    "LMMathSymbols10-Regular",
-}
-TEX_GLYPH_RENDERED_FONTS = {
-    "Sigma": {"LMRoman7-Bold", "LMRoman10-Bold"},
-    "alpha": {"LMMathItalic7-Regular", "LMMathItalic10-Regular"},
-    "angle": {"MSAM10"},
-    "arrowleft": {"LMMathSymbols10-Regular"},
-    "arrowright": {"LMMathSymbols10-Regular"},
-    "asteriskmath": {
-        "LMMathSymbols5-Regular",
-        "LMMathSymbols7-Regular",
-        "LMMathSymbols10-Regular",
-    },
-    "bardbl": {"LMMathSymbols7-Regular", "LMMathSymbols10-Regular"},
-    **{
-        name: _LM_MATH_EXTENSION_FONTS
-        for name in {
-            "braceleftBigg",
-            "bracketleftBig",
-            "bracketleftbig",
-            "bracketleftbigg",
-            "bracketrightBig",
-            "bracketrightbig",
-            "bracketrightbigg",
-            "integraldisplay",
-            "integraltext",
-            "parenleftBig",
-            "parenleftBigg",
-            "parenleftbig",
-            "parenleftbigg",
-            "parenrightBig",
-            "parenrightBigg",
-            "parenrightbig",
-            "parenrightbigg",
-            "radicalbig",
-            "radicalbigg",
-            "radicalbt",
-            "radicaltp",
-            "radicalvertex",
-        }
-    },
-    "element": {
-        "LMMathSymbols7-Regular",
-        "LMMathSymbols8-Regular",
-        "LMMathSymbols10-Regular",
-    },
-    "epsilon1": {"LMMathItalic10-Regular"},
-    "gamma": {"LMMathItalic10-Regular"},
-    "greaterequal": {"LMMathSymbols10-Regular"},
-    "intersection": {"LMMathSymbols10-Regular"},
-    "lambda": {"LMMathItalic10-Regular"},
-    "latticetop": _LM_MATH_SYMBOL_FONTS,
-    "lessequal": {"LMMathSymbols10-Regular"},
-    "lessmuch": _LM_MATH_SYMBOL_FONTS,
-    "mapsto": _LM_MATH_SYMBOL_FONTS,
-    "minus": _LM_MATH_SYMBOL_FONTS,
-    "multiply": {"LMMathSymbols10-Regular"},
-    "nabla": {"LMMathSymbols10-Regular"},
-    "partialdiff": {"LMMathItalic7-Regular", "LMMathItalic10-Regular"},
-    "phi": {"LMMathItalic10-Regular"},
-    "pi": {"LMMathItalic10-Regular"},
-    "prime": _LM_MATH_SYMBOL_FONTS,
-    "productdisplay": {
-        "LMMathExtension10-Regula",
-        "LMMathExtension10-Regular",
-    },
-    "producttext": {
-        "LMMathExtension10-Regula",
-        "LMMathExtension10-Regular",
-    },
-    "radicalBig": _LM_MATH_EXTENSION_FONTS,
-    "radical": {"LMMathSymbols10-Regular"},
-    "rho": {"LMMathItalic7-Regular", "LMMathItalic10-Regular"},
-    "sigma": {
-        "LMMathItalic5-Regular",
-        "LMMathItalic10-Regular",
-        "LMMathItalic10-Bold",
-    },
-    "similar": {"LMMathSymbols10-Regular"},
-    "summationdisplay": {
-        "LMMathExtension10-Regula",
-        "LMMathExtension10-Regular",
-    },
-    "summationtext": {"LMMathExtension10-Regula", "LMMathExtension10-Regular"},
-    "tau": {"LMMathItalic10-Regular"},
-    "theta": {"LMMathItalic7-Regular", "LMMathItalic10-Regular"},
-    "union": {"LMMathSymbols10-Regular"},
 }
 
 
@@ -247,6 +151,15 @@ def _trace_font(base_font: str) -> str:
     return base_font.removeprefix("/").split("+", 1)[-1][:24]
 
 
+def _math_glyph_evidence(glyph_names: list[str]) -> list[str]:
+    """Return font-internal evidence without interpreting the font's name."""
+    return sorted(set(glyph_names) & TEX_GLYPH_UNICODE.keys())
+
+
+def _math_unicode_evidence(values: dict[int, str]) -> list[str]:
+    return sorted({value for value in values.values() if is_math_indicator(value)})
+
+
 def _load_type1_font(resource: str, reference: Any, font: Any) -> LoadedFont:
     font = reference.get_object()
     require_supported(
@@ -308,6 +221,8 @@ def _load_type1_font(resource: str, reference: Any, font: Any) -> LoadedFont:
                 "bytes": len(cff_bytes),
                 "charset": charset,
             },
+            "math_glyph_evidence": _math_glyph_evidence(charset),
+            "math_unicode_evidence": _math_unicode_evidence(to_unicode),
         },
         code_bytes=1,
         encoding_names=dict(enumerate(names)),
@@ -336,11 +251,6 @@ def _load_type0_font(resource: str, reference: Any, font: Any) -> LoadedFont:
         f"{resource}: seule une CIDFontType2 est supportée",
     )
     cid_to_gid = descendant.get("/CIDToGIDMap")
-    require_supported(
-        cid_to_gid is None or str(cid_to_gid) == "/Identity",
-        "identity_cid_to_gid_required",
-        f"{resource}: CIDToGIDMap non Identity",
-    )
     descriptor = descendant.get("/FontDescriptor")
     require_supported(
         descriptor is not None,
@@ -363,12 +273,19 @@ def _load_type0_font(resource: str, reference: Any, font: Any) -> LoadedFont:
         f"{resource}: ToUnicode requis pour une police Type0",
     )
     require_supported(
-        all(
-            code < len(glyph_order) and glyph_order[code] != ".notdef"
-            for code in to_unicode
+        cid_to_gid is None or str(cid_to_gid) == "/Identity",
+        "cid_to_gid_stream_not_qualified",
+        f"{resource}: flux CIDToGIDMap sans gain mathématique qualifié",
+    )
+    code_to_gid = {code: code for code in to_unicode}
+    require_supported(
+        len(code_to_gid) == len(to_unicode)
+        and all(
+            0 < gid < len(glyph_order) and glyph_order[gid] != ".notdef"
+            for gid in code_to_gid.values()
         ),
-        "identity_cid_to_gid_required",
-        f"{resource}: CID sans glyphe TrueType correspondant",
+        "cid_to_gid_map_required",
+        f"{resource}: correspondance CID/GID incomplète ou sans glyphe",
     )
     base_font = str(font.get("/BaseFont"))
     return LoadedFont(
@@ -388,12 +305,14 @@ def _load_type0_font(resource: str, reference: Any, font: Any) -> LoadedFont:
                 "glyphs": len(glyph_order),
                 "cid_to_gid": "/Identity",
             },
+            "math_glyph_evidence": _math_glyph_evidence(glyph_order),
+            "math_unicode_evidence": _math_unicode_evidence(to_unicode),
         },
         code_bytes=2,
-        encoding_names={code: glyph_order[code] for code in to_unicode},
+        encoding_names={code: glyph_order[gid] for code, gid in code_to_gid.items()},
         source_unicode=to_unicode,
         to_unicode=to_unicode,
-        glyph_ids={glyph_order[code]: code for code in to_unicode},
+        glyph_ids={glyph_order[gid]: gid for gid in code_to_gid.values()},
     )
 
 
@@ -465,6 +384,8 @@ def _load_true_type_font(resource: str, reference: Any, font: Any) -> LoadedFont
                 "bytes": len(font_bytes),
                 "glyphs": len(glyph_order),
             },
+            "math_glyph_evidence": _math_glyph_evidence(glyph_order),
+            "math_unicode_evidence": _math_unicode_evidence(to_unicode),
         },
         code_bytes=1,
         encoding_names=encoding_names,

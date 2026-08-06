@@ -68,6 +68,7 @@ class MathCorrectionResultValidatorTest < ActiveSupport::TestCase
     summary = {
       "status" => "corrected",
       "regions" => 1,
+      "target_region_ids" => [ "missing:1" ],
       "targets" => 1,
       "accepted" => 1,
       "accepted_regions" => 1,
@@ -99,7 +100,7 @@ class MathCorrectionResultValidatorTest < ActiveSupport::TestCase
       MathCorrectionResultValidator.new(
         result,
         native_document: JSON.generate(native)
-      ).validate(correction, target_region_ids: [ "missing:1" ])
+      ).validate(correction, available_region_ids: [ "missing:1" ])
     end
   end
 
@@ -120,6 +121,8 @@ class MathCorrectionResultValidatorTest < ActiveSupport::TestCase
       "page" => 1,
       "docling_ref" => "#/texts/0",
       "charspan" => [ 0, 1 ],
+      "derived_docling_ref" => "#/texts/0",
+      "derived_charspan" => [ 0, 3 ],
       "before" => "x",
       "after" => "$x$",
       "mathml" => mathml,
@@ -138,6 +141,7 @@ class MathCorrectionResultValidatorTest < ActiveSupport::TestCase
     summary = {
       "status" => "corrected",
       "regions" => 1,
+      "target_region_ids" => [ "source:1" ],
       "targets" => 1,
       "accepted" => 1,
       "accepted_regions" => 1,
@@ -169,7 +173,7 @@ class MathCorrectionResultValidatorTest < ActiveSupport::TestCase
       MathCorrectionResultValidator.new(
         result,
         native_document: JSON.generate(native)
-      ).validate(correction, target_region_ids: [ "source:1" ])
+      ).validate(correction, available_region_ids: [ "source:1" ])
     end
   end
 
@@ -221,7 +225,9 @@ class MathCorrectionResultValidatorTest < ActiveSupport::TestCase
       "before" => "z",
       "mathml" => '<math data-correction-id="formula:1"><mi>x</mi></math>',
       "docling_ref" => "#/texts/0",
-      "charspan" => [ 0, 1 ]
+      "charspan" => [ 0, 1 ],
+      "derived_docling_ref" => "#/texts/0",
+      "derived_charspan" => [ 0, 1 ]
     )
     assert validator.send(:valid_accepted_record?, record)
 

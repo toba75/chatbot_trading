@@ -32,16 +32,39 @@
           method: :post, class: "button", data: { turbo_frame: "_top" } %>
       <% end %>
     <% end %>
-    <p class="math-verdict"><strong>Verdict : <%= qualification.verdict %></strong></p>
+    <p><strong>Exécution terminée.</strong></p>
+    <p class="math-verdict"><strong>Verdict sémantique : <%= qualification.verdict %></strong></p>
     <dl class="math-summary">
       <div><dt>Régions observées</dt><dd><%= qualification.summary.fetch("regions") %></dd></div>
       <div><dt>Conformes</dt><dd><%= qualification.summary.fetch("conformant") %></dd></div>
       <div><dt>Contradictoires</dt><dd><%= qualification.summary.fetch("contradicted") %></dd></div>
       <div><dt>Non vérifiables</dt><dd><%= qualification.summary.fetch("non_verifiable") %></dd></div>
     </dl>
-    <p>
-      Pages prouvées : <%= qualification.summary.dig("coverage", "pages_traced") %> / <%= qualification.summary.dig("coverage", "pages_total") %>.
-    </p>
+    <% coverage = qualification.summary.fetch("coverage") %>
+    <h3>Couverture de la trace PDF</h3>
+    <dl class="math-coverage">
+      <div><dt>Entièrement tracées</dt><dd><%= coverage.fetch("pages_traced", 0) %></dd></div>
+      <div><dt>Tracées avec exclusions localisées</dt><dd><%= coverage.fetch("pages_traced_with_exclusions", 0) %></dd></div>
+      <div><dt>Partiellement tracées</dt><dd><%= coverage.fetch("pages_partially_traced", 0) %></dd></div>
+      <div><dt>Non supportées</dt><dd><%= coverage.fetch("pages_unsupported", 0) %></dd></div>
+      <div><dt>Ambiguës</dt><dd><%= coverage.fetch("pages_ambiguous", 0) %></dd></div>
+      <div><dt>Total</dt><dd><%= coverage.fetch("pages_total") %></dd></div>
+    </dl>
+    <% if html_integrity = qualification.summary["html_integrity"] %>
+      <% audited_html = html_integrity.fetch("artifact") == "derived_html" ? "HTML corrigé" : "HTML natif paginé" %>
+      <h3>Intégrité — <%= audited_html %></h3>
+      <p>
+        <strong><%= html_integrity.fetch("status") == "passed" ? "Intégrité vérifiée" : "Anomalies détectées" %></strong>
+        — <%= html_integrity.fetch("pages_checked") %> / <%= html_integrity.fetch("pages_total") %> pages contrôlées.
+      </p>
+      <% if html_integrity.fetch("issues").any? %>
+        <ul class="html-integrity-issues">
+          <% html_integrity.fetch("issues").each do |issue| %>
+            <li>Page <%= issue.fetch("page") %> — <%= issue.fetch("message") %></li>
+          <% end %>
+        </ul>
+      <% end %>
+    <% end %>
     <% correction = qualification.summary["correction"] %>
     <% if correction %>
       <div class="math-correction">
@@ -54,7 +77,15 @@
             <p>La vue paginée correspondante est disponible dans l’onglet « HTML corrigé ».</p>
           <% end %>
         <% when "failed" %>
-          <p><strong>La proposition de correction a échoué explicitement.</strong> Aucune sortie native n’a été remplacée.</p>
+          <% if correction.fetch("accepted").positive? %>
+            <p><strong><%= correction.fetch("accepted") %> région(s) corrigée(s), <%= correction.fetch("failed") %> correction(s) échouée(s).</strong></p>
+            <p>Les sorties natives restent inchangées ; le résultat partiel est conservé dans les sorties dérivées.</p>
+            <% if qualification.derived_html.attached? %>
+              <p>La vue paginée partielle est disponible dans l’onglet « HTML corrigé ».</p>
+            <% end %>
+          <% else %>
+            <p><strong>La proposition de correction a échoué explicitement.</strong> Aucune sortie native n’a été remplacée.</p>
+          <% end %>
         <% when "rejected" %>
           <p><strong>Aucune proposition n’était entièrement prouvée.</strong> Aucun document dérivé n’a été produit.</p>
         <% else %>

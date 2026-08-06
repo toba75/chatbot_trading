@@ -1,14 +1,23 @@
 from __future__ import annotations
 
 import re
+import unicodedata
+from collections import defaultdict, deque
+from html import escape
+from pathlib import Path
 
-from docling_core.types.doc import DoclingDocument, ImageRefMode
+from docling_core.types.doc import DocItemLabel, DoclingDocument, ImageRefMode
 from latex2mathml.converter import convert
 from lxml import etree, html as lxml_html
+
+from pdf_math_audit.source_formula_rendering import (
+    replace_unrenderable_formulas_from_source,
+)
 
 
 _PAGE = re.compile(r"<div class=(['\"])page\1>")
 _MATHML = re.compile(r"<math\b[^>]*>.*?</math>", re.DOTALL)
+_PRE = re.compile(r"<pre\b[^>]*>.*?</pre>", re.DOTALL)
 _TEX_ANNOTATION = re.compile(
     r"<annotation\b[^>]*>(.*?)</annotation\s*>", re.DOTALL | re.IGNORECASE
 )
@@ -20,11 +29,31 @@ _XML_ENTITY_VALUE = {
     "quot": '"',
     "apos": "'",
 }
+_MISORDERED_NEGATION = re.compile(
+    r"(?P<space>[ \t]*)\N{COMBINING LONG SOLIDUS OVERLAY}[ \t]*"
+    r"(?P<operator>[=<>∈∋≤≥≡≈∼≅≃⊂⊃⊆⊇])"
+)
 _NAVIGATION_STYLE = """
 <style>
 body > table > tbody > tr > td:first-child { display: none; }
 body > table > tbody > tr > td:last-child { width: 100%; }
 .page { scroll-margin-top: 1rem; }
+.page math[display="block"] {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.page pre {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.page .formula-source-render {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+.page img, .page svg { max-width: 100%; height: auto; }
 .blank-page { color: #666; }
 </style>
 """
@@ -307,12 +336,86 @@ def _wrap_tex_annotations(html: str) -> str:
     return _MATHML.sub(wrap, html)
 
 
-def render_page_anchored_html(document: DoclingDocument) -> bytes:
+def annotate_mathml(mathml: str, docling_ref: str, charspan: tuple[int, int]) -> str:
+    """Attach the stable Docling locus represented by one MathML root."""
+    start, end = charspan
+    attributes = (
+        f' data-docling-ref="{escape(docling_ref, quote=True)}"'
+        f' data-docling-charspan="{start}:{end}"'
+    )
+    annotated, count = re.subn(r"<math\b", f"<math{attributes}", mathml, count=1)
+    if count != 1:
+        raise ValueError("Racine MathML absente")
+    return annotated
+
+
+def _normalize_misordered_negation(text: str) -> str:
+    """Rattache U+0338 à l'opérateur qu'il nie quand Docling l'a placé avant."""
+
+    def normalize(match: re.Match[str]) -> str:
+        spacing = " " if match.group("space") else ""
+        operator = unicodedata.normalize(
+            "NFC", f"{match.group('operator')}\N{COMBINING LONG SOLIDUS OVERLAY}"
+        )
+        return f"{spacing}{operator}"
+
+    return _MISORDERED_NEGATION.sub(normalize, text)
+
+
+def _annotate_formula_nodes(html: str, document: DoclingDocument) -> str:
+    identities_by_tex: dict[str, deque[tuple[str, tuple[int, int]]]] = defaultdict(
+        deque
+    )
+    for item, _level in document.iterate_items():
+        if item.label != DocItemLabel.FORMULA:
+            continue
+        identities_by_tex[item.text].append((item.self_ref, (0, len(item.text))))
+
+    def tex_annotation(mathml: str) -> str:
+        try:
+            node = lxml_html.fragment_fromstring(mathml)
+        except (etree.ParserError, ValueError) as error:
+            raise ValueError("Le MathML Docling n'est pas analysable") from error
+        annotations = node.xpath(".//annotation[@encoding='TeX']")
+        if len(annotations) != 1 or annotations[0].text is None:
+            raise ValueError("MathML Docling sans annotation TeX unique")
+        return annotations[0].text
+
+    def annotate(match: re.Match[str]) -> str:
+        mathml = match.group(0)
+        identities = identities_by_tex[tex_annotation(mathml)]
+        if not identities:
+            raise ValueError("MathML sans formule Docling correspondante")
+        ref, charspan = identities.popleft()
+        return annotate_mathml(mathml, ref, charspan)
+
+    annotated = _MATHML.sub(annotate, html)
+
+    def annotate_fallback(match: re.Match[str]) -> str:
+        node = lxml_html.fragment_fromstring(match.group(0))
+        identities = identities_by_tex[node.text_content()]
+        if not identities:
+            return match.group(0)
+        ref, (start, end) = identities.popleft()
+        node.set("data-docling-ref", ref)
+        node.set("data-docling-charspan", f"{start}:{end}")
+        node.set("data-docling-formula-fallback", "")
+        return lxml_html.tostring(node, encoding="unicode", method="html")
+
+    return _PRE.sub(annotate_fallback, annotated)
+
+
+def render_page_anchored_html(
+    document: DoclingDocument, pdf_path: Path | None = None
+) -> bytes:
     """Sérialise la vue native en conservant une ancre exacte par page."""
     page_numbers = sorted(document.pages)
     view = document.model_copy(deep=True)
     for page in view.pages.values():
         page.image = None
+    for item, _level in view.iterate_items():
+        if item.label != DocItemLabel.FORMULA and hasattr(item, "text"):
+            item.text = _normalize_misordered_negation(item.text)
 
     html = view.export_to_html(split_page_view=True, image_mode=ImageRefMode.EMBEDDED)
     provenance_pages = {
@@ -333,7 +436,8 @@ def render_page_anchored_html(document: DoclingDocument) -> bytes:
         raise ValueError(
             "Le nombre de pages HTML ne correspond pas aux provenances Docling."
         )
-    page_index = 0
+    page_cursor = 0
+    content_cursor = 0
 
     def blank_page(page_number: int) -> str:
         message = (
@@ -347,22 +451,28 @@ def render_page_anchored_html(document: DoclingDocument) -> bytes:
         )
 
     def anchor(match: re.Match[str]) -> str:
-        nonlocal page_index
-        page_number = content_pages[page_index]
+        nonlocal content_cursor, page_cursor
+        page_number = content_pages[content_cursor]
+        content_cursor += 1
         blanks = []
-        while page_numbers[page_index] < page_number:
-            blanks.append(blank_page(page_numbers[page_index]))
-            page_index += 1
+        while page_numbers[page_cursor] < page_number:
+            blanks.append(blank_page(page_numbers[page_cursor]))
+            page_cursor += 1
         quote = match.group(1)
-        page_index += 1
+        page_cursor += 1
         blanks.append(
             f"<div class={quote}page{quote} id={quote}page-{page_number}{quote}>"
         )
         return "".join(blanks)
 
-    anchored = _PAGE.sub(anchor, _wrap_tex_annotations(html))
-    trailing = "".join(blank_page(number) for number in page_numbers[page_index:])
+    rendered = _annotate_formula_nodes(_wrap_tex_annotations(html), document)
+    anchored = _PAGE.sub(anchor, rendered)
+    trailing = "".join(blank_page(number) for number in page_numbers[page_cursor:])
     anchored = anchored.replace("</body>", f"{trailing}</body>", 1)
+    if pdf_path is not None:
+        anchored = replace_unrenderable_formulas_from_source(
+            anchored, document, pdf_path
+        )
     return anchored.replace("</head>", f"{_NAVIGATION_STYLE}</head>", 1).encode(
         "utf-8"
     )

@@ -64,6 +64,40 @@ def _pdf_with_form_xobject(
     return output
 
 
+def _pdf_with_content_prefix(tmp_path: Path, prefix: bytes) -> Path:
+    reader = PdfReader(REFERENCE_PDF)
+    page = reader.pages[0]
+    content = DecodedStreamObject()
+    content.set_data(prefix + page.get_contents().get_data())
+    page[NameObject("/Contents")] = content
+    output = tmp_path / "content-prefix.pdf"
+    writer = PdfWriter()
+    writer.add_page(page)
+    with output.open("wb") as destination:
+        writer.write(destination)
+    return output
+
+
+def test_accepte_un_mode_de_rendu_de_texte_visible(tmp_path: Path) -> None:
+    report = analyze_pdf(_pdf_with_content_prefix(tmp_path, b"0 Tr\n"))
+
+    assert report["pages"][0]["status"] == "traced"
+    assert {"operator": "Tr", "count": 1} in report["pages"][0][
+        "operation_counts"
+    ]
+
+
+def test_refuse_explicitement_un_mode_de_rendu_de_texte_invalide(
+    tmp_path: Path,
+) -> None:
+    report = analyze_pdf(_pdf_with_content_prefix(tmp_path, b"8 Tr\n"))
+
+    assert report["pages"][0]["status"] == "unsupported"
+    assert report["pages"][0]["reasons"][0]["code"] == (
+        "text_rendering_mode_unsupported"
+    )
+
+
 def test_conserve_la_boite_transformee_d_un_formulaire_vectoriel(
     tmp_path: Path,
 ) -> None:

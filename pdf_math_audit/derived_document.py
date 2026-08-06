@@ -2,24 +2,27 @@ from __future__ import annotations
 
 import html as html_module
 import re
+from pathlib import Path
 from typing import Any
 
 from docling_core.types.doc import (
     DocItemLabel,
     DoclingDocument,
 )
-from latex2mathml.converter import convert
 
 from pdf_math_audit.correction_targets import TEXT_REF
-from pdf_math_audit.page_html import render_page_anchored_html
+from pdf_math_audit.inline_math import (
+    carries_inline_math,
+    inline_math_spans,
+    is_unambiguous_inline_math,
+)
+from pdf_math_audit.mathml_candidate import publishable_mathml
+from pdf_math_audit.page_html import annotate_mathml, render_page_anchored_html
 
 
 _MATH_MARKER = "OSTMATHCORRECTION{index:08d}END"
 _INLINE_MATH_MARKER = "OSTDOCLINGMATH{index:08d}END"
-_INLINE_MATH = re.compile(r"\$([^$\r\n]+)\$")
 _MATHML = re.compile(r"<math\b[^>]*>.*?</math>", re.DOTALL)
-_INLINE_RELATION = re.compile(r"\A\S+\s*[<>=]\s*\S+\Z")
-_INLINE_SYNTAX = re.compile(r"[+*/^_{}()\[\]\\]")
 
 
 def _unique_marker(serialized_document: str, template: str, index: int) -> str:
@@ -29,41 +32,80 @@ def _unique_marker(serialized_document: str, template: str, index: int) -> str:
     return marker
 
 
-def _is_unambiguous_inline_math(latex: str) -> bool:
-    stripped = latex.strip()
-    return (
-        not any(character.isspace() for character in stripped)
-        or stripped.startswith(("\\", "{"))
-        or bool(_INLINE_RELATION.fullmatch(stripped))
-        or bool(_INLINE_SYNTAX.search(stripped))
-    )
-
-
 def _mark_inline_math(
     document: DoclingDocument,
 ) -> list[tuple[str, int, str, str]]:
     marked: list[tuple[str, int, str, str]] = []
     serialized_document = document.model_dump_json()
     for node_index, node in enumerate(document.texts):
-        if node.label == DocItemLabel.FORMULA:
+        if not carries_inline_math(node):
             continue
 
-        def mark(match: re.Match[str]) -> str:
-            latex = html_module.unescape(match.group(1))
-            if not _is_unambiguous_inline_math(latex):
-                return match.group(0)
+        parts: list[str] = []
+        cursor = 0
+        for start, end, raw_latex in inline_math_spans(node.text):
+            latex = html_module.unescape(raw_latex)
+            if not is_unambiguous_inline_math(latex):
+                continue
+            # Une conversion non prouvée laisse le fragment intact : l'audit
+            # d'intégrité le compte alors comme une formule attendue et manquante
+            # plutôt que de publier un contenu altéré.
+            converted = publishable_mathml(latex)
+            if converted is None:
+                continue
 
             marker = _unique_marker(
                 serialized_document, _INLINE_MATH_MARKER, len(marked)
             )
-            mathml = convert(latex).replace(
+            mathml = converted.replace(
                 "<math ", '<math data-docling-kind="inline-math" ', 1
             )
-            marked.append((marker, node_index, match.group(0), mathml))
-            return marker
-
-        node.text = _INLINE_MATH.sub(mark, node.text)
+            original = node.text[start:end]
+            marked.append((marker, node_index, original, mathml))
+            parts.extend((node.text[cursor:start], marker))
+            cursor = end
+        if parts:
+            parts.append(node.text[cursor:])
+            node.text = "".join(parts)
     return marked
+
+
+def _materialize_markers(
+    document: DoclingDocument, replacements: dict[str, str]
+) -> dict[str, tuple[str, tuple[int, int]]]:
+    loci: dict[str, tuple[str, tuple[int, int]]] = {}
+    for node in document.texts:
+        occurrences = []
+        for marker, replacement in replacements.items():
+            count = node.text.count(marker)
+            if count > 1:
+                raise ValueError("Un marqueur mathématique n'est pas unique")
+            if count == 1:
+                occurrences.append((node.text.index(marker), marker, replacement))
+        if not occurrences:
+            continue
+
+        parts = []
+        cursor = 0
+        final_length = 0
+        for start, marker, replacement in sorted(occurrences):
+            prefix = node.text[cursor:start]
+            parts.extend((prefix, replacement))
+            final_length += len(prefix)
+            loci[marker] = (
+                node.self_ref,
+                (final_length, final_length + len(replacement)),
+            )
+            final_length += len(replacement)
+            cursor = start + len(marker)
+        parts.append(node.text[cursor:])
+        node.text = "".join(parts)
+        if node.orig in replacements:
+            node.orig = replacements[node.orig]
+
+    if loci.keys() != replacements.keys():
+        raise ValueError("Un marqueur mathématique est absent du document dérivé")
+    return loci
 
 
 def derive_document(
@@ -98,7 +140,9 @@ def derive_document(
 
 
 def derive_document_and_page_html(
-    document: DoclingDocument, accepted: list[dict[str, Any]]
+    document: DoclingDocument,
+    accepted: list[dict[str, Any]],
+    pdf_path: Path | None = None,
 ) -> tuple[DoclingDocument, bytes]:
     """Produit une seule copie dérivée et son HTML paginé en MathML."""
     marked_records = []
@@ -113,7 +157,15 @@ def derive_document_and_page_html(
 
     derived = derive_document(document, marked_records)
     inline_math = _mark_inline_math(derived)
-    html = render_page_anchored_html(derived).decode("utf-8")
+    html = render_page_anchored_html(derived, pdf_path).decode("utf-8")
+    replacements = {
+        marker: record["final_after"]
+        for marker, record in zip(markers, marked_records, strict=True)
+    }
+    replacements.update(
+        {marker: source for marker, _index, source, _mathml in inline_math}
+    )
+    loci = _materialize_markers(derived, replacements)
     for marker, record, source_record in zip(
         markers, marked_records, accepted, strict=True
     ):
@@ -124,6 +176,11 @@ def derive_document_and_page_html(
         if match is None:
             raise ValueError("Référence Docling invalide après validation")
         node = derived.texts[int(match.group(1))]
+        derived_ref, derived_span = loci[marker]
+        if derived_ref != node.self_ref:
+            raise ValueError("Référence Docling dérivée incohérente")
+        source_record["derived_docling_ref"] = derived_ref
+        source_record["derived_charspan"] = list(derived_span)
         if node.label == DocItemLabel.FORMULA:
             candidates = [
                 math
@@ -134,35 +191,35 @@ def derive_document_and_page_html(
                 raise ValueError(
                     "La formule corrigée n'est pas localisable dans l'HTML dérivé"
                 )
-            html = html.replace(candidates[0], record["mathml"], 1)
-            replacement = record["final_after"]
+            replacement_mathml = annotate_mathml(
+                record["mathml"], node.self_ref, derived_span
+            )
+            source_record["mathml"] = replacement_mathml
+            html = html.replace(candidates[0], replacement_mathml, 1)
         else:
             if html.count(marker) != 1:
                 raise ValueError(
                     "La correction n'est pas localisable dans l'HTML dérivé"
                 )
-            html = html.replace(marker, record["mathml"], 1)
-            replacement = record["final_after"]
-
-        if node.text.count(marker) != 1:
-            raise ValueError(
-                "La correction n'est pas localisable dans le document dérivé"
+            replacement_mathml = annotate_mathml(
+                record["mathml"], node.self_ref, derived_span
             )
-        node.text = node.text.replace(marker, replacement, 1)
-        if node.orig == marker:
-            node.orig = replacement
+            source_record["mathml"] = replacement_mathml
+            html = html.replace(marker, replacement_mathml, 1)
 
-    for marker, node_index, source, mathml in inline_math:
+    for marker, node_index, _source, mathml in inline_math:
         if html.count(marker) != 1:
             raise ValueError(
                 "Le fragment LaTeX inline n'est pas localisable dans l'HTML"
             )
-        html = html.replace(marker, mathml, 1)
         node = derived.texts[node_index]
-        if node.text.count(marker) != 1:
-            raise ValueError(
-                "Le fragment LaTeX inline n'est pas localisable dans le document"
-            )
-        node.text = node.text.replace(marker, source, 1)
+        derived_ref, derived_span = loci[marker]
+        if derived_ref != node.self_ref:
+            raise ValueError("Référence Docling inline dérivée incohérente")
+        html = html.replace(
+            marker,
+            annotate_mathml(mathml, node.self_ref, derived_span),
+            1,
+        )
 
     return DoclingDocument.model_validate(derived.model_dump()), html.encode("utf-8")

@@ -83,7 +83,131 @@ class ReconcileInterruptedExecutionsJobTest < ActiveJob::TestCase
     assert_predicate attempt.reload, :converting?
   end
 
+  test "rend terminale une qualification en file dont le job a échoué avant de démarrer" do
+    qualification = queued_math_qualification("qualification-echouee-avant-demarrage")
+    fail_queue_job("QualifyMathJob", qualification.execution_job_id)
+
+    ReconcileInterruptedExecutionsJob.perform_now
+
+    assert_interrupted qualification.reload
+  end
+
+  test "rend terminale une conversion en file dont le job a échoué avant de démarrer" do
+    attempt = queued_conversion_attempt("conversion-echouee-avant-demarrage")
+    fail_queue_job("ConvertDocumentJob", attempt.execution_job_id)
+
+    ReconcileInterruptedExecutionsJob.perform_now
+
+    assert_interrupted attempt.reload
+  end
+
+  test "préserve une qualification en file dont le job attend encore son tour" do
+    qualification = queued_math_qualification("qualification-en-attente")
+    queue_job("QualifyMathJob", qualification.execution_job_id)
+
+    ReconcileInterruptedExecutionsJob.perform_now
+
+    assert_predicate qualification.reload, :queued?
+    assert_nil qualification.completed_at
+  end
+
+  test "n'attribue pas le job d'un enregistrement dont l'identifiant partage un préfixe" do
+    qualification = staged_math_qualification(updated_at: 10.minutes.ago)
+    foreign_job = SolidQueue::Job.create!(
+      queue_name: "test",
+      class_name: "QualifyMathJob",
+      arguments: { "arguments" => [ "#{qualification.to_global_id}1" ] },
+      priority: 0,
+      active_job_id: "job-d-un-autre-enregistrement",
+      scheduled_at: Time.current
+    )
+
+    ReconcileInterruptedExecutionsJob.perform_now
+
+    qualification.reload
+    assert_predicate qualification, :failed?
+    assert_equal "enqueue_interrupted", qualification.error_code
+    assert_not_equal foreign_job.active_job_id, qualification.execution_job_id
+  end
+
+  test "rend terminale une qualification en file dont Solid Queue n'a plus aucune trace" do
+    qualification = queued_math_qualification("qualification-sans-job")
+    qualification.update_columns(updated_at: 10.minutes.ago)
+
+    ReconcileInterruptedExecutionsJob.perform_now
+
+    qualification.reload
+    assert_predicate qualification, :failed?
+    assert_equal "execution_job_missing", qualification.error_code
+    assert qualification.completed_at
+  end
+
+  test "rend terminale une conversion en file dont Solid Queue n'a plus aucune trace" do
+    attempt = queued_conversion_attempt("conversion-sans-job")
+    attempt.update_columns(updated_at: 10.minutes.ago)
+
+    ReconcileInterruptedExecutionsJob.perform_now
+
+    attempt.reload
+    assert_predicate attempt, :failed?
+    assert_equal "execution_job_missing", attempt.error_code
+  end
+
+  test "préserve une qualification en file dont le job est encore inscrit" do
+    qualification = queued_math_qualification("qualification-inscrite")
+    qualification.update_columns(updated_at: 10.minutes.ago)
+    queue_job("QualifyMathJob", qualification.execution_job_id)
+
+    ReconcileInterruptedExecutionsJob.perform_now
+
+    assert_predicate qualification.reload, :queued?
+  end
+
+  test "préserve une qualification tout juste mise en file sans trace de job" do
+    qualification = queued_math_qualification("qualification-toute-recente")
+
+    ReconcileInterruptedExecutionsJob.perform_now
+
+    assert_predicate qualification.reload, :queued?
+  end
+
+  test "n'attribue pas la disparition du job à une classe de job étrangère" do
+    qualification = queued_math_qualification("qualification-classe-etrangere")
+    qualification.update_columns(updated_at: 10.minutes.ago)
+    queue_job("ConvertDocumentJob", qualification.execution_job_id)
+
+    ReconcileInterruptedExecutionsJob.perform_now
+
+    qualification.reload
+    assert_predicate qualification, :failed?
+    assert_equal "execution_job_missing", qualification.error_code
+  end
+
   private
+
+  def queued_math_qualification(execution_job_id)
+    document = Document.create!(source_sha256: "1" * 64)
+    attempt = document.conversion_attempts.create!(
+      status: "succeeded",
+      conversion_options: { "pipeline" => "vlm" }
+    )
+    MathQualification.build_for(
+      attempt,
+      docling_document_sha256: "2" * 64
+    ).tap do |qualification|
+      qualification.save!
+      qualification.update!(status: "queued", execution_job_id: execution_job_id)
+    end
+  end
+
+  def queued_conversion_attempt(execution_job_id)
+    document = Document.create!(source_sha256: "3" * 64)
+    document.conversion_attempts.create!(
+      status: "queued",
+      conversion_options: { "pipeline" => "vlm" },
+      execution_job_id: execution_job_id
+    )
+  end
 
   def conversion_attempt(execution_job_id)
     document = Document.create!(source_sha256: "a" * 64)

@@ -16,3 +16,12 @@ __pycache__/
 /package/
 /pdfjs-dist-*.tgz
 /experiments/paddle_formula_spike/work/
+/experiments/nougat_shadow/work/
+
+# PDF de travail à la racine (extraits de débogage)
+/*.pdf
+
+# Corpus de référence : livres sous droit d'auteur, jamais poussés sur le
+# dépôt distant. Son manifeste d'empreintes sera committé, pas les fichiers
+# (décision de conservation : plan 004, étape 1).
+/docs/corpus_reference/

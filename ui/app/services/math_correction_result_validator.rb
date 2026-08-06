@@ -10,8 +10,13 @@ class MathCorrectionResultValidator
     @native_document = native_document
   end
 
-  def validate(correction, target_region_ids:)
+  def validate(correction, available_region_ids:)
     counts = correction_counts(correction)
+    target_region_ids = validate_target_region_ids(
+      correction,
+      counts,
+      available_region_ids
+    )
     status = expected_status(counts)
     reject! unless correction["status"] == status
     validate_artifacts(correction, counts)
@@ -42,6 +47,20 @@ class MathCorrectionResultValidator
     return "rejected" if counts.fetch("targets").positive?
 
     "not_required"
+  end
+
+  def validate_target_region_ids(correction, counts, available_region_ids)
+    target_region_ids = correction["target_region_ids"]
+    reject! unless target_region_ids.is_a?(Array) &&
+      target_region_ids.all? { |identifier| identifier.is_a?(String) } &&
+      target_region_ids.uniq.size == target_region_ids.size &&
+      target_region_ids.size == counts.fetch("regions")
+    reject! unless available_region_ids.is_a?(Array) &&
+      available_region_ids.all? { |identifier| identifier.is_a?(String) } &&
+      available_region_ids.uniq.size == available_region_ids.size
+    reject! unless (target_region_ids - available_region_ids).empty?
+
+    target_region_ids
   end
 
   def validate_artifacts(correction, counts)
@@ -76,8 +95,7 @@ class MathCorrectionResultValidator
     reject! unless records.size == counts.fetch("targets")
     record_region_ids = records.flat_map { |record| record["region_ids"] }
     reject! unless record_region_ids.uniq.size == record_region_ids.size
-    reject! unless record_region_ids.sort == target_region_ids.sort
-    reject! unless counts.fetch("regions") == target_region_ids.size
+    reject! unless record_region_ids == target_region_ids
     reject! unless records.all? { |record| valid_record?(record) }
     tallies = records.map { |record| record["status"] }.tally
     %w[accepted rejected failed].each do |status|
@@ -91,7 +109,7 @@ class MathCorrectionResultValidator
     valid_summary = summary.is_a?(Hash) &&
       %w[status regions targets accepted accepted_regions rejected failed].all? do |name|
         summary[name] == (name == "status" ? expected_status(counts) : counts.fetch(name))
-      end
+      end && summary["target_region_ids"] == target_region_ids
     reject! unless valid_summary
     records
   end
@@ -118,6 +136,9 @@ class MathCorrectionResultValidator
     record["docling_ref"].is_a?(String) &&
       record["charspan"].is_a?(Array) && record["charspan"].size == 2 &&
       record["charspan"].all? { |value| value.is_a?(Integer) } &&
+      record["derived_docling_ref"].is_a?(String) &&
+      record["derived_charspan"].is_a?(Array) && record["derived_charspan"].size == 2 &&
+      record["derived_charspan"].all? { |value| value.is_a?(Integer) } &&
       record["before"].is_a?(String)
   end
 

@@ -1,2 +1,7 @@
 *.pdf filter=lfs diff=lfs merge=lfs -text
 ui/bin/* text eol=lf
+
+# Les artefacts de qualification sont des preuves : leurs octets exacts sont
+# empreintés dans manifest.json et candidate-provenance.json. Une conversion de
+# fin de ligne au checkout invaliderait le contrôle d'intégrité du corpus.
+qualification/**/*.json -text

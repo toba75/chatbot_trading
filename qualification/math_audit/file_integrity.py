@@ -9,9 +9,19 @@ SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
 
 
 def require_hash(path: Path, expected: str) -> None:
-    actual = hashlib.sha256(path.read_bytes()).hexdigest()
-    if actual != expected:
-        raise ValueError(f"Empreinte inattendue pour {path}: {actual} != {expected}")
+    content = path.read_bytes()
+    actual = hashlib.sha256(content).hexdigest()
+    if actual == expected:
+        return
+    if hashlib.sha256(content.replace(b"\r\n", b"\n")).hexdigest() == expected:
+        # Sans ce diagnostic, une conversion de fin de ligne au checkout ressemble
+        # à une preuve altérée et fait passer le gate pour durablement cassé.
+        raise ValueError(
+            f"Empreinte inattendue pour {path}: le contenu est intact mais ses fins "
+            "de ligne ont été converties en CRLF au checkout. Vérifier la règle "
+            "`-text` de .gitattributes puis restaurer le fichier depuis git."
+        )
+    raise ValueError(f"Empreinte inattendue pour {path}: {actual} != {expected}")
 
 
 def validate_independent_proofs(oracle: dict[str, Any], *, required: bool) -> None:

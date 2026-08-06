@@ -93,7 +93,9 @@ capacités. Il recalcule les empreintes avant l’analyse. Son endpoint
 
 Le même `DoclingDocument` natif produit aussi une vue HTML de navigation. Le
 sérialiseur Docling conserve une section par page ; l’analyseur lui ajoute les
-ancres `page-N`. Les images pleine page ne sont pas dupliquées dans cette vue de
+ancres `page-N`. Les fragments LaTeX inline explicitement délimités et
+non ambigus y sont rendus en MathML sans modifier le `DoclingDocument` natif ;
+les dollars littéraux restent du texte. Les images pleine page ne sont pas dupliquées dans cette vue de
 7 Mo environ pour le PDF de référence de 152 pages : elles restent conservées
 dans le JSON canonique, tandis que les images de contenu restent embarquées dans
 l’HTML. L’HTML natif exact reçu de Docling Serve reste lui aussi conservé
@@ -102,6 +104,37 @@ HTML vers l’ancre correspondante, sans rechercher approximativement du texte.
 Si cette vue paginée n’a pas été produite, l’interface affiche l’HTML natif exact
 sans fragment et signale explicitement que la synchronisation par page est
 indisponible.
+
+Le rapport distingue l'exécution, la couverture de la trace PDF, le verdict
+sémantique et l'intégrité HTML. Cette dernière compare, page par page, les
+ancres et les inventaires de formules et d'images du `DoclingDocument` au DOM
+produit. Une page HTML vide alors que le PDF contient du texte, une image ou un
+dessin est signalée. Ce constat n'est jamais transformé en verdict sémantique.
+Chaque racine MathML porte aussi le `docling_ref` et le charspan dont elle
+provient. Pour chaque région PDF prouvée et liée, l'audit exige exactement un
+nœud `<math>` portant cette identité dans l'ancre de la bonne page ; les
+inventaires par page restent un contrôle secondaire. Le charspan de la région
+doit désigner exactement son texte candidat dans le nœud Docling ; le charspan
+du DOM désigne ensuite l'élément complet effectivement sérialisé.
+Rails exige l'inventaire d'intégrité de chacune des pages, avec son numéro, ses
+comptages attendus et rendus et son statut. Les seuls totaux `pages_checked` et
+`pages_total` ne suffisent pas à faire accepter le rapport, et une page
+`passed` dont les inventaires divergent est refusée. Une limitation de police
+doit nommer sa ressource et conserver une preuve d'exclusion localisée non vide
+pour ses opérations comme pour ses glyphes. La liste `region_links` doit couvrir
+exactement, sans doublon, toutes les régions évaluables annoncées comme liées ;
+le nombre d'occurrences doit correspondre au statut de chaque lien. Enfin, le
+statut `failed` d'une page équivaut à la présence d'au moins une anomalie sur
+cette page : ni une anomalie sans page en échec, ni une page en échec sans
+anomalie ne sont acceptées.
+Pour une correction acceptée, le document dérivé enregistre le nouveau
+`docling_ref` et le nouveau charspan après matérialisation de tous les
+remplacements. Le lien conserve séparément le charspan candidat natif et prouve
+le locus dérivé portant le `data-correction-id`. Rails recoupe chaque page,
+référence et charspan candidat avec la région source, puis la référence et le
+charspan dérivés avec le sélecteur DOM annoncé.
+Les formules de bloc trop larges restent entières et disposent d'un défilement
+horizontal local au lieu d'être coupées silencieusement.
 
 Le service est sans base et sans file. La taille des deux fichiers, le délai
 d’upload, la durée d’analyse, la concurrence, le spool multipart et les tailles
@@ -116,6 +149,13 @@ qualification. Le flux brut et le total des artefacts sont bornés par
 configuration ; un dépassement échoue explicitement en conservant le préfixe
 admis. Une coupure ou un échec conserve le flux et les fragments déjà reçus. Les
 sorties Docling restent intactes.
+
+Le rapport JSON est un artefact machine sérialisé sans indentation. Les longues
+suites d'indices répétées dans une exclusion localisée sont conservées sous
+forme de plages inclusives, par exemple `[[10, 4884]]`; cette représentation est
+réversible et évite qu'un rapport grossisse artificiellement avec les espaces ou
+la répétition d'un entier par ligne. Les raisons complètes restent enregistrées
+une fois au niveau de la page.
 
 Pendant la correction, chaque registre, crop, requête et réponse terminés est
 aussi checkpointé sur disque. Si le processus atteint son timeout global ou
@@ -153,14 +193,31 @@ normalisées avant cette comparaison stricte ; `\dots` est ainsi comparé aux
 trois points consécutifs réellement prouvés par le PDF. Dans la vue HTML,
 l’espacement de deux barres verticales adjacentes est neutralisé sans fusionner
 leurs nœuds MathML, modifier les valeurs absolues ni altérer l’annotation TeX.
+Si Docling ne peut pas sérialiser une formule complète en MathML, le LaTeX brut
+n’est pas présenté comme un rendu valide. La vue paginée reproduit à sa place
+le crop exact du PDF source défini par la provenance Docling. Cette image porte
+l’identité Docling de la formule et l’audit la signale par
+`formula_rendered_from_pdf_source` : la qualité visuelle est préservée, mais la
+limite de sérialisation reste observable et ne devient pas une preuve sémantique.
 
 Les polices Type1/CFF, les polices composites Type0 `Identity-H` et les polices
 TrueType simples à programme embarqué sont décodées. Pour Type0, la CMap
-`ToUnicode`, la largeur de code, la correspondance CID/GID Identity et le GID
-rendu doivent concorder. Pour une police TrueType simple, `ToUnicode` fournit
+`ToUnicode`, la largeur de code, la correspondance CID/GID identité et le GID
+rendu doivent concorder. Un flux `CIDToGIDMap` reste une exclusion explicite : sa mesure sur
+le document 22 n’a rendu aucune région mathématique supplémentaire vérifiable.
+Pour une police TrueType simple, `ToUnicode` fournit
 le caractère et le programme embarqué fournit le GID ; la trace rendue doit
 confirmer ce GID. Le nom local d'une ressource, par exemple `/G1`, ne constitue
 jamais une règle d'acceptation.
+
+Le rôle mathématique d'une police n'est jamais déduit de `/BaseFont` ni du nom
+rapporté par le moteur de rendu. Il est établi par les noms des glyphes
+effectivement utilisés, les caractères Unicode mathématiques observés, les
+attributs italique/gras et la géométrie des groupes courts. La seule présence
+d’un glyphe mathématique inutilisé dans le charset ne classe donc pas toute la
+ressource comme mathématique. Un nom de glyphe TeX explicitement mappé reste
+une preuve seulement si son GID embarqué est celui du glyphe rendu. Renommer une
+police ne modifie donc ni les candidats ni leur sémantique.
 
 Les polices simples appliquent aussi `WinAnsiEncoding` et leurs `Differences`.
 Une CMap `ToUnicode` qui annonce deux octets tout en ne mappant que les codes
@@ -172,9 +229,22 @@ divergences Unicode de `rawdict` restent attachées à chaque preuve, et deux
 ressources homonymes de capacité différente rendent l'association ambiguë.
 
 Une page qui contient encore une police non supportée est déclarée
-`partially_traced` et chaque police ignorée est nommée dans le rapport. Aucun
-fragment de cette page ne peut produire une correction : une trace amputée ne
-prouve pas l'absence de glyphes entre deux éléments supportés.
+`partially_traced` si une autre trace exploitable subsiste, sinon `unsupported`.
+Dans les deux cas, chaque police ignorée est nommée et localisée par les boîtes
+des lignes rendues avec cette police. Une région qui intersecte une telle boîte
+reste `non_verifiable`; une région disjointe peut utiliser sa trace complète.
+Si la police ne peut pas être localisée, l'exclusion couvre toute la page. Les
+exclusions de police et de XObject se cumulent sans que l'une masque l'autre.
+Chaque exclusion conserve aussi les indices d'opérations PDF et les indices de
+glyphes potentiellement absents qui l'ont causée, sous forme de plages
+inclusives canoniques lorsqu'elle est répétée pour plusieurs lignes.
+Le contrat Rails applique la même exigence aux pages `unsupported` : une raison
+de police sans exclusion localisée complète invalide le rapport. Une limitation
+de page qui ne provient pas d'une police conserve au minimum la boîte de la page
+et son code explicite.
+Une divergence `rendered_font_*` ou `rendered_gid_mismatch` entre la trace source
+et la trace rendue est une ambiguïté d'alignement de page, pas une police source
+ignorée : elle est acceptée uniquement avec le statut `ambiguous`.
 
 Le texte d'un `Form XObject`, y compris dans ses formulaires imbriqués, est lu
 récursivement avec les ressources de police du formulaire et rattaché à la
@@ -187,12 +257,11 @@ le texte seul ne prouve pas le contenu graphique superposé. Un XObject image
 appelé directement est lui aussi conservé comme exclusion matricielle et suit
 la même règle conservatrice.
 
-Pour les polices Latin Modern Math embarquées, les noms CFF explicites des
-opérateurs, délimiteurs extensibles, variantes grecques et pièces de radicaux
-utilisés par le livre font autorité lorsque les tables Unicode du PDF divergent.
-Ils ne sont acceptés que pour les familles Latin Modern explicitement
-qualifiées et avec concordance du GID rendu ; une autre police ou une nouvelle
-variante reste non vérifiable. La règle reste inscrite dans la preuve. Le langage
+Les noms CFF/TrueType explicites des opérateurs, délimiteurs extensibles,
+variantes grecques et pièces de radicaux font autorité lorsque leur sémantique
+est définie par le mapping embarqué et que le GID rendu concorde. Cette preuve
+ne dépend d'aucune famille ni d'aucun nom de police. Un glyphe sans mapping ou
+dont le GID diverge reste non vérifiable. La règle reste inscrite dans la preuve. Le langage
 structurel conserve le radicand dans la limite exacte de sa
 barre, les bornes d'une somme, le numérateur et le dénominateur d'une fraction,
 au même titre que les indices et exposants ordinaires.
@@ -260,7 +329,13 @@ accepté par son MathML prouvé et rend aussi les fragments LaTeX inline natifs
 non ambigus en MathML côté serveur avec `latex2mathml`. Ce post-traitement ne
 s'applique pas aux nœuds déjà typés `formula` par Docling : leur
 sérialisation MathML native reste l'unique autorité de rendu. Un `$` isolé,
-notamment dans une unité monétaire telle que `M$`, reste du texte.
+notamment dans une unité monétaire telle que `M$`, reste du texte. Les formes
+monétaires `$5` et `10 M$` sont écartées avant l'appariement ; une formule
+adjacente telle que `$x_i$` reste néanmoins reconnue.
+Quand Docling place le caractère Unicode U+0338 avant l'opérateur qu'il nie
+(`γ ̸ = 0`), la vue HTML rattache déterministement la barre à cet opérateur par
+composition Unicode (`γ ≠ 0`). Le `DoclingDocument` canonique reste inchangé ;
+cette normalisation ne reconnaît ni ne réécrit la barre ASCII `/`.
 Quand cette sérialisation contient explicitement un fragment `$...$` dans un
 `mtext`, seul ce fragment est rendu en MathML imbriqué ; l'annotation TeX brute
 reste inchangée et aucun `$` monétaire hors formule n'est interprété.
@@ -302,8 +377,11 @@ Le `DoclingDocument`, le Markdown et
 les sorties natives conservent leurs chaînes originales. Rails
 conserve séparément le registre, le ZIP des crops/requêtes/réponses, le document
 dérivé et ses deux exports. Il vérifie leurs tailles et SHA-256 avant de les
-attacher. Rails recoupe aussi les cibles et statuts du registre avec le rapport
-et refuse un document dérivé qui n'est pas un objet `DoclingDocument`.
+attacher. L'analyseur publie la liste canonique `target_region_ids` dans le
+rapport et le registre. Rails exige leur égalité exacte, leur unicité, leur
+appartenance aux régions du rapport et leur concordance avec les compteurs,
+sans redéduire la politique de ciblage. Il recoupe aussi les statuts et refuse
+un document dérivé qui n'est pas un objet `DoclingDocument`.
 L'interface identifie explicitement ces sorties comme dérivées. L’onglet
 « HTML corrigé » est synchronisé avec la page PDF. Deux onglets distincts
 conservent la resérialisation native paginée et l’HTML natif exact reçu de

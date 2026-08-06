@@ -10,6 +10,7 @@ from pypdf import PdfReader
 import qualification.math_audit.qualify as qualification_runner
 from qualification.math_audit.capture import _require_pages, request_payload
 from qualification.math_audit.corpus import build_corpus
+from qualification.math_audit.file_integrity import require_hash
 from qualification.math_audit.measurement import (
     _assertions_covered,
     _expectation_met,
@@ -634,3 +635,19 @@ def test_refuse_les_seuils_hors_domaine(field: str, value: float) -> None:
 
     with pytest.raises(ValueError, match="Seuil invalide"):
         _validate_manifest(manifest)
+
+
+def test_designe_une_conversion_de_fin_de_ligne_plutot_qu_une_preuve_alteree(
+    tmp_path: Path,
+) -> None:
+    original = b'{"regions":\n[]}\n'
+    artefact = tmp_path / "docling-response.json"
+    artefact.write_bytes(original.replace(b"\n", b"\r\n"))
+
+    with pytest.raises(ValueError, match="converties en CRLF"):
+        require_hash(artefact, hashlib.sha256(original).hexdigest())
+
+    artefact.write_bytes(b'{"regions": ["altere"]}')
+    with pytest.raises(ValueError, match="Empreinte inattendue") as altered:
+        require_hash(artefact, hashlib.sha256(original).hexdigest())
+    assert "CRLF" not in str(altered.value)

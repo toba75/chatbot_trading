@@ -108,6 +108,7 @@ def test_cree_un_document_derive_sans_modifier_le_document_natif() -> None:
     assert result.summary == {
         "status": "corrected",
         "regions": 1,
+        "target_region_ids": ["pdf-source:1:733"],
         "targets": 1,
         "accepted": 1,
         "accepted_regions": 1,
@@ -136,9 +137,14 @@ def test_cree_un_document_derive_sans_modifier_le_document_natif() -> None:
         "deterministic_source"
     )
     mathml = records["records"][0]["mathml"]
-    assert mathml.startswith('<math data-correction-id="pdf-source:1:733" ')
+    assert mathml.startswith(
+        '<math data-docling-ref="#/texts/8" '
+        'data-docling-charspan="83:129" '
+        'data-correction-id="pdf-source:1:733" '
+    )
     assert 'xmlns="http://www.w3.org/1998/Math/MathML"' in mathml
-    assert mathml.encode() in result.html
+    assert b'data-correction-id="pdf-source:1:733"' in result.html
+    assert b'data-docling-ref="#/texts/8"' in result.html
     assert b"id='page-1'" in result.html
     assert corrected.encode() not in result.html
     assert b"$^{1}$" not in result.html
@@ -517,7 +523,8 @@ def test_remplace_une_formule_complete_sans_exposer_le_marqueur_html() -> None:
 
     assert document.texts[16].text == "w x - b = 0 ,"
     assert derived.texts[16].text == proposal
-    assert html.count(mathml.encode()) == 1
+    assert html.count(b'data-correction-id="formula-16"') == 1
+    assert html.count(b'data-docling-ref="#/texts/16"') == 1
     assert literal_marker.encode() in html
     assert b'<annotation encoding="TeX"><math' not in html
 
@@ -563,7 +570,8 @@ def test_le_registre_d_une_formule_complete_conserve_le_latex_brut() -> None:
     assert record["after"] == proposal
     assert 'display="block"' in record["mathml"]
     assert derived.texts[16].text == proposal
-    assert record["mathml"].encode() in result.html
+    assert b'data-correction-id="formula-16"' in result.html
+    assert b'data-docling-ref="#/texts/16"' in result.html
 
 
 def test_ne_remplace_pas_un_marqueur_inline_present_dans_le_texte() -> None:

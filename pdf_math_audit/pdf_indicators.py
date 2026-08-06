@@ -23,6 +23,7 @@ def glyph_reference(page: int, glyph: dict[str, Any]) -> dict[str, Any]:
         "code": glyph["code"],
         "code_hex": glyph["code_hex"],
         "cff_gid": glyph["cff_gid"],
+        "font_math_glyph_evidence": glyph.get("font_math_glyph_evidence", []),
         "rendered_gid": glyph["rendered"]["gid"],
         "to_unicode": glyph["to_unicode"],
         "rendered_unicode": glyph["rendered"]["unicode_text"],

@@ -1,6 +1,6 @@
 [project]
 name = "chatbot-trading"
-version = "0.6.2"
+version = "0.8.0"
 description = "Pipeline documentaire minimal fondé sur Docling"
 requires-python = "==3.12.8"
 dependencies = [

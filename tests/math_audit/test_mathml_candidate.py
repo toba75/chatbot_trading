@@ -3,6 +3,7 @@ from pdf_math_audit.mathml_candidate import (
     candidate_analysis,
     candidate_signature,
     candidate_tokens,
+    publishable_mathml,
 )
 
 
@@ -65,6 +66,30 @@ def test_reconstruit_un_indice_docling_fragmente_en_plusieurs_groupes() -> None:
     assert reason is None
     assert tokens == list("xn−1")
     assert signature == ["x", "<sub>", "n", "−", "1", "</sub>"]
+
+
+def test_preserve_un_pourcentage_dans_le_texte_mixte_docling() -> None:
+    tokens, signature, reason = candidate_analysis("≤ 200%", "mixed_text")
+
+    assert reason is None
+    assert tokens == list("≤200%")
+    assert signature == list("≤200%")
+
+
+def test_ne_double_pas_un_pourcentage_deja_echappe() -> None:
+    tokens, signature, reason = candidate_analysis(r"≤ 200\%", "mixed_text")
+
+    assert reason is None
+    assert tokens == list("≤200%")
+    assert signature == list("≤200%")
+
+
+def test_echappe_un_pourcentage_apres_un_antislash_lui_meme_echappe() -> None:
+    tokens, signature, reason = candidate_analysis(r"A\\%B", "mixed_text")
+
+    assert reason is None
+    assert tokens == list("A%B")
+    assert signature == list("A%B")
 
 
 def test_refuse_un_fragment_mixed_text_aux_delimiteurs_dollar_incomplets() -> None:
@@ -208,3 +233,25 @@ def test_refuse_une_fraction_incomplete_sans_interrompre_l_analyse() -> None:
     assert signature is None
     assert token_reason["code"] == "candidate_relation_invalid"
     assert signature_reason["code"] == "candidate_relation_invalid"
+
+
+def test_refuse_un_fragment_inline_que_latex2mathml_ne_sait_pas_convertir() -> None:
+    assert publishable_mathml("x_") is None
+    assert publishable_mathml(r"\left( x") is None
+
+
+def test_refuse_un_fragment_inline_ampute_par_un_commentaire_latex() -> None:
+    assert publishable_mathml("100%") is None
+    assert publishable_mathml(r"5\%") is not None
+
+
+def test_refuse_le_balisage_qu_un_text_fait_traverser_le_serialiseur() -> None:
+    assert publishable_mathml(r"\text{<script>alert(1)</script>}") is None
+    assert publishable_mathml("a & b") is None
+
+
+def test_publie_un_fragment_inline_prouve() -> None:
+    mathml = publishable_mathml("x_i")
+
+    assert mathml is not None
+    assert "<msub>" in mathml

@@ -2,10 +2,12 @@ require "application_system_test_case"
 
 class PdfConversionTest < ApplicationSystemTestCase
   test "convertit réellement le PDF de référence et rafraîchit l'écran par Cable" do
+    reference_pdf = unique_reference_pdf
+    filename = reference_pdf.basename.to_s
     visit root_path
-    attach_file "Documents PDF", "/reference/ostrading-environment-qualification-5-pages.pdf"
+    attach_file "Documents PDF", reference_pdf
     click_on "Lancer les conversions"
-    click_on "ostrading-environment-qualification-5-pages.pdf"
+    click_on filename
 
     assert_text(/En attente|Conversion en cours/)
     running_elapsed = find(%([data-controller="elapsed-time"])).text
@@ -19,14 +21,48 @@ class PdfConversionTest < ApplicationSystemTestCase
     assert_text "2 images — pages 2 et 3"
     assert_selector %(canvas[title="Page courante du PDF original"])
     assert_text "Qualification mathématique"
-    assert_text(/Verdict : (conformant_within_scope|contradicted|partial|non_verifiable)/)
+    assert_text(/Verdict sémantique : (conformant_within_scope|contradicted|partial|non_verifiable)/)
     assert_link "Rapport de qualification"
     assert_link "Preuve source"
     assert_link "Réponse brute de l’analyseur"
 
-    html_label = find(%(a[role="tab"][aria-selected="true"])).text
+    click_on "HTML natif paginé"
+    assert_selector %(a[role="tab"][aria-selected="true"]), text: "HTML natif paginé"
+    html_label = "HTML natif paginé"
     within_frame(find(%(iframe[title="#{html_label} — page 1"]))) do
       assert_selector "img", count: 2
+      page.execute_script <<~JAVASCRIPT
+        const container = document.querySelector(".page");
+        const math = document.createElement("math");
+        math.setAttribute("display", "block");
+        const row = document.createElement("mrow");
+        row.style.display = "inline-block";
+        row.style.width = "2400px";
+        math.appendChild(row);
+        container.prepend(math);
+        const pre = document.createElement("pre");
+        pre.textContent = "x".repeat(2400);
+        container.prepend(pre);
+      JAVASCRIPT
+      layout = page.evaluate_script <<~JAVASCRIPT
+        (() => {
+          const container = document.querySelector(".page");
+          const math = container.querySelector('math[display="block"]');
+          const pre = container.querySelector("pre");
+          return {
+            overflow: getComputedStyle(math).overflowX,
+            mathScrolls: math.scrollWidth > math.clientWidth,
+            preOverflow: getComputedStyle(pre).overflowX,
+            preScrolls: pre.scrollWidth > pre.clientWidth,
+            parentDoesNotOverflow: container.scrollWidth === container.clientWidth
+          };
+        })()
+      JAVASCRIPT
+      assert_equal "auto", layout.fetch("overflow")
+      assert layout.fetch("mathScrolls")
+      assert_equal "auto", layout.fetch("preOverflow")
+      assert layout.fetch("preScrolls")
+      assert layout.fetch("parentDoesNotOverflow")
     end
 
     fill_in "Page", with: "2"
@@ -54,6 +90,13 @@ class PdfConversionTest < ApplicationSystemTestCase
   end
 
   private
+
+  def unique_reference_pdf
+    source = File.binread("/reference/ostrading-environment-qualification-5-pages.pdf")
+    path = Rails.root.join("tmp", "qualification-#{SecureRandom.hex(8)}.pdf")
+    File.binwrite(path, "#{source}\n% system-test #{SecureRandom.uuid}\n")
+    path
+  end
 
   def next_elapsed_second(clock)
     hours, minutes, seconds = clock.split(":").map(&:to_i)

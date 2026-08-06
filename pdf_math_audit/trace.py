@@ -22,7 +22,7 @@ from pdf_math_audit.limitations import (
 )
 
 
-UNSUPPORTED_OPERATORS = {"Tr", "'", '"', "INLINE IMAGE", "sh"}
+UNSUPPORTED_OPERATORS = {"'", '"', "INLINE IMAGE", "sh"}
 FORM_TEXT_OPERATORS = {b"Tj", b"TJ", b"'", b'"'}
 IDENTITY_MATRIX = (1.0, 0.0, 0.0, 1.0, 0.0, 0.0)
 
@@ -35,11 +35,25 @@ class PageTrace:
     layout: dict[str, int]
     horizontal_rules: list[dict[str, float | int]]
     font_limitations: list[dict[str, str]]
+    font_exclusions: list[dict[str, Any]]
     opaque_regions: list[dict[str, Any]]
 
 
 def number_list(values: Any) -> list[float]:
     return [float(value) for value in values]
+
+
+def _text_rendering_mode(operands: list[Any]) -> int:
+    try:
+        value = float(operands[0]) if len(operands) == 1 else -1.0
+    except (TypeError, ValueError):
+        value = -1.0
+    require_supported(
+        value.is_integer() and 0 <= value <= 7,
+        "text_rendering_mode_unsupported",
+        "Le mode de rendu du texte doit être un entier entre 0 et 7",
+    )
+    return int(value)
 
 
 def _original_bytes(value: Any) -> bytes | None:
@@ -136,7 +150,7 @@ def _form_contains_text(
     if any(operator in FORM_TEXT_OPERATORS for _operands, operator in operations):
         active.remove(identity)
         return True
-    for operands, operator in operations:
+    for operation_index, (operands, operator) in enumerate(operations):
         if operator != b"Do":
             continue
         nested_reference, nested = _xobject(
@@ -183,7 +197,7 @@ def _opaque_xobject_regions(
     current = IDENTITY_MATRIX
     stack: list[tuple[float, ...]] = []
     regions = []
-    for operands, operator in operations:
+    for operation_index, (operands, operator) in enumerate(operations):
         if operator == b"q":
             stack.append(current)
         elif operator == b"Q":
@@ -238,6 +252,8 @@ def _opaque_xobject_regions(
                     ),
                     "bbox_coord_origin": "TOPLEFT",
                     "text_traced": text_traced,
+                    "operation_indices": [operation_index],
+                    "glyph_sequence_indices": [],
                     "reason": reason,
                 }
             )
@@ -254,7 +270,7 @@ def _source_glyphs(
     dict[str, LoadedFont],
     list[dict[str, str]],
     list[dict[str, Any]],
-    set[str],
+    dict[str, set[str]],
 ]:
     resources = page["/Resources"]
     operations = ContentStream(page.get_contents(), reader).operations
@@ -264,11 +280,34 @@ def _source_glyphs(
     counts: Counter[str] = Counter()
     fonts: dict[str, LoadedFont] = {}
     font_limitations: dict[str, AnalysisLimitation] = {}
-    limited_trace_fonts: set[str] = set()
+    font_limitation_evidence: defaultdict[str, dict[str, set[int]]] = defaultdict(
+        lambda: {"operation_indices": set(), "glyph_sequence_indices": set()}
+    )
+    limited_trace_fonts: defaultdict[str, set[str]] = defaultdict(set)
     first_font_xrefs: dict[str, int] = {}
     glyphs: list[dict[str, Any]] = []
     sequence_index = 0
     operation_index = 0
+
+    def exclude_loaded_font(
+        font_key: str, limitation: AnalysisLimitation
+    ) -> None:
+        """Retire toute preuve d'une police devenue non interprétable."""
+        font = fonts.pop(font_key)
+        font_limitations[font_key] = limitation
+        limited_trace_fonts[font.public["trace_font"] or font_key].add(font_key)
+        retained = []
+        for glyph in glyphs:
+            if glyph["font_resource"] != font_key:
+                retained.append(glyph)
+                continue
+            font_limitation_evidence[font_key]["operation_indices"].add(
+                glyph["operation_index"]
+            )
+            font_limitation_evidence[font_key]["glyph_sequence_indices"].add(
+                glyph["sequence_index"]
+            )
+        glyphs[:] = retained
 
     def trace_stream(
         content: Any,
@@ -280,6 +319,7 @@ def _source_glyphs(
         stream_fonts = stream_resources.get("/Font", {})
         current_font: str | None = None
         current_matrix: list[float] | None = None
+        text_rendering_mode = 0
         stream_operations = ContentStream(content, reader).operations
         unsupported = sorted(
             UNSUPPORTED_OPERATORS.intersection(
@@ -299,6 +339,8 @@ def _source_glyphs(
                 current_font = str(operands[0])
             elif operator == b"Tm":
                 current_matrix = number_list(operands)
+            elif operator == b"Tr":
+                text_rendering_mode = _text_rendering_mode(operands)
             elif operator == b"Do":
                 reference, xobject = _xobject(
                     stream_resources, operands[0], context="Contenu imbriqué"
@@ -327,6 +369,8 @@ def _source_glyphs(
                     trace_stream(xobject, child_resources, active_forms | {identity})
 
             for chunk in _text_chunks(operands, operator):
+                if text_rendering_mode in {3, 7}:
+                    continue
                 require_unambiguous(
                     current_font is not None,
                     "text_font_missing",
@@ -349,10 +393,18 @@ def _source_glyphs(
                         fonts[font_key] = load_font(font_key, reference)
                     except AnalysisLimitation as limitation:
                         font_limitations[font_key] = limitation
-                        limited_trace_fonts.add(
+                        limited_trace_fonts[
                             _trace_font(str(_resolved(reference).get("/BaseFont", "")))
-                        )
+                            or font_key
+                        ].add(font_key)
                 if font_key in font_limitations:
+                    missing_indices = range(sequence_index, sequence_index + len(chunk))
+                    font_limitation_evidence[font_key]["operation_indices"].add(
+                        current_operation
+                    )
+                    font_limitation_evidence[font_key][
+                        "glyph_sequence_indices"
+                    ].update(missing_indices)
                     sequence_index += len(chunk)
                     continue
                 font = fonts[font_key]
@@ -361,20 +413,41 @@ def _source_glyphs(
                     "font_code_width_mismatch",
                     f"{font_key}: chaîne incompatible avec la largeur des codes",
                 )
-                for offset in range(0, len(chunk), font.code_bytes):
-                    code = int.from_bytes(
-                        chunk[offset : offset + font.code_bytes], "big"
+                decoded = []
+                try:
+                    for offset in range(0, len(chunk), font.code_bytes):
+                        code = int.from_bytes(
+                            chunk[offset : offset + font.code_bytes], "big"
+                        )
+                        glyph_name = font.encoding_names.get(code, ".notdef")
+                        require_supported(
+                            glyph_name != ".notdef" and glyph_name in font.glyph_ids,
+                            "embedded_glyph_required",
+                            f"{font_key} 0x{code:0{font.code_bytes * 2}x}: glyphe absent",
+                        )
+                        unicode_value = font.source_unicode.get(code)
+                        unicode_method = "to_unicode" if unicode_value else "agl"
+                        decoded.append(
+                            (
+                                code,
+                                glyph_name,
+                                unicode_method,
+                                unicode_value or agl_unicode(glyph_name),
+                            )
+                        )
+                except AnalysisLimitation as limitation:
+                    exclude_loaded_font(font_key, limitation)
+                    count = len(chunk) // font.code_bytes
+                    font_limitation_evidence[font_key]["operation_indices"].add(
+                        current_operation
                     )
-                    glyph_name = font.encoding_names.get(code, ".notdef")
-                    require_supported(
-                        glyph_name != ".notdef" and glyph_name in font.glyph_ids,
-                        "embedded_glyph_required",
-                        f"{font_key} 0x{code:0{font.code_bytes * 2}x}: glyphe absent",
-                    )
-                    unicode_method = "to_unicode" if font.source_unicode else "agl"
-                    unicode_value = font.source_unicode.get(code) or agl_unicode(
-                        glyph_name
-                    )
+                    font_limitation_evidence[font_key][
+                        "glyph_sequence_indices"
+                    ].update(range(sequence_index, sequence_index + count))
+                    sequence_index += count
+                    continue
+
+                for code, glyph_name, unicode_method, unicode_value in decoded:
                     glyphs.append(
                         {
                             "sequence_index": sequence_index,
@@ -395,16 +468,17 @@ def _source_glyphs(
                                 else []
                             ),
                             "cff_gid": font.glyph_ids[glyph_name],
+                            "font_math_glyph_evidence": font.public.get(
+                                "math_glyph_evidence", []
+                            ),
                             "text_matrix": current_matrix,
                         }
                     )
                     sequence_index += 1
 
     trace_stream(page.get_contents(), resources, set())
-    if not glyphs and font_limitations:
-        raise next(iter(font_limitations.values()))
     require_supported(
-        bool(glyphs) or not operations,
+        bool(glyphs) or bool(font_limitations) or not operations,
         "page_content_unsupported",
         "Contenu de page sans texte supporté",
     )
@@ -413,7 +487,16 @@ def _source_glyphs(
         counts,
         fonts,
         [
-            limitation.as_dict() | {"font_resource": resource}
+            limitation.as_dict()
+            | {
+                "font_resource": resource,
+                "operation_indices": sorted(
+                    font_limitation_evidence[resource]["operation_indices"]
+                ),
+                "glyph_sequence_indices": sorted(
+                    font_limitation_evidence[resource]["glyph_sequence_indices"]
+                ),
+            }
             for resource, limitation in font_limitations.items()
         ],
         opaque_regions,
@@ -614,6 +697,102 @@ def _attach_render_and_blocks(
     }
 
 
+def _font_exclusion_regions(
+    page: fitz.Page,
+    limited_trace_fonts: dict[str, set[str]],
+    font_limitations: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    if not limited_trace_fonts:
+        return []
+
+    reasons = {
+        limitation["font_resource"]: limitation.copy()
+        for limitation in font_limitations
+    }
+
+    def ranges(values: list[int]) -> list[list[int]]:
+        compact: list[list[int]] = []
+        for value in values:
+            if compact and value == compact[-1][1] + 1:
+                compact[-1][1] = value
+            else:
+                compact.append([value, value])
+        return compact
+
+    def reason_summary(resource: str) -> dict[str, Any]:
+        return {
+            key: value
+            for key, value in reasons[resource].items()
+            if key not in {"operation_indices", "glyph_sequence_indices"}
+        }
+
+    def evidence(
+        resources: tuple[str, ...] | list[str],
+    ) -> dict[str, list[list[int]]]:
+        return {
+            key.replace("_indices", "_index_ranges"): ranges(
+                sorted(
+                    {
+                        value
+                        for resource in resources
+                        for value in reasons[resource].get(key, [])
+                    }
+                )
+            )
+            for key in ("operation_indices", "glyph_sequence_indices")
+        }
+    regions: list[dict[str, Any]] = []
+    located_fonts: set[str] = set()
+    seen: set[tuple[str, tuple[str, ...], tuple[float, ...]]] = set()
+    rawdict = page.get_text("rawdict", sort=False)
+    for block in rawdict["blocks"]:
+        if block.get("type") != 0:
+            continue
+        for line in block["lines"]:
+            bbox = tuple(number_list(line["bbox"]))
+            for span in line["spans"]:
+                trace_font = span["font"]
+                resources = tuple(sorted(limited_trace_fonts.get(trace_font, ())))
+                if not resources:
+                    continue
+                located_fonts.add(trace_font)
+                key = (trace_font, resources, bbox)
+                if key in seen:
+                    continue
+                seen.add(key)
+                public_trace_font = trace_font or resources[0]
+                regions.append(
+                    {
+                        "kind": "font",
+                        "scope": "line",
+                        "resources": list(resources),
+                        "trace_font": public_trace_font,
+                        "bbox": list(bbox),
+                        **evidence(resources),
+                        "reasons": [reason_summary(resource) for resource in resources],
+                    }
+                )
+
+    page_bbox = number_list(page.rect)
+    for trace_font, resources_set in limited_trace_fonts.items():
+        if trace_font in located_fonts:
+            continue
+        resources = sorted(resources_set)
+        public_trace_font = trace_font or resources[0]
+        regions.append(
+            {
+                "kind": "font",
+                "scope": "page",
+                "resources": resources,
+                "trace_font": public_trace_font,
+                "bbox": page_bbox,
+                **evidence(resources),
+                "reasons": [reason_summary(resource) for resource in resources],
+            }
+        )
+    return regions
+
+
 def _horizontal_rules(page: fitz.Page) -> list[dict[str, float | int]]:
     rules = []
     for drawing in page.get_drawings():
@@ -647,7 +826,10 @@ def trace_page(
         limited_trace_fonts,
     ) = _source_glyphs(source_page, rendered_page, reader)
     layout = _attach_render_and_blocks(
-        rendered_page, glyphs, fonts, limited_trace_fonts
+        rendered_page, glyphs, fonts, set(limited_trace_fonts)
+    )
+    font_exclusions = _font_exclusion_regions(
+        rendered_page, limited_trace_fonts, font_limitations
     )
     return PageTrace(
         glyphs,
@@ -656,5 +838,6 @@ def trace_page(
         layout,
         _horizontal_rules(rendered_page),
         font_limitations,
+        font_exclusions,
         opaque_regions,
     )

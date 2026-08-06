@@ -19,7 +19,8 @@ from pdf_math_audit.contract import (
     sha256_argument,
 )
 from pdf_math_audit.correction import CorrectionConfig, correct_document
-from pdf_math_audit.page_html import render_page_anchored_html
+from pdf_math_audit.derived_document import derive_document_and_page_html
+from pdf_math_audit.html_integrity import audit_page_html
 
 
 def _emit(event: dict[str, Any]) -> None:
@@ -213,10 +214,22 @@ def main() -> int:
         )
         args.correction_records.write_bytes(correction.records)
         args.correction_evidence.write_bytes(correction.evidence)
-        args.native_page_html.write_bytes(render_page_anchored_html(document))
+        _native_document, native_page_html = derive_document_and_page_html(
+            document, [], args.pdf
+        )
+        args.native_page_html.write_bytes(native_page_html)
         report["native_page_html"] = {
             "bytes": args.native_page_html.stat().st_size,
             "sha256": file_sha256(args.native_page_html),
+        }
+        report["html_integrity"] = {
+            "artifact": "native_page_html",
+            **audit_page_html(
+                document,
+                native_page_html,
+                args.pdf,
+                report["alignment"]["pdf_source_math_regions"],
+            ),
         }
         correction_artifacts = {
             "corrections": args.correction_records,
@@ -226,6 +239,22 @@ def main() -> int:
             args.derived_docling_document.write_bytes(correction.document)
             args.derived_html.write_bytes(correction.html)
             args.derived_markdown.write_bytes(correction.markdown)
+            derived_document = DoclingDocument.model_validate_json(correction.document)
+            accepted_corrections = [
+                record
+                for record in json.loads(correction.records)["records"]
+                if record["status"] == "accepted"
+            ]
+            report["html_integrity"] = {
+                "artifact": "derived_html",
+                **audit_page_html(
+                    derived_document,
+                    correction.html,
+                    args.pdf,
+                    report["alignment"]["pdf_source_math_regions"],
+                    accepted_corrections,
+                ),
+            }
             correction_artifacts.update(
                 {
                     "derived_docling_document": args.derived_docling_document,
@@ -261,7 +290,13 @@ def main() -> int:
         "sha256": hashlib.sha256(evidence_bytes).hexdigest(),
     }
     report_bytes = (
-        json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+        json.dumps(
+            report,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+        + "\n"
     ).encode()
     args.report.write_bytes(report_bytes)
     _emit(

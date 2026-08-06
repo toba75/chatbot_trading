@@ -1,13 +1,20 @@
 from pathlib import Path
 import re
+from base64 import b64decode
 
+import fitz
 import pytest
 
-from docling_core.types.doc import DoclingDocument, PageItem, Size
+from docling_core.types.doc import DocItemLabel, DoclingDocument, PageItem, Size
 from latex2mathml.converter import convert
 from lxml import html as lxml_html
 
-from pdf_math_audit.page_html import _wrap_tex_annotations, render_page_anchored_html
+from pdf_math_audit.page_html import (
+    _annotate_formula_nodes,
+    _wrap_tex_annotations,
+    render_page_anchored_html,
+)
+from pdf_math_audit.source_formula_rendering import visual_delimiters_balanced
 
 
 ROOT = Path(__file__).parents[2]
@@ -26,6 +33,9 @@ def test_produit_une_ancre_exacte_par_page_sans_modifier_le_document() -> None:
         1
     ] * len(document.pages)
     assert "body > table > tbody > tr > td:first-child { display: none; }" in html
+    assert '.page math[display="block"]' in html
+    assert ".page pre" in html
+    assert "overflow-x: auto" in html
     assert {number: page.image for number, page in document.pages.items()} == original_images
 
 
@@ -48,6 +58,23 @@ def test_ajoute_une_ancre_aux_pages_sans_contenu() -> None:
     assert "id='page-3'" in html
     assert "class='page blank-page'" in html
     assert "Page sans contenu Docling" in html
+
+
+def test_ajoute_une_ancre_a_une_page_sans_contenu_intercalee() -> None:
+    document = DoclingDocument.model_validate_json(DOCUMENT.read_bytes())
+    document.pages[3] = document.pages[2].model_copy(update={"page_no": 3})
+    for item, _level in document.iterate_items():
+        for provenance in getattr(item, "prov", []):
+            if provenance.page_no == 2:
+                provenance.page_no = 3
+
+    html = render_page_anchored_html(document).decode("utf-8")
+
+    assert [html.count(f"id='page-{number}'") for number in document.pages] == [
+        1
+    ] * len(document.pages)
+    assert "class='page blank-page' id='page-2'" in html
+    assert html.index("id='page-1'") < html.index("id='page-2'") < html.index("id='page-3'")
 
 
 def test_une_provenance_secondaire_ne_cree_pas_une_fausse_page_html() -> None:
@@ -74,6 +101,87 @@ def test_conserve_le_tex_dans_une_semantique_mathml_non_visible() -> None:
     assert all("><semantics>" in formula for formula in formulas)
     assert all('<annotation encoding="TeX">' in formula for formula in formulas)
     assert all("</annotation></semantics></math>" in formula for formula in formulas)
+
+
+def test_attache_chaque_formule_a_son_identite_docling() -> None:
+    document = DoclingDocument.model_validate_json(DOCUMENT.read_bytes())
+
+    root = lxml_html.fromstring(render_page_anchored_html(document))
+    expected = [
+        item.self_ref
+        for item, _level in document.iterate_items()
+        if item.label == DocItemLabel.FORMULA
+    ]
+
+    assert root.xpath("//math/@data-docling-ref") == expected
+    assert all(root.xpath("//math/@data-docling-charspan"))
+
+
+def test_rattache_la_barre_de_negation_a_l_operateur_sans_modifier_la_source() -> None:
+    document = DoclingDocument.model_validate_json(DOCUMENT.read_bytes())
+    document.texts[0].text = "where γ ̸ = 0, δ ̸ = 0; ASCII /= inchangé"
+
+    html = render_page_anchored_html(document).decode("utf-8")
+
+    assert "where γ ≠ 0, δ ≠ 0; ASCII /= inchangé" in html
+    assert "̸" not in html
+    assert document.texts[0].text == "where γ ̸ = 0, δ ̸ = 0; ASCII /= inchangé"
+
+
+def test_identifie_une_formule_rendue_par_son_tex_meme_si_une_autre_est_absente() -> None:
+    document = DoclingDocument.model_validate_json(DOCUMENT.read_bytes())
+    formula = document.texts[20]
+    source = convert(formula.text).replace(
+        "</math>",
+        f'<annotation encoding="TeX">{formula.text}</annotation></math>',
+    )
+    html = _wrap_tex_annotations(source)
+
+    root = lxml_html.fragment_fromstring(_annotate_formula_nodes(html, document))
+
+    assert root.get("data-docling-ref") == formula.self_ref
+    assert root.get("data-docling-charspan") == f"0:{len(formula.text)}"
+
+
+def test_reproduit_depuis_le_pdf_une_formule_aux_delimiteurs_incomplets(
+    tmp_path: Path,
+) -> None:
+    document = DoclingDocument.model_validate_json(DOCUMENT.read_bytes())
+    formula = next(item for item in document.texts if item.label == DocItemLabel.FORMULA)
+    formula.text = r"v | X = x \sim N \mu , \Sigma )"
+    pdf_path = tmp_path / "source.pdf"
+    with fitz.open() as source:
+        for page in document.pages.values():
+            source.new_page(width=page.size.width, height=page.size.height)
+        source.save(pdf_path)
+
+    root = lxml_html.fromstring(render_page_anchored_html(document, pdf_path))
+
+    images = root.xpath(
+        f"//img[@data-docling-formula-source][@data-docling-ref='{formula.self_ref}']"
+    )
+    assert len(images) == 1
+    assert images[0].get("src", "").startswith("data:image/png;base64,")
+    rendered_png = b64decode(images[0].get("src", "").split(",", 1)[1])
+    provenance = formula.prov[0]
+    page_size = document.pages[provenance.page_no].size
+    bbox = provenance.bbox.to_top_left_origin(page_size.height)
+    clip = fitz.Rect(bbox.l, bbox.t, bbox.r, bbox.b)
+    with fitz.open(pdf_path) as source:
+        expected_png = source[provenance.page_no - 1].get_pixmap(
+            matrix=fitz.Matrix(2, 2), clip=clip, alpha=False
+        ).tobytes("png")
+    assert rendered_png == expected_png
+    assert not root.xpath(
+        f"//pre[@data-docling-ref='{formula.self_ref}'] | "
+        f"//math[@data-docling-ref='{formula.self_ref}']"
+    )
+
+
+def test_refuse_des_types_de_delimiteurs_visuels_incompatibles() -> None:
+    assert not visual_delimiters_balanced("(]")
+    assert not visual_delimiters_balanced("[)")
+    assert visual_delimiters_balanced("([x])")
 
 
 def test_rend_le_latex_inline_explicitement_delimite_dans_un_texte_mathml() -> None:

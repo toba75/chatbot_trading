@@ -466,6 +466,16 @@ class DocumentsControllerTest < ActionDispatch::IntegrationTest
     assert_select ".math-correction", text: /onglet « HTML corrigé »/
     assert_select "iframe.conversion-preview", count: 0
 
+    qualification.update_column(
+      :summary,
+      qualification.summary.deep_merge(
+        "correction" => { "status" => "failed", "accepted" => 1, "failed" => 1 }
+      )
+    )
+    get document_path(document)
+    assert_select ".math-correction", text: /1 région\(s\) corrigée\(s\), 1 correction\(s\) échouée\(s\)/
+    assert_select ".math-correction", text: /résultat partiel est conservé/
+
     get derived_html_preview_document_path(document)
 
     assert_response :success
@@ -518,7 +528,11 @@ class DocumentsControllerTest < ActionDispatch::IntegrationTest
         "conformant" => 3,
         "contradicted" => 0,
         "non_verifiable" => 2,
-        "coverage" => { "pages_total" => 2, "pages_traced" => 1 },
+        "coverage" => {
+          "pages_total" => 2,
+          "pages_traced" => 1,
+          "pages_partially_traced" => 1
+        },
         "correction" => {
           "status" => "not_required", "targets" => 0, "accepted" => 0,
           "rejected" => 0, "failed" => 0
@@ -526,6 +540,13 @@ class DocumentsControllerTest < ActionDispatch::IntegrationTest
         "region_details" => [
           { "id" => "r1", "page" => 1, "bbox" => [ 1, 2, 3, 4 ], "verdict" => "partial", "reasons" => [] }
         ],
+        "html_integrity" => {
+          "artifact" => "native_page_html", "status" => "failed",
+          "pages_total" => 2, "pages_checked" => 2,
+          "issues" => [
+            { "page" => 1, "code" => "math_inventory_incomplete", "message" => "Une formule manque" }
+          ]
+        },
         "page_exclusions" => [
           { "page" => 2, "status" => "unsupported", "reasons" => [ { "message" => "Police non supportée" } ] }
         ]
@@ -535,8 +556,13 @@ class DocumentsControllerTest < ActionDispatch::IntegrationTest
 
     get document_path(document)
 
-    assert_select ".math-verdict", text: /partial/
+    assert_select "p", text: "Exécution terminée."
+    assert_select ".math-verdict", text: /Verdict sémantique : partial/
     assert_select ".math-summary dd", text: "5"
+    assert_select ".math-coverage dt", text: "Entièrement tracées"
+    assert_select ".math-coverage dd", text: "1", count: 2
+    assert_select ".html-integrity-issues", text: /Page 1 .* Une formule manque/
+    assert_select ".math-coverage dt", text: "Non supportées"
     assert_select ".math-regions td", text: "1, 2, 3, 4"
     assert_select "li", text: /Police non supportée/
     assert_select "a", text: "Rapport de qualification"
