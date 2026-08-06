@@ -1,0 +1,392 @@
+{
+  "conservation": "outside_repository",
+  "conservation_reason": "Livres sous droit d'auteur : les fichiers restent hors du dépôt et hors du dépôt distant. Seul ce manifeste atteste leur identité.",
+  "documents": [
+    {
+      "bytes": 1196662,
+      "included": true,
+      "name": "A Century of Profitable Industry Trends Carlo Zarattini Gary Antonacci.pdf",
+      "pages": 36,
+      "sha256": "7a3001e2de57c3e028a5d36bbcfaa7fb773ae3b77a144aaefcd4cc221b1de03d",
+      "text_layer": "text"
+    },
+    {
+      "bytes": 8893995,
+      "included": true,
+      "name": "Advances in Financial Machine Learning-Wiley (2018).pdf",
+      "pages": 393,
+      "sha256": "5a93ef385b4216c7859bd8e17401195a3aa70f91583f37984f56121e33e93305",
+      "text_layer": "text"
+    },
+    {
+      "bytes": 12191536,
+      "included": true,
+      "name": "alpha-trading-profitable-strategies-that-remove-directional-risk-wiley-trading-.pdf",
+      "pages": 340,
+      "sha256": "a9458052d3dd31671406eaa75d21e3e7e32cb5817c19d6cafdd1950defcebf11",
+      "text_layer": "text"
+    },
+    {
+      "bytes": 1861352,
+      "included": true,
+      "name": "bear-market-trading-strategies.pdf",
+      "pages": 64,
+      "sha256": "9aff5d8d643604f1c7a414af82b6b97b4c55e9643655e2c8ecb42b0b9064189f",
+      "text_layer": "text"
+    },
+    {
+      "bytes": 3877382,
+      "exclusion_reason": "Numérisation sans couche de texte : la preuve du pipeline décode les glyphes des octets du PDF, ce qu'un scan ne fournit pas. Un OCR serait nécessaire ; il n'existe pas à ce jour.",
+      "included": false,
+      "name": "building-winning-trading-systems-with-tradestation.pdf",
+      "pages": 95,
+      "sha256": "3dd9202e763f2e54efafd8abc1b255e1d87bf06ef75c9a9891ca24b7f6d1d449",
+      "text_layer": "scanned"
+    },
+    {
+      "bytes": 6313658,
+      "included": true,
+      "name": "buy-the-fear-sell-the-greed-pdf-free.pdf",
+      "pages": 216,
+      "sha256": "da9c5f99b6c1d3b1af1d82bef109d4d358620aa09be6f0c5d7c93b7ac9ea37a0",
+      "text_layer": "text"
+    },
+    {
+      "bytes": 3205165,
+      "included": true,
+      "name": "causal-factor-investing.pdf",
+      "pages": 92,
+      "sha256": "cf2215890cdd779fd97f5216d9fc04f68dbdda3bcec720d7a77274d4e2a2638a",
+      "text_layer": "text"
+    },
+    {
+      "bytes": 5103702,
+      "included": true,
+      "name": "come-into-my-trading-room-a-complete-guide-to-trading.pdf",
+      "pages": 322,
+      "sha256": "7b4fe6cf42be3f207ff54420c6a3bb4110580118c11bb75036b4a919b7741b4e",
+      "text_layer": "text"
+    },
+    {
+      "bytes": 741661,
+      "included": true,
+      "name": "Common_Sense_-_Joel_Greenblatt.pdf",
+      "pages": 103,
+      "sha256": "36d6a460e07d0e66a2294f775d730052e284db5297dab156eda3ebaf7b20f797",
+      "text_layer": "text"
+    },
+    {
+      "bytes": 5635691,
+      "exclusion_reason": "Numérisation sans couche de texte : la preuve du pipeline décode les glyphes des octets du PDF, ce qu'un scan ne fournit pas. Un OCR serait nécessaire ; il n'existe pas à ce jour.",
+      "included": false,
+      "name": "connors-on-advanced-trading-strategies.pdf",
+      "pages": 221,
+      "sha256": "9cad07bc705fdd62b6f1bbca221845af77785d601aced78bd3f6556d9dfb0fe1",
+      "text_layer": "scanned"
+    },
+    {
+      "bytes": 2997625,
+      "exclusion_reason": "Doublon exact de short-term-trading-strategies-that-work-.pdf (même SHA-256), que sa couche de texte issue d'un OCR écarte aussi.",
+      "included": false,
+      "name": "document.pdf",
+      "pages": 144,
+      "sha256": "2be5ad53fdbf45395761b2c9bac2fef1d339ef72d14190296aeb9dc38dc91bbf",
+      "text_layer": "ocr"
+    },
+    {
+      "bytes": 10876493,
+      "included": true,
+      "name": "dual-momentum-investing-an-innovative-strategy-for-higher-returns-with-lower-risk.pdf",
+      "pages": 265,
+      "sha256": "8c536df8808f9e1988fa25795ee6774060cd8f0998d8ff5063f3c7ad16400475",
+      "text_layer": "text"
+    },
+    {
+      "bytes": 6694320,
+      "included": true,
+      "name": "ebin.pub_the-alpha-formula-high-powered-strategies-to-beat-the-market-with-less-risk-9780578530840-9781792313394.pdf",
+      "pages": 137,
+      "sha256": "e3b5dcb43882a6372bc15978368528dc236388cae04d44253f4dc8e952b53e90",
+      "text_layer": "text"
+    },
+    {
+      "bytes": 40421125,
+      "included": true,
+      "name": "entries-exits-visits-to-16-trading-rooms-wiley-trading.pdf",
+      "pages": 353,
+      "sha256": "58fa7c2fabbd8fa93ffbdf925fac282d890b793c935812252c96a7f29b44a04a",
+      "text_layer": "text"
+    },
+    {
+      "bytes": 2894838,
+      "exclusion_reason": "Même ouvrage que high-frequency-trading-maureen-o-mara-pdf-free.pdf : 257 pages et texte identiques, même producteur ; le nom portant l'autrice est conservé.",
+      "included": false,
+      "name": "high frequency trading.pdf",
+      "pages": 257,
+      "sha256": "f598432abc7df7d85a257b879ddb51b9fc1212d165f54ba1a6928d1e93560eef",
+      "text_layer": "text"
+    },
+    {
+      "bytes": 2894552,
+      "included": true,
+      "name": "high-frequency-trading-maureen-o-mara-pdf-free.pdf",
+      "pages": 257,
+      "sha256": "5dc0ce50d3b6f2ea2509e25205600dd0f2f0dc6a7ee66c777300bf52eaf0a7ad",
+      "text_layer": "text"
+    },
+    {
+      "bytes": 6468158,
+      "exclusion_reason": "Numérisation sans couche de texte : la preuve du pipeline décode les glyphes des octets du PDF, ce qu'un scan ne fournit pas. Un OCR serait nécessaire ; il n'existe pas à ce jour.",
+      "included": false,
+      "name": "high-probability-etf-trading-7-professional-strategies-to-improve-your-etf-trading.pdf",
+      "pages": 130,
+      "sha256": "fea297d5ce1f528a5384be9710e1b133aaeade054ca8549cafc73c3f53df554d",
+      "text_layer": "scanned"
+    },
+    {
+      "bytes": 4153458,
+      "included": true,
+      "name": "How Markets Really Work_ Quantitative Guide to Stock Market Behavior.pdf",
+      "pages": 175,
+      "sha256": "c3596216a0bffe8f2b519ffb15cd035e645dbced05ba73133925be3c7ed5eb3a",
+      "text_layer": "text"
+    },
+    {
+      "bytes": 45274789,
+      "included": true,
+      "name": "How_Countries_Go_Broke_The_Big_Cycle_-_Ray_Dalio.pdf",
+      "pages": 396,
+      "sha256": "032d54c949ea550e05878ce458e67f65f34faf2830ea9105ea7a15b6b8f5dd8c",
+      "text_layer": "text"
+    },
+    {
+      "bytes": 1137867,
+      "included": true,
+      "name": "HowtoMasterManagedFutures-electronic.pdf",
+      "pages": 91,
+      "sha256": "dc42c851d977c6b961c64fdf82a89356e140947cd549f6facf30b65fe0ce1ca3",
+      "text_layer": "text"
+    },
+    {
+      "bytes": 4563635,
+      "included": true,
+      "name": "machine-learning-for-asset-managers.pdf",
+      "pages": 152,
+      "sha256": "ac101c48f631d2beee4ec4fa4a27c526efa5c0e20e9b02f00b5214107eba6c5a",
+      "text_layer": "text"
+    },
+    {
+      "bytes": 43937610,
+      "exclusion_reason": "Couche de texte produite par OCR au-dessus d'une numérisation : contenu généré, qui ne peut pas se présenter comme contenu source, et dont les glyphes synthétiques rendraient toute preuve fictive.",
+      "included": false,
+      "name": "Macro_to_micro_volatility_trading_-_Mark_whistler.pdf",
+      "pages": 120,
+      "sha256": "65a689b76793eaaf5b2907a07422188646e529197d0b67face11773adb952acd",
+      "text_layer": "ocr"
+    },
+    {
+      "bytes": 2156088,
+      "included": true,
+      "name": "Margin_of_Safety__Risk-Averse_Value_Invest_-_Seth_A_Klarman.pdf",
+      "pages": 297,
+      "sha256": "e7c1dcba5c3d86bb48c6ddea4591adf2669ec8368a64caf1ff2087beb6d553dc",
+      "text_layer": "text"
+    },
+    {
+      "bytes": 23148359,
+      "included": true,
+      "name": "Markets_and_Momentum_-_James_F_Dalton.pdf",
+      "pages": 258,
+      "sha256": "e620456a6285f469779110ce06fc5e33bb31f624d869c07014bbe336e7311692",
+      "text_layer": "text"
+    },
+    {
+      "bytes": 4998815,
+      "included": true,
+      "name": "Mastering_the_Market_Cycle_-_Howard_Marks.pdf",
+      "pages": 245,
+      "sha256": "3715ceac073f5576f8adc243c1a1e8d835ae54b7060b04ac654eaf8fd489b5d8",
+      "text_layer": "text"
+    },
+    {
+      "bytes": 332673,
+      "included": true,
+      "name": "Optimal Trend Following Rules in Two State Switching Regime Models.pdf",
+      "pages": 42,
+      "sha256": "e3f57432a5f1d0e506867a0c273fb6ae72bc23a6d46c6d40d87a7aad98e6a881",
+      "text_layer": "text"
+    },
+    {
+      "bytes": 60651816,
+      "exclusion_reason": "Numérisation sans couche de texte : la preuve du pipeline décode les glyphes des octets du PDF, ce qu'un scan ne fournit pas. Un OCR serait nécessaire ; il n'existe pas à ce jour.",
+      "included": false,
+      "name": "optimal-mean-reversion-trading-mathematical-analysis-and-practical-applications.pdf",
+      "pages": 221,
+      "sha256": "a7930c1ae0f456fcbebec4294379c1f0d0bf815f418b7ac91731105b82459fad",
+      "text_layer": "scanned"
+    },
+    {
+      "bytes": 6555398,
+      "included": true,
+      "name": "Quantitative_Momentum_-_Wesley_R_Gray.pdf",
+      "pages": 268,
+      "sha256": "94c0a6ca1a772f0daf99dca375db81ed34432e73dfdb28c6bdb7b681da8b7f02",
+      "text_layer": "text"
+    },
+    {
+      "bytes": 6533643,
+      "included": true,
+      "name": "Quantitative_value_-_Wesley_gray.pdf",
+      "pages": 326,
+      "sha256": "efd718f770f8c4ece864580d7bde522be6e55aace0d3fb93cc49fc7b7add7a90",
+      "text_layer": "text"
+    },
+    {
+      "bytes": 2997625,
+      "exclusion_reason": "Couche de texte produite par OCR au-dessus d'une numérisation : contenu généré, qui ne peut pas se présenter comme contenu source, et dont les glyphes synthétiques rendraient toute preuve fictive.",
+      "included": false,
+      "name": "short-term-trading-strategies-that-work-.pdf",
+      "pages": 144,
+      "sha256": "2be5ad53fdbf45395761b2c9bac2fef1d339ef72d14190296aeb9dc38dc91bbf",
+      "text_layer": "ocr"
+    },
+    {
+      "bytes": 23167784,
+      "included": true,
+      "name": "systemic-liquidity-risk-and-bipolar-markets-wealth-management-in-todays-macro-risk-on-risk-off-financial-environment.pdf",
+      "pages": 365,
+      "sha256": "0f7e74043e6039e94b634bff4d1f01964d0214f0bde59eabf109dbfcaefe7606",
+      "text_layer": "text"
+    },
+    {
+      "bytes": 3218132,
+      "included": true,
+      "name": "the-evaluation-and-optimization-of-trading-strategies.pdf",
+      "pages": 367,
+      "sha256": "70ae7f6bf008badaaf9871bc8706452b719f9ee866262687a0b75017254e04e3",
+      "text_layer": "text"
+    },
+    {
+      "bytes": 13146529,
+      "included": true,
+      "name": "the-new-trading-for-a-living-psychology-discipline-trading-tools-and-systems-risk-control-trade-management.pdf",
+      "pages": 303,
+      "sha256": "78a4b443a64326a230a1cfe4142d5a2407f07619bba79a687ac6c08255341f51",
+      "text_layer": "text"
+    },
+    {
+      "bytes": 302466,
+      "included": true,
+      "name": "the-original-turtle-trading-rules.pdf",
+      "pages": 38,
+      "sha256": "073f361ebb4ac6c10765a21ba7cca42d75fde8fabadc84340e6bbfca444fbda4",
+      "text_layer": "text"
+    },
+    {
+      "bytes": 1483249,
+      "included": true,
+      "name": "The_Acquirers_Multiple_-_Tobias_E_Carlisle.pdf",
+      "pages": 179,
+      "sha256": "8243ceb960361c57ab51059aa4c73bacb2e8c2de3d78289316e10939000292e6",
+      "text_layer": "text"
+    },
+    {
+      "bytes": 1186663,
+      "included": true,
+      "name": "The_Big_Secret_for_the_Small_Investor_-_Joel_Greenblatt.pdf",
+      "pages": 98,
+      "sha256": "00e4765c6f0b899319a4e113286e01ea4ab5c8f1d097edc107e24813304b7302",
+      "text_layer": "text"
+    },
+    {
+      "bytes": 1744000,
+      "included": true,
+      "name": "The_Most_Important_Thing_Illuminated_-_Howard_Marks.pdf",
+      "pages": 238,
+      "sha256": "b01fb4c9ce3e1d1c22d4d33f808a3263d2d71d936ad88cf531222d0cca56eb75",
+      "text_layer": "text"
+    },
+    {
+      "bytes": 15238269,
+      "included": true,
+      "name": "the_second_leg_down_-_hari_p_krishnan.pdf",
+      "pages": 371,
+      "sha256": "bc853e10d9abec73ff9308dd7c9bc689f9758e58780f69dd04a2349f24329f06",
+      "text_layer": "text"
+    },
+    {
+      "bytes": 3214935,
+      "included": true,
+      "name": "time-compression-trading-exploiting-multiple-time-frames-in-zero-sum-markets-wiley-trading.pdf",
+      "pages": 212,
+      "sha256": "0fd2c69a1a978b61bcab0c3deddbec06cf472fc9d200539f96896bec90d31718",
+      "text_layer": "text"
+    },
+    {
+      "bytes": 4907414,
+      "included": true,
+      "name": "trading-for-a-living-psychology-trading-tactics-money-management.pdf",
+      "pages": 312,
+      "sha256": "11f9dc42c0495b58ddeece7e1f339c9a698b609264ffca13ff4f511979a70275",
+      "text_layer": "text"
+    },
+    {
+      "bytes": 2199942,
+      "included": true,
+      "name": "trading-on-momentum-advanced-techniques-for-high-percentage-day-trading.pdf",
+      "pages": 288,
+      "sha256": "b68e620f6f7b59ec2a35794f4c8040106b5bc92a31164aaad0bcb1435e457553",
+      "text_layer": "text"
+    },
+    {
+      "bytes": 1182542,
+      "exclusion_reason": "Même ouvrage que trading-on-momentum-advanced-techniques-for-high-percentage-day-trading.pdf, refondu par un outil tiers (Multivalent Merge) ; la sortie Distiller d'origine est conservée.",
+      "included": false,
+      "name": "trading-on-momentum.pdf",
+      "pages": 289,
+      "sha256": "6a77fd40209cbb1e988ef8674baf6dd1e410f9907a813566f7668e637c004b03",
+      "text_layer": "text"
+    },
+    {
+      "bytes": 13847107,
+      "included": true,
+      "name": "trading-regime-analysis-the-probability-of-volatility-wiley-trading.pdf",
+      "pages": 441,
+      "sha256": "a7bae9c5fff794489a5496734a47e3a35fe793c0a27e1c1ae1018b17a22d911d",
+      "text_layer": "text"
+    },
+    {
+      "bytes": 2608461,
+      "included": true,
+      "name": "two-roads-diverged-trading-divergences.pdf",
+      "pages": 47,
+      "sha256": "b5f7e399ef9ede1ef301cad26a3800279d0c022e67daeb348425066ba61893e1",
+      "text_layer": "text"
+    },
+    {
+      "bytes": 5781875,
+      "included": true,
+      "name": "understanding-hedged-scale-trading.pdf",
+      "pages": 268,
+      "sha256": "1c7724b3b04d8f47dd66afdc46597402e80ffae8efca4cdf724ec4c1499ec09b",
+      "text_layer": "text"
+    },
+    {
+      "bytes": 47115951,
+      "included": true,
+      "name": "vdoc.pub_trend-following-with-managed-futures-the-search-for-crisis-alpha.pdf",
+      "pages": 454,
+      "sha256": "852846e02de0fa52742957be36866e8fcf29f5b14e3ef39115be3fe564f0515b",
+      "text_layer": "text"
+    },
+    {
+      "bytes": 1150178,
+      "included": true,
+      "name": "You_Can_Be_a_Stock_Market_Genius_-_Joel_Greenblatt.pdf",
+      "pages": 172,
+      "sha256": "bbb993ba14a288fed1d14163a082f1aa8333c626cfed1d6a2db55a6ed944f7c1",
+      "text_layer": "text"
+    }
+  ],
+  "schema_version": 1
+}
