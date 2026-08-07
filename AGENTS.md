@@ -64,6 +64,12 @@
 - Ne reconstruis pas une image Docker ou une base inchangée pour répéter un test.
 - N'utilise pas de stub ou mock pour des tests d'intégration. Stubs et mocks sont réservés aux
   tests unitaires.
+- Utilise la vision : quand un résultat se contrôle visuellement — rendu de page,
+  crop de PDF, graphique, interface — regarde-le réellement avant de conclure.
+  Un comptage ne prouve pas ce qu'une image contredit, et inversement une
+  intuition visuelle ne remplace pas la mesure : les deux se confrontent.
+- En cas de doute persistant après vérification, demande au développeur au lieu
+  de trancher seul.
 
 ## Revue contradictoire
 
